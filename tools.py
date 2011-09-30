@@ -1,4 +1,5 @@
 import time
+from ccmlib.node import Node
 
 def retry_till_success(fun, *args, **kwargs):
     timeout = kwargs["timeout"] or 60
@@ -24,3 +25,15 @@ def query_c1c2(cursor, key, consistency):
     res = cursor.fetchone()
     assert len(res) == 2 and res[0] == 'value1' and res[1] == 'value2'
 
+# work for cluster started by populate
+def new_node(cluster, bootstrap=True, token=None):
+    i = len(cluster.nodes) + 1
+    node = Node('node%s' % i,
+                cluster,
+                bootstrap,
+                ('127.0.0.%s' % i, 9160),
+                ('127.0.0.%s' % i, 7000),
+                str(7000 + i * 100),
+                token)
+    cluster.add(node, not bootstrap)
+    return node

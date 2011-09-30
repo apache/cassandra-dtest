@@ -1,5 +1,5 @@
 from __future__ import with_statement
-import os, tempfile, sys, shutil, types, time
+import os, tempfile, sys, shutil, types, time, threading
 
 from ccmlib.cluster import Cluster
 from ccmlib.node import Node
@@ -43,10 +43,17 @@ class Tester(object):
             f.write(self.test_path + '\n')
             f.write(self.cluster.name)
         self.connections = []
+        self.runners = []
 
     def tearDown(self):
         for con in self.connections:
             con.close()
+
+        for runner in self.runners:
+            try:
+                runner.stop()
+            except:
+                pass
 
         try:
             if sys.exc_info() != (None, None, None):
@@ -91,3 +98,39 @@ class Tester(object):
     # We default to UTF8Type because it's simpler to use in tests
     def create_cf(self, cursor, name, key_type="varchar", comparator="UTF8Type", validation="UTF8Type"):
         cursor.execute('CREATE COLUMNFAMILY %s (key %s PRIMARY KEY) WITH comparator=%s AND default_validation=%s' % (name, key_type, comparator, validation))
+
+    def go(self, func):
+        runner = Runner(func)
+        self.runners.append(runner)
+        runner.start()
+        return runner
+
+class Runner(threading.Thread):
+    def __init__(self, func):
+        threading.Thread.__init__(self)
+        self.__func = func
+        self.__error = None
+        self.__stopped = False
+        self.daemon = True
+
+    def run(self):
+        i = 0
+        while True:
+            if self.__stopped:
+                return
+            try:
+                self.__func(i)
+            except Exception as e:
+                self.__error = e
+                return
+            i = i + 1
+
+    def stop(self):
+        self.__stopped = True
+        self.join()
+        if self.__error is not None:
+            raise self.__error
+
+    def check(self):
+        if self.__error is not None:
+            raise self.__error
