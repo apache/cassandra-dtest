@@ -16,6 +16,7 @@ class TestBoostrap(Tester):
         cluster.populate(1, tokens=[0]).start()
         node1 = cluster.nodes["node1"]
 
+        time.sleep(.5)
         cursor = self.cql_connection(node1).cursor()
         self.create_ks(cursor, 'ks', 1)
         self.create_cf(cursor, 'cf')

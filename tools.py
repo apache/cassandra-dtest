@@ -16,14 +16,30 @@ def retry_till_success(fun, *args, **kwargs):
             exception = e
     raise exception
 
-def insert_c1c2(cursor, key, consistency):
+def insert_c1c2(cursor, key, consistency="QUORUM"):
     cursor.execute('UPDATE cf USING CONSISTENCY %s SET c1=value1, c2=value2 WHERE key=k%d' % (consistency, key))
 
-def query_c1c2(cursor, key, consistency):
+def insert_columns(cursor, key, columns_count, consistency="QUORUM"):
+    kvs = [ "c%d=value%d" % (i, i) for i in xrange(0, columns_count)]
+    query = 'UPDATE cf USING CONSISTENCY %s SET %s WHERE key=k%d' % (consistency, ', '.join(kvs), key)
+    cursor.execute(query)
+
+def query_c1c2(cursor, key, consistency="QUORUM"):
     cursor.execute('SELECT c1, c2 FROM cf USING CONSISTENCY %s WHERE key=k%d' % (consistency, key))
     assert cursor.rowcount == 1
     res = cursor.fetchone()
     assert len(res) == 2 and res[0] == 'value1' and res[1] == 'value2'
+
+def query_columns(cursor, key, columns_count, consistency="QUORUM"):
+    cursor.execute('SELECT c0..c%d FROM cf USING CONSISTENCY %s WHERE key=k%d' % (columns_count, consistency, key))
+    assert cursor.rowcount == 1
+    res = cursor.fetchone()
+    assert len(res) == columns_count
+    for i in xrange(0, columns_count):
+        assert res[i] == 'value%d' % i
+
+def remove_c1c2(cursor, key, consistency="QUORUM"):
+    cursor.execute('DELETE c1, c2 FROM cf USING CONSISTENCY %s WHERE key=k%d' % (consistency, key))
 
 # work for cluster started by populate
 def new_node(cluster, bootstrap=True, token=None):

@@ -36,9 +36,11 @@ class Tester(object):
                 self.test_path = f.readline().strip('\n')
                 name = f.readline()
                 self.cluster = Cluster.load(self.test_path, name)
+                # Avoid waiting too long for node to be marked down
                 self.__cleanup_cluster()
 
         self.cluster = self.__get_cluster()
+        self.cluster.set_configuration_options(values={'phi_convict_threshold': 2})
         with open(LAST_TEST_DIR, 'w') as f:
             f.write(self.test_path + '\n')
             f.write(self.cluster.name)
@@ -56,24 +58,30 @@ class Tester(object):
                 pass
 
         try:
-            if sys.exc_info() != (None, None, None):
-                # means the test failed. Save the logs for inspection.
-                if not os.path.exists(LOG_SAVED_DIR):
-                    os.mkdir(LOG_SAVED_DIR)
-                logs = [ (node.name, node.logfilename()) for node in self.cluster.nodes.values() ]
-                if len(logs) is not 0:
-                    basedir = str(int(time.time() * 1000))
-                    dir = os.path.join(LOG_SAVED_DIR, basedir)
-                    os.mkdir(dir)
-                    for name, log in logs:
-                        shutil.copyfile(log, os.path.join(dir, name + ".log"))
-                    if os.path.exists(LAST_LOG):
-                        os.unlink(LAST_LOG)
-                    os.symlink(basedir, LAST_LOG)
-        except Exception as e:
-            print "Error saving log:", str(e)
+            for node in self.cluster.nodelist():
+                errors = node.grep_log("ERROR")
+                if len(errors) is not 0:
+                    raise AssertionError('Unexpected error in %s node log' % node.name)
         finally:
-            self.__cleanup_cluster()
+            try:
+                if sys.exc_info() != (None, None, None):
+                    # means the test failed. Save the logs for inspection.
+                    if not os.path.exists(LOG_SAVED_DIR):
+                        os.mkdir(LOG_SAVED_DIR)
+                    logs = [ (node.name, node.logfilename()) for node in self.cluster.nodes.values() ]
+                    if len(logs) is not 0:
+                        basedir = str(int(time.time() * 1000))
+                        dir = os.path.join(LOG_SAVED_DIR, basedir)
+                        os.mkdir(dir)
+                        for name, log in logs:
+                            shutil.copyfile(log, os.path.join(dir, name + ".log"))
+                        if os.path.exists(LAST_LOG):
+                            os.unlink(LAST_LOG)
+                        os.symlink(basedir, LAST_LOG)
+            except Exception as e:
+                    print "Error saving log:", str(e)
+            finally:
+                self.__cleanup_cluster()
 
     def cql_connection(self, node, keyspace=None):
         import cql
@@ -96,8 +104,11 @@ class Tester(object):
         cursor.execute('USE %s' % name)
 
     # We default to UTF8Type because it's simpler to use in tests
-    def create_cf(self, cursor, name, key_type="varchar", comparator="UTF8Type", validation="UTF8Type"):
-        cursor.execute('CREATE COLUMNFAMILY %s (key %s PRIMARY KEY) WITH comparator=%s AND default_validation=%s' % (name, key_type, comparator, validation))
+    def create_cf(self, cursor, name, key_type="varchar", comparator="UTF8Type", validation="UTF8Type", read_repair=None):
+        query = 'CREATE COLUMNFAMILY %s (key %s PRIMARY KEY) WITH comparator=%s AND default_validation=%s' % (name, key_type, comparator, validation)
+        if read_repair is not None:
+            query = '%s AND read_repair_chance=%f' % (query, read_repair)
+        cursor.execute(query)
 
     def go(self, func):
         runner = Runner(func)
