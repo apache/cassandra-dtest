@@ -1,0 +1,29 @@
+Cassandra Distributed Tests
+===========================
+
+
+Prerequisite
+------------
+
+An up to date of ccm (https://github.com/pcmanus/ccm) should be installed.
+The tests are run using nosetests (http://readthedocs.org/docs/nose/en/latest/)
+which thus needs to be installed too.
+
+
+Usage
+-----
+
+Tests are ran by nostests, the only thing the framework needs to know is where
+is the (compliled) sources for Cassandra to use. There is two options:
+ * Use existing sources:
+     CASSANDRA_DIR=~/path/to/cassandra nosetests
+ * Use ccm ability to download/compile released sources from archives.apache.org:
+     CASSANDRA_VERSION=1.0.0 nosetests
+
+Existing tests are probably the best place to start to look at how write
+tests.
+
+Each test spawns a new fresh cluster and tear him down after the test. If a
+test fails, the logs for the node are saved in a logs/<timestamp> directory
+for analysis (it's not perfect but have been good enough so far, I'm open to
+better suggestsions).

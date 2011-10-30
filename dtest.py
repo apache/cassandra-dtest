@@ -57,14 +57,16 @@ class Tester(object):
             except:
                 pass
 
+        failed = sys.exc_info() != (None, None, None)
         try:
             for node in self.cluster.nodelist():
                 errors = node.grep_log("ERROR")
                 if len(errors) is not 0:
-                    raise AssertionError('Unexpected error in %s node log' % node.name)
+                    failed = True
+                    raise AssertionError('Unexpected error in %s node log: %s' % (node.name, errors))
         finally:
             try:
-                if sys.exc_info() != (None, None, None):
+                if failed:
                     # means the test failed. Save the logs for inspection.
                     if not os.path.exists(LOG_SAVED_DIR):
                         os.mkdir(LOG_SAVED_DIR)
@@ -104,10 +106,18 @@ class Tester(object):
         cursor.execute('USE %s' % name)
 
     # We default to UTF8Type because it's simpler to use in tests
-    def create_cf(self, cursor, name, key_type="varchar", comparator="UTF8Type", validation="UTF8Type", read_repair=None):
-        query = 'CREATE COLUMNFAMILY %s (key %s PRIMARY KEY) WITH comparator=%s AND default_validation=%s' % (name, key_type, comparator, validation)
+    def create_cf(self, cursor, name, key_type="varchar", comparator="UTF8Type", validation="UTF8Type", read_repair=None, compression=None, gc_grace=None, columns=None):
+        additional_columns = ""
+        if columns is not None:
+            for k, v in columns.items():
+                additional_columns = "%s, %s %s" % (additional_columns, k, v)
+        query = 'CREATE COLUMNFAMILY %s (key %s PRIMARY KEY%s) WITH comparator=%s AND default_validation=%s' % (name, key_type, additional_columns, comparator, validation)
         if read_repair is not None:
             query = '%s AND read_repair_chance=%f' % (query, read_repair)
+        if compression is not None:
+            query = '%s AND compression_options={sstable_compression:%sCompressor}' % (query, compression)
+        if gc_grace is not None:
+            query = '%s AND gc_grace_seconds=%d' % (query, gc_grace)
         cursor.execute(query)
 
     def go(self, func):

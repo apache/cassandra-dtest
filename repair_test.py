@@ -28,8 +28,17 @@ class TestRepair(Tester):
             for node in stopped_nodes:
                 node.start(wait_other_notice=True)
 
-    def simple_repair_test(self):
+    def simple_repair_test(self, ):
+        self._simple_repair()
+
+    def simple_repair_order_preserving_test(self, ):
+        self._simple_repair(order_preserving_partitioner=True)
+
+    def _simple_repair(self, order_preserving_partitioner=False):
         cluster = self.cluster
+
+        if order_preserving_partitioner:
+            cluster.set_partitioner('org.apache.cassandra.dht.ByteOrderedPartitioner')
 
         # Disable hinted handoff and set batch commit log so this doesn't
         # interfer with the test (this must be after the populate)
@@ -87,3 +96,4 @@ class TestRepair(Tester):
 
         # Check node3 now has the key
         self.check_rows_on_node(node3, 2001, found=[1000], restart=False)
+
