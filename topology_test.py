@@ -32,7 +32,7 @@ class TestTopology(Tester):
         balancing_tokens = Cluster.balanced_tokens(3)
         node2.move(balancing_tokens[1])
         node3.move(balancing_tokens[2])
-        time.sleep(.5)
+        time.sleep(1)
 
         cluster.cleanup()
 

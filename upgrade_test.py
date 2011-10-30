@@ -29,6 +29,7 @@ class TestUpgrade(Tester):
         cli = node1.cli().do("use ks").do("consistencylevel as QUORUM")
         for n in xrange(0, 20):
             cli.do("get cf[k%d][c1]" % n)
+            time.sleep(.1)
             assert re.search('=> \(column=c1', cli.last_output()), cli.last_output()
         cli.close()
 
@@ -51,14 +52,16 @@ class TestUpgrade(Tester):
         for n in xrange(0, 20000):
             query_c1c2(cursor, n, "ALL")
 
-        cursor1 = self.cql_connection(node2, 'ks').cursor()
-        for n in xrange(0, 10000):
-            query_c1c2(cursor1, n, "QUORUM")
+        # CQL driver can't talk to 0.8 so let's use the cli
+        #cursor1 = self.cql_connection(node2, 'ks').cursor()
+        #for n in xrange(0, 10000):
+        #    query_c1c2(cursor1, n, "QUORUM")
 
         # Check from an old node (again cli is necessary)
         cli = node1.cli().do("use ks").do("consistencylevel as QUORUM")
         for n in xrange(9990, 10010):
             cli.do("get cf[k%d][c1]" % n)
+            time.sleep(.1)
             assert re.search('=> \(column=c1', cli.last_output()), cli.last_output()
         cli.close()
 
