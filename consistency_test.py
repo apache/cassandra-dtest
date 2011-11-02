@@ -191,10 +191,10 @@ class TestConsistency(Tester):
         res = cursor.fetchone()
         # the key is returned
         assert len(res) - 1 == 3, 'Expecting 3 values (excluding the key), got %d (%s)' % (len(res) - 1, str(res))
-        assert res[0] == 'k0', str(res)
+        assert res[len(res) - 1] == 'k0', str(res)
         # value 6, 7 and 8 have been deleted
-        for i in xrange(1, 4):
-            assert res[i] == 'value%d' % (6-i), 'Expecting value%d, got %s (%s)' % (6-i, res[i], str(res))
+        for i in xrange(0, 3):
+            assert res[i] == 'value%d' % (5-i), 'Expecting value%d, got %s (%s)' % (5-i, res[i], str(res))
 
     def stop_delete_and_restart(self, node_number, column):
         to_stop = self.cluster.nodes["node%d" % node_number]
