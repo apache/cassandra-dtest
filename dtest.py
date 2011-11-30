@@ -44,7 +44,7 @@ class Tester(object):
                     pass
 
         self.cluster = self.__get_cluster()
-        self.cluster.set_configuration_options(values={'phi_convict_threshold': 2})
+        self.cluster.set_configuration_options(values={'phi_convict_threshold': 5})
         with open(LAST_TEST_DIR, 'w') as f:
             f.write(self.test_path + '\n')
             f.write(self.cluster.name)
@@ -64,7 +64,7 @@ class Tester(object):
         failed = sys.exc_info() != (None, None, None)
         try:
             for node in self.cluster.nodelist():
-                errors = node.grep_log("ERROR")
+                errors = [ msg for msg, i in node.grep_log("ERROR")]
                 if len(errors) is not 0:
                     failed = True
                     raise AssertionError('Unexpected error in %s node log: %s' % (node.name, errors))
@@ -102,11 +102,10 @@ class Tester(object):
             # we assume simpleStrategy
             cursor.execute(query % (name, 'SimpleStrategy', 'strategy_options:replication_factor=%d' % rf))
         else:
-            assert len(name) != 0, "At least one datacenter/rf pair is needed"
+            assert len(rf) != 0, "At least one datacenter/rf pair is needed"
             # we assume networkTopolyStrategy
-            options = [ 'strategy_options:%s=%d' % (dc, rf[dc]) for dc in rf ].join(' AND ')
+            options = (' AND ').join([ 'strategy_options:%s=%d' % (d, r) for d, r in rf.iteritems() ])
             cursor.execute(query % (name, 'NetworkTopologyStrategy', options))
-        #cursor.execute('USE :name;', {"name": name})
         cursor.execute('USE %s' % name)
 
     # We default to UTF8Type because it's simpler to use in tests
