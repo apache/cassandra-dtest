@@ -1,5 +1,5 @@
 from __future__ import with_statement
-import os, tempfile, sys, shutil, types, time, threading
+import os, tempfile, sys, shutil, types, time, threading, ConfigParser
 
 from ccmlib.cluster import Cluster
 from ccmlib.node import Node
@@ -8,6 +8,12 @@ LOG_SAVED_DIR="logs"
 LAST_LOG = os.path.join(LOG_SAVED_DIR, "last")
 
 LAST_TEST_DIR='last_test_dir'
+
+DEFAULT_DIR='./'
+config = ConfigParser.RawConfigParser()
+if len(config.read(os.path.expanduser('~/.cassandra-dtest'))) > 0:
+    if config.has_option('main', 'default_dir'):
+        DEFAULT_DIR=os.path.expanduser(config.get('main', 'default_dir'))
 
 class Tester(object):
     def __get_cluster(self, name='test'):
@@ -19,7 +25,7 @@ class Tester(object):
             try:
                 cdir = os.environ['CASSANDRA_DIR']
             except KeyError:
-                cdir = './'
+                cdir = DEFAULT_DIR
             return Cluster(self.test_path, name, cassandra_dir=cdir)
 
     def __cleanup_cluster(self):
@@ -44,6 +50,7 @@ class Tester(object):
                     pass
 
         self.cluster = self.__get_cluster()
+        # the failure detector can be quite slow in such tests with quick start/stop
         self.cluster.set_configuration_options(values={'phi_convict_threshold': 5})
         with open(LAST_TEST_DIR, 'w') as f:
             f.write(self.test_path + '\n')
