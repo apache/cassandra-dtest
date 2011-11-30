@@ -35,9 +35,13 @@ class Tester(object):
             with open(LAST_TEST_DIR) as f:
                 self.test_path = f.readline().strip('\n')
                 name = f.readline()
-                self.cluster = Cluster.load(self.test_path, name)
-                # Avoid waiting too long for node to be marked down
-                self.__cleanup_cluster()
+                try:
+                    self.cluster = Cluster.load(self.test_path, name)
+                    # Avoid waiting too long for node to be marked down
+                    self.__cleanup_cluster()
+                except IOError:
+                    # after a restart, /tmp will be emptied so we'll get an IOError when loading the old cluster here
+                    pass
 
         self.cluster = self.__get_cluster()
         self.cluster.set_configuration_options(values={'phi_convict_threshold': 2})
