@@ -130,7 +130,7 @@ class TestConsistency(Tester):
         cluster = self.cluster
 
         # Disable hinted handoff and set batch commit log so this doesn't
-        # interfer with the test (this must be after the populate)
+        # interfer with the test
         cluster.set_configuration_options(values={ 'hinted_handoff_enabled' : False}, batch_commitlog=True)
 
         cluster.populate(3).start()
@@ -165,7 +165,7 @@ class TestConsistency(Tester):
         cluster = self.cluster
 
         # Disable hinted handoff and set batch commit log so this doesn't
-        # interfer with the test (this must be after the populate)
+        # interfer with the test
         cluster.set_configuration_options(values={ 'hinted_handoff_enabled' : False}, batch_commitlog=True)
 
         cluster.populate(3).start()
