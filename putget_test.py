@@ -66,6 +66,7 @@ class TestPutGet(Tester):
 
         node1.flush()
         node1.compact()
+        time.sleep(.5)
 
         cursor.execute('select * from cf;')
         result = cursor.fetchall()
