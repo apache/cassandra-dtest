@@ -66,8 +66,8 @@ class TestTopology(Tester):
         init_size = sizes[0]
         assert_almost_equal(*sizes)
 
-        node4.decommission()
         time.sleep(.5)
+        node4.decommission()
         node4.stop()
         cluster.cleanup()
         time.sleep(.5)
