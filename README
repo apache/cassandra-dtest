@@ -7,7 +7,8 @@ Prerequisite
 
 An up to date of ccm (https://github.com/pcmanus/ccm) should be installed.
 The tests are run using nosetests (http://readthedocs.org/docs/nose/en/latest/)
-which thus needs to be installed too.
+which thus needs to be installed too. The python CQL driver also needs to be
+available (http://code.google.com/a/apache-extras.org/p/cassandra-dbapi2/).
 
 
 Usage

@@ -20,7 +20,7 @@ class TestRepair(Tester):
 
         for k in missings:
             cursor.execute('SELECT c1, c2 FROM cf USING CONSISTENCY ONE WHERE key=k%d' % k)
-            assert cursor.rowcount == 0
+            assert cursor.rowcount == 0, cursor.fetchall()
 
         cursor.close()
 
@@ -45,7 +45,6 @@ class TestRepair(Tester):
         cluster.set_configuration_options(values={ 'hinted_handoff_enabled' : False}, batch_commitlog=True)
         cluster.populate(3).start()
         [node1, node2, node3] = cluster.nodelist()
-        time.sleep(.5)
 
         cursor = self.cql_connection(node1).cursor()
         self.create_ks(cursor, 'ks', 3)
@@ -67,14 +66,15 @@ class TestRepair(Tester):
 
         cluster.flush()
 
+        # Verify that node3 has only 2000 keys
+        self.check_rows_on_node(node3, 2000, missings=[1000])
+
+
         # Verify that node1 has 2001 keys
         self.check_rows_on_node(node1, 2001, found=[1000])
 
         # Verify that node2 has 2001 keys
         self.check_rows_on_node(node2, 2001, found=[1000])
-
-        # Verify that node3 has only 2000 keys
-        self.check_rows_on_node(node3, 2000, missings=[1000])
 
         # Run repair
         node1.repair()
