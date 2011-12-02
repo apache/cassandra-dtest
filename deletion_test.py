@@ -32,6 +32,7 @@ class TestDeletion(Tester):
         assert len(result) == 2 and len(result[0]) == 1 and len(result[1]) == 2, result
 
         node1.flush()
+        time.sleep(.5)
         node1.compact()
         time.sleep(.5)
 
