@@ -1,4 +1,8 @@
 from __future__ import with_statement
+
+import sys
+sys.path = ['/home/tahooie/ccm'] + sys.path
+
 import os, tempfile, sys, shutil, types, time, threading, ConfigParser
 
 from ccmlib.cluster import Cluster
@@ -16,6 +20,12 @@ if len(config.read(os.path.expanduser('~/.cassandra-dtest'))) > 0:
         DEFAULT_DIR=os.path.expanduser(config.get('main', 'default_dir'))
 
 class Tester(object):
+
+    def __init__(self, *argv, **kwargs):
+        # if False, then scan the log of each node for errors after every test.
+        super(Tester, self).__init__(*argv, **kwargs)
+        self.allow_log_errors = False
+
     def __get_cluster(self, name='test'):
         self.test_path = tempfile.mkdtemp(prefix='dtest-')
         try:
@@ -72,10 +82,11 @@ class Tester(object):
         failed = sys.exc_info() != (None, None, None)
         try:
             for node in self.cluster.nodelist():
-                errors = [ msg for msg, i in node.grep_log("ERROR")]
-                if len(errors) is not 0:
-                    failed = True
-                    raise AssertionError('Unexpected error in %s node log: %s' % (node.name, errors))
+                if self.allow_log_errors == False:
+                    errors = [ msg for msg, i in node.grep_log("ERROR")]
+                    if len(errors) is not 0:
+                        failed = True
+                        raise AssertionError('Unexpected error in %s node log: %s' % (node.name, errors))
         finally:
             try:
                 if failed:

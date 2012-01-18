@@ -84,13 +84,13 @@ class TestUpgrade(Tester):
                         '--average-size-values', '--create-index=KEYS', 
                         '--replication-factor=3', '--keep-trying=2',
                         '--threads=1', '--nodes='+stress_node.address()],
-#                    [   '--operation=INSERT', '--family-type=Super', 
-#                        '--num-keys=20000', '--consistency-level=TWO', 
-#                        '--average-size-values', '--create-index=KEYS', 
-#                        '--replication-factor=3', '--keep-trying=2',
-#                        '--threads=1', '--nodes='+stress_node.address()],
+                    [   '--operation=INSERT', '--family-type=Super', 
+                        '--num-keys=20000', '--consistency-level=TWO', 
+                        '--average-size-values', '--create-index=KEYS', 
+                        '--replication-factor=3', '--keep-trying=2',
+                        '--threads=1', '--nodes='+stress_node.address()],
 #                    [   '--operation=COUNTER_ADD', '--family-type=Standard', 
-#                        '--num-keys=10000', '--consistency-level=TWO', 
+#                        '--num-keys=10000', '--consistency-level=ONE', 
 #                        '--replication-factor=3', '--keep-trying=2',
 #                        '--threads=1', '--nodes='+stress_node.address()],
 #                    [   '--operation=COUNTER_ADD', '--family-type=Super', 
@@ -105,7 +105,7 @@ class TestUpgrade(Tester):
         print "Done sleeping"
     
         # Upgrade the node
-        print "Upgrading!"
+        print "Upgrading node: %s %s" % (node.name, node.address())
         print "draining..."
         node.nodetool('drain')
         print "sleeping 1"
@@ -139,22 +139,22 @@ class TestUpgrade(Tester):
 
         print "Reading back with stress"
         args = [
-                    [   '--operation=READ', '--family-type=Standard', 
-                        '--num-keys=20000', '--consistency-level=ALL', 
-                        '--threads=10', '--keep-trying=2',
-                        '--nodes='+stress_node.address()],
-                    [   '--operation=READ', '--family-type=Super', 
-                        '--num-keys=20000', '--consistency-level=ALL', 
-                        '--threads=10', '--keep-trying=2',
-                        '--nodes='+stress_node.address()],
-                    [   '--operation=COUNTER_GET', '--family-type=Standard', 
-                        '--num-keys=10000', '--consistency-level=ALL', 
-                        '--threads=10', '--keep-trying=2',
-                        '--nodes='+stress_node.address()],
-                    [   '--operation=COUNTER_GET', '--family-type=Super', 
-                        '--num-keys=1', '--consistency-level=ALL', 
-                        '--threads=10', '--keep-trying=2',
-                        '--nodes='+stress_node.address()],
+#                    [   '--operation=READ', '--family-type=Standard', 
+#                        '--num-keys=20000', '--consistency-level=ALL', 
+#                        '--threads=10', '--keep-trying=2',
+#                        '--nodes='+stress_node.address()],
+#                    [   '--operation=READ', '--family-type=Super', 
+#                        '--num-keys=20000', '--consistency-level=ALL', 
+#                        '--threads=10', '--keep-trying=2',
+#                        '--nodes='+stress_node.address()],
+#                    [   '--operation=COUNTER_GET', '--family-type=Standard', 
+#                        '--num-keys=10000', '--consistency-level=ALL', 
+#                        '--threads=10', '--keep-trying=2',
+#                        '--nodes='+stress_node.address()],
+#                    [   '--operation=COUNTER_GET', '--family-type=Super', 
+#                        '--num-keys=1', '--consistency-level=ALL', 
+#                        '--threads=10', '--keep-trying=2',
+#                        '--nodes='+stress_node.address()],
         ]
         sm = StressMaker(stress_node, args)
         print "Waiting up to 60 seconds for the stress process to quit"
