@@ -20,19 +20,23 @@ class ContinuousLoader(threading.Thread):
     of loads (standard, super, counter, and super counter)
 
     Applies each type of load in a round-robin fashion
-
     """
-    def __init__(self, node, load_makers=[]):
+    def __init__(self, server_list, load_makers=[]):
         """
         stress_arg_list is a list of stresses to run
         """
-        self._node = node
+        self._server_list = server_list
         self._load_makers = load_makers
         self._inserting_lock = threading.Lock()
         self._is_loading = True
         super(ContinuousLoader, self).__init__()
         self.setDaemon(True)
         self.exception = None
+
+        # make sure each loader gets called at least once.
+#        self._generate_load_once()
+
+        # now fire up the loaders to continuously load the system.
         self.start()
 
     def run(self):
@@ -40,18 +44,23 @@ class ContinuousLoader(threading.Thread):
         applies load whenever it isn't paused.
         """
         while True:
-            for load_maker in self._load_makers:
-                self._inserting_lock.acquire()
-                try:
-                    load_maker.generate(num_keys=100, server_list=[self._node.address()])
-                except Exception, e:
-                    # if anything goes wrong, store the exception
-                    e.args = e.args + (str(load_maker), )
-                    self.exception = (e, sys.exc_info()[2])
-                    return
-                finally:
-                    self._inserting_lock.release()
+            self._generate_load_once()
 
+    def _generate_load_once(self):
+        """
+        runs one round of load with all the load_makers.
+        """
+        for load_maker in self._load_makers:
+            self._inserting_lock.acquire()
+            try:
+                load_maker.generate(num_keys=100, server_list=self._server_list)
+            except Exception, e:
+                # if anything goes wrong, store the exception
+                e.args = e.args + (str(load_maker), )
+                self.exception = (e, sys.exc_info()[2])
+                raise
+            finally:
+                self._inserting_lock.release()
 
     def check_exc(self):
         """
@@ -69,7 +78,7 @@ class ContinuousLoader(threading.Thread):
         self.check_exc()
         self.pause()
         for load_maker in self._load_makers:
-            load_maker.validate(step=step, server_list=[self._node.address()])
+            load_maker.validate(step=step, server_list=self._server_list)
         self.unpause()
 
     def pause(self):
@@ -87,6 +96,13 @@ class ContinuousLoader(threading.Thread):
         assert self._is_loading == False, "Called Pause while loading!"
         self._inserting_lock.release()
         self._is_loading = True
+
+    def update_server_list(self, server_list):
+        if self._is_loading:
+            self._inserting_lock.acquire()
+        self._server_list = server_list
+        if self._is_loading:
+            self._inserting_lock.release()
         
 
 class TestUpgrade(Tester):
@@ -95,59 +111,14 @@ class TestUpgrade(Tester):
         super(TestUpgrade, self).__init__(*argv, **kwargs)
         self.allow_log_errors = True
 
-    def rolling_upgrade_node(self, node, stress_node):
+    def rolling_upgrade_node(self, node, stress_node, loader):
         """
         node is the node to upgrade. stress_ip is the node to run stress on.
         """
         print "Starting on upgrade procedure for node %s..." % node.name
 
-        print "Creating LoadMaker.."
-        lm_standard = loadmaker.LoadMaker(column_family_name='rolling_cf_standard',
-                consistency_level='TWO')
-        lm_super = loadmaker.LoadMaker(column_family_name='rolling_cf_super',
-                column_family_type='super', num_cols=2, consistency_level='TWO')
-        lm_counter_standard = loadmaker.LoadMaker(
-                column_family_name='rolling_cf_counter_standard', 
-                is_counter=True, consistency_level='TWO')
-        loader = ContinuousLoader(stress_node, load_makers=
-                [lm_standard, lm_super, lm_counter_standard])
+        loader.update_server_list([stress_node.address()])
 
-        # let some load get in there
-        print "sleeping"
-        time.sleep(2)
-
-        print "validating data..."
-        loader.read_and_validate()
-        print "done validating"
-        
-
-
-        # put some load on the cluster. 
-#        args = [
-#                    [   '--operation=INSERT', '--family-type=Standard', 
-#                        '--num-keys=40000', '--consistency-level=TWO', 
-#                        '--average-size-values', '--create-index=KEYS', 
-#                        '--replication-factor=3', '--keep-trying=2',
-#                        '--threads=1', '--nodes='+stress_node.address()],
-#                    [   '--operation=INSERT', '--family-type=Super', 
-#                        '--num-keys=20000', '--consistency-level=TWO', 
-#                        '--average-size-values', '--create-index=KEYS', 
-#                        '--replication-factor=3', '--keep-trying=2',
-#                        '--threads=1', '--nodes='+stress_node.address()],
-#                    [   '--operation=COUNTER_ADD', '--family-type=Standard', 
-#                        '--num-keys=10000', '--consistency-level=ONE', 
-#                        '--replication-factor=3', '--keep-trying=2',
-#                        '--threads=1', '--nodes='+stress_node.address()],
-#                    [   '--operation=COUNTER_ADD', '--family-type=Super', 
-#                        '--num-keys=1', '--consistency-level=TWO', 
-#                        '--replication-factor=3', '--keep-trying=2',
-#                        '--threads=1', '--nodes='+stress_node.address()],
-#                ]
-#        print "Starting stress."
-#        sm = StressMaker(stress_node, args)
-#        print "sleeping 10 seconds..."
-#        time.sleep(10) # make sure some data gets in before we shut down a node.
-#        print "Done sleeping"
 #    
 #        print "Upgrading node: %s %s" % (node.name, node.address())
 #        print "draining..."
@@ -172,36 +143,10 @@ class TestUpgrade(Tester):
 #        print "scrubbing..."
 #        node.nodetool('scrub')
 
-#        if sm.is_alive():
-#            print "The stress continued through the entire upgrade!"
-#        else:
-#            print "Need to send more keys to stress"
 
-#        sm.join(120)
-
-
-#        print "Reading back with stress"
-#        args = [
-#                    [   '--operation=READ', '--family-type=Standard', 
-#                        '--num-keys=20000', '--consistency-level=ALL', 
-#                        '--threads=10', '--keep-trying=2',
-#                        '--nodes='+stress_node.address()],
-#                    [   '--operation=READ', '--family-type=Super', 
-#                        '--num-keys=20000', '--consistency-level=ALL', 
-#                        '--threads=10', '--keep-trying=2',
-#                        '--nodes='+stress_node.address()],
-#                    [   '--operation=COUNTER_GET', '--family-type=Standard', 
-#                        '--num-keys=10000', '--consistency-level=ALL', 
-#                        '--threads=10', '--keep-trying=2',
-#                        '--nodes='+stress_node.address()],
-#                    [   '--operation=COUNTER_GET', '--family-type=Super', 
-#                        '--num-keys=1', '--consistency-level=ALL', 
-#                        '--threads=10', '--keep-trying=2',
-#                        '--nodes='+stress_node.address()],
-#        ]
-#        sm = StressMaker(stress_node, args)
-#        print "Waiting up to 60 seconds for the stress process to quit"
-#        sm.join(60)
+        print "validating data..."
+        loader.read_and_validate(step=10)
+        print "done validating"
 
         print "Done upgrading node %s." % node.name
 
@@ -218,7 +163,29 @@ class TestUpgrade(Tester):
         cluster.start()
 
         time.sleep(.6)
-        self.rolling_upgrade_node(node1, stress_node=node3)
+
+        print "Creating LoadMaker.."
+        lm_standard = loadmaker.LoadMaker(column_family_name='rolling_cf_standard',
+                consistency_level='TWO')
+        lm_super = loadmaker.LoadMaker(column_family_name='rolling_cf_super',
+                column_family_type='super', num_cols=2, consistency_level='TWO')
+        lm_counter_standard = loadmaker.LoadMaker(
+                column_family_name='rolling_cf_counter_standard', 
+                is_counter=True, consistency_level='TWO')
+        lm_counter_super = loadmaker.LoadMaker(
+                column_family_name='rolling_cf_counter_super', 
+                is_counter=True, consistency_level='TWO',
+                column_family_type='super', num_cols=2,
+                num_counter_rows=2, num_subcols=2)
+        loader = ContinuousLoader([node2.address()], load_makers=
+                [
+                    lm_standard, 
+                    lm_super, 
+                    lm_counter_standard, 
+                    lm_counter_super,
+                ])
+
+        self.rolling_upgrade_node(node1, stress_node=node2, loader=loader)
 #        self.rolling_upgrade_node(node2, stress_node=node3)
 #        self.rolling_upgrade_node(node3, stress_node=node1)
 

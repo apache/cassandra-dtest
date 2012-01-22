@@ -42,7 +42,7 @@ class LoadMaker(object):
         'key_validation_type': 'UTF8Type',
         'num_cols': 5,
         'num_subcols': 5, # only applies to super columns
-        'num_counter_rows': 100, # only applies to counter columns
+        'num_counter_rows': 10, # only applies to counter columns
     }
 
     def __init__(self, **kwargs):
@@ -55,17 +55,25 @@ class LoadMaker(object):
             self._params[key] = value
 
         # validate the consistency_level
-        self._params['consistency_level'] = getattr(
+        self._params['validated_consistency_level'] = getattr(
                 pycassa.cassandra.ttypes.ConsistencyLevel,
                 self._params['consistency_level'])
+        # column_family_type should be lowercase so that future comparisons will work.
+        self._params['column_family_type'] = self._params['column_family_type'].lower()
 
         self._inserted_key_count = 0
+        self._num_generate_calls = 0
         
         self.create_keyspace()
         self.create_column_family()
     
     def __str__(self):
-        return "LoadMaker<" + str(self._params) + ">"
+        # print out the _params and some other stuff
+        params = dict(list(self._params.items()) + list({
+            '_inserted_key_count': self._inserted_key_count,
+            '_num_generate_calls': self._num_generate_calls,
+        }.items()))
+        return "LoadMaker<" + str(params) + ">"
 
     def generate(self, num_keys=10000, server_list=['localhost:9160']):
         """
@@ -77,41 +85,48 @@ class LoadMaker(object):
         cf = pycassa.ColumnFamily(pool, self._params['column_family_name'])
 
         if self._params['is_counter']:
-            self._generate_counter(num_keys, cf)
+            self._generate_counter(cf)
         else:
             rows = self._gen_rows(self._inserted_key_count, new_inserted_key_count)
-            cf.batch_insert(rows, write_consistency_level=self._params['consistency_level'])
+            cf.batch_insert(rows, write_consistency_level=self._params['validated_consistency_level'])
 
         self._inserted_key_count = new_inserted_key_count
-        
+        self._num_generate_calls += 1
 
-    def _iterate_over_counter_columns(self, num_keys, func):
+    def _iterate_over_counter_columns(self, func):
         """
-        calls func on every column of the counter column family.
+        calls func on every column that should be in the counter column family.
 
         func should have a signature like this:
-        func(row_key, col_name)
+        func(row_key, col_name, subcol_name=None)
         """
-        for row_index in xrange(num_keys):
+        # if we haven't gotten around to generating any data yet, bail now.
+        for row_index in xrange(self._params['num_counter_rows']):
             row_key = self._generate_row_key(row_index)
             for col_index in xrange(self._params['num_cols']):
                 col_name = self._generate_col_name(
                         self._params['comparator_type'], col_index)
+                if self._params['column_family_type'] == 'super':
+                    for subcol_index in xrange(self._params['num_cols']):
+                        subcol_name = self._generate_col_name(
+                                self._params['subcomparator_type'], subcol_index)
+                        func(row_key, col_name, subcol_name)
+                else:
                     func(row_key, col_name)
 
 
-    def _generate_counter(self, num_keys, column_family):
+    def _generate_counter(self, cf):
         """
         increments all counters. There are num_keys counter rows, 
         each with self._params['num_cols'] individual counters.
         This increments each by one.
         """
-        def add_func(row_key, col_name):
-            column_family.add(row_key, col_name)
-        self._iterate_over_counter_columns(num_keys, func)
+        def add_func(row_key, col_name, subcol_name=None):
+            cf.add(row_key, col_name, super_column=subcol_name, 
+                    write_consistency_level=self._params['validated_consistency_level'])
+        self._iterate_over_counter_columns(add_func)
         
 
-    # TODO: Improve the type and increase the amount of validation performed here
     def validate(self, start_index=0, end_index=sys.maxint, step=1, server_list=['localhost:9160']):
         """
         gets the rows from start_index (inclusive) to end_index (exclusive) and
@@ -127,13 +142,13 @@ class LoadMaker(object):
         cf = pycassa.ColumnFamily(pool, self._params['column_family_name'])
 
         if self._params['is_counter']:
-            self._validate_counter(num_
+            self._validate_counter(cf)
             
         else:
             # generate what we expect to read
             rows = self._gen_rows(start_index, end_index, step)
             read_rows = cf.multiget(rows.keys(), read_consistency_level=
-                    self._params['consistency_level'])
+                    self._params['validated_consistency_level'])
 
             if len(list(read_rows)) < len(rows):
                 raise Exception("number of rows (%s) doesn't match expected number (%s)" % (str(len(read_rows)), str(len(rows))))
@@ -147,9 +162,18 @@ class LoadMaker(object):
                     (pprint.pformat(row_value), pprint.pformat(read_row_value)))
                 
     def _validate_counter(self, cf):
-        def add_func(row_key, col_name):
-            column_family.add(row_key, col_name)
-        self._iterate_over_counter_columns(num_keys, func)
+        def validate_func(row_key, col_name, subcol_name=None):
+            assert self._num_generate_calls > 0, "Data must be generated before validating!"
+            # cf.get() returns something like this: OrderedDict([('col_2', 3)]) 
+            try:
+                from_db = cf.get(row_key, [col_name], super_column=subcol_name, 
+                        read_consistency_level=self._params['validated_consistency_level'])
+            except:
+                print "cf.get failed!", row_key, col_name, subcol_name, self
+                raise
+            val = from_db[col_name]
+            assert val == self._num_generate_calls, "A counter did not have the right value! %s != %s" %(val, self._num_generate_calls)
+        self._iterate_over_counter_columns(validate_func)
         
 
     def _gen_rows(self, start_index, end_index, step=1):
@@ -158,7 +182,7 @@ class LoadMaker(object):
         """
         rows = dict()
         for row_num in xrange(start_index, end_index, step):
-            if self._params['column_family_type'].lower() == 'super':
+            if self._params['column_family_type'] == 'super':
                 sub_cols = dict((
                         self._generate_col_name(self._params['subcomparator_type'], i),
                         self._generate_col_value(i)
@@ -241,13 +265,13 @@ class LoadMaker(object):
         if self._params['is_counter']:
             sm.create_column_family(
                 self._params['keyspace_name'], self._params['column_family_name'],
-                super=self._params['column_family_type'].lower()=='super',
+                super=self._params['column_family_type']=='super',
                 default_validation_class='CounterColumnType',
             )
         else:
             sm.create_column_family(
                 self._params['keyspace_name'], self._params['column_family_name'],
-                super=self._params['column_family_type'].lower()=='super',
+                super=self._params['column_family_type']=='super',
             )
             
         sys.stdout = sys.__stdout__
