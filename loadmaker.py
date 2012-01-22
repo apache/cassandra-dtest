@@ -92,6 +92,7 @@ class LoadMaker(object):
 
         self._inserted_key_count = new_inserted_key_count
         self._num_generate_calls += 1
+        print "Generate called"
 
     def _iterate_over_counter_columns(self, func):
         """
@@ -160,6 +161,8 @@ class LoadMaker(object):
                     raise AssertionError(
                     "The value written does not match the value read! written: %s written: %s" %
                     (pprint.pformat(row_value), pprint.pformat(read_row_value)))
+
+        print "Validate succeeded"
                 
     def _validate_counter(self, cf):
         def validate_func(row_key, col_name, subcol_name=None):

@@ -34,7 +34,7 @@ class ContinuousLoader(threading.Thread):
         self.exception = None
 
         # make sure each loader gets called at least once.
-#        self._generate_load_once()
+        self._generate_load_once()
 
         # now fire up the loaders to continuously load the system.
         self.start()
@@ -43,6 +43,7 @@ class ContinuousLoader(threading.Thread):
         """
         applies load whenever it isn't paused.
         """
+        print "Loadmaker started"
         while True:
             self._generate_load_once()
 
@@ -61,6 +62,7 @@ class ContinuousLoader(threading.Thread):
                 raise
             finally:
                 self._inserting_lock.release()
+        return True
 
     def check_exc(self):
         """
@@ -119,34 +121,34 @@ class TestUpgrade(Tester):
 
         loader.update_server_list([stress_node.address()])
 
-#    
-#        print "Upgrading node: %s %s" % (node.name, node.address())
-#        print "draining..."
-#        node.nodetool('drain')
-#        print "sleeping 1"
-#        time.sleep(1)
-#        print "stopping..."
-#        node.stop(wait_other_notice=True)
-#        print "sleeping 1"
-#        time.sleep(1)
-#        print "setting dir..."
-#        try:
-#            node.set_cassandra_dir(cassandra_version="cassandra")
-#        except Exception, e:
-#            new_exception = Exception("Did you clone and compile cassandra in $HOME/.ccm/repository/ ?"\
-#                    " original exception: " + str(e))
-#            raise new_exception
-#        print "starting..."
-#        node.start(wait_other_notice=True)
-#        print "sleeping 1"
-#        time.sleep(1)
-#        print "scrubbing..."
-#        node.nodetool('scrub')
+    
+        print "Upgrading node: %s %s" % (node.name, node.address())
+        print "draining..."
+        node.nodetool('drain')
+        print "sleeping 1"
+        time.sleep(1)
+        print "stopping..."
+        node.stop(wait_other_notice=True)
+        print "sleeping 1"
+        time.sleep(1)
+        print "setting dir..."
+        try:
+            node.set_cassandra_dir(cassandra_version="cassandra")
+        except Exception, e:
+            new_exception = Exception("Did you clone and compile cassandra in $HOME/.ccm/repository/ ? original exception: " + str(e))
+            raise new_exception
+        print "starting..."
+        node.start(wait_other_notice=True)
+        print "sleeping 1"
+        time.sleep(1)
+        print "scrubbing..."
+        node.nodetool('scrub')
 
 
         print "validating data..."
         loader.read_and_validate(step=10)
         print "done validating"
+        loader.check_exc()
 
         print "Done upgrading node %s." % node.name
 
@@ -162,7 +164,7 @@ class TestUpgrade(Tester):
         [node1, node2, node3] = cluster.nodelist()
         cluster.start()
 
-        time.sleep(.6)
+        time.sleep(.5)
 
         print "Creating LoadMaker.."
         lm_standard = loadmaker.LoadMaker(column_family_name='rolling_cf_standard',
@@ -189,6 +191,7 @@ class TestUpgrade(Tester):
 #        self.rolling_upgrade_node(node2, stress_node=node3)
 #        self.rolling_upgrade_node(node3, stress_node=node1)
 
+        loader.pause()
         cluster.flush()
 
         cluster.cleanup()
