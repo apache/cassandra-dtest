@@ -15,8 +15,7 @@ import logging
 import pycassa
 import pycassa.system_manager as system_manager
 
-logger = logging.getLogger('input')
-logger.setLevel(logging.INFO)
+import logging
 
 class LoadMaker(object):
     """
@@ -68,6 +67,11 @@ class LoadMaker(object):
         self.create_column_family()
     
     def __str__(self):
+        d = {'is_counter': self._params['is_counter'], 
+             'column_family_type': self._params['column_family_type']}
+        return "<LoadMaker %s>" % str(d)
+
+    def str_info(self):
         # print out the _params and some other stuff
         params = dict(list(self._params.items()) + list({
             '_inserted_key_count': self._inserted_key_count,
@@ -79,6 +83,7 @@ class LoadMaker(object):
         """
         Generates a bunch of data and inserts it into cassandra
         """
+        logging.debug( "Generate() starting " + str(self))
         new_inserted_key_count = self._inserted_key_count + num_keys
 
         pool = self._get_pool(server_list=server_list)
@@ -89,10 +94,10 @@ class LoadMaker(object):
         else:
             rows = self._gen_rows(self._inserted_key_count, new_inserted_key_count)
             cf.batch_insert(rows, write_consistency_level=self._params['validated_consistency_level'])
+            logging.debug("Generate inserted %d rows" % len(rows))
 
         self._inserted_key_count = new_inserted_key_count
         self._num_generate_calls += 1
-        print "Generate called"
 
     def _iterate_over_counter_columns(self, func):
         """
@@ -102,6 +107,7 @@ class LoadMaker(object):
         func(row_key, col_name, subcol_name=None)
         """
         # if we haven't gotten around to generating any data yet, bail now.
+        col_count = 0
         for row_index in xrange(self._params['num_counter_rows']):
             row_key = self._generate_row_key(row_index)
             for col_index in xrange(self._params['num_cols']):
@@ -112,8 +118,11 @@ class LoadMaker(object):
                         subcol_name = self._generate_col_name(
                                 self._params['subcomparator_type'], subcol_index)
                         func(row_key, col_name, subcol_name)
+                        col_count += 1
                 else:
                     func(row_key, col_name)
+                    col_count += 1
+        logging.debug("iterated over %d counter columns" % col_count)
 
 
     def _generate_counter(self, cf):
@@ -135,6 +144,7 @@ class LoadMaker(object):
         is greater than what has been inserted, it will read to the last
         value that was inserted.
         """
+        logging.debug("validate() starting " + str(self))
         if end_index > self._inserted_key_count:
             end_index = self._inserted_key_count
         assert(start_index <= end_index)
@@ -162,7 +172,7 @@ class LoadMaker(object):
                     "The value written does not match the value read! written: %s written: %s" %
                     (pprint.pformat(row_value), pprint.pformat(read_row_value)))
 
-        print "Validate succeeded"
+        logging.debug("validate() succeeded")
                 
     def _validate_counter(self, cf):
         def validate_func(row_key, col_name, subcol_name=None):

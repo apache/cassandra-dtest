@@ -9,10 +9,17 @@ from ccmlib import common as ccmcommon
 import random
 import time
 import threading
+import logging
 
 #from automaton.cluster.automation_modules import pycassa_util
 
 import loadmaker
+
+
+# NOTE: with nosetests, use the --nologcapture flag to let logging get through.
+# then set the logging level here.
+logging.basicConfig(level=logging.DEBUG)
+logging.info("Starting...")
 
 class ContinuousLoader(threading.Thread):
     """
@@ -34,6 +41,7 @@ class ContinuousLoader(threading.Thread):
         self.exception = None
 
         # make sure each loader gets called at least once.
+        logging.debug("calling ContinuousLoader()._generate_load_once() from __init__().")
         self._generate_load_once()
 
         # now fire up the loaders to continuously load the system.
@@ -51,6 +59,7 @@ class ContinuousLoader(threading.Thread):
         """
         runs one round of load with all the load_makers.
         """
+        logging.debug("ContinuousLoader()._generate_load_once() starting")
         for load_maker in self._load_makers:
             self._inserting_lock.acquire()
             try:
@@ -62,7 +71,7 @@ class ContinuousLoader(threading.Thread):
                 raise
             finally:
                 self._inserting_lock.release()
-        return True
+        logging.debug("ContinuousLoader()._generate_load_once() done.")
 
     def check_exc(self):
         """
@@ -77,6 +86,7 @@ class ContinuousLoader(threading.Thread):
         reads back all the data that has been inserted.
         Pauses loading while validating. Cannot already be paused.
         """
+        logging.debug("read_and_validate()")
         self.check_exc()
         self.pause()
         for load_maker in self._load_makers:
@@ -87,6 +97,7 @@ class ContinuousLoader(threading.Thread):
         """
         acquires the _inserting_lock to stop the loading from happening.
         """
+        logging.debug("pausing continuousloader...")
         assert self._is_loading == True, "Called Pause while not loading!"
         self._inserting_lock.acquire()
         self._is_loading = False
@@ -95,6 +106,7 @@ class ContinuousLoader(threading.Thread):
         """
         releases the _inserting_lock to resume loading.
         """
+        logging.debug("unpausing continuousloader...")
         assert self._is_loading == False, "Called Pause while loading!"
         self._inserting_lock.release()
         self._is_loading = True
@@ -110,8 +122,6 @@ class ContinuousLoader(threading.Thread):
 class TestUpgrade(Tester):
 
     def __init__(self, *argv, **kwargs):
-        super(TestUpgrade, self).__init__(*argv, **kwargs)
-        self.allow_log_errors = True
 
     def rolling_upgrade_node(self, node, stress_node, loader):
         """
@@ -122,27 +132,27 @@ class TestUpgrade(Tester):
         loader.update_server_list([stress_node.address()])
 
     
-        print "Upgrading node: %s %s" % (node.name, node.address())
-        print "draining..."
-        node.nodetool('drain')
-        print "sleeping 1"
-        time.sleep(1)
-        print "stopping..."
-        node.stop(wait_other_notice=True)
-        print "sleeping 1"
-        time.sleep(1)
-        print "setting dir..."
-        try:
-            node.set_cassandra_dir(cassandra_version="cassandra")
-        except Exception, e:
-            new_exception = Exception("Did you clone and compile cassandra in $HOME/.ccm/repository/ ? original exception: " + str(e))
-            raise new_exception
-        print "starting..."
-        node.start(wait_other_notice=True)
-        print "sleeping 1"
-        time.sleep(1)
-        print "scrubbing..."
-        node.nodetool('scrub')
+#        print "Upgrading node: %s %s" % (node.name, node.address())
+#        print "draining..."
+#        node.nodetool('drain')
+#        print "sleeping 1"
+#        time.sleep(1)
+#        print "stopping..."
+#        node.stop(wait_other_notice=True)
+#        print "sleeping 1"
+#        time.sleep(1)
+#        print "setting dir..."
+#        try:
+#            node.set_cassandra_dir(cassandra_version="cassandra")
+#        except Exception, e:
+#            new_exception = Exception("Did you clone and compile cassandra in $HOME/.ccm/repository/ ? original exception: " + str(e))
+#            raise new_exception
+#        print "starting..."
+#        node.start(wait_other_notice=True)
+#        print "sleeping 1"
+#        time.sleep(1)
+#        print "scrubbing..."
+#        node.nodetool('scrub')
 
 
         print "validating data..."
