@@ -30,20 +30,12 @@ class TestReadWhenNodeDown(Tester):
         node1.nodetool('drain')
         node1.stop()
 
-        # Test will pass if this is un-commented.
-        # I suspect it is because gossip detects the node as down
-#        time.sleep(20)
+        # Reads will fail if gossip hasn't noticed the node is down.
+        print "Sleeping to let gossip notice the node is down.."
+        time.sleep(20) # 10 seconds is about the bare minimum. Increase for safety.
 
         print "Reading back data."
-        try:
-            start_time = time.time()
-            query_c1c2(cursor, 100, CL)
-        except Exception, e:
-            # Time how long it took to fail. Compare this time with
-            # rpc_timeout set in cassandra.yaml
-            fail = "reading failed in %.4f seconds." % (time.time() - start_time)
-            e.args = e.args + (fail ,)
-            raise
+        query_c1c2(cursor, 100, CL)
 
         cluster.cleanup()
 
