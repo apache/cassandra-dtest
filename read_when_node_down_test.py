@@ -30,6 +30,10 @@ class TestReadWhenNodeDown(Tester):
         node1.nodetool('drain')
         node1.stop()
 
+        # Test will pass if this is un-commented.
+        # I suspect it is because gossip detects the node as down
+#        time.sleep(20)
+
         print "Reading back data."
         try:
             start_time = time.time()
