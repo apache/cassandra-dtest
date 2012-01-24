@@ -405,3 +405,43 @@ class TestCQL(Tester):
         cursor.execute("SELECT firstname FROM users WHERE userid = f47ac10b-58cc-4372-a567-0e02b2c3d479 AND age = 33");
         res = cursor.fetchall()
         assert res == [[ 'Samwise' ]], res
+
+    def select_key_in_test(self):
+        """Query for KEY IN (...)"""
+        cluster = self.cluster
+
+        cluster.populate(1).start()
+        node1 = cluster.nodelist()[0]
+        time.sleep(0.2)
+
+        cursor = self.cql_connection(node1).cursor()
+        self.create_ks(cursor, 'ks', 1)
+
+        # Create
+        cursor.execute("""
+            CREATE TABLE users (
+                userid uuid PRIMARY KEY,
+                firstname text,
+                lastname text,
+                age int
+            );
+        """)
+
+        # Inserts
+        cursor.execute("""
+                INSERT INTO users (userid, firstname, lastname, age)
+                VALUES (550e8400-e29b-41d4-a716-446655440000, Frodo, Baggins, 32)
+        """)
+        cursor.execute("""
+                INSERT INTO users (userid, firstname, lastname, age)
+                VALUES (f47ac10b-58cc-4372-a567-0e02b2c3d479, Samwise, Gamgee, 33)
+        """)
+
+        # Select
+        cursor.execute("""
+                SELECT firstname, lastname FROM users
+                WHERE userid IN (550e8400-e29b-41d4-a716-446655440000, f47ac10b-58cc-4372-a567-0e02b2c3d479)
+        """);
+
+        res = cursor.fetchall()
+        assert len(res) == 2, res
