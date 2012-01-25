@@ -64,9 +64,8 @@ class LoadMaker(object):
         self._num_generate_calls = 0
 
         self.create_keyspace()
-        self.create_column_family()
-
         self.set_server_list(server_list)
+        self.create_column_family()
 
     def __str__(self):
         d = {'is_counter': self._params['is_counter'],
@@ -183,7 +182,8 @@ class LoadMaker(object):
                 from_db = cf.get(row_key, [col_name], super_column=subcol_name,
                         read_consistency_level=self._params['validated_consistency_level'])
             except:
-                print "cf.get failed!", row_key, col_name, subcol_name, self
+                logger.error("cf.get failed!" + str(row_key) + " " + 
+                        str(col_name) + " " + str(subcol_name) + " " + str(self))
                 raise
             val = from_db[col_name]
             assert val == self._num_generate_calls, "A counter did not have the right value! %s != %s" %(val, self._num_generate_calls)
@@ -236,6 +236,11 @@ class LoadMaker(object):
         if target_type == 'LongType':
             return long(num)
 
+        # TODO: To support these we would need to store the values that get
+        # generated so that we can check them when reading them back out.
+        # This could be done with a hashtable mapping rowname_columnname_subcolname
+        # to values. Should work as long as we don't end up with too many values
+        # to fit in memory.
 #        if target_type == 'LexicalUUIDType':
 #            return uuid.uuid1()
 
@@ -265,7 +270,7 @@ class LoadMaker(object):
                     self._params['keyspace_strategy_options'])
             logging.info("Created keyspace %s" % keyspace_name)
         else:
-            logging.info("keyspace %s already existed" % keyspace_name)
+            logging.debug("keyspace %s already existed" % keyspace_name)
 
 #        logging.debug("keyspace replication factor: " + str(
 #                sm.describe_keyspace(keyspace_name)['replication_factor']))
@@ -278,25 +283,37 @@ class LoadMaker(object):
         if cf_name in sm.get_keyspace_column_families(
                 self._params['keyspace_name']).keys():
             # column family already exists
-            logging.info("column family %s already exists" % cf_name)
+            logging.debug("column family %s already exists" % cf_name)
+            if self._params['is_counter']:
+                # Now pre-set self._num_generate_calls so that the counter
+                # will be synchronized with what it should be:
+                def read_val_func(row_key, col_name, subcol_name=None):
+                    cf = pycassa.ColumnFamily(self._connection_pool, 
+                            self._params['column_family_name'])
+                    from_db = cf.get(row_key, [col_name], super_column=subcol_name)
+                    val = from_db[col_name]
+                    self._num_generate_calls = val
+                    # misuse this exception. We just needed something to stop
+                    # from iterating over the whole space. We only need one value!
+                    raise StopIteration()
+                try:
+                    self._iterate_over_counter_columns(read_val_func)
+                except StopIteration: pass
+
         else:
-            # sm.create_column_family prints to stdout, which
-            # we don't want.
-            # We redirect it temporarily here.
-            sys.stdout = open(os.devnull, 'w')
             if self._params['is_counter']:
                 sm.create_column_family(
                     self._params['keyspace_name'], self._params['column_family_name'],
                     super=self._params['column_family_type']=='super',
                     default_validation_class='CounterColumnType',
                 )
+
             else:
                 sm.create_column_family(
                     self._params['keyspace_name'], self._params['column_family_name'],
                     super=self._params['column_family_type']=='super',
                 )
 
-            sys.stdout = sys.__stdout__
             logging.info("Created column family %s" % cf_name)
         logging.debug("column family %s: %s" % (cf_name, 
             sm.get_keyspace_column_families(self._params['keyspace_name'])[cf_name]
@@ -313,16 +330,24 @@ class ContinuousLoader(threading.Thread):
 
     Applies each type of load in a round-robin fashion
     """
-    def __init__(self, load_makers=[]):
+    def __init__(self, server_list, load_makers=[], sleep_between=1):
         """
         load_makers is a list of load_makers to run
+
+        sleep_between will slow down loading of the cluster
+        by sleeping between every insert operation this many seconds.
         """
         self._load_makers = load_makers
+        self._sleep_between = sleep_between
         self._inserting_lock = threading.Lock()
         self._is_loading = True
+        self._should_exit = False
         super(ContinuousLoader, self).__init__()
         self.setDaemon(True)
         self.exception = None
+
+        for load_maker in load_makers:
+            load_maker.set_server_list(server_list)
 
         # make sure each loader gets called at least once.
         logging.debug("calling ContinuousLoader()._generate_load_once() from __init__().")
@@ -335,9 +360,12 @@ class ContinuousLoader(threading.Thread):
         """
         applies load whenever it isn't paused.
         """
-        print "Loadmaker started"
+        logging.info("Loadmaker started")
         while True:
+            if self._should_exit:
+                break
             self._generate_load_once()
+        logging.info("continuous loader exiting.")
 
     def _generate_load_once(self):
         """
@@ -346,6 +374,11 @@ class ContinuousLoader(threading.Thread):
         logging.debug("ContinuousLoader()._generate_load_once() starting")
         for load_maker in self._load_makers:
             self._inserting_lock.acquire()
+
+            # exit if needed.
+            if self._should_exit:
+                return
+
             try:
                 load_maker.generate(num_keys=100)
             except Exception, e:
@@ -355,7 +388,14 @@ class ContinuousLoader(threading.Thread):
                 raise
             finally:
                 self._inserting_lock.release()
+            if self._sleep_between:
+                time.sleep(self._sleep_between)
         logging.debug("ContinuousLoader()._generate_load_once() done.")
+
+    def exit(self):
+        self._should_exit = True
+        if self._is_loading == False:
+            self.unpause()
 
     def check_exc(self):
         """
@@ -376,7 +416,12 @@ class ContinuousLoader(threading.Thread):
         logging.debug("Sleeping %.2f seconds.." % pause_before_validate)
         time.sleep(pause_before_validate)
         for load_maker in self._load_makers:
-            load_maker.validate(step=step)
+            try:
+                load_maker.validate(step=step)
+            except Exception, e:
+                # put the loader into the exception to make life easier
+                e.args = e.args + (str(load_maker), )
+                raise
         self.unpause()
 
     def pause(self):
