@@ -32,7 +32,7 @@ class TestReadWhenNodeDown(Tester):
 
         # Reads will fail if gossip hasn't noticed the node is down.
         print "Sleeping to let gossip notice the node is down.."
-        time.sleep(20) # 10 seconds is about the bare minimum. Increase for safety.
+        time.sleep(25) 
 
         print "Reading back data."
         query_c1c2(cursor, 100, CL)
