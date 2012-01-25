@@ -5,6 +5,8 @@ import os, sys, time, tools
 from uuid import UUID
 from ccmlib.cluster import Cluster
 
+cql_version="3.0.0-beta1"
+
 class TestCQL(Tester):
 
     def static_cf_test(self):
@@ -15,7 +17,7 @@ class TestCQL(Tester):
         node1 = cluster.nodelist()[0]
         time.sleep(0.2)
 
-        cursor = self.cql_connection(node1).cursor()
+        cursor = self.cql_connection(node1, version=cql_version).cursor()
         self.create_ks(cursor, 'ks', 1)
 
         # Create
@@ -73,7 +75,7 @@ class TestCQL(Tester):
         node1 = cluster.nodelist()[0]
         time.sleep(0.2)
 
-        cursor = self.cql_connection(node1).cursor()
+        cursor = self.cql_connection(node1, version=cql_version).cursor()
         self.create_ks(cursor, 'ks', 1)
 
         cursor.execute("""
@@ -117,7 +119,7 @@ class TestCQL(Tester):
         node1 = cluster.nodelist()[0]
         time.sleep(0.2)
 
-        cursor = self.cql_connection(node1).cursor()
+        cursor = self.cql_connection(node1, version=cql_version).cursor()
         self.create_ks(cursor, 'ks', 1)
 
         cursor.execute("""
@@ -172,7 +174,7 @@ class TestCQL(Tester):
         node1 = cluster.nodelist()[0]
         time.sleep(0.2)
 
-        cursor = self.cql_connection(node1).cursor()
+        cursor = self.cql_connection(node1, version=cql_version).cursor()
         self.create_ks(cursor, 'ks', 1)
 
         cursor.execute("""
@@ -219,7 +221,7 @@ class TestCQL(Tester):
         node1 = cluster.nodelist()[0]
         time.sleep(0.2)
 
-        cursor = self.cql_connection(node1).cursor()
+        cursor = self.cql_connection(node1, version=cql_version).cursor()
         self.create_ks(cursor, 'ks', 1)
 
         assert_invalid(cursor, "CREATE TABLE test ()")
@@ -242,7 +244,7 @@ class TestCQL(Tester):
         node1 = cluster.nodelist()[0]
         time.sleep(0.2)
 
-        cursor = self.cql_connection(node1).cursor()
+        cursor = self.cql_connection(node1, version=cql_version).cursor()
         self.create_ks(cursor, 'ks', 1)
 
         cursor.execute("""
@@ -275,7 +277,7 @@ class TestCQL(Tester):
         node1 = cluster.nodelist()[0]
         time.sleep(0.2)
 
-        cursor = self.cql_connection(node1).cursor()
+        cursor = self.cql_connection(node1, version=cql_version).cursor()
         self.create_ks(cursor, 'ks', 1)
 
         cursor.execute("""
@@ -306,7 +308,7 @@ class TestCQL(Tester):
         node1 = cluster.nodelist()[0]
         time.sleep(0.2)
 
-        cursor = self.cql_connection(node1).cursor()
+        cursor = self.cql_connection(node1, version=cql_version).cursor()
         self.create_ks(cursor, 'ks', 1)
 
         cursor.execute("""
@@ -338,7 +340,7 @@ class TestCQL(Tester):
         node1 = cluster.nodelist()[0]
         time.sleep(0.2)
 
-        cursor = self.cql_connection(node1).cursor()
+        cursor = self.cql_connection(node1, version=cql_version).cursor()
         self.create_ks(cursor, 'ks', 1)
 
         cursor.execute("""
@@ -378,7 +380,7 @@ class TestCQL(Tester):
         node1 = cluster.nodelist()[0]
         time.sleep(0.2)
 
-        cursor = self.cql_connection(node1).cursor()
+        cursor = self.cql_connection(node1, version=cql_version).cursor()
         self.create_ks(cursor, 'ks', 1)
 
         # Create
