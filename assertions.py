@@ -1,4 +1,4 @@
-import re
+import re, cql
 
 def assert_unavailable(fun, *args):
     import cql
@@ -24,3 +24,12 @@ def assert_almost_equal(*args, **kwargs):
     vmax = max(args)
     vmin = min(args)
     assert vmin > vmax * (1.0 - error), "values not within %.2f%% of the max: %s" % (error * 100, args)
+
+def assert_invalid(cursor, query, matching = None):
+    try:
+        cursor.execute(query)
+        assert False, "Expecting query to be invalid"
+    except cql.ProgrammingError as e:
+        msg = str(e)
+        if matching is not None:
+            assert re.search(matching, msg), "Error message does not contain " + matching + " (error = " + msg + ")"

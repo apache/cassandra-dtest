@@ -97,10 +97,10 @@ class Tester(object):
             finally:
                 self.__cleanup_cluster()
 
-    def cql_connection(self, node, keyspace=None):
+    def cql_connection(self, node, keyspace=None, version=None):
         import cql
         host, port = node.network_interfaces['thrift']
-        con = cql.connect(host, port, keyspace)
+        con = cql.connect(host, port, keyspace=keyspace, cql_version=version)
         self.connections.append(con)
         return con
 
