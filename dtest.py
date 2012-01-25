@@ -1,8 +1,4 @@
 from __future__ import with_statement
-
-import sys
-sys.path = ['/home/tahooie/ccm'] + sys.path
-
 import os, tempfile, sys, shutil, types, time, threading, ConfigParser
 
 from ccmlib.cluster import Cluster
