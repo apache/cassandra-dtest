@@ -18,10 +18,6 @@ logging.info("Starting...")
 
 class TestUpgrade(Tester):
 
-    def __init__(self, *argv, **kwargs):
-        super(TestUpgrade, self).__init__(*argv, **kwargs)
-        self.allow_log_errors = True
-
     def rolling_upgrade_node(self, node, stress_node):
         """
         node is the node to upgrade. stress_ip is the node to run stress on.
