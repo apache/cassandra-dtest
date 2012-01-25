@@ -18,6 +18,12 @@ logging.info("Starting...")
 
 class TestUpgrade(Tester):
 
+    def __init__(self, *argv, **kwargs):
+        super(TestUpgrade, self).__init__(*argv, **kwargs)
+        # When a node goes down under load it prints an error in it's log. 
+        # If we don't allow log errors, then the test will fail.
+        self.allow_log_errors = True
+
     def rolling_upgrade_node(self, node, stress_node):
         """
         node is the node to upgrade. stress_ip is the node to run stress on.
