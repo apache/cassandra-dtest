@@ -447,3 +447,56 @@ class TestCQL(Tester):
 
         res = cursor.fetchall()
         assert len(res) == 2, res
+
+    def exclusive_slice_test(self):
+        cluster = self.cluster
+
+        cluster.populate(1).start()
+        node1 = cluster.nodelist()[0]
+        time.sleep(0.2)
+
+        cursor = self.cql_connection(node1, version=cql_version).cursor()
+        self.create_ks(cursor, 'ks', 1)
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k int,
+                c int,
+                v int,
+                PRIMARY KEY (k, c)
+            ) WITH COMPACT STORAGE;
+        """)
+
+        # Inserts
+        for x in range(0, 10):
+            cursor.execute("INSERT INTO test (k, c, v) VALUES (0, %i, %i)" % (x, x))
+
+        # Queries
+        cursor.execute("SELECT v FROM test WHERE k = 0")
+        res = cursor.fetchall()
+        assert len(res) == 10, res
+
+        cursor.execute("SELECT v FROM test WHERE k = 0 AND c >= '' AND c <= ''")
+        res = cursor.fetchall()
+        assert len(res) == 10, res
+
+        cursor.execute("SELECT v FROM test WHERE k = 0 AND c > '' AND c < ''")
+        res = cursor.fetchall()
+        assert len(res) == 10, res
+
+        cursor.execute("SELECT v FROM test WHERE k = 0 AND c >= 2 AND c <= 6")
+        res = cursor.fetchall()
+        assert len(res) == 5 and res[0][0] == 2 and res[len(res) - 1][0] == 6, res
+
+        cursor.execute("SELECT v FROM test WHERE k = 0 AND c > 2 AND c <= 6")
+        res = cursor.fetchall()
+        assert len(res) == 4 and res[0][0] == 3 and res[len(res) - 1][0] == 6, res
+
+        cursor.execute("SELECT v FROM test WHERE k = 0 AND c >= 2 AND c < 6")
+        res = cursor.fetchall()
+        assert len(res) == 4 and res[0][0] == 2 and res[len(res) - 1][0] == 5, res
+
+        cursor.execute("SELECT v FROM test WHERE k = 0 AND c > 2 AND c < 6")
+        res = cursor.fetchall()
+        assert len(res) == 3 and res[0][0] == 3 and res[len(res) - 1][0] == 5, res
+
