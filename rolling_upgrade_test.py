@@ -16,10 +16,10 @@ logging.basicConfig(level=logging.INFO)
 logging.info("Starting...")
 
 
-class TestUpgrade(Tester):
+class TestRollingUpgrade(Tester):
 
     def __init__(self, *argv, **kwargs):
-        super(TestUpgrade, self).__init__(*argv, **kwargs)
+        super(TestRollingUpgrade, self).__init__(*argv, **kwargs)
         # When a node goes down under load it prints an error in it's log. 
         # If we don't allow log errors, then the test will fail.
         self.allow_log_errors = True
