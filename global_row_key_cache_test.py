@@ -1,19 +1,52 @@
+import time
+import logging
+import types
+import pprint
+import hashlib
+
+
 from dtest import Tester
 from tools import *
 from assertions import *
 from ccmlib.cluster import Cluster
 from ccmlib import common as ccmcommon
-import time
-import logging
 
-import loadmaker
+from loadmaker import LoadMaker
 
+import pycassa
+import pycassa.system_manager as system_manager
 
 # NOTE: with nosetests, use the --nologcapture flag to let logging get through.
 # then set the logging level here.
 # A logging-level of DEBUG will show the load being created.
 logging.basicConfig(level=logging.INFO)
 logging.info("Starting...")
+
+class Stopwatch(object):
+    def __init__(self):
+        self._start = time.time()
+    def elapsed(self):
+        return time.time() - self._start
+
+def time_load(column_family, rows, num_runs=3):
+    """
+    runs stress_obj.stress(stress_args). Does it num_runs times
+    and returns the time in seconds for the last run.
+    The reason we do this multiple times is to get the caches warmed up.
+    """
+    for i in range(num_runs):
+        print "generating..."
+        s = Stopwatch()
+        column_family.batch_insert(rows)
+    generate_time = s.elapsed()
+
+    keys = rows.keys()
+    for i in range(num_runs):
+        print "Validating..."
+        s = Stopwatch()
+        column_family.multiget(keys)
+    validate_time = s.elapsed()
+    return (generate_time, validate_time)
 
 
 class TestGlobalRowKeyCache(Tester):
@@ -25,115 +58,144 @@ class TestGlobalRowKeyCache(Tester):
 #        self.allow_log_errors = True
 
 
-    def general_correctness_test(self):
+
+    def functional_test(self):
+        """
+        Test that save and load work in the situation when you write to
+        different CFs. Read 2 or 3 times to make sure the page cache doesn't
+        skew the results.
+        """
+
+        # create some rows to insert
+        NUM_INSERTS = 1000
+        NUM_UPDATES = 100
+        NUM_DELETES = 10
+
+        cluster = self.cluster
+        cluster.set_cassandra_dir(git_branch='trunk')
+#        cluster.set_cassandra_dir(cassandra_version='1.0.7')
+        cluster.populate(3)
+        node1 = cluster.nodelist()[0]
+
+        run_times = {}
+        for kcsim in (0, 2):
+            for rcsim in (0, 2):
+                setup_name = "%d_%d" % (kcsim, rcsim)
+                ks_name = 'ks_' + setup_name
+                cf_name = 'cf_' + setup_name
+
+                print "setup", setup_name
+#                cluster.set_configuration_options(values={
+#                        'key_cache_size_in_mb': kcsim,
+#                        'row_cache_size_in_mb': rcsim,
+#                        'row_cache_save_period': 5,
+#                        'key_cache_save_period': 5,
+#                        })
+                cluster.start()
+                time.sleep(.5)
+                cursor = self.cql_connection(node1).cursor()
+                self.create_ks(cursor, ks_name, 3)
+                time.sleep(1) # wait for propagation
+
+                # create some load makers
+                lm_standard = LoadMaker(keyspace_name=ks_name, column_family_type='standard')
+                lm_super = LoadMaker(keyspace_name=ks_name, column_family_type='super')
+                lm_counter = LoadMaker(keyspace_name=ks_name, column_family_type='standard', is_counter=True)
+                lm_counter_super = LoadMaker(keyspace_name=ks_name, column_family_type='super', is_counter=True)
+
+                # insert some rows
+                lm_standard.generate(NUM_INSERTS)
+                lm_super.generate(NUM_INSERTS)
+                lm_counter.generate(NUM_INSERTS)
+                lm_counter_super.generate(NUM_INSERTS)
+
+                # flush everything to get it into sstables
+                for node in cluster.nodelist():
+                    node.flush()
+
+                print "Validating"
+                for i in range(3):
+                    # read and modify multiple times to get data into and invalidated out of the cache.
+                    lm_standard.update(NUM_UPDATES).delete(NUM_DELETES).validate()
+                    lm_super.update(NUM_UPDATES).delete(NUM_DELETES).validate()
+                    lm_counter.generate().validate()
+                    lm_counter_super.generate().validate()
+
+
+
+                lm_counter_super.validate()
+
+                # flush everything to get it into sstables
+#                for node in cluster.nodelist():
+#                    node.flush()
+
+                # let the data be written to the row/key caches.
+                print "Letting caches be written"
+                time.sleep(10)
+                print "Stopping cluster"
+                cluster.stop()
+                time.sleep(1)
+                print "Starting cluster"
+                cluster.start()
+                time.sleep(5) # read the data back from row and key caches
+
+                lm_standard.set_server_list()
+                lm_super.set_server_list()
+                lm_counter.set_server_list()
+                lm_counter_super.set_server_list()
+
+                print "Validating again..."
+                for i in range(2):
+                    # read and modify multiple times to get data into and invalidated out of the cache.
+                    lm_standard.validate()
+                    lm_super.validate()
+                    lm_counter.validate()
+                    lm_counter_super.validate()
+
+
+                cluster.stop()
+
+
+        pprint.pprint(run_times)
+                
+
+
+
+
+
+
+    # TODO: Set up the configuration on a single cluster, don't try to mess 
+    # with multiple clusters. Errors happen.
+    # TODO: Do the performance testing first, to make sure we're talking 
+    # to cached clusters.
+
+    def general_correctness(self, key_cache_size_in_mb, row_cache_size_in_mb):
         """
         Tests insert/update/delete/read in various configurations to validate
         that data written comes back correct.
         """
-        for key_cache_size_in_mb in [0, 2]:
-            for row_cache_size_in_mb in [0, 2]:
-                self.setUp()
-                self.tearDown()
+        # get ourselves a fresh new cluster
+        print("Starting a cluster with key_cache_size_in_mb=%d and "
+            "row_cache_size_in_mb=%d" % (key_cache_size_in_mb,
+            row_cache_size_in_mb))
+        self.cluster.set_cassandra_dir(git_branch='trunk')
+        self.cluster.set_configuration_options(values={
+                'key_cache_size_in_mb': key_cache_size_in_mb,
+                'row_cache_size_in_mb': row_cache_size_in_mb,})
+        self.cluster.populate(1).start()
+        [node1] = self.cluster.nodelist()
+
+
+#    def general_0_0_test(self):
+#        self.general_correctness(0, 0)
+#    def general_0_1_test(self):
+#        self.general_correctness(0, 1)
+#    def general_1_0_test(self):
+#        self.general_correctness(1, 0)
+#    def general_1_1_test(self):
+#        self.general_correctness(1, 1)
+#                
                 
-                
-        
-        
-
-    def general_correctness_unused(self):
-        logging.info("Called rolling_upgrade_node for: %s %s" % 
-                (node.name, node.address()))
-        logging.info("Stress node log file: " + stress_node.logfilename())
-        logging.info("Stress node address: " + stress_node.address() + ':' + 
-                stress_node.jmx_port)
-
-        keyspace = 'rolling_ks'
-    
-        lm_standard = loadmaker.LoadMaker(column_family_name='rolling_cf_standard',
-                consistency_level='TWO', keyspace_name=keyspace)
-        lm_super = loadmaker.LoadMaker(column_family_name='rolling_cf_super',
-                column_family_type='super', num_cols=2, consistency_level='TWO', 
-                keyspace_name=keyspace)
-        lm_counter_standard = loadmaker.LoadMaker(
-                column_family_name='rolling_cf_counter_standard', 
-                is_counter=True, consistency_level='TWO', num_cols=3, 
-                keyspace_name=keyspace)
-        lm_counter_super = loadmaker.LoadMaker(
-                column_family_name='rolling_cf_counter_super', 
-                is_counter=True, consistency_level='TWO',
-                column_family_type='super', num_cols=2,
-                num_counter_rows=20, num_subcols=2, keyspace_name=keyspace)
-
-        loader_standard = loadmaker.ContinuousLoader([stress_node.address()], 
-                sleep_between=1,
-                load_makers=
-                [
-                    lm_standard, 
-                    lm_super, 
-                ])
-        loader_counter = loadmaker.ContinuousLoader([stress_node.address()], 
-                sleep_between=1,
-                load_makers=
-                [
-                    lm_counter_standard, 
-                    lm_counter_super, 
-                ])
-    
-        logging.debug("Sleeping to get some data into the cluster")
-        time.sleep(5)
-
-        logging.info("pausing counter-add load. This is because a "
-                "dead-but-not-detected-dead node will cause errors on "
-                "counter-add.")
-        loader_counter.pause()
-        time.sleep(2)
-
-        logging.info("draining...")
-        node.nodetool('drain')
-        logging.info("stopping...")
-        node.stop(wait_other_notice=False)
-        logging.info("Node stopped. Sleeping to let gossip detect it as down...")
-        time.sleep(30)
-
-        logging.info("Resuming counter loader")
-        loader_counter.unpause()
-
-        logging.info("Letting the counter loader generate some load")
-        time.sleep(10)
-
-        logging.info("Upgrading node")
-        logging.info("setting dir...")
-        node.set_cassandra_dir(git_branch="trunk")
-            
-        logging.info("starting...")
-        node.start(wait_other_notice=True)
-        logging.info("scrubbing...")
-        node.nodetool('scrub')
-
-        logging.info("validating standard data...")
-        loader_standard.read_and_validate(step=10)
-        loader_standard.exit()
-        logging.info("validating counter data...")
-        loader_counter.read_and_validate(step=10)
-        loader_counter.exit()
-
-        logging.info("Done upgrading node %s.\n" % node.name)
-
-
-    def upgrade089_to_repo(self):
-        logging.info("*** Starting on upgrade089_to_repo_test ***")
-        cluster = self.cluster
-
-        cluster.set_cassandra_dir(cassandra_version="0.8.9")
-
-        cluster.populate(3, tokens=[0, 2**125, 2**126]).start()
-        [node1, node2, node3] = cluster.nodelist()
-
-        self.rolling_upgrade_node(node1, stress_node=node2)
-        self.rolling_upgrade_node(node2, stress_node=node3)
-        self.rolling_upgrade_node(node3, stress_node=node1)
-
-        cluster.flush()
-        cluster.cleanup()
 
 
 
