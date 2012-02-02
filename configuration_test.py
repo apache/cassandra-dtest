@@ -26,7 +26,7 @@ class TestConfiguration(Tester):
 
     def _check_chunk_length(self, cli, value):
         cli.do("describe cf")
-        assert not cli.has_errors()
+        assert not cli.has_errors(), cli.errors()
 
         output = cli.last_output()
         m = re.search(r'chunk_length_kb:\s*(\d+)', output)
