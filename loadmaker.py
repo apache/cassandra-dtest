@@ -201,8 +201,6 @@ class LoadMaker(object):
         This increments each by one.
         """
         def add_func(row_key, col_name, subcol_name=None):
-            if row_key == 'row_0' and col_name == 'col_0' and subcol_name == 'col_0':
-                print "**** FOUND ONE!", row_key, col_name, subcol_name
             cf.add(row_key, col_name, super_column=subcol_name,
                     write_consistency_level=self._params['validated_consistency_level'])
         self._iterate_over_counter_columns(add_func)

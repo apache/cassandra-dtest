@@ -22,32 +22,6 @@ import pycassa.system_manager as system_manager
 logging.basicConfig(level=logging.INFO)
 logging.info("Starting...")
 
-class Stopwatch(object):
-    def __init__(self):
-        self._start = time.time()
-    def elapsed(self):
-        return time.time() - self._start
-
-def time_load(column_family, rows, num_runs=3):
-    """
-    runs stress_obj.stress(stress_args). Does it num_runs times
-    and returns the time in seconds for the last run.
-    The reason we do this multiple times is to get the caches warmed up.
-    """
-    for i in range(num_runs):
-        print "generating..."
-        s = Stopwatch()
-        column_family.batch_insert(rows)
-    generate_time = s.elapsed()
-
-    keys = rows.keys()
-    for i in range(num_runs):
-        print "Validating..."
-        s = Stopwatch()
-        column_family.multiget(keys)
-    validate_time = s.elapsed()
-    return (generate_time, validate_time)
-
 
 class TestGlobalRowKeyCache(Tester):
 
@@ -56,8 +30,6 @@ class TestGlobalRowKeyCache(Tester):
         # When a node goes down under load it prints an error in it's log. 
         # If we don't allow log errors, then the test will fail.
 #        self.allow_log_errors = True
-
-
 
     def functional_test(self):
         """
@@ -77,20 +49,19 @@ class TestGlobalRowKeyCache(Tester):
         cluster.populate(3)
         node1 = cluster.nodelist()[0]
 
-        run_times = {}
-        for kcsim in (0, 2):
-            for rcsim in (0, 2):
+        for kcsim in (0, 10):
+            for rcsim in (0, 10):
                 setup_name = "%d_%d" % (kcsim, rcsim)
                 ks_name = 'ks_' + setup_name
                 cf_name = 'cf_' + setup_name
 
                 print "setup", setup_name
-#                cluster.set_configuration_options(values={
-#                        'key_cache_size_in_mb': kcsim,
-#                        'row_cache_size_in_mb': rcsim,
-#                        'row_cache_save_period': 5,
-#                        'key_cache_save_period': 5,
-#                        })
+                cluster.set_configuration_options(values={
+                        'key_cache_size_in_mb': kcsim,
+                        'row_cache_size_in_mb': rcsim,
+                        'row_cache_save_period': 5,
+                        'key_cache_save_period': 5,
+                        })
                 cluster.start()
                 time.sleep(.5)
                 cursor = self.cql_connection(node1).cursor()
@@ -119,7 +90,7 @@ class TestGlobalRowKeyCache(Tester):
                     lm_standard.update(NUM_UPDATES).delete(NUM_DELETES).validate()
                     lm_super.update(NUM_UPDATES).delete(NUM_DELETES).validate()
                     lm_counter.generate().validate()
-                    lm_counter_super.generate().validate()
+#                    lm_counter_super.generate().validate()
 
 
 
@@ -150,52 +121,9 @@ class TestGlobalRowKeyCache(Tester):
                     lm_standard.validate()
                     lm_super.validate()
                     lm_counter.validate()
-                    lm_counter_super.validate()
+#                    lm_counter_super.validate()
 
 
                 cluster.stop()
-
-
-        pprint.pprint(run_times)
-                
-
-
-
-
-
-
-    # TODO: Set up the configuration on a single cluster, don't try to mess 
-    # with multiple clusters. Errors happen.
-    # TODO: Do the performance testing first, to make sure we're talking 
-    # to cached clusters.
-
-    def general_correctness(self, key_cache_size_in_mb, row_cache_size_in_mb):
-        """
-        Tests insert/update/delete/read in various configurations to validate
-        that data written comes back correct.
-        """
-        # get ourselves a fresh new cluster
-        print("Starting a cluster with key_cache_size_in_mb=%d and "
-            "row_cache_size_in_mb=%d" % (key_cache_size_in_mb,
-            row_cache_size_in_mb))
-        self.cluster.set_cassandra_dir(git_branch='trunk')
-        self.cluster.set_configuration_options(values={
-                'key_cache_size_in_mb': key_cache_size_in_mb,
-                'row_cache_size_in_mb': row_cache_size_in_mb,})
-        self.cluster.populate(1).start()
-        [node1] = self.cluster.nodelist()
-
-
-#    def general_0_0_test(self):
-#        self.general_correctness(0, 0)
-#    def general_0_1_test(self):
-#        self.general_correctness(0, 1)
-#    def general_1_0_test(self):
-#        self.general_correctness(1, 0)
-#    def general_1_1_test(self):
-#        self.general_correctness(1, 1)
-#                
-                
-
 
 
