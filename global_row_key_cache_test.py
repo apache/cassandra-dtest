@@ -44,7 +44,7 @@ class TestGlobalRowKeyCache(Tester):
         NUM_DELETES = 10
 
         cluster = self.cluster
-        cluster.set_cassandra_dir(git_branch='trunk')
+        cluster.set_cassandra_dir(git_branch='cassandra-1.1')
 #        cluster.set_cassandra_dir(cassandra_version='1.0.7')
         cluster.populate(3)
         node1 = cluster.nodelist()[0]
