@@ -32,6 +32,7 @@ class LoadMaker(object):
         'keyspace_strategy_options': {'replication_factor': '3'},
 
         'is_counter': False,
+        'is_indexed': False,
         'column_family_name': None, # needs to be overwritten for the moment
         'consistency_level': 'QUORUM',
         'column_family_type': 'standard',
@@ -48,10 +49,12 @@ class LoadMaker(object):
 
         # allow for overwriting any of the defaults
         self._params = LoadMaker._DEFAULTS.copy()
+        cf_name_generated = 'cf'
         for key, value in kwargs.items():
             if key not in self._params.keys():
                 raise AttributeError("%s is an illegal arguement!" % key)
             self._params[key] = value
+            cf_name_generated += '_' + key + '_' + re.sub('\W', '', str(value))
 
         # validate the consistency_level
         self._params['validated_consistency_level'] = getattr(
@@ -60,8 +63,26 @@ class LoadMaker(object):
         # column_family_type should be lowercase so that future comparisons will work.
         self._params['column_family_type'] = self._params['column_family_type'].lower()
 
-        self._inserted_key_count = 0
+        # use our generated column family name if not given:
+        if self._params['column_family_name'] is None:
+            # keep the column family name within 32 chars:
+            if len(cf_name_generated) > 32:
+                import hashlib
+                cf_name_generated = hashlib.md5(cf_name_generated).hexdigest()
+            self._params['column_family_name'] = cf_name_generated
+
         self._num_generate_calls = 0
+
+        # Keys are in a sort of ever-growing queue. They are inserted at the
+        # end of high indexes, and updated and deleted from low indexes.
+        # Currently you can only delete() keys that you have update()d.
+        self._inserted_key_count = 0
+        self._updated_key_count = 0
+        self._deleted_key_count = 0
+
+        # time each DB operationan and return the last one. Only times,
+        # as much as possible, the DB portion of the operation.
+        self.last_operation_time = 0
 
         self.create_keyspace()
         self.set_server_list(server_list)
@@ -98,6 +119,54 @@ class LoadMaker(object):
 
         self._inserted_key_count = new_inserted_key_count
         self._num_generate_calls += 1
+
+        return self
+
+    def update(self, num_keys=1000):
+        """
+        Update some keys that were previously inserted.
+        """
+        saved_updated_key_count = self._updated_key_count
+        self._updated_key_count += num_keys
+        assert self._updated_key_count <= self._inserted_key_count, "You have to generate() more then you update()!"
+
+        cf = pycassa.ColumnFamily(self._connection_pool, self._params['column_family_name'])
+        if self._params['is_counter']:
+            raise NotImplemented("Counter updates have not been implemented yet.")
+        else:
+            rows = self._gen_rows(saved_updated_key_count, self._updated_key_count)
+            # do the update
+            cf.batch_insert(rows, write_consistency_level=self._params['validated_consistency_level'])
+            logging.debug("update() inserted %d rows" % len(rows))
+
+            # remove the first column from each row
+            for row_key in rows.keys():
+                col_name = self._generate_col_name(self._params['comparator_type'], 0)
+                cf.remove(row_key, columns=[col_name], write_consistency_level=self._params['validated_consistency_level'])
+
+                # remove the first subcol of every super column
+                if self._params['column_family_type'] == 'super':
+                    for col_name in rows[row_key]:
+                        subcol_name = self._generate_col_name(self._params['comparator_type'], 0)
+                        cf.remove(row_key, super_column=col_name, columns=[subcol_name], 
+                                write_consistency_level=self._params['validated_consistency_level'])
+
+        return self
+
+    def delete(self, num_keys=100):
+        """
+        deletes some rows.
+        """
+        saved_deleted_key_count = self._deleted_key_count
+        self._deleted_key_count += num_keys
+        assert self._deleted_key_count <= self._updated_key_count, "You have to update() more then you delete()!"
+
+        cf = pycassa.ColumnFamily(self._connection_pool, self._params['column_family_name'])
+        row_keys = [self._generate_row_key(i) for i in xrange(saved_deleted_key_count, self._deleted_key_count)]
+        for row_key in row_keys:
+            cf.remove(row_key, write_consistency_level=self._params['validated_consistency_level'])
+        return self
+            
 
     def _iterate_over_counter_columns(self, func):
         """
@@ -169,10 +238,18 @@ class LoadMaker(object):
                 read_row_value = read_rows[row_key]
                 if row_value != read_row_value:
                     raise AssertionError(
-                    "The value written does not match the value read! written: %s written: %s" %
+                    "The value written does not match the value read! should be: %s was: %s" %
                     (pprint.pformat(row_value), pprint.pformat(read_row_value)))
 
+            # make sure that deleted rows really are gone.
+            row_keys = [self._generate_row_key(i) for i in xrange(0, self._deleted_key_count, step)]
+            read_rows = cf.multiget(row_keys, read_consistency_level=
+                    self._params['validated_consistency_level'])
+
+
+
         logging.debug("validate() succeeded")
+        return self
 
     def _validate_counter(self, cf):
         def validate_func(row_key, col_name, subcol_name=None):
@@ -182,7 +259,7 @@ class LoadMaker(object):
                 from_db = cf.get(row_key, [col_name], super_column=subcol_name,
                         read_consistency_level=self._params['validated_consistency_level'])
             except:
-                logger.error("cf.get failed!" + str(row_key) + " " + 
+                logging.error("cf.get failed!" + str(row_key) + " " + 
                         str(col_name) + " " + str(subcol_name) + " " + str(self))
                 raise
             val = from_db[col_name]
@@ -193,22 +270,29 @@ class LoadMaker(object):
     def _gen_rows(self, start_index, end_index, step=1):
         """
         Generates a bunch of rows from start_index (inclusive) to end_index (exclusive).
+        Properly generates updated or non-updated rows.
         """
         rows = dict()
-        for row_num in xrange(start_index, end_index, step):
+        for row_num in xrange(max(start_index, self._deleted_key_count), end_index, step):
+            if row_num < self._updated_key_count:
+                is_update = True
+                shift_by_one = 1
+            else:
+                is_update = False
+                shift_by_one = 0
             if self._params['column_family_type'] == 'super':
                 sub_cols = dict((
                         self._generate_col_name(self._params['subcomparator_type'], i),
-                        self._generate_col_value(i)
-                        ) for i in xrange(self._params['num_subcols']))
+                        self._generate_col_value(i, is_update)
+                        ) for i in xrange(shift_by_one, self._params['num_subcols']+shift_by_one))
                 cols = dict((
                         self._generate_col_name(self._params['comparator_type'], i),
-                        sub_cols) for i in xrange(self._params['num_cols']))
+                        sub_cols) for i in xrange(shift_by_one, self._params['num_cols']+shift_by_one))
             else:
                 cols = dict((
                         self._generate_col_name(self._params['comparator_type'], i),
-                        self._generate_col_value(i))
-                        for i in xrange(self._params['num_cols']))
+                        self._generate_col_value(i, is_update))
+                        for i in xrange(shift_by_one, self._params['num_cols']+shift_by_one))
 
             rows[self._generate_row_key(row_num)] = cols
 
@@ -220,8 +304,13 @@ class LoadMaker(object):
     def _generate_col_name(self, subcomparator, num):
         return self._convert(subcomparator, prefix='col_', num=num)
 
-    def _generate_col_value(self, num):
-        return self._convert(self._params['validation_type'], prefix='val_', num=num)
+    def _generate_col_value(self, num, is_update=False):
+        # is_update means that the value should be modified to indicate it has been updated.
+        prefix = 'val_'
+        if is_update:
+            num += 10000
+            prefix = 'val_updated_'
+        return self._convert(self._params['validation_type'], prefix=prefix, num=num)
 
     def _convert(self, target_type, prefix=None, num=None):
         if target_type in ('AsciiType', 'BytesType'):
@@ -250,7 +339,7 @@ class LoadMaker(object):
         if target_type == 'CounterColumnType':
             return int(num)
 
-    def set_server_list(self, server_list):
+    def set_server_list(self, server_list=['localhost']):
         self._connection_pool = pycassa.ConnectionPool(
                 self._params['keyspace_name'], timeout=30,
                 server_list=server_list, prefill=True, max_retries=0)
@@ -290,9 +379,11 @@ class LoadMaker(object):
                 def read_val_func(row_key, col_name, subcol_name=None):
                     cf = pycassa.ColumnFamily(self._connection_pool, 
                             self._params['column_family_name'])
-                    from_db = cf.get(row_key, [col_name], super_column=subcol_name)
+                    from_db = cf.get(row_key, [col_name], super_column=subcol_name,
+                            read_consistency_level=self._params['validated_consistency_level'])
                     val = from_db[col_name]
                     self._num_generate_calls = val
+                    logging.info("set initial counter count from the db. Value: %d" % val)
                     # misuse this exception. We just needed something to stop
                     # from iterating over the whole space. We only need one value!
                     raise StopIteration()
