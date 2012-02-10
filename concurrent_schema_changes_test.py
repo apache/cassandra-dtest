@@ -5,6 +5,7 @@ import random
 import time
 import os
 import sys
+import re
 from threading import Thread
 
 def wait(delay=2):
@@ -15,7 +16,7 @@ def wait(delay=2):
 
 class TestUpgrade(Tester):
 
-    def prepare_for_changes(self, cursor, namespace='ns1', version='v1'):
+    def prepare_for_changes(self, cursor, namespace='ns1'):
         """
         prepares for schema changes by creating a keyspace and column family.
         """
@@ -56,10 +57,8 @@ class TestUpgrade(Tester):
         """ % namespace
         cursor.execute(query)
 
-        wait(3)
 
-
-    def make_schema_changes(self, cursor, namespace='ns1', version='v1'):
+    def make_schema_changes(self, cursor, namespace='ns1'):
         """
         makes a heap of changes.
 
@@ -87,17 +86,15 @@ class TestUpgrade(Tester):
         # drop column family
         cursor.execute("DROP COLUMNFAMILY cf2_%s" % namespace)
 
-        wait(2)
-
         # create column family
         query = """
             CREATE TABLE cf3_%s (
                 col1 uuid PRIMARY KEY,
                 col2 text,
                 col3 text,
-                %s text
+                col4 text
             );
-        """ % (namespace, version)
+        """ % (namespace)
         cursor.execute(query)
 
         # alter column family
@@ -115,38 +112,111 @@ class TestUpgrade(Tester):
 
 
 
-    def validate_schema_consistent(self, keyspace_name, nodes):
+    def validate_schema_consistent(self, node):
         """
-        does a "DESCRIBE KEYSPACE" on each node and makes sure that the 
-        keyspaces are consistent.
-
-        keyspace_name is a string
-        nodes is a list of ccm nodes
+        does a "DESCRIBE CLUSTER" on the node and makes sure that
+        there is only one schema.
         """
 
-        last_result = None
-        last_node = None
-        for node in nodes:
-            cli = node.cli()
-            wait(3) # not sleeping till the cli is running causes wierd errors
-            cli.do("DESCRIBE %s" % keyspace_name)
-            result = cli.last_output()
-            if cli.has_errors():
-                raise Exception("error when describing the keyspace: %s" % cli.last_error())
-            if last_result:
-                # the keyspaces can be the same and still have things listed 
-                # in a different order. By sorting the lines, we throw out the
-                # order. This could potentially allow uncaught problems, like
-                # a column being listed on the wrong column family. 
-                if sorted(result.splitlines()) != sorted(last_result.splitlines()):
-                    raise Exception("Schemas don't match between nodes %s and %s!"
-                            "\nschema1: %s\nschema2: %s" % (last_node.name, node.name,
-                            last_result, result))
-            last_result = result
-            last_node = node
+        cli = node.cli()
+        wait(3)
+        cli.do("describe cluster")
+        res = cli.last_output()
+        # This is messing up the terminal, and I can't figure out why. Fix it.
+        os.system('tset') 
+        schemas = re.findall('[\dabcdef]{8}-[\dabcdef]{4}-[\dabcdef]{4}-[\dabcdef]{4}-[\dabcdef]{12}:', res)
+        assert len(schemas) == 1, "More or less then 1 schema was found! Here is the 'describe_cluster: %s" % res
 
     
-    def decommission_node_tes(self):
+    def basic_test(self):
+        """
+        make sevaral schema changes on the same node.
+        """
+
+        cluster = self.cluster
+        cluster.set_cassandra_dir(git_branch='cassandra-1.1')
+        cluster.populate(2).start()
+        node1 = cluster.nodelist()[0]
+        wait(2)
+        cursor = self.cql_connection(node1).cursor()
+
+        self.prepare_for_changes(cursor, namespace='ns1')
+
+        self.make_schema_changes(cursor, namespace='ns1')
+
+        cluster.cleanup()
+
+    
+    def changes_to_different_nodes_test(self):
+        cluster = self.cluster
+        cluster.set_cassandra_dir(git_branch='cassandra-1.1')
+        cluster.populate(2).start()
+        [node1, node2] = cluster.nodelist()
+        wait(2)
+        cursor = self.cql_connection(node1).cursor()
+        self.prepare_for_changes(cursor, namespace='ns1')
+        self.make_schema_changes(cursor, namespace='ns1')
+        wait(3)
+        self.validate_schema_consistent(node1)
+
+        # wait for changes to get to the first node
+        wait(20)
+
+        cursor = self.cql_connection(node2).cursor()
+        self.prepare_for_changes(cursor, namespace='ns2')
+        self.make_schema_changes(cursor, namespace='ns2')
+        self.validate_schema_consistent(node1)
+        # check both, just because we can
+        self.validate_schema_consistent(node2)
+
+
+    
+    def changes_while_node_down_test(self):
+        """
+        Phase 1:
+            Make schema changes to node 1 while node 2 is down. 
+            Then bring up 2 and make sure it gets the changes. 
+
+        Phase 2: 
+            Then bring down 1 and change 2. 
+            Bring down 2, bring up 1, and finally bring up 2. 
+            1 should get the changes. 
+        """
+        cluster = self.cluster
+        cluster.set_cassandra_dir(git_branch='cassandra-1.1')
+        cluster.populate(2).start()
+        [node1, node2] = cluster.nodelist()
+        wait(2)
+        cursor = self.cql_connection(node1).cursor()
+
+        # Phase 1
+        node2.stop()
+        wait(2)
+        self.prepare_for_changes(cursor, namespace='ns1')
+        self.make_schema_changes(cursor, namespace='ns1')
+        node2.start()
+        wait(3)
+        self.validate_schema_consistent(node1)
+        self.validate_schema_consistent(node2)
+
+        # Phase 2
+        cursor = self.cql_connection(node2).cursor()
+        self.prepare_for_changes(cursor, namespace='ns2')
+        node1.stop()
+        wait(2)
+        self.make_schema_changes(cursor, namespace='ns2')
+        wait(2)
+        node2.stop()
+        wait(2)
+        node1.start()
+        node2.start()
+        wait(20)
+        self.validate_schema_consistent(node1)
+
+        cluster.cleanup()
+
+    
+    def decommission_node_test(self):
         cluster = self.cluster
 
         cluster.set_cassandra_dir(git_branch='cassandra-1.1')
@@ -179,12 +249,12 @@ class TestUpgrade(Tester):
         node3.start()
 
         wait(2)
-        self.validate_schema_consistent('ks_ns1', [node1, node3])
+        self.validate_schema_consistent(node1)
 
         cluster.cleanup()
 
 
-    def snapshot_tes(self):
+    def snapshot_test(self):
         cluster = self.cluster
         cluster.set_cassandra_dir(git_branch='cassandra-1.1')
         cluster.populate(2).start()
@@ -228,7 +298,7 @@ class TestUpgrade(Tester):
         cluster.start()
 
         wait(2)
-        self.validate_schema_consistent('ks_ns2', [node1, node2])
+        self.validate_schema_consistent(node1)
 
         cluster.cleanup()
 
@@ -238,16 +308,12 @@ class TestUpgrade(Tester):
         applies schema changes while the cluster is under load.
         """
 
-
         cluster = self.cluster
         cluster.set_cassandra_dir(git_branch='cassandra-1.1')
         cluster.populate(1).start()
         node1 = cluster.nodelist()[0]
         wait(2)
         cursor = self.cql_connection(node1).cursor()
-
-#        self.prepare_for_changes(cursor)
-#        wait(2)
 
         def stress(args=[]):
             print "Stressing"
@@ -278,5 +344,5 @@ class TestUpgrade(Tester):
 
         tcompact.join()
 
-
+        cluster.cleanup()
 
