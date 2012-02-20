@@ -74,6 +74,8 @@ class Tester(object):
         with open(LAST_TEST_DIR, 'w') as f:
             f.write(self.test_path + '\n')
             f.write(self.cluster.name)
+        if DEBUG:
+            self.cluster.set_log_level("DEBUG")
         self.connections = []
         self.runners = []
 
