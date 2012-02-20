@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+from dtest import debug
 import inspect
 import os
 import pickle
@@ -11,7 +12,6 @@ import time
 import uuid
 import pprint
 import threading
-import logging
 
 import pycassa
 import pycassa.system_manager as system_manager
@@ -105,7 +105,7 @@ class LoadMaker(object):
         """
         Generates a bunch of data and inserts it into cassandra
         """
-        logging.debug( "Generate() starting " + str(self))
+        debug("Generate() starting " + str(self))
         new_inserted_key_count = self._inserted_key_count + num_keys
 
         cf = pycassa.ColumnFamily(self._connection_pool, self._params['column_family_name'])
@@ -115,7 +115,7 @@ class LoadMaker(object):
         else:
             rows = self._gen_rows(self._inserted_key_count, new_inserted_key_count)
             cf.batch_insert(rows, write_consistency_level=self._params['validated_consistency_level'])
-            logging.debug("Generate inserted %d rows" % len(rows))
+            debug("Generate inserted %d rows" % len(rows))
 
         self._inserted_key_count = new_inserted_key_count
         self._num_generate_calls += 1
@@ -137,7 +137,7 @@ class LoadMaker(object):
             rows = self._gen_rows(saved_updated_key_count, self._updated_key_count)
             # do the update
             cf.batch_insert(rows, write_consistency_level=self._params['validated_consistency_level'])
-            logging.debug("update() inserted %d rows" % len(rows))
+            debug("update() inserted %d rows" % len(rows))
 
             # remove the first column from each row
             for row_key in rows.keys():
@@ -191,7 +191,7 @@ class LoadMaker(object):
                 else:
                     func(row_key, col_name)
                     col_count += 1
-        logging.debug("iterated over %d counter columns" % col_count)
+        debug("iterated over %d counter columns" % col_count)
 
 
     def _generate_counter(self, cf):
@@ -213,7 +213,7 @@ class LoadMaker(object):
         is greater than what has been inserted, it will read to the last
         value that was inserted.
         """
-        logging.debug("validate() starting " + str(self))
+        debug("validate() starting " + str(self))
         if end_index > self._inserted_key_count:
             end_index = self._inserted_key_count
         assert(start_index <= end_index)
@@ -248,7 +248,7 @@ class LoadMaker(object):
 
 
 
-        logging.debug("validate() succeeded")
+        debug("validate() succeeded")
         return self
 
     def _validate_counter(self, cf):
@@ -259,9 +259,7 @@ class LoadMaker(object):
                 from_db = cf.get(row_key, [col_name], super_column=subcol_name,
                         read_consistency_level=self._params['validated_consistency_level'])
             except:
-                logging.error("cf.get failed!" + str(row_key) + " " + 
-                        str(col_name) + " " + str(subcol_name) + " " + str(self))
-                raise
+                assert false, "cf.get failed!" + str(row_key) + " " + str(col_name) + " " + str(subcol_name) + " " + str(self)
             val = from_db[col_name]
             assert val == self._num_generate_calls, "A counter did not have the right value! %s != %s" %(val, self._num_generate_calls)
         self._iterate_over_counter_columns(validate_func)
@@ -357,11 +355,11 @@ class LoadMaker(object):
         if keyspace_name not in keyspaces:
             sm.create_keyspace(keyspace_name, strategy_options=
                     self._params['keyspace_strategy_options'])
-            logging.info("Created keyspace %s" % keyspace_name)
+            debug("Created keyspace %s" % keyspace_name)
         else:
-            logging.debug("keyspace %s already existed" % keyspace_name)
+            debug("keyspace %s already existed" % keyspace_name)
 
-#        logging.debug("keyspace replication factor: " + str(
+#        debug("keyspace replication factor: " + str(
 #                sm.describe_keyspace(keyspace_name)['replication_factor']))
         sm.close()
 
@@ -372,7 +370,7 @@ class LoadMaker(object):
         if cf_name in sm.get_keyspace_column_families(
                 self._params['keyspace_name']).keys():
             # column family already exists
-            logging.debug("column family %s already exists" % cf_name)
+            debug("column family %s already exists" % cf_name)
             if self._params['is_counter']:
                 # Now pre-set self._num_generate_calls so that the counter
                 # will be synchronized with what it should be:
@@ -383,7 +381,7 @@ class LoadMaker(object):
                             read_consistency_level=self._params['validated_consistency_level'])
                     val = from_db[col_name]
                     self._num_generate_calls = val
-                    logging.info("set initial counter count from the db. Value: %d" % val)
+                    debug("set initial counter count from the db. Value: %d" % val)
                     # misuse this exception. We just needed something to stop
                     # from iterating over the whole space. We only need one value!
                     raise StopIteration()
@@ -405,13 +403,11 @@ class LoadMaker(object):
                     super=self._params['column_family_type']=='super',
                 )
 
-            logging.info("Created column family %s" % cf_name)
-        logging.debug("column family %s: %s" % (cf_name, 
+            debug("Created column family %s" % cf_name)
+        debug("column family %s: %s" % (cf_name, 
             sm.get_keyspace_column_families(self._params['keyspace_name'])[cf_name]
         ))
         sm.close()
-
-
 
 
 class ContinuousLoader(threading.Thread):
@@ -441,7 +437,7 @@ class ContinuousLoader(threading.Thread):
             load_maker.set_server_list(server_list)
 
         # make sure each loader gets called at least once.
-        logging.debug("calling ContinuousLoader()._generate_load_once() from __init__().")
+        debug("calling ContinuousLoader()._generate_load_once() from __init__().")
         self._generate_load_once()
 
         # now fire up the loaders to continuously load the system.
@@ -451,18 +447,18 @@ class ContinuousLoader(threading.Thread):
         """
         applies load whenever it isn't paused.
         """
-        logging.info("Loadmaker started")
+        debug("Loadmaker started")
         while True:
             if self._should_exit:
                 break
             self._generate_load_once()
-        logging.info("continuous loader exiting.")
+        debug("continuous loader exiting.")
 
     def _generate_load_once(self):
         """
         runs one round of load with all the load_makers.
         """
-        logging.debug("ContinuousLoader()._generate_load_once() starting")
+        debug("ContinuousLoader()._generate_load_once() starting")
         for load_maker in self._load_makers:
             self._inserting_lock.acquire()
 
@@ -481,7 +477,7 @@ class ContinuousLoader(threading.Thread):
                 self._inserting_lock.release()
             if self._sleep_between:
                 time.sleep(self._sleep_between)
-        logging.debug("ContinuousLoader()._generate_load_once() done.")
+        debug("ContinuousLoader()._generate_load_once() done.")
 
     def exit(self):
         self._should_exit = True
@@ -501,10 +497,10 @@ class ContinuousLoader(threading.Thread):
         reads back all the data that has been inserted.
         Pauses loading while validating. Cannot already be paused.
         """
-        logging.debug("read_and_validate()")
+        debug("read_and_validate()")
         self.check_exc()
         self.pause()
-        logging.debug("Sleeping %.2f seconds.." % pause_before_validate)
+        debug("Sleeping %.2f seconds.." % pause_before_validate)
         time.sleep(pause_before_validate)
         for load_maker in self._load_makers:
             try:
@@ -521,7 +517,7 @@ class ContinuousLoader(threading.Thread):
         """
         assert self._is_loading == True, "Called Pause while not loading!"
         self._inserting_lock.acquire()
-        logging.debug("paused continuousloader...")
+        debug("paused continuousloader...")
         self._is_loading = False
 
     def unpause(self):
@@ -529,7 +525,7 @@ class ContinuousLoader(threading.Thread):
         releases the _inserting_lock to resume loading.
         """
         assert self._is_loading == False, "Called Pause while loading!"
-        logging.debug("unpausing continuousloader...")
+        debug("unpausing continuousloader...")
         self._inserting_lock.release()
         self._is_loading = True
 

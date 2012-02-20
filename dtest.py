@@ -1,9 +1,11 @@
 from __future__ import with_statement
-import os, tempfile, sys, shutil, types, time, threading, ConfigParser
+import os, tempfile, sys, shutil, types, time, threading, ConfigParser, logging
 
 from ccmlib.cluster import Cluster
 from ccmlib.node import Node
 from nose.exc import SkipTest
+
+logging.basicConfig(stream=sys.stderr)
 
 LOG_SAVED_DIR="logs"
 LAST_LOG = os.path.join(LOG_SAVED_DIR, "last")
@@ -16,7 +18,14 @@ if len(config.read(os.path.expanduser('~/.cassandra-dtest'))) > 0:
     if config.has_option('main', 'default_dir'):
         DEFAULT_DIR=os.path.expanduser(config.get('main', 'default_dir'))
 
-NO_SKIP = 'SKIP' in os.environ and os.environ['SKIP'].lower() == 'no'
+NO_SKIP = 'SKIP' in os.environ and (os.environ['SKIP'].lower() == 'no' or os.environ['SKIP'].lower() == 'false')
+DEBUG = 'DEBUG' in os.environ and (os.environ['DEBUG'].lower() == 'yes' or os.environ['DEBUG'].lower() == 'true')
+
+LOG = logging.getLogger()
+
+def debug(msg):
+    if DEBUG:
+        LOG.debug(msg)
 
 class Tester(object):
 

@@ -1,5 +1,4 @@
 import time
-import logging
 import types
 import pprint
 import hashlib
@@ -16,8 +15,6 @@ from loadmaker import LoadMaker
 import pycassa
 import pycassa.system_manager as system_manager
 
-# NOTE: with nosetests, use the --nocapture flag to let logging get through.
-
 class TestGlobalRowKeyCache(Tester):
 
     def functional_test(self):
@@ -31,8 +28,6 @@ class TestGlobalRowKeyCache(Tester):
         NUM_ADDS = 100
 
         cluster = self.cluster
-        cluster.set_cassandra_dir(git_branch='trunk')
-#        cluster.set_cassandra_dir(cassandra_version='1.0.7')
         cluster.populate(3).start()
         node1 = cluster.nodelist()[0]
 
