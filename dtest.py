@@ -3,6 +3,7 @@ import os, tempfile, sys, shutil, types, time, threading, ConfigParser
 
 from ccmlib.cluster import Cluster
 from ccmlib.node import Node
+from nose.exc import SkipTest
 
 LOG_SAVED_DIR="logs"
 LAST_LOG = os.path.join(LOG_SAVED_DIR, "last")
@@ -14,6 +15,8 @@ config = ConfigParser.RawConfigParser()
 if len(config.read(os.path.expanduser('~/.cassandra-dtest'))) > 0:
     if config.has_option('main', 'default_dir'):
         DEFAULT_DIR=os.path.expanduser(config.get('main', 'default_dir'))
+
+NO_SKIP = 'SKIP' in os.environ and os.environ['SKIP'].lower() == 'no'
 
 class Tester(object):
 
@@ -136,7 +139,7 @@ class Tester(object):
         if read_repair is not None:
             query = '%s AND read_repair_chance=%f' % (query, read_repair)
         if compression is not None:
-            query = '%s AND compression_options={sstable_compression:%sCompressor}' % (query, compression)
+            query = '%s AND compression_parameters:sstable_compression=%sCompressor' % (query, compression)
         if gc_grace is not None:
             query = '%s AND gc_grace_seconds=%d' % (query, gc_grace)
         cursor.execute(query)
@@ -146,6 +149,10 @@ class Tester(object):
         self.runners.append(runner)
         runner.start()
         return runner
+
+    def skip(self, msg):
+        if not NO_SKIP:
+            raise SkipTest(msg)
 
 class Runner(threading.Thread):
     def __init__(self, func):

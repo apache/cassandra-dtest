@@ -90,7 +90,7 @@ class TestRollingUpgrade(Tester):
 
         logging.info("Upgrading node")
         logging.info("setting dir...")
-        node.set_cassandra_dir(git_branch="cassandra-1.0")
+        node.set_cassandra_dir(cassandra_version="git:cassandra-1.0")
             
         logging.info("starting...")
         node.start(wait_other_notice=True)

@@ -31,8 +31,11 @@ class TestGlobalRowKeyCache(Tester):
         # If we don't allow log errors, then the test will fail.
 #        self.allow_log_errors = True
 
+    @since("1.1")
     def functional_test(self):
         """
+        Test global caches.
+
         Test that save and load work in the situation when you write to
         different CFs. Read 2 or 3 times to make sure the page cache doesn't
         skew the results.
@@ -44,8 +47,6 @@ class TestGlobalRowKeyCache(Tester):
         NUM_DELETES = 10
 
         cluster = self.cluster
-        cluster.set_cassandra_dir(git_branch='cassandra-1.1')
-#        cluster.set_cassandra_dir(cassandra_version='1.0.7')
         cluster.populate(3)
         node1 = cluster.nodelist()[0]
 
