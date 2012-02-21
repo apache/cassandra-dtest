@@ -13,6 +13,9 @@ def wait(delay=2):
     time.sleep(delay)
 
 class TestSchemaChanges(Tester):
+    """
+    demonstrates this issue: https://issues.apache.org/jira/browse/CASSANDRA-3884
+    """
 
     def prepare_for_changes(self, cursor):
         """

@@ -1,11 +1,18 @@
+import time
+import os
+
 from dtest import Tester, debug
 from tools import *
 from assertions import *
 from ccmlib.cluster import Cluster
 from ccmlib import common as ccmcommon
-import time
 
 import loadmaker
+
+try:
+    CASSANDRA_VERSION = os.environ['CASSANDRA_VERSION']
+except KeyError:
+    CASSANDRA_VERSION = 'git:trunk'
 
 class TestRollingUpgrade(Tester):
 
@@ -79,7 +86,7 @@ class TestRollingUpgrade(Tester):
 
         debug("Upgrading node")
         debug("setting dir...")
-        node.set_cassandra_dir(cassandra_version="git:cassandra-1.1")
+        node.set_cassandra_dir(cassandra_version=CASSANDRA_VERSION)
 
         debug("starting...")
         node.start(wait_other_notice=True)
@@ -96,7 +103,7 @@ class TestRollingUpgrade(Tester):
         debug("Done upgrading node %s.\n" % node.name)
 
     def upgrade089_to_repo_test(self):
-        """ Upgrade from 0.8.9 to 1.1 """
+        """ Upgrade from 0.8.9 """
 
         cluster = self.cluster
         cluster.set_cassandra_dir(cassandra_version="0.8.9")
@@ -111,11 +118,11 @@ class TestRollingUpgrade(Tester):
         cluster.flush()
         cluster.cleanup()
 
-    def upgrade106_to_repo_test(self):
-        """ Upgrade from 1.0.6 to 1.1 """
+    def upgrade107_to_repo_test(self):
+        """ Upgrade from 1.0.7 """
 
         cluster = self.cluster
-        cluster.set_cassandra_dir(cassandra_version="1.0.6")
+        cluster.set_cassandra_dir(cassandra_version="1.0.7")
 
         cluster.populate(3, tokens=[0, 2**125, 2**126]).start()
         [node1, node2, node3] = cluster.nodelist()

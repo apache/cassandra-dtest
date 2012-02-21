@@ -1,15 +1,24 @@
-from dtest import Tester
+import time
+import os
+
+from dtest import Tester, debug
 from tools import *
 from assertions import *
 from ccmlib.cluster import Cluster
 from ccmlib import common as ccmcommon
-import time
-import logging
 
 import loadmaker
 
+try:
+    TO_BRANCH = os.environ['CASSANDRA_VERSION']
+except KeyError:
+    TO_BRANCH = 'git:trunk'
 
 class TestCounterUpgrade(Tester):
+    """
+    demonstrates this issue:
+    https://issues.apache.org/jira/browse/CASSANDRA-3804
+    """
 
     def __init__(self, *argv, **kwargs):
         super(TestCounterUpgrade, self).__init__(*argv, **kwargs)
@@ -17,28 +26,27 @@ class TestCounterUpgrade(Tester):
 
 
     def counter_upgrade_test(self):
-        logging.info("*** Starting on upgrade106_to_repo_test ***")
         cluster = self.cluster
 
         cluster.set_cassandra_dir(cassandra_version="1.0.7")
-#        cluster.set_cassandra_dir(git_branch='trunk') # Doesn't fail in this case.
+#        cluster.set_cassandra_dir(cassandra_version=TO_BRANCH) # Doesn't fail in this case.
 
         cluster.populate(3, tokens=[0, 2**125, 2**126]).start()
         [node1, node2, node3] = cluster.nodelist()
         time.sleep(1)
 
-        print "Upgrading"
+        debug("Upgrading")
         node1.nodetool('drain')
         node1.stop()
         time.sleep(1)
-        node1.set_cassandra_dir(git_branch='trunk')
+        node1.set_cassandra_dir(cassandra_version=TO_BRANCH)
         node1.start()
         node1.nodetool('scrub')
-        print "Upgraded, waiting for gossip"
+        debug("Upgraded, waiting for gossip")
         time.sleep(20) # wait for gossip to notice the node is back
     
     
-        print "Creating columnfamily and adding"
+        debug("Creating columnfamily and adding")
         cursor = self.cql_connection(node2).cursor()
         self.create_ks(cursor, 'ks', 3)
         cursor.execute("CREATE COLUMNFAMILY counters (key varchar PRIMARY KEY) WITH comparator=UTF8Type AND default_validation=CounterColumnType")
@@ -46,7 +54,7 @@ class TestCounterUpgrade(Tester):
 
         # Generally this fails before 10 rows have been added.
         for x in xrange(10000):
-            print x
+            debug(x)
             cursor.execute("UPDATE counters SET row = row+1 where key='a'")
 
         cluster.flush()
