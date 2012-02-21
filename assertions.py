@@ -19,7 +19,7 @@ def assert_almost_equal(*args, **kwargs):
     try:
         error = kwargs['error']
     except KeyError:
-        error = 0.13
+        error = 0.16
 
     vmax = max(args)
     vmin = min(args)
