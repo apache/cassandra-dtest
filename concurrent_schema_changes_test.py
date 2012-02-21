@@ -1,4 +1,4 @@
-from dtest import Tester
+from dtest import Tester, debug
 from ccmlib.cluster import Cluster
 from ccmlib.node import Node
 import random
@@ -134,7 +134,6 @@ class TestUpgrade(Tester):
         """
 
         cluster = self.cluster
-        cluster.set_cassandra_dir(git_branch='cassandra-1.1')
         cluster.populate(2).start()
         node1 = cluster.nodelist()[0]
         wait(2)
@@ -149,7 +148,6 @@ class TestUpgrade(Tester):
     
     def changes_to_different_nodes_test(self):
         cluster = self.cluster
-        cluster.set_cassandra_dir(git_branch='cassandra-1.1')
         cluster.populate(2).start()
         [node1, node2] = cluster.nodelist()
         wait(2)
@@ -183,7 +181,6 @@ class TestUpgrade(Tester):
             1 should get the changes. 
         """
         cluster = self.cluster
-        cluster.set_cassandra_dir(git_branch='cassandra-1.1')
         cluster.populate(2).start()
         [node1, node2] = cluster.nodelist()
         wait(2)
@@ -218,8 +215,6 @@ class TestUpgrade(Tester):
     
     def decommission_node_test(self):
         cluster = self.cluster
-
-        cluster.set_cassandra_dir(git_branch='cassandra-1.1')
 
         cluster.populate(2).start()
 
@@ -256,7 +251,6 @@ class TestUpgrade(Tester):
 
     def snapshot_test(self):
         cluster = self.cluster
-        cluster.set_cassandra_dir(git_branch='cassandra-1.1')
         cluster.populate(2).start()
         [node1, node2] = cluster.nodelist()
         wait(2)
@@ -309,21 +303,20 @@ class TestUpgrade(Tester):
         """
 
         cluster = self.cluster
-        cluster.set_cassandra_dir(git_branch='cassandra-1.1')
         cluster.populate(1).start()
         node1 = cluster.nodelist()[0]
         wait(2)
         cursor = self.cql_connection(node1).cursor()
 
         def stress(args=[]):
-            print "Stressing"
+            debug("Stressing")
             node1.stress(args)
-            print "Done Stressing"
+            debug("Done Stressing")
 
         def compact():
-            print "Compacting..."
+            debug("Compacting...")
             node1.nodetool('compact')
-            print "Done Compacting."
+            debug("Done Compacting.")
 
         # put some data into the cluster
         stress(['--num-keys=1000000'])

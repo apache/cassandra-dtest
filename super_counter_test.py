@@ -4,7 +4,7 @@ import pprint
 import hashlib
 
 
-from dtest import Tester
+from dtest import Tester, debug
 from tools import *
 from assertions import *
 from ccmlib.cluster import Cluster
@@ -15,15 +15,13 @@ from loadmaker import LoadMaker
 import pycassa
 import pycassa.system_manager as system_manager
 
-class TestGlobalRowKeyCache(Tester):
+class TestSuperCounterClusterRestart(Tester):
+    """
+    This test is part of this issue:
+    https://issues.apache.org/jira/browse/CASSANDRA-3821
+    """
 
     def functional_test(self):
-        """
-        Test that save and load work in the situation when you write to
-        different CFs. Read 2 or 3 times to make sure the page cache doesn't
-        skew the results.
-        """
-
         NUM_SUBCOLS = 100
         NUM_ADDS = 100
 
@@ -55,28 +53,28 @@ class TestGlobalRowKeyCache(Tester):
 #        for node in cluster.nodelist():
 #            node.flush()
 
-        print "Before restart:"
+        debug("Before restart:")
         for i in xrange(NUM_SUBCOLS):
             print cf.get('row_0', ['col_0'], super_column='subcol_%d'%i, read_consistency_level=consistency_level)['col_0'],
-        print
+        debug("")
 
-        print "Stopping cluster"
+        debug("Stopping cluster")
         cluster.stop()
         time.sleep(1)
-        print "Starting cluster"
+        debug("Starting cluster")
         cluster.start()
         time.sleep(.5)
 
         pool = pycassa.ConnectionPool('ks')
         cf = pycassa.ColumnFamily(pool, 'cf')
 
-        print "After restart:"
+        debug("After restart:")
         from_db = []
         for i in xrange(NUM_SUBCOLS):
             val = cf.get('row_0', ['col_0'], super_column='subcol_%d'%i, read_consistency_level=consistency_level)['col_0']
-            print val,
+            debug(str(val)),
             from_db.append(val)
-        print
+        debug("")
 
         expected = [NUM_ADDS for i in xrange(NUM_SUBCOLS)]
 
