@@ -1,8 +1,11 @@
 from __future__ import with_statement
-import os, tempfile, sys, shutil, types, time, threading, ConfigParser
+import os, tempfile, sys, shutil, types, time, threading, ConfigParser, logging
 
 from ccmlib.cluster import Cluster
 from ccmlib.node import Node
+from nose.exc import SkipTest
+
+logging.basicConfig(stream=sys.stderr)
 
 LOG_SAVED_DIR="logs"
 LAST_LOG = os.path.join(LOG_SAVED_DIR, "last")
@@ -14,6 +17,15 @@ config = ConfigParser.RawConfigParser()
 if len(config.read(os.path.expanduser('~/.cassandra-dtest'))) > 0:
     if config.has_option('main', 'default_dir'):
         DEFAULT_DIR=os.path.expanduser(config.get('main', 'default_dir'))
+
+NO_SKIP = 'SKIP' in os.environ and (os.environ['SKIP'].lower() == 'no' or os.environ['SKIP'].lower() == 'false')
+DEBUG = 'DEBUG' in os.environ and (os.environ['DEBUG'].lower() == 'yes' or os.environ['DEBUG'].lower() == 'true')
+
+LOG = logging.getLogger()
+
+def debug(msg):
+    if DEBUG:
+        LOG.debug(msg)
 
 class Tester(object):
 
@@ -62,6 +74,8 @@ class Tester(object):
         with open(LAST_TEST_DIR, 'w') as f:
             f.write(self.test_path + '\n')
             f.write(self.cluster.name)
+        if DEBUG:
+            self.cluster.set_log_level("DEBUG")
         self.connections = []
         self.runners = []
 
@@ -136,7 +150,7 @@ class Tester(object):
         if read_repair is not None:
             query = '%s AND read_repair_chance=%f' % (query, read_repair)
         if compression is not None:
-            query = '%s AND compression_options={sstable_compression:%sCompressor}' % (query, compression)
+            query = '%s AND compression_parameters:sstable_compression=%sCompressor' % (query, compression)
         if gc_grace is not None:
             query = '%s AND gc_grace_seconds=%d' % (query, gc_grace)
         cursor.execute(query)
@@ -146,6 +160,10 @@ class Tester(object):
         self.runners.append(runner)
         runner.start()
         return runner
+
+    def skip(self, msg):
+        if not NO_SKIP:
+            raise SkipTest(msg)
 
 class Runner(threading.Thread):
     def __init__(self, func):

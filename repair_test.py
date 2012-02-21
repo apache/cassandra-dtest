@@ -20,7 +20,8 @@ class TestRepair(Tester):
 
         for k in missings:
             cursor.execute('SELECT c1, c2 FROM cf USING CONSISTENCY ONE WHERE key=k%d' % k)
-            assert cursor.rowcount == 0, cursor.fetchall()
+            res = cursor.fetchall()
+            assert len(filter(lambda x: len(x) != 0, res)) == 0, res
 
         cursor.close()
 

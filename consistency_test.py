@@ -204,6 +204,5 @@ class TestConsistency(Tester):
         cursor = self.cql_connection(next_node, 'ks').cursor()
         cursor.execute('DELETE c%d, c2 FROM cf USING CONSISTENCY QUORUM WHERE key=k0' % column)
         cursor.close()
-        to_stop.set_log_level("DEBUG")
         to_stop.start(wait_other_notice=True)
 

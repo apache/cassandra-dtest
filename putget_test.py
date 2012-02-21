@@ -1,5 +1,6 @@
 from dtest import Tester
 from assertions import *
+from tools import *
 
 import os, sys, time, tools
 from ccmlib.cluster import Cluster
@@ -10,14 +11,13 @@ class TestPutGet(Tester):
         """ Simple put/get on a single row, hitting multiple sstables """
         self._putget()
 
-    # The 2 following tests will require #3374 to pass
-    #def putget_snappy_test(self):
-    #   """ Simple put/get on a single row, but hitting multiple sstables (with snappy compression) """
-    #    self._putget(compression="Snappy")
+    def putget_snappy_test(self):
+        """ Simple put/get on a single row, but hitting multiple sstables (with snappy compression) """
+        self._putget(compression="Snappy")
 
-    #def putget_deflate_test(self):
-    #   """ Simple put/get on a single row, but hitting multiple sstables (with deflate compression) """
-    #    self._putget(compression="Deflate")
+    def putget_deflate_test(self):
+        """ Simple put/get on a single row, but hitting multiple sstables (with deflate compression) """
+        self._putget(compression="Deflate")
 
     # Simple queries, but with flushes in between inserts to make sure we hit
     # sstables (and more than one) on reads
@@ -30,15 +30,6 @@ class TestPutGet(Tester):
         cursor = self.cql_connection(node1).cursor()
         self.create_ks(cursor, 'ks', 3)
         self.create_cf(cursor, 'cf', compression=compression)
-
-        #cursor.close()
-        #time.sleep(.5)
-        #cli = node1.cli()
-        #cli.do("use ks")
-        #cli.do("create column family cf with comparator=UTF8Type and key_validation_class=UTF8Type and default_validation_class=UTF8Type and compression_options={sstable_compression:%sCompressor}" % compression)
-        #cli.close()
-        #time.sleep(.5)
-        #cursor = self.cql_connection(node1, 'ks').cursor()
 
         tools.putget(cluster, cursor)
 

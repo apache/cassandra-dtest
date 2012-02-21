@@ -1,11 +1,9 @@
 import time
-import logging
 import types
 import pprint
 import hashlib
 
-
-from dtest import Tester
+from dtest import Tester, debug
 from tools import *
 from assertions import *
 from ccmlib.cluster import Cluster
@@ -16,13 +14,6 @@ from loadmaker import LoadMaker
 import pycassa
 import pycassa.system_manager as system_manager
 
-# NOTE: with nosetests, use the --nologcapture flag to let logging get through.
-# then set the logging level here.
-# A logging-level of DEBUG will show the load being created.
-logging.basicConfig(level=logging.INFO)
-logging.info("Starting...")
-
-
 class TestGlobalRowKeyCache(Tester):
 
     def __init__(self, *argv, **kwargs):
@@ -31,8 +22,11 @@ class TestGlobalRowKeyCache(Tester):
         # If we don't allow log errors, then the test will fail.
 #        self.allow_log_errors = True
 
+    @since("1.1")
     def functional_test(self):
         """
+        Test global caches.
+
         Test that save and load work in the situation when you write to
         different CFs. Read 2 or 3 times to make sure the page cache doesn't
         skew the results.
@@ -44,8 +38,6 @@ class TestGlobalRowKeyCache(Tester):
         NUM_DELETES = 10
 
         cluster = self.cluster
-        cluster.set_cassandra_dir(git_branch='cassandra-1.1')
-#        cluster.set_cassandra_dir(cassandra_version='1.0.7')
         cluster.populate(3)
         node1 = cluster.nodelist()[0]
 
@@ -55,7 +47,7 @@ class TestGlobalRowKeyCache(Tester):
                 ks_name = 'ks_' + setup_name
                 cf_name = 'cf_' + setup_name
 
-                print "setup", setup_name
+                debug("setup " + setup_name)
                 cluster.set_configuration_options(values={
                         'key_cache_size_in_mb': kcsim,
                         'row_cache_size_in_mb': rcsim,
@@ -84,7 +76,7 @@ class TestGlobalRowKeyCache(Tester):
                 for node in cluster.nodelist():
                     node.flush()
 
-                print "Validating"
+                debug("Validating")
                 for i in range(3):
                     # read and modify multiple times to get data into and invalidated out of the cache.
                     lm_standard.update(NUM_UPDATES).delete(NUM_DELETES).validate()
@@ -101,12 +93,12 @@ class TestGlobalRowKeyCache(Tester):
 #                    node.flush()
 
                 # let the data be written to the row/key caches.
-                print "Letting caches be written"
+                debug("Letting caches be written")
                 time.sleep(10)
-                print "Stopping cluster"
+                debug("Stopping cluster")
                 cluster.stop()
                 time.sleep(1)
-                print "Starting cluster"
+                debug("Starting cluster")
                 cluster.start()
                 time.sleep(5) # read the data back from row and key caches
 
@@ -115,7 +107,7 @@ class TestGlobalRowKeyCache(Tester):
                 lm_counter.set_server_list()
                 lm_counter_super.set_server_list()
 
-                print "Validating again..."
+                debug("Validating again...")
                 for i in range(2):
                     # read and modify multiple times to get data into and invalidated out of the cache.
                     lm_standard.validate()

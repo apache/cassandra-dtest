@@ -1,5 +1,6 @@
 from dtest import Tester
 from assertions import *
+from tools import *
 
 import os, sys, time, tools
 from uuid import UUID
@@ -9,6 +10,7 @@ cql_version="3.0.0-beta1"
 
 class TestCQL(Tester):
 
+    @since('1.1')
     def static_cf_test(self):
         """ Test non-composite static CF syntax """
         cluster = self.cluster
@@ -67,6 +69,7 @@ class TestCQL(Tester):
             [ UUID('550e8400-e29b-41d4-a716-446655440000'), 36, None, None ],
         ], res
 
+    @since('1.1')
     def dynamic_cf_test(self):
         """ Test non-composite dynamic CF syntax """
         cluster = self.cluster
@@ -111,6 +114,7 @@ class TestCQL(Tester):
         # Result from 'f47ac10b-58cc-4372-a567-0e02b2c3d479' are first
         assert res == [[24], [12], [128], [24], [12], [42]], res
 
+    @since('1.1')
     def dense_cf_test(self):
         """ Test composite 'dense' CF syntax """
         cluster = self.cluster
@@ -166,6 +170,7 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert len(res) == 0, res
 
+    @since('1.1')
     def sparse_cf_test(self):
         """ Test composite 'sparse' CF syntax """
         cluster = self.cluster
@@ -214,6 +219,7 @@ class TestCQL(Tester):
             [ 30, 'Yet one more message', None ]
         ], res
 
+    @since('1.1')
     def create_invalid_test(self):
         cluster = self.cluster
 
@@ -235,6 +241,7 @@ class TestCQL(Tester):
         assert_invalid(cursor, "CREATE TABLE test (key text PRIMARY KEY, c int, d text) WITH COMPACT STORAGE")
         assert_invalid(cursor, "CREATE TABLE test (key text, key2 text, c int, d text, PRIMARY KEY (key, key2)) WITH COMPACT STORAGE")
 
+    @since('1.1')
     def limit_ranges_test(self):
         cluster = self.cluster
         # We don't yet support paging for RP
@@ -270,6 +277,7 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[ 3, 'http://foo.com', 42 ]], res
 
+    @since('1.1')
     def limit_multiget_test(self):
         cluster = self.cluster
 
@@ -301,6 +309,7 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[ 48, 'http://foo.com', 42 ]], res
 
+    @since('1.1')
     def limit_sparse_test(self):
         cluster = self.cluster
 
@@ -333,6 +342,7 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert len(res) == 4, res
 
+    @since('1.1')
     def counters_test(self):
         cluster = self.cluster
 
@@ -372,6 +382,7 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[ -4 ]], res
 
+    @since('1.1')
     def indexed_with_eq_test(self):
         """ Check that you can query for an indexed column even with a key EQ clause """
         cluster = self.cluster
@@ -408,6 +419,7 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[ 'Samwise' ]], res
 
+    @since('1.1')
     def select_key_in_test(self):
         """Query for KEY IN (...)"""
         cluster = self.cluster
@@ -448,6 +460,7 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert len(res) == 2, res
 
+    @require('3785')
     def exclusive_slice_test(self):
         cluster = self.cluster
 
@@ -500,3 +513,152 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert len(res) == 3 and res[0][0] == 3 and res[len(res) - 1][0] == 5, res
 
+    @since('1.1')
+    def in_clause_wide_rows_test(self):
+        cluster = self.cluster
+
+        cluster.populate(1).start()
+        node1 = cluster.nodelist()[0]
+        time.sleep(0.2)
+
+        cursor = self.cql_connection(node1, version=cql_version).cursor()
+        self.create_ks(cursor, 'ks', 1)
+
+        cursor.execute("""
+            CREATE TABLE test1 (
+                k int,
+                c int,
+                v int,
+                PRIMARY KEY (k, c)
+            ) WITH COMPACT STORAGE;
+        """)
+
+        # Inserts
+        for x in range(0, 10):
+            cursor.execute("INSERT INTO test1 (k, c, v) VALUES (0, %i, %i)" % (x, x))
+
+        cursor.execute("SELECT v FROM test1 WHERE k = 0 AND c IN (5, 2, 8)")
+        res = cursor.fetchall()
+        assert res == [[5], [2], [8]], res
+
+        # composites
+        cursor.execute("""
+            CREATE TABLE test2 (
+                k int,
+                c1 int,
+                c2 int,
+                v int,
+                PRIMARY KEY (k, c1, c2)
+            ) WITH COMPACT STORAGE;
+        """)
+
+        # Inserts
+        for x in range(0, 10):
+            cursor.execute("INSERT INTO test2 (k, c1, c2, v) VALUES (0, 0, %i, %i)" % (x, x))
+
+        # Check first we don't allow IN everywhere
+        assert_invalid(cursor, "SELECT v FROM test2 WHERE k = 0 AND c1 IN (5, 2, 8) AND c2 = 3")
+
+        cursor.execute("SELECT v FROM test2 WHERE k = 0 AND c1 = 0 AND c2 IN (5, 2, 8)")
+        res = cursor.fetchall()
+        assert res == [[5], [2], [8]], res
+
+    @since('1.1')
+    def order_by_test(self):
+        cluster = self.cluster
+
+        cluster.populate(1).start()
+        node1 = cluster.nodelist()[0]
+        time.sleep(0.2)
+
+        cursor = self.cql_connection(node1, version=cql_version).cursor()
+        self.create_ks(cursor, 'ks', 1)
+
+        cursor.execute("""
+            CREATE TABLE test1 (
+                k int,
+                c int,
+                v int,
+                PRIMARY KEY (k, c)
+            ) WITH COMPACT STORAGE;
+        """)
+
+        # Inserts
+        for x in range(0, 10):
+            cursor.execute("INSERT INTO test1 (k, c, v) VALUES (0, %i, %i)" % (x, x))
+
+        cursor.execute("SELECT v FROM test1 WHERE k = 0 ORDER BY c DESC")
+        res = cursor.fetchall()
+        assert res == [[x] for x in range(9, -1, -1)], res
+
+        # composites
+        cursor.execute("""
+            CREATE TABLE test2 (
+                k int,
+                c1 int,
+                c2 int,
+                v int,
+                PRIMARY KEY (k, c1, c2)
+            );
+        """)
+
+        # Inserts
+        for x in range(0, 4):
+            for y in range(0, 2):
+                cursor.execute("INSERT INTO test2 (k, c1, c2, v) VALUES (0, %i, %i, %i)" % (x, y, x * 2 + y))
+
+        # Check first we don't always ORDER BY 
+        assert_invalid(cursor, "SELECT v FROM test2 WHERE k = 0 ORDER BY c DESC")
+        assert_invalid(cursor, "SELECT v FROM test2 WHERE k = 0 ORDER BY c2 DESC")
+        assert_invalid(cursor, "SELECT v FROM test2 WHERE k = 0 ORDER BY k DESC")
+
+        cursor.execute("SELECT v FROM test2 WHERE k = 0 ORDER BY c1 DESC")
+        res = cursor.fetchall()
+        assert res == [[x] for x in range(7, -1, -1)], res
+
+        cursor.execute("SELECT v FROM test2 WHERE k = 0 ORDER BY c1")
+        res = cursor.fetchall()
+        assert res == [[x] for x in range(0, 8)], res
+
+    @require('#3783')
+    def null_support_test(self):
+        cluster = self.cluster
+
+        cluster.populate(1).start()
+        node1 = cluster.nodelist()[0]
+        time.sleep(0.2)
+
+        cursor = self.cql_connection(node1, version=cql_version).cursor()
+        self.create_ks(cursor, 'ks', 1)
+
+        cursor.execute("""
+            CREATE TABLE test1 (
+                k int,
+                c1 int,
+                c2 int,
+                c3 int,
+                v int,
+                PRIMARY KEY (k, c1, c2, c3)
+            ) WITH COMPACT STORAGE;
+        """)
+
+        # Inserts
+        cursor.execute("INSERT INTO test1 (k, c1, c2, c3, v) VALUES (0, 0, 0, 0, 0)")
+        cursor.execute("INSERT INTO test1 (k, c1, c2, c3, v) VALUES (0, 0, 0, 1, 1)")
+        cursor.execute("INSERT INTO test1 (k, c1, c2, c3, v) VALUES (0, 0, 1, 0, 2)")
+        cursor.execute("INSERT INTO test1 (k, c1, c2, c3, v) VALUES (0, 0, 1, 1, 3)")
+
+        cursor.execute("INSERT INTO test1 (k, c1, c2, v) VALUES (0, 0, 0, 10)")
+        cursor.execute("INSERT INTO test1 (k, c1, c2, c3, v) VALUES (0, 0, 1, null, 11)")
+
+        #cursor.execute("SELECT v FROM test1 WHERE k = 0")
+        #res = cursor.fetchall()
+        #assert res == [[10], [0], [1], [11], [2], [3]], res
+
+        #cursor.execute("SELECT v FROM test1 WHERE k = 0 AND c1 = 0 AND c2 = 0")
+        #res = cursor.fetchall()
+        #assert res == [[10], [0], [1]], res
+
+        cursor.execute("SELECT v FROM test1 WHERE k = 0 AND c1 = 0 AND c2 = 0 AND c3 = null")
+        res = cursor.fetchall()
+        assert res == [[10]], res

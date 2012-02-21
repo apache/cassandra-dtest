@@ -1,5 +1,6 @@
 import time
 from ccmlib.node import Node
+from decorator  import decorator
 
 def retry_till_success(fun, *args, **kwargs):
     timeout = kwargs["timeout"] or 60
@@ -113,3 +114,36 @@ def range_putget(cluster, cursor, cl="QUORUM"):
     for res in cursor:
         res = res[1:] # removing key
         _validate_row(res)
+
+class since(object):
+    def __init__(self, cass_version):
+        self.cass_version = cass_version
+
+    def __call__(self, f):
+        def wrapped(obj):
+            if obj.cluster.version() < self.cass_version:
+                obj.skip("%s < %s" % (obj.cluster.version(), self.cass_version))
+            f(obj)
+        wrapped.__name__ = f.__name__
+        wrapped.__doc__ = f.__doc__
+        return wrapped
+
+class require(object):
+    def __init__(self, msg):
+        self.msg = msg
+
+    def __call__(self, f):
+        def wrapped(obj):
+            obj.skip("require " + self.msg)
+            f(obj)
+        wrapped.__name__ = f.__name__
+        wrapped.__doc__ = f.__doc__
+        return wrapped
+
+def not_implemented(f):
+    def wrapped(obj):
+        obj.skip("this test not implemented")
+        f(obj)
+    wrapped.__name__ = f.__name__
+    wrapped.__doc__ = f.__doc__
+    return wrapped

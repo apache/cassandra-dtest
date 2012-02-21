@@ -1,20 +1,11 @@
-from dtest import Tester
+from dtest import Tester, debug
 from tools import *
 from assertions import *
 from ccmlib.cluster import Cluster
 from ccmlib import common as ccmcommon
 import time
-import logging
 
 import loadmaker
-
-
-# NOTE: with nosetests, use the --nologcapture flag to let logging get through.
-# then set the logging level here.
-# A logging-level of DEBUG will show the load being created.
-logging.basicConfig(level=logging.INFO)
-logging.info("Starting...")
-
 
 class TestRollingUpgrade(Tester):
 
@@ -28,14 +19,12 @@ class TestRollingUpgrade(Tester):
         """
         node is the node to upgrade. stress_ip is the node to run stress on.
         """
-        logging.info("Called rolling_upgrade_node for: %s %s" % 
-                (node.name, node.address()))
-        logging.info("Stress node log file: " + stress_node.logfilename())
-        logging.info("Stress node address: " + stress_node.address() + ':' + 
-                stress_node.jmx_port)
+        debug("Called rolling_upgrade_node for: %s %s" % (node.name, node.address()))
+        debug("Stress node log file: " + stress_node.logfilename())
+        debug("Stress node address: " + stress_node.address() + ':' + stress_node.jmx_port)
 
         keyspace = 'rolling_ks'
-    
+
         lm_standard = loadmaker.LoadMaker(column_family_name='rolling_cf_standard',
                 consistency_level='TWO', keyspace_name=keyspace)
         lm_super = loadmaker.LoadMaker(column_family_name='rolling_cf_super',
@@ -65,52 +54,51 @@ class TestRollingUpgrade(Tester):
                     lm_counter_standard, 
                     lm_counter_super, 
                 ])
-    
-        logging.debug("Sleeping to get some data into the cluster")
+
+        debug("Sleeping to get some data into the cluster")
         time.sleep(5)
 
-        logging.info("pausing counter-add load. This is because a "
-                "dead-but-not-detected-dead node will cause errors on "
-                "counter-add.")
+        debug("pausing counter-add load. This is because a "
+                  "dead-but-not-detected-dead node will cause errors on "
+                  "counter-add.")
         loader_counter.pause()
         time.sleep(2)
 
-        logging.info("draining...")
+        debug("draining...")
         node.nodetool('drain')
-        logging.info("stopping...")
+        debug("stopping...")
         node.stop(wait_other_notice=False)
-        logging.info("Node stopped. Sleeping to let gossip detect it as down...")
+        debug("Node stopped. Sleeping to let gossip detect it as down...")
         time.sleep(30)
 
-        logging.info("Resuming counter loader")
+        debug("Resuming counter loader")
         loader_counter.unpause()
 
-        logging.info("Letting the counter loader generate some load")
+        debug("Letting the counter loader generate some load")
         time.sleep(10)
 
-        logging.info("Upgrading node")
-        logging.info("setting dir...")
-        node.set_cassandra_dir(git_branch="cassandra-1.0")
-            
-        logging.info("starting...")
+        debug("Upgrading node")
+        debug("setting dir...")
+        node.set_cassandra_dir(cassandra_version="git:cassandra-1.1")
+
+        debug("starting...")
         node.start(wait_other_notice=True)
-        logging.info("scrubbing...")
+        debug("scrubbing...")
         node.nodetool('scrub')
 
-        logging.info("validating standard data...")
+        debug("validating standard data...")
         loader_standard.read_and_validate(step=10)
         loader_standard.exit()
-        logging.info("validating counter data...")
+        debug("validating counter data...")
         loader_counter.read_and_validate(step=10)
         loader_counter.exit()
 
-        logging.info("Done upgrading node %s.\n" % node.name)
-
+        debug("Done upgrading node %s.\n" % node.name)
 
     def upgrade089_to_repo_test(self):
-        logging.info("*** Starting on upgrade089_to_repo_test ***")
-        cluster = self.cluster
+        """ Upgrade from 0.8.9 to 1.1 """
 
+        cluster = self.cluster
         cluster.set_cassandra_dir(cassandra_version="0.8.9")
 
         cluster.populate(3, tokens=[0, 2**125, 2**126]).start()
@@ -123,11 +111,10 @@ class TestRollingUpgrade(Tester):
         cluster.flush()
         cluster.cleanup()
 
-
     def upgrade106_to_repo_test(self):
-        logging.info("*** Starting on upgrade106_to_repo_test ***")
-        cluster = self.cluster
+        """ Upgrade from 1.0.6 to 1.1 """
 
+        cluster = self.cluster
         cluster.set_cassandra_dir(cassandra_version="1.0.6")
 
         cluster.populate(3, tokens=[0, 2**125, 2**126]).start()
@@ -139,6 +126,3 @@ class TestRollingUpgrade(Tester):
 
         cluster.flush()
         cluster.cleanup()
-
-
-

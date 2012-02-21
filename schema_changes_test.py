@@ -12,7 +12,7 @@ def wait(delay=2):
     delay *= .2
     time.sleep(delay)
 
-class TestUpgrade(Tester):
+class TestSchemaChanges(Tester):
 
     def prepare_for_changes(self, cursor):
         """
@@ -110,7 +110,6 @@ class TestUpgrade(Tester):
 
     def snapshot_test(self):
         cluster = self.cluster
-        cluster.set_cassandra_dir(git_branch='cassandra-1.1')
         cluster.populate(2).start()
         [node1, node2] = cluster.nodelist()
         wait(1)
