@@ -1,6 +1,7 @@
 from dtest import Tester, debug
 from ccmlib.cluster import Cluster
 from ccmlib.node import Node
+from tools import since
 import random
 import time
 import os
@@ -14,7 +15,7 @@ def wait(delay=2):
     """
     time.sleep(delay)
 
-class TestUpgrade(Tester):
+class TestConcurrentSchemaChanges(Tester):
 
     def prepare_for_changes(self, cursor, namespace='ns1'):
         """
@@ -122,7 +123,7 @@ class TestUpgrade(Tester):
         wait(3)
         cli.do("describe cluster")
         res = cli.last_output()
-        # This is messing up the terminal, and I can't figure out why. Fix it.
+        # cli is messing up the terminal, and I can't figure out why. TODO: figure it out and fix it.
         os.system('tset') 
         schemas = re.findall('[\dabcdef]{8}-[\dabcdef]{4}-[\dabcdef]{4}-[\dabcdef]{4}-[\dabcdef]{12}:', res)
         assert len(schemas) == 1, "More or less then 1 schema was found! Here is the 'describe_cluster: %s" % res
@@ -249,6 +250,7 @@ class TestUpgrade(Tester):
         cluster.cleanup()
 
 
+    @since('1.1')
     def snapshot_test(self):
         cluster = self.cluster
         cluster.populate(2).start()
@@ -272,19 +274,19 @@ class TestUpgrade(Tester):
         cluster.stop()
 
         ### restore the snapshots ##
-        # clear the commitlogs
-        sys.stdout = open(os.devnull, 'w')
-        sys.stderr = open(os.devnull, 'w')
-        os.system('rm %s/commitlogs/*' % node1.get_path())
-        os.system('rm %s/commitlogs/*' % node2.get_path())
+        # clear the commitlogs and data
+        dirs = (    '%s/commitlogs' % node1.get_path(),
+                    '%s/commitlogs' % node2.get_path(),
+                    '%s/data/ks_ns2/cf_ns2' % node1.get_path(),
+                    '%s/data/ks_ns2/cf_ns2' % node2.get_path(),
+                )
+        for dirr in dirs:
+            for f in os.listdir(dirr):
+                path = os.path.join(dirr, f)
+                if os.path.isfile(path):
+                    os.unlink(path)
 
-        # clear the data. Note that this will leave the subdirectories.
-        os.system('rm %s/data/ks_ns2/cf_ns2/*' % node1.get_path())
-        os.system('rm %s/data/ks_ns2/cf_ns2/*' % node2.get_path())
-        sys.stdout = sys.__stdout__
-        sys.stderr = sys.__stderr__
-
-        # copy the snapshot
+        # copy the snapshot. TODO: This could be replaced with the creation of hard links.
         os.system('cp -p %s/data/ks_ns2/cf_ns2/snapshots/testsnapshot/* %s/data/ks_ns2/cf_ns2/' % (node1.get_path(), node1.get_path()))
         os.system('cp -p %s/data/ks_ns2/cf_ns2/snapshots/testsnapshot/* %s/data/ks_ns2/cf_ns2/' % (node2.get_path(), node2.get_path()))
 
