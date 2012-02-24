@@ -3,14 +3,17 @@ from tools import *
 from assertions import *
 from ccmlib.cluster import Cluster
 import random
+import os
+
+CASSANDRA_VERSION = os.environ.get('CASSANDRA_VERSION', '1.0.0')
 
 class TestUpgrade(Tester):
 
-    def upgrade086_to_100_test(self):
+    def upgrade08_test(self):
         cluster = self.cluster
 
         # Forcing cluster version on purpose
-        cluster.set_cassandra_dir(cassandra_version="0.8.6")
+        cluster.set_cassandra_dir(cassandra_version="0.8.9")
 
         # Create a ring
         cluster.populate(3, tokens=[0, 2**125, 2**126]).start()
@@ -39,7 +42,7 @@ class TestUpgrade(Tester):
         node1.flush()
         time.sleep(.5)
         node1.stop(wait_other_notice=True)
-        node1.set_cassandra_dir(cassandra_version="1.0.0")
+        node1.set_cassandra_dir(cassandra_version=CASSANDRA_VERSION)
         node1.start(wait_other_notice=True)
 
         time.sleep(.5)
@@ -69,7 +72,7 @@ class TestUpgrade(Tester):
         node2.flush()
         time.sleep(.5)
         node2.stop(wait_other_notice=True)
-        node2.set_cassandra_dir(cassandra_version="1.0.0")
+        node2.set_cassandra_dir(cassandra_version=CASSANDRA_VERSION)
         node2.start(wait_other_notice=True)
 
         # Check we can still read and write
@@ -83,7 +86,7 @@ class TestUpgrade(Tester):
         node3.flush()
         time.sleep(.5)
         node3.stop(wait_other_notice=True)
-        node3.set_cassandra_dir(cassandra_version="1.0.0")
+        node3.set_cassandra_dir(cassandra_version=CASSANDRA_VERSION)
         node3.start(wait_other_notice=True)
 
         # Check we can still read and write
@@ -96,7 +99,7 @@ class TestUpgrade(Tester):
         cluster.flush()
 
         # Check we can bootstrap a new 1.0 node
-        cluster.set_cassandra_dir(cassandra_version="1.0.0")
+        cluster.set_cassandra_dir(cassandra_version=CASSANDRA_VERSION)
         initial_size = node1.data_size()
         assert_almost_equal(*[node.data_size() for node in cluster.nodelist()])
         node4 = new_node(cluster, token=3*(2**125))
