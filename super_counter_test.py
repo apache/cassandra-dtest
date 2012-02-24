@@ -55,7 +55,7 @@ class TestSuperCounterClusterRestart(Tester):
 
         debug("Before restart:")
         for i in xrange(NUM_SUBCOLS):
-            print cf.get('row_0', ['col_0'], super_column='subcol_%d'%i, read_consistency_level=consistency_level)['col_0'],
+            debug(cf.get('row_0', ['col_0'], super_column='subcol_%d'%i, read_consistency_level=consistency_level)['col_0'],)
         debug("")
 
         debug("Stopping cluster")
