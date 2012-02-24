@@ -37,6 +37,7 @@ class TestSuperCounterClusterRestart(Tester):
         sm = system_manager.SystemManager()
         sm.create_column_family('ks', 'cf', super=True, 
                 default_validation_class='CounterColumnType')
+        time.sleep(1)
         
         pool = pycassa.ConnectionPool('ks')
         cf = pycassa.ColumnFamily(pool, 'cf')
