@@ -100,6 +100,8 @@ class TestTopology(Tester):
         time.sleep(.5)
         cluster.cleanup()
         time.sleep(.5)
+        cluster.compact()
+        time.sleep(.5)
 
         # Check we can get all the keys
         for n in xrange(0, 10000):
