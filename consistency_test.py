@@ -251,6 +251,34 @@ class TestConsistency(Tester):
         for i in xrange(0, 3):
             assert res[i] == 'value%d' % (5-i), 'Expecting value%d, got %s (%s)' % (5-i, res[i], str(res))
 
+    def quorum_available_during_failure_test(self):
+        CL = 'QUORUM'
+        RF = 3
+
+        debug("Creating a ring")
+        cluster = self.cluster
+        tokens = cluster.balanced_tokens(3)
+        cluster.populate(3, tokens=tokens).start()
+        [node1, node2, node3] = cluster.nodelist()
+        cluster.start()
+
+        debug("Set to talk to node 2")
+        cursor = self.cql_connection(node2).cursor()
+        self.create_ks(cursor, 'ks', RF)
+        self.create_cf(cursor, 'cf')
+
+        debug("Generating some data")
+        for n in xrange(100):
+           insert_c1c2(cursor, n, CL)
+
+        debug("Taking down node1")
+        node1.nodetool('drain')
+        node1.stop(wait_other_notice=True)
+
+        debug("Reading back data.")
+        for n in xrange(100):
+           query_c1c2(cursor, n, CL)
+
     def stop_delete_and_restart(self, node_number, column):
         to_stop = self.cluster.nodes["node%d" % node_number]
         next_node = self.cluster.nodes["node%d" % (((node_number + 1) % 3) + 1)]
