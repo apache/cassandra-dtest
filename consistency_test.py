@@ -161,6 +161,61 @@ class TestConsistency(Tester):
         for i in xrange(1, 4):
             assert res[i] == 'value%d' % (i+2), 'Expecting value%d, got %s (%s)' % (i+2, res[i], str(res))
 
+    def hintedhandoff_test(self):
+        cluster = self.cluster
+
+        tokens = cluster.balanced_tokens(2)
+        cluster.populate(2, tokens=tokens).start()
+        [node1, node2] = cluster.nodelist()
+
+        cursor = self.cql_connection(node1).cursor()
+        self.create_ks(cursor, 'ks', 2)
+        self.create_cf(cursor, 'cf')
+
+        node2.stop(wait_other_notice=True)
+
+        for n in xrange(0, 100):
+            insert_c1c2(cursor, n, "ONE")
+
+        node2.start(wait_other_notice=True)
+        node1.watch_log_for(["Finished hinted"], from_mark=node1.mark_log(), timeout=90)
+
+        node1.stop(wait_other_notice=True)
+
+        # Check node2 for all the keys that should have been delivered via HH
+        cursor = self.cql_connection(node2, keyspace='ks').cursor()
+        for n in xrange(0, 100):
+            query_c1c2(cursor, n, "ONE")
+
+    def readrepair_test(self):
+        cluster = self.cluster
+       cluster.set_configuration_options(values={ 'hinted_handoff_enabled' : False})
+
+        tokens = cluster.balanced_tokens(2)
+        cluster.populate(2, tokens=tokens).start()
+        [node1, node2] = cluster.nodelist()
+
+        cursor = self.cql_connection(node1).cursor()
+        self.create_ks(cursor, 'ks', 2)
+        self.create_cf(cursor, 'cf', read_repair=1.0)
+
+        node2.stop(wait_other_notice=True)
+
+        for n in xrange(0, 10000):
+            insert_c1c2(cursor, n, "ONE")
+
+        node2.start(wait_other_notice=True)
+       # query everything to cause RR
+        for n in xrange(0, 10000):
+            query_c1c2(cursor, n, "QUORUM")
+
+        node1.stop(wait_other_notice=True)
+
+        # Check node2 for all the keys that should have been repaired
+        cursor = self.cql_connection(node2, keyspace='ks').cursor()
+        for n in xrange(0, 10000):
+            query_c1c2(cursor, n, "ONE")
+
     def short_read_reversed_test(self):
         cluster = self.cluster
 
