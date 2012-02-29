@@ -1,5 +1,5 @@
 from time import sleep
-from dtest import Tester
+from dtest import Tester, debug
 from assertions import *
 from tools import *
 
