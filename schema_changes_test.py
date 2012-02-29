@@ -124,14 +124,3 @@ class TestSchemaChanges(Tester):
 
         wait(2)
         self.make_schema_changes(cursor)
-
-        cluster.cleanup()
-
-
-
-        
-
-
-
-
-

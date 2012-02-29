@@ -55,9 +55,6 @@ class TestSSTableGenerationAndLoading(Tester):
         cursor.execute("SELECT 1..8 FROM cf ")
         cursor.fetchone()
 
-        cluster.cleanup()
-
-
     def remove_index_file_test(self):
         """
         tests for situations similar to that found in this issue:
@@ -216,5 +213,3 @@ class TestSSTableGenerationAndLoading(Tester):
 
         debug("Reading data back one more time")
         read_and_validate_data()
-
-        cluster.cleanup()

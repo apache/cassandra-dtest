@@ -57,8 +57,3 @@ class TestCounterUpgrade(Tester):
             debug(x)
             cursor.execute("UPDATE counters SET row = row+1 where key='a'")
 
-        cluster.flush()
-        cluster.cleanup()
-
-
-

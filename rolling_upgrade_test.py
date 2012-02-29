@@ -115,9 +115,6 @@ class TestRollingUpgrade(Tester):
         self.rolling_upgrade_node(node2, stress_node=node3)
         self.rolling_upgrade_node(node3, stress_node=node1)
 
-        cluster.flush()
-        cluster.cleanup()
-
     def upgrade107_to_repo_test(self):
         """ Upgrade from 1.0.7 """
 
@@ -130,6 +127,3 @@ class TestRollingUpgrade(Tester):
         self.rolling_upgrade_node(node1, stress_node=node2)
         self.rolling_upgrade_node(node2, stress_node=node3)
         self.rolling_upgrade_node(node3, stress_node=node1)
-
-        cluster.flush()
-        cluster.cleanup()

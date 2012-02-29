@@ -144,7 +144,6 @@ class TestConcurrentSchemaChanges(Tester):
 
         self.make_schema_changes(cursor, namespace='ns1')
 
-        cluster.cleanup()
 
     
     def changes_to_different_nodes_test(self):
@@ -211,7 +210,6 @@ class TestConcurrentSchemaChanges(Tester):
         wait(20)
         self.validate_schema_consistent(node1)
 
-        cluster.cleanup()
 
     
     def decommission_node_test(self):
@@ -247,7 +245,6 @@ class TestConcurrentSchemaChanges(Tester):
         wait(2)
         self.validate_schema_consistent(node1)
 
-        cluster.cleanup()
 
 
     @since('1.1')
@@ -296,7 +293,6 @@ class TestConcurrentSchemaChanges(Tester):
         wait(2)
         self.validate_schema_consistent(node1)
 
-        cluster.cleanup()
 
 
     def load_test(self):
@@ -339,5 +335,4 @@ class TestConcurrentSchemaChanges(Tester):
 
         tcompact.join()
 
-        cluster.cleanup()
 
