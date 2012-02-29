@@ -189,7 +189,7 @@ class TestConsistency(Tester):
 
     def readrepair_test(self):
         cluster = self.cluster
-       cluster.set_configuration_options(values={ 'hinted_handoff_enabled' : False})
+        cluster.set_configuration_options(values={ 'hinted_handoff_enabled' : False})
 
         tokens = cluster.balanced_tokens(2)
         cluster.populate(2, tokens=tokens).start()
