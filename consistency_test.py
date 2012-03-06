@@ -195,12 +195,8 @@ class TestConsistency(Tester):
         assert cursor.rowcount == 1
         res = cursor.fetchone()
         # the key is returned but the row id empty
-        assert len(res) - 1 == 1, 'Expecting 1 value (excluding the key), got %d (%s)' % (len(res) - 1, str(res))
+        assert len(res) == 1, 'Expecting no value (excluding the key), got %d (%s)' % (len(res) - 1, str(res))
         assert res[0] == 'k0', str(res)
-        assert res[i] == 'value%d' % (i+2), 'Expecting value%d, got %s (%s)' % (i+2, res[i], str(res))
-        # value 0, 1 and 2 have been deleted
-        for i in xrange(1, 4):
-            assert res[i] == 'value%d' % (i+2), 'Expecting value%d, got %s (%s)' % (i+2, res[i], str(res))
 
     def hintedhandoff_test(self):
         cluster = self.cluster
