@@ -161,6 +161,47 @@ class TestConsistency(Tester):
         for i in xrange(1, 4):
             assert res[i] == 'value%d' % (i+2), 'Expecting value%d, got %s (%s)' % (i+2, res[i], str(res))
 
+    def short_read_delete_test(self):
+        """ Test short reads ultimately leaving no columns alive [#4000] """
+        cluster = self.cluster
+
+        # Disable hinted handoff and set batch commit log so this doesn't
+        # interfer with the test
+        cluster.set_configuration_options(values={ 'hinted_handoff_enabled' : False}, batch_commitlog=True)
+
+        cluster.populate(2).start()
+        [node1, node2] = cluster.nodelist()
+        time.sleep(.5)
+
+        cursor = self.cql_connection(node1).cursor()
+        self.create_ks(cursor, 'ks', 3)
+        self.create_cf(cursor, 'cf', read_repair=0.0)
+        # insert 2 columns in one row
+        insert_columns(cursor, 0, 2)
+        cursor.close()
+
+        # Delete the row while first node is dead
+        node1.flush()
+        node1.stop(wait_other_notice=True)
+        cursor = self.cql_connection(node2, 'ks').cursor()
+        cursor.execute('DELETE FROM cf USING CONSISTENCY ONE WHERE key=k0')
+        cursor.close()
+        node1.start(wait_other_notice=True)
+        time.sleep(.5)
+
+        # Query first column
+        cursor = self.cql_connection(node1, 'ks').cursor()
+        cursor.execute('SELECT FIRST 1 * FROM cf USING CONSISTENCY QUORUM WHERE key=k0')
+        assert cursor.rowcount == 1
+        res = cursor.fetchone()
+        # the key is returned but the row id empty
+        assert len(res) - 1 == 1, 'Expecting 1 value (excluding the key), got %d (%s)' % (len(res) - 1, str(res))
+        assert res[0] == 'k0', str(res)
+        assert res[i] == 'value%d' % (i+2), 'Expecting value%d, got %s (%s)' % (i+2, res[i], str(res))
+        # value 0, 1 and 2 have been deleted
+        for i in xrange(1, 4):
+            assert res[i] == 'value%d' % (i+2), 'Expecting value%d, got %s (%s)' % (i+2, res[i], str(res))
+
     def hintedhandoff_test(self):
         cluster = self.cluster
 
