@@ -32,35 +32,23 @@ class TestRollingUpgrade(Tester):
 
         keyspace = 'rolling_ks'
 
-        lm_standard = loadmaker.LoadMaker(column_family_name='rolling_cf_standard',
-                consistency_level='TWO', keyspace_name=keyspace)
-        lm_super = loadmaker.LoadMaker(column_family_name='rolling_cf_super',
-                column_family_type='super', num_cols=2, consistency_level='TWO', 
-                keyspace_name=keyspace)
-        lm_counter_standard = loadmaker.LoadMaker(
-                column_family_name='rolling_cf_counter_standard', 
-                is_counter=True, consistency_level='TWO', num_cols=3, 
-                keyspace_name=keyspace)
-        lm_counter_super = loadmaker.LoadMaker(
-                column_family_name='rolling_cf_counter_super', 
-                is_counter=True, consistency_level='TWO',
-                column_family_type='super', num_cols=2,
-                num_counter_rows=20, num_subcols=2, keyspace_name=keyspace)
+        cursor = self.cql_connection(stress_node).cursor()
 
-        loader_standard = loadmaker.ContinuousLoader([stress_node.address()], 
+        lm_standard = loadmaker.LoadMaker(cursor, column_family_name='rolling_cf_standard',
+                consistency_level='QUORUM', keyspace_name=keyspace)
+        lm_counter_standard = loadmaker.LoadMaker(cursor,
+                column_family_name='rolling_cf_counter_standard', 
+                is_counter=True, consistency_level='QUORUM', num_cols=3, 
+                keyspace_name=keyspace)
+
+        loader_standard = loadmaker.ContinuousLoader(
+                load_makers=[lm_standard],
                 sleep_between=1,
-                load_makers=
-                [
-                    lm_standard, 
-                    lm_super, 
-                ])
-        loader_counter = loadmaker.ContinuousLoader([stress_node.address()], 
+                )
+        loader_counter = loadmaker.ContinuousLoader( 
+                load_makers=[lm_counter_standard],
                 sleep_between=1,
-                load_makers=
-                [
-                    lm_counter_standard, 
-                    lm_counter_super, 
-                ])
+                )
 
         debug("Sleeping to get some data into the cluster")
         time.sleep(5)
@@ -116,10 +104,10 @@ class TestRollingUpgrade(Tester):
         self.rolling_upgrade_node(node3, stress_node=node1)
 
     def upgrade107_to_repo_test(self):
-        """ Upgrade from 1.0.7 """
+        """ Upgrade from 1.0.8 """
 
         cluster = self.cluster
-        cluster.set_cassandra_dir(cassandra_version="1.0.7")
+        cluster.set_cassandra_dir(cassandra_version="1.0.8")
 
         cluster.populate(3, tokens=[0, 2**125, 2**126]).start()
         [node1, node2, node3] = cluster.nodelist()
@@ -127,3 +115,5 @@ class TestRollingUpgrade(Tester):
         self.rolling_upgrade_node(node1, stress_node=node2)
         self.rolling_upgrade_node(node2, stress_node=node3)
         self.rolling_upgrade_node(node3, stress_node=node1)
+
+
