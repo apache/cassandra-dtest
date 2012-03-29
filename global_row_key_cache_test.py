@@ -11,9 +11,6 @@ from ccmlib import common as ccmcommon
 
 from loadmaker import LoadMaker
 
-import pycassa
-import pycassa.system_manager as system_manager
-
 class TestGlobalRowKeyCache(Tester):
 
     def __init__(self, *argv, **kwargs):
