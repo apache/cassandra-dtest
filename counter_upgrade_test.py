@@ -7,8 +7,6 @@ from assertions import *
 from ccmlib.cluster import Cluster
 from ccmlib import common as ccmcommon
 
-import loadmaker
-
 try:
     TO_BRANCH = os.environ['CASSANDRA_VERSION']
 except KeyError:

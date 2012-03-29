@@ -32,21 +32,22 @@ class TestRollingUpgrade(Tester):
 
         keyspace = 'rolling_ks'
 
-        cursor = self.cql_connection(stress_node).cursor()
-
-        lm_standard = loadmaker.LoadMaker(cursor, column_family_name='rolling_cf_standard',
+        lm_standard = loadmaker.LoadMaker(
+                self.cql_connection(stress_node).cursor(), 
+                column_family_name='rolling_cf_standard',
                 consistency_level='QUORUM', keyspace_name=keyspace)
-        lm_counter_standard = loadmaker.LoadMaker(cursor,
+        lm_counter_standard = loadmaker.LoadMaker(
+                self.cql_connection(stress_node).cursor(),
                 column_family_name='rolling_cf_counter_standard', 
                 is_counter=True, consistency_level='QUORUM', num_cols=3, 
                 keyspace_name=keyspace)
 
-        loader_standard = loadmaker.ContinuousLoader(
-                load_makers=[lm_standard],
-                sleep_between=1,
-                )
         loader_counter = loadmaker.ContinuousLoader( 
                 load_makers=[lm_counter_standard],
+                sleep_between=1,
+                )
+        loader_standard = loadmaker.ContinuousLoader(
+                load_makers=[lm_standard],
                 sleep_between=1,
                 )
 
@@ -81,6 +82,7 @@ class TestRollingUpgrade(Tester):
         debug("scrubbing...")
         node.nodetool('scrub')
 
+#        import ipdb; ipdb.set_trace()
         debug("validating standard data...")
         loader_standard.read_and_validate(step=10)
         loader_standard.exit()
@@ -103,7 +105,7 @@ class TestRollingUpgrade(Tester):
         self.rolling_upgrade_node(node2, stress_node=node3)
         self.rolling_upgrade_node(node3, stress_node=node1)
 
-    def upgrade107_to_repo_test(self):
+    def upgrade107_to_repo_est(self):
         """ Upgrade from 1.0.8 """
 
         cluster = self.cluster
