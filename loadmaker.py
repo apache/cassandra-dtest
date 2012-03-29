@@ -12,6 +12,7 @@ import time
 import uuid
 import pprint
 import threading
+import cql
 
 try:
     import cStringIO as StringIO
@@ -38,15 +39,16 @@ class LoadMaker(object):
         'column_family_name': None, # needs to be overwritten for the moment
         'consistency_level': 'QUORUM',
         'column_family_type': 'standard',
-        'validation_type': 'UTF8Type',
-        'comparator_type': 'UTF8Type',
-        'key_validation_type': 'UTF8Type',
+        'validation_type': 'text',
+        'comparator_type': 'text',
+        'key_validation_type': 'text',
         'num_cols': 5,
         'num_counter_rows': 10, # only applies to counter columns
     }
 
 
     def __init__(self, cursor, **kwargs):
+        self._cursor = cursor
 
         # allow for overwriting any of the defaults
         self._params = LoadMaker._DEFAULTS.copy()
@@ -66,7 +68,7 @@ class LoadMaker(object):
             if len(cf_name_generated) > 32:
                 import hashlib
                 cf_name_generated = hashlib.md5(cf_name_generated).hexdigest()
-            self._params['column_family_name'] = cf_name_generated
+            self._params['column_family_name'] = ('cf_' + cf_name_generated)[:32]
 
         self._num_generate_calls = 0
 
@@ -82,7 +84,6 @@ class LoadMaker(object):
         self.last_operation_time = 0
 
         self.create_keyspace(cursor)
-        self.set_cursor(cursor)
 
         self.create_column_family()
 
@@ -116,8 +117,7 @@ class LoadMaker(object):
                     values,
                     ))
         cql_stream.write("APPLY BATCH;")
-        debug(cql_stream.getvalue())
-        self._cursor.execute(cql_stream.getvalue())
+        self.execute_query(cql_stream.getvalue())
 
 
     def generate(self, num_keys=10000):
@@ -160,8 +160,7 @@ class LoadMaker(object):
             for row_key in rows.keys():
                 col_name = self._generate_col_name(0)
                 cql_str = "DELETE '%s' FROM %s WHERE KEY='%s'"%(col_name, self._params['column_family_name'], row_key)
-                debug(cql_str)
-                self._cursor.execute(cql_str)
+                self.execute_query(cql_str)
 
         return self
 
@@ -177,8 +176,7 @@ class LoadMaker(object):
         row_keys = [self._generate_row_key(i) for i in xrange(saved_deleted_key_count, self._deleted_key_count)]
         for row_key in row_keys:
             cql_str = "DELETE FROM %s WHERE KEY='%s'"%(self._params['column_family_name'], row_key)
-            debug(cql_str)
-            self._cursor.execute(cql_str)
+            self.execute_query(cql_str)
         return self
             
 
@@ -206,21 +204,13 @@ class LoadMaker(object):
         This increments each by one.
         """
         def add_func(row_key, col_name, subcol_name=None):
-            cql_str = """
-            UPDATE %(cf_name)s SET %(col_name)s=%(col_name)s+1
-            WHERE KEY=%(row_key)s;
-            """ % {
+            cql_str = """UPDATE %(cf_name)s SET %(col_name)s=%(col_name)s+1
+            WHERE KEY=%(row_key)s;""" % {
                 'cf_name': self._params['column_family_name'],
                 'col_name': col_name,
                 'row_key': row_key,
             }
-            debug(cql_str)
-            try:
-                self._cursor.execute(cql_str)
-            except Exception, e:
-                print "ERROR\n" * 200
-                print cql_str
-                raise
+            self.execute_query(cql_str, num_retries=0)
 
         self._iterate_over_counter_columns(add_func)
 
@@ -230,8 +220,7 @@ class LoadMaker(object):
         keys_str = ', '.join("'"+str(key)+"'" for key in keys)
         cql_str = "SELECT * FROM %s USING CONSISTENCY %s WHERE KEY in (%s)" % (
             self._params['column_family_name'], self._params['consistency_level'], keys_str)
-        debug(cql_str)
-        self._cursor.execute(cql_str)
+        self.execute_query(cql_str)
         rows = self._cursor.result
         out = {}
         for row in rows:
@@ -291,8 +280,7 @@ class LoadMaker(object):
         def validate_func(row_key, col_name):
             assert self._num_generate_calls > 0, "Data must be generated before validating!"
             cql_str = "SELECT '%s' FROM %s WHERE KEY='%s'"%(col_name, self._params['column_family_name'], row_key)
-            debug(cql_str)
-            self._cursor.execute(cql_str)
+            self.execute_query(cql_str)
             from_db = self._cursor.fetchone()
             val = from_db[0]
             assert val == self._num_generate_calls, "A counter did not have the right value! %s != %s" %(val, self._num_generate_calls)
@@ -346,48 +334,59 @@ class LoadMaker(object):
     def set_cursor(self, cursor):
         self._cursor = cursor
         cql_str = "USE %s" % self._params['keyspace_name']
-        debug(cql_str)
-        cursor.execute(cql_str)
+        self.execute_query(cql_str)
 
 
     def create_keyspace(self, cursor):
-        import cql
         keyspace_name = self._params['keyspace_name']
         cql_str = ("CREATE KEYSPACE %s WITH strategy_class=SimpleStrategy AND "
                 "strategy_options:replication_factor=%d" % (keyspace_name, int(self._params['replication_factor'])))
 
         try:
-            debug(cql_str)
-            cursor.execute(cql_str)
+            self.execute_query(cql_str)
         except cql.ProgrammingError, e:
+            # the ks already exists
             pass
         cql_str = "USE %s" % keyspace_name
-        debug(cql_str)
-        cursor.execute(cql_str)
+        self.execute_query(cql_str)
 
 
     def create_column_family(self):
-        import cql
+        """ The columnfamily should not already exist! """
         cf_name = self._params['column_family_name']
         if self._params['is_counter']:
             cql_str = """
-            CREATE COLUMNFAMILY %s (KEY text PRIMARY KEY) WITH default_validation=counter
-            """ % cf_name
-            try:
-                debug(cql_str)
-                self._cursor.execute(cql_str)
-            except cql.ProgrammingError, e:
-                pass # the cf exists
+            CREATE COLUMNFAMILY %s (KEY text PRIMARY KEY) WITH default_validation=counter""" % cf_name
+            self.execute_query(cql_str)
         else:
             cql_str = """
-            CREATE COLUMNFAMILY %s (KEY varchar PRIMARY KEY) WITH comparator=UTF8Type
-            AND default_validation=UTF8Type
-            """ % cf_name
+            CREATE COLUMNFAMILY %s (KEY %s PRIMARY KEY) WITH comparator=%s
+            AND default_validation=%s""" % (cf_name, 
+                self._params['key_validation_type'],
+                self._params['comparator_type'],
+                self._params['validation_type'])
+            self.execute_query(cql_str)
+
+    
+    def execute_query(self, cql_str, num_retries=3):
+        """
+        execute the query, and retry several times if needed.
+        """
+        debug(cql_str)
+        for try_num in xrange(num_retries+1):
             try:
-                debug(cql_str)
                 self._cursor.execute(cql_str)
-            except cql.ProgrammingError, e:
-                pass # the cf exists
+            except cql.ProgrammingError:
+                raise
+            except Exception as err:
+                debug("AN EXCEPTION OCCURED: %s %s, cql_str: %s try_num=%d" %
+                        (str(type(err)), str(err), cql_str, try_num))
+                if try_num == num_retries:
+                    raise
+                time.sleep(1)
+            else:
+                break
+
 
 
 class ContinuousLoader(threading.Thread):
@@ -446,7 +445,7 @@ class ContinuousLoader(threading.Thread):
                 return
 
             try:
-                load_maker.generate(num_keys=100)
+                load_maker.generate(num_keys=3)
             except Exception, e:
                 # if anything goes wrong, store the exception
                 e.args = e.args + (str(load_maker), )
@@ -512,15 +511,6 @@ class ContinuousLoader(threading.Thread):
         debug("unpausing continuousloader...")
         self._inserting_lock.release()
         self._is_loading = True
-
-
-#    def update_server_list(self, server_list):
-#        if self._is_loading:
-#            self._inserting_lock.acquire()
-#        for lm in self._load_makers:
-#            lm.set_server_list(server_list)
-#        if self._is_loading:
-#            self._inserting_lock.release()
 
 
 
