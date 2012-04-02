@@ -92,7 +92,7 @@ class TestRollingUpgrade(Tester):
 
         debug("Done upgrading node %s.\n" % node.name)
 
-    def upgrade089_to_repo_test(self):
+    def upgrade089_to_repo_tes(self):
         """ Upgrade from 0.8.9 """
 
         cluster = self.cluster
@@ -105,7 +105,7 @@ class TestRollingUpgrade(Tester):
         self.rolling_upgrade_node(node2, stress_node=node3)
         self.rolling_upgrade_node(node3, stress_node=node1)
 
-    def upgrade107_to_repo_est(self):
+    def upgrade107_to_repo_test(self):
         """ Upgrade from 1.0.8 """
 
         cluster = self.cluster

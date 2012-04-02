@@ -1,13 +1,14 @@
+import time
+import os
+import pprint
+from threading import Thread
+
 from dtest import Tester, debug
 from ccmlib.cluster import Cluster
 from ccmlib.node import Node
 from tools import since
-import random
-import time
-import os
-import sys
-import re
-from threading import Thread
+
+from cql.connection import Connection as ThriftConnection
 
 def wait(delay=2):
     """
@@ -16,6 +17,10 @@ def wait(delay=2):
     time.sleep(delay)
 
 class TestConcurrentSchemaChanges(Tester):
+
+    def __init__(self, *argv, **kwargs):
+        super(TestConcurrentSchemaChanges, self).__init__(*argv, **kwargs)
+        self.allow_log_errors = True
 
     def prepare_for_changes(self, cursor, namespace='ns1'):
         """
@@ -114,21 +119,15 @@ class TestConcurrentSchemaChanges(Tester):
 
 
     def validate_schema_consistent(self, node):
-        """
-        does a "DESCRIBE CLUSTER" on the node and makes sure that
-        there is only one schema.
-        """
+        """ Makes sure that there is only one schema """
 
-        cli = node.cli()
-        wait(3)
-        cli.do("describe cluster")
-        res = cli.last_output()
-        # cli is messing up the terminal, and I can't figure out why. TODO: figure it out and fix it.
-        os.system('tset') 
-        schemas = re.findall('[\dabcdef]{8}-[\dabcdef]{4}-[\dabcdef]{4}-[\dabcdef]{4}-[\dabcdef]{12}:', res)
-        assert len(schemas) == 1, "More or less then 1 schema was found! Here is the 'describe_cluster: %s" % res
+        host, port = node.network_interfaces['thrift']
+        conn = ThriftConnection(host, port, keyspace=None)
+        schemas = conn.client.describe_schema_versions()
+        num_schemas = len([ss for ss in schemas.keys() if ss != 'UNREACHABLE'])
+        assert num_schemas == 1, "There were multiple schema versions: " + pprint.pformat(schemas)
 
-    
+
     def basic_test(self):
         """
         make sevaral schema changes on the same node.
@@ -215,19 +214,31 @@ class TestConcurrentSchemaChanges(Tester):
     def decommission_node_test(self):
         cluster = self.cluster
 
-        cluster.populate(2).start()
+        cluster.populate(1)
+        # create and add a new node, I must not be a seed, otherwise
+        # we get schema disagreement issues for awhile after decommissioning it.
+        node2 = Node('node2', 
+                    cluster,
+                    True,
+                    ('127.0.0.2', 9160),
+                    ('127.0.0.2', 7000),
+                    '7200',
+                    None)
+        cluster.add(node2, False)
 
         [node1, node2] = cluster.nodelist()
-
+        node1.start()
+        node2.start()
         wait(2)
+
         cursor = self.cql_connection(node1).cursor()
         self.prepare_for_changes(cursor)
-        wait(2)
 
         node2.decommission()
+        wait(30)
 
+        self.validate_schema_consistent(node1)
         self.make_schema_changes(cursor, namespace='ns1')
-        wait(2)
 
         # create and add a new node
         node3 = Node('node3', 
@@ -239,12 +250,10 @@ class TestConcurrentSchemaChanges(Tester):
                     None)
 
         cluster.add(node3, True)
-
         node3.start()
 
-        wait(2)
+        wait(30)
         self.validate_schema_consistent(node1)
-
 
 
     @since('1.1')
@@ -297,7 +306,7 @@ class TestConcurrentSchemaChanges(Tester):
 
     def load_test(self):
         """
-        applies schema changes while the cluster is under load.
+        apply schema changes while the cluster is under load.
         """
 
         cluster = self.cluster
