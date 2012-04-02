@@ -378,9 +378,7 @@ class LoadMaker(object):
                 self._cursor.execute(cql_str)
             except cql.ProgrammingError:
                 raise
-            except Exception as err:
-                debug("AN EXCEPTION OCCURED: %s %s, cql_str: %s try_num=%d" %
-                        (str(type(err)), str(err), cql_str, try_num))
+            except:
                 if try_num == num_retries:
                     raise
                 time.sleep(1)
