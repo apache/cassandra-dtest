@@ -309,7 +309,6 @@ class TestConsistency(Tester):
            insert_c1c2(cursor, n, CL)
 
         debug("Taking down node1")
-        node1.nodetool('drain')
         node1.stop(wait_other_notice=True)
 
         debug("Reading back data.")
