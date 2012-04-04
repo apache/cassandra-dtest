@@ -20,12 +20,15 @@ if len(config.read(os.path.expanduser('~/.cassandra-dtest'))) > 0:
 
 NO_SKIP = os.environ.get('SKIP', '').lower() in ('no', 'false')
 DEBUG = os.environ.get('DEBUG', '').lower() in ('yes', 'true')
+PRINT_DEBUG = os.environ.get('PRINT_DEBUG', '').lower() in ('yes', 'true')
 
 LOG = logging.getLogger()
 
 def debug(msg):
     if DEBUG:
         LOG.debug(msg)
+    if PRINT_DEBUG:
+        print msg
 
 class Tester(object):
 
