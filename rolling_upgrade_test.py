@@ -22,7 +22,7 @@ class TestRollingUpgrade(Tester):
         # If we don't allow log errors, then the test will fail.
         self.allow_log_errors = True
 
-    def rolling_upgrade_node(self, node, stress_node, create_db_objects):
+    def rolling_upgrade_node(self, node, stress_node, create_ks_and_cf):
         """
         node is the node to upgrade. stress_ip is the node to run stress on.
         """
@@ -34,12 +34,12 @@ class TestRollingUpgrade(Tester):
 
         lm_standard = loadmaker.LoadMaker(
                 self.cql_connection(stress_node).cursor(), 
-                create_ks=create_db_objects, create_cf=create_db_objects,
+                create_ks=create_ks_and_cf, create_cf=create_ks_and_cf,
                 column_family_name='rolling_cf_standard',
                 consistency_level='QUORUM', keyspace_name=keyspace)
         lm_counter_standard = loadmaker.LoadMaker(
                 self.cql_connection(stress_node).cursor(),
-                create_ks=create_db_objects, create_cf=create_db_objects,
+                create_ks=create_ks_and_cf, create_cf=create_ks_and_cf,
                 column_family_name='rolling_cf_counter_standard', 
                 is_counter=True, consistency_level='QUORUM', num_cols=3, 
                 keyspace_name=keyspace)
@@ -106,8 +106,8 @@ class TestRollingUpgrade(Tester):
         [node1, node2, node3] = cluster.nodelist()
         time.sleep(1)
 
-        self.rolling_upgrade_node(node1, stress_node=node2, create_db_objects=True)
-        self.rolling_upgrade_node(node2, stress_node=node3, create_db_objects=False)
-        self.rolling_upgrade_node(node3, stress_node=node1, create_db_objects=False)
+        self.rolling_upgrade_node(node1, stress_node=node2, create_ks_and_cf=True)
+        self.rolling_upgrade_node(node2, stress_node=node3, create_ks_and_cf=False)
+        self.rolling_upgrade_node(node3, stress_node=node1, create_ks_and_cf=False)
 
 
