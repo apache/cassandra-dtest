@@ -26,7 +26,7 @@ class TestCounterUpgrade(Tester):
     def counter_upgrade_test(self):
         cluster = self.cluster
 
-        cluster.set_cassandra_dir(cassandra_version="1.0.7")
+        cluster.set_cassandra_dir(cassandra_version="1.0.8")
 #        cluster.set_cassandra_dir(cassandra_version=TO_BRANCH) # Doesn't fail in this case.
 
         cluster.populate(3, tokens=[0, 2**125, 2**126]).start()
