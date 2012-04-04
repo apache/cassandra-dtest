@@ -9,6 +9,10 @@ from tools import since
 from cql.connection import Connection as ThriftConnection
 
 class TestUnavailableSchemaOnDecommission(Tester):
+    """
+    demonstrates JIRA #4115 
+    """
+
 
     def validate_schema_consistent(self, node):
         """ Makes sure that there is only one schema """
