@@ -11,9 +11,6 @@ from ccmlib import common as ccmcommon
 
 from loadmaker import LoadMaker
 
-import pycassa
-import pycassa.system_manager as system_manager
-
 class TestGlobalRowKeyCache(Tester):
 
     def __init__(self, *argv, **kwargs):
@@ -45,7 +42,6 @@ class TestGlobalRowKeyCache(Tester):
             for rcsim in (0, 10):
                 setup_name = "%d_%d" % (kcsim, rcsim)
                 ks_name = 'ks_' + setup_name
-                cf_name = 'cf_' + setup_name
 
                 debug("setup " + setup_name)
                 cluster.set_configuration_options(values={
@@ -61,16 +57,14 @@ class TestGlobalRowKeyCache(Tester):
                 time.sleep(1) # wait for propagation
 
                 # create some load makers
-                lm_standard = LoadMaker(keyspace_name=ks_name, column_family_type='standard')
-                lm_super = LoadMaker(keyspace_name=ks_name, column_family_type='super')
-                lm_counter = LoadMaker(keyspace_name=ks_name, column_family_type='standard', is_counter=True)
-                lm_counter_super = LoadMaker(keyspace_name=ks_name, column_family_type='super', is_counter=True)
+                lm_standard = LoadMaker(self.cql_connection(node1).cursor(), 
+                        keyspace_name=ks_name, column_family_type='standard')
+                lm_counter = LoadMaker(self.cql_connection(node1).cursor(),
+                        keyspace_name=ks_name, column_family_type='standard', is_counter=True)
 
                 # insert some rows
                 lm_standard.generate(NUM_INSERTS)
-                lm_super.generate(NUM_INSERTS)
                 lm_counter.generate(NUM_INSERTS)
-                lm_counter_super.generate(NUM_INSERTS)
 
                 # flush everything to get it into sstables
                 for node in cluster.nodelist():
@@ -80,17 +74,7 @@ class TestGlobalRowKeyCache(Tester):
                 for i in range(3):
                     # read and modify multiple times to get data into and invalidated out of the cache.
                     lm_standard.update(NUM_UPDATES).delete(NUM_DELETES).validate()
-                    lm_super.update(NUM_UPDATES).delete(NUM_DELETES).validate()
                     lm_counter.generate().validate()
-#                    lm_counter_super.generate().validate()
-
-
-
-                lm_counter_super.validate()
-
-                # flush everything to get it into sstables
-#                for node in cluster.nodelist():
-#                    node.flush()
 
                 # let the data be written to the row/key caches.
                 debug("Letting caches be written")
@@ -102,18 +86,14 @@ class TestGlobalRowKeyCache(Tester):
                 cluster.start()
                 time.sleep(5) # read the data back from row and key caches
 
-                lm_standard.set_server_list()
-                lm_super.set_server_list()
-                lm_counter.set_server_list()
-                lm_counter_super.set_server_list()
+                lm_standard.set_cursor(self.cql_connection(node1).cursor())
+                lm_counter.set_cursor(self.cql_connection(node1).cursor())
 
                 debug("Validating again...")
                 for i in range(2):
                     # read and modify multiple times to get data into and invalidated out of the cache.
                     lm_standard.validate()
-                    lm_super.validate()
                     lm_counter.validate()
-#                    lm_counter_super.validate()
 
 
                 cluster.stop()

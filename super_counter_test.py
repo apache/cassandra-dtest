@@ -10,8 +10,6 @@ from assertions import *
 from ccmlib.cluster import Cluster
 from ccmlib import common as ccmcommon
 
-from loadmaker import LoadMaker
-
 import pycassa
 import pycassa.system_manager as system_manager
 

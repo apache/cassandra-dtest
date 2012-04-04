@@ -7,8 +7,6 @@ from assertions import *
 from ccmlib.cluster import Cluster
 from ccmlib import common as ccmcommon
 
-import loadmaker
-
 try:
     TO_BRANCH = os.environ['CASSANDRA_VERSION']
 except KeyError:
@@ -28,7 +26,7 @@ class TestCounterUpgrade(Tester):
     def counter_upgrade_test(self):
         cluster = self.cluster
 
-        cluster.set_cassandra_dir(cassandra_version="1.0.7")
+        cluster.set_cassandra_dir(cassandra_version="1.0.8")
 #        cluster.set_cassandra_dir(cassandra_version=TO_BRANCH) # Doesn't fail in this case.
 
         cluster.populate(3, tokens=[0, 2**125, 2**126]).start()
