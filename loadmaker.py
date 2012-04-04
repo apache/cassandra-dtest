@@ -47,7 +47,7 @@ class LoadMaker(object):
     }
 
 
-    def __init__(self, cursor, **kwargs):
+    def __init__(self, cursor, create_ks=True, create_cf=True, **kwargs):
         self._cursor = cursor
 
         # allow for overwriting any of the defaults
@@ -59,9 +59,6 @@ class LoadMaker(object):
             self._params[key] = value
             cf_name_generated += '_' + key + '_' + re.sub('\W', '', str(value))
 
-        # column_family_type should be lowercase so that future comparisons will work.
-        self._params['column_family_type'] = self._params['column_family_type'].lower()
-
         # use our generated column family name if not given:
         if self._params['column_family_name'] is None:
             # keep the column family name within 32 chars:
@@ -69,6 +66,9 @@ class LoadMaker(object):
                 import hashlib
                 cf_name_generated = hashlib.md5(cf_name_generated).hexdigest()
             self._params['column_family_name'] = ('cf_' + cf_name_generated)[:32]
+
+        # column_family_type should be lowercase so that future comparisons will work.
+        self._params['column_family_type'] = self._params['column_family_type'].lower()
 
         self._num_generate_calls = 0
 
@@ -83,9 +83,22 @@ class LoadMaker(object):
         # as much as possible, the DB portion of the operation.
         self.last_operation_time = 0
 
-        self.create_keyspace(cursor)
+        if create_ks:
+            self.create_keyspace(cursor)
+        cql_str = "USE %s" % self._params['keyspace_name']
+        self.execute_query(cql_str)
 
-        self.create_column_family()
+        if create_cf:
+            self.create_column_family()
+        elif self._params['is_counter']:
+            # Now find the value that the counters should have. They should all have the same value.
+            row_key = self._generate_row_key(0)
+            col_name = self._generate_col_name(0)
+            cql_str = "SELECT '%s' FROM %s WHERE KEY='%s'"%(
+                    col_name, self._params['column_family_name'], row_key)
+            self.execute_query(cql_str)
+            from_db = self._cursor.fetchone()
+            self._num_generate_calls = from_db[0] or 0
 
 
     def __str__(self):
@@ -269,8 +282,6 @@ class LoadMaker(object):
 
             # make sure that deleted rows really are gone.
             row_keys = [self._generate_row_key(i) for i in xrange(0, self._deleted_key_count, step)]
-#            read_rows = cf.multiget(row_keys, read_consistency_level=
-#                    self._params['validated_consistency_level'])
 
         debug("validate() succeeded")
         return self
@@ -283,7 +294,7 @@ class LoadMaker(object):
             self.execute_query(cql_str)
             from_db = self._cursor.fetchone()
             val = from_db[0]
-            assert val == self._num_generate_calls, "A counter did not have the right value! %s != %s" %(val, self._num_generate_calls)
+            assert self._num_generate_calls == val, "A counter did not have the right value! %s != %s, QUERY: %s" %(val, self._num_generate_calls, cql_str)
         self._iterate_over_counter_columns(validate_func)
 
 
@@ -341,14 +352,11 @@ class LoadMaker(object):
         keyspace_name = self._params['keyspace_name']
         cql_str = ("CREATE KEYSPACE %s WITH strategy_class=SimpleStrategy AND "
                 "strategy_options:replication_factor=%d" % (keyspace_name, int(self._params['replication_factor'])))
-
         try:
             self.execute_query(cql_str)
         except cql.ProgrammingError, e:
             # the ks already exists
             pass
-        cql_str = "USE %s" % keyspace_name
-        self.execute_query(cql_str)
 
 
     def create_column_family(self):
