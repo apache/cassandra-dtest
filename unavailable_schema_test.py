@@ -8,8 +8,7 @@ from tools import since
 
 from cql.connection import Connection as ThriftConnection
 
-class TestUnavailableSchema(Tester):
-
+class TestUnavailableSchemaOnDecommission(Tester):
 
     def validate_schema_consistent(self, node):
         """ Makes sure that there is only one schema """
@@ -21,7 +20,7 @@ class TestUnavailableSchema(Tester):
         assert num_schemas == 1, "There were multiple schema versions: " + pprint.pformat(schemas)
 
     
-    def decommission_node_test(self):
+    def decommission_node_schema_check_test(self):
         cluster = self.cluster
 
         cluster.populate(1)
