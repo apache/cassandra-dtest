@@ -620,7 +620,7 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[x] for x in range(0, 8)], res
 
-    #@require('#4004')
+    @require('#4004')
     def reversed_comparator_test(self):
         cluster = self.cluster
 
