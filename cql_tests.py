@@ -460,7 +460,7 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert len(res) == 2, res
 
-    @require('3785')
+    @since('1.1')
     def exclusive_slice_test(self):
         cluster = self.cluster
 
@@ -619,6 +619,34 @@ class TestCQL(Tester):
         cursor.execute("SELECT v FROM test2 WHERE k = 0 ORDER BY c1")
         res = cursor.fetchall()
         assert res == [[x] for x in range(0, 8)], res
+
+    #@require('#4004')
+    def reversed_comparator_test(self):
+        cluster = self.cluster
+
+        cluster.populate(1).start()
+        node1 = cluster.nodelist()[0]
+        time.sleep(0.2)
+
+        cursor = self.cql_connection(node1, version=cql_version).cursor()
+        self.create_ks(cursor, 'ks', 1)
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k int,
+                c int,
+                v int,
+                PRIMARY KEY (k, c DESC)
+            );
+        """)
+
+        # Inserts
+        for x in range(0, 10):
+            cursor.execute("INSERT INTO test (k, c, v) VALUES (0, %i, %i)" % (x, x))
+
+        cursor.execute("SELECT v FROM test WHERE k = 0")
+        res = cursor.fetchall()
+        assert res == [[x] for x in range(9, -1, -1)], res
 
     @require('#3783')
     def null_support_test(self):
