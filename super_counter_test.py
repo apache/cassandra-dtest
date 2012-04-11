@@ -10,10 +10,9 @@ from assertions import *
 from ccmlib.cluster import Cluster
 from ccmlib import common as ccmcommon
 
-from loadmaker import LoadMaker
-
-import pycassa
-import pycassa.system_manager as system_manager
+from cql.connection import Connection as ThriftConnection
+from cql.cassandra.ttypes import CfDef, ColumnParent, CounterColumn, \
+        ConsistencyLevel, ColumnPath
 
 class TestSuperCounterClusterRestart(Tester):
     """
@@ -34,30 +33,28 @@ class TestSuperCounterClusterRestart(Tester):
         self.create_ks(cursor, 'ks', 3)
         time.sleep(1) # wait for propagation
 
-        sm = system_manager.SystemManager()
-        sm.create_column_family('ks', 'cf', super=True, 
+        # create the columnfamily using thrift
+        host, port = node1.network_interfaces['thrift']
+        thrift_conn = ThriftConnection(host, port, keyspace='ks')
+        cf_def = CfDef(keyspace='ks', name='cf', column_type='Super', 
                 default_validation_class='CounterColumnType')
-        time.sleep(1)
-        
-        pool = pycassa.ConnectionPool('ks')
-        cf = pycassa.ColumnFamily(pool, 'cf')
+        thrift_conn.client.system_add_column_family(cf_def)
 
-        consistency_level = getattr(pycassa.cassandra.ttypes.ConsistencyLevel, 'QUORUM')
+        # let the sediment settle to to the bottom before drinking...
+        time.sleep(2)
 
         for subcol in xrange(NUM_SUBCOLS):
             for add in xrange(NUM_ADDS):
-                cf.add('row_0', 'col_0', super_column='subcol_%d' % subcol, 
-                        write_consistency_level=consistency_level)
-        time.sleep(5)
+                column_parent = ColumnParent(column_family='cf', 
+                        super_column='subcol_%d' % subcol)
+                counter_column = CounterColumn('col_0', 1)
+                thrift_conn.client.add('row_0', column_parent, counter_column,
+                        ConsistencyLevel.QUORUM)
+        time.sleep(1)
 
         # flush everything and the problem will be mostly corrected.
 #        for node in cluster.nodelist():
 #            node.flush()
-
-        debug("Before restart:")
-        for i in xrange(NUM_SUBCOLS):
-            debug(cf.get('row_0', ['col_0'], super_column='subcol_%d'%i, read_consistency_level=consistency_level)['col_0'],)
-        debug("")
 
         debug("Stopping cluster")
         cluster.stop()
@@ -66,13 +63,16 @@ class TestSuperCounterClusterRestart(Tester):
         cluster.start()
         time.sleep(.5)
 
-        pool = pycassa.ConnectionPool('ks')
-        cf = pycassa.ColumnFamily(pool, 'cf')
+        thrift_conn = ThriftConnection(host, port, keyspace='ks')
 
-        debug("After restart:")
         from_db = []
+
         for i in xrange(NUM_SUBCOLS):
-            val = cf.get('row_0', ['col_0'], super_column='subcol_%d'%i, read_consistency_level=consistency_level)['col_0']
+            column_path = ColumnPath(column_family='cf', column='col_0', 
+                    super_column='subcol_%d'%i)
+            column_or_super_column = thrift_conn.client.get('row_0', column_parent, 
+                    ConsistencyLevel.QUORUM)
+            val = column_or_super_column.counter_super_column.columns[0].value
             debug(str(val)),
             from_db.append(val)
         debug("")

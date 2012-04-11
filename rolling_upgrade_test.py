@@ -22,7 +22,7 @@ class TestRollingUpgrade(Tester):
         # If we don't allow log errors, then the test will fail.
         self.allow_log_errors = True
 
-    def rolling_upgrade_node(self, node, stress_node):
+    def rolling_upgrade_node(self, node, stress_node, create_ks_and_cf):
         """
         node is the node to upgrade. stress_ip is the node to run stress on.
         """
@@ -32,35 +32,27 @@ class TestRollingUpgrade(Tester):
 
         keyspace = 'rolling_ks'
 
-        lm_standard = loadmaker.LoadMaker(column_family_name='rolling_cf_standard',
-                consistency_level='TWO', keyspace_name=keyspace)
-        lm_super = loadmaker.LoadMaker(column_family_name='rolling_cf_super',
-                column_family_type='super', num_cols=2, consistency_level='TWO', 
-                keyspace_name=keyspace)
+        lm_standard = loadmaker.LoadMaker(
+                self.cql_connection(stress_node).cursor(), 
+                create_ks=create_ks_and_cf, create_cf=create_ks_and_cf,
+                column_family_name='rolling_cf_standard',
+                consistency_level='QUORUM', keyspace_name=keyspace)
         lm_counter_standard = loadmaker.LoadMaker(
+                self.cql_connection(stress_node).cursor(),
+                create_ks=create_ks_and_cf, create_cf=create_ks_and_cf,
                 column_family_name='rolling_cf_counter_standard', 
-                is_counter=True, consistency_level='TWO', num_cols=3, 
+                is_counter=True, consistency_level='QUORUM', num_cols=3, 
                 keyspace_name=keyspace)
-        lm_counter_super = loadmaker.LoadMaker(
-                column_family_name='rolling_cf_counter_super', 
-                is_counter=True, consistency_level='TWO',
-                column_family_type='super', num_cols=2,
-                num_counter_rows=20, num_subcols=2, keyspace_name=keyspace)
 
-        loader_standard = loadmaker.ContinuousLoader([stress_node.address()], 
+        loader_counter = loadmaker.ContinuousLoader( 
+                load_makers=[lm_counter_standard],
                 sleep_between=1,
-                load_makers=
-                [
-                    lm_standard, 
-                    lm_super, 
-                ])
-        loader_counter = loadmaker.ContinuousLoader([stress_node.address()], 
+                )
+        loader_standard = loadmaker.ContinuousLoader(
+                load_makers=[lm_standard],
                 sleep_between=1,
-                load_makers=
-                [
-                    lm_counter_standard, 
-                    lm_counter_super, 
-                ])
+                )
+        loader_counter.read_and_validate(step=10)
 
         debug("Sleeping to get some data into the cluster")
         time.sleep(5)
@@ -90,9 +82,10 @@ class TestRollingUpgrade(Tester):
 
         debug("starting...")
         node.start(wait_other_notice=True)
-        debug("scrubbing...")
-        node.nodetool('scrub')
+        debug("upgradsstables...")
+        node.nodetool('upgradesstables')
 
+#        import ipdb; ipdb.set_trace()
         debug("validating standard data...")
         loader_standard.read_and_validate(step=10)
         loader_standard.exit()
@@ -102,28 +95,19 @@ class TestRollingUpgrade(Tester):
 
         debug("Done upgrading node %s.\n" % node.name)
 
-    def upgrade089_to_repo_test(self):
-        """ Upgrade from 0.8.9 """
+
+    def upgrade108_to_repo_test(self):
+        """ Upgrade from 1.0.8 """
 
         cluster = self.cluster
-        cluster.set_cassandra_dir(cassandra_version="0.8.9")
+        cluster.set_cassandra_dir(cassandra_version="1.0.8")
 
         cluster.populate(3, tokens=[0, 2**125, 2**126]).start()
         [node1, node2, node3] = cluster.nodelist()
+        time.sleep(1)
 
-        self.rolling_upgrade_node(node1, stress_node=node2)
-        self.rolling_upgrade_node(node2, stress_node=node3)
-        self.rolling_upgrade_node(node3, stress_node=node1)
+        self.rolling_upgrade_node(node1, stress_node=node2, create_ks_and_cf=True)
+        self.rolling_upgrade_node(node2, stress_node=node3, create_ks_and_cf=False)
+        self.rolling_upgrade_node(node3, stress_node=node1, create_ks_and_cf=False)
 
-    def upgrade107_to_repo_test(self):
-        """ Upgrade from 1.0.7 """
 
-        cluster = self.cluster
-        cluster.set_cassandra_dir(cassandra_version="1.0.7")
-
-        cluster.populate(3, tokens=[0, 2**125, 2**126]).start()
-        [node1, node2, node3] = cluster.nodelist()
-
-        self.rolling_upgrade_node(node1, stress_node=node2)
-        self.rolling_upgrade_node(node2, stress_node=node3)
-        self.rolling_upgrade_node(node3, stress_node=node1)
