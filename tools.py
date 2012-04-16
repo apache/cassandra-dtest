@@ -1,21 +1,22 @@
 import time
 from ccmlib.node import Node
 from decorator  import decorator
+import cql
 
 def retry_till_success(fun, *args, **kwargs):
-    timeout = kwargs["timeout"] or 60
+    if 'timeout' in kwargs:
+        timeout = kwargs['timeout']
+        del(kwargs['timeout']) # don't pass timeout to the function
+    else:
+        timeout = 60
+
     deadline = time.time() + timeout
-    exception = None
-    while time.time() < deadline:
+    while True:
         try:
-            if len(args) == 0:
-                fun(None)
-            else:
-                fun(*args)
-            return
-        except Exception as e:
-            exception = e
-    raise exception
+            return fun(*args, **kwargs)
+        except:
+            if time.time() > deadline:
+                raise
 
 def insert_c1c2(cursor, key, consistency="QUORUM"):
     cursor.execute('UPDATE cf USING CONSISTENCY %s SET c1=value1, c2=value2 WHERE key=k%d' % (consistency, key))
@@ -147,3 +148,57 @@ def not_implemented(f):
     wrapped.__name__ = f.__name__
     wrapped.__doc__ = f.__doc__
     return wrapped
+
+#from cql.connection import Connection
+#from pycassa.cassandra.c10 import Cassandra
+from cql.cassandra import Cassandra
+from thrift.transport import TTransport, TSocket
+from thrift.protocol import TBinaryProtocol
+class ThriftConnection(object):
+    """
+    A thrift connection. For when CQL doesn't do what we need.
+    """
+
+    DEFAULT_KEYSPACE = 'ks'
+    DEFAULT_COLUMN_FAMILY = 'cf'
+
+    def __init__(self, node=None, host=None, port=None, use_ks=False):
+        if node:
+            host, port = node.network_interfaces['thrift']
+
+        socket = TSocket.TSocket(host, port)
+        self.transport = TTransport.TFramedTransport(socket)
+        protocol = TBinaryProtocol.TBinaryProtocolAccelerated(self.transport)
+        self.client = Cassandra.Client(protocol)
+
+        socket.open()
+        self.open_socket = True
+
+
+    def create_ks(self, ks_name=ThriftConnection.DEFAULT_KEYSPACE, 
+            replication_factor=1):
+        ks_def = Cassandra.KsDef(ks_name, 'org.apache.cassandra.locator.SimpleStrategy', 
+                {'replication_factor': str(replication_factor)}, cf_defs=[])
+        retry_till_success(self.client.system_add_keyspace, ks_def, timeout=10)
+        self.use_ks(ks_name)
+        time.sleep(.5)
+
+
+    def use_ks(self, ks_name=ThriftConnection.DEFAULT_KEYSPACE)
+        retry_till_success(self.client.set_keyspace, ks_name, timeout=10)
+        
+    
+    def create_cf(self, cf_name=ThriftConnection.DEFAULT_COLUMN_FAMILY,
+            ks_name=ThriftConnection.DEFAULT_KEYSPACE):
+        cf_def = Cassandra.CfDef(name=cf_name, keyspace=ks_name)
+        retry_till_success(self.client.system_add_column_family, cf_def, timeout=10)
+
+
+    def insert_columns(self, num_columns=10, num_keys=1, 
+            ks_name=ThriftConnection.DEFAULT_KEYSPACE, 
+            cf_name=ThriftConnection.DEFAULT_COLUMN_FAMILY):
+        cf_parent = Cassandra.ColumnParent(column_family=cf_name)
+#        import ipdb; ipdb.set_trace()
+
+        
+
