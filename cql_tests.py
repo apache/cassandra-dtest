@@ -711,6 +711,23 @@ class TestCQL(Tester):
         assert res == [['%i%i' % (x, y)] for x in range(9, -1, -1) for y in range(0, 10)], res
 
     @since('1.1')
+    def invalid_old_property_test(self):
+        cluster = self.cluster
+
+        cluster.populate(1).start()
+        node1 = cluster.nodelist()[0]
+        time.sleep(0.2)
+
+        cursor = self.cql_connection(node1, version=cql_version).cursor()
+        self.create_ks(cursor, 'ks', 1)
+
+        assert_invalid(cursor, "CREATE TABLE test (foo text PRIMARY KEY, c int) WITH default_validation=timestamp")
+
+        cursor.execute("CREATE TABLE test (foo text PRIMARY KEY, c int)")
+        assert_invalid(cursor, "ALTER TABLE test WITH default_validation=int;")
+
+
+    @since('1.1')
     def alter_type_test(self):
         cluster = self.cluster
 
