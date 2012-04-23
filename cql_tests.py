@@ -620,6 +620,34 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[x] for x in range(0, 8)], res
 
+    #@require('#4004')
+    #def reversed_comparator_test(self):
+    #    cluster = self.cluster
+
+    #    cluster.populate(1).start()
+    #    node1 = cluster.nodelist()[0]
+    #    time.sleep(0.2)
+
+    #    cursor = self.cql_connection(node1, version=cql_version).cursor()
+    #    self.create_ks(cursor, 'ks', 1)
+
+    #    cursor.execute("""
+    #        CREATE TABLE test (
+    #            k int,
+    #            c int,
+    #            v int,
+    #            PRIMARY KEY (k, c DESC)
+    #        );
+    #    """)
+
+    #    # Inserts
+    #    for x in range(0, 10):
+    #        cursor.execute("INSERT INTO test (k, c, v) VALUES (0, %i, %i)" % (x, x))
+
+    #    cursor.execute("SELECT v FROM test WHERE k = 0")
+    #    res = cursor.fetchall()
+    #    assert res == [[x] for x in range(9, -1, -1)], res
+
     @require('#4004')
     def reversed_comparator_test(self):
         cluster = self.cluster
@@ -636,17 +664,90 @@ class TestCQL(Tester):
                 k int,
                 c int,
                 v int,
-                PRIMARY KEY (k, c DESC)
-            );
+                PRIMARY KEY (k, c)
+            ) WITH CLUSTERING ORDER BY (c DESC);
         """)
 
         # Inserts
         for x in range(0, 10):
             cursor.execute("INSERT INTO test (k, c, v) VALUES (0, %i, %i)" % (x, x))
 
-        cursor.execute("SELECT v FROM test WHERE k = 0")
+        cursor.execute("SELECT v FROM test WHERE k = 0 ORDER BY c ASC")
+        res = cursor.fetchall()
+        assert res == [[x] for x in range(0, 10)], res
+
+        cursor.execute("SELECT v FROM test WHERE k = 0 ORDER BY c DESC")
         res = cursor.fetchall()
         assert res == [[x] for x in range(9, -1, -1)], res
+
+        cursor.execute("""
+            CREATE TABLE test2 (
+                k int,
+                c1 int,
+                c2 int,
+                v text,
+                PRIMARY KEY (k, c1, c2)
+            ) WITH CLUSTERING ORDER BY (c1 ASC, c2 DESC);
+        """)
+
+        # Inserts
+        for x in range(0, 10):
+            for y in range(0, 10):
+                cursor.execute("INSERT INTO test2 (k, c1, c2, v) VALUES (0, %i, %i, '%i%i')" % (x, y, x, y))
+
+        assert_invalid(cursor, "SELECT v FROM test2 WHERE k = 0 ORDER BY c1 ASC, c2 ASC")
+        assert_invalid(cursor, "SELECT v FROM test2 WHERE k = 0 ORDER BY c1 DESC, c2 DESC")
+
+        cursor.execute("SELECT v FROM test2 WHERE k = 0 ORDER BY c1 ASC")
+        res = cursor.fetchall()
+        assert res == [['%i%i' % (x, y)] for x in range(0, 10) for y in range(9, -1, -1)], res
+
+        cursor.execute("SELECT v FROM test2 WHERE k = 0 ORDER BY c1 ASC, c2 DESC")
+        res = cursor.fetchall()
+        assert res == [['%i%i' % (x, y)] for x in range(0, 10) for y in range(9, -1, -1)], res
+
+        cursor.execute("SELECT v FROM test2 WHERE k = 0 ORDER BY c1 DESC, c2 ASC")
+        res = cursor.fetchall()
+        assert res == [['%i%i' % (x, y)] for x in range(9, -1, -1) for y in range(0, 10)], res
+
+    @since('1.1')
+    def invalid_old_property_test(self):
+        cluster = self.cluster
+
+        cluster.populate(1).start()
+        node1 = cluster.nodelist()[0]
+        time.sleep(0.2)
+
+        cursor = self.cql_connection(node1, version=cql_version).cursor()
+        self.create_ks(cursor, 'ks', 1)
+
+        assert_invalid(cursor, "CREATE TABLE test (foo text PRIMARY KEY, c int) WITH default_validation=timestamp")
+
+        cursor.execute("CREATE TABLE test (foo text PRIMARY KEY, c int)")
+        assert_invalid(cursor, "ALTER TABLE test WITH default_validation=int;")
+
+
+    @since('1.1')
+    def alter_type_test(self):
+        cluster = self.cluster
+
+        cluster.populate(1).start()
+        node1 = cluster.nodelist()[0]
+        time.sleep(0.2)
+
+        cursor = self.cql_connection(node1, version=cql_version).cursor()
+        self.create_ks(cursor, 'ks', 1)
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k int PRIMARY KEY,
+                v int
+            )
+        """)
+
+        cursor.execute("ALTER TABLE test ALTER v TYPE float")
+        cursor.execute("INSERT INTO test (k, v) VALUES (0, 2.4)")
+
 
     @require('#3783')
     def null_support_test(self):
