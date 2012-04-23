@@ -4,6 +4,9 @@ from decorator  import decorator
 import cql
 import re
 
+from thrift.transport import TTransport, TSocket
+from thrift.protocol import TBinaryProtocol
+
 def retry_till_success(fun, *args, **kwargs):
     if 'timeout' in kwargs:
         timeout = kwargs['timeout']
@@ -150,9 +153,7 @@ def not_implemented(f):
     wrapped.__doc__ = f.__doc__
     return wrapped
 
-#from cassandra.v11 import Cassandra
-from thrift.transport import TTransport, TSocket
-from thrift.protocol import TBinaryProtocol
+
 class ThriftConnection(object):
     """
     A thrift connection. For when CQL doesn't do what we need.
@@ -239,6 +240,7 @@ class ThriftConnection(object):
                     timeout=30)
         return self
 
+
     def query_columns(self, num_rows=10, consistency_level='QUORUM'):
         """ Check that the values inserted in insert_columns() are present """ 
         for row_key in ('row_%d'%i for i in xrange(num_rows)):
@@ -252,8 +254,4 @@ class ThriftConnection(object):
             assert value == 'val_0', "column did not have the same value that was inserted!"
         return self
 
-
-
-
-        
 
