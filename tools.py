@@ -1,21 +1,26 @@
 import time
 from ccmlib.node import Node
 from decorator  import decorator
+import cql
+import re
+
+from thrift.transport import TTransport, TSocket
+from thrift.protocol import TBinaryProtocol
 
 def retry_till_success(fun, *args, **kwargs):
-    timeout = kwargs["timeout"] or 60
+    if 'timeout' in kwargs:
+        timeout = kwargs['timeout']
+        del(kwargs['timeout']) # don't pass timeout to the function
+    else:
+        timeout = 60
+
     deadline = time.time() + timeout
-    exception = None
-    while time.time() < deadline:
+    while True:
         try:
-            if len(args) == 0:
-                fun(None)
-            else:
-                fun(*args)
-            return
-        except Exception as e:
-            exception = e
-    raise exception
+            return fun(*args, **kwargs)
+        except:
+            if time.time() > deadline:
+                raise
 
 def insert_c1c2(cursor, key, consistency="QUORUM"):
     cursor.execute('UPDATE cf USING CONSISTENCY %s SET c1=value1, c2=value2 WHERE key=k%d' % (consistency, key))
@@ -147,3 +152,106 @@ def not_implemented(f):
     wrapped.__name__ = f.__name__
     wrapped.__doc__ = f.__doc__
     return wrapped
+
+
+class ThriftConnection(object):
+    """
+    A thrift connection. For when CQL doesn't do what we need.
+    """
+
+    def __init__(self, node=None, host=None, port=None, ks_name='ks', cf_name='cf',
+            cassandra_interface='11'):
+        """
+        initializes the connection. 
+         - node: a ccm node. If supplied, the host and port, and cassandra_interface 
+           will be pulled from the node.
+         - host, port: overwritten if node is supplied
+         - ks_name, cf_name: all operations are done on the supplied ks and cf
+         - cassandra_interface: '07' and '11' are currently supported. This is the 
+           thrift interface to cassandra. '11' suffices for now except when creating
+           keyspaces against cassandra0.7, in which case 07 must be used.
+        """
+        if node:
+            host, port = node.network_interfaces['thrift']
+            if re.findall('0\.7\.\d+', node.get_cassandra_dir()):
+                cassandra_interface='07'
+        self.node = node; self.host = host; self.port = port; self.cassandra_interface = cassandra_interface
+
+        # import the correct version of the cassandra thrift interface
+        # and set self.Cassandra as the imported module
+        module_name = 'cassandra.v%s' % cassandra_interface
+        imp = __import__(module_name, globals(), locals(), ['Cassandra'])
+        self.Cassandra = imp.Cassandra
+
+        socket = TSocket.TSocket(host, port)
+        self.transport = TTransport.TFramedTransport(socket)
+        protocol = TBinaryProtocol.TBinaryProtocolAccelerated(self.transport)
+        self.client = self.Cassandra.Client(protocol)
+
+        socket.open()
+        self.open_socket = True
+
+        self.ks_name = ks_name
+        self.cf_name = cf_name
+
+
+    def create_ks(self, replication_factor=1):
+        if self.cassandra_interface == '07':
+            ks_def = self.Cassandra.KsDef(name=self.ks_name, 
+                    strategy_class='org.apache.cassandra.locator.SimpleStrategy', 
+                    replication_factor=int(replication_factor),
+                    cf_defs=[])
+        else:
+            ks_def = self.Cassandra.KsDef(name=self.ks_name, 
+                    strategy_class='org.apache.cassandra.locator.SimpleStrategy', 
+                    strategy_options={'replication_factor': str(replication_factor)}, 
+                    cf_defs=[])
+        retry_till_success(self.client.system_add_keyspace, ks_def, timeout=30)
+        self.use_ks()
+        time.sleep(.5)
+        return self
+
+
+    def use_ks(self):
+        retry_till_success(self.client.set_keyspace, self.ks_name, timeout=30)
+        return self
+        
+    
+    def create_cf(self):
+        cf_def = self.Cassandra.CfDef(name=self.cf_name, keyspace=self.ks_name)
+        retry_till_success(self.client.system_add_column_family, cf_def, timeout=30)
+        return self
+
+
+    def _translate_cl(self, cl):
+        return self.Cassandra.ConsistencyLevel._NAMES_TO_VALUES[cl]
+
+
+    def insert_columns(self, num_rows=10, consistency_level='QUORUM'):
+        """ Insert some basic values """
+        cf_parent = self.Cassandra.ColumnParent(column_family=self.cf_name)
+
+        for row_key in ('row_%d'%i for i in xrange(num_rows)):
+            col = self.Cassandra.Column(name='col_0', value='val_0', 
+                    timestamp=int(time.time()*1000))
+            retry_till_success(self.client.insert, 
+                    key=row_key, column_parent=cf_parent, column=col, 
+                    consistency_level=self._translate_cl(consistency_level), 
+                    timeout=30)
+        return self
+
+
+    def query_columns(self, num_rows=10, consistency_level='QUORUM'):
+        """ Check that the values inserted in insert_columns() are present """ 
+        for row_key in ('row_%d'%i for i in xrange(num_rows)):
+            cpath = self.Cassandra.ColumnPath(column_family=self.cf_name,
+                    column='col_0')
+            cosc = retry_till_success(self.client.get, key=row_key, column_path=cpath,
+                    consistency_level=self._translate_cl(consistency_level),
+                    timeout=30)
+            col = cosc.column
+            value = col.value
+            assert value == 'val_0', "column did not have the same value that was inserted!"
+        return self
+
+
