@@ -11,9 +11,9 @@ class TestLoadmaker(Tester):
         cluster.populate(1).start()
         node1 = cluster.nodelist()[0]
         time.sleep(.2)
-        cursor = self.cql_connection(node1).cursor()
+        host, port = node1.network_interfaces['thrift']
 
-        lm = loadmaker.LoadMaker(cursor, column_family_name='cf_standard',
+        lm = loadmaker.LoadMaker(host, port, column_family_name='cf_standard',
                 consistency_level='ONE')
         lm.generate(500)
         lm.validate()
@@ -22,16 +22,16 @@ class TestLoadmaker(Tester):
         lm.delete(10)
         lm.validate()
 
-        lm = loadmaker.LoadMaker(cursor, column_family_name='cf_counter',
+        lm = loadmaker.LoadMaker(host, port, column_family_name='cf_counter',
                 is_counter=True,
                 consistency_level='ONE')
         lm.generate(200)
         lm.validate()
 
 
-        lm1 = loadmaker.LoadMaker(cursor, column_family_name='cf_standard2',
+        lm1 = loadmaker.LoadMaker(host, port, column_family_name='cf_standard2',
                 consistency_level='ONE')
-        lm2 = loadmaker.LoadMaker(cursor, column_family_name='cf_counter2',
+        lm2 = loadmaker.LoadMaker(host, port, column_family_name='cf_counter2',
                 is_counter=True,
                 consistency_level='ONE')
 
