@@ -8,6 +8,7 @@ import itertools
 import zlib
 
 from dtest import Tester, debug
+from tools import since
 from ccmlib.cluster import Cluster
 from ccmlib.node import Node
 from ccmlib import common as ccmcommon
@@ -55,6 +56,7 @@ class TestSSTableGenerationAndLoading(Tester):
         cursor.execute("SELECT 1..8 FROM cf ")
         cursor.fetchone()
 
+    @since('1.1')
     def remove_index_file_test(self):
         """
         tests for situations similar to that found in this issue:
