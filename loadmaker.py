@@ -48,7 +48,7 @@ class LoadMaker(object):
 
 
     def __init__(self, host='localhost', port=9160, create_ks=True, create_cf=True, **kwargs):
-        self.refresh_cursor(host, port)
+        self.refresh_connection(host, port)
 
         # allow for overwriting any of the defaults
         self._params = LoadMaker._DEFAULTS.copy()
@@ -104,11 +104,11 @@ class LoadMaker(object):
     @property
     def _cursor(self):
         if self._cached_cursor == None:
-            self.refresh_cursor()
+            self.refresh_connection()
         return self._cached_cursor
                 
 
-    def refresh_cursor(self, host=None, port=None, cql_version=None):
+    def refresh_connection(self, host=None, port=None, cql_version=None):
         if host:
             self._host = host
         if port:
@@ -116,9 +116,9 @@ class LoadMaker(object):
         self._cql_version = cql_version or None
             
         if self._cql_version:
-            con = cql.connect(host, port, keyspace=None, cql_version=self._cql_version)
+            con = cql.connect(self._host, self._port, keyspace=None, cql_version=self._cql_version)
         else:
-            con = cql.connect(host, port, keyspace=None)
+            con = cql.connect(self._host, self._port, keyspace=None)
         self._cached_cursor = con.cursor()
 
 
@@ -406,7 +406,7 @@ class LoadMaker(object):
                     raise
                 # try to reconnect
                 time.sleep(1)
-                self.refresh_cursor()
+                self.refresh_connection()
             else:
                 break
 
