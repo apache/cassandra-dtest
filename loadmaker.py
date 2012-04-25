@@ -48,7 +48,6 @@ class LoadMaker(object):
 
 
     def __init__(self, host='localhost', port=9160, create_ks=True, create_cf=True, **kwargs):
-        self.refresh_connection(host, port)
 
         # allow for overwriting any of the defaults
         self._params = LoadMaker._DEFAULTS.copy()
@@ -83,8 +82,11 @@ class LoadMaker(object):
         # as much as possible, the DB portion of the operation.
         self.last_operation_time = 0
 
+        self._is_keyspace_created = False
+        self.refresh_connection(host, port)
         if create_ks:
             self.create_keyspace(self._cursor)
+        self._is_keyspace_created = True
         cql_str = "USE %s" % self._params['keyspace_name']
         self.execute_query(cql_str)
 
@@ -120,6 +122,9 @@ class LoadMaker(object):
         else:
             con = cql.connect(self._host, self._port, keyspace=None)
         self._cached_cursor = con.cursor()
+        if self._is_keyspace_created:
+            cql_str = "USE %s" % self._params['keyspace_name']
+            self.execute_query(cql_str)
 
 
     def __str__(self):
