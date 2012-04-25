@@ -56,10 +56,12 @@ class TestGlobalRowKeyCache(Tester):
                 self.create_ks(cursor, ks_name, 3)
                 time.sleep(1) # wait for propagation
 
+                host, port = node1.network_interfaces['thrift']
+
                 # create some load makers
-                lm_standard = LoadMaker(self.cql_connection(node1).cursor(), 
+                lm_standard = LoadMaker(host, port, 
                         keyspace_name=ks_name, column_family_type='standard')
-                lm_counter = LoadMaker(self.cql_connection(node1).cursor(),
+                lm_counter = LoadMaker(host, port,
                         keyspace_name=ks_name, column_family_type='standard', is_counter=True)
 
                 # insert some rows
@@ -86,8 +88,8 @@ class TestGlobalRowKeyCache(Tester):
                 cluster.start()
                 time.sleep(5) # read the data back from row and key caches
 
-                lm_standard.set_cursor(self.cql_connection(node1).cursor())
-                lm_counter.set_cursor(self.cql_connection(node1).cursor())
+                lm_standard.refresh_connection()
+                lm_counter.refresh_connection()
 
                 debug("Validating again...")
                 for i in range(2):
