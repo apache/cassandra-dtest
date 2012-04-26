@@ -32,13 +32,15 @@ class TestRollingUpgrade(Tester):
 
         keyspace = 'rolling_ks'
 
+        host, port = stress_node.network_interfaces['thrift']
+
         lm_standard = loadmaker.LoadMaker(
-                self.cql_connection(stress_node).cursor(), 
+                host, port, 
                 create_ks=create_ks_and_cf, create_cf=create_ks_and_cf,
                 column_family_name='rolling_cf_standard',
                 consistency_level='QUORUM', keyspace_name=keyspace)
         lm_counter_standard = loadmaker.LoadMaker(
-                self.cql_connection(stress_node).cursor(),
+                host, port,
                 create_ks=create_ks_and_cf, create_cf=create_ks_and_cf,
                 column_family_name='rolling_cf_counter_standard', 
                 is_counter=True, consistency_level='QUORUM', num_cols=3, 
