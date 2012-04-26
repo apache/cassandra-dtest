@@ -20,6 +20,7 @@ class TestSuperCounterClusterRestart(Tester):
     https://issues.apache.org/jira/browse/CASSANDRA-3821
     """
 
+    @since('1.1')
     def functional_test(self):
         NUM_SUBCOLS = 100
         NUM_ADDS = 100

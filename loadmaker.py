@@ -47,8 +47,7 @@ class LoadMaker(object):
     }
 
 
-    def __init__(self, cursor, create_ks=True, create_cf=True, **kwargs):
-        self._cursor = cursor
+    def __init__(self, host='localhost', port=9160, create_ks=True, create_cf=True, **kwargs):
 
         # allow for overwriting any of the defaults
         self._params = LoadMaker._DEFAULTS.copy()
@@ -83,8 +82,11 @@ class LoadMaker(object):
         # as much as possible, the DB portion of the operation.
         self.last_operation_time = 0
 
+        self._is_keyspace_created = False
+        self.refresh_connection(host, port)
         if create_ks:
-            self.create_keyspace(cursor)
+            self.create_keyspace(self._cursor)
+        self._is_keyspace_created = True
         cql_str = "USE %s" % self._params['keyspace_name']
         self.execute_query(cql_str)
 
@@ -99,6 +101,30 @@ class LoadMaker(object):
             self.execute_query(cql_str)
             from_db = self._cursor.fetchone()
             self._num_generate_calls = from_db[0] or 0
+
+    
+    @property
+    def _cursor(self):
+        if self._cached_cursor == None:
+            self.refresh_connection()
+        return self._cached_cursor
+                
+
+    def refresh_connection(self, host=None, port=None, cql_version=None):
+        if host:
+            self._host = host
+        if port:
+            self._port = port
+        self._cql_version = cql_version or None
+            
+        if self._cql_version:
+            con = cql.connect(self._host, self._port, keyspace=None, cql_version=self._cql_version)
+        else:
+            con = cql.connect(self._host, self._port, keyspace=None)
+        self._cached_cursor = con.cursor()
+        if self._is_keyspace_created:
+            cql_str = "USE %s" % self._params['keyspace_name']
+            self.execute_query(cql_str)
 
 
     def __str__(self):
@@ -342,12 +368,6 @@ class LoadMaker(object):
         return str(prefix + str(num))
 
 
-    def set_cursor(self, cursor):
-        self._cursor = cursor
-        cql_str = "USE %s" % self._params['keyspace_name']
-        self.execute_query(cql_str)
-
-
     def create_keyspace(self, cursor):
         keyspace_name = self._params['keyspace_name']
         cql_str = ("CREATE KEYSPACE %s WITH strategy_class=SimpleStrategy AND "
@@ -376,7 +396,7 @@ class LoadMaker(object):
             self.execute_query(cql_str)
 
     
-    def execute_query(self, cql_str, num_retries=3):
+    def execute_query(self, cql_str, num_retries=10):
         """
         execute the query, and retry several times if needed.
         """
@@ -386,10 +406,12 @@ class LoadMaker(object):
                 self._cursor.execute(cql_str)
             except cql.ProgrammingError:
                 raise
-            except:
+            except Exception, e:
                 if try_num == num_retries:
                     raise
+                # try to reconnect
                 time.sleep(1)
+                self.refresh_connection()
             else:
                 break
 
