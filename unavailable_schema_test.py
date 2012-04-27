@@ -23,7 +23,7 @@ class TestUnavailableSchemaOnDecommission(Tester):
         num_schemas = len(schemas)
         assert num_schemas == 1, "There were multiple schema versions: " + pprint.pformat(schemas)
 
-    
+    @since(1.0) 
     def decommission_node_schema_check_test(self):
         cluster = self.cluster
 

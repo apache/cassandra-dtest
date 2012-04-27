@@ -110,21 +110,31 @@ class LoadMaker(object):
         return self._cached_cursor
                 
 
-    def refresh_connection(self, host=None, port=None, cql_version=None):
+    def refresh_connection(self, host=None, port=None, cql_version=None, num_retries=10):
+        """
+        establish a connection to the server. retry if needed.
+        """
         if host:
             self._host = host
         if port:
             self._port = port
         self._cql_version = cql_version or None
             
-        if self._cql_version:
-            con = cql.connect(self._host, self._port, keyspace=None, cql_version=self._cql_version)
-        else:
-            con = cql.connect(self._host, self._port, keyspace=None)
-        self._cached_cursor = con.cursor()
-        if self._is_keyspace_created:
-            cql_str = "USE %s" % self._params['keyspace_name']
-            self.execute_query(cql_str)
+        for try_num in xrange(1+num_retries):
+            try:
+                if self._cql_version:
+                    con = cql.connect(self._host, self._port, keyspace=None, cql_version=self._cql_version)
+                else:
+                    con = cql.connect(self._host, self._port, keyspace=None)
+                self._cached_cursor = con.cursor()
+                if self._is_keyspace_created:
+                    cql_str = "USE %s" % self._params['keyspace_name']
+                    self.execute_query(cql_str)
+            except:
+                if try_num < num_retries:
+                    time.sleep(1)
+                else:
+                    raise
 
 
     def __str__(self):
