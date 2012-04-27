@@ -19,6 +19,7 @@ class TestSSTableGenerationAndLoading(Tester):
         super(TestSSTableGenerationAndLoading, self).__init__(*argv, **kwargs)
         self.allow_log_errors = True
 
+    @since('1.0')
     def incompressible_data_in_compressed_table_test(self):
         """
         tests for the bug that caused this:
@@ -88,24 +89,33 @@ class TestSSTableGenerationAndLoading(Tester):
         assert data_found > 0, "After removing index, filter, stats, and digest files, the data file was deleted!"
 
 
+    @since('1.1')
     def sstableloader_compression_none_to_none_test(self):
         self.load_sstable_with_configuration(None, None)
+    @since('1.1')
     def sstableloader_compression_none_to_snappy_test(self):
         self.load_sstable_with_configuration(None, 'SnappyCompressor')
+    @since('1.1')
     def sstableloader_compression_none_to_deflate_test(self):
         self.load_sstable_with_configuration(None, 'DeflateCompressor')
 
+    @since('1.1')
     def sstableloader_compression_snappy_to_none_test(self):
         self.load_sstable_with_configuration('SnappyCompressor', None)
+    @since('1.1')
     def sstableloader_compression_snappy_to_snappy_test(self):
         self.load_sstable_with_configuration('SnappyCompressor', 'SnappyCompressor')
+    @since('1.1')
     def sstableloader_compression_snappy_to_deflate_test(self):
         self.load_sstable_with_configuration('SnappyCompressor', 'DeflateCompressor')
 
+    @since('1.1')
     def sstableloader_compression_deflate_to_none_test(self):
         self.load_sstable_with_configuration('DeflateCompressor', None)
+    @since('1.1')
     def sstableloader_compression_deflate_to_snappy_test(self):
         self.load_sstable_with_configuration('DeflateCompressor', 'SnappyCompressor')
+    @since('1.1')
     def sstableloader_compression_deflate_to_deflate_test(self):
         self.load_sstable_with_configuration('DeflateCompressor', 'DeflateCompressor')
 
