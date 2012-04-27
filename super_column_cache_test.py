@@ -26,11 +26,18 @@ class TestSCCache(Tester):
         cli = node1.cli()
         cli.do("create keyspace ks")
         cli.do("use ks")
-        cli.do("""
-            create column family Users
-            with column_type='Super' and key_validation_class='UTF8Type' and comparator='UTF8Type' and subcomparator='UTF8Type' and default_validation_class='UTF8Type'
-            and rows_cached=75000 and row_cache_provider='ConcurrentLinkedHashCacheProvider';
-        """)
+       if cluster.version() < "1.1":
+               cli.do("""
+                   create column family Users
+                   with column_type='Super' and key_validation_class='UTF8Type' and comparator='UTF8Type' and subcomparator='UTF8Type' and default_validation_class='UTF8Type'
+                   and rows_cached=75000 and row_cache_provider='ConcurrentLinkedHashCacheProvider';
+               """)
+       else:
+               cli.do("""
+                   create column family Users
+                   with column_type='Super' and key_validation_class='UTF8Type' and comparator='UTF8Type' and subcomparator='UTF8Type' and default_validation_class='UTF8Type'
+                   and caching='ROWS_ONLY';
+               """)
 
         cli.do("set Users['mina']['attrs']['name'] = 'Mina'")
         cli.do("get Users['mina']")
