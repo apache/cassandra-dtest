@@ -696,7 +696,7 @@ class TestCQL(Tester):
         assert res == [[10]], res
 
     @since('1.1')
-    def nameless_index(self):
+    def nameless_index_test(self):
         """ Test CREATE INDEX without name and validate the index can be dropped """
         cursor = self.prepare()
 
@@ -720,3 +720,59 @@ class TestCQL(Tester):
         cursor.execute("DROP INDEX users_birth_year")
 
         assert_invalid(cursor, "SELECT id FROM users WHERE birth_year = 42")
+
+    @since('1.1')
+    def deletion_test(self):
+        """ Test simple deletion and in particular check for #4193 bug """
+
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE testcf (
+                username varchar,
+                id int,
+                name varchar,
+                stuff varchar,
+                PRIMARY KEY(username, id)
+            );
+        """)
+
+        q = "INSERT INTO testcf (username, id, name, stuff) VALUES ('%s', %d, '%s', '%s');"
+        row1 = ('abc', 2, 'rst', 'some value')
+        row2 = ('abc', 4, 'xyz', 'some other value')
+        cursor.execute(q % row1)
+        cursor.execute(q % row2)
+
+        cursor.execute("SELECT * FROM testcf")
+        res = cursor.fetchall()
+        assert res == [ list(row1), list(row2) ], res
+
+        cursor.execute("DELETE FROM testcf WHERE username='abc' AND id=2");
+
+        cursor.execute("SELECT * FROM testcf")
+        res = cursor.fetchall()
+        assert res == [ list(row2) ], res
+
+        # Compact case
+        cursor.execute("""
+            CREATE TABLE testcf2 (
+                username varchar,
+                id int,
+                name varchar,
+                stuff varchar,
+                PRIMARY KEY(username, id, name)
+            ) WITH COMPACT STORAGE;
+        """)
+
+        q = "INSERT INTO testcf2 (username, id, name, stuff) VALUES ('%s', %d, '%s', '%s');"
+        row1 = ('abc', 2, 'rst', 'some value')
+        row2 = ('abc', 4, 'xyz', 'some other value')
+        cursor.execute(q % row1)
+        cursor.execute(q % row2)
+
+        cursor.execute("SELECT * FROM testcf2")
+        res = cursor.fetchall()
+        assert res == [ list(row1), list(row2) ], res
+
+        # Won't be allowed until #3708 is in
+        assert_invalid(cursor, "DELETE FROM testcf2 WHERE username='abc' AND id=2");
