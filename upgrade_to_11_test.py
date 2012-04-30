@@ -1,16 +1,9 @@
 from dtest import Tester, debug
 from tools import *
-from assertions import *
-from ccmlib.cluster import Cluster
-from ccmlib.node import TimeoutError
-import random
-import os
-
-from tools import ThriftConnection
 
 class TestUpgradeTo1_1(Tester):
     """
-    upgrades a 3-node cluster through each of the above versions.
+    Demonstrates https://issues.apache.org/jira/browse/CASSANDRA-4195
     """
 
     def upgrade_test(self):
@@ -20,12 +13,10 @@ class TestUpgradeTo1_1(Tester):
         # Forcing cluster version on purpose
         cluster.set_cassandra_dir(cassandra_version='1.0.9')
 
-        # Create a ring
-        cluster.populate(2).start()
+        cluster.populate(3).start()
         time.sleep(1)
 
-        for node in self.cluster.nodelist():
-            debug('upgrading node ' + node.name)
+        for node in cluster.nodelist():
             node.flush()
             time.sleep(.5)
             node.stop(wait_other_notice=True)
