@@ -10,7 +10,7 @@ from cql.connection import Connection as ThriftConnection
 
 class TestUnavailableSchemaOnDecommission(Tester):
     """
-    demonstrates JIRA #4115 
+    demonstrates https://issues.apache.org/jira/browse/CASSANDRA-4115 
     """
 
 
