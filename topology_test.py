@@ -142,3 +142,30 @@ class TestTopology(Tester):
 
         sizes = [ node.data_size() for node in cluster.nodelist() if node.is_running()]
         assert_almost_equal(*sizes)
+
+    def move_single_node_test(self):
+        """ Test moving a node in a single-node cluster (#4200) """
+        cluster = self.cluster
+
+        # Create an unbalanced ring
+        cluster.populate(1, tokens=[0]).start()
+        node1 = cluster.nodelist()[0]
+        time.sleep(0.2)
+
+        cursor = self.cql_connection(node1).cursor()
+        self.create_ks(cursor, 'ks', 1)
+        self.create_cf(cursor, 'cf')
+
+        for n in xrange(0, 10000):
+            insert_c1c2(cursor, n, "ONE")
+
+        cluster.flush()
+
+        node1.move(2**125)
+        time.sleep(1)
+
+        cluster.cleanup()
+
+        # Check we can get all the keys
+        for n in xrange(0, 10000):
+            query_c1c2(cursor, n, "ONE")
