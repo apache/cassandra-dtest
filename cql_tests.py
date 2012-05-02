@@ -550,6 +550,50 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[x] for x in range(0, 8)], res
 
+    @since('1.1')
+    def more_order_by_test(self):
+        """ More ORDER BY checks (#4160) """
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE COLUMNFAMILY Test (
+                row text,
+                number int,
+                string text,
+                PRIMARY KEY (row, number)
+            ) WITH COMPACT STORAGE
+        """)
+
+        cursor.execute("INSERT INTO Test (row, number, string) VALUES ('row', 1, 'one');")
+        cursor.execute("INSERT INTO Test (row, number, string) VALUES ('row', 2, 'two');")
+        cursor.execute("INSERT INTO Test (row, number, string) VALUES ('row', 3, 'three');")
+        cursor.execute("INSERT INTO Test (row, number, string) VALUES ('row', 4, 'four');")
+
+        cursor.execute("SELECT number FROM Test WHERE row='row' AND number < 3 ORDER BY number ASC;")
+        res = cursor.fetchall()
+        assert res == [[1], [2]], res
+
+        cursor.execute("SELECT number FROM Test WHERE row='row' AND number >= 3 ORDER BY number ASC;")
+        res = cursor.fetchall()
+        assert res == [[3], [4]], res
+
+        cursor.execute("SELECT number FROM Test WHERE row='row' AND number < 3 ORDER BY number DESC;")
+        res = cursor.fetchall()
+        assert res == [[2], [1]], res
+
+        cursor.execute("SELECT number FROM Test WHERE row='row' AND number >= 3 ORDER BY number DESC;")
+        res = cursor.fetchall()
+        assert res == [[4], [3]], res
+
+        cursor.execute("SELECT number FROM Test WHERE row='row' AND number > 3 ORDER BY number DESC;")
+        res = cursor.fetchall()
+        assert res == [[4]], res
+
+        cursor.execute("SELECT number FROM Test WHERE row='row' AND number <= 3 ORDER BY number DESC;")
+        res = cursor.fetchall()
+        assert res == [[3], [2], [1]], res
+
+
     #@require('#4004')
     #def reversed_comparator_test(self):
     #    cluster = self.cluster
