@@ -633,6 +633,8 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [['%i%i' % (x, y)] for x in range(9, -1, -1) for y in range(0, 10)], res
 
+        assert_invalid(cursor, "SELECT v FROM test2 WHERE k = 0 ORDER BY c2 DESC, c1 ASC")
+
     @since('1.1')
     def invalid_old_property_test(self):
         """ Check obsolete properties from CQL2 are rejected """
