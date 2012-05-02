@@ -3,9 +3,11 @@ import time
 import loadmaker
 
 from dtest import Tester, debug
+from tools import since
 
 class TestLoadmaker(Tester):
     
+    @since('1.0')
     def loadmaker_test(self):
         cluster = self.cluster
         cluster.populate(1).start()
@@ -39,4 +41,5 @@ class TestLoadmaker(Tester):
         time.sleep(10)
         cont_loader.read_and_validate()
 
-        cluster.cleanup()
+        cont_loader.exit()
+

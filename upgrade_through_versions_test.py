@@ -34,7 +34,7 @@ class TestUpgradeThroughVersions(Tester):
         conn = ThriftConnection(node1)
         conn.create_ks()
         conn.create_cf()
-        time.sleep(5)
+        time.sleep(.5)
         self._write_values()
 
         self.upgrade_to_version(versions[1], from_version_07=True)
@@ -42,8 +42,6 @@ class TestUpgradeThroughVersions(Tester):
         for version in versions[2:]:
             self.upgrade_to_version(version, from_version_07=False)
 
-        cluster.cleanup()
-        time.sleep(.5)
 
     def upgrade_to_version(self, version, from_version_07=True):
         debug('Upgrading to ' + version)

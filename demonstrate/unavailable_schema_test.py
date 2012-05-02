@@ -10,7 +10,7 @@ from cql.connection import Connection as ThriftConnection
 
 class TestUnavailableSchemaOnDecommission(Tester):
     """
-    demonstrates JIRA #4115 
+    demonstrates https://issues.apache.org/jira/browse/CASSANDRA-4115 
     """
 
 
@@ -23,7 +23,7 @@ class TestUnavailableSchemaOnDecommission(Tester):
         num_schemas = len(schemas)
         assert num_schemas == 1, "There were multiple schema versions: " + pprint.pformat(schemas)
 
-    
+    @since(1.0) 
     def decommission_node_schema_check_test(self):
         cluster = self.cluster
 
