@@ -593,7 +593,6 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[3], [2], [1]], res
 
-
     #@require('#4004')
     #def reversed_comparator_test(self):
     #    cluster = self.cluster
@@ -741,7 +740,7 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[10]], res
 
-    @since('1.1')
+    @require('#4192')
     def nameless_index_test(self):
         """ Test CREATE INDEX without name and validate the index can be dropped """
         cursor = self.prepare()
@@ -763,7 +762,7 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [['Tom'], ['Bob']]
 
-        cursor.execute("DROP INDEX users_birth_year")
+        cursor.execute("DROP INDEX users_birth_year_idx")
 
         assert_invalid(cursor, "SELECT id FROM users WHERE birth_year = 42")
 
@@ -822,3 +821,189 @@ class TestCQL(Tester):
 
         # Won't be allowed until #3708 is in
         assert_invalid(cursor, "DELETE FROM testcf2 WHERE username='abc' AND id=2");
+
+    @since('1.1')
+    def count_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE events (
+                kind text,
+                time int,
+                value1 int,
+                value2 int,
+                PRIMARY KEY(kind, time)
+            )
+        """)
+
+        full = "INSERT INTO events (kind, time, value1, value2) VALUES ('ev1', %d, %d, %d)"
+        no_v2 = "INSERT INTO events (kind, time, value1) VALUES ('ev1', %d, %d)"
+
+        cursor.execute(full  % (0, 0, 0));
+        cursor.execute(full  % (1, 1, 1));
+        cursor.execute(no_v2 % (2, 2));
+        cursor.execute(full  % (3, 3, 3));
+        cursor.execute(no_v2 % (4, 4));
+        cursor.execute("INSERT INTO events (kind, time, value1, value2) VALUES ('ev2', 0, 0, 0)")
+
+        cursor.execute("SELECT COUNT(*) FROM events WHERE kind = 'ev1'")
+        res = cursor.fetchall()
+        assert res == [[5]], res
+
+        cursor.execute("SELECT COUNT(1) FROM events WHERE kind IN ('ev1', 'ev2') AND time=0")
+        res = cursor.fetchall()
+        assert res == [[2]], res
+
+    @since('1.1')
+    def reserved_keyword_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test1 (
+                key text PRIMARY KEY,
+                count counter,
+            )
+        """)
+
+        assert_invalid(cursor, "CREATE TABLE test2 ( select text PRIMARY KEY, x int)")
+
+    @since('1.1')
+    def timeuuid_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE timeline (
+                k text,
+                time timeuuid,
+                value int,
+                PRIMARY KEY(k, time)
+            )
+        """)
+
+        q = "INSERT INTO timeline (k, time, value) VALUES ('k', '%s', %d)"
+        cursor.execute(q % ('2012-04-10', 0))
+        cursor.execute(q % ('2012-04-15', 1))
+        cursor.execute(q % ('2012-04-22', 2))
+        cursor.execute(q % ('now', 3))
+
+        cursor.execute("SELECT value FROM timeline WHERE k='k' AND time > '2012-04-15'")
+        res = cursor.fetchall()
+        assert res == [[2], [3]], res
+
+    @since('1.1')
+    def identifier_test(self):
+        cursor = self.prepare()
+
+        # Test case insensitivity
+        cursor.execute("CREATE TABLE test1 (key_23 int PRIMARY KEY, CoLuMn int)")
+
+        # Should work
+        cursor.execute("INSERT INTO test1 (Key_23, Column) VALUES (0, 0)")
+        cursor.execute("INSERT INTO test1 (KEY_23, COLUMN) VALUES (0, 0)")
+
+        # Reserved keywords
+        assert_invalid(cursor, "CREATE TABLE test1 (select int PRIMARY KEY, column int)")
+
+    @since('1.1')
+    def keyspace_test(self):
+        cursor = self.prepare()
+
+        assert_invalid(cursor, "CREATE KEYSPACE test1");
+        cursor.execute("CREATE KEYSPACE test2 WITH strategy_class = SimpleStrategy AND strategy_options:replication_factor = 1");
+        assert_invalid(cursor, "CREATE KEYSPACE My_much_much_too_long_identifier_that_should_not_work WITH strategy_class = SimpleStrategy AND strategy_options:replication_factor = 1");
+
+        cursor.execute("DROP KEYSPACE test2");
+        assert_invalid(cursor, "DROP KEYSPACE non_existing");
+        cursor.execute("CREATE KEYSPACE test2 WITH strategy_class = SimpleStrategy AND strategy_options:replication_factor = 1");
+
+    @since('1.1')
+    def table_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test1 (
+                k int PRIMARY KEY,
+                c int
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE test2 (
+                k int,
+                name int,
+                value int,
+                PRIMARY KEY(k, name)
+            ) WITH COMPACT STORAGE
+        """)
+
+        cursor.execute("""
+            CREATE TABLE test3 (
+                k int,
+                c int,
+                PRIMARY KEY (k),
+            )
+        """)
+
+        # existing table
+        assert_invalid(cursor, "CREATE TABLE test3 (k int PRIMARY KEY, c int)")
+        # repeated column
+        assert_invalid(cursor, "CREATE TABLE test4 (k int PRIMARY KEY, c int, k text)")
+
+        # compact storage limitations
+        assert_invalid(cursor, "CREATE TABLE test4 (k int PRIMARY KEY, c int) WITH COMPACT STORAGE")
+        assert_invalid(cursor, "CREATE TABLE test4 (k int, name, int, c1 int, c2 int, PRIMARY KEY(k, name)) WITH COMPACT STORAGE")
+
+        cursor.execute("DROP TABLE test1")
+        cursor.execute("TRUNCATE test2")
+
+    @since('1.1')
+    def batch_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE users (
+                userid text PRIMARY KEY,
+                name text,
+                password text
+            )
+        """)
+
+        cursor.execute("""
+            BEGIN BATCH USING CONSISTENCY QUORUM
+                INSERT INTO users (userid, password, name) VALUES ('user2', 'ch@ngem3b', 'second user');
+                UPDATE users SET password = 'ps22dhds' WHERE userid = 'user3';
+                INSERT INTO users (userid, password) VALUES ('user4', 'ch@ngem3c');
+                DELETE name FROM users WHERE userid = 'user1';
+            APPLY BATCH;
+        """)
+
+    @require('#3771')
+    def token_range_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k int PRIMARY KEY,
+                c int,
+                v int
+            )
+        """)
+
+        c = 100
+        for i in range(0, c):
+            cursor.execute("INSERT INTO test (k, c, v) VALUES (%d, %d, %d)" % (i, i, i))
+
+        cursor.execute("SELECT k FROM test")
+        inOrder = [ x[0] for x in cursor.fetchall() ]
+        assert len(inOrder) == c, 'Expecting %d elements, got %d' % (c, len(inOrder))
+
+        cursor.execute("SELECT k FROM test WHERE token(k) >= '0'")
+        res = cursor.fetchall()
+        assert len(res) == c, "%s [all: %s]" % (str(res), str(inOrder))
+
+        assert_invalid(cursor, "SELECT k FROM test WHERE token(k) >= 0")
+
+        cursor.execute("SELECT k FROM test WHERE token(k) >= token(%d) AND token(k) < token(%d)" % (inOrder[32], inOrder[65]))
+        res = cursor.fetchall()
+        assert res == [ [inOrder[x]] for x in range(32, 65) ], "%s [all: %s]" % (str(res), str(inOrder))
+
