@@ -1007,3 +1007,34 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [ [inOrder[x]] for x in range(32, 65) ], "%s [all: %s]" % (str(res), str(inOrder))
 
+    @since('1.1')
+    def table_options_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k int PRIMARY KEY,
+                c int
+            ) WITH comment = 'My comment'
+               AND read_repair_chance = 0.5
+               AND dclocal_read_repair_chance = 0.5
+               AND gc_grace_seconds = 4
+               AND bloom_filter_fp_chance = 0.01
+               AND compaction_strategy_class = LeveledCompactionStrategy
+               AND compaction_strategy_options:sstable_size_in_mb = 10
+               AND compression_parameters:sstable_compression = ''
+               AND caching = all
+        """)
+
+        cursor.execute("""
+            ALTER TABLE test
+            WITH comment = 'other comment'
+             AND read_repair_chance = 0.3
+             AND dclocal_read_repair_chance = 0.3
+             AND gc_grace_seconds = 100
+             AND bloom_filter_fp_chance = 0.1
+             AND compaction_strategy_class = SizeTieredCompactionStrategy
+             AND compaction_strategy_options:min_sstable_size = 42
+             AND compression_parameters:sstable_compression = SnappyCompressor
+             AND caching = rows_only
+        """)
