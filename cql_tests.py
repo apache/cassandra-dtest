@@ -1038,3 +1038,29 @@ class TestCQL(Tester):
              AND compression_parameters:sstable_compression = SnappyCompressor
              AND caching = rows_only
         """)
+
+    @require('#4217')
+    def timestamp_and_ttl_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k int PRIMARY KEY,
+                c text
+            )
+        """)
+
+        cursor.execute("INSERT INTO test (k, c) VALUES (1, 'test')")
+        cursor.execute("INSERT INTO test (k, c) VALUES (2, 'test') USING TTL 400")
+
+        cursor.execute("SELECT k, c, writetime(c), ttl(c) FROM test")
+        res = cursor.fetchall()
+        assert len(res) == 2, res
+        for r in res:
+            assert isinstance(r[2], (int, long))
+            if r[0] == 1:
+                assert r[3] == None, res
+            else:
+                assert isinstance(r[3], (int, long)), res
+
+        assert_invalid(cursor, "SELECT k, c, writetime(k) FROM test")
