@@ -26,6 +26,7 @@ class TestConcurrentSchemaChanges(Tester):
         """
         prepares for schema changes by creating a keyspace and column family.
         """
+        debug("prepare_for_changes() " + str(namespace))
         # create a keyspace that will be used
         query = """CREATE KEYSPACE ks_%s WITH strategy_class=SimpleStrategy AND 
                 strategy_options:replication_factor=2""" % (namespace)
@@ -78,6 +79,7 @@ class TestConcurrentSchemaChanges(Tester):
         rebuild index (via jmx)
         set default_validation_class
         """
+        debug("make_schema_changes() " + str(namespace))
         cursor.execute('USE ks_%s' % namespace)
         # drop keyspace
         cursor.execute('DROP KEYSPACE ks2_%s' % namespace)
@@ -117,9 +119,9 @@ class TestConcurrentSchemaChanges(Tester):
         cursor.execute("DROP INDEX index_%s" % namespace)
 
 
-
     def validate_schema_consistent(self, node):
         """ Makes sure that there is only one schema """
+        debug("validate_schema_consistent() " + node.name)
 
         host, port = node.network_interfaces['thrift']
         conn = ThriftConnection(host, port, keyspace=None)
@@ -132,6 +134,7 @@ class TestConcurrentSchemaChanges(Tester):
         """
         make sevaral schema changes on the same node.
         """
+        debug("basic_test()")
 
         cluster = self.cluster
         cluster.populate(2).start()
@@ -143,9 +146,9 @@ class TestConcurrentSchemaChanges(Tester):
 
         self.make_schema_changes(cursor, namespace='ns1')
 
-
     
     def changes_to_different_nodes_test(self):
+        debug("changes_to_different_nodes_test()")
         cluster = self.cluster
         cluster.populate(2).start()
         [node1, node2] = cluster.nodelist()
@@ -166,36 +169,20 @@ class TestConcurrentSchemaChanges(Tester):
         # check both, just because we can
         self.validate_schema_consistent(node2)
 
-
     
     def changes_while_node_down_test(self):
         """
-        Phase 1:
-            Make schema changes to node 1 while node 2 is down. 
-            Then bring up 2 and make sure it gets the changes. 
-
-        Phase 2: 
-            Then bring down 1 and change 2. 
-            Bring down 2, bring up 1, and finally bring up 2. 
-            1 should get the changes. 
+        makes schema changes while a node is down.
+        Make schema changes to node 1 while node 2 is down. 
+        Then bring up 2 and make sure it gets the changes. 
         """
+        debug("changes_while_node_down_test()")
         cluster = self.cluster
         cluster.populate(2).start()
         [node1, node2] = cluster.nodelist()
         wait(2)
         cursor = self.cql_connection(node1).cursor()
 
-        # Phase 1
-        node2.stop()
-        wait(2)
-        self.prepare_for_changes(cursor, namespace='ns1')
-        self.make_schema_changes(cursor, namespace='ns1')
-        node2.start()
-        wait(3)
-        self.validate_schema_consistent(node1)
-        self.validate_schema_consistent(node2)
-
-        # Phase 2
         cursor = self.cql_connection(node2).cursor()
         self.prepare_for_changes(cursor, namespace='ns2')
         node1.stop()
@@ -210,8 +197,37 @@ class TestConcurrentSchemaChanges(Tester):
         self.validate_schema_consistent(node1)
 
 
-    
+    def changes_while_node_toggle_test(self):
+        """
+        makes schema changes while a node is down.
+
+        Bring down 1 and change 2. 
+        Bring down 2, bring up 1, and finally bring up 2. 
+        1 should get the changes. 
+        """
+        debug("changes_while_node_toggle_test()")
+        cluster = self.cluster
+        cluster.populate(2).start()
+        [node1, node2] = cluster.nodelist()
+        wait(2)
+        cursor = self.cql_connection(node1).cursor()
+
+        cursor = self.cql_connection(node2).cursor()
+        self.prepare_for_changes(cursor, namespace='ns2')
+        node1.stop()
+        wait(2)
+        self.make_schema_changes(cursor, namespace='ns2')
+        wait(2)
+        node2.stop()
+        wait(2)
+        node1.start()
+        node2.start()
+        wait(20)
+        self.validate_schema_consistent(node1)
+
+
     def decommission_node_test(self):
+        debug("decommission_node_test()")
         cluster = self.cluster
 
         cluster.populate(1)
@@ -258,6 +274,7 @@ class TestConcurrentSchemaChanges(Tester):
 
     @since('1.1')
     def snapshot_test(self):
+        debug("snapshot_test()")
         cluster = self.cluster
         cluster.populate(2).start()
         [node1, node2] = cluster.nodelist()
@@ -308,6 +325,7 @@ class TestConcurrentSchemaChanges(Tester):
         """
         apply schema changes while the cluster is under load.
         """
+        debug("load_test()")
 
         cluster = self.cluster
         cluster.populate(1).start()
