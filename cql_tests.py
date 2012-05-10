@@ -1064,3 +1064,51 @@ class TestCQL(Tester):
                 assert isinstance(r[3], (int, long)), res
 
         assert_invalid(cursor, "SELECT k, c, writetime(k) FROM test")
+
+    @require('3982')
+    def no_range_ghost_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k int PRIMARY KEY,
+                v int
+            )
+        """)
+
+        for k in range(0, 5):
+            cursor.execute("INSERT INTO test (k, v) VALUES (%d, 0)" % k)
+
+        cursor.execute("SELECT k FROM test")
+        res = sorted(cursor.fetchall())
+        assert res == [[k] for k in range(0, 5)], res
+
+        cursor.execute("DELETE FROM test WHERE k=2")
+
+        cursor.execute("SELECT k FROM test")
+        res = sorted(cursor.fetchall())
+        assert res == [[k] for k in range(0, 5) if k is not 2], res
+
+    @require('3982')
+    def undefined_column_handling_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k int PRIMARY KEY,
+                v1 int,
+                v2 int,
+            )
+        """)
+
+        cursor.execute("INSERT INTO test (k, v1, v2) VALUES (0, 0, 0)")
+        cursor.execute("INSERT INTO test (k, v1) VALUES (1, 1)")
+        cursor.execute("INSERT INTO test (k, v1, v2) VALUES (2, 2, 2)")
+
+        cursor.execute("SELECT v2 FROM test")
+        res = cursor.fetchall()
+        assert res == [[0], [None], [2]], res
+
+        cursor.execute("SELECT v2 FROM test WHERE k = 1")
+        res = cursor.fetchall()
+        assert res == [[None]], res
