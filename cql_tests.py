@@ -593,35 +593,7 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[3], [2], [1]], res
 
-    #@require('#4004')
-    #def reversed_comparator_test(self):
-    #    cluster = self.cluster
-
-    #    cluster.populate(1).start()
-    #    node1 = cluster.nodelist()[0]
-    #    time.sleep(0.2)
-
-    #    cursor = self.cql_connection(node1, version=cql_version).cursor()
-    #    self.create_ks(cursor, 'ks', 1)
-
-    #    cursor.execute("""
-    #        CREATE TABLE test (
-    #            k int,
-    #            c int,
-    #            v int,
-    #            PRIMARY KEY (k, c DESC)
-    #        );
-    #    """)
-
-    #    # Inserts
-    #    for x in range(0, 10):
-    #        cursor.execute("INSERT INTO test (k, c, v) VALUES (0, %i, %i)" % (x, x))
-
-    #    cursor.execute("SELECT v FROM test WHERE k = 0")
-    #    res = cursor.fetchall()
-    #    assert res == [[x] for x in range(9, -1, -1)], res
-
-    @require('#4004')
+    @since('1.1')
     def reversed_comparator_test(self):
         cursor = self.prepare()
 
@@ -740,7 +712,7 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[10]], res
 
-    @require('#4192')
+    @since('1.1')
     def nameless_index_test(self):
         """ Test CREATE INDEX without name and validate the index can be dropped """
         cursor = self.prepare()
@@ -977,7 +949,7 @@ class TestCQL(Tester):
             APPLY BATCH;
         """)
 
-    @require('#3771')
+    @since('1.1')
     def token_range_test(self):
         cursor = self.prepare()
 
@@ -1065,7 +1037,7 @@ class TestCQL(Tester):
 
         assert_invalid(cursor, "SELECT k, c, writetime(k) FROM test")
 
-    @require('3982')
+    @since('1.1')
     def no_range_ghost_test(self):
         cursor = self.prepare()
 
@@ -1089,7 +1061,35 @@ class TestCQL(Tester):
         res = sorted(cursor.fetchall())
         assert res == [[k] for k in range(0, 5) if k is not 2], res
 
-    @require('3982')
+        # Example from #3505
+        cursor.execute("CREATE KEYSPACE ks1 with strategy_class = 'org.apache.cassandra.locator.SimpleStrategy' and strategy_options:replication_factor=1;")
+        cursor.execute("USE ks1")
+        cursor.execute("""
+            CREATE COLUMNFAMILY users (
+                KEY varchar PRIMARY KEY,
+                password varchar,
+                gender varchar,
+                birth_year bigint)
+        """)
+
+        cursor.execute("INSERT INTO users (KEY, password) VALUES ('user1', 'ch@ngem3a')")
+        cursor.execute("UPDATE users SET gender = 'm', birth_year = '1980' WHERE KEY = 'user1'")
+        cursor.execute("SELECT * FROM users WHERE KEY='user1'")
+        res = cursor.fetchall()
+        assert res == [[ 'user1', 1980, 'm', 'ch@ngem3a' ]], res
+
+        cursor.execute("TRUNCATE users")
+
+        cursor.execute("SELECT * FROM users")
+        res = cursor.fetchall()
+        assert res == [], res
+
+        cursor.execute("SELECT * FROM users WHERE KEY='user1'")
+        res = cursor.fetchall()
+        assert res == [], res
+
+
+    @since('1.1')
     def undefined_column_handling_test(self):
         cursor = self.prepare()
 
