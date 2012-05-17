@@ -594,6 +594,28 @@ class TestCQL(Tester):
         assert res == [[3], [2], [1]], res
 
     @since('1.1')
+    def order_by_validation_test(self):
+        """ Check we don't allow order by on row key (#4246) """
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k1 int,
+                k2 int,
+                v int,
+                PRIMARY KEY (k1, k2)
+            )
+        """)
+
+        q = "INSERT INTO test (k1, k2, v) VALUES (%d, %d, %d)"
+        cursor.execute(q % (0, 0, 0))
+        cursor.execute(q % (1, 1, 1))
+        cursor.execute(q % (2, 2, 2))
+
+        assert_invalid(cursor, "SELECT * FROM test ORDER BY k2")
+
+
+    @since('1.1')
     def reversed_comparator_test(self):
         cursor = self.prepare()
 
