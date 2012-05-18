@@ -1134,3 +1134,116 @@ class TestCQL(Tester):
         cursor.execute("SELECT v2 FROM test WHERE k = 1")
         res = cursor.fetchall()
         assert res == [[None]], res
+
+    @since('1.2')
+    def range_tombstones_test(self):
+        """ Test deletion by 'composite prefix' (range tombstones) """
+        cluster = self.cluster
+
+        # Uses 3 nodes just to make sure RowMutation are correctly serialized
+        cluster.populate(3).start()
+        node1 = cluster.nodelist()[0]
+        time.sleep(0.2)
+
+        cursor = self.cql_connection(node1, version=cql_version).cursor()
+        self.create_ks(cursor, 'ks', 1)
+
+        cursor.execute("""
+            CREATE TABLE test1 (
+                k int,
+                c1 int,
+                c2 int,
+                v1 int,
+                v2 int,
+                PRIMARY KEY (k, c1, c2)
+            );
+        """)
+
+        rows = 10
+        col1 = 2
+        col2 = 2
+        cpr = col1 * col2
+        for i in xrange(0, rows):
+            for j in xrange(0, col1):
+                for k in xrange(0, col2):
+                    n = (i * cpr) + (j * col2) + k
+                    cursor.execute("INSERT INTO test1 (k, c1, c2, v1, v2) VALUES (%d, %d, %d, %d, %d)" % (i, j, k, n, n))
+
+        for i in xrange(0, rows):
+            cursor.execute("SELECT v1, v2 FROM test1 where k = %d" % i)
+            res = cursor.fetchall()
+            assert res == [[x, x] for x in xrange(i * cpr, (i + 1) * cpr)], res
+
+        for i in xrange(0, rows):
+            cursor.execute("DELETE FROM test1 WHERE k = %d AND c1 = 0" % i)
+
+        for i in xrange(0, rows):
+            cursor.execute("SELECT v1, v2 FROM test1 WHERE k = %d" % i)
+            res = cursor.fetchall()
+            assert res == [[x, x] for x in xrange(i * cpr + col1, (i + 1) * cpr)], res
+
+        cluster.flush()
+        time.sleep(0.2)
+
+        for i in xrange(0, rows):
+            cursor.execute("SELECT v1, v2 FROM test1 WHERE k = %d" % i)
+            res = cursor.fetchall()
+            assert res == [[x, x] for x in xrange(i * cpr + col1, (i + 1) * cpr)], res
+
+    @since('1.2')
+    def range_tombstones_compaction_test(self):
+        """ Test deletion by 'composite prefix' (range tombstones) with compaction """
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test1 (
+                k int,
+                c1 int,
+                c2 int,
+                v1 text,
+                PRIMARY KEY (k, c1, c2)
+            );
+        """)
+
+
+        for c1 in range(0, 4):
+            for c2 in range(0, 2):
+                cursor.execute("INSERT INTO test1 (k, c1, c2, v1) VALUES (0, %d, %d, %s)" % (c1, c2, '%i%i' % (c1, c2)))
+
+        self.cluster.flush()
+
+        cursor.execute("DELETE FROM test1 WHERE k = 0 AND c1 = 1")
+
+        self.cluster.flush()
+        self.cluster.compact()
+
+        cursor.execute("SELECT v1 FROM test1 WHERE k = 0")
+        res = cursor.fetchall()
+        assert res == [ ['%i%i' % (c1, c2)] for c1 in xrange(0, 4) for c2 in xrange(0, 2) if c1 != 1], res
+
+    @since('1.2')
+    def delete_row_test(self):
+        """ Test deletion of rows """
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                 k int,
+                 c1 int,
+                 c2 int,
+                 v1 int,
+                 v2 int,
+                 PRIMARY KEY (k, c1, c2)
+            );
+        """)
+
+        q = "INSERT INTO test (k, c1, c2, v1, v2) VALUES (%d, %d, %d, %d, %d)"
+        cursor.execute(q % (0, 0, 0, 0, 0))
+        cursor.execute(q % (0, 0, 1, 1, 1))
+        cursor.execute(q % (0, 0, 2, 2, 2))
+        cursor.execute(q % (0, 1, 0, 3, 3))
+
+        cursor.execute("DELETE FROM test WHERE k = 0 AND c1 = 0 AND c2 = 0")
+        cursor.execute("SELECT * FROM test")
+        res = cursor.fetchall()
+        assert len(res) == 3, res
