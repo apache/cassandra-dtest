@@ -1247,3 +1247,21 @@ class TestCQL(Tester):
         cursor.execute("SELECT * FROM test")
         res = cursor.fetchall()
         assert len(res) == 3, res
+
+    @since('1.1')
+    def range_query_2ndary_test(self):
+        """ Test range queries with 2ndary indexes (#4257) """
+        cursor = self.prepare()
+
+        cursor.execute("CREATE TABLE indextest (id int primary key, row int, setid int);")
+        cursor.execute("CREATE INDEX indextest_setid_idx ON indextest (setid)")
+
+        q =  "INSERT INTO indextest (id, row, setid) VALUES (%d, %d, %d);"
+        cursor.execute(q % (0, 0, 0))
+        cursor.execute(q % (1, 1, 0))
+        cursor.execute(q % (2, 2, 0))
+        cursor.execute(q % (3, 3, 0))
+
+        cursor.execute("SELECT * FROM indextest WHERE setid = 0 AND row < 1;")
+        res = cursor.fetchall()
+        assert res == [[0, 0, 0]], res
