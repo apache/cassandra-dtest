@@ -54,6 +54,17 @@ class Tester(object):
         os.rmdir(self.test_path)
         os.remove(LAST_TEST_DIR)
 
+    def set_node_to_current_version(self, node):
+        try:
+            version = os.environ['CASSANDRA_VERSION']
+            node.set_cassandra_dir(cassandra_version=version)
+        except KeyError:
+            try:
+                cdir = os.environ['CASSANDRA_DIR']
+            except KeyError:
+                cdir = DEFAULT_DIR
+            node.set_cassandra_dir(cassandra_dir=cdir)
+
     def setUp(self):
         # cleaning up if a previous execution didn't trigger tearDown (which
         # can happen if it is interrupted by KeyboardInterrupt)

@@ -1,7 +1,7 @@
 import time
 import os
 
-from dtest import Tester, debug
+from dtest import Tester, debug, DEFAULT_DIR
 from tools import *
 from assertions import *
 from ccmlib.cluster import Cluster
@@ -112,4 +112,41 @@ class TestRollingUpgrade(Tester):
         self.rolling_upgrade_node(node2, stress_node=node3, create_ks_and_cf=False)
         self.rolling_upgrade_node(node3, stress_node=node1, create_ks_and_cf=False)
 
+    def upgrade1010_with_index(self):
+        """ Test for #4262 bug """
+        cluster = self.cluster
+        cluster.set_cassandra_dir(cassandra_version="1.0.10")
 
+        cluster.populate(2).start()
+        [node1, node2] = cluster.nodelist()
+        time.sleep(.2)
+
+        cli = node1.cli()
+        cli.do("create keyspace test with placement_strategy='org.apache.cassandra.locator.SimpleStrategy' and strategy_options = {replication_factor:2}")
+        cli.do("use test")
+        cli.do("create column family test with comparator=UTF8Type and key_validation_class=UTF8Type and column_metadata = [{ column_name: a, index_type: KEYS, validation_class: UTF8Type}]")
+        cli.do("set test[a][a] = a")
+        cli.do("set test[b][a] = a")
+        cli.do("set test[c][a] = b")
+        cli.do("consistencylevel as ALL")
+        cli.do("get test where a = a")
+
+        assert not cli.has_errors(), cli.errors()
+        output = cli.last_output()
+        assert re.search('%d Rows Returned' % 2, output) is not None, output
+
+        node1.stop()
+        time.sleep(2)
+        self.set_node_to_current_version(node1)
+        time.sleep(.2)
+        node1.start()
+
+        cli = node1.cli()
+        cli.do("use test")
+        cli.do("consistencylevel as ALL")
+        cli.do("list test")
+        cli.do("get test where a = a")
+
+        assert not cli.has_errors(), cli.errors()
+        output = cli.last_output()
+        assert re.search('%d Rows Returned' % 2, output) is not None, output
