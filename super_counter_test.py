@@ -71,9 +71,9 @@ class TestSuperCounterClusterRestart(Tester):
         for i in xrange(NUM_SUBCOLS):
             column_path = ColumnPath(column_family='cf', column='col_0', 
                     super_column='subcol_%d'%i)
-            column_or_super_column = thrift_conn.client.get('row_0', column_parent, 
+            column_or_super_column = thrift_conn.client.get('row_0', column_path, 
                     ConsistencyLevel.QUORUM)
-            val = column_or_super_column.counter_super_column.columns[0].value
+            val = column_or_super_column.counter_column.value
             debug(str(val)),
             from_db.append(val)
         debug("")
