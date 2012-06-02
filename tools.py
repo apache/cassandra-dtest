@@ -48,7 +48,7 @@ def remove_c1c2(cursor, key, consistency="QUORUM"):
     cursor.execute('DELETE c1, c2 FROM cf USING CONSISTENCY %s WHERE key=k%d' % (consistency, key))
 
 # work for cluster started by populate
-def new_node(cluster, bootstrap=True, token=None):
+def new_node(cluster, bootstrap=True, token=None, remote_debug_port='2000'):
     i = len(cluster.nodes) + 1
     node = Node('node%s' % i,
                 cluster,
@@ -56,6 +56,7 @@ def new_node(cluster, bootstrap=True, token=None):
                 ('127.0.0.%s' % i, 9160),
                 ('127.0.0.%s' % i, 7000),
                 str(7000 + i * 100),
+                remote_debug_port,
                 token)
     cluster.add(node, not bootstrap)
     return node
