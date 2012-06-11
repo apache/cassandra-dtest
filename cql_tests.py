@@ -1265,3 +1265,26 @@ class TestCQL(Tester):
         cursor.execute("SELECT * FROM indextest WHERE setid = 0 AND row < 1;")
         res = cursor.fetchall()
         assert res == [[0, 0, 0]], res
+
+    @since('1.1')
+    def compression_option_validation_test(self):
+        """ Check for unknown compression parameters options (#4266) """
+        cursor = self.prepare()
+
+        assert_invalid(cursor, """
+          CREATE TABLE users (key varchar PRIMARY KEY, password varchar, gender varchar)
+          WITH compression_parameters:sstable_compressor = 'DeflateCompressor';
+        """)
+
+    @since('1.1')
+    def keyspace_creation_options_test(self):
+        """ Check one can use arbitrary name for datacenter when creating keyspace (#4278) """
+        cursor = self.prepare()
+
+        # we just want to make sure the following is valid
+        cursor.execute("""
+            CREATE KEYSPACE Foo
+                WITH strategy_class = NetworkTopologyStrategy
+                AND strategy_options:"us-east"=1
+                AND strategy_options:"us-west"=1;
+        """)
