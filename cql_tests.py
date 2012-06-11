@@ -2,11 +2,17 @@ from dtest import Tester
 from assertions import *
 from tools import *
 
-import os, sys, time, tools
+import os, sys, time, tools, json
 from uuid import UUID
 from ccmlib.cluster import Cluster
 
 cql_version="3.0.0-beta1"
+
+def assert_json(cursor, expected):
+    res = cursor.fetchall()
+    assert len(res) == 1 and len(res[0]) == 1, res
+    value = json.loads(res[0][0])
+    assert value == expected, value
 
 class TestCQL(Tester):
 
@@ -1288,3 +1294,123 @@ class TestCQL(Tester):
                 AND strategy_options:"us-east"=1
                 AND strategy_options:"us-west"=1;
         """)
+
+    @since('1.2')
+    def set_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE user (
+                fn text,
+                ln text,
+                tags set<text>,
+                PRIMARY KEY (fn, ln)
+            )
+        """)
+
+        q = "UPDATE user SET %s WHERE fn='Tom' AND ln='Bombadil'"
+        cursor.execute(q % "tags = tags.add('foo')")
+        cursor.execute(q % "tags = tags.add('bar')")
+        cursor.execute(q % "tags = tags.add('foo')")
+        cursor.execute(q % "tags = tags.add('foobar')")
+        cursor.execute(q % "tags = tags.discard('bar')")
+
+        cursor.execute("SELECT tags FROM user");
+        assert_json(cursor, ['foo', 'foobar'])
+
+        q = "UPDATE user SET %s WHERE fn='Bilbo' AND ln='Baggins'"
+        cursor.execute(q % "tags = { 'a', 'c', 'b' }")
+        cursor.execute("SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'");
+        assert_json(cursor, ['a', 'b', 'c'])
+
+        time.sleep(.01)
+
+        cursor.execute(q % "tags = { 'm', 'n' }")
+        cursor.execute("SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'");
+        assert_json(cursor, ['m', 'n'])
+
+        cursor.execute("DELETE tags FROM user WHERE fn='Bilbo' AND ln='Baggins'")
+        cursor.execute("SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'");
+        res = cursor.fetchall()
+        assert res == [], res
+
+
+    @since('1.2')
+    def map_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE user (
+                fn text,
+                ln text,
+                m map<text, int>,
+                PRIMARY KEY (fn, ln)
+            )
+        """)
+
+        q = "UPDATE user SET %s WHERE fn='Tom' AND ln='Bombadil'"
+        cursor.execute(q % "m = m.put('foo', 3)")
+        cursor.execute(q % "m = m.put('bar', 4)")
+        cursor.execute(q % "m = m.put('woot', 5)")
+        cursor.execute(q % "m = m.put('bar', 6)")
+        cursor.execute(q % "m = m.discard('foo')")
+
+        cursor.execute("SELECT m FROM user");
+        assert_json(cursor, { 'woot': 5, 'bar' : 6 })
+
+        q = "UPDATE user SET %s WHERE fn='Bilbo' AND ln='Baggins'"
+        cursor.execute(q % "m = { 'a' : 4 , 'c' : 3, 'b' : 2 }")
+        cursor.execute("SELECT m FROM user WHERE fn='Bilbo' AND ln='Baggins'");
+        assert_json(cursor, {'a' : 4, 'b' : 2, 'c' : 3 })
+
+        time.sleep(.01)
+
+        # Check we correctly overwrite
+        cursor.execute(q % "m = { 'm' : 4 , 'n' : 1, 'o' : 2 }")
+        cursor.execute("SELECT m FROM user WHERE fn='Bilbo' AND ln='Baggins'");
+        assert_json(cursor, {'m' : 4, 'n' : 1, 'o' : 2 })
+
+    @since('1.2')
+    def list_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE user (
+                fn text,
+                ln text,
+                tags list<text>,
+                PRIMARY KEY (fn, ln)
+            )
+        """)
+
+        q = "UPDATE user SET %s WHERE fn='Tom' AND ln='Bombadil'"
+        cursor.execute(q % "tags = tags.append('foo')")
+        cursor.execute(q % "tags = tags.append('bar')")
+        cursor.execute(q % "tags = tags.append('foo')")
+        cursor.execute(q % "tags = tags.append('foobar')")
+
+        cursor.execute("SELECT tags FROM user");
+        assert_json(cursor, ['foo', 'bar', 'foo', 'foobar'])
+
+        q = "UPDATE user SET %s WHERE fn='Bilbo' AND ln='Baggins'"
+        cursor.execute(q % "tags = [ 'a', 'c', 'b', 'c' ]")
+        cursor.execute("SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'");
+        assert_json(cursor, ['a', 'c', 'b', 'c'])
+
+        cursor.execute(q % "tags = tags.prepend_all('m', 'n')")
+        cursor.execute("SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'");
+        assert_json(cursor, ['n', 'm', 'a', 'c', 'b', 'c'])
+
+
+        cursor.execute(q % "tags = tags.set(2, 'foo'), tags = tags.set(4, 'bar')")
+        cursor.execute("SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'");
+        assert_json(cursor, ['n', 'm', 'foo', 'c', 'bar', 'c'])
+
+        cursor.execute(q % "tags = tags.discard_idx(2)")
+        cursor.execute("SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'");
+        assert_json(cursor, ['n', 'm', 'c', 'bar', 'c'])
+
+        cursor.execute(q % "tags = tags.discard('bar')")
+        cursor.execute("SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'");
+        assert_json(cursor, ['n', 'm', 'c', 'c'])
+
