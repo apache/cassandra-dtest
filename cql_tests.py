@@ -1309,11 +1309,11 @@ class TestCQL(Tester):
         """)
 
         q = "UPDATE user SET %s WHERE fn='Tom' AND ln='Bombadil'"
-        cursor.execute(q % "tags = tags.add('foo')")
-        cursor.execute(q % "tags = tags.add('bar')")
-        cursor.execute(q % "tags = tags.add('foo')")
-        cursor.execute(q % "tags = tags.add('foobar')")
-        cursor.execute(q % "tags = tags.discard('bar')")
+        cursor.execute(q % "tags = tags + { 'foo' }")
+        cursor.execute(q % "tags = tags + { 'bar' }")
+        cursor.execute(q % "tags = tags + { 'foo' }")
+        cursor.execute(q % "tags = tags + { 'foobar' }")
+        cursor.execute(q % "tags = tags - { 'bar' }")
 
         cursor.execute("SELECT tags FROM user");
         assert_json(cursor, ['foo', 'foobar'])
@@ -1349,11 +1349,11 @@ class TestCQL(Tester):
         """)
 
         q = "UPDATE user SET %s WHERE fn='Tom' AND ln='Bombadil'"
-        cursor.execute(q % "m = m.put('foo', 3)")
-        cursor.execute(q % "m = m.put('bar', 4)")
-        cursor.execute(q % "m = m.put('woot', 5)")
-        cursor.execute(q % "m = m.put('bar', 6)")
-        cursor.execute(q % "m = m.discard('foo')")
+        cursor.execute(q % "m['foo'] = 3")
+        cursor.execute(q % "m['bar'] = 4")
+        cursor.execute(q % "m['woot'] = 5")
+        cursor.execute(q % "m['bar'] = 6")
+        cursor.execute("DELETE m['foo'] FROM user WHERE fn='Tom' AND ln='Bombadil'")
 
         cursor.execute("SELECT m FROM user");
         assert_json(cursor, { 'woot': 5, 'bar' : 6 })
@@ -1384,10 +1384,10 @@ class TestCQL(Tester):
         """)
 
         q = "UPDATE user SET %s WHERE fn='Tom' AND ln='Bombadil'"
-        cursor.execute(q % "tags = tags.append('foo')")
-        cursor.execute(q % "tags = tags.append('bar')")
-        cursor.execute(q % "tags = tags.append('foo')")
-        cursor.execute(q % "tags = tags.append('foobar')")
+        cursor.execute(q % "tags = tags + [ 'foo' ]")
+        cursor.execute(q % "tags = tags + [ 'bar' ]")
+        cursor.execute(q % "tags = tags + [ 'foo' ]")
+        cursor.execute(q % "tags = tags + [ 'foobar' ]")
 
         cursor.execute("SELECT tags FROM user");
         assert_json(cursor, ['foo', 'bar', 'foo', 'foobar'])
@@ -1397,20 +1397,20 @@ class TestCQL(Tester):
         cursor.execute("SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'");
         assert_json(cursor, ['a', 'c', 'b', 'c'])
 
-        cursor.execute(q % "tags = tags.prepend_all('m', 'n')")
+        cursor.execute(q % "tags = [ 'm', 'n' ] + tags")
         cursor.execute("SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'");
         assert_json(cursor, ['n', 'm', 'a', 'c', 'b', 'c'])
 
 
-        cursor.execute(q % "tags = tags.set(2, 'foo'), tags = tags.set(4, 'bar')")
+        cursor.execute(q % "tags[2] = 'foo', tags[4] = 'bar'")
         cursor.execute("SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'");
         assert_json(cursor, ['n', 'm', 'foo', 'c', 'bar', 'c'])
 
-        cursor.execute(q % "tags = tags.discard_idx(2)")
+        cursor.execute("DELETE tags[2] FROM user WHERE fn='Bilbo' AND ln='Baggins'")
         cursor.execute("SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'");
         assert_json(cursor, ['n', 'm', 'c', 'bar', 'c'])
 
-        cursor.execute(q % "tags = tags.discard('bar')")
+        cursor.execute(q % "tags = tags - [ 'bar' ]")
         cursor.execute("SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'");
         assert_json(cursor, ['n', 'm', 'c', 'c'])
 
