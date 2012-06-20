@@ -165,6 +165,7 @@ class TestConcurrentSchemaChanges(Tester):
         cursor = self.cql_connection(node2).cursor()
         self.prepare_for_changes(cursor, namespace='ns2')
         self.make_schema_changes(cursor, namespace='ns2')
+        wait(3)
         self.validate_schema_consistent(node1)
         # check both, just because we can
         self.validate_schema_consistent(node2)
