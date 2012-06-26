@@ -16,8 +16,11 @@ def assert_json(cursor, expected):
 
 class TestCQL(Tester):
 
-    def prepare(self):
+    def prepare(self, ordered=False):
         cluster = self.cluster
+
+        if (ordered):
+            cluster.set_partitioner("org.apache.cassandra.dht.ByteOrderedPartitioner")
 
         cluster.populate(1).start()
         node1 = cluster.nodelist()[0]
@@ -29,7 +32,7 @@ class TestCQL(Tester):
 
     @since('1.1')
     def static_cf_test(self):
-        """ Test non-composite static CF syntax """
+        """ Test static CF syntax """
         cursor = self.prepare()
 
         # Create
@@ -40,6 +43,58 @@ class TestCQL(Tester):
                 lastname text,
                 age int
             );
+        """)
+
+        # Inserts
+        cursor.execute("INSERT INTO users (userid, firstname, lastname, age) VALUES (550e8400-e29b-41d4-a716-446655440000, 'Frodo', 'Baggins', 32)")
+        cursor.execute("UPDATE users SET firstname = 'Samwise', lastname = 'Gamgee', age = 33 WHERE userid = f47ac10b-58cc-4372-a567-0e02b2c3d479")
+
+        # Queries
+        cursor.execute("SELECT firstname, lastname FROM users WHERE userid = 550e8400-e29b-41d4-a716-446655440000");
+        res = cursor.fetchall()
+        assert res == [[ 'Frodo', 'Baggins' ]], res
+
+        cursor.execute("SELECT * FROM users WHERE userid = 550e8400-e29b-41d4-a716-446655440000");
+        res = cursor.fetchall()
+        assert res == [[ UUID('550e8400-e29b-41d4-a716-446655440000'), 32, 'Frodo', 'Baggins' ]], res
+
+        cursor.execute("SELECT * FROM users");
+        res = cursor.fetchall()
+        assert res == [
+            [ UUID('f47ac10b-58cc-4372-a567-0e02b2c3d479'), 33, 'Samwise', 'Gamgee' ],
+            [ UUID('550e8400-e29b-41d4-a716-446655440000'), 32, 'Frodo', 'Baggins' ],
+        ], res
+
+        # Test batch inserts
+        cursor.execute("""
+            BEGIN BATCH
+                INSERT INTO users (userid, age) VALUES (550e8400-e29b-41d4-a716-446655440000, 36)
+                UPDATE users SET age = 37 WHERE userid = f47ac10b-58cc-4372-a567-0e02b2c3d479
+                DELETE firstname, lastname FROM users WHERE userid = 550e8400-e29b-41d4-a716-446655440000
+                DELETE firstname, lastname FROM users WHERE userid = f47ac10b-58cc-4372-a567-0e02b2c3d479
+            APPLY BATCH
+        """)
+
+        cursor.execute("SELECT * FROM users")
+        res = cursor.fetchall()
+        assert res == [
+            [ UUID('f47ac10b-58cc-4372-a567-0e02b2c3d479'), 37, None, None ],
+            [ UUID('550e8400-e29b-41d4-a716-446655440000'), 36, None, None ],
+        ], res
+
+    @since('1.2')
+    def noncomposite_static_cf_test(self):
+        """ Test non-composite static CF syntax """
+        cursor = self.prepare()
+
+        # Create
+        cursor.execute("""
+            CREATE TABLE users (
+                userid uuid PRIMARY KEY,
+                firstname text,
+                lastname text,
+                age int
+            ) WITH COMPACT STORAGE;
         """)
 
         # Inserts
@@ -222,23 +277,12 @@ class TestCQL(Tester):
         assert_invalid(cursor, "CREATE TABLE test (key text PRIMARY KEY, key int)")
         assert_invalid(cursor, "CREATE TABLE test (key text PRIMARY KEY, c int, c text)")
 
-        assert_invalid(cursor, "CREATE TABLE test (key text PRIMARY KEY, c int, d text) WITH COMPACT STORAGE")
         assert_invalid(cursor, "CREATE TABLE test (key text, key2 text, c int, d text, PRIMARY KEY (key, key2)) WITH COMPACT STORAGE")
 
     @since('1.1')
     def limit_ranges_test(self):
         """ Validate LIMIT option for 'range queries' in SELECT statements """
-
-        cluster = self.cluster
-        # We don't yet support paging for RP
-        cluster.set_partitioner("org.apache.cassandra.dht.ByteOrderedPartitioner")
-
-        cluster.populate(1).start()
-        node1 = cluster.nodelist()[0]
-        time.sleep(0.2)
-
-        cursor = self.cql_connection(node1, version=cql_version).cursor()
-        self.create_ks(cursor, 'ks', 1)
+        cursor = self.prepare(ordered=True)
 
         cursor.execute("""
             CREATE TABLE clicks (
@@ -950,7 +994,6 @@ class TestCQL(Tester):
         assert_invalid(cursor, "CREATE TABLE test4 (k int PRIMARY KEY, c int, k text)")
 
         # compact storage limitations
-        assert_invalid(cursor, "CREATE TABLE test4 (k int PRIMARY KEY, c int) WITH COMPACT STORAGE")
         assert_invalid(cursor, "CREATE TABLE test4 (k int, name, int, c1 int, c2 int, PRIMARY KEY(k, name)) WITH COMPACT STORAGE")
 
         cursor.execute("DROP TABLE test1")
@@ -1414,3 +1457,19 @@ class TestCQL(Tester):
         cursor.execute("SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'");
         assert_json(cursor, ['n', 'm', 'c', 'c'])
 
+    @since('1.1')
+    def range_query_test(self):
+        """ Range test query from #4372 """
+        cursor = self.prepare()
+
+        cursor.execute("CREATE TABLE test (a int, b int, c int, d int, e int, f text, PRIMARY KEY (a, b, c, d, e) )");
+
+        cursor.execute("INSERT INTO test (a, b, c, d, e, f) VALUES (1, 1, 1, 1, 2, '2');")
+        cursor.execute("INSERT INTO test (a, b, c, d, e, f) VALUES (1, 1, 1, 1, 1, '1');")
+        cursor.execute("INSERT INTO test (a, b, c, d, e, f) VALUES (1, 1, 1, 2, 1, '1');")
+        cursor.execute("INSERT INTO test (a, b, c, d, e, f) VALUES (1, 1, 1, 1, 3, '3');")
+        cursor.execute("INSERT INTO test (a, b, c, d, e, f) VALUES (1, 1, 1, 1, 5, '5');")
+
+        cursor.execute("SELECT a, b, c, d, e, f FROM test WHERE a = 1 AND b = 1 AND c = 1 AND d = 1 AND e >= 2;")
+        res = cursor.fetchall()
+        assert res == [[1, 1, 1, 1, 2, u'2'], [1, 1, 1, 1, 3, u'3'], [1, 1, 1, 1, 5, u'5']], res
