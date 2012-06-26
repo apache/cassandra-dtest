@@ -214,7 +214,7 @@ class TestConsistency(Tester):
         for n in xrange(0, 100):
             insert_c1c2(cursor, n, "ONE")
 
-        node2.start(wait_other_notice=True)
+        node2.start()
         node1.watch_log_for(["Finished hinted"], from_mark=node1.mark_log(), timeout=90)
 
         node1.stop(wait_other_notice=True)

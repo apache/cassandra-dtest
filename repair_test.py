@@ -77,6 +77,7 @@ class TestRepair(Tester):
         # Verify that node2 has 2001 keys
         self.check_rows_on_node(node2, 2001, found=[1000])
 
+        time.sleep(10) # see CASSANDRA-4373
         # Run repair
         node1.repair()
 
