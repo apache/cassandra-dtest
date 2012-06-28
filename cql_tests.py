@@ -1,3 +1,5 @@
+# coding: utf-8
+
 from dtest import Tester
 from assertions import *
 from tools import *
@@ -1473,3 +1475,42 @@ class TestCQL(Tester):
         cursor.execute("SELECT a, b, c, d, e, f FROM test WHERE a = 1 AND b = 1 AND c = 1 AND d = 1 AND e >= 2;")
         res = cursor.fetchall()
         assert res == [[1, 1, 1, 1, 2, u'2'], [1, 1, 1, 1, 3, u'3'], [1, 1, 1, 1, 5, u'5']], res
+
+    @require('#4041')
+    def update_type_test(self):
+        """ Test altering the type of a column, including the one in the primary key (#4041) """
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k text,
+                c text,
+                v text,
+                PRIMARY KEY (k, c)
+            )
+        """)
+
+        req = "INSERT INTO test (k, c, v) VALUES ('%s', '%s', '%s')"
+        # using utf8 character so that we can see the transition to BytesType
+        cursor.execute(req % ('ɸ', 'ɸ', 'ɸ'))
+
+        cursor.execute("SELECT * FROM test")
+        cursor.execute("SELECT * FROM test")
+        res = cursor.fetchall()
+        assert res == [[u'ɸ', u'ɸ', u'ɸ']], res
+
+        cursor.execute("ALTER TABLE test ALTER v TYPE blob")
+        cursor.execute("SELECT * FROM test")
+        res = cursor.fetchall()
+        # the last should not be utf8 but a raw string
+        assert res == [[u'ɸ', u'ɸ', 'ɸ']], res
+
+        cursor.execute("ALTER TABLE test ALTER k TYPE blob")
+        cursor.execute("SELECT * FROM test")
+        res = cursor.fetchall()
+        assert res == [['ɸ', u'ɸ', 'ɸ']], res
+
+        cursor.execute("ALTER TABLE test ALTER c TYPE blob")
+        cursor.execute("SELECT * FROM test")
+        res = cursor.fetchall()
+        assert res == [['ɸ', 'ɸ', 'ɸ']], res
