@@ -1340,7 +1340,7 @@ class TestCQL(Tester):
                 AND strategy_options:"us-west"=1;
         """)
 
-    @since('1.2')
+    @require('#3647')
     def set_test(self):
         cursor = self.prepare()
 
@@ -1380,7 +1380,7 @@ class TestCQL(Tester):
         assert res == [], res
 
 
-    @since('1.2')
+    @require('#3647')
     def map_test(self):
         cursor = self.prepare()
 
@@ -1415,7 +1415,7 @@ class TestCQL(Tester):
         cursor.execute("SELECT m FROM user WHERE fn='Bilbo' AND ln='Baggins'");
         assert_json(cursor, {'m' : 4, 'n' : 1, 'o' : 2 })
 
-    @since('1.2')
+    @require('#3647')
     def list_test(self):
         cursor = self.prepare()
 
@@ -1514,3 +1514,32 @@ class TestCQL(Tester):
         cursor.execute("SELECT * FROM test")
         res = cursor.fetchall()
         assert res == [['ɸ', 'ɸ', 'ɸ']], res
+
+    @require('#4179')
+    def composite_row_key_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k1 int,
+                k2 int,
+                c int,
+                v int,
+                PRIMARY KEY ((k1, k2), c)
+            )
+        """)
+
+        req = "INSERT INTO test (k1, k2, c, v) VALUES (%d, %d, %d, %d)"
+        for i in range(0, 4):
+            cursor.execute(req % (0, i, i, i))
+
+        cursor.execute("SELECT * FROM test")
+        res = cursor.fetchall()
+        assert res == [[0, 2, 2, 2], [0, 3, 3, 3], [0, 0, 0, 0], [0, 1, 1, 1]], res
+
+        cursor.execute("SELECT * FROM test WHERE k1 = 0 and k2 IN (1, 3)")
+        res = cursor.fetchall()
+        assert res == [[0, 1, 1, 1], [0, 3, 3, 3]], res
+
+        assert_invalid(cursor, "SELECT * FROM test WHERE k2 = 3")
+        assert_invalid(cursor, "SELECT * FROM test WHERE k1 IN (0, 1) and k2 = 3")
