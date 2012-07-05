@@ -396,7 +396,7 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[ -4 ]], res
 
-    @since('1.1')
+    @require('#3680')
     def indexed_with_eq_test(self):
         """ Check that you can query for an indexed column even with a key EQ clause """
         cursor = self.prepare()
@@ -786,7 +786,7 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[10]], res
 
-    @since('1.1')
+    @require('#3680')
     def nameless_index_test(self):
         """ Test CREATE INDEX without name and validate the index can be dropped """
         cursor = self.prepare()
@@ -866,7 +866,8 @@ class TestCQL(Tester):
         assert res == [ list(row1), list(row2) ], res
 
         # Won't be allowed until #3708 is in
-        assert_invalid(cursor, "DELETE FROM testcf2 WHERE username='abc' AND id=2");
+        if self.cluster.version() < "1.2":
+            assert_invalid(cursor, "DELETE FROM testcf2 WHERE username='abc' AND id=2");
 
     @since('1.1')
     def count_test(self):
@@ -1084,7 +1085,7 @@ class TestCQL(Tester):
              AND caching = rows_only
         """)
 
-    @require('#4217')
+    @since('1.1')
     def timestamp_and_ttl_test(self):
         cursor = self.prepare()
 
@@ -1299,7 +1300,7 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert len(res) == 3, res
 
-    @since('1.1')
+    @require('#3680')
     def range_query_2ndary_test(self):
         """ Test range queries with 2ndary indexes (#4257) """
         cursor = self.prepare()
@@ -1476,7 +1477,7 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[1, 1, 1, 1, 2, u'2'], [1, 1, 1, 1, 3, u'3'], [1, 1, 1, 1, 5, u'5']], res
 
-    @require('#4041')
+    @since('1.1.2')
     def update_type_test(self):
         """ Test altering the type of a column, including the one in the primary key (#4041) """
         cursor = self.prepare()
