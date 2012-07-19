@@ -1350,7 +1350,7 @@ class TestCQL(Tester):
                 AND strategy_options:"us-west"=1;
         """)
 
-    @require('#3647')
+    @since('1.2')
     def set_test(self):
         cursor = self.prepare()
 
@@ -1390,7 +1390,7 @@ class TestCQL(Tester):
         assert res == [], res
 
 
-    @require('#3647')
+    @since('1.2')
     def map_test(self):
         cursor = self.prepare()
 
@@ -1425,7 +1425,7 @@ class TestCQL(Tester):
         cursor.execute("SELECT m FROM user WHERE fn='Bilbo' AND ln='Baggins'")
         assert_json(cursor, {'m' : 4, 'n' : 1, 'o' : 2 })
 
-    @require('#3647')
+    @since('1.2')
     def list_test(self):
         cursor = self.prepare()
 
@@ -1554,6 +1554,14 @@ class TestCQL(Tester):
         assert_invalid(cursor, "SELECT * FROM test WHERE k2 = 3")
         assert_invalid(cursor, "SELECT * FROM test WHERE k1 IN (0, 1) and k2 = 3")
 
+        cursor.execute("SELECT * FROM test WHERE token(k1, k2) = token(0, 1)")
+        res = cursor.fetchall()
+        assert res == [[0, 1, 1, 1]], res
+
+        cursor.execute("SELECT * FROM test WHERE token(k1, k2) > '0'")
+        res = cursor.fetchall()
+        assert res == [[0, 2, 2, 2], [0, 3, 3, 3], [0, 0, 0, 0], [0, 1, 1, 1]], res
+
     @require('#4377')
     def cql3_insert_thrift_test(self):
         """ Check that we can insert from thrift into a CQL3 table (#4377) """
@@ -1578,7 +1586,7 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [ "foo" ], res
 
-    #@require('#4361')
+    @require('#4361')
     def row_existence_test(self):
         """ Check the semantic of CQL row existence (part of #4361) """
         cursor = self.prepare()
@@ -1621,7 +1629,7 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[2, 2, None, None]], res
 
-    #@require('#4361')
+    @require('#4361')
     def only_pk_test(self):
         """ Check table with only a PK (#4361) """
         cursor = self.prepare()
