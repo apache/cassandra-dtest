@@ -10,10 +10,9 @@ from ccmlib.cluster import Cluster
 
 cql_version="3.0.0-beta1"
 
-def assert_json(cursor, expected):
-    res = cursor.fetchall()
-    assert len(res) == 1 and len(res[0]) == 1, res
-    value = json.loads(res[0][0])
+def assert_json(res, expected, col=0):
+    assert len(res) == 1, res
+    value = json.loads(res[0][col])
     assert value == expected, value
 
 class TestCQL(Tester):
@@ -1371,18 +1370,18 @@ class TestCQL(Tester):
         cursor.execute(q % "tags = tags - { 'bar' }")
 
         cursor.execute("SELECT tags FROM user")
-        assert_json(cursor, ['foo', 'foobar'])
+        assert_json(cursor.fetchall(), ['foo', 'foobar'])
 
         q = "UPDATE user SET %s WHERE fn='Bilbo' AND ln='Baggins'"
         cursor.execute(q % "tags = { 'a', 'c', 'b' }")
         cursor.execute("SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'")
-        assert_json(cursor, ['a', 'b', 'c'])
+        assert_json(cursor.fetchall(), ['a', 'b', 'c'])
 
         time.sleep(.01)
 
         cursor.execute(q % "tags = { 'm', 'n' }")
         cursor.execute("SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'")
-        assert_json(cursor, ['m', 'n'])
+        assert_json(cursor.fetchall(), ['m', 'n'])
 
         cursor.execute("DELETE tags FROM user WHERE fn='Bilbo' AND ln='Baggins'")
         cursor.execute("SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'")
@@ -1411,19 +1410,19 @@ class TestCQL(Tester):
         cursor.execute("DELETE m['foo'] FROM user WHERE fn='Tom' AND ln='Bombadil'")
 
         cursor.execute("SELECT m FROM user")
-        assert_json(cursor, { 'woot': 5, 'bar' : 6 })
+        assert_json(cursor.fetchall(), { 'woot': 5, 'bar' : 6 })
 
         q = "UPDATE user SET %s WHERE fn='Bilbo' AND ln='Baggins'"
         cursor.execute(q % "m = { 'a' : 4 , 'c' : 3, 'b' : 2 }")
         cursor.execute("SELECT m FROM user WHERE fn='Bilbo' AND ln='Baggins'")
-        assert_json(cursor, {'a' : 4, 'b' : 2, 'c' : 3 })
+        assert_json(cursor.fetchall(), {'a' : 4, 'b' : 2, 'c' : 3 })
 
         time.sleep(.01)
 
         # Check we correctly overwrite
         cursor.execute(q % "m = { 'm' : 4 , 'n' : 1, 'o' : 2 }")
         cursor.execute("SELECT m FROM user WHERE fn='Bilbo' AND ln='Baggins'")
-        assert_json(cursor, {'m' : 4, 'n' : 1, 'o' : 2 })
+        assert_json(cursor.fetchall(), {'m' : 4, 'n' : 1, 'o' : 2 })
 
     @since('1.2')
     def list_test(self):
@@ -1444,30 +1443,56 @@ class TestCQL(Tester):
         cursor.execute(q % "tags = tags + [ 'foo' ]")
         cursor.execute(q % "tags = tags + [ 'foobar' ]")
 
+
         cursor.execute("SELECT tags FROM user")
-        assert_json(cursor, ['foo', 'bar', 'foo', 'foobar'])
+        assert_json(cursor.fetchall(), ['foo', 'bar', 'foo', 'foobar'])
 
         q = "UPDATE user SET %s WHERE fn='Bilbo' AND ln='Baggins'"
         cursor.execute(q % "tags = [ 'a', 'c', 'b', 'c' ]")
         cursor.execute("SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'")
-        assert_json(cursor, ['a', 'c', 'b', 'c'])
+        assert_json(cursor.fetchall(), ['a', 'c', 'b', 'c'])
 
         cursor.execute(q % "tags = [ 'm', 'n' ] + tags")
         cursor.execute("SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'")
-        assert_json(cursor, ['n', 'm', 'a', 'c', 'b', 'c'])
-
+        assert_json(cursor.fetchall(), ['n', 'm', 'a', 'c', 'b', 'c'])
 
         cursor.execute(q % "tags[2] = 'foo', tags[4] = 'bar'")
         cursor.execute("SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'")
-        assert_json(cursor, ['n', 'm', 'foo', 'c', 'bar', 'c'])
+        assert_json(cursor.fetchall(), ['n', 'm', 'foo', 'c', 'bar', 'c'])
 
         cursor.execute("DELETE tags[2] FROM user WHERE fn='Bilbo' AND ln='Baggins'")
         cursor.execute("SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'")
-        assert_json(cursor, ['n', 'm', 'c', 'bar', 'c'])
+        assert_json(cursor.fetchall(), ['n', 'm', 'c', 'bar', 'c'])
 
         cursor.execute(q % "tags = tags - [ 'bar' ]")
         cursor.execute("SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'")
-        assert_json(cursor, ['n', 'm', 'c', 'c'])
+        assert_json(cursor.fetchall(), ['n', 'm', 'c', 'c'])
+
+    @since('1.2')
+    def multi_collection_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE foo(
+                k uuid PRIMARY KEY,
+                L list<int>,
+                M map<text, int>,
+                S set<int>
+            );
+        """)
+
+        cursor.execute("UPDATE ks.foo SET L = [1, 3, 5] WHERE k = 'b017f48f-ae67-11e1-9096-005056c00008';")
+        cursor.execute("UPDATE ks.foo SET L = L + [7, 11, 13] WHERE k = 'b017f48f-ae67-11e1-9096-005056c00008';")
+        cursor.execute("UPDATE ks.foo SET S = {1, 3, 5} WHERE k = 'b017f48f-ae67-11e1-9096-005056c00008';")
+        cursor.execute("UPDATE ks.foo SET S = S + {7, 11, 13} WHERE k = 'b017f48f-ae67-11e1-9096-005056c00008';")
+        cursor.execute("UPDATE ks.foo SET M = {'foo': 1, 'bar' : 3} WHERE k = 'b017f48f-ae67-11e1-9096-005056c00008';")
+        cursor.execute("UPDATE ks.foo SET M = M + {'foobar' : 4} WHERE k = 'b017f48f-ae67-11e1-9096-005056c00008';")
+
+        cursor.execute("SELECT L, M, S FROM foo WHERE k = 'b017f48f-ae67-11e1-9096-005056c00008'")
+        res = cursor.fetchall()
+        assert_json(res, [1, 3, 5, 7, 11, 13], col=0)
+        assert_json(res, {'foo' : 1, 'bar' : 3, 'foobar' : 4}, col=1)
+        assert_json(res, [1, 3, 5, 7, 11, 13], col=2)
 
     @since('1.1')
     def range_query_test(self):
