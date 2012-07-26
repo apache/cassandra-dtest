@@ -1611,7 +1611,7 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [ "foo" ], res
 
-    @require('#4361')
+    @since('1.2')
     def row_existence_test(self):
         """ Check the semantic of CQL row existence (part of #4361) """
         cursor = self.prepare()
@@ -1654,7 +1654,7 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[2, 2, None, None]], res
 
-    @require('#4361')
+    @since('1.2')
     def only_pk_test(self):
         """ Check table with only a PK (#4361) """
         cursor = self.prepare()
@@ -1708,3 +1708,30 @@ class TestCQL(Tester):
 
         cursor.execute("INSERT INTO test (k, t) VALUES (0, '2011-02-03')")
         assert_invalid(cursor, "INSERT INTO test (k, t) VALUES (0, '2011-42-42')")
+
+    def range_slice_test(self):
+        """ Test a regression from #1337 """
+
+        cluster = self.cluster
+
+        cluster.populate(2).start()
+        node1 = cluster.nodelist()[0]
+        time.sleep(0.2)
+
+        cursor = self.cql_connection(node1, version=cql_version).cursor()
+        self.create_ks(cursor, 'ks', 1)
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k text PRIMARY KEY,
+                v int
+            );
+        """)
+
+        cursor.execute("INSERT INTO test (k, v) VALUES ('foo', 0)")
+        cursor.execute("INSERT INTO test (k, v) VALUES ('bar', 1)")
+
+        cursor.execute("SELECT * FROM test")
+        res = cursor.fetchall()
+        assert len(res) == 2, res
+
