@@ -1386,7 +1386,7 @@ class TestCQL(Tester):
         cursor.execute("DELETE tags FROM user WHERE fn='Bilbo' AND ln='Baggins'")
         cursor.execute("SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'")
         res = cursor.fetchall()
-        assert res == [], res
+        assert res == [[None]], re
 
 
     @since('1.2')
