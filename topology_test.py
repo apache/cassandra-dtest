@@ -96,7 +96,7 @@ class TestTopology(Tester):
         assert_almost_equal(*sizes)
         assert_almost_equal(sizes[0], 2 * init_size)
 
-        node5 = new_node(cluster, token=(tokens[2]+1)).start()
+        node5 = new_node('node5', cluster, token=(tokens[2]+1)).start()
         time.sleep(.5)
         cluster.cleanup()
         time.sleep(.5)
@@ -131,7 +131,7 @@ class TestTopology(Tester):
         node3.stop(wait_other_notice=True)
         time.sleep(.5)
 
-        node4 = new_node(cluster, token=tokens[2])
+        node4 = new_node('node4', cluster, token=tokens[2])
         node4.start(replace_token=tokens[2])
         time.sleep(.5)
         cluster.cleanup()
