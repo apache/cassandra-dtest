@@ -10,8 +10,10 @@ from tools import ThriftConnection
 
 CASSANDRA_VERSION = os.environ.get('CASSANDRA_VERSION', '1.0.0')
 
+# As of Sep 4, 2012 there is an error upgrading to trunk due to 
+# https://issues.apache.org/jira/browse/CASSANDRA-4576
 versions = (
-    '0.7.10', '0.8.10', '1.0.9',
+    '0.7.10', '0.8.10', 'git:cassandra-1.0', 'git:cassandra-1.1', 'git:trunk',
 )
 
 class TestUpgradeThroughVersions(Tester):
@@ -31,6 +33,7 @@ class TestUpgradeThroughVersions(Tester):
         [node1, node2, node3] = cluster.nodelist()
         self.node2 = node2
 
+        node1.watch_log_for('Listening for thrift clients...')
         conn = ThriftConnection(node1)
         conn.create_ks()
         conn.create_cf()
@@ -70,7 +73,7 @@ class TestUpgradeThroughVersions(Tester):
         # Check we can bootstrap a new 1.0 node
         debug("Adding a node to the cluster")
         self.cluster.set_cassandra_dir(cassandra_version=version)
-        nnode = new_node(self.cluster)
+        nnode = new_node(self.cluster, remote_debug_port=str(2000+len(self.cluster.nodes)))
         if from_version_07:
             nnode.start(no_wait=True)
             time.sleep(200)
