@@ -8,7 +8,7 @@ import os, sys, time, tools, json
 from uuid import UUID
 from ccmlib.cluster import Cluster
 
-cql_version="3.0.0-beta1"
+cql_version="3.0.0"
 
 def assert_json(res, expected, col=0):
     assert len(res) == 1, res
@@ -665,6 +665,28 @@ class TestCQL(Tester):
         cursor.execute(q % (2, 2, 2))
 
         assert_invalid(cursor, "SELECT * FROM test ORDER BY k2")
+
+    @since('1.1.3')
+    def order_by_with_in_test(self):
+        """ Check that order-by works with IN (#4327) """
+        cursor = self.prepare()
+        cursor.execute("""
+            CREATE TABLE test(
+                my_id varchar, 
+                col1 int, 
+                value varchar, 
+                PRIMARY KEY (my_id, col1)
+            )
+        """)
+        cursor.execute("INSERT INTO test(my_id, col1, value) VALUES ( 'key1', 1, 'a')")
+        cursor.execute("INSERT INTO test(my_id, col1, value) VALUES ( 'key2', 3, 'c')")
+        cursor.execute("INSERT INTO test(my_id, col1, value) VALUES ( 'key3', 2, 'b')")
+        cursor.execute("INSERT INTO test(my_id, col1, value) VALUES ( 'key4', 4, 'd')")
+        # Currently this breaks due to CASSANDRA-4612
+        cursor.execute("SELECT col1 FROM test WHERE my_id in('key1', 'key2', 'key3') ORDER BY col1")
+
+        res = cursor.fetchall()
+        assert res == [[1], [2], [3]], res
 
 
     @since('1.1')
