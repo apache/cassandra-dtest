@@ -87,7 +87,6 @@ class TestRollingUpgrade(Tester):
         debug("upgradsstables...")
         node.nodetool('upgradesstables')
 
-#        import ipdb; ipdb.set_trace()
         debug("validating standard data...")
         loader_standard.read_and_validate(step=10)
         loader_standard.exit()
@@ -98,11 +97,11 @@ class TestRollingUpgrade(Tester):
         debug("Done upgrading node %s.\n" % node.name)
 
 
-    def upgrade108_to_repo_test(self):
-        """ Upgrade from 1.0.8 """
+    def upgrade110_test(self):
+        """ Upgrade from 1.0.10 """
 
         cluster = self.cluster
-        cluster.set_cassandra_dir(cassandra_version="1.0.8")
+        cluster.set_cassandra_dir(cassandra_version="1.0.10")
 
         cluster.populate(3, tokens=[0, 2**125, 2**126]).start()
         [node1, node2, node3] = cluster.nodelist()
@@ -111,6 +110,22 @@ class TestRollingUpgrade(Tester):
         self.rolling_upgrade_node(node1, stress_node=node2, create_ks_and_cf=True)
         self.rolling_upgrade_node(node2, stress_node=node3, create_ks_and_cf=False)
         self.rolling_upgrade_node(node3, stress_node=node1, create_ks_and_cf=False)
+
+
+    def upgrade114_test(self):
+        """ Upgrade from 1.1.4 """
+
+        cluster = self.cluster
+        cluster.set_cassandra_dir(cassandra_version="1.1.4")
+
+        cluster.populate(3, tokens=[0, 2**125, 2**126]).start()
+        [node1, node2, node3] = cluster.nodelist()
+        time.sleep(1)
+
+        self.rolling_upgrade_node(node1, stress_node=node2, create_ks_and_cf=True)
+        self.rolling_upgrade_node(node2, stress_node=node3, create_ks_and_cf=False)
+        self.rolling_upgrade_node(node3, stress_node=node1, create_ks_and_cf=False)
+
 
     def upgrade1010_with_index(self):
         """ Test for #4262 bug """
