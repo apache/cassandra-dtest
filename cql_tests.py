@@ -1731,6 +1731,7 @@ class TestCQL(Tester):
         cursor.execute("INSERT INTO test (k, t) VALUES (0, '2011-02-03')")
         assert_invalid(cursor, "INSERT INTO test (k, t) VALUES (0, '2011-42-42')")
 
+    @since('1.1')
     def range_slice_test(self):
         """ Test a regression from #1337 """
 
