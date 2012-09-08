@@ -13,7 +13,7 @@ CASSANDRA_VERSION = os.environ.get('CASSANDRA_VERSION', '1.0.0')
 # As of Sep 4, 2012 there is an error upgrading to trunk due to 
 # https://issues.apache.org/jira/browse/CASSANDRA-4576
 versions = (
-    '0.7.10', '0.8.10', 'git:cassandra-1.0', 'git:cassandra-1.1', 'git:trunk',
+    '0.7.10', '0.8.10', 'git:cassandra-1.0', CASSANDRA_VERSION,
 )
 
 class TestUpgradeThroughVersions(Tester):
