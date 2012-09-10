@@ -62,3 +62,23 @@ class TestPutGet(Tester):
         self.create_cf(cursor, 'cf')
 
         tools.range_putget(cluster, cursor)
+
+    def wide_row_test(self):
+        """ Test wide row slices """
+        cluster = self.cluster
+
+        cluster.populate(3).start()
+        [node1, node2, node3] = cluster.nodelist()
+
+        cursor = self.cql_connection(node1).cursor()
+        self.create_ks(cursor, 'ks', 1)
+        self.create_cf(cursor, 'cf')
+
+        key = 'wide'
+        
+        for x in xrange(1, 5001):
+            tools.insert_columns(cursor, key, 100, offset=x-1)
+        
+        for size in (10, 100, 1000):
+            for x in xrange(1, (50001 - size) / size):
+                tools.query_columns(cursor, key, size, offset=x*size-1)

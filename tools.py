@@ -25,9 +25,9 @@ def retry_till_success(fun, *args, **kwargs):
 def insert_c1c2(cursor, key, consistency="QUORUM"):
     cursor.execute('UPDATE cf USING CONSISTENCY %s SET c1=value1, c2=value2 WHERE key=k%d' % (consistency, key))
 
-def insert_columns(cursor, key, columns_count, consistency="QUORUM"):
-    kvs = [ "c%d=value%d" % (i, i) for i in xrange(0, columns_count)]
-    query = 'UPDATE cf USING CONSISTENCY %s SET %s WHERE key=k%d' % (consistency, ', '.join(kvs), key)
+def insert_columns(cursor, key, columns_count, consistency="QUORUM", offset=0):
+    kvs = [ "c%06d=value%d" % (i, i) for i in xrange(offset*columns_count, columns_count*(offset+1))]
+    query = 'UPDATE cf USING CONSISTENCY %s SET %s WHERE key=%s' % (consistency, ', '.join(kvs), key)
     cursor.execute(query)
 
 def query_c1c2(cursor, key, consistency="QUORUM"):
@@ -36,13 +36,13 @@ def query_c1c2(cursor, key, consistency="QUORUM"):
     res = cursor.fetchone()
     assert len(res) == 2 and res[0] == 'value1' and res[1] == 'value2'
 
-def query_columns(cursor, key, columns_count, consistency="QUORUM"):
-    cursor.execute('SELECT c0..c%d FROM cf USING CONSISTENCY %s WHERE key=k%d' % (columns_count, consistency, key))
+def query_columns(cursor, key, columns_count, consistency="QUORUM", offset=0):
+    cursor.execute('SELECT c%06d..c%06d FROM cf USING CONSISTENCY %s WHERE key=%s' % (offset, columns_count+offset-1, consistency, key))
     assert cursor.rowcount == 1
     res = cursor.fetchone()
-    assert len(res) == columns_count
+    assert len(res) == columns_count, "%s != %s (%s-%s)" % (len(res), columns_count, offset, columns_count+offset-1)
     for i in xrange(0, columns_count):
-        assert res[i] == 'value%d' % i
+        assert res[i] == 'value%d' % (i+offset)
 
 def remove_c1c2(cursor, key, consistency="QUORUM"):
     cursor.execute('DELETE c1, c2 FROM cf USING CONSISTENCY %s WHERE key=k%d' % (consistency, key))
