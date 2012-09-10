@@ -17,7 +17,7 @@ def assert_json(res, expected, col=0):
 
 class TestCQL(Tester):
 
-    def prepare(self, ordered=False):
+    def prepare(self, ordered=False, create_keyspace=True):
         cluster = self.cluster
 
         if (ordered):
@@ -28,7 +28,8 @@ class TestCQL(Tester):
         time.sleep(0.2)
 
         cursor = self.cql_connection(node1, version=cql_version).cursor()
-        self.create_ks(cursor, 'ks', 1)
+        if create_keyspace:
+            self.create_ks(cursor, 'ks', 1)
         return cursor
 
     @since('1.1')
@@ -1734,4 +1735,202 @@ class TestCQL(Tester):
         cursor.execute("SELECT * FROM test")
         res = cursor.fetchall()
         assert len(res) == 2, res
+
+    def composite_index_with_pk_test(self):
+
+        cursor = self.prepare()
+        cursor.execute("""
+            CREATE TABLE blogs (
+                blog_id int,
+                time1 int,
+                time2 int,
+                author text,
+                content text,
+                PRIMARY KEY (blog_id, time1, time2)
+            )
+        """)
+
+        cursor.execute("CREATE INDEX ON blogs(author)")
+
+        req = "INSERT INTO blogs (blog_id, time1, time2, author, content) VALUES (%d, %d, %d, '%s', '%s')"
+        cursor.execute(req % (1, 0, 0, 'foo', 'bar1'))
+        cursor.execute(req % (1, 0, 1, 'foo', 'bar2'))
+        cursor.execute(req % (2, 1, 0, 'foo', 'baz'))
+        cursor.execute(req % (3, 0, 1, 'gux', 'qux'))
+
+
+        cursor.execute("SELECT blog_id, content FROM blogs WHERE author='foo'")
+        res = cursor.fetchall()
+        assert res == [[1, 'bar1'], [1, 'bar2'], [2, 'baz']], res
+
+        cursor.execute("SELECT blog_id, content FROM blogs WHERE time1 > 0 AND author='foo'")
+        res = cursor.fetchall()
+        assert res == [[2, 'baz']], res
+
+        cursor.execute("SELECT blog_id, content FROM blogs WHERE time1 = 1 AND author='foo'")
+        res = cursor.fetchall()
+        assert res == [[2, 'baz']], res
+
+        cursor.execute("SELECT blog_id, content FROM blogs WHERE time1 = 1 AND time2 = 0 AND author='foo'")
+        res = cursor.fetchall()
+        assert res == [[2, 'baz']], res
+
+        cursor.execute("SELECT content FROM blogs WHERE time1 = 1 AND time2 = 1 AND author='foo'")
+        res = cursor.fetchall()
+        assert res == [], res
+
+        cursor.execute("SELECT content FROM blogs WHERE time1 = 1 AND time2 > 0 AND author='foo'")
+        res = cursor.fetchall()
+        assert res == [], res
+
+        assert_invalid(cursor, "SELECT content FROM blogs WHERE time2 >= 0 AND author='foo'")
+
+    def limit_bugs_test(self):
+        """ Test for LIMIT bugs from 4579 """
+
+        cursor = self.prepare(ordered=True)
+        cursor.execute("""
+            CREATE TABLE testcf (
+                a int,
+                b int,
+                c int,
+                d int,
+                e int,
+                PRIMARY KEY (a, b)
+            );
+        """)
+
+        cursor.execute("INSERT INTO testcf (a, b, c, d, e) VALUES (1, 1, 1, 1, 1);")
+        cursor.execute("INSERT INTO testcf (a, b, c, d, e) VALUES (2, 2, 2, 2, 2);")
+        cursor.execute("INSERT INTO testcf (a, b, c, d, e) VALUES (3, 3, 3, 3, 3);")
+        cursor.execute("INSERT INTO testcf (a, b, c, d, e) VALUES (4, 4, 4, 4, 4);")
+
+        cursor.execute("SELECT * FROM testcf;")
+        res = cursor.fetchall()
+        assert res == [[1, 1, 1, 1, 1], [2, 2, 2, 2, 2], [3, 3, 3, 3, 3], [4, 4, 4, 4, 4]], res
+
+        cursor.execute("SELECT * FROM testcf LIMIT 1;") # columns d and e in result row are null
+        res = cursor.fetchall()
+        assert res == [[1, 1, 1, 1, 1]], res
+
+        cursor.execute("SELECT * FROM testcf LIMIT 2;") # columns d and e in last result row are null
+        res = cursor.fetchall()
+        assert res == [[1, 1, 1, 1, 1], [2, 2, 2, 2, 2]], res
+
+        cursor.execute("""
+            CREATE TABLE testcf2 (
+                a int primary key,
+                b int,
+                c int,
+            );
+        """)
+
+        cursor.execute("INSERT INTO testcf2 (a, b, c) VALUES (1, 1, 1);")
+        cursor.execute("INSERT INTO testcf2 (a, b, c) VALUES (2, 2, 2);")
+        cursor.execute("INSERT INTO testcf2 (a, b, c) VALUES (3, 3, 3);")
+        cursor.execute("INSERT INTO testcf2 (a, b, c) VALUES (4, 4, 4);")
+
+        cursor.execute("SELECT * FROM testcf2;")
+        res = cursor.fetchall()
+        assert res == [[1, 1, 1], [2, 2, 2], [3, 3, 3], [4, 4, 4]], res
+
+        cursor.execute("SELECT * FROM testcf2 LIMIT 1;") # gives 1 row
+        res = cursor.fetchall()
+        assert res == [[1, 1, 1]], res
+
+        cursor.execute("SELECT * FROM testcf2 LIMIT 2;") # gives 1 row
+        res = cursor.fetchall()
+        assert res == [[1, 1, 1], [2, 2, 2]], res
+
+        cursor.execute("SELECT * FROM testcf2 LIMIT 3;") # gives 2 rows
+        res = cursor.fetchall()
+        assert res == [[1, 1, 1], [2, 2, 2], [3, 3, 3]], res
+
+        cursor.execute("SELECT * FROM testcf2 LIMIT 4;") # gives 2 rows
+        res = cursor.fetchall()
+        assert res == [[1, 1, 1], [2, 2, 2], [3, 3, 3], [4, 4, 4]], res
+
+        cursor.execute("SELECT * FROM testcf2 LIMIT 5;") # gives 3 rows
+        res = cursor.fetchall()
+        assert res == [[1, 1, 1], [2, 2, 2], [3, 3, 3], [4, 4, 4]], res
+
+    def bug_4532_test(self):
+
+        cursor = self.prepare()
+        cursor.execute("""
+            CREATE TABLE compositetest(
+                status ascii,
+                ctime bigint,
+                key ascii,
+                nil ascii,
+                PRIMARY KEY (status, ctime, key)
+            )
+        """)
+
+        cursor.execute("INSERT INTO compositetest(status,ctime,key,nil) VALUES ('C',12345678,'key1','')")
+        cursor.execute("INSERT INTO compositetest(status,ctime,key,nil) VALUES ('C',12345678,'key2','')")
+        cursor.execute("INSERT INTO compositetest(status,ctime,key,nil) VALUES ('C',12345679,'key3','')")
+        cursor.execute("INSERT INTO compositetest(status,ctime,key,nil) VALUES ('C',12345679,'key4','')")
+        cursor.execute("INSERT INTO compositetest(status,ctime,key,nil) VALUES ('C',12345679,'key5','')")
+        cursor.execute("INSERT INTO compositetest(status,ctime,key,nil) VALUES ('C',12345680,'key6','')")
+
+        assert_invalid(cursor, "SELECT * FROM compositetest WHERE ctime>=12345679 AND key='key3' AND ctime<=12345680 LIMIT 3;")
+        assert_invalid(cursor, "SELECT * FROM compositetest WHERE ctime=12345679  AND key='key3' AND ctime<=12345680 LIMIT 3")
+
+    def order_by_multikey_test(self):
+        """ Test for #4612 bug and more generaly order by when multiple C* rows are queried """
+
+        cursor = self.prepare(ordered=True)
+        cursor.execute("""
+            CREATE TABLE test(
+                my_id varchar,
+                col1 int,
+                col2 int,
+                value varchar,
+                PRIMARY KEY (my_id, col1, col2)
+            );
+        """)
+
+        cursor.execute("INSERT INTO test(my_id, col1, col2, value) VALUES ( 'key1', 1, 1, 'a');")
+        cursor.execute("INSERT INTO test(my_id, col1, col2, value) VALUES ( 'key2', 3, 3, 'a');")
+        cursor.execute("INSERT INTO test(my_id, col1, col2, value) VALUES ( 'key3', 2, 2, 'b');")
+        cursor.execute("INSERT INTO test(my_id, col1, col2, value) VALUES ( 'key4', 2, 1, 'b');")
+
+        cursor.execute("SELECT col1 FROM test WHERE my_id in('key1', 'key2', 'key3') ORDER BY col1;")
+        res = cursor.fetchall()
+        assert res == [[1], [2], [3]], res
+
+        cursor.execute("SELECT col1, value, my_id, col2 FROM test WHERE my_id in('key3', 'key4') ORDER BY col1, col2;")
+        res = cursor.fetchall()
+        assert res == [[2, 'b', 'key4', 1], [2, 'b', 'key3', 2]], res
+
+        assert_invalid(cursor, "SELECT col1 FROM test ORDER BY col1;")
+        assert_invalid(cursor, "SELECT col1 FROM test WHERE my_id > 'key1' ORDER BY col1;")
+
+    def create_alter_options_test(self):
+        cursor = self.prepare(create_keyspace=False)
+
+        assert_invalid(cursor, "CREATE KEYSPACE ks1")
+        assert_invalid(cursor, "CREATE KEYSPACE ks1 WITH replication={ 'replication_factor' : 1 }")
+
+        cursor.execute("CREATE KEYSPACE ks1 WITH replication={ 'class' : 'SimpleStrategy', 'replication_factor' : 1 }")
+        cursor.execute("CREATE KEYSPACE ks2 WITH replication={ 'class' : 'SimpleStrategy', 'replication_factor' : 1 } AND durable_writes=false")
+
+        cursor.execute("SELECT keyspace_name, durable_writes FROM system.schema_keyspaces")
+        res = cursor.fetchall()
+        assert res == [ ['ks1', True], ['ks2', False] ], res
+
+        cursor.execute("ALTER KEYSPACE ks1 WITH replication = { 'class' : 'NetworkTopologyStrategy', 'dc1' : 1 } AND durable_writes=False")
+        cursor.execute("SELECT keyspace_name, durable_writes, strategy_class FROM system.schema_keyspaces")
+        res = cursor.fetchall()
+        assert res == [ ['ks1', False, 'org.apache.cassandra.locator.NetworkTopologyStrategy'],
+                        ['ks2', False, 'org.apache.cassandra.locator.SimpleStrategy'] ], res
+
+        cursor.execute("USE ks1")
+
+        assert_invalid(cursor, "CREATE TABLE cf1 (a int PRIMARY KEY, b int) WITH compaction = { 'min_threshold' : 4 }")
+        cursor.execute("CREATE TABLE cf1 (a int PRIMARY KEY, b int) WITH compaction = { 'class' : 'SizeTieredCompactionStrategy', 'min_threshold' : 7 }")
+        cursor.execute("SELECT columnfamily_name, min_compaction_threshold FROM system.schema_columnfamilies WHERE keyspace_name='ks1'")
+        res = cursor.fetchall()
+        assert res == [ ['cf1', 7] ], res
 

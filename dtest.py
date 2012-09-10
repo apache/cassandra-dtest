@@ -143,15 +143,26 @@ class Tester(object):
         return con
 
     def create_ks(self, cursor, name, rf):
-        query = 'CREATE KEYSPACE %s WITH strategy_class=%s AND %s'
-        if isinstance(rf, types.IntType):
-            # we assume simpleStrategy
-            cursor.execute(query % (name, 'SimpleStrategy', 'strategy_options:replication_factor=%d' % rf))
+        if self.cluster.version() >= "1.2":
+            query = 'CREATE KEYSPACE %s WITH replication={%s}'
+            if isinstance(rf, types.IntType):
+                # we assume simpleStrategy
+                cursor.execute(query % (name, "'class':'SimpleStrategy', 'replication_factor':%d" % rf))
+            else:
+                assert len(rf) != 0, "At least one datacenter/rf pair is needed"
+                # we assume networkTopolyStrategy
+                options = (', ').join([ '%s:%d' % (d, r) for d, r in rf.iteritems() ])
+                cursor.execute(query % (name, "'class':'NetworkTopologyStrategy', %s" % options))
         else:
-            assert len(rf) != 0, "At least one datacenter/rf pair is needed"
-            # we assume networkTopolyStrategy
-            options = (' AND ').join([ 'strategy_options:%s=%d' % (d, r) for d, r in rf.iteritems() ])
-            cursor.execute(query % (name, 'NetworkTopologyStrategy', options))
+            query = 'CREATE KEYSPACE %s WITH strategy_class=%s AND %s'
+            if isinstance(rf, types.IntType):
+                # we assume simpleStrategy
+                cursor.execute(query % (name, 'SimpleStrategy', 'strategy_options:replication_factor=%d' % rf))
+            else:
+                assert len(rf) != 0, "At least one datacenter/rf pair is needed"
+                # we assume networkTopolyStrategy
+                options = (' AND ').join([ 'strategy_options:%s=%d' % (d, r) for d, r in rf.iteritems() ])
+                cursor.execute(query % (name, 'NetworkTopologyStrategy', options))
         cursor.execute('USE %s' % name)
 
     # We default to UTF8Type because it's simpler to use in tests

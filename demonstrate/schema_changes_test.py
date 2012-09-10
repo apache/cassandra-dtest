@@ -22,13 +22,13 @@ class TestSchemaChanges(Tester):
         prepares for schema changes by creating a keyspace and column family.
         """
         # create a keyspace that will be used
-        query = """CREATE KEYSPACE ks WITH strategy_class=SimpleStrategy AND 
+        query = """CREATE KEYSPACE ks WITH strategy_class=SimpleStrategy AND
                 strategy_options:replication_factor=2"""
         cursor.execute(query)
         cursor.execute('USE ks')
 
         # make a keyspace that can be deleted
-        query = """CREATE KEYSPACE ks2 WITH strategy_class=SimpleStrategy AND 
+        query = """CREATE KEYSPACE ks2 WITH strategy_class=SimpleStrategy AND
                 strategy_options:replication_factor=2"""
         cursor.execute(query)
 
