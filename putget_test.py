@@ -42,7 +42,7 @@ class TestPutGet(Tester):
 
         cursor = self.cql_connection(node1).cursor()
         self.create_ks(cursor, 'ks', 2)
-        self.create_cf(cursor, 'cf')
+        create_c1c2_table(self, cursor)
 
         # insert and get at CL.QUORUM (since RF=2, node1 won't have all key locally)
         for n in xrange(0, 1000):
@@ -75,10 +75,10 @@ class TestPutGet(Tester):
         self.create_cf(cursor, 'cf')
 
         key = 'wide'
-        
+
         for x in xrange(1, 5001):
-            tools.insert_columns(cursor, key, 100, offset=x-1)
-        
+            tools.insert_columns(self, cursor, key, 100, offset=x-1)
+
         for size in (10, 100, 1000):
             for x in xrange(1, (50001 - size) / size):
-                tools.query_columns(cursor, key, size, offset=x*size-1)
+                tools.query_columns(self, cursor, key, size, offset=x*size-1)

@@ -135,6 +135,9 @@ class Tester(object):
     def cql_connection(self, node, keyspace=None, version=None):
         import cql
         host, port = node.network_interfaces['thrift']
+        if not version and self.cluster.version() >= "1.2":
+            version = "3.0.0"
+
         if version:
             con = cql.connect(host, port, keyspace=keyspace, cql_version=version)
         else:
@@ -166,19 +169,30 @@ class Tester(object):
         cursor.execute('USE %s' % name)
 
     # We default to UTF8Type because it's simpler to use in tests
-    def create_cf(self, cursor, name, key_type="varchar", comparator="UTF8Type", validation="UTF8Type", read_repair=None, compression=None, gc_grace=None, columns=None):
+    def create_cf(self, cursor, name, key_type="varchar", read_repair=None, compression=None, gc_grace=None, columns=None):
         additional_columns = ""
         if columns is not None:
             for k, v in columns.items():
                 additional_columns = "%s, %s %s" % (additional_columns, k, v)
-        query = 'CREATE COLUMNFAMILY %s (key %s PRIMARY KEY%s) WITH comparator=%s AND default_validation=%s' % (name, key_type, additional_columns, comparator, validation)
+
+        if self.cluster.version() >= "1.2":
+            if additional_columns == "":
+                query = 'CREATE COLUMNFAMILY %s (key %s, c varchar, v varchar, PRIMARY KEY(key, c)) WITH comment=\'test cf\'' % (name, key_type)
+            else:
+                query = 'CREATE COLUMNFAMILY %s (key %s PRIMARY KEY%s) WITH comment=\'test cf\'' % (name, key_type, additional_columns)
+            if compression is not None:
+                query = '%s AND compression = { \'sstable_compression\': \'%sCompressor\' }' % (query, compression)
+        else:
+            query = 'CREATE COLUMNFAMILY %s (key %s PRIMARY KEY%s) WITH comparator=UTF8Type AND default_validation=UTF8Type' % (name, key_type, additional_columns)
+            if compression is not None:
+                query = '%s AND compression_parameters:sstable_compression=%sCompressor' % (query, compression)
+
         if read_repair is not None:
             query = '%s AND read_repair_chance=%f' % (query, read_repair)
-        if compression is not None:
-            query = '%s AND compression_parameters:sstable_compression=%sCompressor' % (query, compression)
         if gc_grace is not None:
             query = '%s AND gc_grace_seconds=%d' % (query, gc_grace)
         cursor.execute(query)
+        time.sleep(0.2)
 
     def go(self, func):
         runner = Runner(func)

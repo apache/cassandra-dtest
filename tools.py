@@ -22,27 +22,41 @@ def retry_till_success(fun, *args, **kwargs):
             if time.time() > deadline:
                 raise
 
-def insert_c1c2(cursor, key, consistency="QUORUM"):
-    cursor.execute('UPDATE cf USING CONSISTENCY %s SET c1=value1, c2=value2 WHERE key=k%d' % (consistency, key))
+def create_c1c2_table(tester, cursor, read_repair=None):
+    tester.create_cf(cursor, 'cf', columns={ 'c1' : 'text', 'c2' : 'text' }, read_repair=read_repair)
 
-def insert_columns(cursor, key, columns_count, consistency="QUORUM", offset=0):
-    kvs = [ "c%06d=value%d" % (i, i) for i in xrange(offset*columns_count, columns_count*(offset+1))]
-    query = 'UPDATE cf USING CONSISTENCY %s SET %s WHERE key=%s' % (consistency, ', '.join(kvs), key)
+def insert_c1c2(cursor, key, consistency="QUORUM"):
+    cursor.execute('UPDATE cf USING CONSISTENCY %s SET c1=\'value1\', c2=\'value2\' WHERE key=\'k%d\'' % (consistency, key))
+
+def insert_columns(tester, cursor, key, columns_count, consistency="QUORUM", offset=0):
+    if tester.cluster.version() >= "1.2":
+        upds = [ "UPDATE cf SET v=\'value%d\' WHERE key=\'k%s\' AND c=\'c%06d\'" % (i, key, i) for i in xrange(offset*columns_count, columns_count*(offset+1))]
+        query = 'BEGIN BATCH USING CONSISTENCY %s %s; APPLY BATCH' % (consistency, '; '.join(upds))
+    else:
+        kvs = [ "c%06d=value%d" % (i, i) for i in xrange(offset*columns_count, columns_count*(offset+1))]
+        query = 'UPDATE cf USING CONSISTENCY %s SET %s WHERE key=k%s' % (consistency, ', '.join(kvs), key)
     cursor.execute(query)
 
 def query_c1c2(cursor, key, consistency="QUORUM"):
-    cursor.execute('SELECT c1, c2 FROM cf USING CONSISTENCY %s WHERE key=k%d' % (consistency, key))
+    cursor.execute('SELECT c1, c2 FROM cf USING CONSISTENCY %s WHERE key=\'k%d\'' % (consistency, key))
     assert cursor.rowcount == 1
     res = cursor.fetchone()
     assert len(res) == 2 and res[0] == 'value1' and res[1] == 'value2'
 
-def query_columns(cursor, key, columns_count, consistency="QUORUM", offset=0):
-    cursor.execute('SELECT c%06d..c%06d FROM cf USING CONSISTENCY %s WHERE key=%s' % (offset, columns_count+offset-1, consistency, key))
-    assert cursor.rowcount == 1
-    res = cursor.fetchone()
-    assert len(res) == columns_count, "%s != %s (%s-%s)" % (len(res), columns_count, offset, columns_count+offset-1)
-    for i in xrange(0, columns_count):
-        assert res[i] == 'value%d' % (i+offset)
+def query_columns(tester, cursor, key, columns_count, consistency="QUORUM", offset=0):
+    if tester.cluster.version() >= "1.2":
+        cursor.execute('SELECT c, v FROM cf USING CONSISTENCY %s WHERE key=\'k%s\' AND c >= \'c%06d\' AND c <= \'c%06d\'' % (consistency, key, offset, columns_count+offset-1))
+        res = cursor.fetchall()
+        assert len(res) == columns_count, "%s != %s (%s-%s)" % (len(res), columns_count, offset, columns_count+offset-1)
+        for i in xrange(0, columns_count):
+            assert res[i][1] == 'value%d' % (i+offset)
+    else:
+        cursor.execute('SELECT c%06d..c%06d FROM cf USING CONSISTENCY %s WHERE key=k%s' % (offset, columns_count+offset-1, consistency, key))
+        assert cursor.rowcount == 1
+        res = cursor.fetchone()
+        assert len(res) == columns_count, "%s != %s (%s-%s)" % (len(res), columns_count, offset, columns_count+offset-1)
+        for i in xrange(0, columns_count):
+            assert res[i] == 'value%d' % (i+offset)
 
 def remove_c1c2(cursor, key, consistency="QUORUM"):
     cursor.execute('DELETE c1, c2 FROM cf USING CONSISTENCY %s WHERE key=k%d' % (consistency, key))
@@ -62,31 +76,58 @@ def new_node(cluster, bootstrap=True, token=None, remote_debug_port='2000'):
     return node
 
 def _put_with_overwrite(cluster, cursor, nb_keys, cl="QUORUM"):
-    for k in xrange(0, nb_keys):
-        kvs = [ "c%02d=value%d" % (i, i) for i in xrange(0, 100) ]
-        cursor.execute('UPDATE cf USING CONSISTENCY %s SET %s WHERE key=k%s' % (cl, ','.join(kvs), k))
-        time.sleep(.01)
-    cluster.flush()
-    for k in xrange(0, nb_keys):
-        kvs = [ "c%02d=value%d" % (i*2, i*4) for i in xrange(0, 50) ]
-        cursor.execute('UPDATE cf USING CONSISTENCY %s SET %s WHERE key=k%d' % (cl, ','.join(kvs), k))
-        time.sleep(.01)
-    cluster.flush()
-    for k in xrange(0, nb_keys):
-        kvs = [ "c%02d=value%d" % (i*5, i*20) for i in xrange(0, 20) ]
-        cursor.execute('UPDATE cf USING CONSISTENCY %s SET %s WHERE key=k%d' % (cl, ','.join(kvs), k))
-        time.sleep(.01)
-    cluster.flush()
+    if cluster.version() >= "1.2":
+        for k in xrange(0, nb_keys):
+            kvs = [ "UPDATE cf SET v=\'value%d\' WHERE key=\'k%s\' AND c=\'c%02d\'" % (i, k, i) for i in xrange(0, 100) ]
+            cursor.execute('BEGIN BATCH USING CONSISTENCY %s %s APPLY BATCH' % (cl, '; '.join(kvs)))
+            time.sleep(.01)
+        cluster.flush()
+        for k in xrange(0, nb_keys):
+            kvs = [ "UPDATE cf SET v=\'value%d\' WHERE key=\'k%s\' AND c=\'c%02d\'" % (i*4, k, i*2) for i in xrange(0, 50) ]
+            cursor.execute('BEGIN BATCH USING CONSISTENCY %s %s APPLY BATCH' % (cl, '; '.join(kvs)))
+            time.sleep(.01)
+        cluster.flush()
+        for k in xrange(0, nb_keys):
+            kvs = [ "UPDATE cf SET v=\'value%d\' WHERE key=\'k%s\' AND c=\'c%02d\'" % (i*20, k, i*5) for i in xrange(0, 20) ]
+            cursor.execute('BEGIN BATCH USING CONSISTENCY %s %s APPLY BATCH' % (cl, '; '.join(kvs)))
+            time.sleep(.01)
+        cluster.flush()
+    else:
+        for k in xrange(0, nb_keys):
+            kvs = [ "c%02d=value%d" % (i, i) for i in xrange(0, 100) ]
+            cursor.execute('UPDATE cf USING CONSISTENCY %s SET %s WHERE key=k%s' % (cl, ','.join(kvs), k))
+            time.sleep(.01)
+        cluster.flush()
+        for k in xrange(0, nb_keys):
+            kvs = [ "c%02d=value%d" % (i*2, i*4) for i in xrange(0, 50) ]
+            cursor.execute('UPDATE cf USING CONSISTENCY %s SET %s WHERE key=k%d' % (cl, ','.join(kvs), k))
+            time.sleep(.01)
+        cluster.flush()
+        for k in xrange(0, nb_keys):
+            kvs = [ "c%02d=value%d" % (i*5, i*20) for i in xrange(0, 20) ]
+            cursor.execute('UPDATE cf USING CONSISTENCY %s SET %s WHERE key=k%d' % (cl, ','.join(kvs), k))
+            time.sleep(.01)
+        cluster.flush()
 
-def _validate_row(res):
-    assert len(res) == 100
-    for i in xrange(0, 100):
-        if i % 5 == 0:
-            assert res[i] == 'value%d' % (i*4), 'for %d, expecting value%d, got %s' % (i, i*4, res[i])
-        elif i % 2 == 0:
-            assert res[i] == 'value%d' % (i*2), 'for %d, expecting value%d, got %s' % (i, i*2, res[i])
-        else:
-            assert res[i] == 'value%d' % i, 'for %d, expecting value%d, got %s' % (i, i, res[i])
+def _validate_row(cluster, res):
+    if cluster.version() >= "1.2":
+        assert len(res) == 100, len(res)
+        for i in xrange(0, 100):
+            if i % 5 == 0:
+                assert res[i][2] == 'value%d' % (i*4), 'for %d, expecting value%d, got %s' % (i, i*4, res[i][2])
+            elif i % 2 == 0:
+                assert res[i][2] == 'value%d' % (i*2), 'for %d, expecting value%d, got %s' % (i, i*2, res[i][2])
+            else:
+                assert res[i][2] == 'value%d' % i, 'for %d, expecting value%d, got %s' % (i, i, res[i][2])
+    else:
+        assert len(res) == 100, len(res)
+        for i in xrange(0, 100):
+            if i % 5 == 0:
+                assert res[i] == 'value%d' % (i*4), 'for %d, expecting value%d, got %s' % (i, i*4, res[i])
+            elif i % 2 == 0:
+                assert res[i] == 'value%d' % (i*2), 'for %d, expecting value%d, got %s' % (i, i*2, res[i])
+            else:
+                assert res[i] == 'value%d' % i, 'for %d, expecting value%d, got %s' % (i, i, res[i])
 
 # Simple puts and get (on one row), testing both reads by names and by slice,
 # with overwrites and flushes between inserts to make sure we hit multiple
@@ -96,17 +137,25 @@ def putget(cluster, cursor, cl="QUORUM"):
     _put_with_overwrite(cluster, cursor, 1, cl)
 
     # reads by name
-    ks = [ "c%02d" % i for i in xrange(0, 100) ]
-    cursor.execute('SELECT %s FROM cf USING CONSISTENCY %s WHERE key=k0' % (','.join(ks), cl))
-    assert cursor.rowcount == 1
-    res = cursor.fetchone()
-    _validate_row(res)
+    ks = [ "\'c%02d\'" % i for i in xrange(0, 100) ]
+    # We do not support proper IN queries yet
+    #if cluster.version() >= "1.2":
+    #    cursor.execute('SELECT * FROM cf USING CONSISTENCY %s WHERE key=\'k0\' AND c IN (%s)' % (cl, ','.join(ks)))
+    #else:
+    #    cursor.execute('SELECT %s FROM cf USING CONSISTENCY %s WHERE key=\'k0\'' % (','.join(ks), cl))
+    #_validate_row(cluster, cursor)
+    if cluster.version() < "1.2":
+        cursor.execute('SELECT %s FROM cf USING CONSISTENCY %s WHERE key=\'k0\'' % (','.join(ks), cl))
+        assert cursor.rowcount == 1
+        res = cursor.fetchone() #[1:] # removing key
+        _validate_row(cluster, res)
 
     # slice reads
-    cursor.execute('SELECT * FROM cf USING CONSISTENCY %s WHERE key=k0' % cl)
-    assert cursor.rowcount == 1
-    res = cursor.fetchone()[1:] # removing key
-    _validate_row(res)
+    cursor.execute('SELECT * FROM cf USING CONSISTENCY %s WHERE key=\'k0\'' % cl)
+    if cluster.version() >= "1.2":
+        _validate_row(cluster, cursor.fetchall())
+    else:
+        _validate_row(cluster, cursor.fetchone()[1:])
 
 # Simple puts and range gets, with overwrites and flushes between inserts to
 # make sure we hit multiple sstables on reads
@@ -115,11 +164,17 @@ def range_putget(cluster, cursor, cl="QUORUM"):
 
     _put_with_overwrite(cluster, cursor, keys, cl)
 
-    cursor.execute('SELECT * FROM cf USING CONSISTENCY %s WHERE key >= \'\'' % cl)
-    assert cursor.rowcount == 100
-    for res in cursor:
-        res = res[1:] # removing key
-        _validate_row(res)
+    cursor.execute('SELECT * FROM cf USING CONSISTENCY %s LIMIT 10000000' % cl)
+    if cluster.version() >= "1.2":
+        assert cursor.rowcount == keys * 100, cursor.rowcount
+        for k in xrange(0, keys):
+            res = cursor.fetchmany(100)
+            _validate_row(cluster, res)
+    else:
+        assert cursor.rowcount == keys
+        for res in cursor:
+            res = res[1:] # removing key
+            _validate_row(cluster, res)
 
 class since(object):
     def __init__(self, cass_version):
@@ -163,12 +218,12 @@ class ThriftConnection(object):
     def __init__(self, node=None, host=None, port=None, ks_name='ks', cf_name='cf',
             cassandra_interface='11'):
         """
-        initializes the connection. 
-         - node: a ccm node. If supplied, the host and port, and cassandra_interface 
+        initializes the connection.
+         - node: a ccm node. If supplied, the host and port, and cassandra_interface
            will be pulled from the node.
          - host, port: overwritten if node is supplied
          - ks_name, cf_name: all operations are done on the supplied ks and cf
-         - cassandra_interface: '07' and '11' are currently supported. This is the 
+         - cassandra_interface: '07' and '11' are currently supported. This is the
            thrift interface to cassandra. '11' suffices for now except when creating
            keyspaces against cassandra0.7, in which case 07 must be used.
         """
@@ -176,7 +231,10 @@ class ThriftConnection(object):
             host, port = node.network_interfaces['thrift']
             if re.findall('0\.7\.\d+', node.get_cassandra_dir()):
                 cassandra_interface='07'
-        self.node = node; self.host = host; self.port = port; self.cassandra_interface = cassandra_interface
+        self.node = node
+        self.host = host
+        self.port = port
+        self.cassandra_interface = cassandra_interface
 
         # import the correct version of the cassandra thrift interface
         # and set self.Cassandra as the imported module
@@ -198,14 +256,14 @@ class ThriftConnection(object):
 
     def create_ks(self, replication_factor=1):
         if self.cassandra_interface == '07':
-            ks_def = self.Cassandra.KsDef(name=self.ks_name, 
-                    strategy_class='org.apache.cassandra.locator.SimpleStrategy', 
+            ks_def = self.Cassandra.KsDef(name=self.ks_name,
+                    strategy_class='org.apache.cassandra.locator.SimpleStrategy',
                     replication_factor=int(replication_factor),
                     cf_defs=[])
         else:
-            ks_def = self.Cassandra.KsDef(name=self.ks_name, 
-                    strategy_class='org.apache.cassandra.locator.SimpleStrategy', 
-                    strategy_options={'replication_factor': str(replication_factor)}, 
+            ks_def = self.Cassandra.KsDef(name=self.ks_name,
+                    strategy_class='org.apache.cassandra.locator.SimpleStrategy',
+                    strategy_options={'replication_factor': str(replication_factor)},
                     cf_defs=[])
         retry_till_success(self.client.system_add_keyspace, ks_def, timeout=30)
         self.use_ks()
@@ -216,8 +274,8 @@ class ThriftConnection(object):
     def use_ks(self):
         retry_till_success(self.client.set_keyspace, self.ks_name, timeout=30)
         return self
-        
-    
+
+
     def create_cf(self):
         cf_def = self.Cassandra.CfDef(name=self.cf_name, keyspace=self.ks_name)
         retry_till_success(self.client.system_add_column_family, cf_def, timeout=30)
@@ -233,17 +291,17 @@ class ThriftConnection(object):
         cf_parent = self.Cassandra.ColumnParent(column_family=self.cf_name)
 
         for row_key in ('row_%d'%i for i in xrange(num_rows)):
-            col = self.Cassandra.Column(name='col_0', value='val_0', 
+            col = self.Cassandra.Column(name='col_0', value='val_0',
                     timestamp=int(time.time()*1000))
-            retry_till_success(self.client.insert, 
-                    key=row_key, column_parent=cf_parent, column=col, 
-                    consistency_level=self._translate_cl(consistency_level), 
+            retry_till_success(self.client.insert,
+                    key=row_key, column_parent=cf_parent, column=col,
+                    consistency_level=self._translate_cl(consistency_level),
                     timeout=30)
         return self
 
 
     def query_columns(self, num_rows=10, consistency_level='QUORUM'):
-        """ Check that the values inserted in insert_columns() are present """ 
+        """ Check that the values inserted in insert_columns() are present """
         for row_key in ('row_%d'%i for i in xrange(num_rows)):
             cpath = self.Cassandra.ColumnPath(column_family=self.cf_name,
                     column='col_0')

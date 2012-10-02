@@ -13,7 +13,7 @@ class TestConsistency(Tester):
 
         cursor1 = self.cql_connection(node1).cursor()
         self.create_ks(cursor1, 'ks', 3)
-        self.create_cf(cursor1, 'cf')
+        create_c1c2_table(self, cursor1)
 
         cursor2 = self.cql_connection(node2, 'ks').cursor()
 
@@ -41,7 +41,7 @@ class TestConsistency(Tester):
 
         cursor1 = self.cql_connection(node1).cursor()
         self.create_ks(cursor1, 'ks', 3)
-        self.create_cf(cursor1, 'cf')
+        create_c1c2_table(self, cursor1)
 
         cursor2 = self.cql_connection(node2, 'ks').cursor()
 
@@ -62,7 +62,7 @@ class TestConsistency(Tester):
 
         cursor1 = self.cql_connection(node1).cursor()
         self.create_ks(cursor1, 'ks', 3)
-        self.create_cf(cursor1, 'cf')
+        create_c1c2_table(self, cursor1)
 
         cursor2 = self.cql_connection(node2, 'ks').cursor()
 
@@ -91,7 +91,7 @@ class TestConsistency(Tester):
 
         cursor1 = self.cql_connection(node1).cursor()
         self.create_ks(cursor1, 'ks', 3)
-        self.create_cf(cursor1, 'cf')
+        create_c1c2_table(self, cursor1)
 
         cursor2 = self.cql_connection(node2, 'ks').cursor()
 
@@ -113,7 +113,7 @@ class TestConsistency(Tester):
 
         cursor1 = self.cql_connection(node1).cursor()
         self.create_ks(cursor1, 'ks', 3)
-        self.create_cf(cursor1, 'cf')
+        create_c1c2_table(self, cursor1)
 
         cursor2 = self.cql_connection(node2, 'ks').cursor()
 
@@ -141,7 +141,9 @@ class TestConsistency(Tester):
         self.create_ks(cursor, 'ks', 3)
         self.create_cf(cursor, 'cf', read_repair=0.0)
         # insert 9 columns in one row
-        insert_columns(cursor, 0, 9)
+        insert_columns(self, cursor, 0, 9)
+        cursor.execute('SELECT * FROM cf USING CONSISTENCY QUORUM')
+        print ">> ", str(cursor.fetchall())
         cursor.close()
 
         # Deleting 3 first columns with a different node dead each time
@@ -151,15 +153,23 @@ class TestConsistency(Tester):
 
         # Query 3 firsts columns
         cursor = self.cql_connection(node1, 'ks').cursor()
-        cursor.execute('SELECT FIRST 3 * FROM cf USING CONSISTENCY QUORUM WHERE key=k0')
-        assert cursor.rowcount == 1
-        res = cursor.fetchone()
-        # the key is returned
-        assert len(res) - 1 == 3, 'Expecting 3 values (excluding the key), got %d (%s)' % (len(res) - 1, str(res))
-        assert res[0] == 'k0', str(res)
-        # value 0, 1 and 2 have been deleted
-        for i in xrange(1, 4):
-            assert res[i] == 'value%d' % (i+2), 'Expecting value%d, got %s (%s)' % (i+2, res[i], str(res))
+        cursor = self.cql_connection(node1, 'ks').cursor()
+        if self.cluster.version() >= "1.2":
+            cursor.execute('SELECT c, v FROM cf USING CONSISTENCY QUORUM WHERE key=\'k0\' LIMIT 3')
+            res = cursor.fetchall()
+            assert len(res) == 3, 'Expecting 3 values, got %d (%s)' % (len(res), str(res))
+            # value 6, 7 and 8 have been deleted
+            for i in xrange(1, 4):
+                assert res[i-1][1] == 'value%d' % (5-i), 'Expecting value%d, got %s (%s)' % (5-i, res[i-1][1], str(res))
+        else:
+            cursor.execute('SELECT FIRST 3 * FROM cf USING CONSISTENCY QUORUM WHERE key=k0')
+            assert cursor.rowcount == 1
+            res = cursor.fetchone()
+            # the key is returned
+            assert len(res) == 3, 'Expecting 3 values, got %d (%s)' % (len(res), str(res))
+            # value 0, 1 and 2 have been deleted
+            for i in xrange(1, 4):
+                assert res[i] == 'value%d' % (i+2), 'Expecting value%d, got %s (%s)' % (i+2, res[i], str(res))
 
     def short_read_delete_test(self):
         """ Test short reads ultimately leaving no columns alive [#4000] """
@@ -177,7 +187,7 @@ class TestConsistency(Tester):
         self.create_ks(cursor, 'ks', 3)
         self.create_cf(cursor, 'cf', read_repair=0.0)
         # insert 2 columns in one row
-        insert_columns(cursor, 0, 2)
+        insert_columns(self, cursor, 0, 2)
         cursor.close()
 
         # Delete the row while first node is dead
@@ -191,12 +201,14 @@ class TestConsistency(Tester):
 
         # Query first column
         cursor = self.cql_connection(node1, 'ks').cursor()
-        cursor.execute('SELECT FIRST 1 * FROM cf USING CONSISTENCY QUORUM WHERE key=k0')
-        assert cursor.rowcount == 1
-        res = cursor.fetchone()
-        # the key is returned but the row id empty
-        assert len(res) == 1, 'Expecting no value (excluding the key), got %d (%s)' % (len(res) - 1, str(res))
-        assert res[0] == 'k0', str(res)
+        if self.cluster.version() >= "1.2":
+            cursor.execute('SELECT c, v FROM cf USING CONSISTENCY QUORUM WHERE key=\'k0\' LIMIT 1')
+            assert cursor.rowcount == 0, res
+        else:
+            cursor.execute('SELECT FIRST 1 * FROM cf USING CONSISTENCY QUORUM WHERE key=k0')
+            assert cursor.rowcount == 1
+            res = cursor.fetchone()
+            assert len(res) == 0, 'Expecting no value, got %d (%s)' % (len(res), str(res))
 
     def hintedhandoff_test(self):
         cluster = self.cluster
@@ -207,7 +219,7 @@ class TestConsistency(Tester):
 
         cursor = self.cql_connection(node1).cursor()
         self.create_ks(cursor, 'ks', 2)
-        self.create_cf(cursor, 'cf')
+        create_c1c2_table(self, cursor)
 
         node2.stop(wait_other_notice=True)
 
@@ -234,7 +246,7 @@ class TestConsistency(Tester):
 
         cursor = self.cql_connection(node1).cursor()
         self.create_ks(cursor, 'ks', 2)
-        self.create_cf(cursor, 'cf', read_repair=1.0)
+        create_c1c2_table(self, cursor, read_repair=1.0)
 
         node2.stop(wait_other_notice=True)
 
@@ -268,7 +280,7 @@ class TestConsistency(Tester):
         self.create_ks(cursor, 'ks', 3)
         self.create_cf(cursor, 'cf', read_repair=0.0)
         # insert 9 columns in one row
-        insert_columns(cursor, 0, 9)
+        insert_columns(self, cursor, 0, 9)
         cursor.close()
 
         # Deleting 3 last columns with a different node dead each time
@@ -278,15 +290,22 @@ class TestConsistency(Tester):
 
         # Query 3 firsts columns
         cursor = self.cql_connection(node1, 'ks').cursor()
-        cursor.execute('SELECT FIRST 3 REVERSED * FROM cf USING CONSISTENCY QUORUM WHERE key=k0')
-        assert cursor.rowcount == 1
-        res = cursor.fetchone()
-        # the key is returned
-        assert len(res) - 1 == 3, 'Expecting 3 values (excluding the key), got %d (%s)' % (len(res) - 1, str(res))
-        assert res[len(res) - 1] == 'k0', str(res)
-        # value 6, 7 and 8 have been deleted
-        for i in xrange(0, 3):
-            assert res[i] == 'value%d' % (5-i), 'Expecting value%d, got %s (%s)' % (5-i, res[i], str(res))
+        if self.cluster.version() >= "1.2":
+            cursor.execute('SELECT c, v FROM cf USING CONSISTENCY QUORUM WHERE key=\'k0\' ORDER BY c DESC LIMIT 3')
+            res = cursor.fetchall()
+            assert len(res) == 3, 'Expecting 3 values, got %d (%s)' % (len(res), str(res))
+            # value 6, 7 and 8 have been deleted
+            for i in xrange(0, 3):
+                assert res[i][1] == 'value%d' % (5-i), 'Expecting value%d, got %s (%s)' % (5-i, res[i][1], str(res))
+        else:
+            cursor.execute('SELECT FIRST 3 REVERSED * FROM cf USING CONSISTENCY QUORUM WHERE key=k0')
+            assert cursor.rowcount == 1
+            res = cursor.fetchone()
+            # the key is returned
+            assert len(res) == 3, 'Expecting 3 values, got %d (%s)' % (len(res), str(res))
+            # value 6, 7 and 8 have been deleted
+            for i in xrange(0, 3):
+                assert res[i] == 'value%d' % (5-i), 'Expecting value%d, got %s (%s)' % (5-i, res[i], str(res))
 
     def quorum_available_during_failure_test(self):
         CL = 'QUORUM'
@@ -302,18 +321,18 @@ class TestConsistency(Tester):
         debug("Set to talk to node 2")
         cursor = self.cql_connection(node2).cursor()
         self.create_ks(cursor, 'ks', RF)
-        self.create_cf(cursor, 'cf')
+        create_c1c2_table(self, cursor)
 
         debug("Generating some data")
         for n in xrange(100):
-           insert_c1c2(cursor, n, CL)
+            insert_c1c2(cursor, n, CL)
 
         debug("Taking down node1")
         node1.stop(wait_other_notice=True)
 
         debug("Reading back data.")
         for n in xrange(100):
-           query_c1c2(cursor, n, CL)
+            query_c1c2(cursor, n, CL)
 
     def stop_delete_and_restart(self, node_number, column):
         to_stop = self.cluster.nodes["node%d" % node_number]
@@ -321,7 +340,14 @@ class TestConsistency(Tester):
         to_stop.flush()
         to_stop.stop(wait_other_notice=True)
         cursor = self.cql_connection(next_node, 'ks').cursor()
-        cursor.execute('DELETE c%d, c2 FROM cf USING CONSISTENCY QUORUM WHERE key=k0' % column)
+        if self.cluster.version() >= "1.2":
+            query = 'BEGIN BATCH USING CONSISTENCY QUORUM '
+            query = query + 'DELETE FROM cf WHERE key=\'k0\' AND c=\'c%d\'; ' % column
+            query = query + 'DELETE FROM cf WHERE key=\'k0\' AND c=\'c2\'; '
+            query = query + 'APPLY BATCH;'
+            cursor.execute(query)
+        else:
+            cursor.execute('DELETE c%d, c2 FROM cf USING CONSISTENCY QUORUM WHERE key=k0' % column)
         cursor.close()
         to_stop.start(wait_other_notice=True)
 

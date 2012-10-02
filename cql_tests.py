@@ -10,11 +10,6 @@ from ccmlib.cluster import Cluster
 
 cql_version="3.0.0"
 
-def assert_json(res, expected, col=0):
-    assert len(res) == 1, res
-    value = json.loads(res[0][col])
-    assert value == expected, value
-
 class TestCQL(Tester):
 
     def prepare(self, ordered=False, create_keyspace=True):
@@ -673,9 +668,9 @@ class TestCQL(Tester):
         cursor = self.prepare()
         cursor.execute("""
             CREATE TABLE test(
-                my_id varchar, 
-                col1 int, 
-                value varchar, 
+                my_id varchar,
+                col1 int,
+                value varchar,
                 PRIMARY KEY (my_id, col1)
             )
         """)
@@ -707,13 +702,13 @@ class TestCQL(Tester):
         for x in range(0, 10):
             cursor.execute("INSERT INTO test (k, c, v) VALUES (0, %i, %i)" % (x, x))
 
-        cursor.execute("SELECT v FROM test WHERE k = 0 ORDER BY c ASC")
+        cursor.execute("SELECT c, v FROM test WHERE k = 0 ORDER BY c ASC")
         res = cursor.fetchall()
-        assert res == [[x] for x in range(0, 10)], res
+        assert res == [[x, x] for x in range(0, 10)], res
 
-        cursor.execute("SELECT v FROM test WHERE k = 0 ORDER BY c DESC")
+        cursor.execute("SELECT c, v FROM test WHERE k = 0 ORDER BY c DESC")
         res = cursor.fetchall()
-        assert res == [[x] for x in range(9, -1, -1)], res
+        assert res == [[x, x] for x in range(9, -1, -1)], res
 
         cursor.execute("""
             CREATE TABLE test2 (
@@ -730,22 +725,22 @@ class TestCQL(Tester):
             for y in range(0, 10):
                 cursor.execute("INSERT INTO test2 (k, c1, c2, v) VALUES (0, %i, %i, '%i%i')" % (x, y, x, y))
 
-        assert_invalid(cursor, "SELECT v FROM test2 WHERE k = 0 ORDER BY c1 ASC, c2 ASC")
-        assert_invalid(cursor, "SELECT v FROM test2 WHERE k = 0 ORDER BY c1 DESC, c2 DESC")
+        assert_invalid(cursor, "SELECT c1, c2, v FROM test2 WHERE k = 0 ORDER BY c1 ASC, c2 ASC")
+        assert_invalid(cursor, "SELECT c1, c2, v FROM test2 WHERE k = 0 ORDER BY c1 DESC, c2 DESC")
 
-        cursor.execute("SELECT v FROM test2 WHERE k = 0 ORDER BY c1 ASC")
+        cursor.execute("SELECT c1, c2, v FROM test2 WHERE k = 0 ORDER BY c1 ASC")
         res = cursor.fetchall()
-        assert res == [['%i%i' % (x, y)] for x in range(0, 10) for y in range(9, -1, -1)], res
+        assert res == [[x, y, '%i%i' % (x, y)] for x in range(0, 10) for y in range(9, -1, -1)], res
 
-        cursor.execute("SELECT v FROM test2 WHERE k = 0 ORDER BY c1 ASC, c2 DESC")
+        cursor.execute("SELECT c1, c2, v FROM test2 WHERE k = 0 ORDER BY c1 ASC, c2 DESC")
         res = cursor.fetchall()
-        assert res == [['%i%i' % (x, y)] for x in range(0, 10) for y in range(9, -1, -1)], res
+        assert res == [[x, y, '%i%i' % (x, y)] for x in range(0, 10) for y in range(9, -1, -1)], res
 
-        cursor.execute("SELECT v FROM test2 WHERE k = 0 ORDER BY c1 DESC, c2 ASC")
+        cursor.execute("SELECT c1, c2, v FROM test2 WHERE k = 0 ORDER BY c1 DESC, c2 ASC")
         res = cursor.fetchall()
-        assert res == [['%i%i' % (x, y)] for x in range(9, -1, -1) for y in range(0, 10)], res
+        assert res == [[x, y, '%i%i' % (x, y)] for x in range(9, -1, -1) for y in range(0, 10)], res
 
-        assert_invalid(cursor, "SELECT v FROM test2 WHERE k = 0 ORDER BY c2 DESC, c1 ASC")
+        assert_invalid(cursor, "SELECT c1, c2, v FROM test2 WHERE k = 0 ORDER BY c2 DESC, c1 ASC")
 
     @since('1.1')
     def invalid_old_property_test(self):
@@ -974,17 +969,17 @@ class TestCQL(Tester):
         # Reserved keywords
         assert_invalid(cursor, "CREATE TABLE test1 (select int PRIMARY KEY, column int)")
 
-    @since('1.1')
+    @since('1.2')
     def keyspace_test(self):
         cursor = self.prepare()
 
         assert_invalid(cursor, "CREATE KEYSPACE test1")
-        cursor.execute("CREATE KEYSPACE test2 WITH strategy_class = SimpleStrategy AND strategy_options:replication_factor = 1")
-        assert_invalid(cursor, "CREATE KEYSPACE My_much_much_too_long_identifier_that_should_not_work WITH strategy_class = SimpleStrategy AND strategy_options:replication_factor = 1")
+        cursor.execute("CREATE KEYSPACE test2 WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 }")
+        assert_invalid(cursor, "CREATE KEYSPACE My_much_much_too_long_identifier_that_should_not_work WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 }")
 
         cursor.execute("DROP KEYSPACE test2")
         assert_invalid(cursor, "DROP KEYSPACE non_existing")
-        cursor.execute("CREATE KEYSPACE test2 WITH strategy_class = SimpleStrategy AND strategy_options:replication_factor = 1")
+        cursor.execute("CREATE KEYSPACE test2 WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 }")
 
     @since('1.1')
     def table_test(self):
@@ -1074,7 +1069,11 @@ class TestCQL(Tester):
         inOrder = [ x[0] for x in cursor.fetchall() ]
         assert len(inOrder) == c, 'Expecting %d elements, got %d' % (c, len(inOrder))
 
-        cursor.execute("SELECT k FROM test WHERE token(k) >= '0'")
+        if self.cluster.version() < '1.2':
+            cursor.execute("SELECT k FROM test WHERE token(k) >= '0'")
+        else:
+            min_token = -2**63
+            cursor.execute("SELECT k FROM test WHERE token(k) >= '%d'" % min_token)
         res = cursor.fetchall()
         assert len(res) == c, "%s [all: %s]" % (str(res), str(inOrder))
 
@@ -1084,7 +1083,7 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [ [inOrder[x]] for x in range(32, 65) ], "%s [all: %s]" % (str(res), str(inOrder))
 
-    @since('1.1')
+    @since('1.2')
     def table_options_test(self):
         cursor = self.prepare()
 
@@ -1097,10 +1096,10 @@ class TestCQL(Tester):
                AND dclocal_read_repair_chance = 0.5
                AND gc_grace_seconds = 4
                AND bloom_filter_fp_chance = 0.01
-               AND compaction_strategy_class = LeveledCompactionStrategy
-               AND compaction_strategy_options:sstable_size_in_mb = 10
-               AND compression_parameters:sstable_compression = ''
-               AND caching = all
+               AND compaction = { 'class' : 'LeveledCompactionStrategy',
+                                  'sstable_size_in_mb' : 10 }
+               AND compression = { 'sstable_compression' : '' }
+               AND caching = 'all'
         """)
 
         cursor.execute("""
@@ -1110,10 +1109,10 @@ class TestCQL(Tester):
              AND dclocal_read_repair_chance = 0.3
              AND gc_grace_seconds = 100
              AND bloom_filter_fp_chance = 0.1
-             AND compaction_strategy_class = SizeTieredCompactionStrategy
-             AND compaction_strategy_options:min_sstable_size = 42
-             AND compression_parameters:sstable_compression = SnappyCompressor
-             AND caching = rows_only
+             AND compaction = { 'class' : 'SizeTieredCompactionStrategy',
+                                'min_sstable_size' : 42 }
+             AND compression = { 'sstable_compression' : 'SnappyCompressor' }
+             AND caching = 'rows_only'
         """)
 
     @since('1.1')
@@ -1142,7 +1141,7 @@ class TestCQL(Tester):
 
         assert_invalid(cursor, "SELECT k, c, writetime(k) FROM test")
 
-    @since('1.1')
+    @since('1.2')
     def no_range_ghost_test(self):
         cursor = self.prepare()
 
@@ -1167,7 +1166,7 @@ class TestCQL(Tester):
         assert res == [[k] for k in range(0, 5) if k is not 2], res
 
         # Example from #3505
-        cursor.execute("CREATE KEYSPACE ks1 with strategy_class = 'org.apache.cassandra.locator.SimpleStrategy' and strategy_options:replication_factor=1;")
+        cursor.execute("CREATE KEYSPACE ks1 with replication = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 };")
         cursor.execute("USE ks1")
         cursor.execute("""
             CREATE COLUMNFAMILY users (
@@ -1196,7 +1195,7 @@ class TestCQL(Tester):
 
     @since('1.1')
     def undefined_column_handling_test(self):
-        cursor = self.prepare()
+        cursor = self.prepare(ordered=True)
 
         cursor.execute("""
             CREATE TABLE test (
@@ -1367,9 +1366,9 @@ class TestCQL(Tester):
         # we just want to make sure the following is valid
         cursor.execute("""
             CREATE KEYSPACE Foo
-                WITH strategy_class = NetworkTopologyStrategy
-                AND strategy_options:"us-east"=1
-                AND strategy_options:"us-west"=1;
+                WITH replication = { 'class' : 'NetworkTopologyStrategy',
+                                     'us-east' : 1,
+                                     'us-west' : 1 };
         """)
 
     @since('1.2')
@@ -1393,18 +1392,21 @@ class TestCQL(Tester):
         cursor.execute(q % "tags = tags - { 'bar' }")
 
         cursor.execute("SELECT tags FROM user")
-        assert_json(cursor.fetchall(), ['foo', 'foobar'])
+        res = cursor.fetchall()
+        assert res == [[set(['foo', 'foobar'])]], res
 
         q = "UPDATE user SET %s WHERE fn='Bilbo' AND ln='Baggins'"
         cursor.execute(q % "tags = { 'a', 'c', 'b' }")
         cursor.execute("SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'")
-        assert_json(cursor.fetchall(), ['a', 'b', 'c'])
+        res = cursor.fetchall()
+        assert res == [[set(['a', 'b', 'c'])]], res
 
         time.sleep(.01)
 
         cursor.execute(q % "tags = { 'm', 'n' }")
         cursor.execute("SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'")
-        assert_json(cursor.fetchall(), ['m', 'n'])
+        res = cursor.fetchall()
+        assert res == [[set(['m', 'n'])]], res
 
         cursor.execute("DELETE tags FROM user WHERE fn='Bilbo' AND ln='Baggins'")
         cursor.execute("SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'")
@@ -1433,19 +1435,22 @@ class TestCQL(Tester):
         cursor.execute("DELETE m['foo'] FROM user WHERE fn='Tom' AND ln='Bombadil'")
 
         cursor.execute("SELECT m FROM user")
-        assert_json(cursor.fetchall(), { 'woot': 5, 'bar' : 6 })
+        res = cursor.fetchall()
+        assert res == [[{ 'woot': 5, 'bar' : 6 }]], res
 
         q = "UPDATE user SET %s WHERE fn='Bilbo' AND ln='Baggins'"
         cursor.execute(q % "m = { 'a' : 4 , 'c' : 3, 'b' : 2 }")
         cursor.execute("SELECT m FROM user WHERE fn='Bilbo' AND ln='Baggins'")
-        assert_json(cursor.fetchall(), {'a' : 4, 'b' : 2, 'c' : 3 })
+        res = cursor.fetchall()
+        assert res == [[ {'a' : 4, 'b' : 2, 'c' : 3 } ]], res
 
         time.sleep(.01)
 
         # Check we correctly overwrite
         cursor.execute(q % "m = { 'm' : 4 , 'n' : 1, 'o' : 2 }")
         cursor.execute("SELECT m FROM user WHERE fn='Bilbo' AND ln='Baggins'")
-        assert_json(cursor.fetchall(), {'m' : 4, 'n' : 1, 'o' : 2 })
+        res = cursor.fetchall()
+        assert res == [[ {'m' : 4, 'n' : 1, 'o' : 2 } ]], res
 
     @since('1.2')
     def list_test(self):
@@ -1466,30 +1471,35 @@ class TestCQL(Tester):
         cursor.execute(q % "tags = tags + [ 'foo' ]")
         cursor.execute(q % "tags = tags + [ 'foobar' ]")
 
-
         cursor.execute("SELECT tags FROM user")
-        assert_json(cursor.fetchall(), ['foo', 'bar', 'foo', 'foobar'])
+        res = cursor.fetchall()
+        assert res == [[ ('foo', 'bar', 'foo', 'foobar') ]], res
 
         q = "UPDATE user SET %s WHERE fn='Bilbo' AND ln='Baggins'"
         cursor.execute(q % "tags = [ 'a', 'c', 'b', 'c' ]")
         cursor.execute("SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'")
-        assert_json(cursor.fetchall(), ['a', 'c', 'b', 'c'])
+        res = cursor.fetchall()
+        assert res == [[ ('a', 'c', 'b', 'c') ]], res
 
         cursor.execute(q % "tags = [ 'm', 'n' ] + tags")
         cursor.execute("SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'")
-        assert_json(cursor.fetchall(), ['n', 'm', 'a', 'c', 'b', 'c'])
+        res = cursor.fetchall()
+        assert res == [[ ('n', 'm', 'a', 'c', 'b', 'c') ]], res
 
         cursor.execute(q % "tags[2] = 'foo', tags[4] = 'bar'")
         cursor.execute("SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'")
-        assert_json(cursor.fetchall(), ['n', 'm', 'foo', 'c', 'bar', 'c'])
+        res = cursor.fetchall()
+        assert res == [[ ('n', 'm', 'foo', 'c', 'bar', 'c') ]], res
 
         cursor.execute("DELETE tags[2] FROM user WHERE fn='Bilbo' AND ln='Baggins'")
         cursor.execute("SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'")
-        assert_json(cursor.fetchall(), ['n', 'm', 'c', 'bar', 'c'])
+        res = cursor.fetchall()
+        assert res == [[ ('n', 'm', 'c', 'bar', 'c') ]], res
 
         cursor.execute(q % "tags = tags - [ 'bar' ]")
         cursor.execute("SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'")
-        assert_json(cursor.fetchall(), ['n', 'm', 'c', 'c'])
+        res = cursor.fetchall()
+        assert res == [[ ('n', 'm', 'c', 'c') ]], res
 
     @since('1.2')
     def multi_collection_test(self):
@@ -1513,9 +1523,11 @@ class TestCQL(Tester):
 
         cursor.execute("SELECT L, M, S FROM foo WHERE k = 'b017f48f-ae67-11e1-9096-005056c00008'")
         res = cursor.fetchall()
-        assert_json(res, [1, 3, 5, 7, 11, 13], col=0)
-        assert_json(res, {'foo' : 1, 'bar' : 3, 'foobar' : 4}, col=1)
-        assert_json(res, [1, 3, 5, 7, 11, 13], col=2)
+        assert res == [[
+            (1, 3, 5, 7, 11, 13),
+            {'foo' : 1, 'bar' : 3, 'foobar' : 4},
+            set([1, 3, 5, 7, 11, 13]),
+        ]], res
 
     @since('1.1')
     def range_query_test(self):
@@ -1680,7 +1692,7 @@ class TestCQL(Tester):
     @since('1.2')
     def only_pk_test(self):
         """ Check table with only a PK (#4361) """
-        cursor = self.prepare()
+        cursor = self.prepare(ordered=True)
 
         cursor.execute("""
             CREATE TABLE test (
@@ -1751,6 +1763,7 @@ class TestCQL(Tester):
                 v int
             );
         """)
+        time.sleep(0.2)
 
         cursor.execute("INSERT INTO test (k, v) VALUES ('foo', 0)")
         cursor.execute("INSERT INTO test (k, v) VALUES ('bar', 1)")
@@ -1761,7 +1774,7 @@ class TestCQL(Tester):
 
     def composite_index_with_pk_test(self):
 
-        cursor = self.prepare()
+        cursor = self.prepare(ordered=True)
         cursor.execute("""
             CREATE TABLE blogs (
                 blog_id int,
@@ -1934,7 +1947,7 @@ class TestCQL(Tester):
         cursor = self.prepare(create_keyspace=False)
 
         assert_invalid(cursor, "CREATE KEYSPACE ks1")
-        assert_invalid(cursor, "CREATE KEYSPACE ks1 WITH replication={ 'replication_factor' : 1 }")
+        assert_invalid(cursor, "CREATE KEYSPACE ks1 WITH replication= { 'replication_factor' : 1 }")
 
         cursor.execute("CREATE KEYSPACE ks1 WITH replication={ 'class' : 'SimpleStrategy', 'replication_factor' : 1 }")
         cursor.execute("CREATE KEYSPACE ks2 WITH replication={ 'class' : 'SimpleStrategy', 'replication_factor' : 1 } AND durable_writes=false")
@@ -1943,11 +1956,12 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [ ['ks1', True], ['ks2', False] ], res
 
-        cursor.execute("ALTER KEYSPACE ks1 WITH replication = { 'class' : 'NetworkTopologyStrategy', 'dc1' : 1 } AND durable_writes=False")
+        cursor.execute("ALTER KEYSPACE ks1 WITH replication = { 'CLASS' : 'NetworkTopologyStrategy', 'dc1' : 1 } AND durable_writes=False")
+        cursor.execute("ALTER KEYSPACE ks2 WITH durable_writes=true")
         cursor.execute("SELECT keyspace_name, durable_writes, strategy_class FROM system.schema_keyspaces")
         res = cursor.fetchall()
         assert res == [ ['ks1', False, 'org.apache.cassandra.locator.NetworkTopologyStrategy'],
-                        ['ks2', False, 'org.apache.cassandra.locator.SimpleStrategy'] ], res
+                        ['ks2', True, 'org.apache.cassandra.locator.SimpleStrategy'] ], res
 
         cursor.execute("USE ks1")
 
@@ -1957,3 +1971,165 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [ ['cf1', 7] ], res
 
+    def set_default_cl_test(self):
+        cluster = self.cluster
+
+        cluster.populate(2).start()
+        node1 = cluster.nodelist()[0]
+        time.sleep(0.2)
+
+        cursor = self.cql_connection(node1, version=cql_version).cursor()
+        self.create_ks(cursor, 'ks', 2)
+
+        cursor.execute("CREATE TABLE test (a int PRIMARY KEY, b int) WITH default_write_consistency = 'ALL' AND default_read_consistency = 'ALL'")
+        time.sleep(0.2)
+
+        cursor.execute("INSERT INTO test (a, b) VALUES (0, 0)")
+        cursor.execute("SELECT * FROM test WHERE a = 0")
+        res = cursor.fetchall()
+        assert len(res) == 1, res
+
+        cluster.nodelist()[1].stop(wait_other_notice=True)
+        time.sleep(0.1)
+
+        # Both request should now fail
+        try:
+            cursor.execute("INSERT INTO test (a, b) VALUES (0, 0)")
+            assert False, "Expecting query to fail"
+        except cql.OperationalError as e:
+            pass
+
+        try:
+            cursor.execute("SELECT * FROM test WHERE a = 0")
+            assert False, "Expecting query to fail"
+        except cql.OperationalError as e:
+            pass
+
+    @since('1.1')
+    def remove_range_slice_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k int PRIMARY KEY,
+                v int
+            )
+        """)
+
+        for i in range(0, 3):
+            cursor.execute("INSERT INTO test (k, v) VALUES (%d, %d)" % (i, i))
+
+        cursor.execute("DELETE FROM test WHERE k = 1")
+        cursor.execute("SELECT * FROM test")
+        res = cursor.fetchall()
+        assert res == [[0, 0], [2, 2]], res
+
+    @since('1.2')
+    def indexes_composite_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                blog_id int,
+                timestamp int,
+                author text,
+                content text,
+                PRIMARY KEY (blog_id, timestamp)
+            )
+        """)
+
+        req = "INSERT INTO test (blog_id, timestamp, author, content) VALUES (%d, %d, '%s', '%s')"
+        cursor.execute(req % (0, 0, "bob", "1st post"))
+        cursor.execute(req % (0, 1, "tom", "2nd post"))
+        cursor.execute(req % (0, 2, "bob", "3rd post"))
+        cursor.execute(req % (0, 3, "tom", "4nd post"))
+        cursor.execute(req % (1, 0, "bob", "5th post"))
+
+        cursor.execute("CREATE INDEX ON test(author)")
+        time.sleep(1)
+
+        cursor.execute("SELECT blog_id, timestamp FROM test WHERE author = 'bob'")
+        res = cursor.fetchall()
+        assert res == [[0, 0], [0, 2], [1, 0]], res
+
+        cursor.execute(req % (1, 1, "tom", "6th post"))
+        cursor.execute(req % (1, 2, "tom", "7th post"))
+        cursor.execute(req % (1, 3, "bob", "8th post"))
+
+        cursor.execute("SELECT blog_id, timestamp FROM test WHERE author = 'bob'")
+        res = cursor.fetchall()
+        assert res == [[0, 0], [0, 2], [1, 0], [1, 3]], res
+
+    def refuse_in_with_indexes_test(self):
+        """ Test for the validation bug of #4709 """
+
+        cursor = self.prepare()
+        cursor.execute("create table t1 (pk varchar primary key, col1 varchar, col2 varchar);")
+        cursor.execute("create index t1_c1 on t1(col1);")
+        cursor.execute("create index t1_c2 on t1(col2);")
+        cursor.execute("insert into t1  (pk, col1, col2) values ('pk1','foo1','bar1');")
+        cursor.execute("insert into t1  (pk, col1, col2) values ('pk1a','foo1','bar1');")
+        cursor.execute("insert into t1  (pk, col1, col2) values ('pk1b','foo1','bar1');")
+        cursor.execute("insert into t1  (pk, col1, col2) values ('pk1c','foo1','bar1');")
+        cursor.execute("insert into t1  (pk, col1, col2) values ('pk2','foo2','bar2');")
+        cursor.execute("insert into t1  (pk, col1, col2) values ('pk3','foo3','bar3');")
+        assert_invalid(cursor, "select * from t1 where col2 in ('bar1', 'bar2');")
+
+    def validate_counter_regular_test(self):
+        """ Test for the validation bug of #4706 """
+
+        cursor = self.prepare()
+        assert_invalid(cursor, "CREATE TABLE test (id bigint PRIMARY KEY, count counter, things set<text>)")
+
+    def reversed_compact_test(self):
+        """ Test for #4716 bug and more generally for good behavior of ordering"""
+
+        cursor = self.prepare()
+        cursor.execute("""
+            CREATE TABLE test1 (
+                k text,
+                c int,
+                v int,
+                PRIMARY KEY (k, c)
+            ) WITH COMPACT STORAGE
+              AND CLUSTERING ORDER BY (c DESC);
+        """)
+
+        for i in range(0, 10):
+            cursor.execute("INSERT INTO test1(k, c, v) VALUES ('foo', %i, %i)" % (i, i))
+
+        cursor.execute("SELECT c FROM test1 WHERE c > 2 AND c < 6 AND k = 'foo'")
+        res = cursor.fetchall()
+        assert res == [[5], [4], [3]], res
+
+        cursor.execute("SELECT c FROM test1 WHERE c > 2 AND c < 6 AND k = 'foo' ORDER BY c ASC")
+        res = cursor.fetchall()
+        assert res == [[3], [4], [5]], res
+
+        cursor.execute("SELECT c FROM test1 WHERE c > 2 AND c < 6 AND k = 'foo' ORDER BY c DESC")
+        res = cursor.fetchall()
+        assert res == [[5], [4], [3]], res
+
+        cursor.execute("""
+            CREATE TABLE test2 (
+                k text,
+                c int,
+                v int,
+                PRIMARY KEY (k, c)
+            ) WITH COMPACT STORAGE;
+        """)
+
+        for i in range(0, 10):
+            cursor.execute("INSERT INTO test2(k, c, v) VALUES ('foo', %i, %i)" % (i, i))
+
+        cursor.execute("SELECT c FROM test2 WHERE c > 2 AND c < 6 AND k = 'foo'")
+        res = cursor.fetchall()
+        assert res == [[3], [4], [5]], res
+
+        cursor.execute("SELECT c FROM test2 WHERE c > 2 AND c < 6 AND k = 'foo' ORDER BY c ASC")
+        res = cursor.fetchall()
+        assert res == [[3], [4], [5]], res
+
+        cursor.execute("SELECT c FROM test2 WHERE c > 2 AND c < 6 AND k = 'foo' ORDER BY c DESC")
+        res = cursor.fetchall()
+        assert res == [[5], [4], [3]], res
