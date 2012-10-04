@@ -1364,12 +1364,20 @@ class TestCQL(Tester):
         cursor = self.prepare()
 
         # we just want to make sure the following is valid
-        cursor.execute("""
-            CREATE KEYSPACE Foo
-                WITH replication = { 'class' : 'NetworkTopologyStrategy',
-                                     'us-east' : 1,
-                                     'us-west' : 1 };
-        """)
+        if self.cluster.version() >= '1.2':
+            cursor.execute("""
+                CREATE KEYSPACE Foo
+                    WITH replication = { 'class' : 'NetworkTopologyStrategy',
+                                         'us-east' : 1,
+                                         'us-west' : 1 };
+            """)
+        else:
+            cursor.execute("""
+                CREATE KEYSPACE Foo
+                    WITH strategy_class='NetworkTopologyStrategy'
+                     AND strategy_options:"us-east"=1
+                     AND strategy_options:"us-west"=1;
+            """)
 
     @since('1.2')
     def set_test(self):
@@ -1943,6 +1951,7 @@ class TestCQL(Tester):
         assert_invalid(cursor, "SELECT col1 FROM test ORDER BY col1;")
         assert_invalid(cursor, "SELECT col1 FROM test WHERE my_id > 'key1' ORDER BY col1;")
 
+    @since('1.2')
     def create_alter_options_test(self):
         cursor = self.prepare(create_keyspace=False)
 
@@ -1971,6 +1980,7 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [ ['cf1', 7] ], res
 
+    @since('1.2')
     def set_default_cl_test(self):
         cluster = self.cluster
 
@@ -2102,13 +2112,25 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[5], [4], [3]], res
 
+        cursor.execute("SELECT c FROM test1 WHERE c >= 2 AND c <= 6 AND k = 'foo'")
+        res = cursor.fetchall()
+        assert res == [[6], [5], [4], [3], [2]], res
+
         cursor.execute("SELECT c FROM test1 WHERE c > 2 AND c < 6 AND k = 'foo' ORDER BY c ASC")
         res = cursor.fetchall()
         assert res == [[3], [4], [5]], res
 
+        cursor.execute("SELECT c FROM test1 WHERE c >= 2 AND c <= 6 AND k = 'foo' ORDER BY c ASC")
+        res = cursor.fetchall()
+        assert res == [[2], [3], [4], [5], [6]], res
+
         cursor.execute("SELECT c FROM test1 WHERE c > 2 AND c < 6 AND k = 'foo' ORDER BY c DESC")
         res = cursor.fetchall()
         assert res == [[5], [4], [3]], res
+
+        cursor.execute("SELECT c FROM test1 WHERE c >= 2 AND c <= 6 AND k = 'foo' ORDER BY c DESC")
+        res = cursor.fetchall()
+        assert res == [[6], [5], [4], [3], [2]], res
 
         cursor.execute("""
             CREATE TABLE test2 (
@@ -2126,10 +2148,127 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[3], [4], [5]], res
 
+        cursor.execute("SELECT c FROM test2 WHERE c >= 2 AND c <= 6 AND k = 'foo'")
+        res = cursor.fetchall()
+        assert res == [[2], [3], [4], [5], [6]], res
+
         cursor.execute("SELECT c FROM test2 WHERE c > 2 AND c < 6 AND k = 'foo' ORDER BY c ASC")
         res = cursor.fetchall()
         assert res == [[3], [4], [5]], res
 
+        cursor.execute("SELECT c FROM test2 WHERE c >= 2 AND c <= 6 AND k = 'foo' ORDER BY c ASC")
+        res = cursor.fetchall()
+        assert res == [[2], [3], [4], [5], [6]], res
+
         cursor.execute("SELECT c FROM test2 WHERE c > 2 AND c < 6 AND k = 'foo' ORDER BY c DESC")
         res = cursor.fetchall()
         assert res == [[5], [4], [3]], res
+
+        cursor.execute("SELECT c FROM test2 WHERE c >= 2 AND c <= 6 AND k = 'foo' ORDER BY c DESC")
+        res = cursor.fetchall()
+        assert res == [[6], [5], [4], [3], [2]], res
+
+    def unescaped_string_test(self):
+
+        cursor = self.prepare()
+        cursor.execute("""
+            CREATE TABLE test (
+                k text PRIMARY KEY,
+                c text,
+            )
+        """)
+
+        assert_invalid(cursor, "INSERT INTO test (k, c) VALUES ('foo', 'CQL is cassandra's best friend')")
+
+    def reversed_compact_multikey_test(self):
+        """ Test for the bug from #4760 and #4759 """
+
+        cursor = self.prepare()
+        cursor.execute("""
+            CREATE TABLE test (
+                key text,
+                c1 int,
+                c2 int,
+                value text,
+                PRIMARY KEY(key, c1, c2)
+                ) WITH COMPACT STORAGE
+                  AND CLUSTERING ORDER BY(c1 DESC, c2 DESC);
+        """)
+
+        for i in range(0, 3):
+            for j in range(0, 3):
+                cursor.execute("INSERT INTO test(key, c1, c2, value) VALUES ('foo', %i, %i, 'bar');" % (i, j))
+
+        # Equalities
+
+        cursor.execute("SELECT c1, c2 FROM test WHERE key='foo' AND c1 = 1")
+        res = cursor.fetchall()
+        assert res == [[1, 2], [1, 1], [1, 0]], res
+
+        cursor.execute("SELECT c1, c2 FROM test WHERE key='foo' AND c1 = 1 ORDER BY c1 ASC, c2 ASC")
+        res = cursor.fetchall()
+        assert res == [[1, 0], [1, 1], [1, 2]], res
+
+        cursor.execute("SELECT c1, c2 FROM test WHERE key='foo' AND c1 = 1 ORDER BY c1 DESC, c2 DESC")
+        res = cursor.fetchall()
+        assert res == [[1, 2], [1, 1], [1, 0]], res
+
+        # GT
+
+        cursor.execute("SELECT c1, c2 FROM test WHERE key='foo' AND c1 > 1")
+        res = cursor.fetchall()
+        assert res == [[2, 2], [2, 1], [2, 0]], res
+
+        cursor.execute("SELECT c1, c2 FROM test WHERE key='foo' AND c1 > 1 ORDER BY c1 ASC, c2 ASC")
+        res = cursor.fetchall()
+        assert res == [[2, 0], [2, 1], [2, 2]], res
+
+        cursor.execute("SELECT c1, c2 FROM test WHERE key='foo' AND c1 > 1 ORDER BY c1 DESC, c2 DESC")
+        res = cursor.fetchall()
+        assert res == [[2, 2], [2, 1], [2, 0]], res
+
+        cursor.execute("SELECT c1, c2 FROM test WHERE key='foo' AND c1 >= 1")
+        res = cursor.fetchall()
+        assert res == [[2, 2], [2, 1], [2, 0], [1, 2], [1, 1], [1, 0]], res
+
+        cursor.execute("SELECT c1, c2 FROM test WHERE key='foo' AND c1 >= 1 ORDER BY c1 ASC, c2 ASC")
+        res = cursor.fetchall()
+        assert res == [[1, 0], [1, 1], [1, 2], [2, 0], [2, 1], [2, 2]], res
+
+        cursor.execute("SELECT c1, c2 FROM test WHERE key='foo' AND c1 >= 1 ORDER BY c1 ASC")
+        res = cursor.fetchall()
+        assert res == [[1, 0], [1, 1], [1, 2], [2, 0], [2, 1], [2, 2]], res
+
+        cursor.execute("SELECT c1, c2 FROM test WHERE key='foo' AND c1 >= 1 ORDER BY c1 DESC, c2 DESC")
+        res = cursor.fetchall()
+        assert res == [[2, 2], [2, 1], [2, 0], [1, 2], [1, 1], [1, 0]], res
+
+        # LT
+
+        cursor.execute("SELECT c1, c2 FROM test WHERE key='foo' AND c1 < 1")
+        res = cursor.fetchall()
+        assert res == [[0, 2], [0, 1], [0, 0]], res
+
+        cursor.execute("SELECT c1, c2 FROM test WHERE key='foo' AND c1 < 1 ORDER BY c1 ASC, c2 ASC")
+        res = cursor.fetchall()
+        assert res == [[0, 0], [0, 1], [0, 2]], res
+
+        cursor.execute("SELECT c1, c2 FROM test WHERE key='foo' AND c1 < 1 ORDER BY c1 DESC, c2 DESC")
+        res = cursor.fetchall()
+        assert res == [[0, 2], [0, 1], [0, 0]], res
+
+        cursor.execute("SELECT c1, c2 FROM test WHERE key='foo' AND c1 <= 1")
+        res = cursor.fetchall()
+        assert res == [[1, 2], [1, 1], [1, 0], [0, 2], [0, 1], [0, 0]], res
+
+        cursor.execute("SELECT c1, c2 FROM test WHERE key='foo' AND c1 <= 1 ORDER BY c1 ASC, c2 ASC")
+        res = cursor.fetchall()
+        assert res == [[0, 0], [0, 1], [0, 2], [1, 0], [1, 1], [1, 2]], res
+
+        cursor.execute("SELECT c1, c2 FROM test WHERE key='foo' AND c1 <= 1 ORDER BY c1 ASC")
+        res = cursor.fetchall()
+        assert res == [[0, 0], [0, 1], [0, 2], [1, 0], [1, 1], [1, 2]], res
+
+        cursor.execute("SELECT c1, c2 FROM test WHERE key='foo' AND c1 <= 1 ORDER BY c1 DESC, c2 DESC")
+        res = cursor.fetchall()
+        assert res == [[1, 2], [1, 1], [1, 0], [0, 2], [0, 1], [0, 0]], res
