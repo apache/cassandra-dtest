@@ -2090,6 +2090,7 @@ class TestCQL(Tester):
         cursor.execute("insert into t1  (pk, col1, col2) values ('pk3','foo3','bar3');")
         assert_invalid(cursor, "select * from t1 where col2 in ('bar1', 'bar2');")
 
+    @since('1.2')
     def validate_counter_regular_test(self):
         """ Test for the validation bug of #4706 """
 
