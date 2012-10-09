@@ -10,7 +10,7 @@ from assertions import *
 from ccmlib.cluster import Cluster
 from ccmlib import common as ccmcommon
 
-from cql.connection import Connection as ThriftConnection
+import cql
 from cql.cassandra.ttypes import CfDef, ColumnParent, CounterColumn, \
         ConsistencyLevel, ColumnPath
 
@@ -36,7 +36,7 @@ class TestSuperCounterClusterRestart(Tester):
 
         # create the columnfamily using thrift
         host, port = node1.network_interfaces['thrift']
-        thrift_conn = ThriftConnection(host, port, keyspace='ks')
+        thrift_conn = cql.connect(host, port, keyspace='ks')
         cf_def = CfDef(keyspace='ks', name='cf', column_type='Super', 
                 default_validation_class='CounterColumnType')
         thrift_conn.client.system_add_column_family(cf_def)
@@ -64,7 +64,7 @@ class TestSuperCounterClusterRestart(Tester):
         cluster.start()
         time.sleep(.5)
 
-        thrift_conn = ThriftConnection(host, port, keyspace='ks')
+        thrift_conn = cql.connect(host, port, keyspace='ks')
 
         from_db = []
 

@@ -6,7 +6,7 @@ from ccmlib.cluster import Cluster
 from ccmlib.node import Node
 from tools import since
 
-from cql.connection import Connection as ThriftConnection
+import cql
 
 class TestUnavailableSchemaOnDecommission(Tester):
     """
@@ -18,7 +18,7 @@ class TestUnavailableSchemaOnDecommission(Tester):
         """ Makes sure that there is only one schema """
 
         host, port = node.network_interfaces['thrift']
-        conn = ThriftConnection(host, port, keyspace=None)
+        conn = cql.connect(host, port, keyspace=None)
         schemas = conn.client.describe_schema_versions()
         num_schemas = len(schemas)
         assert num_schemas == 1, "There were multiple schema versions: " + pprint.pformat(schemas)
