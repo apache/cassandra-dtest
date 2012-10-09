@@ -41,7 +41,7 @@ def query_c1c2(cursor, key, consistency="QUORUM"):
     cursor.execute('SELECT c1, c2 FROM cf USING CONSISTENCY %s WHERE key=\'k%d\'' % (consistency, key))
     assert cursor.rowcount == 1
     res = cursor.fetchone()
-    assert len(res) == 2 and res[0] == 'value1' and res[1] == 'value2'
+    assert len(res) == 2 and res[0] == 'value1' and res[1] == 'value2', res
 
 def query_columns(tester, cursor, key, columns_count, consistency="QUORUM", offset=0):
     if tester.cluster.version() >= "1.2":
