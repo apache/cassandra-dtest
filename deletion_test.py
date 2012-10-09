@@ -29,7 +29,7 @@ class TestDeletion(Tester):
         cursor.execute('delete from cf where key=1')
         cursor.execute('select * from cf;')
         result = cursor.fetchall()
-        assert len(result) == 2 and len(result[0]) == 1 and len(result[1]) == 2, result
+        assert len(result) == 2 and len(result[0]) == 1 and len(result[1]) == 1, result
 
         node1.flush()
         time.sleep(.5)
