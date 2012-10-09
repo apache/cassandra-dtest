@@ -2175,6 +2175,7 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[6], [5], [4], [3], [2]], res
 
+    @since('1.1')
     def unescaped_string_test(self):
 
         cursor = self.prepare()
