@@ -1780,6 +1780,7 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert len(res) == 2, res
 
+    @since('1.2')
     def composite_index_with_pk_test(self):
 
         cursor = self.prepare(ordered=True)
