@@ -1830,6 +1830,7 @@ class TestCQL(Tester):
 
         assert_invalid(cursor, "SELECT content FROM blogs WHERE time2 >= 0 AND author='foo'")
 
+    @since('1.2')
     def limit_bugs_test(self):
         """ Test for LIMIT bugs from 4579 """
 
