@@ -169,7 +169,7 @@ class Tester(object):
         cursor.execute('USE %s' % name)
 
     # We default to UTF8Type because it's simpler to use in tests
-    def create_cf(self, cursor, name, key_type="varchar", read_repair=None, compression=None, gc_grace=None, columns=None):
+    def create_cf(self, cursor, name, key_type="varchar", read_repair=None, compression=None, gc_grace=None, columns=None, validation="UTF8Type"):
         additional_columns = ""
         if columns is not None:
             for k, v in columns.items():
@@ -183,7 +183,7 @@ class Tester(object):
             if compression is not None:
                 query = '%s AND compression = { \'sstable_compression\': \'%sCompressor\' }' % (query, compression)
         else:
-            query = 'CREATE COLUMNFAMILY %s (key %s PRIMARY KEY%s) WITH comparator=UTF8Type AND default_validation=UTF8Type' % (name, key_type, additional_columns)
+            query = 'CREATE COLUMNFAMILY %s (key %s PRIMARY KEY%s) WITH comparator=UTF8Type AND default_validation=%s' % (name, key_type, additional_columns, validation)
             if compression is not None:
                 query = '%s AND compression_parameters:sstable_compression=%sCompressor' % (query, compression)
 
