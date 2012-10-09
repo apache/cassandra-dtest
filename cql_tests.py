@@ -2097,6 +2097,7 @@ class TestCQL(Tester):
         cursor = self.prepare()
         assert_invalid(cursor, "CREATE TABLE test (id bigint PRIMARY KEY, count counter, things set<text>)")
 
+    @since('1.1')
     def reversed_compact_test(self):
         """ Test for #4716 bug and more generally for good behavior of ordering"""
 
@@ -2186,6 +2187,7 @@ class TestCQL(Tester):
 
         assert_invalid(cursor, "INSERT INTO test (k, c) VALUES ('foo', 'CQL is cassandra's best friend')")
 
+    @since('1.1')
     def reversed_compact_multikey_test(self):
         """ Test for the bug from #4760 and #4759 """
 
