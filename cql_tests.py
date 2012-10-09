@@ -1899,6 +1899,7 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[1, 1, 1], [2, 2, 2], [3, 3, 3], [4, 4, 4]], res
 
+    @since('1.1')
     def bug_4532_test(self):
 
         cursor = self.prepare()
