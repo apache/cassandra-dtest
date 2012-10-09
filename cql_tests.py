@@ -2074,6 +2074,7 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[0, 0], [0, 2], [1, 0], [1, 3]], res
 
+    @since('1.1')
     def refuse_in_with_indexes_test(self):
         """ Test for the validation bug of #4709 """
 
