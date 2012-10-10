@@ -84,7 +84,7 @@ class Tester(object):
         self.cluster = self.__get_cluster()
         # the failure detector can be quite slow in such tests with quick start/stop
         self.cluster.set_configuration_options(values={'phi_convict_threshold': 5})
-        self.cluster.set_configuration_options(values={'rpc_timeout_in_ms': 2000})
+        self.cluster.set_configuration_options(values={'rpc_timeout_in_ms': 15000})
         with open(LAST_TEST_DIR, 'w') as f:
             f.write(self.test_path + '\n')
             f.write(self.cluster.name)
