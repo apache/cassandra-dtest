@@ -322,6 +322,7 @@ class TestConcurrentSchemaChanges(Tester):
 
 
 
+    @since('1.1')
     def load_test(self):
         """
         apply schema changes while the cluster is under load.
