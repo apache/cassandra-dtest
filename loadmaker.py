@@ -273,10 +273,9 @@ class LoadMaker(object):
         rows = self._cursor.result
         out = {}
         for row in rows:
-            columns = row.columns
-            row_key = columns[0].value
+            row_key = row[0].value
             out[row_key] = {}
-            cols = columns[1:]
+            cols = row[1:]
             for col in cols:
                 col_name = col.name
                 col_value = col.value
