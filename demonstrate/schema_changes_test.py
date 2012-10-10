@@ -116,7 +116,7 @@ class TestSchemaChanges(Tester):
         cluster.populate(2).start()
         [node1, node2] = cluster.nodelist()
         wait(1)
-        cursor = self.cql_connection(node1).cursor()
+        cursor = self.cql_connection(node1, version="2.0.0").cursor()
         self.prepare_for_changes(cursor)
 
         wait(2)
