@@ -345,7 +345,7 @@ class TestConcurrentSchemaChanges(Tester):
             debug("Done Compacting.")
 
         # put some data into the cluster
-        stress(['--num-keys=1000000'])
+        stress(['--num-keys=30000'])
 
         # now start stressing and compacting at the same time
         tcompact = Thread(target=compact)
