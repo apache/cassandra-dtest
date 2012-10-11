@@ -2040,7 +2040,7 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[0, 0], [2, 2]], res
 
-    @since('1.2')
+    @require('4796')
     def indexes_composite_test(self):
         cursor = self.prepare()
 
