@@ -277,6 +277,7 @@ class TestCQL(Tester):
 
         assert_invalid(cursor, "CREATE TABLE test (key text, key2 text, c int, d text, PRIMARY KEY (key, key2)) WITH COMPACT STORAGE")
 
+    @require('4797')
     @since('1.1')
     def limit_ranges_test(self):
         """ Validate LIMIT option for 'range queries' in SELECT statements """
