@@ -15,7 +15,7 @@ class TestCounters(Tester):
 
         cursor = self.cql_connection(nodes[0]).cursor()
         self.create_ks(cursor, 'ks', 3)
-        self.create_cf(cursor, 'cf', validation="CounterColumnType")
+        self.create_cf(cursor, 'cf', validation="CounterColumnType", columns={'c': 'counter'})
         cursor.close()
 
 
@@ -26,7 +26,7 @@ class TestCounters(Tester):
         for i in xrange(0, nb_increment):
             for c in xrange(0, nb_counter):
                 cursor = cursors[(i + c) % len(nodes)]
-                cursor.execute("UPDATE cf USING CONSISTENCY QUORUM SET c = c + 1 WHERE key = counter%i" % c)
+                cursor.execute("UPDATE cf USING CONSISTENCY QUORUM SET c = c + 1 WHERE key = 'counter%i'" % c)
 
             cursor = cursors[i % len(nodes)]
             keys = ",".join(["'counter%i'" % c for c in xrange(0, nb_counter)])
