@@ -140,7 +140,7 @@ class TestConcurrentSchemaChanges(Tester):
         cluster.populate(2).start()
         node1 = cluster.nodelist()[0]
         wait(2)
-        cursor = self.cql_connection(node1).cursor()
+        cursor = self.cql_connection(node1, version="2.0.0").cursor()
 
         self.prepare_for_changes(cursor, namespace='ns1')
 
@@ -153,7 +153,7 @@ class TestConcurrentSchemaChanges(Tester):
         cluster.populate(2).start()
         [node1, node2] = cluster.nodelist()
         wait(2)
-        cursor = self.cql_connection(node1).cursor()
+        cursor = self.cql_connection(node1, version="2.0.0").cursor()
         self.prepare_for_changes(cursor, namespace='ns1')
         self.make_schema_changes(cursor, namespace='ns1')
         wait(3)
@@ -162,7 +162,7 @@ class TestConcurrentSchemaChanges(Tester):
         # wait for changes to get to the first node
         wait(20)
 
-        cursor = self.cql_connection(node2).cursor()
+        cursor = self.cql_connection(node2, version="2.0.0").cursor()
         self.prepare_for_changes(cursor, namespace='ns2')
         self.make_schema_changes(cursor, namespace='ns2')
         wait(3)
@@ -182,9 +182,8 @@ class TestConcurrentSchemaChanges(Tester):
         cluster.populate(2).start()
         [node1, node2] = cluster.nodelist()
         wait(2)
-        cursor = self.cql_connection(node1).cursor()
+        cursor = self.cql_connection(node2, version="2.0.0").cursor()
 
-        cursor = self.cql_connection(node2).cursor()
         self.prepare_for_changes(cursor, namespace='ns2')
         node1.stop()
         wait(2)
@@ -211,9 +210,8 @@ class TestConcurrentSchemaChanges(Tester):
         cluster.populate(2).start()
         [node1, node2] = cluster.nodelist()
         wait(2)
-        cursor = self.cql_connection(node1).cursor()
+        cursor = self.cql_connection(node2, version="2.0.0").cursor()
 
-        cursor = self.cql_connection(node2).cursor()
         self.prepare_for_changes(cursor, namespace='ns2')
         node1.stop()
         wait(2)
@@ -248,7 +246,7 @@ class TestConcurrentSchemaChanges(Tester):
         node2.start()
         wait(2)
 
-        cursor = self.cql_connection(node1).cursor()
+        cursor = self.cql_connection(node1, version="2.0.0").cursor()
         self.prepare_for_changes(cursor)
 
         node2.decommission()
@@ -280,7 +278,7 @@ class TestConcurrentSchemaChanges(Tester):
         cluster.populate(2).start()
         [node1, node2] = cluster.nodelist()
         wait(2)
-        cursor = self.cql_connection(node1).cursor()
+        cursor = self.cql_connection(node1, version="2.0.0").cursor()
         self.prepare_for_changes(cursor, namespace='ns2')
 
         wait(2)
@@ -333,7 +331,7 @@ class TestConcurrentSchemaChanges(Tester):
         cluster.populate(1).start()
         node1 = cluster.nodelist()[0]
         wait(2)
-        cursor = self.cql_connection(node1).cursor()
+        cursor = self.cql_connection(node1, version="2.0.0").cursor()
 
         def stress(args=[]):
             debug("Stressing")
