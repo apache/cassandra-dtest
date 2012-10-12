@@ -266,8 +266,9 @@ class ThriftConnection(object):
                     strategy_options={'replication_factor': str(replication_factor)},
                     cf_defs=[])
         retry_till_success(self.client.system_add_keyspace, ks_def, timeout=30)
+        retry_till_success(self.wait_for_agreement, timeout=10)
+        time.sleep(0.5)
         self.use_ks()
-        time.sleep(.5)
         return self
 
 
@@ -279,8 +280,14 @@ class ThriftConnection(object):
     def create_cf(self):
         cf_def = self.Cassandra.CfDef(name=self.cf_name, keyspace=self.ks_name)
         retry_till_success(self.client.system_add_column_family, cf_def, timeout=30)
+        retry_till_success(self.wait_for_agreement, timeout=10)
+        time.sleep(0.5)
         return self
 
+    def wait_for_agreement(self):
+        schemas = self.client.describe_schema_versions()
+        if len([ss for ss in schemas.keys() if ss != 'UNREACHABLE']) > 1:
+            raise Exception("schema agreement not reached")
 
     def _translate_cl(self, cl):
         return self.Cassandra.ConsistencyLevel._NAMES_TO_VALUES[cl]
