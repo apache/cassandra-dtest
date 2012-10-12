@@ -30,9 +30,9 @@ class TestGlobalRowKeyCache(Tester):
         """
 
         # create some rows to insert
-        NUM_INSERTS = 1000
-        NUM_UPDATES = 100
-        NUM_DELETES = 10
+        NUM_INSERTS = 100
+        NUM_UPDATES = 10
+        NUM_DELETES = 1
 
         cluster = self.cluster
         cluster.populate(3)
