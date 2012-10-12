@@ -110,7 +110,7 @@ class LoadMaker(object):
         return self._cached_cursor
                 
 
-    def refresh_connection(self, host=None, port=None, cql_version=None, num_retries=10):
+    def refresh_connection(self, host=None, port=None, cql_version="2.0.0", num_retries=10):
         """
         establish a connection to the server. retry if needed.
         """
