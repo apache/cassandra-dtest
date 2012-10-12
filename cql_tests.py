@@ -1242,7 +1242,7 @@ class TestCQL(Tester):
             );
         """)
 
-        rows = 10
+        rows = 5 
         col1 = 2
         col2 = 2
         cpr = col1 * col2
