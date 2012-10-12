@@ -260,6 +260,7 @@ class TestConsistency(Tester):
             insert_c1c2(cursor, n, "ONE")
 
         node2.start(wait_other_notice=True)
+        time.sleep(5)
        # query everything to cause RR
         for n in xrange(0, 10000):
             query_c1c2(cursor, n, "QUORUM")
