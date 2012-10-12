@@ -154,7 +154,7 @@ class Tester(object):
             else:
                 assert len(rf) != 0, "At least one datacenter/rf pair is needed"
                 # we assume networkTopolyStrategy
-                options = (', ').join([ '%s:%d' % (d, r) for d, r in rf.iteritems() ])
+                options = (', ').join([ '\'%s\':%d' % (d, r) for d, r in rf.iteritems() ])
                 cursor.execute(query % (name, "'class':'NetworkTopologyStrategy', %s" % options))
         else:
             query = 'CREATE KEYSPACE %s WITH strategy_class=%s AND %s'
