@@ -26,11 +26,17 @@ class TestCounters(Tester):
         for i in xrange(0, nb_increment):
             for c in xrange(0, nb_counter):
                 cursor = cursors[(i + c) % len(nodes)]
-                cursor.execute("UPDATE cf USING CONSISTENCY QUORUM SET c = c + 1 WHERE key = 'counter%i'" % c)
+                if cluster.version() >= '1.2':
+                    cursor.execute("UPDATE cf SET c = c + 1 WHERE key = 'counter%i'" % c, consistency_level='QUORUM')
+                else:
+                    cursor.execute("UPDATE cf USING CONSISTENCY QUORUM SET c = c + 1 WHERE key = 'counter%i'" % c)
 
             cursor = cursors[i % len(nodes)]
             keys = ",".join(["'counter%i'" % c for c in xrange(0, nb_counter)])
-            cursor.execute("SELECT key, c FROM cf USING CONSISTENCY QUORUM WHERE key IN (%s)" % keys)
+            if cluster.version() >= '1.2':
+                cursor.execute("SELECT key, c FROM cf WHERE key IN (%s)" % keys, consistency_level='QUORUM')
+            else:
+                cursor.execute("SELECT key, c FROM cf USING CONSISTENCY QUORUM WHERE key IN (%s)" % keys)
             res = cursor.fetchall()
             assert len(res) == nb_counter
             for c in xrange(0, nb_counter):
