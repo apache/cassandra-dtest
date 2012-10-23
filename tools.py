@@ -26,26 +26,32 @@ def create_c1c2_table(tester, cursor, read_repair=None):
     tester.create_cf(cursor, 'cf', columns={ 'c1' : 'text', 'c2' : 'text' }, read_repair=read_repair)
 
 def insert_c1c2(cursor, key, consistency="QUORUM"):
-    cursor.execute('UPDATE cf USING CONSISTENCY %s SET c1=\'value1\', c2=\'value2\' WHERE key=\'k%d\'' % (consistency, key))
+    if cursor.cql_major_version >= 3:
+        cursor.execute('UPDATE cf SET c1=\'value1\', c2=\'value2\' WHERE key=\'k%d\'' % key)
+    else:
+        cursor.execute('UPDATE cf USING CONSISTENCY %s SET c1=\'value1\', c2=\'value2\' WHERE key=\'k%d\'' % (consistency, key))
 
 def insert_columns(tester, cursor, key, columns_count, consistency="QUORUM", offset=0):
     if tester.cluster.version() >= "1.2":
         upds = [ "UPDATE cf SET v=\'value%d\' WHERE key=\'k%s\' AND c=\'c%06d\'" % (i, key, i) for i in xrange(offset*columns_count, columns_count*(offset+1))]
-        query = 'BEGIN BATCH USING CONSISTENCY %s %s; APPLY BATCH' % (consistency, '; '.join(upds))
+        query = 'BEGIN BATCH %s; APPLY BATCH' % '; '.join(upds)
     else:
         kvs = [ "c%06d=value%d" % (i, i) for i in xrange(offset*columns_count, columns_count*(offset+1))]
         query = 'UPDATE cf USING CONSISTENCY %s SET %s WHERE key=k%s' % (consistency, ', '.join(kvs), key)
     cursor.execute(query)
 
 def query_c1c2(cursor, key, consistency="QUORUM"):
-    cursor.execute('SELECT c1, c2 FROM cf USING CONSISTENCY %s WHERE key=\'k%d\'' % (consistency, key))
+    if cursor.cql_major_version >= 3:
+        cursor.execute('SELECT c1, c2 FROM cf WHERE key=\'k%d\'' % key)
+    else:
+        cursor.execute('SELECT c1, c2 FROM cf USING CONSISTENCY %s WHERE key=\'k%d\'' % (consistency, key))
     assert cursor.rowcount == 1
     res = cursor.fetchone()
     assert len(res) == 2 and res[0] == 'value1' and res[1] == 'value2', res
 
 def query_columns(tester, cursor, key, columns_count, consistency="QUORUM", offset=0):
     if tester.cluster.version() >= "1.2":
-        cursor.execute('SELECT c, v FROM cf USING CONSISTENCY %s WHERE key=\'k%s\' AND c >= \'c%06d\' AND c <= \'c%06d\'' % (consistency, key, offset, columns_count+offset-1))
+        cursor.execute('SELECT c, v FROM cf WHERE key=\'k%s\' AND c >= \'c%06d\' AND c <= \'c%06d\'' % (key, offset, columns_count+offset-1))
         res = cursor.fetchall()
         assert len(res) == columns_count, "%s != %s (%s-%s)" % (len(res), columns_count, offset, columns_count+offset-1)
         for i in xrange(0, columns_count):
@@ -59,7 +65,10 @@ def query_columns(tester, cursor, key, columns_count, consistency="QUORUM", offs
             assert res[i] == 'value%d' % (i+offset)
 
 def remove_c1c2(cursor, key, consistency="QUORUM"):
-    cursor.execute('DELETE c1, c2 FROM cf USING CONSISTENCY %s WHERE key=k%d' % (consistency, key))
+    if cursor.cql_major_version >= 3:
+        cursor.execute('DELETE c1, c2 FROM cf WHERE key=k%d' % key)
+    else:
+        cursor.execute('DELETE c1, c2 FROM cf USING CONSISTENCY %s WHERE key=k%d' % (consistency, key))
 
 # work for cluster started by populate
 def new_node(cluster, bootstrap=True, token=None, remote_debug_port='2000'):
@@ -79,17 +88,17 @@ def _put_with_overwrite(cluster, cursor, nb_keys, cl="QUORUM"):
     if cluster.version() >= "1.2":
         for k in xrange(0, nb_keys):
             kvs = [ "UPDATE cf SET v=\'value%d\' WHERE key=\'k%s\' AND c=\'c%02d\'" % (i, k, i) for i in xrange(0, 100) ]
-            cursor.execute('BEGIN BATCH USING CONSISTENCY %s %s APPLY BATCH' % (cl, '; '.join(kvs)))
+            cursor.execute('BEGIN BATCH %s APPLY BATCH' % '; '.join(kvs))
             time.sleep(.01)
         cluster.flush()
         for k in xrange(0, nb_keys):
             kvs = [ "UPDATE cf SET v=\'value%d\' WHERE key=\'k%s\' AND c=\'c%02d\'" % (i*4, k, i*2) for i in xrange(0, 50) ]
-            cursor.execute('BEGIN BATCH USING CONSISTENCY %s %s APPLY BATCH' % (cl, '; '.join(kvs)))
+            cursor.execute('BEGIN BATCH %s APPLY BATCH' % '; '.join(kvs))
             time.sleep(.01)
         cluster.flush()
         for k in xrange(0, nb_keys):
             kvs = [ "UPDATE cf SET v=\'value%d\' WHERE key=\'k%s\' AND c=\'c%02d\'" % (i*20, k, i*5) for i in xrange(0, 20) ]
-            cursor.execute('BEGIN BATCH USING CONSISTENCY %s %s APPLY BATCH' % (cl, '; '.join(kvs)))
+            cursor.execute('BEGIN BATCH %s APPLY BATCH' % '; '.join(kvs))
             time.sleep(.01)
         cluster.flush()
     else:
@@ -164,7 +173,10 @@ def range_putget(cluster, cursor, cl="QUORUM"):
 
     _put_with_overwrite(cluster, cursor, keys, cl)
 
-    cursor.execute('SELECT * FROM cf USING CONSISTENCY %s LIMIT 10000000' % cl)
+    if cluster.version() >= "1.2":
+        cursor.execute('SELECT * FROM cf LIMIT 10000000')
+    else:
+        cursor.execute('SELECT * FROM cf USING CONSISTENCY %s LIMIT 10000000' % cl)
     if cluster.version() >= "1.2":
         assert cursor.rowcount == keys * 100, cursor.rowcount
         for k in xrange(0, keys):
