@@ -1041,14 +1041,24 @@ class TestCQL(Tester):
             )
         """)
 
-        cursor.execute("""
-            BEGIN BATCH USING CONSISTENCY QUORUM
-                INSERT INTO users (userid, password, name) VALUES ('user2', 'ch@ngem3b', 'second user');
-                UPDATE users SET password = 'ps22dhds' WHERE userid = 'user3';
-                INSERT INTO users (userid, password) VALUES ('user4', 'ch@ngem3c');
-                DELETE name FROM users WHERE userid = 'user1';
-            APPLY BATCH;
-        """)
+        if self.cluster.version() >= '1.2':
+            cursor.execute("""
+                BEGIN BATCH 
+                    INSERT INTO users (userid, password, name) VALUES ('user2', 'ch@ngem3b', 'second user');
+                    UPDATE users SET password = 'ps22dhds' WHERE userid = 'user3';
+                    INSERT INTO users (userid, password) VALUES ('user4', 'ch@ngem3c');
+                    DELETE name FROM users WHERE userid = 'user1';
+                APPLY BATCH;
+            """, consistency_level='QUORUM')
+        else:
+            cursor.execute("""
+                BEGIN BATCH USING CONSISTENCY QUORUM
+                    INSERT INTO users (userid, password, name) VALUES ('user2', 'ch@ngem3b', 'second user');
+                    UPDATE users SET password = 'ps22dhds' WHERE userid = 'user3';
+                    INSERT INTO users (userid, password) VALUES ('user4', 'ch@ngem3c');
+                    DELETE name FROM users WHERE userid = 'user1';
+                APPLY BATCH;
+            """)
 
     @since('1.1')
     def token_range_test(self):
