@@ -1041,7 +1041,7 @@ class TestCQL(Tester):
         """)
 
         cursor.execute("""
-            BEGIN BATCH USING CONSISTENCY QUORUM
+            BEGIN BATCH
                 INSERT INTO users (userid, password, name) VALUES ('user2', 'ch@ngem3b', 'second user');
                 UPDATE users SET password = 'ps22dhds' WHERE userid = 'user3';
                 INSERT INTO users (userid, password) VALUES ('user4', 'ch@ngem3c');
@@ -1240,6 +1240,7 @@ class TestCQL(Tester):
                 PRIMARY KEY (k, c1, c2)
             );
         """)
+        time.sleep(1)
 
         rows = 10
         col1 = 2
@@ -1771,7 +1772,7 @@ class TestCQL(Tester):
                 v int
             );
         """)
-        time.sleep(0.2)
+        time.sleep(1)
 
         cursor.execute("INSERT INTO test (k, v) VALUES ('foo', 0)")
         cursor.execute("INSERT INTO test (k, v) VALUES ('bar', 1)")
@@ -1963,13 +1964,15 @@ class TestCQL(Tester):
 
         cursor.execute("SELECT keyspace_name, durable_writes FROM system.schema_keyspaces")
         res = cursor.fetchall()
-        assert res == [ ['ks1', True], ['ks2', False] ], res
+        assert res == [ ['ks1', True], ['system', True], ['system_traces', True],  ['ks2', False] ], res
 
         cursor.execute("ALTER KEYSPACE ks1 WITH replication = { 'CLASS' : 'NetworkTopologyStrategy', 'dc1' : 1 } AND durable_writes=False")
         cursor.execute("ALTER KEYSPACE ks2 WITH durable_writes=true")
         cursor.execute("SELECT keyspace_name, durable_writes, strategy_class FROM system.schema_keyspaces")
         res = cursor.fetchall()
         assert res == [ ['ks1', False, 'org.apache.cassandra.locator.NetworkTopologyStrategy'],
+                        ['system', True, 'org.apache.cassandra.locator.LocalStrategy'],
+                        ['system_traces', True, 'org.apache.cassandra.locator.SimpleStrategy'],
                         ['ks2', True, 'org.apache.cassandra.locator.SimpleStrategy'] ], res
 
         cursor.execute("USE ks1")
@@ -1980,40 +1983,40 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [ ['cf1', 7] ], res
 
-    @since('1.2')
-    def set_default_cl_test(self):
-        cluster = self.cluster
+    #@since('1.2')
+    #def set_default_cl_test(self):
+    #    cluster = self.cluster
 
-        cluster.populate(2).start()
-        node1 = cluster.nodelist()[0]
-        time.sleep(0.2)
+    #    cluster.populate(2).start()
+    #    node1 = cluster.nodelist()[0]
+    #    time.sleep(0.2)
 
-        cursor = self.cql_connection(node1, version=cql_version).cursor()
-        self.create_ks(cursor, 'ks', 2)
+    #    cursor = self.cql_connection(node1, version=cql_version).cursor()
+    #    self.create_ks(cursor, 'ks', 2)
 
-        cursor.execute("CREATE TABLE test (a int PRIMARY KEY, b int) WITH default_write_consistency = 'ALL' AND default_read_consistency = 'ALL'")
-        time.sleep(0.2)
+    #    cursor.execute("CREATE TABLE test (a int PRIMARY KEY, b int) WITH default_write_consistency = 'ALL' AND default_read_consistency = 'ALL'")
+    #    time.sleep(0.2)
 
-        cursor.execute("INSERT INTO test (a, b) VALUES (0, 0)")
-        cursor.execute("SELECT * FROM test WHERE a = 0")
-        res = cursor.fetchall()
-        assert len(res) == 1, res
+    #    cursor.execute("INSERT INTO test (a, b) VALUES (0, 0)")
+    #    cursor.execute("SELECT * FROM test WHERE a = 0")
+    #    res = cursor.fetchall()
+    #    assert len(res) == 1, res
 
-        cluster.nodelist()[1].stop(wait_other_notice=True)
-        time.sleep(0.1)
+    #    cluster.nodelist()[1].stop(wait_other_notice=True)
+    #    time.sleep(0.1)
 
-        # Both request should now fail
-        try:
-            cursor.execute("INSERT INTO test (a, b) VALUES (0, 0)")
-            assert False, "Expecting query to fail"
-        except cql.OperationalError as e:
-            pass
+    #    # Both request should now fail
+    #    try:
+    #        cursor.execute("INSERT INTO test (a, b) VALUES (0, 0)")
+    #        assert False, "Expecting query to fail"
+    #    except cql.OperationalError as e:
+    #        pass
 
-        try:
-            cursor.execute("SELECT * FROM test WHERE a = 0")
-            assert False, "Expecting query to fail"
-        except cql.OperationalError as e:
-            pass
+    #    try:
+    #        cursor.execute("SELECT * FROM test WHERE a = 0")
+    #        assert False, "Expecting query to fail"
+    #    except cql.OperationalError as e:
+    #        pass
 
     @since('1.1')
     def remove_range_slice_test(self):
@@ -2060,7 +2063,7 @@ class TestCQL(Tester):
 
         cursor.execute("SELECT blog_id, timestamp FROM test WHERE author = 'bob'")
         res = cursor.fetchall()
-        assert res == [[0, 0], [0, 2], [1, 0]], res
+        assert res == [[1, 0], [0, 0], [0, 2]], res
 
         cursor.execute(req % (1, 1, "tom", "6th post"))
         cursor.execute(req % (1, 2, "tom", "7th post"))
@@ -2068,7 +2071,7 @@ class TestCQL(Tester):
 
         cursor.execute("SELECT blog_id, timestamp FROM test WHERE author = 'bob'")
         res = cursor.fetchall()
-        assert res == [[0, 0], [0, 2], [1, 0], [1, 3]], res
+        assert res == [[1, 0], [1, 3], [0, 0], [0, 2]], res
 
     def refuse_in_with_indexes_test(self):
         """ Test for the validation bug of #4709 """
@@ -2272,3 +2275,138 @@ class TestCQL(Tester):
         cursor.execute("SELECT c1, c2 FROM test WHERE key='foo' AND c1 <= 1 ORDER BY c1 DESC, c2 DESC")
         res = cursor.fetchall()
         assert res == [[1, 2], [1, 1], [1, 0], [0, 2], [0, 1], [0, 0]], res
+
+    def collection_and_regular_test(self):
+
+        cursor = self.prepare()
+
+        cursor.execute("""
+          CREATE TABLE test (
+            k int PRIMARY KEY,
+            l list<int>,
+            c int
+          )
+        """)
+
+        cursor.execute("INSERT INTO test(k, l, c) VALUES(3, [0, 1, 2], 4)")
+        cursor.execute("UPDATE test SET l[0] = 1, c = 42 WHERE k = 3")
+        cursor.execute("SELECT l, c FROM test WHERE k = 3")
+        res = cursor.fetchall()
+        assert res == [[(1, 1, 2), 42]], res
+
+    def batch_and_list_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+          CREATE TABLE test (
+            k int PRIMARY KEY,
+            l list<int>
+          )
+        """)
+
+        cursor.execute("""
+          BEGIN BATCH
+            UPDATE test SET l = l + [ 1 ] WHERE k = 0;
+            UPDATE test SET l = l + [ 2 ] WHERE k = 0;
+            UPDATE test SET l = l + [ 3 ] WHERE k = 0;
+          APPLY BATCH
+        """)
+
+        cursor.execute("SELECT l FROM test WHERE k = 0")
+        res = cursor.fetchall()
+        assert res == [[(1, 2, 3)]], res
+
+        cursor.execute("""
+          BEGIN BATCH
+            UPDATE test SET l = [ 1 ] + l WHERE k = 1;
+            UPDATE test SET l = [ 2 ] + l WHERE k = 1;
+            UPDATE test SET l = [ 3 ] + l WHERE k = 1;
+          APPLY BATCH
+        """)
+
+        cursor.execute("SELECT l FROM test WHERE k = 1")
+        res = cursor.fetchall()
+        assert res == [[(3, 2, 1)]], res
+
+    def boolean_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+          CREATE TABLE test (
+            k boolean PRIMARY KEY,
+            b boolean
+          )
+        """)
+
+        cursor.execute("INSERT INTO test (k, b) VALUES (true, false)")
+        cursor.execute("SELECT * FROM test WHERE k = true")
+        res = cursor.fetchall()
+        assert res == [[True, False]], res
+
+    def multiordering_test(self):
+        cursor = self.prepare()
+        cursor.execute("""
+            CREATE TABLE test (
+                k text,
+                c1 int,
+                c2 int,
+                PRIMARY KEY (k, c1, c2)
+            ) WITH CLUSTERING ORDER BY (c2 DESC);
+        """)
+
+        for i in range(0, 2):
+            for j in range(0, 2):
+                cursor.execute("INSERT INTO test(k, c1, c2) VALUES ('foo', %i, %i)" % (i, j))
+
+        cursor.execute("SELECT c1, c2 FROM test WHERE k = 'foo'")
+        res = cursor.fetchall()
+        assert res == [[0, 1], [0, 0], [1, 1], [1, 0]], res
+
+        cursor.execute("SELECT c1, c2 FROM test WHERE k = 'foo' ORDER BY c1 ASC, c2 DESC")
+        res = cursor.fetchall()
+        assert res == [[0, 1], [0, 0], [1, 1], [1, 0]], res
+
+        cursor.execute("SELECT c1, c2 FROM test WHERE k = 'foo' ORDER BY c1 DESC, c2 ASC")
+        res = cursor.fetchall()
+        assert res == [[1, 0], [1, 1], [0, 0], [0, 1]], res
+
+        assert_invalid(cursor, "SELECT c1, c2 FROM test WHERE k = 'foo' ORDER BY c2 DESC")
+        assert_invalid(cursor, "SELECT c1, c2 FROM test WHERE k = 'foo' ORDER BY c2 ASC")
+        assert_invalid(cursor, "SELECT c1, c2 FROM test WHERE k = 'foo' ORDER BY c1 ASC, c2 ASC")
+
+    def multiordering_validation_test(self):
+        cursor = self.prepare()
+
+        assert_invalid(cursor, "CREATE TABLE test (k int, c1 int, c2 int, PRIMARY KEY (k, c1, c2)) WITH CLUSTERING ORDER BY (c2 DESC)")
+        assert_invalid(cursor, "CREATE TABLE test (k int, c1 int, c2 int, PRIMARY KEY (k, c1, c2)) WITH CLUSTERING ORDER BY (c2 ASC, c1 DESC)")
+        assert_invalid(cursor, "CREATE TABLE test (k int, c1 int, c2 int, PRIMARY KEY (k, c1, c2)) WITH CLUSTERING ORDER BY (c1 DESC, c2 DESC, c3 DESC)")
+
+        cursor.execute("CREATE TABLE test1 (k int, c1 int, c2 int, PRIMARY KEY (k, c1, c2)) WITH CLUSTERING ORDER BY (c1 DESC, c2 DESC)")
+        cursor.execute("CREATE TABLE test2 (k int, c1 int, c2 int, PRIMARY KEY (k, c1, c2)) WITH CLUSTERING ORDER BY (c1 ASC, c2 DESC)")
+
+    def bug_4882_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k int,
+                c1 int,
+                c2 int,
+                v int,
+                PRIMARY KEY (k, c1, c2)
+            ) WITH CLUSTERING ORDER BY (c2 DESC);
+        """)
+
+        cursor.execute("INSERT INTO test (k, c1, c2, v) VALUES (0, 0, 0, 0);")
+        cursor.execute("INSERT INTO test (k, c1, c2, v) VALUES (0, 1, 1, 1);")
+        cursor.execute("INSERT INTO test (k, c1, c2, v) VALUES (0, 0, 2, 2);")
+        cursor.execute("INSERT INTO test (k, c1, c2, v) VALUES (0, 1, 3, 3);")
+
+        #cursor.execute("select * from video_event;")
+        #res = cursor.fetchall()
+        #assert res == [], res
+
+        cursor.execute("select * from test where k = 0 limit 1;")
+        res = cursor.fetchall()
+        assert res == [], res
+
