@@ -277,6 +277,7 @@ class TestCQL(Tester):
 
         assert_invalid(cursor, "CREATE TABLE test (key text, key2 text, c int, d text, PRIMARY KEY (key, key2)) WITH COMPACT STORAGE")
 
+    @require('4797')
     @since('1.1')
     def limit_ranges_test(self):
         """ Validate LIMIT option for 'range queries' in SELECT statements """
@@ -1040,14 +1041,24 @@ class TestCQL(Tester):
             )
         """)
 
-        cursor.execute("""
-            BEGIN BATCH
-                INSERT INTO users (userid, password, name) VALUES ('user2', 'ch@ngem3b', 'second user');
-                UPDATE users SET password = 'ps22dhds' WHERE userid = 'user3';
-                INSERT INTO users (userid, password) VALUES ('user4', 'ch@ngem3c');
-                DELETE name FROM users WHERE userid = 'user1';
-            APPLY BATCH;
-        """)
+        if self.cluster.version() >= '1.2':
+            cursor.execute("""
+                BEGIN BATCH
+                    INSERT INTO users (userid, password, name) VALUES ('user2', 'ch@ngem3b', 'second user');
+                    UPDATE users SET password = 'ps22dhds' WHERE userid = 'user3';
+                    INSERT INTO users (userid, password) VALUES ('user4', 'ch@ngem3c');
+                    DELETE name FROM users WHERE userid = 'user1';
+                APPLY BATCH;
+            """, consistency_level='QUORUM')
+        else:
+            cursor.execute("""
+                BEGIN BATCH USING CONSISTENCY QUORUM
+                    INSERT INTO users (userid, password, name) VALUES ('user2', 'ch@ngem3b', 'second user');
+                    UPDATE users SET password = 'ps22dhds' WHERE userid = 'user3';
+                    INSERT INTO users (userid, password) VALUES ('user4', 'ch@ngem3c');
+                    DELETE name FROM users WHERE userid = 'user1';
+                APPLY BATCH;
+            """)
 
     @since('1.1')
     def token_range_test(self):
@@ -1242,7 +1253,7 @@ class TestCQL(Tester):
         """)
         time.sleep(1)
 
-        rows = 10
+        rows = 5
         col1 = 2
         col2 = 2
         cpr = col1 * col2
@@ -1781,6 +1792,7 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert len(res) == 2, res
 
+    @require('4796')
     def composite_index_with_pk_test(self):
 
         cursor = self.prepare(ordered=True)
@@ -1830,6 +1842,7 @@ class TestCQL(Tester):
 
         assert_invalid(cursor, "SELECT content FROM blogs WHERE time2 >= 0 AND author='foo'")
 
+    @since('1.2')
     def limit_bugs_test(self):
         """ Test for LIMIT bugs from 4579 """
 
@@ -1899,6 +1912,7 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[1, 1, 1], [2, 2, 2], [3, 3, 3], [4, 4, 4]], res
 
+    @since('1.1')
     def bug_4532_test(self):
 
         cursor = self.prepare()
@@ -1922,6 +1936,7 @@ class TestCQL(Tester):
         assert_invalid(cursor, "SELECT * FROM compositetest WHERE ctime>=12345679 AND key='key3' AND ctime<=12345680 LIMIT 3;")
         assert_invalid(cursor, "SELECT * FROM compositetest WHERE ctime=12345679  AND key='key3' AND ctime<=12345680 LIMIT 3")
 
+    @since('1.1')
     def order_by_multikey_test(self):
         """ Test for #4612 bug and more generaly order by when multiple C* rows are queried """
 
@@ -1964,7 +1979,7 @@ class TestCQL(Tester):
 
         cursor.execute("SELECT keyspace_name, durable_writes FROM system.schema_keyspaces")
         res = cursor.fetchall()
-        assert res == [ ['ks1', True], ['system', True], ['system_traces', True],  ['ks2', False] ], res
+        assert res == [ ['ks1', True], ['system', True], ['system_traces', True], ['ks2', False] ], res
 
         cursor.execute("ALTER KEYSPACE ks1 WITH replication = { 'CLASS' : 'NetworkTopologyStrategy', 'dc1' : 1 } AND durable_writes=False")
         cursor.execute("ALTER KEYSPACE ks2 WITH durable_writes=true")
@@ -2037,7 +2052,7 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[0, 0], [2, 2]], res
 
-    @since('1.2')
+    @require('4796')
     def indexes_composite_test(self):
         cursor = self.prepare()
 
@@ -2073,6 +2088,7 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[1, 0], [1, 3], [0, 0], [0, 2]], res
 
+    @since('1.1')
     def refuse_in_with_indexes_test(self):
         """ Test for the validation bug of #4709 """
 
@@ -2088,12 +2104,14 @@ class TestCQL(Tester):
         cursor.execute("insert into t1  (pk, col1, col2) values ('pk3','foo3','bar3');")
         assert_invalid(cursor, "select * from t1 where col2 in ('bar1', 'bar2');")
 
+    @since('1.2')
     def validate_counter_regular_test(self):
         """ Test for the validation bug of #4706 """
 
         cursor = self.prepare()
         assert_invalid(cursor, "CREATE TABLE test (id bigint PRIMARY KEY, count counter, things set<text>)")
 
+    @since('1.1')
     def reversed_compact_test(self):
         """ Test for #4716 bug and more generally for good behavior of ordering"""
 
@@ -2171,6 +2189,7 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[6], [5], [4], [3], [2]], res
 
+    @since('1.1')
     def unescaped_string_test(self):
 
         cursor = self.prepare()
@@ -2183,6 +2202,7 @@ class TestCQL(Tester):
 
         assert_invalid(cursor, "INSERT INTO test (k, c) VALUES ('foo', 'CQL is cassandra's best friend')")
 
+    @since('1.1')
     def reversed_compact_multikey_test(self):
         """ Test for the bug from #4760 and #4759 """
 

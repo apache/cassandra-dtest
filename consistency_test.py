@@ -213,7 +213,10 @@ class TestConsistency(Tester):
     def hintedhandoff_test(self):
         cluster = self.cluster
 
-        tokens = cluster.balanced_tokens(2)
+        if cluster.version() >= '1.2':
+            tokens = cluster.balanced_tokens(2, 64)
+        else:
+            tokens = cluster.balanced_tokens(2, 128)
         cluster.populate(2, tokens=tokens).start()
         [node1, node2] = cluster.nodelist()
 
@@ -240,7 +243,10 @@ class TestConsistency(Tester):
         cluster = self.cluster
         cluster.set_configuration_options(values={ 'hinted_handoff_enabled' : False})
 
-        tokens = cluster.balanced_tokens(2)
+        if cluster.version() >= '1.2':
+            tokens = cluster.balanced_tokens(2, 64)
+        else:
+            tokens = cluster.balanced_tokens(2, 128)
         cluster.populate(2, tokens=tokens).start()
         [node1, node2] = cluster.nodelist()
 
@@ -254,6 +260,7 @@ class TestConsistency(Tester):
             insert_c1c2(cursor, n, "ONE")
 
         node2.start(wait_other_notice=True)
+        time.sleep(5)
        # query everything to cause RR
         for n in xrange(0, 10000):
             query_c1c2(cursor, n, "QUORUM")
@@ -313,7 +320,10 @@ class TestConsistency(Tester):
 
         debug("Creating a ring")
         cluster = self.cluster
-        tokens = cluster.balanced_tokens(3)
+        if cluster.version() >= '1.2':
+            tokens = cluster.balanced_tokens(2, 64)
+        else:
+            tokens = cluster.balanced_tokens(2, 128)
         cluster.populate(3, tokens=tokens).start()
         [node1, node2, node3] = cluster.nodelist()
         cluster.start()
