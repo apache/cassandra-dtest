@@ -21,7 +21,7 @@ class TestMultiDCPutGet(Tester):
         cluster.populate([2, 2]).start()
 
         cursor = self.cql_connection(cluster.nodelist()[0]).cursor()
-        self.create_ks(cursor, 'ks', { 'dc1' : 2, 'dc2' : 3})
+        self.create_ks(cursor, 'ks', { 'dc1' : 2, 'dc2' : 2})
         self.create_cf(cursor, 'cf')
 
         putget(cluster, cursor)
