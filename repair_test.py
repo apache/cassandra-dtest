@@ -13,7 +13,7 @@ class TestRepair(Tester):
 
         cursor = self.cql_connection(node_to_check, 'ks').cursor()
         cursor.execute("SELECT * FROM cf LIMIT %d" % (rows * 2))
-        assert cursor.rowcount == rows
+        assert cursor.rowcount == rows, cursor.rowcount
 
         for k in found:
             query_c1c2(cursor, k, "ONE")
@@ -49,7 +49,7 @@ class TestRepair(Tester):
 
         cursor = self.cql_connection(node1).cursor()
         self.create_ks(cursor, 'ks', 3)
-        self.create_cf(cursor, 'cf', read_repair=0.0)
+        self.create_cf(cursor, 'cf', read_repair=0.0, columns={'c1': 'text', 'c2': 'text'})
 
         # Insert 1000 keys, kill node 3, insert 1 key, restart node 3, insert 1000 more keys
         for i in xrange(0, 1000):
