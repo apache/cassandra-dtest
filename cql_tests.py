@@ -1997,41 +1997,6 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [ ['cf1', 7] ], res
 
-    @since('1.2')
-    def set_default_cl_test(self):
-        cluster = self.cluster
-
-        cluster.populate(2).start()
-        node1 = cluster.nodelist()[0]
-        time.sleep(0.2)
-
-        cursor = self.cql_connection(node1, version=cql_version).cursor()
-        self.create_ks(cursor, 'ks', 2)
-
-        cursor.execute("CREATE TABLE test (a int PRIMARY KEY, b int) WITH default_write_consistency = 'ALL' AND default_read_consistency = 'ALL'")
-        time.sleep(0.2)
-
-        cursor.execute("INSERT INTO test (a, b) VALUES (0, 0)")
-        cursor.execute("SELECT * FROM test WHERE a = 0")
-        res = cursor.fetchall()
-        assert len(res) == 1, res
-
-        cluster.nodelist()[1].stop(wait_other_notice=True)
-        time.sleep(0.1)
-
-        # Both request should now fail
-        try:
-            cursor.execute("INSERT INTO test (a, b) VALUES (0, 0)")
-            assert False, "Expecting query to fail"
-        except cql.OperationalError as e:
-            pass
-
-        try:
-            cursor.execute("SELECT * FROM test WHERE a = 0")
-            assert False, "Expecting query to fail"
-        except cql.OperationalError as e:
-            pass
-
     @since('1.1')
     def remove_range_slice_test(self):
         cursor = self.prepare()

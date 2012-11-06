@@ -213,10 +213,7 @@ class TestConsistency(Tester):
     def hintedhandoff_test(self):
         cluster = self.cluster
 
-        if cluster.version() >= '1.2':
-            tokens = cluster.balanced_tokens(2, 64)
-        else:
-            tokens = cluster.balanced_tokens(2, 128)
+        tokens = cluster.balanced_tokens(2)
         cluster.populate(2, tokens=tokens).start()
         [node1, node2] = cluster.nodelist()
 
@@ -243,10 +240,7 @@ class TestConsistency(Tester):
         cluster = self.cluster
         cluster.set_configuration_options(values={ 'hinted_handoff_enabled' : False})
 
-        if cluster.version() >= '1.2':
-            tokens = cluster.balanced_tokens(2, 64)
-        else:
-            tokens = cluster.balanced_tokens(2, 128)
+        tokens = cluster.balanced_tokens(2)
         cluster.populate(2, tokens=tokens).start()
         [node1, node2] = cluster.nodelist()
 
@@ -320,10 +314,7 @@ class TestConsistency(Tester):
 
         debug("Creating a ring")
         cluster = self.cluster
-        if cluster.version() >= '1.2':
-            tokens = cluster.balanced_tokens(2, 64)
-        else:
-            tokens = cluster.balanced_tokens(2, 128)
+        tokens = cluster.balanced_tokens(3)
         cluster.populate(3, tokens=tokens).start()
         [node1, node2, node3] = cluster.nodelist()
         cluster.start()

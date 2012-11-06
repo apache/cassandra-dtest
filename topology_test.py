@@ -29,7 +29,7 @@ class TestTopology(Tester):
         assert_almost_equal(sizes[0], 6 * sizes[1])
 
         # Move nodes to balance the cluster
-        balancing_tokens = Cluster.balanced_tokens(3)
+        balancing_tokens = cluster.balanced_tokens(3)
         node2.move(balancing_tokens[1])
         node3.move(balancing_tokens[2])
         time.sleep(1)
@@ -50,7 +50,7 @@ class TestTopology(Tester):
     def decomission_test(self):
         cluster = self.cluster
 
-        tokens = Cluster.balanced_tokens(4)
+        tokens = cluster.balanced_tokens(4)
         cluster.populate(4, tokens=tokens).start()
         [node1, node2, node3, node4] = cluster.nodelist()
 
@@ -115,7 +115,7 @@ class TestTopology(Tester):
     def replace_test(self):
         cluster = self.cluster
 
-        tokens = Cluster.balanced_tokens(3)
+        tokens = cluster.balanced_tokens(3)
         cluster.populate(3, tokens=tokens).start()
         [node1, node2, node3] = cluster.nodelist()
 
