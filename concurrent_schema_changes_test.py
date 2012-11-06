@@ -28,15 +28,8 @@ class TestConcurrentSchemaChanges(Tester):
         """
         debug("prepare_for_changes() " + str(namespace))
         # create a keyspace that will be used
-        query = """CREATE KEYSPACE ks_%s WITH strategy_class=SimpleStrategy AND 
-                strategy_options:replication_factor=2""" % (namespace)
-        cursor.execute(query)
+        self.create_ks(cursor, "ks_%s" % namespace, 2)
         cursor.execute('USE ks_%s' % namespace)
-
-        # make a keyspace that can be deleted
-        query = """CREATE KEYSPACE ks2_%s WITH strategy_class=SimpleStrategy AND 
-                strategy_options:replication_factor=2""" % (namespace)
-        cursor.execute(query)
 
         # create a column family with an index and a row of data
         query = """
@@ -64,6 +57,8 @@ class TestConcurrentSchemaChanges(Tester):
         """ % namespace
         cursor.execute(query)
 
+        # make a keyspace that can be deleted
+        self.create_ks(cursor, "ks2_%s" % namespace, 2)
 
     def make_schema_changes(self, cursor, namespace='ns1'):
         """
@@ -86,9 +81,8 @@ class TestConcurrentSchemaChanges(Tester):
         wait(2)
 
         # create keyspace
-        query = """CREATE KEYSPACE ks3_%s WITH strategy_class=SimpleStrategy AND
-                strategy_options:replication_factor=2""" % namespace
-        cursor.execute(query)
+        self.create_ks(cursor, "ks3_%s" % namespace, 2)
+        cursor.execute('USE ks_%s' % namespace)
 
         wait(2)
         # drop column family
@@ -352,13 +346,13 @@ class TestConcurrentSchemaChanges(Tester):
         wait(1)
 
         # now the cluster is under a lot of load. Make some schema changes.
-        cursor.execute("USE Keyspace1")
+        cursor.execute('USE "Keyspace1"')
         wait(1)
-        cursor.execute("DROP COLUMNFAMILY Standard1")
+        cursor.execute('DROP COLUMNFAMILY "Standard1"')
 
         wait(3)
 
-        cursor.execute("CREATE COLUMNFAMILY Standard1 (KEY text PRIMARY KEY)")
+        cursor.execute('CREATE COLUMNFAMILY "Standard1" (KEY text PRIMARY KEY)')
 
         tcompact.join()
 
