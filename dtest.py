@@ -137,6 +137,8 @@ class Tester(object):
         host, port = node.network_interfaces['thrift']
         if not version and self.cluster.version() >= "1.2":
             version = "3.0.0"
+        elif not version and self.cluster.version() >= "1.1":
+            version = "2.0.0"
 
         if version:
             con = cql.connect(host, port, keyspace=keyspace, cql_version=version)

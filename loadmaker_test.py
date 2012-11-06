@@ -7,7 +7,7 @@ from tools import since
 
 class TestLoadmaker(Tester):
     
-    @since('1.0')
+    @since('1.1')
     def loadmaker_test(self):
         cluster = self.cluster
         cluster.populate(1).start()
