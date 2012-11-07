@@ -82,35 +82,36 @@ class TestTopology(Tester):
         assert_almost_equal((2.0/3.0) * sizes[0], sizes[2])
         assert_almost_equal(sizes[2], init_size)
 
-        node3.stop(wait_other_notice=True)
-        node1.removeToken(tokens[2])
-        time.sleep(.5)
-        cluster.cleanup()
-        time.sleep(.5)
+        if cluster.version() <= '1.2':
+            node3.stop(wait_other_notice=True)
+            node1.removeToken(tokens[2])
+            time.sleep(.5)
+            cluster.cleanup()
+            time.sleep(.5)
 
-        # Check we can get all the keys
-        for n in xrange(0, 10000):
-            query_c1c2(cursor, n, "QUORUM")
+            # Check we can get all the keys
+            for n in xrange(0, 10000):
+                query_c1c2(cursor, n, "QUORUM")
 
-        sizes = [ node.data_size() for node in cluster.nodelist() if node.is_running() ]
-        assert_almost_equal(*sizes)
-        assert_almost_equal(sizes[0], 2 * init_size)
+            sizes = [ node.data_size() for node in cluster.nodelist() if node.is_running() ]
+            assert_almost_equal(*sizes)
+            assert_almost_equal(sizes[0], 2 * init_size)
 
-        node5 = new_node(cluster, token=(tokens[2]+1)).start()
-        time.sleep(.5)
-        cluster.cleanup()
-        time.sleep(.5)
-        cluster.compact()
-        time.sleep(.5)
+            node5 = new_node(cluster, token=(tokens[2]+1)).start()
+            time.sleep(.5)
+            cluster.cleanup()
+            time.sleep(.5)
+            cluster.compact()
+            time.sleep(.5)
 
-        # Check we can get all the keys
-        for n in xrange(0, 10000):
-            query_c1c2(cursor, n, "QUORUM")
+            # Check we can get all the keys
+            for n in xrange(0, 10000):
+                query_c1c2(cursor, n, "QUORUM")
 
-        sizes = [ node.data_size() for node in cluster.nodelist() if node.is_running() ]
-        # We should be back to the earlir 3 nodes situation
-        for i in xrange(0, len(sizes)):
-            assert_almost_equal(sizes[i], three_node_sizes[i])
+            sizes = [ node.data_size() for node in cluster.nodelist() if node.is_running() ]
+            # We should be back to the earlir 3 nodes situation
+            for i in xrange(0, len(sizes)):
+                assert_almost_equal(sizes[i], three_node_sizes[i])
 
     def replace_test(self):
         cluster = self.cluster
