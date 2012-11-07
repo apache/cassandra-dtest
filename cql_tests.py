@@ -2340,7 +2340,7 @@ class TestCQL(Tester):
                 c1 int,
                 c2 int,
                 PRIMARY KEY (k, c1, c2)
-            ) WITH CLUSTERING ORDER BY (c2 DESC);
+            ) WITH CLUSTERING ORDER BY (c1 ASC, c2 DESC);
         """)
 
         for i in range(0, 2):
@@ -2383,7 +2383,7 @@ class TestCQL(Tester):
                 c2 int,
                 v int,
                 PRIMARY KEY (k, c1, c2)
-            ) WITH CLUSTERING ORDER BY (c2 DESC);
+            ) WITH CLUSTERING ORDER BY (c1 ASC, c2 DESC);
         """)
 
         cursor.execute("INSERT INTO test (k, c1, c2, v) VALUES (0, 0, 0, 0);")
