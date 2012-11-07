@@ -1792,7 +1792,7 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert len(res) == 2, res
 
-    @require('4796')
+    @since('1.2')
     def composite_index_with_pk_test(self):
 
         cursor = self.prepare(ordered=True)
@@ -1841,6 +1841,8 @@ class TestCQL(Tester):
         assert res == [], res
 
         assert_invalid(cursor, "SELECT content FROM blogs WHERE time2 >= 0 AND author='foo'")
+
+        assert False
 
     @since('1.2')
     def limit_bugs_test(self):
@@ -2296,6 +2298,7 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[1, 2], [1, 1], [1, 0], [0, 2], [0, 1], [0, 0]], res
 
+    @since('1.2')
     def collection_and_regular_test(self):
 
         cursor = self.prepare()
@@ -2314,6 +2317,7 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[(1, 1, 2), 42]], res
 
+    @since('1.2')
     def batch_and_list_test(self):
         cursor = self.prepare()
 
@@ -2348,6 +2352,7 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[(3, 2, 1)]], res
 
+    @since('1.2')
     def boolean_test(self):
         cursor = self.prepare()
 
@@ -2363,6 +2368,7 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[True, False]], res
 
+    @since('1.2')
     def multiordering_test(self):
         cursor = self.prepare()
         cursor.execute("""
@@ -2422,11 +2428,68 @@ class TestCQL(Tester):
         cursor.execute("INSERT INTO test (k, c1, c2, v) VALUES (0, 0, 2, 2);")
         cursor.execute("INSERT INTO test (k, c1, c2, v) VALUES (0, 1, 3, 3);")
 
-        #cursor.execute("select * from video_event;")
-        #res = cursor.fetchall()
-        #assert res == [], res
-
         cursor.execute("select * from test where k = 0 limit 1;")
         res = cursor.fetchall()
-        assert res == [], res
+        assert res == [[0, 0, 2, 2]], res
 
+    @since("1.2")
+    def multi_list_set_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k int PRIMARY KEY,
+                l1 list<int>,
+                l2 list<int>
+            )
+        """)
+
+        cursor.execute("INSERT INTO test (k, l1, l2) VALUES (0, [1, 2, 3], [4, 5, 6])")
+        cursor.execute("UPDATE test SET l2[1] = 42, l1[1] = 24  WHERE k = 0")
+
+        cursor.execute("SELECT l1, l2 FROM test WHERE k = 0")
+        res = cursor.fetchall()
+        assert res == [[(1, 24, 3), (4, 42, 6)]], res
+
+    @since("1.2")
+    def buggy_prepare(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k int PRIMARY KEY,
+                l list<int>,
+            )
+        """)
+
+        from cql import query
+        p = query.prepare_query("INSERT INTO test (k, l) VALUES (0, [?, ?])")
+        print p
+
+    @since("1.2")
+    def composite_index_collections_test(self):
+        cursor = self.prepare(ordered=True)
+        cursor.execute("""
+            CREATE TABLE blogs (
+                blog_id int,
+                time1 int,
+                time2 int,
+                author text,
+                content set<text>,
+                PRIMARY KEY (blog_id, time1, time2)
+            )
+        """)
+
+        cursor.execute("CREATE INDEX ON blogs(author)")
+
+        req = "INSERT INTO blogs (blog_id, time1, time2, author, content) VALUES (%d, %d, %d, '%s', %s)"
+        cursor.execute(req % (1, 0, 0, 'foo', "{ 'bar1', 'bar2' }"))
+        cursor.execute(req % (1, 0, 1, 'foo', "{ 'bar2', 'bar3' }"))
+        cursor.execute(req % (2, 1, 0, 'foo', "{ 'baz' }"))
+        cursor.execute(req % (3, 0, 1, 'gux', "{ 'qux' }"))
+
+        cursor.execute("SELECT blog_id, content FROM blogs WHERE author='foo'")
+        res = cursor.fetchall()
+        assert res == [[1, set(['bar1', 'bar2'])], [1, set(['bar2', 'bar3'])], [2, set(['baz'])]], res
+
+        assert_invalid(cursor, "CREATE INDEX ON blogs(content)")
