@@ -59,10 +59,10 @@ class TestSuperCounterClusterRestart(Tester):
 
         debug("Stopping cluster")
         cluster.stop()
-        time.sleep(1)
+        time.sleep(5)
         debug("Starting cluster")
         cluster.start()
-        time.sleep(.5)
+        time.sleep(5)
 
         thrift_conn = cql.connect(host, port, keyspace='ks')
 

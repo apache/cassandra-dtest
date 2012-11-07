@@ -20,7 +20,7 @@ class TestRepair(Tester):
 
         for k in missings:
             if self.cluster.version() >= '1.2':
-                cursor.execute('SELECT c1, c2 FROM cf WHERE key=k%d' % k, consistency_level='ONE')
+                cursor.execute("SELECT c1, c2 FROM cf WHERE key='k%d'" % k, consistency_level='ONE')
             else:
                 cursor.execute('SELECT c1, c2 FROM cf USING CONSISTENCY ONE WHERE key=k%d' % k)
             res = cursor.fetchall()
