@@ -1043,7 +1043,7 @@ class TestCQL(Tester):
 
         if self.cluster.version() >= '1.2':
             cursor.execute("""
-                BEGIN BATCH 
+                BEGIN BATCH
                     INSERT INTO users (userid, password, name) VALUES ('user2', 'ch@ngem3b', 'second user');
                     UPDATE users SET password = 'ps22dhds' WHERE userid = 'user3';
                     INSERT INTO users (userid, password) VALUES ('user4', 'ch@ngem3c');
@@ -1251,8 +1251,9 @@ class TestCQL(Tester):
                 PRIMARY KEY (k, c1, c2)
             );
         """)
+        time.sleep(1)
 
-        rows = 5 
+        rows = 5
         col1 = 2
         col2 = 2
         cpr = col1 * col2
@@ -1782,7 +1783,7 @@ class TestCQL(Tester):
                 v int
             );
         """)
-        time.sleep(0.2)
+        time.sleep(1)
 
         cursor.execute("INSERT INTO test (k, v) VALUES ('foo', 0)")
         cursor.execute("INSERT INTO test (k, v) VALUES ('bar', 1)")
@@ -1791,7 +1792,7 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert len(res) == 2, res
 
-    @require('4796')
+    @since('1.2')
     def composite_index_with_pk_test(self):
 
         cursor = self.prepare(ordered=True)
@@ -1840,6 +1841,8 @@ class TestCQL(Tester):
         assert res == [], res
 
         assert_invalid(cursor, "SELECT content FROM blogs WHERE time2 >= 0 AND author='foo'")
+
+        assert False
 
     @since('1.2')
     def limit_bugs_test(self):
@@ -2042,7 +2045,7 @@ class TestCQL(Tester):
 
         cursor.execute("SELECT blog_id, timestamp FROM test WHERE author = 'bob'")
         res = cursor.fetchall()
-        assert res == [[0, 0], [0, 2], [1, 0]], res
+        assert res == [[1, 0], [0, 0], [0, 2]], res
 
         cursor.execute(req % (1, 1, "tom", "6th post"))
         cursor.execute(req % (1, 2, "tom", "7th post"))
@@ -2050,7 +2053,7 @@ class TestCQL(Tester):
 
         cursor.execute("SELECT blog_id, timestamp FROM test WHERE author = 'bob'")
         res = cursor.fetchall()
-        assert res == [[0, 0], [0, 2], [1, 0], [1, 3]], res
+        assert res == [[1, 0], [1, 3], [0, 0], [0, 2]], res
 
     @since('1.1')
     def refuse_in_with_indexes_test(self):
@@ -2259,3 +2262,199 @@ class TestCQL(Tester):
         cursor.execute("SELECT c1, c2 FROM test WHERE key='foo' AND c1 <= 1 ORDER BY c1 DESC, c2 DESC")
         res = cursor.fetchall()
         assert res == [[1, 2], [1, 1], [1, 0], [0, 2], [0, 1], [0, 0]], res
+
+    @since('1.2')
+    def collection_and_regular_test(self):
+
+        cursor = self.prepare()
+
+        cursor.execute("""
+          CREATE TABLE test (
+            k int PRIMARY KEY,
+            l list<int>,
+            c int
+          )
+        """)
+
+        cursor.execute("INSERT INTO test(k, l, c) VALUES(3, [0, 1, 2], 4)")
+        cursor.execute("UPDATE test SET l[0] = 1, c = 42 WHERE k = 3")
+        cursor.execute("SELECT l, c FROM test WHERE k = 3")
+        res = cursor.fetchall()
+        assert res == [[(1, 1, 2), 42]], res
+
+    @since('1.2')
+    def batch_and_list_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+          CREATE TABLE test (
+            k int PRIMARY KEY,
+            l list<int>
+          )
+        """)
+
+        cursor.execute("""
+          BEGIN BATCH
+            UPDATE test SET l = l + [ 1 ] WHERE k = 0;
+            UPDATE test SET l = l + [ 2 ] WHERE k = 0;
+            UPDATE test SET l = l + [ 3 ] WHERE k = 0;
+          APPLY BATCH
+        """)
+
+        cursor.execute("SELECT l FROM test WHERE k = 0")
+        res = cursor.fetchall()
+        assert res == [[(1, 2, 3)]], res
+
+        cursor.execute("""
+          BEGIN BATCH
+            UPDATE test SET l = [ 1 ] + l WHERE k = 1;
+            UPDATE test SET l = [ 2 ] + l WHERE k = 1;
+            UPDATE test SET l = [ 3 ] + l WHERE k = 1;
+          APPLY BATCH
+        """)
+
+        cursor.execute("SELECT l FROM test WHERE k = 1")
+        res = cursor.fetchall()
+        assert res == [[(3, 2, 1)]], res
+
+    @since('1.2')
+    def boolean_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+          CREATE TABLE test (
+            k boolean PRIMARY KEY,
+            b boolean
+          )
+        """)
+
+        cursor.execute("INSERT INTO test (k, b) VALUES (true, false)")
+        cursor.execute("SELECT * FROM test WHERE k = true")
+        res = cursor.fetchall()
+        assert res == [[True, False]], res
+
+    @since('1.2')
+    def multiordering_test(self):
+        cursor = self.prepare()
+        cursor.execute("""
+            CREATE TABLE test (
+                k text,
+                c1 int,
+                c2 int,
+                PRIMARY KEY (k, c1, c2)
+            ) WITH CLUSTERING ORDER BY (c2 DESC);
+        """)
+
+        for i in range(0, 2):
+            for j in range(0, 2):
+                cursor.execute("INSERT INTO test(k, c1, c2) VALUES ('foo', %i, %i)" % (i, j))
+
+        cursor.execute("SELECT c1, c2 FROM test WHERE k = 'foo'")
+        res = cursor.fetchall()
+        assert res == [[0, 1], [0, 0], [1, 1], [1, 0]], res
+
+        cursor.execute("SELECT c1, c2 FROM test WHERE k = 'foo' ORDER BY c1 ASC, c2 DESC")
+        res = cursor.fetchall()
+        assert res == [[0, 1], [0, 0], [1, 1], [1, 0]], res
+
+        cursor.execute("SELECT c1, c2 FROM test WHERE k = 'foo' ORDER BY c1 DESC, c2 ASC")
+        res = cursor.fetchall()
+        assert res == [[1, 0], [1, 1], [0, 0], [0, 1]], res
+
+        assert_invalid(cursor, "SELECT c1, c2 FROM test WHERE k = 'foo' ORDER BY c2 DESC")
+        assert_invalid(cursor, "SELECT c1, c2 FROM test WHERE k = 'foo' ORDER BY c2 ASC")
+        assert_invalid(cursor, "SELECT c1, c2 FROM test WHERE k = 'foo' ORDER BY c1 ASC, c2 ASC")
+
+    def multiordering_validation_test(self):
+        cursor = self.prepare()
+
+        assert_invalid(cursor, "CREATE TABLE test (k int, c1 int, c2 int, PRIMARY KEY (k, c1, c2)) WITH CLUSTERING ORDER BY (c2 DESC)")
+        assert_invalid(cursor, "CREATE TABLE test (k int, c1 int, c2 int, PRIMARY KEY (k, c1, c2)) WITH CLUSTERING ORDER BY (c2 ASC, c1 DESC)")
+        assert_invalid(cursor, "CREATE TABLE test (k int, c1 int, c2 int, PRIMARY KEY (k, c1, c2)) WITH CLUSTERING ORDER BY (c1 DESC, c2 DESC, c3 DESC)")
+
+        cursor.execute("CREATE TABLE test1 (k int, c1 int, c2 int, PRIMARY KEY (k, c1, c2)) WITH CLUSTERING ORDER BY (c1 DESC, c2 DESC)")
+        cursor.execute("CREATE TABLE test2 (k int, c1 int, c2 int, PRIMARY KEY (k, c1, c2)) WITH CLUSTERING ORDER BY (c1 ASC, c2 DESC)")
+
+    def bug_4882_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k int,
+                c1 int,
+                c2 int,
+                v int,
+                PRIMARY KEY (k, c1, c2)
+            ) WITH CLUSTERING ORDER BY (c2 DESC);
+        """)
+
+        cursor.execute("INSERT INTO test (k, c1, c2, v) VALUES (0, 0, 0, 0);")
+        cursor.execute("INSERT INTO test (k, c1, c2, v) VALUES (0, 1, 1, 1);")
+        cursor.execute("INSERT INTO test (k, c1, c2, v) VALUES (0, 0, 2, 2);")
+        cursor.execute("INSERT INTO test (k, c1, c2, v) VALUES (0, 1, 3, 3);")
+
+        cursor.execute("select * from test where k = 0 limit 1;")
+        res = cursor.fetchall()
+        assert res == [[0, 0, 2, 2]], res
+
+    @since("1.2")
+    def multi_list_set_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k int PRIMARY KEY,
+                l1 list<int>,
+                l2 list<int>
+            )
+        """)
+
+        cursor.execute("INSERT INTO test (k, l1, l2) VALUES (0, [1, 2, 3], [4, 5, 6])")
+        cursor.execute("UPDATE test SET l2[1] = 42, l1[1] = 24  WHERE k = 0")
+
+        cursor.execute("SELECT l1, l2 FROM test WHERE k = 0")
+        res = cursor.fetchall()
+        assert res == [[(1, 24, 3), (4, 42, 6)]], res
+
+    @since("1.2")
+    def buggy_prepare(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k int PRIMARY KEY,
+                l list<int>,
+            )
+        """)
+
+        from cql import query
+        p = query.prepare_query("INSERT INTO test (k, l) VALUES (0, [?, ?])")
+        print p
+
+    @since("1.2")
+    def composite_index_collections_test(self):
+        cursor = self.prepare(ordered=True)
+        cursor.execute("""
+            CREATE TABLE blogs (
+                blog_id int,
+                time1 int,
+                time2 int,
+                author text,
+                content set<text>,
+                PRIMARY KEY (blog_id, time1, time2)
+            )
+        """)
+
+        cursor.execute("CREATE INDEX ON blogs(author)")
+
+        req = "INSERT INTO blogs (blog_id, time1, time2, author, content) VALUES (%d, %d, %d, '%s', %s)"
+        cursor.execute(req % (1, 0, 0, 'foo', "{ 'bar1', 'bar2' }"))
+        cursor.execute(req % (1, 0, 1, 'foo', "{ 'bar2', 'bar3' }"))
+        cursor.execute(req % (2, 1, 0, 'foo', "{ 'baz' }"))
+        cursor.execute(req % (3, 0, 1, 'gux', "{ 'qux' }"))
+
+        cursor.execute("SELECT blog_id, content FROM blogs WHERE author='foo'")
+        res = cursor.fetchall()
+        assert res == [[1, set(['bar1', 'bar2'])], [1, set(['bar2', 'bar3'])], [2, set(['baz'])]], res
+
+        assert_invalid(cursor, "CREATE INDEX ON blogs(content)")
