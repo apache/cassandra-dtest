@@ -56,7 +56,7 @@ class TestTopology(Tester):
 
         cursor = self.cql_connection(node1).cursor()
         self.create_ks(cursor, 'ks', 2)
-        self.create_cf(cursor, 'cf')
+        self.create_cf(cursor, 'cf',columns={'c1': 'text', 'c2': 'text'})
 
         for n in xrange(0, 10000):
             insert_c1c2(cursor, n, "QUORUM")
@@ -121,7 +121,7 @@ class TestTopology(Tester):
 
         cursor = self.cql_connection(node1).cursor()
         self.create_ks(cursor, 'ks', 3)
-        self.create_cf(cursor, 'cf')
+        self.create_cf(cursor, 'cf', columns={'c1': 'text', 'c2': 'text'})
 
         for n in xrange(0, 10000):
             insert_c1c2(cursor, n, "QUORUM")
@@ -154,14 +154,14 @@ class TestTopology(Tester):
 
         cursor = self.cql_connection(node1).cursor()
         self.create_ks(cursor, 'ks', 1)
-        self.create_cf(cursor, 'cf')
+        self.create_cf(cursor, 'cf', columns={'c1': 'text', 'c2': 'text'})
 
         for n in xrange(0, 10000):
             insert_c1c2(cursor, n, "ONE")
 
         cluster.flush()
 
-        node1.move(2**125)
+        node1.move(2**25)
         time.sleep(1)
 
         cluster.cleanup()
