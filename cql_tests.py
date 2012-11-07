@@ -2363,6 +2363,7 @@ class TestCQL(Tester):
         assert_invalid(cursor, "SELECT c1, c2 FROM test WHERE k = 'foo' ORDER BY c2 ASC")
         assert_invalid(cursor, "SELECT c1, c2 FROM test WHERE k = 'foo' ORDER BY c1 ASC, c2 ASC")
 
+    @since('1.2')
     def multiordering_validation_test(self):
         cursor = self.prepare()
 
