@@ -11,27 +11,27 @@ class TestTopology(Tester):
         cluster = self.cluster
 
         # Create an unbalanced ring
-        cluster.populate(3, tokens=[0, 2**125, 2**124]).start()
+        cluster.populate(3, tokens=[0, 2**48, 2**62]).start()
         [node1, node2, node3] = cluster.nodelist()
 
         cursor = self.cql_connection(node1).cursor()
         self.create_ks(cursor, 'ks', 1)
-        self.create_cf(cursor, 'cf')
+        self.create_cf(cursor, 'cf', columns={'c1': 'text', 'c2': 'text'})
 
         for n in xrange(0, 10000):
             insert_c1c2(cursor, n, "ONE")
 
         cluster.flush()
-        sizes = [ node.data_size() for node in [node1, node2, node3] ]
-        # Given the assigned token, node2 and node3 should have approximately
-        # the same amount of data and node1 must have 6 times as much
-        assert_almost_equal(sizes[1], sizes[2])
-        assert_almost_equal(sizes[0], 6 * sizes[1])
 
         # Move nodes to balance the cluster
         balancing_tokens = cluster.balanced_tokens(3)
-        node2.move(balancing_tokens[1])
-        node3.move(balancing_tokens[2])
+        if cluster.version() >= '1.2':
+            node1.move('\\%s' % balancing_tokens[0]) # can't assume 0 is balanced with m3p
+            node2.move('\\%s' % balancing_tokens[1])
+            node3.move('\\%s' % balancing_tokens[2])
+        else:
+            node2.move(balancing_tokens[1])
+            node3.move(balancing_tokens[2])
         time.sleep(1)
 
         cluster.cleanup()
