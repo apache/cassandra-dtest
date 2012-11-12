@@ -12,11 +12,14 @@ cql_version="3.0.0"
 
 class TestCQL(Tester):
 
-    def prepare(self, ordered=False, create_keyspace=True):
+    def prepare(self, ordered=False, create_keyspace=True, use_cache=False):
         cluster = self.cluster
 
         if (ordered):
             cluster.set_partitioner("org.apache.cassandra.dht.ByteOrderedPartitioner")
+
+        if (use_cache):
+            cluster.set_configuration_options(values={ 'row_cache_size_in_mb' : 100 })
 
         cluster.populate(1).start()
         node1 = cluster.nodelist()[0]
@@ -2454,3 +2457,27 @@ class TestCQL(Tester):
         assert res == [[1, set(['bar1', 'bar2'])], [1, set(['bar2', 'bar3'])], [2, set(['baz'])]], res
 
         assert_invalid(cursor, "CREATE INDEX ON blogs(content)")
+
+    def truncate_clean_cache_test(self):
+        cursor = self.prepare(ordered=True, use_cache=True)
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k int PRIMARY KEY,
+                v1 int,
+                v2 int,
+            ) WITH CACHING = ALL;
+        """)
+
+        for i in range(0, 3):
+            cursor.execute("INSERT INTO test(k, v1, v2) VALUES (%d, %d, %d)" % (i, i, i*2))
+
+        cursor.execute("SELECT v1, v2 FROM test WHERE k IN (0, 1, 2)")
+        res = cursor.fetchall()
+        assert res == [[0, 0], [1, 2], [2, 4]], res
+
+        cursor.execute("TRUNCATE test")
+
+        cursor.execute("SELECT v1, v2 FROM test WHERE k IN (0, 1, 2)")
+        res = cursor.fetchall()
+        assert res == [], res
