@@ -9,10 +9,7 @@ class TestBoostrap(Tester):
 
     def simple_bootstrap_test(self):
         cluster = self.cluster
-        if cluster.version() >= '1.2':
-            tokens = Cluster.balanced_tokens(2, 64)
-        else:
-            tokens = Cluster.balanced_tokens(2, 128)
+        tokens = cluster.balanced_tokens(2)
 
         keys = 10000
 

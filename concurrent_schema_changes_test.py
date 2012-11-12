@@ -28,15 +28,8 @@ class TestConcurrentSchemaChanges(Tester):
         """
         debug("prepare_for_changes() " + str(namespace))
         # create a keyspace that will be used
-        query = """CREATE KEYSPACE ks_%s WITH strategy_class=SimpleStrategy AND 
-                strategy_options:replication_factor=2""" % (namespace)
-        cursor.execute(query)
+        self.create_ks(cursor, "ks_%s" % namespace, 2)
         cursor.execute('USE ks_%s' % namespace)
-
-        # make a keyspace that can be deleted
-        query = """CREATE KEYSPACE ks2_%s WITH strategy_class=SimpleStrategy AND 
-                strategy_options:replication_factor=2""" % (namespace)
-        cursor.execute(query)
 
         # create a column family with an index and a row of data
         query = """
@@ -64,6 +57,8 @@ class TestConcurrentSchemaChanges(Tester):
         """ % namespace
         cursor.execute(query)
 
+        # make a keyspace that can be deleted
+        self.create_ks(cursor, "ks2_%s" % namespace, 2)
 
     def make_schema_changes(self, cursor, namespace='ns1'):
         """
@@ -86,9 +81,8 @@ class TestConcurrentSchemaChanges(Tester):
         wait(2)
 
         # create keyspace
-        query = """CREATE KEYSPACE ks3_%s WITH strategy_class=SimpleStrategy AND
-                strategy_options:replication_factor=2""" % namespace
-        cursor.execute(query)
+        self.create_ks(cursor, "ks3_%s" % namespace, 2)
+        cursor.execute('USE ks_%s' % namespace)
 
         wait(2)
         # drop column family
@@ -140,7 +134,7 @@ class TestConcurrentSchemaChanges(Tester):
         cluster.populate(2).start()
         node1 = cluster.nodelist()[0]
         wait(2)
-        cursor = self.cql_connection(node1, version="2.0.0").cursor()
+        cursor = self.cql_connection(node1).cursor()
 
         self.prepare_for_changes(cursor, namespace='ns1')
 
@@ -153,7 +147,7 @@ class TestConcurrentSchemaChanges(Tester):
         cluster.populate(2).start()
         [node1, node2] = cluster.nodelist()
         wait(2)
-        cursor = self.cql_connection(node1, version="2.0.0").cursor()
+        cursor = self.cql_connection(node1).cursor()
         self.prepare_for_changes(cursor, namespace='ns1')
         self.make_schema_changes(cursor, namespace='ns1')
         wait(3)
@@ -162,7 +156,7 @@ class TestConcurrentSchemaChanges(Tester):
         # wait for changes to get to the first node
         wait(20)
 
-        cursor = self.cql_connection(node2, version="2.0.0").cursor()
+        cursor = self.cql_connection(node2).cursor()
         self.prepare_for_changes(cursor, namespace='ns2')
         self.make_schema_changes(cursor, namespace='ns2')
         wait(3)
@@ -182,7 +176,7 @@ class TestConcurrentSchemaChanges(Tester):
         cluster.populate(2).start()
         [node1, node2] = cluster.nodelist()
         wait(2)
-        cursor = self.cql_connection(node2, version="2.0.0").cursor()
+        cursor = self.cql_connection(node2).cursor()
 
         self.prepare_for_changes(cursor, namespace='ns2')
         node1.stop()
@@ -210,7 +204,7 @@ class TestConcurrentSchemaChanges(Tester):
         cluster.populate(2).start()
         [node1, node2] = cluster.nodelist()
         wait(2)
-        cursor = self.cql_connection(node2, version="2.0.0").cursor()
+        cursor = self.cql_connection(node2).cursor()
 
         self.prepare_for_changes(cursor, namespace='ns2')
         node1.stop()
@@ -246,7 +240,7 @@ class TestConcurrentSchemaChanges(Tester):
         node2.start()
         wait(2)
 
-        cursor = self.cql_connection(node1, version="2.0.0").cursor()
+        cursor = self.cql_connection(node1).cursor()
         self.prepare_for_changes(cursor)
 
         node2.decommission()
@@ -278,7 +272,7 @@ class TestConcurrentSchemaChanges(Tester):
         cluster.populate(2).start()
         [node1, node2] = cluster.nodelist()
         wait(2)
-        cursor = self.cql_connection(node1, version="2.0.0").cursor()
+        cursor = self.cql_connection(node1).cursor()
         self.prepare_for_changes(cursor, namespace='ns2')
 
         wait(2)
@@ -331,7 +325,7 @@ class TestConcurrentSchemaChanges(Tester):
         cluster.populate(1).start()
         node1 = cluster.nodelist()[0]
         wait(2)
-        cursor = self.cql_connection(node1, version="2.0.0").cursor()
+        cursor = self.cql_connection(node1).cursor()
 
         def stress(args=[]):
             debug("Stressing")
@@ -352,13 +346,18 @@ class TestConcurrentSchemaChanges(Tester):
         wait(1)
 
         # now the cluster is under a lot of load. Make some schema changes.
-        cursor.execute("USE Keyspace1")
-        wait(1)
-        cursor.execute("DROP COLUMNFAMILY Standard1")
-
-        wait(3)
-
-        cursor.execute("CREATE COLUMNFAMILY Standard1 (KEY text PRIMARY KEY)")
+        if cluster.version() >= "1.2":
+            cursor.execute('USE "Keyspace1"')
+            wait(1)
+            cursor.execute('DROP COLUMNFAMILY "Standard1"')
+            wait(3)
+            cursor.execute('CREATE COLUMNFAMILY "Standard1" (KEY text PRIMARY KEY)')
+        else:
+            cursor.execute('USE Keyspace1')
+            wait(1)
+            cursor.execute('DROP COLUMNFAMILY Standard1')
+            wait(3)
+            cursor.execute('CREATE COLUMNFAMILY Standard1 (KEY text PRIMARY KEY)')
 
         tcompact.join()
 

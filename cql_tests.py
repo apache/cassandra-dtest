@@ -1841,8 +1841,6 @@ class TestCQL(Tester):
 
         assert_invalid(cursor, "SELECT content FROM blogs WHERE time2 >= 0 AND author='foo'")
 
-        assert False
-
     @since('1.2')
     def limit_bugs_test(self):
         """ Test for LIMIT bugs from 4579 """
@@ -1998,41 +1996,6 @@ class TestCQL(Tester):
         cursor.execute("SELECT columnfamily_name, min_compaction_threshold FROM system.schema_columnfamilies WHERE keyspace_name='ks1'")
         res = cursor.fetchall()
         assert res == [ ['cf1', 7] ], res
-
-    #@since('1.2')
-    #def set_default_cl_test(self):
-    #    cluster = self.cluster
-
-    #    cluster.populate(2).start()
-    #    node1 = cluster.nodelist()[0]
-    #    time.sleep(0.2)
-
-    #    cursor = self.cql_connection(node1, version=cql_version).cursor()
-    #    self.create_ks(cursor, 'ks', 2)
-
-    #    cursor.execute("CREATE TABLE test (a int PRIMARY KEY, b int) WITH default_write_consistency = 'ALL' AND default_read_consistency = 'ALL'")
-    #    time.sleep(0.2)
-
-    #    cursor.execute("INSERT INTO test (a, b) VALUES (0, 0)")
-    #    cursor.execute("SELECT * FROM test WHERE a = 0")
-    #    res = cursor.fetchall()
-    #    assert len(res) == 1, res
-
-    #    cluster.nodelist()[1].stop(wait_other_notice=True)
-    #    time.sleep(0.1)
-
-    #    # Both request should now fail
-    #    try:
-    #        cursor.execute("INSERT INTO test (a, b) VALUES (0, 0)")
-    #        assert False, "Expecting query to fail"
-    #    except cql.OperationalError as e:
-    #        pass
-
-    #    try:
-    #        cursor.execute("SELECT * FROM test WHERE a = 0")
-    #        assert False, "Expecting query to fail"
-    #    except cql.OperationalError as e:
-    #        pass
 
     @since('1.1')
     def remove_range_slice_test(self):
@@ -2376,7 +2339,7 @@ class TestCQL(Tester):
                 c1 int,
                 c2 int,
                 PRIMARY KEY (k, c1, c2)
-            ) WITH CLUSTERING ORDER BY (c2 DESC);
+            ) WITH CLUSTERING ORDER BY (c1 ASC, c2 DESC);
         """)
 
         for i in range(0, 2):
@@ -2399,6 +2362,7 @@ class TestCQL(Tester):
         assert_invalid(cursor, "SELECT c1, c2 FROM test WHERE k = 'foo' ORDER BY c2 ASC")
         assert_invalid(cursor, "SELECT c1, c2 FROM test WHERE k = 'foo' ORDER BY c1 ASC, c2 ASC")
 
+    @since('1.2')
     def multiordering_validation_test(self):
         cursor = self.prepare()
 
@@ -2419,7 +2383,7 @@ class TestCQL(Tester):
                 c2 int,
                 v int,
                 PRIMARY KEY (k, c1, c2)
-            ) WITH CLUSTERING ORDER BY (c2 DESC);
+            ) WITH CLUSTERING ORDER BY (c1 ASC, c2 DESC);
         """)
 
         cursor.execute("INSERT INTO test (k, c1, c2, v) VALUES (0, 0, 0, 0);")

@@ -13,13 +13,16 @@ class TestRepair(Tester):
 
         cursor = self.cql_connection(node_to_check, 'ks').cursor()
         cursor.execute("SELECT * FROM cf LIMIT %d" % (rows * 2))
-        assert cursor.rowcount == rows
+        assert cursor.rowcount == rows, cursor.rowcount
 
         for k in found:
             query_c1c2(cursor, k, "ONE")
 
         for k in missings:
-            cursor.execute('SELECT c1, c2 FROM cf USING CONSISTENCY ONE WHERE key=k%d' % k)
+            if self.cluster.version() >= '1.2':
+                cursor.execute("SELECT c1, c2 FROM cf WHERE key='k%d'" % k, consistency_level='ONE')
+            else:
+                cursor.execute('SELECT c1, c2 FROM cf USING CONSISTENCY ONE WHERE key=k%d' % k)
             res = cursor.fetchall()
             assert len(filter(lambda x: len(x) != 0, res)) == 0, res
 
@@ -49,7 +52,7 @@ class TestRepair(Tester):
 
         cursor = self.cql_connection(node1).cursor()
         self.create_ks(cursor, 'ks', 3)
-        self.create_cf(cursor, 'cf', read_repair=0.0)
+        self.create_cf(cursor, 'cf', read_repair=0.0, columns={'c1': 'text', 'c2': 'text'})
 
         # Insert 1000 keys, kill node 3, insert 1 key, restart node 3, insert 1000 more keys
         for i in xrange(0, 1000):
