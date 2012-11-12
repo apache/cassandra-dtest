@@ -325,8 +325,7 @@ class TestCQL(Tester):
             for tld in [ 'com', 'org', 'net' ]:
                 cursor.execute("INSERT INTO clicks (userid, url, time) VALUES (%i, 'http://foo.%s', 42)" % (id, tld))
 
-        # Queries
-        # That that we do limit the output to 1 *and* that we respect query
+        # Check that we do limit the output to 1 *and* that we respect query
         # order of keys (even though 48 is after 2)
         cursor.execute("SELECT * FROM clicks WHERE userid IN (48, 2) LIMIT 1")
         res = cursor.fetchall()
