@@ -277,7 +277,6 @@ class TestCQL(Tester):
 
         assert_invalid(cursor, "CREATE TABLE test (key text, key2 text, c int, d text, PRIMARY KEY (key, key2)) WITH COMPACT STORAGE")
 
-    @require('4797')
     @since('1.1')
     def limit_ranges_test(self):
         """ Validate LIMIT option for 'range queries' in SELECT statements """
@@ -392,7 +391,7 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[ -4 ]], res
 
-    @require('#3680')
+    @since('1.2')
     def indexed_with_eq_test(self):
         """ Check that you can query for an indexed column even with a key EQ clause """
         cursor = self.prepare()
@@ -804,7 +803,7 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[10]], res
 
-    @require('#3680')
+    @since('1.2')
     def nameless_index_test(self):
         """ Test CREATE INDEX without name and validate the index can be dropped """
         cursor = self.prepare()
@@ -1341,7 +1340,7 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert len(res) == 3, res
 
-    @require('#3680')
+    @since('1.2')
     def range_query_2ndary_test(self):
         """ Test range queries with 2ndary indexes (#4257) """
         cursor = self.prepare()
@@ -1604,7 +1603,7 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [['ɸ', 'ɸ', 'ɸ']], res
 
-    @require('#4179')
+    @since('1.2')
     def composite_row_key_test(self):
         cursor = self.prepare()
 
@@ -1637,11 +1636,11 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[0, 1, 1, 1]], res
 
-        cursor.execute("SELECT * FROM test WHERE token(k1, k2) > '0'")
+        cursor.execute("SELECT * FROM test WHERE token(k1, k2) > '-" + str(2**63-1) + "'")
         res = cursor.fetchall()
         assert res == [[0, 2, 2, 2], [0, 3, 3, 3], [0, 0, 0, 0], [0, 1, 1, 1]], res
 
-    @require('#4377')
+    @since('1.2')
     def cql3_insert_thrift_test(self):
         """ Check that we can insert from thrift into a CQL3 table (#4377) """
         cursor = self.prepare()
@@ -1659,11 +1658,10 @@ class TestCQL(Tester):
         cli.do("use ks")
         cli.do("set test[2]['4:v'] = int(200)")
         assert not cli.has_errors(), cli.errors()
-        assert False, cli.last_output()
 
         cursor.execute("SELECT * FROM test")
         res = cursor.fetchall()
-        assert res == [ "foo" ], res
+        assert res == [ [2, 4, 200] ], res
 
     @since('1.2')
     def row_existence_test(self):
@@ -2016,7 +2014,7 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[0, 0], [2, 2]], res
 
-    @require('4796')
+    @since('1.2')
     def indexes_composite_test(self):
         cursor = self.prepare()
 
