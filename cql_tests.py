@@ -2374,6 +2374,7 @@ class TestCQL(Tester):
         cursor.execute("CREATE TABLE test1 (k int, c1 int, c2 int, PRIMARY KEY (k, c1, c2)) WITH CLUSTERING ORDER BY (c1 DESC, c2 DESC)")
         cursor.execute("CREATE TABLE test2 (k int, c1 int, c2 int, PRIMARY KEY (k, c1, c2)) WITH CLUSTERING ORDER BY (c1 ASC, c2 DESC)")
 
+    @since('1.2')
     def bug_4882_test(self):
         cursor = self.prepare()
 
