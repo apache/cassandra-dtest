@@ -2459,6 +2459,7 @@ class TestCQL(Tester):
 
         assert_invalid(cursor, "CREATE INDEX ON blogs(content)")
 
+    @since('1.1')
     def truncate_clean_cache_test(self):
         cursor = self.prepare(ordered=True, use_cache=True)
 
