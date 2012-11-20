@@ -4,7 +4,7 @@ from dtest import Tester
 from assertions import *
 from tools import *
 
-import os, sys, time, tools, json
+import os, sys, time, tools, json, random
 from uuid import UUID
 from ccmlib.cluster import Cluster
 
@@ -2459,7 +2459,6 @@ class TestCQL(Tester):
 
         assert_invalid(cursor, "CREATE INDEX ON blogs(content)")
 
-    @since('1.1')
     def truncate_clean_cache_test(self):
         cursor = self.prepare(ordered=True, use_cache=True)
 
@@ -2483,3 +2482,86 @@ class TestCQL(Tester):
         cursor.execute("SELECT v1, v2 FROM test WHERE k IN (0, 1, 2)")
         res = cursor.fetchall()
         assert res == [], res
+
+    @since('1.2')
+    def allow_filtering_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k int,
+                c int,
+                v int,
+                PRIMARY KEY (k, c)
+            )
+        """)
+
+
+        for i in range(0, 3):
+            for j in range(0, 3):
+                cursor.execute("INSERT INTO test(k, c, v) VALUES(%d, %d, %d)" % (i, j, j))
+
+        # Don't require filtering, always allowed
+        queries = [ "SELECT * FROM test WHERE k = 1",
+                    "SELECT * FROM test WHERE k = 1 AND c > 2",
+                    "SELECT * FROM test WHERE k = 1 AND c = 2" ]
+        for q in queries:
+            cursor.execute(q)
+            cursor.execute(q + " ALLOW FILTERING")
+
+        # Require filtering, allowed only with ALLOW FILTERING
+        queries = [ "SELECT * FROM test WHERE c = 2",
+                    "SELECT * FROM test WHERE c > 2 AND c <= 4" ]
+        for q in queries:
+            assert_invalid(cursor, q)
+            cursor.execute(q + " ALLOW FILTERING")
+
+        cursor.execute("""
+            CREATE TABLE indexed (
+                k int PRIMARY KEY,
+                a int,
+                b int,
+            )
+        """)
+
+        cursor.execute("CREATE INDEX ON indexed(a)")
+
+        for i in range(0, 5):
+            cursor.execute("INSERT INTO indexed(k, a, b) VALUES(%d, %d, %d)" % (i, i * 10, i * 100))
+
+        # Don't require filtering, always allowed
+        queries = [ "SELECT * FROM indexed WHERE k = 1",
+                    "SELECT * FROM indexed WHERE a = 20" ]
+        for q in queries:
+            cursor.execute(q)
+            cursor.execute(q + " ALLOW FILTERING")
+
+        # Require filtering, allowed only with ALLOW FILTERING
+        queries = [ "SELECT * FROM indexed WHERE a = 20 AND b = 200" ]
+        for q in queries:
+            assert_invalid(cursor, q)
+            cursor.execute(q + " ALLOW FILTERING")
+
+    @require('4877')
+    def range_with_deletes_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k int PRIMARY KEY,
+                v int,
+            )
+        """)
+
+        nb_keys = 30
+        nb_deletes = 5
+
+        for i in range(0, nb_keys):
+            cursor.execute("INSERT INTO test(k, v) VALUES (%d, %d)" % (i, i))
+
+        for i in random.sample(xrange(nb_keys), nb_deletes):
+            cursor.execute("DELETE FROM test WHERE k = %d" % i)
+
+        cursor.execute("SELECT * FROM test LIMIT %d" % (nb_keys/2))
+        res = cursor.fetchall()
+        assert len(res) == nb_keys/2, "Expected %d but got %d" % (nb_keys/2, len(res))
