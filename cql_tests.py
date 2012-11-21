@@ -2483,7 +2483,7 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [], res
 
-    @since('1.2')
+    @require('4915')
     def allow_filtering_test(self):
         cursor = self.prepare()
 
