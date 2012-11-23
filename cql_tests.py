@@ -1357,7 +1357,7 @@ class TestCQL(Tester):
         cursor.execute(q % (2, 2, 0))
         cursor.execute(q % (3, 3, 0))
 
-        cursor.execute("SELECT * FROM indextest WHERE setid = 0 AND row < 1;")
+        cursor.execute("SELECT * FROM indextest WHERE setid = 0 AND row < 1 ALLOW FILTERING;")
         res = cursor.fetchall()
         assert res == [[0, 0, 0]], res
 
@@ -2483,7 +2483,7 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [], res
 
-    @require('4915')
+    @since('1.2')
     def allow_filtering_test(self):
         cursor = self.prepare()
 
@@ -2495,7 +2495,6 @@ class TestCQL(Tester):
                 PRIMARY KEY (k, c)
             )
         """)
-
 
         for i in range(0, 3):
             for j in range(0, 3):
@@ -2542,7 +2541,7 @@ class TestCQL(Tester):
             assert_invalid(cursor, q)
             cursor.execute(q + " ALLOW FILTERING")
 
-    @require('4877')
+    @since('1.2')
     def range_with_deletes_test(self):
         cursor = self.prepare()
 
