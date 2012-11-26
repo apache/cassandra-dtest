@@ -1357,6 +1357,7 @@ class TestCQL(Tester):
         cursor.execute(q % (2, 2, 0))
         cursor.execute(q % (3, 3, 0))
 
+        assert_invalid(cursor, "SELECT * FROM indextest WHERE setid = 0 AND row < 1;")
         cursor.execute("SELECT * FROM indextest WHERE setid = 0 AND row < 1 ALLOW FILTERING;")
         res = cursor.fetchall()
         assert res == [[0, 0, 0]], res
