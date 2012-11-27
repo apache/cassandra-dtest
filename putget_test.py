@@ -82,3 +82,82 @@ class TestPutGet(Tester):
         for size in (10, 100, 1000):
             for x in xrange(1, (50001 - size) / size):
                 tools.query_columns(self, cursor, key, size, offset=x*size-1)
+
+    @since('1.1')
+    def wide_slice_test(self):
+        """ 
+        Check slicing a wide row. 
+        See https://issues.apache.org/jira/browse/CASSANDRA-4919 
+
+        From Sylvain about duplicating:
+
+        Ok, so now that I think about it, you can't reproduce that with CQL currently.
+        You'll have to use the thrift get_paged_slice call as it's the only way to
+        trigger this.
+
+        Then, I think you'll be able to reproduce with the following steps:
+        1) you'd want to use 2 nodes with RF=1 and with ByteOrderedPartitioner (it's
+        possible to reproduce with a random partitioner but a tad more painful)
+        2) picks token for the nodes so that you know what goes on which node. For
+        example you may want that any row key starting with 'a' goes on node1, and
+        anything starting with a 'b' goes on node 2.
+        3) insers data that span the two nodes. Say inserts 20 rows 'a0' ... 'a9' and
+        'b0' ...'b9' (so 10 rows on each node) with say 10 columns on row.
+        4) then do a get_paged_slice for keys 'a5' to 'b4' and for the column filter, a
+        slice filter that picks the fifth last columns.
+        5) the get_paged_slice is supposed to return 95 columns (it should return the 5
+        last columns of a5 and then all 10 columns for 'a6' to 'b4'), but without
+        CASSANDRA-4919 it will return 90 columns only (it will only return the 5 last
+        columns of 'b0').
+        """
+        cluster = self.cluster
+        cluster.set_configuration_options(values={'partitioner': 'org.apache.cassandra.dht.ByteOrderedPartitioner'})
+        cluster.populate(2)
+        [node1, node2] = cluster.nodelist()
+        node1.set_configuration_options(values={'initial_token': "a".encode('hex')  })
+        node1.set_configuration_options(values={'initial_token': "b".encode('hex')  })
+        cluster.start()
+        time.sleep(.5)
+        cursor = self.cql_connection(node1).cursor()
+        self.create_ks(cursor, 'ks', 1)
+
+        query = """
+            CREATE TABLE test (
+                k text PRIMARY KEY
+            );
+        """
+        cursor.execute(query)
+
+        for i in xrange(10):
+            key_num = str(i).zfill(2)
+            query1 = "INSERT INTO test (k, 'col0', 'col1', 'col2', 'col3', 'col4', 'col5', 'col6', 'col7', 'col8', 'col9') VALUES ('a%s', 0, 1, 2, 3, 4, 5, 6, 7, 8, 9)" % (key_num)
+            query2 = "INSERT INTO test (k, 'col0', 'col1', 'col2', 'col3', 'col4', 'col5', 'col6', 'col7', 'col8', 'col9') VALUES ('b%s', 0, 1, 2, 3, 4, 5, 6, 7, 8, 9)" % (key_num)
+            cursor.execute(query1)
+            cursor.execute(query2)
+
+        cursor.close()
+
+        tc = ThriftConnection(node1, ks_name='ks', cf_name='test')
+        tc.use_ks()
+
+        # Slice on the keys
+        rnge = tc.Cassandra.KeyRange(
+            start_key="a%s" % ('5'.zfill(2)),
+            end_key="b%s" % ('4'.zfill(2)),
+            count=9999,
+        )
+        rows = tc.client.get_paged_slice(
+            column_family='test',
+            range=rnge,
+            start_column='col5',
+            consistency_level=tc.Cassandra.ConsistencyLevel.ONE,
+        )
+        keys = [fd.key for fd in rows]
+        columns = []
+        for row in rows:
+            cols = [col.column.name for col in row.columns]
+            columns.extend(cols)
+            #print row.key
+            #print cols
+        
+        assert len(columns) == 95, "Regression in cassandra-4919. Expected 95 columns, got %d." % len(columns)
