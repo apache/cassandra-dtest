@@ -5,6 +5,7 @@ import time
 
 class TestSchema(Tester):
 
+    @require('#3919')
     def remove_columndef_test(self):
         """ Remove a column definition while a node is dead """
 
