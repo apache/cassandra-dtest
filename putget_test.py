@@ -118,7 +118,7 @@ class TestPutGet(Tester):
         node1.set_configuration_options(values={'initial_token': "b".encode('hex')  })
         cluster.start()
         time.sleep(.5)
-        cursor = self.cql_connection(node1).cursor()
+        cursor = self.cql_connection(node1, version="2.0.0").cursor()
         self.create_ks(cursor, 'ks', 1)
 
         query = """

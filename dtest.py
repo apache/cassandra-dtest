@@ -148,7 +148,7 @@ class Tester(object):
         return con
 
     def create_ks(self, cursor, name, rf):
-        if self.cluster.version() >= "1.2":
+        if self.cluster.version() >= "1.2" and cursor.cql_major_version >= 3:
             query = 'CREATE KEYSPACE %s WITH replication={%s}'
             if isinstance(rf, types.IntType):
                 # we assume simpleStrategy
