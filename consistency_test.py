@@ -142,8 +142,6 @@ class TestConsistency(Tester):
         self.create_cf(cursor, 'cf', read_repair=0.0)
         # insert 9 columns in one row
         insert_columns(self, cursor, 0, 9)
-        cursor.execute('SELECT * FROM cf USING CONSISTENCY QUORUM')
-        print ">> ", str(cursor.fetchall())
         cursor.close()
 
         # Deleting 3 first columns with a different node dead each time
@@ -153,14 +151,13 @@ class TestConsistency(Tester):
 
         # Query 3 firsts columns
         cursor = self.cql_connection(node1, 'ks').cursor()
-        cursor = self.cql_connection(node1, 'ks').cursor()
         if self.cluster.version() >= "1.2":
-            cursor.execute('SELECT c, v FROM cf USING CONSISTENCY QUORUM WHERE key=\'k0\' LIMIT 3')
+            cursor.execute('SELECT c, v FROM cf WHERE key=\'k0\' LIMIT 3', consistency_level="QUORUM")
             res = cursor.fetchall()
             assert len(res) == 3, 'Expecting 3 values, got %d (%s)' % (len(res), str(res))
-            # value 6, 7 and 8 have been deleted
+            # value 0, 1 and 2 have been deleted
             for i in xrange(1, 4):
-                assert res[i-1][1] == 'value%d' % (5-i), 'Expecting value%d, got %s (%s)' % (5-i, res[i-1][1], str(res))
+                assert res[i-1][1] == 'value%d' % (i+2), 'Expecting value%d, got %s (%s)' % (i+2, res[i-1][1], str(res))
         else:
             cursor.execute('SELECT FIRST 3 * FROM cf USING CONSISTENCY QUORUM WHERE key=k0')
             assert cursor.rowcount == 1
@@ -194,7 +191,10 @@ class TestConsistency(Tester):
         node1.flush()
         node1.stop(wait_other_notice=True)
         cursor = self.cql_connection(node2, 'ks').cursor()
-        cursor.execute('DELETE FROM cf USING CONSISTENCY ONE WHERE key=k0')
+        if self.cluster.version() >= "1.2":
+            cursor.execute('DELETE FROM cf WHERE key=\'k0\'', consistency_level="ONE")
+        else:
+            cursor.execute('DELETE FROM cf USING CONSISTENCY ONE WHERE key=k0')
         cursor.close()
         node1.start(wait_other_notice=True)
         time.sleep(.5)
@@ -202,7 +202,8 @@ class TestConsistency(Tester):
         # Query first column
         cursor = self.cql_connection(node1, 'ks').cursor()
         if self.cluster.version() >= "1.2":
-            cursor.execute('SELECT c, v FROM cf USING CONSISTENCY QUORUM WHERE key=\'k0\' LIMIT 1')
+            cursor.execute('SELECT c, v FROM cf WHERE key=\'k0\' LIMIT 1', consistency_level="QUORUM")
+            res = cursor.fetchone()
             assert cursor.rowcount == 0, res
         else:
             cursor.execute('SELECT FIRST 1 * FROM cf USING CONSISTENCY QUORUM WHERE key=k0')
@@ -292,7 +293,7 @@ class TestConsistency(Tester):
         # Query 3 firsts columns
         cursor = self.cql_connection(node1, 'ks').cursor()
         if self.cluster.version() >= "1.2":
-            cursor.execute('SELECT c, v FROM cf USING CONSISTENCY QUORUM WHERE key=\'k0\' ORDER BY c DESC LIMIT 3')
+            cursor.execute('SELECT c, v FROM cf WHERE key=\'k0\' ORDER BY c DESC LIMIT 3', consistency_level="QUORUM")
             res = cursor.fetchall()
             assert len(res) == 3, 'Expecting 3 values, got %d (%s)' % (len(res), str(res))
             # value 6, 7 and 8 have been deleted
@@ -342,13 +343,13 @@ class TestConsistency(Tester):
         to_stop.stop(wait_other_notice=True)
         cursor = self.cql_connection(next_node, 'ks').cursor()
         if self.cluster.version() >= "1.2":
-            query = 'BEGIN BATCH USING CONSISTENCY QUORUM '
-            query = query + 'DELETE FROM cf WHERE key=\'k0\' AND c=\'c%d\'; ' % column
+            query = 'BEGIN BATCH '
+            query = query + 'DELETE FROM cf WHERE key=\'k0\' AND c=\'c%06d\'; ' % column
             query = query + 'DELETE FROM cf WHERE key=\'k0\' AND c=\'c2\'; '
             query = query + 'APPLY BATCH;'
-            cursor.execute(query)
+            cursor.execute(query, consistency_level="QUORUM")
         else:
-            cursor.execute('DELETE c%d, c2 FROM cf USING CONSISTENCY QUORUM WHERE key=k0' % column)
+            cursor.execute('DELETE c%06d, c2 FROM cf USING CONSISTENCY QUORUM WHERE key=k0' % column)
         cursor.close()
         to_stop.start(wait_other_notice=True)
 
