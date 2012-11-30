@@ -21,6 +21,7 @@ if len(config.read(os.path.expanduser('~/.cassandra-dtest'))) > 0:
 NO_SKIP = os.environ.get('SKIP', '').lower() in ('no', 'false')
 DEBUG = os.environ.get('DEBUG', '').lower() in ('yes', 'true')
 PRINT_DEBUG = os.environ.get('PRINT_DEBUG', '').lower() in ('yes', 'true')
+ENABLE_VNODES = os.environ.get('ENABLE_VNODES', 'false').lower() in ('yes', 'true')
 
 LOG = logging.getLogger()
 
@@ -29,6 +30,7 @@ def debug(msg):
         LOG.debug(msg)
     if PRINT_DEBUG:
         print msg
+
 
 class Tester(object):
 
@@ -41,13 +43,16 @@ class Tester(object):
         self.test_path = tempfile.mkdtemp(prefix='dtest-')
         try:
             version = os.environ['CASSANDRA_VERSION']
-            return Cluster(self.test_path, name, cassandra_version=version)
+            cluster = Cluster(self.test_path, name, cassandra_version=version)
         except KeyError:
             try:
                 cdir = os.environ['CASSANDRA_DIR']
             except KeyError:
                 cdir = DEFAULT_DIR
-            return Cluster(self.test_path, name, cassandra_dir=cdir)
+            cluster = Cluster(self.test_path, name, cassandra_dir=cdir)
+        if ENABLE_VNODES:
+            cluster.set_configuration_options(values={'initial_token': None, 'num_tokens': 256})
+        return cluster
 
     def __cleanup_cluster(self):
         self.cluster.remove()
