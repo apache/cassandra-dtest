@@ -127,6 +127,7 @@ class TestPutGet(Tester):
             );
         """
         cursor.execute(query)
+        time.sleep(.5)
 
         for i in xrange(10):
             key_num = str(i).zfill(2)
