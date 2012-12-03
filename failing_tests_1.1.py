@@ -7,21 +7,14 @@ nosetests -ve `failing_tests.py`
 """
 
 failing_tests = """
-    decommission_node_schema_check_test
-    upgrade_test
-    simple_bootstrap_test
+    unavailable_schema_test
+    upgrade_to_11_test
     decommission_node_test
-    all_all_test
-    all_one_test
-    one_all_test
-    one_one_test
-    hintedhandoff_test
-    quorum_available_during_failure_test
-    quorum_quorum_test
-    readrepair_test
-    short_read_reversed_test
+    upgrade_test
+    TestGlobalRowKeyCache
+    rolling_upgrade_test
+    incompressible_data_in_compressed_table_test
     short_read_test
-
 """
 
 lines = (l.strip() for l in failing_tests.splitlines() if l.strip())
