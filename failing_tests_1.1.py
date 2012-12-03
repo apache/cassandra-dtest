@@ -1,6 +1,12 @@
 #!/usr/bin/python
 
-tests_to_skip = """
+"""
+Builds a regex that matches failing tests. Usage:
+
+nosetests -ve `failing_tests.py`
+"""
+
+failing_tests = """
     decommission_node_schema_check_test
     upgrade_test
     simple_bootstrap_test
@@ -18,7 +24,7 @@ tests_to_skip = """
 
 """
 
-lines = (l.strip() for l in tests_to_skip.splitlines() if l.strip())
+lines = (l.strip() for l in failing_tests.splitlines() if l.strip())
 
 print "|".join(lines),
 
