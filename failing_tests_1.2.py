@@ -17,7 +17,8 @@ failing_tests = """
     incompressible_data_in_compressed_table_test
     upgrade_through_versions_test
     cql3_insert_thrift_test
-
+    upgrade_test
+    putget_deflate_test
 """
 
 lines = (l.strip() for l in failing_tests.splitlines() if l.strip())
