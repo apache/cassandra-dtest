@@ -192,13 +192,17 @@ def range_putget(cluster, cursor, cl="QUORUM"):
             _validate_row(cluster, res)
 
 class since(object):
-    def __init__(self, cass_version):
+    def __init__(self, cass_version, max_version=None):
         self.cass_version = cass_version
+        self.max_version = max_version
 
     def __call__(self, f):
         def wrapped(obj):
             if obj.cluster.version() < self.cass_version:
                 obj.skip("%s < %s" % (obj.cluster.version(), self.cass_version))
+            if self.max_version and \
+                    obj.cluster.version()[:len(self.max_version)] > self.max_version:
+                obj.skip("%s > %s" %(obj.cluster.version(), self.max_version)) 
             f(obj)
         wrapped.__name__ = f.__name__
         wrapped.__doc__ = f.__doc__
