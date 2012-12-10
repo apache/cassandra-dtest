@@ -1980,7 +1980,7 @@ class TestCQL(Tester):
 
         cursor.execute("SELECT keyspace_name, durable_writes FROM system.schema_keyspaces")
         res = cursor.fetchall()
-        assert res == [ ['ks1', True], ['system', True], ['system_traces', True], ['ks2', False] ], res
+        assert res == [ [u'system_auth', True], [u'ks1', True], [u'system', True], [u'system_traces', True], [u'ks2', False] ], res
 
         cursor.execute("ALTER KEYSPACE ks1 WITH replication = { 'CLASS' : 'NetworkTopologyStrategy', 'dc1' : 1 } AND durable_writes=False")
         cursor.execute("ALTER KEYSPACE ks2 WITH durable_writes=true")
