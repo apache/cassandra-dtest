@@ -126,6 +126,7 @@ class TestConsistency(Tester):
         node3.stop(wait_other_notice=True)
         assert_unavailable(insert_c1c2, cursor1, 100, "ALL")
 
+    @since('1.2')
     def short_read_test(self):
         cluster = self.cluster
 
