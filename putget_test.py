@@ -83,6 +83,7 @@ class TestPutGet(Tester):
             for x in xrange(1, (50001 - size) / size):
                 tools.query_columns(self, cursor, key, size, offset=x*size-1)
 
+    @no_vnodes()
     @since('1.1')
     def wide_slice_test(self):
         """ 

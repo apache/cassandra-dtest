@@ -3,6 +3,7 @@ from ccmlib.node import Node
 from decorator  import decorator
 import cql
 import re
+import os
 
 from thrift.transport import TTransport, TSocket
 from thrift.protocol import TBinaryProtocol
@@ -191,17 +192,34 @@ def range_putget(cluster, cursor, cl="QUORUM"):
             _validate_row(cluster, res)
 
 class since(object):
-    def __init__(self, cass_version):
+    def __init__(self, cass_version, max_version=None):
         self.cass_version = cass_version
+        self.max_version = max_version
 
     def __call__(self, f):
         def wrapped(obj):
             if obj.cluster.version() < self.cass_version:
                 obj.skip("%s < %s" % (obj.cluster.version(), self.cass_version))
+            if self.max_version and \
+                    obj.cluster.version()[:len(self.max_version)] > self.max_version:
+                obj.skip("%s > %s" %(obj.cluster.version(), self.max_version)) 
             f(obj)
         wrapped.__name__ = f.__name__
         wrapped.__doc__ = f.__doc__
         return wrapped
+
+from dtest import ENABLE_VNODES
+# Use this decorator to skip a test when vnodes are enabled.
+class no_vnodes(object):
+    def __call__(self, f):
+        def wrapped(obj):
+            if ENABLE_VNODES:
+                obj.skip("Test disabled for vnodes")
+            f(obj)
+        wrapped.__name__ = f.__name__
+        wrapped.__doc__ = f.__doc__
+        return wrapped
+    
 
 class require(object):
     def __init__(self, msg):
