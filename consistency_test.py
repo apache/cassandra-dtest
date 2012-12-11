@@ -1,5 +1,5 @@
 from time import sleep
-from dtest import Tester, debug
+from dtest import Tester, debug, ENABLE_VNODES
 from assertions import *
 from tools import *
 
@@ -215,8 +215,11 @@ class TestConsistency(Tester):
     def hintedhandoff_test(self):
         cluster = self.cluster
 
-        tokens = cluster.balanced_tokens(2)
-        cluster.populate(2, tokens=tokens).start()
+        if ENABLE_VNODES:
+            tokens = cluster.balanced_tokens(2)
+            cluster.populate(2, tokens=tokens).start()
+        else:
+            cluster.populate(2).start()
         [node1, node2] = cluster.nodelist()
 
         cursor = self.cql_connection(node1).cursor()
@@ -228,8 +231,9 @@ class TestConsistency(Tester):
         for n in xrange(0, 100):
             insert_c1c2(cursor, n, "ONE")
 
+        log_mark = node1.mark_log()
         node2.start()
-        node1.watch_log_for(["Finished hinted"], from_mark=node1.mark_log(), timeout=90)
+        node1.watch_log_for(["Finished hinted"], from_mark=log_mark, timeout=90)
 
         node1.stop(wait_other_notice=True)
 
@@ -242,8 +246,11 @@ class TestConsistency(Tester):
         cluster = self.cluster
         cluster.set_configuration_options(values={ 'hinted_handoff_enabled' : False})
 
-        tokens = cluster.balanced_tokens(2)
-        cluster.populate(2, tokens=tokens).start()
+        if ENABLE_VNODES:
+            tokens = cluster.balanced_tokens(2)
+            cluster.populate(2, tokens=tokens).start()
+        else:
+            cluster.populate(2).start()
         [node1, node2] = cluster.nodelist()
 
         cursor = self.cql_connection(node1).cursor()
@@ -316,8 +323,11 @@ class TestConsistency(Tester):
 
         debug("Creating a ring")
         cluster = self.cluster
-        tokens = cluster.balanced_tokens(3)
-        cluster.populate(3, tokens=tokens).start()
+        if ENABLE_VNODES:
+            tokens = cluster.balanced_tokens(3)
+            cluster.populate(3, tokens=tokens).start()
+        else:
+            cluster.populate(3).start()
         [node1, node2, node3] = cluster.nodelist()
         cluster.start()
 
