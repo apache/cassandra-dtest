@@ -3,7 +3,7 @@
 """
 Builds a regex that matches failing tests. Usage:
 
-nosetests -ve `./failing_tests.py`
+nosetests -ve `failing_tests/1.2.py`
 """
 
 failing_tests = """
