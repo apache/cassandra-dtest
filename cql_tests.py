@@ -1979,7 +1979,7 @@ class TestCQL(Tester):
 
         cursor.execute("SELECT keyspace_name, durable_writes FROM system.schema_keyspaces")
         res = cursor.fetchall()
-        assert res == [ ['ks1', True], ['system', True], ['system_traces', True], ['ks2', False] ], res
+        assert res == [ ['system_auth', True], ['ks1', True], ['system', True], ['system_traces', True], ['ks2', False] ], res
 
         cursor.execute("ALTER KEYSPACE ks1 WITH replication = { 'CLASS' : 'NetworkTopologyStrategy', 'dc1' : 1 } AND durable_writes=False")
         cursor.execute("ALTER KEYSPACE ks2 WITH durable_writes=true")
@@ -2564,3 +2564,37 @@ class TestCQL(Tester):
         cursor.execute("SELECT * FROM test LIMIT %d" % (nb_keys/2))
         res = cursor.fetchall()
         assert len(res) == nb_keys/2, "Expected %d but got %d" % (nb_keys/2, len(res))
+
+    @since('1.2')
+    def alter_with_collections_test(self):
+        """ Test you can add columns in a table with collections (#4982 bug) """
+        cursor = self.prepare()
+
+        cursor.execute("CREATE TABLE collections (key int PRIMARY KEY, aset set<text>)")
+        cursor.execute("ALTER TABLE collections ADD c text")
+        cursor.execute("ALTER TABLE collections ADD alist list<text>")
+
+    @since('1.2')
+    def collection_compact_test(self):
+        cursor = self.prepare()
+
+        assert_invalid(cursor, """
+            CREATE TABLE test (
+                user ascii PRIMARY KEY,
+                mails list<text>
+            ) WITH COMPACT STORAGE;
+        """)
+
+    @since('1.2')
+    def collection_function_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k int PRIMARY KEY,
+                l set<int>
+            )
+        """)
+
+        assert_invalid(cursor, "SELECT ttl(l) FROM test WHERE k = 0")
+        assert_invalid(cursor, "SELECT writetime(l) FROM test WHERE k = 0")
