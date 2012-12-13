@@ -1357,6 +1357,7 @@ class TestCQL(Tester):
         cursor.execute(q % (2, 2, 0))
         cursor.execute(q % (3, 3, 0))
 
+        assert_invalid(cursor, "SELECT * FROM indextest WHERE setid = 0 AND row < 1;")
         cursor.execute("SELECT * FROM indextest WHERE setid = 0 AND row < 1 ALLOW FILTERING;")
         res = cursor.fetchall()
         assert res == [[0, 0, 0]], res
@@ -1985,10 +1986,11 @@ class TestCQL(Tester):
         cursor.execute("ALTER KEYSPACE ks2 WITH durable_writes=true")
         cursor.execute("SELECT keyspace_name, durable_writes, strategy_class FROM system.schema_keyspaces")
         res = cursor.fetchall()
-        assert res == [ ['ks1', False, 'org.apache.cassandra.locator.NetworkTopologyStrategy'],
-                        ['system', True, 'org.apache.cassandra.locator.LocalStrategy'],
-                        ['system_traces', True, 'org.apache.cassandra.locator.SimpleStrategy'],
-                        ['ks2', True, 'org.apache.cassandra.locator.SimpleStrategy'] ], res
+        assert res == [ [u'system_auth', True, u'org.apache.cassandra.locator.SimpleStrategy'],
+                      [u'ks1', False, u'org.apache.cassandra.locator.NetworkTopologyStrategy'],
+                      [u'system', True, u'org.apache.cassandra.locator.LocalStrategy'],
+                      [u'system_traces', True, u'org.apache.cassandra.locator.SimpleStrategy'],
+                      [u'ks2', True, u'org.apache.cassandra.locator.SimpleStrategy'] ]
 
         cursor.execute("USE ks1")
 

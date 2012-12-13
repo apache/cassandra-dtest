@@ -54,7 +54,7 @@ class TestRollingUpgrade(Tester):
                 load_makers=[lm_standard],
                 sleep_between=1,
                 )
-        loader_counter.read_and_validate(step=10)
+        #loader_counter.read_and_validate(step=10)
 
         debug("Sleeping to get some data into the cluster")
         time.sleep(5)
@@ -91,17 +91,18 @@ class TestRollingUpgrade(Tester):
         loader_standard.read_and_validate(step=10)
         loader_standard.exit()
         debug("validating counter data...")
-        loader_counter.read_and_validate(step=10)
+        #loader_counter.read_and_validate(step=10)
         loader_counter.exit()
 
         debug("Done upgrading node %s.\n" % node.name)
 
 
-    def upgrade110_test(self):
-        """ Upgrade from 1.0.10 """
+    @since('1.0', max_version='1.1') 
+    def upgrade10_test(self):
+        """ Upgrade from 1.0 """
 
         cluster = self.cluster
-        cluster.set_cassandra_dir(cassandra_version="1.0.10")
+        cluster.set_cassandra_dir(cassandra_version="git:cassandra-1.0")
 
         cluster.populate(3, tokens=[0, 2**125, 2**126]).start()
         [node1, node2, node3] = cluster.nodelist()
@@ -112,11 +113,28 @@ class TestRollingUpgrade(Tester):
         self.rolling_upgrade_node(node3, stress_node=node1, create_ks_and_cf=False)
 
 
-    def upgrade114_test(self):
-        """ Upgrade from 1.1.4 """
+    @since('1.1', max_version='1.2') 
+    def upgrade11_test(self):
+        """ Upgrade from 1.1 """
 
         cluster = self.cluster
-        cluster.set_cassandra_dir(cassandra_version="1.1.4")
+        cluster.set_cassandra_dir(cassandra_version="git:cassandra-1.1")
+
+        cluster.populate(3, tokens=[0, 2**125, 2**126]).start()
+        [node1, node2, node3] = cluster.nodelist()
+        time.sleep(1)
+
+        self.rolling_upgrade_node(node1, stress_node=node2, create_ks_and_cf=True)
+        self.rolling_upgrade_node(node2, stress_node=node3, create_ks_and_cf=False)
+        self.rolling_upgrade_node(node3, stress_node=node1, create_ks_and_cf=False)
+
+
+    @since('1.2', max_version='1.3') 
+    def upgrade12_test(self):
+        """ Upgrade from 1.2 """
+
+        cluster = self.cluster
+        cluster.set_cassandra_dir(cassandra_version="git:cassandra-1.2")
 
         cluster.populate(3, tokens=[0, 2**125, 2**126]).start()
         [node1, node2, node3] = cluster.nodelist()

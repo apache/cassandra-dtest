@@ -21,6 +21,7 @@ if len(config.read(os.path.expanduser('~/.cassandra-dtest'))) > 0:
 NO_SKIP = os.environ.get('SKIP', '').lower() in ('no', 'false')
 DEBUG = os.environ.get('DEBUG', '').lower() in ('yes', 'true')
 PRINT_DEBUG = os.environ.get('PRINT_DEBUG', '').lower() in ('yes', 'true')
+ENABLE_VNODES = os.environ.get('ENABLE_VNODES', 'false').lower() in ('yes', 'true')
 
 LOG = logging.getLogger()
 
@@ -29,6 +30,7 @@ def debug(msg):
         LOG.debug(msg)
     if PRINT_DEBUG:
         print msg
+
 
 class Tester(object):
 
@@ -41,13 +43,16 @@ class Tester(object):
         self.test_path = tempfile.mkdtemp(prefix='dtest-')
         try:
             version = os.environ['CASSANDRA_VERSION']
-            return Cluster(self.test_path, name, cassandra_version=version)
+            cluster = Cluster(self.test_path, name, cassandra_version=version)
         except KeyError:
             try:
                 cdir = os.environ['CASSANDRA_DIR']
             except KeyError:
                 cdir = DEFAULT_DIR
-            return Cluster(self.test_path, name, cassandra_dir=cdir)
+            cluster = Cluster(self.test_path, name, cassandra_dir=cdir)
+        if ENABLE_VNODES:
+            cluster.set_configuration_options(values={'initial_token': None, 'num_tokens': 256})
+        return cluster
 
     def __cleanup_cluster(self):
         self.cluster.remove()
@@ -96,6 +101,15 @@ class Tester(object):
                 'truncate_request_timeout_in_ms' : timeout,
                 'request_timeout_in_ms' : timeout
             })
+
+        if self.cluster.version() >= '1.2':
+            self.cluster.set_configuration_options(values={'read_request_timeout_in_ms': 15000})
+            self.cluster.set_configuration_options(values={'write_request_timeout_in_ms': 15000})
+            self.cluster.set_configuration_options(values={'range_request_timeout_in_ms': 15000})
+            self.cluster.set_configuration_options(values={'truncate_request_timeout_in_ms': 15000})
+            self.cluster.set_configuration_options(values={'request_timeout_in_ms': 15000})
+        else:
+            self.cluster.set_configuration_options(values={'rpc_timeout_in_ms': 15000})
 
         with open(LAST_TEST_DIR, 'w') as f:
             f.write(self.test_path + '\n')
@@ -160,7 +174,7 @@ class Tester(object):
         return con
 
     def create_ks(self, cursor, name, rf):
-        if self.cluster.version() >= "1.2":
+        if self.cluster.version() >= "1.2" and cursor.cql_major_version >= 3:
             query = 'CREATE KEYSPACE %s WITH replication={%s}'
             if isinstance(rf, types.IntType):
                 # we assume simpleStrategy

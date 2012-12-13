@@ -7,6 +7,7 @@ from ccmlib.cluster import Cluster
 
 class TestTopology(Tester):
 
+    @no_vnodes()
     def movement_test(self):
         cluster = self.cluster
 
@@ -47,6 +48,7 @@ class TestTopology(Tester):
         assert_almost_equal(sizes[0], sizes[2])
         assert_almost_equal(sizes[1], sizes[2])
 
+    @no_vnodes()
     def decomission_test(self):
         cluster = self.cluster
 
@@ -113,6 +115,7 @@ class TestTopology(Tester):
             for i in xrange(0, len(sizes)):
                 assert_almost_equal(sizes[i], three_node_sizes[i])
 
+    @no_vnodes()
     def replace_test(self):
         cluster = self.cluster
 
@@ -144,6 +147,7 @@ class TestTopology(Tester):
         sizes = [ node.data_size() for node in cluster.nodelist() if node.is_running()]
         assert_almost_equal(*sizes)
 
+    @no_vnodes()
     def move_single_node_test(self):
         """ Test moving a node in a single-node cluster (#4200) """
         cluster = self.cluster
