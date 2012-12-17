@@ -56,12 +56,18 @@ class TestCounters(Tester):
         cursor = self.cql_connection(nodes[0], version=cql_version).cursor()
         self.create_ks(cursor, 'ks', 2)
 
-        cursor.execute("""
+        query = """
             CREATE TABLE counterTable (
                 k int PRIMARY KEY,
                 c counter
-            ) WITH default_validation='CounterColumnType' AND compression_parameters:sstable_compression='SnappyCompressor'
-        """)
+            )
+        """
+        if cluster.version() >= '1.2':
+            query = query +  "WITH compression = { 'sstable_compression' : 'SnappyCompressor' }"
+        else:
+            query = query +  "WITH compression_parameters:sstable_compression='SnappyCompressor'"
+
+        cursor.execute(query)
 
         keys = range(0, 100)
         updates = 5000
@@ -70,7 +76,10 @@ class TestCounters(Tester):
             cursor = self.cql_connection(nodes[0], keyspace='ks', version=cql_version).cursor()
             upd = "UPDATE counterTable SET c = c + 1 WHERE k = %d;"
             #upd = "UPDATE counterTable SET c = c + 1 WHERE k = :k%d;"
-            batch = " ".join(["BEGIN BATCH"] + [upd % x for x in keys] + ["APPLY BATCH;"])
+            if cluster.version() >= '1.2':
+                batch = " ".join(["BEGIN COUNTER BATCH"] + [upd % x for x in keys] + ["APPLY BATCH;"])
+            else:
+                batch = " ".join(["BEGIN BATCH"] + [upd % x for x in keys] + ["APPLY BATCH;"])
 
             #query = cursor.prepare_query(batch)
 

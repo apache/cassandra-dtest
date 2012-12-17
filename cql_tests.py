@@ -1372,6 +1372,12 @@ class TestCQL(Tester):
           WITH compression_parameters:sstable_compressor = 'DeflateCompressor';
         """)
 
+        if self.cluster.version() >= '1.2':
+            assert_invalid(cursor, """
+              CREATE TABLE users (key varchar PRIMARY KEY, password varchar, gender varchar)
+              WITH compression = { 'sstable_compressor' : 'DeflateCompressor' };
+            """)
+
     @since('1.1')
     def keyspace_creation_options_test(self):
         """ Check one can use arbitrary name for datacenter when creating keyspace (#4278) """
