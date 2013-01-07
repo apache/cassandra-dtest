@@ -261,7 +261,7 @@ class Tester(object):
             f.write('CLASSPATH=$CASSANDRA_HOME/build/cobertura/classes:'
                     '$CLASSPATH:{cobertura_jar}\n'.format(
                     cobertura_jar=cobertura_jar))
-            f.write('JVM_OPTS="-Dnet.sourceforge.cobertura.datafile='
+            f.write('JVM_OPTS="$JVM_OPTS -Dnet.sourceforge.cobertura.datafile='
                     '$CASSANDRA_HOME/build/cobertura/cobertura.ser"\n')
 
 
