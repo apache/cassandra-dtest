@@ -249,9 +249,10 @@ class Tester(object):
             if cobertura_jar:
                 break
         else:
-            raise CoberturaNotFoundException(
+            LOG.warning(
                 'Could not setup code coverage analysis because no cobertura '
                 'jar file was found in the m2 repository.')
+            return
 
         # Create a cluster-wide cassandra include file in the ccm
         # staging directory:
@@ -293,6 +294,3 @@ class Runner(threading.Thread):
     def check(self):
         if self.__error is not None:
             raise self.__error
-
-class CoberturaNotFoundException(Exception):
-    pass
