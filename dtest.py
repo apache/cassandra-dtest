@@ -262,7 +262,7 @@ class Tester(object):
                     '$CLASSPATH:{cobertura_jar}\n'.format(
                     cobertura_jar=cobertura_jar))
             f.write('JVM_OPTS="$JVM_OPTS -Dnet.sourceforge.cobertura.datafile='
-                    '$CASSANDRA_HOME/build/cobertura/cobertura.ser"\n')
+                    '$CASSANDRA_HOME/build/cobertura/cassandra-dtest/cobertura.ser"\n')
 
 
 class Runner(threading.Thread):
