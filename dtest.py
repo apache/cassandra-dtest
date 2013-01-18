@@ -1,5 +1,6 @@
 from __future__ import with_statement
 import os, tempfile, sys, shutil, types, time, threading, ConfigParser, logging
+import fnmatch
 
 from ccmlib.cluster import Cluster
 from ccmlib.node import Node
@@ -87,6 +88,7 @@ class Tester(object):
                     pass
 
         self.cluster = self.__get_cluster()
+        self.__setup_cobertura()
         # the failure detector can be quite slow in such tests with quick start/stop
         self.cluster.set_configuration_options(values={'phi_convict_threshold': 5})
 
@@ -231,6 +233,37 @@ class Tester(object):
     def skip(self, msg):
         if not NO_SKIP:
             raise SkipTest(msg)
+        
+    def __setup_cobertura(self, cluster_name='test'):
+        """Setup Cobertura code coverage support"""
+        # Find the cobertura jar file:
+        cobertura_jar = None
+        if 'M2_REPO' in os.environ:
+            m2_dir = os.environ['M2_REPO']
+        else:
+            m2_dir = os.path.join(os.path.expanduser('~'),'.m2')
+        for root, dirnames, filenames in os.walk(m2_dir):
+            for filename in fnmatch.filter(filenames, 'cobertura-*.jar'):
+                cobertura_jar = os.path.join(root, filename)
+                break
+            if cobertura_jar:
+                break
+        else:
+            LOG.warning(
+                'Could not setup code coverage analysis because no cobertura '
+                'jar file was found in the m2 repository.')
+            return
+
+        # Create a cluster-wide cassandra include file in the ccm
+        # staging directory:
+        with open(os.path.join(
+                self.test_path, cluster_name, 'cassandra.in.sh'),'w') as f:
+            f.write('CLASSPATH=$CASSANDRA_HOME/build/cobertura/classes:'
+                    '$CLASSPATH:{cobertura_jar}\n'.format(
+                    cobertura_jar=cobertura_jar))
+            f.write('JVM_OPTS="$JVM_OPTS -Dnet.sourceforge.cobertura.datafile='
+                    '$CASSANDRA_HOME/build/cobertura/cassandra-dtest/cobertura.ser"\n')
+
 
 class Runner(threading.Thread):
     def __init__(self, func):
