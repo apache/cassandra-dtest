@@ -935,29 +935,6 @@ class TestCQL(Tester):
         assert_invalid(cursor, "CREATE TABLE test2 ( select text PRIMARY KEY, x int)")
 
     @since('1.1')
-    def timeuuid_test(self):
-        cursor = self.prepare()
-
-        cursor.execute("""
-            CREATE TABLE timeline (
-                k text,
-                time timeuuid,
-                value int,
-                PRIMARY KEY(k, time)
-            )
-        """)
-
-        q = "INSERT INTO timeline (k, time, value) VALUES ('k', '%s', %d)"
-        cursor.execute(q % ('2012-04-10', 0))
-        cursor.execute(q % ('2012-04-15', 1))
-        cursor.execute(q % ('2012-04-22', 2))
-        cursor.execute(q % ('now', 3))
-
-        cursor.execute("SELECT value FROM timeline WHERE k='k' AND time > '2012-04-15'")
-        res = cursor.fetchall()
-        assert res == [[2], [3]], res
-
-    @since('1.1')
     def identifier_test(self):
         cursor = self.prepare()
 
@@ -1479,6 +1456,11 @@ class TestCQL(Tester):
         cursor.execute("SELECT m FROM user WHERE fn='Bilbo' AND ln='Baggins'")
         res = cursor.fetchall()
         assert res == [[ {'m' : 4, 'n' : 1, 'o' : 2 } ]], res
+
+        cursor.execute(q % "m = {}")
+        cursor.execute("SELECT m FROM user WHERE fn='Bilbo' AND ln='Baggins'")
+        res = cursor.fetchall()
+        assert res == [[ None ]], res
 
     @since('1.2')
     def list_test(self):
@@ -2606,3 +2588,217 @@ class TestCQL(Tester):
 
         assert_invalid(cursor, "SELECT ttl(l) FROM test WHERE k = 0")
         assert_invalid(cursor, "SELECT writetime(l) FROM test WHERE k = 0")
+
+    @since('1.2')
+    def collection_counter_test(self):
+        cursor = self.prepare()
+
+        assert_invalid(cursor, """
+            CREATE TABLE test (
+                k int PRIMARY KEY,
+                l list<counter>
+            )
+        """)
+
+        assert_invalid(cursor, """
+            CREATE TABLE test (
+                k int PRIMARY KEY,
+                s set<counter>
+            )
+        """)
+
+        assert_invalid(cursor, """
+            CREATE TABLE test (
+                k int PRIMARY KEY,
+                m map<text, counter>
+            )
+        """)
+
+    @since('1.2')
+    def composite_partition_key_validation_test(self):
+        """ Test for bug from #5122 """
+        cursor = self.prepare()
+
+        cursor.execute("CREATE TABLE foo (a int, b text, c uuid, PRIMARY KEY ((a, b)));")
+
+        cursor.execute("INSERT INTO foo (a, b , c ) VALUES (  1 , 'aze', '4d481800-4c5f-11e1-82e0-3f484de45426')")
+        cursor.execute("INSERT INTO foo (a, b , c ) VALUES (  1 , 'ert', '693f5800-8acb-11e3-82e0-3f484de45426')")
+        cursor.execute("INSERT INTO foo (a, b , c ) VALUES (  1 , 'opl', 'd4815800-2d8d-11e0-82e0-3f484de45426')")
+
+        cursor.execute("SELECT * FROM foo")
+        res = cursor.fetchall()
+        assert len(res) == 3, res
+
+        assert_invalid(cursor, "SELECT * FROM foo WHERE a=1")
+
+    @require('4762')
+    def multi_in_test(self):
+        self.__multi_in(False)
+
+    @require('4762')
+    def multi_in_compact_test(self):
+        self.__multi_in(True)
+
+    def __multi_in(self, compact):
+        cursor = self.prepare()
+
+        data = [
+            ( 'test', '06029', 'CT',  9, 'Ellington'     ),
+            ( 'test', '06031', 'CT',  9, 'Falls Village' ),
+            ( 'test', '06902', 'CT',  9, 'Stamford'      ),
+            ( 'test', '06927', 'CT',  9, 'Stamford'      ),
+            ( 'test', '10015', 'NY', 36, 'New York'      ),
+            ( 'test', '07182', 'NJ', 34, 'Newark'        ),
+            ( 'test', '73301', 'TX', 48, 'Austin'        ),
+            ( 'test', '94102', 'CA', 06, 'San Francisco' ),
+
+            ( 'test2', '06029', 'CT',  9, 'Ellington'     ),
+            ( 'test2', '06031', 'CT',  9, 'Falls Village' ),
+            ( 'test2', '06902', 'CT',  9, 'Stamford'      ),
+            ( 'test2', '06927', 'CT',  9, 'Stamford'      ),
+            ( 'test2', '10015', 'NY', 36, 'New York'      ),
+            ( 'test2', '07182', 'NJ', 34, 'Newark'        ),
+            ( 'test2', '73301', 'TX', 48, 'Austin'        ),
+            ( 'test2', '94102', 'CA', 06, 'San Francisco' ),
+        ]
+
+        create = """
+            CREATE TABLE zipcodes (
+                group text,
+                zipcode text,
+                state text,
+                fips_regions int,
+                city text,
+                PRIMARY KEY(group,zipcode,state,fips_regions)
+            )"""
+
+        if compact:
+            create = create + " WITH COMPACT STORAGE"
+
+        cursor.execute(create)
+
+        for d in data:
+            cursor.execute("INSERT INTO zipcodes (group, zipcode, state, fips_regions, city) VALUES ('%s', '%s', '%s', %i, '%s')" % d)
+
+        cursor.execute("select zipcode from zipcodes")
+        res = cursor.fetchall()
+        assert len(res) == 16, res
+
+        cursor.execute("select zipcode from zipcodes where group='test'")
+        res = cursor.fetchall()
+        assert len(res) == 8, res
+
+        assert_invalid(cursor, "select zipcode from zipcodes where zipcode='06902'")
+
+        cursor.execute("select zipcode from zipcodes where zipcode='06902' ALLOW FILTERING")
+        res = cursor.fetchall()
+        assert len(res) == 2, res
+
+        cursor.execute("select zipcode from zipcodes where group='test' and zipcode='06902'")
+        res = cursor.fetchall()
+        assert len(res) == 1, res
+
+        cursor.execute("select zipcode from zipcodes where group='test' and zipcode IN ('06902','73301','94102')")
+        res = cursor.fetchall()
+        assert len(res) == 3, res
+
+        cursor.execute("select zipcode from zipcodes where group='test' AND zipcode IN ('06902','73301','94102') and state IN ('CT','CA')")
+        res = cursor.fetchall()
+        assert len(res) == 2, res
+
+        cursor.execute("select zipcode from zipcodes where group='test' AND zipcode IN ('06902','73301','94102') and state IN ('CT','CA') and fips_regions = 9")
+        res = cursor.fetchall()
+        assert len(res) == 1, res
+
+        cursor.execute("select zipcode from zipcodes where group='test' AND zipcode IN ('06902','73301','94102') and state IN ('CT','CA') ORDER BY zipcode DESC")
+        res = cursor.fetchall()
+        assert len(res) == 2, res
+
+        cursor.execute("select zipcode from zipcodes where group='test' AND zipcode IN ('06902','73301','94102') and state IN ('CT','CA') and fips_regions > 0")
+        res = cursor.fetchall()
+        assert len(res) == 2, res
+
+        cursor.execute("select zipcode from zipcodes where group='test' AND zipcode IN ('06902','73301','94102') and state IN ('CT','CA') and fips_regions < 0")
+        res = cursor.fetchall()
+        assert len(res) == 0, res
+
+    @require('4762')
+    def multi_in_compact_non_composite_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                key int,
+                c int,
+                v int,
+                PRIMARY KEY (key, c)
+            ) WITH COMPACT STORAGE
+        """)
+
+        cursor.execute("INSERT INTO test (key, c, v) VALUES (0, 0, 0)")
+        cursor.execute("INSERT INTO test (key, c, v) VALUES (0, 1, 1)")
+        cursor.execute("INSERT INTO test (key, c, v) VALUES (0, 2, 2)")
+
+        cursor.execute("SELECT * FROM test WHERE key=0 AND c IN (0, 2)")
+        res = cursor.fetchall()
+        assert res == [[0, 0, 0], [0, 2, 2]], res
+
+    @since('1.2.1')
+    def timeuuid_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k int,
+                t timeuuid,
+                PRIMARY KEY (k, t)
+            )
+        """)
+
+        assert_invalid(cursor, "INSERT INTO test (k, t) VALUES (0, '2012-11-07 18:18:22-0800')")
+
+        for i in range(4):
+            cursor.execute("INSERT INTO test (k, t) VALUES (0, now())")
+            time.sleep(1)
+
+        cursor.execute("SELECT * FROM test")
+        res = cursor.fetchall()
+        assert len(res) == 4, res
+        dates = [ d[1] for d in res ]
+
+        cursor.execute("SELECT * FROM test WHERE k = 0 AND t >= '%s'" % dates[0])
+        res = cursor.fetchall()
+        assert len(res) == 4, res
+
+        cursor.execute("SELECT * FROM test WHERE k = 0 AND t < '%s'" % dates[0])
+        res = cursor.fetchall()
+        assert len(res) == 0, res
+
+        cursor.execute("SELECT * FROM test WHERE k = 0 AND t > '%s' AND t <= '%s'" % (dates[0], dates[2]))
+        res = cursor.fetchall()
+        assert len(res) == 2, res
+
+        cursor.execute("SELECT * FROM test WHERE k = 0 AND t = '%s'" % dates[0])
+        res = cursor.fetchall()
+        assert len(res) == 1, res
+
+        assert_invalid(cursor, "SELECT dateOf(k) FROM test WHERE k = 0 AND t = '%s'" % dates[0])
+
+        cursor.execute("SELECT dateOf(t), unixTimestampOf(t) FROM test WHERE k = 0 AND t = '%s'" % dates[0])
+        # not sure what to check exactly so just checking the query returns
+
+    @since('1.2')
+    def float_with_exponent_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k int PRIMARY KEY,
+                d double,
+                f float
+            )
+        """)
+
+        cursor.execute("INSERT INTO test(k, d, f) VALUES (0, 3E+10, 3.4E3)")
+        cursor.execute("INSERT INTO test(k, d, f) VALUES (1, 3.E10, -23.44E-3)")
+        cursor.execute("INSERT INTO test(k, d, f) VALUES (2, 3, -2)")
