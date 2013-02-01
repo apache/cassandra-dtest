@@ -481,14 +481,6 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert len(res) == 10, res
 
-        cursor.execute("SELECT v FROM test WHERE k = 0 AND c >= '' AND c <= ''")
-        res = cursor.fetchall()
-        assert len(res) == 10, res
-
-        cursor.execute("SELECT v FROM test WHERE k = 0 AND c > '' AND c < ''")
-        res = cursor.fetchall()
-        assert len(res) == 10, res
-
         cursor.execute("SELECT v FROM test WHERE k = 0 AND c >= 2 AND c <= 6")
         res = cursor.fetchall()
         assert len(res) == 5 and res[0][0] == 2 and res[len(res) - 1][0] == 6, res
@@ -1066,7 +1058,8 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert len(res) == c, "%s [all: %s]" % (str(res), str(inOrder))
 
-        assert_invalid(cursor, "SELECT k FROM test WHERE token(k) >= 0")
+        #assert_invalid(cursor, "SELECT k FROM test WHERE token(k) >= 0")
+        #cursor.execute("SELECT k FROM test WHERE token(k) >= 0")
 
         cursor.execute("SELECT k FROM test WHERE token(k) >= token(%d) AND token(k) < token(%d)" % (inOrder[32], inOrder[65]))
         res = cursor.fetchall()
@@ -1166,7 +1159,7 @@ class TestCQL(Tester):
         """)
 
         cursor.execute("INSERT INTO users (KEY, password) VALUES ('user1', 'ch@ngem3a')")
-        cursor.execute("UPDATE users SET gender = 'm', birth_year = '1980' WHERE KEY = 'user1'")
+        cursor.execute("UPDATE users SET gender = 'm', birth_year = 1980 WHERE KEY = 'user1'")
         cursor.execute("SELECT * FROM users WHERE KEY='user1'")
         res = cursor.fetchall()
         assert res == [[ 'user1', 1980, 'm', 'ch@ngem3a' ]], res
@@ -1280,7 +1273,7 @@ class TestCQL(Tester):
 
         for c1 in range(0, 4):
             for c2 in range(0, 2):
-                cursor.execute("INSERT INTO test1 (k, c1, c2, v1) VALUES (0, %d, %d, %s)" % (c1, c2, '%i%i' % (c1, c2)))
+                cursor.execute("INSERT INTO test1 (k, c1, c2, v1) VALUES (0, %d, %d, '%s')" % (c1, c2, '%i%i' % (c1, c2)))
 
         self.cluster.flush()
 
@@ -1524,14 +1517,14 @@ class TestCQL(Tester):
             );
         """)
 
-        cursor.execute("UPDATE ks.foo SET L = [1, 3, 5] WHERE k = 'b017f48f-ae67-11e1-9096-005056c00008';")
-        cursor.execute("UPDATE ks.foo SET L = L + [7, 11, 13] WHERE k = 'b017f48f-ae67-11e1-9096-005056c00008';")
-        cursor.execute("UPDATE ks.foo SET S = {1, 3, 5} WHERE k = 'b017f48f-ae67-11e1-9096-005056c00008';")
-        cursor.execute("UPDATE ks.foo SET S = S + {7, 11, 13} WHERE k = 'b017f48f-ae67-11e1-9096-005056c00008';")
-        cursor.execute("UPDATE ks.foo SET M = {'foo': 1, 'bar' : 3} WHERE k = 'b017f48f-ae67-11e1-9096-005056c00008';")
-        cursor.execute("UPDATE ks.foo SET M = M + {'foobar' : 4} WHERE k = 'b017f48f-ae67-11e1-9096-005056c00008';")
+        cursor.execute("UPDATE ks.foo SET L = [1, 3, 5] WHERE k = b017f48f-ae67-11e1-9096-005056c00008;")
+        cursor.execute("UPDATE ks.foo SET L = L + [7, 11, 13] WHERE k = b017f48f-ae67-11e1-9096-005056c00008;")
+        cursor.execute("UPDATE ks.foo SET S = {1, 3, 5} WHERE k = b017f48f-ae67-11e1-9096-005056c00008;")
+        cursor.execute("UPDATE ks.foo SET S = S + {7, 11, 13} WHERE k = b017f48f-ae67-11e1-9096-005056c00008;")
+        cursor.execute("UPDATE ks.foo SET M = {'foo': 1, 'bar' : 3} WHERE k = b017f48f-ae67-11e1-9096-005056c00008;")
+        cursor.execute("UPDATE ks.foo SET M = M + {'foobar' : 4} WHERE k = b017f48f-ae67-11e1-9096-005056c00008;")
 
-        cursor.execute("SELECT L, M, S FROM foo WHERE k = 'b017f48f-ae67-11e1-9096-005056c00008'")
+        cursor.execute("SELECT L, M, S FROM foo WHERE k = b017f48f-ae67-11e1-9096-005056c00008")
         res = cursor.fetchall()
         assert res == [[
             (1, 3, 5, 7, 11, 13),
@@ -1628,7 +1621,7 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[0, 1, 1, 1]], res
 
-        cursor.execute("SELECT * FROM test WHERE token(k1, k2) > '-" + str(2**63-1) + "'")
+        cursor.execute("SELECT * FROM test WHERE token(k1, k2) > " + str(-((2**63)-1)))
         res = cursor.fetchall()
         assert res == [[0, 2, 2, 2], [0, 3, 3, 3], [0, 0, 0, 0], [0, 1, 1, 1]], res
 
@@ -2621,9 +2614,9 @@ class TestCQL(Tester):
 
         cursor.execute("CREATE TABLE foo (a int, b text, c uuid, PRIMARY KEY ((a, b)));")
 
-        cursor.execute("INSERT INTO foo (a, b , c ) VALUES (  1 , 'aze', '4d481800-4c5f-11e1-82e0-3f484de45426')")
-        cursor.execute("INSERT INTO foo (a, b , c ) VALUES (  1 , 'ert', '693f5800-8acb-11e3-82e0-3f484de45426')")
-        cursor.execute("INSERT INTO foo (a, b , c ) VALUES (  1 , 'opl', 'd4815800-2d8d-11e0-82e0-3f484de45426')")
+        cursor.execute("INSERT INTO foo (a, b , c ) VALUES (  1 , 'aze', 4d481800-4c5f-11e1-82e0-3f484de45426)")
+        cursor.execute("INSERT INTO foo (a, b , c ) VALUES (  1 , 'ert', 693f5800-8acb-11e3-82e0-3f484de45426)")
+        cursor.execute("INSERT INTO foo (a, b , c ) VALUES (  1 , 'opl', d4815800-2d8d-11e0-82e0-3f484de45426)")
 
         cursor.execute("SELECT * FROM foo")
         res = cursor.fetchall()
@@ -2755,7 +2748,7 @@ class TestCQL(Tester):
             )
         """)
 
-        assert_invalid(cursor, "INSERT INTO test (k, t) VALUES (0, '2012-11-07 18:18:22-0800')")
+        assert_invalid(cursor, "INSERT INTO test (k, t) VALUES (0, 2012-11-07 18:18:22-0800)")
 
         for i in range(4):
             cursor.execute("INSERT INTO test (k, t) VALUES (0, now())")
@@ -2766,25 +2759,25 @@ class TestCQL(Tester):
         assert len(res) == 4, res
         dates = [ d[1] for d in res ]
 
-        cursor.execute("SELECT * FROM test WHERE k = 0 AND t >= '%s'" % dates[0])
+        cursor.execute("SELECT * FROM test WHERE k = 0 AND t >= %s" % dates[0])
         res = cursor.fetchall()
         assert len(res) == 4, res
 
-        cursor.execute("SELECT * FROM test WHERE k = 0 AND t < '%s'" % dates[0])
+        cursor.execute("SELECT * FROM test WHERE k = 0 AND t < %s" % dates[0])
         res = cursor.fetchall()
         assert len(res) == 0, res
 
-        cursor.execute("SELECT * FROM test WHERE k = 0 AND t > '%s' AND t <= '%s'" % (dates[0], dates[2]))
+        cursor.execute("SELECT * FROM test WHERE k = 0 AND t > %s AND t <= %s" % (dates[0], dates[2]))
         res = cursor.fetchall()
         assert len(res) == 2, res
 
-        cursor.execute("SELECT * FROM test WHERE k = 0 AND t = '%s'" % dates[0])
+        cursor.execute("SELECT * FROM test WHERE k = 0 AND t = %s" % dates[0])
         res = cursor.fetchall()
         assert len(res) == 1, res
 
-        assert_invalid(cursor, "SELECT dateOf(k) FROM test WHERE k = 0 AND t = '%s'" % dates[0])
+        assert_invalid(cursor, "SELECT dateOf(k) FROM test WHERE k = 0 AND t = %s" % dates[0])
 
-        cursor.execute("SELECT dateOf(t), unixTimestampOf(t) FROM test WHERE k = 0 AND t = '%s'" % dates[0])
+        cursor.execute("SELECT dateOf(t), unixTimestampOf(t) FROM test WHERE k = 0 AND t = %s" % dates[0])
         # not sure what to check exactly so just checking the query returns
 
     @since('1.2')
@@ -2802,3 +2795,20 @@ class TestCQL(Tester):
         cursor.execute("INSERT INTO test(k, d, f) VALUES (0, 3E+10, 3.4E3)")
         cursor.execute("INSERT INTO test(k, d, f) VALUES (1, 3.E10, -23.44E-3)")
         cursor.execute("INSERT INTO test(k, d, f) VALUES (2, 3, -2)")
+
+    @since('1.2')
+    def compact_metadata_test(self):
+        """ Test regression from #5189 """
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE bar (
+                id int primary key,
+                i int
+            ) WITH COMPACT STORAGE;
+        """)
+
+        cursor.execute("INSERT INTO bar (id, i) VALUES (1, 2);")
+        cursor.execute("SELECT * FROM bar")
+        res = cursor.fetchall()
+        assert res == [[1, 2]], res
