@@ -1051,10 +1051,10 @@ class TestCQL(Tester):
         assert len(inOrder) == c, 'Expecting %d elements, got %d' % (c, len(inOrder))
 
         if self.cluster.version() < '1.2':
-            cursor.execute("SELECT k FROM test WHERE token(k) >= '0'")
+            cursor.execute("SELECT k FROM test WHERE token(k) >= 0")
         else:
             min_token = -2**63
-            cursor.execute("SELECT k FROM test WHERE token(k) >= '%d'" % min_token)
+            cursor.execute("SELECT k FROM test WHERE token(k) >= %d" % min_token)
         res = cursor.fetchall()
         assert len(res) == c, "%s [all: %s]" % (str(res), str(inOrder))
 
