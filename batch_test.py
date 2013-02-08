@@ -134,7 +134,7 @@ class TestBatch(Tester):
         """ Test that acknowledged_by_batchlog is True if batchlog can be written """
         cursor = self.prepare(nodes=3)
         # kill one of the nodes so that batchlog will be written, but the write will fail.
-        self.cluster.nodelist()[-1].stop()
+        self.cluster.nodelist()[-1].stop(gently=False)
         self.assert_timedout(cursor, """
             BEGIN BATCH
             INSERT INTO users (id, firstname, lastname) VALUES (0, 'Jack', 'Sparrow')
