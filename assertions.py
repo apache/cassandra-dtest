@@ -28,7 +28,7 @@ def assert_almost_equal(*args, **kwargs):
 def assert_invalid(cursor, query, matching = None):
     try:
         cursor.execute(query)
-        assert False, "Expecting query to be invalid"
+        assert False, "Expecting query to be invalid: got %s" % cursor.fetchall()
     except cql.ProgrammingError as e:
         msg = str(e)
         if matching is not None:

@@ -2812,3 +2812,90 @@ class TestCQL(Tester):
         cursor.execute("SELECT * FROM bar")
         res = cursor.fetchall()
         assert res == [[1, 2]], res
+
+    @require('5125')
+    def clustering_indexing_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE posts (
+                id1 int,
+                id2 int,
+                author text,
+                time bigint,
+                content text,
+                PRIMARY KEY ((id1, id2), author, time)
+            )
+        """)
+
+        cursor.execute("CREATE INDEX ON posts(time)")
+        cursor.execute("CREATE INDEX ON posts(id2)")
+
+        cursor.execute("INSERT INTO posts(id1, id2, author, time, content) VALUES(0, 0, 'bob', 0, 'A')")
+        cursor.execute("INSERT INTO posts(id1, id2, author, time, content) VALUES(0, 0, 'bob', 1, 'B')")
+        cursor.execute("INSERT INTO posts(id1, id2, author, time, content) VALUES(0, 1, 'bob', 2, 'C')")
+        cursor.execute("INSERT INTO posts(id1, id2, author, time, content) VALUES(0, 0, 'tom', 0, 'D')")
+        cursor.execute("INSERT INTO posts(id1, id2, author, time, content) VALUES(0, 1, 'tom', 1, 'E')")
+
+        cursor.execute("SELECT content FROM posts WHERE time = 1")
+        res = cursor.fetchall()
+        assert res == [ ['B'], ['E'] ], res
+
+        cursor.execute("SELECT content FROM posts WHERE id2 = 1")
+        res = cursor.fetchall()
+        assert res == [ ['C'], ['E'] ], res
+
+        cursor.execute("SELECT content FROM posts WHERE id1 = 0 AND id2 = 0 AND author = 'bob' AND time = 0")
+        res = cursor.fetchall()
+        assert res == [ ['A'] ], res
+
+    @since('1.2')
+    def bug_5240_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test(
+                interval text,
+                seq int,
+                id int,
+                severity int,
+                PRIMARY KEY ((interval, seq), id)
+            ) WITH CLUSTERING ORDER BY (id DESC);
+        """)
+
+        cursor.execute("CREATE INDEX ON test(severity);")
+
+        cursor.execute("insert into test(interval, seq, id , severity) values('t',1, 1, 1);")
+        cursor.execute("insert into test(interval, seq, id , severity) values('t',1, 2, 1);")
+        cursor.execute("insert into test(interval, seq, id , severity) values('t',1, 3, 2);")
+        cursor.execute("insert into test(interval, seq, id , severity) values('t',1, 4, 3);")
+        cursor.execute("insert into test(interval, seq, id , severity) values('t',2, 1, 3);")
+        cursor.execute("insert into test(interval, seq, id , severity) values('t',2, 2, 3);")
+        cursor.execute("insert into test(interval, seq, id , severity) values('t',2, 3, 1);")
+        cursor.execute("insert into test(interval, seq, id , severity) values('t',2, 4, 2);")
+
+        cursor.execute("select * from test where severity = 3 and interval = 't' and seq =1;")
+        res = cursor.fetchall()
+        assert res == [['t', 1, 4, 3]], res
+
+    @since('1.2')
+    def ticket_5230_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE foo (
+                key text,
+                c text,
+                v text,
+                PRIMARY KEY (key, c)
+            )
+        """)
+
+        cursor.execute("INSERT INTO foo(key, c, v) VALUES ('foo', '1', '1')")
+        cursor.execute("INSERT INTO foo(key, c, v) VALUES ('foo', '2', '2')")
+        cursor.execute("INSERT INTO foo(key, c, v) VALUES ('foo', '3', '3')")
+
+        cursor.execute("SELECT c FROM foo WHERE key = 'foo' AND c IN ('1', '2');")
+        res = cursor.fetchall()
+        assert res == [['1'], ['2']], res
+
