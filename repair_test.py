@@ -57,15 +57,15 @@ class TestRepair(Tester):
         # Insert 1000 keys, kill node 3, insert 1 key, restart node 3, insert 1000 more keys
         for i in xrange(0, 1000):
             insert_c1c2(cursor, i, "ONE")
-        time.sleep(.5)
-        node3.flush();
+        time.sleep(1)
+        node3.flush()
         node3.stop()
         insert_c1c2(cursor, 1000, "ONE")
         time.sleep(.5)
         node3.start(wait_other_notice=True)
         for i in xrange(1001, 2001):
             insert_c1c2(cursor, i, "ONE")
-        time.sleep(.5)
+        time.sleep(1)
         cursor.close()
 
         cluster.flush()
