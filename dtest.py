@@ -5,6 +5,7 @@ import fnmatch
 from ccmlib.cluster import Cluster
 from ccmlib.node import Node
 from nose.exc import SkipTest
+from unittest import TestCase
 
 logging.basicConfig(stream=sys.stderr)
 
@@ -33,7 +34,7 @@ def debug(msg):
         print msg
 
 
-class Tester(object):
+class Tester(TestCase):
 
     def __init__(self, *argv, **kwargs):
         # if False, then scan the log of each node for errors after every test.
@@ -160,7 +161,7 @@ class Tester(object):
             finally:
                 self.__cleanup_cluster()
 
-    def cql_connection(self, node, keyspace=None, version=None):
+    def cql_connection(self, node, keyspace=None, version=None, user=None, password=None):
         import cql
         host, port = node.network_interfaces['thrift']
         if not version and self.cluster.version() >= "1.2":
@@ -169,9 +170,9 @@ class Tester(object):
             version = "2.0.0"
 
         if version:
-            con = cql.connect(host, port, keyspace=keyspace, cql_version=version)
+            con = cql.connect(host, port, keyspace=keyspace, cql_version=version, user=user, password=password)
         else:
-            con = cql.connect(host, port, keyspace=keyspace)
+            con = cql.connect(host, port, keyspace=keyspace, user=user, password=password)
         self.connections.append(con)
         return con
 
