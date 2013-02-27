@@ -107,10 +107,8 @@ class TestAuth(Tester):
         self.prepare()
 
         cursor = self.get_cursor(user='cassandra', password='cassandra')
-        with self.assertRaises(ProgrammingError) as cm:
-            cursor.execute("DROP USER cassandra")
-        self.assertEqual("Bad Request: Users aren't allowed to DROP themselves",
-                         cm.exception.message)
+        self.assertUnauthorized("Users aren't allowed to DROP themselves",
+                                cursor, "DROP USER cassandra")
 
     @since('1.2')
     def only_superusers_can_drop_users_test(self):
@@ -123,10 +121,9 @@ class TestAuth(Tester):
         self.assertEqual(3, cassandra.rowcount)
 
         cathy = self.get_cursor(user='cathy', password='12345')
-        with self.assertRaises(ProgrammingError) as cm:
-            cathy.execute('DROP USER dave')
-        self.assertEqual('Bad Request: Only superusers are allowed to perfrom DROP USER queries',
-                         cm.exception.message)
+        self.assertUnauthorized('Only superusers are allowed to perfrom DROP USER queries',
+                                cathy, 'DROP USER dave')
+
         cassandra.execute("LIST USERS")
         self.assertEqual(3, cassandra.rowcount)
 
@@ -139,10 +136,8 @@ class TestAuth(Tester):
         self.prepare()
 
         cursor = self.get_cursor(user='cassandra', password='cassandra')
-        with self.assertRaises(ProgrammingError) as cm:
-            cursor.execute('DROP USER nonexistent')
-        self.assertEqual("Bad Request: User nonexistent doesn't exist",
-                         cm.exception.message)
+        self.assertUnauthorized("User nonexistent doesn't exist",
+                                cursor, 'DROP USER nonexistent')
 
     @since('1.2')
     def regular_users_can_alter_their_passwords_only_test(self):
@@ -155,20 +150,16 @@ class TestAuth(Tester):
         cathy = self.get_cursor(user='cathy', password='12345')
         cathy.execute("ALTER USER cathy WITH PASSWORD '54321'")
         cathy = self.get_cursor(user='cathy', password='54321')
-        with self.assertRaises(ProgrammingError) as cm:
-            cathy.execute("ALTER USER bob WITH PASSWORD 'cantchangeit'")
-        self.assertEqual("Bad Request: You aren't allowed to alter this user",
-                         cm.exception.message)
+        self.assertUnauthorized("You aren't allowed to alter this user",
+                                cathy, "ALTER USER bob WITH PASSWORD 'cantchangeit'")
 
     @since('1.2')
     def users_cant_alter_their_superuser_status_test(self):
         self.prepare()
 
         cursor = self.get_cursor(user='cassandra', password='cassandra')
-        with self.assertRaises(ProgrammingError) as cm:
-            cursor.execute("ALTER USER cassandra NOSUPERUSER")
-        self.assertEqual("Bad Request: You aren't allowed to alter your own superuser status",
-                         cm.exception.message)
+        self.assertUnauthorized("You aren't allowed to alter your own superuser status",
+                                cursor, "ALTER USER cassandra NOSUPERUSER")
 
     @since('1.2')
     def only_superuser_alters_superuser_status_test(self):
@@ -178,10 +169,8 @@ class TestAuth(Tester):
         cassandra.execute("CREATE USER cathy WITH PASSWORD '12345'")
 
         cathy = self.get_cursor(user='cathy', password='12345')
-        with self.assertRaises(ProgrammingError) as cm:
-            cathy.execute("ALTER USER cassandra NOSUPERUSER")
-        self.assertEqual("Bad Request: Only superusers are allowed to alter superuser status",
-                         cm.exception.message)
+        self.assertUnauthorized("Only superusers are allowed to alter superuser status",
+                                cathy, "ALTER USER cassandra NOSUPERUSER")
 
         cassandra.execute("ALTER USER cathy SUPERUSER")
 
@@ -190,10 +179,8 @@ class TestAuth(Tester):
         self.prepare()
 
         cursor = self.get_cursor(user='cassandra', password='cassandra')
-        with self.assertRaises(ProgrammingError) as cm:
-            cursor.execute("ALTER USER nonexistent WITH PASSWORD 'doesn''tmatter'")
-        self.assertEqual("Bad Request: User nonexistent doesn't exist",
-                         cm.exception.message)
+        self.assertUnauthorized("User nonexistent doesn't exist",
+                                cursor, "ALTER USER nonexistent WITH PASSWORD 'doesn''tmatter'")
 
     @since('1.2')
     def create_ks_auth_test(self):
@@ -203,11 +190,9 @@ class TestAuth(Tester):
         cassandra.execute("CREATE USER cathy WITH PASSWORD '12345'")
 
         cathy = self.get_cursor(user='cathy', password='12345')
-        with self.assertRaises(ProgrammingError) as cm:
-            cathy.execute("""CREATE KEYSPACE ks
-                             WITH replication = {'class':'SimpleStrategy', 'replication_factor':1}""")
-        self.assertEqual("Bad Request: User cathy has no CREATE permission on <all keyspaces> or any of its parents",
-                         cm.exception.message)
+        self.assertUnauthorized("User cathy has no CREATE permission on <all keyspaces> or any of its parents",
+                                cathy,
+                                "CREATE KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor':1}")
 
         cassandra.execute("GRANT CREATE ON ALL KEYSPACES TO cathy")
         cathy.execute("""CREATE KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor':1}""")
@@ -221,10 +206,8 @@ class TestAuth(Tester):
         cassandra.execute("CREATE KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor':1}")
 
         cathy = self.get_cursor(user='cathy', password='12345')
-        with self.assertRaises(ProgrammingError) as cm:
-            cathy.execute("CREATE TABLE ks.cf (id int primary key)")
-        self.assertEqual("Bad Request: User cathy has no CREATE permission on <keyspace ks> or any of its parents",
-                         cm.exception.message)
+        self.assertUnauthorized("User cathy has no CREATE permission on <keyspace ks> or any of its parents",
+                                cathy, "CREATE TABLE ks.cf (id int primary key)")
 
         cassandra.execute("GRANT CREATE ON KEYSPACE ks TO cathy")
         cathy.execute("CREATE TABLE ks.cf (id int primary key)")
@@ -238,10 +221,9 @@ class TestAuth(Tester):
         cassandra.execute("CREATE KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor':1}")
 
         cathy = self.get_cursor(user='cathy', password='12345')
-        with self.assertRaises(ProgrammingError) as cm:
-            cathy.execute("ALTER KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor':2}")
-        self.assertEqual("Bad Request: User cathy has no ALTER permission on <keyspace ks> or any of its parents",
-                         cm.exception.message)
+        self.assertUnauthorized("User cathy has no ALTER permission on <keyspace ks> or any of its parents",
+                                cathy,
+                                "ALTER KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor':2}")
 
         cassandra.execute("GRANT ALTER ON KEYSPACE ks TO cathy")
         cathy.execute("ALTER KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor':2}")
@@ -256,19 +238,15 @@ class TestAuth(Tester):
         cassandra.execute("CREATE TABLE ks.cf (id int primary key)")
 
         cathy = self.get_cursor(user='cathy', password='12345')
-        with self.assertRaises(ProgrammingError) as cm:
-            cathy.execute("ALTER TABLE ks.cf ADD val int")
-        self.assertEqual("Bad Request: User cathy has no ALTER permission on <table ks.cf> or any of its parents",
-                         cm.exception.message)
+        self.assertUnauthorized("User cathy has no ALTER permission on <table ks.cf> or any of its parents",
+                                cathy, "ALTER TABLE ks.cf ADD val int")
 
         cassandra.execute("GRANT ALTER ON ks.cf TO cathy")
         cathy.execute("ALTER TABLE ks.cf ADD val int")
 
         cassandra.execute("REVOKE ALTER ON ks.cf FROM cathy")
-        with self.assertRaises(ProgrammingError) as cm:
-            cathy.execute("CREATE INDEX ON ks.cf(val)")
-        self.assertEqual("Bad Request: User cathy has no ALTER permission on <table ks.cf> or any of its parents",
-                         cm.exception.message)
+        self.assertUnauthorized("User cathy has no ALTER permission on <table ks.cf> or any of its parents",
+                                cathy, "CREATE INDEX ON ks.cf(val)")
 
         cassandra.execute("GRANT ALTER ON ks.cf TO cathy")
         cathy.execute("CREATE INDEX ON ks.cf(val)")
@@ -276,10 +254,8 @@ class TestAuth(Tester):
         cassandra.execute("REVOKE ALTER ON ks.cf FROM cathy")
 
         cathy.execute("USE ks")
-        with self.assertRaises(ProgrammingError) as cm:
-            cathy.execute("DROP INDEX cf_val_idx")
-        self.assertEqual("Bad Request: User cathy has no ALTER permission on <table ks.cf> or any of its parents",
-                         cm.exception.message)
+        self.assertUnauthorized("User cathy has no ALTER permission on <table ks.cf> or any of its parents",
+                                cathy, "DROP INDEX cf_val_idx")
 
         cassandra.execute("GRANT ALTER ON ks.cf TO cathy")
         cathy.execute("DROP INDEX cf_val_idx")
@@ -293,10 +269,8 @@ class TestAuth(Tester):
         cassandra.execute("CREATE KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor':1}")
 
         cathy = self.get_cursor(user='cathy', password='12345')
-        with self.assertRaises(ProgrammingError) as cm:
-            cathy.execute("DROP KEYSPACE ks")
-        self.assertEqual("Bad Request: User cathy has no DROP permission on <keyspace ks> or any of its parents",
-                         cm.exception.message)
+        self.assertUnauthorized("User cathy has no DROP permission on <keyspace ks> or any of its parents",
+                                cathy, "DROP KEYSPACE ks")
 
         cassandra.execute("GRANT DROP ON KEYSPACE ks TO cathy")
         cathy.execute("DROP KEYSPACE ks")
@@ -311,10 +285,8 @@ class TestAuth(Tester):
         cassandra.execute("CREATE TABLE ks.cf (id int primary key)")
 
         cathy = self.get_cursor(user='cathy', password='12345')
-        with self.assertRaises(ProgrammingError) as cm:
-            cathy.execute("DROP TABLE ks.cf")
-        self.assertEqual("Bad Request: User cathy has no DROP permission on <table ks.cf> or any of its parents",
-                         cm.exception.message)
+        self.assertUnauthorized("User cathy has no DROP permission on <table ks.cf> or any of its parents",
+                                cathy, "DROP TABLE ks.cf")
 
         cassandra.execute("GRANT DROP ON ks.cf TO cathy")
         cathy.execute("DROP TABLE ks.cf")
@@ -329,34 +301,24 @@ class TestAuth(Tester):
         cassandra.execute("CREATE TABLE ks.cf (id int primary key, val int)")
 
         cathy = self.get_cursor(user='cathy', password='12345')
-        with self.assertRaises(ProgrammingError) as cm:
-            cathy.execute("SELECT * FROM ks.cf")
-        self.assertEqual("Bad Request: User cathy has no SELECT permission on <table ks.cf> or any of its parents",
-                         cm.exception.message)
+        self.assertUnauthorized("User cathy has no SELECT permission on <table ks.cf> or any of its parents",
+                                cathy, "SELECT * FROM ks.cf")
 
         cassandra.execute("GRANT SELECT ON ks.cf TO cathy")
         cathy.execute("SELECT * FROM ks.cf")
         self.assertEquals(0, cathy.rowcount)
 
-        with self.assertRaises(ProgrammingError) as cm:
-            cathy.execute("INSERT INTO ks.cf (id, val) VALUES (0, 0)")
-        self.assertEqual("Bad Request: User cathy has no MODIFY permission on <table ks.cf> or any of its parents",
-                         cm.exception.message)
+        self.assertUnauthorized("User cathy has no MODIFY permission on <table ks.cf> or any of its parents",
+                                cathy, "INSERT INTO ks.cf (id, val) VALUES (0, 0)")
 
-        with self.assertRaises(ProgrammingError) as cm:
-            cathy.execute("UPDATE ks.cf SET val = 1 WHERE id = 1")
-        self.assertEqual("Bad Request: User cathy has no MODIFY permission on <table ks.cf> or any of its parents",
-                         cm.exception.message)
+        self.assertUnauthorized("User cathy has no MODIFY permission on <table ks.cf> or any of its parents",
+                                cathy, "UPDATE ks.cf SET val = 1 WHERE id = 1")
 
-        with self.assertRaises(ProgrammingError) as cm:
-            cathy.execute("DELETE FROM ks.cf WHERE id = 1")
-        self.assertEqual("Bad Request: User cathy has no MODIFY permission on <table ks.cf> or any of its parents",
-                         cm.exception.message)
+        self.assertUnauthorized("User cathy has no MODIFY permission on <table ks.cf> or any of its parents",
+                                cathy, "DELETE FROM ks.cf WHERE id = 1")
 
-        with self.assertRaises(ProgrammingError) as cm:
-            cathy.execute("TRUNCATE ks.cf")
-        self.assertEqual("Bad Request: User cathy has no MODIFY permission on <table ks.cf> or any of its parents",
-                         cm.exception.message)
+        self.assertUnauthorized("User cathy has no MODIFY permission on <table ks.cf> or any of its parents",
+                                cathy, "TRUNCATE ks.cf")
 
         cassandra.execute("GRANT MODIFY ON ks.cf TO cathy")
         cathy.execute("INSERT INTO ks.cf (id, val) VALUES (0, 0)")
@@ -381,18 +343,14 @@ class TestAuth(Tester):
 
         cathy = self.get_cursor(user='cathy', password='12345')
         # missing both SELECT and AUTHORIZE
-        with self.assertRaises(ProgrammingError) as cm:
-            cathy.execute("GRANT SELECT ON ALL KEYSPACES TO bob")
-        self.assertEqual("Bad Request: User cathy has no AUTHORIZE permission on <all keyspaces> or any of its parents",
-                         cm.exception.message)
+        self.assertUnauthorized("User cathy has no AUTHORIZE permission on <all keyspaces> or any of its parents",
+                                cathy, "GRANT SELECT ON ALL KEYSPACES TO bob")
 
         cassandra.execute("GRANT AUTHORIZE ON ALL KEYSPACES TO cathy")
 
         # still missing SELECT
-        with self.assertRaises(ProgrammingError) as cm:
-            cathy.execute("GRANT SELECT ON ALL KEYSPACES TO bob")
-        self.assertEqual("Bad Request: User cathy has no SELECT permission on <all keyspaces> or any of its parents",
-                         cm.exception.message)
+        self.assertUnauthorized("User cathy has no SELECT permission on <all keyspaces> or any of its parents",
+                                cathy, "GRANT SELECT ON ALL KEYSPACES TO bob")
 
         cassandra.execute("GRANT SELECT ON ALL KEYSPACES TO cathy")
 
@@ -407,23 +365,17 @@ class TestAuth(Tester):
         cassandra.execute("CREATE USER cathy WITH PASSWORD '12345'")
         cassandra.execute("CREATE KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor':1}")
 
-        with self.assertRaises(ProgrammingError) as cm:
-            cassandra.execute("GRANT ALL ON KEYSPACE nonexistent TO cathy")
-        self.assertEquals("Bad Request: <keyspace nonexistent> doesn't exist",
-                          cm.exception.message)
-        with self.assertRaises(ProgrammingError) as cm:
-            cassandra.execute("GRANT ALL ON KEYSPACE ks TO nonexistent")
-        self.assertEquals("Bad Request: User nonexistent doesn't exist",
-                          cm.exception.message)
+        self.assertUnauthorized("<keyspace nonexistent> doesn't exist",
+                                cassandra, "GRANT ALL ON KEYSPACE nonexistent TO cathy")
 
-        with self.assertRaises(ProgrammingError) as cm:
-            cassandra.execute("REVOKE ALL ON KEYSPACE nonexistent FROM cathy")
-        self.assertEquals("Bad Request: <keyspace nonexistent> doesn't exist",
-                          cm.exception.message)
-        with self.assertRaises(ProgrammingError) as cm:
-            cassandra.execute("REVOKE ALL ON KEYSPACE ks FROM nonexistent")
-        self.assertEquals("Bad Request: User nonexistent doesn't exist",
-                          cm.exception.message)
+        self.assertUnauthorized("User nonexistent doesn't exist",
+                                cassandra, "GRANT ALL ON KEYSPACE ks TO nonexistent")
+
+        self.assertUnauthorized("<keyspace nonexistent> doesn't exist",
+                                cassandra, "REVOKE ALL ON KEYSPACE nonexistent FROM cathy")
+
+        self.assertUnauthorized("User nonexistent doesn't exist",
+                                cassandra, "REVOKE ALL ON KEYSPACE ks FROM nonexistent")
 
     @since('1.2')
     def grant_revoke_cleanup_test(self):
@@ -444,15 +396,11 @@ class TestAuth(Tester):
         cassandra.execute("DROP USER cathy")
         cassandra.execute("CREATE USER cathy WITH PASSWORD '12345'")
 
-        with self.assertRaises(ProgrammingError) as cm:
-            cathy.execute("INSERT INTO ks.cf (id, val) VALUES (0, 0)")
-        self.assertEqual("Bad Request: User cathy has no MODIFY permission on <table ks.cf> or any of its parents",
-                         cm.exception.message)
+        self.assertUnauthorized("User cathy has no MODIFY permission on <table ks.cf> or any of its parents",
+                                cathy, "INSERT INTO ks.cf (id, val) VALUES (0, 0)")
 
-        with self.assertRaises(ProgrammingError) as cm:
-            cathy.execute("SELECT * FROM ks.cf")
-        self.assertEqual("Bad Request: User cathy has no SELECT permission on <table ks.cf> or any of its parents",
-                         cm.exception.message)
+        self.assertUnauthorized("User cathy has no SELECT permission on <table ks.cf> or any of its parents",
+                                cathy, "SELECT * FROM ks.cf")
 
         # grant all the permissions back
         cassandra.execute("GRANT ALL ON ks.cf TO cathy")
@@ -465,15 +413,11 @@ class TestAuth(Tester):
         cassandra.execute("CREATE KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor':1}")
         cassandra.execute("CREATE TABLE ks.cf (id int primary key, val int)")
 
-        with self.assertRaises(ProgrammingError) as cm:
-            cathy.execute("INSERT INTO ks.cf (id, val) VALUES (0, 0)")
-        self.assertEqual("Bad Request: User cathy has no MODIFY permission on <table ks.cf> or any of its parents",
-                         cm.exception.message)
+        self.assertUnauthorized("User cathy has no MODIFY permission on <table ks.cf> or any of its parents",
+                                cathy, "INSERT INTO ks.cf (id, val) VALUES (0, 0)")
 
-        with self.assertRaises(ProgrammingError) as cm:
-            cathy.execute("SELECT * FROM ks.cf")
-        self.assertEqual("Bad Request: User cathy has no SELECT permission on <table ks.cf> or any of its parents",
-                         cm.exception.message)
+        self.assertUnauthorized("User cathy has no SELECT permission on <table ks.cf> or any of its parents",
+                                cathy, "SELECT * FROM ks.cf")
 
     @since('1.2')
     def permissions_caching_test(self):
@@ -486,10 +430,8 @@ class TestAuth(Tester):
 
         cathy = self.get_cursor(user='cathy', password='12345')
 
-        with self.assertRaises(ProgrammingError) as cm:
-            cathy.execute("SELECT * FROM ks.cf")
-        self.assertEqual("Bad Request: User cathy has no SELECT permission on <table ks.cf> or any of its parents",
-                         cm.exception.message)
+        self.assertUnauthorized("User cathy has no SELECT permission on <table ks.cf> or any of its parents",
+                                cathy, "SELECT * FROM ks.cf")
 
         # grant SELECT to cathy
         cassandra.execute("GRANT SELECT ON ks.cf TO cathy")
@@ -498,10 +440,8 @@ class TestAuth(Tester):
         # should still see a failure
         time.sleep(1.7)
         cathy2 = self.get_cursor(user='cathy', password='12345')
-        with self.assertRaises(ProgrammingError) as cm:
-            cathy2.execute("SELECT * FROM ks.cf")
-        self.assertEqual("Bad Request: User cathy has no SELECT permission on <table ks.cf> or any of its parents",
-                         cm.exception.message)
+        self.assertUnauthorized("User cathy has no SELECT permission on <table ks.cf> or any of its parents",
+                                cathy2, "SELECT * FROM ks.cf")
 
         # wait a bit more until the cache expires
         time.sleep(0.4)
@@ -520,10 +460,8 @@ class TestAuth(Tester):
         time.sleep(0.4)
 
         # the changes (SELECT revocation) should kick in now
-        with self.assertRaises(ProgrammingError) as cm:
-            cathy.execute("SELECT * FROM ks.cf")
-        self.assertEqual("Bad Request: User cathy has no SELECT permission on <table ks.cf> or any of its parents",
-                         cm.exception.message)
+        self.assertUnauthorized("User cathy has no SELECT permission on <table ks.cf> or any of its parents",
+                                cathy, "SELECT * FROM ks.cf")
 
     @since('1.2')
     def list_permissions_test(self):
@@ -543,51 +481,41 @@ class TestAuth(Tester):
         cassandra.execute("GRANT MODIFY ON ks.cf2 TO bob")
         cassandra.execute("GRANT SELECT ON ks.cf2 TO cathy")
 
-        cassandra.execute("LIST ALL PERMISSIONS")
-        self.assertPermissions([('cathy', '<all keyspaces>', 'CREATE'),
-                                ('cathy', '<table ks.cf>', 'MODIFY'),
-                                ('cathy', '<table ks.cf2>', 'SELECT'),
-                                ('bob', '<keyspace ks>', 'ALTER'),
-                                ('bob', '<table ks.cf>', 'DROP'),
-                                ('bob', '<table ks.cf2>', 'MODIFY')],
-                               cassandra.fetchall())
+        self.assertPermissionsListed([('cathy', '<all keyspaces>', 'CREATE'),
+                                      ('cathy', '<table ks.cf>', 'MODIFY'),
+                                      ('cathy', '<table ks.cf2>', 'SELECT'),
+                                      ('bob', '<keyspace ks>', 'ALTER'),
+                                      ('bob', '<table ks.cf>', 'DROP'),
+                                      ('bob', '<table ks.cf2>', 'MODIFY')],
+                                     cassandra, "LIST ALL PERMISSIONS")
 
-        cassandra.execute("LIST ALL PERMISSIONS OF cathy")
-        self.assertPermissions([('cathy', '<all keyspaces>', 'CREATE'),
-                                ('cathy', '<table ks.cf>', 'MODIFY'),
-                                ('cathy', '<table ks.cf2>', 'SELECT')],
-                               cassandra.fetchall())
+        self.assertPermissionsListed([('cathy', '<all keyspaces>', 'CREATE'),
+                                      ('cathy', '<table ks.cf>', 'MODIFY'),
+                                      ('cathy', '<table ks.cf2>', 'SELECT')],
+                                     cassandra, "LIST ALL PERMISSIONS OF cathy")
 
-        cassandra.execute("LIST ALL PERMISSIONS ON ks.cf NORECURSIVE")
-        self.assertPermissions([('cathy', '<table ks.cf>', 'MODIFY'),
-                                ('bob', '<table ks.cf>', 'DROP')],
-                               cassandra.fetchall())
+        self.assertPermissionsListed([('cathy', '<table ks.cf>', 'MODIFY'),
+                                      ('bob', '<table ks.cf>', 'DROP')],
+                                     cassandra, "LIST ALL PERMISSIONS ON ks.cf NORECURSIVE")
 
-        cassandra.execute("LIST SELECT ON ks.cf2")
-        self.assertPermissions([('cathy', '<table ks.cf2>', 'SELECT')],
-                               cassandra.fetchall())
+        self.assertPermissionsListed([('cathy', '<table ks.cf2>', 'SELECT')],
+                                      cassandra, "LIST SELECT ON ks.cf2")
 
-        cassandra.execute("LIST ALL ON ks.cf OF cathy")
-        self.assertPermissions([('cathy', '<all keyspaces>', 'CREATE'),
-                                ('cathy', '<table ks.cf>', 'MODIFY')],
-                               cassandra.fetchall())
+        self.assertPermissionsListed([('cathy', '<all keyspaces>', 'CREATE'),
+                                      ('cathy', '<table ks.cf>', 'MODIFY')],
+                                     cassandra, "LIST ALL ON ks.cf OF cathy")
 
         bob = self.get_cursor(user='bob', password='12345')
-        bob.execute("LIST ALL PERMISSIONS OF bob")
-        self.assertPermissions([('bob', '<keyspace ks>', 'ALTER'),
-                                ('bob', '<table ks.cf>', 'DROP'),
-                                ('bob', '<table ks.cf2>', 'MODIFY')],
-                               bob.fetchall())
+        self.assertPermissionsListed([('bob', '<keyspace ks>', 'ALTER'),
+                                      ('bob', '<table ks.cf>', 'DROP'),
+                                      ('bob', '<table ks.cf2>', 'MODIFY')],
+                                     bob, "LIST ALL PERMISSIONS OF bob")
 
-        with self.assertRaises(ProgrammingError) as cm:
-            bob.execute("LIST ALL PERMISSIONS")
-        self.assertEqual("Bad Request: You are not authorized to view everyone's permissions",
-                         cm.exception.message)
+        self.assertUnauthorized("You are not authorized to view everyone's permissions",
+                                bob, "LIST ALL PERMISSIONS")
 
-        with self.assertRaises(ProgrammingError) as cm:
-            bob.execute("LIST ALL PERMISSIONS OF cathy")
-        self.assertEqual("Bad Request: You are not authorized to view cathy's permissions",
-                         cm.exception.message)
+        self.assertUnauthorized("You are not authorized to view cathy's permissions",
+                                bob, "LIST ALL PERMISSIONS OF cathy")
 
     def prepare(self, nodes=1, permissions_expiry=0):
         config = {'authenticator' : 'org.apache.cassandra.auth.PasswordAuthenticator',
@@ -602,6 +530,12 @@ class TestAuth(Tester):
         conn = self.cql_connection(node, version="3.0.1", user=user, password=password)
         return conn.cursor()
 
-    def assertPermissions(self, perms, rows):
-        rows_to_perms = [(str(r[0]), str(r[1]), str(r[2])) for r in rows]
-        self.assertEqual(sorted(perms), sorted(rows_to_perms))
+    def assertPermissionsListed(self, expected, cursor, query):
+        cursor.execute(query)
+        perms = [(str(r[0]), str(r[1]), str(r[2])) for r in cursor.fetchall()]
+        self.assertEqual(sorted(expected), sorted(perms))
+
+    def assertUnauthorized(self, message, cursor, query):
+        with self.assertRaises(ProgrammingError) as cm:
+            cursor.execute(query)
+        self.assertEqual("Bad Request: " + message, cm.exception.message)
