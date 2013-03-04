@@ -523,7 +523,13 @@ class TestAuth(Tester):
                   'permissions_validity_in_ms' : permissions_expiry}
         self.cluster.set_configuration_options(values=config)
         self.cluster.populate(nodes).start()
-        time.sleep(12) # default user setup is delayed by 10 seconds to reduce log spam
+        # default user setup is delayed by 10 seconds to reduce log spam
+        if nodes == 1:
+            self.cluster.nodelist()[0].watch_log_for('Created default superuser')
+        else:
+            # can' just watch for log - the line will appear in just one of the nodes' logs
+            # only one test uses more than 1 node, though, so some sleep is fine.
+            time.sleep(15)
 
     def get_cursor(self, node_idx=0, user=None, password=None):
         node = self.cluster.nodelist()[node_idx]
