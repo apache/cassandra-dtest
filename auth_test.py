@@ -523,7 +523,7 @@ class TestAuth(Tester):
                   'permissions_validity_in_ms' : permissions_expiry}
         self.cluster.set_configuration_options(values=config)
         self.cluster.populate(nodes).start()
-        time.sleep(11) # default user setup is delayed by 10 seconds to reduce log spam
+        time.sleep(12) # default user setup is delayed by 10 seconds to reduce log spam
 
     def get_cursor(self, node_idx=0, user=None, password=None):
         node = self.cluster.nodelist()[node_idx]
