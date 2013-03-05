@@ -1030,7 +1030,7 @@ class TestCQL(Tester):
                 APPLY BATCH;
             """)
 
-    @since('1.1')
+    @since('1.2')
     def token_range_test(self):
         cursor = self.prepare()
 

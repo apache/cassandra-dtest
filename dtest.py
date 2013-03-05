@@ -93,7 +93,7 @@ class Tester(TestCase):
         # the failure detector can be quite slow in such tests with quick start/stop
         self.cluster.set_configuration_options(values={'phi_convict_threshold': 5})
 
-        timeout = 15000
+        timeout = 10000
         if self.cluster.version() < "1.2":
             self.cluster.set_configuration_options(values={'rpc_timeout_in_ms': timeout})
         else:
@@ -106,13 +106,13 @@ class Tester(TestCase):
             })
 
         if self.cluster.version() >= '1.2':
-            self.cluster.set_configuration_options(values={'read_request_timeout_in_ms': 15000})
-            self.cluster.set_configuration_options(values={'write_request_timeout_in_ms': 15000})
-            self.cluster.set_configuration_options(values={'range_request_timeout_in_ms': 15000})
-            self.cluster.set_configuration_options(values={'truncate_request_timeout_in_ms': 15000})
-            self.cluster.set_configuration_options(values={'request_timeout_in_ms': 15000})
+            self.cluster.set_configuration_options(values={'read_request_timeout_in_ms': timeout})
+            self.cluster.set_configuration_options(values={'write_request_timeout_in_ms': timeout})
+            self.cluster.set_configuration_options(values={'range_request_timeout_in_ms': timeout})
+            self.cluster.set_configuration_options(values={'truncate_request_timeout_in_ms': timeout})
+            self.cluster.set_configuration_options(values={'request_timeout_in_ms': timeout})
         else:
-            self.cluster.set_configuration_options(values={'rpc_timeout_in_ms': 15000})
+            self.cluster.set_configuration_options(values={'rpc_timeout_in_ms': timeout})
 
         with open(LAST_TEST_DIR, 'w') as f:
             f.write(self.test_path + '\n')
