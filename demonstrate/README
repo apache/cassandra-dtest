@@ -1,5 +1,0 @@
-Tests in this module demonstrate specific issues in the cassandra jira. Tests here
-are generally versions of other tests that have been stripped down to be as simple 
-as possible while still demonstrating the issue. See comments in each test for
-the issue they demonstrate.
-
