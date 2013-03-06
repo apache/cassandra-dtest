@@ -1963,7 +1963,7 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [ ['system_auth', True], ['ks1', True], ['system', True], ['system_traces', True], ['ks2', False] ], res
 
-        cursor.execute("ALTER KEYSPACE ks1 WITH replication = { 'CLASS' : 'NetworkTopologyStrategy', 'dc1' : 1 } AND durable_writes=False")
+        cursor.execute("ALTER KEYSPACE ks1 WITH replication = { 'class' : 'NetworkTopologyStrategy', 'dc1' : 1 } AND durable_writes=False")
         cursor.execute("ALTER KEYSPACE ks2 WITH durable_writes=true")
         cursor.execute("SELECT keyspace_name, durable_writes, strategy_class FROM system.schema_keyspaces")
         res = cursor.fetchall()
