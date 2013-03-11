@@ -38,11 +38,18 @@ class Tester(TestCase):
 
     def __init__(self, *argv, **kwargs):
         # if False, then scan the log of each node for errors after every test.
-        super(Tester, self).__init__(*argv, **kwargs)
         self.allow_log_errors = False
+        try:
+            self.cluster_options = kwargs['cluster_options']
+        except KeyError:
+            self.cluster_options = None
+        del kwargs['cluster_options']
+        super(Tester, self).__init__(*argv, **kwargs)
+
 
     def __get_cluster(self, name='test'):
         self.test_path = tempfile.mkdtemp(prefix='dtest-')
+        debug("cluster ccm directory: "+self.test_path)
         try:
             version = os.environ['CASSANDRA_VERSION']
             cluster = Cluster(self.test_path, name, cassandra_version=version)
@@ -94,7 +101,9 @@ class Tester(TestCase):
         self.cluster.set_configuration_options(values={'phi_convict_threshold': 5})
 
         timeout = 10000
-        if self.cluster.version() < "1.2":
+        if self.cluster_options is not None:
+            self.cluster.set_configuration_options(values=self.cluster_options)
+        elif self.cluster.version() < "1.2":
             self.cluster.set_configuration_options(values={'rpc_timeout_in_ms': timeout})
         else:
             self.cluster.set_configuration_options(values={
@@ -104,15 +113,6 @@ class Tester(TestCase):
                 'truncate_request_timeout_in_ms' : timeout,
                 'request_timeout_in_ms' : timeout
             })
-
-        if self.cluster.version() >= '1.2':
-            self.cluster.set_configuration_options(values={'read_request_timeout_in_ms': timeout})
-            self.cluster.set_configuration_options(values={'write_request_timeout_in_ms': timeout})
-            self.cluster.set_configuration_options(values={'range_request_timeout_in_ms': timeout})
-            self.cluster.set_configuration_options(values={'truncate_request_timeout_in_ms': timeout})
-            self.cluster.set_configuration_options(values={'request_timeout_in_ms': timeout})
-        else:
-            self.cluster.set_configuration_options(values={'rpc_timeout_in_ms': timeout})
 
         with open(LAST_TEST_DIR, 'w') as f:
             f.write(self.test_path + '\n')
