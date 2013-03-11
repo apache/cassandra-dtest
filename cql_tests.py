@@ -2778,6 +2778,7 @@ class TestCQL(Tester):
         assert_invalid(cursor, "SELECT dateOf(k) FROM test WHERE k = 0 AND t = %s" % dates[0])
 
         cursor.execute("SELECT dateOf(t), unixTimestampOf(t) FROM test WHERE k = 0 AND t = %s" % dates[0])
+        cursor.execute("SELECT t FROM test WHERE k = 0 AND t > maxTimeuuid(1234567) AND t < minTimeuuid('2012-11-07 18:18:22-0800')")
         # not sure what to check exactly so just checking the query returns
 
     @since('1.2')
@@ -2899,3 +2900,55 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [['1'], ['2']], res
 
+    @since('1.2')
+    def conversion_functions_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k int PRIMARY KEY,
+                i varint,
+                b blob
+            )
+        """)
+
+        cursor.execute("INSERT INTO test(k, i, b) VALUES (0, blobAsVarint(bigintAsBlob(3)), textAsBlob('foobar'))")
+        cursor.execute("SELECT i, blobAsText(b) FROM test WHERE k = 0")
+        res = cursor.fetchall()
+        assert res == [[3, 'foobar']], res
+
+    @since('1.2')
+    def alter_bug_test(self):
+        """ Test for bug of 5232 """
+        cursor = self.prepare()
+
+        cursor.execute("CREATE TABLE t1 (id int PRIMARY KEY, t text);")
+
+        cursor.execute("UPDATE t1 SET t = '111' WHERE id = 1;")
+        cursor.execute("ALTER TABLE t1 ADD l list<text>;")
+
+        time.sleep(.5)
+
+        cursor.execute("SELECT * FROM t1;")
+        res = cursor.fetchall()
+        assert res == [[1, None, '111']], res
+
+        cursor.execute("ALTER TABLE t1 ADD m map<int, text>;")
+        time.sleep(.5)
+        cursor.execute("SELECT * FROM t1;")
+        res = cursor.fetchall()
+        assert res == [[1, None, None, '111']], res
+
+    @since('1.2')
+    def validation_bug_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k int PRIMARY KEY,
+                l list<int>,
+                s set<int>
+            )
+        """)
+
+        assert_invalid(cursor, "INSERT INTO test(k, s) VALUES (0, {1, 1})")
