@@ -9,13 +9,13 @@ class TestAuth(Tester):
 
     @since('1.2')
     def system_auth_ks_is_alterable_test(self):
-        self.prepare(3)
+        self.cluster.populate(3).start()
 
         schema_query = """SELECT strategy_options
                           FROM system.schema_keyspaces
                           WHERE keyspace_name = 'system_auth'"""
 
-        cursor = self.get_cursor(1, user='cassandra', password='cassandra')
+        cursor = self.get_cursor(0)
         cursor.execute(schema_query)
         row = cursor.fetchone()
         self.assertEqual('{"replication_factor":"1"}', row[0])
@@ -28,10 +28,9 @@ class TestAuth(Tester):
         # make sure schema change is persistent
         self.cluster.stop()
         self.cluster.start()
-        self.cluster.repair()
 
         for i in range(3):
-            cursor = self.get_cursor(i, user='cassandra', password='cassandra')
+            cursor = self.get_cursor(i)
             cursor.execute(schema_query)
             row = cursor.fetchone()
             self.assertEqual('{"replication_factor":"3"}', row[0])
