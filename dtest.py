@@ -41,9 +41,9 @@ class Tester(TestCase):
         self.allow_log_errors = False
         try:
             self.cluster_options = kwargs['cluster_options']
+            del kwargs['cluster_options']
         except KeyError:
             self.cluster_options = None
-        del kwargs['cluster_options']
         super(Tester, self).__init__(*argv, **kwargs)
 
 
