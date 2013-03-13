@@ -9,7 +9,7 @@ import os
 from tools import ThriftConnection
 
 versions = (
-    '1.1.9', '1.2.2'
+    '1.1.9', 'git:cassandra-1.2'
 )
 
 class TestUpgradeThroughVersions(Tester):
@@ -24,8 +24,8 @@ class TestUpgradeThroughVersions(Tester):
         kwargs['cluster_options'] = {'partitioner':'org.apache.cassandra.dht.RandomPartitioner'}
         Tester.__init__(self, *args, **kwargs)
 
-    # def upgrade_test(self):
-    #     self.upgrade_scenario()
+    def upgrade_test(self):
+        self.upgrade_scenario()
 
     def upgrade_test_mixed(self):
         """Only upgrade part of the cluster, so we have mixed versions when
