@@ -17,10 +17,12 @@ except KeyError:
 class TestRollingUpgrade(Tester):
 
     def __init__(self, *argv, **kwargs):
-        super(TestRollingUpgrade, self).__init__(*argv, **kwargs)
         # When a node goes down under load it prints an error in it's log. 
         # If we don't allow log errors, then the test will fail.
         self.allow_log_errors = True
+        # Force cluster options that are common among versions:
+        kwargs['cluster_options'] = {'partitioner':'org.apache.cassandra.dht.RandomPartitioner'}
+        super(TestRollingUpgrade, self).__init__(*argv, **kwargs)
 
     def rolling_upgrade_node(self, node, stress_node, create_ks_and_cf):
         """
