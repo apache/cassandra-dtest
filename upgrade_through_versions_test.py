@@ -55,6 +55,7 @@ class TestUpgradeThroughVersions(Tester):
                 self.upgrade_to_version(version, mixed_version=True, nodes=(node1,))
             else:
                 self.upgrade_to_version(version)
+        cluster.stop()
 
     def upgrade_to_version(self, version, mixed_version=False, nodes=None):
         """Upgrade Nodes - if *mixed_version* is True, only upgrade those nodes
