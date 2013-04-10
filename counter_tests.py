@@ -69,8 +69,8 @@ class TestCounters(Tester):
 
         cursor.execute(query)
 
-        keys = range(0, 100)
-        updates = 5000
+        keys = range(0, 10)
+        updates = 500
 
         def make_updates():
             cursor = self.cql_connection(nodes[0], keyspace='ks', version=cql_version).cursor()
@@ -79,18 +79,25 @@ class TestCounters(Tester):
             if cluster.version() >= '1.2':
                 batch = " ".join(["BEGIN COUNTER BATCH"] + [upd % x for x in keys] + ["APPLY BATCH;"])
             else:
-                batch = " ".join(["BEGIN BATCH"] + [upd % x for x in keys] + ["APPLY BATCH;"])
+                batch = " ".join(["BEGIN BATCH USING CONSISTENCY LEVEL QUORUM"] + [upd % x for x in keys] + ["APPLY BATCH;"])
 
             #query = cursor.prepare_query(batch)
 
             kmap = { "k%d" % i : i for i in keys }
             for i in range(0, updates):
-                cursor.execute(batch)
+                if cluster.version() >= '1.2':
+                    cursor.execute(batch, consistency_level='QUORUM')
+                else:
+                    cursor.execute(batch)
+
                 #cursor.execute_prepared(query, kmap)
 
         def check(i):
             cursor = self.cql_connection(nodes[0], keyspace='ks', version=cql_version).cursor()
-            cursor.execute("SELECT * FROM counterTable")
+            if cluster.version() >= '1.2':
+                cursor.execute("SELECT * FROM counterTable", consistency_level='QUORUM')
+            else:
+                cursor.execute("SELECT * FROM counterTable USING CONSISTENCY QUORUM")
             assert cursor.rowcount == len(keys), "Expected %d rows, got %d: %s" % (len(keys), cursor.rowcount, str(cursor.fetchall()))
             for row in cursor:
                 assert row[1] == i * updates, "Unexpected value %s" % str(row)
