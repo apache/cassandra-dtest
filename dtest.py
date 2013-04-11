@@ -59,7 +59,7 @@ class Tester(TestCase):
             except KeyError:
                 cdir = DEFAULT_DIR
             cluster = Cluster(self.test_path, name, cassandra_dir=cdir)
-        if ENABLE_VNODES:
+        if ENABLE_VNODES and version >= "1.2":
             cluster.set_configuration_options(values={'initial_token': None, 'num_tokens': 256})
         return cluster
 

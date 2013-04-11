@@ -76,6 +76,9 @@ class TestUpgradeThroughVersions(Tester):
             time.sleep(.5)
             node.stop(wait_other_notice=False)
 
+        if ENABLE_VNODES and version >= "1.2":
+            self.cluster.set_configuration_options(values={'initial_token': None, 'num_tokens': 256})
+
         for node in nodes:
             debug('Upgrading node: ' + node.name)
             node.set_cassandra_dir(cassandra_version=version)
