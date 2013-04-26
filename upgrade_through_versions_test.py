@@ -55,6 +55,7 @@ class TestUpgradeThroughVersions(Tester):
                 self.upgrade_to_version(version, mixed_version=True, nodes=(node1,))
             else:
                 self.upgrade_to_version(version)
+        cluster.stop()
 
     def upgrade_to_version(self, version, mixed_version=False, nodes=None):
         """Upgrade Nodes - if *mixed_version* is True, only upgrade those nodes
@@ -74,6 +75,9 @@ class TestUpgradeThroughVersions(Tester):
             debug('Shutting down node: ' + node.name)
             time.sleep(.5)
             node.stop(wait_other_notice=False)
+
+        if ENABLE_VNODES and version >= "1.2":
+            self.cluster.set_configuration_options(values={'initial_token': None, 'num_tokens': 256})
 
         for node in nodes:
             debug('Upgrading node: ' + node.name)
