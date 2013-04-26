@@ -761,42 +761,40 @@ class TestCQL(Tester):
         cursor.execute("ALTER TABLE test ALTER v TYPE float")
         cursor.execute("INSERT INTO test (k, v) VALUES (0, 2.4)")
 
-    @require('#3783')
+    @since('1.2')
     def null_support_test(self):
         """ Test support for nulls """
         cursor = self.prepare()
 
         cursor.execute("""
-            CREATE TABLE test1 (
+            CREATE TABLE test (
                 k int,
-                c1 int,
-                c2 int,
-                c3 int,
-                v int,
-                PRIMARY KEY (k, c1, c2, c3)
-            ) WITH COMPACT STORAGE;
+                c int,
+                v1 int,
+                v2 set<text>,
+                PRIMARY KEY (k, c)
+            );
         """)
 
         # Inserts
-        cursor.execute("INSERT INTO test1 (k, c1, c2, c3, v) VALUES (0, 0, 0, 0, 0)")
-        cursor.execute("INSERT INTO test1 (k, c1, c2, c3, v) VALUES (0, 0, 0, 1, 1)")
-        cursor.execute("INSERT INTO test1 (k, c1, c2, c3, v) VALUES (0, 0, 1, 0, 2)")
-        cursor.execute("INSERT INTO test1 (k, c1, c2, c3, v) VALUES (0, 0, 1, 1, 3)")
+        cursor.execute("INSERT INTO test (k, c, v1, v2) VALUES (0, 0, null, {'1', '2'})")
+        cursor.execute("INSERT INTO test (k, c, v1) VALUES (0, 1, 1)")
 
-        cursor.execute("INSERT INTO test1 (k, c1, c2, v) VALUES (0, 0, 0, 10)")
-        cursor.execute("INSERT INTO test1 (k, c1, c2, c3, v) VALUES (0, 0, 1, null, 11)")
-
-        #cursor.execute("SELECT v FROM test1 WHERE k = 0")
-        #res = cursor.fetchall()
-        #assert res == [[10], [0], [1], [11], [2], [3]], res
-
-        #cursor.execute("SELECT v FROM test1 WHERE k = 0 AND c1 = 0 AND c2 = 0")
-        #res = cursor.fetchall()
-        #assert res == [[10], [0], [1]], res
-
-        cursor.execute("SELECT v FROM test1 WHERE k = 0 AND c1 = 0 AND c2 = 0 AND c3 = null")
+        cursor.execute("SELECT * FROM test")
         res = cursor.fetchall()
-        assert res == [[10]], res
+        assert res == [ [0, 0, None, set(['1', '2'])], [0, 1, 1, None]], res
+
+        cursor.execute("INSERT INTO test (k, c, v1) VALUES (0, 1, null)")
+        cursor.execute("INSERT INTO test (k, c, v2) VALUES (0, 0, null)")
+
+        cursor.execute("SELECT * FROM test")
+        res = cursor.fetchall()
+        assert res == [ [0, 0, None, None], [0, 1, None, None]], res
+
+        assert_invalid(cursor, "INSERT INTO test (k, c, v2) VALUES (0, 2, {1, null})")
+        assert_invalid(cursor, "SELECT * FROM test WHER k = null")
+        assert_invalid(cursor, "INSERT INTO test (k, c, v2) VALUES (0, 0, { 'foo', 'bar', null })")
+
 
     @since('1.2')
     def nameless_index_test(self):
@@ -1104,7 +1102,8 @@ class TestCQL(Tester):
         cursor.execute("""
             CREATE TABLE test (
                 k int PRIMARY KEY,
-                c text
+                c text,
+                d text
             )
         """)
 
@@ -1122,6 +1121,10 @@ class TestCQL(Tester):
                 assert isinstance(r[3], (int, long)), res
 
         assert_invalid(cursor, "SELECT k, c, writetime(k) FROM test")
+
+        cursor.execute("SELECT k, d, writetime(d) FROM test WHERE k = 1")
+        res = cursor.fetchall()
+        assert res == [[1, None, None]]
 
     @since('1.2')
     def no_range_ghost_test(self):
@@ -2814,7 +2817,7 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[1, 2]], res
 
-    @require('5125')
+    @since('2.0')
     def clustering_indexing_test(self):
         cursor = self.prepare()
 
@@ -2952,3 +2955,137 @@ class TestCQL(Tester):
         """)
 
         assert_invalid(cursor, "INSERT INTO test(k, s) VALUES (0, {1, 1})")
+
+    @since('1.2')
+    def bug_5376(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                key text,
+                c bigint,
+                v text,
+                x set<text>,
+                PRIMARY KEY (key, c)
+            );
+        """)
+
+        assert_invalid(cursor, "select * from test where key = 'foo' and c in (1,3,4);")
+
+    @since('1.2')
+    def function_and_reverse_type_test(self):
+        """ Test for #5386 """
+
+        cursor = self.prepare()
+        cursor.execute("""
+            CREATE TABLE test (
+                k int,
+                c timeuuid,
+                v int,
+                PRIMARY KEY (k, c)
+            ) WITH CLUSTERING ORDER BY (c DESC)
+        """)
+
+        cursor.execute("INSERT INTO test (k, c, v) VALUES (0, now(), 0);")
+
+    @since('1.2')
+    def bug_5404(self):
+        cursor = self.prepare()
+
+        cursor.execute("CREATE TABLE test (key text PRIMARY KEY)")
+        # We just want to make sure this doesn't NPE server side
+        assert_invalid(cursor, "select * from test where token(key) > token(int(3030343330393233)) limit 1;")
+
+    @since('1.2')
+    def empty_blob_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("CREATE TABLE test (k int PRIMARY KEY, b blob)")
+        cursor.execute("INSERT INTO test (k, b) VALUES (0, 0x)");
+        cursor.execute("SELECT * FROM test");
+        res = cursor.fetchall()
+        assert res == [[ 0, '' ]], res
+
+    @since('1.2')
+    def rename_test(self):
+        cursor = self.prepare()
+
+        # The goal is to test renaming from an old cli value
+        cli = self.cluster.nodelist()[0].cli()
+        cli.do("use ks")
+        cli.do("create column family test with comparator='CompositeType(Int32Type, Int32Type, Int32Type)' "
+                + "and key_validation_class=UTF8Type and default_validation_class=UTF8Type");
+        cli.do("set test['foo']['4:3:2'] = 'bar'")
+        assert not cli.has_errors(), cli.errors()
+
+        # This shouldn't work
+        assert_invalid(cursor, "ALTER TABLE test RENAME column2 TO foo")
+        # but this should
+        cursor.execute("ALTER TABLE test RENAME column1 TO foo1 AND column2 TO foo2 AND column3 TO foo3")
+
+    @since('1.2')
+    def clustering_order_and_functions_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k int,
+                t timeuuid,
+                PRIMARY KEY (k, t)
+            ) WITH CLUSTERING ORDER BY (t DESC)
+        """)
+
+        for i in range(0, 5):
+            cursor.execute("INSERT INTO test (k, t) VALUES (%d, now())" % i)
+
+        cursor.execute("SELECT dateOf(t) FROM test");
+
+    @since('2.0')
+    def conditional_update_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k int PRIMARY KEY,
+                v1 int,
+                v2 text
+            )
+        """)
+
+        cursor.execute("UPDATE test SET v1 = 2, v2 = 'foo' WHERE k = 0")
+
+        # Should not apply
+        cursor.execute("UPDATE test SET v1 = 3, v2 = 'bar' WHERE k = 0 IF v1 = 4")
+        res = cursor.fetchall()
+        assert res == [[ False ]], res
+
+        cursor.execute("SELECT * FROM test")
+        res = cursor.fetchall()
+        assert res == [[ 0, 2, 'foo' ]], res
+
+        # Should apply
+        cursor.execute("UPDATE test SET v1 = 3, v2 = 'bar' WHERE k = 0 IF v1 = 2")
+        res = cursor.fetchall()
+        assert res == [[ True ]], res
+
+        cursor.execute("SELECT * FROM test")
+        res = cursor.fetchall()
+        assert res == [[ 0, 3, 'bar' ]], res
+
+        # Shouldn't apply, only one condition is ok
+        cursor.execute("UPDATE test SET v1 = 5, v2 = 'foobar' WHERE k = 0 IF v1 = 3 AND v2 = 'foo'")
+        res = cursor.fetchall()
+        assert res == [[ False ]], res
+
+        cursor.execute("SELECT * FROM test")
+        res = cursor.fetchall()
+        assert res == [[ 0, 3, 'bar' ]], res
+
+        # Should apply
+        cursor.execute("UPDATE test SET v1 = 5, v2 = 'foobar' WHERE k = 0 IF v1 = 3 AND v2 = 'bar'")
+        res = cursor.fetchall()
+        assert res == [[ True ]], res
+
+        cursor.execute("SELECT * FROM test")
+        res = cursor.fetchall()
+        assert res == [[ 0, 5, 'foobar' ]], res
