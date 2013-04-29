@@ -3048,44 +3048,50 @@ class TestCQL(Tester):
             CREATE TABLE test (
                 k int PRIMARY KEY,
                 v1 int,
-                v2 text
+                v2 text,
+                v3 int
             )
         """)
 
-        cursor.execute("UPDATE test SET v1 = 2, v2 = 'foo' WHERE k = 0")
+        # Should apply
+        assert_one(cursor, "UPDATE test SET v1 = 2, v2 = 'foo' WHERE k = 0 IF NOT EXISTS", [True])
+
+        # Shouldn't apply
+        assert_one(cursor, "UPDATE test SET v1 = 5, v2 = 'bar' WHERE k = 0 IF NOT EXISTS", [False])
+        assert_one(cursor, "SELECT * FROM test", [ 0, 2, 'foo', None ])
 
         # Should not apply
-        cursor.execute("UPDATE test SET v1 = 3, v2 = 'bar' WHERE k = 0 IF v1 = 4")
-        res = cursor.fetchall()
-        assert res == [[ False ]], res
-
-        cursor.execute("SELECT * FROM test")
-        res = cursor.fetchall()
-        assert res == [[ 0, 2, 'foo' ]], res
+        assert_one(cursor, "UPDATE test SET v1 = 3, v2 = 'bar' WHERE k = 0 IF v1 = 4", [False])
+        assert_one(cursor, "SELECT * FROM test", [ 0, 2, 'foo', None ])
 
         # Should apply
-        cursor.execute("UPDATE test SET v1 = 3, v2 = 'bar' WHERE k = 0 IF v1 = 2")
-        res = cursor.fetchall()
-        assert res == [[ True ]], res
-
-        cursor.execute("SELECT * FROM test")
-        res = cursor.fetchall()
-        assert res == [[ 0, 3, 'bar' ]], res
+        assert_one(cursor, "UPDATE test SET v1 = 3, v2 = 'bar' WHERE k = 0 IF v1 = 2", [True])
+        assert_one(cursor, "SELECT * FROM test", [ 0, 3, 'bar', None ])
 
         # Shouldn't apply, only one condition is ok
-        cursor.execute("UPDATE test SET v1 = 5, v2 = 'foobar' WHERE k = 0 IF v1 = 3 AND v2 = 'foo'")
-        res = cursor.fetchall()
-        assert res == [[ False ]], res
-
-        cursor.execute("SELECT * FROM test")
-        res = cursor.fetchall()
-        assert res == [[ 0, 3, 'bar' ]], res
+        assert_one(cursor, "UPDATE test SET v1 = 5, v2 = 'foobar' WHERE k = 0 IF v1 = 3 AND v2 = 'foo'", [False])
+        assert_one(cursor, "SELECT * FROM test", [ 0, 3, 'bar', None ])
 
         # Should apply
-        cursor.execute("UPDATE test SET v1 = 5, v2 = 'foobar' WHERE k = 0 IF v1 = 3 AND v2 = 'bar'")
-        res = cursor.fetchall()
-        assert res == [[ True ]], res
+        assert_one(cursor, "UPDATE test SET v1 = 5, v2 = 'foobar' WHERE k = 0 IF v1 = 3 AND v2 = 'bar'", [True])
+        assert_one(cursor, "SELECT * FROM test", [ 0, 5, 'foobar', None ])
 
-        cursor.execute("SELECT * FROM test")
-        res = cursor.fetchall()
-        assert res == [[ 0, 5, 'foobar' ]], res
+        # Shouldn't apply
+        assert_one(cursor, "DELETE v2 FROM test WHERE k = 0 IF v1 = 3", [False])
+        assert_one(cursor, "SELECT * FROM test", [ 0, 5, 'foobar', None ])
+
+        # Shouldn't apply
+        assert_one(cursor, "DELETE v2 FROM test WHERE k = 0 IF v1 = null", [False])
+        assert_one(cursor, "SELECT * FROM test", [ 0, 5, 'foobar', None ])
+
+        # Should apply
+        assert_one(cursor, "DELETE v2 FROM test WHERE k = 0 IF v1 = 5", [True])
+        assert_one(cursor, "SELECT * FROM test", [ 0, 5, None, None ])
+
+        # Should apply
+        assert_one(cursor, "DELETE v1 FROM test WHERE k = 0 IF v3 = null", [True])
+        assert_one(cursor, "SELECT * FROM test", [ 0, None, None, None ])
+
+        # Should apply
+        assert_one(cursor, "DELETE FROM test WHERE k = 0 IF v1 = null", [True])
+        assert_none(cursor, "SELECT * FROM test")
