@@ -1,0 +1,99 @@
+Setup Instructions for cassandra-dtest
+======================================
+
+These are instructions for setting up dtests on an fresh install of Ubuntu Linux 12.04 LTS. If you use something else, you'll need to adapt these for your particular situation (or better yet, append to this file with your platform's requirements and send a pull request.)
+
+# Prerequisite Software:
+* Update software repositories:
+
+        apt-get update
+
+* python
+
+        apt-get install python python-setuptools python-dev python-pip
+
+* git
+
+        apt-get install git
+
+# Install Oracle Java 6:
+* java and misc tools:
+
+        apt-get install software-properties-common
+        add-apt-repository ppa:webupd8team/java
+        apt-get update
+        apt-get install oracle-java6-installer
+
+* Ensure that java is a HotSpot 1.6.x version:
+
+        # java -version
+        java version "1.6.0_45"
+        Java(TM) SE Runtime Environment (build 1.6.0_45-b06)
+        Java HotSpot(TM) 64-Bit Server VM (build 20.45-b01, mixed
+        mode)
+
+* install ant
+
+        apt-get install ant
+
+# Create a git directory for holding several projects we'll use:
+
+        mkdir -p ~/git/cstar
+
+# Install Companion tools / libraries:
+It's best to download the git source tree for these libraries as you
+will often need to modify them in some fashion at some later point:
+
+* ccm:
+
+        cd ~/git/cstar
+        git clone git://github.com/pcmanus/ccm.git
+        pip install -e ccm
+        pip install pyyaml
+
+* cql
+
+        cd ~/git/cstar
+        git clone https://code.google.com/a/apache-extras.org/p/cassandra-dbapi2/
+        pip install -e cassandra-dbapi2
+
+* cassandra-dtest
+
+        cd ~/git/cstar
+        git clone git://github.com/riptano/cassandra-dtest.git
+
+* nose
+
+        apt-get install python-nose    
+
+* cassandra
+
+        cd ~/git/cstar
+        git clone http://git-wip-us.apache.org/repos/asf/cassandra.git
+        cd cassandra
+        ant clean jar
+
+ Optionally, you can self-check cassandra at this point by running
+ it's unit tests:
+
+        ant test
+
+# Setup and run dtests
+* Install current python dependencies:
+
+        pip install decorator
+
+* Set CASSANDRA_DIR environment variable.
+  Set the variable in your ~/.bashrc file once so that you don't have to keep setting it everytime you run dtests:
+
+        export CASSANDRA_DIR=~/git/cstar/cassandra
+
+* Run the full dtest suite (takes multiple hours, depending on your hardware):
+
+         cd ~/git/cstar/cassandra-dtest
+         nosetests
+
+* Run a single dtest, stopping at the first error encountered (this one should take ~5 mins if successful):
+
+         cd ~/git/cstar/cassandra-dtest
+         nosetests -x upgrade_through_versions_test.py

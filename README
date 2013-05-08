@@ -36,3 +36,10 @@ Each test spawns a new fresh cluster and tear him down after the test. If a
 test fails, the logs for the node are saved in a logs/<timestamp> directory
 for analysis (it's not perfect but have been good enough so far, I'm open to
 better suggestsions).
+
+Detailed Instructions
+---------------------
+
+See more detailed instructions in the included INSTALL file 
+(https://github.com/riptano/cassandra-dtest/blob/master/INSTALL.md)
+
