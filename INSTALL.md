@@ -1,9 +1,9 @@
-Setup Instructions for cassandra-dtest
+Setup instructions for cassandra-dtest
 ======================================
 
-These are instructions for setting up dtests on an fresh install of Ubuntu Linux 12.04 LTS. If you use something else, you'll need to adapt these for your particular situation (or better yet, append to this file with your platform's requirements and send a pull request.)
+These are instructions for setting up dtests on a fresh install of Ubuntu Linux 12.04 LTS. If you use something else, you'll need to adapt these for your particular situation (or better yet, append to this file with your platform's requirements and send a pull request.)
 
-# Prerequisite Software:
+## Prerequisite Software:
 * Update software repositories:
 
         apt-get update
@@ -16,7 +16,7 @@ These are instructions for setting up dtests on an fresh install of Ubuntu Linux
 
         apt-get install git
 
-# Install Oracle Java 6:
+## Install Oracle Java 6:
 * java and misc tools:
 
         apt-get install software-properties-common
@@ -36,11 +36,11 @@ These are instructions for setting up dtests on an fresh install of Ubuntu Linux
 
         apt-get install ant
 
-# Create a git directory for holding several projects we'll use:
+## Create a git directory for holding several projects we'll use:
 
         mkdir -p ~/git/cstar
 
-# Install Companion tools / libraries:
+## Install companion tools / libraries:
 It's best to download the git source tree for these libraries as you
 will often need to modify them in some fashion at some later point:
 
@@ -78,7 +78,7 @@ will often need to modify them in some fashion at some later point:
 
         ant test
 
-# Setup and run dtests
+## Setup and run dtests
 * Install current python dependencies:
 
         pip install decorator
