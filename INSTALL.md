@@ -6,23 +6,23 @@ These are instructions for setting up dtests on a fresh install of Ubuntu Linux 
 ## Prerequisite Software:
 * Update software repositories:
 
-        apt-get update
+        sudo apt-get update
 
 * python
 
-        apt-get install python python-setuptools python-dev python-pip
+        sudo apt-get install python python-setuptools python-dev python-pip
 
 * git
 
-        apt-get install git
+        sudo apt-get install git
 
 ## Install Oracle Java 6:
 * java and misc tools:
 
-        apt-get install software-properties-common
-        add-apt-repository ppa:webupd8team/java
-        apt-get update
-        apt-get install oracle-java6-installer
+        sudo apt-get install software-properties-common
+        sudo add-apt-repository ppa:webupd8team/java
+        sudo apt-get update
+        sudo apt-get install oracle-java6-installer
 
 * Ensure that java is a HotSpot 1.6.x version:
 
@@ -34,7 +34,7 @@ These are instructions for setting up dtests on a fresh install of Ubuntu Linux 
 
 * install ant
 
-        apt-get install ant
+        sudo apt-get install ant
 
 ## Create a git directory for holding several projects we'll use:
 
@@ -48,14 +48,14 @@ will often need to modify them in some fashion at some later point:
 
         cd ~/git/cstar
         git clone git://github.com/pcmanus/ccm.git
-        pip install -e ccm
-        pip install pyyaml
+        sudo pip install -e ccm
+        sudo pip install pyyaml
 
 * cql
 
         cd ~/git/cstar
         git clone https://code.google.com/a/apache-extras.org/p/cassandra-dbapi2/
-        pip install -e cassandra-dbapi2
+        sudo pip install -e cassandra-dbapi2
 
 * cassandra-dtest
 
@@ -64,7 +64,7 @@ will often need to modify them in some fashion at some later point:
 
 * nose
 
-        apt-get install python-nose    
+        sudo apt-get install python-nose    
 
 * cassandra
 
@@ -81,7 +81,7 @@ will often need to modify them in some fashion at some later point:
 ## Setup and run dtests
 * Install current python dependencies:
 
-        pip install decorator
+        sudo pip install decorator
 
 * Set CASSANDRA_DIR environment variable.
   Set the variable in your ~/.bashrc file once so that you don't have to keep setting it everytime you run dtests:
