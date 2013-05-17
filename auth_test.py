@@ -437,13 +437,13 @@ class TestAuth(Tester):
 
         # start another client, sleep for about 2 seconds, retry the request
         # should still see a failure
-        time.sleep(1.7)
+        time.sleep(1.5)
         cathy2 = self.get_cursor(user='cathy', password='12345')
         self.assertUnauthorized("User cathy has no SELECT permission on <table ks.cf> or any of its parents",
                                 cathy2, "SELECT * FROM ks.cf")
 
         # wait a bit more until the cache expires
-        time.sleep(0.4)
+        time.sleep(1.0)
         cathy2.execute("SELECT * FROM ks.cf")
         self.assertEqual(0, cathy2.rowcount)
 
@@ -451,12 +451,12 @@ class TestAuth(Tester):
         cassandra.execute("REVOKE SELECT ON ks.cf FROM cathy")
 
         # wait for about 2 seconds and retry - SELECT should still be in the cache
-        time.sleep(1.7)
+        time.sleep(1.5)
         cathy.execute("SELECT * FROM ks.cf")
         self.assertEqual(0, cathy.rowcount)
 
         # wait a bit more until the cache expires
-        time.sleep(0.4)
+        time.sleep(1.0)
 
         # the changes (SELECT revocation) should kick in now
         self.assertUnauthorized("User cathy has no SELECT permission on <table ks.cf> or any of its parents",
