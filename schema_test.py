@@ -4,7 +4,7 @@ from tools import *
 import time
 
 class TestSchema(Tester):
-    @since('#3919')
+    @since('2.0')
     def drop_column_compact_test(self):
         cursor = self.prepare()
 
@@ -16,7 +16,7 @@ class TestSchema(Tester):
         self.assertEqual("Bad Request: Cannot drop columns from a non-CQL3 CF",
                          cm.exception.message)
 
-    @since('#3919')
+    @since('2.0')
     def drop_column_compaction_test(self):
         cursor = self.prepare()
         cursor.execute("USE ks")
@@ -51,7 +51,7 @@ class TestSchema(Tester):
         cursor.execute("SELECT c1 FROM ks.cf")
         self.assertEqual([[None], [None], [None], [4]], sorted(cursor.fetchall()))
 
-    @since('#3919')
+    @since('2.0')
     def drop_column_queries_test(self):
         cursor = self.prepare()
 
