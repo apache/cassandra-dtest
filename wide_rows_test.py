@@ -69,3 +69,39 @@ class TestWideRows(Tester):
             debug(value)
             assert len(value[0]) > 0
             
+
+
+    def test_column_index_stress(self):
+        """
+        The goal of this test is to write a large number of columns to a single
+        row and set 'column_index_size_in_kb' to a sufficiently low value
+        to force the creation of a column index.  The test will then randomly
+        read columns from that row and ensure that all data is returned.
+        See CASSANDRA-5225.
+        """
+        cluster = self.cluster
+        cluster.populate(1).start()
+        (node1,) = cluster.nodelist()
+        cluster.set_configuration_options(values={ 'column_index_size_in_kb' : 1 }) #reduce this value to force column index creation
+        cursor = self.cql_connection(node1).cursor()
+        self.create_ks(cursor, 'wide_rows', 1)
+        
+        create_table_query = 'CREATE TABLE test_table (row varchar, name varchar, value int, PRIMARY KEY (row, name));'
+        cursor.execute(create_table_query, 1)
+
+        #Now insert 1,000,000 columns to row 'row0'
+        insert_column_query = "UPDATE test_table SET value = {value} WHERE row = '{row}' AND name = '{name}';"
+        for i in range(1000000):
+            row = 'row0'
+            name = 'val' + str(i)
+            cursor.execute( insert_column_query.format( value=i, row=row, name=name) )
+
+        #now randomly fetch 300,000 columns, 3 columns at a time.
+        for i in range(100000):
+            select_column_query = "SELECT value FROM test_table WHERE row='row0' AND name in ('{name1}', '{name2}', '{name3}');"
+            values2fetch = [str(random.randint(0, 999999)) for i in range(3)]
+            cursor.execute( select_column_query.format(name1="val" + values2fetch[0],
+                                                       name2="val" + values2fetch[1],
+                                                       name3="val" + values2fetch[2]), 1)
+            assert cursor.rowcount == 3
+            
