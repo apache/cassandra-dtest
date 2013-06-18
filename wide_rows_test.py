@@ -2,6 +2,7 @@ from dtest import Tester, debug
 import os
 import datetime
 import random
+import sets
 
 status_messages = (
     "I''m going to the Cassandra Summit in June!",
@@ -89,19 +90,23 @@ class TestWideRows(Tester):
         create_table_query = 'CREATE TABLE test_table (row varchar, name varchar, value int, PRIMARY KEY (row, name));'
         cursor.execute(create_table_query, 1)
 
-        #Now insert 1,000,000 columns to row 'row0'
+        #Now insert 100,000 columns to row 'row0'
         insert_column_query = "UPDATE test_table SET value = {value} WHERE row = '{row}' AND name = '{name}';"
-        for i in range(1000000):
+        for i in range(100000):
             row = 'row0'
             name = 'val' + str(i)
             cursor.execute( insert_column_query.format( value=i, row=row, name=name) )
 
-        #now randomly fetch 300,000 columns, 3 columns at a time.
-        for i in range(100000):
+        #now randomly fetch columns: 1 to 3 at a time
+        for i in range(10000):
             select_column_query = "SELECT value FROM test_table WHERE row='row0' AND name in ('{name1}', '{name2}', '{name3}');"
-            values2fetch = [str(random.randint(0, 999999)) for i in range(3)]
+            values2fetch = [str(random.randint(0, 99999)) for i in range(3)]
+            #values2fetch is a list of random values.  Because they are random, they will not be unique necessarily.
+            #To simplify the template logic in the select_column_query I will not expect the query to
+            #necessarily return 3 values.  Hence I am computing the number of unique values in values2fetch
+            #and using that in the assert at the end.
+            expected_rows = len( sets.Set( values2fetch ) )
             cursor.execute( select_column_query.format(name1="val" + values2fetch[0],
                                                        name2="val" + values2fetch[1],
                                                        name3="val" + values2fetch[2]), 1)
-            assert cursor.rowcount == 3
-            
+            assert cursor.rowcount == expected_rows
