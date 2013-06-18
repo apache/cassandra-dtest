@@ -2,7 +2,6 @@ from dtest import Tester, debug
 import os
 import datetime
 import random
-import sets
 
 status_messages = (
     "I''m going to the Cassandra Summit in June!",
@@ -105,7 +104,7 @@ class TestWideRows(Tester):
             #To simplify the template logic in the select_column_query I will not expect the query to
             #necessarily return 3 values.  Hence I am computing the number of unique values in values2fetch
             #and using that in the assert at the end.
-            expected_rows = len( sets.Set( values2fetch ) )
+            expected_rows = len( set( values2fetch ) )
             cursor.execute( select_column_query.format(name1="val" + values2fetch[0],
                                                        name2="val" + values2fetch[1],
                                                        name3="val" + values2fetch[2]), 1)
