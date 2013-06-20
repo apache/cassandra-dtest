@@ -192,6 +192,7 @@ class ReplicationTest(Tester):
         self.cluster.populate([3,3]).start()
         time.sleep(5)
         node1 = self.cluster.nodelist()[0]
+        ip_nodes = dict((node.address(), node) for node in self.cluster.nodelist())
         self.conn = self.cql_connection(node1)
         
         # Install a tracing cursor so we can get info about who the
@@ -206,8 +207,9 @@ class ReplicationTest(Tester):
         # CASSANDRA-5658
         time.sleep(5)
 
+        forwarders_used = set()
+
         for key, token in murmur3_hashes.items():
-            time.sleep(10)
             cursor.execute("INSERT INTO test (id, value) VALUES (%s, 'asdf')" % key)
             time.sleep(5)
             trace = cursor.get_last_trace()
@@ -220,15 +222,21 @@ class ReplicationTest(Tester):
 
             #Make sure the coordinator only talked to a single node in
             #the second datacenter - CASSANDRA-5632:
-            ip_nodes = dict((node.address(), node) for node in self.cluster.nodelist())
             num_in_other_dcs_contacted = 0
             for node_contacted in stats['nodes_contacted'][node1.address()]:
                 if ip_nodes[node_contacted].data_center != node1.data_center:
                     num_in_other_dcs_contacted += 1
             self.assertEqual(num_in_other_dcs_contacted, 1)
 
+            # Record the forwarder used for each INSERT:
+            forwarders_used = forwarders_used.union(stats['forwarders'])
+
             #Make sure the correct nodes are replicas:
             self.assertEqual(stats['replicas'], replicas_should_be)
             #Make sure that each replica node was contacted and
             #acknowledged the write:
             self.assertEqual(stats['nodes_sent_write'], stats['nodes_responded_write'])
+            
+        #Given a diverse enough keyset, each node in the second
+        #datacenter should get a chance to be a forwarder:
+        self.assertEqual(len(forwarders_used), 3)
