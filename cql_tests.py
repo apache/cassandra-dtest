@@ -301,11 +301,11 @@ class TestCQL(Tester):
                 cursor.execute("INSERT INTO clicks (userid, url, time) VALUES (%i, 'http://foo.%s', 42)" % (id, tld))
 
         # Queries
-        cursor.execute("SELECT * FROM clicks WHERE userid >= 2 LIMIT 1")
+        cursor.execute("SELECT * FROM clicks WHERE token(userid) >= token(2) LIMIT 1")
         res = cursor.fetchall()
         assert res == [[ 2, 'http://foo.com', 42 ]], res
 
-        cursor.execute("SELECT * FROM clicks WHERE userid > 2 LIMIT 1")
+        cursor.execute("SELECT * FROM clicks WHERE token(userid) > token(2) LIMIT 1")
         res = cursor.fetchall()
         assert res == [[ 3, 'http://foo.com', 42 ]], res
 
