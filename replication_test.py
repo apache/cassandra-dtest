@@ -44,7 +44,7 @@ class ReplicationTest(Tester):
     """
     def __init__(self, *args, **kwargs):
         # Forcing cluster version on purpose
-        os.environ['CASSANDRA_VERSION'] = 'git:cassandra-1.2'
+        # os.environ['CASSANDRA_VERSION'] = 'git:cassandra-1.2'
         Tester.__init__(self, *args, **kwargs)
 
     def get_replicas_from_trace(self, trace):
