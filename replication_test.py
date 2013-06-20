@@ -83,12 +83,14 @@ class ReplicationTest(Tester):
         }
 
     def get_replicas_for_token(self, token, replication_factor,
-                               strategy='SimpleStrategy'):
+                               strategy='SimpleStrategy', nodes=None):
         """Figure out which node(s) should receive data for a given token and
         replication factor"""
-        nodes = self.cluster.nodelist()
+        if not nodes:
+            nodes = self.cluster.nodelist()
         token_ranges = sorted(zip([n.initial_token for n in nodes], nodes))
         replicas = []
+
         # Find first replica:
         for i, (r, node) in enumerate(token_ranges):
             if token <= r:
@@ -98,7 +100,7 @@ class ReplicationTest(Tester):
         else:
             replicas.append(token_ranges[0][1].address())
             first_ring_position = 0
-        debug('first_ring_position: %s' % first_ring_position)
+
         # Find other replicas:
         if strategy == 'SimpleStrategy':
             for node in nodes[first_ring_position+1:]:
@@ -111,10 +113,17 @@ class ReplicationTest(Tester):
                     replicas.append(node.address())
                     if len(replicas) == replication_factor:
                         break
+        elif strategy == 'NetworkTopologyStrategy':
+            # NetworkTopologyStrategy can be broken down into multiple 
+            # SimpleStrategies, just once per datacenter:
+            for dc,rf in replication_factor.items():
+                dc_nodes = [n for n in nodes if n.data_center == dc]
+                replicas.extend(self.get_replicas_for_token(
+                    token, rf, nodes=dc_nodes))
         else:
             raise NotImplemented('replication strategy not implemented: %s' 
                                  % strategy)
-        debug("replicas: %s" % replicas)
+
         return replicas
     
     def pprint_trace(self, trace):
@@ -128,7 +137,7 @@ class ReplicationTest(Tester):
     def simple_test(self):
         """Test the SimpleStrategy on a 3 node cluster"""
         self.cluster.populate(3).start()
-        time.sleep(20)
+        time.sleep(5)
         node1 = self.cluster.nodelist()[0]
         self.conn = self.cql_connection(node1)
         
@@ -146,11 +155,43 @@ class ReplicationTest(Tester):
 
         for key, token in murmur3_hashes.items():
             cursor.execute("INSERT INTO test (id, value) VALUES (%s, 'asdf')" % key)
-            time.sleep(30)
+            time.sleep(5)
             trace = cursor.get_last_trace()
             stats = self.get_replicas_from_trace(trace)
             replicas_should_be = set(self.get_replicas_for_token(
                 token, replication_factor))
+            debug('\nreplicas should be: %s' % replicas_should_be)
+            debug('replicas were: %s' % stats['replicas'])
+            self.pprint_trace(trace)
+            self.assertEqual(stats['replicas'], replicas_should_be)
+
+
+    def network_topology_test(self):
+        """Test the NetworkTopologyStrategy on a 2DC 3:3 node cluster"""
+        self.cluster.populate([3,3]).start()
+        time.sleep(5)
+        node1 = self.cluster.nodelist()[0]
+        self.conn = self.cql_connection(node1)
+        
+        # Install a tracing cursor so we can get info about who the
+        # coordinator is contacting: 
+        self.conn.cursorclass = TracingCursor
+        cursor = self.conn.cursor()
+
+        replication_factor = {'dc1':2, 'dc2':2}
+        self.create_ks(cursor, 'test', replication_factor)
+        cursor.execute('CREATE TABLE test.test (id int PRIMARY KEY, value text)', trace=False)
+        # Wait for table creation, otherwise trace times out -
+        # CASSANDRA-5658
+        time.sleep(5)
+
+        for key, token in murmur3_hashes.items():
+            cursor.execute("INSERT INTO test (id, value) VALUES (%s, 'asdf')" % key)
+            time.sleep(5)
+            trace = cursor.get_last_trace()
+            stats = self.get_replicas_from_trace(trace)
+            replicas_should_be = set(self.get_replicas_for_token(
+                token, replication_factor, strategy='NetworkTopologyStrategy'))
             debug('\nreplicas should be: %s' % replicas_should_be)
             debug('replicas were: %s' % stats['replicas'])
             self.pprint_trace(trace)
