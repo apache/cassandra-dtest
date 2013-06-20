@@ -4,11 +4,13 @@ from ccmlib.cluster import Cluster
 import re
 import os
 import time
+from collections import defaultdict
 
 TRACE_DETERMINE_REPLICAS = re.compile('Determining replicas for mutation')
 TRACE_SEND_MESSAGE = re.compile('Sending message to /([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)')
 TRACE_RESPOND_MESSAGE = re.compile('Message received from /([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)')
 TRACE_COMMIT_LOG = re.compile('Appending to commitlog')
+TRACE_FORWARD_WRITE = re.compile('Enqueuing forwarded write to /([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)')
 
 # Some pre-computed murmur 3 hashes; there are no good python murmur3
 # hashing libraries :(
@@ -42,15 +44,18 @@ class ReplicationTest(Tester):
     """
     def __init__(self, *args, **kwargs):
         # Forcing cluster version on purpose
-        os.environ['CASSANDRA_VERSION'] = '1.2.4'
+        os.environ['CASSANDRA_VERSION'] = 'git:cassandra-1.2'
         Tester.__init__(self, *args, **kwargs)
 
     def get_replicas_from_trace(self, trace):
         """Look at trace and return a list of the replicas contacted"""
         coordinator = None
-        nodes_sent = set([])
-        nodes_responded = set([])
-        replicas_written = set([])
+        nodes_sent_write = set([]) #Nodes sent a write request
+        nodes_responded_write = set([]) #Nodes that acknowledges a write
+        replicas_written = set([]) #Nodes that wrote to their commitlog
+        forwarders = set([]) #Nodes that forwarded a write to another node
+        nodes_contacted = defaultdict(set) #node -> list of nodes that were contacted
+
         for session, event, activity, source, source_elapsed, thread in trace:
             # Step 1, find coordinator node:
             if activity.startswith('Determining replicas for mutation'):
@@ -59,27 +64,38 @@ class ReplicationTest(Tester):
             if not coordinator:
                 continue
 
-            # Step 2, find nodes who were contacted/responded:
-            if source == coordinator:
-                send_match = TRACE_SEND_MESSAGE.search(activity)
-                recv_match = TRACE_RESPOND_MESSAGE.search(activity)
-                if send_match:
-                    nodes_sent.add(send_match.groups()[0])
-                elif recv_match:
-                    nodes_responded.add(recv_match.groups()[0])
+            # Step 2, find all the nodes that each node talked to:
+            send_match = TRACE_SEND_MESSAGE.search(activity)
+            recv_match = TRACE_RESPOND_MESSAGE.search(activity)
+            if send_match:
+                node_contacted = send_match.groups()[0]
+                if source == coordinator:
+                    nodes_sent_write.add(node_contacted)
+                nodes_contacted[source].add(node_contacted)
+            elif recv_match:
+                node_contacted = recv_match.groups()[0]
+                if source == coordinator:
+                    nodes_responded_write.add(recv_match.groups()[0])
 
-            # Step 3, find nodes who actually wrote data:
+            # Step 3, find nodes that forwarded to other nodes:
+            # (Happens in multi-datacenter clusters)
+            if source != coordinator:
+                forward_match = TRACE_FORWARD_WRITE.search(activity)
+                if forward_match:
+                    forwarding_node = forward_match.groups()[0]
+                    nodes_sent_write.add(forwarding_node)
+                    forwarders.add(forwarding_node)
+
+            # Step 4, find nodes who actually wrote data:
             if TRACE_COMMIT_LOG.search(activity):
                 replicas_written.add(source)
 
-        # Error if not all the replicas responded:
-        if nodes_sent != nodes_responded:
-            raise AssertionError('Not all replicas responded.')
-
         return {"coordinator": coordinator,
+                "forwarders": forwarders,
                 "replicas": replicas_written,
-                "nodes_sent": nodes_sent,
-                "nodes_responded": nodes_responded
+                "nodes_sent_write": nodes_sent_write,
+                "nodes_responded_write": nodes_responded_write,
+                "nodes_contacted": nodes_contacted
         }
 
     def get_replicas_for_token(self, token, replication_factor,
@@ -163,7 +179,12 @@ class ReplicationTest(Tester):
             debug('\nreplicas should be: %s' % replicas_should_be)
             debug('replicas were: %s' % stats['replicas'])
             self.pprint_trace(trace)
+
+            #Make sure the correct nodes are replicas:
             self.assertEqual(stats['replicas'], replicas_should_be)
+            #Make sure that each replica node was contacted and
+            #acknowledged the write:
+            self.assertEqual(stats['nodes_sent_write'], stats['nodes_responded_write'])
 
 
     def network_topology_test(self):
@@ -186,6 +207,7 @@ class ReplicationTest(Tester):
         time.sleep(5)
 
         for key, token in murmur3_hashes.items():
+            time.sleep(10)
             cursor.execute("INSERT INTO test (id, value) VALUES (%s, 'asdf')" % key)
             time.sleep(5)
             trace = cursor.get_last_trace()
@@ -195,4 +217,18 @@ class ReplicationTest(Tester):
             debug('\nreplicas should be: %s' % replicas_should_be)
             debug('replicas were: %s' % stats['replicas'])
             self.pprint_trace(trace)
+
+            #Make sure the coordinator only talked to a single node in
+            #the second datacenter - CASSANDRA-5632:
+            ip_nodes = dict((node.address(), node) for node in self.cluster.nodelist())
+            num_in_other_dcs_contacted = 0
+            for node_contacted in stats['nodes_contacted'][node1.address()]:
+                if ip_nodes[node_contacted].data_center != node1.data_center:
+                    num_in_other_dcs_contacted += 1
+            self.assertEqual(num_in_other_dcs_contacted, 1)
+
+            #Make sure the correct nodes are replicas:
             self.assertEqual(stats['replicas'], replicas_should_be)
+            #Make sure that each replica node was contacted and
+            #acknowledged the write:
+            self.assertEqual(stats['nodes_sent_write'], stats['nodes_responded_write'])
