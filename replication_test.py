@@ -42,10 +42,6 @@ class ReplicationTest(Tester):
     """This test suite looks at how data is replicated across a cluster
     and who the coordinator, replicas and forwarders involved are.
     """
-    def __init__(self, *args, **kwargs):
-        # Forcing cluster version on purpose
-        # os.environ['CASSANDRA_VERSION'] = 'git:cassandra-1.2'
-        Tester.__init__(self, *args, **kwargs)
 
     def get_replicas_from_trace(self, trace):
         """Look at trace and return a list of the replicas contacted"""
