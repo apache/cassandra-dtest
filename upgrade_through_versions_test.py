@@ -4,12 +4,13 @@ from assertions import *
 from ccmlib.cluster import Cluster
 from ccmlib.node import TimeoutError
 import random
+import time
 import os
 
 from tools import ThriftConnection
 
 versions = (
-    '1.1.9', 'git:cassandra-1.2'
+    '1.1.9', 'git:cassandra-1.2', 'git:trunk'
 )
 
 class TestUpgradeThroughVersions(Tester):
@@ -37,6 +38,7 @@ class TestUpgradeThroughVersions(Tester):
         cluster = self.cluster
 
         # Create a ring
+        debug('Creating cluster (%s)' % versions[0])
         cluster.populate(3)
         cluster.start()
         node1, node2, node3 = cluster.nodelist()
@@ -53,6 +55,10 @@ class TestUpgradeThroughVersions(Tester):
         for version in versions[1:]:
             if mixed_version:
                 self.upgrade_to_version(version, mixed_version=True, nodes=(node1,))
+                self.upgrade_to_version(version, mixed_version=True, nodes=(node2,node3)) 
+                node1.nodetool('upgradesstables')
+                node2.nodetool('upgradesstables')
+                node3.nodetool('upgradesstables')
             else:
                 self.upgrade_to_version(version)
         cluster.stop()
@@ -100,8 +106,15 @@ class TestUpgradeThroughVersions(Tester):
             nnode = new_node(self.cluster, remote_debug_port=str(2000+len(self.cluster.nodes)))
             nnode.start(no_wait=False)
             nnode.watch_log_for("Bootstrap completed!")
+            debug("node should be up, but sleeping a bit to ensure...")
+            time.sleep(15)
             self._check_values()
 
+        if mixed_version:
+            debug('Successfully upgraded part of the cluster to %s' % version) 
+        else:
+            debug('Successfully upgraded to %s' % version)
+            
 
     def _write_values(self, consistency_level='ALL'):
         self.num_rows += 2

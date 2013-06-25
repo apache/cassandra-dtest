@@ -11,7 +11,7 @@ def assert_columns(cli, names):
     output = cli.last_output()
 
     for name in names:
-        assert re.search('column=%s' % name, output) is not None, 'Cannot find column %s in %s' % (name, output)
+        assert re.search('name=%s' % name, output) is not None, 'Cannot find column %s in %s' % (name, output)
 
 class TestSCCache(Tester):
 

@@ -4,6 +4,8 @@ import fnmatch
 
 from ccmlib.cluster import Cluster
 from ccmlib.node import Node
+from cql.thrifteries import ThriftCursor
+from uuid import UUID
 from nose.exc import SkipTest
 from unittest import TestCase
 
@@ -295,3 +297,29 @@ class Runner(threading.Thread):
     def check(self):
         if self.__error is not None:
             raise self.__error
+
+
+class TracingCursor(ThriftCursor):
+    """A CQL Cursor with query tracing ability"""
+    def __init__(self, connection):
+        ThriftCursor.__init__(self, connection)
+        self.last_session_id = None
+        self.connection = connection
+
+    def execute(self, cql_query, params={}, decoder=None, 
+                consistency_level=None, trace=True):
+        if trace:
+            self.last_session_id = UUID(bytes=self.connection.client.trace_next_query())
+        ThriftCursor.execute(self, cql_query, params=params, decoder=decoder, 
+                             consistency_level=consistency_level)
+
+    def get_last_trace(self):
+        if self.last_session_id:
+            time.sleep(0.5) # Tracing is done async, so wait a little.
+            self.execute("SELECT session_id, event_id, activity, source, "
+                         "source_elapsed, thread FROM system_traces.events "
+                         "WHERE session_id=%s" % self.last_session_id)
+            return [event for event in self]
+        else:
+            raise AssertionError('No query to trace')
+        

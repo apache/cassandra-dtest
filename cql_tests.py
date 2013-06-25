@@ -2,6 +2,7 @@
 
 from dtest import Tester
 from assertions import *
+from cql import ProgrammingError
 from tools import *
 
 import os, sys, time, tools, json, random
@@ -300,11 +301,11 @@ class TestCQL(Tester):
                 cursor.execute("INSERT INTO clicks (userid, url, time) VALUES (%i, 'http://foo.%s', 42)" % (id, tld))
 
         # Queries
-        cursor.execute("SELECT * FROM clicks WHERE userid >= 2 LIMIT 1")
+        cursor.execute("SELECT * FROM clicks WHERE token(userid) >= token(2) LIMIT 1")
         res = cursor.fetchall()
         assert res == [[ 2, 'http://foo.com', 42 ]], res
 
-        cursor.execute("SELECT * FROM clicks WHERE userid > 2 LIMIT 1")
+        cursor.execute("SELECT * FROM clicks WHERE token(userid) > token(2) LIMIT 1")
         res = cursor.fetchall()
         assert res == [[ 3, 'http://foo.com', 42 ]], res
 
@@ -3096,7 +3097,6 @@ class TestCQL(Tester):
         assert_none(cursor, "DELETE FROM test WHERE k = 0 IF v1 = null")
         assert_none(cursor, "SELECT * FROM test")
 
-
     @since('1.2')
     def range_key_ordered_test(self):
         cursor = self.prepare(ordered=True)
@@ -3109,3 +3109,48 @@ class TestCQL(Tester):
 
         assert_all(cursor, "SELECT * FROM test", [[0], [1], [-1]])
         assert_invalid("SELECT * FROM test WHERE k >= -1 AND k < 1;")
+
+    @since('2.0')
+    def select_with_alias_test(self):
+        cursor = self.prepare()
+        cursor.execute('CREATE TABLE users (id int PRIMARY KEY, name text)')
+
+        for id in range(0, 5):
+            cursor.execute("INSERT INTO users (id, name) VALUES (%d, 'name%d') USING TTL 10 AND TIMESTAMP 0" % (id, id))
+
+        # test aliasing count(*)
+        cursor.execute('SELECT count(*) AS user_count FROM users')
+        self.assertEqual('user_count', cursor.name_info[0][0])
+        self.assertEqual([5], cursor.fetchone())
+
+        # test aliasing regular value
+        cursor.execute('SELECT name AS user_name FROM users WHERE id = 0')
+        self.assertEqual('user_name', cursor.name_info[0][0])
+        self.assertEqual(['name0'], cursor.fetchone())
+
+        # test aliasing writetime
+        cursor.execute('SELECT writeTime(name) AS name_writetime FROM users WHERE id = 0')
+        self.assertEqual('name_writetime', cursor.name_info[0][0])
+        self.assertEqual([0], cursor.fetchone())
+
+        # test aliasing ttl
+        cursor.execute('SELECT ttl(name) AS name_ttl FROM users WHERE id = 0')
+        self.assertEqual('name_ttl', cursor.name_info[0][0])
+        assert cursor.fetchone()[0] in (9, 10)
+
+        # test aliasing a regular function
+        cursor.execute('SELECT intAsBlob(id) AS id_blob FROM users WHERE id = 0')
+        self.assertEqual('id_blob', cursor.name_info[0][0])
+        self.assertEqual(['\x00\x00\x00\x00'], cursor.fetchone())
+
+        # test that select throws a meaningful exception for aliases in where clause
+        with self.assertRaises(ProgrammingError) as cm:
+            cursor.execute('SELECT id AS user_id, name AS user_name FROM users WHERE user_id = 0')
+        self.assertEqual("Bad Request: Aliases aren't allowed in where clause ('user_id EQ 0')",
+                         cm.exception.message)
+
+        # test that select throws a meaningful exception for aliases in order by clause
+        with self.assertRaises(ProgrammingError) as cm:
+            cursor.execute('SELECT id AS user_id, name AS user_name FROM users WHERE id IN (0) ORDER BY user_name')
+        self.assertEqual("Bad Request: Aliases are not allowed in order by clause ('user_name')",
+                         cm.exception.message)

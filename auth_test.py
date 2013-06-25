@@ -428,39 +428,26 @@ class TestAuth(Tester):
         cassandra.execute("CREATE TABLE ks.cf (id int primary key, val int)")
 
         cathy = self.get_cursor(user='cathy', password='12345')
+        # another user to make sure the cache is at user level
+        cathy2 = self.get_cursor(user='cathy', password='12345')
+        cathys = [cathy, cathy2]
 
         self.assertUnauthorized("User cathy has no SELECT permission on <table ks.cf> or any of its parents",
                                 cathy, "SELECT * FROM ks.cf")
 
         # grant SELECT to cathy
         cassandra.execute("GRANT SELECT ON ks.cf TO cathy")
+        # should still fail after 1 second.
+        time.sleep(1.0)
+        for c in cathys:
+            self.assertUnauthorized("User cathy has no SELECT permission on <table ks.cf> or any of its parents",
+                                    c, "SELECT * FROM ks.cf")
 
-        # start another client, sleep for about 2 seconds, retry the request
-        # should still see a failure
-        time.sleep(1.7)
-        cathy2 = self.get_cursor(user='cathy', password='12345')
-        self.assertUnauthorized("User cathy has no SELECT permission on <table ks.cf> or any of its parents",
-                                cathy2, "SELECT * FROM ks.cf")
-
-        # wait a bit more until the cache expires
-        time.sleep(0.4)
-        cathy2.execute("SELECT * FROM ks.cf")
-        self.assertEqual(0, cathy2.rowcount)
-
-        # revoke SELECT from cathy
-        cassandra.execute("REVOKE SELECT ON ks.cf FROM cathy")
-
-        # wait for about 2 seconds and retry - SELECT should still be in the cache
-        time.sleep(1.7)
-        cathy.execute("SELECT * FROM ks.cf")
-        self.assertEqual(0, cathy.rowcount)
-
-        # wait a bit more until the cache expires
-        time.sleep(0.4)
-
-        # the changes (SELECT revocation) should kick in now
-        self.assertUnauthorized("User cathy has no SELECT permission on <table ks.cf> or any of its parents",
-                                cathy, "SELECT * FROM ks.cf")
+        # wait until the cache definitely expires and retry - should succeed now
+        time.sleep(1.5)
+        for c in cathys:
+            c.execute("SELECT * FROM ks.cf")
+            self.assertEqual(0, c.rowcount)
 
     @since('1.2')
     def list_permissions_test(self):
