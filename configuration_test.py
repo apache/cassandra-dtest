@@ -3,6 +3,7 @@ from assertions import *
 
 import re
 from ccmlib.cluster import Cluster
+import ast
 
 class TestConfiguration(Tester):
 
@@ -12,23 +13,34 @@ class TestConfiguration(Tester):
 
         cluster.populate(1).start()
         node = cluster.nodelist()[0]
+        cursor = self.cql_connection(node).cursor()
+        self.create_ks(cursor, 'ks', 1)
 
-        cli = node.cli()
-        cli.do("create keyspace ks")
-        cli.do("use ks")
-        cli.do("create column family cf with compression_options={sstable_compression:SnappyCompressor, chunk_length_kb:32}")
-        self._check_chunk_length(cli, 32)
+        create_table_query = "CREATE TABLE test_table (row varchar, name varchar, value int, PRIMARY KEY (row, name));"
+        alter_chunk_len_query = "ALTER TABLE test_table WITH compression = {{'sstable_compression' : 'SnappyCompressor', 'chunk_length_kb' : {chunk_length}}};"
 
-        cli.do("update column family cf with compression_options={sstable_compression:SnappyCompressor, chunk_length_kb:64}")
-        self._check_chunk_length(cli, 64)
+        cursor.execute( create_table_query, 1 )
 
-        cli.close()
+        cursor.execute( alter_chunk_len_query.format(chunk_length=32) )
+        self._check_chunk_length( cursor, 32 )
 
-    def _check_chunk_length(self, cli, value):
-        cli.do("describe cf")
-        assert not cli.has_errors(), cli.errors()
+        cursor.execute( alter_chunk_len_query.format(chunk_length=64) )
+        self._check_chunk_length( cursor, 64 )
 
-        output = cli.last_output()
-        m = re.search(r'chunk_length_kb:\s*(\d+)', output)
-        assert m is not None, 'cannot find chunk_length_kb in ' + output
-        assert m.group(1) == str(value), 'expecting chunk length of ' + str(value) + ', got ' + m.group(1)
+        
+    def _check_chunk_length(self, cursor, value):
+        describe_table_query = "SELECT * FROM system.schema_columnfamilies WHERE keyspace_name='ks' AND columnfamily_name='test_table';"
+        cursor.execute( describe_table_query )
+        results = cursor.fetchall()[0]
+        #Now extract the param list
+        params = ''
+        for result in results:
+            if 'sstable_compression' in str(result):
+                params = result
+
+        assert params is not '', "Looking for a row with the string 'sstable_compression' in system.schema_columnfamilies, but could not find it."
+
+        params = ast.literal_eval( params )
+        chunk_length = int( params['chunk_length_kb'] )
+
+        assert chunk_length == value, "Expected chunk_length: %s.  We got: %s" % (value, chunk_length)
