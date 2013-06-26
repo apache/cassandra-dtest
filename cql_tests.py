@@ -3007,7 +3007,7 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[ 0, '' ]], res
 
-    @since('1.2')
+    @since('2.0')
     def rename_test(self):
         cursor = self.prepare()
 
@@ -3019,10 +3019,8 @@ class TestCQL(Tester):
         cli.do("set test['foo']['4:3:2'] = 'bar'")
         assert not cli.has_errors(), cli.errors()
 
-        # This shouldn't work
-        assert_invalid(cursor, "ALTER TABLE test RENAME column2 TO foo")
-        # but this should
         cursor.execute("ALTER TABLE test RENAME column1 TO foo1 AND column2 TO foo2 AND column3 TO foo3")
+        assert_one(cursor, "SELECT foo1, foo2, foo3 FROM test", [4, 3, 2])
 
     @since('1.2')
     def clustering_order_and_functions_test(self):
@@ -3055,47 +3053,60 @@ class TestCQL(Tester):
         """)
 
         # Should apply
-        assert_one(cursor, "UPDATE test SET v1 = 2, v2 = 'foo' WHERE k = 0 IF NOT EXISTS", [True])
+        assert_none(cursor, "UPDATE test SET v1 = 2, v2 = 'foo' WHERE k = 0 IF NOT EXISTS")
 
         # Shouldn't apply
-        assert_one(cursor, "UPDATE test SET v1 = 5, v2 = 'bar' WHERE k = 0 IF NOT EXISTS", [False])
+        assert_one(cursor, "UPDATE test SET v1 = 5, v2 = 'bar' WHERE k = 0 IF NOT EXISTS", [ 0, 2, 'foo', None ])
         assert_one(cursor, "SELECT * FROM test", [ 0, 2, 'foo', None ])
 
         # Should not apply
-        assert_one(cursor, "UPDATE test SET v1 = 3, v2 = 'bar' WHERE k = 0 IF v1 = 4", [False])
+        assert_one(cursor, "UPDATE test SET v1 = 3, v2 = 'bar' WHERE k = 0 IF v1 = 4", [ 2 ])
         assert_one(cursor, "SELECT * FROM test", [ 0, 2, 'foo', None ])
 
         # Should apply
-        assert_one(cursor, "UPDATE test SET v1 = 3, v2 = 'bar' WHERE k = 0 IF v1 = 2", [True])
+        assert_none(cursor, "UPDATE test SET v1 = 3, v2 = 'bar' WHERE k = 0 IF v1 = 2")
         assert_one(cursor, "SELECT * FROM test", [ 0, 3, 'bar', None ])
 
         # Shouldn't apply, only one condition is ok
-        assert_one(cursor, "UPDATE test SET v1 = 5, v2 = 'foobar' WHERE k = 0 IF v1 = 3 AND v2 = 'foo'", [False])
+        assert_one(cursor, "UPDATE test SET v1 = 5, v2 = 'foobar' WHERE k = 0 IF v1 = 3 AND v2 = 'foo'", [ 3, 'bar' ])
         assert_one(cursor, "SELECT * FROM test", [ 0, 3, 'bar', None ])
 
         # Should apply
-        assert_one(cursor, "UPDATE test SET v1 = 5, v2 = 'foobar' WHERE k = 0 IF v1 = 3 AND v2 = 'bar'", [True])
+        assert_none(cursor, "UPDATE test SET v1 = 5, v2 = 'foobar' WHERE k = 0 IF v1 = 3 AND v2 = 'bar'")
         assert_one(cursor, "SELECT * FROM test", [ 0, 5, 'foobar', None ])
 
         # Shouldn't apply
-        assert_one(cursor, "DELETE v2 FROM test WHERE k = 0 IF v1 = 3", [False])
+        assert_one(cursor, "DELETE v2 FROM test WHERE k = 0 IF v1 = 3", [ 5 ])
         assert_one(cursor, "SELECT * FROM test", [ 0, 5, 'foobar', None ])
 
         # Shouldn't apply
-        assert_one(cursor, "DELETE v2 FROM test WHERE k = 0 IF v1 = null", [False])
+        assert_one(cursor, "DELETE v2 FROM test WHERE k = 0 IF v1 = null", [ 5 ])
         assert_one(cursor, "SELECT * FROM test", [ 0, 5, 'foobar', None ])
 
         # Should apply
-        assert_one(cursor, "DELETE v2 FROM test WHERE k = 0 IF v1 = 5", [True])
+        assert_none(cursor, "DELETE v2 FROM test WHERE k = 0 IF v1 = 5")
         assert_one(cursor, "SELECT * FROM test", [ 0, 5, None, None ])
 
         # Should apply
-        assert_one(cursor, "DELETE v1 FROM test WHERE k = 0 IF v3 = null", [True])
+        assert_none(cursor, "DELETE v1 FROM test WHERE k = 0 IF v3 = null")
         assert_one(cursor, "SELECT * FROM test", [ 0, None, None, None ])
 
         # Should apply
-        assert_one(cursor, "DELETE FROM test WHERE k = 0 IF v1 = null", [True])
+        assert_none(cursor, "DELETE FROM test WHERE k = 0 IF v1 = null")
         assert_none(cursor, "SELECT * FROM test")
+
+    @since('1.2')
+    def range_key_ordered_test(self):
+        cursor = self.prepare(ordered=True)
+
+        cursor.execute("CREATE TABLE test ( k int PRIMARY KEY)")
+
+        cursor.execute("INSERT INTO test(k) VALUES (-1)")
+        cursor.execute("INSERT INTO test(k) VALUES ( 0)")
+        cursor.execute("INSERT INTO test(k) VALUES ( 1)")
+
+        assert_all(cursor, "SELECT * FROM test", [[0], [1], [-1]])
+        assert_invalid(cursor, "SELECT * FROM test WHERE k >= -1 AND k < 1;")
 
     @since('2.0')
     def select_with_alias_test(self):
