@@ -3007,7 +3007,7 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[ 0, '' ]], res
 
-    @since('1.2')
+    @since('2.0')
     def rename_test(self):
         cursor = self.prepare()
 
@@ -3019,10 +3019,8 @@ class TestCQL(Tester):
         cli.do("set test['foo']['4:3:2'] = 'bar'")
         assert not cli.has_errors(), cli.errors()
 
-        # This shouldn't work
-        assert_invalid(cursor, "ALTER TABLE test RENAME column2 TO foo")
-        # but this should
         cursor.execute("ALTER TABLE test RENAME column1 TO foo1 AND column2 TO foo2 AND column3 TO foo3")
+        assert_one(cursor, "SELECT foo1, foo2, foo3 FROM test", [4, 3, 2])
 
     @since('1.2')
     def clustering_order_and_functions_test(self):
@@ -3108,7 +3106,7 @@ class TestCQL(Tester):
         cursor.execute("INSERT INTO test(k) VALUES ( 1)")
 
         assert_all(cursor, "SELECT * FROM test", [[0], [1], [-1]])
-        assert_invalid("SELECT * FROM test WHERE k >= -1 AND k < 1;")
+        assert_invalid(cursor, "SELECT * FROM test WHERE k >= -1 AND k < 1;")
 
     @since('2.0')
     def select_with_alias_test(self):
