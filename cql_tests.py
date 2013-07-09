@@ -3052,48 +3052,65 @@ class TestCQL(Tester):
             )
         """)
 
+        # Shouldn't apply
+        assert_one(cursor, "UPDATE test SET v1 = 3, v2 = 'bar' WHERE k = 0 IF v1 = 4", [ False ])
+
         # Should apply
-        assert_none(cursor, "UPDATE test SET v1 = 2, v2 = 'foo' WHERE k = 0 IF NOT EXISTS")
+        assert_one(cursor, "UPDATE test SET v1 = 2, v2 = 'foo' WHERE k = 0 IF NOT EXISTS", [ True ])
 
         # Shouldn't apply
-        assert_one(cursor, "UPDATE test SET v1 = 5, v2 = 'bar' WHERE k = 0 IF NOT EXISTS", [ 0, 2, 'foo', None ])
+        assert_one(cursor, "UPDATE test SET v1 = 5, v2 = 'bar' WHERE k = 0 IF NOT EXISTS", [ False, 0, 2, 'foo', None ])
         assert_one(cursor, "SELECT * FROM test", [ 0, 2, 'foo', None ])
 
         # Should not apply
-        assert_one(cursor, "UPDATE test SET v1 = 3, v2 = 'bar' WHERE k = 0 IF v1 = 4", [ 2 ])
+        assert_one(cursor, "UPDATE test SET v1 = 3, v2 = 'bar' WHERE k = 0 IF v1 = 4", [ False, 2 ])
         assert_one(cursor, "SELECT * FROM test", [ 0, 2, 'foo', None ])
 
         # Should apply
-        assert_none(cursor, "UPDATE test SET v1 = 3, v2 = 'bar' WHERE k = 0 IF v1 = 2")
+        assert_one(cursor, "UPDATE test SET v1 = 3, v2 = 'bar' WHERE k = 0 IF v1 = 2", [ True ])
         assert_one(cursor, "SELECT * FROM test", [ 0, 3, 'bar', None ])
 
         # Shouldn't apply, only one condition is ok
-        assert_one(cursor, "UPDATE test SET v1 = 5, v2 = 'foobar' WHERE k = 0 IF v1 = 3 AND v2 = 'foo'", [ 3, 'bar' ])
+        assert_one(cursor, "UPDATE test SET v1 = 5, v2 = 'foobar' WHERE k = 0 IF v1 = 3 AND v2 = 'foo'", [ False, 3, 'bar' ])
         assert_one(cursor, "SELECT * FROM test", [ 0, 3, 'bar', None ])
 
         # Should apply
-        assert_none(cursor, "UPDATE test SET v1 = 5, v2 = 'foobar' WHERE k = 0 IF v1 = 3 AND v2 = 'bar'")
+        assert_one(cursor, "UPDATE test SET v1 = 5, v2 = 'foobar' WHERE k = 0 IF v1 = 3 AND v2 = 'bar'", [ True ])
         assert_one(cursor, "SELECT * FROM test", [ 0, 5, 'foobar', None ])
 
         # Shouldn't apply
-        assert_one(cursor, "DELETE v2 FROM test WHERE k = 0 IF v1 = 3", [ 5 ])
+        assert_one(cursor, "DELETE v2 FROM test WHERE k = 0 IF v1 = 3", [ False, 5 ])
         assert_one(cursor, "SELECT * FROM test", [ 0, 5, 'foobar', None ])
 
         # Shouldn't apply
-        assert_one(cursor, "DELETE v2 FROM test WHERE k = 0 IF v1 = null", [ 5 ])
+        assert_one(cursor, "DELETE v2 FROM test WHERE k = 0 IF v1 = null", [ False, 5 ])
         assert_one(cursor, "SELECT * FROM test", [ 0, 5, 'foobar', None ])
 
         # Should apply
-        assert_none(cursor, "DELETE v2 FROM test WHERE k = 0 IF v1 = 5")
+        assert_one(cursor, "DELETE v2 FROM test WHERE k = 0 IF v1 = 5", [ True ])
         assert_one(cursor, "SELECT * FROM test", [ 0, 5, None, None ])
 
+        # Shouln't apply
+        assert_one(cursor, "DELETE v1 FROM test WHERE k = 0 IF v3 = 4", [ False, None ])
+
         # Should apply
-        assert_none(cursor, "DELETE v1 FROM test WHERE k = 0 IF v3 = null")
+        assert_one(cursor, "DELETE v1 FROM test WHERE k = 0 IF v3 = null", [ True ])
         assert_one(cursor, "SELECT * FROM test", [ 0, None, None, None ])
 
         # Should apply
-        assert_none(cursor, "DELETE FROM test WHERE k = 0 IF v1 = null")
+        assert_one(cursor, "DELETE FROM test WHERE k = 0 IF v1 = null", [ True ])
         assert_none(cursor, "SELECT * FROM test")
+
+        # Should apply, but only once
+        #assert_none(cursor, "INSERT INTO test (k, v1, v2) VALUES (1, 3, 'test') IF NOT EXISTS")
+        #assert_one(cursor, "INSERT INTO test (k, v1, v2) VALUES (1, 3, 'test') IF NOT EXISTS", [1, 3, 'test', None])
+
+        ## Shouldn't apply
+        #assert_one(cursor, "INSERT INTO test (k, v1, v2) VALUES (4, 5, 'test') IF v1 = 10", [1, 3, 'test', None])
+        ## But should
+        #assert_none(cursor, "INSERT INTO test (k, v1, v2) VALUES (1, 5, 'test') IF v1 = 3",)
+        #assert_one(cursor, "SELECT * FROM test", [ 1, 5, 'test', None ])
+
 
     @since('1.2')
     def range_key_ordered_test(self):
@@ -3152,3 +3169,13 @@ class TestCQL(Tester):
             cursor.execute('SELECT id AS user_id, name AS user_name FROM users WHERE id IN (0) ORDER BY user_name')
         self.assertEqual("Bad Request: Aliases are not allowed in order by clause ('user_name')",
                          cm.exception.message)
+
+    @since('2.0')
+    def only_key_update(self):
+
+        cursor = self.prepare()
+        cursor.execute("CREATE TABLE test (k int PRIMARY KEY)")
+
+        cursor.execute("UPDATE test SET PRIMARY KEY WHERE k = 0")
+        assert_one(cursor, "SELECT * FROM test", [ 0 ])
+
