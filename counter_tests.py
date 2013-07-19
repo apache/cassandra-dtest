@@ -69,8 +69,8 @@ class TestCounters(Tester):
 
         cursor.execute(query)
 
-        keys = range(0, 10)
-        updates = 500
+        keys = range(0, 4)
+        updates = 50
 
         def make_updates():
             cursor = self.cql_connection(nodes[0], keyspace='ks', version=cql_version).cursor()

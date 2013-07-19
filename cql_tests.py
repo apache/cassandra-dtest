@@ -3056,10 +3056,10 @@ class TestCQL(Tester):
         assert_one(cursor, "UPDATE test SET v1 = 3, v2 = 'bar' WHERE k = 0 IF v1 = 4", [ False ])
 
         # Should apply
-        assert_one(cursor, "UPDATE test SET v1 = 2, v2 = 'foo' WHERE k = 0 IF NOT EXISTS", [ True ])
+        assert_one(cursor, "INSERT INTO test (k, v1, v2) VALUES (0, 2, 'foo') IF NOT EXISTS", [ True ])
 
         # Shouldn't apply
-        assert_one(cursor, "UPDATE test SET v1 = 5, v2 = 'bar' WHERE k = 0 IF NOT EXISTS", [ False, 0, 2, 'foo', None ])
+        assert_one(cursor, "INSERT INTO test (k, v1, v2) VALUES (0, 5, 'bar') IF NOT EXISTS", [ False, 0, 2, 'foo', None ])
         assert_one(cursor, "SELECT * FROM test", [ 0, 2, 'foo', None ])
 
         # Should not apply
@@ -3100,16 +3100,6 @@ class TestCQL(Tester):
         # Should apply
         assert_one(cursor, "DELETE FROM test WHERE k = 0 IF v1 = null", [ True ])
         assert_none(cursor, "SELECT * FROM test")
-
-        # Should apply, but only once
-        #assert_none(cursor, "INSERT INTO test (k, v1, v2) VALUES (1, 3, 'test') IF NOT EXISTS")
-        #assert_one(cursor, "INSERT INTO test (k, v1, v2) VALUES (1, 3, 'test') IF NOT EXISTS", [1, 3, 'test', None])
-
-        ## Shouldn't apply
-        #assert_one(cursor, "INSERT INTO test (k, v1, v2) VALUES (4, 5, 'test') IF v1 = 10", [1, 3, 'test', None])
-        ## But should
-        #assert_none(cursor, "INSERT INTO test (k, v1, v2) VALUES (1, 5, 'test') IF v1 = 3",)
-        #assert_one(cursor, "SELECT * FROM test", [ 1, 5, 'test', None ])
 
 
     @since('1.2')
@@ -3178,4 +3168,3 @@ class TestCQL(Tester):
 
         cursor.execute("UPDATE test SET PRIMARY KEY WHERE k = 0")
         assert_one(cursor, "SELECT * FROM test", [ 0 ])
-
