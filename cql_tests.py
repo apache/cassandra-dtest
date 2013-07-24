@@ -3066,8 +3066,8 @@ class TestCQL(Tester):
         assert_one(cursor, "UPDATE test SET v1 = 3, v2 = 'bar' WHERE k = 0 IF v1 = 4", [ False, 2 ])
         assert_one(cursor, "SELECT * FROM test", [ 0, 2, 'foo', None ])
 
-        # Should apply
-        assert_one(cursor, "UPDATE test SET v1 = 3, v2 = 'bar' WHERE k = 0 IF v1 = 2", [ True ])
+        # Should apply (note: we want v2 before v1 in the statement order to exercise #5786)
+        assert_one(cursor, "UPDATE test SET v2 = 'bar', v1 = 3 WHERE k = 0 IF v1 = 2", [ True ])
         assert_one(cursor, "SELECT * FROM test", [ 0, 3, 'bar', None ])
 
         # Shouldn't apply, only one condition is ok
@@ -3168,3 +3168,13 @@ class TestCQL(Tester):
 
         cursor.execute("UPDATE test SET PRIMARY KEY WHERE k = 0")
         assert_one(cursor, "SELECT * FROM test", [ 0 ])
+
+    @since('1.2')
+    def nonpure_function_collection(self):
+        """ Test for bug #5795 """
+
+        cursor = self.prepare()
+        cursor.execute("CREATE TABLE test (k int PRIMARY KEY, v list<timeuuid>)")
+
+        # we just want to make sure this doesn't throw
+        cursor.execute("INSERT INTO test(k, v) VALUES (0, [now()])")
