@@ -3178,3 +3178,27 @@ class TestCQL(Tester):
 
         # we just want to make sure this doesn't throw
         cursor.execute("INSERT INTO test(k, v) VALUES (0, [now()])")
+
+    @require('5626')
+    def empty_in(self):
+        cursor = self.prepare()
+        cursor.execute("CREATE TABLE test (k1 int, k2 int, v int, PRIMARY KEY (k1, k2))")
+
+        # Inserts a few rows to make sure we don't actually query something
+        for i in range(0, 1):
+            for j in range(0, 1):
+                cursor.execute("INSERT INTO test(k1, k2, v) VALUES (%d, %d, %d)" % (i, j, i+j))
+
+        assert_none(cursor, "SELECT v FROM test WHERE k1 IN ()")
+        assert_none(cursor, "SELECT v FROM test WHERE k1 = 0 AND k2 IN ()")
+
+        # Same test, but for compact
+        cursor.execute("CREATE TABLE test_compact (k1 int, k2 int, v int, PRIMARY KEY (k1, k2)) WITH COMPACT STORAGE")
+
+        for i in range(0, 1):
+            for j in range(0, 1):
+                cursor.execute("INSERT INTO test_compact(k1, k2, v) VALUES (%d, %d, %d)" % (i, j, i+j))
+
+        assert_none(cursor, "SELECT v FROM test_compact WHERE k1 IN ()")
+        assert_none(cursor, "SELECT v FROM test_compact WHERE k1 = 0 AND k2 IN ()")
+
