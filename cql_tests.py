@@ -2944,20 +2944,6 @@ class TestCQL(Tester):
         assert res == [[1, None, None, '111']], res
 
     @since('1.2')
-    def validation_bug_test(self):
-        cursor = self.prepare()
-
-        cursor.execute("""
-            CREATE TABLE test (
-                k int PRIMARY KEY,
-                l list<int>,
-                s set<int>
-            )
-        """)
-
-        assert_invalid(cursor, "INSERT INTO test(k, s) VALUES (0, {1, 1})")
-
-    @since('1.2')
     def bug_5376(self):
         cursor = self.prepare()
 
