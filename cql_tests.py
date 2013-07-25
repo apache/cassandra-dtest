@@ -3202,3 +3202,17 @@ class TestCQL(Tester):
         assert_none(cursor, "SELECT v FROM test_compact WHERE k1 IN ()")
         assert_none(cursor, "SELECT v FROM test_compact WHERE k1 = 0 AND k2 IN ()")
 
+    @since('1.2')
+    def collection_flush(self):
+        """ Test for 5805 bug """
+        cursor = self.prepare()
+
+        cursor.execute("CREATE TABLE test (k int PRIMARY KEY, s set<int>)")
+
+        cursor.execute("INSERT INTO test(k, s) VALUES (1, {1})");
+        self.cluster.flush()
+        cursor.execute("INSERT INTO test(k, s) VALUES (1, {2})");
+        self.cluster.flush()
+
+        assert_one(cursor, "SELECT * FROM test", [ 1, set([2]) ])
+
