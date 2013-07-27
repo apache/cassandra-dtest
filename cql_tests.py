@@ -3165,28 +3165,51 @@ class TestCQL(Tester):
         # we just want to make sure this doesn't throw
         cursor.execute("INSERT INTO test(k, v) VALUES (0, [now()])")
 
-    @require('5626')
+    @since('1.2')
     def empty_in(self):
         cursor = self.prepare()
         cursor.execute("CREATE TABLE test (k1 int, k2 int, v int, PRIMARY KEY (k1, k2))")
 
-        # Inserts a few rows to make sure we don't actually query something
-        for i in range(0, 1):
-            for j in range(0, 1):
-                cursor.execute("INSERT INTO test(k1, k2, v) VALUES (%d, %d, %d)" % (i, j, i+j))
+        def fill(table):
+            for i in range(0, 2):
+                for j in range(0, 2):
+                    cursor.execute("INSERT INTO %s (k1, k2, v) VALUES (%d, %d, %d)" % (table, i, j, i+j))
 
+        def assert_nothing_changed(table):
+            cursor.execute("SELECT * FROM %s" % table) # make sure nothing got removed
+            self.assertEqual([[0,0,0], [0,1,1], [1,0,1], [1,1,2]], sorted(cursor.fetchall()))
+
+        # Inserts a few rows to make sure we don't actually query something
+        fill("test")
+
+        # Test empty IN () in SELECT
         assert_none(cursor, "SELECT v FROM test WHERE k1 IN ()")
         assert_none(cursor, "SELECT v FROM test WHERE k1 = 0 AND k2 IN ()")
+
+        # Test empty IN () in DELETE
+        cursor.execute("DELETE FROM test WHERE k1 IN ()");
+        assert_nothing_changed("test")
+
+        # Test empty IN () in UPDATE
+        cursor.execute("UPDATE test SET v = 3 WHERE k1 IN () AND k2 = 2")
+        assert_nothing_changed("test")
 
         # Same test, but for compact
         cursor.execute("CREATE TABLE test_compact (k1 int, k2 int, v int, PRIMARY KEY (k1, k2)) WITH COMPACT STORAGE")
 
-        for i in range(0, 1):
-            for j in range(0, 1):
-                cursor.execute("INSERT INTO test_compact(k1, k2, v) VALUES (%d, %d, %d)" % (i, j, i+j))
+        fill("test_compact")
 
         assert_none(cursor, "SELECT v FROM test_compact WHERE k1 IN ()")
         assert_none(cursor, "SELECT v FROM test_compact WHERE k1 = 0 AND k2 IN ()")
+
+        # Test empty IN () in DELETE
+        cursor.execute("DELETE FROM test_compact WHERE k1 IN ()");
+        assert_nothing_changed("test_compact")
+
+        # Test empty IN () in UPDATE
+        cursor.execute("UPDATE test_compact SET v = 3 WHERE k1 IN () AND k2 = 2")
+        assert_nothing_changed("test_compact")
+
 
     @since('1.2')
     def collection_flush(self):
