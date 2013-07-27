@@ -3147,7 +3147,7 @@ class TestCQL(Tester):
                          cm.exception.message)
 
     @since('2.0')
-    def only_key_update(self):
+    def only_key_update_test(self):
 
         cursor = self.prepare()
         cursor.execute("CREATE TABLE test (k int PRIMARY KEY)")
@@ -3156,7 +3156,7 @@ class TestCQL(Tester):
         assert_one(cursor, "SELECT * FROM test", [ 0 ])
 
     @since('1.2')
-    def nonpure_function_collection(self):
+    def nonpure_function_collection_test(self):
         """ Test for bug #5795 """
 
         cursor = self.prepare()
@@ -3166,7 +3166,7 @@ class TestCQL(Tester):
         cursor.execute("INSERT INTO test(k, v) VALUES (0, [now()])")
 
     @since('1.2')
-    def empty_in(self):
+    def empty_in_test(self):
         cursor = self.prepare()
         cursor.execute("CREATE TABLE test (k1 int, k2 int, v int, PRIMARY KEY (k1, k2))")
 
@@ -3212,7 +3212,7 @@ class TestCQL(Tester):
 
 
     @since('1.2')
-    def collection_flush(self):
+    def collection_flush_test(self):
         """ Test for 5805 bug """
         cursor = self.prepare()
 
