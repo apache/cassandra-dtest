@@ -3146,15 +3146,6 @@ class TestCQL(Tester):
         self.assertEqual("Bad Request: Aliases are not allowed in order by clause ('user_name')",
                          cm.exception.message)
 
-    @since('2.0')
-    def only_key_update_test(self):
-
-        cursor = self.prepare()
-        cursor.execute("CREATE TABLE test (k int PRIMARY KEY)")
-
-        cursor.execute("UPDATE test SET PRIMARY KEY WHERE k = 0")
-        assert_one(cursor, "SELECT * FROM test", [ 0 ])
-
     @since('1.2')
     def nonpure_function_collection_test(self):
         """ Test for bug #5795 """
