@@ -1,4 +1,5 @@
 from dtest import Tester, debug
+from tools import since
 import os
 import datetime
 import random
@@ -24,19 +25,16 @@ clients = (
 class TestWideRows(Tester):
 
     def __init__(self, *args, **kwargs):
-        # Forcing cluster version on purpose
-        os.environ['CASSANDRA_VERSION'] = 'git:cassandra-1.2'
         Tester.__init__(self, *args, **kwargs)
-    
-    # def test_cassandra_1_2_1(self):
-    #     self.write_wide_rows('git:cassandra-1.2.1')
 
-    def test_cassandra_1_2_head(self):
-        self.write_wide_rows('git:cassandra-1.2')
+    @since('1.2')
+    def test_wide_rows(self):
+        self.write_wide_rows()
 
-    def write_wide_rows(self, version):
+    def write_wide_rows(self, version=None):
         cluster = self.cluster
-        self.cluster.set_cassandra_dir(cassandra_version=version)
+        if version:
+            self.cluster.set_cassandra_dir(cassandra_version=version)
         cluster.populate(1).start()
         (node1,) = cluster.nodelist()
 
@@ -71,13 +69,13 @@ class TestWideRows(Tester):
             
 
 
+    @since('1.2')
     def test_column_index_stress(self):
-        """
-        The goal of this test is to write a large number of columns to a single
-        row and set 'column_index_size_in_kb' to a sufficiently low value
-        to force the creation of a column index.  The test will then randomly
-        read columns from that row and ensure that all data is returned.
-        See CASSANDRA-5225.
+        """Write a large number of columns to a single row and set
+        'column_index_size_in_kb' to a sufficiently low value to force
+        the creation of a column index. The test will then randomly
+        read columns from that row and ensure that all data is
+        returned. See CASSANDRA-5225.
         """
         cluster = self.cluster
         cluster.populate(1).start()
