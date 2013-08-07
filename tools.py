@@ -201,11 +201,12 @@ class since(object):
 
     def __call__(self, f):
         def wrapped(obj):
-            if obj.cluster.version() < self.cass_version:
-                obj.skip("%s < %s" % (obj.cluster.version(), self.cass_version))
+            cluster_version = LooseVersion(obj.cluster.version())
+            if cluster_version < self.cass_version:
+                obj.skip("%s < %s" % (cluster_version, self.cass_version))
             if self.max_version and \
-                    obj.cluster.version()[:len(self.max_version)] > self.max_version:
-                obj.skip("%s > %s" %(obj.cluster.version(), self.max_version)) 
+                    cluster_version[:len(self.max_version)] > self.max_version:
+                obj.skip("%s > %s" %(cluster_version, self.max_version)) 
             f(obj)
         wrapped.__name__ = f.__name__
         wrapped.__doc__ = f.__doc__
