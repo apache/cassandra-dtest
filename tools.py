@@ -1,6 +1,7 @@
 import time
 from ccmlib.node import Node
 from decorator  import decorator
+from distutils.version import LooseVersion
 import cql
 import re
 import os
@@ -193,8 +194,10 @@ def range_putget(cluster, cursor, cl="QUORUM"):
 
 class since(object):
     def __init__(self, cass_version, max_version=None):
-        self.cass_version = cass_version
+        self.cass_version = LooseVersion(cass_version)
         self.max_version = max_version
+        if self.max_version is not None:
+            self.max_version = LooseVersion(self.max_version)
 
     def __call__(self, f):
         def wrapped(obj):
