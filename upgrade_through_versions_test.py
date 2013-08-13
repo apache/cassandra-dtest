@@ -10,7 +10,7 @@ import os
 from tools import ThriftConnection
 
 versions = (
-    '1.1.9', 'git:cassandra-1.2', 'git:trunk'
+    'git:cassandra-1.1', 'git:cassandra-1.2', 'git:cassandra-2.0', 'git:trunk'
 )
 
 class TestUpgradeThroughVersions(Tester):
