@@ -29,12 +29,11 @@ class TestUpgradeThroughVersions(Tester):
         self.upgrade_scenario()
 
     def upgrade_test_mixed(self):
-        """Only upgrade part of the cluster, so we have mixed versions when
-        we're done."""
+        """Only upgrade part of the cluster, so we have mixed versions part way through."""
         self.upgrade_scenario(mixed_version=True)
 
     def upgrade_scenario(self, mixed_version=False):
-        self.num_rows = 0
+        self.num_rows = 2000
         cluster = self.cluster
 
         # Create a ring
@@ -114,7 +113,6 @@ class TestUpgradeThroughVersions(Tester):
             debug('Successfully upgraded part of the cluster to %s' % version) 
         else:
             debug('Successfully upgraded to %s' % version)
-            
 
     def _write_values(self, consistency_level='ALL'):
         self.num_rows += 2
