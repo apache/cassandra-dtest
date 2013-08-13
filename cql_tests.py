@@ -2854,6 +2854,45 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [ ['A'] ], res
 
+    def edge_2i_on_complex_pk_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE indexed (
+                pk0 int,
+                pk1 int,
+                ck0 int,
+                ck1 int,
+                ck2 int,
+                value int,
+                PRIMARY KEY ((pk0, pk1), ck0, ck1, ck2)
+            )
+        """)
+
+        cursor.execute("CREATE INDEX ON indexed(pk0)")
+        cursor.execute("CREATE INDEX ON indexed(ck0)")
+        cursor.execute("CREATE INDEX ON indexed(ck1)")
+        cursor.execute("CREATE INDEX ON indexed(ck2)")
+
+        cursor.execute("INSERT INTO indexed (pk0, pk1, ck0, ck1, ck2, value) VALUES (0, 1, 2, 3, 4, 5)")
+        cursor.execute("INSERT INTO indexed (pk0, pk1, ck0, ck1, ck2, value) VALUES (1, 2, 3, 4, 5, 0)")
+        cursor.execute("INSERT INTO indexed (pk0, pk1, ck0, ck1, ck2, value) VALUES (2, 3, 4, 5, 0, 1)")
+        cursor.execute("INSERT INTO indexed (pk0, pk1, ck0, ck1, ck2, value) VALUES (3, 4, 5, 0, 1, 2)")
+        cursor.execute("INSERT INTO indexed (pk0, pk1, ck0, ck1, ck2, value) VALUES (4, 5, 0, 1, 2, 3)")
+        cursor.execute("INSERT INTO indexed (pk0, pk1, ck0, ck1, ck2, value) VALUES (5, 0, 1, 2, 3, 4)")
+
+        cursor.execute("SELECT value FROM indexed WHERE pk0 = 2")
+        self.assertEqual([[1]], cursor.fetchall())
+
+        cursor.execute("SELECT value FROM indexed WHERE ck0 = 0")
+        self.assertEqual([[3]], cursor.fetchall())
+
+        cursor.execute("SELECT value FROM indexed WHERE pk0 = 3 AND pk1 = 4 AND ck1 = 0")
+        self.assertEqual([[2]], cursor.fetchall())
+
+        cursor.execute("SELECT value FROM indexed WHERE pk0 = 5 AND pk1 = 0 AND ck0 = 1 AND ck2 = 3 ALLOW FILTERING")
+        self.assertEqual([[4]], cursor.fetchall())
+
     @since('1.2')
     def bug_5240_test(self):
         cursor = self.prepare()
@@ -3215,4 +3254,3 @@ class TestCQL(Tester):
         self.cluster.flush()
 
         assert_one(cursor, "SELECT * FROM test", [ 1, set([2]) ])
-
