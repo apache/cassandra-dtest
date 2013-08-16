@@ -2854,6 +2854,7 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [ ['A'] ], res
 
+    @since('2.0')
     def edge_2i_on_complex_pk_test(self):
         cursor = self.prepare()
 
