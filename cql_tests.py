@@ -1965,14 +1965,13 @@ class TestCQL(Tester):
 
         cursor.execute("SELECT keyspace_name, durable_writes FROM system.schema_keyspaces")
         res = cursor.fetchall()
-        assert res == [ ['system_auth', True], ['ks1', True], ['system', True], ['system_traces', True], ['ks2', False] ], res
+        assert res == [ ['ks1', True], ['system', True], ['system_traces', True], ['ks2', False] ], res
 
         cursor.execute("ALTER KEYSPACE ks1 WITH replication = { 'class' : 'NetworkTopologyStrategy', 'dc1' : 1 } AND durable_writes=False")
         cursor.execute("ALTER KEYSPACE ks2 WITH durable_writes=true")
         cursor.execute("SELECT keyspace_name, durable_writes, strategy_class FROM system.schema_keyspaces")
         res = cursor.fetchall()
-        assert res == [ [u'system_auth', True, u'org.apache.cassandra.locator.SimpleStrategy'],
-                      [u'ks1', False, u'org.apache.cassandra.locator.NetworkTopologyStrategy'],
+        assert res == [ [u'ks1', False, u'org.apache.cassandra.locator.NetworkTopologyStrategy'],
                       [u'system', True, u'org.apache.cassandra.locator.LocalStrategy'],
                       [u'system_traces', True, u'org.apache.cassandra.locator.SimpleStrategy'],
                       [u'ks2', True, u'org.apache.cassandra.locator.SimpleStrategy'] ]
