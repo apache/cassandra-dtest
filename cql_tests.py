@@ -3255,3 +3255,56 @@ class TestCQL(Tester):
         self.cluster.flush()
 
         assert_one(cursor, "SELECT * FROM test", [ 1, set([2]) ])
+
+    @require('4536')
+    def select_distinct_test(self):
+        cursor = self.prepare()
+
+        # Test a regular (CQL3) table.
+        cursor.execute('CREATE TABLE regular (pk0 int, pk1 int, ck0 int, val int, PRIMARY KEY((pk0, pk1), ck0))')
+
+        for i in xrange(0, 3):
+            cursor.execute('INSERT INTO regular (pk0, pk1, ck0, val) VALUES (%d, %d, 0, 0)' % (i, i))
+            cursor.execute('INSERT INTO regular (pk0, pk1, ck0, val) VALUES (%d, %d, 1, 1)' % (i, i))
+
+        cursor.execute('SELECT DISTINCT pk0, pk1 FROM regular LIMIT 1')
+        self.assertEqual([[0, 0]], cursor.fetchall())
+
+        cursor.execute('SELECT DISTINCT pk0, pk1 FROM regular LIMIT 3')
+        self.assertEqual([[0, 0], [1, 1], [2, 2]], sorted(cursor.fetchall()))
+
+        # Test a 'compact storage' table.
+        cursor.execute('CREATE TABLE compact (pk0 int, pk1 int, val int, PRIMARY KEY((pk0, pk1))) WITH COMPACT STORAGE')
+
+        for i in xrange(0, 3):
+            cursor.execute('INSERT INTO compact (pk0, pk1, val) VALUES (%d, %d, %d)' % (i, i, i))
+
+        cursor.execute('SELECT DISTINCT pk0, pk1 FROM compact LIMIT 1')
+        self.assertEqual([[0, 0]], cursor.fetchall())
+
+        cursor.execute('SELECT DISTINCT pk0, pk1 FROM compact LIMIT 3')
+        self.assertEqual([[0, 0], [1, 1], [2, 2]], sorted(cursor.fetchall()))
+
+        # Test a 'wide row' thrift table.
+        cursor.execute('CREATE TABLE wide (pk int, name text, val int, PRIMARY KEY(pk, name)) WITH COMPACT STORAGE')
+
+        for i in xrange(0, 3):
+            cursor.execute("INSERT INTO wide (pk, name, val) VALUES (%d, 'name0', 0)" % i)
+            cursor.execute("INSERT INTO wide (pk, name, val) VALUES (%d, 'name1', 1)" % i)
+
+        cursor.execute('SELECT DISTINCT pk FROM wide LIMIT 1')
+        self.assertEqual([[1]], cursor.fetchall())
+
+        cursor.execute('SELECT DISTINCT pk FROM wide LIMIT 3')
+        self.assertEqual([[0], [1], [2]], sorted(cursor.fetchall()))
+
+        # Test selection validation.
+        with self.assertRaises(ProgrammingError) as cm:
+            cursor.execute('SELECT DISTINCT pk0 FROM regular')
+        self.assertEqual('Bad Request: SELECT DISTINCT queries must request all the partition key columns (missing pk1)',
+                         cm.exception.message)
+
+        with self.assertRaises(ProgrammingError) as cm:
+            cursor.execute('SELECT DISTINCT pk0, pk1, ck0 FROM regular')
+        self.assertEqual('Bad Request: SELECT DISTINCT queries must only request partition key columns (not ck0)',
+                         cm.exception.message)
