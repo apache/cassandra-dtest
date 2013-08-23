@@ -34,6 +34,7 @@ class TestUpgradeThroughVersions(Tester):
 
     def upgrade_scenario(self, mixed_version=False):
         self.num_rows = 2000
+        self.counter_val = 0
         cluster = self.cluster
 
         # Create a ring
@@ -47,8 +48,11 @@ class TestUpgradeThroughVersions(Tester):
         conn = ThriftConnection(node1)
         conn.create_ks()
         conn.create_cf()
+        self._create_counter_cf()
+        
         time.sleep(.5)
         self._write_values()
+        self._increment_counter_value()
 
         # upgrade through versions
         for version in versions[1:]:
@@ -75,6 +79,7 @@ class TestUpgradeThroughVersions(Tester):
             debug('Prepping node for shutdown: ' + node.name)
             node.flush()
             self._check_values()
+        self._check_counter_values()
         
         for node in nodes:
             debug('Shutting down node: ' + node.name)
@@ -98,6 +103,10 @@ class TestUpgradeThroughVersions(Tester):
                 self._write_values()
             self._check_values()
 
+        self._increment_counter_value()
+        time.sleep(0.5)
+        self._check_counter_values()
+        
         if not mixed_version:
             # Check we can bootstrap a new node on the upgraded cluster:
             debug("Adding a node to the cluster")
@@ -108,7 +117,8 @@ class TestUpgradeThroughVersions(Tester):
             debug("node should be up, but sleeping a bit to ensure...")
             time.sleep(15)
             self._check_values()
-
+            self._check_counter_values()
+        
         if mixed_version:
             debug('Successfully upgraded part of the cluster to %s' % version) 
         else:
@@ -125,3 +135,29 @@ class TestUpgradeThroughVersions(Tester):
             conn = ThriftConnection(node).use_ks()
             conn.query_columns(self.num_rows, consistency_level)
             
+    def _create_counter_cf(self):
+        cursor = self.cql_connection(self.node2).cursor()
+        cursor.execute("use ks;")
+        create_counter_table_query = ("CREATE TABLE countertable ( "
+                                      "k text PRIMARY KEY, "
+                                      "c counter) WITH "
+                                      "default_validation=CounterColumnType;")
+        cursor.execute( create_counter_table_query )
+
+    def _increment_counter_value(self):
+        debug("incrementing counter...")
+        cursor = self.cql_connection(self.node2).cursor()
+        cursor.execute("use ks;")
+        update_counter_query = ("UPDATE countertable SET c = c + 1 WHERE k='www.datastax.com'")
+        cursor.execute( update_counter_query )
+        self.counter_val += 1
+        debug("OK...")
+
+    def _check_counter_values(self):
+        debug("Checking counter values...")
+        cursor = self.cql_connection(self.node2).cursor()
+        cursor.execute("use ks;")
+        cursor.execute("SELECT c from countertable;")
+        res = cursor.fetchall()[0][0]
+        assert res == self.counter_val, "Counter not at expected value."
+        debug("OK...")
