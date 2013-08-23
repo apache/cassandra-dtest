@@ -6,7 +6,6 @@ from ccmlib.node import TimeoutError
 import random
 import time
 import os
-import pdb
 
 from tools import ThriftConnection
 
