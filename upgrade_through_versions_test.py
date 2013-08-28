@@ -13,9 +13,16 @@ versions = (
     'git:cassandra-1.1', 'git:cassandra-1.2', 'git:cassandra-2.0', 'git:trunk'
 )
 
+try:
+    current_version = os.environ['CASSANDRA_VERSION']
+except KeyError:
+    current_version = versions[-1]
+    
 class TestUpgradeThroughVersions(Tester):
     """
     upgrades a 3-node cluster through each of the above versions.
+    if the CASSANDRA_VERSION variable is set then upgrade to that version.
+    otherwise upgrade all the way to trunk.
     """
 
     def __init__(self, *args, **kwargs):
@@ -54,8 +61,10 @@ class TestUpgradeThroughVersions(Tester):
         self._write_values()
         self._increment_counter_value()
 
+        test_versions = [v for v in versions if v <= current_version ]
+       
         # upgrade through versions
-        for version in versions[1:]:
+        for version in test_versions[1:]:
             if mixed_version:
                 self.upgrade_to_version(version, mixed_version=True, nodes=(node1,))
                 self.upgrade_to_version(version, mixed_version=True, nodes=(node2,node3)) 
