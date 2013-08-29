@@ -22,7 +22,6 @@ def get_version_from_build():
         for line in f:
             match = re.search('name="base\.version" value="([0-9.]+)[^"]*"', line)
             if match:
-                print line
                 return 'git:cassandra-' + match.group(1)
 
 try:
