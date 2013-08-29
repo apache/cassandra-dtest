@@ -75,7 +75,7 @@ class TestUpgradeThroughVersions(Tester):
         self._increment_counter_value()
 
         test_versions = [v for v in versions if v <= current_version ]
-        print test_versions
+        debug( str(test_versions) )
         # upgrade through versions
         for version in test_versions[1:]:
             if mixed_version:
