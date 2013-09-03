@@ -6,6 +6,8 @@ from ccmlib.node import TimeoutError
 import random
 import time
 import os
+from distutils.version import LooseVersion
+
 
 from tools import ThriftConnection
 
@@ -13,9 +15,27 @@ versions = (
     'git:cassandra-1.1', 'git:cassandra-1.2', 'git:cassandra-2.0', 'git:trunk'
 )
 
+def get_version_from_build():
+    cassandra_dir = os.environ["CASSANDRA_DIR"]
+    build = os.path.join(cassandra_dir, 'build.xml')
+    with open(build) as f:
+        for line in f:
+            match = re.search('name="base\.version" value="([0-9.]+)[^"]*"', line)
+            if match:
+                return 'git:cassandra-' + match.group(1)
+
+try:
+    current_version = get_version_from_build()
+except KeyError:
+    current_version = versions[-1]
+
+print current_version
+
 class TestUpgradeThroughVersions(Tester):
     """
-    upgrades a 3-node cluster through each of the above versions.
+    Upgrades a 3-node cluster through each of the above versions.
+    If the CASSANDRA_DIR variable is set then upgrade to that version,
+    otherwise upgrade all the way to the trunk.
     """
 
     def __init__(self, *args, **kwargs):
@@ -54,8 +74,10 @@ class TestUpgradeThroughVersions(Tester):
         self._write_values()
         self._increment_counter_value()
 
+        test_versions = [v for v in versions if v <= current_version ]
+        debug( str(test_versions) )
         # upgrade through versions
-        for version in versions[1:]:
+        for version in test_versions[1:]:
             if mixed_version:
                 self.upgrade_to_version(version, mixed_version=True, nodes=(node1,))
                 self.upgrade_to_version(version, mixed_version=True, nodes=(node2,node3)) 
