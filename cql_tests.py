@@ -3255,7 +3255,7 @@ class TestCQL(Tester):
 
         assert_one(cursor, "SELECT * FROM test", [ 1, set([2]) ])
 
-    @require('4536')
+    @since('2.0.1')
     def select_distinct_test(self):
         cursor = self.prepare()
 
