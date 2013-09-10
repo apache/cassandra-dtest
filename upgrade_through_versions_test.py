@@ -11,7 +11,7 @@ from distutils.version import LooseVersion
 from tools import ThriftConnection
 
 versions = (
-    'git:cassandra-1.1', 'git:cassandra-1.2', 'git:cassandra-2.0'
+    'git:cassandra-1.1', 'git:cassandra-1.2', 'git:cassandra-2.0', 'git:trunk'
 )
 
 def get_version_from_build():
