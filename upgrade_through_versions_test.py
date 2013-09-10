@@ -8,11 +8,10 @@ import time
 import os
 from distutils.version import LooseVersion
 
-
 from tools import ThriftConnection
 
 versions = (
-    'git:cassandra-1.1', 'git:cassandra-1.2', 'git:cassandra-2.0', 'git:trunk'
+    'git:cassandra-1.1', 'git:cassandra-1.2', 'git:cassandra-2.0'
 )
 
 def get_version_from_build():
@@ -28,8 +27,6 @@ try:
     current_version = get_version_from_build()
 except KeyError:
     current_version = versions[-1]
-
-print current_version
 
 class TestUpgradeThroughVersions(Tester):
     """
@@ -118,6 +115,11 @@ class TestUpgradeThroughVersions(Tester):
             time.sleep(.5)
             if not mixed_version:
                 node.nodetool('upgradesstables')
+
+        if ENABLE_VNODES and version >= "1.2" and not mixed_version:
+            debug("Running shuffle")
+            self.node2.shuffle("create")
+            self.node2.shuffle("en")
 
         for node in nodes:
             debug('Checking node: ' + node.name)
