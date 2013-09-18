@@ -13,7 +13,7 @@ cql_version="3.0.0"
 
 class TestCQL(Tester):
 
-    def prepare(self, ordered=False, create_keyspace=True, use_cache=False):
+    def prepare(self, ordered=False, create_keyspace=True, use_cache=False, nodes=1, rf=1):
         cluster = self.cluster
 
         if (ordered):
@@ -22,13 +22,13 @@ class TestCQL(Tester):
         if (use_cache):
             cluster.set_configuration_options(values={ 'row_cache_size_in_mb' : 100 })
 
-        cluster.populate(1).start()
+        cluster.populate(nodes).start()
         node1 = cluster.nodelist()[0]
         time.sleep(0.2)
 
         cursor = self.cql_connection(node1, version=cql_version).cursor()
         if create_keyspace:
-            self.create_ks(cursor, 'ks', 1)
+            self.create_ks(cursor, 'ks', rf)
         return cursor
 
     @since('1.1')
@@ -3307,3 +3307,44 @@ class TestCQL(Tester):
             cursor.execute('SELECT DISTINCT pk0, pk1, ck0 FROM regular')
         self.assertEqual('Bad Request: SELECT DISTINCT queries must only request partition key columns (not ck0)',
                          cm.exception.message)
+
+    @since('1.2')
+    def function_with_null_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k int PRIMARY KEY,
+                t timeuuid,
+            )
+        """)
+
+        cursor.execute("INSERT INTO test(k) VALUES (0)")
+        assert_one(cursor, "SELECT dateOf(t) FROM test WHERE k=0", [ None ])
+
+    @since('2.0')
+    def cas_stress_test(self):
+        cursor = self.prepare(nodes=3, rf=3)
+
+        cursor.execute("CREATE TABLE tkns (tkn int, consumed boolean, PRIMARY KEY (tkn));")
+
+        for i in range(1, 10):
+            cursor.execute("INSERT INTO tkns (tkn, consumed) VALUES (%i,FALSE) USING TTL 30;" % i, consistency_level='QUORUM')
+            assert_one(cursor, "UPDATE tkns USING TTL 1 SET consumed = TRUE WHERE tkn = %i IF consumed = FALSE;" % i, [True], cl='QUORUM')
+            assert_one(cursor, "UPDATE tkns USING TTL 1 SET consumed = TRUE WHERE tkn = %i IF consumed = FALSE;" % i, [False, True], cl='QUORUM')
+
+
+    @since('1.2')
+    def bug_6050_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k int PRIMARY KEY,
+                a int,
+                b int
+            )
+        """)
+
+        cursor.execute("CREATE INDEX ON test(a)")
+        assert_invalid(cursor, "SELECT * FROM test WHERE a = 3 AND b IN (1, 3)")

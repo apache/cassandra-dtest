@@ -34,17 +34,17 @@ def assert_invalid(cursor, query, matching = None):
         if matching is not None:
             assert re.search(matching, msg), "Error message does not contain " + matching + " (error = " + msg + ")"
 
-def assert_one(cursor, query, expected):
-    cursor.execute(query)
+def assert_one(cursor, query, expected, cl='ONE'):
+    cursor.execute(query, consistency_level=cl)
     res = cursor.fetchall()
     assert res == [expected], res
 
-def assert_none(cursor, query):
-    cursor.execute(query)
+def assert_none(cursor, query, cl='ONE'):
+    cursor.execute(query, consistency_level=cl)
     res = cursor.fetchall()
     assert res == [], res
 
-def assert_all(cursor, query, expected):
-    cursor.execute(query)
+def assert_all(cursor, query, expected, cl='ONE'):
+    cursor.execute(query, consistency_level=cl)
     res = cursor.fetchall()
     assert res == expected, res
