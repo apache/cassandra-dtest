@@ -747,21 +747,6 @@ class TestCQL(Tester):
         cursor.execute("CREATE TABLE test (foo text PRIMARY KEY, c int)")
         assert_invalid(cursor, "ALTER TABLE test WITH default_validation=int;")
 
-    @since('1.1')
-    def alter_type_test(self):
-        """ Validate ALTER TYPE behavior """
-        cursor = self.prepare()
-
-        cursor.execute("""
-            CREATE TABLE test (
-                k int PRIMARY KEY,
-                v int
-            )
-        """)
-
-        cursor.execute("ALTER TABLE test ALTER v TYPE float")
-        cursor.execute("INSERT INTO test (k, v) VALUES (0, 2.4)")
-
     @since('1.2')
     def null_support_test(self):
         """ Test support for nulls """
