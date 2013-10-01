@@ -24,6 +24,7 @@ if len(config.read(os.path.expanduser('~/.cassandra-dtest'))) > 0:
 
 NO_SKIP = os.environ.get('SKIP', '').lower() in ('no', 'false')
 DEBUG = os.environ.get('DEBUG', '').lower() in ('yes', 'true')
+TRACE = os.environ.get('TRACE', '').lower() in ('yes', 'true')
 KEEP_LOGS = os.environ.get('KEEP_LOGS', '').lower() in ('yes', 'true')
 PRINT_DEBUG = os.environ.get('PRINT_DEBUG', '').lower() in ('yes', 'true')
 ENABLE_VNODES = os.environ.get('ENABLE_VNODES', 'false').lower() in ('yes', 'true')
@@ -122,6 +123,8 @@ class Tester(TestCase):
             f.write(self.cluster.name)
         if DEBUG:
             self.cluster.set_log_level("DEBUG")
+        if TRACE:
+            self.cluster.set_log_level("TRACE")
         self.connections = []
         self.runners = []
 

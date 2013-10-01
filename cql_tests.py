@@ -2024,6 +2024,13 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[1, 0], [1, 3], [0, 0], [0, 2]], res
 
+        cursor.execute("DELETE FROM test WHERE blog_id = 0 AND timestamp = 2")
+
+        cursor.execute("SELECT blog_id, timestamp FROM test WHERE author = 'bob'")
+        res = cursor.fetchall()
+        assert res == [[1, 0], [1, 3], [0, 0]], res
+
+
     @since('1.1')
     def refuse_in_with_indexes_test(self):
         """ Test for the validation bug of #4709 """
@@ -3333,3 +3340,29 @@ class TestCQL(Tester):
 
         cursor.execute("CREATE INDEX ON test(a)")
         assert_invalid(cursor, "SELECT * FROM test WHERE a = 3 AND b IN (1, 3)")
+
+    @since('2.0')
+    def bug_6069_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k int PRIMARY KEY,
+                s set<int>
+            )
+        """)
+
+        assert_one(cursor, "INSERT INTO test(k, s) VALUES (0, {1, 2, 3}) IF NOT EXISTS", [True])
+        assert_one(cursor, "SELECT * FROM test", [0, {1, 2, 3}])
+
+    @since('1.2')
+    def bug_6115_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("CREATE TABLE test (k int, v int, PRIMARY KEY (k, v))")
+
+        cursor.execute("INSERT INTO test (k, v) VALUES (0, 1)")
+        cursor.execute("BEGIN BATCH DELETE FROM test WHERE k=0 AND v=1; INSERT INTO test (k, v) VALUES (0, 2); APPLY BATCH")
+
+        assert_one(cursor, "SELECT * FROM test", [0, 2])
+
