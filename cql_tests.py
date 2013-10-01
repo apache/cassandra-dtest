@@ -3315,15 +3315,15 @@ class TestCQL(Tester):
         assert_one(cursor, "SELECT dateOf(t) FROM test WHERE k=0", [ None ])
 
     @since('2.0')
-    def cas_stress_test(self):
+    def cas_simple_test(self):
         cursor = self.prepare(nodes=3, rf=3)
 
         cursor.execute("CREATE TABLE tkns (tkn int, consumed boolean, PRIMARY KEY (tkn));")
 
         for i in range(1, 10):
-            cursor.execute("INSERT INTO tkns (tkn, consumed) VALUES (%i,FALSE) USING TTL 30;" % i, consistency_level='QUORUM')
-            assert_one(cursor, "UPDATE tkns USING TTL 1 SET consumed = TRUE WHERE tkn = %i IF consumed = FALSE;" % i, [True], cl='QUORUM')
-            assert_one(cursor, "UPDATE tkns USING TTL 1 SET consumed = TRUE WHERE tkn = %i IF consumed = FALSE;" % i, [False, True], cl='QUORUM')
+            cursor.execute("INSERT INTO tkns (tkn, consumed) VALUES (%i,FALSE);" % i, consistency_level='QUORUM')
+            assert_one(cursor, "UPDATE tkns SET consumed = TRUE WHERE tkn = %i IF consumed = FALSE;" % i, [True], cl='QUORUM')
+            assert_one(cursor, "UPDATE tkns SET consumed = TRUE WHERE tkn = %i IF consumed = FALSE;" % i, [False, True], cl='QUORUM')
 
 
     @since('1.2')
