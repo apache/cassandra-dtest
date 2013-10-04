@@ -1,6 +1,7 @@
 import time
 
 from dtest import Tester, TracingCursor
+from tools import since
 
 class TestSecondaryIndexes(Tester):
 
@@ -41,6 +42,7 @@ class TestSecondaryIndexes(Tester):
         result = cursor.fetchall()
         assert len(result) == 1, "Expecting 1 users, got" + str(result)
 
+    @since('2.1')
     def test_low_cardinality_indexes(self):
         """
         Checks that low-cardinality secondary index subqueries are executed
