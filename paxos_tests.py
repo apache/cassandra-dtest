@@ -28,6 +28,7 @@ class TestPaxos(Tester):
             self.create_ks(cursor, 'ks', rf)
         return cursor
 
+    @since('2.0')
     def contention_test(self):
         """ Test threads repeatedly contending on the same row """
 
