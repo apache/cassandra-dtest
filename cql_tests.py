@@ -173,6 +173,10 @@ class TestCQL(Tester):
         # Result from 'f47ac10b-58cc-4372-a567-0e02b2c3d479' are first
         assert res == [[24], [12], [128], [24], [12], [42]], res
 
+        # Check we don't allow empty values for url since this is the full underlying cell name (#6152)
+        #assert_invalid(cursor, "INSERT INTO clicks (userid, url, time) VALUES (810e8500-e29b-41d4-a716-446655440000, '', 42)")
+        cursor.execute("INSERT INTO clicks (userid, url, time) VALUES (810e8500-e29b-41d4-a716-446655440000, '', 42)")
+
     @since('1.1')
     def dense_cf_test(self):
         """ Test composite 'dense' CF syntax """
@@ -3366,3 +3370,29 @@ class TestCQL(Tester):
 
         assert_one(cursor, "SELECT * FROM test", [0, 2])
 
+    @since('1.2')
+    def secondary_index_counters(self):
+        cursor = self.prepare()
+        cursor.execute("CREATE TABLE test (k int PRIMARY KEY, c counter)")
+        assert_invalid(cursor, "CREATE INDEX ON test(c)");
+
+    @since('1.2')
+    def column_name_validation_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k text,
+                c int,
+                v timeuuid,
+                PRIMARY KEY (k, c)
+            )
+        """)
+
+        cursor.execute("INSERT INTO test(k, c) VALUES ('', 0)")
+
+        # Insert a value that don't fit 'int'
+        assert_invalid(cursor, "INSERT INTO test(k, c) VALUES (0, 10000000000)")
+
+        # Insert a non-version 1 uuid
+        assert_invalid(cursor, "INSERT INTO test(k, c, v) VALUES (0, 0, 550e8400-e29b-41d4-a716-446655440000)")
