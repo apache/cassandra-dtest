@@ -95,7 +95,7 @@ class TestBatch(Tester):
         """ Test that logged batch throws UAE if there aren't enough live nodes """
         cursor = self.prepare(nodes=3)
         [ node.stop(wait_other_notice=True) for node in self.cluster.nodelist()[1:] ]
-        cursor.consistency_level = 'ANY'
+        cursor.consistency_level = 'ONE'
         assert_unavailable(cursor.execute, """
             BEGIN BATCH
             INSERT INTO users (id, firstname, lastname) VALUES (0, 'Jack', 'Sparrow')

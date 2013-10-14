@@ -232,6 +232,7 @@ class TestConcurrentSchemaChanges(Tester):
                     ('127.0.0.2', 9160),
                     ('127.0.0.2', 7000),
                     '7200',
+                     '0',
                     None)
         cluster.add(node2, False)
 
@@ -256,6 +257,7 @@ class TestConcurrentSchemaChanges(Tester):
                     ('127.0.0.3', 9160),
                     ('127.0.0.3', 7000),
                     '7300',
+                     '0',
                     None)
 
         cluster.add(node3, True)
