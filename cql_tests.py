@@ -174,8 +174,7 @@ class TestCQL(Tester):
         assert res == [[24], [12], [128], [24], [12], [42]], res
 
         # Check we don't allow empty values for url since this is the full underlying cell name (#6152)
-        #assert_invalid(cursor, "INSERT INTO clicks (userid, url, time) VALUES (810e8500-e29b-41d4-a716-446655440000, '', 42)")
-        cursor.execute("INSERT INTO clicks (userid, url, time) VALUES (810e8500-e29b-41d4-a716-446655440000, '', 42)")
+        assert_invalid(cursor, "INSERT INTO clicks (userid, url, time) VALUES (810e8500-e29b-41d4-a716-446655440000, '', 42)")
 
     @since('1.1')
     def dense_cf_test(self):
