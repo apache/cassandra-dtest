@@ -1,16 +1,10 @@
 import time
 import os
-import sys
-import re
 from distutils import dir_util
 import subprocess
-import itertools
-import zlib
 
 from dtest import Tester, debug
 from tools import since
-from ccmlib.cluster import Cluster
-from ccmlib.node import Node
 from ccmlib import common as ccmcommon
 
 class TestSSTableGenerationAndLoading(Tester):
@@ -36,25 +30,22 @@ class TestSSTableGenerationAndLoading(Tester):
 
         cursor = self.cql_connection(node1).cursor()
         self.create_ks(cursor, 'ks', 1)
-        self.create_cf(cursor, 'cf', compression="Deflate", validation='blob', comparator='bigint')
+        self.create_cf(cursor, 'cf', compression="Deflate")
 
         # make unique column names, and values that are incompressible
         rnd = open('/dev/urandom', 'rb')
-        for key in xrange(1):
-            for col in xrange(10):
-                col_name = col
-                col_val = rnd.read(5000)
-                col_val = col_val.encode('hex')
-                cql = u"UPDATE cf SET %d = '%s' WHERE KEY='%s'" % (
-                        col_name,
-                        col_val,
-                        str(key))
-                cursor.execute(cql)
+        for col in xrange(10):
+            col_name = str(col)
+            col_val = rnd.read(5000)
+            col_val = col_val.encode('hex')
+            cql = "UPDATE cf SET v='%s' WHERE KEY='0' AND c='%s'" % (col_val, col_name)
+            # print cql
+            cursor.execute(cql)
         rnd.close()
 
         node1.flush()
         time.sleep(2)
-        cursor.execute("SELECT 1..8 FROM cf ")
+        cursor.execute("SELECT * FROM cf WHERE KEY = '0' AND c < '8'")
         cursor.fetchone()
 
     @since('1.1')
@@ -88,36 +79,41 @@ class TestSSTableGenerationAndLoading(Tester):
                 data_found += 1
         assert data_found > 0, "After removing index, filter, stats, and digest files, the data file was deleted!"
 
-
     @since('1.1')
     def sstableloader_compression_none_to_none_test(self):
         self.load_sstable_with_configuration(None, None)
+
     @since('1.1')
     def sstableloader_compression_none_to_snappy_test(self):
-        self.load_sstable_with_configuration(None, 'SnappyCompressor')
+        self.load_sstable_with_configuration(None, 'Snappy')
+
     @since('1.1')
     def sstableloader_compression_none_to_deflate_test(self):
-        self.load_sstable_with_configuration(None, 'DeflateCompressor')
+        self.load_sstable_with_configuration(None, 'Deflate')
 
     @since('1.1')
     def sstableloader_compression_snappy_to_none_test(self):
-        self.load_sstable_with_configuration('SnappyCompressor', None)
+        self.load_sstable_with_configuration('Snappy', None)
+
     @since('1.1')
     def sstableloader_compression_snappy_to_snappy_test(self):
-        self.load_sstable_with_configuration('SnappyCompressor', 'SnappyCompressor')
+        self.load_sstable_with_configuration('Snappy', 'Snappy')
+
     @since('1.1')
     def sstableloader_compression_snappy_to_deflate_test(self):
-        self.load_sstable_with_configuration('SnappyCompressor', 'DeflateCompressor')
+        self.load_sstable_with_configuration('Snappy', 'Deflate')
 
     @since('1.1')
     def sstableloader_compression_deflate_to_none_test(self):
-        self.load_sstable_with_configuration('DeflateCompressor', None)
+        self.load_sstable_with_configuration('Deflate', None)
+
     @since('1.1')
     def sstableloader_compression_deflate_to_snappy_test(self):
-        self.load_sstable_with_configuration('DeflateCompressor', 'SnappyCompressor')
+        self.load_sstable_with_configuration('Deflate', 'Snappy')
+
     @since('1.1')
     def sstableloader_compression_deflate_to_deflate_test(self):
-        self.load_sstable_with_configuration('DeflateCompressor', 'DeflateCompressor')
+        self.load_sstable_with_configuration('Deflate', 'Deflate')
 
     def load_sstable_with_configuration(self, pre_compression=None, post_compression=None):
         """
@@ -126,25 +122,12 @@ class TestSSTableGenerationAndLoading(Tester):
         can be specified.
 
         pre_compression and post_compression can be these values:
-        None, 'SnappyCompressor', or 'DeflateCompressor'.
+        None, 'Snappy', or 'Deflate'.
         """
         NUM_KEYS = 1000
 
-        def read_and_validate_data():
-            debug("READ")
-            node1.stress(['--operation=READ', '--num-keys=%d'%NUM_KEYS])
-            debug("RANGE_SLICE")
-            node1.stress(['--operation=RANGE_SLICE', '--num-keys=%d'%NUM_KEYS])
-            debug("READ SUPER")
-            node1.stress(['--operation=READ', '--num-keys=%d'%NUM_KEYS, '--family-type=Super'])
-            debug("COUNTER GET")
-            node1.stress(['--operation=COUNTER_GET', '--num-keys=%d'%NUM_KEYS])
-            debug("COUNTER GET SUPER")
-            node1.stress(['--operation=COUNTER_GET', '--num-keys=%d'%NUM_KEYS, '--family-type=Super'])
-            
-
-        assert pre_compression in (None, 'SnappyCompressor', 'DeflateCompressor'), 'Invalid input pre_compression: ' + str(pre_compression)
-        assert post_compression in (None, 'SnappyCompressor', 'DeflateCompressor'), 'Invalid input post_compression: ' + str(post_compression)
+        for compression_option in (pre_compression, post_compression):
+            assert compression_option in (None, 'Snappy', 'Deflate')
 
         debug("Testing sstableloader with pre_compression=%s and post_compression=%s" % (pre_compression, post_compression))
 
@@ -153,17 +136,21 @@ class TestSSTableGenerationAndLoading(Tester):
         [node1, node2] = cluster.nodelist()
         time.sleep(.5)
 
-        compression_str = '--compression='+pre_compression if pre_compression else ''
+        compression = pre_compression or None
+
+        def create_schema(cursor):
+            self.create_ks(cursor, "ks", rf=2)
+            self.create_cf(cursor, "standard1", compression=compression)
+            self.create_cf(cursor, "counter1", compression=compression, columns={'v': 'counter'})
 
         debug("creating keyspace and inserting")
-        # create the keyspace
-        node1.stress(['--replication-factor=2', '--num-keys=1', compression_str])
-        node1.stress(['--num-keys=%d'%NUM_KEYS, compression_str])
-        node1.stress(['--num-keys=%d'%NUM_KEYS, '--family-type=Super', compression_str])
-        node1.stress(['--num-keys=%d'%NUM_KEYS, '--operation=COUNTER_ADD', compression_str])
-        node1.stress(['--num-keys=%d'%NUM_KEYS, '--family-type=Super', '--operation=COUNTER_ADD', compression_str])
-        time.sleep(2)
-        
+        cursor = self.cql_connection(node1).cursor()
+        create_schema(cursor)
+
+        for i in range(NUM_KEYS):
+            cursor.execute("UPDATE standard1 SET v='%d' WHERE KEY='%d' AND c='col'" % (i, i))
+            cursor.execute("UPDATE counter1 SET v=v+1 WHERE KEY='%d'" % i)
+
         node1.nodetool('drain')
         node1.stop()
         node2.nodetool('drain')
@@ -179,24 +166,15 @@ class TestSSTableGenerationAndLoading(Tester):
                 copy_dir = os.path.join(copy_root, ddir)
                 dir_util.copy_tree(keyspace_dir, copy_dir)
 
-
         debug("Wiping out the data and restarting cluster")
         # wipe out the node data.
-        node1.clear()
-        node2.clear()
-        node1.start()
-        node2.start()
-        time.sleep(20) # let gossip figure out what is going on
+        cluster.clear()
+        cluster.start()
+        time.sleep(5) # let gossip figure out what is going on
 
         debug("re-creating the keyspace and column families.")
-        # now re-create the keyspace and column families, but don't insert much data.
-        # we'll want this data to get overwritten.
-        compression_str = '--compression='+post_compression if post_compression else ''
-        node1.stress(['--replication-factor=1', '--num-keys=1', compression_str])
-        node1.stress(['--num-keys=1', compression_str])
-        node1.stress(['--num-keys=1', '--family-type=Super', compression_str])
-        node1.stress(['--num-keys=1', '--operation=COUNTER_ADD', compression_str])
-        node1.stress(['--num-keys=1', '--family-type=Super', '--operation=COUNTER_ADD', compression_str])
+        cursor = self.cql_connection(node1).cursor()
+        create_schema(cursor)
         time.sleep(2)
 
         debug("Calling sstableloader")
@@ -210,12 +188,21 @@ class TestSSTableGenerationAndLoading(Tester):
             if os.path.isdir(full_cf_dir):
                 cmd_args = [sstableloader, '--nodes', host, full_cf_dir]
                 p = subprocess.Popen(cmd_args, env=env)
-                p.wait()
+                exit_status = p.wait()
+                self.assertEqual(0, exit_status,
+                        "sstableloader exited with a non-zero status: %d" % exit_status)
+
+        def read_and_validate_data(cursor):
+            for i in range(NUM_KEYS):
+                cursor.execute("SELECT * FROM standard1 WHERE KEY='%d'" % i)
+                self.assertEquals([str(i), 'col', str(i)], cursor.fetchone())
+                cursor.execute("SELECT * FROM counter1 WHERE KEY='%d'" % i)
+                self.assertEquals([str(i), 1], cursor.fetchone())
 
         debug("Reading data back")
         # Now we should have sstables with the loaded data, and the existing
         # data. Lets read it all to make sure it is all there.
-        read_and_validate_data()
+        read_and_validate_data(cursor)
 
         debug("scrubbing, compacting, and repairing")
         # do some operations and try reading the data again.
@@ -224,4 +211,4 @@ class TestSSTableGenerationAndLoading(Tester):
         node1.nodetool('repair')
 
         debug("Reading data back one more time")
-        read_and_validate_data()
+        read_and_validate_data(cursor)
