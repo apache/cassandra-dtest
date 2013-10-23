@@ -63,8 +63,11 @@ class Tester(TestCase):
             except KeyError:
                 cdir = DEFAULT_DIR
             cluster = Cluster(self.test_path, name, cassandra_dir=cdir)
-        if ENABLE_VNODES and cluster.version() >= "1.2":
-            cluster.set_configuration_options(values={'initial_token': None, 'num_tokens': 256})
+        if cluster.version() >= "1.2":
+            if ENABLE_VNODES:
+                cluster.set_configuration_options(values={'initial_token': None, 'num_tokens': 256})
+            else:
+                cluster.set_configuration_options(values={'num_tokens': None})
         return cluster
 
     def __cleanup_cluster(self):
@@ -206,7 +209,7 @@ class Tester(TestCase):
         cursor.execute('USE %s' % name)
 
     # We default to UTF8Type because it's simpler to use in tests
-    def create_cf(self, cursor, name, key_type="varchar", read_repair=None, compression=None, gc_grace=None, columns=None, validation="UTF8Type"):
+    def create_cf(self, cursor, name, key_type="varchar", speculative_retry=None, read_repair=None, compression=None, gc_grace=None, columns=None, validation="UTF8Type"):
         additional_columns = ""
         if columns is not None:
             for k, v in columns.items():
@@ -228,6 +231,10 @@ class Tester(TestCase):
             query = '%s AND read_repair_chance=%f' % (query, read_repair)
         if gc_grace is not None:
             query = '%s AND gc_grace_seconds=%d' % (query, gc_grace)
+        if self.cluster.version() >= "2.0":
+            if speculative_retry is not None:
+                query = '%s AND speculative_retry=\'%s\'' % (query, speculative_retry)
+
         cursor.execute(query)
         time.sleep(0.2)
 
