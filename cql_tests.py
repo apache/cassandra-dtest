@@ -6,6 +6,7 @@ from cql import ProgrammingError
 from tools import *
 
 import os, sys, time, tools, json, random
+import uuid
 from uuid import UUID
 from ccmlib.cluster import Cluster
 
@@ -3395,3 +3396,61 @@ class TestCQL(Tester):
 
         # Insert a non-version 1 uuid
         assert_invalid(cursor, "INSERT INTO test(k, c, v) VALUES (0, 0, 550e8400-e29b-41d4-a716-446655440000)")
+
+    @since('2.1')
+    def user_types_test(self):
+        cursor = self.prepare()
+
+        userID_1 = uuid.uuid4()
+        stmt = """
+              CREATE TYPE address (
+              street text,
+              city text,
+              zip_code int,
+              phones set<text>
+              )
+           """
+        cursor.execute(stmt)
+
+        stmt = """
+              CREATE TYPE fullname (
+               firstname text,
+               lastname text
+              )
+           """
+        cursor.execute(stmt)
+
+        stmt = """
+              CREATE TABLE users (
+               id uuid PRIMARY KEY,
+               name fullname,
+               addresses map<text, address>
+              )
+           """
+        cursor.execute(stmt)
+
+        stmt = """
+              INSERT INTO users (id, name)
+              VALUES ({id}, {{ firstname: 'Paul', lastname: 'smith'}});
+           """.format(id=userID_1)
+        cursor.execute(stmt)
+
+        stmt = """
+              SELECT name.firstname FROM users WHERE id = {id}
+        """.format(id=userID_1)
+        cursor.execute(stmt)
+        self.assertEqual(['Paul'], cursor.fetchone())
+
+        stmt = """
+              UPDATE users
+              SET addresses = addresses + {{ 'home': {{ street: '...', city: 'SF', zip_code: 94102, phones: {{}} }} }}
+              WHERE id={id};
+           """.format(id=userID_1)
+        cursor.execute(stmt)
+
+        stmt = """
+              SELECT addresses FROM users WHERE id = {id}
+        """.format(id=userID_1)
+        cursor.execute(stmt)
+        res = cursor.fetchone()
+        ## TODO: deserialize the value here and check it's right.
