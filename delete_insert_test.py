@@ -11,8 +11,6 @@ class DeleteInsertTest(Tester):
     """
 
     def __init__(self, *args, **kwargs):
-        # Forcing cluster version on purpose
-        os.environ['CASSANDRA_VERSION'] = '1.2.5'
         Tester.__init__(self, *args, **kwargs)
 
         # Generate 1000 rows in memory so we can re-use the same ones over again:
