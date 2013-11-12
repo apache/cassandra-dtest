@@ -501,6 +501,16 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert len(res) == 3 and res[0][0] == 3 and res[len(res) - 1][0] == 5, res
 
+        # With LIMIT
+        cursor.execute("SELECT v FROM test WHERE k = 0 AND c > 2 AND c <= 6 LIMIT 2")
+        res = cursor.fetchall()
+        assert len(res) == 2 and res[0][0] == 3 and res[len(res) - 1][0] == 4, res
+
+        cursor.execute("SELECT v FROM test WHERE k = 0 AND c >= 2 AND c < 6 ORDER BY c DESC LIMIT 2")
+        res = cursor.fetchall()
+        assert len(res) == 2 and res[0][0] == 5 and res[len(res) - 1][0] == 4, res
+
+
     @since('1.1')
     def in_clause_wide_rows_test(self):
         """ Check IN support for 'wide rows' in SELECT statement """
@@ -1788,7 +1798,6 @@ class TestCQL(Tester):
         cursor.execute(req % (1, 0, 1, 'foo', 'bar2'))
         cursor.execute(req % (2, 1, 0, 'foo', 'baz'))
         cursor.execute(req % (3, 0, 1, 'gux', 'qux'))
-
 
         cursor.execute("SELECT blog_id, content FROM blogs WHERE author='foo'")
         res = cursor.fetchall()
