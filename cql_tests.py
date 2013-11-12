@@ -3463,3 +3463,20 @@ class TestCQL(Tester):
         cursor.execute(stmt)
         res = cursor.fetchone()
         ## TODO: deserialize the value here and check it's right.
+
+
+    @since('1.2')
+    def bug_6327_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k int,
+                v int,
+                PRIMARY KEY (k, v)
+            )
+        """)
+
+        cursor.execute("INSERT INTO test (k, v) VALUES (0, 0)")
+        self.cluster.flush()
+        assert_one(cursor, "SELECT v FROM test WHERE k=0 AND v IN (1, 0)", [0])
