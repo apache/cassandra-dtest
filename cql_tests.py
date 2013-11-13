@@ -3480,3 +3480,35 @@ class TestCQL(Tester):
         cursor.execute("INSERT INTO test (k, v) VALUES (0, 0)")
         self.cluster.flush()
         assert_one(cursor, "SELECT v FROM test WHERE k=0 AND v IN (1, 0)", [0])
+
+    @since('1.2')
+    def large_count_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k int,
+                v int,
+                PRIMARY KEY (k)
+            )
+        """)
+
+        # We know we page at 10K, so test counting just before, at 10K, just after and
+        # a bit after that.
+        for k in range(1, 10000):
+            cursor.execute("INSERT INTO test(k) VALUES (%d)" % k)
+
+        assert_one(cursor, "SELECT COUNT(*) FROM test", [9999])
+
+        cursor.execute("INSERT INTO test(k) VALUES (%d)" % 10000)
+
+        assert_one(cursor, "SELECT COUNT(*) FROM test", [10000])
+
+        cursor.execute("INSERT INTO test(k) VALUES (%d)" % 10001)
+
+        assert_one(cursor, "SELECT COUNT(*) FROM test", [10001])
+
+        for k in range(10002, 15001):
+            cursor.execute("INSERT INTO test(k) VALUES (%d)" % k)
+
+        assert_one(cursor, "SELECT COUNT(*) FROM test", [15000])
