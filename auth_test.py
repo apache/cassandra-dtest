@@ -3,11 +3,9 @@ import time
 from cql import ProgrammingError
 from cql.cassandra.ttypes import AuthenticationException
 from dtest import Tester
-from tools import since
 
 class TestAuth(Tester):
 
-    @since('1.2')
     def system_auth_ks_is_alterable_test(self):
         self.cluster.populate(3).start()
 
@@ -35,7 +33,6 @@ class TestAuth(Tester):
             row = cursor.fetchone()
             self.assertEqual('{"replication_factor":"3"}', row[0])
 
-    @since('1.2')
     def login_test(self):
         # also tests default user creation (cassandra/cassandra)
         self.prepare()
@@ -45,7 +42,6 @@ class TestAuth(Tester):
         with self.assertRaises(AuthenticationException):
             self.get_cursor(user='doesntexist', password='doesntmatter')
 
-    @since('1.2')
     def only_superuser_can_create_users_test(self):
         self.prepare()
 
@@ -58,7 +54,6 @@ class TestAuth(Tester):
         self.assertEqual('Bad Request: Only superusers are allowed to perfrom CREATE USER queries',
                          cm.exception.message)
 
-    @since('1.2')
     def password_authenticator_create_user_requires_password_test(self):
         self.prepare()
 
@@ -68,7 +63,6 @@ class TestAuth(Tester):
         self.assertEqual('Bad Request: PasswordAuthenticator requires PASSWORD option',
                          cm.exception.message)
 
-    @since('1.2')
     def cant_create_existing_user_test(self):
         self.prepare()
 
@@ -79,7 +73,6 @@ class TestAuth(Tester):
         self.assertEqual('Bad Request: User james@example.com already exists',
                          cm.exception.message)
 
-    @since('1.2')
     def list_users_test(self):
         self.prepare()
 
@@ -101,7 +94,6 @@ class TestAuth(Tester):
         self.assertFalse(users['cathy'])
         self.assertTrue(users['dave'])
 
-    @since('1.2')
     def user_cant_drop_themselves_test(self):
         self.prepare()
 
@@ -109,7 +101,6 @@ class TestAuth(Tester):
         self.assertUnauthorized("Users aren't allowed to DROP themselves",
                                 cursor, "DROP USER cassandra")
 
-    @since('1.2')
     def only_superusers_can_drop_users_test(self):
         self.prepare()
 
@@ -130,7 +121,6 @@ class TestAuth(Tester):
         cassandra.execute("LIST USERS")
         self.assertEqual(2, cassandra.rowcount)
 
-    @since('1.2')
     def dropping_nonexistent_user_throws_exception_test(self):
         self.prepare()
 
@@ -138,7 +128,6 @@ class TestAuth(Tester):
         self.assertUnauthorized("User nonexistent doesn't exist",
                                 cursor, 'DROP USER nonexistent')
 
-    @since('1.2')
     def regular_users_can_alter_their_passwords_only_test(self):
         self.prepare()
 
@@ -152,7 +141,6 @@ class TestAuth(Tester):
         self.assertUnauthorized("You aren't allowed to alter this user",
                                 cathy, "ALTER USER bob WITH PASSWORD 'cantchangeit'")
 
-    @since('1.2')
     def users_cant_alter_their_superuser_status_test(self):
         self.prepare()
 
@@ -160,7 +148,6 @@ class TestAuth(Tester):
         self.assertUnauthorized("You aren't allowed to alter your own superuser status",
                                 cursor, "ALTER USER cassandra NOSUPERUSER")
 
-    @since('1.2')
     def only_superuser_alters_superuser_status_test(self):
         self.prepare()
 
@@ -173,7 +160,6 @@ class TestAuth(Tester):
 
         cassandra.execute("ALTER USER cathy SUPERUSER")
 
-    @since('1.2')
     def altering_nonexistent_user_throws_exception_test(self):
         self.prepare()
 
@@ -181,7 +167,6 @@ class TestAuth(Tester):
         self.assertUnauthorized("User nonexistent doesn't exist",
                                 cursor, "ALTER USER nonexistent WITH PASSWORD 'doesn''tmatter'")
 
-    @since('1.2')
     def create_ks_auth_test(self):
         self.prepare()
 
@@ -196,7 +181,6 @@ class TestAuth(Tester):
         cassandra.execute("GRANT CREATE ON ALL KEYSPACES TO cathy")
         cathy.execute("""CREATE KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor':1}""")
 
-    @since('1.2')
     def create_cf_auth_test(self):
         self.prepare()
 
@@ -211,7 +195,6 @@ class TestAuth(Tester):
         cassandra.execute("GRANT CREATE ON KEYSPACE ks TO cathy")
         cathy.execute("CREATE TABLE ks.cf (id int primary key)")
 
-    @since('1.2')
     def alter_ks_auth_test(self):
         self.prepare()
 
@@ -227,7 +210,6 @@ class TestAuth(Tester):
         cassandra.execute("GRANT ALTER ON KEYSPACE ks TO cathy")
         cathy.execute("ALTER KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor':2}")
 
-    @since('1.2')
     def alter_cf_auth_test(self):
         self.prepare()
 
@@ -259,7 +241,6 @@ class TestAuth(Tester):
         cassandra.execute("GRANT ALTER ON ks.cf TO cathy")
         cathy.execute("DROP INDEX cf_val_idx")
 
-    @since('1.2')
     def drop_ks_auth_test(self):
         self.prepare()
 
@@ -274,7 +255,6 @@ class TestAuth(Tester):
         cassandra.execute("GRANT DROP ON KEYSPACE ks TO cathy")
         cathy.execute("DROP KEYSPACE ks")
 
-    @since('1.2')
     def drop_cf_auth_test(self):
         self.prepare()
 
@@ -290,7 +270,6 @@ class TestAuth(Tester):
         cassandra.execute("GRANT DROP ON ks.cf TO cathy")
         cathy.execute("DROP TABLE ks.cf")
 
-    @since('1.2')
     def modify_and_select_auth_test(self):
         self.prepare()
 
@@ -332,7 +311,6 @@ class TestAuth(Tester):
         cathy.execute("TRUNCATE ks.cf")
         self.assertEquals(0, cathy.rowcount)
 
-    @since('1.2')
     def grant_revoke_auth_test(self):
         self.prepare()
 
@@ -356,7 +334,6 @@ class TestAuth(Tester):
         # should succeed now with both SELECT and AUTHORIZE
         cathy.execute("GRANT SELECT ON ALL KEYSPACES TO bob")
 
-    @since('1.2')
     def grant_revoke_validation_test(self):
         self.prepare()
 
@@ -376,7 +353,6 @@ class TestAuth(Tester):
         self.assertUnauthorized("User nonexistent doesn't exist",
                                 cassandra, "REVOKE ALL ON KEYSPACE ks FROM nonexistent")
 
-    @since('1.2')
     def grant_revoke_cleanup_test(self):
         self.prepare()
 
@@ -418,7 +394,6 @@ class TestAuth(Tester):
         self.assertUnauthorized("User cathy has no SELECT permission on <table ks.cf> or any of its parents",
                                 cathy, "SELECT * FROM ks.cf")
 
-    @since('1.2')
     def permissions_caching_test(self):
         self.prepare(permissions_expiry=2000)
 
@@ -449,7 +424,6 @@ class TestAuth(Tester):
             c.execute("SELECT * FROM ks.cf")
             self.assertEqual(0, c.rowcount)
 
-    @since('1.2')
     def list_permissions_test(self):
         self.prepare()
 

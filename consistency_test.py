@@ -1,7 +1,9 @@
-from time import sleep
+import time
+
 from dtest import Tester, debug, ENABLE_VNODES
-from assertions import *
-from tools import *
+from assertions import assert_unavailable
+from tools import (create_c1c2_table, insert_c1c2, query_c1c2, retry_till_success,
+                   insert_columns)
 
 class TestConsistency(Tester):
 
@@ -126,7 +128,6 @@ class TestConsistency(Tester):
         node3.stop(wait_other_notice=True)
         assert_unavailable(insert_c1c2, cursor1, 100, "ALL")
 
-    @since('1.2')
     def short_read_test(self):
         cluster = self.cluster
 

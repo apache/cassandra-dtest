@@ -4,9 +4,7 @@ import pprint
 from threading import Thread
 
 from dtest import Tester, debug
-from ccmlib.cluster import Cluster
 from ccmlib.node import Node
-from tools import since
 
 import cql
 
@@ -267,7 +265,6 @@ class TestConcurrentSchemaChanges(Tester):
         self.validate_schema_consistent(node1)
 
 
-    @since('1.1')
     def snapshot_test(self):
         debug("snapshot_test()")
         cluster = self.cluster
@@ -316,7 +313,6 @@ class TestConcurrentSchemaChanges(Tester):
 
 
 
-    @since('1.1')
     def load_test(self):
         """
         apply schema changes while the cluster is under load.

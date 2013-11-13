@@ -32,7 +32,6 @@ class TestCQL(Tester):
             self.create_ks(cursor, 'ks', rf)
         return cursor
 
-    @since('1.1')
     def static_cf_test(self):
         """ Test static CF syntax """
         cursor = self.prepare()
@@ -84,7 +83,6 @@ class TestCQL(Tester):
             [ UUID('550e8400-e29b-41d4-a716-446655440000'), 36, None, None ],
         ], res
 
-    @since('1.2')
     def noncomposite_static_cf_test(self):
         """ Test non-composite static CF syntax """
         cursor = self.prepare()
@@ -136,7 +134,6 @@ class TestCQL(Tester):
             [ UUID('550e8400-e29b-41d4-a716-446655440000'), 36, None, None ],
         ], res
 
-    @since('1.1')
     def dynamic_cf_test(self):
         """ Test non-composite dynamic CF syntax """
         cursor = self.prepare()
@@ -177,7 +174,6 @@ class TestCQL(Tester):
         # Check we don't allow empty values for url since this is the full underlying cell name (#6152)
         assert_invalid(cursor, "INSERT INTO clicks (userid, url, time) VALUES (810e8500-e29b-41d4-a716-446655440000, '', 42)")
 
-    @since('1.1')
     def dense_cf_test(self):
         """ Test composite 'dense' CF syntax """
         cursor = self.prepare()
@@ -226,7 +222,6 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert len(res) == 0, res
 
-    @since('1.1')
     def sparse_cf_test(self):
         """ Test composite 'sparse' CF syntax """
         cursor = self.prepare()
@@ -268,7 +263,6 @@ class TestCQL(Tester):
             [ 30, 'Yet one more message', None ]
         ], res
 
-    @since('1.1')
     def create_invalid_test(self):
         """ Check invalid CREATE TABLE requests """
 
@@ -285,7 +279,6 @@ class TestCQL(Tester):
 
         assert_invalid(cursor, "CREATE TABLE test (key text, key2 text, c int, d text, PRIMARY KEY (key, key2)) WITH COMPACT STORAGE")
 
-    @since('1.1')
     def limit_ranges_test(self):
         """ Validate LIMIT option for 'range queries' in SELECT statements """
         cursor = self.prepare(ordered=True)
@@ -313,7 +306,6 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[ 3, 'http://foo.com', 42 ]], res
 
-    @since('1.1')
     def limit_multiget_test(self):
         """ Validate LIMIT option for 'multiget' in SELECT statements """
         cursor = self.prepare()
@@ -338,7 +330,6 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[ 48, 'http://foo.com', 42 ]], res
 
-    @since('1.1')
     def limit_sparse_test(self):
         """ Validate LIMIT option for sparse table in SELECT statements """
         cursor = self.prepare()
@@ -365,7 +356,6 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert len(res) == 4, res
 
-    @since('1.1')
     def counters_test(self):
         """ Validate counter support """
         cursor = self.prepare()
@@ -399,7 +389,6 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[ -4 ]], res
 
-    @since('1.2')
     def indexed_with_eq_test(self):
         """ Check that you can query for an indexed column even with a key EQ clause """
         cursor = self.prepare()
@@ -429,7 +418,6 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[ 'Samwise' ]], res
 
-    @since('1.1')
     def select_key_in_test(self):
         """ Query for KEY IN (...) """
         cursor = self.prepare()
@@ -463,7 +451,6 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert len(res) == 2, res
 
-    @since('1.1')
     def exclusive_slice_test(self):
         """ Test SELECT respects inclusive and exclusive bounds """
         cursor = self.prepare()
@@ -511,8 +498,6 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert len(res) == 2 and res[0][0] == 5 and res[len(res) - 1][0] == 4, res
 
-
-    @since('1.1')
     def in_clause_wide_rows_test(self):
         """ Check IN support for 'wide rows' in SELECT statement """
         cursor = self.prepare()
@@ -556,7 +541,6 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[5], [2], [8]], res
 
-    @since('1.1')
     def order_by_test(self):
         """ Check ORDER BY support in SELECT statement """
         cursor = self.prepare()
@@ -607,7 +591,6 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[x] for x in range(0, 8)], res
 
-    @since('1.1')
     def more_order_by_test(self):
         """ More ORDER BY checks (#4160) """
         cursor = self.prepare()
@@ -650,7 +633,6 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[3], [2], [1]], res
 
-    @since('1.1')
     def order_by_validation_test(self):
         """ Check we don't allow order by on row key (#4246) """
         cursor = self.prepare()
@@ -671,7 +653,6 @@ class TestCQL(Tester):
 
         assert_invalid(cursor, "SELECT * FROM test ORDER BY k2")
 
-    @since('1.1.3')
     def order_by_with_in_test(self):
         """ Check that order-by works with IN (#4327) """
         cursor = self.prepare()
@@ -694,7 +675,6 @@ class TestCQL(Tester):
         assert res == [[1], [2], [3]], res
 
 
-    @since('1.1')
     def reversed_comparator_test(self):
         cursor = self.prepare()
 
@@ -751,7 +731,6 @@ class TestCQL(Tester):
 
         assert_invalid(cursor, "SELECT c1, c2, v FROM test2 WHERE k = 0 ORDER BY c2 DESC, c1 ASC")
 
-    @since('1.1')
     def invalid_old_property_test(self):
         """ Check obsolete properties from CQL2 are rejected """
         cursor = self.prepare()
@@ -761,7 +740,6 @@ class TestCQL(Tester):
         cursor.execute("CREATE TABLE test (foo text PRIMARY KEY, c int)")
         assert_invalid(cursor, "ALTER TABLE test WITH default_validation=int;")
 
-    @since('1.2')
     def null_support_test(self):
         """ Test support for nulls """
         cursor = self.prepare()
@@ -796,7 +774,6 @@ class TestCQL(Tester):
         assert_invalid(cursor, "INSERT INTO test (k, c, v2) VALUES (0, 0, { 'foo', 'bar', null })")
 
 
-    @since('1.2')
     def nameless_index_test(self):
         """ Test CREATE INDEX without name and validate the index can be dropped """
         cursor = self.prepare()
@@ -822,7 +799,6 @@ class TestCQL(Tester):
 
         assert_invalid(cursor, "SELECT id FROM users WHERE birth_year = 42")
 
-    @since('1.1')
     def deletion_test(self):
         """ Test simple deletion and in particular check for #4193 bug """
 
@@ -879,7 +855,6 @@ class TestCQL(Tester):
         if self.cluster.version() < "1.2":
             assert_invalid(cursor, "DELETE FROM testcf2 WHERE username='abc' AND id=2")
 
-    @since('1.1')
     def count_test(self):
         cursor = self.prepare()
 
@@ -911,7 +886,6 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[2]], res
 
-    @since('1.1')
     def reserved_keyword_test(self):
         cursor = self.prepare()
 
@@ -924,7 +898,6 @@ class TestCQL(Tester):
 
         assert_invalid(cursor, "CREATE TABLE test2 ( select text PRIMARY KEY, x int)")
 
-    @since('1.1')
     def identifier_test(self):
         cursor = self.prepare()
 
@@ -938,7 +911,6 @@ class TestCQL(Tester):
         # Reserved keywords
         assert_invalid(cursor, "CREATE TABLE test1 (select int PRIMARY KEY, column int)")
 
-    @since('1.2')
     def keyspace_test(self):
         cursor = self.prepare()
 
@@ -950,7 +922,6 @@ class TestCQL(Tester):
         assert_invalid(cursor, "DROP KEYSPACE non_existing")
         cursor.execute("CREATE KEYSPACE test2 WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 }")
 
-    @since('1.1')
     def table_test(self):
         cursor = self.prepare()
 
@@ -997,7 +968,6 @@ class TestCQL(Tester):
             )
         """)
 
-    @since('1.1')
     def batch_test(self):
         cursor = self.prepare()
 
@@ -1028,7 +998,6 @@ class TestCQL(Tester):
                 APPLY BATCH;
             """)
 
-    @since('1.2')
     def token_range_test(self):
         cursor = self.prepare()
 
@@ -1063,7 +1032,6 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [ [inOrder[x]] for x in range(32, 65) ], "%s [all: %s]" % (str(res), str(inOrder))
 
-    @since('1.2')
     def table_options_test(self):
         cursor = self.prepare()
 
@@ -1095,7 +1063,6 @@ class TestCQL(Tester):
              AND caching = 'rows_only'
         """)
 
-    @since('1.1')
     def timestamp_and_ttl_test(self):
         cursor = self.prepare()
 
@@ -1126,7 +1093,6 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[1, None, None]]
 
-    @since('1.2')
     def no_range_ghost_test(self):
         cursor = self.prepare()
 
@@ -1178,7 +1144,6 @@ class TestCQL(Tester):
         assert res == [], res
 
 
-    @since('1.1')
     def undefined_column_handling_test(self):
         cursor = self.prepare(ordered=True)
 
@@ -1202,7 +1167,6 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[None]], res
 
-    @since('1.2')
     def range_tombstones_test(self):
         """ Test deletion by 'composite prefix' (range tombstones) """
         cluster = self.cluster
@@ -1258,7 +1222,6 @@ class TestCQL(Tester):
             res = cursor.fetchall()
             assert res == [[x, x] for x in xrange(i * cpr + col1, (i + 1) * cpr)], res
 
-    @since('1.2')
     def range_tombstones_compaction_test(self):
         """ Test deletion by 'composite prefix' (range tombstones) with compaction """
         cursor = self.prepare()
@@ -1289,7 +1252,6 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [ ['%i%i' % (c1, c2)] for c1 in xrange(0, 4) for c2 in xrange(0, 2) if c1 != 1], res
 
-    @since('1.2')
     def delete_row_test(self):
         """ Test deletion of rows """
         cursor = self.prepare()
@@ -1316,7 +1278,6 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert len(res) == 3, res
 
-    @since('1.2')
     def range_query_2ndary_test(self):
         """ Test range queries with 2ndary indexes (#4257) """
         cursor = self.prepare()
@@ -1335,7 +1296,6 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[0, 0, 0]], res
 
-    @since('1.1')
     def compression_option_validation_test(self):
         """ Check for unknown compression parameters options (#4266) """
         cursor = self.prepare()
@@ -1351,7 +1311,6 @@ class TestCQL(Tester):
               WITH compression = { 'sstable_compressor' : 'DeflateCompressor' };
             """)
 
-    @since('1.1')
     def keyspace_creation_options_test(self):
         """ Check one can use arbitrary name for datacenter when creating keyspace (#4278) """
         cursor = self.prepare()
@@ -1372,7 +1331,6 @@ class TestCQL(Tester):
                      AND strategy_options:"us-west"=1;
             """)
 
-    @since('1.2')
     def set_test(self):
         cursor = self.prepare()
 
@@ -1420,7 +1378,6 @@ class TestCQL(Tester):
         assert res == [[None]], re
 
 
-    @since('1.2')
     def map_test(self):
         cursor = self.prepare()
 
@@ -1463,7 +1420,6 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[ None ]], res
 
-    @since('1.2')
     def list_test(self):
         cursor = self.prepare()
 
@@ -1512,7 +1468,6 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[ ('n', 'm', 'c', 'c') ]], res
 
-    @since('1.2')
     def multi_collection_test(self):
         cursor = self.prepare()
 
@@ -1540,7 +1495,6 @@ class TestCQL(Tester):
             set([1, 3, 5, 7, 11, 13]),
         ]], res
 
-    @since('1.1')
     def range_query_test(self):
         """ Range test query from #4372 """
         cursor = self.prepare()
@@ -1557,7 +1511,6 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[1, 1, 1, 1, 2, u'2'], [1, 1, 1, 1, 3, u'3'], [1, 1, 1, 1, 5, u'5']], res
 
-    @since('1.1.2')
     def update_type_test(self):
         """ Test altering the type of a column, including the one in the primary key (#4041) """
         cursor = self.prepare()
@@ -1596,7 +1549,6 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [['ɸ', 'ɸ', 'ɸ']], res
 
-    @since('1.2')
     def composite_row_key_test(self):
         cursor = self.prepare()
 
@@ -1633,7 +1585,6 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[0, 2, 2, 2], [0, 3, 3, 3], [0, 0, 0, 0], [0, 1, 1, 1]], res
 
-    @since('1.2')
     def cql3_insert_thrift_test(self):
         """ Check that we can insert from thrift into a CQL3 table (#4377) """
         cursor = self.prepare()
@@ -1656,7 +1607,6 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [ [2, 4, 200] ], res
 
-    @since('1.2')
     def row_existence_test(self):
         """ Check the semantic of CQL row existence (part of #4361) """
         cursor = self.prepare()
@@ -1699,7 +1649,6 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[2, 2, None, None]], res
 
-    @since('1.2')
     def only_pk_test(self):
         """ Check table with only a PK (#4361) """
         cursor = self.prepare(ordered=True)
@@ -1739,7 +1688,6 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[x, y] for x in range(0, 2) for y in range(0, 2)], res
 
-    @since('1.2')
     def date_test(self):
         """ Check dates are correctly recognized and validated """
         cursor = self.prepare()
@@ -1754,7 +1702,6 @@ class TestCQL(Tester):
         cursor.execute("INSERT INTO test (k, t) VALUES (0, '2011-02-03')")
         assert_invalid(cursor, "INSERT INTO test (k, t) VALUES (0, '2011-42-42')")
 
-    @since('1.1')
     def range_slice_test(self):
         """ Test a regression from #1337 """
 
@@ -1782,7 +1729,6 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert len(res) == 2, res
 
-    @since('1.2')
     def composite_index_with_pk_test(self):
 
         cursor = self.prepare(ordered=True)
@@ -1831,7 +1777,6 @@ class TestCQL(Tester):
 
         assert_invalid(cursor, "SELECT content FROM blogs WHERE time2 >= 0 AND author='foo'")
 
-    @since('1.2')
     def limit_bugs_test(self):
         """ Test for LIMIT bugs from 4579 """
 
@@ -1901,7 +1846,6 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[1, 1, 1], [2, 2, 2], [3, 3, 3], [4, 4, 4]], res
 
-    @since('1.1')
     def bug_4532_test(self):
 
         cursor = self.prepare()
@@ -1925,7 +1869,6 @@ class TestCQL(Tester):
         assert_invalid(cursor, "SELECT * FROM compositetest WHERE ctime>=12345679 AND key='key3' AND ctime<=12345680 LIMIT 3;")
         assert_invalid(cursor, "SELECT * FROM compositetest WHERE ctime=12345679  AND key='key3' AND ctime<=12345680 LIMIT 3")
 
-    @since('1.1')
     def order_by_multikey_test(self):
         """ Test for #4612 bug and more generaly order by when multiple C* rows are queried """
 
@@ -1956,7 +1899,6 @@ class TestCQL(Tester):
         assert_invalid(cursor, "SELECT col1 FROM test ORDER BY col1;")
         assert_invalid(cursor, "SELECT col1 FROM test WHERE my_id > 'key1' ORDER BY col1;")
 
-    @since('1.2')
     def create_alter_options_test(self):
         cursor = self.prepare(create_keyspace=False)
 
@@ -1987,7 +1929,6 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [ ['cf1', 7] ], res
 
-    @since('1.1')
     def remove_range_slice_test(self):
         cursor = self.prepare()
 
@@ -2006,7 +1947,6 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[0, 0], [2, 2]], res
 
-    @since('1.2')
     def indexes_composite_test(self):
         cursor = self.prepare()
 
@@ -2049,7 +1989,6 @@ class TestCQL(Tester):
         assert res == [[1, 0], [1, 3], [0, 0]], res
 
 
-    @since('1.1')
     def refuse_in_with_indexes_test(self):
         """ Test for the validation bug of #4709 """
 
@@ -2065,14 +2004,12 @@ class TestCQL(Tester):
         cursor.execute("insert into t1  (pk, col1, col2) values ('pk3','foo3','bar3');")
         assert_invalid(cursor, "select * from t1 where col2 in ('bar1', 'bar2');")
 
-    @since('1.2')
     def validate_counter_regular_test(self):
         """ Test for the validation bug of #4706 """
 
         cursor = self.prepare()
         assert_invalid(cursor, "CREATE TABLE test (id bigint PRIMARY KEY, count counter, things set<text>)")
 
-    @since('1.1')
     def reversed_compact_test(self):
         """ Test for #4716 bug and more generally for good behavior of ordering"""
 
@@ -2150,7 +2087,6 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[6], [5], [4], [3], [2]], res
 
-    @since('1.1')
     def unescaped_string_test(self):
 
         cursor = self.prepare()
@@ -2163,7 +2099,6 @@ class TestCQL(Tester):
 
         assert_invalid(cursor, "INSERT INTO test (k, c) VALUES ('foo', 'CQL is cassandra's best friend')")
 
-    @since('1.1')
     def reversed_compact_multikey_test(self):
         """ Test for the bug from #4760 and #4759 """
 
@@ -2257,7 +2192,6 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[1, 2], [1, 1], [1, 0], [0, 2], [0, 1], [0, 0]], res
 
-    @since('1.2')
     def collection_and_regular_test(self):
 
         cursor = self.prepare()
@@ -2276,7 +2210,6 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[(1, 1, 2), 42]], res
 
-    @since('1.2')
     def batch_and_list_test(self):
         cursor = self.prepare()
 
@@ -2311,7 +2244,6 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[(3, 2, 1)]], res
 
-    @since('1.2')
     def boolean_test(self):
         cursor = self.prepare()
 
@@ -2327,7 +2259,6 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[True, False]], res
 
-    @since('1.2')
     def multiordering_test(self):
         cursor = self.prepare()
         cursor.execute("""
@@ -2359,7 +2290,6 @@ class TestCQL(Tester):
         assert_invalid(cursor, "SELECT c1, c2 FROM test WHERE k = 'foo' ORDER BY c2 ASC")
         assert_invalid(cursor, "SELECT c1, c2 FROM test WHERE k = 'foo' ORDER BY c1 ASC, c2 ASC")
 
-    @since('1.2')
     def multiordering_validation_test(self):
         cursor = self.prepare()
 
@@ -2370,7 +2300,6 @@ class TestCQL(Tester):
         cursor.execute("CREATE TABLE test1 (k int, c1 int, c2 int, PRIMARY KEY (k, c1, c2)) WITH CLUSTERING ORDER BY (c1 DESC, c2 DESC)")
         cursor.execute("CREATE TABLE test2 (k int, c1 int, c2 int, PRIMARY KEY (k, c1, c2)) WITH CLUSTERING ORDER BY (c1 ASC, c2 DESC)")
 
-    @since('1.2')
     def bug_4882_test(self):
         cursor = self.prepare()
 
@@ -2393,7 +2322,6 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[0, 0, 2, 2]], res
 
-    @since("1.2")
     def multi_list_set_test(self):
         cursor = self.prepare()
 
@@ -2412,7 +2340,6 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[(1, 24, 3), (4, 42, 6)]], res
 
-    @since("1.2")
     def buggy_prepare(self):
         cursor = self.prepare()
 
@@ -2427,7 +2354,6 @@ class TestCQL(Tester):
         p = query.prepare_query("INSERT INTO test (k, l) VALUES (0, [?, ?])")
         print p
 
-    @since("1.2")
     def composite_index_collections_test(self):
         cursor = self.prepare(ordered=True)
         cursor.execute("""
@@ -2479,7 +2405,6 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [], res
 
-    @since('1.2')
     def allow_filtering_test(self):
         cursor = self.prepare()
 
@@ -2537,7 +2462,6 @@ class TestCQL(Tester):
             assert_invalid(cursor, q)
             cursor.execute(q + " ALLOW FILTERING")
 
-    @since('1.2')
     def range_with_deletes_test(self):
         cursor = self.prepare()
 
@@ -2561,7 +2485,6 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert len(res) == nb_keys/2, "Expected %d but got %d" % (nb_keys/2, len(res))
 
-    @since('1.2')
     def alter_with_collections_test(self):
         """ Test you can add columns in a table with collections (#4982 bug) """
         cursor = self.prepare()
@@ -2570,7 +2493,6 @@ class TestCQL(Tester):
         cursor.execute("ALTER TABLE collections ADD c text")
         cursor.execute("ALTER TABLE collections ADD alist list<text>")
 
-    @since('1.2')
     def collection_compact_test(self):
         cursor = self.prepare()
 
@@ -2581,7 +2503,6 @@ class TestCQL(Tester):
             ) WITH COMPACT STORAGE;
         """)
 
-    @since('1.2')
     def collection_function_test(self):
         cursor = self.prepare()
 
@@ -2595,7 +2516,6 @@ class TestCQL(Tester):
         assert_invalid(cursor, "SELECT ttl(l) FROM test WHERE k = 0")
         assert_invalid(cursor, "SELECT writetime(l) FROM test WHERE k = 0")
 
-    @since('1.2')
     def collection_counter_test(self):
         cursor = self.prepare()
 
@@ -2620,7 +2540,6 @@ class TestCQL(Tester):
             )
         """)
 
-    @since('1.2')
     def composite_partition_key_validation_test(self):
         """ Test for bug from #5122 """
         cursor = self.prepare()
@@ -2794,7 +2713,6 @@ class TestCQL(Tester):
         cursor.execute("SELECT t FROM test WHERE k = 0 AND t > maxTimeuuid(1234567) AND t < minTimeuuid('2012-11-07 18:18:22-0800')")
         # not sure what to check exactly so just checking the query returns
 
-    @since('1.2')
     def float_with_exponent_test(self):
         cursor = self.prepare()
 
@@ -2810,7 +2728,6 @@ class TestCQL(Tester):
         cursor.execute("INSERT INTO test(k, d, f) VALUES (1, 3.E10, -23.44E-3)")
         cursor.execute("INSERT INTO test(k, d, f) VALUES (2, 3, -2)")
 
-    @since('1.2')
     def compact_metadata_test(self):
         """ Test regression from #5189 """
         cursor = self.prepare()
@@ -2903,7 +2820,6 @@ class TestCQL(Tester):
         cursor.execute("SELECT value FROM indexed WHERE pk0 = 5 AND pk1 = 0 AND ck0 = 1 AND ck2 = 3 ALLOW FILTERING")
         self.assertEqual([[4]], cursor.fetchall())
 
-    @since('1.2')
     def bug_5240_test(self):
         cursor = self.prepare()
 
@@ -2932,7 +2848,6 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [['t', 1, 4, 3]], res
 
-    @since('1.2')
     def ticket_5230_test(self):
         cursor = self.prepare()
 
@@ -2953,7 +2868,6 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [['1'], ['2']], res
 
-    @since('1.2')
     def conversion_functions_test(self):
         cursor = self.prepare()
 
@@ -2970,7 +2884,6 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[3, 'foobar']], res
 
-    @since('1.2')
     def alter_bug_test(self):
         """ Test for bug of 5232 """
         cursor = self.prepare()
@@ -2992,7 +2905,6 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[1, None, None, '111']], res
 
-    @since('1.2')
     def bug_5376(self):
         cursor = self.prepare()
 
@@ -3008,7 +2920,6 @@ class TestCQL(Tester):
 
         assert_invalid(cursor, "select * from test where key = 'foo' and c in (1,3,4);")
 
-    @since('1.2')
     def function_and_reverse_type_test(self):
         """ Test for #5386 """
 
@@ -3024,7 +2935,6 @@ class TestCQL(Tester):
 
         cursor.execute("INSERT INTO test (k, c, v) VALUES (0, now(), 0);")
 
-    @since('1.2')
     def bug_5404(self):
         cursor = self.prepare()
 
@@ -3032,7 +2942,6 @@ class TestCQL(Tester):
         # We just want to make sure this doesn't NPE server side
         assert_invalid(cursor, "select * from test where token(key) > token(int(3030343330393233)) limit 1;")
 
-    @since('1.2')
     def empty_blob_test(self):
         cursor = self.prepare()
 
@@ -3057,7 +2966,6 @@ class TestCQL(Tester):
         cursor.execute("ALTER TABLE test RENAME column1 TO foo1 AND column2 TO foo2 AND column3 TO foo3")
         assert_one(cursor, "SELECT foo1, foo2, foo3 FROM test", [4, 3, 2])
 
-    @since('1.2')
     def clustering_order_and_functions_test(self):
         cursor = self.prepare()
 
@@ -3137,7 +3045,6 @@ class TestCQL(Tester):
         assert_none(cursor, "SELECT * FROM test")
 
 
-    @since('1.2')
     def range_key_ordered_test(self):
         cursor = self.prepare(ordered=True)
 
@@ -3195,7 +3102,6 @@ class TestCQL(Tester):
         self.assertEqual("Bad Request: Aliases are not allowed in order by clause ('user_name')",
                          cm.exception.message)
 
-    @since('1.2')
     def nonpure_function_collection_test(self):
         """ Test for bug #5795 """
 
@@ -3205,7 +3111,6 @@ class TestCQL(Tester):
         # we just want to make sure this doesn't throw
         cursor.execute("INSERT INTO test(k, v) VALUES (0, [now()])")
 
-    @since('1.2')
     def empty_in_test(self):
         cursor = self.prepare()
         cursor.execute("CREATE TABLE test (k1 int, k2 int, v int, PRIMARY KEY (k1, k2))")
@@ -3251,7 +3156,6 @@ class TestCQL(Tester):
         assert_nothing_changed("test_compact")
 
 
-    @since('1.2')
     def collection_flush_test(self):
         """ Test for 5805 bug """
         cursor = self.prepare()
@@ -3318,7 +3222,6 @@ class TestCQL(Tester):
         self.assertEqual('Bad Request: SELECT DISTINCT queries must only request partition key columns (not ck0)',
                          cm.exception.message)
 
-    @since('1.2')
     def function_with_null_test(self):
         cursor = self.prepare()
 
@@ -3344,7 +3247,6 @@ class TestCQL(Tester):
             assert_one(cursor, "UPDATE tkns SET consumed = TRUE WHERE tkn = %i IF consumed = FALSE;" % i, [False, True], cl='QUORUM')
 
 
-    @since('1.2')
     def bug_6050_test(self):
         cursor = self.prepare()
 
@@ -3373,7 +3275,6 @@ class TestCQL(Tester):
         assert_one(cursor, "INSERT INTO test(k, s) VALUES (0, {1, 2, 3}) IF NOT EXISTS", [True])
         assert_one(cursor, "SELECT * FROM test", [0, {1, 2, 3}])
 
-    @since('1.2')
     def bug_6115_test(self):
         cursor = self.prepare()
 
@@ -3384,13 +3285,11 @@ class TestCQL(Tester):
 
         assert_one(cursor, "SELECT * FROM test", [0, 2])
 
-    @since('1.2')
     def secondary_index_counters(self):
         cursor = self.prepare()
         cursor.execute("CREATE TABLE test (k int PRIMARY KEY, c counter)")
         assert_invalid(cursor, "CREATE INDEX ON test(c)");
 
-    @since('1.2')
     def column_name_validation_test(self):
         cursor = self.prepare()
 

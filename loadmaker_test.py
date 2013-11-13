@@ -2,12 +2,10 @@ import time
 
 import loadmaker
 
-from dtest import Tester, debug
-from tools import since
+from dtest import Tester
 
 class TestLoadmaker(Tester):
-    
-    @since('1.1')
+
     def loadmaker_test(self):
         cluster = self.cluster
         cluster.populate(1).start()
@@ -42,4 +40,3 @@ class TestLoadmaker(Tester):
         cont_loader.read_and_validate()
 
         cont_loader.exit()
-

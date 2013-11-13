@@ -1,9 +1,8 @@
 from dtest import Tester
-from assertions import *
-from tools import *
+import tools
+from tools import no_vnodes, create_c1c2_table, ThriftConnection
 
-import os, sys, time, tools
-from ccmlib.cluster import Cluster
+import time
 
 class TestPutGet(Tester):
 
@@ -84,7 +83,6 @@ class TestPutGet(Tester):
                 tools.query_columns(self, cursor, key, size, offset=x*size-1)
 
     @no_vnodes()
-    @since('1.1')
     def wide_slice_test(self):
         """ 
         Check slicing a wide row. 

@@ -1,14 +1,6 @@
 import time
-import types
-import pprint
-import hashlib
-
 
 from dtest import Tester, debug
-from tools import *
-from assertions import *
-from ccmlib.cluster import Cluster
-from ccmlib import common as ccmcommon
 
 import cql
 from cql.cassandra.ttypes import CfDef, ColumnParent, CounterColumn, \
@@ -20,7 +12,6 @@ class TestSuperCounterClusterRestart(Tester):
     https://issues.apache.org/jira/browse/CASSANDRA-3821
     """
 
-    @since('1.1')
     def functional_test(self):
         NUM_SUBCOLS = 100
         NUM_ADDS = 100
@@ -82,5 +73,3 @@ class TestSuperCounterClusterRestart(Tester):
 
         if from_db != expected:
             raise Exception("Expected a bunch of the same values out of the db. Got this: " + str(from_db))
-
-

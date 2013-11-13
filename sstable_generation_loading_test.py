@@ -4,7 +4,6 @@ from distutils import dir_util
 import subprocess
 
 from dtest import Tester, debug
-from tools import since
 from ccmlib import common as ccmcommon
 
 class TestSSTableGenerationAndLoading(Tester):
@@ -13,7 +12,6 @@ class TestSSTableGenerationAndLoading(Tester):
         super(TestSSTableGenerationAndLoading, self).__init__(*argv, **kwargs)
         self.allow_log_errors = True
 
-    @since('1.0')
     def incompressible_data_in_compressed_table_test(self):
         """
         tests for the bug that caused this:
@@ -48,7 +46,6 @@ class TestSSTableGenerationAndLoading(Tester):
         cursor.execute("SELECT * FROM cf WHERE KEY = '0' AND c < '8'")
         cursor.fetchone()
 
-    @since('1.1')
     def remove_index_file_test(self):
         """
         tests for situations similar to that found in this issue:
@@ -79,39 +76,30 @@ class TestSSTableGenerationAndLoading(Tester):
                 data_found += 1
         assert data_found > 0, "After removing index, filter, stats, and digest files, the data file was deleted!"
 
-    @since('1.1')
     def sstableloader_compression_none_to_none_test(self):
         self.load_sstable_with_configuration(None, None)
 
-    @since('1.1')
     def sstableloader_compression_none_to_snappy_test(self):
         self.load_sstable_with_configuration(None, 'Snappy')
 
-    @since('1.1')
     def sstableloader_compression_none_to_deflate_test(self):
         self.load_sstable_with_configuration(None, 'Deflate')
 
-    @since('1.1')
     def sstableloader_compression_snappy_to_none_test(self):
         self.load_sstable_with_configuration('Snappy', None)
 
-    @since('1.1')
     def sstableloader_compression_snappy_to_snappy_test(self):
         self.load_sstable_with_configuration('Snappy', 'Snappy')
 
-    @since('1.1')
     def sstableloader_compression_snappy_to_deflate_test(self):
         self.load_sstable_with_configuration('Snappy', 'Deflate')
 
-    @since('1.1')
     def sstableloader_compression_deflate_to_none_test(self):
         self.load_sstable_with_configuration('Deflate', None)
 
-    @since('1.1')
     def sstableloader_compression_deflate_to_snappy_test(self):
         self.load_sstable_with_configuration('Deflate', 'Snappy')
 
-    @since('1.1')
     def sstableloader_compression_deflate_to_deflate_test(self):
         self.load_sstable_with_configuration('Deflate', 'Deflate')
 
