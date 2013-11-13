@@ -1409,6 +1409,11 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[set(['m', 'n'])]], res
 
+        cursor.execute("DELETE tags['m'] FROM user WHERE fn='Bilbo' AND ln='Baggins'")
+        cursor.execute("SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'")
+        res = cursor.fetchall()
+        assert res == [[set(['n'])]], res
+
         cursor.execute("DELETE tags FROM user WHERE fn='Bilbo' AND ln='Baggins'")
         cursor.execute("SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'")
         res = cursor.fetchall()
