@@ -1,14 +1,14 @@
 # coding: utf-8
 
-from dtest import Tester
-from assertions import *
-from cql import ProgrammingError
-from tools import *
+import random
+import re
+import time
+from uuid import uuid4, UUID
 
-import os, sys, time, tools, json, random
-import uuid
-from uuid import UUID
-from ccmlib.cluster import Cluster
+from dtest import Tester
+from assertions import assert_invalid, assert_one, assert_none, assert_all
+from cql import ProgrammingError
+from tools import since, require
 
 cql_version="3.0.0"
 
@@ -3415,7 +3415,7 @@ class TestCQL(Tester):
     def user_types_test(self):
         cursor = self.prepare()
 
-        userID_1 = uuid.uuid4()
+        userID_1 = uuid4()
         stmt = """
               CREATE TYPE address (
               street text,
