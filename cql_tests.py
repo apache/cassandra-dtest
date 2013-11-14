@@ -3517,3 +3517,44 @@ class TestCQL(Tester):
             cursor.execute("INSERT INTO test(k) VALUES (%d)" % k)
 
         assert_one(cursor, "SELECT COUNT(*) FROM test", [15000])
+
+    @require('4511')
+    def collection_indexing_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k int,
+                v int,
+                l list<int>,
+                s set<text>,
+                m map<text, int>,
+                PRIMARY KEY (k, v)
+            )
+        """)
+
+        cursor.execute("INSERT INTO test (k, v, l, s, m) VALUES (0, 0, [1, 2],    {'a'},      {'a' : 1})")
+        cursor.execute("INSERT INTO test (k, v, l, s, m) VALUES (0, 1, [3, 4],    {'b', 'c'}, {'a' : 1, 'b' : 2})")
+        cursor.execute("INSERT INTO test (k, v, l, s, m) VALUES (0, 2, [1],       {'a', 'c'}, {'c' : 3})")
+        cursor.execute("INSERT INTO test (k, v, l, s, m) VALUES (1, 0, [1, 2, 4], {},         {'b' : 1})")
+        cursor.execute("INSERT INTO test (k, v, l, s, m) VALUES (1, 1, [4, 5],    {'d'},      {'a' : 1, 'b' : 3})")
+
+        cursor.execute("CREATE INDEX ON test(l)")
+        cursor.execute("CREATE INDEX ON test(s)")
+        cursor.execute("CREATE INDEX ON test(m)")
+
+        # lists
+        assert_all(cursor, "SELECT k, v FROM test WHERE l CONTAINS 1", [[1, 0], [0, 0], [0, 2]])
+        assert_all(cursor, "SELECT k, v FROM test WHERE l CONTAINS 2", [[1, 0], [0, 0]])
+        assert_none(cursor, "SELECT k, v FROM test WHERE l CONTAINS 6")
+
+        # sets
+        assert_all(cursor, "SELECT k, v FROM test WHERE s CONTAINS 'a'", [[0, 0], [0, 2]])
+        assert_all(cursor, "SELECT k, v FROM test WHERE s CONTAINS 'd'", [[1, 1]])
+        assert_none(cursor, "SELECT k, v FROM test  WHERE s CONTAINS 'e'")
+
+        # maps
+        assert_all(cursor, "SELECT k, v FROM test WHERE m CONTAINS 1", [[1, 0], [1, 1], [0, 0], [0, 1]])
+        assert_all(cursor, "SELECT k, v FROM test WHERE m CONTAINS 2", [[0, 1]])
+        assert_none(cursor, "SELECT k, v FROM test  WHERE m CONTAINS 4")
+
