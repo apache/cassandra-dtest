@@ -1,6 +1,4 @@
 from dtest import Tester, debug
-from tools import since
-import os
 import datetime
 import random
 
@@ -27,7 +25,6 @@ class TestWideRows(Tester):
     def __init__(self, *args, **kwargs):
         Tester.__init__(self, *args, **kwargs)
 
-    @since('1.2')
     def test_wide_rows(self):
         self.write_wide_rows()
 
@@ -66,10 +63,7 @@ class TestWideRows(Tester):
         for value in cursor:
             debug(value)
             assert len(value[0]) > 0
-            
 
-
-    @since('1.2')
     def test_column_index_stress(self):
         """Write a large number of columns to a single row and set
         'column_index_size_in_kb' to a sufficiently low value to force

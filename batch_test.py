@@ -1,16 +1,13 @@
-import cql
 import time
 
 from assertions import assert_invalid, assert_unavailable
 from cql.cassandra.ttypes import Compression, ConsistencyLevel, TimedOutException
 from dtest import Tester
-from tools import since
 
 cql_version="3.0.0"
 
 class TestBatch(Tester):
 
-    @since('1.2')
     def counter_batch_accepts_counter_mutations_test(self):
         """ Test that counter batch accepts counter mutations """
         cursor = self.prepare()
@@ -25,7 +22,6 @@ class TestBatch(Tester):
         res = cursor.fetchall()
         assert res == [[1], [1], [1]], res
 
-    @since('1.2')
     def counter_batch_rejects_regular_mutations_test(self):
         """ Test that counter batch rejects non-counter mutations """
         cursor = self.prepare()
@@ -38,7 +34,6 @@ class TestBatch(Tester):
             APPLY BATCH
         """, matching="Only counter mutations are allowed in COUNTER batches")
 
-    @since('1.2')
     def logged_batch_accepts_regular_mutations_test(self):
         """ Test that logged batch accepts regular mutations """
         cursor = self.prepare()
@@ -52,7 +47,6 @@ class TestBatch(Tester):
         res = sorted(cursor.fetchall())
         assert res == [[0, u'Jack', u'Sparrow'], [1, u'Will', u'Turner']], res
 
-    @since('1.2')
     def logged_batch_rejects_counter_mutations_test(self):
         """ Test that logged batch rejects counter mutations """
         cursor = self.prepare()
@@ -64,7 +58,6 @@ class TestBatch(Tester):
             APPLY BATCH
         """, matching="Counter mutations are only allowed in COUNTER batches")
 
-    @since('1.2')
     def unlogged_batch_accepts_regular_mutations_test(self):
         """ Test that unlogged batch accepts regular mutations """
         cursor = self.prepare()
@@ -78,7 +71,6 @@ class TestBatch(Tester):
         res = sorted(cursor.fetchall())
         assert res == [[0, u'Jack', u'Sparrow'], [2, u'Elizabeth', u'Swann']], res
 
-    @since('1.2')
     def unlogged_batch_rejects_counter_mutations_test(self):
         """ Test that unlogged batch rejects counter mutations """
         cursor = self.prepare()
@@ -90,7 +82,6 @@ class TestBatch(Tester):
             APPLY BATCH
         """, matching="Counter mutations are only allowed in COUNTER batches")
 
-    @since('1.2')
     def logged_batch_throws_uae_test(self):
         """ Test that logged batch throws UAE if there aren't enough live nodes """
         cursor = self.prepare(nodes=3)
@@ -103,7 +94,6 @@ class TestBatch(Tester):
             APPLY BATCH
         """)
 
-    @since('1.2')
     def logged_batch_doesnt_throw_uae_test(self):
         """ Test that logged batch DOES NOT throw UAE if there are at least 2 live nodes """
         cursor = self.prepare(nodes=3)
@@ -116,7 +106,6 @@ class TestBatch(Tester):
         """, consistency_level="ANY")
         assert True
 
-    @since('1.2')
     def aknowledged_by_batchlog_not_set_when_batchlog_write_fails_test(self):
         """ Test that acknowledged_by_batchlog is False if batchlog can't be written """
         cursor = self.prepare(nodes=3)
@@ -129,7 +118,6 @@ class TestBatch(Tester):
             APPLY BATCH
         """, ConsistencyLevel.ONE, acknowledged_by_batchlog=False)
 
-    @since('1.2')
     def aknowledged_by_batchlog_set_when_batchlog_write_succeeds_test(self):
         """ Test that acknowledged_by_batchlog is True if batchlog can be written """
         cursor = self.prepare(nodes=3)

@@ -1,14 +1,6 @@
 import time
-import types
-import pprint
-import hashlib
 
 from dtest import Tester, debug
-from tools import *
-from assertions import *
-from ccmlib.cluster import Cluster
-from ccmlib import common as ccmcommon
-
 from loadmaker import LoadMaker
 
 class TestGlobalRowKeyCache(Tester):
@@ -19,7 +11,6 @@ class TestGlobalRowKeyCache(Tester):
         # If we don't allow log errors, then the test will fail.
 #        self.allow_log_errors = True
 
-    @since("1.1")
     def functional_test(self):
         """
         Test global caches.
@@ -99,5 +90,3 @@ class TestGlobalRowKeyCache(Tester):
 
 
                 cluster.stop()
-
-
