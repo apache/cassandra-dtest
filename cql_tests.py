@@ -3302,7 +3302,7 @@ class TestCQL(Tester):
             )
         """)
 
-        cursor.execute("INSERT INTO test(k, c) VALUES ('', 0)")
+        assert_invalid(cursor, "INSERT INTO test(k, c) VALUES ('', 0)")
 
         # Insert a value that don't fit 'int'
         assert_invalid(cursor, "INSERT INTO test(k, c) VALUES (0, 10000000000)")
