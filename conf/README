@@ -1,0 +1,9 @@
+This is a set of cassandra-dtest exclude configuration files for use with nose-test-select
+- https://github.com/EnigmaCurry/nose-test-select
+
+(This is also a TODO list of dtests that need TLC.. patches welcome :) )
+
+The files are for each C* branch and are run with:
+
+  nosetests --test-select-config=conf/${C_BRANCH}_test-select.cfg
+
