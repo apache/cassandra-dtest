@@ -1,6 +1,6 @@
 # coding: utf-8
 
-import random
+import random, math
 import re
 import time
 from uuid import uuid4, UUID
@@ -911,62 +911,62 @@ class TestCQL(Tester):
         # Reserved keywords
         assert_invalid(cursor, "CREATE TABLE test1 (select int PRIMARY KEY, column int)")
 
-    def keyspace_test(self):
-        cursor = self.prepare()
+    #def keyspace_test(self):
+    #    cursor = self.prepare()
 
-        assert_invalid(cursor, "CREATE KEYSPACE test1")
-        cursor.execute("CREATE KEYSPACE test2 WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 }")
-        assert_invalid(cursor, "CREATE KEYSPACE My_much_much_too_long_identifier_that_should_not_work WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 }")
+    #    assert_invalid(cursor, "CREATE KEYSPACE test1")
+    #    cursor.execute("CREATE KEYSPACE test2 WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 }")
+    #    assert_invalid(cursor, "CREATE KEYSPACE My_much_much_too_long_identifier_that_should_not_work WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 }")
 
-        cursor.execute("DROP KEYSPACE test2")
-        assert_invalid(cursor, "DROP KEYSPACE non_existing")
-        cursor.execute("CREATE KEYSPACE test2 WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 }")
+    #    cursor.execute("DROP KEYSPACE test2")
+    #    assert_invalid(cursor, "DROP KEYSPACE non_existing")
+    #    cursor.execute("CREATE KEYSPACE test2 WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 }")
 
-    def table_test(self):
-        cursor = self.prepare()
+    #def table_test(self):
+    #    cursor = self.prepare()
 
-        cursor.execute("""
-            CREATE TABLE test1 (
-                k int PRIMARY KEY,
-                c int
-            )
-        """)
+    #    cursor.execute("""
+    #        CREATE TABLE test1 (
+    #            k int PRIMARY KEY,
+    #            c int
+    #        )
+    #    """)
 
-        cursor.execute("""
-            CREATE TABLE test2 (
-                k int,
-                name int,
-                value int,
-                PRIMARY KEY(k, name)
-            ) WITH COMPACT STORAGE
-        """)
+    #    cursor.execute("""
+    #        CREATE TABLE test2 (
+    #            k int,
+    #            name int,
+    #            value int,
+    #            PRIMARY KEY(k, name)
+    #        ) WITH COMPACT STORAGE
+    #    """)
 
-        cursor.execute("""
-            CREATE TABLE test3 (
-                k int,
-                c int,
-                PRIMARY KEY (k),
-            )
-        """)
+    #    cursor.execute("""
+    #        CREATE TABLE test3 (
+    #            k int,
+    #            c int,
+    #            PRIMARY KEY (k),
+    #        )
+    #    """)
 
-        # existing table
-        assert_invalid(cursor, "CREATE TABLE test3 (k int PRIMARY KEY, c int)")
-        # repeated column
-        assert_invalid(cursor, "CREATE TABLE test4 (k int PRIMARY KEY, c int, k text)")
+    #    # existing table
+    #    assert_invalid(cursor, "CREATE TABLE test3 (k int PRIMARY KEY, c int)")
+    #    # repeated column
+    #    assert_invalid(cursor, "CREATE TABLE test4 (k int PRIMARY KEY, c int, k text)")
 
-        # compact storage limitations
-        assert_invalid(cursor, "CREATE TABLE test4 (k int, name, int, c1 int, c2 int, PRIMARY KEY(k, name)) WITH COMPACT STORAGE")
+    #    # compact storage limitations
+    #    assert_invalid(cursor, "CREATE TABLE test4 (k int, name, int, c1 int, c2 int, PRIMARY KEY(k, name)) WITH COMPACT STORAGE")
 
-        cursor.execute("DROP TABLE test1")
-        cursor.execute("TRUNCATE test2")
+    #    cursor.execute("DROP TABLE test1")
+    #    cursor.execute("TRUNCATE test2")
 
-        cursor.execute("""
-            CREATE TABLE test1 (
-                k int PRIMARY KEY,
-                c1 int,
-                c2 int,
-            )
-        """)
+    #    cursor.execute("""
+    #        CREATE TABLE test1 (
+    #            k int PRIMARY KEY,
+    #            c1 int,
+    #            c2 int,
+    #        )
+    #    """)
 
     def batch_test(self):
         cursor = self.prepare()
@@ -3417,7 +3417,7 @@ class TestCQL(Tester):
 
         assert_one(cursor, "SELECT COUNT(*) FROM test", [15000])
 
-    @require('4511')
+    @since('2.1')
     def collection_indexing_test(self):
         cursor = self.prepare()
 
@@ -3432,15 +3432,15 @@ class TestCQL(Tester):
             )
         """)
 
+        cursor.execute("CREATE INDEX ON test(l)")
+        cursor.execute("CREATE INDEX ON test(s)")
+        cursor.execute("CREATE INDEX ON test(m)")
+
         cursor.execute("INSERT INTO test (k, v, l, s, m) VALUES (0, 0, [1, 2],    {'a'},      {'a' : 1})")
         cursor.execute("INSERT INTO test (k, v, l, s, m) VALUES (0, 1, [3, 4],    {'b', 'c'}, {'a' : 1, 'b' : 2})")
         cursor.execute("INSERT INTO test (k, v, l, s, m) VALUES (0, 2, [1],       {'a', 'c'}, {'c' : 3})")
         cursor.execute("INSERT INTO test (k, v, l, s, m) VALUES (1, 0, [1, 2, 4], {},         {'b' : 1})")
         cursor.execute("INSERT INTO test (k, v, l, s, m) VALUES (1, 1, [4, 5],    {'d'},      {'a' : 1, 'b' : 3})")
-
-        cursor.execute("CREATE INDEX ON test(l)")
-        cursor.execute("CREATE INDEX ON test(s)")
-        cursor.execute("CREATE INDEX ON test(m)")
 
         # lists
         assert_all(cursor, "SELECT k, v FROM test WHERE l CONTAINS 1", [[1, 0], [0, 0], [0, 2]])
@@ -3456,4 +3456,45 @@ class TestCQL(Tester):
         assert_all(cursor, "SELECT k, v FROM test WHERE m CONTAINS 1", [[1, 0], [1, 1], [0, 0], [0, 1]])
         assert_all(cursor, "SELECT k, v FROM test WHERE m CONTAINS 2", [[0, 1]])
         assert_none(cursor, "SELECT k, v FROM test  WHERE m CONTAINS 4")
+
+    @require('6383')
+    def map_keys_indexing(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k int,
+                v int,
+                m map<text, int>,
+                PRIMARY KEY (k, v)
+            )
+        """)
+
+        cursor.execute("CREATE INDEX ON test(keys(m))")
+
+        cursor.execute("INSERT INTO test (k, v, m) VALUES (0, 0, {'a' : 1})")
+        cursor.execute("INSERT INTO test (k, v, m) VALUES (0, 1, {'a' : 1, 'b' : 2})")
+        cursor.execute("INSERT INTO test (k, v, m) VALUES (0, 2, {'c' : 3})")
+        cursor.execute("INSERT INTO test (k, v, m) VALUES (1, 0, {'b' : 1})")
+        cursor.execute("INSERT INTO test (k, v, m) VALUES (1, 1, {'a' : 1, 'b' : 3})")
+
+        # maps
+        assert_all(cursor, "SELECT k, v FROM test WHERE m CONTAINS KEY 'a'", [[1, 1], [0, 0], [0, 1]])
+        assert_all(cursor, "SELECT k, v FROM test WHERE m CONTAINS KEY 'c'", [[0, 2]])
+        assert_none(cursor, "SELECT k, v FROM test  WHERE m CONTAINS KEY 'd'")
+
+        # we're not allowed to create a value index if we already have a key one
+        assert_invalid(cursor, "CREATE INDEX ON test(m)")
+
+    #def nan_infinity_test(self):
+    #    cursor = self.prepare()
+
+    #    cursor.execute("CREATE TABLE test (f float PRIMARY KEY)")
+
+    #    cursor.execute("INSERT INTO test(f) VALUES (NaN)")
+    #    cursor.execute("INSERT INTO test(f) VALUES (-NaN)")
+    #    cursor.execute("INSERT INTO test(f) VALUES (Infinity)")
+    #    cursor.execute("INSERT INTO test(f) VALUES (-Infinity)")
+
+    #    assert_all(cursor, "SELECT * FROM test", [[nan], [inf], [-inf]])
 
