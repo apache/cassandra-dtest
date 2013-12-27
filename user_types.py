@@ -1,3 +1,4 @@
+from cql import ProgrammingError
 from dtest import Tester, debug
 from tools import since
 import os
@@ -9,6 +10,51 @@ class TestUserTypes(Tester):
 
     def __init__(self, *args, **kwargs):
         Tester.__init__(self, *args, **kwargs)
+
+    @since('2.1')
+    def test_type_enforcement(self):
+      """
+      Confirm error when incorrect data type used for user type
+      """
+      cluster = self.cluster
+      cluster.populate(3).start()
+      node1, node2, node3 = cluster.nodelist()
+      cursor = self.cql_connection(node1).cursor()
+      self.create_ks(cursor, 'user_type_enforcement', 2)
+
+      stmt = """
+            CREATE TYPE simple_type (
+            user_number int
+            )
+         """
+      cursor.execute(stmt)
+
+      stmt = """
+            CREATE TABLE simple_table (
+            id uuid PRIMARY KEY,
+            number simple_type
+            )
+         """
+      cursor.execute(stmt)
+
+      # here we will attempt an insert statement which should fail
+      # because the user type is an int, but the insert statement is
+      # providing text
+      _id = uuid.uuid4()
+      stmt = """
+            INSERT INTO simple_table (id, number)
+            VALUES ({id}, {{user_number: 'uh oh....this is not a number'}});
+         """.format(id=_id)
+      with self.assertRaisesRegexp(ProgrammingError, 'field user_number is not of type int'):
+        cursor.execute(stmt)
+
+      # let's check the rowcount and make sure the data
+      # didn't get inserted when the exception asserted above was thrown
+      stmt = """
+            SELECT * FROM simple_table;
+         """
+      cursor.execute(stmt)
+      self.assertEqual(0, cursor.rowcount)
 
     @since('2.1')
     def test_nested_user_types(self):
