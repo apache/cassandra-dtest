@@ -12,6 +12,47 @@ class TestUserTypes(Tester):
         Tester.__init__(self, *args, **kwargs)
 
     @since('2.1')
+    def test_type_renaming(self):
+      """
+      Confirm that types can be renamed and the proper associations are updated.
+      """
+      cluster = self.cluster
+      cluster.populate(3).start()
+      node1, node2, node3 = cluster.nodelist()
+      cursor = self.cql_connection(node1).cursor()
+      self.create_ks(cursor, 'user_type_renaming', 2)
+
+      stmt = """
+            CREATE TYPE simple_type (
+            user_number int
+            )
+         """
+      cursor.execute(stmt)
+
+      stmt = """
+            CREATE TABLE simple_table (
+            id uuid PRIMARY KEY,
+            number simple_type
+            )
+         """
+      cursor.execute(stmt)
+
+      stmt = """
+          ALTER TYPE simple_type rename to renamed_type;
+         """
+      cursor.execute(stmt)
+
+      stmt = """
+          SELECT type_name from system.schema_usertypes;
+         """
+      cursor.execute(stmt)
+      # we should only have one user type in this test
+      self.assertEqual(1, cursor.rowcount)
+
+      # finally let's look for the new type name
+      self.assertEqual(cursor.fetchone()[0], u'renamed_type')
+
+    @since('2.1')
     def test_type_enforcement(self):
       """
       Confirm error when incorrect data type used for user type
