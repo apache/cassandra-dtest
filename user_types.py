@@ -148,6 +148,57 @@ class TestUserTypes(Tester):
       data = cursor.fetchone()[0]
       self.assertIn('inserted', data)
 
+
+    @since('2.1')
+    def test_nested_type_dropping(self):
+      """
+      Confirm a user type can't be dropped when being used by another user type. 
+      """
+      cluster = self.cluster
+      cluster.populate(3).start()
+      node1, node2, node3 = cluster.nodelist()
+      cursor = self.cql_connection(node1).cursor()
+      self.create_ks(cursor, 'nested_user_type_dropping', 2)
+
+      stmt = """
+            CREATE TYPE simple_type (
+            user_number int,
+            user_text text
+            )
+         """
+      cursor.execute(stmt)
+
+      stmt = """
+            CREATE TYPE another_type (
+            somefield simple_type
+            )
+         """
+      cursor.execute(stmt)
+
+      stmt = """
+            DROP TYPE simple_type;
+         """
+      with self.assertRaisesRegexp(ProgrammingError, 'Cannot drop user type simple_type as it is still used by user type another_type'):
+        cursor.execute(stmt)
+
+      # drop the type that's impeding the drop, and then try again
+      stmt = """
+            DROP TYPE another_type;
+         """
+      cursor.execute(stmt)
+
+      stmt = """
+            DROP TYPE simple_type;
+         """
+      cursor.execute(stmt)
+
+      # now let's have a look at the system schema and make sure no user types are defined
+      stmt = """
+            SELECT type_name from system.schema_usertypes;
+         """
+      cursor.execute(stmt)
+      self.assertEqual(0, cursor.rowcount)
+
     @since('2.1')
     def test_type_enforcement(self):
       """
@@ -231,8 +282,6 @@ class TestUserTypes(Tester):
          """
       with self.assertRaisesRegexp(ProgrammingError, 'Cannot drop user type simple_type as it is still used by table user_type_dropping.simple_table'):
         cursor.execute(stmt)
-
-      # TODO: add confirmation that you can't drop a type being used by another type
 
       # now that we've confirmed that a user type cannot be dropped while in use
       # let's remove the offending table
