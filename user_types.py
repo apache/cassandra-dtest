@@ -53,6 +53,102 @@ class TestUserTypes(Tester):
       self.assertEqual(cursor.fetchone()[0], u'renamed_type')
 
     @since('2.1')
+    def test_nested_type_renaming(self):
+      """
+      Confirm type renaming works as expected on nested types.
+      """
+      cluster = self.cluster
+      cluster.populate(3).start()
+      node1, node2, node3 = cluster.nodelist()
+      cursor = self.cql_connection(node1).cursor()
+      self.create_ks(cursor, 'nested_user_type_renaming', 2)
+
+      stmt = """
+            CREATE TYPE simple_type (
+            user_number int,
+            user_text text
+            )
+         """
+      cursor.execute(stmt)
+
+      stmt = """
+            CREATE TYPE another_type (
+            somefield simple_type
+            )
+         """
+      cursor.execute(stmt)
+
+      stmt = """
+            CREATE TYPE yet_another_type (
+            some_other_field another_type
+            )
+         """
+      cursor.execute(stmt)
+
+      stmt = """
+            CREATE TABLE uses_nested_type (
+            id uuid PRIMARY KEY,
+            field_name yet_another_type
+            )
+         """
+      cursor.execute(stmt)
+
+      # let's insert some basic data using the nested types
+      _id = uuid.uuid4()
+      stmt = """
+            INSERT INTO uses_nested_type (id, field_name)
+            VALUES (%s, {some_other_field: {somefield: {user_number: 1, user_text: 'original'}}});
+         """ % _id
+      cursor.execute(stmt)
+
+      # rename one of the types used in the nesting
+      stmt = """
+            ALTER TYPE another_type rename to another_type2;
+         """
+      cursor.execute(stmt)
+
+      # confirm nested data can be queried without error
+      stmt = """
+            SELECT field_name FROM uses_nested_type where id = {id}
+         """.format(id=_id)
+      cursor.execute(stmt)
+
+      data = cursor.fetchone()[0]
+      self.assertIn('original', data)
+
+      # confirm we can alter/query the data after altering the type
+      stmt = """
+            UPDATE uses_nested_type
+            SET field_name = {some_other_field: {somefield: {user_number: 2, user_text: 'altered'}}}
+            WHERE id=%s;
+         """ % _id
+      cursor.execute(stmt)
+
+      stmt = """
+            SELECT field_name FROM uses_nested_type where id = {id}
+         """.format(id=_id)
+      cursor.execute(stmt)
+
+      data = cursor.fetchone()[0]
+      self.assertIn('altered', data)
+
+      # and confirm we can add/query new data after the type rename
+      _id = uuid.uuid4()
+      stmt = """
+            INSERT INTO uses_nested_type (id, field_name)
+            VALUES (%s, {some_other_field: {somefield: {user_number: 1, user_text: 'inserted'}}});
+         """ % _id
+      cursor.execute(stmt)
+
+      stmt = """
+            SELECT field_name FROM uses_nested_type where id = {id}
+         """.format(id=_id)
+      cursor.execute(stmt)
+
+      data = cursor.fetchone()[0]
+      self.assertIn('inserted', data)
+
+    @since('2.1')
     def test_type_enforcement(self):
       """
       Confirm error when incorrect data type used for user type
@@ -135,6 +231,8 @@ class TestUserTypes(Tester):
          """
       with self.assertRaisesRegexp(ProgrammingError, 'Cannot drop user type simple_type as it is still used by table user_type_dropping.simple_table'):
         cursor.execute(stmt)
+
+      # TODO: add confirmation that you can't drop a type being used by another type
 
       # now that we've confirmed that a user type cannot be dropped while in use
       # let's remove the offending table
