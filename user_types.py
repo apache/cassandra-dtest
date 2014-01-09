@@ -23,6 +23,11 @@ class TestUserTypes(Tester):
       self.create_ks(cursor, 'user_type_renaming', 2)
 
       stmt = """
+            USE user_type_renaming
+         """
+      cursor.execute(stmt)
+
+      stmt = """
             CREATE TYPE simple_type (
             user_number int
             )
@@ -38,12 +43,12 @@ class TestUserTypes(Tester):
       cursor.execute(stmt)
 
       stmt = """
-          ALTER TYPE simple_type rename to renamed_type;
+            ALTER TYPE simple_type rename to renamed_type;
          """
       cursor.execute(stmt)
 
       stmt = """
-          SELECT type_name from system.schema_usertypes;
+            SELECT type_name from system.schema_usertypes;
          """
       cursor.execute(stmt)
       # we should only have one user type in this test
@@ -62,6 +67,11 @@ class TestUserTypes(Tester):
       node1, node2, node3 = cluster.nodelist()
       cursor = self.cql_connection(node1).cursor()
       self.create_ks(cursor, 'nested_user_type_renaming', 2)
+
+      stmt = """
+            USE nested_user_type_renaming
+         """
+      cursor.execute(stmt)
 
       stmt = """
             CREATE TYPE simple_type (
@@ -160,6 +170,11 @@ class TestUserTypes(Tester):
       self.create_ks(cursor, 'user_type_dropping', 2)
 
       stmt = """
+            USE user_type_dropping
+         """
+      cursor.execute(stmt)
+
+      stmt = """
             CREATE TYPE simple_type (
             user_number int
             )
@@ -214,6 +229,11 @@ class TestUserTypes(Tester):
       self.create_ks(cursor, 'nested_user_type_dropping', 2)
 
       stmt = """
+            USE nested_user_type_dropping
+         """
+      cursor.execute(stmt)
+
+      stmt = """
             CREATE TYPE simple_type (
             user_number int,
             user_text text
@@ -264,6 +284,11 @@ class TestUserTypes(Tester):
       self.create_ks(cursor, 'user_type_enforcement', 2)
 
       stmt = """
+            USE user_type_enforcement
+         """
+      cursor.execute(stmt)
+
+      stmt = """
             CREATE TYPE simple_type (
             user_number int
             )
@@ -305,7 +330,12 @@ class TestUserTypes(Tester):
         node1,node2,node3 = cluster.nodelist()
         cursor = self.cql_connection(node1).cursor()
         self.create_ks(cursor, 'user_types', 2)
-        
+
+        stmt = """
+              USE user_types
+           """
+        cursor.execute(stmt)
+
         #### Create a user type to go inside another one:
         stmt = """
               CREATE TYPE item (
