@@ -148,6 +148,59 @@ class TestUserTypes(Tester):
       data = cursor.fetchone()[0]
       self.assertIn('inserted', data)
 
+    @since('2.1')
+    def test_type_dropping(self):
+      """
+      Tests that a type cannot be dropped when in use, and otherwise can be dropped.
+      """
+      cluster = self.cluster
+      cluster.populate(3).start()
+      node1, node2, node3 = cluster.nodelist()
+      cursor = self.cql_connection(node1).cursor()
+      self.create_ks(cursor, 'user_type_dropping', 2)
+
+      stmt = """
+            CREATE TYPE simple_type (
+            user_number int
+            )
+         """
+      cursor.execute(stmt)
+
+      stmt = """
+            CREATE TABLE simple_table (
+            id uuid PRIMARY KEY,
+            number simple_type
+            )
+         """
+      cursor.execute(stmt)
+
+      _id = uuid.uuid4()
+      stmt = """
+            INSERT INTO simple_table (id, number)
+            VALUES ({id}, {{user_number: 1}});
+         """.format(id=_id)
+      cursor.execute(stmt)
+
+      stmt = """
+            DROP TYPE simple_type;
+         """
+      with self.assertRaisesRegexp(ProgrammingError, 'Cannot drop user type simple_type as it is still used by table user_type_dropping.simple_table'):
+        cursor.execute(stmt)
+
+      # now that we've confirmed that a user type cannot be dropped while in use
+      # let's remove the offending table
+
+      # TODO: uncomment below after CASSANDRA-6472 is resolved
+      # and add another check to make sure the table/type drops succeed
+      # stmt = """
+      #       DROP TABLE simple_table;
+      #    """.format(id=_id)
+      #
+      # cursor.execute(stmt)
+      # stmt = """
+      #       DROP TYPE simple_type;
+      #    """
+      # cursor.execute(stmt)
 
     @since('2.1')
     def test_nested_type_dropping(self):
@@ -243,60 +296,6 @@ class TestUserTypes(Tester):
          """
       cursor.execute(stmt)
       self.assertEqual(0, cursor.rowcount)
-
-    @since('2.1')
-    def test_dropping_user_types(self):
-      """
-      Tests that a type cannot be dropped when in use, and otherwise can be dropped.
-      """
-      cluster = self.cluster
-      cluster.populate(3).start()
-      node1, node2, node3 = cluster.nodelist()
-      cursor = self.cql_connection(node1).cursor()
-      self.create_ks(cursor, 'user_type_dropping', 2)
-
-      stmt = """
-            CREATE TYPE simple_type (
-            user_number int
-            )
-         """
-      cursor.execute(stmt)
-
-      stmt = """
-            CREATE TABLE simple_table (
-            id uuid PRIMARY KEY,
-            number simple_type
-            )
-         """
-      cursor.execute(stmt)
-
-      _id = uuid.uuid4()
-      stmt = """
-            INSERT INTO simple_table (id, number)
-            VALUES ({id}, {{user_number: 1}});
-         """.format(id=_id)
-      cursor.execute(stmt)
-
-      stmt = """
-            DROP TYPE simple_type;
-         """
-      with self.assertRaisesRegexp(ProgrammingError, 'Cannot drop user type simple_type as it is still used by table user_type_dropping.simple_table'):
-        cursor.execute(stmt)
-
-      # now that we've confirmed that a user type cannot be dropped while in use
-      # let's remove the offending table
-
-      # TODO: uncomment below after CASSANDRA-6472 is resolved
-      # and add another check to make sure the table/type drops succeed
-      # stmt = """
-      #       DROP TABLE simple_table;
-      #    """.format(id=_id)
-      #
-      # cursor.execute(stmt)
-      # stmt = """
-      #       DROP TYPE simple_type;
-      #    """
-      # cursor.execute(stmt)
 
     @since('2.1')
     def test_nested_user_types(self):
@@ -399,4 +398,3 @@ class TestUserTypes(Tester):
             self.assertIn('stuff4', items[1])
             self.assertIn('one_3_other', items[1])
             self.assertIn('two_3_other', items[1])
-            
