@@ -3498,3 +3498,74 @@ class TestCQL(Tester):
 
     #    assert_all(cursor, "SELECT * FROM test", [[nan], [inf], [-inf]])
 
+    #@require('#6561')
+    def static_columns_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k int,
+                p int,
+                s int static,
+                v int,
+                PRIMARY KEY (k, p)
+            )
+        """)
+
+        cursor.execute("INSERT INTO test(k, s) VALUES (0, 42)")
+
+        assert_one(cursor, "SELECT * FROM test", [0, None, 42, None])
+
+        cursor.execute("INSERT INTO test(k, p, s, v) VALUES (0, 0, 12, 0)")
+        cursor.execute("INSERT INTO test(k, p, s, v) VALUES (0, 1, 24, 1)")
+
+        # Check the static columns in indeed "static"
+        assert_all(cursor, "SELECT * FROM test", [[0, 0, 24, 0], [0, 1, 24, 1]])
+
+        # Check we do correctly get the static column value with a SELECT *, even
+        # if we're only slicing part of the partition
+        assert_one(cursor, "SELECT * FROM test WHERE k=0 AND p=0", [0, 0, 24, 0])
+        assert_one(cursor, "SELECT * FROM test WHERE k=0 AND p=1", [0, 1, 24, 1])
+
+        # Check things still work if we don't select the static column. We also want
+        # this to not request the static columns internally at all, though that part
+        # require debugging to assert
+        assert_one(cursor, "SELECT p, v FROM test WHERE k=0 AND p=1", [1, 1])
+
+        # Check selecting only a static column is also ok, and only yield one value
+        # (as we only query the static columns)
+        assert_one(cursor, "SELECT s FROM test WHERE k=0", [24])
+
+        # Check that deleting a row don't implicitely deletes statics
+        cursor.execute("DELETE FROM test WHERE k=0 AND p=0")
+        assert_all(cursor, "SELECT * FROM test", [[0, 1, 24, 1]])
+
+        # But that explicitely deleting the static column does remove it
+        cursor.execute("DELETE s FROM test WHERE k=0")
+        assert_all(cursor, "SELECT * FROM test", [[0, 1, None, 1]])
+
+    #@require('#6561')
+    def static_columns_cas_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                id int,
+                k text,
+                v text,
+                version int static,
+                PRIMARY KEY (id, k)
+            )
+        """)
+
+        cursor.execute("INSERT INTO test(id, version) VALUES (0, 0)")
+
+        assert_one(cursor, "UPDATE test SET v='foo', version=1 WHERE id=0 AND k='k1' IF version = 0", [True])
+        assert_all(cursor, "SELECT * FROM test", [[0, 'k1', 'foo', 1]])
+
+        assert_one(cursor, "UPDATE test SET v='bar', version=1 WHERE id=0 AND k='k2' IF version = 0", [False, 1])
+        assert_all(cursor, "SELECT * FROM test", [[0, 'k1', 'foo', 1]])
+
+        assert_one(cursor, "UPDATE test SET v='bar', version=2 WHERE id=0 AND k='k2' IF version = 1", [True])
+        assert_all(cursor, "SELECT * FROM test", [[0, 'k1', 'foo', 2], [0, 'k2', 'bar', 2]])
+
