@@ -3498,7 +3498,7 @@ class TestCQL(Tester):
 
     #    assert_all(cursor, "SELECT * FROM test", [[nan], [inf], [-inf]])
 
-    #@require('#6561')
+    @require('#6561')
     def static_columns_test(self):
         cursor = self.prepare()
 
@@ -3544,7 +3544,7 @@ class TestCQL(Tester):
         cursor.execute("DELETE s FROM test WHERE k=0")
         assert_all(cursor, "SELECT * FROM test", [[0, 1, None, 1]])
 
-    #@require('#6561')
+    @require('#6561')
     def static_columns_cas_test(self):
         cursor = self.prepare()
 
@@ -3568,4 +3568,16 @@ class TestCQL(Tester):
 
         assert_one(cursor, "UPDATE test SET v='bar', version=2 WHERE id=0 AND k='k2' IF version = 1", [True])
         assert_all(cursor, "SELECT * FROM test", [[0, 'k1', 'foo', 2], [0, 'k2', 'bar', 2]])
+
+    def select_count_paging_test(self):
+        """ Test for the #6579 'select count' paging bug """
+
+        cursor = self.prepare()
+        cursor.execute("create table test(field1 text, field2 timeuuid, field3 boolean, primary key(field1, field2));")
+        cursor.execute("create index test_index on test(field3);")
+
+        cursor.execute("insert into test(field1, field2, field3) values ('hola', now(), false);");
+        cursor.execute("insert into test(field1, field2, field3) values ('hola', now(), false);");
+
+        assert_one(cursor, "select count(*) from test where field3 = false limit 1;", [1])
 
