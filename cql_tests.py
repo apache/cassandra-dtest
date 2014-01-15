@@ -3457,6 +3457,7 @@ class TestCQL(Tester):
         assert_all(cursor, "SELECT k, v FROM test WHERE m CONTAINS 2", [[0, 1]])
         assert_none(cursor, "SELECT k, v FROM test  WHERE m CONTAINS 4")
 
+
     @require('6383')
     def map_keys_indexing(self):
         cursor = self.prepare()
@@ -3580,4 +3581,18 @@ class TestCQL(Tester):
         cursor.execute("insert into test(field1, field2, field3) values ('hola', now(), false);");
 
         assert_one(cursor, "select count(*) from test where field3 = false limit 1;", [1])
+
+
+    @since('2.1')
+    def user_types_rename_test(self):
+
+        cursor = self.prepare()
+        cursor.execute("CREATE TYPE simple_type (x int)")
+        cursor.execute("CREATE TABLE test (k int PRIMARY KEY, v simple_type)")
+
+        cursor.execute("ALTER TYPE simple_type RENAME TO renamed_type")
+
+        # This shouldn't be allowed because test uses it, so this is a somewhat indirect way to
+        # make sure the rename propagated to the table correctly.
+        assert_invalid(cursor, "DROP TYPE renamed_type")
 
