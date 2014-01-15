@@ -180,7 +180,7 @@ class TestSecondaryIndexesOnCollections(Tester):
 
         log = []
 
-        for i in range(50001):
+        for i in range(50000):
             user_uuid = uuid.uuid4()
             unshared_uuid = uuid.uuid4()
 
