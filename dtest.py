@@ -7,6 +7,7 @@ from ccmlib.node import Node
 from cql.thrifteries import ThriftCursor
 from uuid import UUID
 from nose.exc import SkipTest
+from thrift.transport import TSocket
 from unittest import TestCase
 
 logging.basicConfig(stream=sys.stderr)
@@ -37,6 +38,20 @@ def debug(msg):
     if PRINT_DEBUG:
         print msg
 
+def retry_till_success(fun, *args, **kwargs):
+    timeout = kwargs.pop('timeout', 60)
+    bypassed_exception = kwargs.pop('bypassed_exception', Exception)
+
+    deadline = time.time() + timeout
+    while True:
+        try:
+            return fun(*args, **kwargs)
+        except bypassed_exception:
+            if time.time() > deadline:
+                raise
+            else:
+                # brief pause before next attempt
+                time.sleep(0.25)
 
 class Tester(TestCase):
 
@@ -184,6 +199,23 @@ class Tester(TestCase):
             con = cql.connect(host, port, keyspace=keyspace, user=user, password=password)
         self.connections.append(con)
         return con
+
+    def patient_cql_connection(self, node, keyspace=None, version=None, user=None, password=None, timeout=10):
+        """
+        Returns a connection after it stops throwing TTransportExceptions due to not being ready.
+
+        If the timeout is exceeded, the exception is raised.
+        """
+        return retry_till_success(
+            self.cql_connection,
+            node,
+            keyspace=keyspace,
+            version=version,
+            user=user,
+            password=password,
+            timeout=timeout,
+            bypassed_exception=TSocket.TTransportException
+        )
 
     def create_ks(self, cursor, name, rf):
         if self.cluster.version() >= "1.2" and cursor.cql_major_version >= 3:

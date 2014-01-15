@@ -10,19 +10,19 @@ from thrift.transport import TTransport, TSocket
 from thrift.protocol import TBinaryProtocol
 
 def retry_till_success(fun, *args, **kwargs):
-    if 'timeout' in kwargs:
-        timeout = kwargs['timeout']
-        del(kwargs['timeout']) # don't pass timeout to the function
-    else:
-        timeout = 60
+    timeout = kwargs.pop('timeout', 60)
+    bypassed_exception = kwargs.pop('bypassed_exception', Exception)
 
     deadline = time.time() + timeout
     while True:
         try:
             return fun(*args, **kwargs)
-        except:
+        except bypassed_exception:
             if time.time() > deadline:
                 raise
+            else:
+                # brief pause before next attempt
+                time.sleep(0.25)
 
 def create_c1c2_table(tester, cursor, read_repair=None):
     tester.create_cf(cursor, 'cf', columns={ 'c1' : 'text', 'c2' : 'text' }, read_repair=read_repair)
