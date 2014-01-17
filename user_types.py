@@ -63,7 +63,7 @@ class TestUserTypes(Tester):
         cluster = self.cluster
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
-        cursor = self.cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1).cursor()
         self.create_ks(cursor, 'nested_user_type_renaming', 2)
 
         stmt = """
@@ -164,7 +164,7 @@ class TestUserTypes(Tester):
         cluster = self.cluster
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
-        cursor = self.cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1).cursor()
         self.create_ks(cursor, 'user_type_dropping', 2)
 
         stmt = """
@@ -223,7 +223,7 @@ class TestUserTypes(Tester):
         cluster = self.cluster
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
-        cursor = self.cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1).cursor()
         self.create_ks(cursor, 'nested_user_type_dropping', 2)
 
         stmt = """
