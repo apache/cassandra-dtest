@@ -1,10 +1,12 @@
 import os
 import datetime
 import random
+import time
 import uuid
 from cql import ProgrammingError
 from dtest import Tester, debug
 from tools import since
+from decode_tools import decode
 
 
 class TestUserTypes(Tester):
@@ -324,7 +326,7 @@ class TestUserTypes(Tester):
         cluster = self.cluster
         cluster.populate(3).start()
         node1,node2,node3 = cluster.nodelist()
-        cursor = self.cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1).cursor()
         self.create_ks(cursor, 'user_types', 2)
 
         stmt = """
@@ -391,6 +393,17 @@ class TestUserTypes(Tester):
            """.format(id=_id)
         cursor.execute(stmt)
 
+        stmt = """
+              SELECT primary_item, other_items, other_containers from bucket where id={id};
+           """.format(id=_id)
+        cursor.execute(stmt)
+        
+        primary_item, other_items, other_containers = cursor.fetchone()
+        
+        self.assertEqual(decode(primary_item), [[u'test', u'test2']])
+        self.assertEqual(decode(other_items), [[u'stuff', [u'one', u'two']]])
+        self.assertEqual(decode(other_containers), [[u'stuff2', [u'one_other', u'two_other']], [u'stuff3', [u'one_2_other', u'two_2_other']], [u'stuff4', [u'one_3_other', u'two_3_other']]])
+        
         ### Generate some repetitive data and check it for it's contents:
         for x in xrange(50):
 
@@ -403,24 +416,13 @@ class TestUserTypes(Tester):
            """.format(id=_id)
             cursor.execute(stmt)
             
+            time.sleep(0.1)
+            
             ### Check it:
             stmt = """
               SELECT other_containers from bucket WHERE id={id}
             """.format(id=_id)
             cursor.execute(stmt)
 
-            try:
-                items = cursor.fetchone()[0]
-            except TypeError:
-                print stmt
-                raise
-            print items
-            self.assertEqual(len(items), 2)
-            # Item 1:
-            self.assertIn('stuff3', items[0])
-            self.assertIn('one_2_other', items[0])
-            self.assertIn('two_2_other', items[0])
-            # Item 2:
-            self.assertIn('stuff4', items[1])
-            self.assertIn('one_3_other', items[1])
-            self.assertIn('two_3_other', items[1])
+            items = cursor.fetchone()[0]
+            self.assertEqual(decode(items), [[u'stuff3', [u'one_2_other', u'two_2_other']], [u'stuff4', [u'one_3_other', u'two_3_other']]])
