@@ -197,7 +197,7 @@ class TestUserTypes(Tester):
         stmt = """
               DROP TYPE simple_type;
            """
-        with self.assertRaisesRegexp(ProgrammingError, 'Cannot drop user type simple_type as it is still used by table user_type_dropping.simple_table'):
+        with self.assertRaisesRegexp(ProgrammingError, 'Cannot drop user type user_type_dropping.simple_type as it is still used by table user_type_dropping.simple_table'):
             cursor.execute(stmt)
 
         # now that we've confirmed that a user type cannot be dropped while in use
@@ -249,7 +249,7 @@ class TestUserTypes(Tester):
         stmt = """
               DROP TYPE simple_type;
            """
-        with self.assertRaisesRegexp(ProgrammingError, 'Cannot drop user type simple_type as it is still used by user type another_type'):
+        with self.assertRaisesRegexp(ProgrammingError, 'Cannot drop user type nested_user_type_dropping.simple_type as it is still used by user type another_type'):
             cursor.execute(stmt)
 
         # drop the type that's impeding the drop, and then try again
