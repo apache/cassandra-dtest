@@ -3570,6 +3570,55 @@ class TestCQL(Tester):
         assert_one(cursor, "UPDATE test SET v='bar', version=2 WHERE id=0 AND k='k2' IF version = 1", [True])
         assert_all(cursor, "SELECT * FROM test", [[0, 'k1', 'foo', 2], [0, 'k2', 'bar', 2]])
 
+        # Testing batches
+        assert_one(cursor,
+        """
+          BEGIN BATCH
+            UPDATE test SET v='foobar' WHERE id=0 AND k='k1';
+            UPDATE test SET v='barfoo' WHERE id=0 AND k='k2';
+            UPDATE test SET version=3 WHERE id=0 IF version=1;
+          APPLY BATCH
+        """, [False, 0, None, 2])
+
+        assert_one(cursor,
+        """
+          BEGIN BATCH
+            UPDATE test SET v='foobar' WHERE id=0 AND k='k1';
+            UPDATE test SET v='barfoo' WHERE id=0 AND k='k2';
+            UPDATE test SET version=3 WHERE id=0 IF version=2;
+          APPLY BATCH
+        """, [True])
+        assert_all(cursor, "SELECT * FROM test", [[0, 'k1', 'foobar', 3], [0, 'k2', 'barfoo', 3]])
+
+        assert_all(cursor,
+        """
+          BEGIN BATCH
+            UPDATE test SET v='row1' WHERE id=0 AND k='k1' IF v='foo';
+            UPDATE test SET v='row2' WHERE id=0 AND k='k2' IF v='bar';
+            UPDATE test SET version=4 WHERE id=0 IF version=3;
+          APPLY BATCH
+        """, [[False, 0, 'k1', 'foobar', 3], [False, 0, 'k2', 'barfoo', 3]])
+
+        assert_one(cursor,
+        """
+          BEGIN BATCH
+            UPDATE test SET v='row1' WHERE id=0 AND k='k1' IF v='foobar';
+            UPDATE test SET v='row2' WHERE id=0 AND k='k2' IF v='barfoo';
+            UPDATE test SET version=4 WHERE id=0 IF version=3;
+          APPLY BATCH
+        """, [True])
+        assert_all(cursor, "SELECT * FROM test", [[0, 'k1', 'row1', 4], [0, 'k2', 'row2', 4]])
+
+        assert_invalid(cursor,
+        """
+          BEGIN BATCH
+            UPDATE test SET v='row1' WHERE id=0 AND k='k1';
+            UPDATE test SET v='row2' WHERE id=1 AND k='k2';
+            UPDATE test SET version=5 WHERE id=0 IF version=4;
+          APPLY BATCH
+        """)
+
+
     def select_count_paging_test(self):
         """ Test for the #6579 'select count' paging bug """
 

@@ -51,7 +51,7 @@ class TestAuth(Tester):
         jackob = self.get_cursor(user='jackob', password='12345')
         with self.assertRaises(ProgrammingError) as cm:
             jackob.execute("CREATE USER james WITH PASSWORD '54321' NOSUPERUSER")
-        self.assertEqual('Bad Request: Only superusers are allowed to perfrom CREATE USER queries',
+        self.assertEqual('Bad Request: Only superusers are allowed to perform CREATE USER queries',
                          cm.exception.message)
 
     def password_authenticator_create_user_requires_password_test(self):
@@ -111,7 +111,7 @@ class TestAuth(Tester):
         self.assertEqual(3, cassandra.rowcount)
 
         cathy = self.get_cursor(user='cathy', password='12345')
-        self.assertUnauthorized('Only superusers are allowed to perfrom DROP USER queries',
+        self.assertUnauthorized('Only superusers are allowed to perform DROP USER queries',
                                 cathy, 'DROP USER dave')
 
         cassandra.execute("LIST USERS")
