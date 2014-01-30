@@ -481,3 +481,86 @@ class TestUserTypes(Tester):
         
         self.assertEqual(first_name, u'Nero')
         self.assertEqual(like, u'arson')
+
+    @since('2.1')
+    def test_type_secondary_indexing(self):
+        """
+        Confirm that user types are secondary-indexable
+        Similar procedure to TestSecondaryIndexesOnCollections.test_list_indexes
+        """
+        cluster = self.cluster
+        cluster.populate(3).start()
+        node1,node2,node3 = cluster.nodelist()
+        cursor = self.patient_cql_connection(node1).cursor()
+        self.create_ks(cursor, 'user_type_indexing', 2)
+                
+        stmt = """
+              CREATE TYPE t_person_name (
+              first text,
+              middle text,
+              last text
+            )
+           """
+        cursor.execute(stmt)
+
+        stmt = """
+              CREATE TABLE person_likes (
+              id uuid PRIMARY KEY,
+              name t_person_name,
+              like text
+              )
+           """
+        cursor.execute(stmt)
+        
+        # no index present yet, make sure there's an error trying to query column
+        stmt = """
+              SELECT * from person_likes where name = {first:'Nero', middle: 'Claudius Caesar Augustus', last: 'Germanicus'};
+            """
+        with self.assertRaisesRegexp(ProgrammingError, 'No indexed columns present in by-columns clause'):
+            cursor.execute(stmt)
+        
+        # add index and query again (even though there are no rows in the table yet)
+        stmt = """
+              CREATE INDEX person_likes_name on person_likes (name);
+            """
+        cursor.execute(stmt)
+
+        stmt = """
+              SELECT * from person_likes where name = {first:'Nero', middle: 'Claudius Caesar Augustus', last: 'Germanicus'};
+            """
+        cursor.execute(stmt)
+        self.assertEqual(0, cursor.rowcount)
+
+        # add a row which doesn't specify data for the indexed column, and query again
+        _id = uuid.uuid4()
+        stmt = """
+              INSERT INTO person_likes (id, like)
+              VALUES ({id}, 'long walks on the beach');
+           """.format(id=_id)
+        cursor.execute(stmt)
+        
+        stmt = """
+              SELECT * from person_likes where name = {first:'Bob', middle: 'Testy', last: 'McTesterson'};
+            """
+        cursor.execute(stmt)
+        self.assertEqual(0, cursor.rowcount)
+        
+        # finally let's add a queryable row, and get it back using the index
+        _id = uuid.uuid4()
+
+        stmt = """
+              INSERT INTO person_likes (id, name, like)
+              VALUES ({id}, {{first:'Nero', middle:'Claudius Caesar Augustus', last:'Germanicus'}}, 'arson');
+           """.format(id=_id)
+        cursor.execute(stmt)
+        
+        stmt = """
+              SELECT id, name.first, like from person_likes where name = {first:'Nero', middle: 'Claudius Caesar Augustus', last: 'Germanicus'};
+           """
+        cursor.execute(stmt)
+        
+        row_uuid, first_name, like = cursor.fetchone()
+        
+        self.assertEqual(str(row_uuid), str(_id))
+        self.assertEqual(first_name, u'Nero')
+        self.assertEqual(like, u'arson')
