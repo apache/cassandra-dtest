@@ -426,3 +426,58 @@ class TestUserTypes(Tester):
 
             items = cursor.fetchone()[0]
             self.assertEqual(decode(items), [[u'stuff3', [u'one_2_other', u'two_2_other']], [u'stuff4', [u'one_3_other', u'two_3_other']]])
+
+    @since('2.1')
+    def test_type_as_part_of_pkey(self):
+        """Tests user types as part of a composite pkey"""
+        # make sure we can define a table with a user type as part of the pkey
+        # and do a basic insert/query of data in that table.
+        cluster = self.cluster
+        cluster.populate(3).start()
+        node1,node2,node3 = cluster.nodelist()
+        cursor = self.patient_cql_connection(node1).cursor()
+        self.create_ks(cursor, 'user_type_pkeys', 2)
+        
+        stmt = """
+              CREATE TYPE t_person_name (
+              first text,
+              middle text,
+              last text
+            )
+           """
+        cursor.execute(stmt)
+
+        stmt = """
+              CREATE TABLE person_likes (
+              id uuid,
+              name t_person_name,
+              like text,
+              PRIMARY KEY ((id, name))
+              )
+           """
+        cursor.execute(stmt)
+
+        _id = uuid.uuid4()
+
+        stmt = """
+              INSERT INTO person_likes (id, name, like)
+              VALUES ({id}, {{first:'Nero', middle:'Claudius Caesar Augustus', last:'Germanicus'}}, 'arson');
+           """.format(id=_id)
+        cursor.execute(stmt)
+        
+        # attempt to query without the user type portion of the pkey and confirm there is an error
+        stmt = """
+              SELECT id, name.first from person_likes where id={id};
+           """.format(id=_id)
+        with self.assertRaisesRegexp(ProgrammingError, 'Partition key part name must be restricted since preceding part is'):
+            cursor.execute(stmt)
+            
+        stmt = """
+              SELECT id, name.first, like from person_likes where id={id} and name = {{first:'Nero', middle: 'Claudius Caesar Augustus', last: 'Germanicus'}};
+           """.format(id=_id)
+        cursor.execute(stmt)
+        
+        row_uuid, first_name, like = cursor.fetchone()
+        
+        self.assertEqual(first_name, u'Nero')
+        self.assertEqual(like, u'arson')
