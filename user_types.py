@@ -246,15 +246,22 @@ class TestUserTypes(Tester):
 
         # TODO: uncomment below after CASSANDRA-6472 is resolved
         # and add another check to make sure the table/type drops succeed
-        # stmt = """
-        #       DROP TABLE simple_table;
-        #    """.format(id=_id)
-        #
-        # cursor.execute(stmt)
-        # stmt = """
-        #       DROP TYPE simple_type;
-        #    """
-        # cursor.execute(stmt)
+        stmt = """
+              DROP TABLE simple_table;
+           """.format(id=_id)        
+        cursor.execute(stmt)
+        
+        stmt = """
+              DROP TYPE simple_type;
+           """
+        cursor.execute(stmt)
+        
+        # now let's have a look at the system schema and make sure no user types are defined
+        stmt = """
+              SELECT type_name from system.schema_usertypes;
+           """
+        cursor.execute(stmt)
+        self.assertEqual(0, cursor.rowcount)
 
     @since('2.1')
     def test_nested_type_dropping(self):
