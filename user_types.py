@@ -612,3 +612,40 @@ class TestUserTypes(Tester):
         self.assertEqual(str(row_uuid), str(_id))
         self.assertEqual(first_name, u'Nero')
         self.assertEqual(like, u'arson')
+        
+        #rename the type and make sure the index still works
+        stmt = """
+            ALTER TYPE t_person_name rename to t_person_name2;
+            """
+        cursor.execute(stmt)
+        
+        stmt = """
+            SELECT id, name.first, like from person_likes where name = {first:'Nero', middle: 'Claudius Caesar Augustus', last: 'Germanicus'};
+            """
+        cursor.execute(stmt)
+        
+        row_uuid, first_name, like = cursor.fetchone()
+        
+        self.assertEqual(str(row_uuid), str(_id))
+        self.assertEqual(first_name, u'Nero')
+        self.assertEqual(like, u'arson')
+
+        # add another row to be sure the index is still adding new data
+        _id = uuid.uuid4()
+
+        stmt = """
+              INSERT INTO person_likes (id, name, like)
+              VALUES ({id}, {{first:'Abraham', middle:'', last:'Lincoln'}}, 'preserving unions');
+           """.format(id=_id)
+        cursor.execute(stmt)
+        
+        stmt = """
+            SELECT id, name.first, like from person_likes where name = {first:'Abraham', middle:'', last:'Lincoln'};
+            """
+        cursor.execute(stmt)
+        
+        row_uuid, first_name, like = cursor.fetchone()
+        
+        self.assertEqual(str(row_uuid), str(_id))
+        self.assertEqual(first_name, u'Abraham')
+        self.assertEqual(like, u'preserving unions')
