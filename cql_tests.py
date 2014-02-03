@@ -3645,3 +3645,41 @@ class TestCQL(Tester):
         # make sure the rename propagated to the table correctly.
         assert_invalid(cursor, "DROP TYPE renamed_type")
 
+    @require('6623')
+    def cas_and_ttl_test(self):
+        cursor = self.prepare()
+        cursor.execute("CREATE TABLE test (k int PRIMARY KEY, v int, lock boolean)")
+
+        cursor.execute("INSERT INTO test (k, v, lock) VALUES (0, 0, false)")
+        cursor.execute("UPDATE test USING TTL 1 SET lock=true WHERE k=0")
+
+        time.sleep(2)
+
+        assert_one(cursor, "UPDATE test SET v = 1 WHERE k = 0 IF lock = null", [True])
+
+    @require('4851')
+    def tuple_notation_test(self):
+        """ Test the syntax introduced by #4851 """
+        cursor = self.prepare()
+
+        cursor.execute("CREATE TABLE test (k int, v1 int, v2 int, v3 int, PRIMARY KEY (k, v1, v2, v3))")
+        for i in range(0, 2):
+            for j in range(0, 2):
+                for k in range(0, 2):
+                    cursor.execute("INSERT INTO test(k, v1, v2, v3) VALUES (0, %d, %d, %d)" % (i, j, k))
+
+        assert_all(cursor, "SELECT v1, v2, v3 FROM test WHERE k = 0", [[0, 0, 0],
+                                                                       [0, 0, 1],
+                                                                       [0, 1, 0],
+                                                                       [0, 1, 1],
+                                                                       [1, 0, 0],
+                                                                       [1, 0, 1],
+                                                                       [1, 1, 0],
+                                                                       [1, 1, 1]])
+
+        assert_all(cursor, "SELECT v1, v2, v3 FROM test WHERE k = 0 AND (v1, v2, v3) >= (1, 0, 1)", [[1, 0, 1], [1, 1, 0], [1, 1, 1]])
+        assert_all(cursor, "SELECT v1, v2, v3 FROM test WHERE k = 0 AND (v1, v2) >= (1, 1)", [[1, 1, 0], [1, 1, 1]])
+        assert_all(cursor, "SELECT v1, v2, v3 FROM test WHERE k = 0 AND (v1, v2) > (0, 1) AND (v1, v2, v3) <= (1, 1, 0)", [[1, 0, 0], [1, 0, 1], [1, 1, 0]])
+
+        assert_invalid(cursor, "SELECT v1, v2, v3 FROM test WHERE k = 0 AND (v1, v3) > (1, 0)")
+
