@@ -1,5 +1,5 @@
 import random, time
-from dtest import Tester
+from dtest import Tester, debug
 from tools import *
 from assertions import *
 from ccmlib.cluster import Cluster
@@ -46,3 +46,19 @@ class TestBoostrap(Tester):
         size2 = node2.data_size()
         assert_almost_equal(size1, size2)
         assert_almost_equal(initial_size, 2 * size1)
+
+    def read_from_bootstrapped_node_test(self):
+        """Test bootstrapped node sees existing data, eg. CASSANDRA-6648"""
+        cluster = self.cluster
+        cluster.populate(3)
+        cluster.start()
+        
+        node1 = cluster.nodes['node1']
+        node1.stress(['-n 10000'])
+        
+        node4 = new_node(cluster)
+        node4.start()
+
+        cursor = self.patient_cql_connection(node4).cursor()
+        cursor.execute('select * from "Keyspace1"."Standard1" limit 10')
+        assert len(list(cursor)) == 10
