@@ -15,7 +15,7 @@ class TestTopology(Tester):
         cluster.populate(3, tokens=[0, 2**48, 2**62]).start()
         [node1, node2, node3] = cluster.nodelist()
 
-        cursor = self.cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1).cursor()
         self.create_ks(cursor, 'ks', 1)
         self.create_cf(cursor, 'cf', columns={'c1': 'text', 'c2': 'text'})
 
@@ -56,7 +56,7 @@ class TestTopology(Tester):
         cluster.populate(4, tokens=tokens).start()
         [node1, node2, node3, node4] = cluster.nodelist()
 
-        cursor = self.cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1).cursor()
         self.create_ks(cursor, 'ks', 2)
         self.create_cf(cursor, 'cf',columns={'c1': 'text', 'c2': 'text'})
 
@@ -123,7 +123,7 @@ class TestTopology(Tester):
         cluster.populate(3, tokens=tokens).start()
         [node1, node2, node3] = cluster.nodelist()
 
-        cursor = self.cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1).cursor()
         self.create_ks(cursor, 'ks', 3)
         self.create_cf(cursor, 'cf', columns={'c1': 'text', 'c2': 'text'})
 
@@ -157,7 +157,7 @@ class TestTopology(Tester):
         node1 = cluster.nodelist()[0]
         time.sleep(0.2)
 
-        cursor = self.cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1).cursor()
         self.create_ks(cursor, 'ks', 1)
         self.create_cf(cursor, 'cf', columns={'c1': 'text', 'c2': 'text'})
 

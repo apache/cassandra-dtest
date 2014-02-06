@@ -9,7 +9,7 @@ class TestMultiDCPutGet(Tester):
         cluster = self.cluster
         cluster.populate([1, 1]).start()
 
-        cursor = self.cql_connection(cluster.nodelist()[0]).cursor()
+        cursor = self.patient_cql_connection(cluster.nodelist()[0]).cursor()
         self.create_ks(cursor, 'ks', { 'dc1' : 1, 'dc2' : 1})
         self.create_cf(cursor, 'cf')
 
@@ -20,7 +20,7 @@ class TestMultiDCPutGet(Tester):
         cluster = self.cluster
         cluster.populate([2, 2]).start()
 
-        cursor = self.cql_connection(cluster.nodelist()[0]).cursor()
+        cursor = self.patient_cql_connection(cluster.nodelist()[0]).cursor()
         self.create_ks(cursor, 'ks', { 'dc1' : 2, 'dc2' : 2})
         self.create_cf(cursor, 'cf')
 
