@@ -13,7 +13,7 @@ class TestConfiguration(Tester):
 
         cluster.populate(1).start()
         node = cluster.nodelist()[0]
-        cursor = self.cql_connection(node).cursor()
+        cursor = self.patient_cql_connection(node).cursor()
         self.create_ks(cursor, 'ks', 1)
 
         create_table_query = "CREATE TABLE test_table (row varchar, name varchar, value int, PRIMARY KEY (row, name));"
