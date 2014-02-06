@@ -3545,7 +3545,7 @@ class TestCQL(Tester):
         cursor.execute("DELETE s FROM test WHERE k=0")
         assert_all(cursor, "SELECT * FROM test", [[0, 1, None, 1]])
 
-    @require('#6561')
+    #@require('#6561')
     def static_columns_cas_test(self):
         cursor = self.prepare()
 
@@ -3617,6 +3617,41 @@ class TestCQL(Tester):
             UPDATE test SET version=5 WHERE id=0 IF version=4;
           APPLY BATCH
         """)
+
+        assert_one(cursor,
+        """
+          BEGIN BATCH
+            INSERT INTO TEST (id, k, v) VALUES(1, 'k1', 'val1') IF NOT EXISTS;
+            INSERT INTO TEST (id, k, v) VALUES(1, 'k2', 'val2') IF NOT EXISTS;
+          APPLY BATCH
+        """, [True])
+        assert_all(cursor, "SELECT * FROM test WHERE id=1", [[1, 'k1', 'val1', None], [1, 'k2', 'val2', None]])
+
+        assert_one(cursor,
+        """
+          BEGIN BATCH
+            INSERT INTO TEST (id, k, v) VALUES(1, 'k2', 'val2') IF NOT EXISTS;
+            INSERT INTO TEST (id, k, v) VALUES(1, 'k3', 'val3') IF NOT EXISTS;
+          APPLY BATCH
+        """, [False, 1, 'k2', 'val2', None])
+
+        assert_one(cursor,
+        """
+          BEGIN BATCH
+            UPDATE test SET v='newVal' WHERE id=1 AND k='k2' IF v='val0';
+            INSERT INTO TEST (id, k, v) VALUES(1, 'k3', 'val3') IF NOT EXISTS;
+          APPLY BATCH
+        """, [False, 1, 'k2', 'val2', None])
+        assert_all(cursor, "SELECT * FROM test WHERE id=1", [[1, 'k1', 'val1', None], [1, 'k2', 'val2', None]])
+
+        assert_one(cursor,
+        """
+          BEGIN BATCH
+            UPDATE test SET v='newVal' WHERE id=1 AND k='k2' IF v='val2';
+            INSERT INTO TEST (id, k, v, version) VALUES(1, 'k3', 'val3', 1) IF NOT EXISTS;
+          APPLY BATCH
+        """, [True])
+        assert_all(cursor, "SELECT * FROM test WHERE id=1", [[1, 'k1', 'val1', 1], [1, 'k2', 'newVal', 1], [1, 'k3', 'val3', 1]])
 
 
     def select_count_paging_test(self):
