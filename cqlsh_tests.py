@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
 from dtest import Tester, debug
 from tools import since, require
+from ccmlib import common
+import subprocess
 import binascii
 from decimal import Decimal
+import sys, os
 from uuid import UUID
 
 class TestCqlsh(Tester):
@@ -268,3 +271,21 @@ UPDATE varcharmaptable SET varcharvarintmap['Vitrum edere possum, mihi non nocet
             'I can eat glass and it does not hurt me' : 1400
         })
 
+        output = run_cqlsh(node1, 'use testks; SELECT * FROM varcharmaptable')
+        self.assertEquals(output.count("Можам да јадам стакло, а не ме штета."), 16)
+
+
+def run_cqlsh(node, cmds, cqlsh_options=[]):
+    cdir = node.get_cassandra_dir()
+    cli = os.path.join(cdir, 'bin', 'cqlsh')
+    env = common.make_cassandra_env(cdir, node.get_path())
+    host = node.network_interfaces['thrift'][0]
+    port = node.network_interfaces['thrift'][1]
+    args = cqlsh_options + [ host, str(port) ]
+    sys.stdout.flush()
+    p = subprocess.Popen([ cli ] + args, env=env, stdin=subprocess.PIPE, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+    for cmd in cmds.split(';'):
+        p.stdin.write(cmd + ';\n')
+    p.stdin.write("quit;\n")
+    p.wait()
+    return p.stdout.read()
