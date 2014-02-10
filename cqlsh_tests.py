@@ -272,7 +272,10 @@ UPDATE varcharmaptable SET varcharvarintmap['Vitrum edere possum, mihi non nocet
         })
 
         output = run_cqlsh(node1, 'use testks; SELECT * FROM varcharmaptable')
-        self.assertEquals(output.count("Можам да јадам стакло, а не ме штета."), 16)
+
+        self.assertEquals(output.count('Можам да јадам стакло, а не ме штета.'), 16)
+        self.assertEquals(output.count(' ⠊⠀⠉⠁⠝⠀⠑⠁⠞⠀⠛⠇⠁⠎⠎⠀⠁⠝⠙⠀⠊⠞⠀⠙⠕⠑⠎⠝⠞⠀⠓⠥⠗⠞⠀⠍⠑'), 16)
+        self.assertEquals(output.count('᚛᚛ᚉᚑᚅᚔᚉᚉᚔᚋ ᚔᚈᚔ ᚍᚂᚐᚅᚑ ᚅᚔᚋᚌᚓᚅᚐ᚜'), 2)
 
 
 def run_cqlsh(node, cmds, cqlsh_options=[]):
