@@ -246,15 +246,22 @@ class TestUserTypes(Tester):
 
         # TODO: uncomment below after CASSANDRA-6472 is resolved
         # and add another check to make sure the table/type drops succeed
-        # stmt = """
-        #       DROP TABLE simple_table;
-        #    """.format(id=_id)
-        #
-        # cursor.execute(stmt)
-        # stmt = """
-        #       DROP TYPE simple_type;
-        #    """
-        # cursor.execute(stmt)
+        stmt = """
+              DROP TABLE simple_table;
+           """.format(id=_id)        
+        cursor.execute(stmt)
+        
+        stmt = """
+              DROP TYPE simple_type;
+           """
+        cursor.execute(stmt)
+        
+        # now let's have a look at the system schema and make sure no user types are defined
+        stmt = """
+              SELECT type_name from system.schema_usertypes;
+           """
+        cursor.execute(stmt)
+        self.assertEqual(0, cursor.rowcount)
 
     @since('2.1')
     def test_nested_type_dropping(self):
@@ -605,3 +612,112 @@ class TestUserTypes(Tester):
         self.assertEqual(str(row_uuid), str(_id))
         self.assertEqual(first_name, u'Nero')
         self.assertEqual(like, u'arson')
+        
+        #rename the type and make sure the index still works
+        stmt = """
+            ALTER TYPE t_person_name rename to t_person_name2;
+            """
+        cursor.execute(stmt)
+        
+        stmt = """
+            SELECT id, name.first, like from person_likes where name = {first:'Nero', middle: 'Claudius Caesar Augustus', last: 'Germanicus'};
+            """
+        cursor.execute(stmt)
+        
+        row_uuid, first_name, like = cursor.fetchone()
+        
+        self.assertEqual(str(row_uuid), str(_id))
+        self.assertEqual(first_name, u'Nero')
+        self.assertEqual(like, u'arson')
+
+        # add another row to be sure the index is still adding new data
+        _id = uuid.uuid4()
+
+        stmt = """
+              INSERT INTO person_likes (id, name, like)
+              VALUES ({id}, {{first:'Abraham', middle:'', last:'Lincoln'}}, 'preserving unions');
+           """.format(id=_id)
+        cursor.execute(stmt)
+        
+        stmt = """
+            SELECT id, name.first, like from person_likes where name = {first:'Abraham', middle:'', last:'Lincoln'};
+            """
+        cursor.execute(stmt)
+        
+        row_uuid, first_name, like = cursor.fetchone()
+        
+        self.assertEqual(str(row_uuid), str(_id))
+        self.assertEqual(first_name, u'Abraham')
+        self.assertEqual(like, u'preserving unions')
+        
+    @since('2.1')
+    def test_type_keyspace_permission_isolation(self):
+        """
+        Confirm permissions are respected for types in different keyspaces
+        """
+        self.ignore_log_patterns = [
+            # I think this happens when permissions change and a node becomes temporarily unavailable
+            # and it's probably ok to ignore on this test, as I can see the schema changes propogating
+            # almost immediately after
+            r'Can\'t send migration request: node.*is down',
+        ]
+        
+        cluster = self.cluster
+        config = {'authenticator' : 'org.apache.cassandra.auth.PasswordAuthenticator',
+                  'authorizer' : 'org.apache.cassandra.auth.CassandraAuthorizer',
+                  'permissions_validity_in_ms' : 0}
+        cluster.set_configuration_options(values=config)
+        cluster.populate(3).start()
+        node1, node2, node3 = cluster.nodelist()
+        # need a bit of time for user to be created and propagate
+        time.sleep(5)
+        
+        # do setup that requires a super user
+        superuser_cursor = self.patient_cql_connection(node1, user='cassandra', password='cassandra').cursor()
+        superuser_cursor.execute("create user ks1_user with password 'cassandra' nosuperuser;")
+        superuser_cursor.execute("create user ks2_user with password 'cassandra' nosuperuser;")
+        self.create_ks(superuser_cursor, 'ks1', 2)
+        self.create_ks(superuser_cursor, 'ks2', 2)
+        superuser_cursor.execute("grant all permissions on keyspace ks1 to ks1_user;")
+        superuser_cursor.execute("grant all permissions on keyspace ks2 to ks2_user;")
+        
+        user1_cursor = self.patient_cql_connection(node1, user='ks1_user', password='cassandra').cursor()
+        user2_cursor = self.patient_cql_connection(node1, user='ks2_user', password='cassandra').cursor()
+
+        # first make sure the users can't create types in each other's ks
+        with self.assertRaisesRegexp(ProgrammingError, 'User ks1_user has no CREATE permission on <keyspace ks2> or any of its parents'):
+            user1_cursor.execute("CREATE TYPE ks2.simple_type (user_number int, user_text text );")
+        
+        with self.assertRaisesRegexp(ProgrammingError, 'User ks2_user has no CREATE permission on <keyspace ks1> or any of its parents'):
+            user2_cursor.execute("CREATE TYPE ks1.simple_type (user_number int, user_text text );")
+        
+        # now, actually create the types in the correct keyspaces
+        user1_cursor.execute("CREATE TYPE ks1.simple_type (user_number int, user_text text );")
+        user2_cursor.execute("CREATE TYPE ks2.simple_type (user_number int, user_text text );")
+        
+        # each user now has a type belonging to their granted keyspace
+        # let's make sure they can't drop each other's types (for which they have no permissions)
+        with self.assertRaisesRegexp(ProgrammingError, 'User ks1_user has no DROP permission on <keyspace ks2> or any of its parents'):
+            user1_cursor.execute("DROP TYPE ks2.simple_type;")
+        
+        with self.assertRaisesRegexp(ProgrammingError, 'User ks2_user has no DROP permission on <keyspace ks1> or any of its parents'):
+            user2_cursor.execute("DROP TYPE ks1.simple_type;")
+        
+        # let's make sure they can't rename each other's types (for which they have no permissions)
+        with self.assertRaisesRegexp(ProgrammingError, 'User ks1_user has no ALTER permission on <keyspace ks2> or any of its parents'):
+            user1_cursor.execute("ALTER TYPE ks2.simple_type RENAME TO ks2.renamed_type;")
+        
+        with self.assertRaisesRegexp(ProgrammingError, 'User ks2_user has no ALTER permission on <keyspace ks1> or any of its parents'):
+            user2_cursor.execute("ALTER TYPE ks1.simple_type RENAME TO ks1.renamed_type;")
+
+        #rename the types using the correct user w/permissions to do so
+        user1_cursor.execute("ALTER TYPE ks1.simple_type RENAME TO ks1.renamed_type;")
+        user2_cursor.execute("ALTER TYPE ks2.simple_type RENAME TO ks2.renamed_type;")
+        
+        #finally, drop the types using the correct user w/permissions to do so
+        user1_cursor.execute("DROP TYPE ks1.renamed_type;")
+        user2_cursor.execute("DROP TYPE ks2.renamed_type;")
+        
+        #verify user type metadata is gone from the system schema
+        superuser_cursor.execute("SELECT * from system.schema_usertypes")
+        self.assertEqual(0, superuser_cursor.rowcount)
