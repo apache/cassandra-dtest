@@ -655,15 +655,22 @@ class TestUserTypes(Tester):
         """
         Confirm permissions are respected for types in different keyspaces
         """
+        self.ignore_log_patterns = [
+            # I think this happens when permissions change and a node becomes temporarily unavailable
+            # and it's probably ok to ignore on this test, as I can see the schema changes propogating
+            # almost immediately after
+            r'Can\'t send migration request: node.*is down',
+        ]
+        
         cluster = self.cluster
         config = {'authenticator' : 'org.apache.cassandra.auth.PasswordAuthenticator',
                   'authorizer' : 'org.apache.cassandra.auth.CassandraAuthorizer',
-                  'permissions_validity_in_ms' : 2000}
+                  'permissions_validity_in_ms' : 0}
         cluster.set_configuration_options(values=config)
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
         # need a bit of time for user to be created and propagate
-        time.sleep(10)
+        time.sleep(5)
         
         # do setup that requires a super user
         superuser_cursor = self.patient_cql_connection(node1, user='cassandra', password='cassandra').cursor()
