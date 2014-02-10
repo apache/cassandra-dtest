@@ -13,13 +13,13 @@ class TestCounters(Tester):
         cluster.populate(3).start()
         nodes = cluster.nodelist()
 
-        cursor = self.cql_connection(nodes[0]).cursor()
+        cursor = self.patient_cql_connection(nodes[0]).cursor()
         self.create_ks(cursor, 'ks', 3)
         self.create_cf(cursor, 'cf', validation="CounterColumnType", columns={'c': 'counter'})
         cursor.close()
 
 
-        cursors = [ self.cql_connection(node, 'ks').cursor() for node in nodes ]
+        cursors = [ self.patient_cql_connection(node, 'ks').cursor() for node in nodes ]
         nb_increment=50
         nb_counter=10
 
@@ -53,7 +53,7 @@ class TestCounters(Tester):
 
         cql_version=None
 
-        cursor = self.cql_connection(nodes[0], version=cql_version).cursor()
+        cursor = self.patient_cql_connection(nodes[0], version=cql_version).cursor()
         self.create_ks(cursor, 'ks', 2)
 
         query = """
@@ -73,7 +73,7 @@ class TestCounters(Tester):
         updates = 50
 
         def make_updates():
-            cursor = self.cql_connection(nodes[0], keyspace='ks', version=cql_version).cursor()
+            cursor = self.patient_cql_connection(nodes[0], keyspace='ks', version=cql_version).cursor()
             upd = "UPDATE counterTable SET c = c + 1 WHERE k = %d;"
             #upd = "UPDATE counterTable SET c = c + 1 WHERE k = :k%d;"
             if cluster.version() >= '1.2':
@@ -93,7 +93,7 @@ class TestCounters(Tester):
                 #cursor.execute_prepared(query, kmap)
 
         def check(i):
-            cursor = self.cql_connection(nodes[0], keyspace='ks', version=cql_version).cursor()
+            cursor = self.patient_cql_connection(nodes[0], keyspace='ks', version=cql_version).cursor()
             if cluster.version() >= '1.2':
                 cursor.execute("SELECT * FROM counterTable", consistency_level='QUORUM')
             else:

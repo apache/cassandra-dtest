@@ -21,7 +21,7 @@ class TestSuperCounterClusterRestart(Tester):
         node1 = cluster.nodelist()[0]
 
         time.sleep(.5)
-        cursor = self.cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1).cursor()
         self.create_ks(cursor, 'ks', 3)
         time.sleep(1) # wait for propagation
 

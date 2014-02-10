@@ -35,7 +35,7 @@ class TestWideRows(Tester):
         cluster.populate(1).start()
         (node1,) = cluster.nodelist()
 
-        cursor = self.cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1).cursor()
         start_time = datetime.datetime.now()
         self.create_ks(cursor, 'wide_rows', 1)
         # Simple timeline:  user -> {date: value, ...}
@@ -75,7 +75,7 @@ class TestWideRows(Tester):
         cluster.populate(1).start()
         (node1,) = cluster.nodelist()
         cluster.set_configuration_options(values={ 'column_index_size_in_kb' : 1 }) #reduce this value to force column index creation
-        cursor = self.cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1).cursor()
         self.create_ks(cursor, 'wide_rows', 1)
         
         create_table_query = 'CREATE TABLE test_table (row varchar, name varchar, value int, PRIMARY KEY (row, name));'
