@@ -17,7 +17,10 @@ class TestCounters(Tester):
         cluster.populate(1).start()
         node = cluster.nodelist()[0]
         debug("Run stress to insert data")
-        node.stress( ['-o', 'insert'] )
+        if cluster.version() < "2.1":
+            node.stress( ['-o', 'insert'] )
+        else:
+            node.stress( ['write', 'n=1000000'] )
         
         self._do_compaction(node)
         self._do_split(node)
@@ -25,7 +28,10 @@ class TestCounters(Tester):
         self._do_split(node)
 
         debug("Run stress to ensure data is readable")
-        node.stress( ['-o', 'read'] )
+        if cluster.version() < "2.1":
+            node.stress( ['-o', 'read'] )
+        else:
+            node.stress( ['read', 'n=1000000', '-rate', 'threads=8'] )
 
     def _do_compaction(self, node):
         debug("Compact sstables.")
