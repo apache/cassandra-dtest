@@ -21,7 +21,7 @@ class TestSSTableSplit(Tester):
         if version < "2.1":
             node.stress( ['-o', 'insert'] )
         else:
-            node.stress( ['write', 'n=1500000', '-rate', 'threads=8'] )
+            node.stress( ['write', 'n=1100000', '-rate', 'threads=8'] )
         
         self._do_compaction(node)
         self._do_split(node, version)
@@ -32,7 +32,7 @@ class TestSSTableSplit(Tester):
         if version < "2.1":
             node.stress( ['-o', 'read'] )
         else:
-            node.stress( ['read', 'n=1500000', '-rate', 'threads=8'] )
+            node.stress( ['read', 'n=1100000', '-rate', 'threads=8'] )
 
     def _do_compaction(self, node):
         debug("Compact sstables.")
