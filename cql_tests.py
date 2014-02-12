@@ -3553,8 +3553,8 @@ class TestCQL(Tester):
             CREATE TABLE test (
                 id int,
                 k text,
-                v text,
                 version int static,
+                v text,
                 PRIMARY KEY (id, k)
             )
         """)
@@ -3562,13 +3562,13 @@ class TestCQL(Tester):
         cursor.execute("INSERT INTO test(id, version) VALUES (0, 0)")
 
         assert_one(cursor, "UPDATE test SET v='foo', version=1 WHERE id=0 AND k='k1' IF version = 0", [True])
-        assert_all(cursor, "SELECT * FROM test", [[0, 'k1', 'foo', 1]])
+        assert_all(cursor, "SELECT * FROM test", [[0, 'k1', 1, 'foo']])
 
         assert_one(cursor, "UPDATE test SET v='bar', version=1 WHERE id=0 AND k='k2' IF version = 0", [False, 1])
-        assert_all(cursor, "SELECT * FROM test", [[0, 'k1', 'foo', 1]])
+        assert_all(cursor, "SELECT * FROM test", [[0, 'k1', 1, 'foo']])
 
         assert_one(cursor, "UPDATE test SET v='bar', version=2 WHERE id=0 AND k='k2' IF version = 1", [True])
-        assert_all(cursor, "SELECT * FROM test", [[0, 'k1', 'foo', 2], [0, 'k2', 'bar', 2]])
+        assert_all(cursor, "SELECT * FROM test", [[0, 'k1', 2, 'foo'], [0, 'k2', 2, 'bar']])
 
         # Testing batches
         assert_one(cursor,
@@ -3588,33 +3588,33 @@ class TestCQL(Tester):
             UPDATE test SET version=3 WHERE id=0 IF version=2;
           APPLY BATCH
         """, [True])
-        assert_all(cursor, "SELECT * FROM test", [[0, 'k1', 'foobar', 3], [0, 'k2', 'barfoo', 3]])
+        assert_all(cursor, "SELECT * FROM test", [[0, 'k1', 3, 'foobar'], [0, 'k2', 3, 'barfoo']])
 
         assert_all(cursor,
         """
           BEGIN BATCH
+            UPDATE test SET version=4 WHERE id=0 IF version=3;
             UPDATE test SET v='row1' WHERE id=0 AND k='k1' IF v='foo';
             UPDATE test SET v='row2' WHERE id=0 AND k='k2' IF v='bar';
-            UPDATE test SET version=4 WHERE id=0 IF version=3;
           APPLY BATCH
-        """, [[False, 0, 'k1', 'foobar', 3], [False, 0, 'k2', 'barfoo', 3]])
+        """, [[False, 0, 'k1', 3, 'foobar'], [False, 0, 'k2', 3, 'barfoo']])
 
         assert_one(cursor,
         """
           BEGIN BATCH
+            UPDATE test SET version=4 WHERE id=0 IF version=3;
             UPDATE test SET v='row1' WHERE id=0 AND k='k1' IF v='foobar';
             UPDATE test SET v='row2' WHERE id=0 AND k='k2' IF v='barfoo';
-            UPDATE test SET version=4 WHERE id=0 IF version=3;
           APPLY BATCH
         """, [True])
-        assert_all(cursor, "SELECT * FROM test", [[0, 'k1', 'row1', 4], [0, 'k2', 'row2', 4]])
+        assert_all(cursor, "SELECT * FROM test", [[0, 'k1', 4, 'row1'], [0, 'k2', 4, 'row2']])
 
         assert_invalid(cursor,
         """
           BEGIN BATCH
+            UPDATE test SET version=5 WHERE id=0 IF version=4;
             UPDATE test SET v='row1' WHERE id=0 AND k='k1';
             UPDATE test SET v='row2' WHERE id=1 AND k='k2';
-            UPDATE test SET version=5 WHERE id=0 IF version=4;
           APPLY BATCH
         """)
 
@@ -3625,7 +3625,7 @@ class TestCQL(Tester):
             INSERT INTO TEST (id, k, v) VALUES(1, 'k2', 'val2') IF NOT EXISTS;
           APPLY BATCH
         """, [True])
-        assert_all(cursor, "SELECT * FROM test WHERE id=1", [[1, 'k1', 'val1', None], [1, 'k2', 'val2', None]])
+        assert_all(cursor, "SELECT * FROM test WHERE id=1", [[1, 'k1', None, 'val1'], [1, 'k2', None, 'val2']])
 
         assert_one(cursor,
         """
@@ -3633,7 +3633,7 @@ class TestCQL(Tester):
             INSERT INTO TEST (id, k, v) VALUES(1, 'k2', 'val2') IF NOT EXISTS;
             INSERT INTO TEST (id, k, v) VALUES(1, 'k3', 'val3') IF NOT EXISTS;
           APPLY BATCH
-        """, [False, 1, 'k2', 'val2', None])
+        """, [False, 1, 'k2', None, 'val2'])
 
         assert_one(cursor,
         """
@@ -3641,8 +3641,8 @@ class TestCQL(Tester):
             UPDATE test SET v='newVal' WHERE id=1 AND k='k2' IF v='val0';
             INSERT INTO TEST (id, k, v) VALUES(1, 'k3', 'val3') IF NOT EXISTS;
           APPLY BATCH
-        """, [False, 1, 'k2', 'val2', None])
-        assert_all(cursor, "SELECT * FROM test WHERE id=1", [[1, 'k1', 'val1', None], [1, 'k2', 'val2', None]])
+        """, [False, 1, 'k2', None, 'val2'])
+        assert_all(cursor, "SELECT * FROM test WHERE id=1", [[1, 'k1', None, 'val1'], [1, 'k2', None, 'val2']])
 
         assert_one(cursor,
         """
@@ -3651,7 +3651,7 @@ class TestCQL(Tester):
             INSERT INTO TEST (id, k, v, version) VALUES(1, 'k3', 'val3', 1) IF NOT EXISTS;
           APPLY BATCH
         """, [True])
-        assert_all(cursor, "SELECT * FROM test WHERE id=1", [[1, 'k1', 'val1', 1], [1, 'k2', 'newVal', 1], [1, 'k3', 'val3', 1]])
+        assert_all(cursor, "SELECT * FROM test WHERE id=1", [[1, 'k1', 1, 'val1'], [1, 'k2', 1, 'newVal'], [1, 'k3', 1, 'val3']])
 
 
     def select_count_paging_test(self):
@@ -3718,3 +3718,27 @@ class TestCQL(Tester):
 
         assert_invalid(cursor, "SELECT v1, v2, v3 FROM test WHERE k = 0 AND (v1, v3) > (1, 0)")
 
+    @since('2.1')
+    def in_order_by_without_selecting_test(self):
+        """ Test that columns don't need to be selected for ORDER BY when there is a IN (#4911) """
+
+        cursor = self.prepare()
+        cursor.execute("CREATE TABLE test (k int, c1 int, c2 int, v int, PRIMARY KEY (k, c1, c2))")
+
+        cursor.execute("INSERT INTO test(k, c1, c2, v) VALUES (0, 0, 0, 0)");
+        cursor.execute("INSERT INTO test(k, c1, c2, v) VALUES (0, 0, 1, 1)");
+        cursor.execute("INSERT INTO test(k, c1, c2, v) VALUES (0, 0, 2, 2)");
+        cursor.execute("INSERT INTO test(k, c1, c2, v) VALUES (1, 1, 0, 3)");
+        cursor.execute("INSERT INTO test(k, c1, c2, v) VALUES (1, 1, 1, 4)");
+        cursor.execute("INSERT INTO test(k, c1, c2, v) VALUES (1, 1, 2, 5)");
+
+        # check we do order IN on the last clustering column
+        assert_all(cursor, "SELECT * FROM test WHERE k=0 AND c1 = 0 AND c2 IN (2, 0)", [[0, 0, 2, 2], [0, 0, 0, 0]])
+        # but that ORDER BY still trumps that ordering on IN
+        assert_all(cursor, "SELECT * FROM test WHERE k=0 AND c1 = 0 AND c2 IN (2, 0) ORDER BY c1 ASC, c2 ASC", [[0, 0, 0, 0], [0, 0, 2, 2]])
+
+        # check that we don't need to select the column on which we order
+        assert_all(cursor, "SELECT v FROM test WHERE k=0 AND c1 = 0 AND c2 IN (2, 0)", [[2], [0]])
+        assert_all(cursor, "SELECT v FROM test WHERE k=0 AND c1 = 0 AND c2 IN (2, 0) ORDER BY c1 ASC", [[2], [0]])
+        assert_all(cursor, "SELECT v FROM test WHERE k IN (1, 0)", [[3], [4], [5], [0], [1], [2]])
+        assert_all(cursor, "SELECT v FROM test WHERE k IN (1, 0) ORDER BY c1 ASC", [[0], [1], [2], [3], [4], [5]])
