@@ -5,7 +5,7 @@ from tools import *
 from os.path import getsize
 import time
 
-class TestCounters(Tester):
+class TestSSTableSplit(Tester):
 
     def split_test(self):
         """
