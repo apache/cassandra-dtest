@@ -20,7 +20,7 @@ class TestCounters(Tester):
         if cluster.version() < "2.1":
             node.stress( ['-o', 'insert'] )
         else:
-            node.stress( ['write', 'n=1000000'] )
+            node.stress( ['write', 'n=1000000', '-rate', 'threads=8'] )
         
         self._do_compaction(node)
         self._do_split(node)
