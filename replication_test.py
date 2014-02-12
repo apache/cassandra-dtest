@@ -153,7 +153,7 @@ class ReplicationTest(Tester):
         self.cluster.populate(3).start()
         time.sleep(5)
         node1 = self.cluster.nodelist()[0]
-        self.conn = self.cql_connection(node1)
+        self.conn = self.patient_cql_connection(node1)
         
         # Install a tracing cursor so we can get info about who the
         # coordinator is contacting: 
@@ -193,7 +193,7 @@ class ReplicationTest(Tester):
         time.sleep(5)
         node1 = self.cluster.nodelist()[0]
         ip_nodes = dict((node.address(), node) for node in self.cluster.nodelist())
-        self.conn = self.cql_connection(node1)
+        self.conn = self.patient_cql_connection(node1)
         
         # Install a tracing cursor so we can get info about who the
         # coordinator is contacting: 

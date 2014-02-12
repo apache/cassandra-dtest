@@ -11,7 +11,7 @@ class TestRepair(Tester):
                 stopped_nodes.append(node)
                 node.stop(wait_other_notice=True)
 
-        cursor = self.cql_connection(node_to_check, 'ks').cursor()
+        cursor = self.patient_cql_connection(node_to_check, 'ks').cursor()
         cursor.execute("SELECT * FROM cf LIMIT %d" % (rows * 2))
         assert cursor.rowcount == rows, cursor.rowcount
 
@@ -50,7 +50,7 @@ class TestRepair(Tester):
         cluster.populate(3).start()
         [node1, node2, node3] = cluster.nodelist()
 
-        cursor = self.cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1).cursor()
         self.create_ks(cursor, 'ks', 3)
         self.create_cf(cursor, 'cf', read_repair=0.0, columns={'c1': 'text', 'c2': 'text'})
 

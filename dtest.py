@@ -1,6 +1,7 @@
 from __future__ import with_statement
 import os, tempfile, sys, shutil, types, time, threading, ConfigParser, logging
 import fnmatch
+import re
 
 from ccmlib.cluster import Cluster
 from ccmlib.node import Node
@@ -27,8 +28,10 @@ NO_SKIP = os.environ.get('SKIP', '').lower() in ('no', 'false')
 DEBUG = os.environ.get('DEBUG', '').lower() in ('yes', 'true')
 TRACE = os.environ.get('TRACE', '').lower() in ('yes', 'true')
 KEEP_LOGS = os.environ.get('KEEP_LOGS', '').lower() in ('yes', 'true')
+KEEP_TEST_DIR = os.environ.get('KEEP_TEST_DIR', '').lower() in ('yes', 'true')
 PRINT_DEBUG = os.environ.get('PRINT_DEBUG', '').lower() in ('yes', 'true')
 ENABLE_VNODES = os.environ.get('ENABLE_VNODES', 'false').lower() in ('yes', 'true')
+
 
 LOG = logging.getLogger()
 
@@ -86,8 +89,13 @@ class Tester(TestCase):
         return cluster
 
     def __cleanup_cluster(self):
-        self.cluster.remove()
-        os.rmdir(self.test_path)
+        if KEEP_TEST_DIR:
+            # Just kill it, leave the files where they are:
+            self.cluster.stop(gently=False)
+        else:
+            # Cleanup everything:
+            self.cluster.remove()
+            os.rmdir(self.test_path)
         os.remove(LAST_TEST_DIR)
 
     def set_node_to_current_version(self, node):
@@ -160,7 +168,7 @@ class Tester(TestCase):
         try:
             for node in self.cluster.nodelist():
                 if self.allow_log_errors == False:
-                    errors = [ msg for msg, i in node.grep_log("ERROR")]
+                    errors = list(self.__filter_errors([ msg for msg, i in node.grep_log("ERROR")]))
                     if len(errors) is not 0:
                         failed = True
                         raise AssertionError('Unexpected error in %s node log: %s' % (node.name, errors))
@@ -310,6 +318,16 @@ class Tester(TestCase):
             f.write('JVM_OPTS="$JVM_OPTS -Dnet.sourceforge.cobertura.datafile='
                     '$CASSANDRA_HOME/build/cobertura/cassandra-dtest/cobertura.ser -XX:-UseSplitVerifier"\n')
 
+    def __filter_errors(self, errors):
+        """Filter errors, removing those that match self.ignore_log_patterns"""
+        if not hasattr(self, 'ignore_log_patterns'):
+            self.ignore_log_patterns = []
+        for e in errors:
+            for pattern in self.ignore_log_patterns:
+                if re.search(pattern, e):
+                    break
+            else:
+                yield e
 
 class Runner(threading.Thread):
     def __init__(self, func):

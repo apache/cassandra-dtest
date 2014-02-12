@@ -13,11 +13,11 @@ class TestConsistency(Tester):
         cluster.populate(3).start()
         [node1, node2, node3] = cluster.nodelist()
 
-        cursor1 = self.cql_connection(node1).cursor()
+        cursor1 = self.patient_cql_connection(node1).cursor()
         self.create_ks(cursor1, 'ks', 3)
         create_c1c2_table(self, cursor1)
 
-        cursor2 = self.cql_connection(node2, 'ks').cursor()
+        cursor2 = self.patient_cql_connection(node2, 'ks').cursor()
 
         # insert and get at CL.QUORUM
         for n in xrange(0, 100):
@@ -41,11 +41,11 @@ class TestConsistency(Tester):
         cluster.populate(3).start()
         [node1, node2, node3] = cluster.nodelist()
 
-        cursor1 = self.cql_connection(node1).cursor()
+        cursor1 = self.patient_cql_connection(node1).cursor()
         self.create_ks(cursor1, 'ks', 3)
         create_c1c2_table(self, cursor1)
 
-        cursor2 = self.cql_connection(node2, 'ks').cursor()
+        cursor2 = self.patient_cql_connection(node2, 'ks').cursor()
 
         # insert and get at CL.ALL
         for n in xrange(0, 100):
@@ -62,11 +62,11 @@ class TestConsistency(Tester):
         cluster.populate(3).start()
         [node1, node2, node3] = cluster.nodelist()
 
-        cursor1 = self.cql_connection(node1).cursor()
+        cursor1 = self.patient_cql_connection(node1).cursor()
         self.create_ks(cursor1, 'ks', 3)
         create_c1c2_table(self, cursor1)
 
-        cursor2 = self.cql_connection(node2, 'ks').cursor()
+        cursor2 = self.patient_cql_connection(node2, 'ks').cursor()
 
         # insert and get at CL.ONE
         for n in xrange(0, 100):
@@ -91,11 +91,11 @@ class TestConsistency(Tester):
         cluster.populate(3).start()
         [node1, node2, node3] = cluster.nodelist()
 
-        cursor1 = self.cql_connection(node1).cursor()
+        cursor1 = self.patient_cql_connection(node1).cursor()
         self.create_ks(cursor1, 'ks', 3)
         create_c1c2_table(self, cursor1)
 
-        cursor2 = self.cql_connection(node2, 'ks').cursor()
+        cursor2 = self.patient_cql_connection(node2, 'ks').cursor()
 
         # insert and get at CL.ONE
         for n in xrange(0, 100):
@@ -113,11 +113,11 @@ class TestConsistency(Tester):
         cluster.populate(3).start()
         [node1, node2, node3] = cluster.nodelist()
 
-        cursor1 = self.cql_connection(node1).cursor()
+        cursor1 = self.patient_cql_connection(node1).cursor()
         self.create_ks(cursor1, 'ks', 3)
         create_c1c2_table(self, cursor1)
 
-        cursor2 = self.cql_connection(node2, 'ks').cursor()
+        cursor2 = self.patient_cql_connection(node2, 'ks').cursor()
 
         # insert and get at CL.ONE
         for n in xrange(0, 100):
@@ -139,7 +139,7 @@ class TestConsistency(Tester):
         [node1, node2, node3] = cluster.nodelist()
         time.sleep(.5)
 
-        cursor = self.cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1).cursor()
         self.create_ks(cursor, 'ks', 3)
         self.create_cf(cursor, 'cf', read_repair=0.0)
         # insert 9 columns in one row
@@ -152,7 +152,7 @@ class TestConsistency(Tester):
         self.stop_delete_and_restart(3, 2)
 
         # Query 3 firsts columns
-        cursor = self.cql_connection(node1, 'ks').cursor()
+        cursor = self.patient_cql_connection(node1, 'ks').cursor()
         if self.cluster.version() >= "1.2":
             cursor.execute('SELECT c, v FROM cf WHERE key=\'k0\' LIMIT 3', consistency_level="QUORUM")
             res = cursor.fetchall()
@@ -182,7 +182,7 @@ class TestConsistency(Tester):
         [node1, node2] = cluster.nodelist()
         time.sleep(.5)
 
-        cursor = self.cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1).cursor()
         self.create_ks(cursor, 'ks', 3)
         self.create_cf(cursor, 'cf', read_repair=0.0)
         # insert 2 columns in one row
@@ -192,7 +192,7 @@ class TestConsistency(Tester):
         # Delete the row while first node is dead
         node1.flush()
         node1.stop(wait_other_notice=True)
-        cursor = self.cql_connection(node2, 'ks').cursor()
+        cursor = self.patient_cql_connection(node2, 'ks').cursor()
         if self.cluster.version() >= "1.2":
             cursor.execute('DELETE FROM cf WHERE key=\'k0\'', consistency_level="ONE")
         else:
@@ -202,7 +202,7 @@ class TestConsistency(Tester):
         time.sleep(.5)
 
         # Query first column
-        cursor = self.cql_connection(node1, 'ks').cursor()
+        cursor = self.patient_cql_connection(node1, 'ks').cursor()
         if self.cluster.version() >= "1.2":
             cursor.execute('SELECT c, v FROM cf WHERE key=\'k0\' LIMIT 1', consistency_level="QUORUM")
             res = cursor.fetchone()
@@ -223,7 +223,7 @@ class TestConsistency(Tester):
             cluster.populate(2).start()
         [node1, node2] = cluster.nodelist()
 
-        cursor = self.cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1).cursor()
         self.create_ks(cursor, 'ks', 2)
         create_c1c2_table(self, cursor)
 
@@ -239,7 +239,7 @@ class TestConsistency(Tester):
         node1.stop(wait_other_notice=True)
 
         # Check node2 for all the keys that should have been delivered via HH
-        cursor = self.cql_connection(node2, keyspace='ks').cursor()
+        cursor = self.patient_cql_connection(node2, keyspace='ks').cursor()
         for n in xrange(0, 100):
             query_c1c2(cursor, n, "ONE")
 
@@ -254,7 +254,7 @@ class TestConsistency(Tester):
             cluster.populate(2).start()
         [node1, node2] = cluster.nodelist()
 
-        cursor = self.cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1).cursor()
         self.create_ks(cursor, 'ks', 2)
         create_c1c2_table(self, cursor, read_repair=1.0)
 
@@ -272,7 +272,7 @@ class TestConsistency(Tester):
         node1.stop(wait_other_notice=True)
 
         # Check node2 for all the keys that should have been repaired
-        cursor = self.cql_connection(node2, keyspace='ks').cursor()
+        cursor = self.patient_cql_connection(node2, keyspace='ks').cursor()
         for n in xrange(0, 10000):
             query_c1c2(cursor, n, "ONE")
 
@@ -287,7 +287,7 @@ class TestConsistency(Tester):
         [node1, node2, node3] = cluster.nodelist()
         time.sleep(.5)
 
-        cursor = self.cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1).cursor()
         self.create_ks(cursor, 'ks', 3)
         self.create_cf(cursor, 'cf', read_repair=0.0)
         # insert 9 columns in one row
@@ -300,7 +300,7 @@ class TestConsistency(Tester):
         self.stop_delete_and_restart(3, 8)
 
         # Query 3 firsts columns
-        cursor = self.cql_connection(node1, 'ks').cursor()
+        cursor = self.patient_cql_connection(node1, 'ks').cursor()
         if self.cluster.version() >= "1.2":
             cursor.execute('SELECT c, v FROM cf WHERE key=\'k0\' ORDER BY c DESC LIMIT 3', consistency_level="QUORUM")
             res = cursor.fetchall()
@@ -333,7 +333,7 @@ class TestConsistency(Tester):
         cluster.start()
 
         debug("Set to talk to node 2")
-        cursor = self.cql_connection(node2).cursor()
+        cursor = self.patient_cql_connection(node2).cursor()
         self.create_ks(cursor, 'ks', RF)
         create_c1c2_table(self, cursor)
 
@@ -353,7 +353,7 @@ class TestConsistency(Tester):
         next_node = self.cluster.nodes["node%d" % (((node_number + 1) % 3) + 1)]
         to_stop.flush()
         to_stop.stop(wait_other_notice=True)
-        cursor = self.cql_connection(next_node, 'ks').cursor()
+        cursor = self.patient_cql_connection(next_node, 'ks').cursor()
         if self.cluster.version() >= "1.2":
             query = 'BEGIN BATCH '
             query = query + 'DELETE FROM cf WHERE key=\'k0\' AND c=\'c%06d\'; ' % column

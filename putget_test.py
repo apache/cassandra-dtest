@@ -26,7 +26,7 @@ class TestPutGet(Tester):
         cluster.populate(3).start()
         [node1, node2, node3] = cluster.nodelist()
 
-        cursor = self.cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1).cursor()
         self.create_ks(cursor, 'ks', 3)
         self.create_cf(cursor, 'cf', compression=compression)
 
@@ -39,7 +39,7 @@ class TestPutGet(Tester):
         cluster.populate(3).start()
         [node1, node2, node3] = cluster.nodelist()
 
-        cursor = self.cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1).cursor()
         self.create_ks(cursor, 'ks', 2)
         create_c1c2_table(self, cursor)
 
@@ -56,7 +56,7 @@ class TestPutGet(Tester):
         cluster.populate(3).start()
         [node1, node2, node3] = cluster.nodelist()
 
-        cursor = self.cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1).cursor()
         self.create_ks(cursor, 'ks', 2)
         self.create_cf(cursor, 'cf')
 
@@ -69,7 +69,7 @@ class TestPutGet(Tester):
         cluster.populate(3).start()
         [node1, node2, node3] = cluster.nodelist()
 
-        cursor = self.cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1).cursor()
         self.create_ks(cursor, 'ks', 1)
         self.create_cf(cursor, 'cf')
 
@@ -117,7 +117,7 @@ class TestPutGet(Tester):
         node1.set_configuration_options(values={'initial_token': "b".encode('hex')  })
         cluster.start()
         time.sleep(.5)
-        cursor = self.cql_connection(node1, version="2.0.0").cursor()
+        cursor = self.patient_cql_connection(node1, version="2.0.0").cursor()
         self.create_ks(cursor, 'ks', 1)
 
         query = """
