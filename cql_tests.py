@@ -3545,7 +3545,17 @@ class TestCQL(Tester):
         cursor.execute("DELETE s FROM test WHERE k=0")
         assert_all(cursor, "SELECT * FROM test", [[0, 1, None, 1]])
 
-    #@require('#6561')
+        # Check we can add a static column ...
+        cursor.execute("ALTER TABLE test ADD s2 int static")
+        assert_all(cursor, "SELECT * FROM test", [[0, 1, None, None, 1]])
+        cursor.execute("INSERT INTO TEST (k, p, s2, v) VALUES(0, 2, 42, 2)")
+        assert_all(cursor, "SELECT * FROM test", [[0, 1, None, 42, 1], [0, 2, None, 42, 2]])
+        # ... and that we can drop it
+        cursor.execute("ALTER TABLE test DROP s2")
+        assert_all(cursor, "SELECT * FROM test", [[0, 1, None, 1], [0, 2, None, 2]])
+
+
+    @require('#6561')
     def static_columns_cas_test(self):
         cursor = self.prepare()
 
@@ -3718,6 +3728,17 @@ class TestCQL(Tester):
 
         assert_invalid(cursor, "SELECT v1, v2, v3 FROM test WHERE k = 0 AND (v1, v3) > (1, 0)")
 
+    def in_with_desc_order_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("CREATE TABLE test (k int, c1 int, c2 int, PRIMARY KEY (k, c1, c2))")
+        cursor.execute("INSERT INTO test(k, c1, c2) VALUES (0, 0, 0)");
+        cursor.execute("INSERT INTO test(k, c1, c2) VALUES (0, 0, 1)");
+        cursor.execute("INSERT INTO test(k, c1, c2) VALUES (0, 0, 2)");
+
+        assert_all(cursor, "SELECT * FROM test WHERE k=0 AND c1 = 0 AND c2 IN (2, 0) ORDER BY c1 DESC", [[0, 0, 2], [0, 0, 0]])
+
+
     @since('2.1')
     def in_order_by_without_selecting_test(self):
         """ Test that columns don't need to be selected for ORDER BY when there is a IN (#4911) """
@@ -3740,5 +3761,6 @@ class TestCQL(Tester):
         # check that we don't need to select the column on which we order
         assert_all(cursor, "SELECT v FROM test WHERE k=0 AND c1 = 0 AND c2 IN (2, 0)", [[2], [0]])
         assert_all(cursor, "SELECT v FROM test WHERE k=0 AND c1 = 0 AND c2 IN (2, 0) ORDER BY c1 ASC", [[2], [0]])
+        assert_all(cursor, "SELECT v FROM test WHERE k=0 AND c1 = 0 AND c2 IN (2, 0) ORDER BY c1 DESC", [[2], [0]])
         assert_all(cursor, "SELECT v FROM test WHERE k IN (1, 0)", [[3], [4], [5], [0], [1], [2]])
         assert_all(cursor, "SELECT v FROM test WHERE k IN (1, 0) ORDER BY c1 ASC", [[0], [1], [2], [3], [4], [5]])
