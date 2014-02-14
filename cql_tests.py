@@ -3536,6 +3536,9 @@ class TestCQL(Tester):
         # Check selecting only a static column is also ok, and only yield one value
         # (as we only query the static columns)
         assert_one(cursor, "SELECT s FROM test WHERE k=0", [24])
+        # but that querying other columns does correctly yield the full partition
+        assert_all(cursor, "SELECT s, v FROM test WHERE k=0", [[24, 0], [24, 1]])
+        assert_one(cursor, "SELECT s, v FROM test WHERE k=0 AND p=1", [24, 1])
 
         # Check that deleting a row don't implicitely deletes statics
         cursor.execute("DELETE FROM test WHERE k=0 AND p=0")
@@ -3737,7 +3740,6 @@ class TestCQL(Tester):
         cursor.execute("INSERT INTO test(k, c1, c2) VALUES (0, 0, 2)");
 
         assert_all(cursor, "SELECT * FROM test WHERE k=0 AND c1 = 0 AND c2 IN (2, 0) ORDER BY c1 DESC", [[0, 0, 2], [0, 0, 0]])
-
 
     @since('2.1')
     def in_order_by_without_selecting_test(self):
