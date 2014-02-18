@@ -3,7 +3,6 @@ from tools import *
 from assertions import *
 from ccmlib.cluster import Cluster
 from ccmlib.node import TimeoutError
-import random
 import time
 import os
 import re
@@ -150,11 +149,13 @@ class TestUpgradeThroughVersions(Tester):
             self.node2.shuffle("en")
 
         for node in nodes:
-            debug('Checking node: ' + node.name)
+            debug('Checking %s ...' % (node.name))
             if not mixed_version:
                 self._write_values()
             self._check_values()
 
+        debug('upgrade.cf should have %d total rows' % (len(self.row_values)))
+            
         self._increment_counter_value()
         if check_counters:
             self._check_counter_values()
@@ -188,7 +189,7 @@ class TestUpgradeThroughVersions(Tester):
         cursor = self.patient_cql_connection(self.node2).cursor()
         cursor.execute("use upgrade")
         for i in xrange(num):
-            x = random.randint(0, 99999999)
+            x = len(self.row_values) + 1
             cursor.execute("UPDATE cf SET v='%d' WHERE k=%d" % (x,x))
             self.row_values.add(x)
 
