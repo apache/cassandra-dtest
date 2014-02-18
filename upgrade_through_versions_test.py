@@ -59,11 +59,15 @@ class TestUpgradeThroughVersions(Tester):
     def upgrade_test(self):
         self.upgrade_scenario(check_counters=False)
 
+    def upgrade_test_no_flush(self):
+        """Do an upgrade without flushing/draining between versions (Not best practice!)"""
+        self.upgrade_scenario(check_counters=False, flush=False)
+
     def upgrade_test_mixed(self):
         """Only upgrade part of the cluster, so we have mixed versions part way through."""
         self.upgrade_scenario(check_counters=False, mixed_version=True)
 
-    def upgrade_scenario(self, mixed_version=False, check_counters=True):
+    def upgrade_scenario(self, mixed_version=False, check_counters=True, flush=True):
         # Record the rows we write as we go:
         self.row_values = set()
         self.counter_val = 0
@@ -88,17 +92,17 @@ class TestUpgradeThroughVersions(Tester):
             if mixed_version:
                 for num, node in enumerate(self.cluster.nodelist()):
                     self.upgrade_to_version(version, mixed_version=True, nodes=(node,), 
-                                            check_counters=check_counters)
+                                            check_counters=check_counters, flush=flush)
                     node.nodetool('upgradesstables')
                     debug('Successfully upgraded %d of %d nodes to %s' % 
                           (num+1, len(self.cluster.nodelist()), version))
             else:
-                self.upgrade_to_version(version, check_counters=check_counters)
+                self.upgrade_to_version(version, check_counters=check_counters, flush=flush)
             debug('All nodes successfully upgraded to %s' % version)
 
         cluster.stop()
 
-    def upgrade_to_version(self, version, mixed_version=False, nodes=None, check_counters=True):
+    def upgrade_to_version(self, version, mixed_version=False, nodes=None, check_counters=True, flush=True):
         """Upgrade Nodes - if *mixed_version* is True, only upgrade those nodes
         that are specified by *nodes*, otherwise ignore *nodes* specified
         and upgrade all nodes.
@@ -110,12 +114,14 @@ class TestUpgradeThroughVersions(Tester):
         # Shutdown nodes
         for node in nodes:
             debug('Prepping node for shutdown: ' + node.name)
-            node.flush()
+            if flush:
+                node.flush()
         
         for node in nodes:
             debug('Shutting down node: ' + node.name)
-            node.drain()
-            node.watch_log_for("DRAINED")
+            if flush:
+                node.drain()
+                node.watch_log_for("DRAINED")
             node.stop(wait_other_notice=False)
 
         if ENABLE_VNODES and version >= "1.2":
@@ -167,10 +173,10 @@ class TestUpgradeThroughVersions(Tester):
         cursor = self.patient_cql_connection(self.node2).cursor()
         
         # DDL for C* 1.1 :
-        cursor.execute("""CREATE KEYSPACE ks WITH strategy_class = 'SimpleStrategy' 
+        cursor.execute("""CREATE KEYSPACE upgrade WITH strategy_class = 'SimpleStrategy' 
         AND strategy_options:replication_factor = 2;""")
 
-        cursor.execute('use ks')
+        cursor.execute('use upgrade')
         cursor.execute('CREATE TABLE cf ( k int PRIMARY KEY , v text )')
         cursor.execute('CREATE INDEX vals ON cf (v)')
         cursor.execute("CREATE TABLE countertable ( "
@@ -180,7 +186,7 @@ class TestUpgradeThroughVersions(Tester):
 
     def _write_values(self, num=100, consistency_level='ALL'):
         cursor = self.patient_cql_connection(self.node2).cursor()
-        cursor.execute("use ks")
+        cursor.execute("use upgrade")
         for i in xrange(num):
             x = random.randint(0, 99999999)
             cursor.execute("UPDATE cf SET v='%d' WHERE k=%d" % (x,x))
@@ -189,7 +195,7 @@ class TestUpgradeThroughVersions(Tester):
     def _check_values(self, consistency_level='ALL'):
         for node in self.cluster.nodelist():
             cursor = self.patient_cql_connection(node).cursor()
-            cursor.execute("use ks")
+            cursor.execute("use upgrade")
             for x in self.row_values:
                 cursor.execute("SELECT k,v FROM cf WHERE k=%d" % x, consistency_level=consistency_level)
                 k,v = cursor.fetchone()
@@ -199,7 +205,7 @@ class TestUpgradeThroughVersions(Tester):
     def _increment_counter_value(self):
         debug("incrementing counter...")
         cursor = self.patient_cql_connection(self.node2).cursor()
-        cursor.execute("use ks;")
+        cursor.execute("use upgrade;")
         update_counter_query = ("UPDATE countertable SET c = c + 1 WHERE k='www.datastax.com'")
         cursor.execute( update_counter_query )
         self.counter_val += 1
@@ -207,7 +213,7 @@ class TestUpgradeThroughVersions(Tester):
     def _check_counter_values(self):
         debug("Checking counter values...")
         cursor = self.patient_cql_connection(self.node2).cursor()
-        cursor.execute("use ks;")
+        cursor.execute("use upgrade;")
         cursor.execute("SELECT c from countertable;")
         res = cursor.fetchall()[0][0]
         assert res == self.counter_val, "Counter not at expected value."
