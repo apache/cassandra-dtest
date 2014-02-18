@@ -3539,6 +3539,8 @@ class TestCQL(Tester):
         # but that querying other columns does correctly yield the full partition
         assert_all(cursor, "SELECT s, v FROM test WHERE k=0", [[24, 0], [24, 1]])
         assert_one(cursor, "SELECT s, v FROM test WHERE k=0 AND p=1", [24, 1])
+        assert_one(cursor, "SELECT p, s FROM test WHERE k=0 AND p=1", [1, 24])
+        assert_one(cursor, "SELECT k, p, s FROM test WHERE k=0 AND p=1", [0, 1, 24])
 
         # Check that deleting a row don't implicitely deletes statics
         cursor.execute("DELETE FROM test WHERE k=0 AND p=0")
@@ -3665,6 +3667,14 @@ class TestCQL(Tester):
           APPLY BATCH
         """, [True])
         assert_all(cursor, "SELECT * FROM test WHERE id=1", [[1, 'k1', 1, 'val1'], [1, 'k2', 1, 'newVal'], [1, 'k3', 1, 'val3']])
+
+        assert_invalid(cursor,
+        """
+          BEGIN BATCH
+            UPDATE test SET v='newVal1' WHERE id=1 AND k='k2' IF v='val2';
+            UPDATE test SET v='newVal2' WHERE id=1 AND k='k2' IF v='val3';
+          APPLY BATCH
+        """)
 
 
     def select_count_paging_test(self):
