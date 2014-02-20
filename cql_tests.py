@@ -3499,7 +3499,7 @@ class TestCQL(Tester):
 
     #    assert_all(cursor, "SELECT * FROM test", [[nan], [inf], [-inf]])
 
-    @require('#6561')
+    @since('2.0')
     def static_columns_test(self):
         cursor = self.prepare()
 
@@ -3560,7 +3560,7 @@ class TestCQL(Tester):
         assert_all(cursor, "SELECT * FROM test", [[0, 1, None, 1], [0, 2, None, 2]])
 
 
-    @require('#6561')
+    @since('2.0')
     def static_columns_cas_test(self):
         cursor = self.prepare()
 
@@ -3675,6 +3675,32 @@ class TestCQL(Tester):
             UPDATE test SET v='newVal2' WHERE id=1 AND k='k2' IF v='val3';
           APPLY BATCH
         """)
+
+    @since('2.0')
+    def static_columns_with_2i_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k int,
+                p int,
+                s int static,
+                v int,
+                PRIMARY KEY (k, p)
+            )
+        """)
+
+        cursor.execute("CREATE INDEX ON test(v)")
+
+        cursor.execute("INSERT INTO test(k, p, s, v) VALUES (0, 0, 42, 1)")
+        cursor.execute("INSERT INTO test(k, p, v) VALUES (0, 1, 1)")
+        cursor.execute("INSERT INTO test(k, p, v) VALUES (0, 2, 2)")
+
+        assert_all(cursor, "SELECT * FROM test WHERE v = 1", [[0, 0, 42, 1], [0, 1, 42, 1]])
+        assert_all(cursor, "SELECT p, s FROM test WHERE v = 1", [[0, 42], [1, 42]])
+        assert_all(cursor, "SELECT p FROM test WHERE v = 1", [[0], [1]])
+        # We don't support that
+        assert_invalid(cursor, "SELECT s FROM test WHERE v = 1")
 
 
     def select_count_paging_test(self):
