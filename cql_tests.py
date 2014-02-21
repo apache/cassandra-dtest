@@ -1519,35 +1519,45 @@ class TestCQL(Tester):
             CREATE TABLE test (
                 k text,
                 c text,
+                s set<text>,
                 v text,
                 PRIMARY KEY (k, c)
             )
         """)
 
-        req = "INSERT INTO test (k, c, v) VALUES ('%s', '%s', '%s')"
+        req = "INSERT INTO test (k, c, v, s) VALUES ('%s', '%s', '%s', {'%s'})"
         # using utf8 character so that we can see the transition to BytesType
-        cursor.execute(req % ('ɸ', 'ɸ', 'ɸ'))
+        cursor.execute(req % ('ɸ', 'ɸ', 'ɸ', 'ɸ'))
 
         cursor.execute("SELECT * FROM test")
         cursor.execute("SELECT * FROM test")
         res = cursor.fetchall()
-        assert res == [[u'ɸ', u'ɸ', u'ɸ']], res
+        assert res == [[u'ɸ', u'ɸ', set([u'ɸ']), u'ɸ']], res
 
         cursor.execute("ALTER TABLE test ALTER v TYPE blob")
         cursor.execute("SELECT * FROM test")
         res = cursor.fetchall()
         # the last should not be utf8 but a raw string
-        assert res == [[u'ɸ', u'ɸ', 'ɸ']], res
+        assert res == [[u'ɸ', u'ɸ', set([u'ɸ']), 'ɸ']], res
 
         cursor.execute("ALTER TABLE test ALTER k TYPE blob")
         cursor.execute("SELECT * FROM test")
         res = cursor.fetchall()
-        assert res == [['ɸ', u'ɸ', 'ɸ']], res
+        assert res == [['ɸ', u'ɸ', set([u'ɸ']), 'ɸ']], res
 
         cursor.execute("ALTER TABLE test ALTER c TYPE blob")
         cursor.execute("SELECT * FROM test")
         res = cursor.fetchall()
-        assert res == [['ɸ', 'ɸ', 'ɸ']], res
+        assert res == [['ɸ', 'ɸ', set([u'ɸ']), 'ɸ']], res
+
+        if self.cluster.version() < "2.1":
+            asssert_invalid(cursor, "ALTER TABLE test ALTER s TYPE set<blob>")
+        else:
+            cursor.execute("ALTER TABLE test ALTER s TYPE set<blob>")
+            cursor.execute("SELECT * FROM test")
+            res = cursor.fetchall()
+            assert res == [['ɸ', 'ɸ', set(['ɸ']), 'ɸ']], res
+
 
     def composite_row_key_test(self):
         cursor = self.prepare()
@@ -3721,13 +3731,15 @@ class TestCQL(Tester):
 
         cursor = self.prepare()
         cursor.execute("CREATE TYPE simple_type (x int)")
-        cursor.execute("CREATE TABLE test (k int PRIMARY KEY, v simple_type)")
+        cursor.execute("CREATE TYPE simple_type_2 (s set<simple_type>)")
+        cursor.execute("CREATE TABLE test (k int PRIMARY KEY, v1 simple_type, v2 simple_type_2, s set<simple_type>)")
 
         cursor.execute("ALTER TYPE simple_type RENAME TO renamed_type")
 
-        # This shouldn't be allowed because test uses it, so this is a somewhat indirect way to
+        # This shouldn't be allowed because test uses the types, so this is a somewhat indirect way to
         # make sure the rename propagated to the table correctly.
         assert_invalid(cursor, "DROP TYPE renamed_type")
+        assert_invalid(cursor, "DROP TYPE simple_type_2")
 
     @require('6623')
     def cas_and_ttl_test(self):
