@@ -517,7 +517,7 @@ class TestCQL(Tester):
 
         cursor.execute("SELECT v FROM test1 WHERE k = 0 AND c IN (5, 2, 8)")
         res = cursor.fetchall()
-        assert res == [[5], [2], [8]], res
+        assert res == [[2], [5], [8]], res
 
         # composites
         cursor.execute("""
@@ -539,7 +539,7 @@ class TestCQL(Tester):
 
         cursor.execute("SELECT v FROM test2 WHERE k = 0 AND c1 = 0 AND c2 IN (5, 2, 8)")
         res = cursor.fetchall()
-        assert res == [[5], [2], [8]], res
+        assert res == [[2], [5], [8]], res
 
     def order_by_test(self):
         """ Check ORDER BY support in SELECT statement """
@@ -1551,7 +1551,7 @@ class TestCQL(Tester):
         assert res == [['ɸ', 'ɸ', set([u'ɸ']), 'ɸ']], res
 
         if self.cluster.version() < "2.1":
-            asssert_invalid(cursor, "ALTER TABLE test ALTER s TYPE set<blob>")
+            assert_invalid(cursor, "ALTER TABLE test ALTER s TYPE set<blob>")
         else:
             cursor.execute("ALTER TABLE test ALTER s TYPE set<blob>")
             cursor.execute("SELECT * FROM test")
