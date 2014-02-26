@@ -3538,6 +3538,9 @@ class TestCQL(Tester):
         assert_one(cursor, "SELECT * FROM test WHERE k=0 AND p=0", [0, 0, 24, 0])
         assert_one(cursor, "SELECT * FROM test WHERE k=0 AND p=1", [0, 1, 24, 1])
 
+        # Test for IN on the clustering key (#6769)
+        assert_all(cursor, "SELECT * FROM test WHERE k=0 AND p IN (0, 1)", [[0, 0, 24, 0], [0, 1, 24, 1]])
+
         # Check things still work if we don't select the static column. We also want
         # this to not request the static columns internally at all, though that part
         # require debugging to assert
