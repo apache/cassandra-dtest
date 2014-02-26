@@ -51,10 +51,14 @@ class TestBoostrap(Tester):
         """Test bootstrapped node sees existing data, eg. CASSANDRA-6648"""
         cluster = self.cluster
         cluster.populate(3)
+        version = cluster.version()
         cluster.start()
         
         node1 = cluster.nodes['node1']
-        node1.stress(['-n 10000'])
+        if version < "2.1":
+            node1.stress(['-n 10000'])
+        else:
+            node1.stress(['write n=10000 -rate threads=8'])
         
         node4 = new_node(cluster)
         node4.start()
