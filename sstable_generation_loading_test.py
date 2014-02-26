@@ -54,7 +54,11 @@ class TestSSTableGenerationAndLoading(Tester):
         cluster = self.cluster
         cluster.populate(1).start()
         node1 = cluster.nodelist()[0]
-        node1.stress(['--num-keys=10000'])
+        version = cluster.version()
+        if version < "2.1":
+            node1.stress(['--num-keys=10000'])
+        else:
+            node1.stress(['write', 'n=10000', '-rate', 'threads=8'])
         node1.flush()
         node1.compact()
         node1.stop()
