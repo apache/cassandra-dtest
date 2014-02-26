@@ -14,7 +14,7 @@ class TestSSTableGenerationAndLoading(Tester):
 
     def incompressible_data_in_compressed_table_test(self):
         """
-        tests for the bug that caused this:
+        tests for the bug that caused #3370:
         https://issues.apache.org/jira/browse/CASSANDRA-3370
 
         inserts random data into a compressed table. The compressed SSTable was
