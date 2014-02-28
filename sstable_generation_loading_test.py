@@ -14,7 +14,7 @@ class TestSSTableGenerationAndLoading(Tester):
 
     def incompressible_data_in_compressed_table_test(self):
         """
-        tests for the bug that caused this:
+        tests for the bug that caused #3370:
         https://issues.apache.org/jira/browse/CASSANDRA-3370
 
         inserts random data into a compressed table. The compressed SSTable was
@@ -48,13 +48,17 @@ class TestSSTableGenerationAndLoading(Tester):
 
     def remove_index_file_test(self):
         """
-        tests for situations similar to that found in this issue:
+        tests for situations similar to that found in #343:
         https://issues.apache.org/jira/browse/CASSANDRA-343
         """
         cluster = self.cluster
         cluster.populate(1).start()
         node1 = cluster.nodelist()[0]
-        node1.stress(['--num-keys=10000'])
+        version = cluster.version()
+        if version < "2.1":
+            node1.stress(['--num-keys=10000'])
+        else:
+            node1.stress(['write', 'n=10000', '-rate', 'threads=8'])
         node1.flush()
         node1.compact()
         node1.stop()
