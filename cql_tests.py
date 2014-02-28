@@ -3378,6 +3378,36 @@ class TestCQL(Tester):
         res = cursor.fetchone()
         ## TODO: deserialize the value here and check it's right.
 
+    @since('2.1')
+    def more_user_types_test(self):
+        """ user type test that does a little more nesting"""
+
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TYPE type1 (
+                s set<text>,
+                m map<text, text>,
+                l list<text>
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TYPE type2 (
+                s set<type1>,
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE test (id int PRIMARY KEY, val type2)
+        """)
+
+
+        cursor.execute("INSERT INTO test(id, val) VALUES (0, { s : {{ s : {'foo', 'bar'}, m : { 'foo' : 'bar' }, l : ['foo', 'bar']} }})")
+
+        # TODO: check result once we have an easy way to do it. For now we just check it doesn't crash
+        cursor.execute("SELECT * FROM test")
+
 
     @since('1.2')
     def bug_6327_test(self):
