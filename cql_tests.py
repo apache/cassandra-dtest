@@ -3774,7 +3774,7 @@ class TestCQL(Tester):
         assert_invalid(cursor, "DROP TYPE renamed_type")
         assert_invalid(cursor, "DROP TYPE simple_type_2")
 
-    @require('6623')
+    @since('2.0')
     def cas_and_ttl_test(self):
         cursor = self.prepare()
         cursor.execute("CREATE TABLE test (k int PRIMARY KEY, v int, lock boolean)")
