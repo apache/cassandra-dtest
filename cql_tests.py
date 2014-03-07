@@ -1375,7 +1375,7 @@ class TestCQL(Tester):
         cursor.execute("DELETE tags FROM user WHERE fn='Bilbo' AND ln='Baggins'")
         cursor.execute("SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'")
         res = cursor.fetchall()
-        assert res == [[None]], re
+        assert res == [], re
 
 
     def map_test(self):
@@ -1418,7 +1418,7 @@ class TestCQL(Tester):
         cursor.execute(q % "m = {}")
         cursor.execute("SELECT m FROM user WHERE fn='Bilbo' AND ln='Baggins'")
         res = cursor.fetchall()
-        assert res == [[ None ]], res
+        assert res == [], res
 
     def list_test(self):
         cursor = self.prepare()
