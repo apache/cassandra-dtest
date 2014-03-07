@@ -1375,7 +1375,7 @@ class TestCQL(Tester):
         cursor.execute("DELETE tags FROM user WHERE fn='Bilbo' AND ln='Baggins'")
         cursor.execute("SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'")
         res = cursor.fetchall()
-        assert res == [[None]], re
+        assert res == [], re
 
 
     def map_test(self):
@@ -1418,7 +1418,7 @@ class TestCQL(Tester):
         cursor.execute(q % "m = {}")
         cursor.execute("SELECT m FROM user WHERE fn='Bilbo' AND ln='Baggins'")
         res = cursor.fetchall()
-        assert res == [[ None ]], res
+        assert res == [], res
 
     def list_test(self):
         cursor = self.prepare()
@@ -3781,9 +3781,7 @@ class TestCQL(Tester):
 
         cursor.execute("INSERT INTO test (k, v, lock) VALUES (0, 0, false)")
         cursor.execute("UPDATE test USING TTL 1 SET lock=true WHERE k=0")
-
         time.sleep(2)
-
         assert_one(cursor, "UPDATE test SET v = 1 WHERE k = 0 IF lock = null", [True])
 
     @require('4851')
@@ -3847,3 +3845,26 @@ class TestCQL(Tester):
         assert_all(cursor, "SELECT v FROM test WHERE k=0 AND c1 = 0 AND c2 IN (2, 0) ORDER BY c1 DESC", [[2], [0]])
         assert_all(cursor, "SELECT v FROM test WHERE k IN (1, 0)", [[3], [4], [5], [0], [1], [2]])
         assert_all(cursor, "SELECT v FROM test WHERE k IN (1, 0) ORDER BY c1 ASC", [[0], [1], [2], [3], [4], [5]])
+
+    @since('2.0')
+    def cas_and_compact_test(self):
+        """ Test for CAS with compact storage table, and #6813 in particular """
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE lock (
+                partition text,
+                key text,
+                owner text,
+                PRIMARY KEY (partition, key)
+            ) WITH COMPACT STORAGE
+        """)
+
+        cursor.execute("INSERT INTO lock(partition, key, owner) VALUES ('a', 'b', null)")
+        assert_one(cursor, "UPDATE lock SET owner='z' WHERE partition='a' AND key='b' IF owner=null", [True])
+
+        assert_one(cursor, "UPDATE lock SET owner='b' WHERE partition='a' AND key='b' IF owner='a'", [False, 'z'])
+        assert_one(cursor, "UPDATE lock SET owner='b' WHERE partition='a' AND key='b' IF owner='z'", [True])
+
+        assert_one(cursor, "INSERT INTO lock(partition, key, owner) VALUES ('a', 'c', 'x') IF NOT EXISTS", [True])
+
