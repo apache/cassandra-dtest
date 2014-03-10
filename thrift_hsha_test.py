@@ -5,7 +5,7 @@ import os
 import subprocess
 import shlex 
 
-JNA_PATH = '/usr/share/java/jna/jna.jar'
+JNA_PATH = '/usr/share/java/jna.jar'
 ATTACK_JAR = 'cassandra-attack.jar'
 
 class ThriftHSHATest(Tester):
