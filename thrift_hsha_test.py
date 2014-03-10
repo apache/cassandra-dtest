@@ -14,6 +14,7 @@ class ThriftHSHATest(Tester):
         Tester.__init__(self, *args, **kwargs)
 
     @unittest.skipIf(not os.path.exists(ATTACK_JAR), "No attack jar found")
+    @unittest.skipIf(not os.path.exists(JNA_PATH), "No JNA jar found")
     def test_6285(self):
         """Test CASSANDRA-6285 with Viktor Kuzmin's  attack jar.
 
