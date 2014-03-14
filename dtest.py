@@ -1,5 +1,5 @@
 from __future__ import with_statement
-import os, tempfile, sys, shutil, types, time, threading, ConfigParser, logging
+import os, tempfile, sys, shutil, subprocess, types, time, threading, ConfigParser, logging
 import fnmatch
 import re
 
@@ -71,6 +71,10 @@ class Tester(TestCase):
 
     def __get_cluster(self, name='test'):
         self.test_path = tempfile.mkdtemp(prefix='dtest-')
+        # ccm on cygwin needs absolute path to directory - it crosses from cygwin space into
+        # regular Windows space on wmic calls which will otherwise break pathing
+        if sys.platform == "cygwin":
+            self.test_path = subprocess.Popen(["cygpath", "-m", self.test_path], stdout = subprocess.PIPE, stderr = subprocess.STDOUT).communicate()[0].rstrip()
         debug("cluster ccm directory: "+self.test_path)
         try:
             version = os.environ['CASSANDRA_VERSION']
