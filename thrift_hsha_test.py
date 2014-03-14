@@ -4,6 +4,7 @@ import time
 import os
 import subprocess
 import shlex 
+import pycassa
 
 JNA_PATH = '/usr/share/java/jna.jar'
 ATTACK_JAR = 'cassandra-attack.jar'
@@ -13,6 +14,38 @@ class ThriftHSHATest(Tester):
     def __init__(self, *args, **kwargs):
         Tester.__init__(self, *args, **kwargs)
 
+
+    @unittest.skip('Disable for now until CASSANDRA-6546 has more feedback')
+    def test_closing_connections(self):
+        """Test CASSANDRA-6546 - do connections get closed when disabling / renabling thrift service?"""
+        cluster = self.cluster
+        cluster.set_configuration_options(values={
+            'rpc_server_type' : 'hsha',
+            'rpc_max_threads' : 20
+        })
+        
+        cluster.populate(1)
+        cluster.start()
+        (node1,) = cluster.nodelist()
+
+        cursor = self.patient_cql_connection(node1).cursor()
+        self.create_ks(cursor, 'test', 1)
+        cursor.execute("CREATE TABLE \"CF\" (key text PRIMARY KEY, val text) WITH COMPACT STORAGE;")
+        def make_connection():
+            pool = pycassa.ConnectionPool('test', timeout=None)
+            cf = pycassa.ColumnFamily(pool, 'CF')
+            return pool
+
+        pools = []
+        for i in xrange(100):
+            debug("Creating connection pools..")
+            for x in xrange(3):
+                pools.append(make_connection())
+            debug("Disabling/Enabling thrift iteration #{i}".format(i=i))
+            node1.nodetool('disablethrift')
+            node1.nodetool('enablethrift')
+
+        raw_input("wait")
     @unittest.skipIf(not os.path.exists(ATTACK_JAR), "No attack jar found")
     @unittest.skipIf(not os.path.exists(JNA_PATH), "No JNA jar found")
     def test_6285(self):
