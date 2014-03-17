@@ -3617,6 +3617,14 @@ class TestCQL(Tester):
             )
         """)
 
+        # Test that INSERT IF NOT EXISTS concerns only the static column if no clustering nor regular columns
+        # is provided, but concerns the CQL3 row targetted by the clustering columns otherwise
+        cursor.execute("INSERT INTO test(id, k, v) VALUES (1, 'foo', 'foo')")
+        assert_one(cursor, "INSERT INTO test(id, k, version) VALUES (1, 'foo', 1) IF NOT EXISTS", [False, 1, 'foo', None, 'foo']);
+        assert_one(cursor, "INSERT INTO test(id, version) VALUES (1, 1) IF NOT EXISTS", [True]);
+        assert_one(cursor, "SELECT * FROM test", [1, 'foo', 1, 'foo'])
+        cursor.execute("DELETE FROM test WHERE id = 1");
+
         cursor.execute("INSERT INTO test(id, version) VALUES (0, 0)")
 
         assert_one(cursor, "UPDATE test SET v='foo', version=1 WHERE id=0 AND k='k1' IF version = 0", [True])
@@ -3718,6 +3726,7 @@ class TestCQL(Tester):
             UPDATE test SET v='newVal2' WHERE id=1 AND k='k2' IF v='val3';
           APPLY BATCH
         """)
+
 
     @since('2.0')
     def static_columns_with_2i_test(self):
