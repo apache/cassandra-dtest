@@ -3054,6 +3054,55 @@ class TestCQL(Tester):
         assert_one(cursor, "DELETE FROM test WHERE k = 0 IF v1 = null", [ True ])
         assert_none(cursor, "SELECT * FROM test")
 
+    @since('2.0.7')
+    def conditional_delete_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k int PRIMARY KEY,
+                v1 int,
+            )
+        """)
+
+        assert_one(cursor, "DELETE FROM test WHERE k=1 IF EXISTS", [False])
+
+        cursor.execute("INSERT INTO test (k, v1) VALUES (1, 2)")
+        assert_one(cursor, "DELETE FROM test WHERE k=1 IF EXISTS", [True])
+        assert_none(cursor, "SELECT * FROM test WHERE k=1")
+        assert_one(cursor, "DELETE FROM test WHERE k=1 IF EXISTS", [False])
+
+        cursor.execute("UPDATE test USING TTL 1 SET v1=2 WHERE k=1")
+        time.sleep(1.5)
+        assert_one(cursor, "DELETE FROM test WHERE k=1 IF EXISTS", [False])
+        assert_none(cursor, "SELECT * FROM test WHERE k=1")
+
+        cursor.execute("INSERT INTO test (k, v1) VALUES (2, 2) USING TTL 1")
+        time.sleep(1.5)
+        assert_one(cursor, "DELETE FROM test WHERE k=2 IF EXISTS", [False])
+        assert_none(cursor, "SELECT * FROM test WHERE k=2")
+
+        cursor.execute("INSERT INTO test (k, v1) VALUES (3, 2)")
+        assert_one(cursor, "DELETE v1 FROM test WHERE k=3 IF EXISTS", [True])
+        assert_one(cursor, "SELECT * FROM test WHERE k=3", [3, None])
+        assert_one(cursor, "DELETE v1 FROM test WHERE k=3 IF EXISTS", [True])
+        assert_one(cursor, "DELETE FROM test WHERE k=3 IF EXISTS", [True])
+
+        # static columns
+        cursor.execute("""
+            CREATE TABLE test2 (
+                k text,
+                s text static,
+                i int,
+                v text,
+                PRIMARY KEY (k, i)
+            )""")
+
+        cursor.execute("INSERT INTO test2 (k, s, i, v) VALUES ('k', 's', 0, 'v')")
+        assert_one(cursor, "DELETE v FROM test2 WHERE k='k' AND i=0 IF EXISTS", [True])
+        assert_one(cursor, "DELETE FROM test2 WHERE k='k' AND i=0 IF EXISTS", [True])
+        assert_one(cursor, "DELETE v FROM test2 WHERE k='k' AND i=0 IF EXISTS", [False])
+        assert_one(cursor, "DELETE FROM test2 WHERE k='k' AND i=0 IF EXISTS", [False])
 
     def range_key_ordered_test(self):
         cursor = self.prepare(ordered=True)
