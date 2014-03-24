@@ -198,3 +198,45 @@ class TestCounters(Tester):
             
             self.assertEqual(counter_one_actual, counter_dict[counter_id]['counter_one'])
             self.assertEqual(counter_two_actual, counter_dict[counter_id]['counter_two'])
+    
+    def multi_counter_update_test(self):
+        """
+        Test for singlular update statements that will affect multiple counters.
+        """
+        cluster = self.cluster
+        cluster.populate(3).start()
+        node1, node2, node3 = cluster.nodelist()
+        cursor = self.patient_cql_connection(node1).cursor()
+        self.create_ks(cursor, 'counter_tests', 3)
+        
+        cursor.execute("""
+            CREATE TABLE counter_table (
+            id text,
+            myuuid uuid,
+            counter_one COUNTER,
+            PRIMARY KEY (id, myuuid))
+            """)
+        
+        expected_counts = {}
+        
+        # set up expectations
+        for i in range(1,6):
+            _id = uuid.uuid4()
+            
+            expected_counts[_id] = i
+
+        for k, v in expected_counts.items():
+            cursor.execute("""
+                UPDATE counter_table set counter_one = counter_one + {v}
+                WHERE id='foo' and myuuid = {k}
+                """.format(k=k, v=v))
+
+        for k, v in expected_counts.items():
+            cursor.execute("""
+                SELECT counter_one FROM counter_table
+                WHERE id = 'foo' and myuuid = {k}
+                """.format(k=k))
+            
+            count = cursor.fetchone()[0]
+            
+            self.assertEqual(v, count)
