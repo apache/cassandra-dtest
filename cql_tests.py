@@ -517,7 +517,10 @@ class TestCQL(Tester):
 
         cursor.execute("SELECT v FROM test1 WHERE k = 0 AND c IN (5, 2, 8)")
         res = cursor.fetchall()
-        assert res == [[2], [5], [8]], res
+        if self.cluster.version() <= "1.2":
+            assert res == [[5], [2], [8]], res
+        else:
+            assert res == [[2], [5], [8]], res
 
         # composites
         cursor.execute("""
@@ -1375,7 +1378,10 @@ class TestCQL(Tester):
         cursor.execute("DELETE tags FROM user WHERE fn='Bilbo' AND ln='Baggins'")
         cursor.execute("SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'")
         res = cursor.fetchall()
-        assert res == [], re
+        if self.cluster.version() <= "1.2":
+            assert res == [None], res
+        else:
+            assert res == [], res
 
 
     def map_test(self):
@@ -1418,7 +1424,10 @@ class TestCQL(Tester):
         cursor.execute(q % "m = {}")
         cursor.execute("SELECT m FROM user WHERE fn='Bilbo' AND ln='Baggins'")
         res = cursor.fetchall()
-        assert res == [], res
+        if self.cluster.version() <= "1.2":
+            assert res == [None], res
+        else:
+            assert res == [], res
 
     def list_test(self):
         cursor = self.prepare()
