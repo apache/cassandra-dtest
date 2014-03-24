@@ -144,7 +144,7 @@ class TestCounters(Tester):
         cursor.execute(stmt)
         
         counters = []
-        # establish 1000 counters (2x500 rows)
+        # establish 50 counters (2x25 rows)
         for i in xrange(25):
             _id = str(uuid.uuid4())
             counters.append(
