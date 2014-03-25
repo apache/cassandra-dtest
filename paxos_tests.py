@@ -5,7 +5,8 @@ from assertions import *
 from cql import ProgrammingError
 from tools import *
 
-import time, threading
+import time
+from multiprocessing import Process
 from ccmlib.cluster import Cluster
 
 class TestPaxos(Tester):
@@ -29,14 +30,21 @@ class TestPaxos(Tester):
         return cursor
 
     @since('2.0')
-    def contention_test(self):
+    def contention_test_multi_iterations(self):
+        self._contention_test(8, 100)
+
+    @since('2.0')
+    def contention_test_many_threds(self):
+        self._contention_test(1000, 1)
+
+    def _contention_test(self, threads, iterations):
         """ Test threads repeatedly contending on the same row """
 
         verbose = False
 
-        class Worker(threading.Thread):
+        class Worker(Process):
             def __init__(self, wid, cursor, iterations):
-                threading.Thread.__init__(self)
+                Process.__init__(self)
                 self.wid = wid
                 self.iterations = iterations
                 self.cursor = cursor
@@ -52,7 +60,6 @@ class TestPaxos(Tester):
                     tries = 0
                     while not done:
                         try:
-
                             self.cursor.execute("UPDATE test SET v = %d WHERE k = 0 IF v = %d" % (prev+1, prev))
                             res = self.cursor.fetchall()[0]
                             if verbose:
@@ -84,14 +91,12 @@ class TestPaxos(Tester):
         cursor.execute("CREATE TABLE test (k int PRIMARY KEY, v int)")
         cursor.execute("INSERT INTO test(k, v) VALUES (0, 0)");
 
-        N = 8
-        I = 100
         nodes = self.cluster.nodelist()
         workers = []
-        for n in range(0, N):
+        for n in range(0, threads):
             c = self.cql_connection(nodes[n % len(nodes)], version="3.0.0").cursor()
             c.execute("USE ks")
-            workers.append(Worker(n, c, I))
+            workers.append(Worker(n, c, iterations))
 
         start = time.time()
 
@@ -116,5 +121,5 @@ class TestPaxos(Tester):
             retries = retries + w.retries
             gaveup = gaveup + w.gaveup
 
-        assert (value == N * I) and (errors == 0) and (gaveup == 0), "value=%d, errors=%d, gaveup=%d, retries=%d" % (value, errors, gaveup, retries)
+        assert (value == threads * iterations) and (errors == 0) and (gaveup == 0), "value=%d, errors=%d, gaveup=%d, retries=%d" % (value, errors, gaveup, retries)
 
