@@ -1,8 +1,7 @@
 from dtest import Tester
-from assertions import *
-from tools import *
+from datatool import create_rows
 
-import time
+import random, time, uuid
 
 class TestCounters(Tester):
 
@@ -124,3 +123,120 @@ class TestCounters(Tester):
         rolling_restart()
 
         check(3)
+
+    def counter_consistency_test(self):
+        """
+        Do a bunch of writes with ONE, read back with ALL and check results.
+        """
+        cluster = self.cluster
+        cluster.populate(3).start()
+        node1, node2, node3 = cluster.nodelist()
+        cursor = self.patient_cql_connection(node1).cursor()
+        self.create_ks(cursor, 'counter_tests', 3)
+        
+        stmt = """
+              CREATE TABLE counter_table (
+              id uuid PRIMARY KEY,
+              counter_one COUNTER,
+              counter_two COUNTER,
+              )
+           """
+        cursor.execute(stmt)
+        
+        counters = []
+        # establish 50 counters (2x25 rows)
+        for i in xrange(25):
+            _id = str(uuid.uuid4())
+            counters.append(
+                {_id: {'counter_one':1, 'counter_two':1}}
+            )
+        
+            cursor.execute("""
+                UPDATE counter_table
+                SET counter_one = counter_one + 1, counter_two = counter_two + 1
+                where id = {uuid}""".format(uuid=_id), consistency_level='ONE')
+        
+        # increment a bunch of counters with CL.ONE
+        for i in xrange(10000):
+            counter = counters[random.randint(0, len(counters)-1)]
+            counter_id = counter.keys()[0]
+
+            cursor.execute("""
+                UPDATE counter_table
+                SET counter_one = counter_one + 2
+                where id = {uuid}""".format(uuid=counter_id), consistency_level='ONE')
+            
+            cursor.execute("""
+                UPDATE counter_table
+                SET counter_two = counter_two + 10
+                where id = {uuid}""".format(uuid=counter_id), consistency_level='ONE')
+            
+            cursor.execute("""
+                UPDATE counter_table
+                SET counter_one = counter_one - 1
+                where id = {uuid}""".format(uuid=counter_id), consistency_level='ONE')
+            
+            cursor.execute("""
+                UPDATE counter_table
+                SET counter_two = counter_two - 5
+                where id = {uuid}""".format(uuid=counter_id), consistency_level='ONE')
+            
+            # update expectations to match (assumed) db state
+            counter[counter_id]['counter_one'] += 1
+            counter[counter_id]['counter_two'] += 5
+        
+        # let's verify the counts are correct, using CL.ALL
+        for counter_dict in counters:
+            counter_id = counter_dict.keys()[0]
+            
+            cursor.execute("""
+                SELECT counter_one, counter_two
+                FROM counter_table WHERE id = {uuid}
+                """.format(uuid=counter_id), consistency_level='ALL')
+            
+            counter_one_actual, counter_two_actual = cursor.fetchone()
+            
+            self.assertEqual(counter_one_actual, counter_dict[counter_id]['counter_one'])
+            self.assertEqual(counter_two_actual, counter_dict[counter_id]['counter_two'])
+    
+    def multi_counter_update_test(self):
+        """
+        Test for singlular update statements that will affect multiple counters.
+        """
+        cluster = self.cluster
+        cluster.populate(3).start()
+        node1, node2, node3 = cluster.nodelist()
+        cursor = self.patient_cql_connection(node1).cursor()
+        self.create_ks(cursor, 'counter_tests', 3)
+        
+        cursor.execute("""
+            CREATE TABLE counter_table (
+            id text,
+            myuuid uuid,
+            counter_one COUNTER,
+            PRIMARY KEY (id, myuuid))
+            """)
+        
+        expected_counts = {}
+        
+        # set up expectations
+        for i in range(1,6):
+            _id = uuid.uuid4()
+            
+            expected_counts[_id] = i
+
+        for k, v in expected_counts.items():
+            cursor.execute("""
+                UPDATE counter_table set counter_one = counter_one + {v}
+                WHERE id='foo' and myuuid = {k}
+                """.format(k=k, v=v))
+
+        for k, v in expected_counts.items():
+            cursor.execute("""
+                SELECT counter_one FROM counter_table
+                WHERE id = 'foo' and myuuid = {k}
+                """.format(k=k))
+            
+            count = cursor.fetchone()[0]
+            
+            self.assertEqual(v, count)
