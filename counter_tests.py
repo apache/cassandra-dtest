@@ -1,5 +1,4 @@
 from dtest import Tester
-from datatool import create_rows
 
 import random, time, uuid
 
