@@ -3935,3 +3935,36 @@ class TestCQL(Tester):
 
         assert_one(cursor, "INSERT INTO lock(partition, key, owner) VALUES ('a', 'c', 'x') IF NOT EXISTS", [True])
 
+    def cas_and_map_syntax_test(self):
+        cursor = self.prepare()
+
+        # Maps
+        cursor.execute("""
+            CREATE TABLE tmap (
+                k int PRIMARY KEY,
+                m map<text, text>,
+            )
+        """)
+
+        cursor.execute("INSERT INTO tmap(k, m) VALUES (0, {'foo' : 'bar'})")
+        assert_one(cursor, "DELETE FROM tmap WHERE k=0 IF m['foo'] = 'foo'", [False, {'foo' : 'bar'}])
+        assert_one(cursor, "SELECT * FROM tmap", [0, {'foo' : 'bar'}])
+
+        assert_one(cursor, "DELETE FROM tmap WHERE k=0 IF m['foo'] = 'bar'", [True])
+        assert_none(cursor, "SELECT * FROM tmap")
+
+        # Lists
+        cursor.execute("""
+            CREATE TABLE tlist (
+                k int PRIMARY KEY,
+                l list<text>,
+            )
+        """)
+
+        cursor.execute("INSERT INTO tlist(k, l) VALUES (0, ['foo', 'bar', 'foobar'])")
+        assert_one(cursor, "DELETE FROM tlist WHERE k=0 IF l[1] = 'foobar'", [False, ('foo', 'bar', 'foobar')])
+        assert_one(cursor, "SELECT * FROM tlist", [0, ('foo', 'bar', 'foobar')])
+
+        assert_one(cursor, "DELETE FROM tlist WHERE k=0 IF l[1] = 'bar'", [True])
+        assert_none(cursor, "SELECT * FROM tlist")
+
