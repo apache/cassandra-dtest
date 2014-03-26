@@ -37,7 +37,7 @@ LOG = logging.getLogger()
 
 # copy the initial environment variables so we can reset them later:
 initial_environment = copy.copy(os.environ)
-def reset_environment_vars1():
+def reset_environment_vars():
     os.environ.clear()
     os.environ.update(initial_environment)
 
