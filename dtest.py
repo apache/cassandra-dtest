@@ -2,6 +2,7 @@ from __future__ import with_statement
 import os, tempfile, sys, shutil, types, time, threading, ConfigParser, logging
 import fnmatch
 import re
+import copy
 
 from ccmlib.cluster import Cluster
 from ccmlib.node import Node
@@ -32,8 +33,10 @@ KEEP_TEST_DIR = os.environ.get('KEEP_TEST_DIR', '').lower() in ('yes', 'true')
 PRINT_DEBUG = os.environ.get('PRINT_DEBUG', '').lower() in ('yes', 'true')
 ENABLE_VNODES = os.environ.get('ENABLE_VNODES', 'false').lower() in ('yes', 'true')
 
-
 LOG = logging.getLogger()
+
+# copy the initial environment variables so we can reset them later:
+initial_environment = copy.copy(os.environ)
 
 def debug(msg):
     if DEBUG:
@@ -155,6 +158,13 @@ class Tester(TestCase):
         self.runners = []
 
     def tearDown(self):
+        ## Reset the environment back to what it was when we
+        ## initialized. This is in case any of the tests mucked with
+        ## the environment (upgrade_through_version_test) - we need to
+        ## reset for the next test:
+        os.environ.clear()
+        os.environ.update(initial_environment)
+
         for con in self.connections:
             con.close()
 

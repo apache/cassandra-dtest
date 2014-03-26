@@ -42,10 +42,6 @@ class TestUpgradeThroughVersions(Tester):
     """
 
     def __init__(self, *args, **kwargs):
-        # Forcing cluster version on purpose
-        os.environ['CASSANDRA_VERSION'] = test_versions[0]
-        # Force cluster options that are common among versions:
-        kwargs['cluster_options'] = {'partitioner':'org.apache.cassandra.dht.RandomPartitioner'}
         # Ignore these log patterns:
         self.ignore_log_patterns = [
             # This one occurs if we do a non-rolling upgrade, the node
@@ -53,7 +49,14 @@ class TestUpgradeThroughVersions(Tester):
             # and when it does, it gets replayed and everything is fine.
             r'Can\'t send migration request: node.*is down',
         ]
+        # Force cluster options that are common among versions:
+        kwargs['cluster_options'] = {'partitioner':'org.apache.cassandra.dht.RandomPartitioner'}
         Tester.__init__(self, *args, **kwargs)
+
+    def setUp(self):
+        # Forcing cluster version on purpose
+        os.environ['CASSANDRA_VERSION'] = test_versions[0]
+        super(TestUpgradeThroughVersions, self).setUp()
 
     def upgrade_test(self):
         self.upgrade_scenario(check_counters=False)
