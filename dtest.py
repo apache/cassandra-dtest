@@ -37,6 +37,9 @@ LOG = logging.getLogger()
 
 # copy the initial environment variables so we can reset them later:
 initial_environment = copy.copy(os.environ)
+def reset_environment_vars1():
+    os.environ.clear()
+    os.environ.update(initial_environment)
 
 def debug(msg):
     if DEBUG:
@@ -157,13 +160,12 @@ class Tester(TestCase):
         self.connections = []
         self.runners = []
 
+    @classmethod
+    def tearDownClass(cls):
+        reset_environment_vars()
+
     def tearDown(self):
-        ## Reset the environment back to what it was when we
-        ## initialized. This is in case any of the tests mucked with
-        ## the environment (upgrade_through_version_test) - we need to
-        ## reset for the next test:
-        os.environ.clear()
-        os.environ.update(initial_environment)
+        reset_environment_vars()
 
         for con in self.connections:
             con.close()
