@@ -36,7 +36,7 @@ ENABLE_VNODES = os.environ.get('ENABLE_VNODES', 'false').lower() in ('yes', 'tru
 LOG = logging.getLogger()
 
 # copy the initial environment variables so we can reset them later:
-initial_environment = copy.copy(os.environ)
+initial_environment = copy.deepcopy(os.environ)
 def reset_environment_vars():
     os.environ.clear()
     os.environ.update(initial_environment)
