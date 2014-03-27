@@ -12,7 +12,7 @@ from tools import ThriftConnection
 
 TRUNK_VERSION = '2.1'
 
-versions = ('git:cassandra-1.1', 'git:cassandra-1.2', 'git:cassandra-2.0', 'git:trunk')
+versions = ('git:cassandra-1.1', 'git:cassandra-1.2.15', 'git:cassandra-2.0.5', 'git:trunk')
 semantic_versions = [LooseVersion(
     v.replace('git:cassandra-','').replace('git:','').replace("trunk",TRUNK_VERSION)) 
                      for v in versions]
@@ -60,10 +60,6 @@ class TestUpgradeThroughVersions(Tester):
 
     def upgrade_test(self):
         self.upgrade_scenario(check_counters=False)
-
-    def upgrade_test_no_flush(self):
-        """Do an upgrade without flushing/draining between versions (Not best practice!)"""
-        self.upgrade_scenario(check_counters=False, flush=False)
 
     def upgrade_test_mixed(self):
         """Only upgrade part of the cluster, so we have mixed versions part way through."""
@@ -151,6 +147,7 @@ class TestUpgradeThroughVersions(Tester):
             self.node2.shuffle("create")
             self.node2.shuffle("en")
 
+        
         for node in nodes:
             debug('Checking %s ...' % (node.name))
             if not mixed_version:
