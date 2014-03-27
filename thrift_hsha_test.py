@@ -46,6 +46,7 @@ class ThriftHSHATest(Tester):
             node1.nodetool('enablethrift')
 
         raw_input("wait")
+
     @unittest.skipIf(not os.path.exists(ATTACK_JAR), "No attack jar found")
     @unittest.skipIf(not os.path.exists(JNA_PATH), "No JNA jar found")
     def test_6285(self):
