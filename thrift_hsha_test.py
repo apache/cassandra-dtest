@@ -65,9 +65,9 @@ class ThriftHSHATest(Tester):
                 jna_path=JNA_PATH))
 
         cluster.populate(2)
-        cluster.start(use_jna=True)
+        nodes = (node1, node2) = cluster.nodelist()
+        [n.start(use_jna=True) for n in nodes]
         debug("Cluster started.")
-        (node1, node2) = cluster.nodelist()
 
         cursor = self.patient_cql_connection(node1).cursor()
         self.create_ks(cursor, 'tmp', 2)
