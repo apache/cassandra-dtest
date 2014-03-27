@@ -345,6 +345,10 @@ class Tester(TestCase):
             else:
                 yield e
 
+    # Disable docstrings printing in nosetest output
+    def shortDescription(self):
+        return None
+
 class Runner(threading.Thread):
     def __init__(self, func):
         threading.Thread.__init__(self)
