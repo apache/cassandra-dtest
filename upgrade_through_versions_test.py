@@ -1,22 +1,75 @@
+from collections import OrderedDict
+import bisect, os, re, subprocess
+from distutils.version import LooseVersion
+
 from dtest import Tester, debug
 from tools import *
 from assertions import *
 from ccmlib.cluster import Cluster
 from ccmlib.node import TimeoutError
-import time
-import os
-import re
-from distutils.version import LooseVersion
 
 from tools import ThriftConnection
 
+START_TAG = 'cassandra-1.1.9'
 TRUNK_VERSION = '2.1'
 
-versions = ('git:cassandra-1.1', 'git:cassandra-1.2.15', 'git:cassandra-2.0.5', 'git:trunk')
-semantic_versions = [LooseVersion(
-    v.replace('git:cassandra-','').replace('git:','').replace("trunk",TRUNK_VERSION)) 
-                     for v in versions]
+class TagSemVer(object):
+    """
+    Wraps a git tag up with a semver (as LooseVersion)
+    """
+    tag = None
+    semver = None
+    maj_min = None
+    
+    def __init__(self, tag, semver):
+        self.tag = 'git:' + tag
+        self.semver = LooseVersion(semver)
+        self.maj_min = str(self.semver.version[0]) + '.' + str(self.semver.version[1])
+    
+    def __cmp__(self, other):
+        return cmp(self.semver, other.semver)
+    
+def get_upgrade_path(start_tag=START_TAG, trunk_ver=TRUNK_VERSION, num_patches=2):
+    """
+    Runs "git tag -l *cassandra-*"
+    And returns a list of versions as an upgrade path. Each major.minor version tag will
+    include (up to) num_patches patch versions to be tested. These will be from the highest
+    patch versions available for that major.minor version.
+    """
+    tags = subprocess.check_output(
+        ["git", "tag", "-l", "*cassandra-*"], cwd=os.environ["CASSANDRA_DIR"])\
+        .rstrip()\
+        .split('\n')
+    
+    # bad start tag means you get a ValueError
+    tags = tags[tags.index(start_tag):]
+    
+    wrappers = []
+    for t in tags:
+        match = re.match('^cassandra-(\d+\.\d+\.\d+)$', t)
+        
+        if match:
+            full = match.group(1)
+            bisect.insort(wrappers, TagSemVer(t, full))
+    
+    # manually add trunk with expected trunk version
+    wrappers.append(TagSemVer('trunk', TRUNK_VERSION))
+    
+    # group by maj.min version
+    release_groups = OrderedDict()
+    for w in wrappers:
+        if release_groups.get(w.maj_min) is None:
+            release_groups[w.maj_min] = []
 
+        release_groups[w.maj_min].append(w)
+    
+    upgrade_path = []
+    for release, versions in release_groups.items():
+        upgrade_path.extend(
+            [ v.tag for v in versions[-num_patches:] ]
+        )
+    return upgrade_path
+    
 def get_version_from_build():
     cassandra_dir = os.environ["CASSANDRA_DIR"]
     build = os.path.join(cassandra_dir, 'build.xml')
@@ -31,7 +84,7 @@ try:
 except:
     current_version = versions[-1]
 
-test_versions = [v for v,s in zip(versions, semantic_versions) if s <= current_version]
+test_versions = get_upgrade_path()
 debug("Versions to test: %s" % str(test_versions))
 
 class TestUpgradeThroughVersions(Tester):
