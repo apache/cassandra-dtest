@@ -2398,8 +2398,6 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[1, set(['bar1', 'bar2'])], [1, set(['bar2', 'bar3'])], [2, set(['baz'])]], res
 
-        assert_invalid(cursor, "CREATE INDEX ON blogs(content)")
-
     def truncate_clean_cache_test(self):
         cursor = self.prepare(ordered=True, use_cache=True)
 
@@ -2981,6 +2979,8 @@ class TestCQL(Tester):
                 + "and key_validation_class=UTF8Type and default_validation_class=UTF8Type");
         cli.do("set test['foo']['4:3:2'] = 'bar'")
         assert not cli.has_errors(), cli.errors()
+
+        time.sleep(1)
 
         cursor.execute("ALTER TABLE test RENAME column1 TO foo1 AND column2 TO foo2 AND column3 TO foo3")
         assert_one(cursor, "SELECT foo1, foo2, foo3 FROM test", [4, 3, 2])
@@ -3826,21 +3826,6 @@ class TestCQL(Tester):
         assert_one(cursor, "select count(*) from test where field3 = false limit 1;", [1])
 
 
-    @since('2.1')
-    def user_types_rename_test(self):
-
-        cursor = self.prepare()
-        cursor.execute("CREATE TYPE simple_type (x int)")
-        cursor.execute("CREATE TYPE simple_type_2 (s set<simple_type>)")
-        cursor.execute("CREATE TABLE test (k int PRIMARY KEY, v1 simple_type, v2 simple_type_2, s set<simple_type>)")
-
-        cursor.execute("ALTER TYPE simple_type RENAME TO renamed_type")
-
-        # This shouldn't be allowed because test uses the types, so this is a somewhat indirect way to
-        # make sure the rename propagated to the table correctly.
-        assert_invalid(cursor, "DROP TYPE renamed_type")
-        assert_invalid(cursor, "DROP TYPE simple_type_2")
-
     @since('2.0')
     def cas_and_ttl_test(self):
         cursor = self.prepare()
@@ -3901,14 +3886,12 @@ class TestCQL(Tester):
         cursor.execute("INSERT INTO test(k, c1, c2, v) VALUES (1, 1, 1, 4)");
         cursor.execute("INSERT INTO test(k, c1, c2, v) VALUES (1, 1, 2, 5)");
 
-        # check we do order IN on the last clustering column
-        assert_all(cursor, "SELECT * FROM test WHERE k=0 AND c1 = 0 AND c2 IN (2, 0)", [[0, 0, 2, 2], [0, 0, 0, 0]])
-        # but that ORDER BY still trumps that ordering on IN
+        assert_all(cursor, "SELECT * FROM test WHERE k=0 AND c1 = 0 AND c2 IN (2, 0)", [[0, 0, 0, 0], [0, 0, 2, 2]])
         assert_all(cursor, "SELECT * FROM test WHERE k=0 AND c1 = 0 AND c2 IN (2, 0) ORDER BY c1 ASC, c2 ASC", [[0, 0, 0, 0], [0, 0, 2, 2]])
 
         # check that we don't need to select the column on which we order
-        assert_all(cursor, "SELECT v FROM test WHERE k=0 AND c1 = 0 AND c2 IN (2, 0)", [[2], [0]])
-        assert_all(cursor, "SELECT v FROM test WHERE k=0 AND c1 = 0 AND c2 IN (2, 0) ORDER BY c1 ASC", [[2], [0]])
+        assert_all(cursor, "SELECT v FROM test WHERE k=0 AND c1 = 0 AND c2 IN (2, 0)", [[0], [2]])
+        assert_all(cursor, "SELECT v FROM test WHERE k=0 AND c1 = 0 AND c2 IN (2, 0) ORDER BY c1 ASC", [[0], [2]])
         assert_all(cursor, "SELECT v FROM test WHERE k=0 AND c1 = 0 AND c2 IN (2, 0) ORDER BY c1 DESC", [[2], [0]])
         assert_all(cursor, "SELECT v FROM test WHERE k IN (1, 0)", [[3], [4], [5], [0], [1], [2]])
         assert_all(cursor, "SELECT v FROM test WHERE k IN (1, 0) ORDER BY c1 ASC", [[0], [1], [2], [3], [4], [5]])
