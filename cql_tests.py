@@ -3951,3 +3951,24 @@ class TestCQL(Tester):
         assert_one(cursor, "DELETE FROM tlist WHERE k=0 IF l[1] = 'bar'", [True])
         assert_none(cursor, "SELECT * FROM tlist")
 
+    @require("6956")
+    def static_with_limit_test(self):
+        """ Test LIMIT when static columns are present (#6956) """
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k int,
+                s int static,
+                v int,
+                PRIMARY KEY (k, v)
+            )
+        """)
+
+        cursor.execute("INSERT INTO test(k, s) VALUES(0, 42)")
+        for i in range(0, 4):
+            cursor.execute("INSERT INTO test(k, v) VALUES(0, %d)" % i)
+
+        assert_one(cursor, "SELECT * FROM test WHERE k = 0 LIMIT 1", [0, 0, 42])
+        assert_all(cursor, "SELECT * FROM test WHERE k = 0 LIMIT 2", [[0, 0, 42], [0, 1, 42]])
+        assert_all(cursor, "SELECT * FROM test WHERE k = 0 LIMIT 3", [[0, 0, 42], [0, 1, 42], [0, 2, 42]])
