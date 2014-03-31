@@ -1,5 +1,5 @@
 import time, re
-from dtest import Tester
+from dtest import Tester, debug
 from tools import *
 
 class TestRepair(Tester):
@@ -47,6 +47,7 @@ class TestRepair(Tester):
         # Disable hinted handoff and set batch commit log so this doesn't
         # interfer with the test (this must be after the populate)
         cluster.set_configuration_options(values={ 'hinted_handoff_enabled' : False}, batch_commitlog=True)
+        debug("Starting cluster..")
         cluster.populate(3).start()
         [node1, node2, node3] = cluster.nodelist()
 
@@ -55,6 +56,7 @@ class TestRepair(Tester):
         self.create_cf(cursor, 'cf', read_repair=0.0, columns={'c1': 'text', 'c2': 'text'})
 
         # Insert 1000 keys, kill node 3, insert 1 key, restart node 3, insert 1000 more keys
+        debug("Inserting data...")
         for i in xrange(0, 1000):
             insert_c1c2(cursor, i, "ALL")
         node3.flush()
@@ -68,18 +70,24 @@ class TestRepair(Tester):
         cluster.flush()
 
         # Verify that node3 has only 2000 keys
+        debug("Checking data on node3...")
         self.check_rows_on_node(node3, 2000, missings=[1000])
 
 
         # Verify that node1 has 2001 keys
+        debug("Checking data on node1...")
         self.check_rows_on_node(node1, 2001, found=[1000])
 
         # Verify that node2 has 2001 keys
+        debug("Checking data on node2...")
         self.check_rows_on_node(node2, 2001, found=[1000])
 
         time.sleep(10) # see CASSANDRA-4373
         # Run repair
+        start = time.time()
+        debug("starting repair...")
         node1.repair()
+        debug("Repair time: {end}".format(end=time.time() - start))
 
         # Validate that only one range was transfered
         l = node1.grep_log("/([0-9.]+) and /([0-9.]+) have ([0-9]+) range\(s\) out of sync")

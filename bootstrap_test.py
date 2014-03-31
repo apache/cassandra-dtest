@@ -7,6 +7,16 @@ from ccmlib.cluster import Cluster
 
 class TestBoostrap(Tester):
 
+    def __init__(self, *args, **kwargs):
+        # Ignore these log patterns:
+        self.ignore_log_patterns = [
+            # This one occurs when trying to send the migration to a
+            # node that hasn't started yet, and when it does, it gets
+            # replayed and everything is fine.
+            r'Can\'t send migration request: node.*is down',
+        ]
+        Tester.__init__(self, *args, **kwargs)
+
     def simple_bootstrap_test(self):
         cluster = self.cluster
         tokens = cluster.balanced_tokens(2)

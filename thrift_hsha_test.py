@@ -46,6 +46,7 @@ class ThriftHSHATest(Tester):
             node1.nodetool('enablethrift')
 
         raw_input("wait")
+
     @unittest.skipIf(not os.path.exists(ATTACK_JAR), "No attack jar found")
     @unittest.skipIf(not os.path.exists(JNA_PATH), "No JNA jar found")
     def test_6285(self):
@@ -64,9 +65,9 @@ class ThriftHSHATest(Tester):
                 jna_path=JNA_PATH))
 
         cluster.populate(2)
-        cluster.start(use_jna=True)
+        nodes = (node1, node2) = cluster.nodelist()
+        [n.start(use_jna=True) for n in nodes]
         debug("Cluster started.")
-        (node1, node2) = cluster.nodelist()
 
         cursor = self.patient_cql_connection(node1).cursor()
         self.create_ks(cursor, 'tmp', 2)

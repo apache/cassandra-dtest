@@ -13,8 +13,7 @@ class TestSchema(Tester):
 
         with self.assertRaises(ProgrammingError) as cm:
             cursor.execute("ALTER TABLE cf DROP c1")
-        self.assertEqual("Bad Request: Cannot drop columns from a non-CQL3 CF",
-                         cm.exception.message)
+        self.assertTrue(cm.exception.message.startswith("Bad Request: Cannot drop columns from a"))
 
     @since('2.0')
     def drop_column_compaction_test(self):
