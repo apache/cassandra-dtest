@@ -5,6 +5,8 @@ from distutils.version import LooseVersion
 import cql
 import re
 import os
+import sys
+import fileinput
 
 from thrift.transport import TTransport, TSocket
 from thrift.protocol import TBinaryProtocol
@@ -245,6 +247,21 @@ def not_implemented(f):
     wrapped.__doc__ = f.__doc__
     return wrapped
 
+
+def replace_in_file(filepath, search_replacements):
+    """In-place file search and replace.
+    
+    filepath - The path of the file to edit 
+    search_replacements - a list of tuples (regex, replacement) that
+    represent however many search and replace operations you wish to
+    perform.
+
+    Note: This does not work with multi-line regexes.
+    """
+    for line in fileinput.input(filepath, inplace=True):
+        for regex, replacement in search_replacements:
+            line = re.sub(regex, replacement, line)
+        sys.stdout.write(line)
 
 class ThriftConnection(object):
     """
