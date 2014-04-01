@@ -3951,7 +3951,7 @@ class TestCQL(Tester):
         assert_one(cursor, "DELETE FROM tlist WHERE k=0 IF l[1] = 'bar'", [True])
         assert_none(cursor, "SELECT * FROM tlist")
 
-    @require("6956")
+    @since("2.0")
     def static_with_limit_test(self):
         """ Test LIMIT when static columns are present (#6956) """
         cursor = self.prepare()
