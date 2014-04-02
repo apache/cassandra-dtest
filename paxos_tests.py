@@ -31,16 +31,16 @@ class TestPaxos(Tester):
 
     @since('2.0.6')
     def contention_test_multi_iterations(self):
-        self._contention_test(8, 10)
+        self._contention_test(8, 100)
 
-    #@since('2.0.6')
-    #def contention_test_many_threds(self):
-    #    self._contention_test(300, 1)
+    @since('2.0.6')
+    def contention_test_many_threds(self):
+        self._contention_test(300, 1)
 
     def _contention_test(self, threads, iterations):
         """ Test threads repeatedly contending on the same row """
 
-        verbose = True
+        verbose = False
         max_tries = 50
 
         cursor = self.prepare()
@@ -129,7 +129,6 @@ class TestPaxos(Tester):
                    INSERT INTO test (k, id) VALUES (0, :worker_id) IF NOT EXISTS;
                 APPLY BATCH
             """)
-            print ">> ", q
             workers.append(Worker(n, c, iterations, q))
 
         start = time.time()
