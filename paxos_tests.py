@@ -31,23 +31,28 @@ class TestPaxos(Tester):
 
     @since('2.0.6')
     def contention_test_multi_iterations(self):
-        self._contention_test(8, 100)
+        self._contention_test(8, 10)
 
-    @since('2.0.6')
-    def contention_test_many_threds(self):
-        self._contention_test(300, 1)
+    #@since('2.0.6')
+    #def contention_test_many_threds(self):
+    #    self._contention_test(300, 1)
 
     def _contention_test(self, threads, iterations):
         """ Test threads repeatedly contending on the same row """
 
-        verbose = False
+        verbose = True
         max_tries = 50
 
+        cursor = self.prepare()
+        cursor.execute("CREATE TABLE test (k int, v int static, id int, PRIMARY KEY (k, id))")
+        cursor.execute("INSERT INTO test(k, v) VALUES (0, 0)");
+
         class Worker(Thread):
-            def __init__(self, wid, cursor, iterations):
+            def __init__(self, wid, cursor, iterations, query):
                 Thread.__init__(self)
                 self.wid = wid
                 self.iterations = iterations
+                self.query = query
                 self.cursor = cursor
                 self.errors = 0
                 self.gaveup = 0
@@ -62,12 +67,7 @@ class TestPaxos(Tester):
                     tries = 0
                     while not done:
                         try:
-                            self.cursor.execute("""
-                                BEGIN BATCH
-                                   UPDATE test SET v = %d WHERE k = 0 IF v = %d;
-                                   INSERT INTO test (k, id) VALUES (0, %d) IF NOT EXISTS;
-                                APPLY BATCH
-                            """ % (prev+1, prev, self.wid))
+                            self.cursor.execute_prepared(self.query, { 'new_value' : prev+1, 'prev_value' : prev, 'worker_id' : self.wid })
                             res = self.cursor.fetchall()
                             if verbose:
                                 print "[%3d] CAS %3d -> %3d (res: %s)" % (self.wid, prev, prev+1, str(res))
@@ -117,16 +117,20 @@ class TestPaxos(Tester):
                             pass
 
 
-        cursor = self.prepare()
-        cursor.execute("CREATE TABLE test (k int, v int static, id int, PRIMARY KEY (k, id))")
-        cursor.execute("INSERT INTO test(k, v) VALUES (0, 0)");
-
         nodes = self.cluster.nodelist()
         workers = []
         for n in range(0, threads):
             c = self.cql_connection(nodes[n % len(nodes)], version="3.0.0").cursor()
+            # This is overkill, we prepare the query multiple time per-host, but not a huge deal
             c.execute("USE ks")
-            workers.append(Worker(n, c, iterations))
+            q = c.prepare_query("""
+                BEGIN BATCH
+                   UPDATE test SET v = :new_value WHERE k = 0 IF v = :prev_value;
+                   INSERT INTO test (k, id) VALUES (0, :worker_id) IF NOT EXISTS;
+                APPLY BATCH
+            """)
+            print ">> ", q
+            workers.append(Worker(n, c, iterations, q))
 
         start = time.time()
 
