@@ -3930,10 +3930,15 @@ class TestCQL(Tester):
         """)
 
         cursor.execute("INSERT INTO tmap(k, m) VALUES (0, {'foo' : 'bar'})")
+        assert_invalid(cursor, "DELETE FROM tmap WHERE k=0 IF m[null] = 'foo'")
         assert_one(cursor, "DELETE FROM tmap WHERE k=0 IF m['foo'] = 'foo'", [False, {'foo' : 'bar'}])
         assert_one(cursor, "SELECT * FROM tmap", [0, {'foo' : 'bar'}])
 
         assert_one(cursor, "DELETE FROM tmap WHERE k=0 IF m['foo'] = 'bar'", [True])
+        assert_none(cursor, "SELECT * FROM tmap")
+
+        cursor.execute("INSERT INTO tmap(k, m) VALUES (1, {'foo' : 'bar', 'bar' : 'foo'})")
+        assert_one(cursor, "DELETE FROM tmap WHERE k=1 IF m['foo'] = 'bar' AND m['bar'] = 'foo'", [True])
         assert_none(cursor, "SELECT * FROM tmap")
 
         # Lists
@@ -3945,11 +3950,25 @@ class TestCQL(Tester):
         """)
 
         cursor.execute("INSERT INTO tlist(k, l) VALUES (0, ['foo', 'bar', 'foobar'])")
+        assert_invalid(cursor, "DELETE FROM tlist WHERE k=0 IF l[null] = 'foobar'")
+        assert_invalid(cursor, "DELETE FROM tlist WHERE k=0 IF l[-2] = 'foobar'")
+        assert_invalid(cursor, "DELETE FROM tlist WHERE k=0 IF l[3] = 'foobar'")
         assert_one(cursor, "DELETE FROM tlist WHERE k=0 IF l[1] = 'foobar'", [False, ('foo', 'bar', 'foobar')])
         assert_one(cursor, "SELECT * FROM tlist", [0, ('foo', 'bar', 'foobar')])
 
         assert_one(cursor, "DELETE FROM tlist WHERE k=0 IF l[1] = 'bar'", [True])
         assert_none(cursor, "SELECT * FROM tlist")
+
+        # Sanity checks for sets
+        cursor.execute("""
+            CREATE TABLE tset (
+                k int PRIMARY KEY,
+                s set<text>,
+            )
+        """)
+        cursor.execute("INSERT INTO tset(k, s) VALUES (0, {'foo', 'bar', 'foobar'})")
+        assert_invalid(cursor, "DELETE FROM tset WHERE k=0 IF s['foo'] = 'foobar'")
+
 
     @since("2.0")
     def static_with_limit_test(self):
