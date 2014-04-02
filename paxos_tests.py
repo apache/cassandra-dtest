@@ -2,11 +2,11 @@
 
 from dtest import Tester
 from assertions import *
-from cql import ProgrammingError
+from cql import ProgrammingError, OperationalError
 from tools import *
 
 import time
-from multiprocessing import Process
+from threading import Thread
 from ccmlib.cluster import Cluster
 
 class TestPaxos(Tester):
@@ -29,22 +29,23 @@ class TestPaxos(Tester):
             self.create_ks(cursor, 'ks', rf)
         return cursor
 
-    @since('2.0')
+    @since('2.0.6')
     def contention_test_multi_iterations(self):
         self._contention_test(8, 100)
 
-    @since('2.0')
+    @since('2.0.6')
     def contention_test_many_threds(self):
-        self._contention_test(1000, 1)
+        self._contention_test(300, 1)
 
     def _contention_test(self, threads, iterations):
         """ Test threads repeatedly contending on the same row """
 
         verbose = False
+        max_tries = 50
 
-        class Worker(Process):
+        class Worker(Thread):
             def __init__(self, wid, cursor, iterations):
-                Process.__init__(self)
+                Thread.__init__(self)
                 self.wid = wid
                 self.iterations = iterations
                 self.cursor = cursor
@@ -53,6 +54,7 @@ class TestPaxos(Tester):
                 self.retries = 0
 
             def run(self):
+                global worker_done
                 i = 0
                 prev = 0
                 while i < self.iterations:
@@ -60,11 +62,16 @@ class TestPaxos(Tester):
                     tries = 0
                     while not done:
                         try:
-                            self.cursor.execute("UPDATE test SET v = %d WHERE k = 0 IF v = %d" % (prev+1, prev))
-                            res = self.cursor.fetchall()[0]
+                            self.cursor.execute("""
+                                BEGIN BATCH
+                                   UPDATE test SET v = %d WHERE k = 0 IF v = %d;
+                                   INSERT INTO test (k, id) VALUES (0, %d) IF NOT EXISTS;
+                                APPLY BATCH
+                            """ % (prev+1, prev, self.wid))
+                            res = self.cursor.fetchall()
                             if verbose:
-                                print "[%d]" % self.wid, "CAS", prev, "->", prev+1, ":", str(res)
-                            if res[0] is True:
+                                print "[%3d] CAS %3d -> %3d (res: %s)" % (self.wid, prev, prev+1, str(res))
+                            if res[0][0] is True:
                                 done = True
                                 prev = prev + 1
                             else:
@@ -72,23 +79,46 @@ class TestPaxos(Tester):
                                 # in practice we put some high value of retry before gaving up just
                                 # to make sure there is not something wrong that makes one thread starve
                                 # to death anormally
-                                if tries >= 30:
+                                if tries >= max_tries:
                                     if verbose:
-                                        print "[%d]" % self.wid, "Too much retries, skipping iteration"
+                                        print "[%d] Too much retries, skipping iteration" % self.wid
                                     self.gaveup = self.gaveup + 1
                                     done = True
                                 else:
                                     tries = tries + 1 
                                     self.retries = self.retries + 1
-                                    prev = res[1]
+                                    # There is 2 conditions, so 2 reasons to fail: if we failed because the row with our
+                                    # worker ID already exists, it means we timeout earlier but our update did went in,
+                                    # so do consider this as a success
+                                    prev = res[0][3]
+                                    if res[0][2] is not None:
+                                        if verbose:
+                                            print "[%3d] Update was inserted on previous try (res = %s)" % (self.wid, str(res))
+                                        done = True
+                        except OperationalError as e:
+                            if verbose:
+                                print "[%3d] TIMEOUT (%s)" % (self.wid, str(e))
+                            # This means a timeout: just retry, if it happens that our update was indeed persisted,
+                            # we'll figure it out on the next run.
+                            self.retries = self.retries + 1
                         except Exception as e:
+                            if verbose:
+                                print "[%3d] ERROR: %s" % (self.wid, str(e))
                             self.errors = self.errors + 1
                             done = True
                     i = i + 1
+                    # Clean up for next iteration
+                    while True:
+                        try:
+                            self.cursor.execute("DELETE FROM test WHERE k = 0 AND id = %d IF EXISTS" % self.wid)
+                            break;
+                        except OperationalError as e:
+                            # Timeout, just retry
+                            pass
 
 
         cursor = self.prepare()
-        cursor.execute("CREATE TABLE test (k int PRIMARY KEY, v int)")
+        cursor.execute("CREATE TABLE test (k int, v int static, id int, PRIMARY KEY (k, id))")
         cursor.execute("INSERT INTO test(k, v) VALUES (0, 0)");
 
         nodes = self.cluster.nodelist()
