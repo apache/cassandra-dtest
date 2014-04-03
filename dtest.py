@@ -13,6 +13,11 @@ from thrift.transport import TSocket
 from unittest import TestCase
 
 LOG_SAVED_DIR="logs"
+try:
+    os.mkdir(LOG_SAVED_DIR)
+except OSError:
+    pass
+
 LAST_LOG = os.path.join(LOG_SAVED_DIR, "last")
 
 LAST_TEST_DIR='last_test_dir'
