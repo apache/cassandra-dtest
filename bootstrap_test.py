@@ -5,7 +5,7 @@ from assertions import *
 from ccmlib.cluster import Cluster
 
 
-class TestBoostrap(Tester):
+class TestBootstrap(Tester):
 
     def __init__(self, *args, **kwargs):
         # Ignore these log patterns:
