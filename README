@@ -32,7 +32,7 @@ environment variable (that still have precedence if given though).
 Existing tests are probably the best place to start to look at how write
 tests.
 
-Each test spawns a new fresh cluster and tear him down after the test. If a
+Each test spawns a new fresh cluster and tears it down after the test. If a
 test fails, the logs for the node are saved in a logs/<timestamp> directory
 for analysis (it's not perfect but have been good enough so far, I'm open to
 better suggestsions).
