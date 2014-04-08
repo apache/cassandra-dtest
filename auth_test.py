@@ -3,6 +3,7 @@ import time
 from cql import ProgrammingError
 from cql.cassandra.ttypes import AuthenticationException
 from dtest import Tester, debug
+from tools import *
 
 class TestAuth(Tester):
 
