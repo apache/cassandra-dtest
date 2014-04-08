@@ -3556,7 +3556,7 @@ class TestCQL(Tester):
         assert_none(cursor, "SELECT k, v FROM test  WHERE m CONTAINS 4")
 
 
-    @require('6383')
+    @since('2.1')
     def map_keys_indexing(self):
         cursor = self.prepare()
 
@@ -3836,7 +3836,7 @@ class TestCQL(Tester):
         time.sleep(2)
         assert_one(cursor, "UPDATE test SET v = 1 WHERE k = 0 IF lock = null", [True])
 
-    @require('4851')
+    @since('2.0')
     def tuple_notation_test(self):
         """ Test the syntax introduced by #4851 """
         cursor = self.prepare()
