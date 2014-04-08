@@ -282,8 +282,8 @@ def run_cqlsh(node, cmds, cqlsh_options=[]):
     cdir = node.get_cassandra_dir()
     cli = os.path.join(cdir, 'bin', 'cqlsh')
     env = common.make_cassandra_env(cdir, node.get_path())
-    host = node.network_interfaces['thrift'][0]
-    port = node.network_interfaces['thrift'][1]
+    host = node.network_interfaces['binary'][0]
+    port = node.network_interfaces['binary'][1]
     args = cqlsh_options + [ host, str(port) ]
     sys.stdout.flush()
     p = subprocess.Popen([ cli ] + args, env=env, stdin=subprocess.PIPE, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
