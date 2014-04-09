@@ -13,7 +13,9 @@ class SnapshotTester(Tester):
     def make_snapshot(self, node, ks, cf, name):
         debug("Making snapshot....")
         node.flush()
-        node.nodetool('snapshot {ks} -cf {cf} -t {name}'.format(**locals()))
+        snapshot_cmd = 'snapshot {ks} -cf {cf} -t {name}'.format(**locals())
+        debug("Running snapshot cmd: {snapshot_cmd}".format(snapshot_cmd=snapshot_cmd))
+        node.nodetool(snapshot_cmd)
         tmpdir = tempfile.mkdtemp()
         os.mkdir(os.path.join(tmpdir,ks))
         os.mkdir(os.path.join(tmpdir,ks,cf))
@@ -112,10 +114,6 @@ class TestArchiveCommitlog(SnapshotTester):
         debug("node1 commitlog dir: " + commitlog_dir)
         self.assertTrue(len(set(os.listdir(tmp_commitlog)) - set(os.listdir(commitlog_dir))) > 0)
         
-        # Copy the active commitlogs to the backup directory:
-        for f in glob.glob(commitlog_dir+"/*"):
-            shutil.copy2(f, tmp_commitlog)
-
         # Drop the keyspace, restore from snapshot:
         cursor.execute("DROP KEYSPACE ks")
         self.create_ks(cursor, 'ks', 1)
