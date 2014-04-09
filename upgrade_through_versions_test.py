@@ -1,4 +1,4 @@
-from dtest import Tester, debug
+from dtest import Tester, debug, DISABLE_VNODES
 from tools import *
 from assertions import *
 from ccmlib.cluster import Cluster
@@ -122,7 +122,7 @@ class TestUpgradeThroughVersions(Tester):
                 node.watch_log_for("DRAINED")
             node.stop(wait_other_notice=False)
 
-        if ENABLE_VNODES and version >= "1.2":
+        if not DISABLE_VNODES and version >= "1.2":
             self.cluster.set_configuration_options(values={
                 'initial_token': None, 
                 'num_tokens': 256})
@@ -142,7 +142,7 @@ class TestUpgradeThroughVersions(Tester):
             if not mixed_version:
                 node.nodetool('upgradesstables')
 
-        if ENABLE_VNODES and version >= "1.2" and not mixed_version:
+        if not DISABLE_VNODES and version >= "1.2" and not mixed_version:
             debug("Running shuffle")
             self.node2.shuffle("create")
             self.node2.shuffle("en")

@@ -34,7 +34,7 @@ TRACE = os.environ.get('TRACE', '').lower() in ('yes', 'true')
 KEEP_LOGS = os.environ.get('KEEP_LOGS', '').lower() in ('yes', 'true')
 KEEP_TEST_DIR = os.environ.get('KEEP_TEST_DIR', '').lower() in ('yes', 'true')
 PRINT_DEBUG = os.environ.get('PRINT_DEBUG', '').lower() in ('yes', 'true')
-ENABLE_VNODES = os.environ.get('ENABLE_VNODES', 'false').lower() in ('yes', 'true')
+DISABLE_VNODES = os.environ.get('DISABLE_VNODES', '').lower() in ('yes', 'true')
 
 CURRENT_TEST = ""
 
@@ -102,10 +102,10 @@ class Tester(TestCase):
                 cdir = DEFAULT_DIR
             cluster = Cluster(self.test_path, name, cassandra_dir=cdir)
         if cluster.version() >= "1.2":
-            if ENABLE_VNODES:
-                cluster.set_configuration_options(values={'initial_token': None, 'num_tokens': 256})
-            else:
+            if DISABLE_VNODES:
                 cluster.set_configuration_options(values={'num_tokens': None})
+            else:
+                cluster.set_configuration_options(values={'initial_token': None, 'num_tokens': 256})
         return cluster
 
     def __cleanup_cluster(self):
