@@ -85,7 +85,7 @@ class Tester(TestCase):
         super(Tester, self).__init__(*argv, **kwargs)
 
 
-    def __get_cluster(self, name='test'):
+    def _get_cluster(self, name='test'):
         self.test_path = tempfile.mkdtemp(prefix='dtest-')
         # ccm on cygwin needs absolute path to directory - it crosses from cygwin space into
         # regular Windows space on wmic calls which will otherwise break pathing
@@ -147,7 +147,7 @@ class Tester(TestCase):
                     # after a restart, /tmp will be emptied so we'll get an IOError when loading the old cluster here
                     pass
 
-        self.cluster = self.__get_cluster()
+        self.cluster = self._get_cluster()
         self.__setup_cobertura()
         # the failure detector can be quite slow in such tests with quick start/stop
         self.cluster.set_configuration_options(values={'phi_convict_threshold': 5})
