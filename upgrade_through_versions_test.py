@@ -1,13 +1,11 @@
 from collections import OrderedDict
 import bisect, os, re, subprocess
 from distutils.version import LooseVersion
-from dtest import Tester, debug, DISABLE_VNODES
-from tools import *
-from assertions import *
+from dtest import Tester, debug, DISABLE_VNODES, DEFAULT_DIR
+from tools import new_node
 
-
-START_TAG = 'cassandra-1.1.9'
-TRUNK_VERSION = '2.1'
+START_VER = '1.1' # earliest version considered but won't necessarily be used!
+TRUNK_VER = '2.1'
 
 class TagSemVer(object):
     """
@@ -17,39 +15,41 @@ class TagSemVer(object):
     semver = None
     maj_min = None
     
-    def __init__(self, tag, semver):
+    def __init__(self, tag, semver_str):
         self.tag = 'git:' + tag
-        self.semver = LooseVersion(semver)
+        self.semver = LooseVersion(semver_str)
         self.maj_min = str(self.semver.version[0]) + '.' + str(self.semver.version[1])
     
     def __cmp__(self, other):
         return cmp(self.semver, other.semver)
     
-def get_upgrade_path(start_tag=START_TAG, trunk_ver=TRUNK_VERSION, num_patches=2):
+def get_upgrade_path(start_ver=START_VER, trunk_ver=TRUNK_VER, num_patches=2):
     """
     Runs "git tag -l *cassandra-*"
-    And returns a list of versions as an upgrade path. Each major.minor version tag will
+    And returns a list of versions as an upgrade path. Each major.minor version tag may
     include (up to) num_patches patch versions to be tested. These will be from the highest
     patch versions available for that major.minor version.
     """
+    git_path = os.environ.get('CASSANDRA_DIR', DEFAULT_DIR)
+    
     tags = subprocess.check_output(
-        ["git", "tag", "-l", "*cassandra-*"], cwd=os.environ["CASSANDRA_DIR"])\
+        ["git", "tag", "-l", "*cassandra-*"], cwd=git_path)\
         .rstrip()\
         .split('\n')
     
-    # bad start tag means you get a ValueError
-    tags = tags[tags.index(start_tag):]
+    # earliest version considered but won't necessarily be used!
+    start_ver = LooseVersion(start_ver)
     
     wrappers = []
     for t in tags:
         match = re.match('^cassandra-(\d+\.\d+\.\d+)$', t)
-        
         if match:
-            full = match.group(1)
-            bisect.insort(wrappers, TagSemVer(t, full))
+            tsv = TagSemVer(t, match.group(1))
+            if tsv.semver >= start_ver:
+                bisect.insort(wrappers, tsv)
     
     # manually add trunk with expected trunk version
-    wrappers.append(TagSemVer('trunk', TRUNK_VERSION))
+    wrappers.append(TagSemVer('trunk', TRUNK_VER))
     
     # group by maj.min version
     release_groups = OrderedDict()
@@ -67,8 +67,9 @@ def get_upgrade_path(start_tag=START_TAG, trunk_ver=TRUNK_VERSION, num_patches=2
     return upgrade_path
     
 def get_version_from_build():
-    cassandra_dir = os.environ["CASSANDRA_DIR"]
-    build = os.path.join(cassandra_dir, 'build.xml')
+    path = os.environ.get('CASSANDRA_DIR', DEFAULT_DIR)
+    
+    build = os.path.join(path, 'build.xml')
     with open(build) as f:
         for line in f:
             match = re.search('name="base\.version" value="([0-9.]+)[^"]*"', line)
