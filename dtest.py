@@ -12,9 +12,12 @@ from nose.exc import SkipTest
 from thrift.transport import TSocket
 from unittest import TestCase
 
-logging.basicConfig(stream=sys.stderr)
-
 LOG_SAVED_DIR="logs"
+try:
+    os.mkdir(LOG_SAVED_DIR)
+except OSError:
+    pass
+
 LAST_LOG = os.path.join(LOG_SAVED_DIR, "last")
 
 LAST_TEST_DIR='last_test_dir'
@@ -31,9 +34,17 @@ TRACE = os.environ.get('TRACE', '').lower() in ('yes', 'true')
 KEEP_LOGS = os.environ.get('KEEP_LOGS', '').lower() in ('yes', 'true')
 KEEP_TEST_DIR = os.environ.get('KEEP_TEST_DIR', '').lower() in ('yes', 'true')
 PRINT_DEBUG = os.environ.get('PRINT_DEBUG', '').lower() in ('yes', 'true')
-ENABLE_VNODES = os.environ.get('ENABLE_VNODES', 'false').lower() in ('yes', 'true')
+DISABLE_VNODES = os.environ.get('DISABLE_VNODES', '').lower() in ('yes', 'true')
 
-LOG = logging.getLogger()
+CURRENT_TEST = ""
+
+logging.basicConfig(filename=os.path.join(LOG_SAVED_DIR,"dtest.log"),
+                    filemode='w',
+                    format='%(asctime)s,%(msecs)d %(name)s %(current_test)s %(levelname)s %(message)s',
+                    datefmt='%H:%M:%S',
+                    level=logging.DEBUG)
+
+LOG = logging.getLogger('dtest')
 
 # copy the initial environment variables so we can reset them later:
 initial_environment = copy.deepcopy(os.environ)
@@ -42,8 +53,7 @@ def reset_environment_vars():
     os.environ.update(initial_environment)
 
 def debug(msg):
-    if DEBUG:
-        LOG.debug(msg)
+    LOG.debug(msg, extra={"current_test":CURRENT_TEST})
     if PRINT_DEBUG:
         print msg
 
@@ -92,10 +102,10 @@ class Tester(TestCase):
                 cdir = DEFAULT_DIR
             cluster = Cluster(self.test_path, name, cassandra_dir=cdir)
         if cluster.version() >= "1.2":
-            if ENABLE_VNODES:
-                cluster.set_configuration_options(values={'initial_token': None, 'num_tokens': 256})
-            else:
+            if DISABLE_VNODES:
                 cluster.set_configuration_options(values={'num_tokens': None})
+            else:
+                cluster.set_configuration_options(values={'initial_token': None, 'num_tokens': 256})
         return cluster
 
     def __cleanup_cluster(self):
@@ -120,6 +130,8 @@ class Tester(TestCase):
             node.set_cassandra_dir(cassandra_dir=cdir)
 
     def setUp(self):
+        global CURRENT_TEST
+        CURRENT_TEST = self.id() + self._testMethodName
         # cleaning up if a previous execution didn't trigger tearDown (which
         # can happen if it is interrupted by KeyboardInterrupt)
         # TODO: move that part to a generic fixture
@@ -344,6 +356,10 @@ class Tester(TestCase):
                     break
             else:
                 yield e
+
+    # Disable docstrings printing in nosetest output
+    def shortDescription(self):
+        return None
 
 class Runner(threading.Thread):
     def __init__(self, func):

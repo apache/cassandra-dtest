@@ -3,7 +3,7 @@ import time
 import uuid
 
 from cql import ProgrammingError
-from dtest import Tester, TracingCursor
+from dtest import Tester, TracingCursor, debug
 from tools import since
 
 
@@ -103,6 +103,37 @@ class TestSecondaryIndexes(Tester):
             result = cursor.fetchall()
             self.assertEqual(limit, len(result))
 
+
+    def test_6924(self):
+        """Tests CASSANDRA-6924
+        
+        Data inserted immediately after secondary index creation is not indexed.
+        """
+        # Reproducing requires at least 3 nodes:
+        cluster = self.cluster
+        cluster.populate(3).start()
+        node1,node2,node3 = cluster.nodelist()
+        conn = self.patient_cql_connection(node1)
+        cursor = conn.cursor()
+        
+        #This only occurs when dropping keyspaces and creating with
+        #the same name, so loop through this test a few times:
+        for i in range(10):
+            debug("round %s" % i)
+            try:
+                cursor.execute("DROP KEYSPACE ks")
+            except ProgrammingError:
+                pass
+            self.create_ks(cursor, 'ks', 1)
+            cursor.execute("CREATE TABLE ks.cf (key text PRIMARY KEY, col1 text);")
+            cursor.execute("CREATE INDEX on ks.cf (col1);")
+            for r in range(10):
+                stmt = "INSERT INTO ks.cf (key, col1) VALUES ('%s','asdf');" % r
+                cursor.execute(stmt)
+            cursor.execute("select count(*) from ks.cf WHERE col1='asdf'")
+            count = cursor.fetchone()[0]
+            self.assertEqual(count,10)
+        
 
 class TestSecondaryIndexesOnCollections(Tester):
     def __init__(self, *args, **kwargs):

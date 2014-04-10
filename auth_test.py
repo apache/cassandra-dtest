@@ -2,21 +2,33 @@ import time
 
 from cql import ProgrammingError
 from cql.cassandra.ttypes import AuthenticationException
-from dtest import Tester
+from dtest import Tester, debug
+from tools import *
 
 class TestAuth(Tester):
 
-    def system_auth_ks_is_alterable_test(self):
-        self.cluster.populate(3).start()
+    def __init__(self, *args, **kwargs):
+        self.ignore_log_patterns = [
+            # This one occurs if we do a non-rolling upgrade, the node
+            # it's trying to send the migration to hasn't started yet,
+            # and when it does, it gets replayed and everything is fine.
+            r'Can\'t send migration request: node.*is down',
+        ]
+        Tester.__init__(self, *args, **kwargs)
 
+    @require('7011')
+    def system_auth_ks_is_alterable_test(self):
+        self.prepare(nodes=3)
+        debug("nodes started")
         schema_query = """SELECT strategy_options
                           FROM system.schema_keyspaces
                           WHERE keyspace_name = 'system_auth'"""
 
-        cursor = self.get_cursor(0)
+        cursor = self.get_cursor(0, user='cassandra', password='cassandra')
         cursor.execute(schema_query)
         row = cursor.fetchone()
         self.assertEqual('{"replication_factor":"1"}', row[0])
+
 
         cursor.execute("""
             ALTER KEYSPACE system_auth
@@ -24,11 +36,16 @@ class TestAuth(Tester):
         """)
 
         # make sure schema change is persistent
+        debug("Stopping cluster..")
         self.cluster.stop()
+        debug("Restarting cluster..")
         self.cluster.start()
 
+        time.sleep(15)
+
         for i in range(3):
-            cursor = self.get_cursor(i)
+            debug('Checking node: {i}'.format(i=i))
+            cursor = self.get_cursor(i, user='cassandra', password='cassandra')
             cursor.execute(schema_query)
             row = cursor.fetchone()
             self.assertEqual('{"replication_factor":"3"}', row[0])

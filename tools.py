@@ -5,6 +5,8 @@ from distutils.version import LooseVersion
 import cql
 import re
 import os
+import sys
+import fileinput
 
 from thrift.transport import TTransport, TSocket
 from thrift.protocol import TBinaryProtocol
@@ -212,12 +214,12 @@ class since(object):
         wrapped.__doc__ = f.__doc__
         return wrapped
 
-from dtest import ENABLE_VNODES
+from dtest import DISABLE_VNODES
 # Use this decorator to skip a test when vnodes are enabled.
 class no_vnodes(object):
     def __call__(self, f):
         def wrapped(obj):
-            if ENABLE_VNODES:
+            if not DISABLE_VNODES:
                 obj.skip("Test disabled for vnodes")
             f(obj)
         wrapped.__name__ = f.__name__
@@ -245,6 +247,21 @@ def not_implemented(f):
     wrapped.__doc__ = f.__doc__
     return wrapped
 
+
+def replace_in_file(filepath, search_replacements):
+    """In-place file search and replace.
+    
+    filepath - The path of the file to edit 
+    search_replacements - a list of tuples (regex, replacement) that
+    represent however many search and replace operations you wish to
+    perform.
+
+    Note: This does not work with multi-line regexes.
+    """
+    for line in fileinput.input(filepath, inplace=True):
+        for regex, replacement in search_replacements:
+            line = re.sub(regex, replacement, line)
+        sys.stdout.write(line)
 
 class ThriftConnection(object):
     """

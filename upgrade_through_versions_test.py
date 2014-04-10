@@ -1,14 +1,10 @@
 from collections import OrderedDict
 import bisect, os, re, subprocess
 from distutils.version import LooseVersion
-
-from dtest import Tester, debug
+from dtest import Tester, debug, DISABLE_VNODES
 from tools import *
 from assertions import *
-from ccmlib.cluster import Cluster
-from ccmlib.node import TimeoutError
 
-from tools import ThriftConnection
 
 START_TAG = 'cassandra-1.1.9'
 TRUNK_VERSION = '2.1'
@@ -78,11 +74,6 @@ def get_version_from_build():
             match = re.search('name="base\.version" value="([0-9.]+)[^"]*"', line)
             if match:
                 return LooseVersion(match.group(1))
-
-try:
-    current_version = get_version_from_build()
-except:
-    current_version = versions[-1]
 
 test_versions = get_upgrade_path()
 debug("Versions to test: %s" % str(test_versions))
@@ -175,7 +166,7 @@ class TestUpgradeThroughVersions(Tester):
                 node.watch_log_for("DRAINED")
             node.stop(wait_other_notice=False)
 
-        if ENABLE_VNODES and version >= "1.2":
+        if not DISABLE_VNODES and version >= "1.2":
             self.cluster.set_configuration_options(values={
                 'initial_token': None, 
                 'num_tokens': 256})
@@ -195,7 +186,7 @@ class TestUpgradeThroughVersions(Tester):
             if not mixed_version:
                 node.nodetool('upgradesstables')
 
-        if ENABLE_VNODES and version >= "1.2" and not mixed_version:
+        if not DISABLE_VNODES and version >= "1.2" and not mixed_version:
             debug("Running shuffle")
             self.node2.shuffle("create")
             self.node2.shuffle("en")

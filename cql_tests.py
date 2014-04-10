@@ -2398,8 +2398,6 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert res == [[1, set(['bar1', 'bar2'])], [1, set(['bar2', 'bar3'])], [2, set(['baz'])]], res
 
-        assert_invalid(cursor, "CREATE INDEX ON blogs(content)")
-
     def truncate_clean_cache_test(self):
         cursor = self.prepare(ordered=True, use_cache=True)
 
@@ -2982,6 +2980,8 @@ class TestCQL(Tester):
         cli.do("set test['foo']['4:3:2'] = 'bar'")
         assert not cli.has_errors(), cli.errors()
 
+        time.sleep(1)
+
         cursor.execute("ALTER TABLE test RENAME column1 TO foo1 AND column2 TO foo2 AND column3 TO foo3")
         assert_one(cursor, "SELECT foo1, foo2, foo3 FROM test", [4, 3, 2])
 
@@ -3556,7 +3556,7 @@ class TestCQL(Tester):
         assert_none(cursor, "SELECT k, v FROM test  WHERE m CONTAINS 4")
 
 
-    @require('6383')
+    @since('2.1')
     def map_keys_indexing(self):
         cursor = self.prepare()
 
@@ -3826,21 +3826,6 @@ class TestCQL(Tester):
         assert_one(cursor, "select count(*) from test where field3 = false limit 1;", [1])
 
 
-    @since('2.1')
-    def user_types_rename_test(self):
-
-        cursor = self.prepare()
-        cursor.execute("CREATE TYPE simple_type (x int)")
-        cursor.execute("CREATE TYPE simple_type_2 (s set<simple_type>)")
-        cursor.execute("CREATE TABLE test (k int PRIMARY KEY, v1 simple_type, v2 simple_type_2, s set<simple_type>)")
-
-        cursor.execute("ALTER TYPE simple_type RENAME TO renamed_type")
-
-        # This shouldn't be allowed because test uses the types, so this is a somewhat indirect way to
-        # make sure the rename propagated to the table correctly.
-        assert_invalid(cursor, "DROP TYPE renamed_type")
-        assert_invalid(cursor, "DROP TYPE simple_type_2")
-
     @since('2.0')
     def cas_and_ttl_test(self):
         cursor = self.prepare()
@@ -3851,7 +3836,7 @@ class TestCQL(Tester):
         time.sleep(2)
         assert_one(cursor, "UPDATE test SET v = 1 WHERE k = 0 IF lock = null", [True])
 
-    @require('4851')
+    @since('2.0')
     def tuple_notation_test(self):
         """ Test the syntax introduced by #4851 """
         cursor = self.prepare()
@@ -3901,14 +3886,12 @@ class TestCQL(Tester):
         cursor.execute("INSERT INTO test(k, c1, c2, v) VALUES (1, 1, 1, 4)");
         cursor.execute("INSERT INTO test(k, c1, c2, v) VALUES (1, 1, 2, 5)");
 
-        # check we do order IN on the last clustering column
-        assert_all(cursor, "SELECT * FROM test WHERE k=0 AND c1 = 0 AND c2 IN (2, 0)", [[0, 0, 2, 2], [0, 0, 0, 0]])
-        # but that ORDER BY still trumps that ordering on IN
+        assert_all(cursor, "SELECT * FROM test WHERE k=0 AND c1 = 0 AND c2 IN (2, 0)", [[0, 0, 0, 0], [0, 0, 2, 2]])
         assert_all(cursor, "SELECT * FROM test WHERE k=0 AND c1 = 0 AND c2 IN (2, 0) ORDER BY c1 ASC, c2 ASC", [[0, 0, 0, 0], [0, 0, 2, 2]])
 
         # check that we don't need to select the column on which we order
-        assert_all(cursor, "SELECT v FROM test WHERE k=0 AND c1 = 0 AND c2 IN (2, 0)", [[2], [0]])
-        assert_all(cursor, "SELECT v FROM test WHERE k=0 AND c1 = 0 AND c2 IN (2, 0) ORDER BY c1 ASC", [[2], [0]])
+        assert_all(cursor, "SELECT v FROM test WHERE k=0 AND c1 = 0 AND c2 IN (2, 0)", [[0], [2]])
+        assert_all(cursor, "SELECT v FROM test WHERE k=0 AND c1 = 0 AND c2 IN (2, 0) ORDER BY c1 ASC", [[0], [2]])
         assert_all(cursor, "SELECT v FROM test WHERE k=0 AND c1 = 0 AND c2 IN (2, 0) ORDER BY c1 DESC", [[2], [0]])
         assert_all(cursor, "SELECT v FROM test WHERE k IN (1, 0)", [[3], [4], [5], [0], [1], [2]])
         assert_all(cursor, "SELECT v FROM test WHERE k IN (1, 0) ORDER BY c1 ASC", [[0], [1], [2], [3], [4], [5]])
@@ -3947,10 +3930,15 @@ class TestCQL(Tester):
         """)
 
         cursor.execute("INSERT INTO tmap(k, m) VALUES (0, {'foo' : 'bar'})")
+        assert_invalid(cursor, "DELETE FROM tmap WHERE k=0 IF m[null] = 'foo'")
         assert_one(cursor, "DELETE FROM tmap WHERE k=0 IF m['foo'] = 'foo'", [False, {'foo' : 'bar'}])
         assert_one(cursor, "SELECT * FROM tmap", [0, {'foo' : 'bar'}])
 
         assert_one(cursor, "DELETE FROM tmap WHERE k=0 IF m['foo'] = 'bar'", [True])
+        assert_none(cursor, "SELECT * FROM tmap")
+
+        cursor.execute("INSERT INTO tmap(k, m) VALUES (1, {'foo' : 'bar', 'bar' : 'foo'})")
+        assert_one(cursor, "DELETE FROM tmap WHERE k=1 IF m['foo'] = 'bar' AND m['bar'] = 'foo'", [True])
         assert_none(cursor, "SELECT * FROM tmap")
 
         # Lists
@@ -3962,9 +3950,44 @@ class TestCQL(Tester):
         """)
 
         cursor.execute("INSERT INTO tlist(k, l) VALUES (0, ['foo', 'bar', 'foobar'])")
+        assert_invalid(cursor, "DELETE FROM tlist WHERE k=0 IF l[null] = 'foobar'")
+        assert_invalid(cursor, "DELETE FROM tlist WHERE k=0 IF l[-2] = 'foobar'")
+        assert_invalid(cursor, "DELETE FROM tlist WHERE k=0 IF l[3] = 'foobar'")
         assert_one(cursor, "DELETE FROM tlist WHERE k=0 IF l[1] = 'foobar'", [False, ('foo', 'bar', 'foobar')])
         assert_one(cursor, "SELECT * FROM tlist", [0, ('foo', 'bar', 'foobar')])
 
         assert_one(cursor, "DELETE FROM tlist WHERE k=0 IF l[1] = 'bar'", [True])
         assert_none(cursor, "SELECT * FROM tlist")
 
+        # Sanity checks for sets
+        cursor.execute("""
+            CREATE TABLE tset (
+                k int PRIMARY KEY,
+                s set<text>,
+            )
+        """)
+        cursor.execute("INSERT INTO tset(k, s) VALUES (0, {'foo', 'bar', 'foobar'})")
+        assert_invalid(cursor, "DELETE FROM tset WHERE k=0 IF s['foo'] = 'foobar'")
+
+
+    @since("2.0")
+    def static_with_limit_test(self):
+        """ Test LIMIT when static columns are present (#6956) """
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k int,
+                s int static,
+                v int,
+                PRIMARY KEY (k, v)
+            )
+        """)
+
+        cursor.execute("INSERT INTO test(k, s) VALUES(0, 42)")
+        for i in range(0, 4):
+            cursor.execute("INSERT INTO test(k, v) VALUES(0, %d)" % i)
+
+        assert_one(cursor, "SELECT * FROM test WHERE k = 0 LIMIT 1", [0, 0, 42])
+        assert_all(cursor, "SELECT * FROM test WHERE k = 0 LIMIT 2", [[0, 0, 42], [0, 1, 42]])
+        assert_all(cursor, "SELECT * FROM test WHERE k = 0 LIMIT 3", [[0, 0, 42], [0, 1, 42], [0, 2, 42]])
