@@ -17,7 +17,7 @@ class TestBootstrap(Tester):
         ]
         Tester.__init__(self, *args, **kwargs)
 
-    def simple_boostrap_test(self):
+    def simple_bootstrap_test(self):
         cluster = self.cluster
         tokens = cluster.balanced_tokens(2)
 
