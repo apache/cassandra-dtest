@@ -77,13 +77,8 @@ class Tester(TestCase):
     def __init__(self, *argv, **kwargs):
         # if False, then scan the log of each node for errors after every test.
         self.allow_log_errors = False
-        try:
-            self.cluster_options = kwargs['cluster_options']
-            del kwargs['cluster_options']
-        except KeyError:
-            self.cluster_options = None
+        self.cluster_options = kwargs.pop('cluster_options', None)
         super(Tester, self).__init__(*argv, **kwargs)
-
 
     def __get_cluster(self, name='test'):
         self.test_path = tempfile.mkdtemp(prefix='dtest-')
