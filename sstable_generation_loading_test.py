@@ -128,16 +128,14 @@ class TestSSTableGenerationAndLoading(Tester):
         [node1, node2] = cluster.nodelist()
         time.sleep(.5)
 
-        compression = pre_compression or None
-
-        def create_schema(cursor):
+        def create_schema(cursor, compression):
             self.create_ks(cursor, "ks", rf=2)
             self.create_cf(cursor, "standard1", compression=compression)
             self.create_cf(cursor, "counter1", compression=compression, columns={'v': 'counter'})
 
         debug("creating keyspace and inserting")
         cursor = self.cql_connection(node1).cursor()
-        create_schema(cursor)
+        create_schema(cursor, pre_compression)
 
         for i in range(NUM_KEYS):
             cursor.execute("UPDATE standard1 SET v='%d' WHERE KEY='%d' AND c='col'" % (i, i))
@@ -166,7 +164,7 @@ class TestSSTableGenerationAndLoading(Tester):
 
         debug("re-creating the keyspace and column families.")
         cursor = self.cql_connection(node1).cursor()
-        create_schema(cursor)
+        create_schema(cursor, post_compression)
         time.sleep(2)
 
         debug("Calling sstableloader")
