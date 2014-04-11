@@ -87,15 +87,14 @@ class Tester(TestCase):
         if sys.platform == "cygwin":
             self.test_path = subprocess.Popen(["cygpath", "-m", self.test_path], stdout = subprocess.PIPE, stderr = subprocess.STDOUT).communicate()[0].rstrip()
         debug("cluster ccm directory: "+self.test_path)
-        try:
-            version = os.environ['CASSANDRA_VERSION']
+        version = os.environ.get('CASSANDRA_VERSION')
+        cdir = os.environ.get('CASSANDRA_DIR', DEFAULT_DIR)
+        
+        if version:
             cluster = Cluster(self.test_path, name, cassandra_version=version)
-        except KeyError:
-            try:
-                cdir = os.environ['CASSANDRA_DIR']
-            except KeyError:
-                cdir = DEFAULT_DIR
+        else:
             cluster = Cluster(self.test_path, name, cassandra_dir=cdir)
+        
         if cluster.version() >= "1.2":
             if DISABLE_VNODES:
                 cluster.set_configuration_options(values={'num_tokens': None})
