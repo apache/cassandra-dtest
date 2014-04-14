@@ -4,6 +4,7 @@ from distutils import dir_util
 import subprocess
 
 from dtest import Tester, debug
+from tools import *
 from ccmlib import common as ccmcommon
 
 class TestSSTableGenerationAndLoading(Tester):
@@ -80,30 +81,39 @@ class TestSSTableGenerationAndLoading(Tester):
                 data_found += 1
         assert data_found > 0, "After removing index, filter, stats, and digest files, the data file was deleted!"
 
+    @require('https://issues.apache.org/jira/browse/CASSANDRA-7013')
     def sstableloader_compression_none_to_none_test(self):
         self.load_sstable_with_configuration(None, None)
 
+    @require('https://issues.apache.org/jira/browse/CASSANDRA-7013')
     def sstableloader_compression_none_to_snappy_test(self):
         self.load_sstable_with_configuration(None, 'Snappy')
 
+    @require('https://issues.apache.org/jira/browse/CASSANDRA-7013')
     def sstableloader_compression_none_to_deflate_test(self):
         self.load_sstable_with_configuration(None, 'Deflate')
 
+    @require('https://issues.apache.org/jira/browse/CASSANDRA-7013')
     def sstableloader_compression_snappy_to_none_test(self):
         self.load_sstable_with_configuration('Snappy', None)
 
+    @require('https://issues.apache.org/jira/browse/CASSANDRA-7013')
     def sstableloader_compression_snappy_to_snappy_test(self):
         self.load_sstable_with_configuration('Snappy', 'Snappy')
 
+    @require('https://issues.apache.org/jira/browse/CASSANDRA-7013')
     def sstableloader_compression_snappy_to_deflate_test(self):
         self.load_sstable_with_configuration('Snappy', 'Deflate')
 
+    @require('https://issues.apache.org/jira/browse/CASSANDRA-7013')
     def sstableloader_compression_deflate_to_none_test(self):
         self.load_sstable_with_configuration('Deflate', None)
 
+    @require('https://issues.apache.org/jira/browse/CASSANDRA-7013')
     def sstableloader_compression_deflate_to_snappy_test(self):
         self.load_sstable_with_configuration('Deflate', 'Snappy')
 
+    @require('https://issues.apache.org/jira/browse/CASSANDRA-7013')
     def sstableloader_compression_deflate_to_deflate_test(self):
         self.load_sstable_with_configuration('Deflate', 'Deflate')
 
