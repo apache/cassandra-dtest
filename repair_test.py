@@ -35,6 +35,7 @@ class TestRepair(Tester):
     def simple_repair_test(self, ):
         self._simple_repair()
 
+    @no_vnodes()  # https://issues.apache.org/jira/browse/CASSANDRA-5220
     def simple_repair_order_preserving_test(self, ):
         self._simple_repair(order_preserving_partitioner=True)
 
