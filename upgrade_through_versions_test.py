@@ -26,9 +26,12 @@ class TagSemVer(object):
 def get_upgrade_path(start_ver=START_VER, trunk_ver=TRUNK_VER, num_patches=2):
     """
     Runs "git tag -l *cassandra-*"
-    And returns a list of versions as an upgrade path. Each major.minor version tag may
+    And returns a list representing upgrade path. Each major.minor version tag may
     include (up to) num_patches patch versions to be tested. These will be from the highest
     patch versions available for that major.minor version.
+    
+    The list elements will be simple wrapper objects with the git tag, and a corresponding
+    LooseVersion for utility comparing versions.
     """
     git_path = os.environ.get('CASSANDRA_DIR', DEFAULT_DIR)
     
@@ -62,8 +65,9 @@ def get_upgrade_path(start_ver=START_VER, trunk_ver=TRUNK_VER, num_patches=2):
     upgrade_path = []
     for release, versions in release_groups.items():
         upgrade_path.extend(
-            [ v.tag for v in versions[-num_patches:] ]
+            [ v for v in versions[-num_patches:] ]
         )
+    
     return upgrade_path
     
 def get_version_from_build():
@@ -76,8 +80,6 @@ def get_version_from_build():
             if match:
                 return LooseVersion(match.group(1))
 
-test_versions = get_upgrade_path()
-debug("Versions to test: %s" % str(test_versions))
 
 class TestUpgradeThroughVersions(Tester):
     """
@@ -85,7 +87,8 @@ class TestUpgradeThroughVersions(Tester):
     If the CASSANDRA_DIR variable is set then upgrade to that version,
     otherwise upgrade all the way to the trunk.
     """
-
+    test_versions = None # set on init to know which versions to use
+    
     def __init__(self, *args, **kwargs):
         # Ignore these log patterns:
         self.ignore_log_patterns = [
@@ -94,13 +97,16 @@ class TestUpgradeThroughVersions(Tester):
             # and when it does, it gets replayed and everything is fine.
             r'Can\'t send migration request: node.*is down',
         ]
+        self.test_versions = get_upgrade_path()
+        
         # Force cluster options that are common among versions:
         kwargs['cluster_options'] = {'partitioner':'org.apache.cassandra.dht.RandomPartitioner'}
         Tester.__init__(self, *args, **kwargs)
 
     def setUp(self):
         # Forcing cluster version on purpose
-        os.environ['CASSANDRA_VERSION'] = test_versions[0]
+        os.environ['CASSANDRA_VERSION'] = self.test_versions[0].tag
+        debug("Versions to test (%s): %s" % (type(self), str([v.tag for v in self.test_versions])))
         super(TestUpgradeThroughVersions, self).setUp()
 
     def upgrade_test(self):
@@ -115,42 +121,44 @@ class TestUpgradeThroughVersions(Tester):
         self.row_values = set()
         self.counter_val = 0
         cluster = self.cluster
-
+        
         # Start with 3 node cluster
-        debug('Creating cluster (%s)' % test_versions[0])
+        debug('Creating cluster (%s)' % self.test_versions[0].tag)
         cluster.populate(3)
         cluster.start()
         node1, node2, node3 = cluster.nodelist()
         self.node2 = node2
 
         self._create_schema()
-
-        # node1.stress(['--operation=INSERT','--family-type=Standard','--num-keys=10000','--create-index=KEYS','--compression=SnappyCompressor','--compaction-strategy=LeveledCompactionStrategy'])
         
         self._write_values()
         self._increment_counter_value()
 
         # upgrade through versions
-        for version in test_versions[1:]:
+        for tag_semver in self.test_versions[1:]:
+            tag = tag_semver.tag
+            semver = tag_semver.semver
+            
             if mixed_version:
                 for num, node in enumerate(self.cluster.nodelist()):
-                    self.upgrade_to_version(version, mixed_version=True, nodes=(node,), 
+                    self.upgrade_to_version(tag, semver, mixed_version=True, nodes=(node,),
                                             check_counters=check_counters, flush=flush)
                     node.nodetool('upgradesstables')
                     debug('Successfully upgraded %d of %d nodes to %s' % 
-                          (num+1, len(self.cluster.nodelist()), version))
+                          (num+1, len(self.cluster.nodelist()), tag))
             else:
-                self.upgrade_to_version(version, check_counters=check_counters, flush=flush)
-            debug('All nodes successfully upgraded to %s' % version)
+                self.upgrade_to_version(tag, semver, check_counters=check_counters, flush=flush)
+            debug('All nodes successfully upgraded to %s' % tag)
 
         cluster.stop()
 
-    def upgrade_to_version(self, version, mixed_version=False, nodes=None, check_counters=True, flush=True):
+    def upgrade_to_version(self, tag, semver, mixed_version=False, nodes=None, check_counters=True, flush=True):
         """Upgrade Nodes - if *mixed_version* is True, only upgrade those nodes
         that are specified by *nodes*, otherwise ignore *nodes* specified
         and upgrade all nodes.
         """
-        debug('Upgrading to ' + version)
+        # see TagSemVer class
+        debug('Upgrading to ' + tag)
         if not mixed_version:
             nodes = self.cluster.nodelist()
 
@@ -167,32 +175,33 @@ class TestUpgradeThroughVersions(Tester):
                 node.watch_log_for("DRAINED")
             node.stop(wait_other_notice=False)
 
-        if not DISABLE_VNODES and version >= "1.2":
+        # note that this is checking the version about to be upgraded-to
+        # and making settings that will apply to the new version (not necessarily the current one)
+        if not DISABLE_VNODES and semver >= LooseVersion('1.2'):
             self.cluster.set_configuration_options(values={
-                'initial_token': None, 
+                'initial_token': None,
                 'num_tokens': 256})
 
         # Update Cassandra Directory
         for node in nodes:
-            node.set_cassandra_dir(cassandra_version=version)
+            node.set_cassandra_dir(cassandra_version=tag)
             debug("Set new cassandra dir for %s: %s" % (node.name, node.get_cassandra_dir()))
-        self.cluster.set_cassandra_dir(cassandra_version=version)
+        self.cluster.set_cassandra_dir(cassandra_version=tag)
 
         # Restart nodes on new version
         for node in nodes:
-            debug('Starting %s on new version (%s)' % (node.name, version))
+            debug('Starting %s on new version (%s)' % (node.name, tag))
             # Setup log4j / logback again (necessary moving from 2.0 -> 2.1):
             node.set_log_level("INFO")
             node.start(wait_other_notice=True)
             if not mixed_version:
                 node.nodetool('upgradesstables')
 
-        if not DISABLE_VNODES and version >= "1.2" and not mixed_version:
+        if not DISABLE_VNODES and self.cluster.version() >= '1.2':
             debug("Running shuffle")
             self.node2.shuffle("create")
             self.node2.shuffle("en")
 
-        
         for node in nodes:
             debug('Checking %s ...' % (node.name))
             if not mixed_version:
@@ -208,7 +217,7 @@ class TestUpgradeThroughVersions(Tester):
         if not mixed_version:
             # Check we can bootstrap a new node on the upgraded cluster:
             debug("Adding a node to the cluster")
-            self.cluster.set_cassandra_dir(cassandra_version=version)
+            self.cluster.set_cassandra_dir(cassandra_version=tag)
             nnode = new_node(self.cluster, remote_debug_port=str(2000+len(self.cluster.nodes)))
             nnode.start(no_wait=False)
             self._check_values()
@@ -218,9 +227,15 @@ class TestUpgradeThroughVersions(Tester):
     def _create_schema(self):
         cursor = self.patient_cql_connection(self.node2).cursor()
         
-        # DDL for C* 1.1 :
-        cursor.execute("""CREATE KEYSPACE upgrade WITH strategy_class = 'SimpleStrategy' 
-        AND strategy_options:replication_factor = 2;""")
+        if self.cluster.version() >= '1.2':
+            #DDL for C* 1.2+
+            cursor.execute("""CREATE KEYSPACE upgrade WITH replication = {'class':'SimpleStrategy', 
+                'replication_factor':2};
+                """)
+        else:
+            # DDL for C* 1.1
+            cursor.execute("""CREATE KEYSPACE upgrade WITH strategy_class = 'SimpleStrategy' 
+            AND strategy_options:replication_factor = 2;""")
 
         cursor.execute('use upgrade')
         cursor.execute('CREATE TABLE cf ( k int PRIMARY KEY , v text )')
@@ -264,3 +279,23 @@ class TestUpgradeThroughVersions(Tester):
         res = cursor.fetchall()[0][0]
         assert res == self.counter_val, "Counter not at expected value."
 
+
+class TestMurmurUpgrade(TestUpgradeThroughVersions):
+    def __init__(self, *args, **kwargs):
+        # Ignore these log patterns:
+        self.ignore_log_patterns = [
+            # This one occurs if we do a non-rolling upgrade, the node
+            # it's trying to send the migration to hasn't started yet,
+            # and when it does, it gets replayed and everything is fine.
+            r'Can\'t send migration request: node.*is down',
+        ]
+        # murmur3 only works on 1.2 and up, so we have to filter the upgrade path
+        # before setting self.test_versions
+        min_murmur_ver = LooseVersion('1.2')
+        self.test_versions = [v for v in get_upgrade_path() if v.semver >= min_murmur_ver]
+        debug("Murmur3 tests intentionally exclude cassandra versions prior to 1.2 (murmur not supported)")
+        
+        # Force cluster options that are common among versions:
+        kwargs['cluster_options'] = {'partitioner':'org.apache.cassandra.dht.Murmur3Partitioner'}
+        Tester.__init__(self, *args, **kwargs)
+        
