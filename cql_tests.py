@@ -2573,11 +2573,11 @@ class TestCQL(Tester):
 
         assert_invalid(cursor, "SELECT * FROM foo WHERE a=1")
 
-    @require('4762')
+    @require('https://issues.apache.org/jira/browse/CASSANDRA-4762')
     def multi_in_test(self):
         self.__multi_in(False)
 
-    @require('4762')
+    @require('https://issues.apache.org/jira/browse/CASSANDRA-4762')
     def multi_in_compact_test(self):
         self.__multi_in(True)
 
@@ -2664,7 +2664,7 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert len(res) == 0, res
 
-    @require('4762')
+    @require('https://issues.apache.org/jira/browse/CASSANDRA-4762')
     def multi_in_compact_non_composite_test(self):
         cursor = self.prepare()
 
