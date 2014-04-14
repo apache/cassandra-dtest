@@ -1,4 +1,4 @@
-from dtest import Tester, debug, TracingCursor, PRINT_DEBUG, DISABLE_VNODES
+from dtest import Tester, debug, TracingCursor, PRINT_DEBUG
 from tools import *
 from ccmlib.cluster import Cluster
 import re
