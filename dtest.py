@@ -113,16 +113,14 @@ class Tester(TestCase):
         os.remove(LAST_TEST_DIR)
 
     def set_node_to_current_version(self, node):
-        try:
-            version = os.environ['CASSANDRA_VERSION']
+        version = os.environ.get('CASSANDRA_VERSION')
+        cdir = os.environ.get('CASSANDRA_DIR', DEFAULT_DIR)
+        
+        if version:
             node.set_cassandra_dir(cassandra_version=version)
-        except KeyError:
-            try:
-                cdir = os.environ['CASSANDRA_DIR']
-            except KeyError:
-                cdir = DEFAULT_DIR
+        else:
             node.set_cassandra_dir(cassandra_dir=cdir)
-
+        
     def setUp(self):
         global CURRENT_TEST
         CURRENT_TEST = self.id() + self._testMethodName
