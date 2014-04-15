@@ -139,7 +139,7 @@ class Tester(TestCase):
                     # after a restart, /tmp will be emptied so we'll get an IOError when loading the old cluster here
                     pass
 
-        self.cluster = self.__get_cluster()
+        self.cluster = self._get_cluster()
         self.__setup_cobertura()
         # the failure detector can be quite slow in such tests with quick start/stop
         self.cluster.set_configuration_options(values={'phi_convict_threshold': 5})
@@ -196,22 +196,32 @@ class Tester(TestCase):
             try:
                 if failed or KEEP_LOGS:
                     # means the test failed. Save the logs for inspection.
-                    if not os.path.exists(LOG_SAVED_DIR):
-                        os.mkdir(LOG_SAVED_DIR)
-                    logs = [ (node.name, node.logfilename()) for node in self.cluster.nodes.values() ]
-                    if len(logs) is not 0:
-                        basedir = str(int(time.time() * 1000))
-                        dir = os.path.join(LOG_SAVED_DIR, basedir)
-                        os.mkdir(dir)
-                        for name, log in logs:
-                            shutil.copyfile(log, os.path.join(dir, name + ".log"))
-                        if os.path.exists(LAST_LOG):
-                            os.unlink(LAST_LOG)
-                        os.symlink(basedir, LAST_LOG)
+                    self.copy_logs()
             except Exception as e:
                     print "Error saving log:", str(e)
             finally:
                 self.__cleanup_cluster()
+
+    def copy_logs(self, directory=None, name=None):
+        """Copy the current cluster's log files somewhere, by default to LOG_SAVED_DIR with a name of 'last'"""
+        if directory is None:
+            directory = LOG_SAVED_DIR
+        if name is None:
+            name = LAST_LOG
+        else:
+            name = os.path.join(directory, name)
+        if not os.path.exists(directory):
+            os.mkdir(directory)
+        logs = [ (node.name, node.logfilename()) for node in self.cluster.nodes.values() ]
+        if len(logs) is not 0:
+            basedir = str(int(time.time() * 1000))
+            dir = os.path.join(directory, basedir)
+            os.mkdir(dir)
+            for n, log in logs:
+                shutil.copyfile(log, os.path.join(dir, n + ".log"))
+            if os.path.exists(name):
+                os.unlink(name)
+            os.symlink(basedir, name)
 
     def cql_connection(self, node, keyspace=None, version=None, user=None, password=None):
         import cql

@@ -4,6 +4,7 @@ from distutils import dir_util
 import subprocess
 
 from dtest import Tester, debug
+from tools import *
 from ccmlib import common as ccmcommon
 
 class TestSSTableGenerationAndLoading(Tester):
@@ -80,30 +81,39 @@ class TestSSTableGenerationAndLoading(Tester):
                 data_found += 1
         assert data_found > 0, "After removing index, filter, stats, and digest files, the data file was deleted!"
 
+    @require('https://issues.apache.org/jira/browse/CASSANDRA-7013')
     def sstableloader_compression_none_to_none_test(self):
         self.load_sstable_with_configuration(None, None)
 
+    @require('https://issues.apache.org/jira/browse/CASSANDRA-7013')
     def sstableloader_compression_none_to_snappy_test(self):
         self.load_sstable_with_configuration(None, 'Snappy')
 
+    @require('https://issues.apache.org/jira/browse/CASSANDRA-7013')
     def sstableloader_compression_none_to_deflate_test(self):
         self.load_sstable_with_configuration(None, 'Deflate')
 
+    @require('https://issues.apache.org/jira/browse/CASSANDRA-7013')
     def sstableloader_compression_snappy_to_none_test(self):
         self.load_sstable_with_configuration('Snappy', None)
 
+    @require('https://issues.apache.org/jira/browse/CASSANDRA-7013')
     def sstableloader_compression_snappy_to_snappy_test(self):
         self.load_sstable_with_configuration('Snappy', 'Snappy')
 
+    @require('https://issues.apache.org/jira/browse/CASSANDRA-7013')
     def sstableloader_compression_snappy_to_deflate_test(self):
         self.load_sstable_with_configuration('Snappy', 'Deflate')
 
+    @require('https://issues.apache.org/jira/browse/CASSANDRA-7013')
     def sstableloader_compression_deflate_to_none_test(self):
         self.load_sstable_with_configuration('Deflate', None)
 
+    @require('https://issues.apache.org/jira/browse/CASSANDRA-7013')
     def sstableloader_compression_deflate_to_snappy_test(self):
         self.load_sstable_with_configuration('Deflate', 'Snappy')
 
+    @require('https://issues.apache.org/jira/browse/CASSANDRA-7013')
     def sstableloader_compression_deflate_to_deflate_test(self):
         self.load_sstable_with_configuration('Deflate', 'Deflate')
 
@@ -128,16 +138,14 @@ class TestSSTableGenerationAndLoading(Tester):
         [node1, node2] = cluster.nodelist()
         time.sleep(.5)
 
-        compression = pre_compression or None
-
-        def create_schema(cursor):
+        def create_schema(cursor, compression):
             self.create_ks(cursor, "ks", rf=2)
             self.create_cf(cursor, "standard1", compression=compression)
             self.create_cf(cursor, "counter1", compression=compression, columns={'v': 'counter'})
 
         debug("creating keyspace and inserting")
         cursor = self.cql_connection(node1).cursor()
-        create_schema(cursor)
+        create_schema(cursor, pre_compression)
 
         for i in range(NUM_KEYS):
             cursor.execute("UPDATE standard1 SET v='%d' WHERE KEY='%d' AND c='col'" % (i, i))
@@ -166,7 +174,7 @@ class TestSSTableGenerationAndLoading(Tester):
 
         debug("re-creating the keyspace and column families.")
         cursor = self.cql_connection(node1).cursor()
-        create_schema(cursor)
+        create_schema(cursor, post_compression)
         time.sleep(2)
 
         debug("Calling sstableloader")
