@@ -240,10 +240,14 @@ class TestUpgradeThroughVersions(Tester):
         cursor.execute('use upgrade')
         cursor.execute('CREATE TABLE cf ( k int PRIMARY KEY , v text )')
         cursor.execute('CREATE INDEX vals ON cf (v)')
-        cursor.execute("CREATE TABLE countertable ( "
-                                      "k text PRIMARY KEY, "
-                                      "c counter) WITH "
-                                      "default_validation=CounterColumnType;")
+        
+        if self.cluster.version() >= '1.2':
+            cursor.execute("""
+                CREATE TABLE countertable (k text PRIMARY KEY, c counter);""")
+        else:
+            cursor.execute("""
+                CREATE TABLE countertable (k text PRIMARY KEY, c counter)
+                WITH default_validation=CounterColumnType;""")
 
     def _write_values(self, num=100, consistency_level='ALL'):
         cursor = self.patient_cql_connection(self.node2).cursor()
