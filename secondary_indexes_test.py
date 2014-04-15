@@ -103,20 +103,22 @@ class TestSecondaryIndexes(Tester):
             result = cursor.fetchall()
             self.assertEqual(limit, len(result))
 
-
-    def test_6924(self):
+    @since('2.1')
+    def test_6924_dropping_ks(self):
         """Tests CASSANDRA-6924
         
-        Data inserted immediately after secondary index creation is not indexed.
+        Data inserted immediately after dropping and recreating a
+        keyspace with an indexed column familiy is not included
+        in the index.
         """
-        # Reproducing requires at least 3 nodes:
+                # Reproducing requires at least 3 nodes:
         cluster = self.cluster
         cluster.populate(3).start()
-        node1,node2,node3 = cluster.nodelist()
+        node1, node2, node3 = cluster.nodelist()
         conn = self.patient_cql_connection(node1)
         cursor = conn.cursor()
-        
-        #This only occurs when dropping keyspaces and creating with
+
+        #This only occurs when dropping and recreating with
         #the same name, so loop through this test a few times:
         for i in range(10):
             debug("round %s" % i)
@@ -124,16 +126,75 @@ class TestSecondaryIndexes(Tester):
                 cursor.execute("DROP KEYSPACE ks")
             except ProgrammingError:
                 pass
+
             self.create_ks(cursor, 'ks', 1)
             cursor.execute("CREATE TABLE ks.cf (key text PRIMARY KEY, col1 text);")
             cursor.execute("CREATE INDEX on ks.cf (col1);")
+
             for r in range(10):
                 stmt = "INSERT INTO ks.cf (key, col1) VALUES ('%s','asdf');" % r
                 cursor.execute(stmt)
+
+            self.wait_for_schema_agreement(cursor)
+
             cursor.execute("select count(*) from ks.cf WHERE col1='asdf'")
             count = cursor.fetchone()[0]
-            self.assertEqual(count,10)
-        
+            self.assertEqual(count, 10)
+
+    @since('2.1')
+    def test_6924_dropping_cf(self):
+        """Tests CASSANDRA-6924
+
+        Data inserted immediately after dropping and recreating an
+        indexed column family is not included in the index.
+        """
+        # Reproducing requires at least 3 nodes:
+        cluster = self.cluster
+        cluster.populate(3).start()
+        node1, node2, node3 = cluster.nodelist()
+        conn = self.patient_cql_connection(node1)
+        cursor = conn.cursor()
+        self.create_ks(cursor, 'ks', 1)
+
+        #This only occurs when dropping and recreating with
+        #the same name, so loop through this test a few times:
+        for i in range(10):
+            debug("round %s" % i)
+            try:
+                cursor.execute("DROP COLUMNFAMILY ks.cf")
+            except ProgrammingError:
+                pass
+
+            cursor.execute("CREATE TABLE ks.cf (key text PRIMARY KEY, col1 text);")
+            cursor.execute("CREATE INDEX on ks.cf (col1);")
+
+            for r in range(10):
+                stmt = "INSERT INTO ks.cf (key, col1) VALUES ('%s','asdf');" % r
+                cursor.execute(stmt)
+
+            self.wait_for_schema_agreement(cursor)
+
+            cursor.execute("select count(*) from ks.cf WHERE col1='asdf'")
+            count = cursor.fetchone()[0]
+            self.assertEqual(count, 10)
+
+    def wait_for_schema_agreement(self, cursor):
+        cursor.execute("SELECT schema_version FROM system.local")
+        local_version = cursor.fetchone()
+
+        all_match = True
+        cursor.execute("SELECT schema_version FROM system.peers")
+        for peer_version in cursor.fetchall():
+            if peer_version != local_version:
+                all_match = False
+                break
+
+        if all_match:
+            return
+        else:
+            time.sleep(0.10)
+            self.wait_for_schema_agreement(cursor)
+
 
 class TestSecondaryIndexesOnCollections(Tester):
     def __init__(self, *args, **kwargs):
