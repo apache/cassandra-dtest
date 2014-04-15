@@ -80,7 +80,7 @@ class Tester(TestCase):
         self.cluster_options = kwargs.pop('cluster_options', None)
         super(Tester, self).__init__(*argv, **kwargs)
 
-    def __get_cluster(self, name='test'):
+    def _get_cluster(self, name='test'):
         self.test_path = tempfile.mkdtemp(prefix='dtest-')
         # ccm on cygwin needs absolute path to directory - it crosses from cygwin space into
         # regular Windows space on wmic calls which will otherwise break pathing
