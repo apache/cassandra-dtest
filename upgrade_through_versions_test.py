@@ -321,5 +321,6 @@ for (from_ver, to_branch) in POINT_UPGRADES:
     cls_name = ('TestUpgrade_from_'+from_ver+'_latest_tag_to_'+to_branch+'_HEAD').replace('-', '_').replace('.', '_')
     debug('Creating test upgrade class: {}'.format(cls_name))
     vars()[cls_name] = type(
-        cls_name, (TestUpgradeThroughVersions,),
+        cls_name,
+        (TestUpgradeThroughVersions,),
         {'test_versions': (latest_tag_matching(from_ver), 'git:'+to_branch,)})
