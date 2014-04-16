@@ -217,8 +217,6 @@ class TestUpgradeThroughVersions(Tester):
     def _create_schema(self):
         cursor = self.patient_cql_connection(self.node2).cursor()
         
-        debug("CLUSTER VERSION: {}".format(self.cluster.version()))
-        
         if self.cluster.version() >= '1.2':
             #DDL for C* 1.2+
             cursor.execute("""CREATE KEYSPACE upgrade WITH replication = {'class':'SimpleStrategy', 
