@@ -1,75 +1,65 @@
-from collections import OrderedDict
 import bisect, os, re, subprocess
 from distutils.version import LooseVersion
 from dtest import Tester, debug, DISABLE_VNODES, DEFAULT_DIR
 from tools import new_node
 
-START_VER = '1.1' # earliest version considered but won't necessarily be used!
-TRUNK_VER = '2.1'
+TRUNK_VER = '2.2'
 
-class TagSemVer(object):
+# Used to build upgrade path(s) for tests. Some tests will go from start to finish,
+# other tests will focus on single upgrades from UPGRADE_PATH[n] to UPGRADE_PATH[n+1]
+# Note that these strings should match git branch names, and will be used to search for
+# tags which are related to a particular branch as well.
+UPGRADE_PATH = ['cassandra-1.1', 'cassandra-1.2', 'cassandra-2.0', 'cassandra-2.1', 'trunk']
+
+
+class GitSemVer(object):
     """
-    Wraps a git tag up with a semver (as LooseVersion)
+    Wraps a git ref up with a semver (as LooseVersion)
     """
-    tag = None
+    git_ref = None
     semver = None
-    maj_min = None
     
-    def __init__(self, tag, semver_str):
-        self.tag = 'git:' + tag
+    def __init__(self, git_ref, semver_str):
+        self.git_ref = 'git:' + git_ref
         self.semver = LooseVersion(semver_str)
-        self.maj_min = str(self.semver.version[0]) + '.' + str(self.semver.version[1])
+        if semver_str == 'trunk':
+            self.semver = TRUNK_VER
     
     def __cmp__(self, other):
         return cmp(self.semver, other.semver)
-    
-def get_upgrade_path(start_ver=START_VER, trunk_ver=TRUNK_VER, num_patches=2):
+
+def latest_tag_matching(match_string='cassandra-1.1'):
     """
-    Runs "git tag -l *cassandra-*"
-    And returns a list representing upgrade path. Each major.minor version tag may
-    include (up to) num_patches patch versions to be tested. These will be from the highest
-    patch versions available for that major.minor version.
-    
-    The list elements will be simple wrapper objects with the git tag, and a corresponding
-    LooseVersion for utility comparing versions.
+    Returns the latest tag matching match_string*, as a GitSemVer
+    which is a dumb object containing the git tag and a semver (as LooseVersion).
     """
     git_path = os.environ.get('CASSANDRA_DIR', DEFAULT_DIR)
     
     tags = subprocess.check_output(
-        ["git", "tag", "-l", "*cassandra-*"], cwd=git_path)\
+        ["git", "tag", "-l", "{search}*".format(search=match_string)], cwd=git_path)\
         .rstrip()\
         .split('\n')
     
-    # earliest version considered but won't necessarily be used!
-    start_ver = LooseVersion(start_ver)
-    
     wrappers = []
     for t in tags:
-        match = re.match('^cassandra-(\d+\.\d+\.\d+)$', t)
+        match = re.match('^cassandra-(\d+\.\d+\.\d+(-+\w+)*)$', t)
         if match:
-            tsv = TagSemVer(t, match.group(1))
-            if tsv.semver >= start_ver:
-                bisect.insort(wrappers, tsv)
-    
-    # manually add trunk with expected trunk version
-    wrappers.append(TagSemVer('trunk', TRUNK_VER))
-    
-    # group by maj.min version
-    release_groups = OrderedDict()
-    for w in wrappers:
-        if release_groups.get(w.maj_min) is None:
-            release_groups[w.maj_min] = []
+            gsv = GitSemVer(t, match.group(1))
+            bisect.insort(wrappers, gsv)
+            
+    if wrappers:
+        return wrappers.pop().git_ref
+    return None
 
-        release_groups[w.maj_min].append(w)
+def get_version_from_tag(tag):
+    if tag == 'trunk':
+        return TRUNK_VER
     
-    upgrade_path = []
-    for release, versions in release_groups.items():
-        upgrade_path.extend(
-            [ v for v in versions[-num_patches:] ]
-        )
-    
-    return upgrade_path
-    
+    match = re.match('^(git:)*cassandra-(\d+\.\d+\.*\d*(-+\w+)*)$', tag)
+    if match:
+        return match.group(2)
+    return None
+
 def get_version_from_build():
     path = os.environ.get('CASSANDRA_DIR', DEFAULT_DIR)
     
@@ -97,16 +87,20 @@ class TestUpgradeThroughVersions(Tester):
             # and when it does, it gets replayed and everything is fine.
             r'Can\'t send migration request: node.*is down',
         ]
-        self.test_versions = get_upgrade_path()
         
         # Force cluster options that are common among versions:
-        kwargs['cluster_options'] = {'partitioner':'org.apache.cassandra.dht.RandomPartitioner'}
+        kwargs['cluster_options'] = {'partitioner':'org.apache.cassandra.dht.Murmur3Partitioner'}
         Tester.__init__(self, *args, **kwargs)
+
+    @property
+    def test_versions(self):
+        # Murmur was not present until 1.2+
+        return ['git:'+v for v in END_TO_END_PATH if get_version_from_tag(v) >= '1.2']
 
     def setUp(self):
         # Forcing cluster version on purpose
-        os.environ['CASSANDRA_VERSION'] = self.test_versions[0].tag
-        debug("Versions to test (%s): %s" % (type(self), str([v.tag for v in self.test_versions])))
+        os.environ['CASSANDRA_VERSION'] = self.test_versions[0]
+        debug("Versions to test (%s): %s" % (type(self), str([v for v in self.test_versions])))
         super(TestUpgradeThroughVersions, self).setUp()
 
     def upgrade_test(self):
@@ -123,7 +117,7 @@ class TestUpgradeThroughVersions(Tester):
         cluster = self.cluster
         
         # Start with 3 node cluster
-        debug('Creating cluster (%s)' % self.test_versions[0].tag)
+        debug('Creating cluster (%s)' % self.test_versions[0])
         cluster.populate(3)
         cluster.start()
         node1, node2, node3 = cluster.nodelist()
@@ -135,29 +129,25 @@ class TestUpgradeThroughVersions(Tester):
         self._increment_counter_value()
 
         # upgrade through versions
-        for tag_semver in self.test_versions[1:]:
-            tag = tag_semver.tag
-            semver = tag_semver.semver
-            
+        for tag in self.test_versions[1:]:
             if mixed_version:
                 for num, node in enumerate(self.cluster.nodelist()):
-                    self.upgrade_to_version(tag, semver, mixed_version=True, nodes=(node,),
+                    self.upgrade_to_version(tag, mixed_version=True, nodes=(node,),
                                             check_counters=check_counters, flush=flush)
                     node.nodetool('upgradesstables')
                     debug('Successfully upgraded %d of %d nodes to %s' % 
                           (num+1, len(self.cluster.nodelist()), tag))
             else:
-                self.upgrade_to_version(tag, semver, check_counters=check_counters, flush=flush)
+                self.upgrade_to_version(tag, check_counters=check_counters, flush=flush)
             debug('All nodes successfully upgraded to %s' % tag)
 
         cluster.stop()
 
-    def upgrade_to_version(self, tag, semver, mixed_version=False, nodes=None, check_counters=True, flush=True):
+    def upgrade_to_version(self, tag, mixed_version=False, nodes=None, check_counters=True, flush=True):
         """Upgrade Nodes - if *mixed_version* is True, only upgrade those nodes
         that are specified by *nodes*, otherwise ignore *nodes* specified
         and upgrade all nodes.
         """
-        # see TagSemVer class
         debug('Upgrading to ' + tag)
         if not mixed_version:
             nodes = self.cluster.nodelist()
@@ -177,7 +167,7 @@ class TestUpgradeThroughVersions(Tester):
 
         # note that this is checking the version about to be upgraded-to
         # and making settings that will apply to the new version (not necessarily the current one)
-        if not DISABLE_VNODES and semver >= LooseVersion('1.2'):
+        if not DISABLE_VNODES and get_version_from_tag(tag) >= '1.2':
             self.cluster.set_configuration_options(values={
                 'initial_token': None,
                 'num_tokens': 256})
@@ -226,6 +216,8 @@ class TestUpgradeThroughVersions(Tester):
                     
     def _create_schema(self):
         cursor = self.patient_cql_connection(self.node2).cursor()
+        
+        debug("CLUSTER VERSION: {}".format(self.cluster.version()))
         
         if self.cluster.version() >= '1.2':
             #DDL for C* 1.2+
@@ -284,7 +276,7 @@ class TestUpgradeThroughVersions(Tester):
         assert res == self.counter_val, "Counter not at expected value."
 
 
-class TestMurmurUpgrade(TestUpgradeThroughVersions):
+class TestRandomPartitionerUpgrade(TestUpgradeThroughVersions):
     def __init__(self, *args, **kwargs):
         # Ignore these log patterns:
         self.ignore_log_patterns = [
@@ -293,13 +285,43 @@ class TestMurmurUpgrade(TestUpgradeThroughVersions):
             # and when it does, it gets replayed and everything is fine.
             r'Can\'t send migration request: node.*is down',
         ]
-        # murmur3 only works on 1.2 and up, so we have to filter the upgrade path
-        # before setting self.test_versions
-        min_murmur_ver = LooseVersion('1.2')
-        self.test_versions = [v for v in get_upgrade_path() if v.semver >= min_murmur_ver]
-        debug("Murmur3 tests intentionally exclude cassandra versions prior to 1.2 (murmur not supported)")
         
         # Force cluster options that are common among versions:
-        kwargs['cluster_options'] = {'partitioner':'org.apache.cassandra.dht.Murmur3Partitioner'}
+        kwargs['cluster_options'] = {'partitioner':'org.apache.cassandra.dht.RandomPartitioner'}
         Tester.__init__(self, *args, **kwargs)
-        
+
+    @property
+    def test_versions(self):
+        return ['git:'+v for v in UPGRADE_PATH]
+
+
+# create test classes for upgrading from latest tag on branch to the head of that same branch
+for from_ver in UPGRADE_PATH:
+    # we only want to do single upgrade tests for 1.2+
+    # and trunk is the final version, so there's no test where trunk is upgraded to something else
+    if get_version_from_tag(from_ver) >= '1.2' and from_ver != 'trunk':
+        cls_name = ('TestUpgrade_from_'+from_ver+'_latest_tag_to_'+from_ver+'_HEAD').replace('-', '_').replace('.', '_')
+        debug('Creating test upgrade class: {}'.format(cls_name))
+        vars()[cls_name] = type(
+            cls_name,
+            (TestUpgradeThroughVersions,),
+            {'test_versions': (latest_tag_matching(from_ver), 'git:'+from_ver,)})
+
+# build a list of tuples like so:
+# [(A, B), (B, C) ... ]
+# each pair in the list represents an upgrade test (A, B)
+# where we will upgrade from the latest *tag* matching A, to the HEAD of branch B
+POINT_UPGRADES = []
+points = [v for v in UPGRADE_PATH if get_version_from_tag(v) >= '1.2']
+for i, _ in enumerate(points):
+    verslice = tuple(points[i:i+2])
+    if len(verslice) == 2: # exclude dangling version at end
+        POINT_UPGRADES.append( tuple(points[i:i+2]) )
+
+# create test classes
+for (from_ver, to_branch) in POINT_UPGRADES:
+    cls_name = ('TestUpgrade_from_'+from_ver+'_latest_tag_to_'+to_branch+'_HEAD').replace('-', '_').replace('.', '_')
+    debug('Creating test upgrade class: {}'.format(cls_name))
+    vars()[cls_name] = type(
+        cls_name, (TestUpgradeThroughVersions,),
+        {'test_versions': (latest_tag_matching(from_ver), 'git:'+to_branch,)})
