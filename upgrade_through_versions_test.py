@@ -30,8 +30,7 @@ class GitSemVer(object):
 
 def latest_tag_matching(match_string='cassandra-1.1'):
     """
-    Returns the latest tag matching match_string*, as a GitSemVer
-    which is a dumb object containing the git tag and a semver (as LooseVersion).
+    Returns the latest tag matching match_string*
     """
     git_path = os.environ.get('CASSANDRA_DIR', DEFAULT_DIR)
     
