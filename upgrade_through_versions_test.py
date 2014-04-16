@@ -23,7 +23,7 @@ class GitSemVer(object):
         self.git_ref = 'git:' + git_ref
         self.semver = LooseVersion(semver_str)
         if semver_str == 'trunk':
-            self.semver = TRUNK_VER
+            self.semver = LooseVersion(TRUNK_VER)
     
     def __cmp__(self, other):
         return cmp(self.semver, other.semver)
