@@ -114,6 +114,7 @@ class Tester(TestCase):
             self.cluster.stop(gently=False)
         else:
             # Cleanup everything:
+            debug("removing ccm cluster " + self.cluster.name + " at: " + self.test_path)
             self.cluster.remove()
             os.rmdir(self.test_path)
         os.remove(LAST_TEST_DIR)
