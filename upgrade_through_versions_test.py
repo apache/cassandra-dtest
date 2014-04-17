@@ -94,7 +94,7 @@ class TestUpgradeThroughVersions(Tester):
     @property
     def test_versions(self):
         # Murmur was not present until 1.2+
-        return ['git:'+v for v in END_TO_END_PATH if get_version_from_tag(v) >= '1.2']
+        return ['git:'+v for v in UPGRADE_PATH if get_version_from_tag(v) >= '1.2']
 
     def setUp(self):
         # Forcing cluster version on purpose
