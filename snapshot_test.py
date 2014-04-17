@@ -75,9 +75,11 @@ class TestSnapshot(SnapshotTester):
         self.restore_snapshot(snapshot_dir, node1, 'ks', 'cf')
         node1.nodetool('refresh ks cf')
         cursor.execute('SELECT count(*) from ks.cf')
-        self.assertEqual(cursor.fetchone()[0], 100)
-        
-        shutil.rmtree(snapshot_dir)
+        try:
+            self.assertEqual(cursor.fetchone()[0], 100)
+        finally:
+            debug("removing snapshot_dir: " + snapshot_dir)
+            shutil.rmtree(snapshot_dir)
 
 class TestArchiveCommitlog(SnapshotTester):
     def __init__(self, *args, **kwargs):
@@ -208,12 +210,16 @@ class TestArchiveCommitlog(SnapshotTester):
         cursor.execute('SELECT count(*) from ks.cf')
         # Now we should have 30000 rows from the snapshot + 30000 rows
         # from the commitlog backups:
-        if not restore_archived_commitlog:
-            self.assertEqual(cursor.fetchone()[0], 30000)
-        elif restore_point_in_time:
-            self.assertEqual(cursor.fetchone()[0], 60000)
-        else:
-            self.assertEqual(cursor.fetchone()[0], 65000)
-
-        shutil.rmtree(snapshot_dir)
+        try:
+            if not restore_archived_commitlog:
+                self.assertEqual(cursor.fetchone()[0], 30000)
+            elif restore_point_in_time:
+                self.assertEqual(cursor.fetchone()[0], 60000)
+            else:
+                self.assertEqual(cursor.fetchone()[0], 65000)
+        finally:
+            debug("removing snapshot_dir: " + snapshot_dir)
+            shutil.rmtree(snapshot_dir)
+            debug("removing tmp_commitlog: " + tmp_commitlog)
+            shutil.rmtree(tmp_commitlog)
         
