@@ -72,9 +72,7 @@ def get_version_from_build():
 
 class TestUpgradeThroughVersions(Tester):
     """
-    Upgrades a 3-node cluster through each of the above versions.
-    If the CASSANDRA_DIR variable is set then upgrade to that version,
-    otherwise upgrade all the way to the trunk.
+    Upgrades a 3-node Murmur3Partitioner cluster through versions specified in test_versions.
     """
     test_versions = None # set on init to know which versions to use
     
@@ -127,6 +125,8 @@ class TestUpgradeThroughVersions(Tester):
         self._write_values()
         self._increment_counter_value()
 
+        self._log_current_ver(self.test_versions[0])
+        
         # upgrade through versions
         for tag in self.test_versions[1:]:
             if mixed_version:
@@ -139,6 +139,7 @@ class TestUpgradeThroughVersions(Tester):
             else:
                 self.upgrade_to_version(tag, check_counters=check_counters, flush=flush)
             debug('All nodes successfully upgraded to %s' % tag)
+            self._log_current_ver(tag)
 
         cluster.stop()
 
@@ -212,7 +213,17 @@ class TestUpgradeThroughVersions(Tester):
             self._check_values()
             if check_counters:
                 self._check_counter_values()
-                    
+    
+    def _log_current_ver(self, current_tag):
+        """
+        Logs where we currently are in the upgrade path, surrounding the current branch/tag, like ***sometag***
+        """
+        vers = self.test_versions
+        curr_index = vers.index(current_tag)
+        debug(
+            "Current upgrade path: {}".format(
+                vers[:curr_index] + ['***'+current_tag+'***'] + vers[curr_index+1:]))
+    
     def _create_schema(self):
         cursor = self.patient_cql_connection(self.node2).cursor()
         
@@ -274,6 +285,9 @@ class TestUpgradeThroughVersions(Tester):
 
 
 class TestRandomPartitionerUpgrade(TestUpgradeThroughVersions):
+    """
+    Upgrades a 3-node RandomPartitioner cluster through versions specified in test_versions.
+    """
     def __init__(self, *args, **kwargs):
         # Ignore these log patterns:
         self.ignore_log_patterns = [
