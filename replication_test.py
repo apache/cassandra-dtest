@@ -1,5 +1,5 @@
-from dtest import Tester, debug, TracingCursor, PRINT_DEBUG, ENABLE_VNODES
-from tools import putget
+from dtest import Tester, debug, TracingCursor, PRINT_DEBUG
+from tools import *
 from ccmlib.cluster import Cluster
 import re
 import os
@@ -145,11 +145,10 @@ class ReplicationTest(Tester):
             for t in trace:
                 print("%s\t%s\t%s\t%s" % (t[3], t[4], t[2], t[5]))
             print("-" * 40)
-    
+
+    @no_vnodes()
     def simple_test(self):
         """Test the SimpleStrategy on a 3 node cluster"""
-        if ENABLE_VNODES:
-            self.skip("test unimplemented for vnodes")
         self.cluster.populate(3).start()
         time.sleep(5)
         node1 = self.cluster.nodelist()[0]
@@ -184,11 +183,9 @@ class ReplicationTest(Tester):
             #acknowledged the write:
             self.assertEqual(stats['nodes_sent_write'], stats['nodes_responded_write'])
 
-
+    @no_vnodes()
     def network_topology_test(self):
         """Test the NetworkTopologyStrategy on a 2DC 3:3 node cluster"""
-        if ENABLE_VNODES:
-            self.skip("test unimplemented for vnodes")
         self.cluster.populate([3,3]).start()
         time.sleep(5)
         node1 = self.cluster.nodelist()[0]

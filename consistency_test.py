@@ -1,6 +1,6 @@
 import time
 
-from dtest import Tester, debug, ENABLE_VNODES
+from dtest import Tester, debug, DISABLE_VNODES
 from assertions import assert_unavailable
 from tools import (create_c1c2_table, insert_c1c2, query_c1c2, retry_till_success,
                    insert_columns)
@@ -216,11 +216,11 @@ class TestConsistency(Tester):
     def hintedhandoff_test(self):
         cluster = self.cluster
 
-        if ENABLE_VNODES:
+        if DISABLE_VNODES:
+            cluster.populate(2).start()
+        else:
             tokens = cluster.balanced_tokens(2)
             cluster.populate(2, tokens=tokens).start()
-        else:
-            cluster.populate(2).start()
         [node1, node2] = cluster.nodelist()
 
         cursor = self.patient_cql_connection(node1).cursor()
@@ -247,11 +247,11 @@ class TestConsistency(Tester):
         cluster = self.cluster
         cluster.set_configuration_options(values={ 'hinted_handoff_enabled' : False})
 
-        if ENABLE_VNODES:
+        if DISABLE_VNODES:
+            cluster.populate(2).start()
+        else:
             tokens = cluster.balanced_tokens(2)
             cluster.populate(2, tokens=tokens).start()
-        else:
-            cluster.populate(2).start()
         [node1, node2] = cluster.nodelist()
 
         cursor = self.patient_cql_connection(node1).cursor()
@@ -324,11 +324,11 @@ class TestConsistency(Tester):
 
         debug("Creating a ring")
         cluster = self.cluster
-        if ENABLE_VNODES:
+        if DISABLE_VNODES:
+            cluster.populate(3).start()
+        else:
             tokens = cluster.balanced_tokens(3)
             cluster.populate(3, tokens=tokens).start()
-        else:
-            cluster.populate(3).start()
         [node1, node2, node3] = cluster.nodelist()
         cluster.start()
 

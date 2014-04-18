@@ -12,9 +12,12 @@ from nose.exc import SkipTest
 from thrift.transport import TSocket
 from unittest import TestCase
 
-logging.basicConfig(stream=sys.stderr)
-
 LOG_SAVED_DIR="logs"
+try:
+    os.mkdir(LOG_SAVED_DIR)
+except OSError:
+    pass
+
 LAST_LOG = os.path.join(LOG_SAVED_DIR, "last")
 
 LAST_TEST_DIR='last_test_dir'
@@ -31,9 +34,17 @@ TRACE = os.environ.get('TRACE', '').lower() in ('yes', 'true')
 KEEP_LOGS = os.environ.get('KEEP_LOGS', '').lower() in ('yes', 'true')
 KEEP_TEST_DIR = os.environ.get('KEEP_TEST_DIR', '').lower() in ('yes', 'true')
 PRINT_DEBUG = os.environ.get('PRINT_DEBUG', '').lower() in ('yes', 'true')
-ENABLE_VNODES = os.environ.get('ENABLE_VNODES', 'false').lower() in ('yes', 'true')
+DISABLE_VNODES = os.environ.get('DISABLE_VNODES', '').lower() in ('yes', 'true')
 
-LOG = logging.getLogger()
+CURRENT_TEST = ""
+
+logging.basicConfig(filename=os.path.join(LOG_SAVED_DIR,"dtest.log"),
+                    filemode='w',
+                    format='%(asctime)s,%(msecs)d %(name)s %(current_test)s %(levelname)s %(message)s',
+                    datefmt='%H:%M:%S',
+                    level=logging.DEBUG)
+
+LOG = logging.getLogger('dtest')
 
 # copy the initial environment variables so we can reset them later:
 initial_environment = copy.deepcopy(os.environ)
@@ -42,8 +53,7 @@ def reset_environment_vars():
     os.environ.update(initial_environment)
 
 def debug(msg):
-    if DEBUG:
-        LOG.debug(msg)
+    LOG.debug(msg, extra={"current_test":CURRENT_TEST})
     if PRINT_DEBUG:
         print msg
 
@@ -75,7 +85,7 @@ class Tester(TestCase):
         super(Tester, self).__init__(*argv, **kwargs)
 
 
-    def __get_cluster(self, name='test'):
+    def _get_cluster(self, name='test'):
         self.test_path = tempfile.mkdtemp(prefix='dtest-')
         # ccm on cygwin needs absolute path to directory - it crosses from cygwin space into
         # regular Windows space on wmic calls which will otherwise break pathing
@@ -92,10 +102,10 @@ class Tester(TestCase):
                 cdir = DEFAULT_DIR
             cluster = Cluster(self.test_path, name, cassandra_dir=cdir)
         if cluster.version() >= "1.2":
-            if ENABLE_VNODES:
-                cluster.set_configuration_options(values={'initial_token': None, 'num_tokens': 256})
-            else:
+            if DISABLE_VNODES:
                 cluster.set_configuration_options(values={'num_tokens': None})
+            else:
+                cluster.set_configuration_options(values={'initial_token': None, 'num_tokens': 256})
         return cluster
 
     def __cleanup_cluster(self):
@@ -104,6 +114,7 @@ class Tester(TestCase):
             self.cluster.stop(gently=False)
         else:
             # Cleanup everything:
+            debug("removing ccm cluster " + self.cluster.name + " at: " + self.test_path)
             self.cluster.remove()
             os.rmdir(self.test_path)
         os.remove(LAST_TEST_DIR)
@@ -120,6 +131,8 @@ class Tester(TestCase):
             node.set_cassandra_dir(cassandra_dir=cdir)
 
     def setUp(self):
+        global CURRENT_TEST
+        CURRENT_TEST = self.id() + self._testMethodName
         # cleaning up if a previous execution didn't trigger tearDown (which
         # can happen if it is interrupted by KeyboardInterrupt)
         # TODO: move that part to a generic fixture
@@ -135,7 +148,7 @@ class Tester(TestCase):
                     # after a restart, /tmp will be emptied so we'll get an IOError when loading the old cluster here
                     pass
 
-        self.cluster = self.__get_cluster()
+        self.cluster = self._get_cluster()
         self.__setup_cobertura()
         # the failure detector can be quite slow in such tests with quick start/stop
         self.cluster.set_configuration_options(values={'phi_convict_threshold': 5})
@@ -192,22 +205,32 @@ class Tester(TestCase):
             try:
                 if failed or KEEP_LOGS:
                     # means the test failed. Save the logs for inspection.
-                    if not os.path.exists(LOG_SAVED_DIR):
-                        os.mkdir(LOG_SAVED_DIR)
-                    logs = [ (node.name, node.logfilename()) for node in self.cluster.nodes.values() ]
-                    if len(logs) is not 0:
-                        basedir = str(int(time.time() * 1000))
-                        dir = os.path.join(LOG_SAVED_DIR, basedir)
-                        os.mkdir(dir)
-                        for name, log in logs:
-                            shutil.copyfile(log, os.path.join(dir, name + ".log"))
-                        if os.path.exists(LAST_LOG):
-                            os.unlink(LAST_LOG)
-                        os.symlink(basedir, LAST_LOG)
+                    self.copy_logs()
             except Exception as e:
                     print "Error saving log:", str(e)
             finally:
                 self.__cleanup_cluster()
+
+    def copy_logs(self, directory=None, name=None):
+        """Copy the current cluster's log files somewhere, by default to LOG_SAVED_DIR with a name of 'last'"""
+        if directory is None:
+            directory = LOG_SAVED_DIR
+        if name is None:
+            name = LAST_LOG
+        else:
+            name = os.path.join(directory, name)
+        if not os.path.exists(directory):
+            os.mkdir(directory)
+        logs = [ (node.name, node.logfilename()) for node in self.cluster.nodes.values() ]
+        if len(logs) is not 0:
+            basedir = str(int(time.time() * 1000))
+            dir = os.path.join(directory, basedir)
+            os.mkdir(dir)
+            for n, log in logs:
+                shutil.copyfile(log, os.path.join(dir, n + ".log"))
+            if os.path.exists(name):
+                os.unlink(name)
+            os.symlink(basedir, name)
 
     def cql_connection(self, node, keyspace=None, version=None, user=None, password=None):
         import cql

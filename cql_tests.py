@@ -2573,11 +2573,11 @@ class TestCQL(Tester):
 
         assert_invalid(cursor, "SELECT * FROM foo WHERE a=1")
 
-    @require('4762')
+    @require('https://issues.apache.org/jira/browse/CASSANDRA-4762')
     def multi_in_test(self):
         self.__multi_in(False)
 
-    @require('4762')
+    @require('https://issues.apache.org/jira/browse/CASSANDRA-4762')
     def multi_in_compact_test(self):
         self.__multi_in(True)
 
@@ -2664,7 +2664,7 @@ class TestCQL(Tester):
         res = cursor.fetchall()
         assert len(res) == 0, res
 
-    @require('4762')
+    @require('https://issues.apache.org/jira/browse/CASSANDRA-4762')
     def multi_in_compact_non_composite_test(self):
         cursor = self.prepare()
 
@@ -3556,7 +3556,7 @@ class TestCQL(Tester):
         assert_none(cursor, "SELECT k, v FROM test  WHERE m CONTAINS 4")
 
 
-    @require('6383')
+    @since('2.1')
     def map_keys_indexing(self):
         cursor = self.prepare()
 
@@ -3836,7 +3836,7 @@ class TestCQL(Tester):
         time.sleep(2)
         assert_one(cursor, "UPDATE test SET v = 1 WHERE k = 0 IF lock = null", [True])
 
-    @require('4851')
+    @since('2.0')
     def tuple_notation_test(self):
         """ Test the syntax introduced by #4851 """
         cursor = self.prepare()
