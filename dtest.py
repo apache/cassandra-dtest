@@ -117,7 +117,8 @@ class Tester(TestCase):
             debug("removing ccm cluster " + self.cluster.name + " at: " + self.test_path)
             self.cluster.remove()
             os.rmdir(self.test_path)
-        os.remove(LAST_TEST_DIR)
+        if os.path.exists(LAST_TEST_DIR):
+            os.remove(LAST_TEST_DIR)
 
     def set_node_to_current_version(self, node):
         try:

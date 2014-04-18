@@ -172,6 +172,7 @@ class TestArchiveCommitlog(SnapshotTester):
         # Destroy the cluster
         cluster.stop()
         self.copy_logs(name=self.id().split(".")[0]+"_pre-restore")
+        self.tearDown()
         cluster = self.cluster = self._get_cluster()
         cluster.populate(1)
         (node1,) = cluster.nodelist()
