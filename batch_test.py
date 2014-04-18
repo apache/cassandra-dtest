@@ -130,6 +130,42 @@ class TestBatch(Tester):
             APPLY BATCH
         """, ConsistencyLevel.THREE, acknowledged_by_batchlog=True)
 
+    def batch_uses_proper_timestamp_test(self):
+        """ Test that each statement will be executed with provided BATCH timestamp """
+        cursor = self.prepare()
+        cursor.execute("""
+            BEGIN BATCH USING TIMESTAMP 1111111111111111
+            INSERT INTO users (id, firstname, lastname) VALUES (0, 'Jack', 'Sparrow')
+            INSERT INTO users (id, firstname, lastname) VALUES (1, 'Will', 'Turner')
+            APPLY BATCH
+        """)
+        cursor.execute("SELECT id, writetime(firstname), writetime(lastname) FROM users")
+        res = sorted(cursor.fetchall())
+        assert res == [[0, 1111111111111111, 1111111111111111], [1, 1111111111111111, 1111111111111111]], res
+
+    def only_one_timestamp_is_valid_test(self):
+        """ Test that TIMESTAMP must not be used in the statements within the batch. """
+        cursor = self.prepare()
+        assert_invalid(cursor, """
+            BEGIN BATCH USING TIMESTAMP 1111111111111111
+            INSERT INTO users (id, firstname, lastname) VALUES (0, 'Jack', 'Sparrow') USING TIMESTAMP 2
+            INSERT INTO users (id, firstname, lastname) VALUES (1, 'Will', 'Turner')
+            APPLY BATCH
+        """, matching="Timestamp must be set either on BATCH or individual statements")
+
+    def each_statement_in_batch_uses_proper_timestamp_test(self):
+        """ Test that each statement will be executed with its own timestamp """
+        cursor = self.prepare()
+        cursor.execute("""
+            BEGIN BATCH
+            INSERT INTO users (id, firstname, lastname) VALUES (0, 'Jack', 'Sparrow') USING TIMESTAMP 1111111111111111
+            INSERT INTO users (id, firstname, lastname) VALUES (1, 'Will', 'Turner') USING TIMESTAMP 1111111111111112
+            APPLY BATCH
+        """)
+        cursor.execute("SELECT id, writetime(firstname), writetime(lastname) FROM users")
+        res = sorted(cursor.fetchall())
+        assert res == [[0, 1111111111111111, 1111111111111111], [1, 1111111111111112, 1111111111111112]], res
+
     def assert_timedout(self, cursor, query, cl, acknowledged_by=None,
                         acknowledged_by_batchlog=None):
         client = cursor._connection.client
