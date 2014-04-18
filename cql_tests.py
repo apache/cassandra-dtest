@@ -3938,6 +3938,8 @@ class TestCQL(Tester):
         assert_none(cursor, "SELECT * FROM tmap")
 
         cursor.execute("INSERT INTO tmap(k, m) VALUES (1, {'foo' : 'bar', 'bar' : 'foo'})")
+        # TODO: Fix that
+        assert_one(cursor, "DELETE FROM tmap WHERE k=1 IF m['foo'] = 'bar' AND m['bar'] = 'bar'", [False, {'foo' : 'bar', 'bar' : 'foo'}])
         assert_one(cursor, "DELETE FROM tmap WHERE k=1 IF m['foo'] = 'bar' AND m['bar'] = 'foo'", [True])
         assert_none(cursor, "SELECT * FROM tmap")
 
@@ -3991,3 +3993,21 @@ class TestCQL(Tester):
         assert_one(cursor, "SELECT * FROM test WHERE k = 0 LIMIT 1", [0, 0, 42])
         assert_all(cursor, "SELECT * FROM test WHERE k = 0 LIMIT 2", [[0, 0, 42], [0, 1, 42]])
         assert_all(cursor, "SELECT * FROM test WHERE k = 0 LIMIT 3", [[0, 0, 42], [0, 1, 42], [0, 2, 42]])
+
+    @since("1.2")
+    def limit_compact_table(self):
+        """ Check for #7052 bug """
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k text,
+                v int,
+                PRIMARY KEY (k, v)
+            ) WITH COMPACT STORAGE
+        """)
+
+        for i in range(0, 6):
+            cursor.execute("INSERT INTO test(k, v) VALUES ('key', %d)" % i)
+
+        assert_all(cursor, "SELECT v FROM test WHERE k='key' AND v > -1 AND v <= 6 LIMIT 2", [[0], [1]])
