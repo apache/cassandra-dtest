@@ -293,8 +293,8 @@ class TestConcurrentSchemaChanges(Tester):
         # clear the commitlogs and data
         dirs = (    '%s/commitlogs' % node1.get_path(),
                     '%s/commitlogs' % node2.get_path(),
-                    '%s/data/ks_ns2/cf-*/*' % node1.get_path(),
-                    '%s/data/ks_ns2/cf-*/*' % node2.get_path(),
+                    '%s/data/ks_ns2/cf_*/*' % node1.get_path(),
+                    '%s/data/ks_ns2/cf_*/*' % node2.get_path(),
                 )
         for dirr in dirs:
             for f in glob.glob(os.path.join(dirr)):
@@ -302,8 +302,8 @@ class TestConcurrentSchemaChanges(Tester):
                     os.unlink(f)
 
         # copy the snapshot. TODO: This could be replaced with the creation of hard links.
-        os.system('cp -p %s/data/ks_ns2/cf-*/snapshots/testsnapshot/* %s/data/ks_ns2/cf-*/' % (node1.get_path(), node1.get_path()))
-        os.system('cp -p %s/data/ks_ns2/cf-*/snapshots/testsnapshot/* %s/data/ks_ns2/cf-*/' % (node2.get_path(), node2.get_path()))
+        os.system('cp -p %s/data/ks_ns2/cf_*/snapshots/testsnapshot/* %s/data/ks_ns2/cf_*/' % (node1.get_path(), node1.get_path()))
+        os.system('cp -p %s/data/ks_ns2/cf_*/snapshots/testsnapshot/* %s/data/ks_ns2/cf_*/' % (node2.get_path(), node2.get_path()))
 
         # restart the cluster
         cluster.start()
