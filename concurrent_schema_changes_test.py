@@ -1,6 +1,7 @@
 import time
 import os
 import pprint
+import glob
 from threading import Thread
 
 from dtest import Tester, debug
@@ -292,18 +293,17 @@ class TestConcurrentSchemaChanges(Tester):
         # clear the commitlogs and data
         dirs = (    '%s/commitlogs' % node1.get_path(),
                     '%s/commitlogs' % node2.get_path(),
-                    '%s/data/ks_ns2/cf_ns2' % node1.get_path(),
-                    '%s/data/ks_ns2/cf_ns2' % node2.get_path(),
+                    '%s/data/ks_ns2/cf-*/*' % node1.get_path(),
+                    '%s/data/ks_ns2/cf-*/*' % node2.get_path(),
                 )
         for dirr in dirs:
-            for f in os.listdir(dirr):
-                path = os.path.join(dirr, f)
-                if os.path.isfile(path):
-                    os.unlink(path)
+            for f in glob.glob(os.path.join(dirr)):
+                if os.path.isfile(f):
+                    os.unlink(f)
 
         # copy the snapshot. TODO: This could be replaced with the creation of hard links.
-        os.system('cp -p %s/data/ks_ns2/cf_ns2/snapshots/testsnapshot/* %s/data/ks_ns2/cf_ns2/' % (node1.get_path(), node1.get_path()))
-        os.system('cp -p %s/data/ks_ns2/cf_ns2/snapshots/testsnapshot/* %s/data/ks_ns2/cf_ns2/' % (node2.get_path(), node2.get_path()))
+        os.system('cp -p %s/data/ks_ns2/cf-*/snapshots/testsnapshot/* %s/data/ks_ns2/cf-*/' % (node1.get_path(), node1.get_path()))
+        os.system('cp -p %s/data/ks_ns2/cf-*/snapshots/testsnapshot/* %s/data/ks_ns2/cf-*/' % (node2.get_path(), node2.get_path()))
 
         # restart the cluster
         cluster.start()
