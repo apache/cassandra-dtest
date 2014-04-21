@@ -4001,13 +4001,22 @@ class TestCQL(Tester):
 
         cursor.execute("""
             CREATE TABLE test (
-                k text,
+                k int,
                 v int,
                 PRIMARY KEY (k, v)
             ) WITH COMPACT STORAGE
         """)
 
-        for i in range(0, 6):
-            cursor.execute("INSERT INTO test(k, v) VALUES ('key', %d)" % i)
+        for i in range(0, 4):
+            for j in range(0, 4):
+                cursor.execute("INSERT INTO test(k, v) VALUES (%d, %d)" % (i, j))
 
-        assert_all(cursor, "SELECT v FROM test WHERE k='key' AND v > -1 AND v <= 6 LIMIT 2", [[0], [1]])
+        assert_all(cursor, "SELECT v FROM test WHERE k=0 AND v > 0 AND v <= 4 LIMIT 2", [[1], [2]])
+        assert_all(cursor, "SELECT v FROM test WHERE k=0 AND v > -1 AND v <= 4 LIMIT 2", [[0], [1]])
+
+        assert_all(cursor, "SELECT * FROM test WHERE k IN (0, 1, 2) AND v > 0 AND v <= 4 LIMIT 2", [[0, 1], [0, 2]])
+        assert_all(cursor, "SELECT * FROM test WHERE k IN (0, 1, 2) AND v > -1 AND v <= 4 LIMIT 2", [[0, 0], [0, 1]])
+        assert_all(cursor, "SELECT * FROM test WHERE k IN (0, 1, 2) AND v > 0 AND v <= 4 LIMIT 6", [[0, 1], [0, 2], [0, 3], [1, 1], [1, 2], [1, 3]])
+
+        # This doesn't work -- see #7059
+        #assert_all(cursor, "SELECT * FROM test WHERE v > 1 AND v <= 3 LIMIT 6 ALLOW FILTERING", [[1, 2], [1, 3], [0, 2], [0, 3], [2, 2], [2, 3]])
