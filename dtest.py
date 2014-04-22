@@ -102,15 +102,17 @@ class Tester(TestCase):
                 cluster.set_configuration_options(values={'initial_token': None, 'num_tokens': 256})
         return cluster
 
-    def __cleanup_cluster(self):
+    def _cleanup_cluster(self):
         if KEEP_TEST_DIR:
             # Just kill it, leave the files where they are:
             self.cluster.stop(gently=False)
         else:
             # Cleanup everything:
+            debug("removing ccm cluster " + self.cluster.name + " at: " + self.test_path)
             self.cluster.remove()
             os.rmdir(self.test_path)
-        os.remove(LAST_TEST_DIR)
+        if os.path.exists(LAST_TEST_DIR):
+            os.remove(LAST_TEST_DIR)
 
     def set_node_to_current_version(self, node):
         version = os.environ.get('CASSANDRA_VERSION')
@@ -134,7 +136,7 @@ class Tester(TestCase):
                 try:
                     self.cluster = Cluster.load(self.test_path, name)
                     # Avoid waiting too long for node to be marked down
-                    self.__cleanup_cluster()
+                    self._cleanup_cluster()
                 except IOError:
                     # after a restart, /tmp will be emptied so we'll get an IOError when loading the old cluster here
                     pass
@@ -200,7 +202,7 @@ class Tester(TestCase):
             except Exception as e:
                     print "Error saving log:", str(e)
             finally:
-                self.__cleanup_cluster()
+                self._cleanup_cluster()
 
     def copy_logs(self, directory=None, name=None):
         """Copy the current cluster's log files somewhere, by default to LOG_SAVED_DIR with a name of 'last'"""
