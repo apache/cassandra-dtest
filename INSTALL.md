@@ -92,7 +92,7 @@ will often need to modify them in some fashion at some later point:
          cd ~/git/cstar/cassandra-dtest
          nosetests
 
-* Run a single dtest, stopping at the first error encountered (this one should take ~5 mins if successful):
+* Run a single dtest, printing debug info, stopping at the first error encountered (if any):
 
          cd ~/git/cstar/cassandra-dtest
-         nosetests -x upgrade_through_versions_test.py
+         PRINT_DEBUG=true nosetests -x -s -v putget_test.py
