@@ -1,4 +1,5 @@
-import bisect, os, re, subprocess
+import bisect, os, re, subprocess, unittest
+from collections import defaultdict
 from distutils.version import LooseVersion
 from dtest import Tester, debug, DISABLE_VNODES, DEFAULT_DIR
 from tools import new_node
@@ -101,13 +102,13 @@ class TestUpgradeThroughVersions(Tester):
         super(TestUpgradeThroughVersions, self).setUp()
 
     def upgrade_test(self):
-        self.upgrade_scenario(check_counters=False)
+        self.upgrade_scenario()
 
     def upgrade_test_mixed(self):
         """Only upgrade part of the cluster, so we have mixed versions part way through."""
-        self.upgrade_scenario(check_counters=False, mixed_version=True)
+        self.upgrade_scenario(mixed_version=True)
 
-    def upgrade_scenario(self, mixed_version=False, check_counters=True, flush=True):
+    def upgrade_scenario(self, mixed_version=False, flush=True, after_upgrade_call=()):
         # Record the rows we write as we go:
         self.row_values = set()
         self.counter_val = 0
@@ -121,7 +122,6 @@ class TestUpgradeThroughVersions(Tester):
         self.node2 = node2
 
         self._create_schema()
-        
         self._write_values()
         self._increment_counter_value()
 
@@ -131,22 +131,30 @@ class TestUpgradeThroughVersions(Tester):
         for tag in self.test_versions[1:]:
             if mixed_version:
                 for num, node in enumerate(self.cluster.nodelist()):
-                    self.upgrade_to_version(tag, mixed_version=True, nodes=(node,),
-                                            check_counters=check_counters, flush=flush)
-                    node.nodetool('upgradesstables')
+                    self.upgrade_to_version(
+                        tag, mixed_version=True, nodes=(node,), flush=flush,
+                        after_upgrade_call=after_upgrade_call,
+                        is_last_upgrade=bool(node == self.cluster.nodelist()[-1]))
                     debug('Successfully upgraded %d of %d nodes to %s' % 
                           (num+1, len(self.cluster.nodelist()), tag))
             else:
-                self.upgrade_to_version(tag, check_counters=check_counters, flush=flush)
+                self.upgrade_to_version(tag, flush=flush,
+                    after_upgrade_call=after_upgrade_call, is_last_upgrade=True)
             debug('All nodes successfully upgraded to %s' % tag)
             self._log_current_ver(tag)
-
+            
         cluster.stop()
 
-    def upgrade_to_version(self, tag, mixed_version=False, nodes=None, check_counters=True, flush=True):
+    def upgrade_to_version(self, tag, mixed_version=False, nodes=None,
+                           flush=True, after_upgrade_call=(), is_last_upgrade=True):
         """Upgrade Nodes - if *mixed_version* is True, only upgrade those nodes
         that are specified by *nodes*, otherwise ignore *nodes* specified
         and upgrade all nodes.
+        
+        is_last_upgrade indicates this call is completing a cluster upgrade,
+        either by upgrading all nodes at once, or when the final node is upgraded (for mixed)
+        
+        after_upgrade_call is an optional callable which will be run after the upgrade is complete
         """
         debug('Upgrading to ' + tag)
         if not mixed_version:
@@ -166,8 +174,9 @@ class TestUpgradeThroughVersions(Tester):
             node.stop(wait_other_notice=False)
 
         # note that this is checking the version about to be upgraded-to
-        # and making settings that will apply to the new version (not necessarily the current one)
+        # and making settings that will apply to the new version (not the current one)
         if not DISABLE_VNODES and get_version_from_tag(tag) >= '1.2':
+            debug("configuring for vnodes")
             self.cluster.set_configuration_options(values={
                 'initial_token': None,
                 'num_tokens': 256})
@@ -184,13 +193,12 @@ class TestUpgradeThroughVersions(Tester):
             # Setup log4j / logback again (necessary moving from 2.0 -> 2.1):
             node.set_log_level("INFO")
             node.start(wait_other_notice=True)
-            if not mixed_version:
-                node.nodetool('upgradesstables')
-
-        if not DISABLE_VNODES and self.cluster.version() >= '1.2':
-            debug("Running shuffle")
-            self.node2.shuffle("create")
-            self.node2.shuffle("en")
+            node.nodetool('upgradesstables')
+        
+        if is_last_upgrade and after_upgrade_call:
+            # run custom post-upgrade callables
+            for call in after_upgrade_call:
+                call()
 
         for node in nodes:
             debug('Checking %s ...' % (node.name))
@@ -201,18 +209,7 @@ class TestUpgradeThroughVersions(Tester):
         debug('upgrade.cf should have %d total rows' % (len(self.row_values)))
             
         self._increment_counter_value()
-        if check_counters:
-            self._check_counter_values()
-        
-        if not mixed_version:
-            # Check we can bootstrap a new node on the upgraded cluster:
-            debug("Adding a node to the cluster")
-            self.cluster.set_cassandra_dir(cassandra_version=tag)
-            nnode = new_node(self.cluster, remote_debug_port=str(2000+len(self.cluster.nodes)))
-            nnode.start(no_wait=False)
-            self._check_values()
-            if check_counters:
-                self._check_counter_values()
+        self._check_counter_values()
     
     def _log_current_ver(self, current_tag):
         """
@@ -306,6 +303,54 @@ class TestRandomPartitionerUpgrade(TestUpgradeThroughVersions):
         return ['git:'+v for v in UPGRADE_PATH]
 
 
+class PointToPointUpgradeBase(TestUpgradeThroughVersions):
+    """
+    Base class for testing a single upgrade (ver1->ver2).
+    
+    We are dynamically creating subclasses of this for testing point upgrades, so this is a convenient
+    place to add functionality/tests for those subclasses to run.
+    """
+    def setUp(self):
+        # Forcing cluster version on purpose
+        os.environ['CASSANDRA_VERSION'] = self.test_versions[0]
+        
+        super(TestUpgradeThroughVersions, self).setUp()
+        
+        # if this is the shuffle test, we want to specifically disable vnodes initially
+        # so that we can enable them later and do shuffle
+        if self.id().split('.')[-1] == 'shuffle_test':
+            debug("setting custom cluster config for shuffle_test")
+            if self.cluster.version() >= "1.2":
+                self.cluster.set_configuration_options(values={'num_tokens': None})
+            
+        debug("Versions to test (%s): %s" % (type(self), str([v for v in self.test_versions])))
+    
+    def _shuffle(self):
+        if not DISABLE_VNODES and self.cluster.version() >= '1.2':
+            debug("Running shuffle")
+            self.node2.shuffle("create")
+            self.node2.shuffle("enable")
+    
+    def _bootstrap_new_node(self):
+        # Check we can bootstrap a new node on the upgraded cluster:
+        debug("Adding a node to the cluster")
+        nnode = new_node(self.cluster, remote_debug_port=str(2000+len(self.cluster.nodes)))
+        nnode.start(no_wait=False)
+        self._write_values()
+        self._increment_counter_value()
+        self._check_values()
+        self._check_counter_values()
+    
+    @unittest.skipIf(DISABLE_VNODES, "vnodes disabled for this test run")
+    def shuffle_test(self):
+        # go from non-vnodes to vnodes, and run shuffle to distribute the data.
+        self.upgrade_scenario(after_upgrade_call=(self._shuffle,))
+    
+    def bootstrap_test(self):
+        # try and add a new node
+        self.upgrade_scenario(after_upgrade_call=(self._bootstrap_new_node,))
+
+
 # create test classes for upgrading from latest tag on branch to the head of that same branch
 for from_ver in UPGRADE_PATH:
     # we only want to do single upgrade tests for 1.2+
@@ -315,8 +360,8 @@ for from_ver in UPGRADE_PATH:
         debug('Creating test upgrade class: {}'.format(cls_name))
         vars()[cls_name] = type(
             cls_name,
-            (TestUpgradeThroughVersions,),
-            {'test_versions': (latest_tag_matching(from_ver), 'git:'+from_ver,)})
+            (PointToPointUpgradeBase,),
+            {'test_versions': [latest_tag_matching(from_ver), 'git:'+from_ver,]})
 
 # build a list of tuples like so:
 # [(A, B), (B, C) ... ]
@@ -329,11 +374,12 @@ for i, _ in enumerate(points):
     if len(verslice) == 2: # exclude dangling version at end
         POINT_UPGRADES.append( tuple(points[i:i+2]) )
 
-# create test classes
+# create test classes for upgrading from latest tag on one branch, to head of the next branch (see comment above)
 for (from_ver, to_branch) in POINT_UPGRADES:
     cls_name = ('TestUpgrade_from_'+from_ver+'_latest_tag_to_'+to_branch+'_HEAD').replace('-', '_').replace('.', '_')
     debug('Creating test upgrade class: {}'.format(cls_name))
     vars()[cls_name] = type(
         cls_name,
-        (TestUpgradeThroughVersions,),
-        {'test_versions': (latest_tag_matching(from_ver), 'git:'+to_branch,)})
+        (PointToPointUpgradeBase,),
+        {'test_versions': [latest_tag_matching(from_ver), 'git:'+to_branch,]})
+
