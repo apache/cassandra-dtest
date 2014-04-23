@@ -1,13 +1,26 @@
-from dtest import Tester, debug
+from dtest import Tester, debug, DEFAULT_DIR
 import unittest
 import time
 import os
 import subprocess
 import shlex 
 import pycassa
+import glob
 
 JNA_PATH = '/usr/share/java/jna.jar'
 ATTACK_JAR = 'cassandra-attack.jar'
+
+# Use jna.jar in {CASSANDRA_DIR,DEFAULT_DIR}lib/, since >=2.1 needs correct version
+try:
+    if glob.glob('%s/lib/jna-*.jar' % os.environ['CASSANDRA_DIR']):
+        debug('Using jna.jar in CASSANDRA_DIR/lib..')
+        JNA_IN_LIB = glob.glob('%s/lib/jna-*.jar' % os.environ['CASSANDRA_DIR'])
+        JNA_PATH = JNA_IN_LIB[0]
+except KeyError:
+    if glob.glob('%s/lib/jna-*.jar' % DEFAULT_DIR):
+        print ('Using jna.jar in DEFAULT_DIR/lib/..')
+        JNA_IN_LIB = glob.glob('%s/lib/jna-*.jar' % DEFAULT_DIR)
+        JNA_PATH = JNA_IN_LIB[0]
 
 class ThriftHSHATest(Tester):
 
