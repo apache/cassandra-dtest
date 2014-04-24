@@ -1,13 +1,26 @@
-from dtest import Tester, debug
+from dtest import Tester, debug, DEFAULT_DIR
 import unittest
 import time
 import os
 import subprocess
 import shlex 
 import pycassa
+import glob
 
 JNA_PATH = '/usr/share/java/jna.jar'
 ATTACK_JAR = 'cassandra-attack.jar'
+
+# Use jna.jar in {CASSANDRA_DIR,DEFAULT_DIR}/lib/, since >=2.1 needs correct version
+try:
+    if glob.glob('%s/lib/jna-*.jar' % os.environ['CASSANDRA_DIR']):
+        debug('Using jna.jar in CASSANDRA_DIR/lib..')
+        JNA_IN_LIB = glob.glob('%s/lib/jna-*.jar' % os.environ['CASSANDRA_DIR'])
+        JNA_PATH = JNA_IN_LIB[0]
+except KeyError:
+    if glob.glob('%s/lib/jna-*.jar' % DEFAULT_DIR):
+        print ('Using jna.jar in DEFAULT_DIR/lib/..')
+        JNA_IN_LIB = glob.glob('%s/lib/jna-*.jar' % DEFAULT_DIR)
+        JNA_PATH = JNA_IN_LIB[0]
 
 class ThriftHSHATest(Tester):
 
@@ -77,23 +90,8 @@ class ThriftHSHATest(Tester):
   column1 timeuuid,
   value blob,
   PRIMARY KEY (key, column1)
-) WITH COMPACT STORAGE AND
-  bloom_filter_fp_chance=0.010000 AND
-  caching='KEYS_ONLY' AND
-  comment='' AND
-  dclocal_read_repair_chance=0.000000 AND
-  gc_grace_seconds=7200 AND
-  index_interval=128 AND
-  read_repair_chance=0.000000 AND
-  replicate_on_write='true' AND
-  populate_io_cache_on_flush='false' AND
-  default_time_to_live=0 AND
-  speculative_retry='NONE' AND
-  memtable_flush_period_in_ms=0 AND
-  compaction={'class': 'LeveledCompactionStrategy', 'sstable_size_in_mb' : 2} AND
-  compression={'chunk_length_kb': '64', 'sstable_compression': 'DeflateCompressor'};
+) WITH COMPACT STORAGE;
 """)
-
 
 
         debug("running attack jar...")

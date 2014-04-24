@@ -28,7 +28,7 @@ class SnapshotTester(Tester):
         # Find the snapshot dir, it's different in various C* versions:
         snapshot_dir = "{node_dir}/data/{ks}/{cf}/snapshots/{name}".format(**locals())
         if not os.path.isdir(snapshot_dir):
-            snapshot_dir = glob.glob("{node_dir}/flush/{ks}/{cf}-*/snapshots/{name}".format(**locals()))[0]
+            snapshot_dir = glob.glob("{node_dir}/data/{ks}/{cf}-*/snapshots/{name}".format(**locals()))[0]
         debug("snapshot_dir is : " + snapshot_dir)
         debug("snapshot copy is : " + tmpdir)
 
