@@ -4020,3 +4020,30 @@ class TestCQL(Tester):
 
         # This doesn't work -- see #7059
         #assert_all(cursor, "SELECT * FROM test WHERE v > 1 AND v <= 3 LIMIT 6 ALLOW FILTERING", [[1, 2], [1, 3], [0, 2], [0, 3], [2, 2], [2, 3]])
+
+    @require("6950")
+    def key_index_with_reverse_clustering(self):
+        """ Test for #6950 bug """
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k1 int,
+                k2 int,
+                v int,
+                PRIMARY KEY ((k1, k2), v)
+            ) WITH CLUSTERING ORDER BY (v DESC)
+        """)
+
+        cursor.execute("CREATE INDEX ON test(k2)")
+
+        cursor.execute("INSERT INTO test(k1, k2, v) VALUES (0, 0, 1)")
+        cursor.execute("INSERT INTO test(k1, k2, v) VALUES (0, 1, 2)")
+        cursor.execute("INSERT INTO test(k1, k2, v) VALUES (0, 0, 3)")
+        cursor.execute("INSERT INTO test(k1, k2, v) VALUES (1, 0, 4)")
+        cursor.execute("INSERT INTO test(k1, k2, v) VALUES (1, 1, 5)")
+        cursor.execute("INSERT INTO test(k1, k2, v) VALUES (2, 0, 7)")
+        cursor.execute("INSERT INTO test(k1, k2, v) VALUES (2, 1, 8)")
+        cursor.execute("INSERT INTO test(k1, k2, v) VALUES (3, 0, 1)")
+
+        assert_all(cursor, "SELECT * FROM test WHERE k2 = 0 AND v >= 2 ALLOW FILTERING", [[0, 0, 3], [1, 0, 4], [2, 0, 7]]);
