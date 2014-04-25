@@ -276,7 +276,7 @@ class TestUpgradeThroughVersions(Tester):
                 self.assertEqual(x, k)
                 self.assertEqual(str(x), v)
 
-    def _increment_counters(self):
+    def _increment_counters(self, timeout=300):
         debug("incrementing counter...")
         cursor = self.patient_cql_connection(self.node2).cursor()
         cursor.execute("use upgrade;")
@@ -287,6 +287,7 @@ class TestUpgradeThroughVersions(Tester):
         uuids = [uuid.uuid4() for i in range(100)]
         self.expected_counts = defaultdict(int)
         
+        expiry=time.time()+timeout
         for i in range(5000):
             counter_key = random.choice(uuids)
             
@@ -296,9 +297,12 @@ class TestUpgradeThroughVersions(Tester):
                 fail_count += 1
             else:
                 self.expected_counts[counter_key] += 1
-        
+            
+            if time.time() > expiry:
+                break
+            
         # make sure at least half succeeded
-        assert fail_count < 2500
+        assert sum(self.expected_counts.values()) > 2500
 
     def _check_counters(self):
         debug("Checking counter values...")
