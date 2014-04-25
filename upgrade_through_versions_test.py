@@ -1,8 +1,9 @@
-import bisect, os, re, subprocess, unittest
+import bisect, os, random, re, subprocess, time, uuid, unittest
 from collections import defaultdict
 from distutils.version import LooseVersion
+from cql import OperationalError
 from dtest import Tester, debug, DISABLE_VNODES, DEFAULT_DIR
-from tools import new_node
+from tools import new_node, not_implemented
 
 TRUNK_VER = '2.2'
 
@@ -108,22 +109,32 @@ class TestUpgradeThroughVersions(Tester):
         """Only upgrade part of the cluster, so we have mixed versions part way through."""
         self.upgrade_scenario(mixed_version=True)
 
-    def upgrade_scenario(self, mixed_version=False, flush=True, after_upgrade_call=()):
+    def upgrade_scenario(self, populate=True, create_schema=True, mixed_version=False, flush=True, after_upgrade_call=()):
         # Record the rows we write as we go:
         self.row_values = set()
-        self.counter_val = 0
         cluster = self.cluster
         
-        # Start with 3 node cluster
-        debug('Creating cluster (%s)' % self.test_versions[0])
-        cluster.populate(3)
-        cluster.start()
-        node1, node2, node3 = cluster.nodelist()
-        self.node2 = node2
+        if populate:
+            # Start with 3 node cluster
+            debug('Creating cluster (%s)' % self.test_versions[0])
+            cluster.populate(3)
+            cluster.start()
+        else:
+            debug("Skipping cluster creation (should already be built)")
 
-        self._create_schema()
+        # add nodes to self for convenience
+        for i, node in enumerate(cluster.nodelist(), 1):
+            node_name = 'node'+str(i)
+            setattr(self, node_name, node)
+        
+        if create_schema:
+            self._create_schema()
+        else:
+            debug("Skipping schema creation (should already be built)")
+        time.sleep(5) #sigh...
+            
         self._write_values()
-        self._increment_counter_value()
+        self._increment_counters()
 
         self._log_current_ver(self.test_versions[0])
         
@@ -154,7 +165,7 @@ class TestUpgradeThroughVersions(Tester):
         is_last_upgrade indicates this call is completing a cluster upgrade,
         either by upgrading all nodes at once, or when the final node is upgraded (for mixed)
         
-        after_upgrade_call is an optional callable which will be run after the upgrade is complete
+        after_upgrade_call is an optional list of callables which will be run after the upgrade is complete
         """
         debug('Upgrading to ' + tag)
         if not mixed_version:
@@ -176,7 +187,7 @@ class TestUpgradeThroughVersions(Tester):
         # note that this is checking the version about to be upgraded-to
         # and making settings that will apply to the new version (not the current one)
         if not DISABLE_VNODES and get_version_from_tag(tag) >= '1.2':
-            debug("configuring for vnodes")
+            debug("configuring for vnodes (may happen more than once)")
             self.cluster.set_configuration_options(values={
                 'initial_token': None,
                 'num_tokens': 256})
@@ -208,8 +219,8 @@ class TestUpgradeThroughVersions(Tester):
 
         debug('upgrade.cf should have %d total rows' % (len(self.row_values)))
             
-        self._increment_counter_value()
-        self._check_counter_values()
+        self._increment_counters()
+        self._check_counters()
     
     def _log_current_ver(self, current_tag):
         """
@@ -232,7 +243,8 @@ class TestUpgradeThroughVersions(Tester):
         else:
             # DDL for C* 1.1
             cursor.execute("""CREATE KEYSPACE upgrade WITH strategy_class = 'SimpleStrategy' 
-            AND strategy_options:replication_factor = 2;""")
+            AND strategy_options:replication_factor = 2;
+            """)
 
         cursor.execute('use upgrade')
         cursor.execute('CREATE TABLE cf ( k int PRIMARY KEY , v text )')
@@ -264,21 +276,39 @@ class TestUpgradeThroughVersions(Tester):
                 self.assertEqual(x, k)
                 self.assertEqual(str(x), v)
 
-    def _increment_counter_value(self):
+    def _increment_counters(self):
         debug("incrementing counter...")
         cursor = self.patient_cql_connection(self.node2).cursor()
         cursor.execute("use upgrade;")
-        update_counter_query = ("UPDATE countertable SET c = c + 1 WHERE k='www.datastax.com'")
-        cursor.execute( update_counter_query )
-        self.counter_val += 1
+        
+        fail_count = 0
+        update_counter_query = ("UPDATE countertable SET c = c + 1 WHERE k='{key}'")
+        
+        uuids = [uuid.uuid4() for i in range(100)]
+        self.expected_counts = defaultdict(int)
+        
+        for i in range(5000):
+            counter_key = random.choice(uuids)
+            
+            try:
+                cursor.execute( update_counter_query.format(key=counter_key) )
+            except OperationalError:
+                fail_count += 1
+            else:
+                self.expected_counts[counter_key] += 1
+        
+        # make sure at least half succeeded
+        assert fail_count < 2500
 
-    def _check_counter_values(self):
+    def _check_counters(self):
         debug("Checking counter values...")
         cursor = self.patient_cql_connection(self.node2).cursor()
         cursor.execute("use upgrade;")
-        cursor.execute("SELECT c from countertable;")
-        res = cursor.fetchall()[0][0]
-        assert res == self.counter_val, "Counter not at expected value."
+        
+        for counter_key, value in self.expected_counts.items():        
+            cursor.execute("SELECT c from countertable where k='{key}';".format(key=counter_key))
+            res = cursor.fetchall()[0][0]
+            assert res == value, "Counter not at expected value."
 
 
 class TestRandomPartitionerUpgrade(TestUpgradeThroughVersions):
@@ -309,16 +339,20 @@ class PointToPointUpgradeBase(TestUpgradeThroughVersions):
     
     We are dynamically creating subclasses of this for testing point upgrades, so this is a convenient
     place to add functionality/tests for those subclasses to run.
+    
+    Set __test__ to False for PointToPointUpgradeBase. Subclasses need to revert to True to run tests!
     """
+    __test__ = False
+
     def setUp(self):
         # Forcing cluster version on purpose
         os.environ['CASSANDRA_VERSION'] = self.test_versions[0]
         
         super(TestUpgradeThroughVersions, self).setUp()
         
-        # if this is the shuffle test, we want to specifically disable vnodes initially
+        # if this is a shuffle test, we want to specifically disable vnodes initially
         # so that we can enable them later and do shuffle
-        if self.id().split('.')[-1] == 'shuffle_test':
+        if self.id().split('.')[-1] in ('shuffle_test', 'shuffle_multidc_test'):
             debug("setting custom cluster config for shuffle_test")
             if self.cluster.version() >= "1.2":
                 self.cluster.set_configuration_options(values={'num_tokens': None})
@@ -328,18 +362,31 @@ class PointToPointUpgradeBase(TestUpgradeThroughVersions):
     def _shuffle(self):
         if not DISABLE_VNODES and self.cluster.version() >= '1.2':
             debug("Running shuffle")
-            self.node2.shuffle("create")
+            self.node1.shuffle("create")
             self.node2.shuffle("enable")
     
     def _bootstrap_new_node(self):
         # Check we can bootstrap a new node on the upgraded cluster:
         debug("Adding a node to the cluster")
         nnode = new_node(self.cluster, remote_debug_port=str(2000+len(self.cluster.nodes)))
-        nnode.start(no_wait=False)
+        nnode.start(wait_other_notice=True)
         self._write_values()
-        self._increment_counter_value()
+        self._increment_counters()
         self._check_values()
-        self._check_counter_values()
+        self._check_counters()
+    
+    def _bootstrap_new_node_multidc(self):
+        # Check we can bootstrap a new node on the upgraded cluster:
+        debug("Adding a node to the cluster")
+        nnode = new_node(self.cluster, bootstrap=False,remote_debug_port=str(2000+len(self.cluster.nodes)), data_center='dc2')
+        
+        # need to set dir?
+        # nnode.set_cassandra_dir(self.cluster.get_cassandra_dir())
+        nnode.start(wait_other_notice=True)
+        self._write_values()
+        self._increment_counters()
+        self._check_values()
+        self._check_counters()
     
     @unittest.skipIf(DISABLE_VNODES, "vnodes disabled for this test run")
     def shuffle_test(self):
@@ -349,6 +396,52 @@ class PointToPointUpgradeBase(TestUpgradeThroughVersions):
     def bootstrap_test(self):
         # try and add a new node
         self.upgrade_scenario(after_upgrade_call=(self._bootstrap_new_node,))
+    
+    @not_implemented # need to figure out how to properly bootstrap a node into multi-dc
+    @unittest.skipIf(DISABLE_VNODES, "vnodes disabled for this test run")
+    def shuffle_multidc_test(self):
+        # go from non-vnodes to vnodes, and run shuffle to distribute the data.
+        # multi dc, 2 nodes in each dc
+        self.cluster.populate([2,2])
+        self.cluster.start()
+        self._multidc_schema_create()
+        self.upgrade_scenario(populate=False, create_schema=False, after_upgrade_call=(self._shuffle,))
+    
+    @not_implemented # need to figure out how to properly bootstrap a node into multi-dc
+    def bootstrap_multidc_test(self):
+        # try and add a new node
+        # multi dc, 2 nodes in each dc
+        self.cluster.populate([2,2])
+        self.cluster.start()
+        self._multidc_schema_create()
+        self.upgrade_scenario(populate=False, create_schema=False, after_upgrade_call=(self._bootstrap_new_node_multidc,))
+
+    def _multidc_schema_create(self):
+        cursor = self.patient_cql_connection(self.cluster.nodelist()[0]).cursor()
+        
+        if self.cluster.version() >= '1.2':
+            #DDL for C* 1.2+
+            cursor.execute("""CREATE KEYSPACE upgrade WITH replication = {'class':'NetworkTopologyStrategy', 
+                'dc1':2, 'dc2':2};
+                """)
+        else:
+            # DDL for C* 1.1
+            cursor.execute("""CREATE KEYSPACE upgrade WITH strategy_class = 'NetworkTopologyStrategy' 
+            AND strategy_options:'dc1':2
+            AND strategy_options:'dc2':2;
+            """)
+
+        cursor.execute('use upgrade')
+        cursor.execute('CREATE TABLE cf ( k int PRIMARY KEY , v text )')
+        cursor.execute('CREATE INDEX vals ON cf (v)')
+        
+        if self.cluster.version() >= '1.2':
+            cursor.execute("""
+                CREATE TABLE countertable (k text PRIMARY KEY, c counter);""")
+        else:
+            cursor.execute("""
+                CREATE TABLE countertable (k text PRIMARY KEY, c counter)
+                WITH default_validation=CounterColumnType;""")
 
 
 # create test classes for upgrading from latest tag on branch to the head of that same branch
@@ -361,7 +454,7 @@ for from_ver in UPGRADE_PATH:
         vars()[cls_name] = type(
             cls_name,
             (PointToPointUpgradeBase,),
-            {'test_versions': [latest_tag_matching(from_ver), 'git:'+from_ver,]})
+            {'test_versions': [latest_tag_matching(from_ver), 'git:'+from_ver,], '__test__':True})
 
 # build a list of tuples like so:
 # [(A, B), (B, C) ... ]
@@ -381,5 +474,5 @@ for (from_ver, to_branch) in POINT_UPGRADES:
     vars()[cls_name] = type(
         cls_name,
         (PointToPointUpgradeBase,),
-        {'test_versions': [latest_tag_matching(from_ver), 'git:'+to_branch,]})
+        {'test_versions': [latest_tag_matching(from_ver), 'git:'+to_branch,], '__test__':True})
 
