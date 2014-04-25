@@ -3615,6 +3615,12 @@ class TestCQL(Tester):
 
         assert_one(cursor, "SELECT * FROM test", [0, None, 42, None])
 
+        # Check that writetime works (#7081) -- we can't predict the exact value easily so
+        # we just check that it's non zero
+        cursor.execute("SELECT s, writetime(s) FROM test WHERE k=0")
+        row = cursor.fetchone()
+        assert row[0] == 42 and row[1] > 0, row
+
         cursor.execute("INSERT INTO test(k, p, s, v) VALUES (0, 0, 12, 0)")
         cursor.execute("INSERT INTO test(k, p, s, v) VALUES (0, 1, 24, 1)")
 
