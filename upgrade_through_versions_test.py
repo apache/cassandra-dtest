@@ -299,6 +299,7 @@ class TestUpgradeThroughVersions(Tester):
                 self.expected_counts[counter_key] += 1
             
             if time.time() > expiry:
+                debug("Timeout incrementing counters. May cause test failure.")
                 break
             
         # make sure at least half succeeded
