@@ -184,13 +184,13 @@ class TestUpgradeThroughVersions(Tester):
                 node.watch_log_for("DRAINED")
             node.stop(wait_other_notice=False)
 
-        # note that this is checking the version about to be upgraded-to
-        # and making settings that will apply to the new version (not the current one)
-        if not DISABLE_VNODES and get_version_from_tag(tag) >= '1.2':
-            debug("configuring for vnodes (may happen more than once)")
-            self.cluster.set_configuration_options(values={
-                'initial_token': None,
-                'num_tokens': 256})
+        # when going from a pre-vnodes to vnodes version, make the proper settings.
+        if not DISABLE_VNODES:
+            if self.cluster.version() < '1.2' and get_version_from_tag(tag) >= '1.2':
+                debug("configuring for vnodes (may happen more than once)")
+                self.cluster.set_configuration_options(values={
+                    'initial_token': None,
+                    'num_tokens': 256})
 
         # Update Cassandra Directory
         for node in nodes:
