@@ -345,7 +345,7 @@ class PointToPointUpgradeBase(TestUpgradeThroughVersions):
     We are dynamically creating subclasses of this for testing point upgrades, so this is a convenient
     place to add functionality/tests for those subclasses to run.
     
-    Set __test__ to False for PointToPointUpgradeBase. Subclasses need to revert to True to run tests!
+    __test__ is False for this class. Subclasses need to revert to True to run tests!
     """
     __test__ = False
 
