@@ -12,7 +12,11 @@ class NodeUnavailable(Exception):
 class TestReplaceAddress(Tester):
 
     def __init__(self, *args, **kwargs):
+        # Ignore these log patterns:
         self.ignore_log_patterns = [
+            # This one occurs when trying to send the migration to a
+            # node that hasn't started yet, and when it does, it gets
+            # replayed and everything is fine.
             r'Can\'t send migration request: node.*is down',
         ]
         Tester.__init__(self, *args, **kwargs)
