@@ -19,7 +19,9 @@ class TestReplaceAddress(Tester):
             # node that hasn't started yet, and when it does, it gets
             # replayed and everything is fine.
             r'Can\'t send migration request: node.*is down',
+            # This is caused by starting a node improperly (replacing active/nonexistent)
             r'Exception encountered during startup',
+            # This is caused by trying to replace a nonexistent node
             r'Exception in thread Thread'
         ]
         Tester.__init__(self, *args, **kwargs)
@@ -120,5 +122,6 @@ class TestReplaceAddress(Tester):
         node4 = Node('node4', cluster, True, ('127.0.0.4', 9160), ('127.0.0.4', 7000), '7400', '0', None, ('127.0.0.4',9042))
         cluster.add(node4, False)
         
+        #try to replace an unassigned ip address
         with self.assertRaises(NodeError):
             node4.start(replace_address='127.0.0.5')
