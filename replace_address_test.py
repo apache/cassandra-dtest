@@ -18,30 +18,27 @@ class TestReplaceAddress(Tester):
 		cluster.populate(3).start()
 		[node1,node2, node3] = cluster.nodelist()
 
-		node1.stress(['write', 'n=1000', '-schema', 'replication(factor=3)'])
+		node1.stress(['write', 'n=10000', '-schema', 'replication(factor=3)'])
 		cursor = self.patient_cql_connection(node1).cursor()
-		node1.run_cqlsh(cmds="CONSISTENCY three", show_output=True)
-		cursor.execute('select * from "Keyspace1"."Standard1" LIMIT 1')
-		initialData = list(cursor)
+		cursor.execute('select * from "Keyspace1"."Standard1" LIMIT 1', consistency_level='THREE')
+		initialData = cursor.fetchall()
 		
 		#stop node, query should time out with consistency 3
 		node3.stop(gently=False)
-		node1.run_cqlsh(cmds="CONSISTENCY three", show_output=True)
-		with self.assertRaises(OperationalError):
-			cursor.execute('select * from "Keyspace1"."Standard1" LIMIT 1')
+		time.sleep(5)
+		with self.assertRaises(OperationalError) as cm:
+			cursor.execute('select * from "Keyspace1"."Standard1" LIMIT 1', consistency_level='THREE')
 
 		node4 = Node('node4', cluster, True, ('127.0.0.4', 9160), ('127.0.0.4', 7000), '7400', '0', None, ('127.0.0.4',9042))
 		cluster.add(node4, False)
 		node4.start(replace_address='127.0.0.3')
 
 		#query should work again
-		node1.run_cqlsh(cmds="CONSISTENCY three", show_output=True)
-		cursor.execute('select * from "Keyspace1"."Standard1" LIMIT 1')
-		finalData = list(cursor)
+		cursor.execute('select * from "Keyspace1"."Standard1" LIMIT 1', consistency_level='THREE')
+		finalData = cursor.fetchall()
 		self.assertListEqual(initialData, finalData)
 		
 		movedTokensList = node4.grep_log("changing ownership from /127.0.0.3 to /127.0.0.4")
-		time.sleep(2)
 		debug(movedTokensList[0])
 		self.assertGreaterEqual(len(movedTokensList), 1)
 
@@ -51,6 +48,6 @@ class TestReplaceAddress(Tester):
 		debug(checkCollision)
 		self.assertGreaterEqual(len(checkCollision), 1)
 
-		updatedSeedList = node4.grep_log("removed /127.0.0.3 from seeds, updated seeds list = [/127.0.0.1, /127.0.0.2]")
+		updatedSeedList = node4.grep_log("FatClient /127.0.0.3 has been silent for 30000ms, removing from gossip")
 		debug(updatedSeedList)
 		self.assertGreaterEqual(len(updatedSeedList), 1)
