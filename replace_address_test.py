@@ -7,8 +7,17 @@ from cql import OperationalError
 
 class TestReplaceAddress(Tester):
 
+    def __init__(self, *args, **kwargs):
+        # Ignore these log patterns:
+        self.ignore_log_patterns = [
+            # This one occurs when trying to send the migration to a
+            # node that hasn't started yet, and when it does, it gets
+            # replayed and everything is fine.
+            r'Can\'t send migration request: node.*is down',
+        ]
+        Tester.__init__(self, *args, **kwargs)
 
-	def replace_stopped_node_test(self):
+	def replace_node_test(self):
 		"""Check that the replace address function correctly replaces a node that has failed in a cluster. 
 		Create a cluster, cause a node to fail, and bring up a new node with the replace_address parameter.
 		Check that tokens are migrated and that data is replicated properly.
