@@ -24,17 +24,19 @@ class TestReplaceAddress(Tester):
 		cursor.execute('select * from "Keyspace1"."Standard1" LIMIT 1')
 		initialData = list(cursor)
 		
+		#stop node, query should time out with consistency 3
 		node3.stop(gently=False)
 		node1.run_cqlsh(cmds="CONSISTENCY three", show_output=True)
 		with self.assertRaises(OperationalError):
-			cursor.execute('select * from "Keyspace1"."Standard1" LIMIT 1') # should time out
+			cursor.execute('select * from "Keyspace1"."Standard1" LIMIT 1')
 
 		node4 = Node('node4', cluster, True, ('127.0.0.4', 9160), ('127.0.0.4', 7000), '7400', '0', None, ('127.0.0.4',9042))
 		cluster.add(node4, False)
 		node4.start(replace_address='127.0.0.3')
 
+		#query should work again
 		node1.run_cqlsh(cmds="CONSISTENCY three", show_output=True)
-		cursor.execute('select * from "Keyspace1"."Standard1" LIMIT 1') # should work
+		cursor.execute('select * from "Keyspace1"."Standard1" LIMIT 1')
 		finalData = list(cursor)
 		self.assertListEqual(initialData, finalData)
 		
@@ -43,7 +45,8 @@ class TestReplaceAddress(Tester):
 		debug(movedTokensList[0])
 		self.assertGreaterEqual(len(movedTokensList), 1)
 
-		node3.start() #check that doesn't work
+		#check that restarting node 3 doesn't work
+		node3.start() 
 		checkCollision = node1.grep_log("between /127.0.0.3 and /127.0.0.4; /127.0.0.4 is the new owner")
 		debug(checkCollision)
 		self.assertGreaterEqual(len(checkCollision), 1)
