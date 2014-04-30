@@ -36,17 +36,16 @@ class TestReplaceAddress(Tester):
         cursor.execute('select * from "Keyspace1"."Standard1" LIMIT 1', consistency_level='THREE')
         initialData = cursor.fetchall()
         
-        #stop node, query should time out with consistency 3
+        #stop node, query should not work with consistency 3
         node3.stop(gently=False)
         time.sleep(5)
-        with self.assertRaises(NodeUnavailable) as cm:
+        with self.assertRaises(NodeUnavailable):
             try:
                 cursor.execute('select * from "Keyspace1"."Standard1" LIMIT 1', consistency_level='THREE')
             except (UnavailableException, OperationalError):
                 raise NodeUnavailable("Node could not be queried.")
 
-        debug(cm.exception)
-
+        #replace node 3 with node 4
         node4 = Node('node4', cluster, True, ('127.0.0.4', 9160), ('127.0.0.4', 7000), '7400', '0', None, ('127.0.0.4',9042))
         cluster.add(node4, False)
         node4.start(replace_address='127.0.0.3')
