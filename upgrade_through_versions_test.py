@@ -487,3 +487,12 @@ for (from_branch, to_branch) in POINT_UPGRADES:
         cls_name,
         (PointToPointUpgradeBase,),
         {'test_versions': ['git:'+from_branch, 'git:'+to_branch,], '__test__':True})
+
+# create test classes for upgrading from HEAD of one branch, to latest tag of next branch
+for (from_branch, to_branch) in POINT_UPGRADES:
+    cls_name = ('TestUpgrade_from_'+from_branch+'_HEAD_to_'+to_branch+'_latest_tag').replace('-', '_').replace('.', '_')
+    debug('Creating test upgrade class: {}'.format(cls_name))
+    vars()[cls_name] = type(
+        cls_name,
+        (PointToPointUpgradeBase,),
+        {'test_versions': ['git:'+from_branch, latest_tag_matching(to_branch),], '__test__':True})
