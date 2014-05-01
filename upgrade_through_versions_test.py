@@ -427,13 +427,13 @@ class PointToPointUpgradeBase(TestUpgradeThroughVersions):
         if self.cluster.version() >= '1.2':
             #DDL for C* 1.2+
             cursor.execute("""CREATE KEYSPACE upgrade WITH replication = {'class':'NetworkTopologyStrategy', 
-                'dc1':2, 'dc2':2};
+                'dc1':1, 'dc2':1};
                 """)
         else:
             # DDL for C* 1.1
             cursor.execute("""CREATE KEYSPACE upgrade WITH strategy_class = 'NetworkTopologyStrategy' 
-            AND strategy_options:'dc1':2
-            AND strategy_options:'dc2':2;
+            AND strategy_options:'dc1':1
+            AND strategy_options:'dc2':1;
             """)
 
         cursor.execute('use upgrade')
