@@ -118,7 +118,7 @@ class TestUpgradeThroughVersions(Tester):
             # Start with 3 node cluster
             debug('Creating cluster (%s)' % self.test_versions[0])
             cluster.populate(3)
-            cluster.start()
+            [node.start(use_jna=True) for node in cluster.nodelist()]
         else:
             debug("Skipping cluster creation (should already be built)")
 
@@ -374,7 +374,7 @@ class PointToPointUpgradeBase(TestUpgradeThroughVersions):
         # Check we can bootstrap a new node on the upgraded cluster:
         debug("Adding a node to the cluster")
         nnode = new_node(self.cluster, remote_debug_port=str(2000+len(self.cluster.nodes)))
-        nnode.start(wait_other_notice=True)
+        nnode.start(use_jna=True, wait_other_notice=True)
         self._write_values()
         self._increment_counters()
         self._check_values()
@@ -383,11 +383,9 @@ class PointToPointUpgradeBase(TestUpgradeThroughVersions):
     def _bootstrap_new_node_multidc(self):
         # Check we can bootstrap a new node on the upgraded cluster:
         debug("Adding a node to the cluster")
-        nnode = new_node(self.cluster, bootstrap=False,remote_debug_port=str(2000+len(self.cluster.nodes)), data_center='dc2')
+        nnode = new_node(self.cluster, remote_debug_port=str(2000+len(self.cluster.nodes)), data_center='dc2')
         
-        # need to set dir?
-        # nnode.set_cassandra_dir(self.cluster.get_cassandra_dir())
-        nnode.start(wait_other_notice=True)
+        nnode.start(use_jna=True, wait_other_notice=True)
         self._write_values()
         self._increment_counters()
         self._check_values()
@@ -408,7 +406,7 @@ class PointToPointUpgradeBase(TestUpgradeThroughVersions):
         # go from non-vnodes to vnodes, and run shuffle to distribute the data.
         # multi dc, 2 nodes in each dc
         self.cluster.populate([2,2])
-        self.cluster.start()
+        [node.start(use_jna=True) for node in self.cluster.nodelist()]
         self._multidc_schema_create()
         self.upgrade_scenario(populate=False, create_schema=False, after_upgrade_call=(self._shuffle,))
     
@@ -417,7 +415,7 @@ class PointToPointUpgradeBase(TestUpgradeThroughVersions):
         # try and add a new node
         # multi dc, 2 nodes in each dc
         self.cluster.populate([2,2])
-        self.cluster.start()
+        [node.start(use_jna=True) for node in self.cluster.nodelist()]
         self._multidc_schema_create()
         self.upgrade_scenario(populate=False, create_schema=False, after_upgrade_call=(self._bootstrap_new_node_multidc,))
 
