@@ -6,6 +6,7 @@ import subprocess
 import shlex 
 import pycassa
 import glob
+import sys
 
 JNA_PATH = '/usr/share/java/jna.jar'
 ATTACK_JAR = 'cassandra-attack.jar'
@@ -28,7 +29,7 @@ class ThriftHSHATest(Tester):
         Tester.__init__(self, *args, **kwargs)
 
 
-    @unittest.skip('Disable for now until CASSANDRA-6546 has more feedback')
+    @unittest.skipIf(sys.platform == "win32", 'Could not be executed on Windows')
     def test_closing_connections(self):
         """Test CASSANDRA-6546 - do connections get closed when disabling / renabling thrift service?"""
         cluster = self.cluster
@@ -50,15 +51,19 @@ class ThriftHSHATest(Tester):
             return pool
 
         pools = []
-        for i in xrange(100):
+        for i in xrange(10):
             debug("Creating connection pools..")
             for x in xrange(3):
                 pools.append(make_connection())
             debug("Disabling/Enabling thrift iteration #{i}".format(i=i))
             node1.nodetool('disablethrift')
             node1.nodetool('enablethrift')
-
-        raw_input("wait")
+            debug("Closing connections from the client side..")
+            for pool in pools:
+                pool.dispose()
+            stdout = subprocess.Popen(["lsof -a -p %s -iTCP -sTCP:CLOSE_WAIT" % node1.pid], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True).communicate()[0]
+            lines = stdout.splitlines()
+            self.assertEqual(len(lines), 0, "There are non-closed connections: %s" % stdout)
 
     @unittest.skipIf(not os.path.exists(ATTACK_JAR), "No attack jar found")
     @unittest.skipIf(not os.path.exists(JNA_PATH), "No JNA jar found")
