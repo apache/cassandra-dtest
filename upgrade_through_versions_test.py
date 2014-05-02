@@ -271,43 +271,38 @@ class TestUpgradeThroughVersions(Tester):
                 self.assertEqual(x, k)
                 self.assertEqual(str(x), v)
 
-    def _increment_counters(self, timeout=300):
-        debug("incrementing counter...")
+    def _increment_counters(self, seconds=15):
+        debug("incrementing counter for {time} seconds")
         cursor = self.patient_cql_connection(self.node2).cursor()
         cursor.execute("use upgrade;")
         
-        fail_count = 0
         update_counter_query = ("UPDATE countertable SET c = c + 1 WHERE k='{key}'")
         
         uuids = [uuid.uuid4() for i in range(100)]
         self.expected_counts = defaultdict(int)
         
-        expiry=time.time()+timeout
-        for i in range(5000):
+        expiry=time.time()+seconds
+        while time.time() < expiry:
             counter_key = random.choice(uuids)
             
             try:
                 cursor.execute( update_counter_query.format(key=counter_key) )
             except OperationalError:
-                fail_count += 1
+                pass
             else:
                 self.expected_counts[counter_key] += 1
             
-            if time.time() > expiry:
-                debug("Timeout incrementing counters. May cause test failure.")
-                break
-            
-        # make sure at least half succeeded
-        assert sum(self.expected_counts.values()) > 2500
+        # make sure 100 succeeded
+        assert sum(self.expected_counts.values()) > 100
 
-    def _check_counters(self):
+    def _check_counters(self, consistency_level='ALL'):
         debug("Checking counter values...")
         cursor = self.patient_cql_connection(self.node2).cursor()
         cursor.execute("use upgrade;")
         
-        for counter_key, value in self.expected_counts.items():        
-            cursor.execute("SELECT c from countertable where k='{key}';".format(key=counter_key))
-            res = cursor.fetchall()[0][0]
+        for counter_key, value in self.expected_counts.items():
+            cursor.execute("SELECT c from countertable where k='{key}';".format(key=counter_key), consistency_level=consistency_level)
+            res = cursor.fetchone()[0]
             assert res == value, "Counter not at expected value."
 
 
