@@ -492,6 +492,12 @@ for (from_branch, to_branch) in POINT_UPGRADES:
 for (from_branch, to_branch) in POINT_UPGRADES:
     cls_name = ('TestUpgrade_from_'+from_branch+'_HEAD_to_'+to_branch+'_latest_tag').replace('-', '_').replace('.', '_')
     debug('Creating test upgrade class: {}'.format(cls_name))
+    
+    # in some cases we might not find a tag (like when the to_branch is trunk)
+    # so these will be skipped.
+    if latest_tag_matching(to_branch) is None:
+        continue
+    
     vars()[cls_name] = type(
         cls_name,
         (PointToPointUpgradeBase,),
