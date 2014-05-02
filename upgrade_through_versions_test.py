@@ -253,7 +253,7 @@ class TestUpgradeThroughVersions(Tester):
                 CREATE TABLE countertable (k text PRIMARY KEY, c counter)
                 WITH default_validation=CounterColumnType;""")
 
-    def _write_values(self, num=100, consistency_level='ALL'):
+    def _write_values(self, num=100):
         cursor = self.patient_cql_connection(self.node2).cursor()
         cursor.execute("use upgrade")
         for i in xrange(num):
