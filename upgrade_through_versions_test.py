@@ -133,31 +133,42 @@ class TestUpgradeThroughVersions(Tester):
             debug("Skipping schema creation (should already be built)")
         time.sleep(5) #sigh...
             
-        self._write_values()
-        self._increment_counters()
-
         self._log_current_ver(self.test_versions[0])
         
         # upgrade through versions
         for tag in self.test_versions[1:]:
             if mixed_version:
                 for num, node in enumerate(self.cluster.nodelist()):
-                    self.upgrade_to_version(
-                        tag, mixed_version=True, nodes=(node,), flush=flush,
-                        after_upgrade_call=after_upgrade_call,
-                        is_last_upgrade=bool(node == self.cluster.nodelist()[-1]))
+                    # do a write and check for each new node as upgraded
+                    self._write_values()
+                    self._increment_counters()
+                    
+                    self.upgrade_to_version(tag, mixed_version=True, nodes=(node,), flush=flush)
+                    
+                    self._check_values()
+                    self._check_counters()
+                    
                     debug('Successfully upgraded %d of %d nodes to %s' % 
                           (num+1, len(self.cluster.nodelist()), tag))
             else:
-                self.upgrade_to_version(tag, flush=flush,
-                    after_upgrade_call=after_upgrade_call, is_last_upgrade=True)
+                self._write_values()
+                self._increment_counters()
+                
+                self.upgrade_to_version(tag, flush=flush)
+                
+                self._check_values()
+                self._check_counters()
+                
+            # run custom post-upgrade callables
+            for call in after_upgrade_call:
+                call()
+                
             debug('All nodes successfully upgraded to %s' % tag)
             self._log_current_ver(tag)
             
         cluster.stop()
 
-    def upgrade_to_version(self, tag, mixed_version=False, nodes=None,
-                           flush=True, after_upgrade_call=(), is_last_upgrade=True):
+    def upgrade_to_version(self, tag, mixed_version=False, nodes=None, flush=True):
         """Upgrade Nodes - if *mixed_version* is True, only upgrade those nodes
         that are specified by *nodes*, otherwise ignore *nodes* specified
         and upgrade all nodes.
@@ -205,22 +216,6 @@ class TestUpgradeThroughVersions(Tester):
             node.set_log_level("INFO")
             node.start(wait_other_notice=True)
             node.nodetool('upgradesstables upgrade cf countertable')
-        
-        if is_last_upgrade and after_upgrade_call:
-            # run custom post-upgrade callables
-            for call in after_upgrade_call:
-                call()
-
-        for node in nodes:
-            debug('Checking %s ...' % (node.name))
-            if not mixed_version:
-                self._write_values()
-            self._check_values()
-
-        debug('upgrade.cf should have %d total rows' % (len(self.row_values)))
-            
-        self._increment_counters()
-        self._check_counters()
     
     def _log_current_ver(self, current_tag):
         """
