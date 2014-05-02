@@ -172,11 +172,6 @@ class TestUpgradeThroughVersions(Tester):
         """Upgrade Nodes - if *mixed_version* is True, only upgrade those nodes
         that are specified by *nodes*, otherwise ignore *nodes* specified
         and upgrade all nodes.
-        
-        is_last_upgrade indicates this call is completing a cluster upgrade,
-        either by upgrading all nodes at once, or when the final node is upgraded (for mixed)
-        
-        after_upgrade_call is an optional list of callables which will be run after the upgrade is complete
         """
         debug('Upgrading to ' + tag)
         if not mixed_version:
