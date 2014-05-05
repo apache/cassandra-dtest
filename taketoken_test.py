@@ -3,7 +3,7 @@ import time
 from dtest import Tester, debug
 from assertions import assert_unavailable
 from tools import (create_c1c2_table, insert_c1c2, query_c1c2, retry_till_success,
-                   insert_columns, new_node, no_vnodes)
+                   insert_columns, new_node, no_vnodes, since)
 
 class TestTakeToken(Tester):
 
