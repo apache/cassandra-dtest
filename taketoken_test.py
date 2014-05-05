@@ -7,6 +7,7 @@ from tools import (create_c1c2_table, insert_c1c2, query_c1c2, retry_till_succes
 
 class TestTakeToken(Tester):
 
+    @since('2.0')
     def taketoken_test(self):
         debug("Creating a ring")
         cluster = self.cluster
