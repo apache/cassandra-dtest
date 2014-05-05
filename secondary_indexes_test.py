@@ -211,59 +211,46 @@ class TestSecondaryIndexesOnCollections(Tester):
         cursor = self.patient_cql_connection(node1).cursor()
         self.create_ks(cursor, 'list_index_search', 1)
 
-        stmt = """
-              CREATE TABLE list_index_search.users (
-               user_id uuid PRIMARY KEY,
-               email text,
-               uuids list<uuid>
-              );
-            """
+        stmt = ("CREATE TABLE list_index_search.users ("
+               "user_id uuid PRIMARY KEY,"
+               "email text,"
+               "uuids list<uuid>"
+              ");")
         cursor.execute(stmt)
 
         # no index present yet, make sure there's an error trying to query column
-        stmt = """
-              SELECT * from list_index_search.users where uuids contains {some_uuid}
-            """.format(some_uuid=uuid.uuid4())
+        stmt = ("SELECT * from list_index_search.users where uuids contains {some_uuid}"
+            ).format(some_uuid=uuid.uuid4())
         with self.assertRaisesRegexp(ProgrammingError, 'No indexed columns present in by-columns clause'):
             cursor.execute(stmt)
 
         # add index and query again (even though there are no rows in the table yet)
-        stmt = """
-              CREATE INDEX user_uuids on list_index_search.users (uuids);
-            """
+        stmt = "CREATE INDEX user_uuids on list_index_search.users (uuids);"
         cursor.execute(stmt)
 
-        stmt = """
-              SELECT * from list_index_search.users where uuids contains {some_uuid}
-            """.format(some_uuid=uuid.uuid4())
+        stmt = ("SELECT * from list_index_search.users where uuids contains {some_uuid}").format(some_uuid=uuid.uuid4())
         cursor.execute(stmt)
         self.assertEqual(0, cursor.rowcount)
 
         # add a row which doesn't specify data for the indexed column, and query again
         user1_uuid = uuid.uuid4()
-        stmt = """
-              INSERT INTO list_index_search.users (user_id, email)
-              values ({user_id}, 'test@example.com')
-            """.format(user_id=user1_uuid)
+        stmt = ("INSERT INTO list_index_search.users (user_id, email)"
+              "values ({user_id}, 'test@example.com')"
+            ).format(user_id=user1_uuid)
         cursor.execute(stmt)
 
         time.sleep(5)
-        stmt = """
-              SELECT * from list_index_search.users where uuids contains {some_uuid}
-            """.format(some_uuid=uuid.uuid4())
+        stmt = ("SELECT * from list_index_search.users where uuids contains {some_uuid}").format(some_uuid=uuid.uuid4())
         cursor.execute(stmt)
         self.assertEqual(0, cursor.rowcount)
 
         _id = uuid.uuid4()
         # alter the row to add a single item to the indexed list
-        stmt = """
-              UPDATE list_index_search.users set uuids = [{id}] where user_id = {user_id}
-            """.format(id=_id, user_id=user1_uuid)
+        stmt = ("UPDATE list_index_search.users set uuids = [{id}] where user_id = {user_id}"
+            ).format(id=_id, user_id=user1_uuid)
         cursor.execute(stmt)
 
-        stmt = """
-              SELECT * from list_index_search.users where uuids contains {some_uuid}
-            """.format(some_uuid=_id)
+        stmt = ("SELECT * from list_index_search.users where uuids contains {some_uuid}").format(some_uuid=_id)
         cursor.execute(stmt)
         self.assertEqual(1, cursor.rowcount)
 
@@ -277,10 +264,9 @@ class TestSecondaryIndexesOnCollections(Tester):
             unshared_uuid = uuid.uuid4()
 
             # give each record a unique email address using the int index
-            stmt = """
-                  INSERT INTO list_index_search.users (user_id, email, uuids)
-                  values ({user_uuid}, '{prefix}@example.com', [{s_uuid}, {u_uuid}])
-               """.format(user_uuid=user_uuid, prefix=i, s_uuid=shared_uuid, u_uuid=unshared_uuid)
+            stmt = ("INSERT INTO list_index_search.users (user_id, email, uuids)"
+                  "values ({user_uuid}, '{prefix}@example.com', [{s_uuid}, {u_uuid}])"
+               ).format(user_uuid=user_uuid, prefix=i, s_uuid=shared_uuid, u_uuid=unshared_uuid)
             cursor.execute(stmt)
 
             log.append(
@@ -290,9 +276,7 @@ class TestSecondaryIndexesOnCollections(Tester):
             )
 
         # confirm there is now 50k rows with the 'shared' uuid above in the secondary index
-        stmt = """
-              SELECT * from list_index_search.users where uuids contains {shared_uuid}
-            """.format(shared_uuid=shared_uuid)
+        stmt = ("SELECT * from list_index_search.users where uuids contains {shared_uuid}").format(shared_uuid=shared_uuid)
         cursor.execute(stmt)
         self.assertEqual(50000, cursor.rowcount)
 
@@ -300,9 +284,8 @@ class TestSecondaryIndexesOnCollections(Tester):
         random.shuffle(log)
 
         for log_entry in log[:1000]:
-            stmt = """
-                  SELECT user_id, email, uuids FROM list_index_search.users where uuids contains {unshared_uuid}
-               """.format(unshared_uuid=log_entry['unshared_uuid'])
+            stmt = ("SELECT user_id, email, uuids FROM list_index_search.users where uuids contains {unshared_uuid}"
+                ).format(unshared_uuid=log_entry['unshared_uuid'])
             cursor.execute(stmt)
 
             self.assertEqual(1, cursor.rowcount)
@@ -324,59 +307,42 @@ class TestSecondaryIndexesOnCollections(Tester):
         cursor = self.patient_cql_connection(node1).cursor()
         self.create_ks(cursor, 'set_index_search', 1)
 
-        stmt = """
-              CREATE TABLE set_index_search.users (
-               user_id uuid PRIMARY KEY,
-               email text,
-               uuids set<uuid>
-              );
-            """
+        stmt = ("CREATE TABLE set_index_search.users ("
+               "user_id uuid PRIMARY KEY,"
+               "email text,"
+               "uuids set<uuid>);")
         cursor.execute(stmt)
 
         # no index present yet, make sure there's an error trying to query column
-        stmt = """
-              SELECT * from set_index_search.users where uuids contains {some_uuid}
-            """.format(some_uuid=uuid.uuid4())
+        stmt = ("SELECT * from set_index_search.users where uuids contains {some_uuid}").format(some_uuid=uuid.uuid4())
         with self.assertRaisesRegexp(ProgrammingError, 'No indexed columns present in by-columns clause'):
             cursor.execute(stmt)
 
         # add index and query again (even though there are no rows in the table yet)
-        stmt = """
-              CREATE INDEX user_uuids on set_index_search.users (uuids);
-            """
+        stmt = "CREATE INDEX user_uuids on set_index_search.users (uuids);"
         cursor.execute(stmt)
 
-        stmt = """
-              SELECT * from set_index_search.users where uuids contains {some_uuid}
-            """.format(some_uuid=uuid.uuid4())
+        stmt = ("SELECT * from set_index_search.users where uuids contains {some_uuid}").format(some_uuid=uuid.uuid4())
         cursor.execute(stmt)
         self.assertEqual(0, cursor.rowcount)
 
         # add a row which doesn't specify data for the indexed column, and query again
         user1_uuid = uuid.uuid4()
-        stmt = """
-              INSERT INTO set_index_search.users (user_id, email)
-              values ({user_id}, 'test@example.com')
-            """.format(user_id=user1_uuid)
+        stmt = ("INSERT INTO set_index_search.users (user_id, email) values ({user_id}, 'test@example.com')"
+            ).format(user_id=user1_uuid)
         cursor.execute(stmt)
 
         time.sleep(5)
-        stmt = """
-              SELECT * from set_index_search.users where uuids contains {some_uuid}
-            """.format(some_uuid=uuid.uuid4())
+        stmt = ("SELECT * from set_index_search.users where uuids contains {some_uuid}").format(some_uuid=uuid.uuid4())
         cursor.execute(stmt)
         self.assertEqual(0, cursor.rowcount)
 
         _id = uuid.uuid4()
         # alter the row to add a single item to the indexed set
-        stmt = """
-              UPDATE set_index_search.users set uuids = {{{id}}} where user_id = {user_id}
-            """.format(id=_id, user_id=user1_uuid)
+        stmt = ("UPDATE set_index_search.users set uuids = {{{id}}} where user_id = {user_id}").format(id=_id, user_id=user1_uuid)
         cursor.execute(stmt)
 
-        stmt = """
-              SELECT * from set_index_search.users where uuids contains {some_uuid}
-            """.format(some_uuid=_id)
+        stmt = ("SELECT * from set_index_search.users where uuids contains {some_uuid}").format(some_uuid=_id)
         cursor.execute(stmt)
         self.assertEqual(1, cursor.rowcount)
 
@@ -390,10 +356,9 @@ class TestSecondaryIndexesOnCollections(Tester):
             unshared_uuid = uuid.uuid4()
 
             # give each record a unique email address using the int index
-            stmt = """
-                  INSERT INTO set_index_search.users (user_id, email, uuids)
-                  values ({user_uuid}, '{prefix}@example.com', {{{s_uuid}, {u_uuid}}})
-               """.format(user_uuid=user_uuid, prefix=i, s_uuid=shared_uuid, u_uuid=unshared_uuid)
+            stmt = ("INSERT INTO set_index_search.users (user_id, email, uuids)"
+                  "values ({user_uuid}, '{prefix}@example.com', {{{s_uuid}, {u_uuid}}})"
+                ).format(user_uuid=user_uuid, prefix=i, s_uuid=shared_uuid, u_uuid=unshared_uuid)
             cursor.execute(stmt)
 
             log.append(
@@ -403,9 +368,7 @@ class TestSecondaryIndexesOnCollections(Tester):
             )
 
         # confirm there is now 50k rows with the 'shared' uuid above in the secondary index
-        stmt = """
-              SELECT * from set_index_search.users where uuids contains {shared_uuid}
-            """.format(shared_uuid=shared_uuid)
+        stmt = ("SELECT * from set_index_search.users where uuids contains {shared_uuid}").format(shared_uuid=shared_uuid)
         cursor.execute(stmt)
         self.assertEqual(50000, cursor.rowcount)
 
@@ -413,16 +376,13 @@ class TestSecondaryIndexesOnCollections(Tester):
         random.shuffle(log)
 
         for log_entry in log[:1000]:
-            stmt = """
-                  SELECT user_id, email, uuids FROM set_index_search.users where uuids contains {unshared_uuid}
-               """.format(unshared_uuid=log_entry['unshared_uuid'])
+            stmt = ("SELECT user_id, email, uuids FROM set_index_search.users where uuids contains {unshared_uuid}"
+                ).format(unshared_uuid=log_entry['unshared_uuid'])
             cursor.execute(stmt)
 
             self.assertEqual(1, cursor.rowcount)
 
             db_user_id, db_email, db_uuids = cursor.fetchone()
-            debug(log_entry['unshared_uuid'])
-            debug(db_uuids)
 
             self.assertEqual(db_user_id, log_entry['user_id'])
             self.assertEqual(db_email, log_entry['email'])
@@ -439,66 +399,50 @@ class TestSecondaryIndexesOnCollections(Tester):
         cursor = self.patient_cql_connection(node1).cursor()
         self.create_ks(cursor, 'map_index_search', 1)
 
-        stmt = """
-              CREATE TABLE map_index_search.users (
-               user_id uuid PRIMARY KEY,
-               email text,
-               uuids map<uuid, uuid>
-              );
-            """
+        stmt = ("CREATE TABLE map_index_search.users ("
+               "user_id uuid PRIMARY KEY,"
+               "email text,"
+               "uuids map<uuid, uuid>);")
         cursor.execute(stmt)
 
         # no index present yet, make sure there's an error trying to query column
-        stmt = """
-              SELECT * from map_index_search.users where uuids contains {some_uuid}
-            """.format(some_uuid=uuid.uuid4())
+        stmt = ("SELECT * from map_index_search.users where uuids contains {some_uuid}").format(some_uuid=uuid.uuid4())
         with self.assertRaisesRegexp(ProgrammingError, 'No indexed columns present in by-columns clause'):
             cursor.execute(stmt)
 
-        stmt = """
-              SELECT * from map_index_search.users where uuids contains key {some_uuid}
-            """.format(some_uuid=uuid.uuid4())
+        stmt = ("SELECT * from map_index_search.users where uuids contains key {some_uuid}"
+            ).format(some_uuid=uuid.uuid4())
         with self.assertRaisesRegexp(ProgrammingError, 'No indexed columns present in by-columns clause'):
             cursor.execute(stmt)
 
         # add index on keys and query again (even though there are no rows in the table yet)
-        stmt = """
-              CREATE INDEX user_uuids on map_index_search.users (KEYS(uuids));
-            """
+        stmt = "CREATE INDEX user_uuids on map_index_search.users (KEYS(uuids));"
         cursor.execute(stmt)
 
-        stmt = """
-              SELECT * from map_index_search.users where uuids contains key {some_uuid}
-            """.format(some_uuid=uuid.uuid4())
+        stmt = "SELECT * from map_index_search.users where uuids contains key {some_uuid}".format(some_uuid=uuid.uuid4())
         cursor.execute(stmt)
         self.assertEqual(0, cursor.rowcount)
 
         # add a row which doesn't specify data for the indexed column, and query again
         user1_uuid = uuid.uuid4()
-        stmt = """
-              INSERT INTO map_index_search.users (user_id, email)
-              values ({user_id}, 'test@example.com')
-            """.format(user_id=user1_uuid)
+        stmt = ("INSERT INTO map_index_search.users (user_id, email)"
+              "values ({user_id}, 'test@example.com')"
+            ).format(user_id=user1_uuid)
         cursor.execute(stmt)
 
         time.sleep(5)
-        stmt = """
-              SELECT * from map_index_search.users where uuids contains key {some_uuid}
-            """.format(some_uuid=uuid.uuid4())
+        stmt = ("SELECT * from map_index_search.users where uuids contains key {some_uuid}").format(some_uuid=uuid.uuid4())
         cursor.execute(stmt)
         self.assertEqual(0, cursor.rowcount)
 
         _id = uuid.uuid4()
 
         # alter the row to add a single item to the indexed map
-        stmt = """
-              UPDATE map_index_search.users set uuids = {{{id}:{user_id}}} where user_id = {user_id}
-            """.format(id=_id, user_id=user1_uuid)
+        stmt = ("UPDATE map_index_search.users set uuids = {{{id}:{user_id}}} where user_id = {user_id}"
+            ).format(id=_id, user_id=user1_uuid)
         cursor.execute(stmt)
 
-        stmt = """
-              SELECT * from map_index_search.users where uuids contains key {some_uuid}
-            """.format(some_uuid=_id)
+        stmt = ("SELECT * from map_index_search.users where uuids contains key {some_uuid}").format(some_uuid=_id)
         cursor.execute(stmt)
         self.assertEqual(1, cursor.rowcount)
 
@@ -513,10 +457,9 @@ class TestSecondaryIndexesOnCollections(Tester):
             unshared_uuid2 = uuid.uuid4()
 
             # give each record a unique email address using the int index, add unique ids for keys and values
-            stmt = """
-                  INSERT INTO map_index_search.users (user_id, email, uuids)
-                  values ({user_uuid}, '{prefix}@example.com', {{{u_uuid1}:{u_uuid2}, {s_uuid}:{s_uuid}}})
-               """.format(user_uuid=user_uuid, prefix=i, s_uuid=shared_uuid, u_uuid1=unshared_uuid1, u_uuid2=unshared_uuid2)
+            stmt = ("INSERT INTO map_index_search.users (user_id, email, uuids)"
+                  "values ({user_uuid}, '{prefix}@example.com', {{{u_uuid1}:{u_uuid2}, {s_uuid}:{s_uuid}}})"
+                ).format(user_uuid=user_uuid, prefix=i, s_uuid=shared_uuid, u_uuid1=unshared_uuid1, u_uuid2=unshared_uuid2)
             cursor.execute(stmt)
 
             log.append(
@@ -527,9 +470,8 @@ class TestSecondaryIndexesOnCollections(Tester):
             )
 
         # confirm there is now 50k rows with the 'shared' uuid above in the secondary index
-        stmt = """
-              SELECT * from map_index_search.users where uuids contains key {shared_uuid}
-            """.format(shared_uuid=shared_uuid)
+        stmt = ("SELECT * from map_index_search.users where uuids contains key {shared_uuid}"
+            ).format(shared_uuid=shared_uuid)
         cursor.execute(stmt)
         self.assertEqual(50000, cursor.rowcount)
 
@@ -537,9 +479,8 @@ class TestSecondaryIndexesOnCollections(Tester):
         random.shuffle(log)
 
         for log_entry in log[:1000]:
-            stmt = """
-                  SELECT user_id, email, uuids FROM map_index_search.users where uuids contains key {unshared_uuid1}
-               """.format(unshared_uuid1=log_entry['unshared_uuid1'])
+            stmt = ("SELECT user_id, email, uuids FROM map_index_search.users where uuids contains key {unshared_uuid1}"
+                ).format(unshared_uuid1=log_entry['unshared_uuid1'])
             cursor.execute(stmt)
 
             self.assertEqual(1, cursor.rowcount)
@@ -553,22 +494,16 @@ class TestSecondaryIndexesOnCollections(Tester):
             self.assertTrue(log_entry['unshared_uuid1'] in db_uuids)
 
         # attempt to add an index on map values as well (should fail)
-        stmt = """
-              CREATE INDEX user_uuids on map_index_search.users (uuids);
-            """
+        stmt = "CREATE INDEX user_uuids on map_index_search.users (uuids);"
         with self.assertRaisesRegexp(ProgrammingError, """Bad Request: Cannot create index on uuids values, an index on uuids keys already exists and indexing a map on both keys and values at the same time is not currently supported"""):
             cursor.execute(stmt)
 
         # since cannot have index on map keys and values remove current index on keys
-        stmt = """
-              DROP INDEX user_uuids;
-            """
+        stmt = "DROP INDEX user_uuids;"
         cursor.execute(stmt)  
         
         # add index on values (will index rows added prior)
-        stmt = """
-              CREATE INDEX user_uids on map_index_search.users (uuids);
-            """
+        stmt = "CREATE INDEX user_uids on map_index_search.users (uuids);"
         cursor.execute(stmt)
 
         # shuffle the log in-place, and double-check a slice of records by querying the secondary index
@@ -578,18 +513,13 @@ class TestSecondaryIndexesOnCollections(Tester):
 
         # since we already inserted unique ids for values as well, check that appropriate recors are found
         for log_entry in log[:1000]:
-            stmt = """
-                  SELECT user_id, email, uuids FROM map_index_search.users where uuids contains {unshared_uuid2}
-               """.format(unshared_uuid2=log_entry['unshared_uuid2'])
-            debug(stmt)
-            cursor.execute(stmt)
+            stmt = ("SELECT user_id, email, uuids FROM map_index_search.users where uuids contains {unshared_uuid2}"
+                ).format(unshared_uuid2=log_entry['unshared_uuid2'])
 
+            cursor.execute(stmt)
             self.assertEqual(1, cursor.rowcount)
 
             db_user_id, db_email, db_uuids = cursor.fetchone()
-
-            debug(db_uuids)
-
             self.assertEqual(db_user_id, log_entry['user_id'])
             self.assertEqual(db_email, log_entry['email'])
 
