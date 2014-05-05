@@ -3938,13 +3938,13 @@ class TestCQL(Tester):
         cursor.execute("INSERT INTO tmap(k, m) VALUES (0, {'foo' : 'bar'})")
         assert_invalid(cursor, "DELETE FROM tmap WHERE k=0 IF m[null] = 'foo'")
         assert_one(cursor, "DELETE FROM tmap WHERE k=0 IF m['foo'] = 'foo'", [False, {'foo' : 'bar'}])
+        assert_one(cursor, "DELETE FROM tmap WHERE k=0 IF m['foo'] = null", [False, {'foo' : 'bar'}])
         assert_one(cursor, "SELECT * FROM tmap", [0, {'foo' : 'bar'}])
 
         assert_one(cursor, "DELETE FROM tmap WHERE k=0 IF m['foo'] = 'bar'", [True])
         assert_none(cursor, "SELECT * FROM tmap")
 
         cursor.execute("INSERT INTO tmap(k, m) VALUES (1, {'foo' : 'bar', 'bar' : 'foo'})")
-        # TODO: Fix that
         assert_one(cursor, "DELETE FROM tmap WHERE k=1 IF m['foo'] = 'bar' AND m['bar'] = 'bar'", [False, {'foo' : 'bar', 'bar' : 'foo'}])
         assert_one(cursor, "DELETE FROM tmap WHERE k=1 IF m['foo'] = 'bar' AND m['bar'] = 'foo'", [True])
         assert_none(cursor, "SELECT * FROM tmap")
@@ -3961,6 +3961,7 @@ class TestCQL(Tester):
         assert_invalid(cursor, "DELETE FROM tlist WHERE k=0 IF l[null] = 'foobar'")
         assert_invalid(cursor, "DELETE FROM tlist WHERE k=0 IF l[-2] = 'foobar'")
         assert_invalid(cursor, "DELETE FROM tlist WHERE k=0 IF l[3] = 'foobar'")
+        assert_one(cursor, "DELETE FROM tlist WHERE k=0 IF l[1] = null", [False, ('foo', 'bar', 'foobar')])
         assert_one(cursor, "DELETE FROM tlist WHERE k=0 IF l[1] = 'foobar'", [False, ('foo', 'bar', 'foobar')])
         assert_one(cursor, "SELECT * FROM tlist", [0, ('foo', 'bar', 'foobar')])
 
