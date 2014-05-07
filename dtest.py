@@ -223,10 +223,10 @@ class Tester(TestCase):
         logs = [ (node.name, node.logfilename()) for node in self.cluster.nodes.values() ]
         if len(logs) is not 0:
             basedir = str(int(time.time() * 1000))
-            dir = os.path.join(directory, basedir)
-            os.mkdir(dir)
+            logdir = os.path.join(directory, basedir)
+            os.mkdir(logdir)
             for n, log in logs:
-                shutil.copyfile(log, os.path.join(dir, n + ".log"))
+                shutil.copyfile(log, os.path.join(logdir, n + ".log"))
             if os.path.exists(name):
                 os.unlink(name)
             os.symlink(basedir, name)
