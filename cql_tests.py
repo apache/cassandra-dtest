@@ -4053,4 +4053,4 @@ class TestCQL(Tester):
         cursor.execute("INSERT INTO test(k1, k2, v) VALUES (2, 1, 8)")
         cursor.execute("INSERT INTO test(k1, k2, v) VALUES (3, 0, 1)")
 
-        assert_all(cursor, "SELECT * FROM test WHERE k2 = 0 AND v >= 2 ALLOW FILTERING", [[0, 0, 3], [1, 0, 4], [2, 0, 7]]);
+        assert_all(cursor, "SELECT * FROM test WHERE k2 = 0 AND v >= 2 ALLOW FILTERING", [[2, 0, 7], [0, 0, 3], [1, 0, 4]]);
