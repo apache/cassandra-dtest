@@ -35,6 +35,7 @@ KEEP_LOGS = os.environ.get('KEEP_LOGS', '').lower() in ('yes', 'true')
 KEEP_TEST_DIR = os.environ.get('KEEP_TEST_DIR', '').lower() in ('yes', 'true')
 PRINT_DEBUG = os.environ.get('PRINT_DEBUG', '').lower() in ('yes', 'true')
 DISABLE_VNODES = os.environ.get('DISABLE_VNODES', '').lower() in ('yes', 'true')
+OFFHEAP_MEMTABLES = os.environ.get('OFFHEAP_MEMTABLES', '').lower() in ('yes', 'true')
 
 CURRENT_TEST = ""
 
@@ -100,6 +101,11 @@ class Tester(TestCase):
                 cluster.set_configuration_options(values={'num_tokens': None})
             else:
                 cluster.set_configuration_options(values={'initial_token': None, 'num_tokens': 256})
+
+        if cluster.version() >= "2.1":
+            if OFFHEAP_MEMTABLES:
+                cluster.set_configuration_options(values={'memtable_allocation_type': 'offheap_objects'})
+
         return cluster
 
     def _cleanup_cluster(self):
