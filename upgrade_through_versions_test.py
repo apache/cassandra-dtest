@@ -385,7 +385,6 @@ class PointToPointUpgradeBase(TestUpgradeThroughVersions):
         # try and add a new node
         self.upgrade_scenario(after_upgrade_call=(self._bootstrap_new_node,))
     
-    @not_implemented # need to figure out how to properly bootstrap a node into multi-dc
     @unittest.skipIf(DISABLE_VNODES, "vnodes disabled for this test run")
     def shuffle_multidc_test(self):
         # go from non-vnodes to vnodes, and run shuffle to distribute the data.
@@ -395,7 +394,6 @@ class PointToPointUpgradeBase(TestUpgradeThroughVersions):
         self._multidc_schema_create()
         self.upgrade_scenario(populate=False, create_schema=False, after_upgrade_call=(self._shuffle,))
     
-    @not_implemented # need to figure out how to properly bootstrap a node into multi-dc
     def bootstrap_multidc_test(self):
         # try and add a new node
         # multi dc, 2 nodes in each dc
