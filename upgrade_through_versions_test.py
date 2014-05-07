@@ -109,7 +109,7 @@ class TestUpgradeThroughVersions(Tester):
         """Only upgrade part of the cluster, so we have mixed versions part way through."""
         self.upgrade_scenario(mixed_version=True)
 
-    def upgrade_scenario(self, populate=True, create_schema=True, mixed_version=False, flush=True, after_upgrade_call=()):
+    def upgrade_scenario(self, populate=True, create_schema=True, mixed_version=False, after_upgrade_call=()):
         # Record the rows we write as we go:
         self.row_values = set()
         cluster = self.cluster
@@ -143,7 +143,7 @@ class TestUpgradeThroughVersions(Tester):
                     self._write_values()
                     self._increment_counters()
                     
-                    self.upgrade_to_version(tag, mixed_version=True, nodes=(node,), flush=flush)
+                    self.upgrade_to_version(tag, mixed_version=True, nodes=(node,))
                     
                     self._check_values()
                     self._check_counters()
@@ -154,7 +154,7 @@ class TestUpgradeThroughVersions(Tester):
                 self._write_values()
                 self._increment_counters()
                 
-                self.upgrade_to_version(tag, flush=flush)
+                self.upgrade_to_version(tag)
                 
                 self._check_values()
                 self._check_counters()
@@ -168,7 +168,7 @@ class TestUpgradeThroughVersions(Tester):
             
         cluster.stop()
 
-    def upgrade_to_version(self, tag, mixed_version=False, nodes=None, flush=True):
+    def upgrade_to_version(self, tag, mixed_version=False, nodes=None):
         """Upgrade Nodes - if *mixed_version* is True, only upgrade those nodes
         that are specified by *nodes*, otherwise ignore *nodes* specified
         and upgrade all nodes.
@@ -176,18 +176,11 @@ class TestUpgradeThroughVersions(Tester):
         debug('Upgrading to ' + tag)
         if not mixed_version:
             nodes = self.cluster.nodelist()
-
-        # Shutdown nodes
-        for node in nodes:
-            debug('Prepping node for shutdown: ' + node.name)
-            if flush:
-                node.flush()
         
         for node in nodes:
             debug('Shutting down node: ' + node.name)
-            if flush:
-                node.drain()
-                node.watch_log_for("DRAINED")
+            node.drain()
+            node.watch_log_for("DRAINED")
             node.stop(wait_other_notice=False)
 
         # when going from a pre-vnodes to vnodes version, make the proper settings.
