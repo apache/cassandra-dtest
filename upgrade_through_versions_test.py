@@ -267,7 +267,7 @@ class TestUpgradeThroughVersions(Tester):
                 self.assertEqual(str(x), v)
 
     def _increment_counters(self, seconds=15):
-        debug("incrementing counter for {time} seconds")
+        debug("incrementing counter for {time} seconds".format(time=seconds))
         cursor = self.patient_cql_connection(self.node2).cursor()
         cursor.execute("use upgrade;")
         
