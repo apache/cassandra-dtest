@@ -66,6 +66,7 @@ class TestCounters(Tester):
             query = query +  "WITH compression_parameters:sstable_compression='SnappyCompressor'"
 
         cursor.execute(query)
+        time.sleep(2)
 
         keys = range(0, 4)
         updates = 50
@@ -105,7 +106,7 @@ class TestCounters(Tester):
             for i in range(0, 2):
                 time.sleep(.2)
                 nodes[i].nodetool("drain")
-                nodes[i].stop(wait_other_notice=True)
+                nodes[i].stop(wait_other_notice=False)
                 nodes[i].start(wait_other_notice=True)
                 time.sleep(.2)
 
