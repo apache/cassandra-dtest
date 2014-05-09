@@ -109,7 +109,7 @@ class TestUpgradeThroughVersions(Tester):
         """Only upgrade part of the cluster, so we have mixed versions part way through."""
         self.upgrade_scenario(mixed_version=True)
 
-    def upgrade_scenario(self, populate=True, create_schema=True, mixed_version=False, flush=True, after_upgrade_call=()):
+    def upgrade_scenario(self, populate=True, create_schema=True, mixed_version=False, after_upgrade_call=()):
         # Record the rows we write as we go:
         self.row_values = set()
         cluster = self.cluster
@@ -133,55 +133,54 @@ class TestUpgradeThroughVersions(Tester):
             debug("Skipping schema creation (should already be built)")
         time.sleep(5) #sigh...
             
-        self._write_values()
-        self._increment_counters()
-
         self._log_current_ver(self.test_versions[0])
         
         # upgrade through versions
         for tag in self.test_versions[1:]:
             if mixed_version:
                 for num, node in enumerate(self.cluster.nodelist()):
-                    self.upgrade_to_version(
-                        tag, mixed_version=True, nodes=(node,), flush=flush,
-                        after_upgrade_call=after_upgrade_call,
-                        is_last_upgrade=bool(node == self.cluster.nodelist()[-1]))
+                    # do a write and check for each new node as upgraded
+                    self._write_values()
+                    self._increment_counters()
+                    
+                    self.upgrade_to_version(tag, mixed_version=True, nodes=(node,))
+                    
+                    self._check_values()
+                    self._check_counters()
+                    
                     debug('Successfully upgraded %d of %d nodes to %s' % 
                           (num+1, len(self.cluster.nodelist()), tag))
             else:
-                self.upgrade_to_version(tag, flush=flush,
-                    after_upgrade_call=after_upgrade_call, is_last_upgrade=True)
+                self._write_values()
+                self._increment_counters()
+                
+                self.upgrade_to_version(tag)
+                
+                self._check_values()
+                self._check_counters()
+                
+            # run custom post-upgrade callables
+            for call in after_upgrade_call:
+                call()
+                
             debug('All nodes successfully upgraded to %s' % tag)
             self._log_current_ver(tag)
             
         cluster.stop()
 
-    def upgrade_to_version(self, tag, mixed_version=False, nodes=None,
-                           flush=True, after_upgrade_call=(), is_last_upgrade=True):
+    def upgrade_to_version(self, tag, mixed_version=False, nodes=None):
         """Upgrade Nodes - if *mixed_version* is True, only upgrade those nodes
         that are specified by *nodes*, otherwise ignore *nodes* specified
         and upgrade all nodes.
-        
-        is_last_upgrade indicates this call is completing a cluster upgrade,
-        either by upgrading all nodes at once, or when the final node is upgraded (for mixed)
-        
-        after_upgrade_call is an optional list of callables which will be run after the upgrade is complete
         """
         debug('Upgrading to ' + tag)
         if not mixed_version:
             nodes = self.cluster.nodelist()
-
-        # Shutdown nodes
-        for node in nodes:
-            debug('Prepping node for shutdown: ' + node.name)
-            if flush:
-                node.flush()
         
         for node in nodes:
             debug('Shutting down node: ' + node.name)
-            if flush:
-                node.drain()
-                node.watch_log_for("DRAINED")
+            node.drain()
+            node.watch_log_for("DRAINED")
             node.stop(wait_other_notice=False)
 
         # when going from a pre-vnodes to vnodes version, make the proper settings.
@@ -205,22 +204,6 @@ class TestUpgradeThroughVersions(Tester):
             node.set_log_level("INFO")
             node.start(wait_other_notice=True)
             node.nodetool('upgradesstables upgrade cf countertable')
-        
-        if is_last_upgrade and after_upgrade_call:
-            # run custom post-upgrade callables
-            for call in after_upgrade_call:
-                call()
-
-        for node in nodes:
-            debug('Checking %s ...' % (node.name))
-            if not mixed_version:
-                self._write_values()
-            self._check_values()
-
-        debug('upgrade.cf should have %d total rows' % (len(self.row_values)))
-            
-        self._increment_counters()
-        self._check_counters()
     
     def _log_current_ver(self, current_tag):
         """
@@ -258,7 +241,7 @@ class TestUpgradeThroughVersions(Tester):
                 CREATE TABLE countertable (k text PRIMARY KEY, c counter)
                 WITH default_validation=CounterColumnType;""")
 
-    def _write_values(self, num=100, consistency_level='ALL'):
+    def _write_values(self, num=100):
         cursor = self.patient_cql_connection(self.node2).cursor()
         cursor.execute("use upgrade")
         for i in xrange(num):
@@ -276,43 +259,38 @@ class TestUpgradeThroughVersions(Tester):
                 self.assertEqual(x, k)
                 self.assertEqual(str(x), v)
 
-    def _increment_counters(self, timeout=300):
-        debug("incrementing counter...")
+    def _increment_counters(self, seconds=15):
+        debug("incrementing counter for {time} seconds".format(time=seconds))
         cursor = self.patient_cql_connection(self.node2).cursor()
         cursor.execute("use upgrade;")
         
-        fail_count = 0
         update_counter_query = ("UPDATE countertable SET c = c + 1 WHERE k='{key}'")
         
         uuids = [uuid.uuid4() for i in range(100)]
         self.expected_counts = defaultdict(int)
         
-        expiry=time.time()+timeout
-        for i in range(5000):
+        expiry=time.time()+seconds
+        while time.time() < expiry:
             counter_key = random.choice(uuids)
             
             try:
                 cursor.execute( update_counter_query.format(key=counter_key) )
             except OperationalError:
-                fail_count += 1
+                pass
             else:
                 self.expected_counts[counter_key] += 1
             
-            if time.time() > expiry:
-                debug("Timeout incrementing counters. May cause test failure.")
-                break
-            
-        # make sure at least half succeeded
-        assert sum(self.expected_counts.values()) > 2500
+        # make sure 100 succeeded
+        assert sum(self.expected_counts.values()) > 100
 
-    def _check_counters(self):
+    def _check_counters(self, consistency_level='ALL'):
         debug("Checking counter values...")
         cursor = self.patient_cql_connection(self.node2).cursor()
         cursor.execute("use upgrade;")
         
-        for counter_key, value in self.expected_counts.items():        
-            cursor.execute("SELECT c from countertable where k='{key}';".format(key=counter_key))
-            res = cursor.fetchall()[0][0]
+        for counter_key, value in self.expected_counts.items():
+            cursor.execute("SELECT c from countertable where k='{key}';".format(key=counter_key), consistency_level=consistency_level)
+            res = cursor.fetchone()[0]
             assert res == value, "Counter not at expected value."
 
 
