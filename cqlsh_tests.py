@@ -278,11 +278,90 @@ UPDATE varcharmaptable SET varcharvarintmap['Vitrum edere possum, mihi non nocet
         self.assertEquals(output.count(' ⠊⠀⠉⠁⠝⠀⠑⠁⠞⠀⠛⠇⠁⠎⠎⠀⠁⠝⠙⠀⠊⠞⠀⠙⠕⠑⠎⠝⠞⠀⠓⠥⠗⠞⠀⠍⠑'), 16)
         self.assertEquals(output.count('᚛᚛ᚉᚑᚅᚔᚉᚉᚔᚋ ᚔᚈᚔ ᚍᚂᚐᚅᚑ ᚅᚔᚋᚌᚓᚅᚐ᚜'), 2)
 
+    def test_with_empty_values(self):
+        """
+        CASSANDRA-7196. Make sure the server returns empty values and CQLSH prints them properly
+        """
+        self.cluster.populate(1)
+        self.cluster.start()
+
+        node1, = self.cluster.nodelist()
+
+        node1.run_cqlsh(cmds = u"""create keyspace  CASSANDRA_7196 WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1} ;
+
+use CASSANDRA_7196;
+
+CREATE TABLE has_all_types (
+    num int PRIMARY KEY,
+    intcol int,
+    asciicol ascii,
+    bigintcol bigint,
+    blobcol blob,
+    booleancol boolean,
+    decimalcol decimal,
+    doublecol double,
+    floatcol float,
+    textcol text,
+    timestampcol timestamp,
+    uuidcol uuid,
+    varcharcol varchar,
+    varintcol varint
+) WITH compression = {'sstable_compression':'LZ4Compressor'};
+
+INSERT INTO has_all_types (num, intcol, asciicol, bigintcol, blobcol, booleancol,
+                           decimalcol, doublecol, floatcol, textcol,
+                           timestampcol, uuidcol, varcharcol, varintcol)
+VALUES (0, -12, 'abcdefg', 1234567890123456789, 0x000102030405fffefd, true,
+        19952.11882, 1.0, -2.1, 'Voilá!', '2012-05-14 12:53:20+0000',
+        bd1924e1-6af8-44ae-b5e1-f24131dbd460, '"', 10000000000000000000000000);
+
+INSERT INTO has_all_types (num, intcol, asciicol, bigintcol, blobcol, booleancol,
+                           decimalcol, doublecol, floatcol, textcol,
+                           timestampcol, uuidcol, varcharcol, varintcol)
+VALUES (1, 2147483647, '__!''$#@!~"', 9223372036854775807, 0xffffffffffffffffff, true,
+        0.00000000000001, 9999999.999, 99999.99, '∭Ƕ⑮ฑ➳❏''', '1900-01-01+0000',
+        ffffffff-ffff-ffff-ffff-ffffffffffff, 'newline->
+<-', 9);
+
+INSERT INTO has_all_types (num, intcol, asciicol, bigintcol, blobcol, booleancol,
+                           decimalcol, doublecol, floatcol, textcol,
+                           timestampcol, uuidcol, varcharcol, varintcol)
+VALUES (2, 0, '', 0, 0x, false,
+        0.0, 0.0, 0.0, '', 0,
+        00000000-0000-0000-0000-000000000000, '', 0);
+
+INSERT INTO has_all_types (num, intcol, asciicol, bigintcol, blobcol, booleancol,
+                           decimalcol, doublecol, floatcol, textcol,
+                           timestampcol, uuidcol, varcharcol, varintcol)
+VALUES (3, -2147483648, '''''''', -9223372036854775808, 0x80, false,
+        10.0000000000000, -1004.10, 100000000.9, '龍馭鬱', '2038-01-19T03:14-1200',
+        ffffffff-ffff-1fff-8fff-ffffffffffff, '''', -10000000000000000000000000);
+
+INSERT INTO has_all_types (num, intcol, asciicol, bigintcol, blobcol, booleancol,
+                           decimalcol, doublecol, floatcol, textcol,
+                           timestampcol, uuidcol, varcharcol, varintcol)
+VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDecimal(0x),
+        blobAsDouble(0x), blobAsFloat(0x), '', blobAsTimestamp(0x), blobAsUuid(0x), '',
+        blobAsVarint(0x))""".encode("utf-8"))
+
+        output = self.run_cqlsh(node1, "select intcol, bigintcol, varintcol from CASSANDRA_7196.has_all_types where num in (0, 1, 2, 3, 4)")
+
+        expected = """
+ intcol      | bigintcol            | varintcol
+-------------+----------------------+-----------------------------
+         -12 |  1234567890123456789 |  10000000000000000000000000
+  2147483647 |  9223372036854775807 |                           9
+           0 |                    0 |                           0
+ -2147483648 | -9223372036854775808 | -10000000000000000000000000
+             |                      |                            \n\n(5 rows)"""
+
+        self.assertTrue(expected in output, "Output \n {%s} \n doesn't contain expected\n {%s}" % (output, expected))
 
     def run_cqlsh(self, node, cmds, cqlsh_options=[]):
         cdir = node.get_cassandra_dir()
         cli = os.path.join(cdir, 'bin', 'cqlsh')
         env = common.make_cassandra_env(cdir, node.get_path())
+        env['LANG'] = 'en_US.UTF-8'
         if LooseVersion(self.cluster.version()) >= LooseVersion('2.1'):
             host = node.network_interfaces['binary'][0]
             port = node.network_interfaces['binary'][1]
@@ -295,5 +374,4 @@ UPDATE varcharmaptable SET varcharvarintmap['Vitrum edere possum, mihi non nocet
         for cmd in cmds.split(';'):
             p.stdin.write(cmd + ';\n')
         p.stdin.write("quit;\n")
-        p.wait()
-        return p.stdout.read()
+        return p.communicate()[0]
