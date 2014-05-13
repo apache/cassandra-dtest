@@ -365,6 +365,9 @@ class PointToPointUpgradeBase(TestUpgradeThroughVersions):
 
             debug("moving cluster to vnodes")
             self.cluster.set_configuration_options(values={'initial_token': None, 'num_tokens': 10})
+            
+            # just a hacky way to get the topology set again, since it seems to get lost
+            self.cluster.set_cassandra_dir(cassandra_dir=self.cluster.get_cassandra_dir())
 
             # Restart nodes on new version
             for node in self.cluster.nodelist():
