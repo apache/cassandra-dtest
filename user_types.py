@@ -16,17 +16,17 @@ def decode_text(string):
     return string.decode('utf-8')
 
 def len_unpacker(val):
-    return struct.Struct('>H').unpack(val)[0]
+    return struct.Struct('>i').unpack(val)[0]
 
 def unpack(bytestr):
     # The composite format for each component is:
-    #   <len>   <value>   <eoc>
-    # 2 bytes | ? bytes | 1 byte
+    #   <len>   <value>
+    # 4 bytes | <len> bytes
     components = []
     while bytestr:
-        length = len_unpacker(bytestr[:2])
-        components.append(decode_text(bytestr[2:2 + length]))
-        bytestr = bytestr[3 + length:]
+        length = len_unpacker(bytestr[:4])
+        components.append(decode_text(bytestr[4:4 + length]))
+        bytestr = bytestr[4 + length:]
     return tuple(components)
 
 def decode(item):
@@ -55,147 +55,148 @@ class TestUserTypes(Tester):
     def __init__(self, *args, **kwargs):
         Tester.__init__(self, *args, **kwargs)
 
-    @since('2.1')
-    def test_type_renaming(self):
-      """
-      Confirm that types can be renamed and the proper associations are updated.
-      """
-      cluster = self.cluster
-      cluster.populate(3).start()
-      node1, node2, node3 = cluster.nodelist()
-      cursor = self.patient_cql_connection(node1).cursor()
-      self.create_ks(cursor, 'user_type_renaming', 2)
+    # We've removed type renaming for now (CASSANDRA-6940)
+    #@since('2.1')
+    #def test_type_renaming(self):
+    #  """
+    #  Confirm that types can be renamed and the proper associations are updated.
+    #  """
+    #  cluster = self.cluster
+    #  cluster.populate(3).start()
+    #  node1, node2, node3 = cluster.nodelist()
+    #  cursor = self.patient_cql_connection(node1).cursor()
+    #  self.create_ks(cursor, 'user_type_renaming', 2)
 
-      stmt = """
-            CREATE TYPE simple_type (
-            user_number int
-            )
-         """
-      cursor.execute(stmt)
+    #  stmt = """
+    #        CREATE TYPE simple_type (
+    #        user_number int
+    #        )
+    #     """
+    #  cursor.execute(stmt)
 
-      stmt = """
-            CREATE TABLE simple_table (
-            id uuid PRIMARY KEY,
-            number simple_type
-            )
-         """
-      cursor.execute(stmt)
+    #  stmt = """
+    #        CREATE TABLE simple_table (
+    #        id uuid PRIMARY KEY,
+    #        number simple_type
+    #        )
+    #     """
+    #  cursor.execute(stmt)
 
-      stmt = """
-          ALTER TYPE simple_type rename to renamed_type;
-         """
-      cursor.execute(stmt)
+    #  stmt = """
+    #      ALTER TYPE simple_type rename to renamed_type;
+    #     """
+    #  cursor.execute(stmt)
 
-      stmt = """
-          SELECT type_name from system.schema_usertypes;
-         """
-      cursor.execute(stmt)
-      # we should only have one user type in this test
-      self.assertEqual(1, cursor.rowcount)
+    #  stmt = """
+    #      SELECT type_name from system.schema_usertypes;
+    #     """
+    #  cursor.execute(stmt)
+    #  # we should only have one user type in this test
+    #  self.assertEqual(1, cursor.rowcount)
 
-      # finally let's look for the new type name
-      self.assertEqual(cursor.fetchone()[0], u'renamed_type')
+    #  # finally let's look for the new type name
+    #  self.assertEqual(cursor.fetchone()[0], u'renamed_type')
 
-    @since('2.1')
-    def test_nested_type_renaming(self):
-        """
-        Confirm type renaming works as expected on nested types.
-        """
-        cluster = self.cluster
-        cluster.populate(3).start()
-        node1, node2, node3 = cluster.nodelist()
-        cursor = self.patient_cql_connection(node1).cursor()
-        self.create_ks(cursor, 'nested_user_type_renaming', 2)
+    #@since('2.1')
+    #def test_nested_type_renaming(self):
+    #    """
+    #    Confirm type renaming works as expected on nested types.
+    #    """
+    #    cluster = self.cluster
+    #    cluster.populate(3).start()
+    #    node1, node2, node3 = cluster.nodelist()
+    #    cursor = self.patient_cql_connection(node1).cursor()
+    #    self.create_ks(cursor, 'nested_user_type_renaming', 2)
 
-        stmt = """
-              USE nested_user_type_renaming
-           """
-        cursor.execute(stmt)
+    #    stmt = """
+    #          USE nested_user_type_renaming
+    #       """
+    #    cursor.execute(stmt)
 
-        stmt = """
-              CREATE TYPE simple_type (
-              user_number int,
-              user_text text
-              )
-           """
-        cursor.execute(stmt)
+    #    stmt = """
+    #          CREATE TYPE simple_type (
+    #          user_number int,
+    #          user_text text
+    #          )
+    #       """
+    #    cursor.execute(stmt)
 
-        stmt = """
-              CREATE TYPE another_type (
-              somefield simple_type
-              )
-           """
-        cursor.execute(stmt)
+    #    stmt = """
+    #          CREATE TYPE another_type (
+    #          somefield simple_type
+    #          )
+    #       """
+    #    cursor.execute(stmt)
 
-        stmt = """
-              CREATE TYPE yet_another_type (
-              some_other_field another_type
-              )
-           """
-        cursor.execute(stmt)
+    #    stmt = """
+    #          CREATE TYPE yet_another_type (
+    #          some_other_field another_type
+    #          )
+    #       """
+    #    cursor.execute(stmt)
 
-        stmt = """
-              CREATE TABLE uses_nested_type (
-              id uuid PRIMARY KEY,
-              field_name yet_another_type
-              )
-           """
-        cursor.execute(stmt)
+    #    stmt = """
+    #          CREATE TABLE uses_nested_type (
+    #          id uuid PRIMARY KEY,
+    #          field_name yet_another_type
+    #          )
+    #       """
+    #    cursor.execute(stmt)
 
-        # let's insert some basic data using the nested types
-        _id = uuid.uuid4()
-        stmt = """
-              INSERT INTO uses_nested_type (id, field_name)
-              VALUES (%s, {some_other_field: {somefield: {user_number: 1, user_text: 'original'}}});
-           """ % _id
-        cursor.execute(stmt)
+    #    # let's insert some basic data using the nested types
+    #    _id = uuid.uuid4()
+    #    stmt = """
+    #          INSERT INTO uses_nested_type (id, field_name)
+    #          VALUES (%s, {some_other_field: {somefield: {user_number: 1, user_text: 'original'}}});
+    #       """ % _id
+    #    cursor.execute(stmt)
 
-        # rename one of the types used in the nesting
-        stmt = """
-              ALTER TYPE another_type rename to another_type2;
-           """
-        cursor.execute(stmt)
+    #    # rename one of the types used in the nesting
+    #    stmt = """
+    #          ALTER TYPE another_type rename to another_type2;
+    #       """
+    #    cursor.execute(stmt)
 
-        # confirm nested data can be queried without error
-        stmt = """
-              SELECT field_name FROM uses_nested_type where id = {id}
-           """.format(id=_id)
-        cursor.execute(stmt)
+    #    # confirm nested data can be queried without error
+    #    stmt = """
+    #          SELECT field_name FROM uses_nested_type where id = {id}
+    #       """.format(id=_id)
+    #    cursor.execute(stmt)
 
-        data = cursor.fetchone()[0]
-        self.assertIn('original', data)
+    #    data = cursor.fetchone()[0]
+    #    self.assertIn('original', data)
 
-        # confirm we can alter/query the data after altering the type
-        stmt = """
-              UPDATE uses_nested_type
-              SET field_name = {some_other_field: {somefield: {user_number: 2, user_text: 'altered'}}}
-              WHERE id=%s;
-           """ % _id
-        cursor.execute(stmt)
+    #    # confirm we can alter/query the data after altering the type
+    #    stmt = """
+    #          UPDATE uses_nested_type
+    #          SET field_name = {some_other_field: {somefield: {user_number: 2, user_text: 'altered'}}}
+    #          WHERE id=%s;
+    #       """ % _id
+    #    cursor.execute(stmt)
 
-        stmt = """
-              SELECT field_name FROM uses_nested_type where id = {id}
-           """.format(id=_id)
-        cursor.execute(stmt)
+    #    stmt = """
+    #          SELECT field_name FROM uses_nested_type where id = {id}
+    #       """.format(id=_id)
+    #    cursor.execute(stmt)
 
-        data = cursor.fetchone()[0]
-        self.assertIn('altered', data)
+    #    data = cursor.fetchone()[0]
+    #    self.assertIn('altered', data)
 
-        # and confirm we can add/query new data after the type rename
-        _id = uuid.uuid4()
-        stmt = """
-              INSERT INTO uses_nested_type (id, field_name)
-              VALUES (%s, {some_other_field: {somefield: {user_number: 1, user_text: 'inserted'}}});
-           """ % _id
-        cursor.execute(stmt)
+    #    # and confirm we can add/query new data after the type rename
+    #    _id = uuid.uuid4()
+    #    stmt = """
+    #          INSERT INTO uses_nested_type (id, field_name)
+    #          VALUES (%s, {some_other_field: {somefield: {user_number: 1, user_text: 'inserted'}}});
+    #       """ % _id
+    #    cursor.execute(stmt)
 
-        stmt = """
-              SELECT field_name FROM uses_nested_type where id = {id}
-           """.format(id=_id)
-        cursor.execute(stmt)
+    #    stmt = """
+    #          SELECT field_name FROM uses_nested_type where id = {id}
+    #       """.format(id=_id)
+    #    cursor.execute(stmt)
 
-        data = cursor.fetchone()[0]
-        self.assertIn('inserted', data)
+    #    data = cursor.fetchone()[0]
+    #    self.assertIn('inserted', data)
 
     @since('2.1')
     def test_type_dropping(self):
@@ -227,6 +228,8 @@ class TestUserTypes(Tester):
               )
            """
         cursor.execute(stmt)
+        # Make sure the scheam propagate
+        time.sleep(2)
 
         _id = uuid.uuid4()
         stmt = """
@@ -348,6 +351,8 @@ class TestUserTypes(Tester):
               )
            """
         cursor.execute(stmt)
+        # Make sure the scheam propagate
+        time.sleep(2)
 
         # here we will attempt an insert statement which should fail
         # because the user type is an int, but the insert statement is
@@ -411,6 +416,8 @@ class TestUserTypes(Tester):
               )
            """
         cursor.execute(stmt)
+        # Make sure the scheam propagate
+        time.sleep(2)
 
         ### Insert some data:
         _id = uuid.uuid4()
@@ -504,6 +511,8 @@ class TestUserTypes(Tester):
               )
            """
         cursor.execute(stmt)
+        # Make sure the scheam propagate
+        time.sleep(2)
 
         _id = uuid.uuid4()
 
@@ -559,6 +568,8 @@ class TestUserTypes(Tester):
               )
            """
         cursor.execute(stmt)
+        # Make sure the scheam propagate
+        time.sleep(2)
         
         # no index present yet, make sure there's an error trying to query column
         stmt = """
