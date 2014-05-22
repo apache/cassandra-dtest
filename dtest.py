@@ -36,6 +36,7 @@ KEEP_TEST_DIR = os.environ.get('KEEP_TEST_DIR', '').lower() in ('yes', 'true')
 PRINT_DEBUG = os.environ.get('PRINT_DEBUG', '').lower() in ('yes', 'true')
 DISABLE_VNODES = os.environ.get('DISABLE_VNODES', '').lower() in ('yes', 'true')
 OFFHEAP_MEMTABLES = os.environ.get('OFFHEAP_MEMTABLES', '').lower() in ('yes', 'true')
+NUM_TOKENS = os.environ.get('NUM_TOKENS', '256')
 
 CURRENT_TEST = ""
 
@@ -100,7 +101,7 @@ class Tester(TestCase):
             if DISABLE_VNODES:
                 cluster.set_configuration_options(values={'num_tokens': None})
             else:
-                cluster.set_configuration_options(values={'initial_token': None, 'num_tokens': 256})
+                cluster.set_configuration_options(values={'initial_token': None, 'num_tokens': NUM_TOKENS})
 
         if cluster.version() >= "2.1":
             if OFFHEAP_MEMTABLES:
