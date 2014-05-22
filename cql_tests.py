@@ -3161,8 +3161,10 @@ class TestCQL(Tester):
         # test that select throws a meaningful exception for aliases in where clause
         with self.assertRaises(ProgrammingError) as cm:
             cursor.execute('SELECT id AS user_id, name AS user_name FROM users WHERE user_id = 0')
-        self.assertEqual("Bad Request: Aliases aren't allowed in where clause ('user_id EQ 0')",
-                         cm.exception.message)
+            message = cm.exception.message
+            self.assertTrue((
+                    message == "Bad Request: Aliases aren't allowed in where clause ('user_id EQ 0')" or
+                    message == "Bad Request: Aliases aren't allowed in where clause ('user_id = 0')"))
 
         # test that select throws a meaningful exception for aliases in order by clause
         with self.assertRaises(ProgrammingError) as cm:
