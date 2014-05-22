@@ -54,7 +54,7 @@ class TestBootstrap(Tester):
 
         size1 = node1.data_size()
         size2 = node2.data_size()
-        assert_almost_equal(size1, size2)
+        assert_almost_equal(size1, size2, error=0.3)
         assert_almost_equal(initial_size, 2 * size1)
 
     def read_from_bootstrapped_node_test(self):
