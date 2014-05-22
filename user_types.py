@@ -25,8 +25,12 @@ def unpack(bytestr):
     components = []
     while bytestr:
         length = len_unpacker(bytestr[:4])
-        components.append(decode_text(bytestr[4:4 + length]))
-        bytestr = bytestr[4 + length:]
+        if length < 0:
+            components.append(None)
+            bytestr = bytestr[4:]
+        else:
+            components.append(decode_text(bytestr[4:4 + length]))
+            bytestr = bytestr[4 + length:]
     return tuple(components)
 
 def decode(item):
@@ -41,7 +45,7 @@ def decode(item):
         for i in item:
             decoded.extend(decode(i))
     else:
-        if item.startswith('\x00'):
+        if item is not None and item.startswith('\x00'):
             unpacked = unpack(item)
             decoded.append(decode(unpacked))
         else:
@@ -732,3 +736,48 @@ class TestUserTypes(Tester):
         #verify user type metadata is gone from the system schema
         superuser_cursor.execute("SELECT * from system.schema_usertypes")
         self.assertEqual(0, superuser_cursor.rowcount)
+
+    @since('2.1')
+    def test_nulls_in_user_types(self):
+        """Tests user types with null values"""
+        cluster = self.cluster
+        cluster.populate(3).start()
+        node1,node2,node3 = cluster.nodelist()
+        cursor = self.patient_cql_connection(node1).cursor()
+        self.create_ks(cursor, 'user_types', 2)
+
+        stmt = """
+              USE user_types
+           """
+        cursor.execute(stmt)
+
+        #### Create a user type to go inside another one:
+        stmt = """
+              CREATE TYPE item (
+              sub_one text,
+              sub_two text,
+              )
+           """
+        cursor.execute(stmt)
+
+        ### Create a table that holds an item
+        stmt = """
+              CREATE TABLE bucket (
+               id int PRIMARY KEY,
+               my_item item,
+              )
+           """
+        cursor.execute(stmt)
+        # Make sure the schema propagates
+        time.sleep(2)
+
+        # Adds an explicit null
+        cursor.execute("INSERT INTO bucket (id, my_item) VALUES (0, {sub_one: 'test', sub_two: null})");
+        # Adds with an implicit null
+        cursor.execute("INSERT INTO bucket (id, my_item) VALUES (1, {sub_one: 'test'})");
+
+        cursor.execute("SELECT my_item FROM bucket WHERE id=0")
+        self.assertEqual(decode(cursor.fetchone()), [[u'test', None]])
+
+        cursor.execute("SELECT my_item FROM bucket WHERE id=1")
+        self.assertEqual(decode(cursor.fetchone()), [[u'test', None]])
