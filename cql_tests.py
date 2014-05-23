@@ -4093,7 +4093,7 @@ class TestCQL(Tester):
         cursor.execute("ALTER TYPE footype ADD foomap map <int,text>")
         cursor.execute("INSERT INTO test (key, data) VALUES (1, {fooint: 1, fooset: {'2'}, foomap: {3 : 'bar'}})")
 
-    @since('2.0')
+    @since('1.2')
     def clustering_order_in_test(self):
         """Test for #7105 bug"""
         cursor = self.prepare()
@@ -4113,7 +4113,7 @@ class TestCQL(Tester):
         assert_one(cursor, "SELECT * FROM test WHERE a=1 AND b=2 AND c IN (3)", [1, 2, 3])
         assert_one(cursor, "SELECT * FROM test WHERE a=1 AND b=2 AND c IN (3, 4)", [1, 2, 3])
 
-    @since('2.0')
+    @since('1.2')
     def bug7105_test(self):
         """Test for #7105 bug"""
         cursor = self.prepare()
