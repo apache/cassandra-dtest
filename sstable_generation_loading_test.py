@@ -64,8 +64,15 @@ class TestSSTableGenerationAndLoading(Tester):
         node1.compact()
         node1.stop()
         time.sleep(1)
+        path = ""
+        if version < "2.1":
+            path = os.path.join(node1.get_path(), 'data', 'Keyspace1', 'Standard1')
+        else:
+            basepath = os.path.join(node1.get_path(), 'data', 'Keyspace1')
+            for x in os.listdir(basepath):
+                if x.startswith("Standard1"):
+                    path = os.path.join(basepath, x)
 
-        path = os.path.join(node1.get_path(), 'data', 'Keyspace1', 'Standard1')
         os.system('rm %s/*Index.db' % path)
         os.system('rm %s/*Filter.db' % path)
         os.system('rm %s/*Statistics.db' % path)
@@ -81,39 +88,30 @@ class TestSSTableGenerationAndLoading(Tester):
                 data_found += 1
         assert data_found > 0, "After removing index, filter, stats, and digest files, the data file was deleted!"
 
-    @require('https://issues.apache.org/jira/browse/CASSANDRA-7013')
     def sstableloader_compression_none_to_none_test(self):
         self.load_sstable_with_configuration(None, None)
 
-    @require('https://issues.apache.org/jira/browse/CASSANDRA-7013')
     def sstableloader_compression_none_to_snappy_test(self):
         self.load_sstable_with_configuration(None, 'Snappy')
 
-    @require('https://issues.apache.org/jira/browse/CASSANDRA-7013')
     def sstableloader_compression_none_to_deflate_test(self):
         self.load_sstable_with_configuration(None, 'Deflate')
 
-    @require('https://issues.apache.org/jira/browse/CASSANDRA-7013')
     def sstableloader_compression_snappy_to_none_test(self):
         self.load_sstable_with_configuration('Snappy', None)
 
-    @require('https://issues.apache.org/jira/browse/CASSANDRA-7013')
     def sstableloader_compression_snappy_to_snappy_test(self):
         self.load_sstable_with_configuration('Snappy', 'Snappy')
 
-    @require('https://issues.apache.org/jira/browse/CASSANDRA-7013')
     def sstableloader_compression_snappy_to_deflate_test(self):
         self.load_sstable_with_configuration('Snappy', 'Deflate')
 
-    @require('https://issues.apache.org/jira/browse/CASSANDRA-7013')
     def sstableloader_compression_deflate_to_none_test(self):
         self.load_sstable_with_configuration('Deflate', None)
 
-    @require('https://issues.apache.org/jira/browse/CASSANDRA-7013')
     def sstableloader_compression_deflate_to_snappy_test(self):
         self.load_sstable_with_configuration('Deflate', 'Snappy')
 
-    @require('https://issues.apache.org/jira/browse/CASSANDRA-7013')
     def sstableloader_compression_deflate_to_deflate_test(self):
         self.load_sstable_with_configuration('Deflate', 'Deflate')
 
@@ -183,8 +181,9 @@ class TestSSTableGenerationAndLoading(Tester):
         sstableloader = os.path.join(cdir, 'bin', 'sstableloader')
         env = ccmcommon.make_cassandra_env(cdir, node1.get_path())
         host = node1.address()
-        for cf_dir in os.listdir(copy_dir):
-            full_cf_dir = os.path.join(copy_dir, cf_dir)
+        sstablecopy_dir = copy_root + '/ks'
+        for cf_dir in os.listdir(sstablecopy_dir):
+            full_cf_dir = os.path.join(sstablecopy_dir, cf_dir)
             if os.path.isdir(full_cf_dir):
                 cmd_args = [sstableloader, '--nodes', host, full_cf_dir]
                 p = subprocess.Popen(cmd_args, env=env)
