@@ -3161,7 +3161,7 @@ class TestCQL(Tester):
         # test that select throws a meaningful exception for aliases in where clause
         with self.assertRaises(ProgrammingError) as cm:
             cursor.execute('SELECT id AS user_id, name AS user_name FROM users WHERE user_id = 0')
-        self.assertEqual("Bad Request: Aliases aren't allowed in where clause ('user_id EQ 0')",
+        self.assertEqual("Bad Request: Aliases aren't allowed in where clause ('user_id = 0')",
                          cm.exception.message)
 
         # test that select throws a meaningful exception for aliases in order by clause
@@ -4079,3 +4079,54 @@ class TestCQL(Tester):
         assert_invalid(cursor, "BEGIN COUNTER BATCH UPDATE counters USING TIMESTAMP 3 SET c = c + 1 WHERE k = 0; UPDATE counters SET c = c + 1 WHERE k = 0; APPLY BATCH")
         assert_invalid(cursor, "BEGIN COUNTER BATCH USING TIMESTAMP 3 UPDATE counters SET c = c + 1 WHERE k = 0; UPDATE counters SET c = c + 1 WHERE k = 0; APPLY BATCH")
 
+
+    @since('2.1')
+    def add_field_to_udt_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("CREATE TYPE footype (fooint int, fooset set <text>)")
+        cursor.execute("CREATE TABLE test (key int PRIMARY KEY, data footype)")
+
+        cursor.execute("INSERT INTO test (key, data) VALUES (1, {fooint: 1, fooset: {'2'}})")
+        cursor.execute("ALTER TYPE footype ADD foomap map <int,text>")
+        cursor.execute("INSERT INTO test (key, data) VALUES (1, {fooint: 1, fooset: {'2'}, foomap: {3 : 'bar'}})")
+
+    @since('2.0')
+    def clustering_order_in_test(self):
+        """Test for #7105 bug"""
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                a int,
+                b int,
+                c int,
+                PRIMARY KEY ((a, b), c)
+            ) with clustering order by (c desc)
+        """);
+
+        cursor.execute("INSERT INTO test (a, b, c) VALUES (1, 2, 3)")
+        cursor.execute("INSERT INTO test (a, b, c) VALUES (4, 5, 6)")
+
+        assert_one(cursor, "SELECT * FROM test WHERE a=1 AND b=2 AND c IN (3)", [1, 2, 3])
+        assert_one(cursor, "SELECT * FROM test WHERE a=1 AND b=2 AND c IN (3, 4)", [1, 2, 3])
+
+    @since('2.0')
+    def bug7105_test(self):
+        """Test for #7105 bug"""
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                a int,
+                b int,
+                c int,
+                d int,
+                PRIMARY KEY (a, b)
+            )
+        """);
+
+        cursor.execute("INSERT INTO test (a, b, c, d) VALUES (1, 2, 3, 3)")
+        cursor.execute("INSERT INTO test (a, b, c, d) VALUES (1, 4, 6, 5)")
+
+        assert_one(cursor, "SELECT * FROM test WHERE a=1 AND b=2 ORDER BY b DESC", [1, 2, 3, 3])
