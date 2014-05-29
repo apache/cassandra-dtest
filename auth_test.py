@@ -184,6 +184,26 @@ class TestAuth(Tester):
         self.assertUnauthorized("User nonexistent doesn't exist",
                                 cursor, "ALTER USER nonexistent WITH PASSWORD 'doesn''tmatter'")
 
+    @since('2.0')
+    def conditional_create_drop_user_test(self):
+        self.prepare()
+        cursor = self.get_cursor(user='cassandra', password='cassandra')
+
+        cursor.execute("LIST USERS")
+        self.assertEqual(1, cursor.rowcount) # cassandra
+
+        cursor.execute("CREATE USER IF NOT EXISTS aleksey WITH PASSWORD 'sup'")
+        cursor.execute("CREATE USER IF NOT EXISTS aleksey WITH PASSWORD 'ignored'")
+
+        cursor.execute("LIST USERS")
+        self.assertEqual(2, cursor.rowcount) # cassandra + aleksey
+
+        cursor.execute("DROP USER IF EXISTS aleksey")
+        cursor.execute("DROP USER IF EXISTS aleksey")
+
+        cursor.execute("LIST USERS")
+        self.assertEqual(1, cursor.rowcount) # cassandra
+
     def create_ks_auth_test(self):
         self.prepare()
 
