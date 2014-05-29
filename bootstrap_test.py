@@ -28,7 +28,7 @@ class TestBootstrap(Tester):
         node1 = cluster.nodes["node1"]
 
         time.sleep(.5)
-        cursor = self.cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1).cursor()
         self.create_ks(cursor, 'ks', 1)
         self.create_cf(cursor, 'cf', columns={ 'c1' : 'text', 'c2' : 'text' })
 
@@ -45,7 +45,7 @@ class TestBootstrap(Tester):
         # Boostraping a new node
         node2 = new_node(cluster, token=tokens[1])
         node2.start()
-        time.sleep(.5)
+        node2.watch_log_for("Listening for thrift clients...")
 
         reader.check()
         node1.cleanup()
