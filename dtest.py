@@ -74,6 +74,9 @@ def retry_till_success(fun, *args, **kwargs):
                 # brief pause before next attempt
                 time.sleep(0.25)
 
+def is_win():
+    return True if sys.platform == "cygwin" or sys.platform == "win32" else False
+
 class Tester(TestCase):
 
     def __init__(self, *argv, **kwargs):
@@ -253,6 +256,9 @@ class Tester(TestCase):
 
         If the timeout is exceeded, the exception is raised.
         """
+        if is_win():
+            timeout = timeout * 5
+
         return retry_till_success(
             self.cql_connection,
             node,
