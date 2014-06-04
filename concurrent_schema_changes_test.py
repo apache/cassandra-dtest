@@ -8,7 +8,6 @@ from dtest import Tester, debug
 from ccmlib.node import Node
 
 import cql
-
 def wait(delay=2):
     """
     An abstraction so that the sleep delays can easily be modified.
@@ -175,7 +174,7 @@ class TestConcurrentSchemaChanges(Tester):
         cluster.populate(2).start()
         [node1, node2] = cluster.nodelist()
         wait(2)
-        cursor = self.cql_connection(node2).cursor()
+        cursor = self.patient_cql_connection(node2).cursor()
 
         self.prepare_for_changes(cursor, namespace='ns2')
         node1.stop()
@@ -203,7 +202,7 @@ class TestConcurrentSchemaChanges(Tester):
         cluster.populate(2).start()
         [node1, node2] = cluster.nodelist()
         wait(2)
-        cursor = self.cql_connection(node2).cursor()
+        cursor = self.patient_cql_connection(node2).cursor()
 
         self.prepare_for_changes(cursor, namespace='ns2')
         node1.stop()
@@ -240,7 +239,7 @@ class TestConcurrentSchemaChanges(Tester):
         node2.start()
         wait(2)
 
-        cursor = self.cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1).cursor()
         self.prepare_for_changes(cursor)
 
         node2.decommission()

@@ -185,7 +185,7 @@ class TestBatch(Tester):
         self.cluster.populate(nodes).start()
         time.sleep(.5)
         node1 = self.cluster.nodelist()[0]
-        cursor = self.cql_connection(node1, version=cql_version).cursor()
+        cursor = self.patient_cql_connection(node1, version=cql_version).cursor()
         self.create_ks(cursor, 'ks', nodes)
         cursor.execute("""
             CREATE TABLE clicks (

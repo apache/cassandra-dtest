@@ -14,7 +14,7 @@ class TestDeletion(Tester):
         [node1] = cluster.nodelist()
 
         time.sleep(.5)
-        cursor = self.cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1).cursor()
         self.create_ks(cursor, 'ks', 1)
         self.create_cf(cursor, 'cf', gc_grace=0, key_type='int', columns={'c1': 'int'})
 
