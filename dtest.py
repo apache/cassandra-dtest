@@ -37,6 +37,8 @@ PRINT_DEBUG = os.environ.get('PRINT_DEBUG', '').lower() in ('yes', 'true')
 DISABLE_VNODES = os.environ.get('DISABLE_VNODES', '').lower() in ('yes', 'true')
 OFFHEAP_MEMTABLES = os.environ.get('OFFHEAP_MEMTABLES', '').lower() in ('yes', 'true')
 NUM_TOKENS = os.environ.get('NUM_TOKENS', '256')
+RECORD_COVERAGE = os.environ.get('RECORD_COVERAGE', '').lower() in ('yes', 'true')
+
 
 CURRENT_TEST = ""
 
@@ -113,10 +115,12 @@ class Tester(TestCase):
         return cluster
 
     def _cleanup_cluster(self):
-        if KEEP_TEST_DIR:
-            # Just kill it, leave the files where they are:
-            self.cluster.stop(gently=False)
-        else:
+        # when recording coverage the jvm has to exit normally
+        # or the coverage information is not written by the jacoco agent
+        # otherwise we can just kill the process
+        self.cluster.stop(gently=bool(RECORD_COVERAGE))
+
+        if not KEEP_TEST_DIR:
             # Cleanup everything:
             debug("removing ccm cluster " + self.cluster.name + " at: " + self.test_path)
             self.cluster.remove()
@@ -152,7 +156,8 @@ class Tester(TestCase):
                     pass
 
         self.cluster = self._get_cluster()
-        self.__setup_cobertura()
+        if RECORD_COVERAGE:
+            self.__setup_jacoco()
         # the failure detector can be quite slow in such tests with quick start/stop
         self.cluster.set_configuration_options(values={'phi_convict_threshold': 5})
 
@@ -332,36 +337,30 @@ class Tester(TestCase):
     def skip(self, msg):
         if not NO_SKIP:
             raise SkipTest(msg)
-        
-    def __setup_cobertura(self, cluster_name='test'):
-        """Setup Cobertura code coverage support"""
-        # Find the cobertura jar file:
-        cobertura_jar = None
-        if 'M2_REPO' in os.environ:
-            m2_dir = os.environ['M2_REPO']
-        else:
-            m2_dir = os.path.join(os.path.expanduser('~'),'.m2')
-        for root, dirnames, filenames in os.walk(m2_dir):
-            for filename in fnmatch.filter(filenames, 'cobertura-*.jar'):
-                cobertura_jar = os.path.join(root, filename)
-                break
-            if cobertura_jar:
-                break
-        else:
-            LOG.warning(
-                'Could not setup code coverage analysis because no cobertura '
-                'jar file was found in the m2 repository.')
-            return
+    
+    def __setup_jacoco(self, cluster_name='test'):
+        """Setup JaCoCo code coverage support"""
+        # use explicit agent and execfile locations
+        # or look for a cassandra build if they are not specified
+        cdir = os.environ.get('CASSANDRA_DIR', DEFAULT_DIR)
 
-        # Create a cluster-wide cassandra include file in the ccm
-        # staging directory:
-        with open(os.path.join(
-                self.test_path, cluster_name, 'cassandra.in.sh'),'w') as f:
-            f.write('CLASSPATH=$CASSANDRA_HOME/build/cobertura/classes:'
-                    '$CLASSPATH:{cobertura_jar}\n'.format(
-                    cobertura_jar=cobertura_jar))
-            f.write('JVM_OPTS="$JVM_OPTS -Dnet.sourceforge.cobertura.datafile='
-                    '$CASSANDRA_HOME/build/cobertura/cassandra-dtest/cobertura.ser -XX:-UseSplitVerifier"\n')
+        agent_location = os.environ.get('JACOCO_AGENT_JAR', os.path.join(cdir, 'build/lib/jars/jacocoagent.jar'))
+        jacoco_execfile = os.environ.get('JACOCO_EXECFILE', os.path.join(cdir, 'build/jacoco/jacoco.exec'))
+
+        if os.path.isfile(agent_location):
+            debug("Jacoco agent found at {}".format(agent_location))
+            with open(os.path.join(
+                    self.test_path, cluster_name, 'cassandra.in.sh'),'w') as f:
+
+                f.write('JVM_OPTS="$JVM_OPTS -javaagent:{jar_path}=destfile={exec_file}"'\
+                    .format(jar_path=agent_location, exec_file=jacoco_execfile))
+                
+                if os.path.isfile(jacoco_execfile):
+                    debug("Jacoco execfile found at {}, execution data will be appended".format(jacoco_execfile))
+                else:
+                    debug("Jacoco execfile will be created at {}".format(jacoco_execfile))
+        else:
+            debug("Jacoco agent not found or is not file. Execution will not be recorded.")
 
     def __filter_errors(self, errors):
         """Filter errors, removing those that match self.ignore_log_patterns"""
