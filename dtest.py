@@ -118,7 +118,7 @@ class Tester(TestCase):
         # when recording coverage the jvm has to exit normally
         # or the coverage information is not written by the jacoco agent
         # otherwise we can just kill the process
-        self.cluster.stop(gently=bool(RECORD_COVERAGE))
+        self.cluster.stop(gently=False)
 
         if not KEEP_TEST_DIR:
             # Cleanup everything:
