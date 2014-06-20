@@ -16,7 +16,7 @@ class TestBootstrap(PyTester):
             # replayed and everything is fine.
             r'Can\'t send migration request: node.*is down',
         ]
-        Tester.__init__(self, *args, **kwargs)
+        PyTester.__init__(self, *args, **kwargs)
 
     def simple_bootstrap_test(self):
         cluster = self.cluster

@@ -414,13 +414,34 @@ class PyTester(Tester):
     def __init__(self, *argv, **kwargs):
         Tester.__init__(self, *argv, **kwargs)
 
-    def cql_connection(self, node, keyspace=None, version=None, user=None, password=None):
+    def cql_connection(self, node, keyspace=None, version=None, user=None, password=None, compression=True):
         from cassandra.cluster import Cluster
-        cluster = Cluster()
+        cluster = Cluster(compression=compression)
         session = cluster.connect()
 
         self.connections.append(session)
         return session
+
+    def patient_cql_connection(self, node, keyspace=None, version=None, user=None, password=None, timeout=10, compression=True):
+        """
+        Returns a connection after it stops throwing TTransportExceptions due to not being ready.
+
+        If the timeout is exceeded, the exception is raised.
+        """
+        if is_win():
+            timeout = timeout * 5
+
+        return retry_till_success(
+            self.cql_connection,
+            node,
+            keyspace=keyspace,
+            version=version,
+            user=user,
+            password=password,
+            timeout=timeout,
+            compression=compression,
+            bypassed_exception=TSocket.TTransportException
+        )
 
     def create_ks(self, session, name, rf):
         if self.cluster.version() >= "1.2":
