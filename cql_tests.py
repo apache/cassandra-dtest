@@ -3063,6 +3063,9 @@ class TestCQL(Tester):
         assert_one(cursor, "DELETE FROM test WHERE k = 0 IF v1 = null", [ True ])
         assert_none(cursor, "SELECT * FROM test")
 
+        # Should apply
+        assert_one(cursor, "DELETE FROM test WHERE k = 0 IF v1 IN (null)", [ True ])
+
     @since('2.0.9')
     def non_eq_conditional_update_test(self):
         cursor = self.prepare()
@@ -3084,6 +3087,9 @@ class TestCQL(Tester):
         assert_one(cursor, "UPDATE test SET v2 = 'bar' WHERE k = 0 IF v1 >= 1", [ True ])
         assert_one(cursor, "UPDATE test SET v2 = 'bar' WHERE k = 0 IF v1 != 1", [ True ])
         assert_one(cursor, "UPDATE test SET v2 = 'bar' WHERE k = 0 IF v1 != 2", [ False, 2 ])
+        assert_one(cursor, "UPDATE test SET v2 = 'bar' WHERE k = 0 IF v1 IN (0, 1, 2)", [ True ])
+        assert_one(cursor, "UPDATE test SET v2 = 'bar' WHERE k = 0 IF v1 IN (142, 276)", [ False, 2 ])
+        assert_one(cursor, "UPDATE test SET v2 = 'bar' WHERE k = 0 IF v1 IN ()", [ False, 2 ])
 
     @since('2.0.7')
     def conditional_delete_test(self):
@@ -3965,10 +3971,13 @@ class TestCQL(Tester):
         assert_one(cursor, "DELETE FROM tmap WHERE k=0 IF m['foo'] = null", [False, {'foo' : 'bar'}])
         assert_one(cursor, "SELECT * FROM tmap", [0, {'foo' : 'bar'}])
 
+        assert_one(cursor, "UPDATE tmap SET m['foo'] = 'bar' WHERE k=0 IF m['foo'] IN ('bar', 'baz')", [True])
+        assert_one(cursor, "UPDATE tmap SET m['foo'] = 'blah' WHERE k=0 IF m['foo'] IN (null, 'qux')", [False, {'foo': 'bar'}])
         assert_one(cursor, "DELETE FROM tmap WHERE k=0 IF m['foo'] = 'bar'", [True])
         assert_none(cursor, "SELECT * FROM tmap")
 
-        cursor.execute("INSERT INTO tmap(k, m) VALUES (1, {'foo' : 'bar', 'bar' : 'foo'})")
+        cursor.execute("INSERT INTO tmap(k, m) VALUES (1, null)")
+        cursor.execute("UPDATE tmap set m['foo'] = 'bar', m['bar'] = 'foo' WHERE k = 1 IF m['foo'] IN ('blah', null)", [True])
 
         # should apply
         assert_one(cursor, "UPDATE tmap SET m = {'foo': 'bar', 'bar': 'foo'} WHERE k = 1 IF m = {'foo': 'bar', 'bar': 'foo'}", [True])
@@ -3977,6 +3986,7 @@ class TestCQL(Tester):
         assert_one(cursor, "UPDATE tmap SET m = {'foo': 'bar', 'bar': 'foo'} WHERE k = 1 IF m < {'z': 'z'}", [True])
         assert_one(cursor, "UPDATE tmap SET m = {'foo': 'bar', 'bar': 'foo'} WHERE k = 1 IF m <= {'z': 'z'}", [True])
         assert_one(cursor, "UPDATE tmap SET m = {'foo': 'bar', 'bar': 'foo'} WHERE k = 1 IF m != {'a': 'a'}", [True])
+        assert_one(cursor, "UPDATE tmap SET m = {'foo': 'bar', 'bar': 'foo'} WHERE k = 1 IF m IN ({'a': 'a'}, {'foo': 'bar', 'bar': 'foo'})", [True])
 
         # should not apply
         assert_one(cursor, "UPDATE tmap SET m = {'foo': 'bar', 'bar': 'foo'} WHERE k = 1 IF m = {'a': 'a'}",
@@ -3990,6 +4000,10 @@ class TestCQL(Tester):
         assert_one(cursor, "UPDATE tmap SET m = {'foo': 'bar', 'bar': 'foo'} WHERE k = 1 IF m <= {'a': 'a'}",
                    [False, {'foo' : 'bar', 'bar' : 'foo'}])
         assert_one(cursor, "UPDATE tmap SET m = {'foo': 'bar', 'bar': 'foo'} WHERE k = 1 IF m != {'bar': 'foo', 'foo': 'bar'}",
+                   [False, {'foo' : 'bar', 'bar' : 'foo'}])
+        assert_one(cursor, "UPDATE tmap SET m = {'foo': 'bar', 'bar': 'foo'} WHERE k = 1 IF m IN ({'a': 'a'}, null)",
+                   [False, {'foo' : 'bar', 'bar' : 'foo'}])
+        assert_one(cursor, "UPDATE tmap SET m = {'foo': 'bar', 'bar': 'foo'} WHERE k = 1 IF m IN ()",
                    [False, {'foo' : 'bar', 'bar' : 'foo'}])
 
         assert_one(cursor, "DELETE FROM tmap WHERE k=1 IF m['foo'] = 'bar' AND m['bar'] = 'bar'", [False, {'foo' : 'bar', 'bar' : 'foo'}])
@@ -4013,6 +4027,7 @@ class TestCQL(Tester):
         assert_one(cursor, "UPDATE tlist SET l = ['foo', 'bar', 'foobar'] WHERE k = 0 IF l >= ['a']", [True])
         assert_one(cursor, "UPDATE tlist SET l = ['foo', 'bar', 'foobar'] WHERE k = 0 IF l < ['z']", [True])
         assert_one(cursor, "UPDATE tlist SET l = ['foo', 'bar', 'foobar'] WHERE k = 0 IF l <= ['z']", [True])
+        assert_one(cursor, "UPDATE tlist SET l = ['foo', 'bar', 'foobar'] WHERE k = 0 IF l IN (['foo', 'bar', 'foobar'], ['a'])", [True])
 
         # should not apply
         assert_one(cursor, "UPDATE tlist SET l = ['foo', 'bar', 'foobar'] WHERE k = 0 IF l = ['baz']",
@@ -4027,15 +4042,24 @@ class TestCQL(Tester):
                    [False, ('foo', 'bar', 'foobar')])
         assert_one(cursor, "UPDATE tlist SET l = ['foo', 'bar', 'foobar'] WHERE k = 0 IF l <= ['a']",
                    [False, ('foo', 'bar', 'foobar')])
+        assert_one(cursor, "UPDATE tlist SET l = ['foo', 'bar', 'foobar'] WHERE k = 0 IF l IN (['a'], null)",
+                   [False, ('foo', 'bar', 'foobar')])
+        assert_one(cursor, "UPDATE tlist SET l = ['foo', 'bar', 'foobar'] WHERE k = 0 IF l IN ()",
+                   [False, ('foo', 'bar', 'foobar')])
 
         assert_invalid(cursor, "DELETE FROM tlist WHERE k=0 IF l[null] = 'foobar'")
         assert_invalid(cursor, "DELETE FROM tlist WHERE k=0 IF l[-2] = 'foobar'")
         assert_invalid(cursor, "DELETE FROM tlist WHERE k=0 IF l[3] = 'foobar'")
         assert_one(cursor, "DELETE FROM tlist WHERE k=0 IF l[1] = null", [False, ('foo', 'bar', 'foobar')])
+        assert_one(cursor, "DELETE FROM tlist WHERE k=0 IF l[1] IN (null, 'blah')", [False, ('foo', 'bar', 'foobar')])
         assert_one(cursor, "DELETE FROM tlist WHERE k=0 IF l[1] = 'foobar'", [False, ('foo', 'bar', 'foobar')])
         assert_one(cursor, "SELECT * FROM tlist", [0, ('foo', 'bar', 'foobar')])
 
         assert_one(cursor, "DELETE FROM tlist WHERE k=0 IF l[1] = 'bar'", [True])
+        assert_none(cursor, "SELECT * FROM tlist")
+
+        cursor.execute("INSERT INTO tlist(k, l) VALUES (0, ['foo', 'bar', 'foobar'])")
+        assert_one(cursor, "DELETE FROM tlist WHERE k=0 IF l[1] IN (null, 'baz', 'bar')", [True])
         assert_none(cursor, "SELECT * FROM tlist")
 
         # Sanity checks for sets
