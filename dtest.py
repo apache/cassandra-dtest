@@ -115,12 +115,15 @@ class Tester(TestCase):
         return cluster
 
     def _cleanup_cluster(self):
-        # when recording coverage the jvm has to exit normally
-        # or the coverage information is not written by the jacoco agent
-        # otherwise we can just kill the process
-        self.cluster.stop(gently=False)
+        if KEEP_TEST_DIR:
+            self.cluster.stop(gently=RECORD_COVERAGE)
+        else:
+            # when recording coverage the jvm has to exit normally
+            # or the coverage information is not written by the jacoco agent
+            # otherwise we can just kill the process
+            if RECORD_COVERAGE:
+                self.cluster.stop(gently=True)
 
-        if not KEEP_TEST_DIR:
             # Cleanup everything:
             debug("removing ccm cluster " + self.cluster.name + " at: " + self.test_path)
             self.cluster.remove()
