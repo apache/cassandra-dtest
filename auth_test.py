@@ -5,7 +5,7 @@ from cql.cassandra.ttypes import AuthenticationException
 from dtest import Tester, debug, PyTester
 from tools import *
 
-class TestAuth(PyTester):
+class TestAuth(Tester):
 
     def __init__(self, *args, **kwargs):
         self.ignore_log_patterns = [
@@ -14,7 +14,7 @@ class TestAuth(PyTester):
             # and when it does, it gets replayed and everything is fine.
             r'Can\'t send migration request: node.*is down',
         ]
-        PyTester.__init__(self, *args, **kwargs)
+        Tester.__init__(self, *args, **kwargs)
 
     @require('https://issues.apache.org/jira/browse/CASSANDRA-7011')
     def system_auth_ks_is_alterable_test(self):

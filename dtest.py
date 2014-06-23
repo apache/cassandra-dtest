@@ -432,6 +432,7 @@ class PyTester(Tester):
 
         If the timeout is exceeded, the exception is raised.
         """
+        from cassandra.cluster import NoHostAvailable
         if is_win():
             timeout = timeout * 5
 
@@ -444,7 +445,7 @@ class PyTester(Tester):
             password=password,
             timeout=timeout,
             compression=compression,
-            bypassed_exception=TSocket.TTransportException
+            bypassed_exception=NoHostAvailable
         )
 
     def create_ks(self, session, name, rf):
