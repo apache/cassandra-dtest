@@ -416,8 +416,12 @@ class PyTester(Tester):
 
     def cql_connection(self, node, keyspace=None, version=None, user=None, password=None, compression=True):
         from cassandra.cluster import Cluster
-        cluster = Cluster(compression=compression)
+
+        node_ip =  node.network_interfaces['binary'][0]
+        cluster = Cluster([node_ip], compression=compression)
         session = cluster.connect()
+        if keyspace is not None:
+            session.execute('USE %s' % keyspace)
 
         self.connections.append(session)
         return session

@@ -1,6 +1,5 @@
 import re, cql
 from cassandra import InvalidRequest, Unavailable
-import pdb
 
 def assert_unavailable(fun, *args):
     try:
