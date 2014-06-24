@@ -11,6 +11,8 @@ from uuid import UUID
 from nose.exc import SkipTest
 from thrift.transport import TSocket
 from unittest import TestCase
+from cassandra.cluster import NoHostAvailable
+from cassandra.cluster import Cluster as PyCluster
 
 LOG_SAVED_DIR="logs"
 try:
@@ -415,10 +417,9 @@ class PyTester(Tester):
         Tester.__init__(self, *argv, **kwargs)
 
     def cql_connection(self, node, keyspace=None, version=None, user=None, password=None, compression=True):
-        from cassandra.cluster import Cluster
 
         node_ip =  node.network_interfaces['binary'][0]
-        cluster = Cluster([node_ip], compression=compression)
+        cluster = PyCluster([node_ip], compression=compression)
         session = cluster.connect()
         if keyspace is not None:
             session.execute('USE %s' % keyspace)
@@ -432,7 +433,6 @@ class PyTester(Tester):
 
         If the timeout is exceeded, the exception is raised.
         """
-        from cassandra.cluster import NoHostAvailable
         if is_win():
             timeout = timeout * 5
 
