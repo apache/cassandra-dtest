@@ -11,6 +11,12 @@ import fileinput
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
 
+def rows_to_list(rows):
+    new_list = []
+    for row in rows:
+        new_list.append(list(row))
+    return new_list
+
 def create_c1c2_table(tester, session, read_repair=None):
     tester.create_cf(session, 'cf', columns={ 'c1' : 'text', 'c2' : 'text' }, read_repair=read_repair)
 
@@ -88,6 +94,18 @@ class no_vnodes(object):
         def wrapped(obj):
             if not DISABLE_VNODES:
                 obj.skip("Test disabled for vnodes")
+            f(obj)
+        wrapped.__name__ = f.__name__
+        wrapped.__doc__ = f.__doc__
+        return wrapped
+
+class require(object):
+    def __init__(self, msg):
+        self.msg = msg
+
+    def __call__(self, f):
+        def wrapped(obj):
+            obj.skip("require " + self.msg)
             f(obj)
         wrapped.__name__ = f.__name__
         wrapped.__doc__ = f.__doc__
