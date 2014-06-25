@@ -68,21 +68,25 @@ class TestJson(Tester):
 
         debug("Flushing and stopping cluster...")
         node1.flush()
-        cluster.stop()
+        # cluster.stop()
 
-        debug("Creating JSON file...")
-        # file = open("schema.json", "w")
-        # file.write(node1.run_sstable2json())
-        # print >> file, node1.run_sstable2json()
+        debug("Exporting to JSON file...")
 
-        # with open("schema.json", "w") as f:
-        #     with f as sys.stdout:
-        #         node1.run_sstable2json()
-        # sys.stdout = sys.__stdout__
+        out_file = open("schema.json", "w")
+        node1.run_sstable2json(out_file)
+        out_file.close()
 
-        sys.stdout = open("schema.json", 'w')
-        #
-        node1.run_sstable2json()
-        sys.stdout = sys.__stdout__
+        debug("Importing JSON file...")
+        in_file = open("schema.json", "r")
+        node1.run_json2sstable(in_file, "test", None, "users")
+        in_file.close()
+        os.remove("schema.json")
 
-        # file.close()
+        debug("Verifying import...")
+        # cluster.start()
+        cursor.execute("SELECT * FROM users")
+        res = cursor.fetchall()
+
+        self.assertItemsEqual(res,
+           [ [ u'frodo', 1985, u'male', u'pass@', u'CA' ],
+              [u'sam', 1980, u'male', u'@pass', u'NY' ] ] )
