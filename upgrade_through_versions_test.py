@@ -208,7 +208,7 @@ class TestUpgradeThroughVersions(Tester):
                 vers[:curr_index] + ['***'+current_tag+'***'] + vers[curr_index+1:]))
     
     def _create_schema(self):
-        cursor = self.patient_cql_connection(self.node2).cursor()
+        cursor = self.patient_cql_connection(self.node2, version="3.0.0").cursor()
         
         if self.cluster.version() >= '1.2':
             #DDL for C* 1.2+
@@ -225,13 +225,13 @@ class TestUpgradeThroughVersions(Tester):
         cursor.execute('CREATE TABLE cf ( k int PRIMARY KEY , v text )')
         cursor.execute('CREATE INDEX vals ON cf (v)')
         
-        if self.cluster.version() >= '1.2':
-            cursor.execute("""
-                CREATE TABLE countertable (k text PRIMARY KEY, c counter);""")
-        else:
-            cursor.execute("""
-                CREATE TABLE countertable (k text PRIMARY KEY, c counter)
-                WITH default_validation=CounterColumnType;""")
+        cursor.execute("""
+            CREATE TABLE countertable (
+                k1 text,
+                k2 int,
+                c counter,
+                PRIMARY KEY (k1, k2)
+                );""")
 
     def _write_values(self, num=100):
         cursor = self.patient_cql_connection(self.node2).cursor()
@@ -251,39 +251,51 @@ class TestUpgradeThroughVersions(Tester):
                 self.assertEqual(x, k)
                 self.assertEqual(str(x), v)
 
-    def _increment_counters(self, seconds=15):
-        debug("incrementing counter for {time} seconds".format(time=seconds))
-        cursor = self.patient_cql_connection(self.node2).cursor()
+    def _increment_counters(self, opcount=25000):
+        debug("performing {opcount} counter increments".format(opcount=opcount))
+        cursor = self.patient_cql_connection(self.node2, version="3.0.0").cursor()
         cursor.execute("use upgrade;")
         
-        update_counter_query = ("UPDATE countertable SET c = c + 1 WHERE k='{key}'")
+        update_counter_query = ("UPDATE countertable SET c = c + 1 WHERE k1='{key1}' and k2={key2}")
         
-        uuids = [uuid.uuid4() for i in range(100)]
-        self.expected_counts = defaultdict(int)
+        self.expected_counts = {}
+        for i in range(10):
+            self.expected_counts[uuid.uuid4()] = defaultdict(int)
         
-        expiry=time.time()+seconds
-        while time.time() < expiry:
-            counter_key = random.choice(uuids)
-            
+        fail_count = 0
+        
+        for i in range(opcount):
+            key1 = random.choice(self.expected_counts.keys())
+            key2 = random.randint(1,10)
             try:
-                cursor.execute( update_counter_query.format(key=counter_key) )
+                cursor.execute( update_counter_query.format(key1=key1, key2=key2), consistency_level='ALL' )
             except OperationalError:
-                pass
+                fail_count += 1
             else:
-                self.expected_counts[counter_key] += 1
-            
-        # make sure 100 succeeded
-        assert sum(self.expected_counts.values()) > 100
+                self.expected_counts[key1][key2] += 1
+            if fail_count > 100:
+                break
+        
+        assert fail_count < 100, "Too many counter increment failures"
 
-    def _check_counters(self, consistency_level='ALL'):
+    def _check_counters(self):
         debug("Checking counter values...")
-        cursor = self.patient_cql_connection(self.node2).cursor()
+        cursor = self.patient_cql_connection(self.node2, version="3.0.0").cursor()
         cursor.execute("use upgrade;")
         
-        for counter_key, value in self.expected_counts.items():
-            cursor.execute("SELECT c from countertable where k='{key}';".format(key=counter_key), consistency_level=consistency_level)
-            res = cursor.fetchone()[0]
-            assert res == value, "Counter not at expected value."
+        for key1 in self.expected_counts.keys():
+            for key2 in self.expected_counts[key1].keys():
+                expected_value = self.expected_counts[key1][key2]
+                cursor.execute("SELECT c from countertable where k1='{key1}' and k2={key2};".format(key1=key1, key2=key2), consistency_level='ONE')
+                results = cursor.fetchone()
+                
+                if results is not None:
+                    actual_value = results[0]
+                else:
+                    # counter wasn't found
+                    actual_value = None
+                    
+                assert actual_value == expected_value, "Counter not at expected value."
 
 
 class TestRandomPartitionerUpgrade(TestUpgradeThroughVersions):
@@ -412,7 +424,7 @@ class PointToPointUpgradeBase(TestUpgradeThroughVersions):
         self.upgrade_scenario(populate=False, create_schema=False, after_upgrade_call=(self._bootstrap_new_node_multidc,))
 
     def _multidc_schema_create(self):
-        cursor = self.patient_cql_connection(self.cluster.nodelist()[0]).cursor()
+        cursor = self.patient_cql_connection(self.cluster.nodelist()[0], version="3.0.0").cursor()
         
         if self.cluster.version() >= '1.2':
             #DDL for C* 1.2+
@@ -430,13 +442,13 @@ class PointToPointUpgradeBase(TestUpgradeThroughVersions):
         cursor.execute('CREATE TABLE cf ( k int PRIMARY KEY , v text )')
         cursor.execute('CREATE INDEX vals ON cf (v)')
         
-        if self.cluster.version() >= '1.2':
-            cursor.execute("""
-                CREATE TABLE countertable (k text PRIMARY KEY, c counter);""")
-        else:
-            cursor.execute("""
-                CREATE TABLE countertable (k text PRIMARY KEY, c counter)
-                WITH default_validation=CounterColumnType;""")
+        cursor.execute("""
+            CREATE TABLE countertable (
+                k1 text,
+                k2 int,
+                c counter,
+                PRIMARY KEY (k1, k2)
+                );""")
 
 
 # create test classes for upgrading from latest tag on branch to the head of that same branch

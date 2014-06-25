@@ -24,7 +24,7 @@ class TestPaxos(Tester):
         node1 = cluster.nodelist()[0]
         time.sleep(0.2)
 
-        cursor = self.cql_connection(node1, version="3.0.0").cursor()
+        cursor = self.patient_cql_connection(node1, version="3.0.0").cursor()
         if create_keyspace:
             self.create_ks(cursor, 'ks', rf)
         return cursor

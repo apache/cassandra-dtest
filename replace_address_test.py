@@ -37,7 +37,10 @@ class TestReplaceAddress(Tester):
         [node1,node2, node3] = cluster.nodelist()
 
         debug("Inserting Data...")
-        node1.stress(['write', 'n=10000', '-schema', 'replication(factor=3)'])
+        if cluster.version() < "2.1":
+            node1.stress(['-o', 'insert', '--num-keys=10000', '--replication-factor=3'])
+        else:
+            node1.stress(['write', 'n=10000', '-schema', 'replication(factor=3)'])
         cursor = self.patient_cql_connection(node1).cursor()
         cursor.execute('select * from "Keyspace1"."Standard1" LIMIT 1', consistency_level='THREE')
         initialData = cursor.fetchall()
@@ -89,7 +92,10 @@ class TestReplaceAddress(Tester):
         [node1,node2, node3] = cluster.nodelist()
 
         debug("Inserting Data...")
-        node1.stress(['write', 'n=10000', '-schema', 'replication(factor=3)'])
+        if cluster.version() < "2.1":
+            node1.stress(['-o', 'insert', '--num-keys=10000', '--replication-factor=3'])
+        else:
+            node1.stress(['write', 'n=10000', '-schema', 'replication(factor=3)'])
         cursor = self.patient_cql_connection(node1).cursor()
         cursor.execute('select * from "Keyspace1"."Standard1" LIMIT 1', consistency_level='THREE')
         initialData = cursor.fetchall()
@@ -113,7 +119,10 @@ class TestReplaceAddress(Tester):
         [node1,node2, node3] = cluster.nodelist()
 
         debug("Inserting Data...")
-        node1.stress(['write', 'n=10000', '-schema', 'replication(factor=3)'])
+        if cluster.version() < "2.1":
+            node1.stress(['-o', 'insert', '--num-keys=10000', '--replication-factor=3'])
+        else:
+            node1.stress(['write', 'n=10000', '-schema', 'replication(factor=3)'])
         cursor = self.patient_cql_connection(node1).cursor()
         cursor.execute('select * from "Keyspace1"."Standard1" LIMIT 1', consistency_level='THREE')
         initialData = cursor.fetchall()

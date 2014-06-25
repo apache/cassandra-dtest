@@ -17,7 +17,7 @@ class TestCQL(Tester):
         node1 = cluster.nodelist()[0]
         time.sleep(0.2)
 
-        cursor = self.cql_connection(node1, version=cql_version).cursor()
+        cursor = self.patient_cql_connection(node1, version=cql_version).cursor()
         self.create_ks(cursor, 'ks', 1)
         return cursor
 

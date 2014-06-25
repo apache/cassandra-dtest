@@ -46,7 +46,7 @@ class TestSchema(Tester):
         time.sleep(.5)
 
         # test that c1 values have been compacted away.
-        cursor = self.cql_connection(node, version='3.0.10').cursor()
+        cursor = self.patient_cql_connection(node, version='3.0.10').cursor()
         cursor.execute("SELECT c1 FROM ks.cf")
         self.assertEqual([[None], [None], [None], [4]], sorted(cursor.fetchall()))
 
@@ -94,6 +94,6 @@ class TestSchema(Tester):
         cluster.populate(1).start()
         time.sleep(.5)
         nodes = cluster.nodelist()
-        cursor = self.cql_connection(nodes[0], version='3.0.10').cursor()
+        cursor = self.patient_cql_connection(nodes[0], version='3.0.10').cursor()
         self.create_ks(cursor, 'ks', 1)
         return cursor
