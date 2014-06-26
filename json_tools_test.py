@@ -1,31 +1,7 @@
-from dtest import Tester, debug, DISABLE_VNODES
-import unittest
-from tools import *
-from ccmlib.cluster import Cluster
-from ccmlib.node import NodeError
-import time
-from cql import OperationalError
-from cql.cassandra.ttypes import UnavailableException
-import sys
-
-class NodeUnavailable(Exception):
-    pass
+from dtest import Tester, debug
+import os
 
 class TestJson(Tester):
-
-    def __init__(self, *args, **kwargs):
-        # Ignore these log patterns:
-        self.ignore_log_patterns = [
-            # This one occurs when trying to send the migration to a
-            # node that hasn't started yet, and when it does, it gets
-            # replayed and everything is fine.
-            r'Can\'t send migration request: node.*is down',
-            # This is caused by starting a node improperly (replacing active/nonexistent)
-            r'Exception encountered during startup',
-            # This is caused by trying to replace a nonexistent node
-            r'Exception in thread Thread'
-        ]
-        Tester.__init__(self, *args, **kwargs)
 
     def json_tools_test(self):
 
@@ -67,10 +43,8 @@ class TestJson(Tester):
         cluster.stop()
 
         debug("Exporting to JSON file...")
-
-        out_file = open("schema.json", "w")
-        node1.run_sstable2json(out_file)
-        out_file.close()
+        with open("schema.json", "w") as out_file:
+            node1.run_sstable2json(out_file)
 
         debug("Deleting cluster and creating new...")
         cluster.clear()
@@ -96,9 +70,8 @@ class TestJson(Tester):
 
         debug("Importing JSON file...")
 
-        in_file = open("schema.json", "r")
-        node1.run_json2sstable(in_file, "test", "users")
-        in_file.close()
+        with open("schema.json", "r") as in_file:
+            node1.run_json2sstable(in_file, "test", "users")
         os.remove("schema.json")
 
         debug("Verifying import...")
