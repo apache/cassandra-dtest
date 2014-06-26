@@ -3066,7 +3066,14 @@ class TestCQL(PyTester):
         # Test selection validation.
         assert_invalid(cursor, 'SELECT DISTINCT pk0 FROM regular', matching="queries must request all the partition key columns")
 
+<<<<<<< HEAD
         assert_invalid(cursor, 'SELECT DISTINCT pk0, pk1, ck0 FROM regular', matching="queries must only request partition key columns")
+=======
+        with self.assertRaises(ProgrammingError) as cm:
+            cursor.execute('SELECT DISTINCT pk0, pk1, ck0 FROM regular')
+        self.assertEqual('Bad Request: SELECT DISTINCT queries must only request partition key columns and/or static columns (not ck0)',
+                         cm.exception.message)
+>>>>>>> 0df25fbed87cb1014c446e79063ab4a418fad9fc
 
     def function_with_null_test(self):
         cursor = self.prepare()
@@ -3320,16 +3327,19 @@ class TestCQL(PyTester):
 
         # lists
         assert_all(cursor, "SELECT k, v FROM test WHERE l CONTAINS 1", [[1, 0], [0, 0], [0, 2]])
+        assert_all(cursor, "SELECT k, v FROM test WHERE k = 0 AND l CONTAINS 1", [[0, 0], [0, 2]])
         assert_all(cursor, "SELECT k, v FROM test WHERE l CONTAINS 2", [[1, 0], [0, 0]])
         assert_none(cursor, "SELECT k, v FROM test WHERE l CONTAINS 6")
 
         # sets
         assert_all(cursor, "SELECT k, v FROM test WHERE s CONTAINS 'a'", [[0, 0], [0, 2]])
+        assert_all(cursor, "SELECT k, v FROM test WHERE k = 0 AND s CONTAINS 'a'", [[0, 0], [0, 2]])
         assert_all(cursor, "SELECT k, v FROM test WHERE s CONTAINS 'd'", [[1, 1]])
         assert_none(cursor, "SELECT k, v FROM test  WHERE s CONTAINS 'e'")
 
         # maps
         assert_all(cursor, "SELECT k, v FROM test WHERE m CONTAINS 1", [[1, 0], [1, 1], [0, 0], [0, 1]])
+        assert_all(cursor, "SELECT k, v FROM test WHERE k = 0 AND m CONTAINS 1", [[0, 0], [0, 1]])
         assert_all(cursor, "SELECT k, v FROM test WHERE m CONTAINS 2", [[0, 1]])
         assert_none(cursor, "SELECT k, v FROM test  WHERE m CONTAINS 4")
 
@@ -3357,6 +3367,7 @@ class TestCQL(PyTester):
 
         # maps
         assert_all(cursor, "SELECT k, v FROM test WHERE m CONTAINS KEY 'a'", [[1, 1], [0, 0], [0, 1]])
+        assert_all(cursor, "SELECT k, v FROM test WHERE k = 0 AND m CONTAINS KEY 'a'", [[0, 0], [0, 1]])
         assert_all(cursor, "SELECT k, v FROM test WHERE m CONTAINS KEY 'c'", [[0, 2]])
         assert_none(cursor, "SELECT k, v FROM test  WHERE m CONTAINS KEY 'd'")
 
@@ -3417,9 +3428,11 @@ class TestCQL(PyTester):
         # require debugging to assert
         assert_one(cursor, "SELECT p, v FROM test WHERE k=0 AND p=1", [1, 1])
 
-        # Check selecting only a static column is also ok, and only yield one value
+        # Check selecting only a static column with distinct only yield one value
         # (as we only query the static columns)
-        assert_one(cursor, "SELECT s FROM test WHERE k=0", [24])
+        assert_one(cursor, "SELECT DISTINCT s FROM test WHERE k=0", [24])
+        # But without DISTINCT, we still get one result per row
+        assert_all(cursor, "SELECT s FROM test WHERE k=0", [[24], [24]])
         # but that querying other columns does correctly yield the full partition
         assert_all(cursor, "SELECT s, v FROM test WHERE k=0", [[24, 0], [24, 1]])
         assert_one(cursor, "SELECT s, v FROM test WHERE k=0 AND p=1", [24, 1])
@@ -3594,6 +3607,37 @@ class TestCQL(PyTester):
         assert_all(cursor, "SELECT p FROM test WHERE v = 1", [[0], [1]])
         # We don't support that
         assert_invalid(cursor, "SELECT s FROM test WHERE v = 1")
+
+    @since('2.0')
+    def static_columns_with_distinct_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k int,
+                p int,
+                s int static,
+                PRIMARY KEY (k, p)
+            )
+        """)
+
+        cursor.execute("INSERT INTO test (k, p) VALUES (1, 1)");
+        cursor.execute("INSERT INTO test (k, p) VALUES (1, 2)");
+
+        assert_all(cursor, "SELECT k, s FROM test", [[1, None], [1, None]]);
+        assert_one(cursor, "SELECT DISTINCT k, s FROM test", [1, None]);
+        assert_one(cursor, "SELECT DISTINCT s FROM test WHERE k=1", [None]);
+        assert_none(cursor, "SELECT DISTINCT s FROM test WHERE k=2");
+
+        cursor.execute("INSERT INTO test (k, p, s) VALUES (2, 1, 3)");
+        cursor.execute("INSERT INTO test (k, p) VALUES (2, 2)");
+
+        assert_all(cursor, "SELECT k, s FROM test", [[1, None], [1, None], [2, 3], [2, 3]]);
+        assert_all(cursor, "SELECT DISTINCT k, s FROM test", [[1, None], [2, 3]]);
+        assert_one(cursor, "SELECT DISTINCT s FROM test WHERE k=1", [None]);
+        assert_one(cursor, "SELECT DISTINCT s FROM test WHERE k=2", [3]);
+
+        assert_invalid(cursor, "SELECT DISTINCT s FROM test")
 
 
     def select_count_paging_test(self):

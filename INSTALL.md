@@ -47,6 +47,7 @@ will often need to modify them in some fashion at some later point:
 
         cd ~/git/cstar
         git clone git://github.com/pcmanus/ccm.git
+        sudo apt-get install libyaml-dev
         sudo pip install -e ccm
         sudo pip install pyyaml
 
