@@ -43,8 +43,7 @@ class TestJson(Tester):
         cluster.stop()
 
         debug("Exporting to JSON file...")
-        with open("schema.json", "w") as out_file:
-            node1.run_sstable2json(out_file)
+        node1.run_sstable2json("schema.json")
 
         debug("Deleting cluster and creating new...")
         cluster.clear()
@@ -69,9 +68,7 @@ class TestJson(Tester):
         cluster.stop()
 
         debug("Importing JSON file...")
-
-        with open("schema.json", "r") as in_file:
-            node1.run_json2sstable(in_file, "test", "users")
+        node1.run_json2sstable("schema.json", "test", "users")
         os.remove("schema.json")
 
         debug("Verifying import...")
