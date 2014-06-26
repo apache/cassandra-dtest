@@ -11,6 +11,8 @@ from uuid import UUID
 from nose.exc import SkipTest
 from thrift.transport import TSocket
 from unittest import TestCase
+from cassandra.cluster import NoHostAvailable
+from cassandra.cluster import Cluster as PyCluster
 
 LOG_SAVED_DIR="logs"
 try:
@@ -410,6 +412,137 @@ class Runner(threading.Thread):
         if self.__error is not None:
             raise self.__error
 
+
+class PyTester(Tester):
+
+    def __init__(self, *argv, **kwargs):
+        Tester.__init__(self, *argv, **kwargs)
+
+    def cql_connection(self, node, keyspace=None, version=None, user=None, password=None, compression=True):
+
+        node_ip =  node.network_interfaces['binary'][0]
+        cluster = PyCluster([node_ip], compression=compression)
+        session = cluster.connect()
+        if keyspace is not None:
+            session.execute('USE %s' % keyspace)
+
+        self.connections.append(session)
+        return session
+
+    def patient_cql_connection(self, node, keyspace=None, version=None, user=None, password=None, timeout=10, compression=True):
+        """
+        Returns a connection after it stops throwing TTransportExceptions due to not being ready.
+
+        If the timeout is exceeded, the exception is raised.
+        """
+        if is_win():
+            timeout = timeout * 5
+
+        return retry_till_success(
+            self.cql_connection,
+            node,
+            keyspace=keyspace,
+            version=version,
+            user=user,
+            password=password,
+            timeout=timeout,
+            compression=compression,
+            bypassed_exception=NoHostAvailable
+        )
+
+    def create_ks(self, session, name, rf):
+        if self.cluster.version() >= "1.2":
+            query = 'CREATE KEYSPACE %s WITH replication={%s}'
+            if isinstance(rf, types.IntType):
+                # we assume simpleStrategy
+                session.execute(query % (name, "'class':'SimpleStrategy', 'replication_factor':%d" % rf))
+            else:
+                assert len(rf) != 0, "At least one datacenter/rf pair is needed"
+                # we assume networkTopolyStrategy
+                options = (', ').join([ '\'%s\':%d' % (d, r) for d, r in rf.iteritems() ])
+                session.execute(query % (name, "'class':'NetworkTopologyStrategy', %s" % options))
+        else:
+            query = 'CREATE KEYSPACE %s WITH strategy_class=%s AND %s'
+            if isinstance(rf, types.IntType):
+                # we assume simpleStrategy
+                session.execute(query % (name, 'SimpleStrategy', 'strategy_options:replication_factor=%d' % rf))
+            else:
+                assert len(rf) != 0, "At least one datacenter/rf pair is needed"
+                # we assume networkTopolyStrategy
+                options = (' AND ').join([ 'strategy_options:%s=%d' % (d, r) for d, r in rf.iteritems() ])
+                session.execute(query % (name, 'NetworkTopologyStrategy', options))
+        session.execute('USE %s' % name)
+
+    # We default to UTF8Type because it's simpler to use in tests
+    def create_cf(self, session, name, key_type="varchar", speculative_retry=None, read_repair=None, compression=None, gc_grace=None, columns=None, validation="UTF8Type"):
+        additional_columns = ""
+        if columns is not None:
+            for k, v in columns.items():
+                additional_columns = "%s, %s %s" % (additional_columns, k, v)
+
+        if self.cluster.version() >= "1.2":
+            if additional_columns == "":
+                query = 'CREATE COLUMNFAMILY %s (key %s, c varchar, v varchar, PRIMARY KEY(key, c)) WITH comment=\'test cf\'' % (name, key_type)
+            else:
+                query = 'CREATE COLUMNFAMILY %s (key %s PRIMARY KEY%s) WITH comment=\'test cf\'' % (name, key_type, additional_columns)
+            if compression is not None:
+                query = '%s AND compression = { \'sstable_compression\': \'%sCompressor\' }' % (query, compression)
+        else:
+            query = 'CREATE COLUMNFAMILY %s (key %s PRIMARY KEY%s) WITH comparator=UTF8Type AND default_validation=%s' % (name, key_type, additional_columns, validation)
+            if compression is not None:
+                query = '%s AND compression_parameters:sstable_compression=%sCompressor' % (query, compression)
+
+        if read_repair is not None:
+            query = '%s AND read_repair_chance=%f' % (query, read_repair)
+        if gc_grace is not None:
+            query = '%s AND gc_grace_seconds=%d' % (query, gc_grace)
+        if self.cluster.version() >= "2.0":
+            if speculative_retry is not None:
+                query = '%s AND speculative_retry=\'%s\'' % (query, speculative_retry)
+
+        session.execute(query)
+        time.sleep(0.2)
+
+    def tearDown(self):
+        reset_environment_vars()
+
+        for con in self.connections:
+            con.shutdown()
+
+        for runner in self.runners:
+            try:
+                runner.stop()
+            except:
+                pass
+
+        failed = sys.exc_info() != (None, None, None)
+        try:
+            for node in self.cluster.nodelist():
+                if self.allow_log_errors == False:
+                    errors = list(self.__filter_errors([ msg for msg, i in node.grep_log("ERROR")]))
+                    if len(errors) is not 0:
+                        failed = True
+                        raise AssertionError('Unexpected error in %s node log: %s' % (node.name, errors))
+        finally:
+            try:
+                if failed or KEEP_LOGS:
+                    # means the test failed. Save the logs for inspection.
+                    self.copy_logs()
+            except Exception as e:
+                    print "Error saving log:", str(e)
+            finally:
+                self._cleanup_cluster()
+
+    def __filter_errors(self, errors):
+        """Filter errors, removing those that match self.ignore_log_patterns"""
+        if not hasattr(self, 'ignore_log_patterns'):
+            self.ignore_log_patterns = []
+        for e in errors:
+            for pattern in self.ignore_log_patterns:
+                if re.search(pattern, e):
+                    break
+            else:
+                yield e
 
 class TracingCursor(ThriftCursor):
     """A CQL Cursor with query tracing ability"""

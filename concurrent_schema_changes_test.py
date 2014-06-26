@@ -4,7 +4,7 @@ import pprint
 import glob
 from threading import Thread
 
-from dtest import Tester, debug
+from dtest import Tester, debug, PyTester
 from ccmlib.node import Node
 
 import cql
@@ -14,20 +14,20 @@ def wait(delay=2):
     """
     time.sleep(delay)
 
-class TestConcurrentSchemaChanges(Tester):
+class TestConcurrentSchemaChanges(PyTester):
 
     def __init__(self, *argv, **kwargs):
         super(TestConcurrentSchemaChanges, self).__init__(*argv, **kwargs)
         self.allow_log_errors = True
 
-    def prepare_for_changes(self, cursor, namespace='ns1'):
+    def prepare_for_changes(self, session, namespace='ns1'):
         """
         prepares for schema changes by creating a keyspace and column family.
         """
         debug("prepare_for_changes() " + str(namespace))
         # create a keyspace that will be used
-        self.create_ks(cursor, "ks_%s" % namespace, 2)
-        cursor.execute('USE ks_%s' % namespace)
+        self.create_ks(session, "ks_%s" % namespace, 2)
+        session.execute('USE ks_%s' % namespace)
 
         # create a column family with an index and a row of data
         query = """
@@ -37,13 +37,13 @@ class TestConcurrentSchemaChanges(Tester):
                 col3 text
             );
         """ % namespace
-        cursor.execute(query)
+        session.execute(query)
         wait(1)
-        cursor.execute("INSERT INTO cf_%s (col1, col2, col3) VALUES ('a', 'b', 'c');" 
+        session.execute("INSERT INTO cf_%s (col1, col2, col3) VALUES ('a', 'b', 'c');" 
                 % namespace)
 
         # create an index
-        cursor.execute("CREATE INDEX index_%s ON cf_%s(col2)"%(namespace, namespace))
+        session.execute("CREATE INDEX index_%s ON cf_%s(col2)"%(namespace, namespace))
 
         # create a column family that can be deleted later.
         query = """
@@ -53,12 +53,12 @@ class TestConcurrentSchemaChanges(Tester):
                 col3 text
             );
         """ % namespace
-        cursor.execute(query)
+        session.execute(query)
 
         # make a keyspace that can be deleted
-        self.create_ks(cursor, "ks2_%s" % namespace, 2)
+        self.create_ks(session, "ks2_%s" % namespace, 2)
 
-    def make_schema_changes(self, cursor, namespace='ns1'):
+    def make_schema_changes(self, session, namespace='ns1'):
         """
         makes a heap of changes.
 
@@ -73,18 +73,18 @@ class TestConcurrentSchemaChanges(Tester):
         set default_validation_class
         """
         debug("make_schema_changes() " + str(namespace))
-        cursor.execute('USE ks_%s' % namespace)
+        session.execute('USE ks_%s' % namespace)
         # drop keyspace
-        cursor.execute('DROP KEYSPACE ks2_%s' % namespace)
+        session.execute('DROP KEYSPACE ks2_%s' % namespace)
         wait(2)
 
         # create keyspace
-        self.create_ks(cursor, "ks3_%s" % namespace, 2)
-        cursor.execute('USE ks_%s' % namespace)
+        self.create_ks(session, "ks3_%s" % namespace, 2)
+        session.execute('USE ks_%s' % namespace)
 
         wait(2)
         # drop column family
-        cursor.execute("DROP COLUMNFAMILY cf2_%s" % namespace)
+        session.execute("DROP COLUMNFAMILY cf2_%s" % namespace)
 
         # create column family
         query = """
@@ -95,20 +95,20 @@ class TestConcurrentSchemaChanges(Tester):
                 col4 text
             );
         """ % (namespace)
-        cursor.execute(query)
+        session.execute(query)
 
         # alter column family
         query = """
             ALTER COLUMNFAMILY cf_%s
             ADD col4 text;
         """ % namespace
-        cursor.execute(query)
+        session.execute(query)
 
         # add index
-        cursor.execute("CREATE INDEX index2_%s ON cf_%s(col3)"%(namespace, namespace))
+        session.execute("CREATE INDEX index2_%s ON cf_%s(col3)"%(namespace, namespace))
 
         # remove an index
-        cursor.execute("DROP INDEX index_%s" % namespace)
+        session.execute("DROP INDEX index_%s" % namespace)
 
 
     def validate_schema_consistent(self, node):
@@ -124,7 +124,7 @@ class TestConcurrentSchemaChanges(Tester):
 
     def basic_test(self):
         """
-        make sevaral schema changes on the same node.
+        make several schema changes on the same node.
         """
         debug("basic_test()")
 
@@ -132,11 +132,11 @@ class TestConcurrentSchemaChanges(Tester):
         cluster.populate(2).start()
         node1 = cluster.nodelist()[0]
         wait(2)
-        cursor = self.cql_connection(node1).cursor()
+        session = self.cql_connection(node1)
 
-        self.prepare_for_changes(cursor, namespace='ns1')
+        self.prepare_for_changes(session, namespace='ns1')
 
-        self.make_schema_changes(cursor, namespace='ns1')
+        self.make_schema_changes(session, namespace='ns1')
 
     
     def changes_to_different_nodes_test(self):
@@ -145,7 +145,7 @@ class TestConcurrentSchemaChanges(Tester):
         cluster.populate(2).start()
         [node1, node2] = cluster.nodelist()
         wait(2)
-        cursor = self.cql_connection(node1).cursor()
+        cursor = self.cql_connection(node1)
         self.prepare_for_changes(cursor, namespace='ns1')
         self.make_schema_changes(cursor, namespace='ns1')
         wait(3)
@@ -154,7 +154,7 @@ class TestConcurrentSchemaChanges(Tester):
         # wait for changes to get to the first node
         wait(20)
 
-        cursor = self.cql_connection(node2).cursor()
+        cursor = self.cql_connection(node2)
         self.prepare_for_changes(cursor, namespace='ns2')
         self.make_schema_changes(cursor, namespace='ns2')
         wait(3)
@@ -174,7 +174,7 @@ class TestConcurrentSchemaChanges(Tester):
         cluster.populate(2).start()
         [node1, node2] = cluster.nodelist()
         wait(2)
-        cursor = self.patient_cql_connection(node2).cursor()
+        cursor = self.patient_cql_connection(node2)
 
         self.prepare_for_changes(cursor, namespace='ns2')
         node1.stop()
@@ -202,7 +202,7 @@ class TestConcurrentSchemaChanges(Tester):
         cluster.populate(2).start()
         [node1, node2] = cluster.nodelist()
         wait(2)
-        cursor = self.patient_cql_connection(node2).cursor()
+        cursor = self.patient_cql_connection(node2)
 
         self.prepare_for_changes(cursor, namespace='ns2')
         node1.stop()
@@ -239,7 +239,7 @@ class TestConcurrentSchemaChanges(Tester):
         node2.start()
         wait(2)
 
-        cursor = self.patient_cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1)
         self.prepare_for_changes(cursor)
 
         node2.decommission()
@@ -271,7 +271,7 @@ class TestConcurrentSchemaChanges(Tester):
         cluster.populate(2).start()
         [node1, node2] = cluster.nodelist()
         wait(2)
-        cursor = self.cql_connection(node1).cursor()
+        cursor = self.cql_connection(node1)
         self.prepare_for_changes(cursor, namespace='ns2')
 
         wait(2)
@@ -323,7 +323,7 @@ class TestConcurrentSchemaChanges(Tester):
         node1 = cluster.nodelist()[0]
         version = cluster.version()
         wait(2)
-        cursor = self.cql_connection(node1).cursor()
+        cursor = self.cql_connection(node1)
 
         def stress(args=[]):
             debug("Stressing")

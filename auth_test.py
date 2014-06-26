@@ -2,7 +2,7 @@ import time
 
 from cql import ProgrammingError
 from cql.cassandra.ttypes import AuthenticationException
-from dtest import Tester, debug
+from dtest import Tester, debug, PyTester
 from tools import *
 
 class TestAuth(Tester):

@@ -1,11 +1,12 @@
 import random, time
-from dtest import Tester, debug
-from tools import *
+from dtest import Tester, debug, PyTester
+from pytools import *
 from assertions import *
 from ccmlib.cluster import Cluster
+from cassandra import ConsistencyLevel
 
 
-class TestBootstrap(Tester):
+class TestBootstrap(PyTester):
 
     def __init__(self, *args, **kwargs):
         # Ignore these log patterns:
@@ -15,7 +16,7 @@ class TestBootstrap(Tester):
             # replayed and everything is fine.
             r'Can\'t send migration request: node.*is down',
         ]
-        Tester.__init__(self, *args, **kwargs)
+        PyTester.__init__(self, *args, **kwargs)
 
     def simple_bootstrap_test(self):
         cluster = self.cluster
@@ -28,19 +29,19 @@ class TestBootstrap(Tester):
         node1 = cluster.nodes["node1"]
 
         time.sleep(.5)
-        cursor = self.patient_cql_connection(node1).cursor()
-        self.create_ks(cursor, 'ks', 1)
-        self.create_cf(cursor, 'cf', columns={ 'c1' : 'text', 'c2' : 'text' })
+        session = self.patient_cql_connection(node1)
+        self.create_ks(session, 'ks', 1)
+        self.create_cf(session, 'cf', columns={ 'c1' : 'text', 'c2' : 'text' })
 
         for n in xrange(0, keys):
-            insert_c1c2(cursor, n, "ONE")
+            insert_c1c2(session, n, ConsistencyLevel.ONE)
 
         node1.flush()
         initial_size = node1.data_size()
 
         # Reads inserted data all during the boostrap process. We shouldn't
         # get any error
-        reader = self.go(lambda _: query_c1c2(cursor, random.randint(0, keys-1), "ONE"))
+        reader = self.go(lambda _: query_c1c2(session, random.randint(0, keys-1), ConsistencyLevel.ONE))
 
         # Boostraping a new node
         node2 = new_node(cluster, token=tokens[1])
@@ -73,6 +74,6 @@ class TestBootstrap(Tester):
         node4 = new_node(cluster)
         node4.start()
 
-        cursor = self.patient_cql_connection(node4).cursor()
-        cursor.execute('select * from "Keyspace1"."Standard1" limit 10')
-        assert len(list(cursor)) == 10
+        session = self.patient_cql_connection(node4)
+        rows = session.execute('select * from "Keyspace1"."Standard1" limit 10')
+        assert len(list(rows)) == 10
