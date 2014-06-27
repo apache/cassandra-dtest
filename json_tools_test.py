@@ -1,4 +1,5 @@
 from dtest import Tester, debug
+import tempfile
 import os
 
 class TestJson(Tester):
@@ -43,7 +44,9 @@ class TestJson(Tester):
         cluster.stop()
 
         debug("Exporting to JSON file...")
-        node1.run_sstable2json("schema.json")
+        json_path = tempfile.mktemp(suffix='.schema.json')
+        with open(json_path, 'w') as f:
+            node1.run_sstable2json(f)
 
         debug("Deleting cluster and creating new...")
         cluster.clear()
@@ -68,8 +71,9 @@ class TestJson(Tester):
         cluster.stop()
 
         debug("Importing JSON file...")
-        node1.run_json2sstable("schema.json", "test", "users")
-        os.remove("schema.json")
+        with open(json_path) as f:
+            node1.run_json2sstable(f, "test", "users")
+        os.remove(json_path)
 
         debug("Verifying import...")
         cluster.start()
