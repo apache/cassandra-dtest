@@ -1,4 +1,4 @@
-from dtest import PyTester
+from dtest import PyTester as Tester
 from pyassertions import *
 from tools import *
 
@@ -8,7 +8,7 @@ from ccmlib.cluster import Cluster
 
 cql_version="3.0.0"
 
-class TestCQL(PyTester):
+class TestCQL(Tester):
 
     def prepare(self):
         cluster = self.cluster

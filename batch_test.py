@@ -2,14 +2,14 @@ import time
 
 from pyassertions import assert_invalid, assert_unavailable
 from cql.cassandra.ttypes import Compression, ConsistencyLevel, TimedOutException
-from dtest import Tester, PyTester
+from dtest import PyTester as Tester
 from cassandra import ConsistencyLevel, Timeout
 from cassandra.query import SimpleStatement
 from cassandra.policies import RetryPolicy
 
 cql_version="3.0.0"
 
-class TestBatch(PyTester):
+class TestBatch(Tester):
 
     def counter_batch_accepts_counter_mutations_test(self):
         """ Test that counter batch accepts counter mutations """

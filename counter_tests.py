@@ -1,10 +1,10 @@
-from dtest import PyTester
+from dtest import PyTester as Tester
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
 
 import random, time, uuid
 
-class TestCounters(PyTester):
+class TestCounters(Tester):
 
     def simple_increment_test(self):
         """ Simple incrementation test (Created for #3465, that wasn't a bug) """

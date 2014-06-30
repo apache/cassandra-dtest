@@ -4,7 +4,8 @@ import pprint
 import glob
 from threading import Thread
 
-from dtest import Tester, debug, PyTester
+from dtest import debug
+from dtest import PyTester as Tester
 from ccmlib.node import Node
 
 import cql
@@ -14,7 +15,7 @@ def wait(delay=2):
     """
     time.sleep(delay)
 
-class TestConcurrentSchemaChanges(PyTester):
+class TestConcurrentSchemaChanges(Tester):
 
     def __init__(self, *argv, **kwargs):
         super(TestConcurrentSchemaChanges, self).__init__(*argv, **kwargs)

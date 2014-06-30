@@ -1,13 +1,14 @@
 import time
 
-from dtest import PyTester, debug, DISABLE_VNODES
+from dtest import PyTester as Tester
+from dtest import debug, DISABLE_VNODES
 from pyassertions import assert_unavailable
 from pytools import (create_c1c2_table, insert_c1c2, query_c1c2, retry_till_success,
                    insert_columns)
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
 
-class TestConsistency(PyTester):
+class TestConsistency(Tester):
 
     def quorum_quorum_test(self):
         cluster = self.cluster

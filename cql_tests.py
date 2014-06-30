@@ -5,7 +5,7 @@ import re
 import time
 from uuid import uuid4, UUID
 
-from dtest import PyTester
+from dtest import PyTester as Tester
 from pyassertions import assert_invalid, assert_one, assert_none, assert_all
 from cql import ProgrammingError
 from pytools import since, require, rows_to_list
@@ -14,7 +14,7 @@ from cassandra.query import SimpleStatement
 
 cql_version="3.0.0"
 
-class TestCQL(PyTester):
+class TestCQL(Tester):
 
     def prepare(self, ordered=False, create_keyspace=True, use_cache=False, nodes=1, rf=1):
         cluster = self.cluster

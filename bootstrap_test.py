@@ -1,12 +1,13 @@
 import random, time
-from dtest import Tester, debug, PyTester
+from dtest import debug
+from dtest import PyTester as Tester
 from pytools import *
 from assertions import *
 from ccmlib.cluster import Cluster
 from cassandra import ConsistencyLevel
 
 
-class TestBootstrap(PyTester):
+class TestBootstrap(Tester):
 
     def __init__(self, *args, **kwargs):
         # Ignore these log patterns:
@@ -16,7 +17,7 @@ class TestBootstrap(PyTester):
             # replayed and everything is fine.
             r'Can\'t send migration request: node.*is down',
         ]
-        PyTester.__init__(self, *args, **kwargs)
+        Tester.__init__(self, *args, **kwargs)
 
     def simple_bootstrap_test(self):
         cluster = self.cluster
