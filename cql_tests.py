@@ -3065,15 +3065,7 @@ class TestCQL(PyTester):
 
         # Test selection validation.
         assert_invalid(cursor, 'SELECT DISTINCT pk0 FROM regular', matching="queries must request all the partition key columns")
-
-<<<<<<< HEAD
         assert_invalid(cursor, 'SELECT DISTINCT pk0, pk1, ck0 FROM regular', matching="queries must only request partition key columns")
-=======
-        with self.assertRaises(ProgrammingError) as cm:
-            cursor.execute('SELECT DISTINCT pk0, pk1, ck0 FROM regular')
-        self.assertEqual('Bad Request: SELECT DISTINCT queries must only request partition key columns and/or static columns (not ck0)',
-                         cm.exception.message)
->>>>>>> 0df25fbed87cb1014c446e79063ab4a418fad9fc
 
     def function_with_null_test(self):
         cursor = self.prepare()
