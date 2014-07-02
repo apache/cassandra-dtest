@@ -3988,6 +3988,9 @@ class TestCQL(Tester):
         assert_one(cursor, "UPDATE tmap SET m = {'foo': 'bar', 'bar': 'foo'} WHERE k = 1 IF m != {'a': 'a'}", [True])
         assert_one(cursor, "UPDATE tmap SET m = {'foo': 'bar', 'bar': 'foo'} WHERE k = 1 IF m IN ({'a': 'a'}, {'foo': 'bar', 'bar': 'foo'})", [True])
 
+        assert_one(cursor, "UPDATE tmap SET m = {'foo': 'bar', 'bar': 'foo'} WHERE k = 1 IF m['zzz'] = null", [True])
+        assert_one(cursor, "UPDATE tmap SET m = {'foo': 'bar', 'bar': 'foo'} WHERE k = 1 IF m['foo'] != null", [True])
+
         # should not apply
         assert_one(cursor, "UPDATE tmap SET m = {'foo': 'bar', 'bar': 'foo'} WHERE k = 1 IF m = {'a': 'a'}",
                    [False, {'foo' : 'bar', 'bar' : 'foo'}])
@@ -4006,6 +4009,7 @@ class TestCQL(Tester):
         assert_one(cursor, "UPDATE tmap SET m = {'foo': 'bar', 'bar': 'foo'} WHERE k = 1 IF m IN ()",
                    [False, {'foo' : 'bar', 'bar' : 'foo'}])
 
+        assert_invalid(cursor, "DELETE FROM tmap WHERE k=1 IF m['foo'] > null")
         assert_one(cursor, "DELETE FROM tmap WHERE k=1 IF m['foo'] = 'bar' AND m['bar'] = 'bar'", [False, {'foo' : 'bar', 'bar' : 'foo'}])
         assert_one(cursor, "DELETE FROM tmap WHERE k=1 IF m['foo'] = 'bar' AND m['bar'] = 'foo'", [True])
         assert_none(cursor, "SELECT * FROM tmap")
@@ -4029,6 +4033,9 @@ class TestCQL(Tester):
         assert_one(cursor, "UPDATE tlist SET l = ['foo', 'bar', 'foobar'] WHERE k = 0 IF l <= ['z']", [True])
         assert_one(cursor, "UPDATE tlist SET l = ['foo', 'bar', 'foobar'] WHERE k = 0 IF l IN (['foo', 'bar', 'foobar'], ['a'])", [True])
 
+        assert_one(cursor, "UPDATE tlist SET l = ['foo', 'bar', 'foobar'] WHERE k = 0 IF l[999] = null", [True])
+        assert_one(cursor, "UPDATE tlist SET l = ['foo', 'bar', 'foobar'] WHERE k = 0 IF l[1] != null", [True])
+
         # should not apply
         assert_one(cursor, "UPDATE tlist SET l = ['foo', 'bar', 'foobar'] WHERE k = 0 IF l = ['baz']",
                    [False, ('foo', 'bar', 'foobar')])
@@ -4049,7 +4056,7 @@ class TestCQL(Tester):
 
         assert_invalid(cursor, "DELETE FROM tlist WHERE k=0 IF l[null] = 'foobar'")
         assert_invalid(cursor, "DELETE FROM tlist WHERE k=0 IF l[-2] = 'foobar'")
-        assert_invalid(cursor, "DELETE FROM tlist WHERE k=0 IF l[3] = 'foobar'")
+        assert_invalid(cursor, "DELETE FROM tlist WHERE k=0 IF l[0] > null")
         assert_one(cursor, "DELETE FROM tlist WHERE k=0 IF l[1] = null", [False, ('foo', 'bar', 'foobar')])
         assert_one(cursor, "DELETE FROM tlist WHERE k=0 IF l[1] IN (null, 'blah')", [False, ('foo', 'bar', 'foobar')])
         assert_one(cursor, "DELETE FROM tlist WHERE k=0 IF l[1] = 'foobar'", [False, ('foo', 'bar', 'foobar')])
