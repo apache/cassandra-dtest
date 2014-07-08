@@ -1,6 +1,4 @@
 from dtest import PyTester as Tester
-from tools import *
-from assertions import *
 
 import os, sys, time
 from ccmlib.cluster import Cluster
