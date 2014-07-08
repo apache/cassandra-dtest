@@ -1,5 +1,7 @@
-from dtest import Tester, debug
-from tools import *
+from dtest import PyTester as Tester
+from dtest import debug
+from pytools import *
+from cassandra import ConsistencyLevel
 import unittest
 
 class TestRepairCompaction(Tester):
@@ -15,14 +17,14 @@ class TestRepairCompaction(Tester):
         cluster.populate(3).start()
         [node1, node2, node3] = cluster.nodelist()
 
-        cursor = self.patient_cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'ks', 3)
         self.create_cf(cursor, 'cf', read_repair=0.0, columns={'c1': 'text', 'c2': 'text'})
 
         debug("insert data into all")
 
         for x in range(1, 5):
-            insert_c1c2(cursor, x, "ALL")
+            insert_c1c2(cursor, x, ConsistencyLevel.ALL)
         node1.flush()
 
         debug("bringing down node 3")
@@ -31,7 +33,7 @@ class TestRepairCompaction(Tester):
 
         debug("inserting additional data into node 1 and 2")
         for y in range(5, 10):
-            insert_c1c2(cursor, y, "TWO")
+            insert_c1c2(cursor, y, ConsistencyLevel.TWO)
         node1.flush()
         node2.flush()
 
@@ -51,7 +53,7 @@ class TestRepairCompaction(Tester):
 
         debug("inserting data in nodes 1 and 3")
         for z in range(10, 15):        
-            insert_c1c2(cursor, z, "TWO")
+            insert_c1c2(cursor, z, ConsistencyLevel.TWO)
         node1.flush()
 
         debug("start and repair node 2")
@@ -83,9 +85,9 @@ class TestRepairCompaction(Tester):
         #additionally should see 14 distinct keys in data(this prints to command line)
         debug((node2.run_sstable2json()))
 
-        cursor.execute("SELECT COUNT(*) FROM ks.cf LIMIT 100")
+        rows = cursor.execute("SELECT COUNT(*) FROM ks.cf LIMIT 100")
 
-        results = cursor.fetchone()
+        results = rows[0]
         debug(results)
 
         self.assertEqual(results[0], 14)
