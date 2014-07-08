@@ -67,6 +67,56 @@ def retry_till_success(fun, *args, **kwargs):
                 # brief pause before next attempt
                 time.sleep(0.25)
 
+# Simple puts and get (on one row), testing both reads by names and by slice,
+# with overwrites and flushes between inserts to make sure we hit multiple
+# sstables on reads
+def putget(cluster, cursor, cl=ConsistencyLevel.QUORUM):
+
+    _put_with_overwrite(cluster, cursor, 1, cl)
+
+    # reads by name
+    ks = [ "\'c%02d\'" % i for i in xrange(0, 100) ]
+    # We do not support proper IN queries yet
+    #if cluster.version() >= "1.2":
+    #    cursor.execute('SELECT * FROM cf USING CONSISTENCY %s WHERE key=\'k0\' AND c IN (%s)' % (cl, ','.join(ks)))
+    #else:
+    #    cursor.execute('SELECT %s FROM cf USING CONSISTENCY %s WHERE key=\'k0\'' % (','.join(ks), cl))
+    #_validate_row(cluster, cursor)
+    # slice reads
+    query = SimpleStatement('SELECT * FROM cf WHERE key=\'k0\'', consistency_level=cl)
+    rows = cursor.execute(query)
+    _validate_row(cluster, rows)
+
+def _put_with_overwrite(cluster, cursor, nb_keys, cl=ConsistencyLevel.QUORUM):
+    for k in xrange(0, nb_keys):
+        kvs = [ "UPDATE cf SET v=\'value%d\' WHERE key=\'k%s\' AND c=\'c%02d\'" % (i, k, i) for i in xrange(0, 100) ]
+        query = SimpleStatement('BEGIN BATCH %s APPLY BATCH' % '; '.join(kvs), consistency_level=cl)
+        cursor.execute(query)
+        time.sleep(.01)
+    cluster.flush()
+    for k in xrange(0, nb_keys):
+        kvs = [ "UPDATE cf SET v=\'value%d\' WHERE key=\'k%s\' AND c=\'c%02d\'" % (i*4, k, i*2) for i in xrange(0, 50) ]
+        query = SimpleStatement('BEGIN BATCH %s APPLY BATCH' % '; '.join(kvs), consistency_level=cl)
+        cursor.execute(query)
+        time.sleep(.01)
+    cluster.flush()
+    for k in xrange(0, nb_keys):
+        kvs = [ "UPDATE cf SET v=\'value%d\' WHERE key=\'k%s\' AND c=\'c%02d\'" % (i*20, k, i*5) for i in xrange(0, 20) ]
+        query = SimpleStatement('BEGIN BATCH %s APPLY BATCH' % '; '.join(kvs), consistency_level=cl)
+        cursor.execute(query)
+        time.sleep(.01)
+    cluster.flush()
+
+def _validate_row(cluster, res):
+    assert len(res) == 100, len(res)
+    for i in xrange(0, 100):
+        if i % 5 == 0:
+            assert res[i][2] == 'value%d' % (i*4), 'for %d, expecting value%d, got %s' % (i, i*4, res[i][2])
+        elif i % 2 == 0:
+            assert res[i][2] == 'value%d' % (i*2), 'for %d, expecting value%d, got %s' % (i, i*2, res[i][2])
+        else:
+            assert res[i][2] == 'value%d' % i, 'for %d, expecting value%d, got %s' % (i, i, res[i][2])
+
 class since(object):
     def __init__(self, cass_version, max_version=None):
         self.cass_version = LooseVersion(cass_version)
