@@ -5,6 +5,7 @@ import shutil
 import glob
 import os
 import time
+import distutils.dir_util
 
 class SnapshotTester(Tester):
     def __init__(self, *args, **kwargs):
@@ -32,7 +33,9 @@ class SnapshotTester(Tester):
         debug("snapshot_dir is : " + snapshot_dir)
         debug("snapshot copy is : " + tmpdir)
 
-        os.system('cp -a {snapshot_dir}/* {tmpdir}/{ks}/{cf}/'.format(**locals()))
+        #os.system('cp -a {snapshot_dir}/* {tmpdir}/{ks}/{cf}/'.format(**locals()))
+        distutils.dir_util.copy_tree(str(snapshot_dir), os.path.join(tmpdir, ks, cf))
+
         return tmpdir
 
     def restore_snapshot(self, snapshot_dir, node, ks, cf):
