@@ -34,7 +34,8 @@ class SnapshotTester(Tester):
         debug("snapshot copy is : " + tmpdir)
 
         #os.system('cp -a {snapshot_dir}/* {tmpdir}/{ks}/{cf}/'.format(**locals()))
-        distutils.dir_util.copy_tree(str(snapshot_dir), os.path.join(tmpdir, ks, cf))
+        # distutils.dir_util.copy_tree(str(snapshot_dir), os.path.join(tmpdir, ks, cf))
+        self.copytree(str(snapshot_dir), os.path.join(tmpdir, ks, cf))
 
         return tmpdir
 
@@ -44,6 +45,11 @@ class SnapshotTester(Tester):
         snapshot_dir = os.path.join(snapshot_dir, ks, cf)
         ip = node.address()
         os.system('{node_dir}/bin/sstableloader -d {ip} {snapshot_dir}'.format(**locals()))
+		
+    def copytree(src, dst, symlinks=False):
+        names = os.listdir(src)
+        if (os.path.isdir(dst)==False):
+            os.makedirs(dst) 
 
 class TestSnapshot(SnapshotTester):
 
@@ -137,8 +143,11 @@ class TestArchiveCommitlog(SnapshotTester):
         insert_cutoff_times = [time.gmtime()]
 
         # Delete all commitlog backups so far:
-        os.system('rm {tmp_commitlog}/*'.format(tmp_commitlog=tmp_commitlog))
-
+        #os.system('rm {tmp_commitlog}/*'.format(tmp_commitlog=tmp_commitlog))
+        files = glob.glob(str(tmp_commitlog)+"/*")
+        for f in files:
+            os.remove(f)
+        
         snapshot_dir = self.make_snapshot(node1, 'ks', 'cf', 'basic')
 
         # Write more data:
