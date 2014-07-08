@@ -1,6 +1,7 @@
 import time
 
-from dtest import Tester, debug
+from dtest import PyTester as Tester
+from dtest import debug
 from loadmaker import LoadMaker
 
 class TestGlobalRowKeyCache(Tester):
@@ -43,7 +44,7 @@ class TestGlobalRowKeyCache(Tester):
                         })
                 cluster.start()
                 time.sleep(.5)
-                cursor = self.cql_connection(node1).cursor()
+                cursor = self.cql_connection(node1)
                 self.create_ks(cursor, ks_name, 3)
                 time.sleep(1) # wait for propagation
 
