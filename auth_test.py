@@ -1,9 +1,11 @@
 import time
 
-from cql import ProgrammingError
-from cql.cassandra.ttypes import AuthenticationException
-from dtest import Tester, debug, PyTester
-from tools import *
+from cassandra import Unauthorized, AuthenticationFailed
+from cassandra.cluster import NoHostAvailable
+from dtest import debug
+from dtest import PyTester as Tester
+from pytools import *
+from pyassertions import assert_invalid
 
 class TestAuth(Tester):
 
@@ -25,8 +27,8 @@ class TestAuth(Tester):
                           WHERE keyspace_name = 'system_auth'"""
 
         cursor = self.get_cursor(0, user='cassandra', password='cassandra')
-        cursor.execute(schema_query)
-        row = cursor.fetchone()
+        rows = cursor.execute(schema_query)
+        row = rows[0]
         self.assertEqual('{"replication_factor":"1"}', row[0])
 
 
@@ -46,18 +48,22 @@ class TestAuth(Tester):
         for i in range(3):
             debug('Checking node: {i}'.format(i=i))
             cursor = self.get_cursor(i, user='cassandra', password='cassandra')
-            cursor.execute(schema_query)
-            row = cursor.fetchone()
+            rows = cursor.execute(schema_query)
+            row = rows[0]
             self.assertEqual('{"replication_factor":"3"}', row[0])
 
     def login_test(self):
         # also tests default user creation (cassandra/cassandra)
         self.prepare()
         self.get_cursor(user='cassandra', password='cassandra')
-        with self.assertRaises(AuthenticationException):
+        try:
             self.get_cursor(user='cassandra', password='badpassword')
-        with self.assertRaises(AuthenticationException):
+        except NoHostAvailable as e:
+            assert isinstance(e.errors.values()[0], AuthenticationFailed)
+        try:
             self.get_cursor(user='doesntexist', password='doesntmatter')
+        except NoHostAvailable as e:
+            assert isinstance(e.errors.values()[0], AuthenticationFailed)
 
     def only_superuser_can_create_users_test(self):
         self.prepare()
@@ -66,29 +72,20 @@ class TestAuth(Tester):
         cassandra.execute("CREATE USER jackob WITH PASSWORD '12345' NOSUPERUSER")
 
         jackob = self.get_cursor(user='jackob', password='12345')
-        with self.assertRaises(ProgrammingError) as cm:
-            jackob.execute("CREATE USER james WITH PASSWORD '54321' NOSUPERUSER")
-        self.assertEqual('Bad Request: Only superusers are allowed to perform CREATE USER queries',
-                         cm.exception.message)
+        self.assertUnauthorized('Only superusers are allowed to perform CREATE USER queries', jackob, "CREATE USER james WITH PASSWORD '54321' NOSUPERUSER")
 
     def password_authenticator_create_user_requires_password_test(self):
         self.prepare()
 
         cursor = self.get_cursor(user='cassandra', password='cassandra')
-        with self.assertRaises(ProgrammingError) as cm:
-            cursor.execute("CREATE USER jackob NOSUPERUSER")
-        self.assertEqual('Bad Request: PasswordAuthenticator requires PASSWORD option',
-                         cm.exception.message)
+        assert_invalid(cursor, "CREATE USER jackob NOSUPERUSER", 'PasswordAuthenticator requires PASSWORD option')
 
     def cant_create_existing_user_test(self):
         self.prepare()
 
         cursor = self.get_cursor(user='cassandra', password='cassandra')
         cursor.execute("CREATE USER 'james@example.com' WITH PASSWORD '12345' NOSUPERUSER")
-        with self.assertRaises(ProgrammingError) as cm:
-            cursor.execute("CREATE USER 'james@example.com' WITH PASSWORD '12345' NOSUPERUSER")
-        self.assertEqual('Bad Request: User james@example.com already exists',
-                         cm.exception.message)
+        assert_invalid(cursor, "CREATE USER 'james@example.com' WITH PASSWORD '12345' NOSUPERUSER", 'User james@example.com already exists')
 
     def list_users_test(self):
         self.prepare()
@@ -99,8 +96,7 @@ class TestAuth(Tester):
         cursor.execute("CREATE USER cathy WITH PASSWORD '12345' NOSUPERUSER")
         cursor.execute("CREATE USER dave WITH PASSWORD '12345' SUPERUSER")
 
-        cursor.execute("LIST USERS")
-        rows = cursor.fetchall()
+        rows = cursor.execute("LIST USERS")
         self.assertEqual(5, len(rows))
         # {username: isSuperuser} dict.
         users = dict([(r[0], r[1]) for r in rows])
@@ -115,8 +111,7 @@ class TestAuth(Tester):
         self.prepare()
 
         cursor = self.get_cursor(user='cassandra', password='cassandra')
-        self.assertUnauthorized("Users aren't allowed to DROP themselves",
-                                cursor, "DROP USER cassandra")
+        assert_invalid(cursor, "DROP USER cassandra", "Users aren't allowed to DROP themselves")
 
     def only_superusers_can_drop_users_test(self):
         self.prepare()
@@ -124,26 +119,25 @@ class TestAuth(Tester):
         cassandra = self.get_cursor(user='cassandra', password='cassandra')
         cassandra.execute("CREATE USER cathy WITH PASSWORD '12345' NOSUPERUSER")
         cassandra.execute("CREATE USER dave WITH PASSWORD '12345' NOSUPERUSER")
-        cassandra.execute("LIST USERS")
-        self.assertEqual(3, cassandra.rowcount)
+        rows = cassandra.execute("LIST USERS")
+        self.assertEqual(3, len(rows))
 
         cathy = self.get_cursor(user='cathy', password='12345')
         self.assertUnauthorized('Only superusers are allowed to perform DROP USER queries',
                                 cathy, 'DROP USER dave')
 
-        cassandra.execute("LIST USERS")
-        self.assertEqual(3, cassandra.rowcount)
+        rows = cassandra.execute("LIST USERS")
+        self.assertEqual(3, len(rows))
 
         cassandra.execute('DROP USER dave')
-        cassandra.execute("LIST USERS")
-        self.assertEqual(2, cassandra.rowcount)
+        rows = cassandra.execute("LIST USERS")
+        self.assertEqual(2, len(rows))
 
     def dropping_nonexistent_user_throws_exception_test(self):
         self.prepare()
 
         cursor = self.get_cursor(user='cassandra', password='cassandra')
-        self.assertUnauthorized("User nonexistent doesn't exist",
-                                cursor, 'DROP USER nonexistent')
+        assert_invalid(cursor, 'DROP USER nonexistent', "User nonexistent doesn't exist")
 
     def regular_users_can_alter_their_passwords_only_test(self):
         self.prepare()
@@ -181,28 +175,27 @@ class TestAuth(Tester):
         self.prepare()
 
         cursor = self.get_cursor(user='cassandra', password='cassandra')
-        self.assertUnauthorized("User nonexistent doesn't exist",
-                                cursor, "ALTER USER nonexistent WITH PASSWORD 'doesn''tmatter'")
+        assert_invalid(cursor, "ALTER USER nonexistent WITH PASSWORD 'doesn''tmatter'", "User nonexistent doesn't exist",)
 
     @since('2.0')
     def conditional_create_drop_user_test(self):
         self.prepare()
         cursor = self.get_cursor(user='cassandra', password='cassandra')
 
-        cursor.execute("LIST USERS")
-        self.assertEqual(1, cursor.rowcount) # cassandra
+        users = cursor.execute("LIST USERS")
+        self.assertEqual(1, len(users)) # cassandra
 
         cursor.execute("CREATE USER IF NOT EXISTS aleksey WITH PASSWORD 'sup'")
         cursor.execute("CREATE USER IF NOT EXISTS aleksey WITH PASSWORD 'ignored'")
 
-        cursor.execute("LIST USERS")
-        self.assertEqual(2, cursor.rowcount) # cassandra + aleksey
+        users = cursor.execute("LIST USERS")
+        self.assertEqual(2, len(users)) # cassandra + aleksey
 
         cursor.execute("DROP USER IF EXISTS aleksey")
         cursor.execute("DROP USER IF EXISTS aleksey")
 
-        cursor.execute("LIST USERS")
-        self.assertEqual(1, cursor.rowcount) # cassandra
+        users = cursor.execute("LIST USERS")
+        self.assertEqual(1, len(users)) # cassandra
 
     def create_ks_auth_test(self):
         self.prepare()
@@ -320,8 +313,8 @@ class TestAuth(Tester):
                                 cathy, "SELECT * FROM ks.cf")
 
         cassandra.execute("GRANT SELECT ON ks.cf TO cathy")
-        cathy.execute("SELECT * FROM ks.cf")
-        self.assertEquals(0, cathy.rowcount)
+        rows = cathy.execute("SELECT * FROM ks.cf")
+        self.assertEquals(0, len(rows))
 
         self.assertUnauthorized("User cathy has no MODIFY permission on <table ks.cf> or any of its parents",
                                 cathy, "INSERT INTO ks.cf (id, val) VALUES (0, 0)")
@@ -338,15 +331,15 @@ class TestAuth(Tester):
         cassandra.execute("GRANT MODIFY ON ks.cf TO cathy")
         cathy.execute("INSERT INTO ks.cf (id, val) VALUES (0, 0)")
         cathy.execute("UPDATE ks.cf SET val = 1 WHERE id = 1")
-        cathy.execute("SELECT * FROM ks.cf")
-        self.assertEquals(2, cathy.rowcount)
+        rows = cathy.execute("SELECT * FROM ks.cf")
+        self.assertEquals(2, len(rows))
 
         cathy.execute("DELETE FROM ks.cf WHERE id = 1")
-        cathy.execute("SELECT * FROM ks.cf")
-        self.assertEquals(1, cathy.rowcount)
+        rows = cathy.execute("SELECT * FROM ks.cf")
+        self.assertEquals(1, len(rows))
 
-        cathy.execute("TRUNCATE ks.cf")
-        self.assertEquals(0, cathy.rowcount)
+        rows = cathy.execute("TRUNCATE ks.cf")
+        assert rows == None
 
     def grant_revoke_auth_test(self):
         self.prepare()
@@ -378,17 +371,13 @@ class TestAuth(Tester):
         cassandra.execute("CREATE USER cathy WITH PASSWORD '12345'")
         cassandra.execute("CREATE KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor':1}")
 
-        self.assertUnauthorized("<keyspace nonexistent> doesn't exist",
-                                cassandra, "GRANT ALL ON KEYSPACE nonexistent TO cathy")
+        assert_invalid(cassandra, "GRANT ALL ON KEYSPACE nonexistent TO cathy", "<keyspace nonexistent> doesn't exist")
 
-        self.assertUnauthorized("User nonexistent doesn't exist",
-                                cassandra, "GRANT ALL ON KEYSPACE ks TO nonexistent")
+        assert_invalid(cassandra, "GRANT ALL ON KEYSPACE ks TO nonexistent", "User nonexistent doesn't exist")
 
-        self.assertUnauthorized("<keyspace nonexistent> doesn't exist",
-                                cassandra, "REVOKE ALL ON KEYSPACE nonexistent FROM cathy")
+        assert_invalid(cassandra, "REVOKE ALL ON KEYSPACE nonexistent FROM cathy", "<keyspace nonexistent> doesn't exist")
 
-        self.assertUnauthorized("User nonexistent doesn't exist",
-                                cassandra, "REVOKE ALL ON KEYSPACE ks FROM nonexistent")
+        assert_invalid(cassandra, "REVOKE ALL ON KEYSPACE ks FROM nonexistent", "User nonexistent doesn't exist")
 
     def grant_revoke_cleanup_test(self):
         self.prepare()
@@ -401,8 +390,8 @@ class TestAuth(Tester):
 
         cathy = self.get_cursor(user='cathy', password='12345')
         cathy.execute("INSERT INTO ks.cf (id, val) VALUES (0, 0)")
-        cathy.execute("SELECT * FROM ks.cf")
-        self.assertEquals(1, cathy.rowcount)
+        rows = cathy.execute("SELECT * FROM ks.cf")
+        self.assertEquals(1, len(rows))
 
         # drop and recreate the user, make sure permissions are gone
         cassandra.execute("DROP USER cathy")
@@ -417,8 +406,8 @@ class TestAuth(Tester):
         # grant all the permissions back
         cassandra.execute("GRANT ALL ON ks.cf TO cathy")
         cathy.execute("INSERT INTO ks.cf (id, val) VALUES (0, 0)")
-        cathy.execute("SELECT * FROM ks.cf")
-        self.assertEqual(1, cathy.rowcount)
+        rows = cathy.execute("SELECT * FROM ks.cf")
+        self.assertEqual(1, len(rows))
 
         # drop and recreate the keyspace, make sure permissions are gone
         cassandra.execute("DROP KEYSPACE ks")
@@ -458,8 +447,8 @@ class TestAuth(Tester):
         # wait until the cache definitely expires and retry - should succeed now
         time.sleep(1.5)
         for c in cathys:
-            c.execute("SELECT * FROM ks.cf")
-            self.assertEqual(0, c.rowcount)
+            rows = c.execute("SELECT * FROM ks.cf")
+            self.assertEqual(0, len(rows))
 
     def list_permissions_test(self):
         self.prepare()
@@ -531,14 +520,14 @@ class TestAuth(Tester):
     def get_cursor(self, node_idx=0, user=None, password=None):
         node = self.cluster.nodelist()[node_idx]
         conn = self.cql_connection(node, version="3.0.1", user=user, password=password)
-        return conn.cursor()
+        return conn
 
     def assertPermissionsListed(self, expected, cursor, query):
-        cursor.execute(query)
-        perms = [(str(r[0]), str(r[1]), str(r[2])) for r in cursor.fetchall()]
+        rows = cursor.execute(query)
+        perms = [(str(r[0]), str(r[1]), str(r[2])) for r in rows]
         self.assertEqual(sorted(expected), sorted(perms))
 
     def assertUnauthorized(self, message, cursor, query):
-        with self.assertRaises(ProgrammingError) as cm:
+        with self.assertRaises(Unauthorized) as cm:
             cursor.execute(query)
-        self.assertEqual("Bad Request: " + message, cm.exception.message)
+        assert re.search(message, cm.exception.message), "Expected: %s" % message

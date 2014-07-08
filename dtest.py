@@ -13,6 +13,7 @@ from thrift.transport import TSocket
 from unittest import TestCase
 from cassandra.cluster import NoHostAvailable
 from cassandra.cluster import Cluster as PyCluster
+from cassandra.auth import PlainTextAuthProvider
 
 LOG_SAVED_DIR="logs"
 try:
@@ -421,7 +422,11 @@ class PyTester(Tester):
     def cql_connection(self, node, keyspace=None, version=None, user=None, password=None, compression=True):
 
         node_ip =  node.network_interfaces['binary'][0]
-        cluster = PyCluster([node_ip], compression=compression)
+        if user is None:
+            cluster = PyCluster([node_ip], compression=compression)
+        else:
+            auth_provider=PlainTextAuthProvider(username=user, password=password)
+            cluster = PyCluster([node_ip], auth_provider=auth_provider, compression=compression)
         session = cluster.connect()
         if keyspace is not None:
             session.execute('USE %s' % keyspace)
