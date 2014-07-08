@@ -139,7 +139,6 @@ class TestArchiveCommitlog(SnapshotTester):
         # Delete all commitlog backups so far:
         for f in glob.glob(tmp_commitlog+"/*"):
             os.remove(f)
-            os.remove(f)
 
         snapshot_dir = self.make_snapshot(node1, 'ks', 'cf', 'basic')
 
