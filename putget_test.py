@@ -1,6 +1,7 @@
-from dtest import Tester
-import tools
-from tools import no_vnodes, create_c1c2_table, ThriftConnection
+from dtest import PyTester as Tester
+import pytools as tools
+from pytools import no_vnodes, create_c1c2_table
+from cassandra import ConsistencyLevel
 
 import time
 
@@ -26,7 +27,7 @@ class TestPutGet(Tester):
         cluster.populate(3).start()
         [node1, node2, node3] = cluster.nodelist()
 
-        cursor = self.patient_cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'ks', 3)
         self.create_cf(cursor, 'cf', compression=compression)
 
@@ -39,14 +40,14 @@ class TestPutGet(Tester):
         cluster.populate(3).start()
         [node1, node2, node3] = cluster.nodelist()
 
-        cursor = self.patient_cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'ks', 2)
         create_c1c2_table(self, cursor)
 
         # insert and get at CL.QUORUM (since RF=2, node1 won't have all key locally)
         for n in xrange(0, 1000):
-            tools.insert_c1c2(cursor, n, "QUORUM")
-            tools.query_c1c2(cursor, n, "QUORUM")
+            tools.insert_c1c2(cursor, n, ConsistencyLevel.QUORUM)
+            tools.query_c1c2(cursor, n, ConsistencyLevel.QUORUM)
 
     def rangeputget_test(self):
         """ Simple put/get on ranges of rows, hitting multiple sstables """
@@ -56,7 +57,7 @@ class TestPutGet(Tester):
         cluster.populate(3).start()
         [node1, node2, node3] = cluster.nodelist()
 
-        cursor = self.patient_cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'ks', 2)
         self.create_cf(cursor, 'cf')
 
@@ -69,7 +70,7 @@ class TestPutGet(Tester):
         cluster.populate(3).start()
         [node1, node2, node3] = cluster.nodelist()
 
-        cursor = self.patient_cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'ks', 1)
         self.create_cf(cursor, 'cf')
 
@@ -117,7 +118,7 @@ class TestPutGet(Tester):
         node1.set_configuration_options(values={'initial_token': "b".encode('hex')  })
         cluster.start()
         time.sleep(.5)
-        cursor = self.patient_cql_connection(node1, version="2.0.0").cursor()
+        cursor = self.patient_cql_connection(node1, version="2.0.0")
         self.create_ks(cursor, 'ks', 1)
 
         query = """

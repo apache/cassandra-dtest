@@ -52,6 +52,13 @@ def insert_columns(tester, session, key, columns_count, consistency=ConsistencyL
     simple_query = SimpleStatement(query, consistency_level=consistency)
     session.execute(simple_query)
 
+def query_columns(tester, cursor, key, columns_count, consistency=ConsistencyLevel.QUORUM, offset=0):
+    query = SimpleStatement('SELECT c, v FROM cf WHERE key=\'k%s\' AND c >= \'c%06d\' AND c <= \'c%06d\'' % (key, offset, columns_count+offset-1), consistency_level=consistency)
+    res = cursor.execute(query)
+    assert len(res) == columns_count, "%s != %s (%s-%s)" % (len(res), columns_count, offset, columns_count+offset-1)
+    for i in xrange(0, columns_count):
+        assert res[i][1] == 'value%d' % (i+offset)
+
 def retry_till_success(fun, *args, **kwargs):
     timeout = kwargs.pop('timeout', 60)
     bypassed_exception = kwargs.pop('bypassed_exception', Exception)
@@ -116,6 +123,19 @@ def _validate_row(cluster, res):
             assert res[i][2] == 'value%d' % (i*2), 'for %d, expecting value%d, got %s' % (i, i*2, res[i][2])
         else:
             assert res[i][2] == 'value%d' % i, 'for %d, expecting value%d, got %s' % (i, i, res[i][2])
+
+# Simple puts and range gets, with overwrites and flushes between inserts to
+# make sure we hit multiple sstables on reads
+def range_putget(cluster, cursor, cl=ConsistencyLevel.QUORUM):
+    keys = 100
+
+    _put_with_overwrite(cluster, cursor, keys, cl)
+
+    rows = cursor.execute('SELECT * FROM cf LIMIT 10000000')
+    assert len(rows) == keys * 100, len(rows)
+    for k in xrange(0, keys):
+        res = cursor.fetchmany(100)
+        _validate_row(cluster, res)
 
 class since(object):
     def __init__(self, cass_version, max_version=None):
