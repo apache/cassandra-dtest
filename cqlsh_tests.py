@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
-from dtest import Tester, debug
+from dtest import PyTester as Tester
+from dtest import debug
 from tools import since, require
 from ccmlib import common
 import subprocess
@@ -31,11 +32,11 @@ class TestCqlsh(Tester):
             insert into simple (id, value) VALUES (4, 'four');
             insert into simple (id, value) VALUES (5, 'five')""")
 
-        cursor = self.patient_cql_connection(node1).cursor()
-        cursor.execute("select id, value from simple.simple");
+        cursor = self.patient_cql_connection(node1)
+        rows = cursor.execute("select id, value from simple.simple");
 
         self.assertEqual({1:'one', 2:'two', 3:'three', 4:'four', 5:'five'}, 
-                         {k : v for k,v in cursor})
+                         {k : v for k,v in rows})
 
     def test_eat_glass(self):
         
@@ -157,13 +158,13 @@ UPDATE varcharmaptable SET varcharvarintmap = varcharvarintmap + {'Vitrum edere 
 UPDATE varcharmaptable SET varcharvarintmap['Vitrum edere possum, mihi non nocet.'] = 1010010101020400204143243 WHERE varcharkey= '᚛᚛ᚉᚑᚅᚔᚉᚉᚔᚋ ᚔᚈᚔ ᚍᚂᚐᚅᚑ ᚅᚔᚋᚌᚓᚅᚐ᚜'
         """.encode("utf-8"))
 
-        cursor = self.patient_cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1)
         def verify_varcharmap(map_name, expected, encode_value=False):
-            cursor.execute((u"SELECT %s FROM testks.varcharmaptable WHERE varcharkey= '᚛᚛ᚉᚑᚅᚔᚉᚉᚔᚋ ᚔᚈᚔ ᚍᚂᚐᚅᚑ ᚅᚔᚋᚌᚓᚅᚐ᚜';" % map_name).encode("utf-8"))
+            rows = cursor.execute((u"SELECT %s FROM testks.varcharmaptable WHERE varcharkey= '᚛᚛ᚉᚑᚅᚔᚉᚉᚔᚋ ᚔᚈᚔ ᚍᚂᚐᚅᚑ ᚅᚔᚋᚌᚓᚅᚐ᚜';" % map_name).encode("utf-8"))
             if encode_value:
-                got = {k.encode("utf-8"):v.encode("utf-8") for k,v in cursor.fetchone()[0].iteritems()}
+                got = {k.encode("utf-8"):v.encode("utf-8") for k,v in rows[0][0].iteritems()}
             else:
-                got = {k.encode("utf-8"):v for k,v in cursor.fetchone()[0].iteritems()}
+                got = {k.encode("utf-8"):v for k,v in rows[0][0].iteritems()}
             self.assertEqual(got, expected)
 
         verify_varcharmap('varcharasciimap', {
