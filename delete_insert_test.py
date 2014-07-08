@@ -1,6 +1,8 @@
-from dtest import Tester, debug
+from dtest import PyTester as Tester
+from dtest import debug
 import uuid
-import cql
+from cassandra import ConsistencyLevel
+from cassandra.query import SimpleStatement
 import os
 import threading
 import random
@@ -45,7 +47,7 @@ class DeleteInsertTest(Tester):
         cluster.populate([2,2]).start()
         node1 = cluster.nodelist()[0]
 
-        cursor = self.cql_connection(node1).cursor()
+        cursor = self.cql_connection(node1)
         cursor.consistency_level = 'LOCAL_QUORUM'
         
         self.create_ddl(cursor)
@@ -65,10 +67,10 @@ class DeleteInsertTest(Tester):
                 self.connection = connection
                 
             def run(self):
-                cursor = self.connection.cursor()
-                cursor.consistency_level = 'LOCAL_QUORUM'
-                cursor.execute("SELECT * FROM delete_insert_search_test.test WHERE group = 'group2'")
-                assert cursor.rowcount == len(deleted)
+                cursor = self.connection
+                query = SimpleStatement("SELECT * FROM delete_insert_search_test.test WHERE group = 'group2'", consistency_level=ConsistencyLevel.LOCAL_QUORUM)
+                rows = cursor.execute(query)
+                assert len(rows) == len(deleted)
 
         threads = []
         for x in range(20):
