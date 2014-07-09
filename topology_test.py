@@ -1,9 +1,10 @@
-from dtest import Tester
-from tools import *
-from assertions import *
+from dtest import PyTester as Tester
+from pytools import *
+from pyassertions import *
 
 import os, sys, time
 from ccmlib.cluster import Cluster
+from cassandra import ConsistencyLevel
 
 class TestTopology(Tester):
 
@@ -15,12 +16,12 @@ class TestTopology(Tester):
         cluster.populate(3, tokens=[0, 2**48, 2**62]).start()
         [node1, node2, node3] = cluster.nodelist()
 
-        cursor = self.patient_cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'ks', 1)
         self.create_cf(cursor, 'cf', columns={'c1': 'text', 'c2': 'text'})
 
         for n in xrange(0, 10000):
-            insert_c1c2(cursor, n, "ONE")
+            insert_c1c2(cursor, n, ConsistencyLevel.ONE)
 
         cluster.flush()
 
@@ -42,7 +43,7 @@ class TestTopology(Tester):
 
         # Check we can get all the keys
         for n in xrange(0, 10000):
-            query_c1c2(cursor, n, "ONE")
+            query_c1c2(cursor, n, ConsistencyLevel.ONE)
 
         # Now the load should be basically even
         sizes = [ node.data_size() for node in [node1, node2, node3] ]
@@ -59,12 +60,12 @@ class TestTopology(Tester):
         cluster.populate(4, tokens=tokens).start()
         [node1, node2, node3, node4] = cluster.nodelist()
 
-        cursor = self.patient_cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'ks', 2)
         self.create_cf(cursor, 'cf',columns={'c1': 'text', 'c2': 'text'})
 
         for n in xrange(0, 10000):
-            insert_c1c2(cursor, n, "QUORUM")
+            insert_c1c2(cursor, n, ConsistencyLevel.QUORUM)
 
         cluster.flush()
         sizes = [ node.data_size() for node in cluster.nodelist() if node.is_running()]
@@ -79,7 +80,7 @@ class TestTopology(Tester):
 
         # Check we can get all the keys
         for n in xrange(0, 10000):
-            query_c1c2(cursor, n, "QUORUM")
+            query_c1c2(cursor, n, ConsistencyLevel.QUORUM)
 
         sizes = [ node.data_size() for node in cluster.nodelist() if node.is_running() ]
         three_node_sizes = sizes
@@ -96,7 +97,7 @@ class TestTopology(Tester):
 
             # Check we can get all the keys
             for n in xrange(0, 10000):
-                query_c1c2(cursor, n, "QUORUM")
+                query_c1c2(cursor, n, ConsistencyLevel.QUORUM)
 
             sizes = [ node.data_size() for node in cluster.nodelist() if node.is_running() ]
             assert_almost_equal(*sizes)
@@ -111,7 +112,7 @@ class TestTopology(Tester):
 
             # Check we can get all the keys
             for n in xrange(0, 10000):
-                query_c1c2(cursor, n, "QUORUM")
+                query_c1c2(cursor, n, ConsistencyLevel.QUORUM)
 
             sizes = [ node.data_size() for node in cluster.nodelist() if node.is_running() ]
             # We should be back to the earlir 3 nodes situation
@@ -126,12 +127,12 @@ class TestTopology(Tester):
         cluster.populate(3, tokens=tokens).start()
         [node1, node2, node3] = cluster.nodelist()
 
-        cursor = self.patient_cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'ks', 3)
         self.create_cf(cursor, 'cf', columns={'c1': 'text', 'c2': 'text'})
 
         for n in xrange(0, 10000):
-            insert_c1c2(cursor, n, "QUORUM")
+            insert_c1c2(cursor, n, ConsistencyLevel.QUORUM)
 
         cluster.flush()
 
@@ -145,7 +146,7 @@ class TestTopology(Tester):
         time.sleep(.5)
 
         for n in xrange(0, 10000):
-            query_c1c2(cursor, n, "QUORUM")
+            query_c1c2(cursor, n, ConsistencyLevel.QUORUM)
 
         sizes = [ node.data_size() for node in cluster.nodelist() if node.is_running()]
         assert_almost_equal(*sizes)
@@ -160,12 +161,12 @@ class TestTopology(Tester):
         node1 = cluster.nodelist()[0]
         time.sleep(0.2)
 
-        cursor = self.patient_cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'ks', 1)
         self.create_cf(cursor, 'cf', columns={'c1': 'text', 'c2': 'text'})
 
         for n in xrange(0, 10000):
-            insert_c1c2(cursor, n, "ONE")
+            insert_c1c2(cursor, n, ConsistencyLevel.ONE)
 
         cluster.flush()
 
@@ -176,4 +177,4 @@ class TestTopology(Tester):
 
         # Check we can get all the keys
         for n in xrange(0, 10000):
-            query_c1c2(cursor, n, "ONE")
+            query_c1c2(cursor, n, ConsistencyLevel.ONE)

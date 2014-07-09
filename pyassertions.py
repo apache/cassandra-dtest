@@ -47,3 +47,13 @@ def assert_all(cursor, query, expected, cl=ConsistencyLevel.ONE):
     res = cursor.execute(simple_query)
     list_res = rows_to_list(res)
     assert list_res == expected, res
+
+def assert_almost_equal(*args, **kwargs):
+    try:
+        error = kwargs['error']
+    except KeyError:
+        error = 0.16
+
+    vmax = max(args)
+    vmin = min(args)
+    assert vmin > vmax * (1.0 - error), "values not within %.2f%% of the max: %s" % (error * 100, args)
