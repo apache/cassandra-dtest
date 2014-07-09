@@ -1,11 +1,12 @@
-from dtest import Tester, debug, DISABLE_VNODES
+from dtest import PyTester as Tester
+from dtest import debug, DISABLE_VNODES
 import unittest
-from tools import *
+from pytools import *
 from ccmlib.cluster import Cluster
 from ccmlib.node import NodeError
+from cassandra import ConsistencyLevel, Unavailable, ReadTimeout
+from cassandra.query import SimpleStatement
 import time
-from cql import OperationalError
-from cql.cassandra.ttypes import UnavailableException
 
 class NodeUnavailable(Exception):
     pass
@@ -41,9 +42,10 @@ class TestReplaceAddress(Tester):
             node1.stress(['-o', 'insert', '--num-keys=10000', '--replication-factor=3'])
         else:
             node1.stress(['write', 'n=10000', '-schema', 'replication(factor=3)'])
-        cursor = self.patient_cql_connection(node1).cursor()
-        cursor.execute('select * from "Keyspace1"."Standard1" LIMIT 1', consistency_level='THREE')
-        initialData = cursor.fetchall()
+        cursor = self.patient_cql_connection(node1)
+        cursor.default_timeout = 45
+        query = SimpleStatement('select * from "Keyspace1"."Standard1" LIMIT 1', consistency_level=ConsistencyLevel.THREE)
+        initialData = cursor.execute(query)
         
         #stop node, query should not work with consistency 3
         debug("Stopping node 3.")
@@ -53,8 +55,9 @@ class TestReplaceAddress(Tester):
         debug("Testing node stoppage (query should fail).")
         with self.assertRaises(NodeUnavailable):
             try:
-                cursor.execute('select * from "Keyspace1"."Standard1" LIMIT 1', consistency_level='THREE')
-            except (UnavailableException, OperationalError):
+                query = SimpleStatement('select * from "Keyspace1"."Standard1" LIMIT 1', consistency_level=ConsistencyLevel.THREE)
+                cursor.execute(query)
+            except (Unavailable, ReadTimeout):
                 raise NodeUnavailable("Node could not be queried.")
 
         #replace node 3 with node 4
@@ -65,8 +68,8 @@ class TestReplaceAddress(Tester):
 
         #query should work again
         debug("Verifying querying works again.")
-        cursor.execute('select * from "Keyspace1"."Standard1" LIMIT 1', consistency_level='THREE')
-        finalData = cursor.fetchall()
+        query = SimpleStatement('select * from "Keyspace1"."Standard1" LIMIT 1', consistency_level=ConsistencyLevel.THREE)
+        finalData = cursor.execute(query)
         self.assertListEqual(initialData, finalData)
         
         debug("Verifying tokens migrated sucessfully")
@@ -96,9 +99,9 @@ class TestReplaceAddress(Tester):
             node1.stress(['-o', 'insert', '--num-keys=10000', '--replication-factor=3'])
         else:
             node1.stress(['write', 'n=10000', '-schema', 'replication(factor=3)'])
-        cursor = self.patient_cql_connection(node1).cursor()
-        cursor.execute('select * from "Keyspace1"."Standard1" LIMIT 1', consistency_level='THREE')
-        initialData = cursor.fetchall()
+        cursor = self.patient_cql_connection(node1)
+        query = SimpleStatement('select * from "Keyspace1"."Standard1" LIMIT 1', consistency_level=ConsistencyLevel.THREE)
+        initialData = cursor.execute(query)
 
         #replace active node 3 with node 4
         debug("Starting node 4 to replace active node 3")
@@ -108,8 +111,7 @@ class TestReplaceAddress(Tester):
         with self.assertRaises(NodeError):
             node4.start(replace_address='127.0.0.3')
 
-        checkError = node4.grep_log("java.lang.UnsupportedOperationException: Cannnot replace a live node...")
-
+        checkError = node4.grep_log("java.lang.UnsupportedOperationException: Cannot replace a live node...")
         self.assertEqual(len(checkError), 1)
 
     def replace_nonexistent_node_test(self):
@@ -123,9 +125,9 @@ class TestReplaceAddress(Tester):
             node1.stress(['-o', 'insert', '--num-keys=10000', '--replication-factor=3'])
         else:
             node1.stress(['write', 'n=10000', '-schema', 'replication(factor=3)'])
-        cursor = self.patient_cql_connection(node1).cursor()
-        cursor.execute('select * from "Keyspace1"."Standard1" LIMIT 1', consistency_level='THREE')
-        initialData = cursor.fetchall()
+        cursor = self.patient_cql_connection(node1)
+        query = SimpleStatement('select * from "Keyspace1"."Standard1" LIMIT 1', consistency_level=ConsistencyLevel.THREE)
+        initialData = cursor.execute(query)
 
         debug('Start node 4 and replace an address with no node')
         node4 = Node('node4', cluster, True, ('127.0.0.4', 9160), ('127.0.0.4', 7000), '7400', '0', None, ('127.0.0.4',9042))
