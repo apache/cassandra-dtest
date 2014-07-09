@@ -1,6 +1,6 @@
-from dtest import Tester
-from assertions import *
-from tools import *
+from dtest import PyTester as Tester
+from pyassertions import *
+from pytools import *
 
 import os, sys, time, tools
 from uuid import UUID
