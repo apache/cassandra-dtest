@@ -1,6 +1,7 @@
 import time
 
-from dtest import Tester, debug
+from dtest import PyTester as Tester
+from dtest import debug
 
 import cql
 from cql.cassandra.ttypes import CfDef, ColumnParent, CounterColumn, \
@@ -21,7 +22,7 @@ class TestSuperCounterClusterRestart(Tester):
         node1 = cluster.nodelist()[0]
 
         time.sleep(.5)
-        cursor = self.patient_cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'ks', 3)
         time.sleep(1) # wait for propagation
 
