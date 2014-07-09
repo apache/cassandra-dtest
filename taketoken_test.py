@@ -1,9 +1,11 @@
 import time
 
-from dtest import Tester, debug
-from assertions import assert_unavailable
-from tools import (create_c1c2_table, insert_c1c2, query_c1c2, retry_till_success,
+from dtest import PyTester as Tester
+from dtest import debug
+from pyassertions import assert_unavailable
+from pytools import (create_c1c2_table, insert_c1c2, query_c1c2, retry_till_success,
                    insert_columns, new_node, no_vnodes, since)
+from cassandra import ConsistencyLevel
 
 class TestTakeToken(Tester):
 
@@ -24,29 +26,27 @@ class TestTakeToken(Tester):
         cluster.start()
        
         debug("Set to talk to node 2")
-        n2cursor = self.patient_cql_connection(node2).cursor()
+        n2cursor = self.patient_cql_connection(node2)
         self.create_ks(n2cursor, 'ks', 2)
         create_c1c2_table(self, n2cursor)
 
         debug("Generating some data for all nodes")
         for n in xrange(10,20):
-            insert_c1c2(n2cursor, n, 'ALL')
+            insert_c1c2(n2cursor, n, ConsistencyLevel.ALL)
 
         node1.flush()
        
         debug("Writing data to node2")
         for n in xrange(30,1000):
-            insert_c1c2(n2cursor, n, 'ONE')
+            insert_c1c2(n2cursor, n, ConsistencyLevel.ONE)
         node2.flush()
    
         debug("Getting token from node 1")
-        n1cursor = self.patient_cql_connection(node1).cursor()
-        n1cursor.execute('SELECT tokens FROM system.local')
-        n1tokens = n1cursor.fetchone()
+        n1cursor = self.patient_cql_connection(node1)
+        n1tokens = n1cursor.execute('SELECT tokens FROM system.local')
 
-        n3cursor = self.patient_cql_connection(node3).cursor()
-        n3cursor.execute('SELECT tokens FROM system.local')
-        n3tokens = n3cursor.fetchone()
+        n3cursor = self.patient_cql_connection(node3)
+        n3tokens = n3cursor.execute('SELECT tokens FROM system.local')
 
         debug("Relocate tokens from node1 to node3")
         i = 0;
@@ -64,20 +64,18 @@ class TestTakeToken(Tester):
         time.sleep(1)
 
         debug("Check that the tokens were really moved")
-        n3cursor.execute('SELECT tokens FROM system.local')
-        n3tokens = n3cursor.fetchone()
+        n3tokens = n3cursor.execute('SELECT tokens FROM system.local')
 
-        n1cursor.execute('SELECT tokens FROM system.local')
-        n1tokens = n1cursor.fetchone()
+        n1tokens = n1cursor.execute('SELECT tokens FROM system.local')
 
         debug("n1 %s n3 %s" % (n1tokens,n3tokens))
-        assert len(n3tokens[0]) == 18
-        assert len(n1tokens[0]) == 2
+        assert len(list(n3tokens[0][0])) == 18
+        assert len(list(n1tokens[0][0])) == 2
 
         debug("Checking that no data was lost")
         for n in xrange(10,20):
-            query_c1c2(n2cursor, n, 'ALL')
+            query_c1c2(n2cursor, n, ConsistencyLevel.ALL)
 
         for n in xrange(30,1000):
-            query_c1c2(n2cursor, n, 'ALL')
+            query_c1c2(n2cursor, n, ConsistencyLevel.ALL)
 
