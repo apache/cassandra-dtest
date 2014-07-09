@@ -12,9 +12,7 @@ from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
 
 def rows_to_list(rows):
-    new_list = []
-    for row in rows:
-        new_list.append(list(row))
+    new_list = [list(row) for row in rows]
     return new_list
 
 def create_c1c2_table(tester, session, read_repair=None):
