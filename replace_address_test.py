@@ -108,7 +108,7 @@ class TestReplaceAddress(Tester):
         with self.assertRaises(NodeError):
             node4.start(replace_address='127.0.0.3')
 
-        checkError = node4.grep_log("java.lang.UnsupportedOperationException: Cannnot replace a live node...")
+        checkError = node4.grep_log("java.lang.UnsupportedOperationException: Cannot replace a live node...")
 
         self.assertEqual(len(checkError), 1)
 
