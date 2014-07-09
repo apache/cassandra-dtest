@@ -1,6 +1,7 @@
-from dtest import Tester, debug
-from assertions import *
-from tools import *
+from dtest import PyTester as Tester
+from dtest import debug
+from pyassertions import *
+from pytools import *
 
 from os.path import getsize
 import time
