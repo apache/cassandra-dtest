@@ -436,7 +436,7 @@ class PyTester(Tester):
 
     def patient_cql_connection(self, node, keyspace=None, version=None, user=None, password=None, timeout=10, compression=True):
         """
-        Returns a connection after it stops throwing TTransportExceptions due to not being ready.
+        Returns a connection after it stops throwing NoHostAvailables due to not being ready.
 
         If the timeout is exceeded, the exception is raised.
         """
