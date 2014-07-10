@@ -419,9 +419,15 @@ class PyTester(Tester):
     def __init__(self, *argv, **kwargs):
         Tester.__init__(self, *argv, **kwargs)
 
-    def cql_connection(self, node, keyspace=None, version=None, user=None, password=None, compression=True, protocol_version=2):
-        
+    def cql_connection(self, node, **kwargs):
         node_ip =  node.network_interfaces['binary'][0]
+        keyspace = kwargs.get('keyspace', None)
+        version = kwargs.get('version', None)
+        user = kwargs.get('user', None)
+        password = kwargs.get('password', None)
+        compression = kwargs.get('compression', True)
+        protocol_version = kwargs.get('protocol_version', 2)
+
         if user is None:
             cluster = PyCluster([node_ip], compression=compression, protocol_version=protocol_version)
         else:
@@ -434,26 +440,22 @@ class PyTester(Tester):
         self.connections.append(session)
         return session
 
-    def patient_cql_connection(self, node, keyspace=None, version=None, user=None, password=None, timeout=10, compression=True, protocol_version=2):
+    def patient_cql_connection(self, node, **kwargs):
         """
         Returns a connection after it stops throwing NoHostAvailables due to not being ready.
 
         If the timeout is exceeded, the exception is raised.
         """
+        timeout = kwargs.get('timeout', 10)
+        
         if is_win():
             timeout = timeout * 5
 
         return retry_till_success(
             self.cql_connection,
             node,
-            keyspace=keyspace,
-            version=version,
-            user=user,
-            password=password,
-            timeout=timeout,
-            compression=compression,
-            protocol_version=protocol_version,
-            bypassed_exception=NoHostAvailable
+            bypassed_exception=NoHostAvailable,
+            **kwargs
         )
 
     def create_ks(self, session, name, rf):
