@@ -5,8 +5,10 @@ import struct
 import time
 import uuid
 from cql import ProgrammingError
-from dtest import Tester, debug
-from tools import since
+from dtest import PyTester as Tester
+from dtest import debug
+from pytools import since
+from pyassertions import assert_invalid
 
 
 def decode_text(string):
@@ -68,7 +70,7 @@ class TestUserTypes(Tester):
     #  cluster = self.cluster
     #  cluster.populate(3).start()
     #  node1, node2, node3 = cluster.nodelist()
-    #  cursor = self.patient_cql_connection(node1).cursor()
+    #  cursor = self.patient_cql_connection(node1)
     #  self.create_ks(cursor, 'user_type_renaming', 2)
 
     #  stmt = """
@@ -109,7 +111,7 @@ class TestUserTypes(Tester):
     #    cluster = self.cluster
     #    cluster.populate(3).start()
     #    node1, node2, node3 = cluster.nodelist()
-    #    cursor = self.patient_cql_connection(node1).cursor()
+    #    cursor = self.patient_cql_connection(node1)
     #    self.create_ks(cursor, 'nested_user_type_renaming', 2)
 
     #    stmt = """
@@ -210,7 +212,7 @@ class TestUserTypes(Tester):
         cluster = self.cluster
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
-        cursor = self.patient_cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'user_type_dropping', 2)
 
         stmt = """
@@ -245,8 +247,7 @@ class TestUserTypes(Tester):
         stmt = """
               DROP TYPE simple_type;
            """
-        with self.assertRaisesRegexp(ProgrammingError, 'Cannot drop user type user_type_dropping.simple_type as it is still used by table user_type_dropping.simple_table'):
-            cursor.execute(stmt)
+        assert_invalid(cursor, stmt, 'Cannot drop user type user_type_dropping.simple_type as it is still used by table user_type_dropping.simple_table')
 
         # now that we've confirmed that a user type cannot be dropped while in use
         # let's remove the offending table
@@ -267,8 +268,8 @@ class TestUserTypes(Tester):
         stmt = """
               SELECT type_name from system.schema_usertypes;
            """
-        cursor.execute(stmt)
-        self.assertEqual(0, cursor.rowcount)
+        rows = cursor.execute(stmt)
+        self.assertEqual(0, len(rows))
 
     @since('2.1')
     def test_nested_type_dropping(self):
@@ -278,7 +279,7 @@ class TestUserTypes(Tester):
         cluster = self.cluster
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
-        cursor = self.patient_cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'nested_user_type_dropping', 2)
 
         stmt = """
@@ -304,8 +305,7 @@ class TestUserTypes(Tester):
         stmt = """
               DROP TYPE simple_type;
            """
-        with self.assertRaisesRegexp(ProgrammingError, 'Cannot drop user type nested_user_type_dropping.simple_type as it is still used by user type another_type'):
-            cursor.execute(stmt)
+        assert_invalid(cursor, stmt, 'Cannot drop user type nested_user_type_dropping.simple_type as it is still used by user type another_type')
 
         # drop the type that's impeding the drop, and then try again
         stmt = """
@@ -322,8 +322,8 @@ class TestUserTypes(Tester):
         stmt = """
               SELECT type_name from system.schema_usertypes;
            """
-        cursor.execute(stmt)
-        self.assertEqual(0, cursor.rowcount)
+        rows = cursor.execute(stmt)
+        self.assertEqual(0, len(rows))
 
     @since('2.1')
     def test_type_enforcement(self):
@@ -333,7 +333,7 @@ class TestUserTypes(Tester):
         cluster = self.cluster
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
-        cursor = self.cql_connection(node1).cursor()
+        cursor = self.cql_connection(node1)
         self.create_ks(cursor, 'user_type_enforcement', 2)
 
         stmt = """
@@ -366,16 +366,15 @@ class TestUserTypes(Tester):
               INSERT INTO simple_table (id, number)
               VALUES ({id}, {{user_number: 'uh oh....this is not a number'}});
            """.format(id=_id)
-        with self.assertRaisesRegexp(ProgrammingError, 'field user_number is not of type int'):
-            cursor.execute(stmt)
+        assert_invalid( cursor, stmt, 'field user_number is not of type int')
 
         # let's check the rowcount and make sure the data
         # didn't get inserted when the exception asserted above was thrown
         stmt = """
               SELECT * FROM simple_table;
            """
-        cursor.execute(stmt)
-        self.assertEqual(0, cursor.rowcount)
+        rows = cursor.execute(stmt)
+        self.assertEqual(0, len(rows))
 
     @since('2.1')
     def test_nested_user_types(self):
@@ -383,7 +382,7 @@ class TestUserTypes(Tester):
         cluster = self.cluster
         cluster.populate(3).start()
         node1,node2,node3 = cluster.nodelist()
-        cursor = self.patient_cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'user_types', 2)
 
         stmt = """
@@ -455,9 +454,9 @@ class TestUserTypes(Tester):
         stmt = """
               SELECT primary_item, other_items, other_containers from bucket where id={id};
            """.format(id=_id)
-        cursor.execute(stmt)
+        rows = cursor.execute(stmt)
         
-        primary_item, other_items, other_containers = cursor.fetchone()
+        primary_item, other_items, other_containers = rows[0]
         
         self.assertEqual(decode(primary_item), [[u'test', u'test2']])
         self.assertEqual(decode(other_items), [[u'stuff', [u'one', u'two']]])
@@ -481,9 +480,9 @@ class TestUserTypes(Tester):
             stmt = """
               SELECT other_containers from bucket WHERE id={id}
             """.format(id=_id)
-            cursor.execute(stmt)
+            rows = cursor.execute(stmt)
 
-            items = cursor.fetchone()[0]
+            items = rows[0][0]
             self.assertEqual(decode(items), [[u'stuff3', [u'one_2_other', u'two_2_other']], [u'stuff4', [u'one_3_other', u'two_3_other']]])
 
     @since('2.1')
@@ -494,7 +493,7 @@ class TestUserTypes(Tester):
         cluster = self.cluster
         cluster.populate(3).start()
         node1,node2,node3 = cluster.nodelist()
-        cursor = self.patient_cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'user_type_pkeys', 2)
         
         stmt = """
@@ -530,15 +529,14 @@ class TestUserTypes(Tester):
         stmt = """
               SELECT id, name.first from person_likes where id={id};
            """.format(id=_id)
-        with self.assertRaisesRegexp(ProgrammingError, 'Partition key part name must be restricted since preceding part is'):
-            cursor.execute(stmt)
+        assert_invalid(cursor, stmt, 'Partition key part name must be restricted since preceding part is')
             
         stmt = """
               SELECT id, name.first, like from person_likes where id={id} and name = {{first:'Nero', middle: 'Claudius Caesar Augustus', last: 'Germanicus'}};
            """.format(id=_id)
-        cursor.execute(stmt)
+        rows = cursor.execute(stmt)
         
-        row_uuid, first_name, like = cursor.fetchone()
+        row_uuid, first_name, like = rows[0]
         
         self.assertEqual(first_name, u'Nero')
         self.assertEqual(like, u'arson')
@@ -552,7 +550,7 @@ class TestUserTypes(Tester):
         cluster = self.cluster
         cluster.populate(3).start()
         node1,node2,node3 = cluster.nodelist()
-        cursor = self.patient_cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'user_type_indexing', 2)
                 
         stmt = """
@@ -579,8 +577,7 @@ class TestUserTypes(Tester):
         stmt = """
               SELECT * from person_likes where name = {first:'Nero', middle: 'Claudius Caesar Augustus', last: 'Germanicus'};
             """
-        with self.assertRaisesRegexp(ProgrammingError, 'No indexed columns present in by-columns clause'):
-            cursor.execute(stmt)
+        assert_invalid(cursor, stmt, 'No indexed columns present in by-columns clause')
         
         # add index and query again (even though there are no rows in the table yet)
         stmt = """
@@ -591,8 +588,8 @@ class TestUserTypes(Tester):
         stmt = """
               SELECT * from person_likes where name = {first:'Nero', middle: 'Claudius Caesar Augustus', last: 'Germanicus'};
             """
-        cursor.execute(stmt)
-        self.assertEqual(0, cursor.rowcount)
+        rows = cursor.execute(stmt)
+        self.assertEqual(0, len(rows))
 
         # add a row which doesn't specify data for the indexed column, and query again
         _id = uuid.uuid4()
@@ -605,8 +602,8 @@ class TestUserTypes(Tester):
         stmt = """
               SELECT * from person_likes where name = {first:'Bob', middle: 'Testy', last: 'McTesterson'};
             """
-        cursor.execute(stmt)
-        self.assertEqual(0, cursor.rowcount)
+        rows = cursor.execute(stmt)
+        self.assertEqual(0, len(rows))
         
         # finally let's add a queryable row, and get it back using the index
         _id = uuid.uuid4()
@@ -620,9 +617,9 @@ class TestUserTypes(Tester):
         stmt = """
               SELECT id, name.first, like from person_likes where name = {first:'Nero', middle: 'Claudius Caesar Augustus', last: 'Germanicus'};
            """
-        cursor.execute(stmt)
+        rows = cursor.execute(stmt)
         
-        row_uuid, first_name, like = cursor.fetchone()
+        row_uuid, first_name, like = rows[0]
         
         self.assertEqual(str(row_uuid), str(_id))
         self.assertEqual(first_name, u'Nero')
@@ -637,9 +634,9 @@ class TestUserTypes(Tester):
         stmt = """
             SELECT id, name.first, like from person_likes where name = {first:'Nero', middle: 'Claudius Caesar Augustus', last: 'Germanicus'};
             """
-        cursor.execute(stmt)
+        rows = cursor.execute(stmt)
         
-        row_uuid, first_name, like = cursor.fetchone()
+        row_uuid, first_name, like = rows[0]
         
         self.assertEqual(str(row_uuid), str(_id))
         self.assertEqual(first_name, u'Nero')
@@ -657,9 +654,9 @@ class TestUserTypes(Tester):
         stmt = """
             SELECT id, name.first, like from person_likes where name = {first:'Abraham', middle:'', last:'Lincoln'};
             """
-        cursor.execute(stmt)
+        rows = cursor.execute(stmt)
         
-        row_uuid, first_name, like = cursor.fetchone()
+        row_uuid, first_name, like = rows[0]
         
         self.assertEqual(str(row_uuid), str(_id))
         self.assertEqual(first_name, u'Abraham')
@@ -688,7 +685,7 @@ class TestUserTypes(Tester):
         time.sleep(5)
         
         # do setup that requires a super user
-        superuser_cursor = self.patient_cql_connection(node1, user='cassandra', password='cassandra').cursor()
+        superuser_cursor = self.patient_cql_connection(node1, user='cassandra', password='cassandra')
         superuser_cursor.execute("create user ks1_user with password 'cassandra' nosuperuser;")
         superuser_cursor.execute("create user ks2_user with password 'cassandra' nosuperuser;")
         self.create_ks(superuser_cursor, 'ks1', 2)
@@ -696,15 +693,13 @@ class TestUserTypes(Tester):
         superuser_cursor.execute("grant all permissions on keyspace ks1 to ks1_user;")
         superuser_cursor.execute("grant all permissions on keyspace ks2 to ks2_user;")
         
-        user1_cursor = self.patient_cql_connection(node1, user='ks1_user', password='cassandra').cursor()
-        user2_cursor = self.patient_cql_connection(node1, user='ks2_user', password='cassandra').cursor()
+        user1_cursor = self.patient_cql_connection(node1, user='ks1_user', password='cassandra')
+        user2_cursor = self.patient_cql_connection(node1, user='ks2_user', password='cassandra')
 
         # first make sure the users can't create types in each other's ks
-        with self.assertRaisesRegexp(ProgrammingError, 'User ks1_user has no CREATE permission on <keyspace ks2> or any of its parents'):
-            user1_cursor.execute("CREATE TYPE ks2.simple_type (user_number int, user_text text );")
+        assert_invalid(user1_cursor, "CREATE TYPE ks2.simple_type (user_number int, user_text text );", 'User ks1_user has no CREATE permission on <keyspace ks2> or any of its parents')
         
-        with self.assertRaisesRegexp(ProgrammingError, 'User ks2_user has no CREATE permission on <keyspace ks1> or any of its parents'):
-            user2_cursor.execute("CREATE TYPE ks1.simple_type (user_number int, user_text text );")
+        assert_invalid(user2_cursor, "CREATE TYPE ks1.simple_type (user_number int, user_text text );", 'User ks2_user has no CREATE permission on <keyspace ks1> or any of its parents')
         
         # now, actually create the types in the correct keyspaces
         user1_cursor.execute("CREATE TYPE ks1.simple_type (user_number int, user_text text );")
@@ -712,18 +707,14 @@ class TestUserTypes(Tester):
         
         # each user now has a type belonging to their granted keyspace
         # let's make sure they can't drop each other's types (for which they have no permissions)
-        with self.assertRaisesRegexp(ProgrammingError, 'User ks1_user has no DROP permission on <keyspace ks2> or any of its parents'):
-            user1_cursor.execute("DROP TYPE ks2.simple_type;")
+        assert_invalid(user1_cursor, "DROP TYPE ks2.simple_type;", 'User ks1_user has no DROP permission on <keyspace ks2> or any of its parents')
         
-        with self.assertRaisesRegexp(ProgrammingError, 'User ks2_user has no DROP permission on <keyspace ks1> or any of its parents'):
-            user2_cursor.execute("DROP TYPE ks1.simple_type;")
+        assert_invalid(user2_cursor, "DROP TYPE ks1.simple_type;", 'User ks2_user has no DROP permission on <keyspace ks1> or any of its parents')
         
         # let's make sure they can't rename each other's types (for which they have no permissions)
-        with self.assertRaisesRegexp(ProgrammingError, 'User ks1_user has no ALTER permission on <keyspace ks2> or any of its parents'):
-            user1_cursor.execute("ALTER TYPE ks2.simple_type RENAME TO ks2.renamed_type;")
+        assert_invalid(user1_cursor, "ALTER TYPE ks2.simple_type RENAME TO ks2.renamed_type;", 'User ks1_user has no ALTER permission on <keyspace ks2> or any of its parents')
         
-        with self.assertRaisesRegexp(ProgrammingError, 'User ks2_user has no ALTER permission on <keyspace ks1> or any of its parents'):
-            user2_cursor.execute("ALTER TYPE ks1.simple_type RENAME TO ks1.renamed_type;")
+        assert_invalid(user2_cursor, "ALTER TYPE ks1.simple_type RENAME TO ks1.renamed_type;", 'User ks2_user has no ALTER permission on <keyspace ks1> or any of its parents')
 
         #rename the types using the correct user w/permissions to do so
         user1_cursor.execute("ALTER TYPE ks1.simple_type RENAME TO ks1.renamed_type;")
@@ -734,8 +725,8 @@ class TestUserTypes(Tester):
         user2_cursor.execute("DROP TYPE ks2.renamed_type;")
         
         #verify user type metadata is gone from the system schema
-        superuser_cursor.execute("SELECT * from system.schema_usertypes")
-        self.assertEqual(0, superuser_cursor.rowcount)
+        rows = superuser_cursor.execute("SELECT * from system.schema_usertypes")
+        self.assertEqual(0, len(rows))
 
     @since('2.1')
     def test_nulls_in_user_types(self):
@@ -743,7 +734,7 @@ class TestUserTypes(Tester):
         cluster = self.cluster
         cluster.populate(3).start()
         node1,node2,node3 = cluster.nodelist()
-        cursor = self.patient_cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'user_types', 2)
 
         stmt = """
@@ -776,8 +767,8 @@ class TestUserTypes(Tester):
         # Adds with an implicit null
         cursor.execute("INSERT INTO bucket (id, my_item) VALUES (1, {sub_one: 'test'})");
 
-        cursor.execute("SELECT my_item FROM bucket WHERE id=0")
-        self.assertEqual(decode(cursor.fetchone()), [[u'test', None]])
+        rows = cursor.execute("SELECT my_item FROM bucket WHERE id=0")
+        self.assertEqual(decode(rows[0]), [[u'test', None]])
 
-        cursor.execute("SELECT my_item FROM bucket WHERE id=1")
-        self.assertEqual(decode(cursor.fetchone()), [[u'test', None]])
+        rows = cursor.execute("SELECT my_item FROM bucket WHERE id=1")
+        self.assertEqual(decode(rows[0]), [[u'test', None]])
