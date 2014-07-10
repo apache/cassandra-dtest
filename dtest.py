@@ -419,14 +419,14 @@ class PyTester(Tester):
     def __init__(self, *argv, **kwargs):
         Tester.__init__(self, *argv, **kwargs)
 
-    def cql_connection(self, node, keyspace=None, version=None, user=None, password=None, compression=True):
-
+    def cql_connection(self, node, keyspace=None, version=None, user=None, password=None, compression=True, protocol_version=2):
+        
         node_ip =  node.network_interfaces['binary'][0]
         if user is None:
-            cluster = PyCluster([node_ip], compression=compression)
+            cluster = PyCluster([node_ip], compression=compression, protocol_version=protocol_version)
         else:
             auth_provider=PlainTextAuthProvider(username=user, password=password)
-            cluster = PyCluster([node_ip], auth_provider=auth_provider, compression=compression)
+            cluster = PyCluster([node_ip], auth_provider=auth_provider, compression=compression, protocol_version=protocol_version)
         session = cluster.connect()
         if keyspace is not None:
             session.execute('USE %s' % keyspace)
@@ -434,7 +434,7 @@ class PyTester(Tester):
         self.connections.append(session)
         return session
 
-    def patient_cql_connection(self, node, keyspace=None, version=None, user=None, password=None, timeout=10, compression=True):
+    def patient_cql_connection(self, node, keyspace=None, version=None, user=None, password=None, timeout=10, compression=True, protocol_version=2):
         """
         Returns a connection after it stops throwing NoHostAvailables due to not being ready.
 
@@ -452,6 +452,7 @@ class PyTester(Tester):
             password=password,
             timeout=timeout,
             compression=compression,
+            protocol_version=protocol_version,
             bypassed_exception=NoHostAvailable
         )
 
