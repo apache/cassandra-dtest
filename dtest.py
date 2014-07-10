@@ -419,7 +419,8 @@ class PyTester(Tester):
     def __init__(self, *argv, **kwargs):
         Tester.__init__(self, *argv, **kwargs)
 
-    def cql_connection(self, node, keyspace=None, version=None, user=None, password=None, compression=True, protocol_version=2):
+    def cql_connection(self, node, keyspace=None, version=None, user=None, 
+        password=None, compression=True, protocol_version=2):
         
         node_ip =  node.network_interfaces['binary'][0]
         if user is None:
@@ -434,7 +435,9 @@ class PyTester(Tester):
         self.connections.append(session)
         return session
 
-    def patient_cql_connection(self, node, keyspace=None, version=None, user=None, password=None, timeout=10, compression=True, protocol_version=2):
+    def patient_cql_connection(self, node, keyspace=None, version=None, 
+        user=None, password=None, timeout=10, compression=True, 
+        protocol_version=2):
         """
         Returns a connection after it stops throwing NoHostAvailables due to not being ready.
 
