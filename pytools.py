@@ -129,10 +129,13 @@ def range_putget(cluster, cursor, cl=ConsistencyLevel.QUORUM):
 
     _put_with_overwrite(cluster, cursor, keys, cl)
 
-    rows = cursor.execute('SELECT * FROM cf LIMIT 10000000')
+    paged_results = cursor.execute('SELECT * FROM cf LIMIT 10000000')
+    rows = [result for result in paged_results]
+
     assert len(rows) == keys * 100, len(rows)
     for k in xrange(0, keys):
-        res = cursor.fetchmany(100)
+        res = rows[:100]
+        del rows[:100]
         _validate_row(cluster, res)
 
 def replace_in_file(filepath, search_replacements):
