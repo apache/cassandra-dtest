@@ -2,7 +2,6 @@ import time
 from ccmlib.node import Node
 from decorator  import decorator
 from distutils.version import LooseVersion
-import cql
 import re
 import os
 import sys

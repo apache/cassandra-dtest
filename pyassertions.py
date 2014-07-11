@@ -1,4 +1,4 @@
-import re, cql
+import re
 from cassandra import InvalidRequest, Unavailable, ConsistencyLevel
 from cassandra.query import SimpleStatement
 from pytools import rows_to_list
