@@ -2,9 +2,13 @@ import random
 import time
 import uuid
 
-from cql import ProgrammingError
-from dtest import Tester, TracingCursor, debug
-from tools import since
+from dtest import PyTester as Tester
+from dtest import debug
+from pytools import since
+from pyassertions import assert_invalid
+from cassandra import InvalidRequest
+from cassandra.query import SimpleStatement
+from cassandra.protocol import ConfigurationException
 
 
 class TestSecondaryIndexes(Tester):
@@ -14,7 +18,7 @@ class TestSecondaryIndexes(Tester):
         cluster.populate(1).start()
         [node1] = cluster.nodelist()
 
-        cursor = self.patient_cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'ks', 1)
 
         columns = {"password": "varchar", "gender": "varchar", "session_token": "varchar", "state": "varchar", "birth_year": "bigint"}
@@ -33,16 +37,13 @@ class TestSecondaryIndexes(Tester):
         cursor.execute("INSERT INTO users (KEY, password, gender, state, birth_year) VALUES ('user3', 'ch@ngem3c', 'f', 'FL', 1978);")
         cursor.execute("INSERT INTO users (KEY, password, gender, state, birth_year) VALUES ('user4', 'ch@ngem3d', 'm', 'TX', 1974);")
 
-        cursor.execute("SELECT * FROM users;")
-        result = cursor.fetchall()
+        result = cursor.execute("SELECT * FROM users;")
         assert len(result) == 4, "Expecting 4 users, got" + str(result)
 
-        cursor.execute("SELECT * FROM users WHERE state='TX';")
-        result = cursor.fetchall()
+        result = cursor.execute("SELECT * FROM users WHERE state='TX';")
         assert len(result) == 2, "Expecting 2 users, got" + str(result)
 
-        cursor.execute("SELECT * FROM users WHERE state='CA';")
-        result = cursor.fetchall()
+        result = cursor.execute("SELECT * FROM users WHERE state='CA';")
         assert len(result) == 1, "Expecting 1 users, got" + str(result)
 
     @since('2.1')
@@ -56,7 +57,8 @@ class TestSecondaryIndexes(Tester):
         node1, node2, node3 = cluster.nodelist()
 
         conn = self.patient_cql_connection(node1, version='3.0.0')
-        cursor = conn.cursor()
+        cursor = conn
+        cursor.max_trace_wait = 120
         cursor.execute("CREATE KEYSPACE ks WITH REPLICATION = {'class': 'SimpleStrategy', 'replication_factor': '1'};")
         cursor.execute("CREATE TABLE ks.cf (a text PRIMARY KEY, b text);")
         cursor.execute("CREATE INDEX b_index ON ks.cf (b);")
@@ -68,39 +70,36 @@ class TestSecondaryIndexes(Tester):
 
         cluster.flush()
 
-        conn.cursorclass = TracingCursor
-        cursor = conn.cursor()
-
-        def check_request_order():
+        def check_request_order(trace):
             # we should see multiple requests get enqueued prior to index scan
             # execution happening
-            trace = cursor.get_last_trace()
-            relevant_events = [(desc, ip) for (_, _, desc, ip, _, _) in trace
-                               if 'Enqueuing request' in desc or
-                               ('Executing indexed scan' in desc and ip == node1.address())]
+            relevant_events = []
+            for event in trace.events:
+                (desc, ip) = event.description, event.source
+                if 'Enqueuing request' in desc or ('Executing indexed scan' in desc and ip == node1.address()):
+                    relevant_events.append((desc,ip))
 
             self.assertTrue('Enqueuing' in relevant_events[0][0], str(relevant_events[0]))
             self.assertTrue('Enqueuing' in relevant_events[1][0], str(relevant_events[0]))
             self.assertTrue('Executing indexed scan' in relevant_events[-1][0], str(relevant_events[-1]))
 
-        cursor.execute("SELECT * FROM ks.cf WHERE b='1';")
-        result = cursor.fetchall()
+        query = SimpleStatement("SELECT * FROM ks.cf WHERE b='1';")
+        result = cursor.execute(query, trace=True)
         self.assertEqual(3, len(result))
-        check_request_order()
+        check_request_order(query.trace)
 
-        cursor.execute("SELECT * FROM ks.cf WHERE b='1' LIMIT 100;")
-        result = cursor.fetchall()
+        query = SimpleStatement("SELECT * FROM ks.cf WHERE b='1' LIMIT 100;")
+        result = cursor.execute(query, trace=True)
         self.assertEqual(3, len(result))
-        check_request_order()
+        check_request_order(query.trace)
 
-        cursor.execute("SELECT * FROM ks.cf WHERE b='1' LIMIT 3;")
-        result = cursor.fetchall()
+        query = SimpleStatement("SELECT * FROM ks.cf WHERE b='1' LIMIT 3;")
+        result = cursor.execute(query, trace=True)
         self.assertEqual(3, len(result))
-        check_request_order()
+        check_request_order(query.trace)
 
         for limit in (1, 2):
-            cursor.execute("SELECT * FROM ks.cf WHERE b='1' LIMIT %d;" % (limit,))
-            result = cursor.fetchall()
+            result = cursor.execute("SELECT * FROM ks.cf WHERE b='1' LIMIT %d;" % (limit,))
             self.assertEqual(limit, len(result))
 
     @since('2.1')
@@ -116,7 +115,7 @@ class TestSecondaryIndexes(Tester):
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
         conn = self.patient_cql_connection(node1)
-        cursor = conn.cursor()
+        cursor = conn
 
         #This only occurs when dropping and recreating with
         #the same name, so loop through this test a few times:
@@ -124,7 +123,7 @@ class TestSecondaryIndexes(Tester):
             debug("round %s" % i)
             try:
                 cursor.execute("DROP KEYSPACE ks")
-            except ProgrammingError:
+            except ConfigurationException:
                 pass
 
             self.create_ks(cursor, 'ks', 1)
@@ -137,8 +136,8 @@ class TestSecondaryIndexes(Tester):
 
             self.wait_for_schema_agreement(cursor)
 
-            cursor.execute("select count(*) from ks.cf WHERE col1='asdf'")
-            count = cursor.fetchone()[0]
+            rows = cursor.execute("select count(*) from ks.cf WHERE col1='asdf'")
+            count = rows[0][0]
             self.assertEqual(count, 10)
 
     @since('2.1')
@@ -153,7 +152,7 @@ class TestSecondaryIndexes(Tester):
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
         conn = self.patient_cql_connection(node1)
-        cursor = conn.cursor()
+        cursor = conn
         self.create_ks(cursor, 'ks', 1)
 
         #This only occurs when dropping and recreating with
@@ -162,7 +161,7 @@ class TestSecondaryIndexes(Tester):
             debug("round %s" % i)
             try:
                 cursor.execute("DROP COLUMNFAMILY ks.cf")
-            except ProgrammingError:
+            except InvalidRequest:
                 pass
 
             cursor.execute("CREATE TABLE ks.cf (key text PRIMARY KEY, col1 text);")
@@ -174,17 +173,17 @@ class TestSecondaryIndexes(Tester):
 
             self.wait_for_schema_agreement(cursor)
 
-            cursor.execute("select count(*) from ks.cf WHERE col1='asdf'")
-            count = cursor.fetchone()[0]
+            rows = cursor.execute("select count(*) from ks.cf WHERE col1='asdf'")
+            count = rows[0][0]
             self.assertEqual(count, 10)
 
     def wait_for_schema_agreement(self, cursor):
-        cursor.execute("SELECT schema_version FROM system.local")
-        local_version = cursor.fetchone()
+        rows = cursor.execute("SELECT schema_version FROM system.local")
+        local_version = rows[0]
 
         all_match = True
-        cursor.execute("SELECT schema_version FROM system.peers")
-        for peer_version in cursor.fetchall():
+        rows = cursor.execute("SELECT schema_version FROM system.peers")
+        for peer_version in rows:
             if peer_version != local_version:
                 all_match = False
                 break
@@ -208,7 +207,7 @@ class TestSecondaryIndexesOnCollections(Tester):
         cluster = self.cluster
         cluster.populate(1).start()
         [node1] = cluster.nodelist()
-        cursor = self.patient_cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'list_index_search', 1)
 
         stmt = ("CREATE TABLE list_index_search.users ("
@@ -221,16 +220,15 @@ class TestSecondaryIndexesOnCollections(Tester):
         # no index present yet, make sure there's an error trying to query column
         stmt = ("SELECT * from list_index_search.users where uuids contains {some_uuid}"
             ).format(some_uuid=uuid.uuid4())
-        with self.assertRaisesRegexp(ProgrammingError, 'No indexed columns present in by-columns clause'):
-            cursor.execute(stmt)
+        assert_invalid(cursor, stmt, 'No indexed columns present in by-columns clause')
 
         # add index and query again (even though there are no rows in the table yet)
         stmt = "CREATE INDEX user_uuids on list_index_search.users (uuids);"
         cursor.execute(stmt)
 
         stmt = ("SELECT * from list_index_search.users where uuids contains {some_uuid}").format(some_uuid=uuid.uuid4())
-        cursor.execute(stmt)
-        self.assertEqual(0, cursor.rowcount)
+        row = cursor.execute(stmt)
+        self.assertEqual(0, len(row))
 
         # add a row which doesn't specify data for the indexed column, and query again
         user1_uuid = uuid.uuid4()
@@ -241,8 +239,8 @@ class TestSecondaryIndexesOnCollections(Tester):
 
         time.sleep(5)
         stmt = ("SELECT * from list_index_search.users where uuids contains {some_uuid}").format(some_uuid=uuid.uuid4())
-        cursor.execute(stmt)
-        self.assertEqual(0, cursor.rowcount)
+        row = cursor.execute(stmt)
+        self.assertEqual(0, len(row))
 
         _id = uuid.uuid4()
         # alter the row to add a single item to the indexed list
@@ -251,8 +249,8 @@ class TestSecondaryIndexesOnCollections(Tester):
         cursor.execute(stmt)
 
         stmt = ("SELECT * from list_index_search.users where uuids contains {some_uuid}").format(some_uuid=_id)
-        cursor.execute(stmt)
-        self.assertEqual(1, cursor.rowcount)
+        row = cursor.execute(stmt)
+        self.assertEqual(1, len(row))
 
         # add a bunch of user records and query them back
         shared_uuid = uuid.uuid4() # this uuid will be on all records
@@ -277,8 +275,8 @@ class TestSecondaryIndexesOnCollections(Tester):
 
         # confirm there is now 50k rows with the 'shared' uuid above in the secondary index
         stmt = ("SELECT * from list_index_search.users where uuids contains {shared_uuid}").format(shared_uuid=shared_uuid)
-        cursor.execute(stmt)
-        self.assertEqual(50000, cursor.rowcount)
+        rows = cursor.execute(stmt)
+        self.assertEqual(50000, len(rows))
 
         # shuffle the log in-place, and double-check a slice of records by querying the secondary index
         random.shuffle(log)
@@ -286,11 +284,11 @@ class TestSecondaryIndexesOnCollections(Tester):
         for log_entry in log[:1000]:
             stmt = ("SELECT user_id, email, uuids FROM list_index_search.users where uuids contains {unshared_uuid}"
                 ).format(unshared_uuid=log_entry['unshared_uuid'])
-            cursor.execute(stmt)
+            rows = cursor.execute(stmt)
 
-            self.assertEqual(1, cursor.rowcount)
+            self.assertEqual(1, len(rows))
 
-            db_user_id, db_email, db_uuids = cursor.fetchone()
+            db_user_id, db_email, db_uuids = rows[0]
 
             self.assertEqual(db_user_id, log_entry['user_id'])
             self.assertEqual(db_email, log_entry['email'])
@@ -304,7 +302,7 @@ class TestSecondaryIndexesOnCollections(Tester):
         cluster = self.cluster
         cluster.populate(1).start()
         [node1] = cluster.nodelist()
-        cursor = self.patient_cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'set_index_search', 1)
 
         stmt = ("CREATE TABLE set_index_search.users ("
@@ -315,16 +313,15 @@ class TestSecondaryIndexesOnCollections(Tester):
 
         # no index present yet, make sure there's an error trying to query column
         stmt = ("SELECT * from set_index_search.users where uuids contains {some_uuid}").format(some_uuid=uuid.uuid4())
-        with self.assertRaisesRegexp(ProgrammingError, 'No indexed columns present in by-columns clause'):
-            cursor.execute(stmt)
+        assert_invalid(cursor, stmt, 'No indexed columns present in by-columns clause')
 
         # add index and query again (even though there are no rows in the table yet)
         stmt = "CREATE INDEX user_uuids on set_index_search.users (uuids);"
         cursor.execute(stmt)
 
         stmt = ("SELECT * from set_index_search.users where uuids contains {some_uuid}").format(some_uuid=uuid.uuid4())
-        cursor.execute(stmt)
-        self.assertEqual(0, cursor.rowcount)
+        row = cursor.execute(stmt)
+        self.assertEqual(0, len(row))
 
         # add a row which doesn't specify data for the indexed column, and query again
         user1_uuid = uuid.uuid4()
@@ -334,8 +331,8 @@ class TestSecondaryIndexesOnCollections(Tester):
 
         time.sleep(5)
         stmt = ("SELECT * from set_index_search.users where uuids contains {some_uuid}").format(some_uuid=uuid.uuid4())
-        cursor.execute(stmt)
-        self.assertEqual(0, cursor.rowcount)
+        row = cursor.execute(stmt)
+        self.assertEqual(0, len(row))
 
         _id = uuid.uuid4()
         # alter the row to add a single item to the indexed set
@@ -343,8 +340,8 @@ class TestSecondaryIndexesOnCollections(Tester):
         cursor.execute(stmt)
 
         stmt = ("SELECT * from set_index_search.users where uuids contains {some_uuid}").format(some_uuid=_id)
-        cursor.execute(stmt)
-        self.assertEqual(1, cursor.rowcount)
+        row = cursor.execute(stmt)
+        self.assertEqual(1, len(row))
 
         # add a bunch of user records and query them back
         shared_uuid = uuid.uuid4() # this uuid will be on all records
@@ -369,8 +366,8 @@ class TestSecondaryIndexesOnCollections(Tester):
 
         # confirm there is now 50k rows with the 'shared' uuid above in the secondary index
         stmt = ("SELECT * from set_index_search.users where uuids contains {shared_uuid}").format(shared_uuid=shared_uuid)
-        cursor.execute(stmt)
-        self.assertEqual(50000, cursor.rowcount)
+        rows= cursor.execute(stmt)
+        self.assertEqual(50000, len(rows))
 
         # shuffle the log in-place, and double-check a slice of records by querying the secondary index
         random.shuffle(log)
@@ -378,11 +375,11 @@ class TestSecondaryIndexesOnCollections(Tester):
         for log_entry in log[:1000]:
             stmt = ("SELECT user_id, email, uuids FROM set_index_search.users where uuids contains {unshared_uuid}"
                 ).format(unshared_uuid=log_entry['unshared_uuid'])
-            cursor.execute(stmt)
+            rows = cursor.execute(stmt)
 
-            self.assertEqual(1, cursor.rowcount)
+            self.assertEqual(1, len(rows))
 
-            db_user_id, db_email, db_uuids = cursor.fetchone()
+            db_user_id, db_email, db_uuids = rows[0]
 
             self.assertEqual(db_user_id, log_entry['user_id'])
             self.assertEqual(db_email, log_entry['email'])
@@ -396,7 +393,7 @@ class TestSecondaryIndexesOnCollections(Tester):
         cluster = self.cluster
         cluster.populate(1).start()
         [node1] = cluster.nodelist()
-        cursor = self.patient_cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'map_index_search', 1)
 
         stmt = ("CREATE TABLE map_index_search.users ("
@@ -407,21 +404,19 @@ class TestSecondaryIndexesOnCollections(Tester):
 
         # no index present yet, make sure there's an error trying to query column
         stmt = ("SELECT * from map_index_search.users where uuids contains {some_uuid}").format(some_uuid=uuid.uuid4())
-        with self.assertRaisesRegexp(ProgrammingError, 'No indexed columns present in by-columns clause'):
-            cursor.execute(stmt)
+        assert_invalid(cursor, stmt, 'No indexed columns present in by-columns clause')
 
         stmt = ("SELECT * from map_index_search.users where uuids contains key {some_uuid}"
             ).format(some_uuid=uuid.uuid4())
-        with self.assertRaisesRegexp(ProgrammingError, 'No indexed columns present in by-columns clause'):
-            cursor.execute(stmt)
+        assert_invalid(cursor, stmt, 'No indexed columns present in by-columns clause')
 
         # add index on keys and query again (even though there are no rows in the table yet)
         stmt = "CREATE INDEX user_uuids on map_index_search.users (KEYS(uuids));"
         cursor.execute(stmt)
 
         stmt = "SELECT * from map_index_search.users where uuids contains key {some_uuid}".format(some_uuid=uuid.uuid4())
-        cursor.execute(stmt)
-        self.assertEqual(0, cursor.rowcount)
+        rows = cursor.execute(stmt)
+        self.assertEqual(0, len(rows))
 
         # add a row which doesn't specify data for the indexed column, and query again
         user1_uuid = uuid.uuid4()
@@ -432,8 +427,8 @@ class TestSecondaryIndexesOnCollections(Tester):
 
         time.sleep(5)
         stmt = ("SELECT * from map_index_search.users where uuids contains key {some_uuid}").format(some_uuid=uuid.uuid4())
-        cursor.execute(stmt)
-        self.assertEqual(0, cursor.rowcount)
+        rows = cursor.execute(stmt)
+        self.assertEqual(0, len(rows))
 
         _id = uuid.uuid4()
 
@@ -443,8 +438,8 @@ class TestSecondaryIndexesOnCollections(Tester):
         cursor.execute(stmt)
 
         stmt = ("SELECT * from map_index_search.users where uuids contains key {some_uuid}").format(some_uuid=_id)
-        cursor.execute(stmt)
-        self.assertEqual(1, cursor.rowcount)
+        rows = cursor.execute(stmt)
+        self.assertEqual(1, len(rows))
 
         # add a bunch of user records and query them back
         shared_uuid = uuid.uuid4() # this uuid will be on all records
@@ -472,8 +467,8 @@ class TestSecondaryIndexesOnCollections(Tester):
         # confirm there is now 50k rows with the 'shared' uuid above in the secondary index
         stmt = ("SELECT * from map_index_search.users where uuids contains key {shared_uuid}"
             ).format(shared_uuid=shared_uuid)
-        cursor.execute(stmt)
-        self.assertEqual(50000, cursor.rowcount)
+        rows = cursor.execute(stmt)
+        self.assertEqual(50000, len(rows))
 
         # shuffle the log in-place, and double-check a slice of records by querying the secondary index on keys
         random.shuffle(log)
@@ -481,11 +476,11 @@ class TestSecondaryIndexesOnCollections(Tester):
         for log_entry in log[:1000]:
             stmt = ("SELECT user_id, email, uuids FROM map_index_search.users where uuids contains key {unshared_uuid1}"
                 ).format(unshared_uuid1=log_entry['unshared_uuid1'])
-            cursor.execute(stmt)
+            row = cursor.execute(stmt)
 
-            self.assertEqual(1, cursor.rowcount)
+            rows = self.assertEqual(1, len(row))
 
-            db_user_id, db_email, db_uuids = cursor.fetchone()
+            db_user_id, db_email, db_uuids = rows[0]
 
             self.assertEqual(db_user_id, log_entry['user_id'])
             self.assertEqual(db_email, log_entry['email'])
@@ -495,8 +490,9 @@ class TestSecondaryIndexesOnCollections(Tester):
 
         # attempt to add an index on map values as well (should fail)
         stmt = "CREATE INDEX user_uuids on map_index_search.users (uuids);"
-        with self.assertRaisesRegexp(ProgrammingError, """Bad Request: Cannot create index on uuids values, an index on uuids keys already exists and indexing a map on both keys and values at the same time is not currently supported"""):
-            cursor.execute(stmt)
+        assert_invalid(cursor, stmt, """Bad Request: Cannot create index on uuids values, an index 
+            on uuids keys already exists and indexing a map on both keys and values at the 
+            same time is not currently supported""")
 
         # since cannot have index on map keys and values remove current index on keys
         stmt = "DROP INDEX user_uuids;"
@@ -516,10 +512,10 @@ class TestSecondaryIndexesOnCollections(Tester):
             stmt = ("SELECT user_id, email, uuids FROM map_index_search.users where uuids contains {unshared_uuid2}"
                 ).format(unshared_uuid2=log_entry['unshared_uuid2'])
 
-            cursor.execute(stmt)
-            self.assertEqual(1, cursor.rowcount)
+            rows = cursor.execute(stmt)
+            self.assertEqual(1, len(rows))
 
-            db_user_id, db_email, db_uuids = cursor.fetchone()
+            db_user_id, db_email, db_uuids = rows[0]
             self.assertEqual(db_user_id, log_entry['user_id'])
             self.assertEqual(db_email, log_entry['email'])
 
