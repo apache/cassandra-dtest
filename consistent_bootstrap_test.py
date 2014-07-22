@@ -140,11 +140,12 @@ class TestBootstrapConsistency(Tester):
         cmd = "taketoken %s" % tl
         debug(cmd)
         node3.nodetool(cmd)
+        time.sleep(2)
 
         n1cursor.execute('SELECT tokens FROM system.local')
         tokens = n1cursor.fetchone()
         debug("%s" % tokens)
-        assert len(tokens) == 2
+        self.assertEqual(len(tokens[0]), 2)
 
         debug("Checking that no data was lost")
         for n in xrange(10,20):
