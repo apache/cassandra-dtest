@@ -54,7 +54,10 @@ class TestTakeToken(Tester):
         for t in n1tokens[0]:
             if i == 8:
                 break
-            t = '\\%s' % t
+            if self.cluster.version() < '2.1':
+                t = '\\%s' % t
+            else:
+                t = '%s' % t
             tl = "%s %s" % (tl, t);
             i += 1
 
@@ -71,8 +74,8 @@ class TestTakeToken(Tester):
         n1tokens = n1cursor.fetchone()
 
         debug("n1 %s n3 %s" % (n1tokens,n3tokens))
-        assert len(n3tokens[0]) == 18
-        assert len(n1tokens[0]) == 2
+        self.assertEqual(len(n3tokens[0]), 18)
+        self.assertEqual(len(n1tokens[0]), 2)
 
         debug("Checking that no data was lost")
         for n in xrange(10,20):
