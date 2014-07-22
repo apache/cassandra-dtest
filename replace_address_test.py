@@ -64,7 +64,7 @@ class TestReplaceAddress(Tester):
         debug("Starting node 4 to replace node 3")
         node4 = Node('node4', cluster, True, ('127.0.0.4', 9160), ('127.0.0.4', 7000), '7400', '0', None, ('127.0.0.4',9042))
         cluster.add(node4, False)
-        node4.start(replace_address='127.0.0.3')
+        node4.start(replace_address='127.0.0.3', jvm_args=["-Dconsistent.rangemovement=false"])
 
         #query should work again
         debug("Verifying querying works again.")
