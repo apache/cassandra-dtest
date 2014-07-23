@@ -42,25 +42,28 @@ class TestTakeToken(Tester):
         node2.flush()
    
         debug("Getting token from node 1")
-        n1cursor = self.patient_cql_connection(node1)
+        n1cursor = self.patient_exclusive_cql_connection(node1)
         n1tokens = n1cursor.execute('SELECT tokens FROM system.local')
 
-        n3cursor = self.patient_cql_connection(node3)
+        n3cursor = self.patient_exclusive_cql_connection(node3)
         n3tokens = n3cursor.execute('SELECT tokens FROM system.local')
 
         debug("Relocate tokens from node1 to node3")
         i = 0;
         tl = "";
-        for t in n1tokens[0]:
+        for t in n1tokens[0][0]:
             if i == 8:
                 break
-            t = '\\%s' % t
+            if self.cluster.version() < '2.1':
+                t = '\\%s' % t
+            else:
+                t = '%s' % t
             tl = "%s %s" % (tl, t);
             i += 1
 
         cmd = "taketoken %s" % tl
         debug(cmd)
-        node3.nodetool(cmd)
+        node3.nodetool(str(cmd))
         time.sleep(1)
 
         debug("Check that the tokens were really moved")
@@ -69,8 +72,8 @@ class TestTakeToken(Tester):
         n1tokens = n1cursor.execute('SELECT tokens FROM system.local')
 
         debug("n1 %s n3 %s" % (n1tokens,n3tokens))
-        assert len(list(n3tokens[0][0])) == 18
-        assert len(list(n1tokens[0][0])) == 2
+        self.assertEqual(len(list(n3tokens[0][0])), 18)
+        self.assertEqual(len(list(n1tokens[0][0])), 2)
 
         debug("Checking that no data was lost")
         for n in xrange(10,20):
