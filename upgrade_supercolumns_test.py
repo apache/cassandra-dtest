@@ -1,7 +1,8 @@
-from dtest import Tester
+from dtest import Tester, debug
 from tools import *
 from assertions import *
 from ccmlib.cluster import Cluster
+from ccmlib.common import get_version_from_build
 import random
 
 # Tests upgrade between 1.2->2.0 for super columns (since that's where
@@ -29,6 +30,13 @@ class TestSCUpgrade(Tester):
         assert not cli.has_errors(), cli.errors()
         cli.close()
 
+        CASSANDRA_DIR = os.environ.get('CASSANDRA_DIR')
+        if get_version_from_build(CASSANDRA_DIR) >= '2.1':
+            #Upgrade nodes to 2.0.
+            #See CASSANDRA-7008
+            self.upgrade_to_version("git:cassandra-2.0.9")
+            time.sleep(.5)
+
         # Upgrade node 1
         node1.flush()
         time.sleep(.5)
@@ -52,6 +60,33 @@ class TestSCUpgrade(Tester):
         cli.do("get sc_test['k0']['sc1']['c1']")
         assert_columns(cli, ['c1'])
 
+    def upgrade_to_version(self, tag):
+            """Upgrade Nodes - if *mixed_version* is True, only upgrade those nodes
+            that are specified by *nodes*, otherwise ignore *nodes* specified
+            and upgrade all nodes.
+            """
+            debug('Upgrading to ' + tag)
+            nodes = self.cluster.nodelist()
+            
+            for node in nodes:
+                debug('Shutting down node: ' + node.name)
+                node.drain()
+                node.watch_log_for("DRAINED")
+                node.stop(wait_other_notice=False)
+
+            # Update Cassandra Directory
+            for node in nodes:
+                node.set_cassandra_dir(cassandra_version=tag)
+                debug("Set new cassandra dir for %s: %s" % (node.name, node.get_cassandra_dir()))
+            self.cluster.set_cassandra_dir(cassandra_version=tag)
+
+            # Restart nodes on new version
+            for node in nodes:
+                debug('Starting %s on new version (%s)' % (node.name, tag))
+                # Setup log4j / logback again (necessary moving from 2.0 -> 2.1):
+                node.set_log_level("INFO")
+                node.start(wait_other_notice=True)
+                node.nodetool('upgradesstables -a')
 
 def assert_scs(cli, names):
     assert not cli.has_errors(), cli.errors()
