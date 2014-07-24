@@ -1,6 +1,6 @@
-from dtest import Tester, debug
-from tools import *
-from assertions import *
+from dtest import PyTester as Tester, debug
+from pytools import *
+from pyassertions import *
 from ccmlib.cluster import Cluster
 from ccmlib.common import get_version_from_build
 import random
