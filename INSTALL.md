@@ -58,6 +58,13 @@ will often need to modify them in some fashion at some later point:
         For more instructions on how to install the python-driver,
         see http://datastax.github.io/python-driver/installation.html
 
+* cql
+
+        cd ~/git/cstar
+        git clone https://code.google.com/a/apache-extras.org/p/cassandra-dbapi2/
+        sudo pip install -e cassandra-dbapi2
+        This is needed for a few legacy tests, and over cql over thrift
+
 * cassandra-dtest
 
         cd ~/git/cstar
