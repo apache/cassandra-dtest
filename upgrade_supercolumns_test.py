@@ -34,7 +34,7 @@ class TestSCUpgrade(Tester):
         if get_version_from_build(CASSANDRA_DIR) >= '2.1':
             #Upgrade nodes to 2.0.
             #See CASSANDRA-7008
-            self.upgrade_to_version("git:cassandra-2.0.9")
+            self.upgrade_to_version("git:cassandra-2.0")
             time.sleep(.5)
 
         # Upgrade node 1
