@@ -121,7 +121,7 @@ class TestBootstrapConsistency(Tester):
             insert_c1c2(n2cursor, n, ConsistencyLevel.ALL)
 
         node1.flush()
-        debug("Taking down node1")
+        debug("Taking down node3")
         node3.stop(wait_other_notice=True)
         
         debug("Writing data to node2")
@@ -129,7 +129,7 @@ class TestBootstrapConsistency(Tester):
             insert_c1c2(n2cursor, n, ConsistencyLevel.ONE)
         node2.flush()
 
-        debug("Restart node1")
+        debug("Restart node3")
         node3.start(wait_other_notice=True)
         
         debug("Getting token from node 1")
