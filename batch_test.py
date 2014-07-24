@@ -32,12 +32,12 @@ class TestBatch(Tester):
             err = "Cannot include non-counter statement in a counter batch"
         
         assert_invalid(session, """
-                BEGIN COUNTER BATCH
-                UPDATE clicks SET total = total + 1 WHERE userid = 1 and url = 'http://foo.com'
-                UPDATE clicks SET total = total + 1 WHERE userid = 1 and url = 'http://bar.com'
-                UPDATE clicks SET total = total + 1 WHERE userid = 2 and url = 'http://baz.com'
-                INSERT INTO users (id, firstname, lastname) VALUES (0, 'Jack', 'Sparrow')
-                APPLY BATCH
+            BEGIN COUNTER BATCH
+            UPDATE clicks SET total = total + 1 WHERE userid = 1 and url = 'http://foo.com'
+            UPDATE clicks SET total = total + 1 WHERE userid = 1 and url = 'http://bar.com'
+            UPDATE clicks SET total = total + 1 WHERE userid = 2 and url = 'http://baz.com'
+            INSERT INTO users (id, firstname, lastname) VALUES (0, 'Jack', 'Sparrow')
+            APPLY BATCH
             """, matching=err)
 
     def logged_batch_accepts_regular_mutations_test(self):
@@ -67,7 +67,7 @@ class TestBatch(Tester):
             INSERT INTO users (id, firstname, lastname) VALUES (1, 'Will', 'Turner')
             UPDATE clicks SET total = total + 1 WHERE userid = 1 and url = 'http://foo.com'
             APPLY BATCH
-        """, matching=err)
+            """, matching=err)
 
     def unlogged_batch_accepts_regular_mutations_test(self):
         """ Test that unlogged batch accepts regular mutations """
@@ -96,7 +96,7 @@ class TestBatch(Tester):
             INSERT INTO users (id, firstname, lastname) VALUES (2, 'Elizabeth', 'Swann')
             UPDATE clicks SET total = total + 1 WHERE userid = 1 AND url = 'http://foo.com'
             APPLY BATCH
-        """, matching=err)
+            """, matching=err)
 
     def logged_batch_throws_uae_test(self):
         """ Test that logged batch throws UAE if there aren't enough live nodes """

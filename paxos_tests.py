@@ -45,7 +45,7 @@ class TestPaxos(Tester):
 
         verbose = False
 
-        cursor = self.prepare()
+        cursor = self.prepare(nodes=3)
         cursor.execute("CREATE TABLE test (k int, v int static, id int, PRIMARY KEY (k, id))")
         cursor.execute("INSERT INTO test(k, v) VALUES (0, 0)");
 
