@@ -423,7 +423,8 @@ class PyTester(Tester):
     def cql_connection(self, node, keyspace=None, version=None, user=None, 
         password=None, compression=True, protocol_version=2):
         
-        node_ip =  node.network_interfaces['binary'][0]
+        node_ip = self.get_ip_from_node(node)
+
         if user is None:
             cluster = PyCluster([node_ip], compression=compression, protocol_version=protocol_version)
         else:
@@ -439,7 +440,8 @@ class PyTester(Tester):
     def exclusive_cql_connection(self, node, keyspace=None, version=None, 
         user=None, password=None, compression=True, protocol_version=2):
 
-        node_ip =  node.network_interfaces['binary'][0]
+        node_ip = self.get_ip_from_node(node)
+
         wlrr = WhiteListRoundRobinPolicy([node_ip])
         if user is None:
             cluster = PyCluster([node_ip], compression=compression, protocol_version=protocol_version, load_balancing_policy=wlrr)
@@ -594,6 +596,13 @@ class PyTester(Tester):
                     break
             else:
                 yield e
+
+    def get_ip_from_node(self, node):
+        if node.network_interfaces['binary']:
+            node_ip = node.network_interfaces['binary'][0]
+        else:
+            node_ip = node.network_interfaces['thrift'][0]
+        return node_ip
 
 class TracingCursor(ThriftCursor):
     """A CQL Cursor with query tracing ability"""
