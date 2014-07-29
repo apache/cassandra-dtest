@@ -233,6 +233,11 @@ class TestUpgradeThroughVersions(Tester):
                 PRIMARY KEY (k1, k2)
                 );""")
 
+    # For C* 1.1 setup we no longer wish to use the dtest.py
+    # connection functions. So here instead of loading data
+    # via thrift, we take pre generated sstables and load
+    # them via sstableloader. For 1.2 and above,
+    # we load the data via CQL.
     def _prepare_for_upgrade(self):
         if self.cluster.version() >= '1.2':
             self._write_values()
