@@ -5,6 +5,7 @@ from cql import OperationalError
 from dtest import Tester, debug, DISABLE_VNODES, DEFAULT_DIR
 from tools import new_node, not_implemented
 from ccmlib import common as ccmcommon
+import tarfile
 
 TRUNK_VER = '2.2'
 
@@ -244,10 +245,8 @@ class TestUpgradeThroughVersions(Tester):
             host = node1.address()
             sstablecopy_dir = os.path.join(os.getcwd(), 'upgrade')
             if not os.path.isdir(sstablecopy_dir):
-                cmd_args = ['tar', '-xvzf', 'oneonesstables.tar.gz', 'upgrade/']
-                p = subprocess.Popen(cmd_args)
-                exit_status = p.wait()
-                self.assertEqual(0, exit_status, "tarball was unzipped successfully.")
+                tfile = tarfile.open('oneonesstables.tar.gz')
+                tfile.extractall(path='.')
 
             for cf_dir in os.listdir(sstablecopy_dir):
                 full_cf_dir = os.path.join(sstablecopy_dir, cf_dir)
