@@ -238,6 +238,12 @@ class TestUpgradeThroughVersions(Tester):
     # via thrift, we take pre generated sstables and load
     # them via sstableloader. For 1.2 and above,
     # we load the data via CQL.
+
+    # The oneonesstables.tar.gz file contains the 1.1 sstables.
+    # It should exist in the git repo. It can be unzipped manually
+    # into upgrade/ which should contain cf/ and countertable/.
+    # If the directory upgrade/ does not exist, the test will
+    # unzip the tar file for you.
     def _prepare_for_upgrade(self):
         if self.cluster.version() >= '1.2':
             self._write_values()
