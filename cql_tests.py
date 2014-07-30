@@ -3944,3 +3944,137 @@ class TestCQL(Tester):
         cursor.execute("INSERT INTO test (a, b, c, d) VALUES (1, 4, 6, 5)")
 
         assert_one(cursor, "SELECT * FROM test WHERE a=1 AND b=2 ORDER BY b DESC", [1, 2, 3, 3])
+
+
+    @since('2.0')
+    def conditional_ddl_keyspace_test(self):
+        cursor = self.prepare(create_keyspace=False)
+
+        # try dropping when doesn't exist
+        cursor.execute("""
+            DROP KEYSPACE IF EXISTS my_test_ks
+            """)
+
+        # create and confirm
+        cursor.execute("""
+            CREATE KEYSPACE IF NOT EXISTS my_test_ks
+            WITH replication = {'class':'SimpleStrategy', 'replication_factor':1} and durable_writes = true
+            """)
+        assert_one(cursor, "select durable_writes from system.schema_keyspaces where keyspace_name = 'my_test_ks';", [True], cl='ALL')
+
+        # unsuccessful create since it's already there, confirm settings don't change
+        cursor.execute("""
+            CREATE KEYSPACE IF NOT EXISTS my_test_ks
+            WITH replication = {'class':'SimpleStrategy', 'replication_factor':1} and durable_writes = false
+            """)
+
+        assert_one(cursor, "select durable_writes from system.schema_keyspaces where keyspace_name = 'my_test_ks';", [True], cl='ALL')
+
+        # drop and confirm
+        cursor.execute("""
+            DROP KEYSPACE IF EXISTS my_test_ks
+            """)
+
+        assert_none(cursor, "select * from system.schema_keyspaces where keyspace_name = 'my_test_ks'")
+
+    @since('2.0')
+    def conditional_ddl_table_test(self):
+        cursor = self.prepare(create_keyspace=False)
+
+        self.create_ks(cursor, 'my_test_ks', 1)
+
+        # try dropping when doesn't exist
+        cursor.execute("""
+            DROP TABLE IF EXISTS my_test_table;
+            """)
+
+        # create and confirm
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS my_test_table (
+            id text PRIMARY KEY,
+            value1 blob ) with comment = 'foo';
+            """)
+
+        assert_one(cursor,
+            """select comment from system.schema_columnfamilies
+               where keyspace_name = 'my_test_ks' and columnfamily_name = 'my_test_table'""",
+            ['foo'])
+
+        # unsuccessful create since it's already there, confirm settings don't change
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS my_test_table (
+            id text PRIMARY KEY,
+            value2 blob ) with comment = 'bar';
+            """)
+
+        assert_one(cursor,
+            """select comment from system.schema_columnfamilies
+               where keyspace_name = 'my_test_ks' and columnfamily_name = 'my_test_table'""",
+            ['foo'])
+
+        # drop and confirm
+        cursor.execute("""
+            DROP TABLE IF EXISTS my_test_table;
+            """)
+
+        assert_none(cursor,
+            """select * from system.schema_columnfamilies
+               where keyspace_name = 'my_test_ks' and columnfamily_name = 'my_test_table'""")
+
+    @since('2.0')
+    def conditional_ddl_index_test(self):
+        cursor = self.prepare(create_keyspace=False)
+
+        self.create_ks(cursor, 'my_test_ks', 1)
+
+        cursor.execute("""
+            CREATE TABLE my_test_table (
+            id text PRIMARY KEY,
+            value1 blob,
+            value2 blob) with comment = 'foo';
+            """)
+
+        # try dropping when doesn't exist
+        cursor.execute("DROP INDEX IF EXISTS myindex")
+
+        # create and confirm
+        cursor.execute("CREATE INDEX IF NOT EXISTS myindex ON my_test_table (value1)")
+        assert_one(
+            cursor,
+            """select index_name from system."IndexInfo" where table_name = 'my_test_ks'""",
+            ['my_test_table.myindex'])
+
+        # unsuccessful create since it's already there
+        cursor.execute("CREATE INDEX IF NOT EXISTS myindex ON my_test_table (value1)")
+
+        # drop and confirm
+        cursor.execute("DROP INDEX IF EXISTS myindex")
+        assert_none(cursor, """select index_name from system."IndexInfo" where table_name = 'my_test_ks'""")
+
+    @since('2.1')
+    def conditional_ddl_type_test(self):
+        cursor = self.prepare(create_keyspace=False)
+
+        self.create_ks(cursor, 'my_test_ks', 1)
+
+        # try dropping when doesn't exist
+        cursor.execute("DROP TYPE IF EXISTS mytype")
+
+        # create and confirm
+        cursor.execute("CREATE TYPE IF NOT EXISTS mytype (somefield int)")
+        assert_one(
+            cursor,
+            "SELECT type_name from system.schema_usertypes where keyspace_name='my_test_ks' and type_name='mytype'",
+            ['mytype'])
+
+        # unsuccessful create since it's already there
+        # TODO: confirm this create attempt doesn't alter type field from int to blob
+        cursor.execute("CREATE TYPE IF NOT EXISTS mytype (somefield blob)")
+
+        # drop and confirm
+        cursor.execute("DROP TYPE IF EXISTS mytype")
+        
+        assert_none(
+            cursor,
+            "SELECT type_name from system.schema_usertypes where keyspace_name='my_test_ks' and type_name='mytype'")
+        

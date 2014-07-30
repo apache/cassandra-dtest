@@ -2,7 +2,7 @@ import bisect, os, random, re, subprocess, time, uuid, unittest
 from collections import defaultdict
 from distutils.version import LooseVersion
 from dtest import PyTester as Tester, debug, DISABLE_VNODES, DEFAULT_DIR
-from pytools import new_node, not_implemented
+from pytools import new_node
 from ccmlib import common as ccmcommon
 import tarfile
 from cassandra import ConsistencyLevel
@@ -14,7 +14,7 @@ TRUNK_VER = '2.2'
 # other tests will focus on single upgrades from UPGRADE_PATH[n] to UPGRADE_PATH[n+1]
 # Note that these strings should match git branch names, and will be used to search for
 # tags which are related to a particular branch as well.
-UPGRADE_PATH = ['cassandra-1.1', 'cassandra-1.2', 'cassandra-2.0', 'cassandra-2.1', 'trunk']
+UPGRADE_PATH = ['cassandra-1.2', 'cassandra-2.0', 'cassandra-2.1', 'trunk']
 
 
 class GitSemVer(object):
@@ -143,7 +143,9 @@ class TestUpgradeThroughVersions(Tester):
             if mixed_version:
                 for num, node in enumerate(self.cluster.nodelist()):
                     # do a write and check for each new node as upgraded
-                    self._prepare_for_upgrade()
+
+                    self._write_values()
+                    self._increment_counters()
 
                     self.upgrade_to_version(tag, mixed_version=True, nodes=(node,))
 
@@ -153,7 +155,8 @@ class TestUpgradeThroughVersions(Tester):
                     debug('Successfully upgraded %d of %d nodes to %s' %
                           (num+1, len(self.cluster.nodelist()), tag))
             else:
-                self._prepare_for_upgrade()
+                self._write_values()
+                self._increment_counters()
 
                 self.upgrade_to_version(tag)
 
@@ -199,27 +202,6 @@ class TestUpgradeThroughVersions(Tester):
             node.start(wait_other_notice=True)
             node.nodetool('upgradesstables -a')
 
-        # If last version was 1.1, we need to make a few improvements
-        # To the column families to update them from thrift
-        # to cql3. The nodes all need to be bounced due to
-        # CASSANDRA-7648
-        if previous_version <= '1.2':
-            cursor = self.patient_cql_connection(self.node2, version="3.0.0", protocol_version=1)
-            cursor.execute('use upgrade')
-            cursor.execute('ALTER TABLE cf RENAME key to k')
-            import pdb
-            pdb.set_trace()
-
-            cursor.execute('ALTER TABLE countertable ALTER column1 TYPE int')
-            cursor.execute('ALTER TABLE countertable RENAME key to k1')
-            cursor.execute('ALTER TABLE countertable RENAME column1 to k2')
-            cursor.execute('ALTER TABLE countertable RENAME value to c')
-
-            for node in nodes:
-                node.stop(wait_other_notice=False)
-            for node in nodes:
-                node.start(wait_other_notice=True)
-
     def _log_current_ver(self, current_tag):
         """
         Logs where we currently are in the upgrade path, surrounding the current branch/tag, like ***sometag***
@@ -231,98 +213,23 @@ class TestUpgradeThroughVersions(Tester):
                 vers[:curr_index] + ['***'+current_tag+'***'] + vers[curr_index+1:]))
 
     def _create_schema(self):
+        cursor = self.patient_cql_connection(self.node2, version="3.0.0", protocol_version=1)
 
-        if self.cluster.version() >= '1.2':
-            #DDL for C* 1.2+
-            cursor = self.patient_cql_connection(self.node2, version="3.0.0", protocol_version=1)
-            cursor.execute("""CREATE KEYSPACE upgrade WITH replication = {'class':'SimpleStrategy',
-                'replication_factor':2};
-                """)
+        cursor.execute("""CREATE KEYSPACE upgrade WITH replication = {'class':'SimpleStrategy',
+            'replication_factor':2};
+            """)
 
-            cursor.execute('use upgrade')
-            cursor.execute('CREATE TABLE cf ( k int PRIMARY KEY , v text )')
-            cursor.execute('CREATE INDEX vals ON cf (v)')
+        cursor.execute('use upgrade')
+        cursor.execute('CREATE TABLE cf ( k int PRIMARY KEY , v text )')
+        cursor.execute('CREATE INDEX vals ON cf (v)')
 
-            cursor.execute("""
-                CREATE TABLE countertable (
-                    k1 text,
-                    k2 text,
-                    c counter,
-                    PRIMARY KEY (k1, k2)
-                    );""")
-        else:
-            # DDL for C* 1.1
-            # The sleeps are required
-            # to prevent a SchemaDisagreementException
-            cli = self.node2.cli()
-            cli.do("""CREATE KEYSPACE upgrade with placement_strategy =
-                'org.apache.cassandra.locator.SimpleStrategy'
-                and strategy_options = {replication_factor:2};
-                """)
-            time.sleep(2)
-
-            cli.do('use upgrade')
-            cli.do("""CREATE COLUMN FAMILY cf WITH comparator = UTF8Type
-                AND key_validation_class=Int32Type
-                AND column_metadata = [
-                {column_name: v, validation_class: UTF8Type, index_type: KEYS}
-                ]""")
-            time.sleep(2)
-
-            cli.do("""
-                CREATE COLUMN FAMILY countertable
-                WITH default_validation_class=CounterColumnType
-                AND comparator = UTF8Type
-                AND key_validation_class=UTF8Type
-                """)
-            time.sleep(2)
-
-            debug("Cli errors: %s" % cli.errors())
-            assert not cli.has_errors()
-
-
-    # For C* 1.1 setup we no longer wish to use the dtest.py
-    # connection functions. So here instead of loading data
-    # via thrift, we take pre generated sstables and load
-    # them via sstableloader. For 1.2 and above,
-    # we load the data via CQL.
-
-    # The oneonesstables.tar.gz file contains the 1.1 sstables.
-    # It should exist in the git repo. It can be unzipped manually
-    # into upgrade/ which should contain cf/ and countertable/.
-    # If the directory upgrade/ does not exist, the test will
-    # unzip the tar file for you.
-    def _prepare_for_upgrade(self):
-        if self.cluster.version() >= '1.2':
-            self._write_values()
-            self._increment_counters()
-        else:
-            node1 = self.cluster.nodelist()[0]
-            cdir = node1.get_cassandra_dir()
-            sstableloader = os.path.join(cdir, 'bin', 'sstableloader')
-            env = ccmcommon.make_cassandra_env(cdir, node1.get_path())
-            host = node1.address()
-            sstablecopy_dir = os.path.join(os.getcwd(), 'upgrade')
-            if not os.path.isdir(sstablecopy_dir):
-                tfile = tarfile.open('oneonesstables.tar.gz')
-                tfile.extractall(path='.')
-
-            for cf_dir in os.listdir(sstablecopy_dir):
-                full_cf_dir = os.path.join(sstablecopy_dir, cf_dir)
-                if os.path.isdir(full_cf_dir):
-                    cmd_args = [sstableloader, '--nodes', host, full_cf_dir]
-                    p = subprocess.Popen(cmd_args, env=env)
-                    exit_status = p.wait()
-                    self.assertEqual(0, exit_status,
-                        "sstableloader exited with a non-zero status: %d" % exit_status)
-
-            for i in xrange(100):
-                x = len(self.row_values) + 1
-                self.row_values.add(x)
-
-            self.expected_counts = {}
-            for i in range(10):
-                self.expected_counts[uuid.uuid4()] = defaultdict(int)
+        cursor.execute("""
+            CREATE TABLE countertable (
+                k1 text,
+                k2 int,
+                c counter,
+                PRIMARY KEY (k1, k2)
+                );""")
 
     def _write_values(self, num=100):
         cursor = self.patient_cql_connection(self.node2, protocol_version=1)
@@ -348,15 +255,13 @@ class TestUpgradeThroughVersions(Tester):
         cursor = self.patient_cql_connection(self.node2, version="3.0.0", protocol_version=1)
         cursor.execute("use upgrade;")
 
-        update_counter_query = ("UPDATE countertable SET c = c + 1 WHERE k1='{key1}' and k2='{key2}'")
+        update_counter_query = ("UPDATE countertable SET c = c + 1 WHERE k1='{key1}' and k2={key2}")
 
         self.expected_counts = {}
         for i in range(10):
             self.expected_counts[uuid.uuid4()] = defaultdict(int)
 
         fail_count = 0
-        import pdb
-        pdb.set_trace()
 
         for i in range(opcount):
             key1 = random.choice(self.expected_counts.keys())
@@ -381,7 +286,8 @@ class TestUpgradeThroughVersions(Tester):
         for key1 in self.expected_counts.keys():
             for key2 in self.expected_counts[key1].keys():
                 expected_value = self.expected_counts[key1][key2]
-                query = SimpleStatement("SELECT c from countertable where k1='{key1}' and k2='{key2}';".format(key1=key1, key2=key2),
+
+                query = SimpleStatement("SELECT c from countertable where k1='{key1}' and k2={key2};".format(key1=key1, key2=key2),
                     consistency_level=ConsistencyLevel.ONE)
                 results = cursor.execute(query)
 
