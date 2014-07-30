@@ -11,8 +11,13 @@ TRUNK_VER = '2.2'
 # other tests will focus on single upgrades from UPGRADE_PATH[n] to UPGRADE_PATH[n+1]
 # Note that these strings should match git branch names, and will be used to search for
 # tags which are related to a particular branch as well.
-UPGRADE_PATH = ['cassandra-1.2', 'cassandra-2.0', 'cassandra-2.1', 'trunk']
 
+DEFAULT_PATH = ['cassandra-1.2', 'cassandra-2.0', 'cassandra-2.1', 'trunk']
+CUSTOM_PATH = os.environ.get('UPGRADE_PATH', None)
+UPGRADE_PATH = CUSTOM_PATH and CUSTOM_PATH.split(':') or DEFAULT_PATH
+
+if os.environ.get('CASSANDRA_VERSION'):
+    debug('CASSANDRA_VERSION is not used by upgrade tests!')
 
 class GitSemVer(object):
     """
@@ -457,11 +462,12 @@ for from_ver in UPGRADE_PATH:
     # and trunk is the final version, so there's no test where trunk is upgraded to something else
     if get_version_from_tag(from_ver) >= '1.2' and from_ver != 'trunk':
         cls_name = ('TestUpgrade_from_'+from_ver+'_latest_tag_to_'+from_ver+'_HEAD').replace('-', '_').replace('.', '_')
-        debug('Creating test upgrade class: {}'.format(cls_name))
+        start_ver_latest_tag = latest_tag_matching(from_ver)
+        debug('Creating test upgrade class: {} with start tag of: {}'.format(cls_name, start_ver_latest_tag))
         vars()[cls_name] = type(
             cls_name,
             (PointToPointUpgradeBase,),
-            {'test_versions': [latest_tag_matching(from_ver), 'git:'+from_ver,], '__test__':True})
+            {'test_versions': [start_ver_latest_tag, 'git:'+from_ver,], '__test__':True})
 
 # build a list of tuples like so:
 # [(A, B), (B, C) ... ]
@@ -477,11 +483,12 @@ for i, _ in enumerate(points):
 # create test classes for upgrading from latest tag on one branch, to head of the next branch (see comment above)
 for (from_ver, to_branch) in POINT_UPGRADES:
     cls_name = ('TestUpgrade_from_'+from_ver+'_latest_tag_to_'+to_branch+'_HEAD').replace('-', '_').replace('.', '_')
-    debug('Creating test upgrade class: {}'.format(cls_name))
+    from_ver_latest_tag = latest_tag_matching(from_ver)
+    debug('Creating test upgrade class: {} with start tag of: {}'.format(cls_name, from_ver_latest_tag))
     vars()[cls_name] = type(
         cls_name,
         (PointToPointUpgradeBase,),
-        {'test_versions': [latest_tag_matching(from_ver), 'git:'+to_branch,], '__test__':True})
+        {'test_versions': [from_ver_latest_tag, 'git:'+to_branch,], '__test__':True})
 
 # create test classes for upgrading from HEAD of one branch to HEAD of next.
 for (from_branch, to_branch) in POINT_UPGRADES:
@@ -495,14 +502,15 @@ for (from_branch, to_branch) in POINT_UPGRADES:
 # create test classes for upgrading from HEAD of one branch, to latest tag of next branch
 for (from_branch, to_branch) in POINT_UPGRADES:
     cls_name = ('TestUpgrade_from_'+from_branch+'_HEAD_to_'+to_branch+'_latest_tag').replace('-', '_').replace('.', '_')
-    debug('Creating test upgrade class: {}'.format(cls_name))
+    to_ver_latest_tag = latest_tag_matching(to_branch)
+    debug('Creating test upgrade class: {} with end tag of: {}'.format(cls_name, to_ver_latest_tag))
 
     # in some cases we might not find a tag (like when the to_branch is trunk)
     # so these will be skipped.
-    if latest_tag_matching(to_branch) is None:
+    if to_ver_latest_tag is None:
         continue
 
     vars()[cls_name] = type(
         cls_name,
         (PointToPointUpgradeBase,),
-        {'test_versions': ['git:'+from_branch, latest_tag_matching(to_branch),], '__test__':True})
+        {'test_versions': ['git:'+from_branch, to_ver_latest_tag,], '__test__':True})
