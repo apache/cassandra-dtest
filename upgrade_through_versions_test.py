@@ -4,8 +4,6 @@ from distutils.version import LooseVersion
 from cql import OperationalError
 from dtest import Tester, debug, DISABLE_VNODES, DEFAULT_DIR
 from tools import new_node
-from ccmlib import common as ccmcommon
-import tarfile
 
 TRUNK_VER = '2.2'
 
@@ -13,7 +11,7 @@ TRUNK_VER = '2.2'
 # other tests will focus on single upgrades from UPGRADE_PATH[n] to UPGRADE_PATH[n+1]
 # Note that these strings should match git branch names, and will be used to search for
 # tags which are related to a particular branch as well.
-UPGRADE_PATH = ['cassandra-1.1', 'cassandra-1.2', 'cassandra-2.0', 'cassandra-2.1', 'trunk']
+UPGRADE_PATH = ['cassandra-1.2', 'cassandra-2.0', 'cassandra-2.1', 'trunk']
 
 
 class GitSemVer(object):
@@ -142,7 +140,8 @@ class TestUpgradeThroughVersions(Tester):
             if mixed_version:
                 for num, node in enumerate(self.cluster.nodelist()):
                     # do a write and check for each new node as upgraded
-                    self._prepare_for_upgrade()
+                    self._write_values()
+                    self._increment_counters()
 
                     self.upgrade_to_version(tag, mixed_version=True, nodes=(node,))
 
@@ -152,7 +151,8 @@ class TestUpgradeThroughVersions(Tester):
                     debug('Successfully upgraded %d of %d nodes to %s' %
                           (num+1, len(self.cluster.nodelist()), tag))
             else:
-                self._prepare_for_upgrade()
+                self._write_values()
+                self._increment_counters()
 
                 self.upgrade_to_version(tag)
 
@@ -232,49 +232,6 @@ class TestUpgradeThroughVersions(Tester):
                 c counter,
                 PRIMARY KEY (k1, k2)
                 );""")
-
-    # For C* 1.1 setup we no longer wish to use the dtest.py
-    # connection functions. So here instead of loading data
-    # via thrift, we take pre generated sstables and load
-    # them via sstableloader. For 1.2 and above,
-    # we load the data via CQL.
-
-    # The oneonesstables.tar.gz file contains the 1.1 sstables.
-    # It should exist in the git repo. It can be unzipped manually
-    # into upgrade/ which should contain cf/ and countertable/.
-    # If the directory upgrade/ does not exist, the test will
-    # unzip the tar file for you.
-    def _prepare_for_upgrade(self):
-        if self.cluster.version() >= '1.2':
-            self._write_values()
-            self._increment_counters()
-        else:
-            node1 = self.cluster.nodelist()[0]
-            cdir = node1.get_cassandra_dir()
-            sstableloader = os.path.join(cdir, 'bin', 'sstableloader')
-            env = ccmcommon.make_cassandra_env(cdir, node1.get_path())
-            host = node1.address()
-            sstablecopy_dir = os.path.join(os.getcwd(), 'upgrade')
-            if not os.path.isdir(sstablecopy_dir):
-                tfile = tarfile.open('oneonesstables.tar.gz')
-                tfile.extractall(path='.')
-
-            for cf_dir in os.listdir(sstablecopy_dir):
-                full_cf_dir = os.path.join(sstablecopy_dir, cf_dir)
-                if os.path.isdir(full_cf_dir):
-                    cmd_args = [sstableloader, '--nodes', host, full_cf_dir]
-                    p = subprocess.Popen(cmd_args, env=env)
-                    exit_status = p.wait()
-                    self.assertEqual(0, exit_status,
-                        "sstableloader exited with a non-zero status: %d" % exit_status)
-
-            for i in xrange(100):
-                x = len(self.row_values) + 1
-                self.row_values.add(x)
-
-            self.expected_counts = {}
-            for i in range(10):
-                self.expected_counts[uuid.uuid4()] = defaultdict(int)
 
     def _write_values(self, num=100):
         cursor = self.patient_cql_connection(self.node2).cursor()
