@@ -105,7 +105,7 @@ class TestSecondaryIndexes(Tester):
     @since('2.1')
     def test_6924_dropping_ks(self):
         """Tests CASSANDRA-6924
-        
+
         Data inserted immediately after dropping and recreating a
         keyspace with an indexed column familiy is not included
         in the index.
@@ -276,7 +276,8 @@ class TestSecondaryIndexesOnCollections(Tester):
         # confirm there is now 50k rows with the 'shared' uuid above in the secondary index
         stmt = ("SELECT * from list_index_search.users where uuids contains {shared_uuid}").format(shared_uuid=shared_uuid)
         rows = cursor.execute(stmt)
-        self.assertEqual(50000, len(rows))
+        result = [row for row in rows]
+        self.assertEqual(50000, len(result))
 
         # shuffle the log in-place, and double-check a slice of records by querying the secondary index
         random.shuffle(log)
@@ -366,8 +367,9 @@ class TestSecondaryIndexesOnCollections(Tester):
 
         # confirm there is now 50k rows with the 'shared' uuid above in the secondary index
         stmt = ("SELECT * from set_index_search.users where uuids contains {shared_uuid}").format(shared_uuid=shared_uuid)
-        rows= cursor.execute(stmt)
-        self.assertEqual(50000, len(rows))
+        rows = cursor.execute(stmt)
+        result = [row for row in rows]
+        self.assertEqual(50000, len(result))
 
         # shuffle the log in-place, and double-check a slice of records by querying the secondary index
         random.shuffle(log)
@@ -468,7 +470,8 @@ class TestSecondaryIndexesOnCollections(Tester):
         stmt = ("SELECT * from map_index_search.users where uuids contains key {shared_uuid}"
             ).format(shared_uuid=shared_uuid)
         rows = cursor.execute(stmt)
-        self.assertEqual(50000, len(rows))
+        result = [row for row in rows]
+        self.assertEqual(50000, len(result))
 
         # shuffle the log in-place, and double-check a slice of records by querying the secondary index on keys
         random.shuffle(log)
@@ -480,7 +483,7 @@ class TestSecondaryIndexesOnCollections(Tester):
 
             rows = self.assertEqual(1, len(row))
 
-            db_user_id, db_email, db_uuids = rows[0]
+            db_user_id, db_email, db_uuids = row[0]
 
             self.assertEqual(db_user_id, log_entry['user_id'])
             self.assertEqual(db_email, log_entry['email'])
@@ -490,14 +493,13 @@ class TestSecondaryIndexesOnCollections(Tester):
 
         # attempt to add an index on map values as well (should fail)
         stmt = "CREATE INDEX user_uuids on map_index_search.users (uuids);"
-        assert_invalid(cursor, stmt, """Bad Request: Cannot create index on uuids values, an index 
-            on uuids keys already exists and indexing a map on both keys and values at the 
-            same time is not currently supported""")
+        matching =  "Cannot create index on uuids values, an index on uuids keys already exists and indexing a map on both keys and values at the same time is not currently supported"
+        assert_invalid(cursor, stmt, matching)
 
         # since cannot have index on map keys and values remove current index on keys
         stmt = "DROP INDEX user_uuids;"
-        cursor.execute(stmt)  
-        
+        cursor.execute(stmt)
+
         # add index on values (will index rows added prior)
         stmt = "CREATE INDEX user_uids on map_index_search.users (uuids);"
         cursor.execute(stmt)
