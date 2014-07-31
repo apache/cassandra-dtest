@@ -20,6 +20,7 @@ class TestCqlsh(Tester):
         self.cluster.start()
 
         node1, = self.cluster.nodelist()
+        node1.watch_log_for('thrift clients...')# We need to delay for the node to startup on windows
 
         node1.run_cqlsh(cmds = """
             CREATE KEYSPACE simple WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
