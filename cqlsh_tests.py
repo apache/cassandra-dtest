@@ -9,6 +9,7 @@ from decimal import Decimal
 import sys, os
 from uuid import UUID
 from distutils.version import LooseVersion
+import datetime
 
 class TestCqlsh(Tester):
 
@@ -35,11 +36,11 @@ class TestCqlsh(Tester):
         cursor = self.patient_cql_connection(node1)
         rows = cursor.execute("select id, value from simple.simple");
 
-        self.assertEqual({1:'one', 2:'two', 3:'three', 4:'four', 5:'five'}, 
+        self.assertEqual({1:'one', 2:'two', 3:'three', 4:'four', 5:'five'},
                          {k : v for k,v in rows})
 
     def test_eat_glass(self):
-        
+
         self.cluster.populate(1)
         self.cluster.start()
 
@@ -48,8 +49,8 @@ class TestCqlsh(Tester):
         node1.run_cqlsh(cmds = u"""create KEYSPACE testks WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
 use testks;
 
-CREATE TABLE varcharmaptable ( 
-        varcharkey varchar , 
+CREATE TABLE varcharmaptable (
+        varcharkey varchar ,
         varcharasciimap map<varchar, ascii>,
         varcharbigintmap map<varchar, bigint>,
         varcharblobmap map<varchar, blob>,
@@ -239,10 +240,10 @@ UPDATE varcharmaptable SET varcharvarintmap['Vitrum edere possum, mihi non nocet
         })
 
         verify_varcharmap('varchartimestampmap', {
-            'Vitrum edere possum, mihi non nocet.' : '\x00\x00\x01?Zs\x1dH',
-            ' ⠊⠀⠉⠁⠝⠀⠑⠁⠞⠀⠛⠇⠁⠎⠎⠀⠁⠝⠙⠀⠊⠞⠀⠙⠕⠑⠎⠝⠞⠀⠓⠥⠗⠞⠀⠍⠑' : '\x00\x00\x00r\x86\xfa\xe3\xc8',
-            'Можам да јадам стакло, а не ме штета.' : '\x00\x00\x00\xdcj\xe1\xffh',
-            'I can eat glass and it does not hurt me' : '\xff\xff\xff3\xa9\x0f^H'
+            'Vitrum edere possum, mihi non nocet.' : datetime.datetime(2013, 6, 19, 3, 21, 1),
+            ' ⠊⠀⠉⠁⠝⠀⠑⠁⠞⠀⠛⠇⠁⠎⠎⠀⠁⠝⠙⠀⠊⠞⠀⠙⠕⠑⠎⠝⠞⠀⠓⠥⠗⠞⠀⠍⠑' : datetime.datetime(1985, 8, 3, 4, 21, 1),
+            'Можам да јадам стакло, а не ме штета.' : datetime.datetime(2000, 1, 1, 0, 20, 1),
+            'I can eat glass and it does not hurt me' : datetime.datetime(1942, 3, 11, 5, 21, 1)
         })
 
         verify_varcharmap('varcharuuidmap', {
