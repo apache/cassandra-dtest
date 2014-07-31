@@ -3960,7 +3960,8 @@ class TestCQL(Tester):
             CREATE KEYSPACE IF NOT EXISTS my_test_ks
             WITH replication = {'class':'SimpleStrategy', 'replication_factor':1} and durable_writes = true
             """)
-        assert_one(cursor, "select durable_writes from system.schema_keyspaces where keyspace_name = 'my_test_ks';", [True], cl='ALL')
+        assert_one(cursor, "select durable_writes from system.schema_keyspaces where keyspace_name = 'my_test_ks';",
+            [True], cl=ConsistencyLevel.ALL)
 
         # unsuccessful create since it's already there, confirm settings don't change
         cursor.execute("""
@@ -3968,7 +3969,8 @@ class TestCQL(Tester):
             WITH replication = {'class':'SimpleStrategy', 'replication_factor':1} and durable_writes = false
             """)
 
-        assert_one(cursor, "select durable_writes from system.schema_keyspaces where keyspace_name = 'my_test_ks';", [True], cl='ALL')
+        assert_one(cursor, "select durable_writes from system.schema_keyspaces where keyspace_name = 'my_test_ks';",
+            [True], cl=ConsistencyLevel.ALL)
 
         # drop and confirm
         cursor.execute("""
@@ -4073,8 +4075,8 @@ class TestCQL(Tester):
 
         # drop and confirm
         cursor.execute("DROP TYPE IF EXISTS mytype")
-        
+
         assert_none(
             cursor,
             "SELECT type_name from system.schema_usertypes where keyspace_name='my_test_ks' and type_name='mytype'")
-        
+

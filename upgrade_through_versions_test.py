@@ -292,7 +292,7 @@ class TestUpgradeThroughVersions(Tester):
                 results = cursor.execute(query)
 
                 if results is not None:
-                    actual_value = results[0]
+                    actual_value = results[0][0]
                 else:
                     # counter wasn't found
                     actual_value = None
