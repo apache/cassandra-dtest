@@ -375,11 +375,6 @@ class PointToPointUpgradeBase(TestUpgradeThroughVersions):
     __test__ = False
 
     def setUp(self):
-        # Forcing cluster version on purpose
-        os.environ['CASSANDRA_VERSION'] = self.test_versions[0]
-
-        super(TestUpgradeThroughVersions, self).setUp()
-
         # if this is a shuffle test, we want to specifically disable vnodes initially
         # so that we can enable them later and do shuffle
         if self.id().split('.')[-1] in ('shuffle_test', 'shuffle_multidc_test'):
@@ -387,7 +382,13 @@ class PointToPointUpgradeBase(TestUpgradeThroughVersions):
             if self.cluster.version() >= "1.2":
                 self.cluster.set_configuration_options(values={'num_tokens': None})
 
+        if LOCAL_MODE:
+            self._init_local(self.test_versions[0])
+        else:
+            # Forcing cluster version on purpose
+            os.environ['CASSANDRA_VERSION'] = 'git:' + self.test_versions[0]
         debug("Versions to test (%s): %s" % (type(self), str([v for v in self.test_versions])))
+        super(TestUpgradeThroughVersions, self).setUp()
 
     def _bootstrap_new_node(self):
         # Check we can bootstrap a new node on the upgraded cluster:
