@@ -5,13 +5,12 @@ import re
 import subprocess
 import time
 import uuid
-import unittest
 
 from collections import defaultdict
 from distutils.version import LooseVersion
 
 from cql import OperationalError
-from dtest import Tester, debug, DISABLE_VNODES, DEFAULT_DIR
+from dtest import Tester, debug, DEFAULT_DIR
 from tools import new_node
 
 TRUNK_VER = '2.2'
@@ -375,18 +374,12 @@ class PointToPointUpgradeBase(TestUpgradeThroughVersions):
     __test__ = False
 
     def setUp(self):
-        # if this is a shuffle test, we want to specifically disable vnodes initially
-        # so that we can enable them later and do shuffle
-        if self.id().split('.')[-1] in ('shuffle_test', 'shuffle_multidc_test'):
-            debug("setting custom cluster config for shuffle_test")
-            if self.cluster.version() >= "1.2":
-                self.cluster.set_configuration_options(values={'num_tokens': None})
-
         if LOCAL_MODE:
             self._init_local(self.test_versions[0])
         else:
             # Forcing cluster version on purpose
             os.environ['CASSANDRA_VERSION'] = 'git:' + self.test_versions[0]
+
         debug("Versions to test (%s): %s" % (type(self), str([v for v in self.test_versions])))
         super(TestUpgradeThroughVersions, self).setUp()
 
@@ -411,55 +404,9 @@ class PointToPointUpgradeBase(TestUpgradeThroughVersions):
         self._check_values()
         self._check_counters()
 
-    def _migrate_to_vnodes(self):
-        if not DISABLE_VNODES and self.cluster.version() >= '1.2':
-            for node in self.cluster.nodelist():
-                debug('Shutting down node: ' + node.name)
-                node.drain()
-                node.watch_log_for("DRAINED")
-                node.stop(wait_other_notice=False)
-
-            debug("moving cluster to vnodes")
-            self.cluster.set_configuration_options(values={'initial_token': None, 'num_tokens': 10})
-
-            # just a hacky way to get the topology set again, since it seems to get lost
-            self.cluster.set_cassandra_dir(cassandra_dir=self.cluster.get_cassandra_dir())
-
-            # Restart nodes on new version
-            for node in self.cluster.nodelist():
-                # Setup log4j / logback again (necessary moving from 2.0 -> 2.1):
-                node.set_log_level("INFO")
-                node.start(wait_other_notice=True)
-
-            debug("Running shuffle")
-            mark = self.node1.mark_log()
-            self.node1.shuffle("create")
-            self.node1.shuffle("enable")
-            self.node1.watch_log_for("Pausing until token count stabilizes", from_mark=mark, timeout=60)
-        else:
-            debug("Not migrating to vnodes because they are disabled or cluster is not above v1.2")
-
-    @unittest.skipIf(DISABLE_VNODES, "vnodes disabled for this test run")
-    def shuffle_test(self):
-        # go from non-vnodes to vnodes, and run shuffle to distribute the data.
-        self.upgrade_scenario(
-            after_upgrade_call=(self._migrate_to_vnodes, self._check_values, self._check_counters))
-
     def bootstrap_test(self):
         # try and add a new node
         self.upgrade_scenario(after_upgrade_call=(self._bootstrap_new_node,))
-
-    @unittest.skipIf(DISABLE_VNODES, "vnodes disabled for this test run")
-    def shuffle_multidc_test(self):
-        # go from non-vnodes to vnodes, and run shuffle to distribute the data.
-        # multi dc, 2 nodes in each dc
-        self.cluster.populate([2, 2])
-        [node.start(use_jna=True) for node in self.cluster.nodelist()]
-        self._multidc_schema_create()
-        self.upgrade_scenario(
-            populate=False,
-            create_schema=False,
-            after_upgrade_call=(self._migrate_to_vnodes, self._check_values, self._check_counters))
 
     def bootstrap_multidc_test(self):
         # try and add a new node
