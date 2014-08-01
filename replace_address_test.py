@@ -6,6 +6,7 @@ from ccmlib.node import NodeError
 import time
 from cql import OperationalError
 from cql.cassandra.ttypes import UnavailableException
+import re
 
 class NodeUnavailable(Exception):
     pass
@@ -30,11 +31,16 @@ class TestReplaceAddress(Tester):
         """Check that the replace address function correctly replaces a node that has failed in a cluster. 
         Create a cluster, cause a node to fail, and bring up a new node with the replace_address parameter.
         Check that tokens are migrated and that data is replicated properly.
-        """
+        """     
         debug("Starting cluster with 3 nodes.")
         cluster = self.cluster
         cluster.populate(3).start()
         [node1,node2, node3] = cluster.nodelist()
+
+        #a little hacky but grep_log returns the whole line...
+        numNodes = int(re.search('num_tokens=(.*?);', node3.grep_log('num_tokens=(.*?);')[0][0]).group()[11:-1])
+
+        debug(numNodes)
 
         debug("Inserting Data...")
         if cluster.version() < "2.1":
@@ -61,7 +67,7 @@ class TestReplaceAddress(Tester):
         debug("Starting node 4 to replace node 3")
         node4 = Node('node4', cluster, True, ('127.0.0.4', 9160), ('127.0.0.4', 7000), '7400', '0', None, ('127.0.0.4',9042))
         cluster.add(node4, False)
-        node4.start(replace_address='127.0.0.3', jvm_args=["-Dconsistent.rangemovement=false"])
+        node4.start(replace_address='127.0.0.3')
 
         #query should work again
         debug("Verifying querying works again.")
@@ -72,10 +78,7 @@ class TestReplaceAddress(Tester):
         debug("Verifying tokens migrated sucessfully")
         movedTokensList = node4.grep_log("Token .* changing ownership from /127.0.0.3 to /127.0.0.4")
         debug(movedTokensList[0])
-        if DISABLE_VNODES:
-            self.assertEqual(len(movedTokensList), 1)
-        else:
-            self.assertEqual(len(movedTokensList), 256)
+        self.assertEqual(len(movedTokensList), numNodes)
 
         #check that restarting node 3 doesn't work
         debug("Try to restart node 3 (should fail)")
