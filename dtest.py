@@ -434,7 +434,7 @@ class PyTester(Tester):
         if user is None:
             cluster = PyCluster([node_ip], compression=compression, protocol_version=protocol_version)
         else:
-            auth_provider=PlainTextAuthProvider(username=user, password=password)
+            auth_provider=self.get_auth_provider(user=user, password=password)
             cluster = PyCluster([node_ip], auth_provider=auth_provider, compression=compression, protocol_version=protocol_version)
         session = cluster.connect()
         if keyspace is not None:
@@ -458,7 +458,7 @@ class PyTester(Tester):
         if user is None:
             cluster = PyCluster([node_ip], compression=compression, protocol_version=protocol_version, load_balancing_policy=wlrr)
         else:
-            auth_provider=PlainTextAuthProvider(username=user, password=password)
+            auth_provider=self.get_auth_provider(user=user, password=password)
             cluster = PyCluster([node_ip], auth_provider=auth_provider, compression=compression, protocol_version=protocol_version, load_balancing_policy=wlrr)
         session = cluster.connect()
         if keyspace is not None:
@@ -493,7 +493,7 @@ class PyTester(Tester):
 
     def patient_exclusive_cql_connection(self, node, keyspace=None, version=None,
         user=None, password=None, timeout=10, compression=True,
-        protocol_version=2):
+        protocol_version=None):
         """
         Returns a connection after it stops throwing NoHostAvailables due to not being ready.
 
@@ -615,6 +615,17 @@ class PyTester(Tester):
         else:
             node_ip = node.network_interfaces['thrift'][0]
         return node_ip
+
+    def get_auth_provider(self, user, password):
+        if self.cluster.version() >= '2.0':
+            return PlainTextAuthProvider(username=user, password=password)
+        else:
+            return self.make_auth(user, password)
+
+    def make_auth(self, user, password):
+        def private_auth(node_ip):
+            return {'username': user, 'password' : password}
+        return private_auth
 
 class TracingCursor(ThriftCursor):
     """A CQL Cursor with query tracing ability"""
