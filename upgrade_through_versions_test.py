@@ -392,7 +392,7 @@ class PointToPointUpgradeBase(TestUpgradeThroughVersions):
     def _bootstrap_new_node(self):
         # Check we can bootstrap a new node on the upgraded cluster:
         debug("Adding a node to the cluster")
-        nnode = new_node(self.cluster, remote_debug_port=str(2000+len(self.cluster.nodes)))
+        nnode = new_node(self.cluster, remote_debug_port=str(2000 + len(self.cluster.nodes)))
         nnode.start(use_jna=True, wait_other_notice=True)
         self._write_values()
         self._increment_counters()
