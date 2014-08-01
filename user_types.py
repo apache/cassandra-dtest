@@ -781,3 +781,25 @@ class TestUserTypes(Tester):
 
         cursor.execute("SELECT my_item FROM bucket WHERE id=1")
         self.assertEqual(decode(cursor.fetchone()), [[u'test', None]])
+
+    @since('2.1')
+    def test_no_counters_in_user_types(self):
+        # CASSANDRA-7672
+        cluster = self.cluster
+        cluster.populate(1).start()
+        [node1] = cluster.nodelist()
+        cursor = self.patient_cql_connection(node1).cursor()
+        self.create_ks(cursor, 'user_types', 1)
+
+        stmt = """
+            USE user_types
+         """
+        cursor.execute(stmt)
+
+        stmt = """
+            CREATE TYPE t_item (
+            sub_one COUNTER )
+         """
+
+        with self.assertRaisesRegexp(ProgrammingError, 'A user type cannot contain counters'):
+            cursor.execute(stmt)
