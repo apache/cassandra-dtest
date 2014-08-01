@@ -44,6 +44,7 @@ class TestCqlsh(Tester):
         self.cluster.start()
 
         node1, = self.cluster.nodelist()
+        node1.watch_log_for('thrift clients...')# We need to delay for the node to startup on windows
 
         node1.run_cqlsh(cmds = u"""create KEYSPACE testks WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
 use testks;
@@ -287,6 +288,7 @@ UPDATE varcharmaptable SET varcharvarintmap['Vitrum edere possum, mihi non nocet
         self.cluster.start()
 
         node1, = self.cluster.nodelist()
+        node1.watch_log_for('thrift clients...')# We need to delay for the node to startup on windows
 
         node1.run_cqlsh(cmds = u"""create keyspace  CASSANDRA_7196 WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1} ;
 
@@ -346,6 +348,8 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         blobAsVarint(0x))""".encode("utf-8"))
 
         output = self.run_cqlsh(node1, "select intcol, bigintcol, varintcol from CASSANDRA_7196.has_all_types where num in (0, 1, 2, 3, 4)")
+        if common.is_win():
+            output = output.replace('\r', '')
 
         expected = """
  intcol      | bigintcol            | varintcol
@@ -360,7 +364,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
 
     def run_cqlsh(self, node, cmds, cqlsh_options=[]):
         cdir = node.get_cassandra_dir()
-        cli = os.path.join(cdir, 'bin', 'cqlsh')
+        cli = os.path.join(cdir, 'bin', common.platform_binary('cqlsh'))
         env = common.make_cassandra_env(cdir, node.get_path())
         env['LANG'] = 'en_US.UTF-8'
         if LooseVersion(self.cluster.version()) >= LooseVersion('2.1'):
