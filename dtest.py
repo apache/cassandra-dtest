@@ -100,12 +100,12 @@ class Tester(TestCase):
         debug("cluster ccm directory: "+self.test_path)
         version = os.environ.get('CASSANDRA_VERSION')
         cdir = os.environ.get('CASSANDRA_DIR', DEFAULT_DIR)
-        
+
         if version:
             cluster = Cluster(self.test_path, name, cassandra_version=version)
         else:
             cluster = Cluster(self.test_path, name, cassandra_dir=cdir)
-        
+
         if cluster.version() >= "1.2":
             if DISABLE_VNODES:
                 cluster.set_configuration_options(values={'num_tokens': None})
@@ -138,12 +138,12 @@ class Tester(TestCase):
     def set_node_to_current_version(self, node):
         version = os.environ.get('CASSANDRA_VERSION')
         cdir = os.environ.get('CASSANDRA_DIR', DEFAULT_DIR)
-        
+
         if version:
             node.set_cassandra_dir(cassandra_version=version)
         else:
             node.set_cassandra_dir(cassandra_dir=cdir)
-        
+
     def setUp(self):
         global CURRENT_TEST
         CURRENT_TEST = self.id() + self._testMethodName
@@ -344,7 +344,7 @@ class Tester(TestCase):
     def skip(self, msg):
         if not NO_SKIP:
             raise SkipTest(msg)
-    
+
     def __setup_jacoco(self, cluster_name='test'):
         """Setup JaCoCo code coverage support"""
         # use explicit agent and execfile locations
@@ -361,7 +361,7 @@ class Tester(TestCase):
 
                 f.write('JVM_OPTS="$JVM_OPTS -javaagent:{jar_path}=destfile={exec_file}"'\
                     .format(jar_path=agent_location, exec_file=jacoco_execfile))
-                
+
                 if os.path.isfile(jacoco_execfile):
                     debug("Jacoco execfile found at {}, execution data will be appended".format(jacoco_execfile))
                 else:
@@ -420,10 +420,16 @@ class PyTester(Tester):
     def __init__(self, *argv, **kwargs):
         Tester.__init__(self, *argv, **kwargs)
 
-    def cql_connection(self, node, keyspace=None, version=None, user=None, 
-        password=None, compression=True, protocol_version=2):
-        
+    def cql_connection(self, node, keyspace=None, version=None, user=None,
+        password=None, compression=True, protocol_version=None):
+
         node_ip = self.get_ip_from_node(node)
+
+        if protocol_version is None:
+            if self.cluster.version() >= '2.0':
+                protocol_version = 2
+            else:
+                protocol_version = 1
 
         if user is None:
             cluster = PyCluster([node_ip], compression=compression, protocol_version=protocol_version)
@@ -437,10 +443,16 @@ class PyTester(Tester):
         self.connections.append(session)
         return session
 
-    def exclusive_cql_connection(self, node, keyspace=None, version=None, 
-        user=None, password=None, compression=True, protocol_version=2):
+    def exclusive_cql_connection(self, node, keyspace=None, version=None,
+        user=None, password=None, compression=True, protocol_version=None):
 
         node_ip = self.get_ip_from_node(node)
+
+        if protocol_version is None:
+            if self.cluster.version() >= '2.0':
+                protocol_version = 2
+            else:
+                protocol_version = 1
 
         wlrr = WhiteListRoundRobinPolicy([node_ip])
         if user is None:
@@ -455,9 +467,9 @@ class PyTester(Tester):
         self.connections.append(session)
         return session
 
-    def patient_cql_connection(self, node, keyspace=None, version=None, 
-        user=None, password=None, timeout=10, compression=True, 
-        protocol_version=2):
+    def patient_cql_connection(self, node, keyspace=None, version=None,
+        user=None, password=None, timeout=10, compression=True,
+        protocol_version=None):
         """
         Returns a connection after it stops throwing NoHostAvailables due to not being ready.
 
@@ -611,11 +623,11 @@ class TracingCursor(ThriftCursor):
         self.last_session_id = None
         self.connection = connection
 
-    def execute(self, cql_query, params={}, decoder=None, 
+    def execute(self, cql_query, params={}, decoder=None,
                 consistency_level=None, trace=True):
         if trace:
             self.last_session_id = UUID(bytes=self.connection.client.trace_next_query())
-        ThriftCursor.execute(self, cql_query, params=params, decoder=decoder, 
+        ThriftCursor.execute(self, cql_query, params=params, decoder=decoder,
                              consistency_level=consistency_level)
 
     def get_last_trace(self):
@@ -627,4 +639,4 @@ class TracingCursor(ThriftCursor):
             return [event for event in self]
         else:
             raise AssertionError('No query to trace')
-        
+
