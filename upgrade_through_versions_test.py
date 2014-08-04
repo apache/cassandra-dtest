@@ -182,6 +182,7 @@ class TestUpgradeThroughVersions(Tester):
 
                     debug('Successfully upgraded %d of %d nodes to %s' %
                           (num + 1, len(self.cluster.nodelist()), tag))
+                self.cluster.set_cassandra_dir(cassandra_version='git:' + tag)
             else:
                 self._write_values()
                 self._increment_counters()
@@ -229,7 +230,6 @@ class TestUpgradeThroughVersions(Tester):
             for node in nodes:
                 node.set_cassandra_dir(cassandra_version='git:' + tag)
                 debug("Set new cassandra dir for %s: %s" % (node.name, node.get_cassandra_dir()))
-            self.cluster.set_cassandra_dir(cassandra_version='git:' + tag)
 
         # Restart nodes on new version
         for node in nodes:
