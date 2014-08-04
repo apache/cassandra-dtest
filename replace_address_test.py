@@ -137,3 +137,80 @@ class TestReplaceAddress(Tester):
         #try to replace an unassigned ip address
         with self.assertRaises(NodeError):
             node4.start(replace_address='127.0.0.5')
+    
+    def replace_first_boot_test(self):
+    	debug("Starting cluster with 3 nodes.")
+        cluster = self.cluster
+        cluster.populate(3).start()
+        [node1,node2, node3] = cluster.nodelist()
+
+        #a little hacky but grep_log returns the whole line...
+        numNodes = int(re.search('num_tokens=(.*?);', node3.grep_log('num_tokens=(.*?);')[0][0]).group()[11:-1])
+
+        debug(numNodes)
+
+        debug("Inserting Data...")
+        if cluster.version() < "2.1":
+            node1.stress(['-o', 'insert', '--num-keys=10000', '--replication-factor=3'])
+        else:
+            node1.stress(['write', 'n=10000', '-schema', 'replication(factor=3)'])
+        cursor = self.patient_cql_connection(node1).cursor()
+        cursor.execute('select * from "Keyspace1"."Standard1" LIMIT 1', consistency_level='THREE')
+        initialData = cursor.fetchall()
+        
+        #stop node, query should not work with consistency 3
+        debug("Stopping node 3.")
+        node3.stop(gently=False)
+
+        debug("Testing node stoppage (query should fail).")
+        with self.assertRaises(NodeUnavailable):
+            try:
+                cursor.execute('select * from "Keyspace1"."Standard1" LIMIT 1', consistency_level='THREE')
+            except (UnavailableException, OperationalError):
+                raise NodeUnavailable("Node could not be queried.")
+
+        #replace node 3 with node 4
+        debug("Starting node 4 to replace node 3")
+        node4 = Node('node4', cluster, True, ('127.0.0.4', 9160), ('127.0.0.4', 7000), '7400', '0', None, ('127.0.0.4',9042))
+        cluster.add(node4, False)
+        node4.start(jvm_args=["-Dcassandra.replace_address_first_boot=127.0.0.3"])
+
+        #query should work again
+        debug("Verifying querying works again.")
+        cursor.execute('select * from "Keyspace1"."Standard1" LIMIT 1', consistency_level='THREE')
+        finalData = cursor.fetchall()
+        self.assertListEqual(initialData, finalData)
+        
+        debug("Verifying tokens migrated sucessfully")
+        movedTokensList = node4.grep_log("Token .* changing ownership from /127.0.0.3 to /127.0.0.4")
+        debug(movedTokensList[0])
+        self.assertEqual(len(movedTokensList), numNodes)
+
+        #check that restarting node 3 doesn't work
+        debug("Try to restart node 3 (should fail)")
+        node3.start() 
+        checkCollision = node1.grep_log("between /127.0.0.3 and /127.0.0.4; /127.0.0.4 is the new owner")
+        debug(checkCollision)
+        self.assertEqual(len(checkCollision), 1)
+
+        #restart node4 (if error's might have to change num_tokens)
+        node4.stop(gently=False)
+        #node4.set_configuration_options(values={'num_tokens': 1})
+        node4.start()
+
+        debug("Verifying querying works again.")
+        cursor.execute('select * from "Keyspace1"."Standard1" LIMIT 1', consistency_level='THREE')
+        finalData = cursor.fetchall()
+        self.assertListEqual(initialData, finalData)
+
+        #we redo this check because restarting node should not result in tokens being moved again, ie number should be same 
+        debug("Verifying tokens migrated sucessfully")
+        movedTokensList = node4.grep_log("Token .* changing ownership from /127.0.0.3 to /127.0.0.4")
+        debug(movedTokensList[0])
+        self.assertEqual(len(movedTokensList), numNodes)
+
+
+
+
+
+
