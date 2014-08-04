@@ -337,7 +337,7 @@ class TestUpgradeThroughVersions(Tester):
                     # counter wasn't found
                     actual_value = None
 
-                assert actual_value == expected_value, "Counter not at expected value."
+                assert actual_value == expected_value, "Counter not at expected value. Got %s, expected %s" % (actual_value, expected_value)
 
 
 class TestRandomPartitionerUpgrade(TestUpgradeThroughVersions):
