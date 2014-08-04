@@ -52,7 +52,7 @@ class TestRepairCompaction(Tester):
         node2.stop(gently=False)
 
         debug("inserting data in nodes 1 and 3")
-        for z in range(10, 15):        
+        for z in range(10, 15):
             insert_c1c2(cursor, z, ConsistencyLevel.TWO)
         node1.flush()
 
@@ -60,7 +60,7 @@ class TestRepairCompaction(Tester):
         node2.flush()
         node2.start()
         node2.repair()
-        
+
         fileFromNode1 = node2.grep_log("reading file from /127.0.0.1, repairedAt = 0")
         fileFromNode3 = node2.grep_log("reading file from /127.0.0.3, repairedAt = 0")
         catchBadReads = node2.grep_log("reading file from .* repairedAt = ([1-9])")
@@ -75,9 +75,7 @@ class TestRepairCompaction(Tester):
         node3.stop(gently=False)
         node5 = Node('node5', cluster, True, ('127.0.0.5', 9160), ('127.0.0.5', 7000), '7500', '0', None, ('127.0.0.5',9042))
         cluster.add(node5, False)
-        node5.start(replace_address = '127.0.0.3')
-        
-        time.sleep(5)
+        node5.start(replace_address = '127.0.0.3', wait_other_notice=True)
 
         fileRead = node5.grep_log("reading file from .*, repairedAt = 0")
         self.assertGreaterEqual(len(fileRead), 1)

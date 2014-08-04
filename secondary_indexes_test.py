@@ -237,7 +237,6 @@ class TestSecondaryIndexesOnCollections(Tester):
             ).format(user_id=user1_uuid)
         cursor.execute(stmt)
 
-        time.sleep(5)
         stmt = ("SELECT * from list_index_search.users where uuids contains {some_uuid}").format(some_uuid=uuid.uuid4())
         row = cursor.execute(stmt)
         self.assertEqual(0, len(row))
@@ -330,7 +329,6 @@ class TestSecondaryIndexesOnCollections(Tester):
             ).format(user_id=user1_uuid)
         cursor.execute(stmt)
 
-        time.sleep(5)
         stmt = ("SELECT * from set_index_search.users where uuids contains {some_uuid}").format(some_uuid=uuid.uuid4())
         row = cursor.execute(stmt)
         self.assertEqual(0, len(row))
@@ -427,7 +425,6 @@ class TestSecondaryIndexesOnCollections(Tester):
             ).format(user_id=user1_uuid)
         cursor.execute(stmt)
 
-        time.sleep(5)
         stmt = ("SELECT * from map_index_search.users where uuids contains key {some_uuid}").format(some_uuid=uuid.uuid4())
         rows = cursor.execute(stmt)
         self.assertEqual(0, len(rows))

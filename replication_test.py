@@ -133,18 +133,18 @@ class ReplicationTest(Tester):
                     if len(replicas) == replication_factor:
                         break
         elif strategy == 'NetworkTopologyStrategy':
-            # NetworkTopologyStrategy can be broken down into multiple 
+            # NetworkTopologyStrategy can be broken down into multiple
             # SimpleStrategies, just once per datacenter:
             for dc,rf in replication_factor.items():
                 dc_nodes = [n for n in nodes if n.data_center == dc]
                 replicas.extend(self.get_replicas_for_token(
                     token, rf, nodes=dc_nodes))
         else:
-            raise NotImplemented('replication strategy not implemented: %s' 
+            raise NotImplemented('replication strategy not implemented: %s'
                                  % strategy)
 
         return replicas
-    
+
     def pprint_trace(self, trace):
         """Pretty print a trace"""
         if PRINT_DEBUG:
@@ -160,9 +160,9 @@ class ReplicationTest(Tester):
         time.sleep(5)
         node1 = self.cluster.nodelist()[0]
         self.conn = self.patient_exclusive_cql_connection(node1)
-        
+
         # Install a tracing cursor so we can get info about who the
-        # coordinator is contacting: 
+        # coordinator is contacting:
         cursor = self.conn
         cursor.max_trace_wait = 120
 
@@ -199,9 +199,9 @@ class ReplicationTest(Tester):
         node1 = self.cluster.nodelist()[0]
         ip_nodes = dict((node.address(), node) for node in self.cluster.nodelist())
         self.conn = self.patient_exclusive_cql_connection(node1)
-        
+
         # Install a tracing cursor so we can get info about who the
-        # coordinator is contacting: 
+        # coordinator is contacting:
         cursor = self.conn
         cursor.max_trace_wait = 120
 
@@ -242,7 +242,7 @@ class ReplicationTest(Tester):
             #Make sure that each replica node was contacted and
             #acknowledged the write:
             self.assertEqual(stats['nodes_sent_write'], stats['nodes_responded_write'])
-            
+
         #Given a diverse enough keyset, each node in the second
         #datacenter should get a chance to be a forwarder:
         self.assertEqual(len(forwarders_used), 3)
