@@ -11,10 +11,9 @@ class TestCFID(Tester):
         """ Test through adding/dropping cf's that the path to sstables for each cf are unique and formatted correctly """
         cluster = self.cluster
 
-        cluster.populate(1).start()
+        cluster.populate(1).start(wait_other_notice=True)
         [node1] = cluster.nodelist()
 
-        time.sleep(.5)
         cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'ks', 1)
 
@@ -24,7 +23,7 @@ class TestCFID(Tester):
             cursor.execute('insert into cf (key, c1) values (2,1)')
             node1.flush()
             cursor.execute('drop table ks.cf;')
-        
+
         #get a list of cf directories
         try:
             cfs = os.listdir(node1.get_path() + "/data/ks")

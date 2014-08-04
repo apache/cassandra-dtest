@@ -179,9 +179,8 @@ class TestConsistency(Tester):
         # interfer with the test
         cluster.set_configuration_options(values={ 'hinted_handoff_enabled' : False}, batch_commitlog=True)
 
-        cluster.populate(3).start()
+        cluster.populate(3).start(wait_other_notice=True)
         [node1, node2, node3] = cluster.nodelist()
-        time.sleep(.5)
 
         cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'ks', 3)
@@ -212,9 +211,8 @@ class TestConsistency(Tester):
         # interfer with the test
         cluster.set_configuration_options(values={ 'hinted_handoff_enabled' : False}, batch_commitlog=True)
 
-        cluster.populate(2).start()
+        cluster.populate(2).start(wait_other_notice=True)
         [node1, node2] = cluster.nodelist()
-        time.sleep(.5)
 
         cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'ks', 3)
@@ -231,7 +229,6 @@ class TestConsistency(Tester):
         cursor.execute(query)
 
         node1.start(wait_other_notice=True)
-        time.sleep(.5)
 
         # Query first column
         cursor = self.patient_cql_connection(node1, 'ks')
@@ -291,7 +288,7 @@ class TestConsistency(Tester):
             insert_c1c2(cursor, n, ConsistencyLevel.ONE)
 
         node2.start(wait_other_notice=True)
-        time.sleep(5)
+
        # query everything to cause RR
         for n in xrange(0, 10000):
             query_c1c2(cursor, n, ConsistencyLevel.QUORUM)
@@ -310,9 +307,8 @@ class TestConsistency(Tester):
         # interfer with the test
         cluster.set_configuration_options(values={ 'hinted_handoff_enabled' : False}, batch_commitlog=True)
 
-        cluster.populate(3).start()
+        cluster.populate(3).start(wait_other_notice=True)
         [node1, node2, node3] = cluster.nodelist()
-        time.sleep(.5)
 
         cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'ks', 3)

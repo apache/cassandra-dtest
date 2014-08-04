@@ -26,10 +26,9 @@ class TestBootstrap(Tester):
         keys = 10000
 
         # Create a single node cluster
-        cluster.populate(1, tokens=[tokens[0]]).start()
+        cluster.populate(1, tokens=[tokens[0]]).start(wait_other_notice=True)
         node1 = cluster.nodes["node1"]
 
-        time.sleep(.5)
         session = self.patient_cql_connection(node1)
         self.create_ks(session, 'ks', 1)
         self.create_cf(session, 'cf', columns={ 'c1' : 'text', 'c2' : 'text' })
@@ -65,13 +64,13 @@ class TestBootstrap(Tester):
         cluster.populate(3)
         version = cluster.version()
         cluster.start()
-        
+
         node1 = cluster.nodes['node1']
         if version < "2.1":
             node1.stress(['-n', '10000'])
         else:
             node1.stress(['write', 'n=10000', '-rate', 'threads=8'])
-        
+
         node4 = new_node(cluster)
         node4.start()
 

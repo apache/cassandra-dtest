@@ -30,7 +30,7 @@ class TestBatch(Tester):
             err = "Only counter mutations are allowed in COUNTER batches"
         else:
             err = "Cannot include non-counter statement in a counter batch"
-        
+
         assert_invalid(session, """
             BEGIN COUNTER BATCH
             UPDATE clicks SET total = total + 1 WHERE userid = 1 and url = 'http://foo.com'
@@ -199,8 +199,8 @@ class TestBatch(Tester):
             assert False, "Expecting TimedOutException but no exception was raised"
 
     def prepare(self, nodes=1, compression=True):
-        self.cluster.populate(nodes).start()
-        time.sleep(.5)
+        self.cluster.populate(nodes).start(wait_other_notice=True)
+
         node1 = self.cluster.nodelist()[0]
         session = self.patient_cql_connection(node1, version=cql_version)
         self.create_ks(session, 'ks', nodes)

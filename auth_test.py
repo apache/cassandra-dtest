@@ -41,9 +41,7 @@ class TestAuth(Tester):
         debug("Stopping cluster..")
         self.cluster.stop()
         debug("Restarting cluster..")
-        self.cluster.start()
-
-        time.sleep(15)
+        self.cluster.start(wait_other_notice=True)
 
         for i in range(3):
             debug('Checking node: {i}'.format(i=i))
