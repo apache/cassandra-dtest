@@ -4341,4 +4341,29 @@ class TestCQL(Tester):
         assert_none(
             cursor,
             "SELECT type_name from system.schema_usertypes where keyspace_name='my_test_ks' and type_name='mytype'")
-        
+
+    @since('2.0')
+    def bug_6612_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE session_data (
+                username text,
+                session_id text,
+                app_name text,
+                account text,
+                last_access timestamp,
+                created_on timestamp,
+                PRIMARY KEY (username, session_id, app_name, account)
+            );
+        """)
+
+        #cursor.execute("create index sessionIndex ON session_data (session_id)")
+        cursor.execute("create index sessionAppName ON session_data (app_name)")
+        cursor.execute("create index lastAccessIndex ON session_data (last_access)")
+
+        assert_one(cursor, "select count(*) from session_data where app_name='foo' and account='bar' and last_access > 4 allow filtering", [0])
+
+        cursor.execute("insert into session_data (username, session_id, app_name, account, last_access, created_on) values ('toto', 'foo', 'foo', 'bar', 12, 13)")
+
+        assert_one(cursor, "select count(*) from session_data where app_name='foo' and account='bar' and last_access > 4 allow filtering", [1])
