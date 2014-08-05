@@ -4017,6 +4017,25 @@ class TestCQL(Tester):
         cursor.execute("INSERT INTO tset(k, s) VALUES (0, {'foo', 'bar', 'foobar'})")
         assert_invalid(cursor, "DELETE FROM tset WHERE k=0 IF s['foo'] = 'foobar'")
 
+    def cas_and_list_index_test(self):
+        """ Test for 7499 test """
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k int PRIMARY KEY,
+                v text,
+                l list<text>
+            )
+        """)
+
+        cursor.execute("INSERT INTO test(k, v, l) VALUES(0, 'foobar', ['foi', 'bar'])")
+
+        assert_one(cursor, "UPDATE test SET l[0] = 'foo' WHERE k = 0 IF v = 'barfoo'", [False, 'foobar'])
+        assert_one(cursor, "UPDATE test SET l[0] = 'foo' WHERE k = 0 IF v = 'foobar'", [True])
+
+        assert_one(cursor, "SELECT * FROM test", [0, 'foobar', ('foo', 'bar')])
+
 
     @since("2.0")
     def static_with_limit_test(self):
@@ -4039,6 +4058,26 @@ class TestCQL(Tester):
         assert_one(cursor, "SELECT * FROM test WHERE k = 0 LIMIT 1", [0, 0, 42])
         assert_all(cursor, "SELECT * FROM test WHERE k = 0 LIMIT 2", [[0, 0, 42], [0, 1, 42]])
         assert_all(cursor, "SELECT * FROM test WHERE k = 0 LIMIT 3", [[0, 0, 42], [0, 1, 42], [0, 2, 42]])
+
+    @since("2.0")
+    def static_with_empty_clustering_test(self):
+        """ Test for bug of #7455 """
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test(
+                pkey text,
+                ckey text,
+                value text,
+                static_value text static,
+                PRIMARY KEY(pkey, ckey)
+            )
+        """)
+
+        cursor.execute("INSERT INTO test(pkey, static_value) VALUES ('partition1', 'static value')")
+        cursor.execute("INSERT INTO test(pkey, ckey, value) VALUES('partition1', '', 'value')")
+
+        assert_one(cursor, "SELECT * FROM test", ['partition1', '', 'static value', 'value'])
 
     @since("1.2")
     def limit_compact_table(self):
