@@ -21,7 +21,7 @@ class TestSSTableSplit(Tester):
         if version < "2.1":
             node.stress( ['-o', 'insert'] )
         else:
-            node.stress( ['write', 'n=1100000', '-rate', 'threads=8'] )
+            node.stress( ['write', 'n=1000000', '-rate', 'threads=50'] )
         
         self._do_compaction(node)
         self._do_split(node, version)
@@ -32,22 +32,30 @@ class TestSSTableSplit(Tester):
         if version < "2.1":
             node.stress( ['-o', 'read'] )
         else:
-            node.stress( ['read', 'n=1100000', '-rate', 'threads=8'] )
+            node.stress( ['read', 'n=1000000', '-rate', 'threads=25'] )
 
     def _do_compaction(self, node):
         debug("Compact sstables.")
+        node.flush()
         node.compact()
+        node.flush()
         sstables = node.get_sstables('Keyspace1', '')
+        debug("Number of sstables after compaction: %s" % len(sstables))
 
     def _do_split(self, node, version):
-        debug("run sstablesplit")
+        debug("Run sstablesplit")
         time.sleep(5.0)
         node.stop()
+        origsstable = node.get_sstables('Keyspace1', '')
+        debug("Original sstable before split: %s" % origsstable)
         node.run_sstablesplit( keyspace='Keyspace1' )
         sstables = node.get_sstables('Keyspace1', '')
-        assert len(sstables) == 6, "Incorrect number of sstables after running sstablesplit."
+        debug("Number of sstables after split: %s" % len(sstables))
         if version < "2.1":
+            assert len(sstables) == 6, "Incorrect number of sstables after running sstablesplit."
             assert max( [ getsize( sstable ) for sstable in sstables ] ) <= 52428960, "Max sstables size should be 52428960."
         else:
+            assert len(sstables) == 7, "Incorrect number of sstables after running sstablesplit."
+            sstables.remove(origsstable[0])  # newer sstablesplit does not remove the original sstable after split
             assert max( [ getsize( sstable ) for sstable in sstables ] ) <= 52428980, "Max sstables size should be 52428980."
         node.start()
