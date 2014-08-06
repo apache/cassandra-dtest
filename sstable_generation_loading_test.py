@@ -55,6 +55,11 @@ class TestSSTableGenerationAndLoading(Tester):
         cluster = self.cluster
         cluster.populate(1).start()
         node1 = cluster.nodelist()[0]
+
+        # Making this connection allows us to be sure
+        # the cluster is ready to accept the subsequent
+        # stress connection. This was an issue on Windows.
+        self.patient_cql_connection(node1)
         version = cluster.version()
         if version < "2.1":
             node1.stress(['--num-keys=10000'])
@@ -178,7 +183,7 @@ class TestSSTableGenerationAndLoading(Tester):
         debug("Calling sstableloader")
         # call sstableloader to re-load each cf.
         cdir = node1.get_cassandra_dir()
-        sstableloader = os.path.join(cdir, 'bin', 'sstableloader')
+        sstableloader = os.path.join(cdir, 'bin', ccmcommon.platform_binary('sstableloader'))
         env = ccmcommon.make_cassandra_env(cdir, node1.get_path())
         host = node1.address()
         sstablecopy_dir = copy_root + '/ks'

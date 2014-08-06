@@ -16,7 +16,6 @@ class TestAuth(Tester):
         ]
         Tester.__init__(self, *args, **kwargs)
 
-    @require('https://issues.apache.org/jira/browse/CASSANDRA-7011')
     def system_auth_ks_is_alterable_test(self):
         self.prepare(nodes=3)
         debug("nodes started")
