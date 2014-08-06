@@ -22,7 +22,7 @@ class TestSSTableSplit(Tester):
         # to the node. This is required for windows
         # to prevent stress starting before the node
         # is ready for connections
-        self.patient_cql_connection(node)
+        node.watch_log_for('thrift clients...')
         debug("Run stress to insert data")
         if version < "2.1":
             node.stress( ['-o', 'insert'] )
