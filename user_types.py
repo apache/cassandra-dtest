@@ -803,3 +803,48 @@ class TestUserTypes(Tester):
 
         with self.assertRaisesRegexp(ProgrammingError, 'A user type cannot contain counters'):
             cursor.execute(stmt)
+
+    @since('2.1')
+    def test_type_as_clustering_col(self):
+        """Tests user types as clustering column"""
+        # make sure we can define a table with a user type as a clustering column
+        # and do a basic insert/query of data in that table.
+        cluster = self.cluster
+        cluster.populate(3).start()
+        node1, node2, node3 = cluster.nodelist()
+        cursor = self.patient_cql_connection(node1).cursor()
+        self.create_ks(cursor, 'user_type_pkeys', 2)
+
+        stmt = """
+              CREATE TYPE t_letterpair (
+              first text,
+              second text
+            )
+           """
+        cursor.execute(stmt)
+
+        stmt = """
+              CREATE TABLE letters (
+              id int,
+              letterpair t_letterpair,
+              PRIMARY KEY (id, letterpair)
+              )
+           """
+        cursor.execute(stmt)
+
+        # create a bit of data and expect a natural order based on clustering user types
+
+        ids = range(1, 10)
+
+        for _id in ids:
+            cursor.execute("INSERT INTO letters (id, letterpair) VALUES ({}, {{first:'a', second:'z'}})".format(_id))
+            cursor.execute("INSERT INTO letters (id, letterpair) VALUES ({}, {{first:'z', second:'a'}})".format(_id))
+            cursor.execute("INSERT INTO letters (id, letterpair) VALUES ({}, {{first:'c', second:'f'}})".format(_id))
+            cursor.execute("INSERT INTO letters (id, letterpair) VALUES ({}, {{first:'c', second:'a'}})".format(_id))
+            cursor.execute("INSERT INTO letters (id, letterpair) VALUES ({}, {{first:'c', second:'z'}})".format(_id))
+            cursor.execute("INSERT INTO letters (id, letterpair) VALUES ({}, {{first:'d', second:'e'}})".format(_id))
+
+        for _id in ids:
+            cursor.execute("SELECT letterpair FROM letters where id = {}".format(_id))
+            res = cursor.fetchall()
+            self.assertEqual(decode(res), [[u'a', u'z'], [u'c', u'a'], [u'c', u'f'], [u'c', u'z'], [u'd', u'e'], [u'z', u'a']])
