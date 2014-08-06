@@ -4017,6 +4017,25 @@ class TestCQL(Tester):
         cursor.execute("INSERT INTO tset(k, s) VALUES (0, {'foo', 'bar', 'foobar'})")
         assert_invalid(cursor, "DELETE FROM tset WHERE k=0 IF s['foo'] = 'foobar'")
 
+    def cas_and_list_index_test(self):
+        """ Test for 7499 test """
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k int PRIMARY KEY,
+                v text,
+                l list<text>
+            )
+        """)
+
+        cursor.execute("INSERT INTO test(k, v, l) VALUES(0, 'foobar', ['foi', 'bar'])")
+
+        assert_one(cursor, "UPDATE test SET l[0] = 'foo' WHERE k = 0 IF v = 'barfoo'", [False, 'foobar'])
+        assert_one(cursor, "UPDATE test SET l[0] = 'foo' WHERE k = 0 IF v = 'foobar'", [True])
+
+        assert_one(cursor, "SELECT * FROM test", [0, 'foobar', ('foo', 'bar')])
+
 
     @since("2.0")
     def static_with_limit_test(self):
@@ -4039,6 +4058,26 @@ class TestCQL(Tester):
         assert_one(cursor, "SELECT * FROM test WHERE k = 0 LIMIT 1", [0, 0, 42])
         assert_all(cursor, "SELECT * FROM test WHERE k = 0 LIMIT 2", [[0, 0, 42], [0, 1, 42]])
         assert_all(cursor, "SELECT * FROM test WHERE k = 0 LIMIT 3", [[0, 0, 42], [0, 1, 42], [0, 2, 42]])
+
+    @since("2.0")
+    def static_with_empty_clustering_test(self):
+        """ Test for bug of #7455 """
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test(
+                pkey text,
+                ckey text,
+                value text,
+                static_value text static,
+                PRIMARY KEY(pkey, ckey)
+            )
+        """)
+
+        cursor.execute("INSERT INTO test(pkey, static_value) VALUES ('partition1', 'static value')")
+        cursor.execute("INSERT INTO test(pkey, ckey, value) VALUES('partition1', '', 'value')")
+
+        assert_one(cursor, "SELECT * FROM test", ['partition1', '', 'static value', 'value'])
 
     @since("1.2")
     def limit_compact_table(self):
@@ -4302,4 +4341,29 @@ class TestCQL(Tester):
         assert_none(
             cursor,
             "SELECT type_name from system.schema_usertypes where keyspace_name='my_test_ks' and type_name='mytype'")
-        
+
+    @since('2.0')
+    def bug_6612_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE session_data (
+                username text,
+                session_id text,
+                app_name text,
+                account text,
+                last_access timestamp,
+                created_on timestamp,
+                PRIMARY KEY (username, session_id, app_name, account)
+            );
+        """)
+
+        #cursor.execute("create index sessionIndex ON session_data (session_id)")
+        cursor.execute("create index sessionAppName ON session_data (app_name)")
+        cursor.execute("create index lastAccessIndex ON session_data (last_access)")
+
+        assert_one(cursor, "select count(*) from session_data where app_name='foo' and account='bar' and last_access > 4 allow filtering", [0])
+
+        cursor.execute("insert into session_data (username, session_id, app_name, account, last_access, created_on) values ('toto', 'foo', 'foo', 'bar', 12, 13)")
+
+        assert_one(cursor, "select count(*) from session_data where app_name='foo' and account='bar' and last_access > 4 allow filtering", [1])
