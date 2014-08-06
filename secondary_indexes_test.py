@@ -86,7 +86,7 @@ class TestSecondaryIndexes(Tester):
                 if ip == node1.address() and 'Executing indexed scan' in desc:
                     index = i
                     break
-            self.assertTrue(index >= 2, "Unexepected index for 'Executing indexed scan' event: %d" % (index,))
+            self.assertTrue(index >= 2, "Unexpected index for 'Executing indexed scan' event: %d" % (index,))
 
         cursor.execute("SELECT * FROM ks.cf WHERE b='1';")
         result = cursor.fetchall()
