@@ -31,7 +31,7 @@ class TestUserFunctions(Tester):
 
     @since('2.1') # TODO bump to C* version 3.0 later
     def test_migration(self):
-        """ Test deletion by 'composite prefix' (range tombstones) """
+        """ Test migration of user functions """
         cluster = self.cluster
 
         # Uses 3 nodes just to make sure function mutations are correctly serialized
@@ -81,8 +81,3 @@ class TestUserFunctions(Tester):
         assert_invalid(cursor1, "SELECT key, value, sin(value), cos(value), tan(value) FROM udf_kv where key = 1")
         assert_invalid(cursor2, "SELECT key, value, sin(value), cos(value), tan(value) FROM udf_kv where key = 1")
         assert_invalid(cursor3, "SELECT key, value, sin(value), cos(value), tan(value) FROM udf_kv where key = 1")
-
-        #cursor1.flush()
-        #cursor2.flush()
-        #cursor3.flush()
-        #time.sleep(0.2)
