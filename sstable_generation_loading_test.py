@@ -183,7 +183,7 @@ class TestSSTableGenerationAndLoading(Tester):
         debug("Calling sstableloader")
         # call sstableloader to re-load each cf.
         cdir = node1.get_cassandra_dir()
-        sstableloader = os.path.join(cdir, 'bin', 'sstableloader')
+        sstableloader = os.path.join(cdir, 'bin', ccmcommon.platform_binary('sstableloader'))
         env = ccmcommon.make_cassandra_env(cdir, node1.get_path())
         host = node1.address()
         sstablecopy_dir = copy_root + '/ks'
