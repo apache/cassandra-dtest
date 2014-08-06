@@ -80,8 +80,13 @@ class TestSecondaryIndexes(Tester):
                     relevant_events.append((desc,ip))
 
             self.assertTrue('Enqueuing' in relevant_events[0][0], str(relevant_events[0]))
-            self.assertTrue('Enqueuing' in relevant_events[1][0], str(relevant_events[0]))
-            self.assertTrue('Executing indexed scan' in relevant_events[-1][0], str(relevant_events[-1]))
+            self.assertTrue('Enqueuing' in relevant_events[1][0], str(relevant_events[1]))
+            index = -1
+            for i, (desc, ip) in enumerate(relevant_events):
+                if ip == node1.address() and 'Executing indexed scan' in desc:
+                    index = i
+                    break
+            self.assertTrue(index >= 2, "Unexpected index for 'Executing indexed scan' event: %d" % (index,))
 
         query = SimpleStatement("SELECT * FROM ks.cf WHERE b='1';")
         result = cursor.execute(query, trace=True)

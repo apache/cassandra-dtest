@@ -6,6 +6,7 @@ import shutil
 import glob
 import os
 import time
+import distutils.dir_util
 
 class SnapshotTester(Tester):
     def __init__(self, *args, **kwargs):
@@ -33,7 +34,9 @@ class SnapshotTester(Tester):
         debug("snapshot_dir is : " + snapshot_dir)
         debug("snapshot copy is : " + tmpdir)
 
-        os.system('cp -a {snapshot_dir}/* {tmpdir}/{ks}/{cf}/'.format(**locals()))
+        # Copy files from the snapshot dir to existing temp dir
+        distutils.dir_util.copy_tree(str(snapshot_dir), os.path.join(tmpdir, ks, cf))
+
         return tmpdir
 
     def restore_snapshot(self, snapshot_dir, node, ks, cf):
@@ -121,7 +124,7 @@ class TestArchiveCommitlog(SnapshotTester):
         # Edit commitlog_archiving.properties and set an archive
         # command:
         replace_in_file(os.path.join(node1.get_path(),'conf','commitlog_archiving.properties'),
-                        [(r'^archive_command=.*$', 'archive_command=/bin/cp %path {tmp_commitlog}/%name'.format(
+                        [(r'^archive_command=.*$', 'archive_command=cp %path {tmp_commitlog}/%name'.format(
                             tmp_commitlog=tmp_commitlog))])
 
         cluster.start()
@@ -135,7 +138,8 @@ class TestArchiveCommitlog(SnapshotTester):
         insert_cutoff_times = [time.gmtime()]
 
         # Delete all commitlog backups so far:
-        os.system('rm {tmp_commitlog}/*'.format(tmp_commitlog=tmp_commitlog))
+        for f in glob.glob(tmp_commitlog+"/*"):
+            os.remove(f)
 
         snapshot_dir = self.make_snapshot(node1, 'ks', 'cf', 'basic')
 
@@ -160,6 +164,7 @@ class TestArchiveCommitlog(SnapshotTester):
         # is not one of the active commit logs:
         commitlog_dir = os.path.join(node1.get_path(), 'commitlogs')
         debug("node1 commitlog dir: " + commitlog_dir)
+
         self.assertTrue(len(set(os.listdir(tmp_commitlog)) - set(os.listdir(commitlog_dir))) > 0)
 
         cluster.flush()
@@ -196,7 +201,7 @@ class TestArchiveCommitlog(SnapshotTester):
                              (r'^restore_command=.*$', 'restore_command=cp -f %from %to'),
                              (r'^restore_directories=.*$', 'restore_directories={tmp_commitlog}'.format(
                                  tmp_commitlog=tmp_commitlog))])
-            
+
             if restore_point_in_time:
                 restore_time = time.strftime("%Y:%m:%d %H:%M:%S", insert_cutoff_times[1])
                 replace_in_file(os.path.join(node1.get_path(),'conf','commitlog_archiving.properties'),
