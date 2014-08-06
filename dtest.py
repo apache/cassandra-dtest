@@ -6,6 +6,7 @@ import copy
 
 from ccmlib.cluster import Cluster
 from ccmlib.node import Node
+from ccmlib.common import is_win
 from cql.thrifteries import ThriftCursor
 from uuid import UUID
 from nose.exc import SkipTest
@@ -241,7 +242,8 @@ class Tester(TestCase):
                 shutil.copyfile(log, os.path.join(logdir, n + ".log"))
             if os.path.exists(name):
                 os.unlink(name)
-            os.symlink(basedir, name)
+            if not is_win():
+                os.symlink(basedir, name)
 
     def cql_connection(self, node, keyspace=None, version=None, user=None, password=None):
         import cql
