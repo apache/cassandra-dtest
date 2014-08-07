@@ -4367,3 +4367,18 @@ class TestCQL(Tester):
         cursor.execute("insert into session_data (username, session_id, app_name, account, last_access, created_on) values ('toto', 'foo', 'foo', 'bar', 12, 13)")
 
         assert_one(cursor, "select count(*) from session_data where app_name='foo' and account='bar' and last_access > 4 allow filtering", [1])
+
+    @since('2.0')
+    def blobAs_functions_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k int PRIMARY KEY,
+                v int
+            );
+        """)
+
+        # A blob that is not 4 bytes should be rejected
+        assert_invalid(cursor, "INSERT INTO test(k, v) VALUES (0, blobAsInt(0x01))")
+
