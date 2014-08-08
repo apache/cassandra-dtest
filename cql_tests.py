@@ -1512,6 +1512,7 @@ class TestCQL(Tester):
         cli.do("use ks")
         cli.do("set test[2]['4:v'] = int(200)")
         assert not cli.has_errors(), cli.errors()
+        time.sleep(1.5)
 
         res = cursor.execute("SELECT * FROM test")
         assert rows_to_list(res) == [ [2, 4, 200] ], res
