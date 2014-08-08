@@ -232,6 +232,11 @@ class TestUpgradeThroughVersions(Tester):
                 node.set_cassandra_dir(cassandra_version='git:' + tag)
                 debug("Set new cassandra dir for %s: %s" % (node.name, node.get_cassandra_dir()))
 
+        # hacky? yes. We could probably extend ccm to allow this publicly.
+        # the topology file needs to be written before any nodes are started
+        # otherwise they won't be grouped into dc's properly for multi-dc tests
+        self.cluster._Cluster__update_topology_files()
+
         # Restart nodes on new version
         for node in nodes:
             debug('Starting %s on new version (%s)' % (node.name, tag))
