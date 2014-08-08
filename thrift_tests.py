@@ -19,10 +19,6 @@ def get_thrift_client(host='127.0.0.1', port=9160):
     return client
 thrift_client = client = get_thrift_client()
 
-pid_fname = "system_test.pid"
-def pid():
-    return int(open(pid_fname).read())
-
 class BaseTester(Tester):
     client = None
     extra_args = []
