@@ -182,12 +182,14 @@ class TestUpgradeThroughVersions(Tester):
 
                     debug('Successfully upgraded %d of %d nodes to %s' %
                           (num + 1, len(self.cluster.nodelist()), tag))
+
                 self.cluster.set_cassandra_dir(cassandra_version='git:' + tag)
             else:
                 self._write_values()
                 self._increment_counters()
 
                 self.upgrade_to_version(tag)
+                self.cluster.set_cassandra_dir(cassandra_version='git:' + tag)
 
                 self._check_values()
                 self._check_counters()
@@ -225,11 +227,15 @@ class TestUpgradeThroughVersions(Tester):
             for node in nodes:
                 node.set_cassandra_dir(cassandra_dir=cdir)
                 debug("Set new cassandra dir for %s: %s" % (node.name, node.get_cassandra_dir()))
-            self.cluster.set_cassandra_dir(cassandra_dir=cdir)
         else:
             for node in nodes:
                 node.set_cassandra_dir(cassandra_version='git:' + tag)
                 debug("Set new cassandra dir for %s: %s" % (node.name, node.get_cassandra_dir()))
+
+        # hacky? yes. We could probably extend ccm to allow this publicly.
+        # the topology file needs to be written before any nodes are started
+        # otherwise they won't be grouped into dc's properly for multi-dc tests
+        self.cluster._Cluster__update_topology_files()
 
         # Restart nodes on new version
         for node in nodes:

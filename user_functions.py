@@ -7,7 +7,8 @@ from dtest import Tester
 from assertions import assert_invalid
 from tools import since
 
-cql_version="3.0.0"
+cql_version = "3.0.0"
+
 
 class TestUserFunctions(Tester):
 
@@ -18,7 +19,7 @@ class TestUserFunctions(Tester):
             cluster.set_partitioner("org.apache.cassandra.dht.ByteOrderedPartitioner")
 
         if (use_cache):
-            cluster.set_configuration_options(values={ 'row_cache_size_in_mb' : 100 })
+            cluster.set_configuration_options(values={'row_cache_size_in_mb': 100})
 
         cluster.populate(nodes).start()
         node1 = cluster.nodelist()[0]
@@ -29,7 +30,7 @@ class TestUserFunctions(Tester):
             self.create_ks(cursor, 'ks', rf)
         return cursor
 
-    @since('2.1') # TODO bump to C* version 3.0 later
+    @since('3.0')
     def test_migration(self):
         """ Test migration of user functions """
         cluster = self.cluster
@@ -66,13 +67,13 @@ class TestUserFunctions(Tester):
 
         cursor1.execute("SELECT key, value, x_sin(value), x_cos(value), x_tan(value) FROM ks.udf_kv where key = %d" % 1)
         res = cursor1.fetchall()
-        assert res == [[ 1, 1.0, 0.8414709848078965, 0.5403023058681398, 1.5574077246549023 ]], res
+        assert res == [[1, 1.0, 0.8414709848078965, 0.5403023058681398, 1.5574077246549023]], res
         cursor2.execute("SELECT key, value, x_sin(value), x_cos(value), x_tan(value) FROM ks.udf_kv where key = %d" % 2)
         res = cursor2.fetchall()
-        assert res == [[ 2, 2.0, math.sin(2.0), math.cos(2.0), math.tan(2.0) ]], res
+        assert res == [[2, 2.0, math.sin(2.0), math.cos(2.0), math.tan(2.0)]], res
         cursor3.execute("SELECT key, value, x_sin(value), x_cos(value), x_tan(value) FROM ks.udf_kv where key = %d" % 3)
         res = cursor3.fetchall()
-        assert res == [[ 3, 3.0, math.sin(3.0), math.cos(3.0), math.tan(3.0) ]], res
+        assert res == [[3, 3.0, math.sin(3.0), math.cos(3.0), math.tan(3.0)]], res
 
         cursor2.execute("drop function x_sin")
         cursor3.execute("drop function x_cos")
