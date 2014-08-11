@@ -4017,6 +4017,7 @@ class TestCQL(Tester):
         cursor.execute("INSERT INTO tset(k, s) VALUES (0, {'foo', 'bar', 'foobar'})")
         assert_invalid(cursor, "DELETE FROM tset WHERE k=0 IF s['foo'] = 'foobar'")
 
+    #@require("#7499")
     def cas_and_list_index_test(self):
         """ Test for 7499 test """
         cursor = self.prepare()
@@ -4034,7 +4035,7 @@ class TestCQL(Tester):
         assert_one(cursor, "UPDATE test SET l[0] = 'foo' WHERE k = 0 IF v = 'barfoo'", [False, 'foobar'])
         assert_one(cursor, "UPDATE test SET l[0] = 'foo' WHERE k = 0 IF v = 'foobar'", [True])
 
-        assert_one(cursor, "SELECT * FROM test", [0, 'foobar', ('foo', 'bar')])
+        assert_one(cursor, "SELECT * FROM test", [0, ('foo', 'bar'), 'foobar' ])
 
 
     @since("2.0")
@@ -4381,4 +4382,13 @@ class TestCQL(Tester):
 
         # A blob that is not 4 bytes should be rejected
         assert_invalid(cursor, "INSERT INTO test(k, v) VALUES (0, blobAsInt(0x01))")
+
+    #@require("7730")
+    def alter_clustering_and_static_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("CREATE TABLE foo (bar int, PRIMARY KEY (bar))")
+
+        # We shouldn't allow static when there is not clustering columns
+        assert_invalid(cursor, "ALTER TABLE foo ADD bar2 text static")
 
