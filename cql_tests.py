@@ -1621,6 +1621,7 @@ class TestCQL(Tester):
         cli.do("use ks")
         cli.do("set test[2]['4:v'] = int(200)")
         assert not cli.has_errors(), cli.errors()
+        time.sleep(1.5)
 
         cursor.execute("SELECT * FROM test")
         res = cursor.fetchall()
@@ -4338,7 +4339,7 @@ class TestCQL(Tester):
 
         # drop and confirm
         cursor.execute("DROP TYPE IF EXISTS mytype")
-        
+
         assert_none(
             cursor,
             "SELECT type_name from system.schema_usertypes where keyspace_name='my_test_ks' and type_name='mytype'")
