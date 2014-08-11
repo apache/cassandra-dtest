@@ -4384,7 +4384,7 @@ class TestCQL(Tester):
         # A blob that is not 4 bytes should be rejected
         assert_invalid(cursor, "INSERT INTO test(k, v) VALUES (0, blobAsInt(0x01))")
 
-    #@require("7730")
+    @require("7730")
     def alter_clustering_and_static_test(self):
         cursor = self.prepare()
 
@@ -4393,3 +4393,12 @@ class TestCQL(Tester):
         # We shouldn't allow static when there is not clustering columns
         assert_invalid(cursor, "ALTER TABLE foo ADD bar2 text static")
 
+    def drop_and_readd_collection_test(self):
+        """ Test for 6276 """
+        cursor = self.prepare()
+
+        cursor.execute("create table test (k int primary key, v set<text>, x int)")
+        cursor.execute("insert into test (k, v) VALUES (0, {'fffffffff'})")
+        self.cluster.flush()
+        cursor.execute("alter table test drop v")
+        assert_invalid(cursor, "alter table test add v set<int>")
