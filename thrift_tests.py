@@ -27,6 +27,10 @@ class BaseTester(Tester):
     client = None
     extra_args = []
 
+    def __init__(self, *args, **kwargs):
+        kwargs['cluster_options'] = {'partitioner': 'org.apache.cassandra.dht.ByteOrderedPartitioner'}
+        Tester.__init__(self, *args, **kwargs)
+
     def open_client(self):
         raise NotImplementedError()
 
@@ -1405,7 +1409,7 @@ class TestMutations(ThriftTester):
         assert cf0.comparator_type == "org.apache.cassandra.db.marshal.BytesType"
 
     def test_describe(self):
-        assert client.describe_cluster_name() == 'Test Cluster'
+        assert client.describe_cluster_name() == 'test'
 
     def test_describe_ring(self):
         assert list(client.describe_ring('Keyspace1'))[0].endpoints == ['127.0.0.1']
@@ -1415,7 +1419,7 @@ class TestMutations(ThriftTester):
         # which uses BytesToken, so this just tests that the string representation of the token
         # matches a regex pattern for BytesToken.toString().
         ring = client.describe_token_map().items()
-        assert len(ring) == 1
+        assert len(ring) == 256
         token, node = ring[0]
         assert re.match("[0-9A-Fa-f]{32}", token)
         assert node == '127.0.0.1'
