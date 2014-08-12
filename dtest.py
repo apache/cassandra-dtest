@@ -210,9 +210,15 @@ class Tester(TestCase):
             for node in self.cluster.nodelist():
                 if self.allow_log_errors == False:
                     errors = list(self.__filter_errors([ msg for msg in node.grep_log_for_errors()]))
+
+                    # flatten errors into one string for more readable output
+                    formatted_errors = ""
+                    for err in errors:
+                        formatted_errors += ''.join(err)
+
                     if len(errors) is not 0:
                         failed = True
-                        raise AssertionError('Unexpected error in %s node log: %s' % (node.name, errors))
+                        raise AssertionError('Unexpected error in %s node log:\n%s' % (node.name, formatted_errors))
         finally:
             try:
                 if failed or KEEP_LOGS:
