@@ -77,8 +77,10 @@ class TestSecondaryIndexes(Tester):
             # execution happening
             trace = cursor.get_last_trace()
 
-            # Look for messages like "Submitting
-            regex = r"Submitting (\d+) concurrent range requests; ([0-9.]+) rows per range expected"
+            # Look for messages like:
+            #         Submitting range requests on 769    ranges with a concurrency of 769    (0.0070312 rows per range expected)
+            regex = r"Submitting range requests on [0-9]+ ranges with a concurrency of (\d+) \(([0-9.]+) rows per range expected\)"
+
             for (_, _, desc, _, _, _) in trace:
                 match = re.match(regex, desc)
                 if match:
