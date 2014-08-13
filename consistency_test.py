@@ -172,6 +172,51 @@ class TestConsistency(Tester):
         node3.stop(wait_other_notice=True)
         assert_unavailable(insert_c1c2, cursor1, 100, ConsistencyLevel.THREE)
 
+    def two_two_test(self):
+        cluster = self.cluster
+
+        cluster.populate(3).start()
+        node1, node2, node3 = cluster.nodelist()
+
+        cursor1 = self.patient_cql_connection(node1)
+        self.create_ks(cursor1, 'ks', 3)
+        create_c1c2_table(self, cursor1)
+
+        cursor2 = self.cql_connection(node2, 'ks')
+
+        for n in xrange(0, 100):
+            insert_c1c2(cursor1, n, ConsistencyLevel.TWO)
+            query_c1c2(cursor2, n, ConsistencyLevel.TWO)
+
+        # shutdown a node and test again
+        node3.stop(wait_other_notice=True)
+        for n in xrange(0, 100):
+            insert_c1c2(cursor1, n, ConsistencyLevel.TWO)
+            query_c1c2(cursor2, n, ConsistencyLevel.TWO)
+
+    def three_one_test(self):
+        cluster = self.cluster
+
+        cluster.populate(3).start()
+        [node1, node2, node3] = cluster.nodelist()
+
+        cursor1 = self.patient_cql_connection(node1)
+        self.create_ks(cursor1, 'ks', 3)
+        create_c1c2_table(self, cursor1)
+
+        cursor2 = self.cql_connection(node2, 'ks')
+
+        for n in xrange(0, 100):
+            insert_c1c2(cursor1, n, ConsistencyLevel.THREE)
+            query_c1c2(cursor2, n, ConsistencyLevel.ONE)
+
+        # shutdown a node and test again
+        node3.stop(wait_other_notice=True)
+        assert_unavailable(insert_c1c2, cursor1, 100, ConsistencyLevel.THREE)
+        for n in xrange(0, 100):
+            insert_c1c2(cursor1, n, ConsistencyLevel.ONE)
+            query_c1c2(cursor2, n, ConsistencyLevel.ONE)
+
     def short_read_test(self):
         cluster = self.cluster
 
