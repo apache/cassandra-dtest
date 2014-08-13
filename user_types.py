@@ -1,6 +1,3 @@
-import os
-import datetime
-import random
 import struct
 import time
 import uuid
@@ -17,8 +14,10 @@ def decode_text(string):
     """
     return string.decode('utf-8')
 
+
 def len_unpacker(val):
     return struct.Struct('>i').unpack(val)[0]
+
 
 def unpack(bytestr):
     # The composite format for each component is:
@@ -34,6 +33,7 @@ def unpack(bytestr):
             components.append(decode_text(bytestr[4:4 + length]))
             bytestr = bytestr[4 + length:]
     return tuple(components)
+
 
 def decode(item):
     """
@@ -381,7 +381,7 @@ class TestUserTypes(Tester):
         """Tests user types within user types"""
         cluster = self.cluster
         cluster.populate(3).start()
-        node1,node2,node3 = cluster.nodelist()
+        node1, node2, node3 = cluster.nodelist()
         cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'user_types', 2)
 
@@ -390,7 +390,7 @@ class TestUserTypes(Tester):
            """
         cursor.execute(stmt)
 
-        #### Create a user type to go inside another one:
+        # Create a user type to go inside another one:
         stmt = """
               CREATE TYPE item (
               sub_one text,
@@ -399,7 +399,7 @@ class TestUserTypes(Tester):
            """
         cursor.execute(stmt)
 
-        #### Create a user type to contain the item:
+        # Create a user type to contain the item:
         stmt = """
               CREATE TYPE container (
               stuff text,
@@ -408,8 +408,8 @@ class TestUserTypes(Tester):
            """
         cursor.execute(stmt)
 
-        ### Create a table that holds and item, a container, and a
-        ### list of containers:
+        #  Create a table that holds and item, a container, and a
+        #  list of containers:
         stmt = """
               CREATE TABLE bucket (
                id uuid PRIMARY KEY,
@@ -422,7 +422,7 @@ class TestUserTypes(Tester):
         # Make sure the scheam propagate
         time.sleep(2)
 
-        ### Insert some data:
+        #  Insert some data:
         _id = uuid.uuid4()
         stmt = """
               INSERT INTO bucket (id, primary_item)
@@ -461,10 +461,10 @@ class TestUserTypes(Tester):
         self.assertEqual(decode(other_items), [[u'stuff', [u'one', u'two']]])
         self.assertEqual(decode(other_containers), [[u'stuff2', [u'one_other', u'two_other']], [u'stuff3', [u'one_2_other', u'two_2_other']], [u'stuff4', [u'one_3_other', u'two_3_other']]])
 
-        ### Generate some repetitive data and check it for it's contents:
+        #  Generate some repetitive data and check it for it's contents:
         for x in xrange(50):
 
-            ### Create row:
+            # Create row:
             _id = uuid.uuid4()
             stmt = """
               UPDATE bucket
@@ -475,7 +475,7 @@ class TestUserTypes(Tester):
 
             time.sleep(0.1)
 
-            ### Check it:
+            # Check it:
             stmt = """
               SELECT other_containers from bucket WHERE id={id}
             """.format(id=_id)
@@ -491,7 +491,7 @@ class TestUserTypes(Tester):
         # and do a basic insert/query of data in that table.
         cluster = self.cluster
         cluster.populate(3).start()
-        node1,node2,node3 = cluster.nodelist()
+        node1, node2, node3 = cluster.nodelist()
         cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'user_type_pkeys', 2)
 
@@ -548,7 +548,7 @@ class TestUserTypes(Tester):
         """
         cluster = self.cluster
         cluster.populate(3).start()
-        node1,node2,node3 = cluster.nodelist()
+        node1, node2, node3 = cluster.nodelist()
         cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'user_type_indexing', 2)
 
@@ -627,7 +627,7 @@ class TestUserTypes(Tester):
         self.assertEqual(first_name, u'Nero')
         self.assertEqual(like, u'arson')
 
-        #rename the type and make sure the index still works
+        # rename the type and make sure the index still works
         stmt = """
             ALTER TYPE t_person_name rename to t_person_name2;
             """
@@ -679,9 +679,9 @@ class TestUserTypes(Tester):
         ]
 
         cluster = self.cluster
-        config = {'authenticator' : 'org.apache.cassandra.auth.PasswordAuthenticator',
-                  'authorizer' : 'org.apache.cassandra.auth.CassandraAuthorizer',
-                  'permissions_validity_in_ms' : 0}
+        config = {'authenticator': 'org.apache.cassandra.auth.PasswordAuthenticator',
+                  'authorizer': 'org.apache.cassandra.auth.CassandraAuthorizer',
+                  'permissions_validity_in_ms': 0}
         cluster.set_configuration_options(values=config)
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
@@ -722,11 +722,11 @@ class TestUserTypes(Tester):
         assert_invalid(user2_cursor, "ALTER TYPE ks1.simple_type RENAME TO ks1.renamed_type;", 'User ks2_user has no ALTER permission on <keyspace ks1> or any of its parents')
 
 
-        #rename the types using the correct user w/permissions to do so
+        # rename the types using the correct user w/permissions to do so
         user1_cursor.execute("ALTER TYPE ks1.simple_type RENAME TO ks1.renamed_type;")
         user2_cursor.execute("ALTER TYPE ks2.simple_type RENAME TO ks2.renamed_type;")
 
-        #finally, drop the types using the correct user w/permissions to do so
+        # finally, drop the types using the correct user w/permissions to do so
         user1_cursor.execute("DROP TYPE ks1.renamed_type;")
         user2_cursor.execute("DROP TYPE ks2.renamed_type;")
 
@@ -739,7 +739,7 @@ class TestUserTypes(Tester):
         """Tests user types with null values"""
         cluster = self.cluster
         cluster.populate(3).start()
-        node1,node2,node3 = cluster.nodelist()
+        node1, node2, node3 = cluster.nodelist()
         cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'user_types', 2)
 
@@ -748,7 +748,7 @@ class TestUserTypes(Tester):
            """
         cursor.execute(stmt)
 
-        #### Create a user type to go inside another one:
+        # Create a user type to go inside another one:
         stmt = """
               CREATE TYPE item (
               sub_one text,
@@ -757,7 +757,7 @@ class TestUserTypes(Tester):
            """
         cursor.execute(stmt)
 
-        ### Create a table that holds an item
+        # Create a table that holds an item
         stmt = """
               CREATE TABLE bucket (
                id int PRIMARY KEY,
@@ -769,12 +769,77 @@ class TestUserTypes(Tester):
         time.sleep(2)
 
         # Adds an explicit null
-        cursor.execute("INSERT INTO bucket (id, my_item) VALUES (0, {sub_one: 'test', sub_two: null})");
+        cursor.execute("INSERT INTO bucket (id, my_item) VALUES (0, {sub_one: 'test', sub_two: null})")
         # Adds with an implicit null
-        cursor.execute("INSERT INTO bucket (id, my_item) VALUES (1, {sub_one: 'test'})");
+        cursor.execute("INSERT INTO bucket (id, my_item) VALUES (1, {sub_one: 'test'})")
 
         rows = cursor.execute("SELECT my_item FROM bucket WHERE id=0")
         self.assertEqual(decode(rows[0]), [[u'test', None]])
 
         rows = cursor.execute("SELECT my_item FROM bucket WHERE id=1")
         self.assertEqual(decode(rows[0]), [[u'test', None]])
+
+    @since('2.1')
+    def test_no_counters_in_user_types(self):
+        # CASSANDRA-7672
+        cluster = self.cluster
+        cluster.populate(1).start()
+        [node1] = cluster.nodelist()
+        cursor = self.patient_cql_connection(node1)
+        self.create_ks(cursor, 'user_types', 1)
+
+        stmt = """
+            USE user_types
+         """
+        cursor.execute(stmt)
+
+        stmt = """
+            CREATE TYPE t_item (
+            sub_one COUNTER )
+         """
+
+        assert_invalid(cursor, stmt, 'A user type cannot contain counters')
+
+    @since('2.1')
+    def test_type_as_clustering_col(self):
+        """Tests user types as clustering column"""
+        # make sure we can define a table with a user type as a clustering column
+        # and do a basic insert/query of data in that table.
+        cluster = self.cluster
+        cluster.populate(3).start()
+        node1, node2, node3 = cluster.nodelist()
+        cursor = self.patient_cql_connection(node1)
+        self.create_ks(cursor, 'user_type_pkeys', 2)
+
+        stmt = """
+              CREATE TYPE t_letterpair (
+              first text,
+              second text
+            )
+           """
+        cursor.execute(stmt)
+
+        stmt = """
+              CREATE TABLE letters (
+              id int,
+              letterpair t_letterpair,
+              PRIMARY KEY (id, letterpair)
+              )
+           """
+        cursor.execute(stmt)
+
+        # create a bit of data and expect a natural order based on clustering user types
+
+        ids = range(1, 10)
+
+        for _id in ids:
+            cursor.execute("INSERT INTO letters (id, letterpair) VALUES ({}, {{first:'a', second:'z'}})".format(_id))
+            cursor.execute("INSERT INTO letters (id, letterpair) VALUES ({}, {{first:'z', second:'a'}})".format(_id))
+            cursor.execute("INSERT INTO letters (id, letterpair) VALUES ({}, {{first:'c', second:'f'}})".format(_id))
+            cursor.execute("INSERT INTO letters (id, letterpair) VALUES ({}, {{first:'c', second:'a'}})".format(_id))
+            cursor.execute("INSERT INTO letters (id, letterpair) VALUES ({}, {{first:'c', second:'z'}})".format(_id))
+            cursor.execute("INSERT INTO letters (id, letterpair) VALUES ({}, {{first:'d', second:'e'}})".format(_id))
+
+        for _id in ids:
+            res = cursor.execute("SELECT letterpair FROM letters where id = {}".format(_id))
+            self.assertEqual(decode(res), [[u'a', u'z'], [u'c', u'a'], [u'c', u'f'], [u'c', u'z'], [u'd', u'e'], [u'z', u'a']])

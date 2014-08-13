@@ -1,4 +1,5 @@
 import random
+import re
 import time
 import uuid
 
@@ -70,38 +71,40 @@ class TestSecondaryIndexes(Tester):
 
         cluster.flush()
 
-        def check_request_order(trace):
+        def check_trace_events(trace):
             # we should see multiple requests get enqueued prior to index scan
             # execution happening
-            relevant_events = []
-            for event in trace.events:
-                (desc, ip) = event.description, event.source
-                if 'Enqueuing request' in desc or ('Executing indexed scan' in desc and ip == node1.address()):
-                    relevant_events.append((desc,ip))
 
-            self.assertTrue('Enqueuing' in relevant_events[0][0], str(relevant_events[0]))
-            self.assertTrue('Enqueuing' in relevant_events[1][0], str(relevant_events[1]))
-            index = -1
-            for i, (desc, ip) in enumerate(relevant_events):
-                if ip == node1.address() and 'Executing indexed scan' in desc:
-                    index = i
+            # Look for messages like:
+            #         Submitting range requests on 769    ranges with a concurrency of 769    (0.0070312 rows per range expected)
+            regex = r"Submitting range requests on [0-9]+ ranges with a concurrency of (\d+) \(([0-9.]+) rows per range expected\)"
+
+            for event in trace.events:
+                desc = event.description
+                match = re.match(regex, desc)
+                if match:
+                    concurrency = int(match.group(1))
+                    expected_per_range = float(match.group(2))
+                    self.assertTrue(concurrency > 1, "Expected more than 1 concurrent range request, got %d" % concurrency)
+                    self.assertTrue(expected_per_range > 0)
                     break
-            self.assertTrue(index >= 2, "Unexpected index for 'Executing indexed scan' event: %d" % (index,))
+            else:
+                self.fail("Didn't find matching trace event")
 
         query = SimpleStatement("SELECT * FROM ks.cf WHERE b='1';")
         result = cursor.execute(query, trace=True)
         self.assertEqual(3, len(result))
-        check_request_order(query.trace)
+        check_trace_events(query.trace)
 
         query = SimpleStatement("SELECT * FROM ks.cf WHERE b='1' LIMIT 100;")
         result = cursor.execute(query, trace=True)
         self.assertEqual(3, len(result))
-        check_request_order(query.trace)
+        check_trace_events(query.trace)
 
         query = SimpleStatement("SELECT * FROM ks.cf WHERE b='1' LIMIT 3;")
         result = cursor.execute(query, trace=True)
         self.assertEqual(3, len(result))
-        check_request_order(query.trace)
+        check_trace_events(query.trace)
 
         for limit in (1, 2):
             result = cursor.execute("SELECT * FROM ks.cf WHERE b='1' LIMIT %d;" % (limit,))

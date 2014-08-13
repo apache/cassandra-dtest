@@ -213,10 +213,16 @@ class Tester(TestCase):
         try:
             for node in self.cluster.nodelist():
                 if self.allow_log_errors == False:
-                    errors = list(self.__filter_errors([ msg for msg, i in node.grep_log("ERROR")]))
+                    errors = list(self.__filter_errors([ msg for msg in node.grep_log_for_errors()]))
+
+                    # flatten errors into one string for more readable output
+                    formatted_errors = ""
+                    for err in errors:
+                        formatted_errors += ''.join(err)
+
                     if len(errors) is not 0:
                         failed = True
-                        raise AssertionError('Unexpected error in %s node log: %s' % (node.name, errors))
+                        raise AssertionError('Unexpected error in %s node log:\n%s' % (node.name, formatted_errors))
         finally:
             try:
                 if failed or KEEP_LOGS:
@@ -375,12 +381,16 @@ class Tester(TestCase):
         """Filter errors, removing those that match self.ignore_log_patterns"""
         if not hasattr(self, 'ignore_log_patterns'):
             self.ignore_log_patterns = []
-        for e in errors:
-            for pattern in self.ignore_log_patterns:
-                if re.search(pattern, e):
+        for stack_trace in errors:
+            ignore = False
+            for line in stack_trace:
+                for pattern in self.ignore_log_patterns:
+                    if re.search(pattern, line):
+                        ignore = True
+                if ignore:
                     break
             else:
-                yield e
+                yield stack_trace
 
     # Disable docstrings printing in nosetest output
     def shortDescription(self):

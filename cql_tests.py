@@ -3793,6 +3793,7 @@ class TestCQL(Tester):
         cursor.execute("INSERT INTO tset(k, s) VALUES (0, {'foo', 'bar', 'foobar'})")
         assert_invalid(cursor, "DELETE FROM tset WHERE k=0 IF s['foo'] = 'foobar'")
 
+    #@require("#7499")
     def cas_and_list_index_test(self):
         """ Test for 7499 test """
         cursor = self.prepare()
@@ -3810,7 +3811,7 @@ class TestCQL(Tester):
         assert_one(cursor, "UPDATE test SET l[0] = 'foo' WHERE k = 0 IF v = 'barfoo'", [False, 'foobar'])
         assert_one(cursor, "UPDATE test SET l[0] = 'foo' WHERE k = 0 IF v = 'foobar'", [True])
 
-        assert_one(cursor, "SELECT * FROM test", [0, 'foobar', ('foo', 'bar')])
+        assert_one(cursor, "SELECT * FROM test", [0, ('foo', 'bar'), 'foobar' ])
 
 
     @since("2.0")
@@ -4145,3 +4146,36 @@ class TestCQL(Tester):
         cursor.execute("insert into session_data (username, session_id, app_name, account, last_access, created_on) values ('toto', 'foo', 'foo', 'bar', 12, 13)")
 
         assert_one(cursor, "select count(*) from session_data where app_name='foo' and account='bar' and last_access > 4 allow filtering", [1])
+
+    @since('2.0')
+    def blobAs_functions_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k int PRIMARY KEY,
+                v int
+            );
+        """)
+
+        # A blob that is not 4 bytes should be rejected
+        assert_invalid(cursor, "INSERT INTO test(k, v) VALUES (0, blobAsInt(0x01))")
+
+    @require("7730")
+    def alter_clustering_and_static_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("CREATE TABLE foo (bar int, PRIMARY KEY (bar))")
+
+        # We shouldn't allow static when there is not clustering columns
+        assert_invalid(cursor, "ALTER TABLE foo ADD bar2 text static")
+
+    def drop_and_readd_collection_test(self):
+        """ Test for 6276 """
+        cursor = self.prepare()
+
+        cursor.execute("create table test (k int primary key, v set<text>, x int)")
+        cursor.execute("insert into test (k, v) VALUES (0, {'fffffffff'})")
+        self.cluster.flush()
+        cursor.execute("alter table test drop v")
+        assert_invalid(cursor, "alter table test add v set<int>")
