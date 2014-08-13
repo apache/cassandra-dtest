@@ -6,7 +6,7 @@ from thrift.transport import THttpClient
 from thrift.protocol import TBinaryProtocol
 from thrift.Thrift import TApplicationException
 
-from dtest import Tester, debug
+from dtest import Tester, debug, NUM_TOKENS
 from thrift_bindings.v30 import Cassandra
 from thrift_bindings.v30.Cassandra import *
 
@@ -1419,7 +1419,7 @@ class TestMutations(ThriftTester):
         # which uses BytesToken, so this just tests that the string representation of the token
         # matches a regex pattern for BytesToken.toString().
         ring = client.describe_token_map().items()
-        assert len(ring) == 256
+        assert len(ring) == NUM_TOKENS
         token, node = ring[0]
         assert re.match("[0-9A-Fa-f]{32}", token)
         assert node == '127.0.0.1'
