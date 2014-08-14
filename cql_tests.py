@@ -4018,7 +4018,7 @@ class TestCQL(Tester):
         cursor.execute("INSERT INTO tset(k, s) VALUES (0, {'foo', 'bar', 'foobar'})")
         assert_invalid(cursor, "DELETE FROM tset WHERE k=0 IF s['foo'] = 'foobar'")
 
-    #@require("#7499")
+    @require("#7499")
     def cas_and_list_index_test(self):
         """ Test for 7499 test """
         cursor = self.prepare()
