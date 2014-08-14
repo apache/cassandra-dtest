@@ -24,15 +24,20 @@ class TestBatch(Tester):
 
     def counter_batch_rejects_regular_mutations_test(self):
         """ Test that counter batch rejects non-counter mutations """
-        cursor = self.prepare()
-        assert_invalid(cursor, """
+        session = self.prepare()
+        if self.cluster.version() < '2.1':
+            err = "Only counter mutations are allowed in COUNTER batches"
+        else:
+            err = "Cannot include non-counter statement in a counter batch"
+        
+        assert_invalid(session, """
             BEGIN COUNTER BATCH
             UPDATE clicks SET total = total + 1 WHERE userid = 1 and url = 'http://foo.com'
             UPDATE clicks SET total = total + 1 WHERE userid = 1 and url = 'http://bar.com'
             UPDATE clicks SET total = total + 1 WHERE userid = 2 and url = 'http://baz.com'
             INSERT INTO users (id, firstname, lastname) VALUES (0, 'Jack', 'Sparrow')
             APPLY BATCH
-        """, matching="Only counter mutations are allowed in COUNTER batches")
+            """, matching=err)
 
     def logged_batch_accepts_regular_mutations_test(self):
         """ Test that logged batch accepts regular mutations """
@@ -49,14 +54,19 @@ class TestBatch(Tester):
 
     def logged_batch_rejects_counter_mutations_test(self):
         """ Test that logged batch rejects counter mutations """
-        cursor = self.prepare()
-        assert_invalid(cursor, """
+        session = self.prepare()
+        if self.cluster.version() < '2.1':
+            err = "Counter mutations are only allowed in COUNTER batches"
+        else:
+            err = "Cannot include a counter statement in a logged batch"
+
+        assert_invalid(session, """
             BEGIN BATCH
             INSERT INTO users (id, firstname, lastname) VALUES (0, 'Jack', 'Sparrow')
             INSERT INTO users (id, firstname, lastname) VALUES (1, 'Will', 'Turner')
             UPDATE clicks SET total = total + 1 WHERE userid = 1 and url = 'http://foo.com'
             APPLY BATCH
-        """, matching="Counter mutations are only allowed in COUNTER batches")
+            """, matching=err)
 
     def unlogged_batch_accepts_regular_mutations_test(self):
         """ Test that unlogged batch accepts regular mutations """
@@ -73,14 +83,19 @@ class TestBatch(Tester):
 
     def unlogged_batch_rejects_counter_mutations_test(self):
         """ Test that unlogged batch rejects counter mutations """
-        cursor = self.prepare()
-        assert_invalid(cursor, """
+        session = self.prepare()
+        if self.cluster.version() < '2.1':
+            err = "Counter mutations are only allowed in COUNTER batches"
+        else:
+            err = "Counter and non-counter mutations cannot exist in the same batch"
+
+        assert_invalid(session, """
             BEGIN UNLOGGED BATCH
             INSERT INTO users (id, firstname, lastname) VALUES (0, 'Jack', 'Sparrow')
             INSERT INTO users (id, firstname, lastname) VALUES (2, 'Elizabeth', 'Swann')
             UPDATE clicks SET total = total + 1 WHERE userid = 1 AND url = 'http://foo.com'
             APPLY BATCH
-        """, matching="Counter mutations are only allowed in COUNTER batches")
+            """, matching=err)
 
     def logged_batch_throws_uae_test(self):
         """ Test that logged batch throws UAE if there aren't enough live nodes """
@@ -185,7 +200,7 @@ class TestBatch(Tester):
         self.cluster.populate(nodes).start()
         time.sleep(.5)
         node1 = self.cluster.nodelist()[0]
-        cursor = self.cql_connection(node1, version=cql_version).cursor()
+        cursor = self.patient_cql_connection(node1, version=cql_version).cursor()
         self.create_ks(cursor, 'ks', nodes)
         cursor.execute("""
             CREATE TABLE clicks (

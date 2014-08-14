@@ -1,9 +1,17 @@
-import bisect, os, random, re, subprocess, time, uuid, unittest
+import bisect
+import os
+import random
+import re
+import subprocess
+import time
+import uuid
+
 from collections import defaultdict
 from distutils.version import LooseVersion
+
 from cql import OperationalError
-from dtest import Tester, debug, DISABLE_VNODES, DEFAULT_DIR
-from tools import new_node, not_implemented
+from dtest import Tester, debug, DEFAULT_DIR
+from tools import new_node
 
 TRUNK_VER = '2.2'
 
@@ -11,7 +19,15 @@ TRUNK_VER = '2.2'
 # other tests will focus on single upgrades from UPGRADE_PATH[n] to UPGRADE_PATH[n+1]
 # Note that these strings should match git branch names, and will be used to search for
 # tags which are related to a particular branch as well.
-UPGRADE_PATH = ['cassandra-1.1', 'cassandra-1.2', 'cassandra-2.0', 'cassandra-2.1', 'trunk']
+
+DEFAULT_PATH = ['cassandra-1.2', 'cassandra-2.0', 'cassandra-2.1', 'trunk']
+CUSTOM_PATH = os.environ.get('UPGRADE_PATH', None)
+UPGRADE_PATH = CUSTOM_PATH and CUSTOM_PATH.split(':') or DEFAULT_PATH
+LOCAL_MODE = os.environ.get('LOCAL_MODE', '').lower() in ('yes', 'true')
+
+
+if os.environ.get('CASSANDRA_VERSION'):
+    debug('CASSANDRA_VERSION is not used by upgrade tests!')
 
 
 class GitSemVer(object):
@@ -20,50 +36,53 @@ class GitSemVer(object):
     """
     git_ref = None
     semver = None
-    
+
     def __init__(self, git_ref, semver_str):
-        self.git_ref = 'git:' + git_ref
+        self.git_ref = git_ref
         self.semver = LooseVersion(semver_str)
         if semver_str == 'trunk':
             self.semver = LooseVersion(TRUNK_VER)
-    
+
     def __cmp__(self, other):
         return cmp(self.semver, other.semver)
+
 
 def latest_tag_matching(match_string='cassandra-1.1'):
     """
     Returns the latest tag matching match_string*
     """
     git_path = os.environ.get('CASSANDRA_DIR', DEFAULT_DIR)
-    
+
     tags = subprocess.check_output(
         ["git", "tag", "-l", "{search}*".format(search=match_string)], cwd=git_path)\
         .rstrip()\
         .split('\n')
-    
+
     wrappers = []
     for t in tags:
         match = re.match('^cassandra-(\d+\.\d+\.\d+(-+\w+)*)$', t)
         if match:
             gsv = GitSemVer(t, match.group(1))
             bisect.insort(wrappers, gsv)
-            
+
     if wrappers:
         return wrappers.pop().git_ref
     return None
 
+
 def get_version_from_tag(tag):
     if tag == 'trunk':
         return TRUNK_VER
-    
+
     match = re.match('^(git:)*cassandra-(\d+\.\d+\.*\d*(-+\w+)*)$', tag)
     if match:
         return match.group(2)
     return None
 
+
 def get_version_from_build():
     path = os.environ.get('CASSANDRA_DIR', DEFAULT_DIR)
-    
+
     build = os.path.join(path, 'build.xml')
     with open(build) as f:
         for line in f:
@@ -76,8 +95,8 @@ class TestUpgradeThroughVersions(Tester):
     """
     Upgrades a 3-node Murmur3Partitioner cluster through versions specified in test_versions.
     """
-    test_versions = None # set on init to know which versions to use
-    
+    test_versions = None  # set on init to know which versions to use
+
     def __init__(self, *args, **kwargs):
         # Ignore these log patterns:
         self.ignore_log_patterns = [
@@ -86,19 +105,32 @@ class TestUpgradeThroughVersions(Tester):
             # and when it does, it gets replayed and everything is fine.
             r'Can\'t send migration request: node.*is down',
         ]
-        
+
         # Force cluster options that are common among versions:
-        kwargs['cluster_options'] = {'partitioner':'org.apache.cassandra.dht.Murmur3Partitioner'}
+        kwargs['cluster_options'] = {'partitioner': 'org.apache.cassandra.dht.Murmur3Partitioner'}
         Tester.__init__(self, *args, **kwargs)
 
     @property
     def test_versions(self):
         # Murmur was not present until 1.2+
-        return ['git:'+v for v in UPGRADE_PATH if get_version_from_tag(v) >= '1.2']
+        return [v for v in UPGRADE_PATH if get_version_from_tag(v) >= '1.2']
+
+    def _init_local(self, git_ref):
+        cdir = os.environ.get('CASSANDRA_DIR', DEFAULT_DIR)
+
+        subprocess.check_call(
+            ["git", "checkout", "{git_ref}".format(git_ref=git_ref)], cwd=cdir)
+
+        subprocess.check_call(
+            ["ant", "-Dbase.version={}".format(git_ref), "clean", "jar"], cwd=cdir)
 
     def setUp(self):
         # Forcing cluster version on purpose
-        os.environ['CASSANDRA_VERSION'] = self.test_versions[0]
+        if LOCAL_MODE:
+            self._init_local(self.test_versions[0])
+        else:
+            os.environ['CASSANDRA_VERSION'] = 'git:' + self.test_versions[0]
+
         debug("Versions to test (%s): %s" % (type(self), str([v for v in self.test_versions])))
         super(TestUpgradeThroughVersions, self).setUp()
 
@@ -113,7 +145,7 @@ class TestUpgradeThroughVersions(Tester):
         # Record the rows we write as we go:
         self.row_values = set()
         cluster = self.cluster
-        
+
         if populate:
             # Start with 3 node cluster
             debug('Creating cluster (%s)' % self.test_versions[0])
@@ -124,17 +156,17 @@ class TestUpgradeThroughVersions(Tester):
 
         # add nodes to self for convenience
         for i, node in enumerate(cluster.nodelist(), 1):
-            node_name = 'node'+str(i)
+            node_name = 'node' + str(i)
             setattr(self, node_name, node)
-        
+
         if create_schema:
             self._create_schema()
         else:
             debug("Skipping schema creation (should already be built)")
-        time.sleep(5) #sigh...
-            
+        time.sleep(5)  # sigh...
+
         self._log_current_ver(self.test_versions[0])
-        
+
         # upgrade through versions
         for tag in self.test_versions[1:]:
             if mixed_version:
@@ -142,30 +174,33 @@ class TestUpgradeThroughVersions(Tester):
                     # do a write and check for each new node as upgraded
                     self._write_values()
                     self._increment_counters()
-                    
+
                     self.upgrade_to_version(tag, mixed_version=True, nodes=(node,))
-                    
+
                     self._check_values()
                     self._check_counters()
-                    
-                    debug('Successfully upgraded %d of %d nodes to %s' % 
-                          (num+1, len(self.cluster.nodelist()), tag))
+
+                    debug('Successfully upgraded %d of %d nodes to %s' %
+                          (num + 1, len(self.cluster.nodelist()), tag))
+
+                self.cluster.set_cassandra_dir(cassandra_version='git:' + tag)
             else:
                 self._write_values()
                 self._increment_counters()
-                
+
                 self.upgrade_to_version(tag)
-                
+                self.cluster.set_cassandra_dir(cassandra_version='git:' + tag)
+
                 self._check_values()
                 self._check_counters()
-                
+
             # run custom post-upgrade callables
             for call in after_upgrade_call:
                 call()
-                
+
             debug('All nodes successfully upgraded to %s' % tag)
             self._log_current_ver(tag)
-            
+
         cluster.stop()
 
     def upgrade_to_version(self, tag, mixed_version=False, nodes=None):
@@ -176,18 +211,31 @@ class TestUpgradeThroughVersions(Tester):
         debug('Upgrading to ' + tag)
         if not mixed_version:
             nodes = self.cluster.nodelist()
-        
+
         for node in nodes:
             debug('Shutting down node: ' + node.name)
             node.drain()
             node.watch_log_for("DRAINED")
             node.stop(wait_other_notice=False)
 
-        # Update Cassandra Directory
-        for node in nodes:
-            node.set_cassandra_dir(cassandra_version=tag)
-            debug("Set new cassandra dir for %s: %s" % (node.name, node.get_cassandra_dir()))
-        self.cluster.set_cassandra_dir(cassandra_version=tag)
+        # Update source or get a new version
+        if LOCAL_MODE:
+            self._init_local(tag)
+            cdir = os.environ.get('CASSANDRA_DIR', DEFAULT_DIR)
+
+            # Although we're not changing dirs, the source has changed, so ccm probably needs to know
+            for node in nodes:
+                node.set_cassandra_dir(cassandra_dir=cdir)
+                debug("Set new cassandra dir for %s: %s" % (node.name, node.get_cassandra_dir()))
+        else:
+            for node in nodes:
+                node.set_cassandra_dir(cassandra_version='git:' + tag)
+                debug("Set new cassandra dir for %s: %s" % (node.name, node.get_cassandra_dir()))
+
+        # hacky? yes. We could probably extend ccm to allow this publicly.
+        # the topology file needs to be written before any nodes are started
+        # otherwise they won't be grouped into dc's properly for multi-dc tests
+        self.cluster._Cluster__update_topology_files()
 
         # Restart nodes on new version
         for node in nodes:
@@ -195,8 +243,8 @@ class TestUpgradeThroughVersions(Tester):
             # Setup log4j / logback again (necessary moving from 2.0 -> 2.1):
             node.set_log_level("INFO")
             node.start(wait_other_notice=True)
-            node.nodetool('upgradesstables upgrade cf countertable')
-    
+            node.nodetool('upgradesstables -a')
+
     def _log_current_ver(self, current_tag):
         """
         Logs where we currently are in the upgrade path, surrounding the current branch/tag, like ***sometag***
@@ -205,40 +253,40 @@ class TestUpgradeThroughVersions(Tester):
         curr_index = vers.index(current_tag)
         debug(
             "Current upgrade path: {}".format(
-                vers[:curr_index] + ['***'+current_tag+'***'] + vers[curr_index+1:]))
-    
+                vers[:curr_index] + ['***' + current_tag + '***'] + vers[curr_index + 1:]))
+
     def _create_schema(self):
-        cursor = self.patient_cql_connection(self.node2).cursor()
-        
+        cursor = self.patient_cql_connection(self.node2, version="3.0.0").cursor()
+
         if self.cluster.version() >= '1.2':
-            #DDL for C* 1.2+
-            cursor.execute("""CREATE KEYSPACE upgrade WITH replication = {'class':'SimpleStrategy', 
+            # DDL for C* 1.2+
+            cursor.execute("""CREATE KEYSPACE upgrade WITH replication = {'class':'SimpleStrategy',
                 'replication_factor':2};
                 """)
         else:
             # DDL for C* 1.1
-            cursor.execute("""CREATE KEYSPACE upgrade WITH strategy_class = 'SimpleStrategy' 
+            cursor.execute("""CREATE KEYSPACE upgrade WITH strategy_class = 'SimpleStrategy'
             AND strategy_options:replication_factor = 2;
             """)
 
         cursor.execute('use upgrade')
         cursor.execute('CREATE TABLE cf ( k int PRIMARY KEY , v text )')
         cursor.execute('CREATE INDEX vals ON cf (v)')
-        
-        if self.cluster.version() >= '1.2':
-            cursor.execute("""
-                CREATE TABLE countertable (k text PRIMARY KEY, c counter);""")
-        else:
-            cursor.execute("""
-                CREATE TABLE countertable (k text PRIMARY KEY, c counter)
-                WITH default_validation=CounterColumnType;""")
+
+        cursor.execute("""
+            CREATE TABLE countertable (
+                k1 text,
+                k2 int,
+                c counter,
+                PRIMARY KEY (k1, k2)
+                );""")
 
     def _write_values(self, num=100):
         cursor = self.patient_cql_connection(self.node2).cursor()
         cursor.execute("use upgrade")
         for i in xrange(num):
             x = len(self.row_values) + 1
-            cursor.execute("UPDATE cf SET v='%d' WHERE k=%d" % (x,x))
+            cursor.execute("UPDATE cf SET v='%d' WHERE k=%d" % (x, x))
             self.row_values.add(x)
 
     def _check_values(self, consistency_level='ALL'):
@@ -247,43 +295,55 @@ class TestUpgradeThroughVersions(Tester):
             cursor.execute("use upgrade")
             for x in self.row_values:
                 cursor.execute("SELECT k,v FROM cf WHERE k=%d" % x, consistency_level=consistency_level)
-                k,v = cursor.fetchone()
+                k, v = cursor.fetchone()
                 self.assertEqual(x, k)
                 self.assertEqual(str(x), v)
 
-    def _increment_counters(self, seconds=15):
-        debug("incrementing counter for {time} seconds".format(time=seconds))
-        cursor = self.patient_cql_connection(self.node2).cursor()
+    def _increment_counters(self, opcount=25000):
+        debug("performing {opcount} counter increments".format(opcount=opcount))
+        cursor = self.patient_cql_connection(self.node2, version="3.0.0").cursor()
         cursor.execute("use upgrade;")
-        
-        update_counter_query = ("UPDATE countertable SET c = c + 1 WHERE k='{key}'")
-        
-        uuids = [uuid.uuid4() for i in range(100)]
-        self.expected_counts = defaultdict(int)
-        
-        expiry=time.time()+seconds
-        while time.time() < expiry:
-            counter_key = random.choice(uuids)
-            
-            try:
-                cursor.execute( update_counter_query.format(key=counter_key) )
-            except OperationalError:
-                pass
-            else:
-                self.expected_counts[counter_key] += 1
-            
-        # make sure 100 succeeded
-        assert sum(self.expected_counts.values()) > 100
 
-    def _check_counters(self, consistency_level='ALL'):
+        update_counter_query = ("UPDATE countertable SET c = c + 1 WHERE k1='{key1}' and k2={key2}")
+
+        self.expected_counts = {}
+        for i in range(10):
+            self.expected_counts[uuid.uuid4()] = defaultdict(int)
+
+        fail_count = 0
+
+        for i in range(opcount):
+            key1 = random.choice(self.expected_counts.keys())
+            key2 = random.randint(1, 10)
+            try:
+                cursor.execute(update_counter_query.format(key1=key1, key2=key2), consistency_level='ALL')
+            except OperationalError:
+                fail_count += 1
+            else:
+                self.expected_counts[key1][key2] += 1
+            if fail_count > 100:
+                break
+
+        assert fail_count < 100, "Too many counter increment failures"
+
+    def _check_counters(self):
         debug("Checking counter values...")
-        cursor = self.patient_cql_connection(self.node2).cursor()
+        cursor = self.patient_cql_connection(self.node2, version="3.0.0").cursor()
         cursor.execute("use upgrade;")
-        
-        for counter_key, value in self.expected_counts.items():
-            cursor.execute("SELECT c from countertable where k='{key}';".format(key=counter_key), consistency_level=consistency_level)
-            res = cursor.fetchone()[0]
-            assert res == value, "Counter not at expected value."
+
+        for key1 in self.expected_counts.keys():
+            for key2 in self.expected_counts[key1].keys():
+                expected_value = self.expected_counts[key1][key2]
+                cursor.execute("SELECT c from countertable where k1='{key1}' and k2={key2};".format(key1=key1, key2=key2), consistency_level='ONE')
+                results = cursor.fetchone()
+
+                if results is not None:
+                    actual_value = results[0]
+                else:
+                    # counter wasn't found
+                    actual_value = None
+
+                assert actual_value == expected_value, "Counter not at expected value. Got %s, expected %s" % (actual_value, expected_value)
 
 
 class TestRandomPartitionerUpgrade(TestUpgradeThroughVersions):
@@ -298,130 +358,81 @@ class TestRandomPartitionerUpgrade(TestUpgradeThroughVersions):
             # and when it does, it gets replayed and everything is fine.
             r'Can\'t send migration request: node.*is down',
         ]
-        
+
         # Force cluster options that are common among versions:
-        kwargs['cluster_options'] = {'partitioner':'org.apache.cassandra.dht.RandomPartitioner'}
+        kwargs['cluster_options'] = {'partitioner': 'org.apache.cassandra.dht.RandomPartitioner'}
         Tester.__init__(self, *args, **kwargs)
 
     @property
     def test_versions(self):
-        return ['git:'+v for v in UPGRADE_PATH]
+        return [v for v in UPGRADE_PATH]
 
 
 class PointToPointUpgradeBase(TestUpgradeThroughVersions):
     """
     Base class for testing a single upgrade (ver1->ver2).
-    
+
     We are dynamically creating subclasses of this for testing point upgrades, so this is a convenient
     place to add functionality/tests for those subclasses to run.
-    
+
     __test__ is False for this class. Subclasses need to revert to True to run tests!
     """
     __test__ = False
 
     def setUp(self):
-        # Forcing cluster version on purpose
-        os.environ['CASSANDRA_VERSION'] = self.test_versions[0]
-        
-        super(TestUpgradeThroughVersions, self).setUp()
-        
-        # if this is a shuffle test, we want to specifically disable vnodes initially
-        # so that we can enable them later and do shuffle
-        if self.id().split('.')[-1] in ('shuffle_test', 'shuffle_multidc_test'):
-            debug("setting custom cluster config for shuffle_test")
-            if self.cluster.version() >= "1.2":
-                self.cluster.set_configuration_options(values={'num_tokens': None})
-            
+        if LOCAL_MODE:
+            self._init_local(self.test_versions[0])
+        else:
+            # Forcing cluster version on purpose
+            os.environ['CASSANDRA_VERSION'] = 'git:' + self.test_versions[0]
+
         debug("Versions to test (%s): %s" % (type(self), str([v for v in self.test_versions])))
-    
+        super(TestUpgradeThroughVersions, self).setUp()
+
     def _bootstrap_new_node(self):
         # Check we can bootstrap a new node on the upgraded cluster:
         debug("Adding a node to the cluster")
-        nnode = new_node(self.cluster, remote_debug_port=str(2000+len(self.cluster.nodes)))
+        nnode = new_node(self.cluster, remote_debug_port=str(2000 + len(self.cluster.nodes)))
         nnode.start(use_jna=True, wait_other_notice=True)
         self._write_values()
         self._increment_counters()
         self._check_values()
         self._check_counters()
-    
+
     def _bootstrap_new_node_multidc(self):
         # Check we can bootstrap a new node on the upgraded cluster:
         debug("Adding a node to the cluster")
-        nnode = new_node(self.cluster, remote_debug_port=str(2000+len(self.cluster.nodes)), data_center='dc2')
-        
+        nnode = new_node(self.cluster, remote_debug_port=str(2000 + len(self.cluster.nodes)), data_center='dc2')
+
         nnode.start(use_jna=True, wait_other_notice=True)
         self._write_values()
         self._increment_counters()
         self._check_values()
         self._check_counters()
-    
-    def _migrate_to_vnodes(self):
-        if not DISABLE_VNODES and self.cluster.version() >= '1.2':
-            for node in self.cluster.nodelist():
-                debug('Shutting down node: ' + node.name)
-                node.drain()
-                node.watch_log_for("DRAINED")
-                node.stop(wait_other_notice=False)
 
-            debug("moving cluster to vnodes")
-            self.cluster.set_configuration_options(values={'initial_token': None, 'num_tokens': 10})
-            
-            # just a hacky way to get the topology set again, since it seems to get lost
-            self.cluster.set_cassandra_dir(cassandra_dir=self.cluster.get_cassandra_dir())
-
-            # Restart nodes on new version
-            for node in self.cluster.nodelist():
-                # Setup log4j / logback again (necessary moving from 2.0 -> 2.1):
-                node.set_log_level("INFO")
-                node.start(wait_other_notice=True)
-        
-            debug("Running shuffle")            
-            mark = self.node1.mark_log()
-            self.node1.shuffle("create")
-            self.node1.shuffle("enable")
-            self.node1.watch_log_for("Pausing until token count stabilizes", from_mark=mark, timeout=60)
-        else:
-            debug("Not migrating to vnodes because they are disabled or cluster is not above v1.2")
-    
-    @unittest.skipIf(DISABLE_VNODES, "vnodes disabled for this test run")
-    def shuffle_test(self):
-        # go from non-vnodes to vnodes, and run shuffle to distribute the data.
-        self.upgrade_scenario(
-            after_upgrade_call=(self._migrate_to_vnodes, self._check_values, self._check_counters))
-    
     def bootstrap_test(self):
         # try and add a new node
         self.upgrade_scenario(after_upgrade_call=(self._bootstrap_new_node,))
-    
-    @unittest.skipIf(DISABLE_VNODES, "vnodes disabled for this test run")
-    def shuffle_multidc_test(self):
-        # go from non-vnodes to vnodes, and run shuffle to distribute the data.
-        # multi dc, 2 nodes in each dc
-        self.cluster.populate([2,2])
-        [node.start(use_jna=True) for node in self.cluster.nodelist()]
-        self._multidc_schema_create()
-        self.upgrade_scenario(populate=False, create_schema=False,
-            after_upgrade_call=(self._migrate_to_vnodes, self._check_values, self._check_counters))
-    
+
     def bootstrap_multidc_test(self):
         # try and add a new node
         # multi dc, 2 nodes in each dc
-        self.cluster.populate([2,2])
+        self.cluster.populate([2, 2])
         [node.start(use_jna=True) for node in self.cluster.nodelist()]
         self._multidc_schema_create()
         self.upgrade_scenario(populate=False, create_schema=False, after_upgrade_call=(self._bootstrap_new_node_multidc,))
 
     def _multidc_schema_create(self):
-        cursor = self.patient_cql_connection(self.cluster.nodelist()[0]).cursor()
-        
+        cursor = self.patient_cql_connection(self.cluster.nodelist()[0], version="3.0.0").cursor()
+
         if self.cluster.version() >= '1.2':
-            #DDL for C* 1.2+
-            cursor.execute("""CREATE KEYSPACE upgrade WITH replication = {'class':'NetworkTopologyStrategy', 
+            # DDL for C* 1.2+
+            cursor.execute("""CREATE KEYSPACE upgrade WITH replication = {'class':'NetworkTopologyStrategy',
                 'dc1':1, 'dc2':1};
                 """)
         else:
             # DDL for C* 1.1
-            cursor.execute("""CREATE KEYSPACE upgrade WITH strategy_class = 'NetworkTopologyStrategy' 
+            cursor.execute("""CREATE KEYSPACE upgrade WITH strategy_class = 'NetworkTopologyStrategy'
             AND strategy_options:'dc1':1
             AND strategy_options:'dc2':1;
             """)
@@ -429,14 +440,14 @@ class PointToPointUpgradeBase(TestUpgradeThroughVersions):
         cursor.execute('use upgrade')
         cursor.execute('CREATE TABLE cf ( k int PRIMARY KEY , v text )')
         cursor.execute('CREATE INDEX vals ON cf (v)')
-        
-        if self.cluster.version() >= '1.2':
-            cursor.execute("""
-                CREATE TABLE countertable (k text PRIMARY KEY, c counter);""")
-        else:
-            cursor.execute("""
-                CREATE TABLE countertable (k text PRIMARY KEY, c counter)
-                WITH default_validation=CounterColumnType;""")
+
+        cursor.execute("""
+            CREATE TABLE countertable (
+                k1 text,
+                k2 int,
+                c counter,
+                PRIMARY KEY (k1, k2)
+                );""")
 
 
 # create test classes for upgrading from latest tag on branch to the head of that same branch
@@ -444,12 +455,13 @@ for from_ver in UPGRADE_PATH:
     # we only want to do single upgrade tests for 1.2+
     # and trunk is the final version, so there's no test where trunk is upgraded to something else
     if get_version_from_tag(from_ver) >= '1.2' and from_ver != 'trunk':
-        cls_name = ('TestUpgrade_from_'+from_ver+'_latest_tag_to_'+from_ver+'_HEAD').replace('-', '_').replace('.', '_')
-        debug('Creating test upgrade class: {}'.format(cls_name))
+        cls_name = ('TestUpgrade_from_' + from_ver + '_latest_tag_to_' + from_ver + '_HEAD').replace('-', '_').replace('.', '_')
+        start_ver_latest_tag = latest_tag_matching(from_ver)
+        debug('Creating test upgrade class: {} with start tag of: {}'.format(cls_name, start_ver_latest_tag))
         vars()[cls_name] = type(
             cls_name,
             (PointToPointUpgradeBase,),
-            {'test_versions': [latest_tag_matching(from_ver), 'git:'+from_ver,], '__test__':True})
+            {'test_versions': [start_ver_latest_tag, from_ver], '__test__': True})
 
 # build a list of tuples like so:
 # [(A, B), (B, C) ... ]
@@ -458,39 +470,41 @@ for from_ver in UPGRADE_PATH:
 POINT_UPGRADES = []
 points = [v for v in UPGRADE_PATH if get_version_from_tag(v) >= '1.2']
 for i, _ in enumerate(points):
-    verslice = tuple(points[i:i+2])
-    if len(verslice) == 2: # exclude dangling version at end
-        POINT_UPGRADES.append( tuple(points[i:i+2]) )
+    verslice = tuple(points[i:i + 2])
+    if len(verslice) == 2:  # exclude dangling version at end
+        POINT_UPGRADES.append(tuple(points[i:i + 2]))
 
 # create test classes for upgrading from latest tag on one branch, to head of the next branch (see comment above)
 for (from_ver, to_branch) in POINT_UPGRADES:
-    cls_name = ('TestUpgrade_from_'+from_ver+'_latest_tag_to_'+to_branch+'_HEAD').replace('-', '_').replace('.', '_')
-    debug('Creating test upgrade class: {}'.format(cls_name))
+    cls_name = ('TestUpgrade_from_' + from_ver + '_latest_tag_to_' + to_branch + '_HEAD').replace('-', '_').replace('.', '_')
+    from_ver_latest_tag = latest_tag_matching(from_ver)
+    debug('Creating test upgrade class: {} with start tag of: {}'.format(cls_name, from_ver_latest_tag))
     vars()[cls_name] = type(
         cls_name,
         (PointToPointUpgradeBase,),
-        {'test_versions': [latest_tag_matching(from_ver), 'git:'+to_branch,], '__test__':True})
+        {'test_versions': [from_ver_latest_tag, to_branch], '__test__': True})
 
 # create test classes for upgrading from HEAD of one branch to HEAD of next.
 for (from_branch, to_branch) in POINT_UPGRADES:
-    cls_name = ('TestUpgrade_from_'+from_branch+'_HEAD_to_'+to_branch+'_HEAD').replace('-', '_').replace('.', '_')
+    cls_name = ('TestUpgrade_from_' + from_branch + '_HEAD_to_' + to_branch + '_HEAD').replace('-', '_').replace('.', '_')
     debug('Creating test upgrade class: {}'.format(cls_name))
     vars()[cls_name] = type(
         cls_name,
         (PointToPointUpgradeBase,),
-        {'test_versions': ['git:'+from_branch, 'git:'+to_branch,], '__test__':True})
+        {'test_versions': [from_branch, to_branch], '__test__': True})
 
 # create test classes for upgrading from HEAD of one branch, to latest tag of next branch
 for (from_branch, to_branch) in POINT_UPGRADES:
-    cls_name = ('TestUpgrade_from_'+from_branch+'_HEAD_to_'+to_branch+'_latest_tag').replace('-', '_').replace('.', '_')
-    debug('Creating test upgrade class: {}'.format(cls_name))
-    
+    cls_name = ('TestUpgrade_from_' + from_branch + '_HEAD_to_' + to_branch + '_latest_tag').replace('-', '_').replace('.', '_')
+    to_ver_latest_tag = latest_tag_matching(to_branch)
+    debug('Creating test upgrade class: {} with end tag of: {}'.format(cls_name, to_ver_latest_tag))
+
     # in some cases we might not find a tag (like when the to_branch is trunk)
     # so these will be skipped.
-    if latest_tag_matching(to_branch) is None:
+    if to_ver_latest_tag is None:
         continue
-    
+
     vars()[cls_name] = type(
         cls_name,
         (PointToPointUpgradeBase,),
-        {'test_versions': ['git:'+from_branch, latest_tag_matching(to_branch),], '__test__':True})
+        {'test_versions': [from_branch, to_ver_latest_tag], '__test__': True})

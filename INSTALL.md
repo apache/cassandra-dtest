@@ -47,6 +47,7 @@ will often need to modify them in some fashion at some later point:
 
         cd ~/git/cstar
         git clone git://github.com/pcmanus/ccm.git
+        sudo apt-get install libyaml-dev
         sudo pip install -e ccm
         sudo pip install pyyaml
 
@@ -76,6 +77,10 @@ will often need to modify them in some fashion at some later point:
  it's unit tests:
 
         ant test
+        
+ Note: you  may need to install ant-optional to get junit working:
+ 
+        sudo apt-get install ant-optional
 
 ## Setup and run dtests
 * Install current python dependencies:

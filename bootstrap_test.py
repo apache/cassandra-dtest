@@ -28,7 +28,7 @@ class TestBootstrap(Tester):
         node1 = cluster.nodes["node1"]
 
         time.sleep(.5)
-        cursor = self.cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1).cursor()
         self.create_ks(cursor, 'ks', 1)
         self.create_cf(cursor, 'cf', columns={ 'c1' : 'text', 'c2' : 'text' })
 
@@ -45,7 +45,7 @@ class TestBootstrap(Tester):
         # Boostraping a new node
         node2 = new_node(cluster, token=tokens[1])
         node2.start()
-        time.sleep(.5)
+        node2.watch_log_for("Listening for thrift clients...")
 
         reader.check()
         node1.cleanup()
@@ -54,7 +54,7 @@ class TestBootstrap(Tester):
 
         size1 = node1.data_size()
         size2 = node2.data_size()
-        assert_almost_equal(size1, size2)
+        assert_almost_equal(size1, size2, error=0.3)
         assert_almost_equal(initial_size, 2 * size1)
 
     def read_from_bootstrapped_node_test(self):

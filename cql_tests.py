@@ -1621,6 +1621,7 @@ class TestCQL(Tester):
         cli.do("use ks")
         cli.do("set test[2]['4:v'] = int(200)")
         assert not cli.has_errors(), cli.errors()
+        time.sleep(1.5)
 
         cursor.execute("SELECT * FROM test")
         res = cursor.fetchall()
@@ -3317,7 +3318,7 @@ class TestCQL(Tester):
 
         with self.assertRaises(ProgrammingError) as cm:
             cursor.execute('SELECT DISTINCT pk0, pk1, ck0 FROM regular')
-        self.assertEqual('Bad Request: SELECT DISTINCT queries must only request partition key columns (not ck0)',
+        self.assertEqual('Bad Request: SELECT DISTINCT queries must only request partition key columns and/or static columns (not ck0)',
                          cm.exception.message)
 
     def function_with_null_test(self):
@@ -3572,16 +3573,19 @@ class TestCQL(Tester):
 
         # lists
         assert_all(cursor, "SELECT k, v FROM test WHERE l CONTAINS 1", [[1, 0], [0, 0], [0, 2]])
+        assert_all(cursor, "SELECT k, v FROM test WHERE k = 0 AND l CONTAINS 1", [[0, 0], [0, 2]])
         assert_all(cursor, "SELECT k, v FROM test WHERE l CONTAINS 2", [[1, 0], [0, 0]])
         assert_none(cursor, "SELECT k, v FROM test WHERE l CONTAINS 6")
 
         # sets
         assert_all(cursor, "SELECT k, v FROM test WHERE s CONTAINS 'a'", [[0, 0], [0, 2]])
+        assert_all(cursor, "SELECT k, v FROM test WHERE k = 0 AND s CONTAINS 'a'", [[0, 0], [0, 2]])
         assert_all(cursor, "SELECT k, v FROM test WHERE s CONTAINS 'd'", [[1, 1]])
         assert_none(cursor, "SELECT k, v FROM test  WHERE s CONTAINS 'e'")
 
         # maps
         assert_all(cursor, "SELECT k, v FROM test WHERE m CONTAINS 1", [[1, 0], [1, 1], [0, 0], [0, 1]])
+        assert_all(cursor, "SELECT k, v FROM test WHERE k = 0 AND m CONTAINS 1", [[0, 0], [0, 1]])
         assert_all(cursor, "SELECT k, v FROM test WHERE m CONTAINS 2", [[0, 1]])
         assert_none(cursor, "SELECT k, v FROM test  WHERE m CONTAINS 4")
 
@@ -3609,6 +3613,7 @@ class TestCQL(Tester):
 
         # maps
         assert_all(cursor, "SELECT k, v FROM test WHERE m CONTAINS KEY 'a'", [[1, 1], [0, 0], [0, 1]])
+        assert_all(cursor, "SELECT k, v FROM test WHERE k = 0 AND m CONTAINS KEY 'a'", [[0, 0], [0, 1]])
         assert_all(cursor, "SELECT k, v FROM test WHERE m CONTAINS KEY 'c'", [[0, 2]])
         assert_none(cursor, "SELECT k, v FROM test  WHERE m CONTAINS KEY 'd'")
 
@@ -3670,9 +3675,11 @@ class TestCQL(Tester):
         # require debugging to assert
         assert_one(cursor, "SELECT p, v FROM test WHERE k=0 AND p=1", [1, 1])
 
-        # Check selecting only a static column is also ok, and only yield one value
+        # Check selecting only a static column with distinct only yield one value
         # (as we only query the static columns)
-        assert_one(cursor, "SELECT s FROM test WHERE k=0", [24])
+        assert_one(cursor, "SELECT DISTINCT s FROM test WHERE k=0", [24])
+        # But without DISTINCT, we still get one result per row
+        assert_all(cursor, "SELECT s FROM test WHERE k=0", [[24], [24]])
         # but that querying other columns does correctly yield the full partition
         assert_all(cursor, "SELECT s, v FROM test WHERE k=0", [[24, 0], [24, 1]])
         assert_one(cursor, "SELECT s, v FROM test WHERE k=0 AND p=1", [24, 1])
@@ -3847,6 +3854,37 @@ class TestCQL(Tester):
         assert_all(cursor, "SELECT p FROM test WHERE v = 1", [[0], [1]])
         # We don't support that
         assert_invalid(cursor, "SELECT s FROM test WHERE v = 1")
+
+    @since('2.0')
+    def static_columns_with_distinct_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k int,
+                p int,
+                s int static,
+                PRIMARY KEY (k, p)
+            )
+        """)
+
+        cursor.execute("INSERT INTO test (k, p) VALUES (1, 1)");
+        cursor.execute("INSERT INTO test (k, p) VALUES (1, 2)");
+
+        assert_all(cursor, "SELECT k, s FROM test", [[1, None], [1, None]]);
+        assert_one(cursor, "SELECT DISTINCT k, s FROM test", [1, None]);
+        assert_one(cursor, "SELECT DISTINCT s FROM test WHERE k=1", [None]);
+        assert_none(cursor, "SELECT DISTINCT s FROM test WHERE k=2");
+
+        cursor.execute("INSERT INTO test (k, p, s) VALUES (2, 1, 3)");
+        cursor.execute("INSERT INTO test (k, p) VALUES (2, 2)");
+
+        assert_all(cursor, "SELECT k, s FROM test", [[1, None], [1, None], [2, 3], [2, 3]]);
+        assert_all(cursor, "SELECT DISTINCT k, s FROM test", [[1, None], [2, 3]]);
+        assert_one(cursor, "SELECT DISTINCT s FROM test WHERE k=1", [None]);
+        assert_one(cursor, "SELECT DISTINCT s FROM test WHERE k=2", [3]);
+
+        assert_invalid(cursor, "SELECT DISTINCT s FROM test")
 
 
     def select_count_paging_test(self):
@@ -4079,6 +4117,26 @@ class TestCQL(Tester):
         cursor.execute("INSERT INTO tset(k, s) VALUES (0, {'foo', 'bar', 'foobar'})")
         assert_invalid(cursor, "DELETE FROM tset WHERE k=0 IF s['foo'] = 'foobar'")
 
+    #@require("#7499")
+    def cas_and_list_index_test(self):
+        """ Test for 7499 test """
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k int PRIMARY KEY,
+                v text,
+                l list<text>
+            )
+        """)
+
+        cursor.execute("INSERT INTO test(k, v, l) VALUES(0, 'foobar', ['foi', 'bar'])")
+
+        assert_one(cursor, "UPDATE test SET l[0] = 'foo' WHERE k = 0 IF v = 'barfoo'", [False, 'foobar'])
+        assert_one(cursor, "UPDATE test SET l[0] = 'foo' WHERE k = 0 IF v = 'foobar'", [True])
+
+        assert_one(cursor, "SELECT * FROM test", [0, ('foo', 'bar'), 'foobar' ])
+
 
     @since("2.0")
     def static_with_limit_test(self):
@@ -4101,6 +4159,26 @@ class TestCQL(Tester):
         assert_one(cursor, "SELECT * FROM test WHERE k = 0 LIMIT 1", [0, 0, 42])
         assert_all(cursor, "SELECT * FROM test WHERE k = 0 LIMIT 2", [[0, 0, 42], [0, 1, 42]])
         assert_all(cursor, "SELECT * FROM test WHERE k = 0 LIMIT 3", [[0, 0, 42], [0, 1, 42], [0, 2, 42]])
+
+    @since("2.0")
+    def static_with_empty_clustering_test(self):
+        """ Test for bug of #7455 """
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test(
+                pkey text,
+                ckey text,
+                value text,
+                static_value text static,
+                PRIMARY KEY(pkey, ckey)
+            )
+        """)
+
+        cursor.execute("INSERT INTO test(pkey, static_value) VALUES ('partition1', 'static value')")
+        cursor.execute("INSERT INTO test(pkey, ckey, value) VALUES('partition1', '', 'value')")
+
+        assert_one(cursor, "SELECT * FROM test", ['partition1', '', 'static value', 'value'])
 
     @since("1.2")
     def limit_compact_table(self):
@@ -4180,3 +4258,246 @@ class TestCQL(Tester):
         assert_invalid(cursor, "BEGIN COUNTER BATCH UPDATE counters USING TIMESTAMP 3 SET c = c + 1 WHERE k = 0; UPDATE counters SET c = c + 1 WHERE k = 0; APPLY BATCH")
         assert_invalid(cursor, "BEGIN COUNTER BATCH USING TIMESTAMP 3 UPDATE counters SET c = c + 1 WHERE k = 0; UPDATE counters SET c = c + 1 WHERE k = 0; APPLY BATCH")
 
+
+    @since('2.1')
+    def add_field_to_udt_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("CREATE TYPE footype (fooint int, fooset set <text>)")
+        cursor.execute("CREATE TABLE test (key int PRIMARY KEY, data footype)")
+
+        cursor.execute("INSERT INTO test (key, data) VALUES (1, {fooint: 1, fooset: {'2'}})")
+        cursor.execute("ALTER TYPE footype ADD foomap map <int,text>")
+        cursor.execute("INSERT INTO test (key, data) VALUES (1, {fooint: 1, fooset: {'2'}, foomap: {3 : 'bar'}})")
+
+    @since('1.2')
+    def clustering_order_in_test(self):
+        """Test for #7105 bug"""
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                a int,
+                b int,
+                c int,
+                PRIMARY KEY ((a, b), c)
+            ) with clustering order by (c desc)
+        """);
+
+        cursor.execute("INSERT INTO test (a, b, c) VALUES (1, 2, 3)")
+        cursor.execute("INSERT INTO test (a, b, c) VALUES (4, 5, 6)")
+
+        assert_one(cursor, "SELECT * FROM test WHERE a=1 AND b=2 AND c IN (3)", [1, 2, 3])
+        assert_one(cursor, "SELECT * FROM test WHERE a=1 AND b=2 AND c IN (3, 4)", [1, 2, 3])
+
+    @since('1.2')
+    def bug7105_test(self):
+        """Test for #7105 bug"""
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                a int,
+                b int,
+                c int,
+                d int,
+                PRIMARY KEY (a, b)
+            )
+        """);
+
+        cursor.execute("INSERT INTO test (a, b, c, d) VALUES (1, 2, 3, 3)")
+        cursor.execute("INSERT INTO test (a, b, c, d) VALUES (1, 4, 6, 5)")
+
+        assert_one(cursor, "SELECT * FROM test WHERE a=1 AND b=2 ORDER BY b DESC", [1, 2, 3, 3])
+
+
+    @since('2.0')
+    def conditional_ddl_keyspace_test(self):
+        cursor = self.prepare(create_keyspace=False)
+
+        # try dropping when doesn't exist
+        cursor.execute("""
+            DROP KEYSPACE IF EXISTS my_test_ks
+            """)
+
+        # create and confirm
+        cursor.execute("""
+            CREATE KEYSPACE IF NOT EXISTS my_test_ks
+            WITH replication = {'class':'SimpleStrategy', 'replication_factor':1} and durable_writes = true
+            """)
+        assert_one(cursor, "select durable_writes from system.schema_keyspaces where keyspace_name = 'my_test_ks';", [True], cl='ALL')
+
+        # unsuccessful create since it's already there, confirm settings don't change
+        cursor.execute("""
+            CREATE KEYSPACE IF NOT EXISTS my_test_ks
+            WITH replication = {'class':'SimpleStrategy', 'replication_factor':1} and durable_writes = false
+            """)
+
+        assert_one(cursor, "select durable_writes from system.schema_keyspaces where keyspace_name = 'my_test_ks';", [True], cl='ALL')
+
+        # drop and confirm
+        cursor.execute("""
+            DROP KEYSPACE IF EXISTS my_test_ks
+            """)
+
+        assert_none(cursor, "select * from system.schema_keyspaces where keyspace_name = 'my_test_ks'")
+
+    @since('2.0')
+    def conditional_ddl_table_test(self):
+        cursor = self.prepare(create_keyspace=False)
+
+        self.create_ks(cursor, 'my_test_ks', 1)
+
+        # try dropping when doesn't exist
+        cursor.execute("""
+            DROP TABLE IF EXISTS my_test_table;
+            """)
+
+        # create and confirm
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS my_test_table (
+            id text PRIMARY KEY,
+            value1 blob ) with comment = 'foo';
+            """)
+
+        assert_one(cursor,
+            """select comment from system.schema_columnfamilies
+               where keyspace_name = 'my_test_ks' and columnfamily_name = 'my_test_table'""",
+            ['foo'])
+
+        # unsuccessful create since it's already there, confirm settings don't change
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS my_test_table (
+            id text PRIMARY KEY,
+            value2 blob ) with comment = 'bar';
+            """)
+
+        assert_one(cursor,
+            """select comment from system.schema_columnfamilies
+               where keyspace_name = 'my_test_ks' and columnfamily_name = 'my_test_table'""",
+            ['foo'])
+
+        # drop and confirm
+        cursor.execute("""
+            DROP TABLE IF EXISTS my_test_table;
+            """)
+
+        assert_none(cursor,
+            """select * from system.schema_columnfamilies
+               where keyspace_name = 'my_test_ks' and columnfamily_name = 'my_test_table'""")
+
+    @since('2.0')
+    def conditional_ddl_index_test(self):
+        cursor = self.prepare(create_keyspace=False)
+
+        self.create_ks(cursor, 'my_test_ks', 1)
+
+        cursor.execute("""
+            CREATE TABLE my_test_table (
+            id text PRIMARY KEY,
+            value1 blob,
+            value2 blob) with comment = 'foo';
+            """)
+
+        # try dropping when doesn't exist
+        cursor.execute("DROP INDEX IF EXISTS myindex")
+
+        # create and confirm
+        cursor.execute("CREATE INDEX IF NOT EXISTS myindex ON my_test_table (value1)")
+        assert_one(
+            cursor,
+            """select index_name from system."IndexInfo" where table_name = 'my_test_ks'""",
+            ['my_test_table.myindex'])
+
+        # unsuccessful create since it's already there
+        cursor.execute("CREATE INDEX IF NOT EXISTS myindex ON my_test_table (value1)")
+
+        # drop and confirm
+        cursor.execute("DROP INDEX IF EXISTS myindex")
+        assert_none(cursor, """select index_name from system."IndexInfo" where table_name = 'my_test_ks'""")
+
+    @since('2.1')
+    def conditional_ddl_type_test(self):
+        cursor = self.prepare(create_keyspace=False)
+
+        self.create_ks(cursor, 'my_test_ks', 1)
+
+        # try dropping when doesn't exist
+        cursor.execute("DROP TYPE IF EXISTS mytype")
+
+        # create and confirm
+        cursor.execute("CREATE TYPE IF NOT EXISTS mytype (somefield int)")
+        assert_one(
+            cursor,
+            "SELECT type_name from system.schema_usertypes where keyspace_name='my_test_ks' and type_name='mytype'",
+            ['mytype'])
+
+        # unsuccessful create since it's already there
+        # TODO: confirm this create attempt doesn't alter type field from int to blob
+        cursor.execute("CREATE TYPE IF NOT EXISTS mytype (somefield blob)")
+
+        # drop and confirm
+        cursor.execute("DROP TYPE IF EXISTS mytype")
+
+        assert_none(
+            cursor,
+            "SELECT type_name from system.schema_usertypes where keyspace_name='my_test_ks' and type_name='mytype'")
+
+    @since('2.0')
+    def bug_6612_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE session_data (
+                username text,
+                session_id text,
+                app_name text,
+                account text,
+                last_access timestamp,
+                created_on timestamp,
+                PRIMARY KEY (username, session_id, app_name, account)
+            );
+        """)
+
+        #cursor.execute("create index sessionIndex ON session_data (session_id)")
+        cursor.execute("create index sessionAppName ON session_data (app_name)")
+        cursor.execute("create index lastAccessIndex ON session_data (last_access)")
+
+        assert_one(cursor, "select count(*) from session_data where app_name='foo' and account='bar' and last_access > 4 allow filtering", [0])
+
+        cursor.execute("insert into session_data (username, session_id, app_name, account, last_access, created_on) values ('toto', 'foo', 'foo', 'bar', 12, 13)")
+
+        assert_one(cursor, "select count(*) from session_data where app_name='foo' and account='bar' and last_access > 4 allow filtering", [1])
+
+    @since('2.0')
+    def blobAs_functions_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k int PRIMARY KEY,
+                v int
+            );
+        """)
+
+        # A blob that is not 4 bytes should be rejected
+        assert_invalid(cursor, "INSERT INTO test(k, v) VALUES (0, blobAsInt(0x01))")
+
+    @require("7730")
+    def alter_clustering_and_static_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("CREATE TABLE foo (bar int, PRIMARY KEY (bar))")
+
+        # We shouldn't allow static when there is not clustering columns
+        assert_invalid(cursor, "ALTER TABLE foo ADD bar2 text static")
+
+    def drop_and_readd_collection_test(self):
+        """ Test for 6276 """
+        cursor = self.prepare()
+
+        cursor.execute("create table test (k int primary key, v set<text>, x int)")
+        cursor.execute("insert into test (k, v) VALUES (0, {'fffffffff'})")
+        self.cluster.flush()
+        cursor.execute("alter table test drop v")
+        assert_invalid(cursor, "alter table test add v set<int>")
