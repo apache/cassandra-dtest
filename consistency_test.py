@@ -10,212 +10,143 @@ from cassandra.query import SimpleStatement
 
 class TestConsistency(Tester):
 
-    def quorum_quorum_test(self):
-        cluster = self.cluster
-
-        cluster.populate(3).start()
-        [node1, node2, node3] = cluster.nodelist()
-
-        session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'ks', 3)
-        create_c1c2_table(self, session)
-
-        cursor2 = self.patient_cql_connection(node2, 'ks')
-
-        # insert and get at CL.QUORUM
-        for n in xrange(0, 100):
-            insert_c1c2(session, n, ConsistencyLevel.QUORUM)
-            query_c1c2(cursor2, n, ConsistencyLevel.QUORUM)
-
-
-        # shutdown a node and test again
-        node3.stop(wait_other_notice=True)
-        for n in xrange(100, 200):
-            insert_c1c2(session, n, ConsistencyLevel.QUORUM)
-            query_c1c2(cursor2, n, ConsistencyLevel.QUORUM)
-
-        # shutdown another node and test we get unavailabe exception
-        node2.stop(wait_other_notice=True)
-        assert_unavailable(insert_c1c2, session, 200, ConsistencyLevel.QUORUM)
-
-    def all_all_test(self):
-        cluster = self.cluster
-
-        cluster.populate(3).start()
-        [node1, node2, node3] = cluster.nodelist()
-
-        cursor1 = self.patient_cql_connection(node1)
-        self.create_ks(cursor1, 'ks', 3)
-        create_c1c2_table(self, cursor1)
-
-        cursor2 = self.patient_cql_connection(node2, 'ks')
-
-        # insert and get at CL.ALL
-        for n in xrange(0, 100):
-            insert_c1c2(cursor1, n, ConsistencyLevel.ALL)
-            query_c1c2(cursor2, n, ConsistencyLevel.ALL)
-
-        # shutdown one node and test we get unavailabe exception
-        node3.stop(wait_other_notice=True)
-        assert_unavailable(insert_c1c2, cursor1, 100, ConsistencyLevel.ALL)
-
-    def one_one_test(self):
-        cluster = self.cluster
-
-        cluster.populate(3).start()
-        [node1, node2, node3] = cluster.nodelist()
-
-        cursor1 = self.patient_cql_connection(node1)
-        self.create_ks(cursor1, 'ks', 3)
-        create_c1c2_table(self, cursor1)
-
-        cursor2 = self.patient_cql_connection(node2, 'ks')
-
-        # insert and get at CL.ONE
-        for n in xrange(0, 100):
-            insert_c1c2(cursor1, n, ConsistencyLevel.ONE)
-            retry_till_success(query_c1c2, cursor2, n, ConsistencyLevel.ONE, timeout=5)
-
-        # shutdown a node and test again
-        node3.stop(wait_other_notice=True)
-        for n in xrange(100, 200):
-            insert_c1c2(cursor1, n, ConsistencyLevel.ONE)
-            retry_till_success(query_c1c2, cursor2, n, ConsistencyLevel.ONE, timeout=5)
-
-        # shutdown a second node and test again
-        node2.stop(wait_other_notice=True)
-        for n in xrange(200, 300):
-            insert_c1c2(cursor1, n, ConsistencyLevel.ONE)
-            retry_till_success(query_c1c2, cursor1, n, ConsistencyLevel.ONE, timeout=5)
-
-    def one_all_test(self):
-        cluster = self.cluster
-
-        cluster.populate(3).start()
-        [node1, node2, node3] = cluster.nodelist()
-
-        cursor1 = self.patient_cql_connection(node1)
-        self.create_ks(cursor1, 'ks', 3)
-        create_c1c2_table(self, cursor1)
-
-        cursor2 = self.patient_cql_connection(node2, 'ks')
-
-        # insert and get at CL.ONE
-        for n in xrange(0, 100):
-            insert_c1c2(cursor1, n, ConsistencyLevel.ONE)
-            query_c1c2(cursor2, n, ConsistencyLevel.ALL)
-
-        # shutdown a node and test again
-        node3.stop(wait_other_notice=True)
-        insert_c1c2(cursor1, 100, ConsistencyLevel.ONE)
-        assert_unavailable(query_c1c2, cursor2, 100, ConsistencyLevel.ALL)
-
-    def all_one_test(self):
-        cluster = self.cluster
-
-        cluster.populate(3).start()
-        [node1, node2, node3] = cluster.nodelist()
-
-        cursor1 = self.patient_cql_connection(node1)
-        self.create_ks(cursor1, 'ks', 3)
-        create_c1c2_table(self, cursor1)
-
-        cursor2 = self.patient_cql_connection(node2, 'ks')
-
-        # insert and get at CL.ONE
-        for n in xrange(0, 100):
-            insert_c1c2(cursor1, n, ConsistencyLevel.ALL)
-            query_c1c2(cursor2, n, ConsistencyLevel.ONE)
-
-        # shutdown a node and test again
-        node3.stop(wait_other_notice=True)
-        assert_unavailable(insert_c1c2, cursor1, 100, ConsistencyLevel.ALL)
-
-    def quorum_two_test(self):
-        cluster = self.cluster
-
-        cluster.populate(3).start()
-        [node1, node2, node3] = cluster.nodelist()
-
-        cursor1 = self.patient_cql_connection(node1)
-        self.create_ks(cursor1, 'ks', 3)
-        create_c1c2_table(self, cursor1)
-
-        cursor2 = self.cql_connection(node2, 'ks')
-
-        for n in xrange(0, 100):
-            insert_c1c2(cursor1, n, ConsistencyLevel.QUORUM)
-            query_c1c2(cursor2, n, ConsistencyLevel.TWO)
-
-        # shutdown a node and test again
-        node3.stop(wait_other_notice=True)
-        for n in xrange(0, 100):
-            query_c1c2(cursor2, n, ConsistencyLevel.TWO)
-
-    def quorum_three_test(self):
-        cluster = self.cluster
-
-        cluster.populate(3).start()
-        [node1, node2, node3] = cluster.nodelist()
-
-        cursor1 = self.patient_cql_connection(node1)
-        self.create_ks(cursor1, 'ks', 3)
-        create_c1c2_table(self, cursor1)
-
-        cursor2 = self.cql_connection(node2, 'ks')
-
-        for n in xrange(0, 100):
-            insert_c1c2(cursor1, n, ConsistencyLevel.QUORUM)
-            query_c1c2(cursor2, n, ConsistencyLevel.THREE)
-
-        # shutdown a node and test again
-        node3.stop(wait_other_notice=True)
-        assert_unavailable(insert_c1c2, cursor1, 100, ConsistencyLevel.THREE)
-
-    def two_two_test(self):
+    def cl_cl_prepare(self, write_cl, read_cl):
         cluster = self.cluster
 
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
 
-        cursor1 = self.patient_cql_connection(node1)
-        self.create_ks(cursor1, 'ks', 3)
-        create_c1c2_table(self, cursor1)
+        session = self.patient_cql_connection(node1)
+        self.create_ks(session, 'ks', 3)
+        create_c1c2_table(self, session)
 
-        cursor2 = self.cql_connection(node2, 'ks')
+        session2 = self.patient_cql_connection(node2, 'ks')
 
+        # insert and get at CL.QUORUM
         for n in xrange(0, 100):
-            insert_c1c2(cursor1, n, ConsistencyLevel.TWO)
-            query_c1c2(cursor2, n, ConsistencyLevel.TWO)
+            insert_c1c2(session, n, write_cl)
+            query_c1c2(session2, n, read_cl)
 
-        # shutdown a node and test again
-        node3.stop(wait_other_notice=True)
+        return session, session2
+
+    def quorum_quorum_test(self):
+        session, session2 = self.cl_cl_prepare(ConsistencyLevel.QUORUM, ConsistencyLevel.QUORUM)
+
+        #Stop a node and retest
+        self.cluster.nodelist()[2].stop()
         for n in xrange(0, 100):
-            insert_c1c2(cursor1, n, ConsistencyLevel.TWO)
-            query_c1c2(cursor2, n, ConsistencyLevel.TWO)
+            insert_c1c2(session, n, ConsistencyLevel.QUORUM)
+            query_c1c2(session2, n, ConsistencyLevel.QUORUM)
+
+        self.cluster.nodelist()[1].stop()
+        assert_unavailable(insert_c1c2, session, 100, ConsistencyLevel.QUORUM)
+
+    def all_all_test(self):
+        session, session2 = self.cl_cl_prepare(ConsistencyLevel.ALL, ConsistencyLevel.ALL)
+
+        self.cluster.nodelist()[2].stop()
+        assert_unavailable(insert_c1c2, session, 100, ConsistencyLevel.ALL)
+
+    def one_one_test(self):
+        session, session2 = self.cl_cl_prepare(ConsistencyLevel.ONE, ConsistencyLevel.ONE)
+
+        #Stop a node and retest
+        self.cluster.nodelist()[2].stop()
+        for n in xrange(0, 100):
+            insert_c1c2(session, n, ConsistencyLevel.ONE)
+            query_c1c2(session2, n, ConsistencyLevel.ONE)
+
+
+        #Stop a node and retest
+        self.cluster.nodelist()[1].stop()
+        for n in xrange(0, 100):
+            insert_c1c2(session, n, ConsistencyLevel.ONE)
+            query_c1c2(session2, n, ConsistencyLevel.ONE)
+
+    def one_all_test(self):
+        session, session2 = self.cl_cl_prepare(ConsistencyLevel.ONE, ConsistencyLevel.ALL)
+
+        #Stop a node and retest
+        self.cluster.nodelist()[2].stop()
+        for n in xrange(0, 100):
+            insert_c1c2(session, n, ConsistencyLevel.ONE)
+        assert_unavailable(query_c1c2, session2, 100, ConsistencyLevel.ALL)
+
+
+        #Stop a node and retest
+        self.cluster.nodelist()[1].stop()
+        for n in xrange(0, 100):
+            insert_c1c2(session, n, ConsistencyLevel.ONE)
+        assert_unavailable(query_c1c2, session2, 100, ConsistencyLevel.ALL)
+
+    def all_one_test(self):
+        session, session2 = self.cl_cl_prepare(ConsistencyLevel.ALL, ConsistencyLevel.ONE)
+
+        #Stop a node and retest
+        self.cluster.nodelist()[2].stop()
+        assert_unavailable(insert_c1c2, session, 100, ConsistencyLevel.ALL)
+        for n in xrange(0, 100):
+            query_c1c2(session2, n, ConsistencyLevel.ONE)
+
+        #Stop a node and retest
+        self.cluster.nodelist()[1].stop()
+        assert_unavailable(insert_c1c2, session, 100, ConsistencyLevel.ALL)
+        for n in xrange(0, 100):
+            query_c1c2(session2, n, ConsistencyLevel.ONE)
+
+    def quorum_two_test(self):
+        session, session2 = self.cl_cl_prepare(ConsistencyLevel.QUORUM, ConsistencyLevel.TWO)
+
+        #Stop a node and retest
+        self.cluster.nodelist()[2].stop()
+        for n in xrange(0, 100):
+            insert_c1c2(session, n, ConsistencyLevel.QUORUM)
+            query_c1c2(session2, n, ConsistencyLevel.TWO)
+
+        self.cluster.nodelist()[1].stop()
+        assert_unavailable(insert_c1c2, session, 100, ConsistencyLevel.QUORUM)
+        assert_unavailable(query_c1c2, session2, 100, ConsistencyLevel.TWO)
+
+    def quorum_three_test(self):
+        session, session2 = self.cl_cl_prepare(ConsistencyLevel.QUORUM, ConsistencyLevel.THREE)
+
+        #Stop a node and retest
+        self.cluster.nodelist()[2].stop()
+        for n in xrange(0, 100):
+            insert_c1c2(session, n, ConsistencyLevel.QUORUM)
+        assert_unavailable(query_c1c2, session2, 100, ConsistencyLevel.THREE)
+
+        self.cluster.nodelist()[1].stop()
+        assert_unavailable(insert_c1c2, session, 100, ConsistencyLevel.QUORUM)
+        assert_unavailable(query_c1c2, session2, 100, ConsistencyLevel.THREE)
+
+    def two_two_test(self):
+        session, session2 = self.cl_cl_prepare(ConsistencyLevel.TWO, ConsistencyLevel.TWO)
+
+        #Stop a node and retest
+        self.cluster.nodelist()[2].stop()
+        for n in xrange(0, 100):
+            insert_c1c2(session, n, ConsistencyLevel.TWO)
+            query_c1c2(session2, n, ConsistencyLevel.TWO)
+
+        self.cluster.nodelist()[1].stop()
+        assert_unavailable(insert_c1c2, session, 100, ConsistencyLevel.TWO)
+        assert_unavailable(query_c1c2, session2, 100, ConsistencyLevel.TWO)
 
     def three_one_test(self):
-        cluster = self.cluster
+        session, session2 = self.cl_cl_prepare(ConsistencyLevel.THREE, ConsistencyLevel.ONE)
 
-        cluster.populate(3).start()
-        [node1, node2, node3] = cluster.nodelist()
-
-        cursor1 = self.patient_cql_connection(node1)
-        self.create_ks(cursor1, 'ks', 3)
-        create_c1c2_table(self, cursor1)
-
-        cursor2 = self.cql_connection(node2, 'ks')
-
+        #Stop a node and retest
+        self.cluster.nodelist()[2].stop()
+        assert_unavailable(insert_c1c2, session, 100, ConsistencyLevel.THREE)
         for n in xrange(0, 100):
-            insert_c1c2(cursor1, n, ConsistencyLevel.THREE)
-            query_c1c2(cursor2, n, ConsistencyLevel.ONE)
+            query_c1c2(session2, n, ConsistencyLevel.ONE)
 
-        # shutdown a node and test again
-        node3.stop(wait_other_notice=True)
-        assert_unavailable(insert_c1c2, cursor1, 100, ConsistencyLevel.THREE)
+        #Stop a node and retest
+        self.cluster.nodelist()[1].stop()
+        assert_unavailable(insert_c1c2, session, 100, ConsistencyLevel.THREE)
         for n in xrange(0, 100):
-            insert_c1c2(cursor1, n, ConsistencyLevel.ONE)
-            query_c1c2(cursor2, n, ConsistencyLevel.ONE)
+            query_c1c2(session2, n, ConsistencyLevel.ONE)
 
     def short_read_test(self):
         cluster = self.cluster
