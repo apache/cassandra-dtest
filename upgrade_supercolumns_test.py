@@ -1,9 +1,7 @@
 from dtest import PyTester as Tester, debug
-from pytools import *
-from pyassertions import *
 from ccmlib.cluster import Cluster
 from ccmlib.common import get_version_from_build
-import random
+import random, os, time, re
 
 # Tests upgrade between 1.2->2.0 for super columns (since that's where
 # we removed then internally)
@@ -67,7 +65,7 @@ class TestSCUpgrade(Tester):
             """
             debug('Upgrading to ' + tag)
             nodes = self.cluster.nodelist()
-            
+
             for node in nodes:
                 debug('Shutting down node: ' + node.name)
                 node.drain()

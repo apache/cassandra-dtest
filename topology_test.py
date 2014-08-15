@@ -1,6 +1,6 @@
 from dtest import PyTester as Tester
-from pytools import *
-from pyassertions import *
+from pytools import insert_c1c2, query_c1c2, no_vnodes, new_node
+from pyassertions import assert_almost_equal
 
 import os, sys, time
 from ccmlib.cluster import Cluster

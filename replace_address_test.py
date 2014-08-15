@@ -1,9 +1,8 @@
 from dtest import PyTester as Tester
 from dtest import debug, DISABLE_VNODES
 import unittest
-from pytools import *
 from ccmlib.cluster import Cluster
-from ccmlib.node import NodeError
+from ccmlib.node import Node, NodeError
 from cassandra import ConsistencyLevel, Unavailable, ReadTimeout
 from cassandra.query import SimpleStatement
 import time

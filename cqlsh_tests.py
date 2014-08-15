@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from dtest import PyTester as Tester
 from dtest import debug
-from tools import since, require
+from pytools import since, require
 from ccmlib import common
 import subprocess
 import binascii

@@ -1,5 +1,5 @@
 from dtest import PyTester as Tester
-from pyassertions import *
+from pyassertions import assert_invalid
 
 import os, sys, time, tools
 from ccmlib.cluster import Cluster

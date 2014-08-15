@@ -1,10 +1,10 @@
-import time
+import time, re
 
 from cassandra import Unauthorized, AuthenticationFailed
 from cassandra.cluster import NoHostAvailable
 from dtest import debug
 from dtest import PyTester as Tester
-from pytools import *
+from pytools import since
 from pyassertions import assert_invalid
 
 class TestAuth(Tester):

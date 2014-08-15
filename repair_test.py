@@ -3,7 +3,7 @@ from dtest import PyTester as Tester
 from dtest import debug
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
-from pytools import *
+from pytools import no_vnodes, insert_c1c2, query_c1c2
 
 class TestRepair(Tester):
 

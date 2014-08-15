@@ -5,7 +5,6 @@ import subprocess
 
 from dtest import PyTester as Tester
 from dtest import debug
-from pytools import *
 from ccmlib import common as ccmcommon
 
 class TestSSTableGenerationAndLoading(Tester):

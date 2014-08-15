@@ -1,6 +1,6 @@
 from dtest import PyTester as Tester
 from dtest import debug
-from pytools import *
+from pytools import insert_c1c2
 from cassandra import ConsistencyLevel
 import unittest
 

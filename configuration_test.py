@@ -1,5 +1,4 @@
 from dtest import PyTester as Tester
-from pyassertions import *
 
 import re
 from ccmlib.cluster import Cluster
@@ -27,7 +26,7 @@ class TestConfiguration(Tester):
         cursor.execute( alter_chunk_len_query.format(chunk_length=64) )
         self._check_chunk_length( cursor, 64 )
 
-        
+
     def _check_chunk_length(self, cursor, value):
         describe_table_query = "SELECT * FROM system.schema_columnfamilies WHERE keyspace_name='ks' AND columnfamily_name='test_table';"
         rows = cursor.execute( describe_table_query )

@@ -1,5 +1,4 @@
 from dtest import PyTester as Tester
-from pyassertions import *
 import unittest
 import os, sys, time, tools
 from ccmlib.cluster import Cluster

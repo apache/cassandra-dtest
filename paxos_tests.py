@@ -1,8 +1,7 @@
 # coding: utf-8
 
 from dtest import PyTester as Tester
-from pyassertions import *
-from pytools import *
+from pytools import since
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
 

@@ -1,8 +1,8 @@
 import random, time
 from dtest import debug
 from dtest import PyTester as Tester
-from pytools import *
-from assertions import *
+from pytools import new_node, insert_c1c2, query_c1c2
+from pyassertions import assert_almost_equal
 from ccmlib.cluster import Cluster
 from cassandra import ConsistencyLevel
 

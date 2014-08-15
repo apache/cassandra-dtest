@@ -1,10 +1,8 @@
 from dtest import PyTester as Tester
 from dtest import debug, PRINT_DEBUG
-from pytools import *
+from pytools import no_vnodes
 from ccmlib.cluster import Cluster
-import re
-import os
-import time
+import re, os, time
 from collections import defaultdict
 from cassandra.query import SimpleStatement
 

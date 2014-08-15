@@ -4,8 +4,8 @@ import math
 import time
 
 from dtest import PyTester as Tester
-from assertions import assert_invalid
-from tools import since
+from pyassertions import assert_invalid
+from pytools import since
 
 cql_version = "3.0.0"
 
