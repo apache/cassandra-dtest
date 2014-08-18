@@ -1,7 +1,7 @@
 # coding: utf-8
 
 import random, math
-import re, os
+import re
 import time
 from collections import OrderedDict
 from blist import sortedset
@@ -13,61 +13,13 @@ from cql import ProgrammingError
 from pytools import since, require, rows_to_list
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
-from ccmlib.cluster import Cluster
 
 cql_version="3.0.0"
-LAST_TEST_DIR='last_test_dir'
-RECORD_COVERAGE = os.environ.get('RECORD_COVERAGE', '').lower() in ('yes', 'true')
-DEBUG = os.environ.get('DEBUG', '').lower() in ('yes', 'true')
-TRACE = os.environ.get('TRACE', '').lower() in ('yes', 'true')
 
 class TestCQL(Tester):
 
     def setUp(self):
-        global CURRENT_TEST
-        CURRENT_TEST = self.id() + self._testMethodName
-        # cleaning up if a previous execution didn't trigger tearDown (which
-        # can happen if it is interrupted by KeyboardInterrupt)
-        # TODO: move that part to a generic fixture
-        if os.path.exists(LAST_TEST_DIR):
-            with open(LAST_TEST_DIR) as f:
-                self.test_path = f.readline().strip('\n')
-                name = f.readline()
-                try:
-                    self.cluster = Cluster.load(self.test_path, name)
-                except IOError:
-                    # after a restart, /tmp will be emptied so we'll get an IOError when loading the old cluster here
-                    pass
-
-        self.cluster = self._get_cluster()
-        if RECORD_COVERAGE:
-            self.__setup_jacoco()
-        # the failure detector can be quite slow in such tests with quick start/stop
-        self.cluster.set_configuration_options(values={'phi_convict_threshold': 5})
-
-        timeout = 10000
-        if self.cluster_options is not None:
-            self.cluster.set_configuration_options(values=self.cluster_options)
-        elif self.cluster.version() < "1.2":
-            self.cluster.set_configuration_options(values={'rpc_timeout_in_ms': timeout})
-        else:
-            self.cluster.set_configuration_options(values={
-                'read_request_timeout_in_ms' : timeout,
-                'range_request_timeout_in_ms' : timeout,
-                'write_request_timeout_in_ms' : timeout,
-                'truncate_request_timeout_in_ms' : timeout,
-                'request_timeout_in_ms' : timeout
-            })
-
-        with open(LAST_TEST_DIR, 'w') as f:
-            f.write(self.test_path + '\n')
-            f.write(self.cluster.name)
-        if DEBUG:
-            self.cluster.set_log_level("DEBUG")
-        if TRACE:
-            self.cluster.set_log_level("TRACE")
-        self.connections = []
-        self.runners = []
+        Tester.setUp(self, preserve=True)
 
     def _get_cluster(self, name='test'):
         if hasattr(self, 'cluster'):

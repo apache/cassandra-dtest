@@ -145,7 +145,7 @@ class Tester(TestCase):
         else:
             node.set_cassandra_dir(cassandra_dir=cdir)
 
-    def setUp(self):
+    def setUp(self, preserve=False):
         global CURRENT_TEST
         CURRENT_TEST = self.id() + self._testMethodName
         # cleaning up if a previous execution didn't trigger tearDown (which
@@ -158,7 +158,8 @@ class Tester(TestCase):
                 try:
                     self.cluster = Cluster.load(self.test_path, name)
                     # Avoid waiting too long for node to be marked down
-                    self._cleanup_cluster()
+                    if not preserve:
+                        self._cleanup_cluster()
                 except IOError:
                     # after a restart, /tmp will be emptied so we'll get an IOError when loading the old cluster here
                     pass
