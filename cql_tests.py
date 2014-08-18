@@ -7,7 +7,7 @@ from collections import OrderedDict
 from blist import sortedset
 from uuid import uuid4, UUID
 
-from dtest import PyTester as Tester
+from dtest import PyTester as Tester, reuseCluster
 from pyassertions import assert_invalid, assert_one, assert_none, assert_all
 from cql import ProgrammingError
 from pytools import since, require, rows_to_list
@@ -16,19 +16,14 @@ from cassandra.query import SimpleStatement
 
 cql_version="3.0.0"
 
+@reuseCluster
 class TestCQL(Tester):
-
-    def setUp(self):
-        Tester.setUp(self, preserve=True)
 
     def _get_cluster(self, name='test'):
         if hasattr(self, 'cluster'):
             return self.cluster
         else:
             return Tester._get_cluster(self, name)
-
-    def tearDown(self):
-        Tester.tearDown(self, preserve=True)
 
     def prepare(self, ordered=False, create_keyspace=True, use_cache=False, nodes=1, rf=1):
         cluster = self.cluster

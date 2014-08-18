@@ -145,7 +145,7 @@ class Tester(TestCase):
         else:
             node.set_cassandra_dir(cassandra_dir=cdir)
 
-    def setUp(self, preserve=False):
+    def setUp(self):
         global CURRENT_TEST
         CURRENT_TEST = self.id() + self._testMethodName
         # cleaning up if a previous execution didn't trigger tearDown (which
@@ -158,7 +158,7 @@ class Tester(TestCase):
                 try:
                     self.cluster = Cluster.load(self.test_path, name)
                     # Avoid waiting too long for node to be marked down
-                    if not preserve:
+                    if not self._preserve_cluster:
                         self._cleanup_cluster()
                 except IOError:
                     # after a restart, /tmp will be emptied so we'll get an IOError when loading the old cluster here
@@ -431,6 +431,8 @@ class Runner(threading.Thread):
 class PyTester(Tester):
 
     def __init__(self, *argv, **kwargs):
+        if not hasattr(self, '__preserve_cluster'):
+            self._preserve_cluster = False
         Tester.__init__(self, *argv, **kwargs)
 
     def cql_connection(self, node, keyspace=None, version=None, user=None,
@@ -581,7 +583,7 @@ class PyTester(Tester):
         session.execute(query)
         time.sleep(0.2)
 
-    def tearDown(self, preserve=False):
+    def tearDown(self):
         reset_environment_vars()
 
         for con in self.connections:
@@ -609,9 +611,9 @@ class PyTester(Tester):
             except Exception as e:
                     print "Error saving log:", str(e)
             finally:
-                if not preserve:
+                if not self._preserve_cluster:
                     self._cleanup_cluster()
-                elif preserve and failed:
+                elif self._preserve_cluster and failed:
                     self._cleanup_cluster()
 
     def __filter_errors(self, errors):
@@ -667,3 +669,13 @@ class TracingCursor(ThriftCursor):
         else:
             raise AssertionError('No query to trace')
 
+def reuseCluster(Tester):
+    orig_init = Tester.__init__
+    # make copy of original __init__, so we can call it without recursion
+
+    def __init__(self, *args, **kwargs):
+        self._preserve_cluster = True
+        orig_init(self, *args, **kwargs) # call the original __init__
+
+    Tester.__init__ = __init__ # set the class' __init__ to the new one
+    return Tester
