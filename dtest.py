@@ -580,7 +580,7 @@ class PyTester(Tester):
         session.execute(query)
         time.sleep(0.2)
 
-    def tearDown(self):
+    def tearDown(self, preserve=False):
         reset_environment_vars()
 
         for con in self.connections:
@@ -608,7 +608,10 @@ class PyTester(Tester):
             except Exception as e:
                     print "Error saving log:", str(e)
             finally:
-                self._cleanup_cluster()
+                if not preserve:
+                    self._cleanup_cluster()
+                elif preserve and failed:
+                    self._cleanup_cluster()
 
     def __filter_errors(self, errors):
         """Filter errors, removing those that match self.ignore_log_patterns"""
