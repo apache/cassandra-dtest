@@ -431,7 +431,7 @@ class Runner(threading.Thread):
 class PyTester(Tester):
 
     def __init__(self, *argv, **kwargs):
-        if not hasattr(self, '__preserve_cluster'):
+        if not hasattr(self, '_preserve_cluster'):
             self._preserve_cluster = False
         Tester.__init__(self, *argv, **kwargs)
 
