@@ -3,6 +3,8 @@
 import random, math
 import re
 import time
+from collections import OrderedDict
+from blist import sortedset
 from uuid import uuid4, UUID
 
 from dtest import PyTester as Tester
@@ -1356,28 +1358,28 @@ class TestCQL(Tester):
         cursor.execute(q % "tags = tags + [ 'foobar' ]")
 
         res = cursor.execute("SELECT tags FROM user")
-        assert rows_to_list(res) == [[ ('foo', 'bar', 'foo', 'foobar') ]], res
+        self.assertItemsEqual(rows_to_list(res), [[ ['foo', 'bar', 'foo', 'foobar'] ]])
 
         q = "UPDATE user SET %s WHERE fn='Bilbo' AND ln='Baggins'"
         cursor.execute(q % "tags = [ 'a', 'c', 'b', 'c' ]")
         res = cursor.execute("SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'")
-        assert rows_to_list(res) == [[ ('a', 'c', 'b', 'c') ]], res
+        self.assertItemsEqual(rows_to_list(res), [[ ['a', 'c', 'b', 'c'] ]])
 
         cursor.execute(q % "tags = [ 'm', 'n' ] + tags")
         res = cursor.execute("SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'")
-        assert rows_to_list(res) == [[ ('n', 'm', 'a', 'c', 'b', 'c') ]], res
+        self.assertItemsEqual(rows_to_list(res), [[ ['n', 'm', 'a', 'c', 'b', 'c'] ]])
 
         cursor.execute(q % "tags[2] = 'foo', tags[4] = 'bar'")
         res = cursor.execute("SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'")
-        assert rows_to_list(res) == [[ ('n', 'm', 'foo', 'c', 'bar', 'c') ]], res
+        self.assertItemsEqual(rows_to_list(res), [[ ['n', 'm', 'foo', 'c', 'bar', 'c'] ]])
 
         cursor.execute("DELETE tags[2] FROM user WHERE fn='Bilbo' AND ln='Baggins'")
         res = cursor.execute("SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'")
-        assert rows_to_list(res) == [[ ('n', 'm', 'c', 'bar', 'c') ]], res
+        self.assertItemsEqual(rows_to_list(res), [[ ['n', 'm', 'c', 'bar', 'c'] ]])
 
         cursor.execute(q % "tags = tags - [ 'bar' ]")
         res = cursor.execute("SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'")
-        assert rows_to_list(res) == [[ ('n', 'm', 'c', 'c') ]], res
+        self.assertItemsEqual(rows_to_list(res), [[ ['n', 'm', 'c', 'c'] ]])
 
     def multi_collection_test(self):
         cursor = self.prepare()
@@ -1399,11 +1401,11 @@ class TestCQL(Tester):
         cursor.execute("UPDATE ks.foo SET M = M + {'foobar' : 4} WHERE k = b017f48f-ae67-11e1-9096-005056c00008;")
 
         res = cursor.execute("SELECT L, M, S FROM foo WHERE k = b017f48f-ae67-11e1-9096-005056c00008")
-        assert rows_to_list(res) == [[
-            (1, 3, 5, 7, 11, 13),
-            {'foo' : 1, 'bar' : 3, 'foobar' : 4},
-            set([1, 3, 5, 7, 11, 13]),
-        ]], res
+        self.assertItemsEqual(rows_to_list(res), [[
+            [1, 3, 5, 7, 11, 13],
+            OrderedDict([('bar', 3), ('foo', 1),  ('foobar', 4)]),
+            sortedset([1, 3, 5, 7, 11, 13])
+        ]])
 
     def range_query_test(self):
         """ Range test query from #4372 """
@@ -2057,7 +2059,7 @@ class TestCQL(Tester):
         cursor.execute("INSERT INTO test(k, l, c) VALUES(3, [0, 1, 2], 4)")
         cursor.execute("UPDATE test SET l[0] = 1, c = 42 WHERE k = 3")
         res = cursor.execute("SELECT l, c FROM test WHERE k = 3")
-        assert rows_to_list(res) == [[(1, 1, 2), 42]], res
+        self.assertItemsEqual(rows_to_list(res), [[[1, 1, 2], 42]])
 
     def batch_and_list_test(self):
         cursor = self.prepare()
@@ -2078,7 +2080,7 @@ class TestCQL(Tester):
         """)
 
         res = cursor.execute("SELECT l FROM test WHERE k = 0")
-        assert rows_to_list(res) == [[(1, 2, 3)]], res
+        self.assertItemsEqual(rows_to_list(res[0]), [[1, 2, 3]])
 
         cursor.execute("""
           BEGIN BATCH
@@ -2089,7 +2091,7 @@ class TestCQL(Tester):
         """)
 
         res = cursor.execute("SELECT l FROM test WHERE k = 1")
-        assert rows_to_list(res) == [[(3, 2, 1)]], res
+        self.assertItemsEqual(rows_to_list(res[0]), [[3, 2, 1]])
 
     def boolean_test(self):
         cursor = self.prepare()
@@ -2179,7 +2181,7 @@ class TestCQL(Tester):
         cursor.execute("UPDATE test SET l2[1] = 42, l1[1] = 24  WHERE k = 0")
 
         res = cursor.execute("SELECT l1, l2 FROM test WHERE k = 0")
-        assert rows_to_list(res) == [[(1, 24, 3), (4, 42, 6)]], res
+        self.assertItemsEqual(rows_to_list(res), [[[1, 24, 3], [4, 42, 6]]])
 
     def buggy_prepare(self):
         cursor = self.prepare()
@@ -3776,9 +3778,9 @@ class TestCQL(Tester):
         assert_invalid(cursor, "DELETE FROM tlist WHERE k=0 IF l[null] = 'foobar'")
         assert_invalid(cursor, "DELETE FROM tlist WHERE k=0 IF l[-2] = 'foobar'")
         assert_invalid(cursor, "DELETE FROM tlist WHERE k=0 IF l[3] = 'foobar'")
-        assert_one(cursor, "DELETE FROM tlist WHERE k=0 IF l[1] = null", [False, ('foo', 'bar', 'foobar')])
-        assert_one(cursor, "DELETE FROM tlist WHERE k=0 IF l[1] = 'foobar'", [False, ('foo', 'bar', 'foobar')])
-        assert_one(cursor, "SELECT * FROM tlist", [0, ('foo', 'bar', 'foobar')])
+        assert_one(cursor, "DELETE FROM tlist WHERE k=0 IF l[1] = null", [False, ['foo', 'bar', 'foobar']])
+        assert_one(cursor, "DELETE FROM tlist WHERE k=0 IF l[1] = 'foobar'", [False, ['foo', 'bar', 'foobar']])
+        assert_one(cursor, "SELECT * FROM tlist", [0, ['foo', 'bar', 'foobar']])
 
         assert_one(cursor, "DELETE FROM tlist WHERE k=0 IF l[1] = 'bar'", [True])
         assert_none(cursor, "SELECT * FROM tlist")
