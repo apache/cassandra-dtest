@@ -1,4 +1,4 @@
-from dtest import PyTester as Tester
+from dtest import Tester
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
 
@@ -116,7 +116,7 @@ class TestCounters(Tester):
         node1, node2, node3 = cluster.nodelist()
         cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'counter_tests', 3)
-        
+
         stmt = """
               CREATE TABLE counter_table (
               id uuid PRIMARY KEY,
@@ -125,7 +125,7 @@ class TestCounters(Tester):
               )
            """
         cursor.execute(stmt)
-        
+
         counters = []
         # establish 50 counters (2x25 rows)
         for i in xrange(25):
@@ -133,13 +133,13 @@ class TestCounters(Tester):
             counters.append(
                 {_id: {'counter_one':1, 'counter_two':1}}
             )
-            
+
             query = SimpleStatement("""
                 UPDATE counter_table
                 SET counter_one = counter_one + 1, counter_two = counter_two + 1
                 where id = {uuid}""".format(uuid=_id), consistency_level=ConsistencyLevel.ONE)
             cursor.execute(query)
-        
+
         # increment a bunch of counters with CL.ONE
         for i in xrange(10000):
             counter = counters[random.randint(0, len(counters)-1)]
@@ -150,44 +150,44 @@ class TestCounters(Tester):
                 SET counter_one = counter_one + 2
                 where id = {uuid}""".format(uuid=counter_id), consistency_level=ConsistencyLevel.ONE)
             cursor.execute(query)
-            
+
             query = SimpleStatement("""
                 UPDATE counter_table
                 SET counter_two = counter_two + 10
                 where id = {uuid}""".format(uuid=counter_id), consistency_level=ConsistencyLevel.ONE)
             cursor.execute(query)
-            
+
             query = SimpleStatement("""
                 UPDATE counter_table
                 SET counter_one = counter_one - 1
                 where id = {uuid}""".format(uuid=counter_id), consistency_level=ConsistencyLevel.ONE)
             cursor.execute(query)
-            
+
             query = SimpleStatement("""
                 UPDATE counter_table
                 SET counter_two = counter_two - 5
                 where id = {uuid}""".format(uuid=counter_id), consistency_level=ConsistencyLevel.ONE)
             cursor.execute(query)
-            
+
             # update expectations to match (assumed) db state
             counter[counter_id]['counter_one'] += 1
             counter[counter_id]['counter_two'] += 5
-        
+
         # let's verify the counts are correct, using CL.ALL
         for counter_dict in counters:
             counter_id = counter_dict.keys()[0]
-            
+
             query = SimpleStatement("""
                 SELECT counter_one, counter_two
                 FROM counter_table WHERE id = {uuid}
                 """.format(uuid=counter_id), consistency_level=ConsistencyLevel.ALL)
             rows = cursor.execute(query)
-            
-            counter_one_actual, counter_two_actual = rows[0]    
-            
+
+            counter_one_actual, counter_two_actual = rows[0]
+
             self.assertEqual(counter_one_actual, counter_dict[counter_id]['counter_one'])
             self.assertEqual(counter_two_actual, counter_dict[counter_id]['counter_two'])
-    
+
     def multi_counter_update_test(self):
         """
         Test for singlular update statements that will affect multiple counters.
@@ -197,7 +197,7 @@ class TestCounters(Tester):
         node1, node2, node3 = cluster.nodelist()
         cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'counter_tests', 3)
-        
+
         cursor.execute("""
             CREATE TABLE counter_table (
             id text,
@@ -205,13 +205,13 @@ class TestCounters(Tester):
             counter_one COUNTER,
             PRIMARY KEY (id, myuuid))
             """)
-        
+
         expected_counts = {}
-        
+
         # set up expectations
         for i in range(1,6):
             _id = uuid.uuid4()
-            
+
             expected_counts[_id] = i
 
         for k, v in expected_counts.items():

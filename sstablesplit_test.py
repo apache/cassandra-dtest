@@ -1,5 +1,4 @@
-from dtest import PyTester as Tester
-from dtest import debug
+from dtest import Tester, debug
 
 from os.path import getsize
 import time

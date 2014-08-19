@@ -8,7 +8,7 @@ import uuid
 
 from collections import defaultdict
 from distutils.version import LooseVersion
-from dtest import PyTester as Tester, debug, DISABLE_VNODES, DEFAULT_DIR
+from dtest import Tester, debug, DISABLE_VNODES, DEFAULT_DIR
 from pytools import new_node
 from ccmlib import common as ccmcommon
 import tarfile

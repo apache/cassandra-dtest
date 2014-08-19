@@ -1,10 +1,9 @@
-from dtest import PyTester as Tester
-from dtest import debug, DEFAULT_DIR
+from dtest import Tester, debug, DEFAULT_DIR
 import unittest
 import time
 import os
 import subprocess
-import shlex 
+import shlex
 import pycassa
 import glob
 import sys
@@ -38,7 +37,7 @@ class ThriftHSHATest(Tester):
             'rpc_server_type' : 'hsha',
             'rpc_max_threads' : 20
         })
-        
+
         cluster.populate(1)
         cluster.start()
         (node1,) = cluster.nodelist()
@@ -110,4 +109,4 @@ class ThriftHSHATest(Tester):
         cluster.start(no_wait=True)
         debug("Waiting 10 seconds before we're done..")
         time.sleep(10)
-        
+

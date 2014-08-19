@@ -1,4 +1,4 @@
-from dtest import PyTester as Tester
+from dtest import Tester
 
 import re
 from ccmlib.cluster import Cluster
