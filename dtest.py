@@ -594,8 +594,11 @@ class PyTester(Tester):
                 try:
                     cluster = Cluster.load(test_path, name)
                     # Avoid waiting too long for node to be marked down
-                    cluster.remove()
-                    os.rmdir(test_path)
+                    if KEEP_TEST_DIR:
+                        cluster.stop(gently=RECORD_COVERAGE)
+                    else:
+                        cluster.remove()
+                        os.rmdir(test_path)
                     os.remove(LAST_TEST_DIR)
                 except IOError:
                     # after a restart, /tmp will be emptied so we'll get an IOError when loading the old cluster here
