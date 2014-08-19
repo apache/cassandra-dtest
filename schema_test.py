@@ -1,4 +1,3 @@
-from cql import ProgrammingError
 from dtest import PyTester as Tester
 from pytools import since, rows_to_list
 from pyassertions import assert_invalid

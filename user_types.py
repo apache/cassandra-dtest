@@ -1,7 +1,6 @@
 import struct
 import time
 import uuid
-from cql import ProgrammingError
 from dtest import PyTester as Tester
 from dtest import debug
 from pytools import since

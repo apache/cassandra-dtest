@@ -9,7 +9,6 @@ from uuid import uuid4, UUID
 
 from dtest import PyTester as Tester
 from pyassertions import assert_invalid, assert_one, assert_none, assert_all
-from cql import ProgrammingError
 from pytools import since, require, rows_to_list
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
