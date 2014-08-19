@@ -3086,7 +3086,6 @@ class TestCQL(Tester):
         cursor.execute("INSERT INTO test(k) VALUES (0)")
         assert_one(cursor, "SELECT dateOf(t) FROM test WHERE k=0", [ None ])
 
-    @require('7163')
     def cas_simple_test(self):
         cursor = self.prepare(nodes=3, rf=3)
 
