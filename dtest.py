@@ -43,6 +43,7 @@ DISABLE_VNODES = os.environ.get('DISABLE_VNODES', '').lower() in ('yes', 'true')
 OFFHEAP_MEMTABLES = os.environ.get('OFFHEAP_MEMTABLES', '').lower() in ('yes', 'true')
 NUM_TOKENS = os.environ.get('NUM_TOKENS', '256')
 RECORD_COVERAGE = os.environ.get('RECORD_COVERAGE', '').lower() in ('yes', 'true')
+REUSE_CLUSTER = os.environ.get('REUSE_CLUSTER', '').lower() in ('yes', 'true')
 
 
 CURRENT_TEST = ""
@@ -692,12 +693,12 @@ class TracingCursor(ThriftCursor):
         else:
             raise AssertionError('No query to trace')
 
-def reuseCluster(Tester):
+def canReuseCluster(Tester):
     orig_init = Tester.__init__
     # make copy of original __init__, so we can call it without recursion
 
     def __init__(self, *args, **kwargs):
-        self._preserve_cluster = True
+        self._preserve_cluster = REUSE_CLUSTER
         orig_init(self, *args, **kwargs) # call the original __init__
 
     Tester.__init__ = __init__ # set the class' __init__ to the new one
