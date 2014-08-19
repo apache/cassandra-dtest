@@ -583,6 +583,24 @@ class PyTester(Tester):
         session.execute(query)
         time.sleep(0.2)
 
+
+    @classmethod
+    def tearDownClass(cls):
+        reset_environment_vars()
+        if os.path.exists(LAST_TEST_DIR):
+            with open(LAST_TEST_DIR) as f:
+                test_path = f.readline().strip('\n')
+                name = f.readline()
+                try:
+                    cluster = Cluster.load(test_path, name)
+                    # Avoid waiting too long for node to be marked down
+                    cluster.remove()
+                    os.rmdir(test_path)
+                    os.remove(LAST_TEST_DIR)
+                except IOError:
+                    # after a restart, /tmp will be emptied so we'll get an IOError when loading the old cluster here
+                    pass
+
     def tearDown(self):
         reset_environment_vars()
 
