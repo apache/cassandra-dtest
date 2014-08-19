@@ -309,17 +309,12 @@ class Tester(TestCase):
             for k, v in columns.items():
                 additional_columns = "%s, %s %s" % (additional_columns, k, v)
 
-        if self.cluster.version() >= "1.2":
-            if additional_columns == "":
-                query = 'CREATE COLUMNFAMILY %s (key %s, c varchar, v varchar, PRIMARY KEY(key, c)) WITH comment=\'test cf\'' % (name, key_type)
-            else:
-                query = 'CREATE COLUMNFAMILY %s (key %s PRIMARY KEY%s) WITH comment=\'test cf\'' % (name, key_type, additional_columns)
-            if compression is not None:
-                query = '%s AND compression = { \'sstable_compression\': \'%sCompressor\' }' % (query, compression)
+        if additional_columns == "":
+            query = 'CREATE COLUMNFAMILY %s (key %s, c varchar, v varchar, PRIMARY KEY(key, c)) WITH comment=\'test cf\'' % (name, key_type)
         else:
-            query = 'CREATE COLUMNFAMILY %s (key %s PRIMARY KEY%s) WITH comparator=UTF8Type AND default_validation=%s' % (name, key_type, additional_columns, validation)
-            if compression is not None:
-                query = '%s AND compression_parameters:sstable_compression=%sCompressor' % (query, compression)
+            query = 'CREATE COLUMNFAMILY %s (key %s PRIMARY KEY%s) WITH comment=\'test cf\'' % (name, key_type, additional_columns)
+        if compression is not None:
+            query = '%s AND compression = { \'sstable_compression\': \'%sCompressor\' }' % (query, compression)
 
         if read_repair is not None:
             query = '%s AND read_repair_chance=%f' % (query, read_repair)
