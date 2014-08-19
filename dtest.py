@@ -9,7 +9,6 @@ from ccmlib.node import Node
 from ccmlib.common import is_win
 from uuid import UUID
 from nose.exc import SkipTest
-from thrift.transport import TSocket
 from unittest import TestCase
 from cassandra.cluster import NoHostAvailable
 from cassandra.cluster import Cluster as PyCluster
