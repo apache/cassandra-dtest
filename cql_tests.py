@@ -19,12 +19,6 @@ cql_version="3.0.0"
 @reuseCluster
 class TestCQL(Tester):
 
-    def _get_cluster(self, name='test'):
-        if hasattr(self, 'cluster'):
-            return self.cluster
-        else:
-            return Tester._get_cluster(self, name)
-
     def prepare(self, ordered=False, create_keyspace=True, use_cache=False, nodes=1, rf=1):
         cluster = self.cluster
 
