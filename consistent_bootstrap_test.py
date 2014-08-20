@@ -1,7 +1,6 @@
 import time
 
-from dtest import PyTester as Tester
-from dtest import debug
+from dtest import Tester, debug
 from pyassertions import assert_unavailable
 from pytools import (create_c1c2_table, insert_c1c2, query_c1c2, retry_till_success,
                    insert_columns, new_node, no_vnodes, since)
@@ -15,7 +14,7 @@ class TestBootstrapConsistency(Tester):
         debug("Creating a ring")
         cluster = self.cluster
         cluster.set_configuration_options(values={ 'hinted_handoff_enabled' : False, 'write_request_timeout_in_ms' : 60000, 'read_request_timeout_in_ms' : 60000, 'dynamic_snitch_badness_threshold' : 0.0}, batch_commitlog=True)
-    
+
         cluster.populate(3, tokens=[0, 2**48, 2**62]).start()
         [node1, node2, node3] = cluster.nodelist()
         cluster.start()
@@ -56,7 +55,7 @@ class TestBootstrapConsistency(Tester):
         debug("Creating a ring")
         cluster = self.cluster
         cluster.set_configuration_options(values={ 'hinted_handoff_enabled' : False, 'write_request_timeout_in_ms' : 60000, 'read_request_timeout_in_ms' : 60000, 'dynamic_snitch_badness_threshold' : 0.0}, batch_commitlog=True)
-    
+
         cluster.populate(2).start()
         [node1, node2] = cluster.nodelist()
         cluster.start()

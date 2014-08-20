@@ -3,7 +3,7 @@
 import math
 import time
 
-from dtest import PyTester as Tester
+from dtest import Tester
 from pyassertions import assert_invalid
 from pytools import since
 

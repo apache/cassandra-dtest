@@ -1,14 +1,13 @@
 import time
 
-from dtest import PyTester as Tester
-from dtest import debug
+from dtest import Tester, debug
 from loadmaker import LoadMaker
 
 class TestGlobalRowKeyCache(Tester):
 
     def __init__(self, *argv, **kwargs):
         super(TestGlobalRowKeyCache, self).__init__(*argv, **kwargs)
-        # When a node goes down under load it prints an error in it's log. 
+        # When a node goes down under load it prints an error in it's log.
         # If we don't allow log errors, then the test will fail.
 #        self.allow_log_errors = True
 
@@ -51,7 +50,7 @@ class TestGlobalRowKeyCache(Tester):
                 host, port = node1.network_interfaces['thrift']
 
                 # create some load makers
-                lm_standard = LoadMaker(host, port, 
+                lm_standard = LoadMaker(host, port,
                         keyspace_name=ks_name, column_family_type='standard')
                 lm_counter = LoadMaker(host, port,
                         keyspace_name=ks_name, column_family_type='standard', is_counter=True)

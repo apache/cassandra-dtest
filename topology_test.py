@@ -1,4 +1,4 @@
-from dtest import PyTester as Tester
+from dtest import Tester
 from pytools import insert_c1c2, query_c1c2, no_vnodes, new_node
 from pyassertions import assert_almost_equal
 

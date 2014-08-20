@@ -1,4 +1,4 @@
-from dtest import PyTester as Tester
+from dtest import Tester
 
 import os, sys, time, tools
 from ccmlib.cluster import Cluster

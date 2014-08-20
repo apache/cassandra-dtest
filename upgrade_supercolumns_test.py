@@ -1,4 +1,4 @@
-from dtest import PyTester as Tester, debug
+from dtest import Tester, debug
 from ccmlib.cluster import Cluster
 from ccmlib.common import get_version_from_build
 import random, os, time, re

@@ -1,4 +1,4 @@
-from dtest import PyTester as Tester
+from dtest import Tester
 import pytools as tools
 from pytools import no_vnodes, create_c1c2_table
 from cassandra import ConsistencyLevel
@@ -85,9 +85,9 @@ class TestPutGet(Tester):
 
     @no_vnodes()
     def wide_slice_test(self):
-        """ 
-        Check slicing a wide row. 
-        See https://issues.apache.org/jira/browse/CASSANDRA-4919 
+        """
+        Check slicing a wide row.
+        See https://issues.apache.org/jira/browse/CASSANDRA-4919
 
         From Sylvain about duplicating:
 
@@ -160,5 +160,5 @@ class TestPutGet(Tester):
             columns.extend(cols)
             #print row.key
             #print cols
-        
+
         assert len(columns) == 95, "Regression in cassandra-4919. Expected 95 columns, got %d." % len(columns)

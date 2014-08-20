@@ -1,4 +1,4 @@
-from dtest import PyTester as Tester
+from dtest import Tester
 from pyassertions import assert_invalid
 
 import os, sys, time, tools

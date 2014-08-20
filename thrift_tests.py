@@ -6,7 +6,7 @@ from thrift.transport import THttpClient
 from thrift.protocol import TBinaryProtocol
 from thrift.Thrift import TApplicationException
 
-from dtest import PyTester as Tester, debug, NUM_TOKENS
+from dtest import Tester, debug, NUM_TOKENS
 from thrift_bindings.v30 import Cassandra
 from thrift_bindings.v30.Cassandra import *
 

@@ -5,8 +5,7 @@ import glob
 import re
 from threading import Thread
 
-from dtest import debug
-from dtest import PyTester as Tester
+from dtest import debug, Tester
 from ccmlib.node import Node
 
 def wait(delay=2):

@@ -1,4 +1,4 @@
-from dtest import PyTester as Tester, debug
+from dtest import Tester, debug
 from pytools import rows_to_list
 import tempfile
 import os

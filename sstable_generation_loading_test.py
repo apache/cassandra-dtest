@@ -3,8 +3,7 @@ import os
 from distutils import dir_util
 import subprocess
 
-from dtest import PyTester as Tester
-from dtest import debug
+from dtest import Tester, debug
 from ccmlib import common as ccmcommon
 
 class TestSSTableGenerationAndLoading(Tester):

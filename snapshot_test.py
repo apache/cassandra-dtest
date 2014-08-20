@@ -1,5 +1,4 @@
-from dtest import PyTester as Tester
-from dtest import debug
+from dtest import Tester, debug
 from pytools import replace_in_file
 import tempfile
 import shutil
@@ -26,7 +25,7 @@ class SnapshotTester(Tester):
         os.mkdir(os.path.join(tmpdir,ks))
         os.mkdir(os.path.join(tmpdir,ks,cf))
         node_dir = node.get_path()
-        
+
         # Find the snapshot dir, it's different in various C* versions:
         snapshot_dir = "{node_dir}/data/{ks}/{cf}/snapshots/{name}".format(**locals())
         if not os.path.isdir(snapshot_dir):
@@ -150,7 +149,7 @@ class TestArchiveCommitlog(SnapshotTester):
         time.sleep(10)
         # Record when this second set of inserts finished:
         insert_cutoff_times.append(time.gmtime())
-        
+
         debug("Writing final 5,000 rows...")
         self.insert_rows(cursor,60000, 65000)
         # Record when the third set of inserts finished:
@@ -192,7 +191,7 @@ class TestArchiveCommitlog(SnapshotTester):
         rows = cursor.execute('SELECT count(*) from ks.cf')
         # Make sure we have the same amount of rows as when we snapshotted:
         self.assertEqual(rows[0][0], 30000)
-        
+
         # Edit commitlog_archiving.properties. Remove the archive
         # command  and set a restore command and restore_directories:
         if restore_archived_commitlog:
@@ -206,7 +205,7 @@ class TestArchiveCommitlog(SnapshotTester):
                 restore_time = time.strftime("%Y:%m:%d %H:%M:%S", insert_cutoff_times[1])
                 replace_in_file(os.path.join(node1.get_path(),'conf','commitlog_archiving.properties'),
                                 [(r'^restore_point_in_time=.*$', 'restore_point_in_time={restore_time}'.format(**locals()))])
-        
+
         debug("Restarting node1..")
         node1.stop()
         node1.start()
