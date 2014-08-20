@@ -1,6 +1,6 @@
-from dtest import PyTester as Tester
+from dtest import Tester
 
-import os, sys, time, tools, re
+import os, sys, time, re
 from uuid import UUID
 from ccmlib.cluster import Cluster
 

@@ -1,5 +1,4 @@
-from dtest import PyTester as Tester
-from dtest import debug, DISABLE_VNODES
+from dtest import Tester, debug, DISABLE_VNODES
 import unittest
 from ccmlib.cluster import Cluster
 from ccmlib.node import Node, NodeError

@@ -1,4 +1,4 @@
-from dtest import PyTester as Tester
+from dtest import Tester
 from pytools import putget
 from ccmlib.cluster import Cluster
 

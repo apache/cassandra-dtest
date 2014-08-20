@@ -1,6 +1,6 @@
-from dtest import PyTester as Tester
+from dtest import Tester
 import unittest
-import os, sys, time, tools
+import os, sys, time
 from ccmlib.cluster import Cluster
 from ccmlib import common
 

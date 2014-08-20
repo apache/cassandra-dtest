@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
-from dtest import PyTester as Tester
-from dtest import debug
+from dtest import Tester, debug
 from pytools import since, require
 from ccmlib import common
 import subprocess

@@ -1,9 +1,7 @@
 import struct
 import time
 import uuid
-from cql import ProgrammingError
-from dtest import PyTester as Tester
-from dtest import debug
+from dtest import Tester, debug
 from pytools import since
 from pyassertions import assert_invalid
 

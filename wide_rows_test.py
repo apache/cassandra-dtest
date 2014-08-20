@@ -1,5 +1,4 @@
-from dtest import PyTester as Tester
-from dtest import debug
+from dtest import Tester, debug
 import datetime
 import random
 
@@ -44,7 +43,7 @@ class TestWideRows(Tester):
         cursor.execute('CREATE TABLE user_events (userid text, event timestamp, value text, PRIMARY KEY (userid, event));')
         date = datetime.datetime.now()
         # Create a large timeline for each of a group of users:
-        for user in ('ryan', 'cathy', 'mallen', 'joaquin', 'erin', 'ham'): 
+        for user in ('ryan', 'cathy', 'mallen', 'joaquin', 'erin', 'ham'):
             debug("Writing values for: %s" % user)
             for day in xrange(5000):
                 date_str = (date + datetime.timedelta(day)).strftime("%Y-%m-%d")
@@ -78,7 +77,7 @@ class TestWideRows(Tester):
         cluster.set_configuration_options(values={ 'column_index_size_in_kb' : 1 }) #reduce this value to force column index creation
         cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'wide_rows', 1)
-        
+
         create_table_query = 'CREATE TABLE test_table (row varchar, name varchar, value int, PRIMARY KEY (row, name));'
         cursor.execute(create_table_query)
 

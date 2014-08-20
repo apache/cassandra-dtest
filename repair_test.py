@@ -1,6 +1,5 @@
 import time, re
-from dtest import PyTester as Tester
-from dtest import debug
+from dtest import Tester, debug
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
 from pytools import no_vnodes, insert_c1c2, query_c1c2

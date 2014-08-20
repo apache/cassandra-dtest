@@ -2,13 +2,12 @@ import time
 import os
 import pprint
 import glob
+import re
 from threading import Thread
 
-from dtest import debug
-from dtest import PyTester as Tester
+from dtest import debug, Tester
 from ccmlib.node import Node
 
-import cql
 def wait(delay=2):
     """
     An abstraction so that the sleep delays can easily be modified.
@@ -40,7 +39,7 @@ class TestConcurrentSchemaChanges(Tester):
         """ % namespace
         session.execute(query)
         wait(1)
-        session.execute("INSERT INTO cf_%s (col1, col2, col3) VALUES ('a', 'b', 'c');" 
+        session.execute("INSERT INTO cf_%s (col1, col2, col3) VALUES ('a', 'b', 'c');"
                 % namespace)
 
         # create an index
@@ -116,10 +115,9 @@ class TestConcurrentSchemaChanges(Tester):
         """ Makes sure that there is only one schema """
         debug("validate_schema_consistent() " + node.name)
 
-        host, port = node.network_interfaces['thrift']
-        conn = cql.connect(host, port, keyspace=None)
-        schemas = conn.client.describe_schema_versions()
-        num_schemas = len([ss for ss in schemas.keys() if ss != 'UNREACHABLE'])
+        response = node.nodetool('describecluster', True)[0]
+        schemas = response.split('Schema versions:')[1].strip()
+        num_schemas = len(re.findall('\[.*?\]', schemas))
         assert num_schemas == 1, "There were multiple schema versions: " + pprint.pformat(schemas)
 
 
@@ -139,7 +137,7 @@ class TestConcurrentSchemaChanges(Tester):
 
         self.make_schema_changes(session, namespace='ns1')
 
-    
+
     def changes_to_different_nodes_test(self):
         debug("changes_to_different_nodes_test()")
         cluster = self.cluster
@@ -163,12 +161,12 @@ class TestConcurrentSchemaChanges(Tester):
         # check both, just because we can
         self.validate_schema_consistent(node2)
 
-    
+
     def changes_while_node_down_test(self):
         """
         makes schema changes while a node is down.
-        Make schema changes to node 1 while node 2 is down. 
-        Then bring up 2 and make sure it gets the changes. 
+        Make schema changes to node 1 while node 2 is down.
+        Then bring up 2 and make sure it gets the changes.
         """
         debug("changes_while_node_down_test()")
         cluster = self.cluster
@@ -194,9 +192,9 @@ class TestConcurrentSchemaChanges(Tester):
         """
         makes schema changes while a node is down.
 
-        Bring down 1 and change 2. 
-        Bring down 2, bring up 1, and finally bring up 2. 
-        1 should get the changes. 
+        Bring down 1 and change 2.
+        Bring down 2, bring up 1, and finally bring up 2.
+        1 should get the changes.
         """
         debug("changes_while_node_toggle_test()")
         cluster = self.cluster
@@ -225,7 +223,7 @@ class TestConcurrentSchemaChanges(Tester):
         cluster.populate(1)
         # create and add a new node, I must not be a seed, otherwise
         # we get schema disagreement issues for awhile after decommissioning it.
-        node2 = Node('node2', 
+        node2 = Node('node2',
                     cluster,
                     True,
                     ('127.0.0.2', 9160),
@@ -250,7 +248,7 @@ class TestConcurrentSchemaChanges(Tester):
         self.make_schema_changes(cursor, namespace='ns1')
 
         # create and add a new node
-        node3 = Node('node3', 
+        node3 = Node('node3',
                     cluster,
                     True,
                     ('127.0.0.3', 9160),

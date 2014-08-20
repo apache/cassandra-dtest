@@ -1,5 +1,5 @@
-from cql import ProgrammingError
-from dtest import PyTester as Tester
+
+from dtest import Tester
 from pytools import since, rows_to_list
 from pyassertions import assert_invalid
 import time
