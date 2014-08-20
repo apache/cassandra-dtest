@@ -1,7 +1,7 @@
 from dtest import Tester
 from pyassertions import assert_invalid
 
-import os, sys, time, tools
+import os, sys, time
 from ccmlib.cluster import Cluster
 
 class TestUDTEncoding(Tester):

@@ -1,6 +1,6 @@
 from dtest import Tester
 
-import os, sys, time, tools
+import os, sys, time
 from ccmlib.cluster import Cluster
 
 class TestDeletion(Tester):
