@@ -118,6 +118,8 @@ class Tester(TestCase):
 
     def __init__(self, *argv, **kwargs):
         # if False, then scan the log of each node for errors after every test.
+        if not hasattr(self, '_preserve_cluster'):
+            self._preserve_cluster = False
         self.allow_log_errors = False
         self.cluster_options = kwargs.pop('cluster_options', None)
         super(Tester, self).__init__(*argv, **kwargs)
