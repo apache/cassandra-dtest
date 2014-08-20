@@ -703,3 +703,14 @@ def canReuseCluster(Tester):
 
     Tester.__init__ = __init__ # set the class' __init__ to the new one
     return Tester
+
+class freshCluster():
+
+    def __call__(self, f):
+        def wrapped(obj):
+            obj._preserve_cluster = False
+            obj.setUp()
+            f(obj)
+        wrapped.__name__ = f.__name__
+        wrapped.__doc__ = f.__doc__
+        return wrapped
