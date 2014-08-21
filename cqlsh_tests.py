@@ -8,6 +8,7 @@ from decimal import Decimal
 import sys, os, datetime
 from uuid import UUID
 from distutils.version import LooseVersion
+from pytools import create_c1c2_table, insert_c1c2
 
 class TestCqlsh(Tester):
 
@@ -361,6 +362,29 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
              |                      |                            \n\n(5 rows)"""
 
         self.assertTrue(expected in output, "Output \n {%s} \n doesn't contain expected\n {%s}" % (output, expected))
+
+    def tracing_from_system_traces_test(self):
+        self.cluster.populate(1).start()
+
+        node1, = self.cluster.nodelist()
+        node1.watch_log_for('thrift clients...')
+
+        session = self.patient_cql_connection(node1)
+
+        self.create_ks(session, 'ks', 1)
+        create_c1c2_table(self, session)
+
+        for n in xrange(100):
+            insert_c1c2(session, n)
+
+        out = self.run_cqlsh(node1, 'TRACING ON; SELECT * FROM ks.cf')
+        self.assertIn('Tracing session: ', out)
+
+        out = self.run_cqlsh(node1, 'TRACING ON; SELECT * FROM system_traces.events')
+        self.assertNotIn('Tracing session: ', out)
+
+        out = self.run_cqlsh(node1, 'TRACING ON; SELECT * FROM system_traces.sessions')
+        self.assertNotIn('Tracing session: ', out)
 
     def run_cqlsh(self, node, cmds, cqlsh_options=[]):
         cdir = node.get_cassandra_dir()
