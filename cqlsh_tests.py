@@ -5,10 +5,9 @@ from ccmlib import common
 import subprocess
 import binascii
 from decimal import Decimal
-import sys, os
+import sys, os, datetime
 from uuid import UUID
 from distutils.version import LooseVersion
-import datetime
 
 class TestCqlsh(Tester):
 

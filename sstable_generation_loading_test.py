@@ -1,5 +1,4 @@
-import time
-import os
+import time, os
 from distutils import dir_util
 import subprocess
 

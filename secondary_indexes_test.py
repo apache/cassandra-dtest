@@ -1,7 +1,4 @@
-import random
-import re
-import time
-import uuid
+import random, re, time, uuid
 
 from dtest import Tester, debug
 from pytools import since
