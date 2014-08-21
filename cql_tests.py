@@ -2180,20 +2180,6 @@ class TestCQL(Tester):
         res = cursor.execute("SELECT l1, l2 FROM test WHERE k = 0")
         self.assertItemsEqual(rows_to_list(res), [[[1, 24, 3], [4, 42, 6]]])
 
-    def buggy_prepare(self):
-        cursor = self.prepare()
-
-        cursor.execute("""
-            CREATE TABLE test (
-                k int PRIMARY KEY,
-                l list<int>,
-            )
-        """)
-
-        from cql import query
-        p = query.prepare_query("INSERT INTO test (k, l) VALUES (0, [?, ?])")
-        print p
-
     def composite_index_collections_test(self):
         cursor = self.prepare(ordered=True)
         cursor.execute("""
