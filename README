@@ -2,20 +2,24 @@ Cassandra Distributed Tests
 ===========================
 
 
-Prerequisite
+Prerequisites
 ------------
 
-An up to date of ccm (https://github.com/pcmanus/ccm) should be installed.
-The tests are run using nosetests (http://readthedocs.org/docs/nose/en/latest/)
-which thus needs to be installed too. The python driver also needs to be
-available (http://datastax.github.io/python-driver/installation.html).
+An up to date copy of ccm should be installed for starting and stopping Cassandra.
+The tests are run using nosetests.
+These tests require the datastax python driver.
+A few tests still require the deprecated python CQL over thrift driver.
 
+ccm: https://github.com/pcmanus/ccm
+nosetests: http://readthedocs.org/docs/nose/en/latest/
+Python Driver: http://datastax.github.io/python-driver/installation.html
+CQL over Thrift Driver: http://code.google.com/a/apache-extras.org/p/cassandra-dbapi2/
 
 Usage
 -----
 
-Tests are ran by nosetests, the only thing the framework needs to know is where
-is the (compiled) sources for Cassandra to use. There is two options:
+The tests are run by nosetests. The only thing the framework needs to know is
+the location of the (compiled) sources for Cassandra. There are two options:
  * Use existing sources:
      CASSANDRA_DIR=~/path/to/cassandra nosetests
  * Use ccm ability to download/compile released sources from archives.apache.org:
@@ -40,6 +44,5 @@ better suggestions).
 Detailed Instructions
 ---------------------
 
-See more detailed instructions in the included INSTALL file 
+See more detailed instructions in the included INSTALL file
 (https://github.com/riptano/cassandra-dtest/blob/master/INSTALL.md)
-
