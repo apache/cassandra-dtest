@@ -109,3 +109,7 @@ will often need to modify them in some fashion at some later point:
 
          cd ~/git/cstar/cassandra-dtest
          PRINT_DEBUG=true nosetests -x -s -v putget_test.py
+
+* To reuse cassandra clusters when possible, set the environment variable REUSE_CLUSTER
+
+        REUSE_CLUSTER=true nosetests -s -v cql_tests.py
