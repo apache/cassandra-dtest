@@ -1,8 +1,6 @@
 # coding: utf-8
 
-import random, math
-import re
-import time
+import random, math, re, time
 from collections import OrderedDict
 from blist import sortedset
 from uuid import uuid4, UUID

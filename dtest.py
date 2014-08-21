@@ -1,8 +1,5 @@
 from __future__ import with_statement
-import os, tempfile, sys, shutil, subprocess, types, time, threading, ConfigParser, logging
-import fnmatch
-import re
-import copy
+import os, tempfile, sys, shutil, subprocess, types, time, threading, ConfigParser, logging, fnmatch, re, copy
 
 from ccmlib.cluster import Cluster
 from ccmlib.node import Node

@@ -1,8 +1,4 @@
-import time
-import os
-import pprint
-import glob
-import re
+import time, os, pprint, glob, re
 from threading import Thread
 
 from dtest import debug, Tester

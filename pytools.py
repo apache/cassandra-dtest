@@ -1,11 +1,7 @@
-import time
 from ccmlib.node import Node
 from decorator  import decorator
 from distutils.version import LooseVersion
-import re
-import os
-import sys
-import fileinput
+import re, os, sys, fileinput, time
 
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
@@ -139,8 +135,8 @@ def range_putget(cluster, cursor, cl=ConsistencyLevel.QUORUM):
 
 def replace_in_file(filepath, search_replacements):
     """In-place file search and replace.
-    
-    filepath - The path of the file to edit 
+
+    filepath - The path of the file to edit
     search_replacements - a list of tuples (regex, replacement) that
     represent however many search and replace operations you wish to
     perform.
@@ -174,7 +170,7 @@ class since(object):
                 obj.skip("%s < %s" % (cluster_version, self.cass_version))
             if self.max_version and \
                     cluster_version[:len(self.max_version)] > self.max_version:
-                obj.skip("%s > %s" %(cluster_version, self.max_version)) 
+                obj.skip("%s > %s" %(cluster_version, self.max_version))
             f(obj)
         wrapped.__name__ = f.__name__
         wrapped.__doc__ = f.__doc__

@@ -4,8 +4,8 @@ from ccmlib.cluster import Cluster
 from ccmlib.node import Node, NodeError
 from cassandra import ConsistencyLevel, Unavailable, ReadTimeout
 from cassandra.query import SimpleStatement
-import time
-import re
+import time, re
+
 class NodeUnavailable(Exception):
     pass
 

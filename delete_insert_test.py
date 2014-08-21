@@ -1,10 +1,7 @@
 from dtest import Tester, debug
-import uuid
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
-import os
-import threading
-import random
+import uuid, os, threading, random
 
 class DeleteInsertTest(Tester):
     """

@@ -1,10 +1,6 @@
 from dtest import Tester, debug
 from pytools import replace_in_file
-import tempfile
-import shutil
-import glob
-import os
-import time
+import tempfile, shutil, glob, os, time
 import distutils.dir_util
 
 class SnapshotTester(Tester):
