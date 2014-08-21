@@ -8,7 +8,7 @@ from decimal import Decimal
 import sys, os, datetime
 from uuid import UUID
 from distutils.version import LooseVersion
-from pytools import create_c1c2_table, insert_c1c2
+from pytools import create_c1c2_table, insert_c1c2, since
 
 class TestCqlsh(Tester):
 
@@ -363,6 +363,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
 
         self.assertTrue(expected in output, "Output \n {%s} \n doesn't contain expected\n {%s}" % (output, expected))
 
+    @since('2.0')
     def tracing_from_system_traces_test(self):
         self.cluster.populate(1).start()
 
