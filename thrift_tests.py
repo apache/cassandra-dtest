@@ -6,7 +6,7 @@ from thrift.transport import THttpClient
 from thrift.protocol import TBinaryProtocol
 from thrift.Thrift import TApplicationException
 
-from dtest import Tester, debug, NUM_TOKENS
+from dtest import Tester, debug, NUM_TOKENS, DISABLE_VNODES
 from thrift_bindings.v30 import Cassandra
 from thrift_bindings.v30.Cassandra import *
 
@@ -43,8 +43,15 @@ class BaseTester(Tester):
     def setUp(self):
         Tester.setUp(self)
         cluster = self.cluster
-        cluster.populate(1).start()
-        (node1,) = cluster.nodelist()
+        cluster.populate(1)
+        node1, = cluster.nodelist()
+        #If vnodes are not used, we must set our own initial_token
+        #Because ccm will not set a hex token for ByteOrderedPartitioner
+        #automatically. It does not matter what token we set as we only
+        #ever use one node.
+        if DISABLE_VNODES:
+            node1.set_configuration_options(values={'initial_token': "a".encode('hex')  })
+        cluster.start()
         cursor = self.patient_cql_connection(node1)
         self.open_client()
         self.define_schema()
