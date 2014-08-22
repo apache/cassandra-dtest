@@ -19,7 +19,7 @@ class TestSCCache(Tester):
 
         cluster.populate(1).start()
         node1 = cluster.nodelist()[0]
-        time.sleep(0.2)
+        self.patient_cql_connection(node1)
 
         cli = node1.cli()
         cli.do("create keyspace ks")
