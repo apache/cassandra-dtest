@@ -2,7 +2,7 @@
 
 from dtest import Tester
 from pytools import since
-from cassandra import ConsistencyLevel
+from cassandra import ConsistencyLevel, WriteTimeout
 from cassandra.query import SimpleStatement
 
 import time
@@ -82,7 +82,7 @@ class TestPaxos(Tester):
                                     if verbose:
                                         print "[%3d] Update was inserted on previous try (res = %s)" % (self.wid, str(res))
                                     done = True
-                        except KeyError as e:
+                        except WriteTimeout as e:
                             if verbose:
                                 print "[%3d] TIMEOUT (%s)" % (self.wid, str(e))
                             # This means a timeout: just retry, if it happens that our update was indeed persisted,
@@ -99,7 +99,7 @@ class TestPaxos(Tester):
                         try:
                             self.cursor.execute("DELETE FROM test WHERE k = 0 AND id = %d IF EXISTS" % self.wid)
                             break;
-                        except KeyError as e:
+                        except WriteTimeout as e:
                             pass
 
         nodes = self.cluster.nodelist()
