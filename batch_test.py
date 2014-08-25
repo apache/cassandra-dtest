@@ -1,14 +1,13 @@
 import time
 
 from pyassertions import assert_invalid, assert_unavailable
-from dtest import Tester, canReuseCluster, freshCluster
+from dtest import Tester
 from cassandra import ConsistencyLevel, Timeout
 from cassandra.query import SimpleStatement
 from cassandra.policies import RetryPolicy
 
 cql_version="3.0.0"
 
-@canReuseCluster
 class TestBatch(Tester):
 
     def counter_batch_accepts_counter_mutations_test(self):
@@ -99,7 +98,6 @@ class TestBatch(Tester):
             APPLY BATCH
             """, matching=err)
 
-    @freshCluster()
     def logged_batch_throws_uae_test(self):
         """ Test that logged batch throws UAE if there aren't enough live nodes """
         session = self.prepare(nodes=3)
@@ -112,7 +110,6 @@ class TestBatch(Tester):
             APPLY BATCH
         """)
 
-    @freshCluster()
     def logged_batch_doesnt_throw_uae_test(self):
         """ Test that logged batch DOES NOT throw UAE if there are at least 2 live nodes """
         session = self.prepare(nodes=3)
@@ -126,7 +123,6 @@ class TestBatch(Tester):
         session.execute(query)
         assert True
 
-    @freshCluster()
     def acknowledged_by_batchlog_not_set_when_batchlog_write_fails_test(self):
         """ Test that acknowledged_by_batchlog is False if batchlog can't be written """
         session = self.prepare(nodes=3, compression=False)
@@ -139,7 +135,6 @@ class TestBatch(Tester):
             APPLY BATCH
         """, ConsistencyLevel.ONE, received_responses=0)
 
-    @freshCluster()
     def acknowledged_by_batchlog_set_when_batchlog_write_succeeds_test(self):
         """ Test that acknowledged_by_batchlog is True if batchlog can be written """
         session = self.prepare(nodes=3, compression=False)
