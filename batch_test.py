@@ -199,10 +199,12 @@ class TestBatch(Tester):
             assert False, "Expecting TimedOutException but no exception was raised"
 
     def prepare(self, nodes=1, compression=True):
-        self.cluster.populate(nodes).start(wait_other_notice=True)
+        if not self.cluster.nodelist():
+            self.cluster.populate(nodes).start(wait_other_notice=True)
 
         node1 = self.cluster.nodelist()[0]
         session = self.patient_cql_connection(node1, version=cql_version)
+        session.execute("DROP KEYSPACE IF EXISTS ks")
         self.create_ks(session, 'ks', nodes)
         session.execute("""
             CREATE TABLE clicks (

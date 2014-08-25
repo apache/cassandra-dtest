@@ -38,6 +38,7 @@ DISABLE_VNODES = os.environ.get('DISABLE_VNODES', '').lower() in ('yes', 'true')
 OFFHEAP_MEMTABLES = os.environ.get('OFFHEAP_MEMTABLES', '').lower() in ('yes', 'true')
 NUM_TOKENS = os.environ.get('NUM_TOKENS', '256')
 RECORD_COVERAGE = os.environ.get('RECORD_COVERAGE', '').lower() in ('yes', 'true')
+REUSE_CLUSTER = os.environ.get('REUSE_CLUSTER', '').lower() in ('yes', 'true')
 
 
 CURRENT_TEST = ""
@@ -114,11 +115,15 @@ class Tester(TestCase):
 
     def __init__(self, *argv, **kwargs):
         # if False, then scan the log of each node for errors after every test.
+        if not hasattr(self, '_preserve_cluster'):
+            self._preserve_cluster = False
         self.allow_log_errors = False
         self.cluster_options = kwargs.pop('cluster_options', None)
         super(Tester, self).__init__(*argv, **kwargs)
 
     def _get_cluster(self, name='test'):
+        if self._preserve_cluster and hasattr(self, 'cluster'):
+            return self.cluster
         self.test_path = tempfile.mkdtemp(prefix='dtest-')
         # ccm on cygwin needs absolute path to directory - it crosses from cygwin space into
         # regular Windows space on wmic calls which will otherwise break pathing
@@ -183,7 +188,8 @@ class Tester(TestCase):
                 try:
                     self.cluster = Cluster.load(self.test_path, name)
                     # Avoid waiting too long for node to be marked down
-                    self._cleanup_cluster()
+                    if not self._preserve_cluster:
+                        self._cleanup_cluster()
                 except IOError:
                     # after a restart, /tmp will be emptied so we'll get an IOError when loading the old cluster here
                     pass
@@ -370,6 +376,27 @@ class Tester(TestCase):
         session.execute(query)
         time.sleep(0.2)
 
+
+    @classmethod
+    def tearDownClass(cls):
+        reset_environment_vars()
+        if os.path.exists(LAST_TEST_DIR):
+            with open(LAST_TEST_DIR) as f:
+                test_path = f.readline().strip('\n')
+                name = f.readline()
+                try:
+                    cluster = Cluster.load(test_path, name)
+                    # Avoid waiting too long for node to be marked down
+                    if KEEP_TEST_DIR:
+                        cluster.stop(gently=RECORD_COVERAGE)
+                    else:
+                        cluster.remove()
+                        os.rmdir(test_path)
+                    os.remove(LAST_TEST_DIR)
+                except IOError:
+                    # after a restart, /tmp will be emptied so we'll get an IOError when loading the old cluster here
+                    pass
+
     def tearDown(self):
         reset_environment_vars()
 
@@ -398,7 +425,10 @@ class Tester(TestCase):
             except Exception as e:
                     print "Error saving log:", str(e)
             finally:
-                self._cleanup_cluster()
+                if not self._preserve_cluster:
+                    self._cleanup_cluster()
+                elif self._preserve_cluster and failed:
+                    self._cleanup_cluster()
 
     def go(self, func):
         runner = Runner(func)
@@ -466,3 +496,25 @@ class Tester(TestCase):
     # Disable docstrings printing in nosetest output
     def shortDescription(self):
         return None
+
+def canReuseCluster(Tester):
+    orig_init = Tester.__init__
+    # make copy of original __init__, so we can call it without recursion
+
+    def __init__(self, *args, **kwargs):
+        self._preserve_cluster = REUSE_CLUSTER
+        orig_init(self, *args, **kwargs) # call the original __init__
+
+    Tester.__init__ = __init__ # set the class' __init__ to the new one
+    return Tester
+
+class freshCluster():
+
+    def __call__(self, f):
+        def wrapped(obj):
+            obj._preserve_cluster = False
+            obj.setUp()
+            f(obj)
+        wrapped.__name__ = f.__name__
+        wrapped.__doc__ = f.__doc__
+        return wrapped
