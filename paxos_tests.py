@@ -104,14 +104,16 @@ class TestPaxos(Tester):
 
         nodes = self.cluster.nodelist()
         workers = []
+
+        c = self.patient_cql_connection(nodes[0], version="3.0.0", keyspace='ks')
+        q = c.prepare("""
+                BEGIN BATCH
+                   UPDATE test SET v = ? WHERE k = 0 IF v = ?;
+                   INSERT INTO test (k, id) VALUES (0, ?) IF NOT EXISTS;
+                APPLY BATCH
+            """)
+
         for n in range(0, threads):
-            c = self.patient_cql_connection(nodes[n % len(nodes)], version="3.0.0", keyspace='ks')
-            q = c.prepare("""
-                    BEGIN BATCH
-                       UPDATE test SET v = ? WHERE k = 0 IF v = ?;
-                       INSERT INTO test (k, id) VALUES (0, ?) IF NOT EXISTS;
-                    APPLY BATCH
-                """)
             workers.append(Worker(n, c, iterations, q))
 
         start = time.time()
