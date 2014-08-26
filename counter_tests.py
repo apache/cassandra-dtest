@@ -4,6 +4,7 @@ from cassandra.query import SimpleStatement
 
 import random, time, uuid
 from pyassertions import assert_invalid, assert_one
+from pytools import rows_to_list, since
 
 class TestCounters(Tester):
 
@@ -252,3 +253,39 @@ class TestCounters(Tester):
         cursor.execute("UPDATE compact_counter_table SET value = value - 2 WHERE pk = 0 AND ck = 'ck'")
 
         assert_one(cursor, "SELECT pk, ck, value FROM compact_counter_table", [0, 'ck', 3])
+
+    @since('2.0')
+    def drop_counter_column_test(self):
+        """Test for CASSANDRA-7831"""
+        cluster = self.cluster
+        cluster.populate(1).start()
+        node1, = cluster.nodelist()
+        session = self.patient_cql_connection(node1)
+        self.create_ks(session, 'counter_tests', 1)
+
+        session.execute("CREATE TABLE counter_bug (t int, c counter, primary key(t))")
+
+        session.execute("UPDATE counter_bug SET c = c + 1 where t = 1")
+        row = session.execute("SELECT * from counter_bug")
+
+        self.assertEqual(rows_to_list(row)[0], [1, 1])
+        self.assertEqual(len(row), 1)
+
+        session.execute("ALTER TABLE counter_bug drop c")
+        session.execute("ALTER TABLE counter_bug add c counter")
+        row = session.execute("SELECT * from counter_bug")
+
+        self.assertEqual(len(row), 0)
+
+        session.execute("UPDATE counter_bug SET c = c + 1 where t = 1")
+        session.execute("UPDATE counter_bug SET c = c + 1 where t = 2")
+        rows = session.execute("SELECT * from counter_bug")
+
+        try:
+            self.assertEqual(len(rows), 2)
+        except AssertionError as e:
+            print "Counter column not being populated. See CASSANDRA-7831."
+            raise e
+        print rows
+        self.assertEqual(rows_to_list(rows)[0], [1, 1])
+        self.assertEqual(rows_to_list(rows)[1], [2, 1])
