@@ -3781,7 +3781,7 @@ class TestCQL(Tester):
 
         def check_applies(condition):
             assert_one(cursor, "UPDATE tlist SET l = ['foo', 'bar', 'foobar'] WHERE k=0 IF %s" % (condition,), [True])
-            assert_one(cursor, "SELECT * FROM tlist", [0, ('foo', 'bar', 'foobar')])
+            assert_one(cursor, "SELECT * FROM tlist", [0, ['foo', 'bar', 'foobar']])
 
         check_applies("l = ['foo', 'bar', 'foobar']")
         check_applies("l != ['baz']")
@@ -3797,8 +3797,8 @@ class TestCQL(Tester):
 
         def check_does_not_apply(condition):
             assert_one(cursor, "UPDATE tlist SET l = ['foo', 'bar', 'foobar'] WHERE k=0 IF %s" % (condition,),
-                       [False, ('foo', 'bar', 'foobar')])
-            assert_one(cursor, "SELECT * FROM tlist", [0, ('foo', 'bar', 'foobar')])
+                       [False, ['foo', 'bar', 'foobar']])
+            assert_one(cursor, "SELECT * FROM tlist", [0, ['foo', 'bar', 'foobar']])
 
         # should not apply
         check_does_not_apply("l = ['baz']")
@@ -3816,7 +3816,7 @@ class TestCQL(Tester):
 
         def check_invalid(condition):
             assert_invalid(cursor, "UPDATE tlist SET l = ['foo', 'bar', 'foobar'] WHERE k=0 IF %s" % (condition,))
-            assert_one(cursor, "SELECT * FROM tlist", [0, ('foo', 'bar', 'foobar')])
+            assert_one(cursor, "SELECT * FROM tlist", [0, ['foo', 'bar', 'foobar']])
 
         check_invalid("l = [null]")
         check_invalid("l < null")
@@ -3870,7 +3870,7 @@ class TestCQL(Tester):
 
         def check_applies(condition):
             assert_one(cursor, "UPDATE tlist SET l[1] = 'bar' WHERE k=0 IF %s" % (condition,), [True])
-            assert_one(cursor, "SELECT * FROM tlist", [0, ('foo', 'bar', 'foobar')])
+            assert_one(cursor, "SELECT * FROM tlist", [0, ['foo', 'bar', 'foobar']])
 
         check_applies("l[1] < 'zzz'")
         check_applies("l[1] <= 'bar'")
@@ -3886,8 +3886,8 @@ class TestCQL(Tester):
         check_applies("l[3] IN (null, 'xxx', 'bar')")
 
         def check_does_not_apply(condition):
-            assert_one(cursor, "UPDATE tlist SET l[1] = 'bar' WHERE k=0 IF %s" % (condition,), [False, ('foo', 'bar', 'foobar')])
-            assert_one(cursor, "SELECT * FROM tlist", [0, ('foo', 'bar', 'foobar')])
+            assert_one(cursor, "UPDATE tlist SET l[1] = 'bar' WHERE k=0 IF %s" % (condition,), [False, ['foo', 'bar', 'foobar']])
+            assert_one(cursor, "SELECT * FROM tlist", [0, ['foo', 'bar', 'foobar']])
 
         check_does_not_apply("l[1] < 'aaa'")
         check_does_not_apply("l[1] <= 'aaa'")
@@ -3904,7 +3904,7 @@ class TestCQL(Tester):
 
         def check_invalid(condition):
             assert_invalid(cursor, "UPDATE tlist SET l[1] = 'bar' WHERE k=0 IF %s" % (condition,))
-            assert_one(cursor, "SELECT * FROM tlist", [0, ('foo', 'bar', 'foobar')])
+            assert_one(cursor, "SELECT * FROM tlist", [0, ['foo', 'bar', 'foobar']])
 
         check_invalid("l[1] < null")
         check_invalid("l[1] <= null")
