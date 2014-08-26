@@ -208,7 +208,7 @@ class TestUpgradeThroughVersions(Tester):
         that are specified by *nodes*, otherwise ignore *nodes* specified
         and upgrade all nodes.
         """
-        debug('Upgrading to ' + tag)
+        debug('Upgrading {nodes} to {tag}'.format(nodes=[n.name for n in nodes] if nodes is not None else 'all nodes',tag=tag))
         if not mixed_version:
             nodes = self.cluster.nodelist()
 

@@ -4343,7 +4343,7 @@ class TestCQL(Tester):
         check_invalid("m['foo'] CONTAINS KEY 367")
         check_invalid("m[null] = null")
 
-    #@require("#7499")
+    @require("#7499")
     def cas_and_list_index_test(self):
         """ Test for 7499 test """
         cursor = self.prepare()
@@ -4727,3 +4727,14 @@ class TestCQL(Tester):
         self.cluster.flush()
         cursor.execute("alter table test drop v")
         assert_invalid(cursor, "alter table test add v set<int>")
+
+    @require("#7744")
+    def downgrade_to_compact_bug_test(self):
+        """ Test for 7744 """
+        cursor = self.prepare()
+
+        cursor.execute("create table test (k int primary key, v set<text>)")
+        cursor.execute("insert into test (k, v) VALUES (0, {'f'})")
+        self.cluster.flush()
+        cursor.execute("alter table test drop v")
+        cursor.execute("alter table test add v int")
