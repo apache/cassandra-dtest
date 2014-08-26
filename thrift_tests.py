@@ -1419,7 +1419,7 @@ class TestMutations(ThriftTester):
         # which uses BytesToken, so this just tests that the string representation of the token
         # matches a regex pattern for BytesToken.toString().
         ring = client.describe_token_map().items()
-        assert len(ring) == NUM_TOKENS
+        self.assertEqual(len(ring), int(NUM_TOKENS))
         token, node = ring[0]
         assert re.match("[0-9A-Fa-f]{32}", token)
         assert node == '127.0.0.1'
