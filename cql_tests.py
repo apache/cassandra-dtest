@@ -629,7 +629,7 @@ class TestCQL(Tester):
         cursor.execute("INSERT INTO test(my_id, col1, value) VALUES ( 'key3', 2, 'b')")
         cursor.execute("INSERT INTO test(my_id, col1, value) VALUES ( 'key4', 4, 'd')")
         # Currently this breaks due to CASSANDRA-4612
-        query = SimpleStatement("SELECT col1 FROM test WHERE my_id in('key1', 'key2', 'key3') ORDER BY col1", fetch_size=100000000)
+        query = SimpleStatement("SELECT col1 FROM test WHERE my_id in('key1', 'key2', 'key3') ORDER BY col1")
         res = cursor.execute(query)
 
         assert rows_to_list(res) == [[1], [2], [3]], res
