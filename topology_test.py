@@ -27,16 +27,12 @@ class TestTopology(Tester):
 
         # Move nodes to balance the cluster
         balancing_tokens = cluster.balanced_tokens(3)
-        if cluster.version() >= '1.2':
-            escformat = '\\%s'
-            if cluster.version() >= '2.1':
-                escformat = '%s'
-            node1.move(escformat % balancing_tokens[0]) # can't assume 0 is balanced with m3p
-            node2.move(escformat % balancing_tokens[1])
-            node3.move(escformat % balancing_tokens[2])
-        else:
-            node2.move(balancing_tokens[1])
-            node3.move(balancing_tokens[2])
+        escformat = '\\%s'
+        if cluster.version() >= '2.1':
+            escformat = '%s'
+        node1.move(escformat % balancing_tokens[0]) # can't assume 0 is balanced with m3p
+        node2.move(escformat % balancing_tokens[1])
+        node3.move(escformat % balancing_tokens[2])
         time.sleep(1)
 
         cluster.cleanup()
