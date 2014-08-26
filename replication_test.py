@@ -146,8 +146,8 @@ class ReplicationTest(Tester):
         """Pretty print a trace"""
         if PRINT_DEBUG:
             print("-" * 40)
-            for t in trace:
-                print("%s\t%s\t%s\t%s" % (t[3], t[4], t[2], t[5]))
+            for t in trace.events:
+                print("%s\t%s\t%s\t%s" % (t.source, t.source_elapsed, t.description, t.thread_name))
             print("-" * 40)
 
     @no_vnodes()
@@ -219,6 +219,7 @@ class ReplicationTest(Tester):
             stats = self.get_replicas_from_trace(trace)
             replicas_should_be = set(self.get_replicas_for_token(
                 token, replication_factor, strategy='NetworkTopologyStrategy'))
+            debug('Current token is %s' % token)
             debug('\nreplicas should be: %s' % replicas_should_be)
             debug('replicas were: %s' % stats['replicas'])
             self.pprint_trace(trace)
@@ -234,11 +235,15 @@ class ReplicationTest(Tester):
             # Record the forwarder used for each INSERT:
             forwarders_used = forwarders_used.union(stats['forwarders'])
 
-            #Make sure the correct nodes are replicas:
-            self.assertEqual(stats['replicas'], replicas_should_be)
-            #Make sure that each replica node was contacted and
-            #acknowledged the write:
-            self.assertEqual(stats['nodes_sent_write'], stats['nodes_responded_write'])
+            try:
+                #Make sure the correct nodes are replicas:
+                self.assertEqual(stats['replicas'], replicas_should_be)
+                #Make sure that each replica node was contacted and
+                #acknowledged the write:
+                self.assertEqual(stats['nodes_sent_write'], stats['nodes_responded_write'])
+            except AssertionError as e:
+                debug("Failed on key %s and token %s." % (key, token))
+                raise e
 
         #Given a diverse enough keyset, each node in the second
         #datacenter should get a chance to be a forwarder:
