@@ -36,7 +36,10 @@ class TestReplaceAddress(Tester):
         [node1,node2, node3] = cluster.nodelist()
 
         #a little hacky but grep_log returns the whole line...
-        numNodes = int(re.search('num_tokens=(.*?);', node3.grep_log('num_tokens=(.*?);')[0][0]).group()[11:-1])
+        if DISABLE_VNODES:
+            numNodes = 1
+        else:
+            numNodes = int(re.search('num_tokens=(.*?);', node3.grep_log('num_tokens=(.*?);')[0][0]).group()[11:-1])
 
         debug(numNodes)
 
@@ -143,7 +146,10 @@ class TestReplaceAddress(Tester):
         [node1,node2, node3] = cluster.nodelist()
 
         #a little hacky but grep_log returns the whole line...
-        numNodes = int(re.search('num_tokens=(.*?);', node3.grep_log('num_tokens=(.*?);')[0][0]).group()[11:-1])
+        if DISABLE_VNODES:
+            numNodes = 1
+        else:
+            numNodes = int(re.search('num_tokens=(.*?);', node3.grep_log('num_tokens=(.*?);')[0][0]).group()[11:-1])
 
         debug(numNodes)
 
