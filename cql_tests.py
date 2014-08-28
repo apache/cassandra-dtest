@@ -4058,7 +4058,7 @@ class TestCQL(Tester):
         assert_none(cursor, "SELECT * FROM tmap")
 
         cursor.execute("INSERT INTO tmap(k, m) VALUES (1, null)")
-        cursor.execute("UPDATE tmap set m['foo'] = 'bar', m['bar'] = 'foo' WHERE k = 1 IF m['foo'] IN ('blah', null)", [True])
+        assert_one(cursor, "UPDATE tmap set m['foo'] = 'bar', m['bar'] = 'foo' WHERE k = 1 IF m['foo'] IN ('blah', null)", [True])
 
     @since('2.1.1')
     def expanded_map_item_conditional_test(self):
