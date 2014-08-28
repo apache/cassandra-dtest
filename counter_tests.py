@@ -272,20 +272,5 @@ class TestCounters(Tester):
         self.assertEqual(len(row), 1)
 
         session.execute("ALTER TABLE counter_bug drop c")
-        session.execute("ALTER TABLE counter_bug add c counter")
-        row = session.execute("SELECT * from counter_bug")
 
-        self.assertEqual(len(row), 0)
-
-        session.execute("UPDATE counter_bug SET c = c + 1 where t = 1")
-        session.execute("UPDATE counter_bug SET c = c + 1 where t = 2")
-        rows = session.execute("SELECT * from counter_bug")
-
-        try:
-            self.assertEqual(len(rows), 2)
-        except AssertionError as e:
-            print "Counter column not being populated. See CASSANDRA-7831."
-            raise e
-        print rows
-        self.assertEqual(rows_to_list(rows)[0], [1, 1])
-        self.assertEqual(rows_to_list(rows)[1], [2, 1])
+        assert_invalid(session, "ALTER TABLE counter_bug add c counter", "Cannot re-add previously dropped counter column c")
