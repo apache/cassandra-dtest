@@ -2856,7 +2856,7 @@ class TestCQL(Tester):
             # Should apply
             assert_one(cursor, "DELETE FROM test WHERE k = 0 IF v1 IN (null)", [ True ])
 
-    @since('2.1')
+    @since('2.1.1')
     def non_eq_conditional_update_test(self):
         cursor = self.prepare()
 
