@@ -4118,7 +4118,7 @@ class TestCQL(Tester):
         check_invalid("m['foo'] CONTAINS KEY 367")
         check_invalid("m[null] = null")
 
-    @require("#7499")
+    @since("2.1.1")
     def cas_and_list_index_test(self):
         """ Test for 7499 test """
         cursor = self.prepare()
@@ -4136,7 +4136,7 @@ class TestCQL(Tester):
         assert_one(cursor, "UPDATE test SET l[0] = 'foo' WHERE k = 0 IF v = 'barfoo'", [False, 'foobar'])
         assert_one(cursor, "UPDATE test SET l[0] = 'foo' WHERE k = 0 IF v = 'foobar'", [True])
 
-        assert_one(cursor, "SELECT * FROM test", [0, ('foo', 'bar'), 'foobar' ])
+        assert_one(cursor, "SELECT * FROM test", [0, ['foo', 'bar'], 'foobar' ])
 
 
     @since("2.0")
