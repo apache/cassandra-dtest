@@ -1426,9 +1426,13 @@ class TestMutations(ThriftTester):
         # which uses BytesToken, so this just tests that the string representation of the token
         # matches a regex pattern for BytesToken.toString().
         ring = client.describe_token_map().items()
-        self.assertEqual(len(ring), int(NUM_TOKENS))
+        if DISABLE_VNODES:
+            self.assertEqual(len(ring), 1)
+        else:
+            self.assertEqual(len(ring), int(NUM_TOKENS))
         token, node = ring[0]
-        assert re.match("[0-9A-Fa-f]{32}", token)
+        if not DISABLE_VNODES:
+            assert re.match("[0-9A-Fa-f]{32}", token)
         assert node == '127.0.0.1'
 
     def test_describe_partitioner(self):
