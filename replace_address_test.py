@@ -28,17 +28,20 @@ class TestReplaceAddress(Tester):
         Tester.__init__(self, *args, **kwargs)
 
     def replace_stopped_node_test(self):
-        """Check that the replace address function correctly replaces a node that has failed in a cluster. 
+        """Check that the replace address function correctly replaces a node that has failed in a cluster.
         Create a cluster, cause a node to fail, and bring up a new node with the replace_address parameter.
         Check that tokens are migrated and that data is replicated properly.
-        """     
+        """
         debug("Starting cluster with 3 nodes.")
         cluster = self.cluster
         cluster.populate(3).start()
         [node1,node2, node3] = cluster.nodelist()
 
-        #a little hacky but grep_log returns the whole line...
-        numNodes = int(re.search('num_tokens=(.*?);', node3.grep_log('num_tokens=(.*?);')[0][0]).group()[11:-1])
+        if DISABLE_VNODES:
+            numNodes = 1
+        else:
+            #a little hacky but grep_log returns the whole line...
+            numNodes = int(re.search('num_tokens=(.*?);', node3.grep_log('num_tokens=(.*?);')[0][0]).group()[11:-1])
 
         debug(numNodes)
 
@@ -50,7 +53,7 @@ class TestReplaceAddress(Tester):
         cursor = self.patient_cql_connection(node1).cursor()
         cursor.execute('select * from "Keyspace1"."Standard1" LIMIT 1', consistency_level='THREE')
         initialData = cursor.fetchall()
-        
+
         #stop node, query should not work with consistency 3
         debug("Stopping node 3.")
         node3.stop(gently=False)
@@ -74,7 +77,7 @@ class TestReplaceAddress(Tester):
         cursor.execute('select * from "Keyspace1"."Standard1" LIMIT 1', consistency_level='THREE')
         finalData = cursor.fetchall()
         self.assertListEqual(initialData, finalData)
-        
+
         debug("Verifying tokens migrated sucessfully")
         movedTokensList = node4.grep_log("Token .* changing ownership from /127.0.0.3 to /127.0.0.4")
         debug(movedTokensList[0])
@@ -82,7 +85,7 @@ class TestReplaceAddress(Tester):
 
         #check that restarting node 3 doesn't work
         debug("Try to restart node 3 (should fail)")
-        node3.start() 
+        node3.start()
         checkCollision = node1.grep_log("between /127.0.0.3 and /127.0.0.4; /127.0.0.4 is the new owner")
         debug(checkCollision)
         self.assertEqual(len(checkCollision), 1)
@@ -107,7 +110,7 @@ class TestReplaceAddress(Tester):
         debug("Starting node 4 to replace active node 3")
         node4 = Node('node4', cluster, True, ('127.0.0.4', 9160), ('127.0.0.4', 7000), '7400', '0', None, ('127.0.0.4',9042))
         cluster.add(node4, False)
-        
+
         with self.assertRaises(NodeError):
             node4.start(replace_address='127.0.0.3')
 
@@ -133,19 +136,22 @@ class TestReplaceAddress(Tester):
         debug('Start node 4 and replace an address with no node')
         node4 = Node('node4', cluster, True, ('127.0.0.4', 9160), ('127.0.0.4', 7000), '7400', '0', None, ('127.0.0.4',9042))
         cluster.add(node4, False)
-        
+
         #try to replace an unassigned ip address
         with self.assertRaises(NodeError):
             node4.start(replace_address='127.0.0.5')
-    
+
     def replace_first_boot_test(self):
-    	debug("Starting cluster with 3 nodes.")
+        debug("Starting cluster with 3 nodes.")
         cluster = self.cluster
         cluster.populate(3).start()
         [node1,node2, node3] = cluster.nodelist()
 
-        #a little hacky but grep_log returns the whole line...
-        numNodes = int(re.search('num_tokens=(.*?);', node3.grep_log('num_tokens=(.*?);')[0][0]).group()[11:-1])
+        if DISABLE_VNODES:
+            numNodes = 1
+        else:
+            #a little hacky but grep_log returns the whole line...
+            numNodes = int(re.search('num_tokens=(.*?);', node3.grep_log('num_tokens=(.*?);')[0][0]).group()[11:-1])
 
         debug(numNodes)
 
@@ -157,7 +163,7 @@ class TestReplaceAddress(Tester):
         cursor = self.patient_cql_connection(node1).cursor()
         cursor.execute('select * from "Keyspace1"."Standard1" LIMIT 1', consistency_level='THREE')
         initialData = cursor.fetchall()
-        
+
         #stop node, query should not work with consistency 3
         debug("Stopping node 3.")
         node3.stop(gently=False)
@@ -180,7 +186,7 @@ class TestReplaceAddress(Tester):
         cursor.execute('select * from "Keyspace1"."Standard1" LIMIT 1', consistency_level='THREE')
         finalData = cursor.fetchall()
         self.assertListEqual(initialData, finalData)
-        
+
         debug("Verifying tokens migrated sucessfully")
         movedTokensList = node4.grep_log("Token .* changing ownership from /127.0.0.3 to /127.0.0.4")
         debug(movedTokensList[0])
@@ -188,7 +194,7 @@ class TestReplaceAddress(Tester):
 
         #check that restarting node 3 doesn't work
         debug("Try to restart node 3 (should fail)")
-        node3.start() 
+        node3.start()
         checkCollision = node1.grep_log("between /127.0.0.3 and /127.0.0.4; /127.0.0.4 is the new owner")
         debug(checkCollision)
         self.assertEqual(len(checkCollision), 1)
@@ -203,7 +209,7 @@ class TestReplaceAddress(Tester):
         finalData = cursor.fetchall()
         self.assertListEqual(initialData, finalData)
 
-        #we redo this check because restarting node should not result in tokens being moved again, ie number should be same 
+        #we redo this check because restarting node should not result in tokens being moved again, ie number should be same
         debug("Verifying tokens migrated sucessfully")
         movedTokensList = node4.grep_log("Token .* changing ownership from /127.0.0.3 to /127.0.0.4")
         debug(movedTokensList[0])
