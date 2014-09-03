@@ -250,6 +250,14 @@ class TestArchiveCommitlog(SnapshotTester):
         # clean up
         debug("removing snapshot_dir: " + snapshot_dir)
         shutil.rmtree(snapshot_dir)
+        debug("removing snapshot_dir: " + system_ks_snapshot_dir)
+        shutil.rmtree(system_ks_snapshot_dir)
+        debug("removing snapshot_dir: " + system_cfs_snapshot_dir)
+        shutil.rmtree(system_cfs_snapshot_dir)
+        debug("removing snapshot_dir: " + system_ut_snapshot_dir)
+        shutil.rmtree(system_ut_snapshot_dir)
+        debug("removing snapshot_dir: " + system_col_snapshot_dir)
+        shutil.rmtree(system_col_snapshot_dir)
         debug("removing tmp_commitlog: " + tmp_commitlog)
         shutil.rmtree(tmp_commitlog)
 
