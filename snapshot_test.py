@@ -208,7 +208,7 @@ class TestArchiveCommitlog(SnapshotTester):
         cluster.populate(1)
         node1, = cluster.nodelist()
 
-        # Restore scehma from snapshots:
+        # Restore schema from snapshots:
         self.restore_snapshot(system_ks_snapshot_dir, node1, 'system', 'schema_keyspaces', 'keyspaces')
         self.restore_snapshot(system_col_snapshot_dir, node1, 'system', 'schema_columns', 'columns')
         self.restore_snapshot(system_ut_snapshot_dir, node1, 'system', 'schema_usertypes', 'usertypes')
