@@ -19,7 +19,7 @@ class TestUDTEncoding(Tester):
 
         # create udt and insert correctly (should be successful)
         cursor.execute('CREATE TYPE address (city text,zip int);')
-        cursor.execute('CREATE TABLE user_profiles (login text PRIMARY KEY, addresses map<text, address>);')
+        cursor.execute('CREATE TABLE user_profiles (login text PRIMARY KEY, addresses map<text, frozen<address>>);')
         cursor.execute("INSERT INTO user_profiles(login, addresses) VALUES ('tsmith', { 'home': {city: 'San Fransisco',zip: 94110 }});")
 
         #note here address looks likes a map -> which is what the driver thinks it is. udt is encoded server side, we test that if addresses is changed slightly whether encoder recognizes the errors
@@ -31,4 +31,4 @@ class TestUDTEncoding(Tester):
         assert_invalid(cursor, "INSERT INTO user_profiles(login, addresses) VALUES ('fsmith', { 'home': {cityname: 'San Fransisco', zip: 94110 }});", "Unknown field 'cityname' in value of user defined type address")
 
         # try modifying a type within the collection - see if will be encoded to a udt (should return error)
-        assert_invalid(cursor, "INSERT INTO user_profiles(login, addresses) VALUES ('fsmith', { 'home': {city: 'San Fransisco', zip: '94110' }});", "Invalid map literal for ColumnDefinition")
+        assert_invalid(cursor, "INSERT INTO user_profiles(login, addresses) VALUES ('fsmith', { 'home': {city: 'San Fransisco', zip: '94110' }});", "Invalid map literal for addresses")
