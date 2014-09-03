@@ -3211,8 +3211,8 @@ class TestCQL(Tester):
         stmt = """
               CREATE TABLE users (
                id uuid PRIMARY KEY,
-               name fullname,
-               addresses map<text, address>
+               name frozen<fullname>,
+               addresses map<text, frozen<address>>
               )
            """
         cursor.execute(stmt)
@@ -3258,12 +3258,12 @@ class TestCQL(Tester):
 
         cursor.execute("""
             CREATE TYPE type2 (
-                s set<type1>,
+                s set<frozen<type1>>,
             )
         """)
 
         cursor.execute("""
-            CREATE TABLE test (id int PRIMARY KEY, val type2)
+            CREATE TABLE test (id int PRIMARY KEY, val frozen<type2>)
         """)
 
 
@@ -4265,7 +4265,7 @@ class TestCQL(Tester):
         cursor = self.prepare()
 
         cursor.execute("CREATE TYPE footype (fooint int, fooset set <text>)")
-        cursor.execute("CREATE TABLE test (key int PRIMARY KEY, data footype)")
+        cursor.execute("CREATE TABLE test (key int PRIMARY KEY, data frozen<footype>)")
 
         cursor.execute("INSERT INTO test (key, data) VALUES (1, {fooint: 1, fooset: {'2'}})")
         cursor.execute("ALTER TYPE footype ADD foomap map <int,text>")
