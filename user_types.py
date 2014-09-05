@@ -228,7 +228,7 @@ class TestUserTypes(Tester):
         stmt = """
               CREATE TABLE simple_table (
               id uuid PRIMARY KEY,
-              number simple_type
+              number frozen<simple_type>
               )
            """
         cursor.execute(stmt)
@@ -296,7 +296,7 @@ class TestUserTypes(Tester):
 
         stmt = """
               CREATE TYPE another_type (
-              somefield simple_type
+              somefield frozen<simple_type>
               )
            """
         cursor.execute(stmt)
@@ -351,7 +351,7 @@ class TestUserTypes(Tester):
         stmt = """
               CREATE TABLE simple_table (
               id uuid PRIMARY KEY,
-              number simple_type
+              number frozen<simple_type>
               )
            """
         cursor.execute(stmt)
@@ -404,7 +404,7 @@ class TestUserTypes(Tester):
         stmt = """
               CREATE TYPE container (
               stuff text,
-              more_stuff item
+              more_stuff frozen<item>
               )
            """
         cursor.execute(stmt)
@@ -414,9 +414,9 @@ class TestUserTypes(Tester):
         stmt = """
               CREATE TABLE bucket (
                id uuid PRIMARY KEY,
-               primary_item item,
-               other_items container,
-               other_containers list<container>
+               primary_item frozen<item>,
+               other_items frozen<container>,
+               other_containers list<frozen<container>>
               )
            """
         cursor.execute(stmt)
@@ -509,7 +509,7 @@ class TestUserTypes(Tester):
         stmt = """
               CREATE TABLE person_likes (
               id uuid,
-              name t_person_name,
+              name frozen<t_person_name>,
               like text,
               PRIMARY KEY ((id, name))
               )
@@ -567,7 +567,7 @@ class TestUserTypes(Tester):
         stmt = """
               CREATE TABLE person_likes (
               id uuid PRIMARY KEY,
-              name t_person_name,
+              name frozen<t_person_name>,
               like text
               )
            """
@@ -764,7 +764,7 @@ class TestUserTypes(Tester):
         stmt = """
               CREATE TABLE bucket (
                id int PRIMARY KEY,
-               my_item item,
+               my_item frozen<item>,
               )
            """
         cursor.execute(stmt)
@@ -826,7 +826,7 @@ class TestUserTypes(Tester):
         stmt = """
               CREATE TABLE letters (
               id int,
-              letterpair t_letterpair,
+              letterpair frozen<t_letterpair>,
               PRIMARY KEY (id, letterpair)
               )
            """
