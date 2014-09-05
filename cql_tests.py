@@ -32,7 +32,8 @@ class TestCQL(Tester):
 
         session = self.patient_cql_connection(node1, version=cql_version)
         if create_keyspace:
-            session.execute("DROP KEYSPACE IF EXISTS ks")
+            if self._preserve_cluster:
+                session.execute("DROP KEYSPACE IF EXISTS ks")
             self.create_ks(session, 'ks', rf)
         return session
 
