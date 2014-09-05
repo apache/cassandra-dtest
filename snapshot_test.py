@@ -217,6 +217,7 @@ class TestArchiveCommitlog(SnapshotTester):
             self.restore_snapshot(snapshot_dir, node1, 'ks', 'cf', 'basic')
 
             cluster.start()
+
             cursor = self.patient_cql_connection(node1)
             node1.nodetool('refresh ks cf')
 
@@ -247,7 +248,6 @@ class TestArchiveCommitlog(SnapshotTester):
 
             cursor = self.patient_cql_connection(node1)
             rows = cursor.execute('SELECT count(*) from ks.cf')
-
             # Now we should have 30000 rows from the snapshot + 30000 rows
             # from the commitlog backups:
             if not restore_archived_commitlog:
