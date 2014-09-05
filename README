@@ -14,8 +14,8 @@ available (http://code.google.com/a/apache-extras.org/p/cassandra-dbapi2/).
 Usage
 -----
 
-Tests are ran by nostests, the only thing the framework needs to know is where
-is the (compliled) sources for Cassandra to use. There is two options:
+Tests are ran by nosetests, the only thing the framework needs to know is where
+is the (compiled) sources for Cassandra to use. There is two options:
  * Use existing sources:
      CASSANDRA_DIR=~/path/to/cassandra nosetests
  * Use ccm ability to download/compile released sources from archives.apache.org:
@@ -27,15 +27,15 @@ set it to something like:
   [main]
   default_dir=~/path/to/cassandra
 The tests will use this directory by default, avoiding the need for any
-environment variable (that still have precedence if given though).
+environment variable (that still will have precedence if given though).
 
-Existing tests are probably the best place to start to look at how write
+Existing tests are probably the best place to start to look at how to write
 tests.
 
 Each test spawns a new fresh cluster and tears it down after the test. If a
 test fails, the logs for the node are saved in a logs/<timestamp> directory
-for analysis (it's not perfect but have been good enough so far, I'm open to
-better suggestsions).
+for analysis (it's not perfect but has been good enough so far, I'm open to
+better suggestions).
 
 Detailed Instructions
 ---------------------

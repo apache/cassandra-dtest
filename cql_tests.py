@@ -1,7 +1,6 @@
 # coding: utf-8
 
-import random, math
-import re
+import random
 import time
 from uuid import uuid4, UUID
 
@@ -3064,6 +3063,35 @@ class TestCQL(Tester):
         assert_one(cursor, "DELETE FROM test WHERE k = 0 IF v1 = null", [ True ])
         assert_none(cursor, "SELECT * FROM test")
 
+        if self.cluster.version() > "2.1.1":
+            # Should apply
+            assert_one(cursor, "DELETE FROM test WHERE k = 0 IF v1 IN (null)", [ True ])
+
+    @since('2.1.1')
+    def non_eq_conditional_update_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k int PRIMARY KEY,
+                v1 int,
+                v2 text,
+                v3 int
+            )
+        """)
+
+        # non-EQ conditions
+        cursor.execute("INSERT INTO test (k, v1, v2) VALUES (0, 2, 'foo')")
+        assert_one(cursor, "UPDATE test SET v2 = 'bar' WHERE k = 0 IF v1 < 3", [ True ])
+        assert_one(cursor, "UPDATE test SET v2 = 'bar' WHERE k = 0 IF v1 <= 3", [ True ])
+        assert_one(cursor, "UPDATE test SET v2 = 'bar' WHERE k = 0 IF v1 > 1", [ True ])
+        assert_one(cursor, "UPDATE test SET v2 = 'bar' WHERE k = 0 IF v1 >= 1", [ True ])
+        assert_one(cursor, "UPDATE test SET v2 = 'bar' WHERE k = 0 IF v1 != 1", [ True ])
+        assert_one(cursor, "UPDATE test SET v2 = 'bar' WHERE k = 0 IF v1 != 2", [ False, 2 ])
+        assert_one(cursor, "UPDATE test SET v2 = 'bar' WHERE k = 0 IF v1 IN (0, 1, 2)", [ True ])
+        assert_one(cursor, "UPDATE test SET v2 = 'bar' WHERE k = 0 IF v1 IN (142, 276)", [ False, 2 ])
+        assert_one(cursor, "UPDATE test SET v2 = 'bar' WHERE k = 0 IF v1 IN ()", [ False, 2 ])
+
     @since('2.0.7')
     def conditional_delete_test(self):
         cursor = self.prepare()
@@ -3407,8 +3435,8 @@ class TestCQL(Tester):
         stmt = """
               CREATE TABLE users (
                id uuid PRIMARY KEY,
-               name fullname,
-               addresses map<text, address>
+               name frozen<fullname>,
+               addresses map<text, frozen<address>>
               )
            """
         cursor.execute(stmt)
@@ -3455,12 +3483,12 @@ class TestCQL(Tester):
 
         cursor.execute("""
             CREATE TYPE type2 (
-                s set<type1>,
+                s set<frozen<type1>>,
             )
         """)
 
         cursor.execute("""
-            CREATE TABLE test (id int PRIMARY KEY, val type2)
+            CREATE TABLE test (id int PRIMARY KEY, val frozen<type2>)
         """)
 
 
@@ -3964,16 +3992,286 @@ class TestCQL(Tester):
 
         assert_one(cursor, "INSERT INTO lock(partition, key, owner) VALUES ('a', 'c', 'x') IF NOT EXISTS", [True])
 
-    def cas_and_map_syntax_test(self):
+    @since('2.1.1')
+    def whole_list_conditional_test(self):
         cursor = self.prepare()
 
-        # Maps
+        cursor.execute("""
+            CREATE TABLE tlist (
+                k int PRIMARY KEY,
+                l list<text>
+            )""")
+
+        cursor.execute("INSERT INTO tlist(k, l) VALUES (0, ['foo', 'bar', 'foobar'])")
+
+        def check_applies(condition):
+            assert_one(cursor, "UPDATE tlist SET l = ['foo', 'bar', 'foobar'] WHERE k=0 IF %s" % (condition,), [True])
+            assert_one(cursor, "SELECT * FROM tlist", [0, ('foo', 'bar', 'foobar')])
+
+        check_applies("l = ['foo', 'bar', 'foobar']")
+        check_applies("l != ['baz']")
+        check_applies("l > ['a']")
+        check_applies("l >= ['a']")
+        check_applies("l < ['z']")
+        check_applies("l <= ['z']")
+        check_applies("l IN (null, ['foo', 'bar', 'foobar'], ['a'])")
+
+        # multiple conditions
+        check_applies("l > ['aaa', 'bbb'] AND l > ['aaa']")
+        check_applies("l != null AND l IN (['foo', 'bar', 'foobar'])")
+
+        def check_does_not_apply(condition):
+            assert_one(cursor, "UPDATE tlist SET l = ['foo', 'bar', 'foobar'] WHERE k=0 IF %s" % (condition,),
+                       [False, ('foo', 'bar', 'foobar')])
+            assert_one(cursor, "SELECT * FROM tlist", [0, ('foo', 'bar', 'foobar')])
+
+        # should not apply
+        check_does_not_apply("l = ['baz']")
+        check_does_not_apply("l != ['foo', 'bar', 'foobar']")
+        check_does_not_apply("l > ['z']")
+        check_does_not_apply("l >= ['z']")
+        check_does_not_apply("l < ['a']")
+        check_does_not_apply("l <= ['a']")
+        check_does_not_apply("l IN (['a'], null)")
+        check_does_not_apply("l IN ()")
+
+        # multiple conditions
+        check_does_not_apply("l IN () AND l IN (['foo', 'bar', 'foobar'])")
+        check_does_not_apply("l > ['zzz'] AND l < ['zzz']")
+
+        def check_invalid(condition):
+            assert_invalid(cursor, "UPDATE tlist SET l = ['foo', 'bar', 'foobar'] WHERE k=0 IF %s" % (condition,))
+            assert_one(cursor, "SELECT * FROM tlist", [0, ('foo', 'bar', 'foobar')])
+
+        check_invalid("l = [null]")
+        check_invalid("l < null")
+        check_invalid("l <= null")
+        check_invalid("l > null")
+        check_invalid("l >= null")
+        check_invalid("l IN null")
+        check_invalid("l IN 367")
+        check_invalid("l CONTAINS KEY 123")
+
+        # not supported yet
+        check_invalid("m CONTAINS 'bar'")
+
+    @since('2.0')
+    def list_item_conditional_test(self):
+        # Lists
+        cursor = self.prepare()
+        cursor.execute("""
+            CREATE TABLE tlist (
+                k int PRIMARY KEY,
+                l list<text>,
+            )
+        """)
+
+        cursor.execute("INSERT INTO tlist(k, l) VALUES (0, ['foo', 'bar', 'foobar'])")
+
+        assert_invalid(cursor, "DELETE FROM tlist WHERE k=0 IF l[null] = 'foobar'")
+        assert_invalid(cursor, "DELETE FROM tlist WHERE k=0 IF l[-2] = 'foobar'")
+        if self.cluster.version() < "2.1":
+            # no longer invalid after CASSANDRA-6839
+            assert_invalid(cursor, "DELETE FROM tlist WHERE k=0 IF l[3] = 'foobar'")
+        assert_one(cursor, "DELETE FROM tlist WHERE k=0 IF l[1] = null", [False, ('foo', 'bar', 'foobar')])
+        assert_one(cursor, "DELETE FROM tlist WHERE k=0 IF l[1] = 'foobar'", [False, ('foo', 'bar', 'foobar')])
+        assert_one(cursor, "SELECT * FROM tlist", [0, ('foo', 'bar', 'foobar')])
+
+        assert_one(cursor, "DELETE FROM tlist WHERE k=0 IF l[1] = 'bar'", [True])
+        assert_none(cursor, "SELECT * FROM tlist")
+
+    @since('2.1.1')
+    def expanded_list_item_conditional_test(self):
+        # expanded functionality from CASSANDRA-6839
+
+        cursor = self.prepare()
+        cursor.execute("""
+            CREATE TABLE tlist (
+                k int PRIMARY KEY,
+                l list<text>
+            )""")
+
+        cursor.execute("INSERT INTO tlist(k, l) VALUES (0, ['foo', 'bar', 'foobar'])")
+
+        def check_applies(condition):
+            assert_one(cursor, "UPDATE tlist SET l[1] = 'bar' WHERE k=0 IF %s" % (condition,), [True])
+            assert_one(cursor, "SELECT * FROM tlist", [0, ('foo', 'bar', 'foobar')])
+
+        check_applies("l[1] < 'zzz'")
+        check_applies("l[1] <= 'bar'")
+        check_applies("l[1] > 'aaa'")
+        check_applies("l[1] >= 'bar'")
+        check_applies("l[1] != 'xxx'")
+        check_applies("l[1] != null")
+        check_applies("l[1] IN (null, 'xxx', 'bar')")
+        check_applies("l[1] > 'aaa' AND l[1] < 'zzz'")
+
+        # check beyond end of list
+        check_applies("l[3] = null")
+        check_applies("l[3] IN (null, 'xxx', 'bar')")
+
+        def check_does_not_apply(condition):
+            assert_one(cursor, "UPDATE tlist SET l[1] = 'bar' WHERE k=0 IF %s" % (condition,), [False, ('foo', 'bar', 'foobar')])
+            assert_one(cursor, "SELECT * FROM tlist", [0, ('foo', 'bar', 'foobar')])
+
+        check_does_not_apply("l[1] < 'aaa'")
+        check_does_not_apply("l[1] <= 'aaa'")
+        check_does_not_apply("l[1] > 'zzz'")
+        check_does_not_apply("l[1] >= 'zzz'")
+        check_does_not_apply("l[1] != 'bar'")
+        check_does_not_apply("l[1] IN (null, 'xxx')")
+        check_does_not_apply("l[1] IN ()")
+        check_does_not_apply("l[1] != null AND l[1] IN ()")
+
+        # check beyond end of list
+        check_does_not_apply("l[3] != null")
+        check_does_not_apply("l[3] = 'xxx'")
+
+        def check_invalid(condition):
+            assert_invalid(cursor, "UPDATE tlist SET l[1] = 'bar' WHERE k=0 IF %s" % (condition,))
+            assert_one(cursor, "SELECT * FROM tlist", [0, ('foo', 'bar', 'foobar')])
+
+        check_invalid("l[1] < null")
+        check_invalid("l[1] <= null")
+        check_invalid("l[1] > null")
+        check_invalid("l[1] >= null")
+        check_invalid("l[1] IN null")
+        check_invalid("l[1] IN 367")
+        check_invalid("l[1] IN (1, 2, 3)")
+        check_invalid("l[1] CONTAINS 367")
+        check_invalid("l[1] CONTAINS KEY 367")
+        check_invalid("l[null] = null")
+
+    @since('2.1.1')
+    def whole_set_conditional_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE tset (
+                k int PRIMARY KEY,
+                s set<text>
+            )""")
+
+        cursor.execute("INSERT INTO tset(k, s) VALUES (0, {'bar', 'foo'})")
+
+        def check_applies(condition):
+            assert_one(cursor, "UPDATE tset SET s = {'bar', 'foo'} WHERE k=0 IF %s" % (condition,), [True])
+            assert_one(cursor, "SELECT * FROM tset", [0, set(['bar', 'foo'])])
+
+        check_applies("s = {'bar', 'foo'}")
+        check_applies("s = {'foo', 'bar'}")
+        check_applies("s != {'baz'}")
+        check_applies("s > {'a'}")
+        check_applies("s >= {'a'}")
+        check_applies("s < {'z'}")
+        check_applies("s <= {'z'}")
+        check_applies("s IN (null, {'bar', 'foo'}, {'a'})")
+
+        # multiple conditions
+        check_applies("s > {'a'} AND s < {'z'}")
+        check_applies("s IN (null, {'bar', 'foo'}, {'a'}) AND s IN ({'a'}, {'bar', 'foo'}, null)")
+
+        def check_does_not_apply(condition):
+            assert_one(cursor, "UPDATE tset SET s = {'bar', 'foo'} WHERE k=0 IF %s" % (condition,),
+                       [False, {'bar', 'foo'}])
+            assert_one(cursor, "SELECT * FROM tset", [0, {'bar', 'foo'}])
+
+        # should not apply
+        check_does_not_apply("s = {'baz'}")
+        check_does_not_apply("s != {'bar', 'foo'}")
+        check_does_not_apply("s > {'z'}")
+        check_does_not_apply("s >= {'z'}")
+        check_does_not_apply("s < {'a'}")
+        check_does_not_apply("s <= {'a'}")
+        check_does_not_apply("s IN ({'a'}, null)")
+        check_does_not_apply("s IN ()")
+        check_does_not_apply("s != null AND s IN ()")
+
+        def check_invalid(condition):
+            assert_invalid(cursor, "UPDATE tset SET s = {'bar', 'foo'} WHERE k=0 IF %s" % (condition,))
+            assert_one(cursor, "SELECT * FROM tset", [0, {'bar', 'foo'}])
+
+        check_invalid("s = {null}")
+        check_invalid("s < null")
+        check_invalid("s <= null")
+        check_invalid("s > null")
+        check_invalid("s >= null")
+        check_invalid("s IN null")
+        check_invalid("s IN 367")
+        check_invalid("s CONTAINS KEY 123")
+
+        # element access is not allow for sets
+        check_invalid("s['foo'] = 'foobar'")
+
+        # not supported yet
+        check_invalid("m CONTAINS 'bar'")
+
+    @since('2.1.1')
+    def whole_map_conditional_test(self):
+        cursor = self.prepare()
         cursor.execute("""
             CREATE TABLE tmap (
                 k int PRIMARY KEY,
                 m map<text, text>,
-            )
-        """)
+            )""")
+
+        cursor.execute("INSERT INTO tmap(k, m) VALUES (0, {'foo' : 'bar'})")
+
+        def check_applies(condition):
+            assert_one(cursor, "UPDATE tmap SET m['foo'] = 'bar' WHERE k=0 IF %s" % (condition,), [True])
+            assert_one(cursor, "SELECT * FROM tmap", [0, {'foo': 'bar'}])
+
+        check_applies("m = {'foo': 'bar'}")
+        check_applies("m > {'a': 'a'}")
+        check_applies("m >= {'a': 'a'}")
+        check_applies("m < {'z': 'z'}")
+        check_applies("m <= {'z': 'z'}")
+        check_applies("m != {'a': 'a'}")
+        check_applies("m IN (null, {'a': 'a'}, {'foo': 'bar'})")
+
+        # multiple conditions
+        check_applies("m > {'a': 'a'} AND m < {'z': 'z'}")
+        check_applies("m != null AND m IN (null, {'a': 'a'}, {'foo': 'bar'})")
+
+        def check_does_not_apply(condition):
+            assert_one(cursor, "UPDATE tmap SET m['foo'] = 'bar' WHERE k=0 IF %s" % (condition,), [False, {'foo': 'bar'}])
+            assert_one(cursor, "SELECT * FROM tmap", [0, {'foo': 'bar'}])
+
+        # should not apply
+        check_does_not_apply("m = {'a': 'a'}")
+        check_does_not_apply("m > {'z': 'z'}")
+        check_does_not_apply("m >= {'z': 'z'}")
+        check_does_not_apply("m < {'a': 'a'}")
+        check_does_not_apply("m <= {'a': 'a'}")
+        check_does_not_apply("m != {'foo': 'bar'}")
+        check_does_not_apply("m IN ({'a': 'a'}, null)")
+        check_does_not_apply("m IN ()")
+        check_does_not_apply("m = null AND m != null")
+
+        def check_invalid(condition):
+            assert_invalid(cursor, "UPDATE tmap SET m['foo'] = 'bar' WHERE k=0 IF %s" % (condition,))
+            assert_one(cursor, "SELECT * FROM tmap", [0, {'foo': 'bar'}])
+
+        check_invalid("m = {null: null}")
+        check_invalid("m = {'a': null}")
+        check_invalid("m = {null: 'a'}")
+        check_invalid("m < null")
+        check_invalid("m IN null")
+
+        # not supported yet
+        check_invalid("m CONTAINS 'bar'")
+        check_invalid("m CONTAINS KEY 'foo'")
+        check_invalid("m CONTAINS null")
+        check_invalid("m CONTAINS KEY null")
+
+    @since('2.0')
+    def map_item_conditional_test(self):
+        cursor = self.prepare()
+        cursor.execute("""
+            CREATE TABLE tmap (
+                k int PRIMARY KEY,
+                m map<text, text>,
+            )""")
 
         cursor.execute("INSERT INTO tmap(k, m) VALUES (0, {'foo' : 'bar'})")
         assert_invalid(cursor, "DELETE FROM tmap WHERE k=0 IF m[null] = 'foo'")
@@ -3984,40 +4282,69 @@ class TestCQL(Tester):
         assert_one(cursor, "DELETE FROM tmap WHERE k=0 IF m['foo'] = 'bar'", [True])
         assert_none(cursor, "SELECT * FROM tmap")
 
-        cursor.execute("INSERT INTO tmap(k, m) VALUES (1, {'foo' : 'bar', 'bar' : 'foo'})")
-        assert_one(cursor, "DELETE FROM tmap WHERE k=1 IF m['foo'] = 'bar' AND m['bar'] = 'bar'", [False, {'foo' : 'bar', 'bar' : 'foo'}])
-        assert_one(cursor, "DELETE FROM tmap WHERE k=1 IF m['foo'] = 'bar' AND m['bar'] = 'foo'", [True])
-        assert_none(cursor, "SELECT * FROM tmap")
+        if self.cluster.version() > "2.1.1":
+            cursor.execute("INSERT INTO tmap(k, m) VALUES (1, null)")
+            assert_one(cursor, "UPDATE tmap set m['foo'] = 'bar', m['bar'] = 'foo' WHERE k = 1 IF m['foo'] IN ('blah', null)", [True])
 
-        # Lists
+    @since('2.1.1')
+    def expanded_map_item_conditional_test(self):
+        # expanded functionality from CASSANDRA-6839
+        cursor = self.prepare()
         cursor.execute("""
-            CREATE TABLE tlist (
+            CREATE TABLE tmap (
                 k int PRIMARY KEY,
-                l list<text>,
-            )
-        """)
+                m map<text, text>,
+            )""")
 
-        cursor.execute("INSERT INTO tlist(k, l) VALUES (0, ['foo', 'bar', 'foobar'])")
-        assert_invalid(cursor, "DELETE FROM tlist WHERE k=0 IF l[null] = 'foobar'")
-        assert_invalid(cursor, "DELETE FROM tlist WHERE k=0 IF l[-2] = 'foobar'")
-        assert_invalid(cursor, "DELETE FROM tlist WHERE k=0 IF l[3] = 'foobar'")
-        assert_one(cursor, "DELETE FROM tlist WHERE k=0 IF l[1] = null", [False, ('foo', 'bar', 'foobar')])
-        assert_one(cursor, "DELETE FROM tlist WHERE k=0 IF l[1] = 'foobar'", [False, ('foo', 'bar', 'foobar')])
-        assert_one(cursor, "SELECT * FROM tlist", [0, ('foo', 'bar', 'foobar')])
+        cursor.execute("INSERT INTO tmap(k, m) VALUES (0, {'foo' : 'bar'})")
 
-        assert_one(cursor, "DELETE FROM tlist WHERE k=0 IF l[1] = 'bar'", [True])
-        assert_none(cursor, "SELECT * FROM tlist")
+        def check_applies(condition):
+            assert_one(cursor, "UPDATE tmap SET m['foo'] = 'bar' WHERE k=0 IF %s" % (condition,), [True])
+            assert_one(cursor, "SELECT * FROM tmap", [0, {'foo': 'bar'}])
 
-        # Sanity checks for sets
-        cursor.execute("""
-            CREATE TABLE tset (
-                k int PRIMARY KEY,
-                s set<text>,
-            )
-        """)
-        cursor.execute("INSERT INTO tset(k, s) VALUES (0, {'foo', 'bar', 'foobar'})")
-        assert_invalid(cursor, "DELETE FROM tset WHERE k=0 IF s['foo'] = 'foobar'")
+        check_applies("m['xxx'] = null")
+        check_applies("m['foo'] < 'zzz'")
+        check_applies("m['foo'] <= 'bar'")
+        check_applies("m['foo'] > 'aaa'")
+        check_applies("m['foo'] >= 'bar'")
+        check_applies("m['foo'] != 'xxx'")
+        check_applies("m['foo'] != null")
+        check_applies("m['foo'] IN (null, 'xxx', 'bar')")
+        check_applies("m['xxx'] IN (null, 'xxx', 'bar')")  # m['xxx'] is not set
 
+        # multiple conditions
+        check_applies("m['foo'] < 'zzz' AND m['foo'] > 'aaa'")
+
+        def check_does_not_apply(condition):
+            assert_one(cursor, "UPDATE tmap SET m['foo'] = 'bar' WHERE k=0 IF %s" % (condition,), [False, {'foo': 'bar'}])
+            assert_one(cursor, "SELECT * FROM tmap", [0, {'foo': 'bar'}])
+
+        check_does_not_apply("m['foo'] < 'aaa'")
+        check_does_not_apply("m['foo'] <= 'aaa'")
+        check_does_not_apply("m['foo'] > 'zzz'")
+        check_does_not_apply("m['foo'] >= 'zzz'")
+        check_does_not_apply("m['foo'] != 'bar'")
+        check_does_not_apply("m['xxx'] != null")  # m['xxx'] is not set
+        check_does_not_apply("m['foo'] IN (null, 'xxx')")
+        check_does_not_apply("m['foo'] IN ()")
+        check_does_not_apply("m['foo'] != null AND m['foo'] = null")
+
+        def check_invalid(condition):
+            assert_invalid(cursor, "UPDATE tmap SET m['foo'] = 'bar' WHERE k=0 IF %s" % (condition,))
+            assert_one(cursor, "SELECT * FROM tmap", [0, {'foo': 'bar'}])
+
+        check_invalid("m['foo'] < null")
+        check_invalid("m['foo'] <= null")
+        check_invalid("m['foo'] > null")
+        check_invalid("m['foo'] >= null")
+        check_invalid("m['foo'] IN null")
+        check_invalid("m['foo'] IN 367")
+        check_invalid("m['foo'] IN (1, 2, 3)")
+        check_invalid("m['foo'] CONTAINS 367")
+        check_invalid("m['foo'] CONTAINS KEY 367")
+        check_invalid("m[null] = null")
+
+    @since("2.1.1")
     def cas_and_list_index_test(self):
         """ Test for 7499 test """
         cursor = self.prepare()
@@ -4035,7 +4362,7 @@ class TestCQL(Tester):
         assert_one(cursor, "UPDATE test SET l[0] = 'foo' WHERE k = 0 IF v = 'barfoo'", [False, 'foobar'])
         assert_one(cursor, "UPDATE test SET l[0] = 'foo' WHERE k = 0 IF v = 'foobar'", [True])
 
-        assert_one(cursor, "SELECT * FROM test", [0, 'foobar', ('foo', 'bar')])
+        assert_one(cursor, "SELECT * FROM test", [0, ('foo', 'bar'), 'foobar' ])
 
 
     @since("2.0")
@@ -4164,7 +4491,7 @@ class TestCQL(Tester):
         cursor = self.prepare()
 
         cursor.execute("CREATE TYPE footype (fooint int, fooset set <text>)")
-        cursor.execute("CREATE TABLE test (key int PRIMARY KEY, data footype)")
+        cursor.execute("CREATE TABLE test (key int PRIMARY KEY, data frozen<footype>)")
 
         cursor.execute("INSERT INTO test (key, data) VALUES (1, {fooint: 1, fooset: {'2'}})")
         cursor.execute("ALTER TYPE footype ADD foomap map <int,text>")
@@ -4383,3 +4710,32 @@ class TestCQL(Tester):
         # A blob that is not 4 bytes should be rejected
         assert_invalid(cursor, "INSERT INTO test(k, v) VALUES (0, blobAsInt(0x01))")
 
+    @require("7730")
+    def alter_clustering_and_static_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("CREATE TABLE foo (bar int, PRIMARY KEY (bar))")
+
+        # We shouldn't allow static when there is not clustering columns
+        assert_invalid(cursor, "ALTER TABLE foo ADD bar2 text static")
+
+    def drop_and_readd_collection_test(self):
+        """ Test for 6276 """
+        cursor = self.prepare()
+
+        cursor.execute("create table test (k int primary key, v set<text>, x int)")
+        cursor.execute("insert into test (k, v) VALUES (0, {'fffffffff'})")
+        self.cluster.flush()
+        cursor.execute("alter table test drop v")
+        assert_invalid(cursor, "alter table test add v set<int>")
+
+    @require("#7744")
+    def downgrade_to_compact_bug_test(self):
+        """ Test for 7744 """
+        cursor = self.prepare()
+
+        cursor.execute("create table test (k int primary key, v set<text>)")
+        cursor.execute("insert into test (k, v) VALUES (0, {'f'})")
+        self.cluster.flush()
+        cursor.execute("alter table test drop v")
+        cursor.execute("alter table test add v int")

@@ -97,12 +97,12 @@ class Tester(TestCase):
         debug("cluster ccm directory: "+self.test_path)
         version = os.environ.get('CASSANDRA_VERSION')
         cdir = os.environ.get('CASSANDRA_DIR', DEFAULT_DIR)
-        
+
         if version:
             cluster = Cluster(self.test_path, name, cassandra_version=version)
         else:
             cluster = Cluster(self.test_path, name, cassandra_dir=cdir)
-        
+
         if cluster.version() >= "1.2":
             if DISABLE_VNODES:
                 cluster.set_configuration_options(values={'num_tokens': None})
@@ -135,12 +135,12 @@ class Tester(TestCase):
     def set_node_to_current_version(self, node):
         version = os.environ.get('CASSANDRA_VERSION')
         cdir = os.environ.get('CASSANDRA_DIR', DEFAULT_DIR)
-        
+
         if version:
             node.set_cassandra_dir(cassandra_version=version)
         else:
             node.set_cassandra_dir(cassandra_dir=cdir)
-        
+
     def setUp(self):
         global CURRENT_TEST
         CURRENT_TEST = self.id() + self._testMethodName
@@ -209,10 +209,16 @@ class Tester(TestCase):
         try:
             for node in self.cluster.nodelist():
                 if self.allow_log_errors == False:
-                    errors = list(self.__filter_errors([ msg for msg, i in node.grep_log("ERROR")]))
+                    errors = list(self.__filter_errors([ msg for msg in node.grep_log_for_errors()]))
+
+                    # flatten errors into one string for more readable output
+                    formatted_errors = ""
+                    for err in errors:
+                        formatted_errors += ''.join(err)
+
                     if len(errors) is not 0:
                         failed = True
-                        raise AssertionError('Unexpected error in %s node log: %s' % (node.name, errors))
+                        raise AssertionError('Unexpected error in %s node log:\n%s' % (node.name, formatted_errors))
         finally:
             try:
                 if failed or KEEP_LOGS:
@@ -342,7 +348,7 @@ class Tester(TestCase):
     def skip(self, msg):
         if not NO_SKIP:
             raise SkipTest(msg)
-    
+
     def __setup_jacoco(self, cluster_name='test'):
         """Setup JaCoCo code coverage support"""
         # use explicit agent and execfile locations
@@ -359,7 +365,7 @@ class Tester(TestCase):
 
                 f.write('JVM_OPTS="$JVM_OPTS -javaagent:{jar_path}=destfile={exec_file}"'\
                     .format(jar_path=agent_location, exec_file=jacoco_execfile))
-                
+
                 if os.path.isfile(jacoco_execfile):
                     debug("Jacoco execfile found at {}, execution data will be appended".format(jacoco_execfile))
                 else:
@@ -371,12 +377,16 @@ class Tester(TestCase):
         """Filter errors, removing those that match self.ignore_log_patterns"""
         if not hasattr(self, 'ignore_log_patterns'):
             self.ignore_log_patterns = []
-        for e in errors:
-            for pattern in self.ignore_log_patterns:
-                if re.search(pattern, e):
+        for stack_trace in errors:
+            ignore = False
+            for line in stack_trace:
+                for pattern in self.ignore_log_patterns:
+                    if re.search(pattern, line):
+                        ignore = True
+                if ignore:
                     break
             else:
-                yield e
+                yield stack_trace
 
     # Disable docstrings printing in nosetest output
     def shortDescription(self):
@@ -420,11 +430,11 @@ class TracingCursor(ThriftCursor):
         self.last_session_id = None
         self.connection = connection
 
-    def execute(self, cql_query, params={}, decoder=None, 
+    def execute(self, cql_query, params={}, decoder=None,
                 consistency_level=None, trace=True):
         if trace:
             self.last_session_id = UUID(bytes=self.connection.client.trace_next_query())
-        ThriftCursor.execute(self, cql_query, params=params, decoder=decoder, 
+        ThriftCursor.execute(self, cql_query, params=params, decoder=decoder,
                              consistency_level=consistency_level)
 
     def get_last_trace(self):
@@ -436,4 +446,4 @@ class TracingCursor(ThriftCursor):
             return [event for event in self]
         else:
             raise AssertionError('No query to trace')
-        
+

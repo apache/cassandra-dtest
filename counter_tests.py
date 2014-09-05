@@ -1,6 +1,7 @@
 from dtest import Tester
 
 import random, time, uuid
+from assertions import assert_invalid, assert_one
 
 class TestCounters(Tester):
 
@@ -240,3 +241,27 @@ class TestCounters(Tester):
             count = cursor.fetchone()[0]
             
             self.assertEqual(v, count)
+
+    def validate_empty_column_name_test(self):
+        cluster = self.cluster
+        cluster.populate(1).start()
+        node1 = cluster.nodelist()[0]
+        cursor = self.patient_cql_connection(node1).cursor()
+        self.create_ks(cursor, 'counter_tests', 1)
+
+        cursor.execute("""
+            CREATE TABLE compact_counter_table (
+                pk int,
+                ck text,
+                value counter,
+                PRIMARY KEY (pk, ck))
+            WITH COMPACT STORAGE
+            """)
+
+        assert_invalid(cursor, "UPDATE compact_counter_table SET value = value + 1 WHERE pk = 0 AND ck = ''")
+        assert_invalid(cursor, "UPDATE compact_counter_table SET value = value - 1 WHERE pk = 0 AND ck = ''")
+
+        cursor.execute("UPDATE compact_counter_table SET value = value + 5 WHERE pk = 0 AND ck = 'ck'")
+        cursor.execute("UPDATE compact_counter_table SET value = value - 2 WHERE pk = 0 AND ck = 'ck'")
+
+        assert_one(cursor, "SELECT pk, ck, value FROM compact_counter_table", [0, 'ck', 3])
