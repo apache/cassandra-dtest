@@ -59,9 +59,9 @@ class TestUserFunctions(Tester):
         cursor1.execute("INSERT INTO udf_kv (key, value) VALUES (%d, %d)" % (2, 2))
         cursor1.execute("INSERT INTO udf_kv (key, value) VALUES (%d, %d)" % (3, 3))
 
-        cursor1.execute("create or replace function x_sin ( input double ) returns double 'org.apache.cassandra.cql3.udf.StdLibMath#sin'")
-        cursor2.execute("create or replace function x_cos ( input double ) returns double 'org.apache.cassandra.cql3.udf.StdLibMath#cos'")
-        cursor3.execute("create or replace function x_tan ( input double ) returns double 'org.apache.cassandra.cql3.udf.StdLibMath#tan'")
+        cursor1.execute("create or replace function x_sin ( input double ) returns double language java as 'if (input==null) return null; return Double.valueOf(Math.sin(input.doubleValue()));'")
+        cursor2.execute("create or replace function x_cos ( input double ) returns double language java as 'if (input==null) return null; return Double.valueOf(Math.cos(input.doubleValue()));'")
+        cursor3.execute("create or replace function x_tan ( input double ) returns double language java as 'if (input==null) return null; return Double.valueOf(Math.tan(input.doubleValue()));'")
 
         time.sleep(1)
 
