@@ -25,7 +25,7 @@ class SnapshotTester(Tester):
         os.mkdir(os.path.join(tmpdir,ks))
         os.mkdir(os.path.join(tmpdir,ks,cf))
         node_dir = node.get_path()
-        
+
         # Find the snapshot dir, it's different in various C* versions:
         snapshot_dir = "{node_dir}/data/{ks}/{cf}/snapshots/{name}".format(**locals())
         if not os.path.isdir(snapshot_dir):
@@ -90,6 +90,32 @@ class TestArchiveCommitlog(SnapshotTester):
         kwargs['cluster_options'] = {'commitlog_segment_size_in_mb':1}
         SnapshotTester.__init__(self, *args, **kwargs)
 
+    def make_snapshot(self, node, ks, cf, name):
+        debug("Making snapshot....")
+        node.flush()
+        snapshot_cmd = 'snapshot {ks} -cf {cf} -t {name}'.format(**locals())
+        debug("Running snapshot cmd: {snapshot_cmd}".format(snapshot_cmd=snapshot_cmd))
+        node.nodetool(snapshot_cmd)
+        tmpdir = tempfile.mkdtemp()
+        node_dir = node.get_path()
+
+        # Copy files from the snapshot dir to existing temp dir
+        distutils.dir_util.copy_tree(os.path.join(node.get_path(),'data', ks), tmpdir)
+
+        return tmpdir
+
+    def restore_snapshot(self, snapshot_dir, node, ks, cf, name):
+        debug("Restoring snapshot for cf ....")
+        data_dir = os.path.join(node.get_path(), 'data')
+        cf_id = [s for s in os.listdir(snapshot_dir) if cf in s][0]
+        snapshot_dir = glob.glob("{snapshot_dir}/{cf}-*/snapshots/{name}".format(**locals()))[0]
+        if not os.path.exists(os.path.join(data_dir, ks)):
+            os.mkdir(os.path.join(data_dir, ks))
+        os.mkdir(os.path.join(data_dir, ks, cf_id))
+
+        debug("snapshot_dir is : " + snapshot_dir)
+        distutils.dir_util.copy_tree(snapshot_dir, os.path.join(data_dir, ks, cf_id))
+
     def test_archive_commitlog(self):
         self.run_archive_commitlog(restore_point_in_time = False)
 
@@ -141,92 +167,114 @@ class TestArchiveCommitlog(SnapshotTester):
             os.remove(f)
 
         snapshot_dir = self.make_snapshot(node1, 'ks', 'cf', 'basic')
+        system_ks_snapshot_dir = self.make_snapshot(node1, 'system', 'schema_keyspaces', 'keyspaces')
+        system_col_snapshot_dir = self.make_snapshot(node1, 'system', 'schema_columns', 'columns')
+        system_ut_snapshot_dir = self.make_snapshot(node1, 'system', 'schema_usertypes', 'usertypes')
+        system_cfs_snapshot_dir = self.make_snapshot(node1, 'system', 'schema_columnfamilies', 'cfs')
 
-        # Write more data:
-        debug("Writing second 30,000 rows...")
-        self.insert_rows(cursor, 30000, 60000)
-        node1.flush()
-        time.sleep(10)
-        # Record when this second set of inserts finished:
-        insert_cutoff_times.append(time.gmtime())
-        
-        debug("Writing final 5,000 rows...")
-        self.insert_rows(cursor,60000, 65000)
-        # Record when the third set of inserts finished:
-        insert_cutoff_times.append(time.gmtime())
+        try:
+            # Write more data:
+            debug("Writing second 30,000 rows...")
+            self.insert_rows(cursor, 30000, 60000)
+            node1.flush()
+            time.sleep(10)
+            # Record when this second set of inserts finished:
+            insert_cutoff_times.append(time.gmtime())
 
-        cursor.execute('SELECT count(*) from ks.cf')
-        # Make sure we have the same amount of rows as when we snapshotted:
-        self.assertEqual(cursor.fetchone()[0], 65000)
+            debug("Writing final 5,000 rows...")
+            self.insert_rows(cursor,60000, 65000)
+            # Record when the third set of inserts finished:
+            insert_cutoff_times.append(time.gmtime())
 
-        # Check that there are at least one commit log backed up that
-        # is not one of the active commit logs:
-        commitlog_dir = os.path.join(node1.get_path(), 'commitlogs')
-        debug("node1 commitlog dir: " + commitlog_dir)
+            cursor.execute('SELECT count(*) from ks.cf')
+            rows = cursor.fetchall()
+            # Make sure we have the same amount of rows as when we snapshotted:
+            self.assertEqual(rows[0][0], 65000)
 
-        self.assertTrue(len(set(os.listdir(tmp_commitlog)) - set(os.listdir(commitlog_dir))) > 0)
+            # Check that there are at least one commit log backed up that
+            # is not one of the active commit logs:
+            commitlog_dir = os.path.join(node1.get_path(), 'commitlogs')
+            debug("node1 commitlog dir: " + commitlog_dir)
 
-        cluster.flush()
-        cluster.compact()
-        node1.drain()
-        if archive_active_commitlogs:
-            # Copy the active commitlogs to the backup directory:
-            for f in glob.glob(commitlog_dir+"/*"):
-                shutil.copy2(f, tmp_commitlog)
+            self.assertTrue(len(set(os.listdir(tmp_commitlog)) - set(os.listdir(commitlog_dir))) > 0)
 
-        # Destroy the cluster
-        cluster.stop()
-        self.copy_logs(name=self.id().split(".")[0]+"_pre-restore")
-        self._cleanup_cluster()
-        cluster = self.cluster = self._get_cluster()
-        cluster.populate(1)
-        (node1,) = cluster.nodelist()
-        cluster.start()
-        cursor = self.patient_cql_connection(node1).cursor()
-        self.create_ks(cursor, 'ks', 1)
-        cursor.execute('CREATE TABLE ks.cf ( key bigint PRIMARY KEY, val text);')
+            cluster.flush()
+            cluster.compact()
+            node1.drain()
+            if archive_active_commitlogs:
+                # Copy the active commitlogs to the backup directory:
+                for f in glob.glob(commitlog_dir+"/*"):
+                    shutil.copy2(f, tmp_commitlog)
 
-        # Restore from snapshot:
-        self.restore_snapshot(snapshot_dir, node1, 'ks', 'cf')
-        cursor.execute('SELECT count(*) from ks.cf')
-        # Make sure we have the same amount of rows as when we snapshotted:
-        self.assertEqual(cursor.fetchone()[0], 30000)
-        
-        # Edit commitlog_archiving.properties. Remove the archive
-        # command  and set a restore command and restore_directories:
-        if restore_archived_commitlog:
-            replace_in_file(os.path.join(node1.get_path(),'conf','commitlog_archiving.properties'),
-                            [(r'^archive_command=.*$', 'archive_command='),
-                             (r'^restore_command=.*$', 'restore_command=cp -f %from %to'),
-                             (r'^restore_directories=.*$', 'restore_directories={tmp_commitlog}'.format(
-                                 tmp_commitlog=tmp_commitlog))])
+            # Destroy the cluster
+            cluster.stop()
+            self.copy_logs(name=self.id().split(".")[0]+"_pre-restore")
+            self._cleanup_cluster()
+            cluster = self.cluster = self._get_cluster()
+            cluster.populate(1)
+            node1, = cluster.nodelist()
 
-            if restore_point_in_time:
-                restore_time = time.strftime("%Y:%m:%d %H:%M:%S", insert_cutoff_times[1])
+            # Restore schema from snapshots:
+            self.restore_snapshot(system_ks_snapshot_dir, node1, 'system', 'schema_keyspaces', 'keyspaces')
+            self.restore_snapshot(system_col_snapshot_dir, node1, 'system', 'schema_columns', 'columns')
+            self.restore_snapshot(system_ut_snapshot_dir, node1, 'system', 'schema_usertypes', 'usertypes')
+            self.restore_snapshot(system_cfs_snapshot_dir, node1, 'system', 'schema_columnfamilies', 'cfs')
+            self.restore_snapshot(snapshot_dir, node1, 'ks', 'cf', 'basic')
+
+            cluster.start()
+            cursor = self.patient_cql_connection(node1).cursor()
+            node1.nodetool('refresh ks cf')
+
+            cursor.execute('SELECT count(*) from ks.cf')
+            rows = cursor.fetchall()
+            # Make sure we have the same amount of rows as when we snapshotted:
+            self.assertEqual(rows[0][0], 30000)
+
+            # Edit commitlog_archiving.properties. Remove the archive
+            # command  and set a restore command and restore_directories:
+            if restore_archived_commitlog:
                 replace_in_file(os.path.join(node1.get_path(),'conf','commitlog_archiving.properties'),
-                                [(r'^restore_point_in_time=.*$', 'restore_point_in_time={restore_time}'.format(**locals()))])
-        
-        debug("Restarting node1..")
-        node1.stop()
-        node1.start()
+                                [(r'^archive_command=.*$', 'archive_command='),
+                                 (r'^restore_command=.*$', 'restore_command=cp -f %from %to'),
+                                 (r'^restore_directories=.*$', 'restore_directories={tmp_commitlog}'.format(
+                                     tmp_commitlog=tmp_commitlog))])
 
-        node1.nodetool('flush')
-        node1.nodetool('compact')
+                if restore_point_in_time:
+                    restore_time = time.strftime("%Y:%m:%d %H:%M:%S", insert_cutoff_times[1])
+                    replace_in_file(os.path.join(node1.get_path(),'conf','commitlog_archiving.properties'),
+                                    [(r'^restore_point_in_time=.*$', 'restore_point_in_time={restore_time}'.format(**locals()))])
 
-        cursor = self.patient_cql_connection(node1).cursor()
-        cursor.execute('SELECT count(*) from ks.cf')
+            debug("Restarting node1..")
+            node1.stop()
+            node1.start()
 
-        # clean up
-        debug("removing snapshot_dir: " + snapshot_dir)
-        shutil.rmtree(snapshot_dir)
-        debug("removing tmp_commitlog: " + tmp_commitlog)
-        shutil.rmtree(tmp_commitlog)
+            node1.nodetool('flush')
+            node1.nodetool('compact')
 
-        # Now we should have 30000 rows from the snapshot + 30000 rows
-        # from the commitlog backups:
-        if not restore_archived_commitlog:
-            self.assertEqual(cursor.fetchone()[0], 30000)
-        elif restore_point_in_time:
-            self.assertEqual(cursor.fetchone()[0], 60000)
-        else:
-            self.assertEqual(cursor.fetchone()[0], 65000)
+            cursor = self.patient_cql_connection(node1).cursor()
+            cursor.execute('SELECT count(*) from ks.cf')
+            rows = cursor.fetchall()
+
+            # Now we should have 30000 rows from the snapshot + 30000 rows
+            # from the commitlog backups:
+            if not restore_archived_commitlog:
+                self.assertEqual(rows[0][0], 30000)
+            elif restore_point_in_time:
+                self.assertEqual(rows[0][0], 60000)
+            else:
+                self.assertEqual(rows[0][0], 65000)
+
+        finally:
+            # clean up
+            debug("removing snapshot_dir: " + snapshot_dir)
+            shutil.rmtree(snapshot_dir)
+            debug("removing snapshot_dir: " + system_ks_snapshot_dir)
+            shutil.rmtree(system_ks_snapshot_dir)
+            debug("removing snapshot_dir: " + system_cfs_snapshot_dir)
+            shutil.rmtree(system_cfs_snapshot_dir)
+            debug("removing snapshot_dir: " + system_ut_snapshot_dir)
+            shutil.rmtree(system_ut_snapshot_dir)
+            debug("removing snapshot_dir: " + system_col_snapshot_dir)
+            shutil.rmtree(system_col_snapshot_dir)
+            debug("removing tmp_commitlog: " + tmp_commitlog)
+            shutil.rmtree(tmp_commitlog)
