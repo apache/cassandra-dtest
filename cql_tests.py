@@ -3063,7 +3063,7 @@ class TestCQL(Tester):
         assert_one(cursor, "DELETE FROM test WHERE k = 0 IF v1 = null", [ True ])
         assert_none(cursor, "SELECT * FROM test")
 
-        if self.cluster.version() > "1.2":
+        if self.cluster.version() > "2.1.1":
             # Should apply
             assert_one(cursor, "DELETE FROM test WHERE k = 0 IF v1 IN (null)", [ True ])
 
@@ -4282,8 +4282,9 @@ class TestCQL(Tester):
         assert_one(cursor, "DELETE FROM tmap WHERE k=0 IF m['foo'] = 'bar'", [True])
         assert_none(cursor, "SELECT * FROM tmap")
 
-        cursor.execute("INSERT INTO tmap(k, m) VALUES (1, null)")
-        assert_one(cursor, "UPDATE tmap set m['foo'] = 'bar', m['bar'] = 'foo' WHERE k = 1 IF m['foo'] IN ('blah', null)", [True])
+        if self.cluster.version() > "2.1.1":
+            cursor.execute("INSERT INTO tmap(k, m) VALUES (1, null)")
+            assert_one(cursor, "UPDATE tmap set m['foo'] = 'bar', m['bar'] = 'foo' WHERE k = 1 IF m['foo'] IN ('blah', null)", [True])
 
     @since('2.1.1')
     def expanded_map_item_conditional_test(self):
