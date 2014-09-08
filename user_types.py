@@ -628,14 +628,14 @@ class TestUserTypes(Tester):
         self.assertEqual(first_name, u'Nero')
         self.assertEqual(like, u'arson')
 
-        # rename the type and make sure the index still works
+        # rename a field in the type and make sure the index still works
         stmt = """
-            ALTER TYPE t_person_name rename to t_person_name2;
+            ALTER TYPE t_person_name rename first to first_name;
             """
         cursor.execute(stmt)
 
         stmt = """
-            SELECT id, name.first, like from person_likes where name = {first:'Nero', middle: 'Claudius Caesar Augustus', last: 'Germanicus'};
+            SELECT id, name.first_name, like from person_likes where name = {first_name:'Nero', middle: 'Claudius Caesar Augustus', last: 'Germanicus'};
             """
         cursor.execute(stmt)
 
@@ -650,12 +650,12 @@ class TestUserTypes(Tester):
 
         stmt = """
               INSERT INTO person_likes (id, name, like)
-              VALUES ({id}, {{first:'Abraham', middle:'', last:'Lincoln'}}, 'preserving unions');
+              VALUES ({id}, {{first_name:'Abraham', middle:'', last:'Lincoln'}}, 'preserving unions');
            """.format(id=_id)
         cursor.execute(stmt)
 
         stmt = """
-            SELECT id, name.first, like from person_likes where name = {first:'Abraham', middle:'', last:'Lincoln'};
+            SELECT id, name.first_name, like from person_likes where name = {first_name:'Abraham', middle:'', last:'Lincoln'};
             """
         cursor.execute(stmt)
 
@@ -718,20 +718,20 @@ class TestUserTypes(Tester):
         with self.assertRaisesRegexp(ProgrammingError, 'User ks2_user has no DROP permission on <keyspace ks1> or any of its parents'):
             user2_cursor.execute("DROP TYPE ks1.simple_type;")
 
-        # let's make sure they can't rename each other's types (for which they have no permissions)
+        # let's make sure they can't rename fieldss in each other's types (for which they have no permissions)
         with self.assertRaisesRegexp(ProgrammingError, 'User ks1_user has no ALTER permission on <keyspace ks2> or any of its parents'):
-            user1_cursor.execute("ALTER TYPE ks2.simple_type RENAME TO ks2.renamed_type;")
+            user1_cursor.execute("ALTER TYPE ks2.simple_type RENAME user_number TO user_num;")
 
         with self.assertRaisesRegexp(ProgrammingError, 'User ks2_user has no ALTER permission on <keyspace ks1> or any of its parents'):
-            user2_cursor.execute("ALTER TYPE ks1.simple_type RENAME TO ks1.renamed_type;")
+            user2_cursor.execute("ALTER TYPE ks1.simple_type RENAME user_number TO user_num;")
 
         # rename the types using the correct user w/permissions to do so
-        user1_cursor.execute("ALTER TYPE ks1.simple_type RENAME TO ks1.renamed_type;")
-        user2_cursor.execute("ALTER TYPE ks2.simple_type RENAME TO ks2.renamed_type;")
+        user1_cursor.execute("ALTER TYPE ks1.simple_type RENAME user_number TO user_num;")
+        user2_cursor.execute("ALTER TYPE ks2.simple_type RENAME user_number TO user_num;")
 
         # finally, drop the types using the correct user w/permissions to do so
-        user1_cursor.execute("DROP TYPE ks1.renamed_type;")
-        user2_cursor.execute("DROP TYPE ks2.renamed_type;")
+        user1_cursor.execute("DROP TYPE ks1.simple_type;")
+        user2_cursor.execute("DROP TYPE ks2.simple_type;")
 
         # verify user type metadata is gone from the system schema
         superuser_cursor.execute("SELECT * from system.schema_usertypes")
