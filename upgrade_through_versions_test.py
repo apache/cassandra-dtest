@@ -12,7 +12,7 @@ from dtest import Tester, debug, DISABLE_VNODES, DEFAULT_DIR
 from pytools import new_node
 from ccmlib import common as ccmcommon
 import tarfile
-from cassandra import ConsistencyLevel
+from cassandra import ConsistencyLevel, WriteTimeout
 from cassandra.query import SimpleStatement
 
 TRUNK_VER = '2.2'
@@ -315,7 +315,7 @@ class TestUpgradeThroughVersions(Tester):
             try:
                 query = SimpleStatement(update_counter_query.format(key1=key1, key2=key2), consistency_level=ConsistencyLevel.ALL)
                 cursor.execute(query)
-            except OperationalError:
+            except WriteTimeout:
                 fail_count += 1
             else:
                 self.expected_counts[key1][key2] += 1
