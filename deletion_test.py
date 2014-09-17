@@ -1,7 +1,6 @@
 from dtest import Tester
-from assertions import *
 
-import os, sys, time, tools
+import os, sys, time
 from ccmlib.cluster import Cluster
 
 class TestDeletion(Tester):
@@ -14,7 +13,7 @@ class TestDeletion(Tester):
         [node1] = cluster.nodelist()
 
         time.sleep(.5)
-        cursor = self.patient_cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'ks', 1)
         self.create_cf(cursor, 'cf', gc_grace=0, key_type='int', columns={'c1': 'int'})
 
@@ -22,13 +21,11 @@ class TestDeletion(Tester):
         cursor.execute('insert into cf (key, c1) values (2,1)')
         node1.flush()
 
-        cursor.execute('select * from cf;')
-        result = cursor.fetchall()
+        result = cursor.execute('select * from cf;')
         assert len(result) == 2 and len(result[0]) == 2 and len(result[1]) == 2, result
 
         cursor.execute('delete from cf where key=1')
-        cursor.execute('select * from cf;')
-        result = cursor.fetchall()
+        result = cursor.execute('select * from cf;')
         if cluster.version() < '1.2': # > 1.2 doesn't show tombstones
             assert len(result) == 2 and len(result[0]) == 1 and len(result[1]) == 1, result
 
@@ -37,7 +34,6 @@ class TestDeletion(Tester):
         node1.compact()
         time.sleep(.5)
 
-        cursor.execute('select * from cf;')
-        result = cursor.fetchall()
+        result = cursor.execute('select * from cf;')
         assert len(result) == 1 and len(result[0]) == 2, result
 

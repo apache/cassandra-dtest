@@ -1,12 +1,5 @@
 from dtest import Tester, debug, DEFAULT_DIR
-import unittest
-import time
-import os
-import subprocess
-import shlex 
-import pycassa
-import glob
-import sys
+import unittest, time, os, subprocess, shlex, pycassa, glob, sys
 
 JNA_PATH = '/usr/share/java/jna.jar'
 ATTACK_JAR = 'cassandra-attack.jar'
@@ -37,12 +30,12 @@ class ThriftHSHATest(Tester):
             'rpc_server_type' : 'hsha',
             'rpc_max_threads' : 20
         })
-        
+
         cluster.populate(1)
         cluster.start()
         (node1,) = cluster.nodelist()
 
-        cursor = self.patient_cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'test', 1)
         cursor.execute("CREATE TABLE \"CF\" (key text PRIMARY KEY, val text) WITH COMPACT STORAGE;")
         def make_connection():
@@ -87,7 +80,7 @@ class ThriftHSHATest(Tester):
         [n.start(use_jna=True) for n in nodes]
         debug("Cluster started.")
 
-        cursor = self.patient_cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'tmp', 2)
 
         cursor.execute("""CREATE TABLE "CF" (
@@ -109,4 +102,4 @@ class ThriftHSHATest(Tester):
         cluster.start(no_wait=True)
         debug("Waiting 10 seconds before we're done..")
         time.sleep(10)
-        
+

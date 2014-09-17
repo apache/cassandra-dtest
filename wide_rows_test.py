@@ -35,15 +35,15 @@ class TestWideRows(Tester):
         cluster.populate(1).start()
         (node1,) = cluster.nodelist()
 
-        cursor = self.patient_cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1)
         start_time = datetime.datetime.now()
         self.create_ks(cursor, 'wide_rows', 1)
         # Simple timeline:  user -> {date: value, ...}
         debug('Create Table....')
-        cursor.execute('CREATE TABLE user_events (userid text, event timestamp, value text, PRIMARY KEY (userid, event));', 1)
+        cursor.execute('CREATE TABLE user_events (userid text, event timestamp, value text, PRIMARY KEY (userid, event));')
         date = datetime.datetime.now()
         # Create a large timeline for each of a group of users:
-        for user in ('ryan', 'cathy', 'mallen', 'joaquin', 'erin', 'ham'): 
+        for user in ('ryan', 'cathy', 'mallen', 'joaquin', 'erin', 'ham'):
             debug("Writing values for: %s" % user)
             for day in xrange(5000):
                 date_str = (date + datetime.timedelta(day)).strftime("%Y-%m-%d")
@@ -52,15 +52,15 @@ class TestWideRows(Tester):
                 query = "UPDATE user_events SET value = '{msg:%s, client:%s}' WHERE userid='%s' and event='%s';" \
                                % (msg, client, user, date_str)
                 #debug(query)
-                cursor.execute(query, 1)
+                cursor.execute(query)
 
         #debug('Duration of test: %s' % (datetime.datetime.now() - start_time))
 
         # Pick out an update for a specific date:
         query = "SELECT value FROM user_events WHERE userid='ryan' and event='%s'" % \
                 (date + datetime.timedelta(10)).strftime("%Y-%m-%d")
-        cursor.execute(query, 1)
-        for value in cursor:
+        rows = cursor.execute(query)
+        for value in rows:
             debug(value)
             assert len(value[0]) > 0
 
@@ -75,11 +75,11 @@ class TestWideRows(Tester):
         cluster.populate(1).start()
         (node1,) = cluster.nodelist()
         cluster.set_configuration_options(values={ 'column_index_size_in_kb' : 1 }) #reduce this value to force column index creation
-        cursor = self.patient_cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'wide_rows', 1)
-        
+
         create_table_query = 'CREATE TABLE test_table (row varchar, name varchar, value int, PRIMARY KEY (row, name));'
-        cursor.execute(create_table_query, 1)
+        cursor.execute(create_table_query)
 
         #Now insert 100,000 columns to row 'row0'
         insert_column_query = "UPDATE test_table SET value = {value} WHERE row = '{row}' AND name = '{name}';"
@@ -97,7 +97,7 @@ class TestWideRows(Tester):
             #necessarily return 3 values.  Hence I am computing the number of unique values in values2fetch
             #and using that in the assert at the end.
             expected_rows = len( set( values2fetch ) )
-            cursor.execute( select_column_query.format(name1="val" + values2fetch[0],
+            rows = cursor.execute( select_column_query.format(name1="val" + values2fetch[0],
                                                        name2="val" + values2fetch[1],
-                                                       name3="val" + values2fetch[2]), 1)
-            assert cursor.rowcount == expected_rows
+                                                       name3="val" + values2fetch[2]))
+            assert len(rows) == expected_rows

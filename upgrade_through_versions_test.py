@@ -8,10 +8,12 @@ import uuid
 
 from collections import defaultdict
 from distutils.version import LooseVersion
-
-from cql import OperationalError
-from dtest import Tester, debug, DEFAULT_DIR
-from tools import new_node
+from dtest import Tester, debug, DISABLE_VNODES, DEFAULT_DIR
+from pytools import new_node
+from ccmlib import common as ccmcommon
+import tarfile
+from cassandra import ConsistencyLevel, WriteTimeout
+from cassandra.query import SimpleStatement
 
 TRUNK_VER = '2.2'
 
@@ -172,6 +174,7 @@ class TestUpgradeThroughVersions(Tester):
             if mixed_version:
                 for num, node in enumerate(self.cluster.nodelist()):
                     # do a write and check for each new node as upgraded
+
                     self._write_values()
                     self._increment_counters()
 
@@ -256,17 +259,10 @@ class TestUpgradeThroughVersions(Tester):
                 vers[:curr_index] + ['***' + current_tag + '***'] + vers[curr_index + 1:]))
 
     def _create_schema(self):
-        cursor = self.patient_cql_connection(self.node2, version="3.0.0").cursor()
+        cursor = self.patient_cql_connection(self.node2, version="3.0.0", protocol_version=1)
 
-        if self.cluster.version() >= '1.2':
-            # DDL for C* 1.2+
-            cursor.execute("""CREATE KEYSPACE upgrade WITH replication = {'class':'SimpleStrategy',
-                'replication_factor':2};
-                """)
-        else:
-            # DDL for C* 1.1
-            cursor.execute("""CREATE KEYSPACE upgrade WITH strategy_class = 'SimpleStrategy'
-            AND strategy_options:replication_factor = 2;
+        cursor.execute("""CREATE KEYSPACE upgrade WITH replication = {'class':'SimpleStrategy',
+            'replication_factor':2};
             """)
 
         cursor.execute('use upgrade')
@@ -282,26 +278,27 @@ class TestUpgradeThroughVersions(Tester):
                 );""")
 
     def _write_values(self, num=100):
-        cursor = self.patient_cql_connection(self.node2).cursor()
+        cursor = self.patient_cql_connection(self.node2, protocol_version=1)
         cursor.execute("use upgrade")
         for i in xrange(num):
             x = len(self.row_values) + 1
             cursor.execute("UPDATE cf SET v='%d' WHERE k=%d" % (x, x))
             self.row_values.add(x)
 
-    def _check_values(self, consistency_level='ALL'):
+    def _check_values(self, consistency_level=ConsistencyLevel.ALL):
         for node in self.cluster.nodelist():
-            cursor = self.patient_cql_connection(node).cursor()
+            cursor = self.patient_cql_connection(node, protocol_version=1)
             cursor.execute("use upgrade")
             for x in self.row_values:
-                cursor.execute("SELECT k,v FROM cf WHERE k=%d" % x, consistency_level=consistency_level)
-                k, v = cursor.fetchone()
+                query = SimpleStatement("SELECT k,v FROM cf WHERE k=%d" % x, consistency_level=consistency_level)
+                result = cursor.execute(query)
+                k,v = result[0]
                 self.assertEqual(x, k)
                 self.assertEqual(str(x), v)
 
     def _increment_counters(self, opcount=25000):
         debug("performing {opcount} counter increments".format(opcount=opcount))
-        cursor = self.patient_cql_connection(self.node2, version="3.0.0").cursor()
+        cursor = self.patient_cql_connection(self.node2, version="3.0.0", protocol_version=1)
         cursor.execute("use upgrade;")
 
         update_counter_query = ("UPDATE countertable SET c = c + 1 WHERE k1='{key1}' and k2={key2}")
@@ -316,8 +313,9 @@ class TestUpgradeThroughVersions(Tester):
             key1 = random.choice(self.expected_counts.keys())
             key2 = random.randint(1, 10)
             try:
-                cursor.execute(update_counter_query.format(key1=key1, key2=key2), consistency_level='ALL')
-            except OperationalError:
+                query = SimpleStatement(update_counter_query.format(key1=key1, key2=key2), consistency_level=ConsistencyLevel.ALL)
+                cursor.execute(query)
+            except WriteTimeout:
                 fail_count += 1
             else:
                 self.expected_counts[key1][key2] += 1
@@ -328,17 +326,19 @@ class TestUpgradeThroughVersions(Tester):
 
     def _check_counters(self):
         debug("Checking counter values...")
-        cursor = self.patient_cql_connection(self.node2, version="3.0.0").cursor()
+        cursor = self.patient_cql_connection(self.node2, version="3.0.0", protocol_version=1)
         cursor.execute("use upgrade;")
 
         for key1 in self.expected_counts.keys():
             for key2 in self.expected_counts[key1].keys():
                 expected_value = self.expected_counts[key1][key2]
-                cursor.execute("SELECT c from countertable where k1='{key1}' and k2={key2};".format(key1=key1, key2=key2), consistency_level='ONE')
-                results = cursor.fetchone()
+
+                query = SimpleStatement("SELECT c from countertable where k1='{key1}' and k2={key2};".format(key1=key1, key2=key2),
+                    consistency_level=ConsistencyLevel.ONE)
+                results = cursor.execute(query)
 
                 if results is not None:
-                    actual_value = results[0]
+                    actual_value = results[0][0]
                 else:
                     # counter wasn't found
                     actual_value = None
@@ -423,7 +423,7 @@ class PointToPointUpgradeBase(TestUpgradeThroughVersions):
         self.upgrade_scenario(populate=False, create_schema=False, after_upgrade_call=(self._bootstrap_new_node_multidc,))
 
     def _multidc_schema_create(self):
-        cursor = self.patient_cql_connection(self.cluster.nodelist()[0], version="3.0.0").cursor()
+        cursor = self.patient_cql_connection(self.cluster.nodelist()[0], version="3.0.0", protocol_version=1)
 
         if self.cluster.version() >= '1.2':
             # DDL for C* 1.2+

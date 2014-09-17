@@ -1,10 +1,8 @@
-import time
-import os
+import time, os
 from distutils import dir_util
 import subprocess
 
 from dtest import Tester, debug
-from tools import *
 from ccmlib import common as ccmcommon
 
 class TestSSTableGenerationAndLoading(Tester):
@@ -27,7 +25,7 @@ class TestSSTableGenerationAndLoading(Tester):
         node1 = cluster.nodelist()[0]
         time.sleep(.5)
 
-        cursor = self.patient_cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'ks', 1)
         self.create_cf(cursor, 'cf', compression="Deflate")
 
@@ -44,8 +42,8 @@ class TestSSTableGenerationAndLoading(Tester):
 
         node1.flush()
         time.sleep(2)
-        cursor.execute("SELECT * FROM cf WHERE KEY = '0' AND c < '8'")
-        cursor.fetchone()
+        rows = cursor.execute("SELECT * FROM cf WHERE KEY = '0' AND c < '8'")
+        assert len(rows) > 0
 
     def remove_index_file_test(self):
         """
@@ -146,7 +144,7 @@ class TestSSTableGenerationAndLoading(Tester):
             self.create_cf(cursor, "counter1", compression=compression, columns={'v': 'counter'})
 
         debug("creating keyspace and inserting")
-        cursor = self.cql_connection(node1).cursor()
+        cursor = self.cql_connection(node1)
         create_schema(cursor, pre_compression)
 
         for i in range(NUM_KEYS):
@@ -175,7 +173,7 @@ class TestSSTableGenerationAndLoading(Tester):
         time.sleep(5) # let gossip figure out what is going on
 
         debug("re-creating the keyspace and column families.")
-        cursor = self.cql_connection(node1).cursor()
+        cursor = self.cql_connection(node1)
         create_schema(cursor, post_compression)
         time.sleep(2)
 
@@ -197,10 +195,10 @@ class TestSSTableGenerationAndLoading(Tester):
 
         def read_and_validate_data(cursor):
             for i in range(NUM_KEYS):
-                cursor.execute("SELECT * FROM standard1 WHERE KEY='%d'" % i)
-                self.assertEquals([str(i), 'col', str(i)], cursor.fetchone())
-                cursor.execute("SELECT * FROM counter1 WHERE KEY='%d'" % i)
-                self.assertEquals([str(i), 1], cursor.fetchone())
+                rows = cursor.execute("SELECT * FROM standard1 WHERE KEY='%d'" % i)
+                self.assertEquals([str(i), 'col', str(i)], list(rows[0]))
+                rows = cursor.execute("SELECT * FROM counter1 WHERE KEY='%d'" % i)
+                self.assertEquals([str(i), 1], list(rows[0]))
 
         debug("Reading data back")
         # Now we should have sstables with the loaded data, and the existing

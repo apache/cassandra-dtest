@@ -1,9 +1,7 @@
 from dtest import Tester
-from assertions import *
 
-import re
+import re, ast
 from ccmlib.cluster import Cluster
-import ast
 
 class TestConfiguration(Tester):
 
@@ -13,13 +11,13 @@ class TestConfiguration(Tester):
 
         cluster.populate(1).start()
         node = cluster.nodelist()[0]
-        cursor = self.patient_cql_connection(node).cursor()
+        cursor = self.patient_cql_connection(node)
         self.create_ks(cursor, 'ks', 1)
 
         create_table_query = "CREATE TABLE test_table (row varchar, name varchar, value int, PRIMARY KEY (row, name));"
         alter_chunk_len_query = "ALTER TABLE test_table WITH compression = {{'sstable_compression' : 'SnappyCompressor', 'chunk_length_kb' : {chunk_length}}};"
 
-        cursor.execute( create_table_query, 1 )
+        cursor.execute( create_table_query)
 
         cursor.execute( alter_chunk_len_query.format(chunk_length=32) )
         self._check_chunk_length( cursor, 32 )
@@ -27,11 +25,11 @@ class TestConfiguration(Tester):
         cursor.execute( alter_chunk_len_query.format(chunk_length=64) )
         self._check_chunk_length( cursor, 64 )
 
-        
+
     def _check_chunk_length(self, cursor, value):
         describe_table_query = "SELECT * FROM system.schema_columnfamilies WHERE keyspace_name='ks' AND columnfamily_name='test_table';"
-        cursor.execute( describe_table_query )
-        results = cursor.fetchall()[0]
+        rows = cursor.execute( describe_table_query )
+        results = rows[0]
         #Now extract the param list
         params = ''
         for result in results:

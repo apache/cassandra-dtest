@@ -1,10 +1,9 @@
-from dtest import Tester, debug, TracingCursor, PRINT_DEBUG
-from tools import *
+from dtest import Tester, debug, PRINT_DEBUG
+from pytools import no_vnodes
 from ccmlib.cluster import Cluster
-import re
-import os
-import time
+import re, os, time
 from collections import defaultdict
+from cassandra.query import SimpleStatement
 
 TRACE_DETERMINE_REPLICAS = re.compile('Determining replicas for mutation')
 TRACE_SEND_MESSAGE = re.compile('Sending message to /([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)')
@@ -52,7 +51,12 @@ class ReplicationTest(Tester):
         forwarders = set([]) #Nodes that forwarded a write to another node
         nodes_contacted = defaultdict(set) #node -> list of nodes that were contacted
 
-        for session, event, activity, source, source_elapsed, thread in trace:
+        for trace_event in trace.events:
+            session = trace._session
+            activity = trace_event.description
+            source = trace_event.source
+            source_elapsed = trace_event.source_elapsed
+            thread = trace_event.thread_name
             # Step 1, find coordinator node:
             if activity.startswith('Determining replicas for mutation'):
                 if not coordinator:
@@ -126,24 +130,24 @@ class ReplicationTest(Tester):
                     if len(replicas) == replication_factor:
                         break
         elif strategy == 'NetworkTopologyStrategy':
-            # NetworkTopologyStrategy can be broken down into multiple 
+            # NetworkTopologyStrategy can be broken down into multiple
             # SimpleStrategies, just once per datacenter:
             for dc,rf in replication_factor.items():
                 dc_nodes = [n for n in nodes if n.data_center == dc]
                 replicas.extend(self.get_replicas_for_token(
                     token, rf, nodes=dc_nodes))
         else:
-            raise NotImplemented('replication strategy not implemented: %s' 
+            raise NotImplemented('replication strategy not implemented: %s'
                                  % strategy)
 
         return replicas
-    
+
     def pprint_trace(self, trace):
         """Pretty print a trace"""
         if PRINT_DEBUG:
             print("-" * 40)
-            for t in trace:
-                print("%s\t%s\t%s\t%s" % (t[3], t[4], t[2], t[5]))
+            for t in trace.events:
+                print("%s\t%s\t%s\t%s" % (t.source, t.source_elapsed, t.description, t.thread_name))
             print("-" * 40)
 
     @no_vnodes()
@@ -152,12 +156,12 @@ class ReplicationTest(Tester):
         self.cluster.populate(3).start()
         time.sleep(5)
         node1 = self.cluster.nodelist()[0]
-        self.conn = self.patient_cql_connection(node1)
-        
+        self.conn = self.patient_exclusive_cql_connection(node1)
+
         # Install a tracing cursor so we can get info about who the
-        # coordinator is contacting: 
-        self.conn.cursorclass = TracingCursor
-        cursor = self.conn.cursor()
+        # coordinator is contacting:
+        cursor = self.conn
+        cursor.max_trace_wait = 120
 
         replication_factor = 3
         self.create_ks(cursor, 'test', replication_factor)
@@ -167,9 +171,10 @@ class ReplicationTest(Tester):
         time.sleep(5)
 
         for key, token in murmur3_hashes.items():
-            cursor.execute("INSERT INTO test (id, value) VALUES (%s, 'asdf')" % key)
+            query = SimpleStatement("INSERT INTO test (id, value) VALUES (%s, 'asdf')" % key)
+            cursor.execute(query, trace=True)
             time.sleep(5)
-            trace = cursor.get_last_trace()
+            trace = query.trace
             stats = self.get_replicas_from_trace(trace)
             replicas_should_be = set(self.get_replicas_for_token(
                 token, replication_factor))
@@ -190,12 +195,12 @@ class ReplicationTest(Tester):
         time.sleep(5)
         node1 = self.cluster.nodelist()[0]
         ip_nodes = dict((node.address(), node) for node in self.cluster.nodelist())
-        self.conn = self.patient_cql_connection(node1)
-        
+        self.conn = self.patient_exclusive_cql_connection(node1)
+
         # Install a tracing cursor so we can get info about who the
-        # coordinator is contacting: 
-        self.conn.cursorclass = TracingCursor
-        cursor = self.conn.cursor()
+        # coordinator is contacting:
+        cursor = self.conn
+        cursor.max_trace_wait = 120
 
         replication_factor = {'dc1':2, 'dc2':2}
         self.create_ks(cursor, 'test', replication_factor)
@@ -207,12 +212,14 @@ class ReplicationTest(Tester):
         forwarders_used = set()
 
         for key, token in murmur3_hashes.items():
-            cursor.execute("INSERT INTO test (id, value) VALUES (%s, 'asdf')" % key)
+            query = SimpleStatement("INSERT INTO test (id, value) VALUES (%s, 'asdf')" % key)
+            cursor.execute(query, trace=True)
             time.sleep(5)
-            trace = cursor.get_last_trace()
+            trace = query.trace
             stats = self.get_replicas_from_trace(trace)
             replicas_should_be = set(self.get_replicas_for_token(
                 token, replication_factor, strategy='NetworkTopologyStrategy'))
+            debug('Current token is %s' % token)
             debug('\nreplicas should be: %s' % replicas_should_be)
             debug('replicas were: %s' % stats['replicas'])
             self.pprint_trace(trace)
@@ -228,12 +235,16 @@ class ReplicationTest(Tester):
             # Record the forwarder used for each INSERT:
             forwarders_used = forwarders_used.union(stats['forwarders'])
 
-            #Make sure the correct nodes are replicas:
-            self.assertEqual(stats['replicas'], replicas_should_be)
-            #Make sure that each replica node was contacted and
-            #acknowledged the write:
-            self.assertEqual(stats['nodes_sent_write'], stats['nodes_responded_write'])
-            
+            try:
+                #Make sure the correct nodes are replicas:
+                self.assertEqual(stats['replicas'], replicas_should_be)
+                #Make sure that each replica node was contacted and
+                #acknowledged the write:
+                self.assertEqual(stats['nodes_sent_write'], stats['nodes_responded_write'])
+            except AssertionError as e:
+                debug("Failed on key %s and token %s." % (key, token))
+                raise e
+
         #Given a diverse enough keyset, each node in the second
         #datacenter should get a chance to be a forwarder:
         self.assertEqual(len(forwarders_used), 3)

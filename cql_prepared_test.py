@@ -1,8 +1,7 @@
 from dtest import Tester
-from assertions import *
-from tools import *
+from pytools import since
 
-import os, sys, time, tools
+import os, sys, time, pytools
 from uuid import UUID
 from ccmlib.cluster import Cluster
 
@@ -17,7 +16,7 @@ class TestCQL(Tester):
         node1 = cluster.nodelist()[0]
         time.sleep(0.2)
 
-        cursor = self.patient_cql_connection(node1, version=cql_version).cursor()
+        cursor = self.patient_cql_connection(node1, version=cql_version)
         self.create_ks(cursor, 'ks', 1)
         return cursor
 
@@ -33,7 +32,7 @@ class TestCQL(Tester):
             )
         """)
 
-        query = "BEGIN BATCH INSERT INTO cf (k, c) VALUES (:key, :val); APPLY BATCH";
-        pq = cursor.prepare_query(query);
+        query = "BEGIN BATCH INSERT INTO cf (k, c) VALUES (?, ?); APPLY BATCH";
+        pq = cursor.prepare(query);
 
-        cursor.execute_prepared(pq, params={'key' : 'foo', 'val' : 4})
+        cursor.execute(pq, ['foo', 4])

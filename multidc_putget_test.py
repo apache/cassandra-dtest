@@ -1,5 +1,5 @@
 from dtest import Tester
-from tools import putget
+from pytools import putget
 from ccmlib.cluster import Cluster
 
 class TestMultiDCPutGet(Tester):
@@ -9,7 +9,7 @@ class TestMultiDCPutGet(Tester):
         cluster = self.cluster
         cluster.populate([1, 1]).start()
 
-        cursor = self.patient_cql_connection(cluster.nodelist()[0]).cursor()
+        cursor = self.patient_cql_connection(cluster.nodelist()[0])
         self.create_ks(cursor, 'ks', { 'dc1' : 1, 'dc2' : 1})
         self.create_cf(cursor, 'cf')
 
@@ -20,7 +20,7 @@ class TestMultiDCPutGet(Tester):
         cluster = self.cluster
         cluster.populate([2, 2]).start()
 
-        cursor = self.patient_cql_connection(cluster.nodelist()[0]).cursor()
+        cursor = self.patient_cql_connection(cluster.nodelist()[0])
         self.create_ks(cursor, 'ks', { 'dc1' : 2, 'dc2' : 2})
         self.create_cf(cursor, 'cf')
 

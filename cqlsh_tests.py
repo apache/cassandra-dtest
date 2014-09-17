@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
 from dtest import Tester, debug
-from tools import since, require
+from pytools import since, require
 from ccmlib import common
 import subprocess
 import binascii
 from decimal import Decimal
-import sys, os
+import sys, os, datetime
 from uuid import UUID
 from distutils.version import LooseVersion
+from pytools import create_c1c2_table, insert_c1c2, since
 
 class TestCqlsh(Tester):
 
@@ -32,14 +33,14 @@ class TestCqlsh(Tester):
             insert into simple (id, value) VALUES (4, 'four');
             insert into simple (id, value) VALUES (5, 'five')""")
 
-        cursor = self.patient_cql_connection(node1).cursor()
-        cursor.execute("select id, value from simple.simple");
+        cursor = self.patient_cql_connection(node1)
+        rows = cursor.execute("select id, value from simple.simple");
 
-        self.assertEqual({1:'one', 2:'two', 3:'three', 4:'four', 5:'five'}, 
-                         {k : v for k,v in cursor})
+        self.assertEqual({1:'one', 2:'two', 3:'three', 4:'four', 5:'five'},
+                         {k : v for k,v in rows})
 
     def test_eat_glass(self):
-        
+
         self.cluster.populate(1)
         self.cluster.start()
 
@@ -49,8 +50,8 @@ class TestCqlsh(Tester):
         node1.run_cqlsh(cmds = u"""create KEYSPACE testks WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
 use testks;
 
-CREATE TABLE varcharmaptable ( 
-        varcharkey varchar , 
+CREATE TABLE varcharmaptable (
+        varcharkey varchar ,
         varcharasciimap map<varchar, ascii>,
         varcharbigintmap map<varchar, bigint>,
         varcharblobmap map<varchar, blob>,
@@ -159,13 +160,13 @@ UPDATE varcharmaptable SET varcharvarintmap = varcharvarintmap + {'Vitrum edere 
 UPDATE varcharmaptable SET varcharvarintmap['Vitrum edere possum, mihi non nocet.'] = 1010010101020400204143243 WHERE varcharkey= '᚛᚛ᚉᚑᚅᚔᚉᚉᚔᚋ ᚔᚈᚔ ᚍᚂᚐᚅᚑ ᚅᚔᚋᚌᚓᚅᚐ᚜'
         """.encode("utf-8"))
 
-        cursor = self.patient_cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1)
         def verify_varcharmap(map_name, expected, encode_value=False):
-            cursor.execute((u"SELECT %s FROM testks.varcharmaptable WHERE varcharkey= '᚛᚛ᚉᚑᚅᚔᚉᚉᚔᚋ ᚔᚈᚔ ᚍᚂᚐᚅᚑ ᚅᚔᚋᚌᚓᚅᚐ᚜';" % map_name).encode("utf-8"))
+            rows = cursor.execute((u"SELECT %s FROM testks.varcharmaptable WHERE varcharkey= '᚛᚛ᚉᚑᚅᚔᚉᚉᚔᚋ ᚔᚈᚔ ᚍᚂᚐᚅᚑ ᚅᚔᚋᚌᚓᚅᚐ᚜';" % map_name).encode("utf-8"))
             if encode_value:
-                got = {k.encode("utf-8"):v.encode("utf-8") for k,v in cursor.fetchone()[0].iteritems()}
+                got = {k.encode("utf-8"):v.encode("utf-8") for k,v in rows[0][0].iteritems()}
             else:
-                got = {k.encode("utf-8"):v for k,v in cursor.fetchone()[0].iteritems()}
+                got = {k.encode("utf-8"):v for k,v in rows[0][0].iteritems()}
             self.assertEqual(got, expected)
 
         verify_varcharmap('varcharasciimap', {
@@ -240,10 +241,10 @@ UPDATE varcharmaptable SET varcharvarintmap['Vitrum edere possum, mihi non nocet
         })
 
         verify_varcharmap('varchartimestampmap', {
-            'Vitrum edere possum, mihi non nocet.' : '\x00\x00\x01?Zs\x1dH',
-            ' ⠊⠀⠉⠁⠝⠀⠑⠁⠞⠀⠛⠇⠁⠎⠎⠀⠁⠝⠙⠀⠊⠞⠀⠙⠕⠑⠎⠝⠞⠀⠓⠥⠗⠞⠀⠍⠑' : '\x00\x00\x00r\x86\xfa\xe3\xc8',
-            'Можам да јадам стакло, а не ме штета.' : '\x00\x00\x00\xdcj\xe1\xffh',
-            'I can eat glass and it does not hurt me' : '\xff\xff\xff3\xa9\x0f^H'
+            'Vitrum edere possum, mihi non nocet.' : datetime.datetime(2013, 6, 19, 3, 21, 1),
+            ' ⠊⠀⠉⠁⠝⠀⠑⠁⠞⠀⠛⠇⠁⠎⠎⠀⠁⠝⠙⠀⠊⠞⠀⠙⠕⠑⠎⠝⠞⠀⠓⠥⠗⠞⠀⠍⠑' : datetime.datetime(1985, 8, 3, 4, 21, 1),
+            'Можам да јадам стакло, а не ме штета.' : datetime.datetime(2000, 1, 1, 0, 20, 1),
+            'I can eat glass and it does not hurt me' : datetime.datetime(1942, 3, 11, 5, 21, 1)
         })
 
         verify_varcharmap('varcharuuidmap', {
@@ -361,6 +362,30 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
              |                      |                            \n\n(5 rows)"""
 
         self.assertTrue(expected in output, "Output \n {%s} \n doesn't contain expected\n {%s}" % (output, expected))
+
+    @since('2.0')
+    def tracing_from_system_traces_test(self):
+        self.cluster.populate(1).start()
+
+        node1, = self.cluster.nodelist()
+        node1.watch_log_for('thrift clients...')
+
+        session = self.patient_cql_connection(node1)
+
+        self.create_ks(session, 'ks', 1)
+        create_c1c2_table(self, session)
+
+        for n in xrange(100):
+            insert_c1c2(session, n)
+
+        out = self.run_cqlsh(node1, 'TRACING ON; SELECT * FROM ks.cf')
+        self.assertIn('Tracing session: ', out)
+
+        out = self.run_cqlsh(node1, 'TRACING ON; SELECT * FROM system_traces.events')
+        self.assertNotIn('Tracing session: ', out)
+
+        out = self.run_cqlsh(node1, 'TRACING ON; SELECT * FROM system_traces.sessions')
+        self.assertNotIn('Tracing session: ', out)
 
     def run_cqlsh(self, node, cmds, cqlsh_options=[]):
         cdir = node.get_cassandra_dir()

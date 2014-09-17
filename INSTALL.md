@@ -51,11 +51,19 @@ will often need to modify them in some fashion at some later point:
         sudo pip install -e ccm
         sudo pip install pyyaml
 
+* python-driver
+
+        cd ~/git/cstar
+        sudo pip install cassandra-driver
+        For more instructions on how to install the python-driver,
+        see http://datastax.github.io/python-driver/installation.html
+
 * cql
 
         cd ~/git/cstar
         git clone https://code.google.com/a/apache-extras.org/p/cassandra-dbapi2/
         sudo pip install -e cassandra-dbapi2
+        This is needed for a few legacy tests, and for cql over thrift
 
 * cassandra-dtest
 
@@ -64,7 +72,7 @@ will often need to modify them in some fashion at some later point:
 
 * nose
 
-        sudo apt-get install python-nose    
+        sudo apt-get install python-nose
 
 * cassandra
 
@@ -77,9 +85,9 @@ will often need to modify them in some fashion at some later point:
  it's unit tests:
 
         ant test
-        
- Note: you  may need to install ant-optional to get junit working:
- 
+
+ Note: you may need to install ant-optional to get junit working:
+
         sudo apt-get install ant-optional
 
 ## Setup and run dtests
@@ -101,3 +109,7 @@ will often need to modify them in some fashion at some later point:
 
          cd ~/git/cstar/cassandra-dtest
          PRINT_DEBUG=true nosetests -x -s -v putget_test.py
+
+* To reuse cassandra clusters when possible, set the environment variable REUSE_CLUSTER
+
+        REUSE_CLUSTER=true nosetests -s -v cql_tests.py

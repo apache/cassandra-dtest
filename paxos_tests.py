@@ -1,9 +1,9 @@
 # coding: utf-8
 
 from dtest import Tester
-from assertions import *
-from cql import ProgrammingError, OperationalError
-from tools import *
+from pytools import since
+from cassandra import ConsistencyLevel, WriteTimeout
+from cassandra.query import SimpleStatement
 
 import time
 from threading import Thread
@@ -24,7 +24,7 @@ class TestPaxos(Tester):
         node1 = cluster.nodelist()[0]
         time.sleep(0.2)
 
-        cursor = self.patient_cql_connection(node1, version="3.0.0").cursor()
+        cursor = self.patient_cql_connection(node1, version="3.0.0")
         if create_keyspace:
             self.create_ks(cursor, 'ks', rf)
         return cursor
@@ -34,6 +34,8 @@ class TestPaxos(Tester):
         self._contention_test(8, 100)
 
     @since('2.0.6')
+    ##Warning, this test will require you to raise the open
+    ##file limit on OSX. Use 'ulimit -n 1000'
     def contention_test_many_threds(self):
         self._contention_test(300, 1)
 
@@ -64,8 +66,7 @@ class TestPaxos(Tester):
                     done = False
                     while not done:
                         try:
-                            self.cursor.execute_prepared(self.query, { 'new_value' : prev+1, 'prev_value' : prev, 'worker_id' : self.wid })
-                            res = self.cursor.fetchall()
+                            res = self.cursor.execute(self.query, (prev+1, prev, self.wid ))
                             if verbose:
                                 print "[%3d] CAS %3d -> %3d (res: %s)" % (self.wid, prev, prev+1, str(res))
                             if res[0][0] is True:
@@ -81,7 +82,7 @@ class TestPaxos(Tester):
                                     if verbose:
                                         print "[%3d] Update was inserted on previous try (res = %s)" % (self.wid, str(res))
                                     done = True
-                        except OperationalError as e:
+                        except WriteTimeout as e:
                             if verbose:
                                 print "[%3d] TIMEOUT (%s)" % (self.wid, str(e))
                             # This means a timeout: just retry, if it happens that our update was indeed persisted,
@@ -98,23 +99,21 @@ class TestPaxos(Tester):
                         try:
                             self.cursor.execute("DELETE FROM test WHERE k = 0 AND id = %d IF EXISTS" % self.wid)
                             break;
-                        except OperationalError as e:
-                            # Timeout, just retry
+                        except WriteTimeout as e:
                             pass
-
 
         nodes = self.cluster.nodelist()
         workers = []
-        for n in range(0, threads):
-            c = self.cql_connection(nodes[n % len(nodes)], version="3.0.0").cursor()
-            # This is overkill, we prepare the query multiple time per-host, but not a huge deal
-            c.execute("USE ks")
-            q = c.prepare_query("""
+
+        c = self.patient_cql_connection(nodes[0], version="3.0.0", keyspace='ks')
+        q = c.prepare("""
                 BEGIN BATCH
-                   UPDATE test SET v = :new_value WHERE k = 0 IF v = :prev_value;
-                   INSERT INTO test (k, id) VALUES (0, :worker_id) IF NOT EXISTS;
+                   UPDATE test SET v = ? WHERE k = 0 IF v = ?;
+                   INSERT INTO test (k, id) VALUES (0, ?) IF NOT EXISTS;
                 APPLY BATCH
             """)
+
+        for n in range(0, threads):
             workers.append(Worker(n, c, iterations, q))
 
         start = time.time()
@@ -129,8 +128,9 @@ class TestPaxos(Tester):
             runtime = time.time() - start
             print "runtime:", runtime
 
-        cursor.execute("SELECT v FROM test WHERE k = 0", consistency_level='ALL')
-        value = cursor.fetchall()[0][0]
+        query = SimpleStatement("SELECT v FROM test WHERE k = 0", consistency_level=ConsistencyLevel.ALL)
+        rows = cursor.execute(query)
+        value = rows[0][0]
 
         errors = 0
         retries = 0

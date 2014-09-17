@@ -1,6 +1,8 @@
 import time, re
 from dtest import Tester, debug
-from tools import *
+from cassandra import ConsistencyLevel
+from cassandra.query import SimpleStatement
+from pytools import no_vnodes, insert_c1c2, query_c1c2
 
 class TestRepair(Tester):
 
@@ -11,22 +13,17 @@ class TestRepair(Tester):
                 stopped_nodes.append(node)
                 node.stop(wait_other_notice=True)
 
-        cursor = self.patient_cql_connection(node_to_check, 'ks').cursor()
-        cursor.execute("SELECT * FROM cf LIMIT %d" % (rows * 2))
-        assert cursor.rowcount == rows, cursor.rowcount
+        cursor = self.patient_cql_connection(node_to_check, 'ks')
+        result = cursor.execute("SELECT * FROM cf LIMIT %d" % (rows * 2))
+        assert len(result) == rows, len(result)
 
         for k in found:
-            query_c1c2(cursor, k, "ONE")
+            query_c1c2(cursor, k, ConsistencyLevel.ONE)
 
         for k in missings:
-            if self.cluster.version() >= '1.2':
-                cursor.execute("SELECT c1, c2 FROM cf WHERE key='k%d'" % k, consistency_level='ONE')
-            else:
-                cursor.execute('SELECT c1, c2 FROM cf USING CONSISTENCY ONE WHERE key=k%d' % k)
-            res = cursor.fetchall()
+            query = SimpleStatement("SELECT c1, c2 FROM cf WHERE key='k%d'" % k, consistency_level=ConsistencyLevel.ONE)
+            res = cursor.execute(query)
             assert len(filter(lambda x: len(x) != 0, res)) == 0, res
-
-        cursor.close()
 
         if restart:
             for node in stopped_nodes:
@@ -52,21 +49,20 @@ class TestRepair(Tester):
         cluster.populate(3).start()
         [node1, node2, node3] = cluster.nodelist()
 
-        cursor = self.patient_cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'ks', 3)
         self.create_cf(cursor, 'cf', read_repair=0.0, columns={'c1': 'text', 'c2': 'text'})
 
         # Insert 1000 keys, kill node 3, insert 1 key, restart node 3, insert 1000 more keys
         debug("Inserting data...")
         for i in xrange(0, 1000):
-            insert_c1c2(cursor, i, "ALL")
+            insert_c1c2(cursor, i, ConsistencyLevel.ALL)
         node3.flush()
         node3.stop()
-        insert_c1c2(cursor, 1000, "TWO")
+        insert_c1c2(cursor, 1000, ConsistencyLevel.TWO)
         node3.start(wait_other_notice=True)
         for i in xrange(1001, 2001):
-            insert_c1c2(cursor, i, "ALL")
-        cursor.close()
+            insert_c1c2(cursor, i, ConsistencyLevel.ALL)
 
         cluster.flush()
 

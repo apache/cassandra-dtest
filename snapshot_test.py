@@ -1,10 +1,6 @@
 from dtest import Tester, debug
-from tools import replace_in_file
-import tempfile
-import shutil
-import glob
-import os
-import time
+from pytools import replace_in_file
+import tempfile, shutil, glob, os, time
 import distutils.dir_util
 
 class SnapshotTester(Tester):
@@ -54,7 +50,7 @@ class TestSnapshot(SnapshotTester):
         cluster = self.cluster
         cluster.populate(1).start()
         (node1,) = cluster.nodelist()
-        cursor = self.patient_cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'ks', 1)
         cursor.execute('CREATE TABLE ks.cf ( key int PRIMARY KEY, val text);')
 
@@ -64,26 +60,26 @@ class TestSnapshot(SnapshotTester):
         # Write more data after the snapshot, this will get thrown
         # away when we restore:
         self.insert_rows(cursor, 100, 200)
-        cursor.execute('SELECT count(*) from ks.cf')
-        self.assertEqual(cursor.fetchone()[0], 200)
+        rows = cursor.execute('SELECT count(*) from ks.cf')
+        self.assertEqual(rows[0][0], 200)
 
         # Drop the keyspace, make sure we have no data:
         cursor.execute('DROP KEYSPACE ks')
         self.create_ks(cursor, 'ks', 1)
         cursor.execute('CREATE TABLE ks.cf ( key int PRIMARY KEY, val text);')
-        cursor.execute('SELECT count(*) from ks.cf')
-        self.assertEqual(cursor.fetchone()[0], 0)
+        rows = cursor.execute('SELECT count(*) from ks.cf')
+        self.assertEqual(rows[0][0], 0)
 
         # Restore data from snapshot:
         self.restore_snapshot(snapshot_dir, node1, 'ks', 'cf')
         node1.nodetool('refresh ks cf')
-        cursor.execute('SELECT count(*) from ks.cf')
+        rows = cursor.execute('SELECT count(*) from ks.cf')
 
         # clean up
         debug("removing snapshot_dir: " + snapshot_dir)
         shutil.rmtree(snapshot_dir)
 
-        self.assertEqual(cursor.fetchone()[0], 100)
+        self.assertEqual(rows[0][0], 100)
 
 class TestArchiveCommitlog(SnapshotTester):
     def __init__(self, *args, **kwargs):
@@ -154,7 +150,7 @@ class TestArchiveCommitlog(SnapshotTester):
 
         cluster.start()
 
-        cursor = self.patient_cql_connection(node1).cursor()
+        cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'ks', 1)
         cursor.execute('CREATE TABLE ks.cf ( key bigint PRIMARY KEY, val text);')
         debug("Writing first 30,000 rows...")
@@ -186,8 +182,7 @@ class TestArchiveCommitlog(SnapshotTester):
             # Record when the third set of inserts finished:
             insert_cutoff_times.append(time.gmtime())
 
-            cursor.execute('SELECT count(*) from ks.cf')
-            rows = cursor.fetchall()
+            rows = cursor.execute('SELECT count(*) from ks.cf')
             # Make sure we have the same amount of rows as when we snapshotted:
             self.assertEqual(rows[0][0], 65000)
 
@@ -222,11 +217,11 @@ class TestArchiveCommitlog(SnapshotTester):
             self.restore_snapshot(snapshot_dir, node1, 'ks', 'cf', 'basic')
 
             cluster.start()
-            cursor = self.patient_cql_connection(node1).cursor()
+
+            cursor = self.patient_cql_connection(node1)
             node1.nodetool('refresh ks cf')
 
-            cursor.execute('SELECT count(*) from ks.cf')
-            rows = cursor.fetchall()
+            rows = cursor.execute('SELECT count(*) from ks.cf')
             # Make sure we have the same amount of rows as when we snapshotted:
             self.assertEqual(rows[0][0], 30000)
 
@@ -251,10 +246,8 @@ class TestArchiveCommitlog(SnapshotTester):
             node1.nodetool('flush')
             node1.nodetool('compact')
 
-            cursor = self.patient_cql_connection(node1).cursor()
-            cursor.execute('SELECT count(*) from ks.cf')
-            rows = cursor.fetchall()
-
+            cursor = self.patient_cql_connection(node1)
+            rows = cursor.execute('SELECT count(*) from ks.cf')
             # Now we should have 30000 rows from the snapshot + 30000 rows
             # from the commitlog backups:
             if not restore_archived_commitlog:

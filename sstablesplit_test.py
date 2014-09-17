@@ -1,6 +1,4 @@
 from dtest import Tester, debug
-from assertions import *
-from tools import *
 
 from os.path import getsize
 import time
@@ -28,7 +26,7 @@ class TestSSTableSplit(Tester):
             node.stress( ['-o', 'insert'] )
         else:
             node.stress( ['write', 'n=1000000', '-rate', 'threads=50'] )
-        
+
         self._do_compaction(node)
         self._do_split(node, version)
         self._do_compaction(node)

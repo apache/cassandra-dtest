@@ -7,7 +7,7 @@ class TestGlobalRowKeyCache(Tester):
 
     def __init__(self, *argv, **kwargs):
         super(TestGlobalRowKeyCache, self).__init__(*argv, **kwargs)
-        # When a node goes down under load it prints an error in it's log. 
+        # When a node goes down under load it prints an error in it's log.
         # If we don't allow log errors, then the test will fail.
 #        self.allow_log_errors = True
 
@@ -43,14 +43,14 @@ class TestGlobalRowKeyCache(Tester):
                         })
                 cluster.start()
                 time.sleep(.5)
-                cursor = self.cql_connection(node1).cursor()
+                cursor = self.cql_connection(node1)
                 self.create_ks(cursor, ks_name, 3)
                 time.sleep(1) # wait for propagation
 
                 host, port = node1.network_interfaces['thrift']
 
                 # create some load makers
-                lm_standard = LoadMaker(host, port, 
+                lm_standard = LoadMaker(host, port,
                         keyspace_name=ks_name, column_family_type='standard')
                 lm_counter = LoadMaker(host, port,
                         keyspace_name=ks_name, column_family_type='standard', is_counter=True)
