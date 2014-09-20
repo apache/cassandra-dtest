@@ -228,7 +228,7 @@ class TestUserTypes(Tester):
         stmt = """
               CREATE TABLE simple_table (
               id uuid PRIMARY KEY,
-              number simple_type
+              number frozen<simple_type>
               )
            """
         cursor.execute(stmt)
@@ -295,7 +295,7 @@ class TestUserTypes(Tester):
 
         stmt = """
               CREATE TYPE another_type (
-              somefield simple_type
+              somefield frozen<simple_type>
               )
            """
         cursor.execute(stmt)
@@ -349,7 +349,7 @@ class TestUserTypes(Tester):
         stmt = """
               CREATE TABLE simple_table (
               id uuid PRIMARY KEY,
-              number simple_type
+              number frozen<simple_type>
               )
            """
         cursor.execute(stmt)
@@ -401,7 +401,7 @@ class TestUserTypes(Tester):
         stmt = """
               CREATE TYPE container (
               stuff text,
-              more_stuff item
+              more_stuff frozen<item>
               )
            """
         cursor.execute(stmt)
@@ -411,9 +411,9 @@ class TestUserTypes(Tester):
         stmt = """
               CREATE TABLE bucket (
                id uuid PRIMARY KEY,
-               primary_item item,
-               other_items container,
-               other_containers list<container>
+               primary_item frozen<item>,
+               other_items frozen<container>,
+               other_containers list<frozen<container>>
               )
            """
         cursor.execute(stmt)
@@ -505,7 +505,7 @@ class TestUserTypes(Tester):
         stmt = """
               CREATE TABLE person_likes (
               id uuid,
-              name t_person_name,
+              name frozen<t_person_name>,
               like text,
               PRIMARY KEY ((id, name))
               )
@@ -562,7 +562,7 @@ class TestUserTypes(Tester):
         stmt = """
               CREATE TABLE person_likes (
               id uuid PRIMARY KEY,
-              name t_person_name,
+              name frozen<t_person_name>,
               like text
               )
            """
@@ -625,14 +625,14 @@ class TestUserTypes(Tester):
         self.assertEqual(first_name, u'Nero')
         self.assertEqual(like, u'arson')
 
-        # rename the type and make sure the index still works
+        # rename a field in the type and make sure the index still works
         stmt = """
-            ALTER TYPE t_person_name rename to t_person_name2;
+            ALTER TYPE t_person_name rename first to first_name;
             """
         cursor.execute(stmt)
 
         stmt = """
-            SELECT id, name.first, like from person_likes where name = {first:'Nero', middle: 'Claudius Caesar Augustus', last: 'Germanicus'};
+            SELECT id, name.first_name, like from person_likes where name = {first_name:'Nero', middle: 'Claudius Caesar Augustus', last: 'Germanicus'};
             """
 
         rows = cursor.execute(stmt)
@@ -648,12 +648,12 @@ class TestUserTypes(Tester):
 
         stmt = """
               INSERT INTO person_likes (id, name, like)
-              VALUES ({id}, {{first:'Abraham', middle:'', last:'Lincoln'}}, 'preserving unions');
+              VALUES ({id}, {{first_name:'Abraham', middle:'', last:'Lincoln'}}, 'preserving unions');
            """.format(id=_id)
         cursor.execute(stmt)
 
         stmt = """
-            SELECT id, name.first, like from person_likes where name = {first:'Abraham', middle:'', last:'Lincoln'};
+            SELECT id, name.first_name, like from person_likes where name = {first_name:'Abraham', middle:'', last:'Lincoln'};
             """
 
         rows = cursor.execute(stmt)
@@ -715,18 +715,17 @@ class TestUserTypes(Tester):
         assert_invalid(user2_cursor, "DROP TYPE ks1.simple_type;", 'User ks2_user has no DROP permission on <keyspace ks1> or any of its parents')
 
         # let's make sure they can't rename each other's types (for which they have no permissions)
-        assert_invalid(user1_cursor, "ALTER TYPE ks2.simple_type RENAME TO ks2.renamed_type;", 'User ks1_user has no ALTER permission on <keyspace ks2> or any of its parents')
+        assert_invalid(user1_cursor, "ALTER TYPE ks2.simple_type RENAME user_number TO user_num;", 'User ks1_user has no ALTER permission on <keyspace ks2> or any of its parents')
 
-        assert_invalid(user2_cursor, "ALTER TYPE ks1.simple_type RENAME TO ks1.renamed_type;", 'User ks2_user has no ALTER permission on <keyspace ks1> or any of its parents')
-
+        assert_invalid(user2_cursor, "ALTER TYPE ks1.simple_type RENAME user_number TO user_num;", 'User ks2_user has no ALTER permission on <keyspace ks1> or any of its parents')
 
         # rename the types using the correct user w/permissions to do so
-        user1_cursor.execute("ALTER TYPE ks1.simple_type RENAME TO ks1.renamed_type;")
-        user2_cursor.execute("ALTER TYPE ks2.simple_type RENAME TO ks2.renamed_type;")
+        user1_cursor.execute("ALTER TYPE ks1.simple_type RENAME user_number TO user_num;")
+        user2_cursor.execute("ALTER TYPE ks2.simple_type RENAME user_number TO user_num;")
 
         # finally, drop the types using the correct user w/permissions to do so
-        user1_cursor.execute("DROP TYPE ks1.renamed_type;")
-        user2_cursor.execute("DROP TYPE ks2.renamed_type;")
+        user1_cursor.execute("DROP TYPE ks1.simple_type;")
+        user2_cursor.execute("DROP TYPE ks2.simple_type;")
 
         #verify user type metadata is gone from the system schema
         rows = superuser_cursor.execute("SELECT * from system.schema_usertypes")
@@ -759,7 +758,7 @@ class TestUserTypes(Tester):
         stmt = """
               CREATE TABLE bucket (
                id int PRIMARY KEY,
-               my_item item,
+               my_item frozen<item>,
               )
            """
         cursor.execute(stmt)
@@ -820,7 +819,7 @@ class TestUserTypes(Tester):
         stmt = """
               CREATE TABLE letters (
               id int,
-              letterpair t_letterpair,
+              letterpair frozen<t_letterpair>,
               PRIMARY KEY (id, letterpair)
               )
            """
