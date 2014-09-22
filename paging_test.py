@@ -52,6 +52,10 @@ class PageFetcher(object):
         self.wait(seconds=30)
 
     def handle_page(self, rows):
+        # occasionally get a final blank page that is useless
+        if rows == []:
+            return
+
         self.retrieved_pages += 1
         page = Page()
         self.pages.append(page)
