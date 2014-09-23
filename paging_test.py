@@ -281,9 +281,9 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
         # make sure expected and actual have same data elements (ignoring order)
         self.assertEqualIgnoreOrder(pf.all_data(), expected_data)
 
-    def test_zero_page_size_ignored(self):
+    def test_undefined_page_size_default(self):
         """
-        If the page size <= 0 then the default fetch size is used.
+        If the page size isn't sent then the default fetch size is used.
         """
         cursor = self.prepare()
         self.create_ks(cursor, 'test_paging_size', 2)
@@ -293,18 +293,17 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
             return uuid.uuid1()
 
         data = """
-              | id     |value   |
-         *5001| [uuid] |testing |
+               | id     |value   |
+          *5001| [uuid] |testing |
             """
         expected_data = create_rows(data, cursor, 'paging_test', format_funcs={'id': random_txt, 'value': unicode})
 
         future = cursor.execute_async(
-            SimpleStatement("select * from paging_test", fetch_size=0)
+            SimpleStatement("select * from paging_test")
         )
 
         pf = PageFetcher(future).request_all()
 
-        self.assertEqual(pf.pagecount(), 2)
         self.assertEqual(pf.num_results_all(), [5000, 1])
 
         # make sure expected and actual have same data elements (ignoring order)
