@@ -309,6 +309,34 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
         # make sure expected and actual have same data elements (ignoring order)
         self.assertEqualIgnoreOrder(pf.all_data(), expected_data)
 
+    def test_zero_page_size_default(self):
+        """
+        If the page size isn't sent then the default fetch size is used.
+        """
+        cursor = self.prepare()
+        self.create_ks(cursor, 'test_paging_size', 2)
+        cursor.execute("CREATE TABLE paging_test ( id uuid PRIMARY KEY, value text )")
+
+        def random_txt(text):
+            return uuid.uuid1()
+
+        data = """
+               | id     |value   |
+          *5000| [uuid] |testing |
+            """
+        expected_data = create_rows(data, cursor, 'paging_test', format_funcs={'id': random_txt, 'value': unicode})
+
+        future = cursor.execute_async(
+            SimpleStatement("select * from paging_test", fetch_size=0)
+        )
+
+        pf = PageFetcher(future).request_all()
+
+        self.assertEqual(pf.num_results_all(), [5000, 1])
+
+        # make sure expected and actual have same data elements (ignoring order)
+        self.assertEqualIgnoreOrder(pf.all_data(), expected_data)
+
 
 class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
     """
