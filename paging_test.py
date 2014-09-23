@@ -31,6 +31,7 @@ class PageFetcher(object):
     future = None
     requested_pages = None
     retrieved_pages = None
+    retrieved_empty_pages = None
 
     def __init__(self, future):
         self.pages = []
@@ -45,6 +46,7 @@ class PageFetcher(object):
         # won't be incremented until it actually arrives
         self.requested_pages = 1
         self.retrieved_pages = 0
+        self.retrieved_empty_pages = 0
 
         # wait for the first page to arrive, otherwise we may call
         # future.has_more_pages too early, since it should only be
@@ -54,6 +56,7 @@ class PageFetcher(object):
     def handle_page(self, rows):
         # occasionally get a final blank page that is useless
         if rows == []:
+            self.retrieved_empty_pages += 1
             return
 
         self.retrieved_pages += 1
@@ -104,14 +107,14 @@ class PageFetcher(object):
         expiry = time.time() + seconds
 
         while time.time() < expiry:
-            if self.requested_pages == self.retrieved_pages:
+            if self.requested_pages == (self.retrieved_pages + self.retrieved_empty_pages):
                 return self
 
         raise RuntimeError("Requested pages were not delivered before timeout.")
 
     def retrieved_pagecount(self):
         """
-        Returns count of *retrieved* pages.
+        Returns count of *retrieved* pages which were not empty.
 
         Pages are retrieved by requesting them with request_page and/or request_all_pages.
         """
