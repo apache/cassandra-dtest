@@ -1,4 +1,5 @@
 import re
+from cassandra.concurrent import execute_concurrent_with_args
 
 
 def strip(val):
@@ -101,19 +102,20 @@ def create_rows(data, cursor, table_name, format_funcs=None, prefix='', postfix=
     Returns a list of maps describing the data created.
     """
     values = []
-    prepared = None
+    dicts = parse_data_into_dicts(data, format_funcs=format_funcs)
 
-    for row_dict in parse_data_into_dicts(data, format_funcs=format_funcs):
-        # prepare if this is the first statement
-        if prepared is None:
-            prepared = cursor.prepare("{prefix} INSERT INTO {table} ({cols}) values ({vals}) {postfix}".format(
-                prefix=prefix, table=table_name, cols=', '.join(row_dict.keys()),
-                vals=', '.join('?' for k in row_dict.keys()), postfix=postfix)
-            )
+    # use the first dictionary to build a prepared statement for all
+    prepared = cursor.prepare(
+        "{prefix} INSERT INTO {table} ({cols}) values ({vals}) {postfix}".format(
+            prefix=prefix, table=table_name, cols=', '.join(dicts[0].keys()),
+            vals=', '.join('?' for k in dicts[0].keys()), postfix=postfix)
+    )
 
-        bound_stmt = prepared.bind(row_dict.values())
-        cursor.execute(bound_stmt)
-        values.append(row_dict)
+    query_results = execute_concurrent_with_args(cursor, prepared, [d.values() for d in dicts])
+
+    for i, (status, result_or_exc) in enumerate(query_results):
+        # should maybe check status here before appening to expected values
+        values.append(dicts[i])
 
     return values
 
