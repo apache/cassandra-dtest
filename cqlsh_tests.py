@@ -275,7 +275,7 @@ UPDATE varcharmaptable SET varcharvarintmap['Vitrum edere possum, mihi non nocet
             'I can eat glass and it does not hurt me' : 1400
         })
 
-        output = self.run_cqlsh(node1, 'use testks; SELECT * FROM varcharmaptable')
+        output, err = self.run_cqlsh(node1, 'use testks; SELECT * FROM varcharmaptable')
 
         self.assertEquals(output.count('Можам да јадам стакло, а не ме штета.'), 16)
         self.assertEquals(output.count(' ⠊⠀⠉⠁⠝⠀⠑⠁⠞⠀⠛⠇⠁⠎⠎⠀⠁⠝⠙⠀⠊⠞⠀⠙⠕⠑⠎⠝⠞⠀⠓⠥⠗⠞⠀⠍⠑'), 16)
@@ -348,7 +348,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         blobAsDouble(0x), blobAsFloat(0x), '', blobAsTimestamp(0x), blobAsUuid(0x), '',
         blobAsVarint(0x))""".encode("utf-8"))
 
-        output = self.run_cqlsh(node1, "select intcol, bigintcol, varintcol from CASSANDRA_7196.has_all_types where num in (0, 1, 2, 3, 4)")
+        output, err = self.run_cqlsh(node1, "select intcol, bigintcol, varintcol from CASSANDRA_7196.has_all_types where num in (0, 1, 2, 3, 4)")
         if common.is_win():
             output = output.replace('\r', '')
 
@@ -378,14 +378,50 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         for n in xrange(100):
             insert_c1c2(session, n)
 
-        out = self.run_cqlsh(node1, 'TRACING ON; SELECT * FROM ks.cf')
+        out, err = self.run_cqlsh(node1, 'TRACING ON; SELECT * FROM ks.cf')
         self.assertIn('Tracing session: ', out)
 
-        out = self.run_cqlsh(node1, 'TRACING ON; SELECT * FROM system_traces.events')
+        out, err = self.run_cqlsh(node1, 'TRACING ON; SELECT * FROM system_traces.events')
         self.assertNotIn('Tracing session: ', out)
 
-        out = self.run_cqlsh(node1, 'TRACING ON; SELECT * FROM system_traces.sessions')
+        out, err = self.run_cqlsh(node1, 'TRACING ON; SELECT * FROM system_traces.sessions')
         self.assertNotIn('Tracing session: ', out)
+
+    @since('2.1')
+    def select_element_inside_udt_test(self):
+        self.cluster.populate(1).start()
+
+        node1, = self.cluster.nodelist()
+        session = self.patient_cql_connection(node1)
+
+        self.create_ks(session, 'ks', 1)
+        session.execute("""
+            CREATE TYPE address (
+            street text,
+            city text,
+            zip_code int,
+            phones set<text>
+             );""")
+
+        session.execute("""CREATE TYPE fullname (
+            firstname text,
+            lastname text
+            );""")
+
+        session.execute("""CREATE TABLE users (
+            id uuid PRIMARY KEY,
+            name FROZEN <fullname>,
+            addresses map<text, FROZEN <address>>
+            );""")
+
+        session.execute("""INSERT INTO users (id, name)
+            VALUES (62c36092-82a1-3a00-93d1-46196ee77204, {firstname: 'Marie-Claude', lastname: 'Josset'});
+            """)
+
+        out, err = self.run_cqlsh(node1, "SELECT name.lastname FROM ks.users WHERE id=62c36092-82a1-3a00-93d1-46196ee77204")
+        self.assertNotIn('list index out of range', err)
+        ##If this assertion fails check CASSANDRA-7891
+
 
     def run_cqlsh(self, node, cmds, cqlsh_options=[]):
         cdir = node.get_cassandra_dir()
@@ -404,4 +440,4 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         for cmd in cmds.split(';'):
             p.stdin.write(cmd + ';\n')
         p.stdin.write("quit;\n")
-        return p.communicate()[0]
+        return p.communicate()
