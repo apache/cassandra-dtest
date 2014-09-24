@@ -2,6 +2,7 @@ from __future__ import with_statement
 import os, tempfile, sys, shutil, subprocess, types, time, threading, ConfigParser, logging, fnmatch, re, copy
 
 from ccmlib.cluster import Cluster
+from ccmlib.cluster_factory import ClusterFactory
 from ccmlib.node import Node
 from ccmlib.common import is_win
 from uuid import UUID
@@ -186,7 +187,7 @@ class Tester(TestCase):
                 self.test_path = f.readline().strip('\n')
                 name = f.readline()
                 try:
-                    self.cluster = Cluster.load(self.test_path, name)
+                    self.cluster = ClusterFactory.load(self.test_path, name)
                     # Avoid waiting too long for node to be marked down
                     if not self._preserve_cluster:
                         self._cleanup_cluster()
@@ -389,7 +390,7 @@ class Tester(TestCase):
                 test_path = f.readline().strip('\n')
                 name = f.readline()
                 try:
-                    cluster = Cluster.load(test_path, name)
+                    cluster = ClusterFactory.load(test_path, name)
                     # Avoid waiting too long for node to be marked down
                     if KEEP_TEST_DIR:
                         cluster.stop(gently=RECORD_COVERAGE)

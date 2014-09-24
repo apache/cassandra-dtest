@@ -229,11 +229,11 @@ class TestUpgradeThroughVersions(Tester):
             # Although we're not changing dirs, the source has changed, so ccm probably needs to know
             for node in nodes:
                 node.set_cassandra_dir(cassandra_dir=cdir)
-                debug("Set new cassandra dir for %s: %s" % (node.name, node.get_cassandra_dir()))
+                debug("Set new cassandra dir for %s: %s" % (node.name, node.get_install_dir()))
         else:
             for node in nodes:
                 node.set_cassandra_dir(cassandra_version='git:' + tag)
-                debug("Set new cassandra dir for %s: %s" % (node.name, node.get_cassandra_dir()))
+                debug("Set new cassandra dir for %s: %s" % (node.name, node.get_install_dir()))
 
         # hacky? yes. We could probably extend ccm to allow this publicly.
         # the topology file needs to be written before any nodes are started

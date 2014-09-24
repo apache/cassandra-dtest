@@ -75,7 +75,7 @@ class TestSCUpgrade(Tester):
             # Update Cassandra Directory
             for node in nodes:
                 node.set_cassandra_dir(cassandra_version=tag)
-                debug("Set new cassandra dir for %s: %s" % (node.name, node.get_cassandra_dir()))
+                debug("Set new cassandra dir for %s: %s" % (node.name, node.get_install_dir()))
             self.cluster.set_cassandra_dir(cassandra_version=tag)
 
             # Restart nodes on new version
