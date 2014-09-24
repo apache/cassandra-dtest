@@ -172,9 +172,9 @@ class Tester(TestCase):
         cdir = os.environ.get('CASSANDRA_DIR', DEFAULT_DIR)
 
         if version:
-            node.set_cassandra_dir(cassandra_version=version)
+            node.set_install_dir(version=version)
         else:
-            node.set_cassandra_dir(cassandra_dir=cdir)
+            node.set_install_dir(install_dir=cdir)
 
     def setUp(self):
         global CURRENT_TEST
