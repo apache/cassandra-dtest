@@ -22,13 +22,13 @@ Usage
 The tests are run by nosetests. The only thing the framework needs to know is
 the location of the (compiled) sources for Cassandra. There are two options:
 
- * Use existing sources:
+Use existing sources:
 
-     CASSANDRA_DIR=~/path/to/cassandra nosetests
+    CASSANDRA_DIR=~/path/to/cassandra nosetests
 
- * Use ccm ability to download/compile released sources from archives.apache.org:
+Use ccm ability to download/compile released sources from archives.apache.org:
 
-     CASSANDRA_VERSION=1.0.0 nosetests
+    CASSANDRA_VERSION=1.0.0 nosetests
 
 A convenient option if tests are regularly run against the same existing
 directory is to set a `default_dir` in `~/.cassandra-dtest`. Create the file and
