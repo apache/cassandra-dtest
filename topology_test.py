@@ -116,38 +116,6 @@ class TestTopology(Tester):
                 assert_almost_equal(sizes[i], three_node_sizes[i])
 
     @no_vnodes()
-    def replace_test(self):
-        cluster = self.cluster
-
-        tokens = cluster.balanced_tokens(3)
-        cluster.populate(3, tokens=tokens).start()
-        [node1, node2, node3] = cluster.nodelist()
-
-        cursor = self.patient_cql_connection(node1)
-        self.create_ks(cursor, 'ks', 3)
-        self.create_cf(cursor, 'cf', columns={'c1': 'text', 'c2': 'text'})
-
-        for n in xrange(0, 10000):
-            insert_c1c2(cursor, n, ConsistencyLevel.QUORUM)
-
-        cluster.flush()
-
-        node3.stop(wait_other_notice=True)
-        time.sleep(.5)
-
-        node4 = new_node(cluster, token=tokens[2])
-        node4.start(replace_token=tokens[2])
-        time.sleep(.5)
-        cluster.cleanup()
-        time.sleep(.5)
-
-        for n in xrange(0, 10000):
-            query_c1c2(cursor, n, ConsistencyLevel.QUORUM)
-
-        sizes = [ node.data_size() for node in cluster.nodelist() if node.is_running()]
-        assert_almost_equal(*sizes)
-
-    @no_vnodes()
     def move_single_node_test(self):
         """ Test moving a node in a single-node cluster (#4200) """
         cluster = self.cluster
