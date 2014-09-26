@@ -39,7 +39,7 @@ class TestReplaceAddress(Tester):
             numNodes = 1
         else:
             #a little hacky but grep_log returns the whole line...
-            numNodes = int(re.search('num_tokens=(.*?);', node3.grep_log('num_tokens=(.*?);')[0][0]).group()[11:-1])
+            numNodes = int(node3.get_conf_option('num_tokens'))
 
         debug(numNodes)
 
@@ -150,7 +150,7 @@ class TestReplaceAddress(Tester):
             numNodes = 1
         else:
             #a little hacky but grep_log returns the whole line...
-            numNodes = int(re.search('num_tokens=(.*?);', node3.grep_log('num_tokens=(.*?);')[0][0]).group()[11:-1])
+            numNodes = int(node3.get_conf_option('num_tokens'))
 
         debug(numNodes)
 
