@@ -141,7 +141,11 @@ class TestReplaceAddress(Tester):
 
         #try to replace an unassigned ip address
         with self.assertRaises(NodeError):
-            node4.start(replace_address='127.0.0.5')
+            try:
+                node4.start(replace_address='127.0.0.5')
+            except (NodeError, TimeoutError):
+                raise NodeError("Node could not start.")
+
 
     def replace_first_boot_test(self):
         debug("Starting cluster with 3 nodes.")
