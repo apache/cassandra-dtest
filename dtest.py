@@ -186,14 +186,14 @@ class Tester(TestCase):
             with open(LAST_TEST_DIR) as f:
                 self.test_path = f.readline().strip('\n')
                 name = f.readline()
-                try:
-                    self.cluster = ClusterFactory.load(self.test_path, name)
-                    # Avoid waiting too long for node to be marked down
-                    if not self._preserve_cluster:
-                        self._cleanup_cluster()
-                except IOError:
-                    # after a restart, /tmp will be emptied so we'll get an IOError when loading the old cluster here
-                    pass
+            try:
+                self.cluster = ClusterFactory.load(self.test_path, name)
+                # Avoid waiting too long for node to be marked down
+                if not self._preserve_cluster:
+                    self._cleanup_cluster()
+            except IOError:
+                # after a restart, /tmp will be emptied so we'll get an IOError when loading the old cluster here
+                pass
 
         self.cluster = self._get_cluster()
         if RECORD_COVERAGE:
