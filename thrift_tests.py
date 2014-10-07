@@ -2007,6 +2007,7 @@ class TestMutations(ThriftTester):
         time.sleep(5)
         _assert_no_columnpath('key2', ColumnPath(column_family='Counter1', column='c1'))
 
+    @since('2.0')
     def test_range_deletion(self):
         """ Tests CASSANDRA-7990 """
         _set_keyspace('Keyspace1')
