@@ -42,8 +42,12 @@ def decode(item):
     decoded = []
 
     if isinstance(item, tuple) or isinstance(item, list):
+        if len(item) == 1:
+          item = item[0]
+        nested = []
         for i in item:
-            decoded.extend(decode(i))
+            nested.extend(decode(i))
+        decoded.append(nested)
     else:
         if item is not None and item.startswith('\x00'):
             unpacked = unpack(item)
@@ -457,7 +461,7 @@ class TestUserTypes(Tester):
         primary_item, other_items, other_containers = rows[0]
         self.assertEqual(decode(primary_item), [[u'test', u'test2']])
         self.assertEqual(decode(other_items), [[u'stuff', [u'one', u'two']]])
-        self.assertEqual(decode(other_containers), [[u'stuff2', [u'one_other', u'two_other']], [u'stuff3', [u'one_2_other', u'two_2_other']], [u'stuff4', [u'one_3_other', u'two_3_other']]])
+        self.assertEqual(decode(other_containers), [[[u'stuff2', [u'one_other', u'two_other']], [u'stuff3', [u'one_2_other', u'two_2_other']], [u'stuff4', [u'one_3_other', u'two_3_other']]]])
 
         #  Generate some repetitive data and check it for it's contents:
         for x in xrange(50):
@@ -480,7 +484,7 @@ class TestUserTypes(Tester):
             rows = cursor.execute(stmt)
 
             items = rows[0][0]
-            self.assertEqual(decode(items), [[u'stuff3', [u'one_2_other', u'two_2_other']], [u'stuff4', [u'one_3_other', u'two_3_other']]])
+            self.assertEqual(decode(items), [[[u'stuff3', [u'one_2_other', u'two_2_other']], [u'stuff4', [u'one_3_other', u'two_3_other']]]])
 
     @since('2.1')
     def test_type_as_part_of_pkey(self):
@@ -839,4 +843,4 @@ class TestUserTypes(Tester):
 
         for _id in ids:
             res = cursor.execute("SELECT letterpair FROM letters where id = {}".format(_id))
-            self.assertEqual(decode(res), [[u'a', u'z'], [u'c', u'a'], [u'c', u'f'], [u'c', u'z'], [u'd', u'e'], [u'z', u'a']])
+            self.assertEqual(decode(res), [[[u'a', u'z'], [u'c', u'a'], [u'c', u'f'], [u'c', u'z'], [u'd', u'e'], [u'z', u'a']]])
