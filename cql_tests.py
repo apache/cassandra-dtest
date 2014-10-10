@@ -8,6 +8,7 @@ from dtest import Tester, canReuseCluster, freshCluster
 from pyassertions import assert_invalid, assert_one, assert_none, assert_all
 from pytools import since, require, rows_to_list
 from cassandra import ConsistencyLevel
+from cassandra.protocol import ProtocolException
 from cassandra.query import SimpleStatement
 try:
     from blist import sortedset
@@ -4521,3 +4522,17 @@ class TestCQL(Tester):
         self.cluster.flush()
         cursor.execute("alter table test drop v")
         cursor.execute("alter table test add v int")
+
+    def invalid_string_literals_test(self):
+        """ Test for CASSANDRA-8101 """
+        cursor = self.prepare()
+        assert_invalid(cursor, u"insert into invalid_string_literals (k, a) VALUES (0, '\u038E\u0394\u03B4\u03E0')")
+
+        # since the protocol requires strings to be valid UTF-8, the error response to this is a ProtocolError
+        cursor = self.cql_connection(self.cluster.nodelist()[0], keyspace='ks')
+        cursor.execute("create table invalid_string_literals (k int primary key, a ascii, b text)")
+        try:
+            cursor.execute("insert into invalid_string_literals (k, c) VALUES (0, '\xc2\x01')")
+            self.fail("Expected error")
+        except ProtocolException as e:
+            self.assertTrue("Cannot decode string as UTF8" in str(e))
