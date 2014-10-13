@@ -2406,11 +2406,11 @@ class TestCQL(Tester):
 
         assert_invalid(cursor, "SELECT * FROM foo WHERE a=1")
 
-    @require('https://issues.apache.org/jira/browse/CASSANDRA-4762')
+    @since('3.0')
     def multi_in_test(self):
         self.__multi_in(False)
 
-    @require('https://issues.apache.org/jira/browse/CASSANDRA-4762')
+    @since('3.0')
     def multi_in_compact_test(self):
         self.__multi_in(True)
 
@@ -2487,7 +2487,7 @@ class TestCQL(Tester):
         res = cursor.execute("select zipcode from zipcodes where group='test' AND zipcode IN ('06902','73301','94102') and state IN ('CT','CA') and fips_regions < 0")
         assert len(res) == 0, res
 
-    @require('https://issues.apache.org/jira/browse/CASSANDRA-4762')
+    @since('3.0')
     def multi_in_compact_non_composite_test(self):
         cursor = self.prepare()
 
