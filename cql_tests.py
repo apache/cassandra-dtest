@@ -3729,6 +3729,22 @@ class TestCQL(Tester):
 
         assert_invalid(cursor, "SELECT v1, v2, v3 FROM test WHERE k = 0 AND (v1, v3) > (1, 0)")
 
+    @since('2.1.1')
+    def test_v2_protocol_IN_with_tuples(self):
+        """ Test for CASSANDRA-8062 """
+        cursor = self.prepare()
+        cursor = self.cql_connection(self.cluster.nodelist()[0], keyspace='ks', protocol_version=2)
+        cursor.execute("CREATE TABLE test (k int, c1 int, c2 text, PRIMARY KEY (k, c1, c2))")
+        cursor.execute("INSERT INTO test (k, c1, c2) VALUES (0, 0, 'a')")
+        cursor.execute("INSERT INTO test (k, c1, c2) VALUES (0, 0, 'b')")
+        cursor.execute("INSERT INTO test (k, c1, c2) VALUES (0, 0, 'c')")
+
+        p = cursor.prepare("SELECT * FROM test WHERE k=? AND (c1, c2) IN ?")
+        rows = cursor.execute(p, (0, [(0, 'b'), (0, 'c')]))
+        self.assertEqual(2, len(rows))
+        self.assertEqual((0, 0, 'b'), rows[0])
+        self.assertEqual((0, 0, 'c'), rows[1])
+
     def in_with_desc_order_test(self):
         cursor = self.prepare()
 
