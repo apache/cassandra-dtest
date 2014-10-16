@@ -75,18 +75,37 @@ class TestSCUpgrade(Tester):
 
         for i in xrange(2):
             for j in xrange(2):
-                for k in xrange(100):
+                for k in xrange(10):
                     cli.do("incr sc_test['Counter1']['sc%d']['c%d'] by 1" % (i, j))
 
         assert not cli.has_errors(), cli.errors()
         cli.close()
 
+
         CASSANDRA_DIR = os.environ.get('CASSANDRA_DIR')
         if get_version_from_build(CASSANDRA_DIR) >= '2.1':
             #Upgrade nodes to 2.0.
             #See CASSANDRA-7008
-            self.upgrade_to_version("git:cassandra-2.0")
+            self.upgrade_to_version("2.0.10", [node1])
             time.sleep(.5)
+        else:
+            self.set_node_to_current_version(node1)
+
+        cli = node2.cli()
+        cli.do("use test")
+        for i in xrange(2):
+            for j in xrange(2):
+                for k in xrange(10):
+                    cli.do("incr sc_test['Counter1']['sc%d']['c%d'] by 1" % (i, j))
+
+        if get_version_from_build(CASSANDRA_DIR) >= '2.1':
+            #Upgrade nodes to 2.0.
+            #See CASSANDRA-7008
+            self.upgrade_to_version("2.0.10", [node2, node3])
+            time.sleep(.5)
+        else:
+            self.set_node_to_current_version(node2)
+            self.set_node_to_current_version(node3)
 
         cli = node1.cli()
         cli.do("use test")
@@ -106,33 +125,30 @@ class TestSCUpgrade(Tester):
         assert not cli.has_errors(), cli.errors()
         cli.close()
 
-    def upgrade_to_version(self, tag):
-            """Upgrade Nodes - if *mixed_version* is True, only upgrade those nodes
-            that are specified by *nodes*, otherwise ignore *nodes* specified
-            and upgrade all nodes.
-            """
-            debug('Upgrading to ' + tag)
+    def upgrade_to_version(self, tag, nodes=None):
+        debug('Upgrading to ' + tag)
+        if nodes is None:
             nodes = self.cluster.nodelist()
 
-            for node in nodes:
-                debug('Shutting down node: ' + node.name)
-                node.drain()
-                node.watch_log_for("DRAINED")
-                node.stop(wait_other_notice=False)
+        for node in nodes:
+            debug('Shutting down node: ' + node.name)
+            node.drain()
+            node.watch_log_for("DRAINED")
+            node.stop(wait_other_notice=False)
 
-            # Update Cassandra Directory
-            for node in nodes:
-                node.set_cassandra_dir(cassandra_version=tag)
-                debug("Set new cassandra dir for %s: %s" % (node.name, node.get_cassandra_dir()))
-            self.cluster.set_cassandra_dir(cassandra_version=tag)
+        # Update Cassandra Directory
+        for node in nodes:
+            node.set_cassandra_dir(cassandra_version=tag)
+            debug("Set new cassandra dir for %s: %s" % (node.name, node.get_cassandra_dir()))
+        self.cluster.set_cassandra_dir(cassandra_version=tag)
 
-            # Restart nodes on new version
-            for node in nodes:
-                debug('Starting %s on new version (%s)' % (node.name, tag))
-                # Setup log4j / logback again (necessary moving from 2.0 -> 2.1):
-                node.set_log_level("INFO")
-                node.start(wait_other_notice=True)
-                node.nodetool('upgradesstables -a')
+        # Restart nodes on new version
+        for node in nodes:
+            debug('Starting %s on new version (%s)' % (node.name, tag))
+            # Setup log4j / logback again (necessary moving from 2.0 -> 2.1):
+            node.set_log_level("INFO")
+            node.start(wait_other_notice=True)
+            node.nodetool('upgradesstables -a')
 
 def assert_scs(cli, names):
     assert not cli.has_errors(), cli.errors()
