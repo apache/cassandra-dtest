@@ -3679,6 +3679,23 @@ class TestCQL(Tester):
 
         assert_invalid(cursor, "SELECT DISTINCT s FROM test")
 
+        if self.cluster.version() >= "2.1.1":
+            # introduce paging to test for CASSANDRA-8108
+            cursor.execute("TRUNCATE test")
+            for i in range(10):
+                for j in range(10):
+                    cursor.execute("INSERT INTO test (k, p, s) VALUES (%s, %s, %s)", (i, j, i))
+
+            cursor.default_fetch_size = 7
+            rows = list(cursor.execute("SELECT DISTINCT k, s FROM test"))
+            self.assertEqual(range(10), sorted([r[0] for r in rows]))
+            self.assertEqual(range(10), sorted([r[1] for r in rows]))
+
+            keys = ",".join(map(str, range(10)))
+            rows = list(cursor.execute("SELECT DISTINCT k, s FROM test WHERE k IN (%s)" % (keys,)))
+            self.assertEqual(range(10), [r[0] for r in rows])
+            self.assertEqual(range(10), [r[1] for r in rows])
+
 
     def select_count_paging_test(self):
         """ Test for the #6579 'select count' paging bug """
