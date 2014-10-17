@@ -59,7 +59,7 @@ class TestSCUpgrade(Tester):
         assert_columns(cli, ['c1'])
 
     #CASSANDRA-7188
-    def upgrade_with_counters(self):
+    def upgrade_with_counters_test(self):
         cluster = self.cluster
 
         # Forcing cluster version on purpose
@@ -69,7 +69,7 @@ class TestSCUpgrade(Tester):
         node1, node2, node3 = cluster.nodelist()
 
         cli = node1.cli()
-        cli.do("create keyspace test with placement_strategy = 'SimpleStrategy' and strategy_options = {replication_factor : 3} and durable_writes = true")
+        cli.do("create keyspace test with placement_strategy = 'SimpleStrategy' and strategy_options = {replication_factor : 2} and durable_writes = true")
         cli.do("use test")
         cli.do("create column family sc_test with column_type = 'Super' and default_validation_class = 'CounterColumnType' AND key_validation_class=UTF8Type AND comparator=UTF8Type")
 
@@ -86,22 +86,36 @@ class TestSCUpgrade(Tester):
         if get_version_from_build(CASSANDRA_DIR) >= '2.1':
             #Upgrade nodes to 2.0.
             #See CASSANDRA-7008
-            self.upgrade_to_version("2.0.10", [node1])
+            self.upgrade_to_version("git:cassandra-2.0", [node1])
             time.sleep(.5)
         else:
             self.set_node_to_current_version(node1)
 
-        cli = node2.cli()
+        cli = node1.cli()
         cli.do("use test")
         for i in xrange(2):
             for j in xrange(2):
-                for k in xrange(10):
+                for k in xrange(100):
                     cli.do("incr sc_test['Counter1']['sc%d']['c%d'] by 1" % (i, j))
+
+        cli2 = node2.cli()
+        cli2.do("use test")
+        for i in xrange(2):
+            for j in xrange(2):
+                for k in xrange(100):
+                    cli2.do("incr sc_test['Counter1']['sc%d']['c%d'] by 1" % (i, j))
+
+        cli3 = node3.cli()
+        cli3.do("use test")
+        for i in xrange(2):
+            for j in xrange(2):
+                for k in xrange(100):
+                    cli3.do("incr sc_test['Counter1']['sc%d']['c%d'] by 1" % (i, j))
 
         if get_version_from_build(CASSANDRA_DIR) >= '2.1':
             #Upgrade nodes to 2.0.
             #See CASSANDRA-7008
-            self.upgrade_to_version("2.0.10", [node2, node3])
+            self.upgrade_to_version("git:cassandra-2.0", [node2, node3])
             time.sleep(.5)
         else:
             self.set_node_to_current_version(node2)
