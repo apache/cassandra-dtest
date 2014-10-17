@@ -8,6 +8,7 @@ from dtest import Tester, canReuseCluster, freshCluster
 from pyassertions import assert_invalid, assert_one, assert_none, assert_all
 from pytools import since, require, rows_to_list
 from cassandra import ConsistencyLevel
+from cassandra.protocol import ProtocolException
 from cassandra.query import SimpleStatement
 try:
     from blist import sortedset
@@ -191,6 +192,10 @@ class TestCQL(Tester):
         cursor.execute("INSERT INTO connections (userid, ip, port, time) VALUES (550e8400-e29b-41d4-a716-446655440000, '192.168.0.2', 90, 42)")
         cursor.execute("UPDATE connections SET time = 24 WHERE userid = f47ac10b-58cc-4372-a567-0e02b2c3d479 AND ip = '192.168.0.2' AND port = 80")
 
+        # we don't have to include all of the clustering columns (see CASSANDRA-7990)
+        cursor.execute("INSERT INTO connections (userid, ip, time) VALUES (f47ac10b-58cc-4372-a567-0e02b2c3d479, '192.168.0.3', 42)")
+        cursor.execute("UPDATE connections SET time = 42 WHERE userid = f47ac10b-58cc-4372-a567-0e02b2c3d479 AND ip = '192.168.0.4'")
+
         # Queries
         res = cursor.execute("SELECT ip, port, time FROM connections WHERE userid = 550e8400-e29b-41d4-a716-446655440000")
         assert rows_to_list(res) == [[ '192.168.0.1', 80, 42 ], [ '192.168.0.2', 80, 24 ], [ '192.168.0.2', 90, 42 ]], res
@@ -204,6 +209,12 @@ class TestCQL(Tester):
         res = cursor.execute("SELECT ip, port, time FROM connections WHERE userid = 550e8400-e29b-41d4-a716-446655440000 and ip > '192.168.0.2'")
         assert rows_to_list(res) == [], res
 
+        res = cursor.execute("SELECT ip, port, time FROM connections WHERE userid = f47ac10b-58cc-4372-a567-0e02b2c3d479 AND ip = '192.168.0.3'")
+        self.assertEqual([['192.168.0.3', None, 42]], rows_to_list(res))
+
+        res = cursor.execute("SELECT ip, port, time FROM connections WHERE userid = f47ac10b-58cc-4372-a567-0e02b2c3d479 AND ip = '192.168.0.4'")
+        self.assertEqual([['192.168.0.4', None, 42]], rows_to_list(res))
+
         # Deletion
         cursor.execute("DELETE time FROM connections WHERE userid = 550e8400-e29b-41d4-a716-446655440000 AND ip = '192.168.0.2' AND port = 80")
         res = cursor.execute("SELECT * FROM connections WHERE userid = 550e8400-e29b-41d4-a716-446655440000")
@@ -212,6 +223,10 @@ class TestCQL(Tester):
         cursor.execute("DELETE FROM connections WHERE userid = 550e8400-e29b-41d4-a716-446655440000")
         res = cursor.execute("SELECT * FROM connections WHERE userid = 550e8400-e29b-41d4-a716-446655440000")
         assert len(res) == 0, res
+
+        cursor.execute("DELETE FROM connections WHERE userid = f47ac10b-58cc-4372-a567-0e02b2c3d479 AND ip = '192.168.0.3'")
+        res = cursor.execute("SELECT * FROM connections WHERE userid = f47ac10b-58cc-4372-a567-0e02b2c3d479 AND ip = '192.168.0.3'")
+        self.assertEqual([], res)
 
     def sparse_cf_test(self):
         """ Test composite 'sparse' CF syntax """
@@ -2392,11 +2407,11 @@ class TestCQL(Tester):
 
         assert_invalid(cursor, "SELECT * FROM foo WHERE a=1")
 
-    @require('https://issues.apache.org/jira/browse/CASSANDRA-4762')
+    @since('3.0')
     def multi_in_test(self):
         self.__multi_in(False)
 
-    @require('https://issues.apache.org/jira/browse/CASSANDRA-4762')
+    @since('3.0')
     def multi_in_compact_test(self):
         self.__multi_in(True)
 
@@ -2473,7 +2488,7 @@ class TestCQL(Tester):
         res = cursor.execute("select zipcode from zipcodes where group='test' AND zipcode IN ('06902','73301','94102') and state IN ('CT','CA') and fips_regions < 0")
         assert len(res) == 0, res
 
-    @require('https://issues.apache.org/jira/browse/CASSANDRA-4762')
+    @since('3.0')
     def multi_in_compact_non_composite_test(self):
         cursor = self.prepare()
 
@@ -3664,6 +3679,22 @@ class TestCQL(Tester):
 
         assert_invalid(cursor, "SELECT DISTINCT s FROM test")
 
+        # paging to test for CASSANDRA-8108
+        cursor.execute("TRUNCATE test")
+        for i in range(10):
+            for j in range(10):
+                cursor.execute("INSERT INTO test (k, p, s) VALUES (%s, %s, %s)", (i, j, i))
+
+        cursor.default_fetch_size = 7
+        rows = list(cursor.execute("SELECT DISTINCT k, s FROM test"))
+        self.assertEqual(range(10), sorted([r[0] for r in rows]))
+        self.assertEqual(range(10), sorted([r[1] for r in rows]))
+
+        keys = ",".join(map(str, range(10)))
+        rows = list(cursor.execute("SELECT DISTINCT k, s FROM test WHERE k IN (%s)" % (keys,)))
+        self.assertEqual(range(10), [r[0] for r in rows])
+        self.assertEqual(range(10), [r[1] for r in rows])
+
 
     def select_count_paging_test(self):
         """ Test for the #6579 'select count' paging bug """
@@ -3713,6 +3744,22 @@ class TestCQL(Tester):
         assert_all(cursor, "SELECT v1, v2, v3 FROM test WHERE k = 0 AND (v1, v2) > (0, 1) AND (v1, v2, v3) <= (1, 1, 0)", [[1, 0, 0], [1, 0, 1], [1, 1, 0]])
 
         assert_invalid(cursor, "SELECT v1, v2, v3 FROM test WHERE k = 0 AND (v1, v3) > (1, 0)")
+
+    @since('2.1.1')
+    def test_v2_protocol_IN_with_tuples(self):
+        """ Test for CASSANDRA-8062 """
+        cursor = self.prepare()
+        cursor = self.cql_connection(self.cluster.nodelist()[0], keyspace='ks', protocol_version=2)
+        cursor.execute("CREATE TABLE test (k int, c1 int, c2 text, PRIMARY KEY (k, c1, c2))")
+        cursor.execute("INSERT INTO test (k, c1, c2) VALUES (0, 0, 'a')")
+        cursor.execute("INSERT INTO test (k, c1, c2) VALUES (0, 0, 'b')")
+        cursor.execute("INSERT INTO test (k, c1, c2) VALUES (0, 0, 'c')")
+
+        p = cursor.prepare("SELECT * FROM test WHERE k=? AND (c1, c2) IN ?")
+        rows = cursor.execute(p, (0, [(0, 'b'), (0, 'c')]))
+        self.assertEqual(2, len(rows))
+        self.assertEqual((0, 0, 'b'), rows[0])
+        self.assertEqual((0, 0, 'c'), rows[1])
 
     def in_with_desc_order_test(self):
         cursor = self.prepare()
@@ -4521,3 +4568,17 @@ class TestCQL(Tester):
         self.cluster.flush()
         cursor.execute("alter table test drop v")
         cursor.execute("alter table test add v int")
+
+    def invalid_string_literals_test(self):
+        """ Test for CASSANDRA-8101 """
+        cursor = self.prepare()
+        assert_invalid(cursor, u"insert into invalid_string_literals (k, a) VALUES (0, '\u038E\u0394\u03B4\u03E0')")
+
+        # since the protocol requires strings to be valid UTF-8, the error response to this is a ProtocolError
+        cursor = self.cql_connection(self.cluster.nodelist()[0], keyspace='ks')
+        cursor.execute("create table invalid_string_literals (k int primary key, a ascii, b text)")
+        try:
+            cursor.execute("insert into invalid_string_literals (k, c) VALUES (0, '\xc2\x01')")
+            self.fail("Expected error")
+        except ProtocolException as e:
+            self.assertTrue("Cannot decode string as UTF8" in str(e))

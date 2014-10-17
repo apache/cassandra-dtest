@@ -1,8 +1,7 @@
-import os, sys, time, signal, httplib, errno, uuid, re, struct
+import time, uuid, re, struct
 
 from thrift.transport import TTransport
 from thrift.transport import TSocket
-from thrift.transport import THttpClient
 from thrift.protocol import TBinaryProtocol
 from thrift.Thrift import TApplicationException
 
@@ -73,6 +72,7 @@ class ThriftTester(BaseTester):
             Cassandra.CfDef('Keyspace1', 'StandardLong1', comparator_type='LongType'),
             Cassandra.CfDef('Keyspace1', 'StandardLong2', comparator_type='LongType'),
             Cassandra.CfDef('Keyspace1', 'StandardInteger1', comparator_type='IntegerType'),
+            Cassandra.CfDef('Keyspace1', 'StandardComposite', comparator_type='CompositeType(AsciiType, AsciiType)'),
             Cassandra.CfDef('Keyspace1', 'Super1', column_type='Super', subcomparator_type='LongType'),
             Cassandra.CfDef('Keyspace1', 'Super2', column_type='Super', subcomparator_type='LongType'),
             Cassandra.CfDef('Keyspace1', 'Super3', column_type='Super', subcomparator_type='LongType'),
@@ -100,6 +100,9 @@ class ThriftTester(BaseTester):
 
 def _i64(n):
     return struct.pack('>q', n) # big endian = network order
+
+def _i16(n):
+    return struct.pack('>h', n) # big endian = network order
 
 _SIMPLE_COLUMNS = [Column('c1', 'value1', 0),
                    Column('c2', 'value2', 0)]
@@ -380,7 +383,6 @@ class TestMutations(ThriftTester):
 
         # Exercise paging
         column_parent = ColumnParent('Standard1')
-        super_column_parent = ColumnParent('Super1', 'sc3')
         # Paging for small columns starts at 1024 columns
         columns_to_insert = [Column('c%d' % (i,), 'value%d' % (i,), 0) for i in xrange(3, 1026)]
         cfmap = {'Standard1': [Mutation(ColumnOrSuperColumn(c)) for c in columns_to_insert]}
@@ -1347,8 +1349,6 @@ class TestMutations(ThriftTester):
 
         # Retrieve all 10 key slices
         rows = _big_multislice(keys, ColumnParent('Standard1'))
-        keys1 = rows.keys().sort()
-        keys2 = keys.sort()
 
         columns = [ColumnOrSuperColumn(c) for c in _SIMPLE_COLUMNS]
         # Validate if the returned rows have the keys requested and if the ColumnOrSuperColumn is what was inserted
@@ -2006,6 +2006,36 @@ class TestMutations(ThriftTester):
         client.batch_mutate(update_map, ConsistencyLevel.ONE)
         time.sleep(5)
         _assert_no_columnpath('key2', ColumnPath(column_family='Counter1', column='c1'))
+
+    @since('2.0')
+    def test_range_deletion(self):
+        """ Tests CASSANDRA-7990 """
+        _set_keyspace('Keyspace1')
+
+        def composite(item1, item2=None, eoc='\x00'):
+            packed = _i16(len(item1)) + item1 + eoc
+            if item2 is not None:
+                packed += _i16(len(item2)) + item2
+                packed += eoc
+            return packed
+
+        for i in range(10):
+            column_name = composite(str(i), str(i))
+            column = Column(column_name, 'value', int(time.time() * 1000))
+            client.insert('key1', ColumnParent('StandardComposite'), column, ConsistencyLevel.ONE)
+
+        delete_slice = SlicePredicate(slice_range=SliceRange(composite('3', eoc='\xff'), composite('6', '\x01'), False, 100))
+        mutations = [Mutation(deletion=Deletion(int(time.time() * 1000), predicate=delete_slice))]
+        keyed_mutations = {'key1': {'StandardComposite': mutations}}
+        client.batch_mutate(keyed_mutations, ConsistencyLevel.ONE)
+
+        slice_predicate = SlicePredicate(slice_range=SliceRange('', '', False, 100))
+        results = client.get_slice('key1', ColumnParent('StandardComposite'), slice_predicate, ConsistencyLevel.ONE)
+        columns = [result.column.name for result in results]
+        self.assertEqual(
+            columns,
+            [composite('0', '0'), composite('1', '1'), composite('2', '2'),
+             composite('6', '6'), composite('7', '7'), composite('8', '8'), composite('9', '9')])
 
     def test_incr_decr_standard_slice(self):
         _set_keyspace('Keyspace1')

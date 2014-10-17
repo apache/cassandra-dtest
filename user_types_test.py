@@ -42,8 +42,12 @@ def decode(item):
     decoded = []
 
     if isinstance(item, tuple) or isinstance(item, list):
+        if len(item) == 1:
+          item = item[0]
+        nested = []
         for i in item:
-            decoded.extend(decode(i))
+            nested.extend(decode(i))
+        decoded.append(nested)
     else:
         if item is not None and item.startswith('\x00'):
             unpacked = unpack(item)
@@ -58,149 +62,6 @@ class TestUserTypes(Tester):
 
     def __init__(self, *args, **kwargs):
         Tester.__init__(self, *args, **kwargs)
-
-    # We've removed type renaming for now (CASSANDRA-6940)
-    #@since('2.1')
-    #def test_type_renaming(self):
-    #  """
-    #  Confirm that types can be renamed and the proper associations are updated.
-    #  """
-    #  cluster = self.cluster
-    #  cluster.populate(3).start()
-    #  node1, node2, node3 = cluster.nodelist()
-    #  cursor = self.patient_cql_connection(node1)
-    #  self.create_ks(cursor, 'user_type_renaming', 2)
-
-    #  stmt = """
-    #        CREATE TYPE simple_type (
-    #        user_number int
-    #        )
-    #     """
-    #  cursor.execute(stmt)
-
-    #  stmt = """
-    #        CREATE TABLE simple_table (
-    #        id uuid PRIMARY KEY,
-    #        number simple_type
-    #        )
-    #     """
-    #  cursor.execute(stmt)
-
-    #  stmt = """
-    #      ALTER TYPE simple_type rename to renamed_type;
-    #     """
-    #  cursor.execute(stmt)
-
-    #  stmt = """
-    #      SELECT type_name from system.schema_usertypes;
-    #     """
-    #  cursor.execute(stmt)
-    #  # we should only have one user type in this test
-    #  self.assertEqual(1, cursor.rowcount)
-
-    #  # finally let's look for the new type name
-    #  self.assertEqual(cursor.fetchone()[0], u'renamed_type')
-
-    #@since('2.1')
-    #def test_nested_type_renaming(self):
-    #    """
-    #    Confirm type renaming works as expected on nested types.
-    #    """
-    #    cluster = self.cluster
-    #    cluster.populate(3).start()
-    #    node1, node2, node3 = cluster.nodelist()
-    #    cursor = self.patient_cql_connection(node1)
-    #    self.create_ks(cursor, 'nested_user_type_renaming', 2)
-
-    #    stmt = """
-    #          USE nested_user_type_renaming
-    #       """
-    #    cursor.execute(stmt)
-
-    #    stmt = """
-    #          CREATE TYPE simple_type (
-    #          user_number int,
-    #          user_text text
-    #          )
-    #       """
-    #    cursor.execute(stmt)
-
-    #    stmt = """
-    #          CREATE TYPE another_type (
-    #          somefield simple_type
-    #          )
-    #       """
-    #    cursor.execute(stmt)
-
-    #    stmt = """
-    #          CREATE TYPE yet_another_type (
-    #          some_other_field another_type
-    #          )
-    #       """
-    #    cursor.execute(stmt)
-
-    #    stmt = """
-    #          CREATE TABLE uses_nested_type (
-    #          id uuid PRIMARY KEY,
-    #          field_name yet_another_type
-    #          )
-    #       """
-    #    cursor.execute(stmt)
-
-    #    # let's insert some basic data using the nested types
-    #    _id = uuid.uuid4()
-    #    stmt = """
-    #          INSERT INTO uses_nested_type (id, field_name)
-    #          VALUES (%s, {some_other_field: {somefield: {user_number: 1, user_text: 'original'}}});
-    #       """ % _id
-    #    cursor.execute(stmt)
-
-    #    # rename one of the types used in the nesting
-    #    stmt = """
-    #          ALTER TYPE another_type rename to another_type2;
-    #       """
-    #    cursor.execute(stmt)
-
-    #    # confirm nested data can be queried without error
-    #    stmt = """
-    #          SELECT field_name FROM uses_nested_type where id = {id}
-    #       """.format(id=_id)
-    #    cursor.execute(stmt)
-
-    #    data = cursor.fetchone()[0]
-    #    self.assertIn('original', data)
-
-    #    # confirm we can alter/query the data after altering the type
-    #    stmt = """
-    #          UPDATE uses_nested_type
-    #          SET field_name = {some_other_field: {somefield: {user_number: 2, user_text: 'altered'}}}
-    #          WHERE id=%s;
-    #       """ % _id
-    #    cursor.execute(stmt)
-
-    #    stmt = """
-    #          SELECT field_name FROM uses_nested_type where id = {id}
-    #       """.format(id=_id)
-    #    cursor.execute(stmt)
-
-    #    data = cursor.fetchone()[0]
-    #    self.assertIn('altered', data)
-
-    #    # and confirm we can add/query new data after the type rename
-    #    _id = uuid.uuid4()
-    #    stmt = """
-    #          INSERT INTO uses_nested_type (id, field_name)
-    #          VALUES (%s, {some_other_field: {somefield: {user_number: 1, user_text: 'inserted'}}});
-    #       """ % _id
-    #    cursor.execute(stmt)
-
-    #    stmt = """
-    #          SELECT field_name FROM uses_nested_type where id = {id}
-    #       """.format(id=_id)
-    #    cursor.execute(stmt)
-
-    #    data = cursor.fetchone()[0]
-    #    self.assertIn('inserted', data)
 
     @since('2.1')
     def test_type_dropping(self):
@@ -457,7 +318,7 @@ class TestUserTypes(Tester):
         primary_item, other_items, other_containers = rows[0]
         self.assertEqual(decode(primary_item), [[u'test', u'test2']])
         self.assertEqual(decode(other_items), [[u'stuff', [u'one', u'two']]])
-        self.assertEqual(decode(other_containers), [[u'stuff2', [u'one_other', u'two_other']], [u'stuff3', [u'one_2_other', u'two_2_other']], [u'stuff4', [u'one_3_other', u'two_3_other']]])
+        self.assertEqual(decode(other_containers), [[[u'stuff2', [u'one_other', u'two_other']], [u'stuff3', [u'one_2_other', u'two_2_other']], [u'stuff4', [u'one_3_other', u'two_3_other']]]])
 
         #  Generate some repetitive data and check it for it's contents:
         for x in xrange(50):
@@ -480,7 +341,7 @@ class TestUserTypes(Tester):
             rows = cursor.execute(stmt)
 
             items = rows[0][0]
-            self.assertEqual(decode(items), [[u'stuff3', [u'one_2_other', u'two_2_other']], [u'stuff4', [u'one_3_other', u'two_3_other']]])
+            self.assertEqual(decode(items), [[[u'stuff3', [u'one_2_other', u'two_2_other']], [u'stuff4', [u'one_3_other', u'two_3_other']]]])
 
     @since('2.1')
     def test_type_as_part_of_pkey(self):
@@ -839,4 +700,4 @@ class TestUserTypes(Tester):
 
         for _id in ids:
             res = cursor.execute("SELECT letterpair FROM letters where id = {}".format(_id))
-            self.assertEqual(decode(res), [[u'a', u'z'], [u'c', u'a'], [u'c', u'f'], [u'c', u'z'], [u'd', u'e'], [u'z', u'a']])
+            self.assertEqual(decode(res), [[[u'a', u'z'], [u'c', u'a'], [u'c', u'f'], [u'c', u'z'], [u'd', u'e'], [u'z', u'a']]])

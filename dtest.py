@@ -51,6 +51,8 @@ logging.basicConfig(filename=os.path.join(LOG_SAVED_DIR,"dtest.log"),
                     level=logging.DEBUG)
 
 LOG = logging.getLogger('dtest')
+# set python-driver log level to WARN by default for dtest
+logging.getLogger('cassandra').setLevel(logging.WARNING)
 
 # copy the initial environment variables so we can reset them later:
 initial_environment = copy.deepcopy(os.environ)
