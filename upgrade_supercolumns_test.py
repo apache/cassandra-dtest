@@ -85,6 +85,12 @@ class TestSCUpgrade(Tester):
         cli.close()
 
 
+        ##If we are on 2.1 or any higher version,
+        ##upgrade to 2.0.latest.
+        ##Otherwise, we must be on a 2.0.x, so we
+        ##should be upgrading to that version.
+        ##This will let us test upgrading
+        ##from 1.2.19 to each of the 2.0 minor releases.
         CASSANDRA_DIR = os.environ.get('CASSANDRA_DIR')
         if get_version_from_build(CASSANDRA_DIR) >= '2.1':
             #Upgrade nodes to 2.0.
