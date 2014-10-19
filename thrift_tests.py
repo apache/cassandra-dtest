@@ -6,6 +6,7 @@ from thrift.protocol import TBinaryProtocol
 from thrift.Thrift import TApplicationException
 
 from dtest import Tester, debug, NUM_TOKENS, DISABLE_VNODES
+from pytools import since
 from thrift_bindings.v30 import Cassandra
 from thrift_bindings.v30.Cassandra import *
 
