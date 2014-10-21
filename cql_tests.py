@@ -2950,6 +2950,15 @@ class TestCQL(Tester):
         assert_one(cursor, "DELETE v FROM test2 WHERE k='k' AND i=0 IF EXISTS", [False])
         assert_one(cursor, "DELETE FROM test2 WHERE k='k' AND i=0 IF EXISTS", [False])
 
+        # CASSANDRA-6430
+        v = self.cluster.version()
+        if v >= "2.1.1" or v < "2.1" and v >= "2.0.11":
+            assert_invalid(cursor, "DELETE FROM test2 WHERE k = 'k' IF EXISTS")
+            assert_invalid(cursor, "DELETE FROM test2 WHERE k = 'k' IF v = 'foo'")
+            assert_invalid(cursor, "DELETE FROM test2 WHERE i = 0 IF EXISTS")
+            assert_invalid(cursor, "DELETE FROM test2 WHERE k = 0 AND i > 0 IF EXISTS")
+            assert_invalid(cursor, "DELETE FROM test2 WHERE k = 0 AND i > 0 IF v = 'foo'")
+
     @freshCluster()
     def range_key_ordered_test(self):
         cursor = self.prepare(ordered=True)
