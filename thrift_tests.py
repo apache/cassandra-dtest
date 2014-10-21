@@ -2195,6 +2195,7 @@ class TestMutations(ThriftTester):
         assert len(result[0].columns) == 1, result[0].columns
         assert result[0].columns[0].super_column.name == 'sc1'
 
+    @since('2.1')
     def test_multi_slice(self):
         _set_keyspace('Keyspace1')
         _insert_six_columns('abc')
