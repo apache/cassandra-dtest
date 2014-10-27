@@ -4591,3 +4591,12 @@ class TestCQL(Tester):
             self.fail("Expected error")
         except ProtocolException as e:
             self.assertTrue("Cannot decode string as UTF8" in str(e))
+
+    def negative_timestamp_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("CREATE TABLE test (k int PRIMARY KEY, v int)")
+        cursor.execute("INSERT INTO test (k, v) VALUES (1, 1) USING TIMESTAMP -42")
+
+        assert_one(cursor, "SELECT writetime(v) FROM TEST WHERE k = 1", [ -42 ])
+
