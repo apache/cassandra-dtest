@@ -11,7 +11,7 @@ class TestSCUpgrade(Tester):
         cluster = self.cluster
 
         # Forcing cluster version on purpose
-        cluster.set_cassandra_dir(cassandra_version="1.2.16")
+        cluster.set_install_dir(version="1.2.16")
         cluster.populate(2).start()
 
         [node1, node2] = cluster.nodelist()
@@ -74,9 +74,9 @@ class TestSCUpgrade(Tester):
 
             # Update Cassandra Directory
             for node in nodes:
-                node.set_cassandra_dir(cassandra_version=tag)
-                debug("Set new cassandra dir for %s: %s" % (node.name, node.get_cassandra_dir()))
-            self.cluster.set_cassandra_dir(cassandra_version=tag)
+                node.set_install_dir(version=tag)
+                debug("Set new cassandra dir for %s: %s" % (node.name, node.get_install_dir()))
+            self.cluster.set_install_dir(version=tag)
 
             # Restart nodes on new version
             for node in nodes:

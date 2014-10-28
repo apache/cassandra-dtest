@@ -1,7 +1,7 @@
 from dtest import Tester, debug, DISABLE_VNODES
 import unittest
 from ccmlib.cluster import Cluster
-from ccmlib.node import Node, NodeError
+from ccmlib.node import Node, NodeError, TimeoutError
 from cassandra import ConsistencyLevel, Unavailable, ReadTimeout
 from cassandra.query import SimpleStatement
 import time, re
@@ -112,7 +112,10 @@ class TestReplaceAddress(Tester):
         cluster.add(node4, False)
 
         with self.assertRaises(NodeError):
-            node4.start(replace_address='127.0.0.3')
+            try:
+                node4.start(replace_address='127.0.0.3')
+            except (NodeError, TimeoutError):
+                raise NodeError("Node could not start.")
 
         checkError = node4.grep_log("java.lang.UnsupportedOperationException: Cannot replace a live node...")
         self.assertEqual(len(checkError), 1)
@@ -138,7 +141,11 @@ class TestReplaceAddress(Tester):
 
         #try to replace an unassigned ip address
         with self.assertRaises(NodeError):
-            node4.start(replace_address='127.0.0.5')
+            try:
+                node4.start(replace_address='127.0.0.5')
+            except (NodeError, TimeoutError):
+                raise NodeError("Node could not start.")
+
 
     def replace_first_boot_test(self):
         debug("Starting cluster with 3 nodes.")
