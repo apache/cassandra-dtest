@@ -7,7 +7,7 @@ from ccmlib.cluster import Cluster
 
 class TestUDF(Tester):
 
-    @since('2.1')
+    @since('3.0')
     def udf_test(self):
         """ Test User Defined Functions """
         cluster = self.cluster
@@ -15,8 +15,7 @@ class TestUDF(Tester):
         [node1,node2, node3] = cluster.nodelist()
         cqlversion = "3.0.0"
         cursor1 = self.patient_cql_connection(node1, version=cqlversion)
-        #cursor2 = self.patient_cql_connection(node2, version=cqlversion).cursor()
-        #cursor3 = self.patient_cql_connection(node3, version=cqlversion).cursor()
+
         self.create_ks(cursor1, 'ks', 1)
 
         cursor1.execute("""
@@ -52,7 +51,7 @@ class TestUDF(Tester):
         #try giving existing function bad input, should error
         assert_invalid(cursor1, "SELECT key, value, foo::sin(key), foo::cos(KEYy), foo::tan(key) FROM ks.udf_kv where key = 1", "Type error: key cannot be passed as argument 0 of function foo::sin of type double")
 
-    @since('2.1')
+    @since('3.0')
     def udf_overload_test(self):
 
         cluster = self.cluster
@@ -60,8 +59,7 @@ class TestUDF(Tester):
         [node1,node2, node3] = cluster.nodelist()
         cqlversion = "3.0.0"
         cursor1 = self.patient_cql_connection(node1, version=cqlversion)
-        #cursor2 = self.patient_cql_connection(node2, version=cqlversion).cursor()
-        #cursor3 = self.patient_cql_connection(node3, version=cqlversion).cursor()
+
         self.create_ks(cursor1, 'ks', 1)
 
         cursor1.execute("CREATE TABLE tab (k text PRIMARY KEY, v int)");
