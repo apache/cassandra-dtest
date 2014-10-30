@@ -98,7 +98,9 @@ class TestSCUpgrade(Tester):
             self.upgrade_to_version("git:cassandra-2.0", [node1])
             time.sleep(.5)
         else:
+            node1.stop(wait_other_notice=True)
             self.set_node_to_current_version(node1)
+            node1.start(wait_other_notice=True)
 
         cli = node1.cli()
         cli.do("use test")
@@ -127,8 +129,12 @@ class TestSCUpgrade(Tester):
             self.upgrade_to_version("git:cassandra-2.0", [node2, node3])
             time.sleep(.5)
         else:
+            node2.stop(wait_other_notice=True)
+            node3.stop(wait_other_notice=True)
             self.set_node_to_current_version(node2)
             self.set_node_to_current_version(node3)
+            node2.start(wait_other_notice=True)
+            node3.start(wait_other_notice=True)
 
         cli = node1.cli()
         cli.do("use test")
