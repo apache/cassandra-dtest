@@ -68,7 +68,10 @@ class ThriftHSHATest(Tester):
         test will be skipped if the jar file is not found.
         """
         cluster = self.cluster
-        cluster.set_configuration_options(values={ 'rpc_server_type' : 'hsha'})
+        cluster.set_configuration_options(values={
+            'rpc_server_type' : 'hsha',
+            'rpc_max_threads' : 20
+        })
 
         # Enable JNA:
         with open(os.path.join(self.test_path, 'test', 'cassandra.in.sh'),'w') as f:

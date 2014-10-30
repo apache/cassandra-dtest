@@ -2950,6 +2950,15 @@ class TestCQL(Tester):
         assert_one(cursor, "DELETE v FROM test2 WHERE k='k' AND i=0 IF EXISTS", [False])
         assert_one(cursor, "DELETE FROM test2 WHERE k='k' AND i=0 IF EXISTS", [False])
 
+        # CASSANDRA-6430
+        v = self.cluster.version()
+        if v >= "2.1.1" or v < "2.1" and v >= "2.0.11":
+            assert_invalid(cursor, "DELETE FROM test2 WHERE k = 'k' IF EXISTS")
+            assert_invalid(cursor, "DELETE FROM test2 WHERE k = 'k' IF v = 'foo'")
+            assert_invalid(cursor, "DELETE FROM test2 WHERE i = 0 IF EXISTS")
+            assert_invalid(cursor, "DELETE FROM test2 WHERE k = 0 AND i > 0 IF EXISTS")
+            assert_invalid(cursor, "DELETE FROM test2 WHERE k = 0 AND i > 0 IF v = 'foo'")
+
     @freshCluster()
     def range_key_ordered_test(self):
         cursor = self.prepare(ordered=True)
@@ -3679,6 +3688,22 @@ class TestCQL(Tester):
 
         assert_invalid(cursor, "SELECT DISTINCT s FROM test")
 
+        # paging to test for CASSANDRA-8108
+        cursor.execute("TRUNCATE test")
+        for i in range(10):
+            for j in range(10):
+                cursor.execute("INSERT INTO test (k, p, s) VALUES (%s, %s, %s)", (i, j, i))
+
+        cursor.default_fetch_size = 7
+        rows = list(cursor.execute("SELECT DISTINCT k, s FROM test"))
+        self.assertEqual(range(10), sorted([r[0] for r in rows]))
+        self.assertEqual(range(10), sorted([r[1] for r in rows]))
+
+        keys = ",".join(map(str, range(10)))
+        rows = list(cursor.execute("SELECT DISTINCT k, s FROM test WHERE k IN (%s)" % (keys,)))
+        self.assertEqual(range(10), [r[0] for r in rows])
+        self.assertEqual(range(10), [r[1] for r in rows])
+
 
     def select_count_paging_test(self):
         """ Test for the #6579 'select count' paging bug """
@@ -3728,6 +3753,22 @@ class TestCQL(Tester):
         assert_all(cursor, "SELECT v1, v2, v3 FROM test WHERE k = 0 AND (v1, v2) > (0, 1) AND (v1, v2, v3) <= (1, 1, 0)", [[1, 0, 0], [1, 0, 1], [1, 1, 0]])
 
         assert_invalid(cursor, "SELECT v1, v2, v3 FROM test WHERE k = 0 AND (v1, v3) > (1, 0)")
+
+    @since('2.1.1')
+    def test_v2_protocol_IN_with_tuples(self):
+        """ Test for CASSANDRA-8062 """
+        cursor = self.prepare()
+        cursor = self.cql_connection(self.cluster.nodelist()[0], keyspace='ks', protocol_version=2)
+        cursor.execute("CREATE TABLE test (k int, c1 int, c2 text, PRIMARY KEY (k, c1, c2))")
+        cursor.execute("INSERT INTO test (k, c1, c2) VALUES (0, 0, 'a')")
+        cursor.execute("INSERT INTO test (k, c1, c2) VALUES (0, 0, 'b')")
+        cursor.execute("INSERT INTO test (k, c1, c2) VALUES (0, 0, 'c')")
+
+        p = cursor.prepare("SELECT * FROM test WHERE k=? AND (c1, c2) IN ?")
+        rows = cursor.execute(p, (0, [(0, 'b'), (0, 'c')]))
+        self.assertEqual(2, len(rows))
+        self.assertEqual((0, 0, 'b'), rows[0])
+        self.assertEqual((0, 0, 'c'), rows[1])
 
     def in_with_desc_order_test(self):
         cursor = self.prepare()
@@ -4550,3 +4591,12 @@ class TestCQL(Tester):
             self.fail("Expected error")
         except ProtocolException as e:
             self.assertTrue("Cannot decode string as UTF8" in str(e))
+
+    def negative_timestamp_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("CREATE TABLE test (k int PRIMARY KEY, v int)")
+        cursor.execute("INSERT INTO test (k, v) VALUES (1, 1) USING TIMESTAMP -42")
+
+        assert_one(cursor, "SELECT writetime(v) FROM TEST WHERE k = 1", [ -42 ])
+

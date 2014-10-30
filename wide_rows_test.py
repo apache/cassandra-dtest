@@ -31,7 +31,7 @@ class TestWideRows(Tester):
     def write_wide_rows(self, version=None):
         cluster = self.cluster
         if version:
-            self.cluster.set_cassandra_dir(cassandra_version=version)
+            self.cluster.set_install_dir(version=version)
         cluster.populate(1).start()
         (node1,) = cluster.nodelist()
 
