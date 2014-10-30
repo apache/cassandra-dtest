@@ -88,7 +88,7 @@ def parse_data_into_dicts(data, format_funcs=None):
     return values
 
 
-def create_rows(data, cursor, table_name, format_funcs=None, prefix='', postfix=''):
+def create_rows(data, cursor, table_name, cl=None, format_funcs=None, prefix='', postfix=''):
     """
     Creates db rows using given cursor, with table name provided,
     using data formatted like:
@@ -110,6 +110,8 @@ def create_rows(data, cursor, table_name, format_funcs=None, prefix='', postfix=
             prefix=prefix, table=table_name, cols=', '.join(dicts[0].keys()),
             vals=', '.join('?' for k in dicts[0].keys()), postfix=postfix)
     )
+    if cl is not None:
+        prepared.consistency_level = cl
 
     query_results = execute_concurrent_with_args(cursor, prepared, [d.values() for d in dicts])
 
