@@ -78,7 +78,7 @@ class TestSCUpgrade(Tester):
 
         for i in xrange(2):
             for j in xrange(2):
-                for k in xrange(10):
+                for k in xrange(20):
                     cli.do("incr sc_test['Counter1']['sc%d']['c%d'] by 1" % (i, j))
 
         assert not cli.has_errors(), cli.errors()
@@ -107,21 +107,21 @@ class TestSCUpgrade(Tester):
         cli.do("use test")
         for i in xrange(2):
             for j in xrange(2):
-                for k in xrange(100):
+                for k in xrange(50):
                     cli.do("incr sc_test['Counter1']['sc%d']['c%d'] by 1" % (i, j))
 
         cli2 = node2.cli()
         cli2.do("use test")
         for i in xrange(2):
             for j in xrange(2):
-                for k in xrange(100):
+                for k in xrange(50):
                     cli2.do("incr sc_test['Counter1']['sc%d']['c%d'] by 1" % (i, j))
 
         cli3 = node3.cli()
         cli3.do("use test")
         for i in xrange(2):
             for j in xrange(2):
-                for k in xrange(100):
+                for k in xrange(50):
                     cli3.do("incr sc_test['Counter1']['sc%d']['c%d'] by 1" % (i, j))
 
         if get_version_from_build(CASSANDRA_DIR) >= '2.1':
