@@ -2588,7 +2588,8 @@ class TestCQL(Tester):
                 id2 int,
                 author text,
                 time bigint,
-                content text,
+                v1 text,
+                v2 text,
                 PRIMARY KEY ((id1, id2), author, time)
             )
         """)
@@ -2596,20 +2597,30 @@ class TestCQL(Tester):
         cursor.execute("CREATE INDEX ON posts(time)")
         cursor.execute("CREATE INDEX ON posts(id2)")
 
-        cursor.execute("INSERT INTO posts(id1, id2, author, time, content) VALUES(0, 0, 'bob', 0, 'A')")
-        cursor.execute("INSERT INTO posts(id1, id2, author, time, content) VALUES(0, 0, 'bob', 1, 'B')")
-        cursor.execute("INSERT INTO posts(id1, id2, author, time, content) VALUES(0, 1, 'bob', 2, 'C')")
-        cursor.execute("INSERT INTO posts(id1, id2, author, time, content) VALUES(0, 0, 'tom', 0, 'D')")
-        cursor.execute("INSERT INTO posts(id1, id2, author, time, content) VALUES(0, 1, 'tom', 1, 'E')")
+        cursor.execute("INSERT INTO posts(id1, id2, author, time, v1, v2) VALUES(0, 0, 'bob', 0, 'A', 'A')")
+        cursor.execute("INSERT INTO posts(id1, id2, author, time, v1, v2) VALUES(0, 0, 'bob', 1, 'B', 'B')")
+        cursor.execute("INSERT INTO posts(id1, id2, author, time, v1, v2) VALUES(0, 1, 'bob', 2, 'C', 'C')")
+        cursor.execute("INSERT INTO posts(id1, id2, author, time, v1, v2) VALUES(0, 0, 'tom', 0, 'D', 'D')")
+        cursor.execute("INSERT INTO posts(id1, id2, author, time, v1, v2) VALUES(0, 1, 'tom', 1, 'E', 'E')")
 
-        res = cursor.execute("SELECT content FROM posts WHERE time = 1")
+        res = cursor.execute("SELECT v1 FROM posts WHERE time = 1")
         assert rows_to_list(res) == [ ['B'], ['E'] ], res
 
-        res = cursor.execute("SELECT content FROM posts WHERE id2 = 1")
+        res = cursor.execute("SELECT v1 FROM posts WHERE id2 = 1")
         assert rows_to_list(res) == [ ['C'], ['E'] ], res
 
-        res = cursor.execute("SELECT content FROM posts WHERE id1 = 0 AND id2 = 0 AND author = 'bob' AND time = 0")
+        res = cursor.execute("SELECT v1 FROM posts WHERE id1 = 0 AND id2 = 0 AND author = 'bob' AND time = 0")
         assert rows_to_list(res) == [ ['A'] ], res
+
+        # Test for CASSANDRA-8206
+        cursor.execute("UPDATE posts SET v2 = null WHERE id1 = 0 AND id2 = 0 AND author = 'bob' AND time = 1")
+
+        res = cursor.execute("SELECT v1 FROM posts WHERE id2 = 0")
+        assert rows_to_list(res) == [ ['A'], ['B'], ['D'] ], res
+
+        res = cursor.execute("SELECT v1 FROM posts WHERE time = 1")
+        assert rows_to_list(res) == [ ['B'], ['E'] ], res
+
 
     @since('2.0')
     def edge_2i_on_complex_pk_test(self):
