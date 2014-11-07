@@ -2621,6 +2621,22 @@ class TestCQL(Tester):
         res = cursor.execute("SELECT v1 FROM posts WHERE time = 1")
         assert rows_to_list(res) == [ ['B'], ['E'] ], res
 
+    @since('2.0')
+    def invalid_clustering_indexing_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("CREATE TABLE test1 (a int, b int, c int, d int, PRIMARY KEY ((a, b))) WITH COMPACT STORAGE")
+        assert_invalid(cursor, "CREATE INDEX ON test1(a)")
+        assert_invalid(cursor, "CREATE INDEX ON test1(b)")
+
+        cursor.execute("CREATE TABLE test2 (a int, b int, c int, PRIMARY KEY (a, b)) WITH COMPACT STORAGE")
+        assert_invalid(cursor, "CREATE INDEX ON test2(a)")
+        assert_invalid(cursor, "CREATE INDEX ON test2(b)")
+        assert_invalid(cursor, "CREATE INDEX ON test2(c)")
+
+        cursor.execute("CREATE TABLE test3 (a int, b int, c int static , PRIMARY KEY (a, b))")
+        assert_invalid(cursor, "CREATE INDEX ON test3(c)")
+
 
     @since('2.0')
     def edge_2i_on_complex_pk_test(self):
