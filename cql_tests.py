@@ -4296,7 +4296,6 @@ class TestCQL(Tester):
         # This doesn't work -- see #7059
         #assert_all(cursor, "SELECT * FROM test WHERE v > 1 AND v <= 3 LIMIT 6 ALLOW FILTERING", [[1, 2], [1, 3], [0, 2], [0, 3], [2, 2], [2, 3]])
 
-    @require("6950")
     def key_index_with_reverse_clustering(self):
         """ Test for #6950 bug """
         cursor = self.prepare()
@@ -4575,7 +4574,6 @@ class TestCQL(Tester):
         # A blob that is not 4 bytes should be rejected
         assert_invalid(cursor, "INSERT INTO test(k, v) VALUES (0, blobAsInt(0x01))")
 
-    @require("7730")
     def alter_clustering_and_static_test(self):
         cursor = self.prepare()
 
@@ -4594,7 +4592,6 @@ class TestCQL(Tester):
         cursor.execute("alter table test drop v")
         assert_invalid(cursor, "alter table test add v set<int>")
 
-    @require("#7744")
     def downgrade_to_compact_bug_test(self):
         """ Test for 7744 """
         cursor = self.prepare()
