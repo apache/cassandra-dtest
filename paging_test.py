@@ -291,7 +291,7 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
         cursor.execute("CREATE TABLE paging_test ( id uuid PRIMARY KEY, value text )")
 
         def random_txt(text):
-            return uuid.uuid1()
+            return uuid.uuid4()
 
         data = """
                | id     |value   |
@@ -319,7 +319,7 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
         cursor.execute("CREATE TABLE paging_test ( id uuid PRIMARY KEY, value text )")
 
         def random_txt(text):
-            return uuid.uuid1()
+            return uuid.uuid4()
 
         data = """
                | id     |value   |
@@ -488,7 +488,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         cursor.execute("CREATE TABLE paging_test ( id int, value text, PRIMARY KEY (id, value) )")
 
         def random_txt(text):
-            return unicode(uuid.uuid1())
+            return unicode(uuid.uuid4())
 
         data = """
               | id | value                  |
@@ -513,7 +513,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         cursor.execute("CREATE TABLE paging_test ( id int, value text, PRIMARY KEY (id, value) )")
 
         def random_txt(text):
-            return unicode(uuid.uuid1())
+            return unicode(uuid.uuid4())
 
         data = """
               | id | value                  |
@@ -540,7 +540,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         cursor.execute("CREATE INDEX ON paging_test(mybool)")
 
         def random_txt(text):
-            return unicode(uuid.uuid1())
+            return unicode(uuid.uuid4())
 
         def bool_from_str_int(text):
             return bool(int(text))
@@ -581,7 +581,7 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
         cursor.execute("CREATE TABLE paging_test ( id int, mytext text, PRIMARY KEY (id, mytext) )")
 
         def random_txt(text):
-            return unicode(uuid.uuid1())
+            return unicode(uuid.uuid4())
 
         data = """
               | id | mytext   |
@@ -614,7 +614,7 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
         cursor.execute("CREATE TABLE paging_test ( id int, mytext text, PRIMARY KEY (id, mytext) )")
 
         def random_txt(text):
-            return unicode(uuid.uuid1())
+            return unicode(uuid.uuid4())
 
         data = """
               | id | mytext   |
@@ -648,7 +648,7 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
         cursor.execute("CREATE TABLE paging_test ( id int, mytext text, PRIMARY KEY (id, mytext) )")
 
         def random_txt(text):
-            return unicode(uuid.uuid1())
+            return unicode(uuid.uuid4())
 
         data = """
               | id | mytext   |
@@ -678,7 +678,7 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
         cursor.execute("CREATE TABLE paging_test ( id int, mytext text, PRIMARY KEY (id, mytext) )")
 
         def random_txt(text):
-            return unicode(uuid.uuid1())
+            return unicode(uuid.uuid4())
 
         # create rows with TTL (some of which we'll try to get after expiry)
         create_rows(
@@ -727,7 +727,7 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
             """)
 
         def random_txt(text):
-            return unicode(uuid.uuid1())
+            return unicode(uuid.uuid4())
 
         data = create_rows(
             """
@@ -825,7 +825,7 @@ class TestPagingQueryIsolation(BasePagingTester, PageAssertionMixin):
         cursor.execute("CREATE TABLE paging_test ( id int, mytext text, PRIMARY KEY (id, mytext) )")
 
         def random_txt(text):
-            return unicode(uuid.uuid1())
+            return unicode(uuid.uuid4())
 
         data = """
                | id | mytext   |
