@@ -60,12 +60,13 @@ class PageFetcher(object):
             self.retrieved_empty_pages += 1
             return
 
-        self.retrieved_pages += 1
         page = Page()
         self.pages.append(page)
 
         for row in rows:
             page.add_row(row)
+
+        self.retrieved_pages += 1
 
     def handle_error(self, exc):
         self.error = exc
