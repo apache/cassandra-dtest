@@ -3742,7 +3742,10 @@ class TestCQL(Tester):
         cursor.execute("insert into test(field1, field2, field3) values ('hola', now(), false);");
         cursor.execute("insert into test(field1, field2, field3) values ('hola', now(), false);");
 
-        assert_one(cursor, "select count(*) from test where field3 = false limit 1;", [2])
+        if self.cluster.version() > '3.0':
+            assert_one(cursor, "select count(*) from test where field3 = false limit 1;", [2])
+        else:
+            assert_one(cursor, "select count(*) from test where field3 = false limit 1;", [1])
 
 
     @since('2.0')
