@@ -27,10 +27,6 @@ def assert_invalid(session, query, matching=None):
         msg = str(e)
         if matching is not None:
             assert re.search(matching, msg), "Error message does not contain " + matching + " (error = " + msg + ")"
-    except Exception as e:
-        msg = str(e)
-        if matching is not None:
-            assert re.search(matching, msg), "Error message does not contain " + matching + " (error = " + msg + ")"
 
 def assert_one(cursor, query, expected, cl=ConsistencyLevel.ONE):
     simple_query = SimpleStatement(query, consistency_level=cl)
