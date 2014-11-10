@@ -4624,3 +4624,146 @@ class TestCQL(Tester):
 
         assert_one(cursor, "SELECT writetime(v) FROM TEST WHERE k = 1", [ -42 ])
 
+    @since('3.0')
+    @require("7936")
+    def select_map_key_single_row_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("CREATE TABLE test (k int PRIMARY KEY, v map<int, text>)")
+        cursor.execute("INSERT INTO test (k, v) VALUES ( 0, {1:'a', 2:'b', 3:'c', 4:'d'})")
+
+        assert_one(cursor, "SELECT v[1] FROM test WHERE k = 0", ['a'])
+        assert_one(cursor, "SELECT v[5] FROM test WHERE k = 0", [])
+        assert_one(cursor, "SELECT v[1] FROM test WHERE k = 1", [])
+
+        assert_one(cursor, "SELECT v[1..3] FROM test WHERE k = 0", ['a', 'b', 'c'])
+        assert_one(cursor, "SELECT v[3..5] FROM test WHERE k = 0", ['c', 'd'])
+        assert_invalid(cursor, "SELECT v[3..1] FROM test WHERE k = 0")
+
+        assert_one(cursor, "SELECT v[..2] FROM test WHERE k = 0", ['a', 'b'])
+        assert_one(cursor, "SELECT v[3..] FROM test WHERE k = 0", ['c', 'd'])
+        assert_one(cursor, "SELECT v[0..] FROM test WHERE k = 0", ['a', 'b', 'c', 'd'])
+        assert_one(cursor, "SELECT v[..5] FROM test WHERE k = 0", ['a', 'b', 'c', 'd'])
+
+        assert_one(cursor, "SELECT sizeof(v) FROM test where k = 0", [4])
+
+    @since('3.0')
+    @require("7936")
+    def select_set_key_single_row_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("CREATE TABLE test (k int PRIMARY KEY, v set<text>)")
+        cursor.execute("INSERT INTO test (k, v) VALUES ( 0, {'e', 'a', 'd', 'b'})")
+
+        assert_one(cursor, "SELECT v FROM test WHERE k = 0", [sortedset(['a', 'b', 'd', 'e'])])
+        assert_one(cursor, "SELECT v['a'] FROM test WHERE k = 0", [True])
+        assert_one(cursor, "SELECT v['c'] FROM test WHERE k = 0", [False])
+        assert_one(cursor, "SELECT v['a'] FROM test WHERE k = 1", [])
+
+        assert_one(cursor, "SELECT v['b'..'d'] FROM test WHERE k = 0", ['b', 'd'])
+        assert_one(cursor, "SELECT v['b'..'e'] FROM test WHERE k = 0", ['b', 'd', 'e'])
+        assert_one(cursor, "SELECT v['a'..'d'] FROM test WHERE k = 0", ['a', 'b', 'd'])
+        assert_one(cursor, "SELECT v['b'..'f'] FROM test WHERE k = 0", ['b', 'd', 'e'])
+        assert_invalid(cursor, "SELECT v['d'..'a'] FROM test WHERE k = 0")
+
+        assert_one(cursor, "SELECT v['d'..] FROM test WHERE k = 0", ['d', 'e'])
+        assert_one(cursor, "SELECT v[..'d'] FROM test WHERE k = 0", ['a', 'b', 'd'])
+        assert_one(cursor, "SELECT v['f'..] FROM test WHERE k = 0", [])
+        assert_one(cursor, "SELECT v[..'f'] FROM test WHERE k = 0", ['a', 'b', 'd', 'e'])
+
+        assert_one(cursor, "SELECT sizeof(v) FROM test where k = 0", [4])
+
+    @since('3.0')
+    @require("7936")
+    def select_list_key_single_row_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("CREATE TABLE test (k int PRIMARY KEY, v list<text>)")
+        cursor.execute("INSERT INTO test (k, v) VALUES ( 0, ['e', 'a', 'd', 'b'])")
+
+        assert_one(cursor, "SELECT v FROM test WHERE k = 0", [['e', 'a', 'd', 'b']])
+        assert_one(cursor, "SELECT v[0] FROM test WHERE k = 0", ['e'])
+        assert_one(cursor, "SELECT v[3] FROM test WHERE k = 0", ['b'])
+        assert_one(cursor, "SELECT v[0] FROM test WHERE k = 1", [])
+
+        assert_invalid(cursor, "SELECT v[-1] FROM test WHERE k = 0")
+        assert_invalid(cursor, "SELECT v[5] FROM test WHERE k = 0")
+
+        assert_one(cursor, "SELECT v[1..3] FROM test WHERE k = 0", ['a', 'd', 'b'])
+        assert_one(cursor, "SELECT v[0..2] FROM test WHERE k = 0", ['e', 'a', 'd'])
+        assert_invalid(cursor, "SELECT v[0..4] FROM test WHERE k = 0")
+        assert_invalid(cursor, "SELECT v[2..0] FROM test WHERE k = 0")
+
+        assert_one(cursor, "SELECT sizeof(v) FROM test where k = 0", [4])
+
+    @since('3.0')
+    @require("7936")
+    def select_map_key_multi_row_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("CREATE TABLE test (k int PRIMARY KEY, v map<int, text>)")
+        cursor.execute("INSERT INTO test (k, v) VALUES ( 0, {1:'a', 2:'b', 3:'c', 4:'d'})")
+        cursor.execute("INSERT INTO test (k, v) VALUES ( 1, {1:'a', 2:'b', 5:'e', 6:'f'})")
+
+        assert_all(cursor, "SELECT v[1] FROM test", [['a'], ['a']])
+        assert_all(cursor, "SELECT v[5] FROM test", [[], []])
+        assert_all(cursor, "SELECT v[1] FROM test", [[], []])
+
+        assert_all(cursor, "SELECT v[1..3] FROM test", [['a', 'b', 'c'], ['a', 'b', 'e']])
+        assert_all(cursor, "SELECT v[3..5] FROM test", [['c', 'd'], ['e']])
+        assert_invalid(cursor, "SELECT v[3..1] FROM test")
+
+        assert_all(cursor, "SELECT v[..2] FROM test", [['a', 'b'], ['a', 'b']])
+        assert_all(cursor, "SELECT v[3..] FROM test", [['c', 'd'], ['e', 'f']])
+        assert_all(cursor, "SELECT v[0..] FROM test", [['a', 'b', 'c', 'd'], ['a', 'b', 'e', 'f']])
+        assert_all(cursor, "SELECT v[..5] FROM test", [['a', 'b', 'c', 'd'], ['a', 'b', 'e']])
+
+        assert_all(cursor, "SELECT sizeof(v) FROM test", [[4], [4]])
+
+    @since('3.0')
+    @require("7936")
+    def select_set_key_multi_row_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("CREATE TABLE test (k int PRIMARY KEY, v set<text>)")
+        cursor.execute("INSERT INTO test (k, v) VALUES ( 0, {'e', 'a', 'd', 'b'})")
+        cursor.execute("INSERT INTO test (k, v) VALUES ( 1, {'c', 'f', 'd', 'b'})")
+
+        assert_all(cursor, "SELECT v FROM test", [[sortedset(['b', 'c', 'd', 'f'])], [sortedset(['a', 'b', 'd', 'e'])]])
+        assert_all(cursor, "SELECT v['a'] FROM test", [[True], [False]])
+        assert_all(cursor, "SELECT v['c'] FROM test", [[False], [True]])
+
+        assert_all(cursor, "SELECT v['b'..'d'] FROM test", [['b', 'd'], ['b', 'c', 'd']])
+        assert_all(cursor, "SELECT v['b'..'e'] FROM test", [['b', 'd', 'e'], ['b', 'c', 'd']])
+        assert_all(cursor, "SELECT v['a'..'d'] FROM test", [['a', 'b', 'd'], ['b', 'c', 'd']])
+        assert_all(cursor, "SELECT v['b'..'f'] FROM test", [['b', 'd', 'e'], ['b', 'c', 'd', 'f']])
+        assert_invalid(cursor, "SELECT v['d'..'a'] FROM test")
+
+        assert_all(cursor, "SELECT v['d'..] FROM test", [['d', 'e'], ['d', 'f']])
+        assert_all(cursor, "SELECT v[..'d'] FROM test", [['a', 'b', 'd'], ['b', 'c', 'd']])
+        assert_all(cursor, "SELECT v['f'..] FROM test", [[], ['f']])
+        assert_all(cursor, "SELECT v[..'f'] FROM test", [['a', 'b', 'd', 'e'], ['b', 'c', 'd', 'f']])
+
+        assert_all(cursor, "SELECT sizeof(v) FROM test", [[4], [4]])
+
+    @since('3.0')
+    @require("7936")
+    def select_list_key_multi_row_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("CREATE TABLE test (k int PRIMARY KEY, v list<text>)")
+        cursor.execute("INSERT INTO test (k, v) VALUES ( 0, ['e', 'a', 'd', 'b'])")
+        cursor.execute("INSERT INTO test (k, v) VALUES ( 1, ['c', 'f', 'd', 'b'])")
+
+        assert_all(cursor, "SELECT v FROM test", [[['c', 'f', 'd', 'b']], [['e', 'a', 'd', 'b']]])
+        assert_all(cursor, "SELECT v[0] FROM test", [['e'], ['c']])
+        assert_all(cursor, "SELECT v[3] FROM test", [['b'], ['b']])
+        assert_invalid(cursor, "SELECT v[-1] FROM test")
+        assert_invalid(cursor, "SELECT v[5] FROM test")
+
+        assert_all(cursor, "SELECT v[1..3] FROM test", [['a', 'd', 'b'], ['f', 'd', 'b']])
+        assert_all(cursor, "SELECT v[0..2] FROM test", [['e', 'a', 'd'], ['c', 'f', 'd']])
+        assert_invalid(cursor, "SELECT v[0..4] FROM test")
+        assert_invalid(cursor, "SELECT v[2..0] FROM test")
+
+        assert_all(cursor, "SELECT sizeof(v) FROM test", [[4], [4]])
