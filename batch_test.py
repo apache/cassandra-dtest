@@ -204,7 +204,6 @@ class TestBatch(Tester):
 
         node1 = self.cluster.nodelist()[0]
         session = self.patient_cql_connection(node1, version=cql_version)
-        session.execute("DROP KEYSPACE IF EXISTS ks")
         self.create_ks(session, 'ks', nodes)
         session.execute("""
             CREATE TABLE clicks (

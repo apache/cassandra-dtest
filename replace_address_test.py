@@ -1,7 +1,7 @@
 from dtest import Tester, debug, DISABLE_VNODES
 import unittest
 from ccmlib.cluster import Cluster
-from ccmlib.node import Node, NodeError
+from ccmlib.node import Node, NodeError, TimeoutError
 from cassandra import ConsistencyLevel, Unavailable, ReadTimeout
 from cassandra.query import SimpleStatement
 import time, re
@@ -39,7 +39,7 @@ class TestReplaceAddress(Tester):
             numNodes = 1
         else:
             #a little hacky but grep_log returns the whole line...
-            numNodes = int(re.search('num_tokens=(.*?);', node3.grep_log('num_tokens=(.*?);')[0][0]).group()[11:-1])
+            numNodes = int(node3.get_conf_option('num_tokens'))
 
         debug(numNodes)
 
@@ -112,7 +112,10 @@ class TestReplaceAddress(Tester):
         cluster.add(node4, False)
 
         with self.assertRaises(NodeError):
-            node4.start(replace_address='127.0.0.3')
+            try:
+                node4.start(replace_address='127.0.0.3')
+            except (NodeError, TimeoutError):
+                raise NodeError("Node could not start.")
 
         checkError = node4.grep_log("java.lang.UnsupportedOperationException: Cannot replace a live node...")
         self.assertEqual(len(checkError), 1)
@@ -138,7 +141,11 @@ class TestReplaceAddress(Tester):
 
         #try to replace an unassigned ip address
         with self.assertRaises(NodeError):
-            node4.start(replace_address='127.0.0.5')
+            try:
+                node4.start(replace_address='127.0.0.5')
+            except (NodeError, TimeoutError):
+                raise NodeError("Node could not start.")
+
 
     def replace_first_boot_test(self):
         debug("Starting cluster with 3 nodes.")
@@ -150,7 +157,7 @@ class TestReplaceAddress(Tester):
             numNodes = 1
         else:
             #a little hacky but grep_log returns the whole line...
-            numNodes = int(re.search('num_tokens=(.*?);', node3.grep_log('num_tokens=(.*?);')[0][0]).group()[11:-1])
+            numNodes = int(node3.get_conf_option('num_tokens'))
 
         debug(numNodes)
 

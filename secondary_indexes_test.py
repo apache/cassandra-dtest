@@ -299,6 +299,7 @@ class TestSecondaryIndexesOnCollections(Tester):
             self.assertEqual(str(db_uuids[0]), str(shared_uuid))
             self.assertEqual(str(db_uuids[1]), str(log_entry['unshared_uuid']))
 
+    @since('2.1')
     def test_set_indexes(self):
         """
         Checks that secondary indexes on sets work for querying.
@@ -390,6 +391,7 @@ class TestSecondaryIndexesOnCollections(Tester):
             self.assertTrue(shared_uuid in db_uuids)
             self.assertTrue(log_entry['unshared_uuid'] in db_uuids)
 
+    @since('2.1')
     def test_map_indexes(self):
         """
         Checks that secondary indexes on maps work for querying on both keys and values

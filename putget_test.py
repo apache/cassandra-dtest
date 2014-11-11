@@ -121,34 +121,27 @@ class TestPutGet(Tester):
         node1.set_configuration_options(values={'initial_token': "b".encode('hex')  })
         cluster.start()
         time.sleep(.5)
-        cursor = self.patient_cql_connection(node1, version="2.0.0")
+        cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'ks', 1)
 
         query = """
             CREATE TABLE test (
-                k text PRIMARY KEY,
-                col0 int,
-                col1 int,
-                col2 int,
-                col3 int,
-                col4 int,
-                col5 int,
-                col6 int,
-                col7 int,
-                col8 int,
-                col9 int
-            );
+                k text,
+                column1 text,
+                value text,
+                PRIMARY KEY (k, column1)
+            ) WITH COMPACT STORAGE;
         """
         cursor.execute(query)
         time.sleep(.5)
 
         for i in xrange(10):
             key_num = str(i).zfill(2)
-            query1 = "INSERT INTO test (k, col0, col1, col2, col3, col4, col5, col6, col7, col8, col9) VALUES ('a%s', 0, 1, 2, 3, 4, 5, 6, 7, 8, 9)" % (key_num)
-            query2 = "INSERT INTO test (k, col0, col1, col2, col3, col4, col5, col6, col7, col8, col9) VALUES ('b%s', 0, 1, 2, 3, 4, 5, 6, 7, 8, 9)" % (key_num)
-            cursor.execute(query1)
-            cursor.execute(query2)
-
+            for j in xrange(10):
+                stmt = "INSERT INTO test (k, column1, value) VALUES ('a%s', 'col%s', '%s')" % (key_num, j, j)
+                cursor.execute(stmt)
+                stmt = "INSERT INTO test (k, column1, value) VALUES ('b%s', 'col%s', '%s')" % (key_num, j, j)
+                cursor.execute(stmt)
         cursor.shutdown()
 
         tc = ThriftConnection(node1, ks_name='ks', cf_name='test')

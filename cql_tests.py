@@ -8,6 +8,7 @@ from dtest import Tester, canReuseCluster, freshCluster
 from pyassertions import assert_invalid, assert_one, assert_none, assert_all
 from pytools import since, require, rows_to_list
 from cassandra import ConsistencyLevel
+from cassandra.protocol import ProtocolException
 from cassandra.query import SimpleStatement
 try:
     from blist import sortedset
@@ -191,6 +192,10 @@ class TestCQL(Tester):
         cursor.execute("INSERT INTO connections (userid, ip, port, time) VALUES (550e8400-e29b-41d4-a716-446655440000, '192.168.0.2', 90, 42)")
         cursor.execute("UPDATE connections SET time = 24 WHERE userid = f47ac10b-58cc-4372-a567-0e02b2c3d479 AND ip = '192.168.0.2' AND port = 80")
 
+        # we don't have to include all of the clustering columns (see CASSANDRA-7990)
+        cursor.execute("INSERT INTO connections (userid, ip, time) VALUES (f47ac10b-58cc-4372-a567-0e02b2c3d479, '192.168.0.3', 42)")
+        cursor.execute("UPDATE connections SET time = 42 WHERE userid = f47ac10b-58cc-4372-a567-0e02b2c3d479 AND ip = '192.168.0.4'")
+
         # Queries
         res = cursor.execute("SELECT ip, port, time FROM connections WHERE userid = 550e8400-e29b-41d4-a716-446655440000")
         assert rows_to_list(res) == [[ '192.168.0.1', 80, 42 ], [ '192.168.0.2', 80, 24 ], [ '192.168.0.2', 90, 42 ]], res
@@ -204,6 +209,12 @@ class TestCQL(Tester):
         res = cursor.execute("SELECT ip, port, time FROM connections WHERE userid = 550e8400-e29b-41d4-a716-446655440000 and ip > '192.168.0.2'")
         assert rows_to_list(res) == [], res
 
+        res = cursor.execute("SELECT ip, port, time FROM connections WHERE userid = f47ac10b-58cc-4372-a567-0e02b2c3d479 AND ip = '192.168.0.3'")
+        self.assertEqual([['192.168.0.3', None, 42]], rows_to_list(res))
+
+        res = cursor.execute("SELECT ip, port, time FROM connections WHERE userid = f47ac10b-58cc-4372-a567-0e02b2c3d479 AND ip = '192.168.0.4'")
+        self.assertEqual([['192.168.0.4', None, 42]], rows_to_list(res))
+
         # Deletion
         cursor.execute("DELETE time FROM connections WHERE userid = 550e8400-e29b-41d4-a716-446655440000 AND ip = '192.168.0.2' AND port = 80")
         res = cursor.execute("SELECT * FROM connections WHERE userid = 550e8400-e29b-41d4-a716-446655440000")
@@ -212,6 +223,10 @@ class TestCQL(Tester):
         cursor.execute("DELETE FROM connections WHERE userid = 550e8400-e29b-41d4-a716-446655440000")
         res = cursor.execute("SELECT * FROM connections WHERE userid = 550e8400-e29b-41d4-a716-446655440000")
         assert len(res) == 0, res
+
+        cursor.execute("DELETE FROM connections WHERE userid = f47ac10b-58cc-4372-a567-0e02b2c3d479 AND ip = '192.168.0.3'")
+        res = cursor.execute("SELECT * FROM connections WHERE userid = f47ac10b-58cc-4372-a567-0e02b2c3d479 AND ip = '192.168.0.3'")
+        self.assertEqual([], res)
 
     def sparse_cf_test(self):
         """ Test composite 'sparse' CF syntax """
@@ -2392,11 +2407,11 @@ class TestCQL(Tester):
 
         assert_invalid(cursor, "SELECT * FROM foo WHERE a=1")
 
-    @require('https://issues.apache.org/jira/browse/CASSANDRA-4762')
+    @since('3.0')
     def multi_in_test(self):
         self.__multi_in(False)
 
-    @require('https://issues.apache.org/jira/browse/CASSANDRA-4762')
+    @since('3.0')
     def multi_in_compact_test(self):
         self.__multi_in(True)
 
@@ -2473,7 +2488,7 @@ class TestCQL(Tester):
         res = cursor.execute("select zipcode from zipcodes where group='test' AND zipcode IN ('06902','73301','94102') and state IN ('CT','CA') and fips_regions < 0")
         assert len(res) == 0, res
 
-    @require('https://issues.apache.org/jira/browse/CASSANDRA-4762')
+    @since('3.0')
     def multi_in_compact_non_composite_test(self):
         cursor = self.prepare()
 
@@ -2573,7 +2588,8 @@ class TestCQL(Tester):
                 id2 int,
                 author text,
                 time bigint,
-                content text,
+                v1 text,
+                v2 text,
                 PRIMARY KEY ((id1, id2), author, time)
             )
         """)
@@ -2581,20 +2597,46 @@ class TestCQL(Tester):
         cursor.execute("CREATE INDEX ON posts(time)")
         cursor.execute("CREATE INDEX ON posts(id2)")
 
-        cursor.execute("INSERT INTO posts(id1, id2, author, time, content) VALUES(0, 0, 'bob', 0, 'A')")
-        cursor.execute("INSERT INTO posts(id1, id2, author, time, content) VALUES(0, 0, 'bob', 1, 'B')")
-        cursor.execute("INSERT INTO posts(id1, id2, author, time, content) VALUES(0, 1, 'bob', 2, 'C')")
-        cursor.execute("INSERT INTO posts(id1, id2, author, time, content) VALUES(0, 0, 'tom', 0, 'D')")
-        cursor.execute("INSERT INTO posts(id1, id2, author, time, content) VALUES(0, 1, 'tom', 1, 'E')")
+        cursor.execute("INSERT INTO posts(id1, id2, author, time, v1, v2) VALUES(0, 0, 'bob', 0, 'A', 'A')")
+        cursor.execute("INSERT INTO posts(id1, id2, author, time, v1, v2) VALUES(0, 0, 'bob', 1, 'B', 'B')")
+        cursor.execute("INSERT INTO posts(id1, id2, author, time, v1, v2) VALUES(0, 1, 'bob', 2, 'C', 'C')")
+        cursor.execute("INSERT INTO posts(id1, id2, author, time, v1, v2) VALUES(0, 0, 'tom', 0, 'D', 'D')")
+        cursor.execute("INSERT INTO posts(id1, id2, author, time, v1, v2) VALUES(0, 1, 'tom', 1, 'E', 'E')")
 
-        res = cursor.execute("SELECT content FROM posts WHERE time = 1")
+        res = cursor.execute("SELECT v1 FROM posts WHERE time = 1")
         assert rows_to_list(res) == [ ['B'], ['E'] ], res
 
-        res = cursor.execute("SELECT content FROM posts WHERE id2 = 1")
+        res = cursor.execute("SELECT v1 FROM posts WHERE id2 = 1")
         assert rows_to_list(res) == [ ['C'], ['E'] ], res
 
-        res = cursor.execute("SELECT content FROM posts WHERE id1 = 0 AND id2 = 0 AND author = 'bob' AND time = 0")
+        res = cursor.execute("SELECT v1 FROM posts WHERE id1 = 0 AND id2 = 0 AND author = 'bob' AND time = 0")
         assert rows_to_list(res) == [ ['A'] ], res
+
+        # Test for CASSANDRA-8206
+        cursor.execute("UPDATE posts SET v2 = null WHERE id1 = 0 AND id2 = 0 AND author = 'bob' AND time = 1")
+
+        res = cursor.execute("SELECT v1 FROM posts WHERE id2 = 0")
+        assert rows_to_list(res) == [ ['A'], ['B'], ['D'] ], res
+
+        res = cursor.execute("SELECT v1 FROM posts WHERE time = 1")
+        assert rows_to_list(res) == [ ['B'], ['E'] ], res
+
+    @since('2.0')
+    def invalid_clustering_indexing_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("CREATE TABLE test1 (a int, b int, c int, d int, PRIMARY KEY ((a, b))) WITH COMPACT STORAGE")
+        assert_invalid(cursor, "CREATE INDEX ON test1(a)")
+        assert_invalid(cursor, "CREATE INDEX ON test1(b)")
+
+        cursor.execute("CREATE TABLE test2 (a int, b int, c int, PRIMARY KEY (a, b)) WITH COMPACT STORAGE")
+        assert_invalid(cursor, "CREATE INDEX ON test2(a)")
+        assert_invalid(cursor, "CREATE INDEX ON test2(b)")
+        assert_invalid(cursor, "CREATE INDEX ON test2(c)")
+
+        cursor.execute("CREATE TABLE test3 (a int, b int, c int static , PRIMARY KEY (a, b))")
+        assert_invalid(cursor, "CREATE INDEX ON test3(c)")
+
 
     @since('2.0')
     def edge_2i_on_complex_pk_test(self):
@@ -2934,6 +2976,15 @@ class TestCQL(Tester):
         assert_one(cursor, "DELETE FROM test2 WHERE k='k' AND i=0 IF EXISTS", [True])
         assert_one(cursor, "DELETE v FROM test2 WHERE k='k' AND i=0 IF EXISTS", [False])
         assert_one(cursor, "DELETE FROM test2 WHERE k='k' AND i=0 IF EXISTS", [False])
+
+        # CASSANDRA-6430
+        v = self.cluster.version()
+        if v >= "2.1.1" or v < "2.1" and v >= "2.0.11":
+            assert_invalid(cursor, "DELETE FROM test2 WHERE k = 'k' IF EXISTS")
+            assert_invalid(cursor, "DELETE FROM test2 WHERE k = 'k' IF v = 'foo'")
+            assert_invalid(cursor, "DELETE FROM test2 WHERE i = 0 IF EXISTS")
+            assert_invalid(cursor, "DELETE FROM test2 WHERE k = 0 AND i > 0 IF EXISTS")
+            assert_invalid(cursor, "DELETE FROM test2 WHERE k = 0 AND i > 0 IF v = 'foo'")
 
     @freshCluster()
     def range_key_ordered_test(self):
@@ -3664,6 +3715,22 @@ class TestCQL(Tester):
 
         assert_invalid(cursor, "SELECT DISTINCT s FROM test")
 
+        # paging to test for CASSANDRA-8108
+        cursor.execute("TRUNCATE test")
+        for i in range(10):
+            for j in range(10):
+                cursor.execute("INSERT INTO test (k, p, s) VALUES (%s, %s, %s)", (i, j, i))
+
+        cursor.default_fetch_size = 7
+        rows = list(cursor.execute("SELECT DISTINCT k, s FROM test"))
+        self.assertEqual(range(10), sorted([r[0] for r in rows]))
+        self.assertEqual(range(10), sorted([r[1] for r in rows]))
+
+        keys = ",".join(map(str, range(10)))
+        rows = list(cursor.execute("SELECT DISTINCT k, s FROM test WHERE k IN (%s)" % (keys,)))
+        self.assertEqual(range(10), [r[0] for r in rows])
+        self.assertEqual(range(10), [r[1] for r in rows])
+
 
     def select_count_paging_test(self):
         """ Test for the #6579 'select count' paging bug """
@@ -3675,7 +3742,10 @@ class TestCQL(Tester):
         cursor.execute("insert into test(field1, field2, field3) values ('hola', now(), false);");
         cursor.execute("insert into test(field1, field2, field3) values ('hola', now(), false);");
 
-        assert_one(cursor, "select count(*) from test where field3 = false limit 1;", [1])
+        if self.cluster.version() > '3.0':
+            assert_one(cursor, "select count(*) from test where field3 = false limit 1;", [2])
+        else:
+            assert_one(cursor, "select count(*) from test where field3 = false limit 1;", [1])
 
 
     @since('2.0')
@@ -3713,6 +3783,22 @@ class TestCQL(Tester):
         assert_all(cursor, "SELECT v1, v2, v3 FROM test WHERE k = 0 AND (v1, v2) > (0, 1) AND (v1, v2, v3) <= (1, 1, 0)", [[1, 0, 0], [1, 0, 1], [1, 1, 0]])
 
         assert_invalid(cursor, "SELECT v1, v2, v3 FROM test WHERE k = 0 AND (v1, v3) > (1, 0)")
+
+    @since('2.1.1')
+    def test_v2_protocol_IN_with_tuples(self):
+        """ Test for CASSANDRA-8062 """
+        cursor = self.prepare()
+        cursor = self.cql_connection(self.cluster.nodelist()[0], keyspace='ks', protocol_version=2)
+        cursor.execute("CREATE TABLE test (k int, c1 int, c2 text, PRIMARY KEY (k, c1, c2))")
+        cursor.execute("INSERT INTO test (k, c1, c2) VALUES (0, 0, 'a')")
+        cursor.execute("INSERT INTO test (k, c1, c2) VALUES (0, 0, 'b')")
+        cursor.execute("INSERT INTO test (k, c1, c2) VALUES (0, 0, 'c')")
+
+        p = cursor.prepare("SELECT * FROM test WHERE k=? AND (c1, c2) IN ?")
+        rows = cursor.execute(p, (0, [(0, 'b'), (0, 'c')]))
+        self.assertEqual(2, len(rows))
+        self.assertEqual((0, 0, 'b'), rows[0])
+        self.assertEqual((0, 0, 'c'), rows[1])
 
     def in_with_desc_order_test(self):
         cursor = self.prepare()
@@ -4251,7 +4337,6 @@ class TestCQL(Tester):
         # This doesn't work -- see #7059
         #assert_all(cursor, "SELECT * FROM test WHERE v > 1 AND v <= 3 LIMIT 6 ALLOW FILTERING", [[1, 2], [1, 3], [0, 2], [0, 3], [2, 2], [2, 3]])
 
-    @require("6950")
     def key_index_with_reverse_clustering(self):
         """ Test for #6950 bug """
         cursor = self.prepare()
@@ -4530,7 +4615,6 @@ class TestCQL(Tester):
         # A blob that is not 4 bytes should be rejected
         assert_invalid(cursor, "INSERT INTO test(k, v) VALUES (0, blobAsInt(0x01))")
 
-    @require("7730")
     def alter_clustering_and_static_test(self):
         cursor = self.prepare()
 
@@ -4549,7 +4633,6 @@ class TestCQL(Tester):
         cursor.execute("alter table test drop v")
         assert_invalid(cursor, "alter table test add v set<int>")
 
-    @require("#7744")
     def downgrade_to_compact_bug_test(self):
         """ Test for 7744 """
         cursor = self.prepare()
@@ -4559,3 +4642,169 @@ class TestCQL(Tester):
         self.cluster.flush()
         cursor.execute("alter table test drop v")
         cursor.execute("alter table test add v int")
+
+    def invalid_string_literals_test(self):
+        """ Test for CASSANDRA-8101 """
+        cursor = self.prepare()
+        assert_invalid(cursor, u"insert into invalid_string_literals (k, a) VALUES (0, '\u038E\u0394\u03B4\u03E0')")
+
+        # since the protocol requires strings to be valid UTF-8, the error response to this is a ProtocolError
+        cursor = self.cql_connection(self.cluster.nodelist()[0], keyspace='ks')
+        cursor.execute("create table invalid_string_literals (k int primary key, a ascii, b text)")
+        try:
+            cursor.execute("insert into invalid_string_literals (k, c) VALUES (0, '\xc2\x01')")
+            self.fail("Expected error")
+        except ProtocolException as e:
+            self.assertTrue("Cannot decode string as UTF8" in str(e))
+
+    def negative_timestamp_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("CREATE TABLE test (k int PRIMARY KEY, v int)")
+        cursor.execute("INSERT INTO test (k, v) VALUES (1, 1) USING TIMESTAMP -42")
+
+        assert_one(cursor, "SELECT writetime(v) FROM TEST WHERE k = 1", [ -42 ])
+
+    @since('3.0')
+    @require("7936")
+    def select_map_key_single_row_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("CREATE TABLE test (k int PRIMARY KEY, v map<int, text>)")
+        cursor.execute("INSERT INTO test (k, v) VALUES ( 0, {1:'a', 2:'b', 3:'c', 4:'d'})")
+
+        assert_one(cursor, "SELECT v[1] FROM test WHERE k = 0", ['a'])
+        assert_one(cursor, "SELECT v[5] FROM test WHERE k = 0", [])
+        assert_one(cursor, "SELECT v[1] FROM test WHERE k = 1", [])
+
+        assert_one(cursor, "SELECT v[1..3] FROM test WHERE k = 0", ['a', 'b', 'c'])
+        assert_one(cursor, "SELECT v[3..5] FROM test WHERE k = 0", ['c', 'd'])
+        assert_invalid(cursor, "SELECT v[3..1] FROM test WHERE k = 0")
+
+        assert_one(cursor, "SELECT v[..2] FROM test WHERE k = 0", ['a', 'b'])
+        assert_one(cursor, "SELECT v[3..] FROM test WHERE k = 0", ['c', 'd'])
+        assert_one(cursor, "SELECT v[0..] FROM test WHERE k = 0", ['a', 'b', 'c', 'd'])
+        assert_one(cursor, "SELECT v[..5] FROM test WHERE k = 0", ['a', 'b', 'c', 'd'])
+
+        assert_one(cursor, "SELECT sizeof(v) FROM test where k = 0", [4])
+
+    @since('3.0')
+    @require("7936")
+    def select_set_key_single_row_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("CREATE TABLE test (k int PRIMARY KEY, v set<text>)")
+        cursor.execute("INSERT INTO test (k, v) VALUES ( 0, {'e', 'a', 'd', 'b'})")
+
+        assert_one(cursor, "SELECT v FROM test WHERE k = 0", [sortedset(['a', 'b', 'd', 'e'])])
+        assert_one(cursor, "SELECT v['a'] FROM test WHERE k = 0", [True])
+        assert_one(cursor, "SELECT v['c'] FROM test WHERE k = 0", [False])
+        assert_one(cursor, "SELECT v['a'] FROM test WHERE k = 1", [])
+
+        assert_one(cursor, "SELECT v['b'..'d'] FROM test WHERE k = 0", ['b', 'd'])
+        assert_one(cursor, "SELECT v['b'..'e'] FROM test WHERE k = 0", ['b', 'd', 'e'])
+        assert_one(cursor, "SELECT v['a'..'d'] FROM test WHERE k = 0", ['a', 'b', 'd'])
+        assert_one(cursor, "SELECT v['b'..'f'] FROM test WHERE k = 0", ['b', 'd', 'e'])
+        assert_invalid(cursor, "SELECT v['d'..'a'] FROM test WHERE k = 0")
+
+        assert_one(cursor, "SELECT v['d'..] FROM test WHERE k = 0", ['d', 'e'])
+        assert_one(cursor, "SELECT v[..'d'] FROM test WHERE k = 0", ['a', 'b', 'd'])
+        assert_one(cursor, "SELECT v['f'..] FROM test WHERE k = 0", [])
+        assert_one(cursor, "SELECT v[..'f'] FROM test WHERE k = 0", ['a', 'b', 'd', 'e'])
+
+        assert_one(cursor, "SELECT sizeof(v) FROM test where k = 0", [4])
+
+    @since('3.0')
+    @require("7936")
+    def select_list_key_single_row_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("CREATE TABLE test (k int PRIMARY KEY, v list<text>)")
+        cursor.execute("INSERT INTO test (k, v) VALUES ( 0, ['e', 'a', 'd', 'b'])")
+
+        assert_one(cursor, "SELECT v FROM test WHERE k = 0", [['e', 'a', 'd', 'b']])
+        assert_one(cursor, "SELECT v[0] FROM test WHERE k = 0", ['e'])
+        assert_one(cursor, "SELECT v[3] FROM test WHERE k = 0", ['b'])
+        assert_one(cursor, "SELECT v[0] FROM test WHERE k = 1", [])
+
+        assert_invalid(cursor, "SELECT v[-1] FROM test WHERE k = 0")
+        assert_invalid(cursor, "SELECT v[5] FROM test WHERE k = 0")
+
+        assert_one(cursor, "SELECT v[1..3] FROM test WHERE k = 0", ['a', 'd', 'b'])
+        assert_one(cursor, "SELECT v[0..2] FROM test WHERE k = 0", ['e', 'a', 'd'])
+        assert_invalid(cursor, "SELECT v[0..4] FROM test WHERE k = 0")
+        assert_invalid(cursor, "SELECT v[2..0] FROM test WHERE k = 0")
+
+        assert_one(cursor, "SELECT sizeof(v) FROM test where k = 0", [4])
+
+    @since('3.0')
+    @require("7936")
+    def select_map_key_multi_row_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("CREATE TABLE test (k int PRIMARY KEY, v map<int, text>)")
+        cursor.execute("INSERT INTO test (k, v) VALUES ( 0, {1:'a', 2:'b', 3:'c', 4:'d'})")
+        cursor.execute("INSERT INTO test (k, v) VALUES ( 1, {1:'a', 2:'b', 5:'e', 6:'f'})")
+
+        assert_all(cursor, "SELECT v[1] FROM test", [['a'], ['a']])
+        assert_all(cursor, "SELECT v[5] FROM test", [[], []])
+        assert_all(cursor, "SELECT v[1] FROM test", [[], []])
+
+        assert_all(cursor, "SELECT v[1..3] FROM test", [['a', 'b', 'c'], ['a', 'b', 'e']])
+        assert_all(cursor, "SELECT v[3..5] FROM test", [['c', 'd'], ['e']])
+        assert_invalid(cursor, "SELECT v[3..1] FROM test")
+
+        assert_all(cursor, "SELECT v[..2] FROM test", [['a', 'b'], ['a', 'b']])
+        assert_all(cursor, "SELECT v[3..] FROM test", [['c', 'd'], ['e', 'f']])
+        assert_all(cursor, "SELECT v[0..] FROM test", [['a', 'b', 'c', 'd'], ['a', 'b', 'e', 'f']])
+        assert_all(cursor, "SELECT v[..5] FROM test", [['a', 'b', 'c', 'd'], ['a', 'b', 'e']])
+
+        assert_all(cursor, "SELECT sizeof(v) FROM test", [[4], [4]])
+
+    @since('3.0')
+    @require("7936")
+    def select_set_key_multi_row_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("CREATE TABLE test (k int PRIMARY KEY, v set<text>)")
+        cursor.execute("INSERT INTO test (k, v) VALUES ( 0, {'e', 'a', 'd', 'b'})")
+        cursor.execute("INSERT INTO test (k, v) VALUES ( 1, {'c', 'f', 'd', 'b'})")
+
+        assert_all(cursor, "SELECT v FROM test", [[sortedset(['b', 'c', 'd', 'f'])], [sortedset(['a', 'b', 'd', 'e'])]])
+        assert_all(cursor, "SELECT v['a'] FROM test", [[True], [False]])
+        assert_all(cursor, "SELECT v['c'] FROM test", [[False], [True]])
+
+        assert_all(cursor, "SELECT v['b'..'d'] FROM test", [['b', 'd'], ['b', 'c', 'd']])
+        assert_all(cursor, "SELECT v['b'..'e'] FROM test", [['b', 'd', 'e'], ['b', 'c', 'd']])
+        assert_all(cursor, "SELECT v['a'..'d'] FROM test", [['a', 'b', 'd'], ['b', 'c', 'd']])
+        assert_all(cursor, "SELECT v['b'..'f'] FROM test", [['b', 'd', 'e'], ['b', 'c', 'd', 'f']])
+        assert_invalid(cursor, "SELECT v['d'..'a'] FROM test")
+
+        assert_all(cursor, "SELECT v['d'..] FROM test", [['d', 'e'], ['d', 'f']])
+        assert_all(cursor, "SELECT v[..'d'] FROM test", [['a', 'b', 'd'], ['b', 'c', 'd']])
+        assert_all(cursor, "SELECT v['f'..] FROM test", [[], ['f']])
+        assert_all(cursor, "SELECT v[..'f'] FROM test", [['a', 'b', 'd', 'e'], ['b', 'c', 'd', 'f']])
+
+        assert_all(cursor, "SELECT sizeof(v) FROM test", [[4], [4]])
+
+    @since('3.0')
+    @require("7936")
+    def select_list_key_multi_row_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("CREATE TABLE test (k int PRIMARY KEY, v list<text>)")
+        cursor.execute("INSERT INTO test (k, v) VALUES ( 0, ['e', 'a', 'd', 'b'])")
+        cursor.execute("INSERT INTO test (k, v) VALUES ( 1, ['c', 'f', 'd', 'b'])")
+
+        assert_all(cursor, "SELECT v FROM test", [[['c', 'f', 'd', 'b']], [['e', 'a', 'd', 'b']]])
+        assert_all(cursor, "SELECT v[0] FROM test", [['e'], ['c']])
+        assert_all(cursor, "SELECT v[3] FROM test", [['b'], ['b']])
+        assert_invalid(cursor, "SELECT v[-1] FROM test")
+        assert_invalid(cursor, "SELECT v[5] FROM test")
+
+        assert_all(cursor, "SELECT v[1..3] FROM test", [['a', 'd', 'b'], ['f', 'd', 'b']])
+        assert_all(cursor, "SELECT v[0..2] FROM test", [['e', 'a', 'd'], ['c', 'f', 'd']])
+        assert_invalid(cursor, "SELECT v[0..4] FROM test")
+        assert_invalid(cursor, "SELECT v[2..0] FROM test")
+
+        assert_all(cursor, "SELECT sizeof(v) FROM test", [[4], [4]])

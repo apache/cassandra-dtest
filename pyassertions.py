@@ -21,6 +21,8 @@ def assert_invalid(session, query, matching=None):
     try:
         res = session.execute(query)
         assert False, "Expecting query to be invalid: got %s" % res
+    except AssertionError as e:
+        raise e
     except InvalidRequest as e:
         msg = str(e)
         if matching is not None:

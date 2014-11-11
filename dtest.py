@@ -2,6 +2,7 @@ from __future__ import with_statement
 import os, tempfile, sys, shutil, subprocess, types, time, threading, ConfigParser, logging, fnmatch, re, copy
 
 from ccmlib.cluster import Cluster
+from ccmlib.cluster_factory import ClusterFactory
 from ccmlib.node import Node
 from ccmlib.common import is_win
 from uuid import UUID
@@ -50,6 +51,8 @@ logging.basicConfig(filename=os.path.join(LOG_SAVED_DIR,"dtest.log"),
                     level=logging.DEBUG)
 
 LOG = logging.getLogger('dtest')
+# set python-driver log level to WARN by default for dtest
+logging.getLogger('cassandra').setLevel(logging.WARNING)
 
 # copy the initial environment variables so we can reset them later:
 initial_environment = copy.deepcopy(os.environ)
@@ -171,9 +174,9 @@ class Tester(TestCase):
         cdir = os.environ.get('CASSANDRA_DIR', DEFAULT_DIR)
 
         if version:
-            node.set_cassandra_dir(cassandra_version=version)
+            node.set_install_dir(version=version)
         else:
-            node.set_cassandra_dir(cassandra_dir=cdir)
+            node.set_install_dir(install_dir=cdir)
 
     def setUp(self):
         global CURRENT_TEST
@@ -185,14 +188,14 @@ class Tester(TestCase):
             with open(LAST_TEST_DIR) as f:
                 self.test_path = f.readline().strip('\n')
                 name = f.readline()
-                try:
-                    self.cluster = Cluster.load(self.test_path, name)
-                    # Avoid waiting too long for node to be marked down
-                    if not self._preserve_cluster:
-                        self._cleanup_cluster()
-                except IOError:
-                    # after a restart, /tmp will be emptied so we'll get an IOError when loading the old cluster here
-                    pass
+            try:
+                self.cluster = ClusterFactory.load(self.test_path, name)
+                # Avoid waiting too long for node to be marked down
+                if not self._preserve_cluster:
+                    self._cleanup_cluster()
+            except IOError:
+                # after a restart, /tmp will be emptied so we'll get an IOError when loading the old cluster here
+                pass
 
         self.cluster = self._get_cluster()
         if RECORD_COVERAGE:
@@ -389,7 +392,7 @@ class Tester(TestCase):
                 test_path = f.readline().strip('\n')
                 name = f.readline()
                 try:
-                    cluster = Cluster.load(test_path, name)
+                    cluster = ClusterFactory.load(test_path, name)
                     # Avoid waiting too long for node to be marked down
                     if KEEP_TEST_DIR:
                         cluster.stop(gently=RECORD_COVERAGE)

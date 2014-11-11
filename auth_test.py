@@ -5,6 +5,7 @@ from cassandra.cluster import NoHostAvailable
 from dtest import debug, Tester
 from pytools import since
 from pyassertions import assert_invalid
+from pytools import require
 
 class TestAuth(Tester):
 
@@ -498,7 +499,52 @@ class TestAuth(Tester):
 
         self.assertUnauthorized("You are not authorized to view cathy's permissions",
                                 bob, "LIST ALL PERMISSIONS OF cathy")
+    @since('2.1')
+    def type_auth_test(self):
+        self.prepare()
 
+        cassandra = self.get_cursor(user='cassandra', password='cassandra')
+        cassandra.execute("CREATE USER cathy WITH PASSWORD '12345'")
+        cassandra.execute("CREATE KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor':1}")
+
+        cathy = self.get_cursor(user='cathy', password='12345')
+        self.assertUnauthorized("User cathy has no CREATE permission on <keyspace ks> or any of its parents",
+                                cathy, "CREATE TYPE ks.address (street text, city text)")
+        self.assertUnauthorized("User cathy has no ALTER permission on <keyspace ks> or any of its parents",
+                                cathy, "ALTER TYPE ks.address ADD zip_code int")
+        self.assertUnauthorized("User cathy has no DROP permission on <keyspace ks> or any of its parents",
+                                cathy, "DROP TYPE ks.address")
+
+        cassandra.execute("GRANT CREATE ON KEYSPACE ks TO cathy")
+        cathy.execute("CREATE TYPE ks.address (street text, city text)")
+        cassandra.execute("GRANT ALTER ON KEYSPACE ks TO cathy")
+        cathy.execute("ALTER TYPE ks.address ADD zip_code int")    
+        cassandra.execute("GRANT DROP ON KEYSPACE ks TO cathy")
+        cathy.execute("DROP TYPE ks.address")    
+
+    @since('3.0')
+    @require('https://issues.apache.org/jira/browse/CASSANDRA-7557')
+    def func_auth_test(self):
+        self.prepare()
+        udf = "CREATE FUNCTION sin ( input double ) RETURNS double LANGUAGE java AS 'return Double.valueOf(Math.sin(input.doubleValue()));'"
+        dropUdf = "DROP FUNCTION sin"
+
+        cassandra = self.get_cursor(user='cassandra', password='cassandra')
+        cassandra.execute("CREATE USER cathy WITH PASSWORD '12345'")
+        cassandra.execute("CREATE KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor':1}")
+
+        cathy = self.get_cursor(user='cathy', password='12345')
+        self.assertUnauthorized("User cathy has no CREATE permission on <keyspace ks> or any of its parents",
+                                cathy, udf)
+        self.assertUnauthorized("User cathy has no DROP permission on <keyspace ks> or any of its parents",
+                                cathy, dropUdf)
+
+        cassandra.execute("GRANT CREATE ON KEYSPACE ks TO cathy")
+        cathy.execute(udf)
+        cassandra.execute("GRANT DROP ON KEYSPACE ks TO cathy")
+        cathy.execute(dropUdf)    
+        
+        
     def prepare(self, nodes=1, permissions_expiry=0):
         config = {'authenticator' : 'org.apache.cassandra.auth.PasswordAuthenticator',
                   'authorizer' : 'org.apache.cassandra.auth.CassandraAuthorizer',

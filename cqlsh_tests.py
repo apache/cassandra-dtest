@@ -424,7 +424,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
 
 
     def run_cqlsh(self, node, cmds, cqlsh_options=[]):
-        cdir = node.get_cassandra_dir()
+        cdir = node.get_install_dir()
         cli = os.path.join(cdir, 'bin', common.platform_binary('cqlsh'))
         env = common.make_cassandra_env(cdir, node.get_path())
         env['LANG'] = 'en_US.UTF-8'
