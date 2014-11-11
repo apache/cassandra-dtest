@@ -647,11 +647,18 @@ class TestCQL(Tester):
         cursor.execute("INSERT INTO test(my_id, col1, value) VALUES ( 'key2', 3, 'c')")
         cursor.execute("INSERT INTO test(my_id, col1, value) VALUES ( 'key3', 2, 'b')")
         cursor.execute("INSERT INTO test(my_id, col1, value) VALUES ( 'key4', 4, 'd')")
-        # Currently this breaks due to CASSANDRA-4612
+
         query = SimpleStatement("SELECT col1 FROM test WHERE my_id in('key1', 'key2', 'key3') ORDER BY col1")
         res = cursor.execute(query)
-
         assert rows_to_list(res) == [[1], [2], [3]], res
+
+        query = SimpleStatement("SELECT col1, my_id FROM test WHERE my_id in('key1', 'key2', 'key3') ORDER BY col1")
+        res = cursor.execute(query)
+        assert rows_to_list(res) == [[1, 'key1'], [2, 'key3'], [3, 'key2']], res
+
+        query = SimpleStatement("SELECT my_id, col1 FROM test WHERE my_id in('key1', 'key2', 'key3') ORDER BY col1")
+        res = cursor.execute(query)
+        assert rows_to_list(res) == [['key1', 1], ['key3', 2], ['key2', 3]], res
 
 
     def reversed_comparator_test(self):
