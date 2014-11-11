@@ -3775,7 +3775,8 @@ class TestCQL(Tester):
     def whole_list_conditional_test(self):
         cursor = self.prepare()
 
-        for frozen in (False, True):
+        frozen_values = (False, True) if self.cluster.version() >= "2.1.3" else (False,)
+        for frozen in frozen_values:
 
             cursor.execute("DROP TABLE IF EXISTS tlist")
 
@@ -3843,7 +3844,7 @@ class TestCQL(Tester):
         # Lists
         cursor = self.prepare()
 
-        frozen_values = (False, True) if self.cluster.version() > "2.1.1" else (False,)
+        frozen_values = (False, True) if self.cluster.version() >= "2.1.3" else (False,)
         for frozen in frozen_values:
 
             cursor.execute("DROP TABLE IF EXISTS tlist")
@@ -3874,7 +3875,8 @@ class TestCQL(Tester):
 
         cursor = self.prepare()
 
-        for frozen in (False, True):
+        frozen_values = (False, True) if self.cluster.version() >= "2.1.3" else (False,)
+        for frozen in frozen_values:
             cursor.execute("DROP TABLE IF EXISTS tlist")
 
             cursor.execute("""
@@ -3938,7 +3940,8 @@ class TestCQL(Tester):
     def whole_set_conditional_test(self):
         cursor = self.prepare()
 
-        for frozen in (False, True):
+        frozen_values = (False, True) if self.cluster.version() >= "2.1.3" else (False,)
+        for frozen in frozen_values:
 
             cursor.execute("DROP TABLE IF EXISTS tset")
 
@@ -4006,7 +4009,8 @@ class TestCQL(Tester):
     def whole_map_conditional_test(self):
         cursor = self.prepare()
 
-        for frozen in (False, True):
+        frozen_values = (False, True) if self.cluster.version() >= "2.1.3" else (False,)
+        for frozen in frozen_values:
 
             cursor.execute("DROP TABLE IF EXISTS tmap")
 
@@ -4069,7 +4073,7 @@ class TestCQL(Tester):
     def map_item_conditional_test(self):
         cursor = self.prepare()
 
-        frozen_values = (False, True) if self.cluster.version() > "2.1.1" else (False,)
+        frozen_values = (False, True) if self.cluster.version() > "2.1.3" else (False,)
         for frozen in frozen_values:
 
             cursor.execute("DROP TABLE IF EXISTS tmap")
@@ -4098,7 +4102,8 @@ class TestCQL(Tester):
         # expanded functionality from CASSANDRA-6839
         cursor = self.prepare()
 
-        for frozen in (False, True):
+        frozen_values = (False, True) if self.cluster.version() > "2.1.3" else (False,)
+        for frozen in frozen_values:
 
             cursor.execute("DROP TABLE IF EXISTS tmap")
 
