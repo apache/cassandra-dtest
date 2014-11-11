@@ -5,7 +5,7 @@ from collections import OrderedDict
 from uuid import uuid4, UUID
 
 from dtest import Tester, canReuseCluster, freshCluster
-from pyassertions import assert_invalid, assert_one, assert_none, assert_all
+from pyassertions import assert_invalid, assert_one, assert_none, assert_all, assert_syntax_invalid
 from pytools import since, require, rows_to_list
 from cassandra import ConsistencyLevel
 from cassandra.protocol import ProtocolException
@@ -271,9 +271,11 @@ class TestCQL(Tester):
 
         cursor = self.prepare()
 
-        assert_invalid(cursor, "CREATE TABLE test ()")
+        assert_syntax_invalid(cursor, "CREATE TABLE test ()")
+
         if self.cluster.version() < "1.2":
             assert_invalid(cursor, "CREATE TABLE test (key text PRIMARY KEY)")
+
         assert_invalid(cursor, "CREATE TABLE test (c1 text, c2 text, c3 text)")
         assert_invalid(cursor, "CREATE TABLE test (key1 text PRIMARY KEY, key2 text PRIMARY KEY)")
 
@@ -709,10 +711,10 @@ class TestCQL(Tester):
         """ Check obsolete properties from CQL2 are rejected """
         cursor = self.prepare()
 
-        assert_invalid(cursor, "CREATE TABLE test (foo text PRIMARY KEY, c int) WITH default_validation=timestamp")
+        assert_syntax_invalid(cursor, "CREATE TABLE test (foo text PRIMARY KEY, c int) WITH default_validation=timestamp")
 
         cursor.execute("CREATE TABLE test (foo text PRIMARY KEY, c int)")
-        assert_invalid(cursor, "ALTER TABLE test WITH default_validation=int;")
+        assert_syntax_invalid(cursor, "ALTER TABLE test WITH default_validation=int;")
 
     def null_support_test(self):
         """ Test support for nulls """
@@ -742,7 +744,7 @@ class TestCQL(Tester):
         assert rows_to_list(res) == [ [0, 0, None, None], [0, 1, None, None]], res
 
         assert_invalid(cursor, "INSERT INTO test (k, c, v2) VALUES (0, 2, {1, null})")
-        assert_invalid(cursor, "SELECT * FROM test WHER k = null")
+        assert_invalid(cursor, "SELECT * FROM test WHERE k = null")
         assert_invalid(cursor, "INSERT INTO test (k, c, v2) VALUES (0, 0, { 'foo', 'bar', null })")
 
 
@@ -862,7 +864,7 @@ class TestCQL(Tester):
             )
         """)
 
-        assert_invalid(cursor, "CREATE TABLE test2 ( select text PRIMARY KEY, x int)")
+        assert_syntax_invalid(cursor, "CREATE TABLE test2 ( select text PRIMARY KEY, x int)")
 
     def identifier_test(self):
         cursor = self.prepare()
@@ -875,7 +877,7 @@ class TestCQL(Tester):
         cursor.execute("INSERT INTO test1 (KEY_23, COLUMN) VALUES (0, 0)")
 
         # Reserved keywords
-        assert_invalid(cursor, "CREATE TABLE test1 (select int PRIMARY KEY, column int)")
+        assert_syntax_invalid(cursor, "CREATE TABLE test1 (select int PRIMARY KEY, column int)")
 
     #def keyspace_test(self):
     #    cursor = self.prepare()
@@ -1817,8 +1819,8 @@ class TestCQL(Tester):
     def create_alter_options_test(self):
         cursor = self.prepare(create_keyspace=False)
 
-        assert_invalid(cursor, "CREATE KEYSPACE ks1")
-        assert_invalid(cursor, "CREATE KEYSPACE ks1 WITH replication= { 'replication_factor' : 1 }")
+        assert_syntax_invalid(cursor, "CREATE KEYSPACE ks1")
+        assert_syntax_invalid(cursor, "CREATE KEYSPACE ks1 WITH replication= { 'replication_factor' : 1 }")
 
         cursor.execute("CREATE KEYSPACE ks1 WITH replication={ 'class' : 'SimpleStrategy', 'replication_factor' : 1 }")
         cursor.execute("CREATE KEYSPACE ks2 WITH replication={ 'class' : 'SimpleStrategy', 'replication_factor' : 1 } AND durable_writes=false")
@@ -1993,7 +1995,10 @@ class TestCQL(Tester):
             )
         """)
 
-        assert_invalid(cursor, "INSERT INTO test (k, c) VALUES ('foo', 'CQL is cassandra's best friend')", matching="Syntax error")
+        #The \ in this query string is not forwarded to cassandra.
+        #The ' is being escaped in python, but only ' is forwarded
+        #over the wire instead of \'.
+        assert_syntax_invalid(cursor, "INSERT INTO test (k, c) VALUES ('foo', 'CQL is cassandra\'s best friend')")
 
     def reversed_compact_multikey_test(self):
         """ Test for the bug from #4760 and #4759 """
@@ -2371,21 +2376,21 @@ class TestCQL(Tester):
     def collection_counter_test(self):
         cursor = self.prepare()
 
-        assert_invalid(cursor, """
+        assert_syntax_invalid(cursor, """
             CREATE TABLE test (
                 k int PRIMARY KEY,
                 l list<counter>
             )
         """)
 
-        assert_invalid(cursor, """
+        assert_syntax_invalid(cursor, """
             CREATE TABLE test (
                 k int PRIMARY KEY,
                 s set<counter>
             )
         """)
 
-        assert_invalid(cursor, """
+        assert_syntax_invalid(cursor, """
             CREATE TABLE test (
                 k int PRIMARY KEY,
                 m map<text, counter>
@@ -2520,7 +2525,7 @@ class TestCQL(Tester):
             )
         """)
 
-        assert_invalid(cursor, "INSERT INTO test (k, t) VALUES (0, 2012-11-07 18:18:22-0800)", matching="Syntax error")
+        assert_syntax_invalid(cursor, "INSERT INTO test (k, t) VALUES (0, 2012-11-07 18:18:22-0800)")
 
         for i in range(4):
             cursor.execute("INSERT INTO test (k, t) VALUES (0, now())")
