@@ -3747,7 +3747,10 @@ class TestCQL(Tester):
         cursor.execute("insert into test(field1, field2, field3) values ('hola', now(), false);");
         cursor.execute("insert into test(field1, field2, field3) values ('hola', now(), false);");
 
-        assert_one(cursor, "select count(*) from test where field3 = false limit 1;", [2])
+        if self.cluster.version() > '3.0':
+            assert_one(cursor, "select count(*) from test where field3 = false limit 1;", [2])
+        else:
+            assert_one(cursor, "select count(*) from test where field3 = false limit 1;", [1])
 
 
     @since('2.0')
@@ -3863,353 +3866,391 @@ class TestCQL(Tester):
     def whole_list_conditional_test(self):
         cursor = self.prepare()
 
-        cursor.execute("""
-            CREATE TABLE tlist (
-                k int PRIMARY KEY,
-                l list<text>
-            )""")
+        frozen_values = (False, True) if self.cluster.version() >= "2.1.3" else (False,)
+        for frozen in frozen_values:
 
-        cursor.execute("INSERT INTO tlist(k, l) VALUES (0, ['foo', 'bar', 'foobar'])")
+            cursor.execute("DROP TABLE IF EXISTS tlist")
 
-        def check_applies(condition):
-            assert_one(cursor, "UPDATE tlist SET l = ['foo', 'bar', 'foobar'] WHERE k=0 IF %s" % (condition,), [True])
-            assert_one(cursor, "SELECT * FROM tlist", [0, ['foo', 'bar', 'foobar']])
+            cursor.execute("""
+                CREATE TABLE tlist (
+                    k int PRIMARY KEY,
+                    l %s
+                )""" % ("frozen<list<text>>" if frozen else "list<text>",))
 
-        check_applies("l = ['foo', 'bar', 'foobar']")
-        check_applies("l != ['baz']")
-        check_applies("l > ['a']")
-        check_applies("l >= ['a']")
-        check_applies("l < ['z']")
-        check_applies("l <= ['z']")
-        check_applies("l IN (null, ['foo', 'bar', 'foobar'], ['a'])")
+            cursor.execute("INSERT INTO tlist(k, l) VALUES (0, ['foo', 'bar', 'foobar'])")
 
-        # multiple conditions
-        check_applies("l > ['aaa', 'bbb'] AND l > ['aaa']")
-        check_applies("l != null AND l IN (['foo', 'bar', 'foobar'])")
+            def check_applies(condition):
+                assert_one(cursor, "UPDATE tlist SET l = ['foo', 'bar', 'foobar'] WHERE k=0 IF %s" % (condition,), [True])
+                assert_one(cursor, "SELECT * FROM tlist", [0, ['foo', 'bar', 'foobar']])
 
-        def check_does_not_apply(condition):
-            assert_one(cursor, "UPDATE tlist SET l = ['foo', 'bar', 'foobar'] WHERE k=0 IF %s" % (condition,),
-                       [False, ['foo', 'bar', 'foobar']])
-            assert_one(cursor, "SELECT * FROM tlist", [0, ['foo', 'bar', 'foobar']])
+            check_applies("l = ['foo', 'bar', 'foobar']")
+            check_applies("l != ['baz']")
+            check_applies("l > ['a']")
+            check_applies("l >= ['a']")
+            check_applies("l < ['z']")
+            check_applies("l <= ['z']")
+            check_applies("l IN (null, ['foo', 'bar', 'foobar'], ['a'])")
 
-        # should not apply
-        check_does_not_apply("l = ['baz']")
-        check_does_not_apply("l != ['foo', 'bar', 'foobar']")
-        check_does_not_apply("l > ['z']")
-        check_does_not_apply("l >= ['z']")
-        check_does_not_apply("l < ['a']")
-        check_does_not_apply("l <= ['a']")
-        check_does_not_apply("l IN (['a'], null)")
-        check_does_not_apply("l IN ()")
+            # multiple conditions
+            check_applies("l > ['aaa', 'bbb'] AND l > ['aaa']")
+            check_applies("l != null AND l IN (['foo', 'bar', 'foobar'])")
 
-        # multiple conditions
-        check_does_not_apply("l IN () AND l IN (['foo', 'bar', 'foobar'])")
-        check_does_not_apply("l > ['zzz'] AND l < ['zzz']")
+            def check_does_not_apply(condition):
+                assert_one(cursor, "UPDATE tlist SET l = ['foo', 'bar', 'foobar'] WHERE k=0 IF %s" % (condition,),
+                           [False, ['foo', 'bar', 'foobar']])
+                assert_one(cursor, "SELECT * FROM tlist", [0, ['foo', 'bar', 'foobar']])
 
-        def check_invalid(condition, expected=InvalidRequest):
-            assert_invalid(cursor, "UPDATE tlist SET l = ['foo', 'bar', 'foobar'] WHERE k=0 IF %s" % (condition,), expected=expected)
-            assert_one(cursor, "SELECT * FROM tlist", [0, ['foo', 'bar', 'foobar']])
+            # should not apply
+            check_does_not_apply("l = ['baz']")
+            check_does_not_apply("l != ['foo', 'bar', 'foobar']")
+            check_does_not_apply("l > ['z']")
+            check_does_not_apply("l >= ['z']")
+            check_does_not_apply("l < ['a']")
+            check_does_not_apply("l <= ['a']")
+            check_does_not_apply("l IN (['a'], null)")
+            check_does_not_apply("l IN ()")
 
-        check_invalid("l = [null]")
-        check_invalid("l < null")
-        check_invalid("l <= null")
-        check_invalid("l > null")
-        check_invalid("l >= null")
-        check_invalid("l IN null", SyntaxException)
-        check_invalid("l IN 367", SyntaxException)
-        check_invalid("l CONTAINS KEY 123", SyntaxException)
+            # multiple conditions
+            check_does_not_apply("l IN () AND l IN (['foo', 'bar', 'foobar'])")
+            check_does_not_apply("l > ['zzz'] AND l < ['zzz']")
 
-        # not supported yet
-        check_invalid("m CONTAINS 'bar'", SyntaxException)
+            def check_invalid(condition):
+                assert_invalid(cursor, "UPDATE tlist SET l = ['foo', 'bar', 'foobar'] WHERE k=0 IF %s" % (condition,))
+                assert_one(cursor, "SELECT * FROM tlist", [0, ['foo', 'bar', 'foobar']])
+
+            check_invalid("l = [null]")
+            check_invalid("l < null")
+            check_invalid("l <= null")
+            check_invalid("l > null")
+            check_invalid("l >= null")
+            check_invalid("l IN null", expected=SyntaxException)
+            check_invalid("l IN 367", expected=SyntaxException)
+            check_invalid("l CONTAINS KEY 123", expected=SyntaxException)
+
+            # not supported yet
+            check_invalid("m CONTAINS 'bar'")
 
     @since('2.0')
     def list_item_conditional_test(self):
         # Lists
         cursor = self.prepare()
-        cursor.execute("""
-            CREATE TABLE tlist (
-                k int PRIMARY KEY,
-                l list<text>,
-            )
-        """)
 
-        cursor.execute("INSERT INTO tlist(k, l) VALUES (0, ['foo', 'bar', 'foobar'])")
+        frozen_values = (False, True) if self.cluster.version() >= "2.1.3" else (False,)
+        for frozen in frozen_values:
 
-        assert_invalid(cursor, "DELETE FROM tlist WHERE k=0 IF l[null] = 'foobar'")
-        assert_invalid(cursor, "DELETE FROM tlist WHERE k=0 IF l[-2] = 'foobar'")
-        if self.cluster.version() < "2.1":
-            # no longer invalid after CASSANDRA-6839
-            assert_invalid(cursor, "DELETE FROM tlist WHERE k=0 IF l[3] = 'foobar'")
-        assert_one(cursor, "DELETE FROM tlist WHERE k=0 IF l[1] = null", [False, ['foo', 'bar', 'foobar']])
-        assert_one(cursor, "DELETE FROM tlist WHERE k=0 IF l[1] = 'foobar'", [False, ['foo', 'bar', 'foobar']])
-        assert_one(cursor, "SELECT * FROM tlist", [0, ['foo', 'bar', 'foobar']])
+            cursor.execute("DROP TABLE IF EXISTS tlist")
 
-        assert_one(cursor, "DELETE FROM tlist WHERE k=0 IF l[1] = 'bar'", [True])
-        assert_none(cursor, "SELECT * FROM tlist")
+            cursor.execute("""
+                CREATE TABLE tlist (
+                    k int PRIMARY KEY,
+                    l %s,
+                )""" % ("frozen<list<text>>" if frozen else "list<text>",))
+
+            cursor.execute("INSERT INTO tlist(k, l) VALUES (0, ['foo', 'bar', 'foobar'])")
+
+            assert_invalid(cursor, "DELETE FROM tlist WHERE k=0 IF l[null] = 'foobar'")
+            assert_invalid(cursor, "DELETE FROM tlist WHERE k=0 IF l[-2] = 'foobar'")
+            if self.cluster.version() < "2.1":
+                # no longer invalid after CASSANDRA-6839
+                assert_invalid(cursor, "DELETE FROM tlist WHERE k=0 IF l[3] = 'foobar'")
+            assert_one(cursor, "DELETE FROM tlist WHERE k=0 IF l[1] = null", [False, ['foo', 'bar', 'foobar']])
+            assert_one(cursor, "DELETE FROM tlist WHERE k=0 IF l[1] = 'foobar'", [False, ['foo', 'bar', 'foobar']])
+            assert_one(cursor, "SELECT * FROM tlist", [0, ['foo', 'bar', 'foobar']])
+
+            assert_one(cursor, "DELETE FROM tlist WHERE k=0 IF l[1] = 'bar'", [True])
+            assert_none(cursor, "SELECT * FROM tlist")
 
     @since('2.1.1')
     def expanded_list_item_conditional_test(self):
         # expanded functionality from CASSANDRA-6839
 
         cursor = self.prepare()
-        cursor.execute("""
-            CREATE TABLE tlist (
-                k int PRIMARY KEY,
-                l list<text>
-            )""")
 
-        cursor.execute("INSERT INTO tlist(k, l) VALUES (0, ['foo', 'bar', 'foobar'])")
+        frozen_values = (False, True) if self.cluster.version() >= "2.1.3" else (False,)
+        for frozen in frozen_values:
+            cursor.execute("DROP TABLE IF EXISTS tlist")
 
-        def check_applies(condition):
-            assert_one(cursor, "UPDATE tlist SET l[1] = 'bar' WHERE k=0 IF %s" % (condition,), [True])
-            assert_one(cursor, "SELECT * FROM tlist", [0, ['foo', 'bar', 'foobar']])
+            cursor.execute("""
+                CREATE TABLE tlist (
+                    k int PRIMARY KEY,
+                    l %s
+                )""" % ("frozen<list<text>>" if frozen else "list<text>",))
 
-        check_applies("l[1] < 'zzz'")
-        check_applies("l[1] <= 'bar'")
-        check_applies("l[1] > 'aaa'")
-        check_applies("l[1] >= 'bar'")
-        check_applies("l[1] != 'xxx'")
-        check_applies("l[1] != null")
-        check_applies("l[1] IN (null, 'xxx', 'bar')")
-        check_applies("l[1] > 'aaa' AND l[1] < 'zzz'")
+            cursor.execute("INSERT INTO tlist(k, l) VALUES (0, ['foo', 'bar', 'foobar'])")
 
-        # check beyond end of list
-        check_applies("l[3] = null")
-        check_applies("l[3] IN (null, 'xxx', 'bar')")
+            def check_applies(condition):
+                assert_one(cursor, "UPDATE tlist SET l = ['foo', 'bar', 'foobar'] WHERE k=0 IF %s" % (condition,), [True])
+                assert_one(cursor, "SELECT * FROM tlist", [0, ['foo', 'bar', 'foobar']])
 
-        def check_does_not_apply(condition):
-            assert_one(cursor, "UPDATE tlist SET l[1] = 'bar' WHERE k=0 IF %s" % (condition,), [False, ['foo', 'bar', 'foobar']])
-            assert_one(cursor, "SELECT * FROM tlist", [0, ['foo', 'bar', 'foobar']])
+            check_applies("l[1] < 'zzz'")
+            check_applies("l[1] <= 'bar'")
+            check_applies("l[1] > 'aaa'")
+            check_applies("l[1] >= 'bar'")
+            check_applies("l[1] != 'xxx'")
+            check_applies("l[1] != null")
+            check_applies("l[1] IN (null, 'xxx', 'bar')")
+            check_applies("l[1] > 'aaa' AND l[1] < 'zzz'")
 
-        check_does_not_apply("l[1] < 'aaa'")
-        check_does_not_apply("l[1] <= 'aaa'")
-        check_does_not_apply("l[1] > 'zzz'")
-        check_does_not_apply("l[1] >= 'zzz'")
-        check_does_not_apply("l[1] != 'bar'")
-        check_does_not_apply("l[1] IN (null, 'xxx')")
-        check_does_not_apply("l[1] IN ()")
-        check_does_not_apply("l[1] != null AND l[1] IN ()")
+            # check beyond end of list
+            check_applies("l[3] = null")
+            check_applies("l[3] IN (null, 'xxx', 'bar')")
 
-        # check beyond end of list
-        check_does_not_apply("l[3] != null")
-        check_does_not_apply("l[3] = 'xxx'")
+            def check_does_not_apply(condition):
+                assert_one(cursor, "UPDATE tlist SET l = ['foo', 'bar', 'foobar'] WHERE k=0 IF %s" % (condition,), [False, ['foo', 'bar', 'foobar']])
+                assert_one(cursor, "SELECT * FROM tlist", [0, ['foo', 'bar', 'foobar']])
 
-        def check_invalid(condition, expected=InvalidRequest):
-            assert_invalid(cursor, "UPDATE tlist SET l[1] = 'bar' WHERE k=0 IF %s" % (condition,), expected=expected)
-            assert_one(cursor, "SELECT * FROM tlist", [0, ['foo', 'bar', 'foobar']])
+            check_does_not_apply("l[1] < 'aaa'")
+            check_does_not_apply("l[1] <= 'aaa'")
+            check_does_not_apply("l[1] > 'zzz'")
+            check_does_not_apply("l[1] >= 'zzz'")
+            check_does_not_apply("l[1] != 'bar'")
+            check_does_not_apply("l[1] IN (null, 'xxx')")
+            check_does_not_apply("l[1] IN ()")
+            check_does_not_apply("l[1] != null AND l[1] IN ()")
 
-        check_invalid("l[1] < null")
-        check_invalid("l[1] <= null")
-        check_invalid("l[1] > null")
-        check_invalid("l[1] >= null")
-        check_invalid("l[1] IN null", SyntaxException)
-        check_invalid("l[1] IN 367", SyntaxException)
-        check_invalid("l[1] IN (1, 2, 3)")
-        check_invalid("l[1] CONTAINS 367", SyntaxException)
-        check_invalid("l[1] CONTAINS KEY 367", SyntaxException)
-        check_invalid("l[null] = null")
+            # check beyond end of list
+            check_does_not_apply("l[3] != null")
+            check_does_not_apply("l[3] = 'xxx'")
+
+            def check_invalid(condition):
+                assert_invalid(cursor, "UPDATE tlist SET l = ['foo', 'bar', 'foobar'] WHERE k=0 IF %s" % (condition,))
+                assert_one(cursor, "SELECT * FROM tlist", [0, ['foo', 'bar', 'foobar']])
+
+            check_invalid("l[1] < null")
+            check_invalid("l[1] <= null")
+            check_invalid("l[1] > null")
+            check_invalid("l[1] >= null")
+            check_invalid("l[1] IN null", expected=SyntaxException)
+            check_invalid("l[1] IN 367", expected=SyntaxException)
+            check_invalid("l[1] IN (1, 2, 3)")
+            check_invalid("l[1] CONTAINS 367", expected=SyntaxException)
+            check_invalid("l[1] CONTAINS KEY 367", expected=SyntaxException)
+            check_invalid("l[null] = null")
 
     @since('2.1.1')
     def whole_set_conditional_test(self):
         cursor = self.prepare()
 
-        cursor.execute("""
-            CREATE TABLE tset (
-                k int PRIMARY KEY,
-                s set<text>
-            )""")
+        frozen_values = (False, True) if self.cluster.version() >= "2.1.3" else (False,)
+        for frozen in frozen_values:
 
-        cursor.execute("INSERT INTO tset(k, s) VALUES (0, {'bar', 'foo'})")
+            cursor.execute("DROP TABLE IF EXISTS tset")
 
-        def check_applies(condition):
-            assert_one(cursor, "UPDATE tset SET s = {'bar', 'foo'} WHERE k=0 IF %s" % (condition,), [True])
-            assert_one(cursor, "SELECT * FROM tset", [0, set(['bar', 'foo'])])
+            cursor.execute("""
+                CREATE TABLE tset (
+                    k int PRIMARY KEY,
+                    s %s
+                )""" % ("frozen<set<text>>" if frozen else "set<text>",))
 
-        check_applies("s = {'bar', 'foo'}")
-        check_applies("s = {'foo', 'bar'}")
-        check_applies("s != {'baz'}")
-        check_applies("s > {'a'}")
-        check_applies("s >= {'a'}")
-        check_applies("s < {'z'}")
-        check_applies("s <= {'z'}")
-        check_applies("s IN (null, {'bar', 'foo'}, {'a'})")
+            cursor.execute("INSERT INTO tset(k, s) VALUES (0, {'bar', 'foo'})")
 
-        # multiple conditions
-        check_applies("s > {'a'} AND s < {'z'}")
-        check_applies("s IN (null, {'bar', 'foo'}, {'a'}) AND s IN ({'a'}, {'bar', 'foo'}, null)")
+            def check_applies(condition):
+                assert_one(cursor, "UPDATE tset SET s = {'bar', 'foo'} WHERE k=0 IF %s" % (condition,), [True])
+                assert_one(cursor, "SELECT * FROM tset", [0, set(['bar', 'foo'])])
 
-        def check_does_not_apply(condition):
-            assert_one(cursor, "UPDATE tset SET s = {'bar', 'foo'} WHERE k=0 IF %s" % (condition,),
-                       [False, {'bar', 'foo'}])
-            assert_one(cursor, "SELECT * FROM tset", [0, {'bar', 'foo'}])
+            check_applies("s = {'bar', 'foo'}")
+            check_applies("s = {'foo', 'bar'}")
+            check_applies("s != {'baz'}")
+            check_applies("s > {'a'}")
+            check_applies("s >= {'a'}")
+            check_applies("s < {'z'}")
+            check_applies("s <= {'z'}")
+            check_applies("s IN (null, {'bar', 'foo'}, {'a'})")
 
-        # should not apply
-        check_does_not_apply("s = {'baz'}")
-        check_does_not_apply("s != {'bar', 'foo'}")
-        check_does_not_apply("s > {'z'}")
-        check_does_not_apply("s >= {'z'}")
-        check_does_not_apply("s < {'a'}")
-        check_does_not_apply("s <= {'a'}")
-        check_does_not_apply("s IN ({'a'}, null)")
-        check_does_not_apply("s IN ()")
-        check_does_not_apply("s != null AND s IN ()")
+            # multiple conditions
+            check_applies("s > {'a'} AND s < {'z'}")
+            check_applies("s IN (null, {'bar', 'foo'}, {'a'}) AND s IN ({'a'}, {'bar', 'foo'}, null)")
 
-        def check_invalid(condition, expected=InvalidRequest):
-            assert_invalid(cursor, "UPDATE tset SET s = {'bar', 'foo'} WHERE k=0 IF %s" % (condition,), expected=expected)
-            assert_one(cursor, "SELECT * FROM tset", [0, {'bar', 'foo'}])
+            def check_does_not_apply(condition):
+                assert_one(cursor, "UPDATE tset SET s = {'bar', 'foo'} WHERE k=0 IF %s" % (condition,),
+                           [False, {'bar', 'foo'}])
+                assert_one(cursor, "SELECT * FROM tset", [0, {'bar', 'foo'}])
 
-        check_invalid("s = {null}")
-        check_invalid("s < null")
-        check_invalid("s <= null")
-        check_invalid("s > null")
-        check_invalid("s >= null")
-        check_invalid("s IN null", SyntaxException)
-        check_invalid("s IN 367", SyntaxException)
-        check_invalid("s CONTAINS KEY 123", SyntaxException)
+            # should not apply
+            check_does_not_apply("s = {'baz'}")
+            check_does_not_apply("s != {'bar', 'foo'}")
+            check_does_not_apply("s > {'z'}")
+            check_does_not_apply("s >= {'z'}")
+            check_does_not_apply("s < {'a'}")
+            check_does_not_apply("s <= {'a'}")
+            check_does_not_apply("s IN ({'a'}, null)")
+            check_does_not_apply("s IN ()")
+            check_does_not_apply("s != null AND s IN ()")
 
-        # element access is not allow for sets
-        check_invalid("s['foo'] = 'foobar'")
+            def check_invalid(condition):
+                assert_invalid(cursor, "UPDATE tset SET s = {'bar', 'foo'} WHERE k=0 IF %s" % (condition,))
+                assert_one(cursor, "SELECT * FROM tset", [0, {'bar', 'foo'}])
 
-        # not supported yet
-        check_invalid("m CONTAINS 'bar'", SyntaxException)
+            check_invalid("s = {null}")
+            check_invalid("s < null")
+            check_invalid("s <= null")
+            check_invalid("s > null")
+            check_invalid("s >= null")
+            check_invalid("s IN null", expected=SyntaxException)
+            check_invalid("s IN 367", expected=SyntaxException)
+            check_invalid("s CONTAINS KEY 123", expected=SyntaxException)
+
+            # element access is not allow for sets
+            check_invalid("s['foo'] = 'foobar'")
+
+            # not supported yet
+            check_invalid("m CONTAINS 'bar'", expected=SyntaxException)
 
     @since('2.1.1')
     def whole_map_conditional_test(self):
         cursor = self.prepare()
-        cursor.execute("""
-            CREATE TABLE tmap (
-                k int PRIMARY KEY,
-                m map<text, text>,
-            )""")
 
-        cursor.execute("INSERT INTO tmap(k, m) VALUES (0, {'foo' : 'bar'})")
+        frozen_values = (False, True) if self.cluster.version() >= "2.1.3" else (False,)
+        for frozen in frozen_values:
 
-        def check_applies(condition):
-            assert_one(cursor, "UPDATE tmap SET m['foo'] = 'bar' WHERE k=0 IF %s" % (condition,), [True])
-            assert_one(cursor, "SELECT * FROM tmap", [0, {'foo': 'bar'}])
+            cursor.execute("DROP TABLE IF EXISTS tmap")
 
-        check_applies("m = {'foo': 'bar'}")
-        check_applies("m > {'a': 'a'}")
-        check_applies("m >= {'a': 'a'}")
-        check_applies("m < {'z': 'z'}")
-        check_applies("m <= {'z': 'z'}")
-        check_applies("m != {'a': 'a'}")
-        check_applies("m IN (null, {'a': 'a'}, {'foo': 'bar'})")
+            cursor.execute("""
+                CREATE TABLE tmap (
+                    k int PRIMARY KEY,
+                    m %s
+                )""" % ("frozen<map<text, text>>" if frozen else "map<text, text>",))
 
-        # multiple conditions
-        check_applies("m > {'a': 'a'} AND m < {'z': 'z'}")
-        check_applies("m != null AND m IN (null, {'a': 'a'}, {'foo': 'bar'})")
+            cursor.execute("INSERT INTO tmap(k, m) VALUES (0, {'foo' : 'bar'})")
 
-        def check_does_not_apply(condition):
-            assert_one(cursor, "UPDATE tmap SET m['foo'] = 'bar' WHERE k=0 IF %s" % (condition,), [False, {'foo': 'bar'}])
-            assert_one(cursor, "SELECT * FROM tmap", [0, {'foo': 'bar'}])
+            def check_applies(condition):
+                assert_one(cursor, "UPDATE tmap SET m = {'foo': 'bar'} WHERE k=0 IF %s" % (condition,), [True])
+                assert_one(cursor, "SELECT * FROM tmap", [0, {'foo': 'bar'}])
 
-        # should not apply
-        check_does_not_apply("m = {'a': 'a'}")
-        check_does_not_apply("m > {'z': 'z'}")
-        check_does_not_apply("m >= {'z': 'z'}")
-        check_does_not_apply("m < {'a': 'a'}")
-        check_does_not_apply("m <= {'a': 'a'}")
-        check_does_not_apply("m != {'foo': 'bar'}")
-        check_does_not_apply("m IN ({'a': 'a'}, null)")
-        check_does_not_apply("m IN ()")
-        check_does_not_apply("m = null AND m != null")
+            check_applies("m = {'foo': 'bar'}")
+            check_applies("m > {'a': 'a'}")
+            check_applies("m >= {'a': 'a'}")
+            check_applies("m < {'z': 'z'}")
+            check_applies("m <= {'z': 'z'}")
+            check_applies("m != {'a': 'a'}")
+            check_applies("m IN (null, {'a': 'a'}, {'foo': 'bar'})")
 
-        def check_invalid(condition, expected=InvalidRequest):
-            assert_invalid(cursor, "UPDATE tmap SET m['foo'] = 'bar' WHERE k=0 IF %s" % (condition,), expected=expected)
-            assert_one(cursor, "SELECT * FROM tmap", [0, {'foo': 'bar'}])
+            # multiple conditions
+            check_applies("m > {'a': 'a'} AND m < {'z': 'z'}")
+            check_applies("m != null AND m IN (null, {'a': 'a'}, {'foo': 'bar'})")
 
-        check_invalid("m = {null: null}")
-        check_invalid("m = {'a': null}")
-        check_invalid("m = {null: 'a'}")
-        check_invalid("m < null")
-        check_invalid("m IN null", SyntaxException)
+            def check_does_not_apply(condition):
+                assert_one(cursor, "UPDATE tmap SET m = {'foo': 'bar'} WHERE k=0 IF %s" % (condition,), [False, {'foo': 'bar'}])
+                assert_one(cursor, "SELECT * FROM tmap", [0, {'foo': 'bar'}])
 
-        # not supported yet
-        check_invalid("m CONTAINS 'bar'", SyntaxException)
-        check_invalid("m CONTAINS KEY 'foo'", SyntaxException)
-        check_invalid("m CONTAINS null", SyntaxException)
-        check_invalid("m CONTAINS KEY null", SyntaxException)
+            # should not apply
+            check_does_not_apply("m = {'a': 'a'}")
+            check_does_not_apply("m > {'z': 'z'}")
+            check_does_not_apply("m >= {'z': 'z'}")
+            check_does_not_apply("m < {'a': 'a'}")
+            check_does_not_apply("m <= {'a': 'a'}")
+            check_does_not_apply("m != {'foo': 'bar'}")
+            check_does_not_apply("m IN ({'a': 'a'}, null)")
+            check_does_not_apply("m IN ()")
+            check_does_not_apply("m = null AND m != null")
+
+            def check_invalid(condition):
+                assert_invalid(cursor, "UPDATE tmap SET m = {'foo': 'bar'} WHERE k=0 IF %s" % (condition,))
+                assert_one(cursor, "SELECT * FROM tmap", [0, {'foo': 'bar'}])
+
+            check_invalid("m = {null: null}")
+            check_invalid("m = {'a': null}")
+            check_invalid("m = {null: 'a'}")
+            check_invalid("m < null")
+            check_invalid("m IN null", expected=SyntaxException)
+
+            # not supported yet
+            check_invalid("m CONTAINS 'bar'", expected=SyntaxException)
+            check_invalid("m CONTAINS KEY 'foo'", expected=SyntaxException)
+            check_invalid("m CONTAINS null", expected=SyntaxException)
+            check_invalid("m CONTAINS KEY null", expected=SyntaxException)
 
     @since('2.0')
     def map_item_conditional_test(self):
         cursor = self.prepare()
-        cursor.execute("""
-            CREATE TABLE tmap (
-                k int PRIMARY KEY,
-                m map<text, text>,
-            )""")
 
-        cursor.execute("INSERT INTO tmap(k, m) VALUES (0, {'foo' : 'bar'})")
-        assert_invalid(cursor, "DELETE FROM tmap WHERE k=0 IF m[null] = 'foo'")
-        assert_one(cursor, "DELETE FROM tmap WHERE k=0 IF m['foo'] = 'foo'", [False, {'foo' : 'bar'}])
-        assert_one(cursor, "DELETE FROM tmap WHERE k=0 IF m['foo'] = null", [False, {'foo' : 'bar'}])
-        assert_one(cursor, "SELECT * FROM tmap", [0, {'foo' : 'bar'}])
+        frozen_values = (False, True) if self.cluster.version() > "2.1.3" else (False,)
+        for frozen in frozen_values:
 
-        assert_one(cursor, "DELETE FROM tmap WHERE k=0 IF m['foo'] = 'bar'", [True])
-        assert_none(cursor, "SELECT * FROM tmap")
+            cursor.execute("DROP TABLE IF EXISTS tmap")
 
-        if self.cluster.version() > "2.1.1":
-            cursor.execute("INSERT INTO tmap(k, m) VALUES (1, null)")
-            assert_one(cursor, "UPDATE tmap set m['foo'] = 'bar', m['bar'] = 'foo' WHERE k = 1 IF m['foo'] IN ('blah', null)", [True])
+            cursor.execute("""
+                CREATE TABLE tmap (
+                    k int PRIMARY KEY,
+                    m %s
+                )""" % ("frozen<map<text, text>>" if frozen else "map<text, text>",))
+
+            cursor.execute("INSERT INTO tmap(k, m) VALUES (0, {'foo' : 'bar'})")
+            assert_invalid(cursor, "DELETE FROM tmap WHERE k=0 IF m[null] = 'foo'")
+            assert_one(cursor, "DELETE FROM tmap WHERE k=0 IF m['foo'] = 'foo'", [False, {'foo' : 'bar'}])
+            assert_one(cursor, "DELETE FROM tmap WHERE k=0 IF m['foo'] = null", [False, {'foo' : 'bar'}])
+            assert_one(cursor, "SELECT * FROM tmap", [0, {'foo' : 'bar'}])
+
+            assert_one(cursor, "DELETE FROM tmap WHERE k=0 IF m['foo'] = 'bar'", [True])
+            assert_none(cursor, "SELECT * FROM tmap")
+
+            if self.cluster.version() > "2.1.1":
+                cursor.execute("INSERT INTO tmap(k, m) VALUES (1, null)")
+                assert_one(cursor, "UPDATE tmap set m['foo'] = 'bar', m['bar'] = 'foo' WHERE k = 1 IF m['foo'] IN ('blah', null)", [True])
 
     @since('2.1.1')
     def expanded_map_item_conditional_test(self):
         # expanded functionality from CASSANDRA-6839
         cursor = self.prepare()
-        cursor.execute("""
-            CREATE TABLE tmap (
-                k int PRIMARY KEY,
-                m map<text, text>,
-            )""")
 
-        cursor.execute("INSERT INTO tmap(k, m) VALUES (0, {'foo' : 'bar'})")
+        frozen_values = (False, True) if self.cluster.version() > "2.1.3" else (False,)
+        for frozen in frozen_values:
 
-        def check_applies(condition):
-            assert_one(cursor, "UPDATE tmap SET m['foo'] = 'bar' WHERE k=0 IF %s" % (condition,), [True])
-            assert_one(cursor, "SELECT * FROM tmap", [0, {'foo': 'bar'}])
+            cursor.execute("DROP TABLE IF EXISTS tmap")
 
-        check_applies("m['xxx'] = null")
-        check_applies("m['foo'] < 'zzz'")
-        check_applies("m['foo'] <= 'bar'")
-        check_applies("m['foo'] > 'aaa'")
-        check_applies("m['foo'] >= 'bar'")
-        check_applies("m['foo'] != 'xxx'")
-        check_applies("m['foo'] != null")
-        check_applies("m['foo'] IN (null, 'xxx', 'bar')")
-        check_applies("m['xxx'] IN (null, 'xxx', 'bar')")  # m['xxx'] is not set
+            cursor.execute("""
+                CREATE TABLE tmap (
+                    k int PRIMARY KEY,
+                    m %s
+                )""" % ("frozen<map<text, text>>" if frozen else "map<text, text>",))
 
-        # multiple conditions
-        check_applies("m['foo'] < 'zzz' AND m['foo'] > 'aaa'")
+            cursor.execute("INSERT INTO tmap(k, m) VALUES (0, {'foo' : 'bar'})")
 
-        def check_does_not_apply(condition):
-            assert_one(cursor, "UPDATE tmap SET m['foo'] = 'bar' WHERE k=0 IF %s" % (condition,), [False, {'foo': 'bar'}])
-            assert_one(cursor, "SELECT * FROM tmap", [0, {'foo': 'bar'}])
+            def check_applies(condition):
+                assert_one(cursor, "UPDATE tmap SET m = {'foo': 'bar'} WHERE k=0 IF %s" % (condition,), [True])
+                assert_one(cursor, "SELECT * FROM tmap", [0, {'foo': 'bar'}])
 
-        check_does_not_apply("m['foo'] < 'aaa'")
-        check_does_not_apply("m['foo'] <= 'aaa'")
-        check_does_not_apply("m['foo'] > 'zzz'")
-        check_does_not_apply("m['foo'] >= 'zzz'")
-        check_does_not_apply("m['foo'] != 'bar'")
-        check_does_not_apply("m['xxx'] != null")  # m['xxx'] is not set
-        check_does_not_apply("m['foo'] IN (null, 'xxx')")
-        check_does_not_apply("m['foo'] IN ()")
-        check_does_not_apply("m['foo'] != null AND m['foo'] = null")
+            check_applies("m['xxx'] = null")
+            check_applies("m['foo'] < 'zzz'")
+            check_applies("m['foo'] <= 'bar'")
+            check_applies("m['foo'] > 'aaa'")
+            check_applies("m['foo'] >= 'bar'")
+            check_applies("m['foo'] != 'xxx'")
+            check_applies("m['foo'] != null")
+            check_applies("m['foo'] IN (null, 'xxx', 'bar')")
+            check_applies("m['xxx'] IN (null, 'xxx', 'bar')")  # m['xxx'] is not set
 
-        def check_invalid(condition, expected=InvalidRequest):
-            assert_invalid(cursor, "UPDATE tmap SET m['foo'] = 'bar' WHERE k=0 IF %s" % (condition,), expected=expected)
-            assert_one(cursor, "SELECT * FROM tmap", [0, {'foo': 'bar'}])
+            # multiple conditions
+            check_applies("m['foo'] < 'zzz' AND m['foo'] > 'aaa'")
 
-        check_invalid("m['foo'] < null")
-        check_invalid("m['foo'] <= null")
-        check_invalid("m['foo'] > null")
-        check_invalid("m['foo'] >= null")
-        check_invalid("m['foo'] IN null", SyntaxException)
-        check_invalid("m['foo'] IN 367", SyntaxException)
-        check_invalid("m['foo'] IN (1, 2, 3)")
-        check_invalid("m['foo'] CONTAINS 367", SyntaxException)
-        check_invalid("m['foo'] CONTAINS KEY 367", SyntaxException)
-        check_invalid("m[null] = null")
+            def check_does_not_apply(condition):
+                assert_one(cursor, "UPDATE tmap SET m = {'foo': 'bar'} WHERE k=0 IF %s" % (condition,), [False, {'foo': 'bar'}])
+                assert_one(cursor, "SELECT * FROM tmap", [0, {'foo': 'bar'}])
+
+            check_does_not_apply("m['foo'] < 'aaa'")
+            check_does_not_apply("m['foo'] <= 'aaa'")
+            check_does_not_apply("m['foo'] > 'zzz'")
+            check_does_not_apply("m['foo'] >= 'zzz'")
+            check_does_not_apply("m['foo'] != 'bar'")
+            check_does_not_apply("m['xxx'] != null")  # m['xxx'] is not set
+            check_does_not_apply("m['foo'] IN (null, 'xxx')")
+            check_does_not_apply("m['foo'] IN ()")
+            check_does_not_apply("m['foo'] != null AND m['foo'] = null")
+
+            def check_invalid(condition):
+                assert_invalid(cursor, "UPDATE tmap SET m = {'foo': 'bar'} WHERE k=0 IF %s" % (condition,))
+                assert_one(cursor, "SELECT * FROM tmap", [0, {'foo': 'bar'}])
+
+            check_invalid("m['foo'] < null")
+            check_invalid("m['foo'] <= null")
+            check_invalid("m['foo'] > null")
+            check_invalid("m['foo'] >= null")
+            check_invalid("m['foo'] IN null", expected=SyntaxException)
+            check_invalid("m['foo'] IN 367", expected=SyntaxException)
+            check_invalid("m['foo'] IN (1, 2, 3)")
+            check_invalid("m['foo'] CONTAINS 367", expected=SyntaxException)
+            check_invalid("m['foo'] CONTAINS KEY 367", expected=SyntaxException)
+            check_invalid("m[null] = null")
 
     @since("2.1.1")
     def cas_and_list_index_test(self):
@@ -4629,3 +4670,146 @@ class TestCQL(Tester):
 
         assert_one(cursor, "SELECT writetime(v) FROM TEST WHERE k = 1", [ -42 ])
 
+    @since('3.0')
+    @require("7936")
+    def select_map_key_single_row_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("CREATE TABLE test (k int PRIMARY KEY, v map<int, text>)")
+        cursor.execute("INSERT INTO test (k, v) VALUES ( 0, {1:'a', 2:'b', 3:'c', 4:'d'})")
+
+        assert_one(cursor, "SELECT v[1] FROM test WHERE k = 0", ['a'])
+        assert_one(cursor, "SELECT v[5] FROM test WHERE k = 0", [])
+        assert_one(cursor, "SELECT v[1] FROM test WHERE k = 1", [])
+
+        assert_one(cursor, "SELECT v[1..3] FROM test WHERE k = 0", ['a', 'b', 'c'])
+        assert_one(cursor, "SELECT v[3..5] FROM test WHERE k = 0", ['c', 'd'])
+        assert_invalid(cursor, "SELECT v[3..1] FROM test WHERE k = 0")
+
+        assert_one(cursor, "SELECT v[..2] FROM test WHERE k = 0", ['a', 'b'])
+        assert_one(cursor, "SELECT v[3..] FROM test WHERE k = 0", ['c', 'd'])
+        assert_one(cursor, "SELECT v[0..] FROM test WHERE k = 0", ['a', 'b', 'c', 'd'])
+        assert_one(cursor, "SELECT v[..5] FROM test WHERE k = 0", ['a', 'b', 'c', 'd'])
+
+        assert_one(cursor, "SELECT sizeof(v) FROM test where k = 0", [4])
+
+    @since('3.0')
+    @require("7936")
+    def select_set_key_single_row_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("CREATE TABLE test (k int PRIMARY KEY, v set<text>)")
+        cursor.execute("INSERT INTO test (k, v) VALUES ( 0, {'e', 'a', 'd', 'b'})")
+
+        assert_one(cursor, "SELECT v FROM test WHERE k = 0", [sortedset(['a', 'b', 'd', 'e'])])
+        assert_one(cursor, "SELECT v['a'] FROM test WHERE k = 0", [True])
+        assert_one(cursor, "SELECT v['c'] FROM test WHERE k = 0", [False])
+        assert_one(cursor, "SELECT v['a'] FROM test WHERE k = 1", [])
+
+        assert_one(cursor, "SELECT v['b'..'d'] FROM test WHERE k = 0", ['b', 'd'])
+        assert_one(cursor, "SELECT v['b'..'e'] FROM test WHERE k = 0", ['b', 'd', 'e'])
+        assert_one(cursor, "SELECT v['a'..'d'] FROM test WHERE k = 0", ['a', 'b', 'd'])
+        assert_one(cursor, "SELECT v['b'..'f'] FROM test WHERE k = 0", ['b', 'd', 'e'])
+        assert_invalid(cursor, "SELECT v['d'..'a'] FROM test WHERE k = 0")
+
+        assert_one(cursor, "SELECT v['d'..] FROM test WHERE k = 0", ['d', 'e'])
+        assert_one(cursor, "SELECT v[..'d'] FROM test WHERE k = 0", ['a', 'b', 'd'])
+        assert_one(cursor, "SELECT v['f'..] FROM test WHERE k = 0", [])
+        assert_one(cursor, "SELECT v[..'f'] FROM test WHERE k = 0", ['a', 'b', 'd', 'e'])
+
+        assert_one(cursor, "SELECT sizeof(v) FROM test where k = 0", [4])
+
+    @since('3.0')
+    @require("7936")
+    def select_list_key_single_row_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("CREATE TABLE test (k int PRIMARY KEY, v list<text>)")
+        cursor.execute("INSERT INTO test (k, v) VALUES ( 0, ['e', 'a', 'd', 'b'])")
+
+        assert_one(cursor, "SELECT v FROM test WHERE k = 0", [['e', 'a', 'd', 'b']])
+        assert_one(cursor, "SELECT v[0] FROM test WHERE k = 0", ['e'])
+        assert_one(cursor, "SELECT v[3] FROM test WHERE k = 0", ['b'])
+        assert_one(cursor, "SELECT v[0] FROM test WHERE k = 1", [])
+
+        assert_invalid(cursor, "SELECT v[-1] FROM test WHERE k = 0")
+        assert_invalid(cursor, "SELECT v[5] FROM test WHERE k = 0")
+
+        assert_one(cursor, "SELECT v[1..3] FROM test WHERE k = 0", ['a', 'd', 'b'])
+        assert_one(cursor, "SELECT v[0..2] FROM test WHERE k = 0", ['e', 'a', 'd'])
+        assert_invalid(cursor, "SELECT v[0..4] FROM test WHERE k = 0")
+        assert_invalid(cursor, "SELECT v[2..0] FROM test WHERE k = 0")
+
+        assert_one(cursor, "SELECT sizeof(v) FROM test where k = 0", [4])
+
+    @since('3.0')
+    @require("7936")
+    def select_map_key_multi_row_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("CREATE TABLE test (k int PRIMARY KEY, v map<int, text>)")
+        cursor.execute("INSERT INTO test (k, v) VALUES ( 0, {1:'a', 2:'b', 3:'c', 4:'d'})")
+        cursor.execute("INSERT INTO test (k, v) VALUES ( 1, {1:'a', 2:'b', 5:'e', 6:'f'})")
+
+        assert_all(cursor, "SELECT v[1] FROM test", [['a'], ['a']])
+        assert_all(cursor, "SELECT v[5] FROM test", [[], []])
+        assert_all(cursor, "SELECT v[1] FROM test", [[], []])
+
+        assert_all(cursor, "SELECT v[1..3] FROM test", [['a', 'b', 'c'], ['a', 'b', 'e']])
+        assert_all(cursor, "SELECT v[3..5] FROM test", [['c', 'd'], ['e']])
+        assert_invalid(cursor, "SELECT v[3..1] FROM test")
+
+        assert_all(cursor, "SELECT v[..2] FROM test", [['a', 'b'], ['a', 'b']])
+        assert_all(cursor, "SELECT v[3..] FROM test", [['c', 'd'], ['e', 'f']])
+        assert_all(cursor, "SELECT v[0..] FROM test", [['a', 'b', 'c', 'd'], ['a', 'b', 'e', 'f']])
+        assert_all(cursor, "SELECT v[..5] FROM test", [['a', 'b', 'c', 'd'], ['a', 'b', 'e']])
+
+        assert_all(cursor, "SELECT sizeof(v) FROM test", [[4], [4]])
+
+    @since('3.0')
+    @require("7936")
+    def select_set_key_multi_row_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("CREATE TABLE test (k int PRIMARY KEY, v set<text>)")
+        cursor.execute("INSERT INTO test (k, v) VALUES ( 0, {'e', 'a', 'd', 'b'})")
+        cursor.execute("INSERT INTO test (k, v) VALUES ( 1, {'c', 'f', 'd', 'b'})")
+
+        assert_all(cursor, "SELECT v FROM test", [[sortedset(['b', 'c', 'd', 'f'])], [sortedset(['a', 'b', 'd', 'e'])]])
+        assert_all(cursor, "SELECT v['a'] FROM test", [[True], [False]])
+        assert_all(cursor, "SELECT v['c'] FROM test", [[False], [True]])
+
+        assert_all(cursor, "SELECT v['b'..'d'] FROM test", [['b', 'd'], ['b', 'c', 'd']])
+        assert_all(cursor, "SELECT v['b'..'e'] FROM test", [['b', 'd', 'e'], ['b', 'c', 'd']])
+        assert_all(cursor, "SELECT v['a'..'d'] FROM test", [['a', 'b', 'd'], ['b', 'c', 'd']])
+        assert_all(cursor, "SELECT v['b'..'f'] FROM test", [['b', 'd', 'e'], ['b', 'c', 'd', 'f']])
+        assert_invalid(cursor, "SELECT v['d'..'a'] FROM test")
+
+        assert_all(cursor, "SELECT v['d'..] FROM test", [['d', 'e'], ['d', 'f']])
+        assert_all(cursor, "SELECT v[..'d'] FROM test", [['a', 'b', 'd'], ['b', 'c', 'd']])
+        assert_all(cursor, "SELECT v['f'..] FROM test", [[], ['f']])
+        assert_all(cursor, "SELECT v[..'f'] FROM test", [['a', 'b', 'd', 'e'], ['b', 'c', 'd', 'f']])
+
+        assert_all(cursor, "SELECT sizeof(v) FROM test", [[4], [4]])
+
+    @since('3.0')
+    @require("7936")
+    def select_list_key_multi_row_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("CREATE TABLE test (k int PRIMARY KEY, v list<text>)")
+        cursor.execute("INSERT INTO test (k, v) VALUES ( 0, ['e', 'a', 'd', 'b'])")
+        cursor.execute("INSERT INTO test (k, v) VALUES ( 1, ['c', 'f', 'd', 'b'])")
+
+        assert_all(cursor, "SELECT v FROM test", [[['c', 'f', 'd', 'b']], [['e', 'a', 'd', 'b']]])
+        assert_all(cursor, "SELECT v[0] FROM test", [['e'], ['c']])
+        assert_all(cursor, "SELECT v[3] FROM test", [['b'], ['b']])
+        assert_invalid(cursor, "SELECT v[-1] FROM test")
+        assert_invalid(cursor, "SELECT v[5] FROM test")
+
+        assert_all(cursor, "SELECT v[1..3] FROM test", [['a', 'd', 'b'], ['f', 'd', 'b']])
+        assert_all(cursor, "SELECT v[0..2] FROM test", [['e', 'a', 'd'], ['c', 'f', 'd']])
+        assert_invalid(cursor, "SELECT v[0..4] FROM test")
+        assert_invalid(cursor, "SELECT v[2..0] FROM test")
+
+        assert_all(cursor, "SELECT sizeof(v) FROM test", [[4], [4]])

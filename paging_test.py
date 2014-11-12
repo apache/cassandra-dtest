@@ -5,6 +5,7 @@ from cassandra import ConsistencyLevel as CL
 from cassandra import InvalidRequest
 from cassandra.query import SimpleStatement, dict_factory
 from dtest import Tester
+from pytools import since
 
 from datahelp import create_rows, parse_data_into_dicts, flatten_into_set
 
@@ -167,7 +168,6 @@ class PageAssertionMixin(object):
     def assertIsSubsetOf(self, subset, superset):
         assert flatten_into_set(subset).issubset(flatten_into_set(superset))
 
-
 class BasePagingTester(Tester):
     def prepare(self):
         cluster = self.cluster
@@ -183,6 +183,8 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
     Basic tests relating to page size (relative to results set)
     and validation of page size setting.
     """
+
+    @since('2.0')
     def test_with_no_results(self):
         """
         No errors when a page is requested and query has no results.
@@ -201,6 +203,7 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
         self.assertEqual([], pf.all_data())
         self.assertFalse(pf.has_more_pages)
 
+    @since('2.0')
     def test_with_less_results_than_page_size(self):
         cursor = self.prepare()
         self.create_ks(cursor, 'test_paging_size', 2)
@@ -225,6 +228,7 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
         self.assertFalse(pf.has_more_pages)
         self.assertEqual(len(expected_data), len(pf.all_data()))
 
+    @since('2.0')
     def test_with_more_results_than_page_size(self):
         cursor = self.prepare()
         self.create_ks(cursor, 'test_paging_size', 2)
@@ -256,6 +260,7 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
         # make sure expected and actual have same data elements (ignoring order)
         self.assertEqualIgnoreOrder(pf.all_data(), expected_data)
 
+    @since('2.0')
     def test_with_equal_results_to_page_size(self):
         cursor = self.prepare()
         self.create_ks(cursor, 'test_paging_size', 2)
@@ -283,6 +288,7 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
         # make sure expected and actual have same data elements (ignoring order)
         self.assertEqualIgnoreOrder(pf.all_data(), expected_data)
 
+    @since('2.0')
     def test_undefined_page_size_default(self):
         """
         If the page size isn't sent then the default fetch size is used.
@@ -311,6 +317,7 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
         # make sure expected and actual have same data elements (ignoring order)
         self.assertEqualIgnoreOrder(pf.all_data(), expected_data)
 
+    @since('2.0')
     def test_zero_page_size_default(self):
         """
         If the page size isn't sent then the default fetch size is used.
@@ -345,6 +352,7 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
     """
     Tests concerned with paging when CQL modifiers (such as order, limit, allow filtering) are used.
     """
+    @since('2.0')
     def test_with_order_by(self):
         """"
         Paging over a single partition with ordering should work.
@@ -394,6 +402,7 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
             stmt = SimpleStatement("select * from paging_test where id in (1,2) order by value asc", consistency_level=CL.ALL)
             cursor.execute(stmt)
 
+    @since('2.0')
     def test_with_limit(self):
         cursor = self.prepare()
         self.create_ks(cursor, 'test_paging_size', 2)
@@ -436,6 +445,7 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
         self.assertEqual(pf.num_results_all(), [5, 3])
         self.assertIsSubsetOf(pf.all_data(), expected_data)
 
+    @since('2.0')
     def test_with_allow_filtering(self):
         cursor = self.prepare()
         self.create_ks(cursor, 'test_paging_size', 2)
@@ -483,6 +493,7 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
 
 
 class TestPagingData(BasePagingTester, PageAssertionMixin):
+    @since('2.0')
     def test_paging_a_single_wide_row(self):
         cursor = self.prepare()
         self.create_ks(cursor, 'test_paging_size', 2)
@@ -508,6 +519,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
         self.assertEqualIgnoreOrder(pf.all_data(), expected_data)
 
+    @since('2.0')
     def test_paging_across_multi_wide_rows(self):
         cursor = self.prepare()
         self.create_ks(cursor, 'test_paging_size', 2)
@@ -534,6 +546,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
         self.assertEqualIgnoreOrder(pf.all_data(), expected_data)
 
+    @since('2.0')
     def test_paging_using_secondary_indexes(self):
         cursor = self.prepare()
         self.create_ks(cursor, 'test_paging_size', 2)
@@ -576,6 +589,7 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
     """
     Tests concerned with paging when the queried dataset changes while pages are being retrieved.
     """
+    @since('2.0')
     def test_data_change_impacting_earlier_page(self):
         cursor = self.prepare()
         self.create_ks(cursor, 'test_paging_size', 2)
@@ -609,6 +623,7 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
 
         self.assertEqualIgnoreOrder(pf.all_data(), expected_data)
 
+    @since('2.0')
     def test_data_change_impacting_later_page(self):
         cursor = self.prepare()
         self.create_ks(cursor, 'test_paging_size', 2)
@@ -643,6 +658,7 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
         expected_data.append({u'id': 2, u'mytext': u'foo'})
         self.assertEqualIgnoreOrder(pf.all_data(), expected_data)
 
+    @since('2.0')
     def test_data_delete_removing_remainder(self):
         cursor = self.prepare()
         self.create_ks(cursor, 'test_paging_size', 2)
@@ -673,6 +689,7 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
         self.assertEqual(pf.pagecount(), 1)
         self.assertEqual(pf.num_results_all(), [500])
 
+    @since('2.0')
     def test_row_TTL_expiry_during_paging(self):
         cursor = self.prepare()
         self.create_ks(cursor, 'test_paging_size', 2)
@@ -715,6 +732,7 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
         self.assertEqual(pf.pagecount(), 3)
         self.assertEqual(pf.num_results_all(), [300, 300, 200])
 
+    @since('2.0')
     def test_cell_TTL_expiry_during_paging(self):
         cursor = self.prepare()
         self.create_ks(cursor, 'test_paging_size', 2)
@@ -779,6 +797,7 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
         page3 = pf.page_data(3)
         self.assertEqualIgnoreOrder(page3, page3expected)
 
+    @since('2.0')
     def test_node_unavailabe_during_paging(self):
         cluster = self.cluster
         cluster.populate(3).start()
@@ -817,6 +836,7 @@ class TestPagingQueryIsolation(BasePagingTester, PageAssertionMixin):
     """
     Tests concerned with isolation of paged queries (queries can't affect each other).
     """
+    @since('2.0')
     def test_query_isolation(self):
         """
         Interleave some paged queries and make sure nothing bad happens.
