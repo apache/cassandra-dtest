@@ -3842,6 +3842,11 @@ class TestCQL(Tester):
         assert_all(cursor, "SELECT v FROM test WHERE k IN (1, 0)", [[3], [4], [5], [0], [1], [2]])
         assert_all(cursor, "SELECT v FROM test WHERE k IN (1, 0) ORDER BY c1 ASC", [[0], [1], [2], [3], [4], [5]])
 
+        # we should also be able to use functions in the select clause (additional test for CASSANDRA-8286)
+        results = cursor.execute("SELECT writetime(v) FROM test WHERE k IN (1, 0) ORDER BY c1 ASC")
+        # since we don't know the write times, just assert that the order matches the order we expect
+        self.assertEqual(results, list(sorted(results)))
+
     @since('2.0')
     def cas_and_compact_test(self):
         """ Test for CAS with compact storage table, and #6813 in particular """
