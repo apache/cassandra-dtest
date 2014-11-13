@@ -1,9 +1,11 @@
 import struct
 import time
 import uuid
+import re
 from dtest import Tester, debug
 from pytools import since
 from pyassertions import assert_invalid
+from cassandra import Unauthorized
 
 
 def decode_text(string):
@@ -62,6 +64,11 @@ class TestUserTypes(Tester):
 
     def __init__(self, *args, **kwargs):
         Tester.__init__(self, *args, **kwargs)
+
+    def assertUnauthorized(self, cursor, query, message):
+        with self.assertRaises(Unauthorized) as cm:
+            cursor.execute(query)
+        assert re.search(message, cm.exception.message), "Expected: %s" % message
 
     @since('2.1')
     def test_type_dropping(self):
@@ -560,9 +567,9 @@ class TestUserTypes(Tester):
         user2_cursor = self.patient_cql_connection(node1, user='ks2_user', password='cassandra')
 
         # first make sure the users can't create types in each other's ks
-        assert_invalid(user1_cursor, "CREATE TYPE ks2.simple_type (user_number int, user_text text );", 'User ks1_user has no CREATE permission on <keyspace ks2> or any of its parents')
+        self.assertUnauthorized(user1_cursor, "CREATE TYPE ks2.simple_type (user_number int, user_text text );", 'User ks1_user has no CREATE permission on <keyspace ks2> or any of its parents')
 
-        assert_invalid(user2_cursor, "CREATE TYPE ks1.simple_type (user_number int, user_text text );", 'User ks2_user has no CREATE permission on <keyspace ks1> or any of its parents')
+        self.assertUnauthorized(user2_cursor, "CREATE TYPE ks1.simple_type (user_number int, user_text text );", 'User ks2_user has no CREATE permission on <keyspace ks1> or any of its parents')
 
         # now, actually create the types in the correct keyspaces
         user1_cursor.execute("CREATE TYPE ks1.simple_type (user_number int, user_text text );")
@@ -571,14 +578,14 @@ class TestUserTypes(Tester):
         # each user now has a type belonging to their granted keyspace
         # let's make sure they can't drop each other's types (for which they have no permissions)
 
-        assert_invalid(user1_cursor, "DROP TYPE ks2.simple_type;", 'User ks1_user has no DROP permission on <keyspace ks2> or any of its parents')
+        self.assertUnauthorized(user1_cursor, "DROP TYPE ks2.simple_type;", 'User ks1_user has no DROP permission on <keyspace ks2> or any of its parents')
 
-        assert_invalid(user2_cursor, "DROP TYPE ks1.simple_type;", 'User ks2_user has no DROP permission on <keyspace ks1> or any of its parents')
+        self.assertUnauthorized(user2_cursor, "DROP TYPE ks1.simple_type;", 'User ks2_user has no DROP permission on <keyspace ks1> or any of its parents')
 
         # let's make sure they can't rename each other's types (for which they have no permissions)
-        assert_invalid(user1_cursor, "ALTER TYPE ks2.simple_type RENAME user_number TO user_num;", 'User ks1_user has no ALTER permission on <keyspace ks2> or any of its parents')
+        self.assertUnauthorized(user1_cursor, "ALTER TYPE ks2.simple_type RENAME user_number TO user_num;", 'User ks1_user has no ALTER permission on <keyspace ks2> or any of its parents')
 
-        assert_invalid(user2_cursor, "ALTER TYPE ks1.simple_type RENAME user_number TO user_num;", 'User ks2_user has no ALTER permission on <keyspace ks1> or any of its parents')
+        self.assertUnauthorized(user2_cursor, "ALTER TYPE ks1.simple_type RENAME user_number TO user_num;", 'User ks2_user has no ALTER permission on <keyspace ks1> or any of its parents')
 
         # rename the types using the correct user w/permissions to do so
         user1_cursor.execute("ALTER TYPE ks1.simple_type RENAME user_number TO user_num;")

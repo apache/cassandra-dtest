@@ -7,8 +7,8 @@ from uuid import uuid4, UUID
 from dtest import Tester, canReuseCluster, freshCluster
 from pyassertions import assert_invalid, assert_one, assert_none, assert_all
 from pytools import since, require, rows_to_list
-from cassandra import ConsistencyLevel
-from cassandra.protocol import ProtocolException
+from cassandra import ConsistencyLevel, InvalidRequest
+from cassandra.protocol import ProtocolException, SyntaxException, ConfigurationException
 from cassandra.query import SimpleStatement
 try:
     from blist import sortedset
@@ -271,9 +271,11 @@ class TestCQL(Tester):
 
         cursor = self.prepare()
 
-        assert_invalid(cursor, "CREATE TABLE test ()")
+        assert_invalid(cursor, "CREATE TABLE test ()", expected=SyntaxException)
+
         if self.cluster.version() < "1.2":
             assert_invalid(cursor, "CREATE TABLE test (key text PRIMARY KEY)")
+
         assert_invalid(cursor, "CREATE TABLE test (c1 text, c2 text, c3 text)")
         assert_invalid(cursor, "CREATE TABLE test (key1 text PRIMARY KEY, key2 text PRIMARY KEY)")
 
@@ -716,10 +718,10 @@ class TestCQL(Tester):
         """ Check obsolete properties from CQL2 are rejected """
         cursor = self.prepare()
 
-        assert_invalid(cursor, "CREATE TABLE test (foo text PRIMARY KEY, c int) WITH default_validation=timestamp")
+        assert_invalid(cursor, "CREATE TABLE test (foo text PRIMARY KEY, c int) WITH default_validation=timestamp", expected=SyntaxException)
 
         cursor.execute("CREATE TABLE test (foo text PRIMARY KEY, c int)")
-        assert_invalid(cursor, "ALTER TABLE test WITH default_validation=int;")
+        assert_invalid(cursor, "ALTER TABLE test WITH default_validation=int;", expected=SyntaxException)
 
     def null_support_test(self):
         """ Test support for nulls """
@@ -749,7 +751,7 @@ class TestCQL(Tester):
         assert rows_to_list(res) == [ [0, 0, None, None], [0, 1, None, None]], res
 
         assert_invalid(cursor, "INSERT INTO test (k, c, v2) VALUES (0, 2, {1, null})")
-        assert_invalid(cursor, "SELECT * FROM test WHER k = null")
+        assert_invalid(cursor, "SELECT * FROM test WHERE k = null")
         assert_invalid(cursor, "INSERT INTO test (k, c, v2) VALUES (0, 0, { 'foo', 'bar', null })")
 
 
@@ -869,7 +871,7 @@ class TestCQL(Tester):
             )
         """)
 
-        assert_invalid(cursor, "CREATE TABLE test2 ( select text PRIMARY KEY, x int)")
+        assert_invalid(cursor, "CREATE TABLE test2 ( select text PRIMARY KEY, x int)", expected=SyntaxException)
 
     def identifier_test(self):
         cursor = self.prepare()
@@ -882,7 +884,7 @@ class TestCQL(Tester):
         cursor.execute("INSERT INTO test1 (KEY_23, COLUMN) VALUES (0, 0)")
 
         # Reserved keywords
-        assert_invalid(cursor, "CREATE TABLE test1 (select int PRIMARY KEY, column int)")
+        assert_invalid(cursor, "CREATE TABLE test1 (select int PRIMARY KEY, column int)", expected=SyntaxException)
 
     #def keyspace_test(self):
     #    cursor = self.prepare()
@@ -1253,13 +1255,13 @@ class TestCQL(Tester):
         assert_invalid(cursor, """
           CREATE TABLE users (key varchar PRIMARY KEY, password varchar, gender varchar)
           WITH compression_parameters:sstable_compressor = 'DeflateCompressor';
-        """)
+        """, expected=SyntaxException)
 
         if self.cluster.version() >= '1.2':
             assert_invalid(cursor, """
               CREATE TABLE users (key varchar PRIMARY KEY, password varchar, gender varchar)
               WITH compression = { 'sstable_compressor' : 'DeflateCompressor' };
-            """)
+            """, expected=ConfigurationException)
 
     def keyspace_creation_options_test(self):
         """ Check one can use arbitrary name for datacenter when creating keyspace (#4278) """
@@ -1824,8 +1826,8 @@ class TestCQL(Tester):
     def create_alter_options_test(self):
         cursor = self.prepare(create_keyspace=False)
 
-        assert_invalid(cursor, "CREATE KEYSPACE ks1")
-        assert_invalid(cursor, "CREATE KEYSPACE ks1 WITH replication= { 'replication_factor' : 1 }")
+        assert_invalid(cursor, "CREATE KEYSPACE ks1", expected=SyntaxException)
+        assert_invalid(cursor, "CREATE KEYSPACE ks1 WITH replication= { 'replication_factor' : 1 }", expected=ConfigurationException)
 
         cursor.execute("CREATE KEYSPACE ks1 WITH replication={ 'class' : 'SimpleStrategy', 'replication_factor' : 1 }")
         cursor.execute("CREATE KEYSPACE ks2 WITH replication={ 'class' : 'SimpleStrategy', 'replication_factor' : 1 } AND durable_writes=false")
@@ -1843,7 +1845,7 @@ class TestCQL(Tester):
 
         cursor.execute("USE ks1")
 
-        assert_invalid(cursor, "CREATE TABLE cf1 (a int PRIMARY KEY, b int) WITH compaction = { 'min_threshold' : 4 }")
+        assert_invalid(cursor, "CREATE TABLE cf1 (a int PRIMARY KEY, b int) WITH compaction = { 'min_threshold' : 4 }", expected=ConfigurationException)
         cursor.execute("CREATE TABLE cf1 (a int PRIMARY KEY, b int) WITH compaction = { 'class' : 'SizeTieredCompactionStrategy', 'min_threshold' : 7 }")
         res = cursor.execute("SELECT columnfamily_name, min_compaction_threshold FROM system.schema_columnfamilies WHERE keyspace_name='ks1'")
         assert rows_to_list(res) == [ ['cf1', 7] ], res
@@ -1923,7 +1925,7 @@ class TestCQL(Tester):
         """ Test for the validation bug of #4706 """
 
         cursor = self.prepare()
-        assert_invalid(cursor, "CREATE TABLE test (id bigint PRIMARY KEY, count counter, things set<text>)", matching="Cannot add a counter column")
+        assert_invalid(cursor, "CREATE TABLE test (id bigint PRIMARY KEY, count counter, things set<text>)", matching="Cannot add a counter column", expected=ConfigurationException)
 
     def reversed_compact_test(self):
         """ Test for #4716 bug and more generally for good behavior of ordering"""
@@ -2000,7 +2002,10 @@ class TestCQL(Tester):
             )
         """)
 
-        assert_invalid(cursor, "INSERT INTO test (k, c) VALUES ('foo', 'CQL is cassandra's best friend')", matching="Syntax error")
+        #The \ in this query string is not forwarded to cassandra.
+        #The ' is being escaped in python, but only ' is forwarded
+        #over the wire instead of \'.
+        assert_invalid(cursor, "INSERT INTO test (k, c) VALUES ('foo', 'CQL is cassandra\'s best friend')", expected=SyntaxException)
 
     def reversed_compact_multikey_test(self):
         """ Test for the bug from #4760 and #4759 """
@@ -2527,7 +2532,7 @@ class TestCQL(Tester):
             )
         """)
 
-        assert_invalid(cursor, "INSERT INTO test (k, t) VALUES (0, 2012-11-07 18:18:22-0800)", matching="Syntax error")
+        assert_invalid(cursor, "INSERT INTO test (k, t) VALUES (0, 2012-11-07 18:18:22-0800)", expected=SyntaxException)
 
         for i in range(4):
             cursor.execute("INSERT INTO test (k, t) VALUES (0, now())")
@@ -3930,9 +3935,9 @@ class TestCQL(Tester):
             check_invalid("l <= null")
             check_invalid("l > null")
             check_invalid("l >= null")
-            check_invalid("l IN null")
-            check_invalid("l IN 367")
-            check_invalid("l CONTAINS KEY 123")
+            check_invalid("l IN null", expected=SyntaxException)
+            check_invalid("l IN 367", expected=SyntaxException)
+            check_invalid("l CONTAINS KEY 123", expected=SyntaxException)
 
             # not supported yet
             check_invalid("m CONTAINS 'bar'")
@@ -4027,11 +4032,11 @@ class TestCQL(Tester):
             check_invalid("l[1] <= null")
             check_invalid("l[1] > null")
             check_invalid("l[1] >= null")
-            check_invalid("l[1] IN null")
-            check_invalid("l[1] IN 367")
+            check_invalid("l[1] IN null", expected=SyntaxException)
+            check_invalid("l[1] IN 367", expected=SyntaxException)
             check_invalid("l[1] IN (1, 2, 3)")
-            check_invalid("l[1] CONTAINS 367")
-            check_invalid("l[1] CONTAINS KEY 367")
+            check_invalid("l[1] CONTAINS 367", expected=SyntaxException)
+            check_invalid("l[1] CONTAINS KEY 367", expected=SyntaxException)
             check_invalid("l[null] = null")
 
     @since('2.1.1')
@@ -4093,15 +4098,15 @@ class TestCQL(Tester):
             check_invalid("s <= null")
             check_invalid("s > null")
             check_invalid("s >= null")
-            check_invalid("s IN null")
-            check_invalid("s IN 367")
-            check_invalid("s CONTAINS KEY 123")
+            check_invalid("s IN null", expected=SyntaxException)
+            check_invalid("s IN 367", expected=SyntaxException)
+            check_invalid("s CONTAINS KEY 123", expected=SyntaxException)
 
             # element access is not allow for sets
             check_invalid("s['foo'] = 'foobar'")
 
             # not supported yet
-            check_invalid("m CONTAINS 'bar'")
+            check_invalid("m CONTAINS 'bar'", expected=SyntaxException)
 
     @since('2.1.1')
     def whole_map_conditional_test(self):
@@ -4159,13 +4164,13 @@ class TestCQL(Tester):
             check_invalid("m = {'a': null}")
             check_invalid("m = {null: 'a'}")
             check_invalid("m < null")
-            check_invalid("m IN null")
+            check_invalid("m IN null", expected=SyntaxException)
 
             # not supported yet
-            check_invalid("m CONTAINS 'bar'")
-            check_invalid("m CONTAINS KEY 'foo'")
-            check_invalid("m CONTAINS null")
-            check_invalid("m CONTAINS KEY null")
+            check_invalid("m CONTAINS 'bar'", expected=SyntaxException)
+            check_invalid("m CONTAINS KEY 'foo'", expected=SyntaxException)
+            check_invalid("m CONTAINS null", expected=SyntaxException)
+            check_invalid("m CONTAINS KEY null", expected=SyntaxException)
 
     @since('2.0')
     def map_item_conditional_test(self):
@@ -4252,11 +4257,11 @@ class TestCQL(Tester):
             check_invalid("m['foo'] <= null")
             check_invalid("m['foo'] > null")
             check_invalid("m['foo'] >= null")
-            check_invalid("m['foo'] IN null")
-            check_invalid("m['foo'] IN 367")
+            check_invalid("m['foo'] IN null", expected=SyntaxException)
+            check_invalid("m['foo'] IN 367", expected=SyntaxException)
             check_invalid("m['foo'] IN (1, 2, 3)")
-            check_invalid("m['foo'] CONTAINS 367")
-            check_invalid("m['foo'] CONTAINS KEY 367")
+            check_invalid("m['foo'] CONTAINS 367", expected=SyntaxException)
+            check_invalid("m['foo'] CONTAINS KEY 367", expected=SyntaxException)
             check_invalid("m[null] = null")
 
     @since("2.1.1")
