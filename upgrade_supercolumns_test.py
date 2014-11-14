@@ -8,6 +8,15 @@ import random, os, time, re
 # we removed then internally)
 class TestSCUpgrade(Tester):
 
+    def __init__(self, *args, **kwargs):
+        self.ignore_log_patterns = [
+            # This one occurs if we do a non-rolling upgrade, the node
+            # it's trying to send the migration to hasn't started yet,
+            # and when it does, it gets replayed and everything is fine.
+            r'Can\'t send migration request: node.*is down',
+        ]
+        Tester.__init__(self, *args, **kwargs)
+
     @since('2.0')
     def upgrade_with_index_creation_test(self):
         cluster = self.cluster
