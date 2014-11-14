@@ -224,7 +224,7 @@ class TestSecondaryIndexesOnCollections(Tester):
         # no index present yet, make sure there's an error trying to query column
         stmt = ("SELECT * from list_index_search.users where uuids contains {some_uuid}"
             ).format(some_uuid=uuid.uuid4())
-        assert_invalid(cursor, stmt, 'No indexed columns present in by-columns clause')
+        assert_invalid(cursor, stmt, 'No secondary indexes on the restricted columns support the provided operators')
 
         # add index and query again (even though there are no rows in the table yet)
         stmt = "CREATE INDEX user_uuids on list_index_search.users (uuids);"
@@ -318,7 +318,7 @@ class TestSecondaryIndexesOnCollections(Tester):
 
         # no index present yet, make sure there's an error trying to query column
         stmt = ("SELECT * from set_index_search.users where uuids contains {some_uuid}").format(some_uuid=uuid.uuid4())
-        assert_invalid(cursor, stmt, 'No indexed columns present in by-columns clause')
+        assert_invalid(cursor, stmt, 'No secondary indexes on the restricted columns support the provided operators')
 
         # add index and query again (even though there are no rows in the table yet)
         stmt = "CREATE INDEX user_uuids on set_index_search.users (uuids);"
@@ -410,11 +410,11 @@ class TestSecondaryIndexesOnCollections(Tester):
 
         # no index present yet, make sure there's an error trying to query column
         stmt = ("SELECT * from map_index_search.users where uuids contains {some_uuid}").format(some_uuid=uuid.uuid4())
-        assert_invalid(cursor, stmt, 'No indexed columns present in by-columns clause')
+        assert_invalid(cursor, stmt, 'No secondary indexes on the restricted columns support the provided operators')
 
         stmt = ("SELECT * from map_index_search.users where uuids contains key {some_uuid}"
             ).format(some_uuid=uuid.uuid4())
-        assert_invalid(cursor, stmt, 'No indexed columns present in by-columns clause')
+        assert_invalid(cursor, stmt, 'No secondary indexes on the restricted columns support the provided operators')
 
         # add index on keys and query again (even though there are no rows in the table yet)
         stmt = "CREATE INDEX user_uuids on map_index_search.users (KEYS(uuids));"
