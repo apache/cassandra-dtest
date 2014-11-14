@@ -3940,7 +3940,7 @@ class TestCQL(Tester):
             check_invalid("l CONTAINS KEY 123", expected=SyntaxException)
 
             # not supported yet
-            check_invalid("m CONTAINS 'bar'")
+            check_invalid("m CONTAINS 'bar'", expected=SyntaxException)
 
     @since('2.0')
     def list_item_conditional_test(self):
