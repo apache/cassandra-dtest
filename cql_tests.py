@@ -3926,8 +3926,8 @@ class TestCQL(Tester):
             check_does_not_apply("l IN () AND l IN (['foo', 'bar', 'foobar'])")
             check_does_not_apply("l > ['zzz'] AND l < ['zzz']")
 
-            def check_invalid(condition):
-                assert_invalid(cursor, "UPDATE tlist SET l = ['foo', 'bar', 'foobar'] WHERE k=0 IF %s" % (condition,))
+            def check_invalid(condition, expected=InvalidRequest):
+                assert_invalid(cursor, "UPDATE tlist SET l = ['foo', 'bar', 'foobar'] WHERE k=0 IF %s" % (condition,), expected=expected)
                 assert_one(cursor, "SELECT * FROM tlist", [0, ['foo', 'bar', 'foobar']])
 
             check_invalid("l = [null]")
@@ -4024,8 +4024,8 @@ class TestCQL(Tester):
             check_does_not_apply("l[3] != null")
             check_does_not_apply("l[3] = 'xxx'")
 
-            def check_invalid(condition):
-                assert_invalid(cursor, "UPDATE tlist SET l = ['foo', 'bar', 'foobar'] WHERE k=0 IF %s" % (condition,))
+            def check_invalid(condition, expected=InvalidRequest):
+                assert_invalid(cursor, "UPDATE tlist SET l = ['foo', 'bar', 'foobar'] WHERE k=0 IF %s" % (condition,), expected=expected)
                 assert_one(cursor, "SELECT * FROM tlist", [0, ['foo', 'bar', 'foobar']])
 
             check_invalid("l[1] < null")
@@ -4089,8 +4089,8 @@ class TestCQL(Tester):
             check_does_not_apply("s IN ()")
             check_does_not_apply("s != null AND s IN ()")
 
-            def check_invalid(condition):
-                assert_invalid(cursor, "UPDATE tset SET s = {'bar', 'foo'} WHERE k=0 IF %s" % (condition,))
+            def check_invalid(condition, expected=InvalidRequest):
+                assert_invalid(cursor, "UPDATE tset SET s = {'bar', 'foo'} WHERE k=0 IF %s" % (condition,), expected=expected)
                 assert_one(cursor, "SELECT * FROM tset", [0, {'bar', 'foo'}])
 
             check_invalid("s = {null}")
@@ -4156,8 +4156,8 @@ class TestCQL(Tester):
             check_does_not_apply("m IN ()")
             check_does_not_apply("m = null AND m != null")
 
-            def check_invalid(condition):
-                assert_invalid(cursor, "UPDATE tmap SET m = {'foo': 'bar'} WHERE k=0 IF %s" % (condition,))
+            def check_invalid(condition, expected=InvalidRequest):
+                assert_invalid(cursor, "UPDATE tmap SET m = {'foo': 'bar'} WHERE k=0 IF %s" % (condition,), expected=expected)
                 assert_one(cursor, "SELECT * FROM tmap", [0, {'foo': 'bar'}])
 
             check_invalid("m = {null: null}")
@@ -4249,8 +4249,8 @@ class TestCQL(Tester):
             check_does_not_apply("m['foo'] IN ()")
             check_does_not_apply("m['foo'] != null AND m['foo'] = null")
 
-            def check_invalid(condition):
-                assert_invalid(cursor, "UPDATE tmap SET m = {'foo': 'bar'} WHERE k=0 IF %s" % (condition,))
+            def check_invalid(condition, expected=InvalidRequest):
+                assert_invalid(cursor, "UPDATE tmap SET m = {'foo': 'bar'} WHERE k=0 IF %s" % (condition,), expected=expected)
                 assert_one(cursor, "SELECT * FROM tmap", [0, {'foo': 'bar'}])
 
             check_invalid("m['foo'] < null")
