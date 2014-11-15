@@ -443,7 +443,7 @@ class TestUserTypes(Tester):
               SELECT * from person_likes where name = {first:'Nero', middle: 'Claudius Caesar Augustus', last: 'Germanicus'};
             """
 
-        assert_invalid(cursor, stmt, 'No indexed columns present in by-columns clause')
+        assert_invalid(cursor, stmt, 'No secondary indexes on the restricted columns support the provided operators')
 
         # add index and query again (even though there are no rows in the table yet)
         stmt = """
