@@ -1,5 +1,6 @@
 from __future__ import with_statement
-import os, tempfile, sys, shutil, subprocess, types, time, threading, ConfigParser, logging, fnmatch, re, copy
+import os, tempfile, sys, shutil, subprocess, types, time, threading, \
+    ConfigParser, logging, fnmatch, re, copy, signal
 
 from ccmlib.cluster import Cluster
 from ccmlib.cluster_factory import ClusterFactory
@@ -399,6 +400,7 @@ class Tester(TestCase):
                     else:
                         cluster.remove()
                         os.rmdir(test_path)
+                        remove_all_cassandra_processes()
                     os.remove(LAST_TEST_DIR)
                 except IOError:
                     # after a restart, /tmp will be emptied so we'll get an IOError when loading the old cluster here
@@ -503,6 +505,16 @@ class Tester(TestCase):
     # Disable docstrings printing in nosetest output
     def shortDescription(self):
         return None
+
+def remove_all_cassandra_processes():
+    try:
+        out, err = subprocess.Popen('jps', stdout=subprocess.PIPE).communicate()
+    except OSError:
+        return
+    for line in out.split('\n'):
+        if line.find('Cassandra') >= 0:
+            pid = int(line.split(' ')[0])
+            os.kill(pid, signal.SIGKILL)
 
 def canReuseCluster(Tester):
     orig_init = Tester.__init__
