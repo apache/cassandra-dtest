@@ -4,7 +4,7 @@ from dtest import Tester, debug
 from pytools import since
 from pyassertions import assert_invalid
 from cassandra import InvalidRequest
-from cassandra.query import SimpleStatement
+from cassandra.query import BatchStatement, SimpleStatement
 from cassandra.protocol import ConfigurationException
 
 
@@ -180,6 +180,70 @@ class TestSecondaryIndexes(Tester):
             rows = cursor.execute("select count(*) from ks.cf WHERE col1='asdf'")
             count = rows[0][0]
             self.assertEqual(count, 10)
+
+    @since('2.0')
+    def test_8280_validate_indexed_values(self):
+        """Tests CASSANDRA-8280
+
+        Reject inserts & updates where values of any indexed
+        column is > 64k
+        """
+        cluster = self.cluster
+        cluster.populate(1).start()
+        node1 = cluster.nodelist()[0]
+        conn = self.patient_cql_connection(node1)
+        cursor = conn
+        self.create_ks(cursor, 'ks', 1)
+
+        self.insert_row_with_oversize_value("CREATE TABLE %s(a int, b int, c text, PRIMARY KEY (a))",
+                                            "CREATE INDEX ON %s(c)",
+                                            "INSERT INTO %s (a, b, c) VALUES (0, 0, ?)",
+                                            cursor)
+
+        self.insert_row_with_oversize_value("CREATE TABLE %s(a int, b text, c int, PRIMARY KEY (a, b))",
+                                            "CREATE INDEX ON %s(b)",
+                                            "INSERT INTO %s (a, b, c) VALUES (0, ?, 0)",
+                                            cursor)
+
+        self.insert_row_with_oversize_value("CREATE TABLE %s(a text, b int, c int, PRIMARY KEY ((a, b)))",
+                                            "CREATE INDEX ON %s(a)",
+                                            "INSERT INTO %s (a, b, c) VALUES (?, 0, 0)",
+                                            cursor)
+
+        self.insert_row_with_oversize_value("CREATE TABLE %s(a int, b text, PRIMARY KEY (a)) WITH COMPACT STORAGE",
+                                            "CREATE INDEX ON %s(b)",
+                                            "INSERT INTO %s (a, b) VALUES (0, ?)",
+                                            cursor)
+
+    def insert_row_with_oversize_value(self, create_table_cql, create_index_cql, insert_cql, cursor):
+        """ Validate two variations of the supplied insert statement, first
+        as it is and then again transformed into a conditional statement
+        """
+        table_name = "table_" + str(int(round(time.time() * 1000)))
+        cursor.execute(create_table_cql % table_name)
+        cursor.execute(create_index_cql % table_name)
+        value = "X" * 65536
+        self._assert_invalid_request(cursor, insert_cql % table_name, value)
+        self._assert_invalid_request(cursor, (insert_cql % table_name) + ' IF NOT EXISTS', value)
+
+    def _assert_invalid_request(self, cursor, insert_cql, value):
+        """ Perform two executions of the supplied statement, as a
+        single statement and again as part of a batch
+        """
+        prepared = cursor.prepare(insert_cql)
+        self._execute_and_fail(lambda: cursor.execute(prepared, [value]), insert_cql)
+        batch = BatchStatement()
+        batch.add(prepared, [value])
+        self._execute_and_fail(lambda: cursor.execute(batch), insert_cql)
+
+    def _execute_and_fail(self, operation, cql_string):
+        try:
+            operation()
+            assert False, "Expecting query %s to be invalid" % cql_string
+        except AssertionError as e:
+            raise e
+        except InvalidRequest:
+            pass
 
     def wait_for_schema_agreement(self, cursor):
         rows = cursor.execute("SELECT schema_version FROM system.local")
