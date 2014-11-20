@@ -2388,21 +2388,21 @@ class TestCQL(Tester):
                 k int PRIMARY KEY,
                 l list<counter>
             )
-        """)
+        """, expected=(InvalidRequest, SyntaxException))
 
         assert_invalid(cursor, """
             CREATE TABLE test (
                 k int PRIMARY KEY,
                 s set<counter>
             )
-        """)
+        """, expected=(InvalidRequest, SyntaxException))
 
         assert_invalid(cursor, """
             CREATE TABLE test (
                 k int PRIMARY KEY,
                 m map<text, counter>
             )
-        """)
+        """, expected=(InvalidRequest, SyntaxException))
 
     def composite_partition_key_validation_test(self):
         """ Test for bug from #5122 """
