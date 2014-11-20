@@ -333,6 +333,121 @@ class TestCQL(Tester):
         res = cursor.execute("SELECT * FROM clicks WHERE userid IN (48, 2) LIMIT 1")
         assert rows_to_list(res) == [[ 48, 'http://foo.com', 42 ]], res
 
+    def tuple_query_mixed_order_columns_prepare(self, cursor, *col_order):
+        cursor.execute("""
+            create table foo (a int, b int, c int, d int , e int, PRIMARY KEY (a, b, c, d, e) )
+            WITH CLUSTERING ORDER BY (b {0}, c {1}, d {2}, e {3});
+        """.format(col_order[0], col_order[1], col_order[2], col_order[3]))
+
+        cursor.execute("""INSERT INTO foo (a, b, c, d, e) VALUES (0, 2, 0, 0, 0);""")
+        cursor.execute("""INSERT INTO foo (a, b, c, d, e) VALUES (0, 1, 0, 0, 0);""")
+        cursor.execute("""INSERT INTO foo (a, b, c, d, e) VALUES (0, 0, 0, 0, 0);""")
+        cursor.execute("""INSERT INTO foo (a, b, c, d, e) VALUES (0, 0, 1, 2, -1);""")
+        cursor.execute("""INSERT INTO foo (a, b, c, d, e) VALUES (0, 0, 1, 1, -1);""")
+        cursor.execute("""INSERT INTO foo (a, b, c, d, e) VALUES (0, 0, 1, 1, 0);""")
+        cursor.execute("""INSERT INTO foo (a, b, c, d, e) VALUES (0, 0, 1, 1, 1);""")
+        cursor.execute("""INSERT INTO foo (a, b, c, d, e) VALUES (0, 0, 1, 0, 2);""")
+        cursor.execute("""INSERT INTO foo (a, b, c, d, e) VALUES (0, 0, 2, 1, -3);""")
+        cursor.execute("""INSERT INTO foo (a, b, c, d, e) VALUES (0, 0, 2, 0, 3);""")
+        cursor.execute("""INSERT INTO foo (a, b, c, d, e) VALUES (0, -1, 2, 2, 2);""")
+
+    def tuple_query_mixed_order_columns_test(self):
+        """CASSANDRA-7281: SELECT on tuple relations are broken for mixed ASC/DESC clustering order
+
+        """
+        cursor = self.prepare()
+
+        self.tuple_query_mixed_order_columns_prepare(cursor, 'DESC', 'ASC', 'DESC', 'ASC')
+        res = cursor.execute("SELECT * FROM foo WHERE a=0 AND (b, c, d, e) > (0, 1, 1, 0);")
+        assert rows_to_list(res) == [[0, 2, 0, 0, 0], [0, 1, 0, 0, 0], [0, 0, 1, 2, -1], 
+                                     [0, 0, 1, 1, 1], [0, 0, 2, 1, -3], [0, 0, 2, 0, 3]], res
+
+    def tuple_query_mixed_order_columns_test2(self):
+        """CASSANDRA-7281: SELECT on tuple relations are broken for mixed ASC/DESC clustering order
+
+        """
+        cursor = self.prepare()
+
+        self.tuple_query_mixed_order_columns_prepare(cursor, 'DESC', 'DESC', 'DESC', 'ASC')
+        res = cursor.execute("SELECT * FROM foo WHERE a=0 AND (b, c, d, e) > (0, 1, 1, 0);")
+        assert rows_to_list(res) == [[0, 2, 0, 0, 0], [0, 1, 0, 0, 0], [0, 0, 2, 1, -3], 
+                                     [0, 0, 2, 0, 3], [0, 0, 1, 2, -1], [0, 0, 1, 1, 1]], res
+
+    def tuple_query_mixed_order_columns_test3(self):
+        """CASSANDRA-7281: SELECT on tuple relations are broken for mixed ASC/DESC clustering order
+
+        """
+        cursor = self.prepare()
+
+        self.tuple_query_mixed_order_columns_prepare(cursor, 'ASC', 'DESC', 'DESC', 'ASC')
+        res = cursor.execute("SELECT * FROM foo WHERE a=0 AND (b, c, d, e) > (0, 1, 1, 0);")
+        assert rows_to_list(res) == [[0, 0, 2, 1, -3], [0, 0, 2, 0, 3], [0, 0, 1, 2, -1], 
+                                     [0, 0, 1, 1, 1], [0, 1, 0, 0, 0], [0, 2, 0, 0, 0]], res
+
+    def tuple_query_mixed_order_columns_test4(self):
+        """CASSANDRA-7281: SELECT on tuple relations are broken for mixed ASC/DESC clustering order
+
+        """
+        cursor = self.prepare()
+
+        self.tuple_query_mixed_order_columns_prepare(cursor, 'DESC', 'ASC', 'ASC', 'DESC')
+        res = cursor.execute("SELECT * FROM foo WHERE a=0 AND (b, c, d, e) > (0, 1, 1, 0);")
+        assert rows_to_list(res) == [[0, 2, 0, 0, 0], [0, 1, 0, 0, 0], [0, 0, 1, 1, 1], 
+                                     [0, 0, 1, 2, -1], [0, 0, 2, 0, 3], [0, 0, 2, 1, -3]], res
+
+
+    def tuple_query_mixed_order_columns_test5(self):
+        """CASSANDRA-7281: SELECT on tuple relations are broken for mixed ASC/DESC clustering order
+            Test that non mixed columns are still working.
+        """
+        cursor = self.prepare()
+
+        self.tuple_query_mixed_order_columns_prepare(cursor, 'DESC', 'DESC', 'DESC', 'DESC')
+        res = cursor.execute("SELECT * FROM foo WHERE a=0 AND (b, c, d, e) > (0, 1, 1, 0);")
+        assert rows_to_list(res) == [[0, 2, 0, 0, 0], [0, 1, 0, 0, 0], [0, 0, 2, 1, -3], 
+                                     [0, 0, 2, 0, 3], [0, 0, 1, 2, -1], [0, 0, 1, 1, 1]], res
+
+    def tuple_query_mixed_order_columns_test6(self):
+        """CASSANDRA-7281: SELECT on tuple relations are broken for mixed ASC/DESC clustering order
+            Test that non mixed columns are still working.
+        """
+        cursor = self.prepare()
+
+        self.tuple_query_mixed_order_columns_prepare(cursor, 'ASC', 'ASC', 'ASC', 'ASC')
+        res = cursor.execute("SELECT * FROM foo WHERE a=0 AND (b, c, d, e) > (0, 1, 1, 0);")
+        assert rows_to_list(res) == [[0, 0, 1, 1, 1], [0, 0, 1, 2, -1],[0, 0, 2, 0, 3],
+                                      [0, 0, 2, 1, -3], [0, 1, 0, 0, 0], [0, 2, 0, 0, 0] ], res
+
+    def tuple_query_mixed_order_columns_test7(self):
+        """CASSANDRA-7281: SELECT on tuple relations are broken for mixed ASC/DESC clustering order
+        """
+        cursor = self.prepare()
+
+        self.tuple_query_mixed_order_columns_prepare(cursor, 'DESC', 'ASC', 'DESC', 'ASC')
+        res = cursor.execute("SELECT * FROM foo WHERE a=0 AND (b, c, d, e) <= (0, 1, 1, 0);")
+        assert rows_to_list(res) == [[0, 0, 0, 0, 0], [0, 0, 1, 1, -1], [0, 0, 1, 1, 0], 
+                                     [0, 0, 1, 0, 2], [0, -1 , 2, 2, 2]], res
+
+    def tuple_query_mixed_order_columns_test8(self):
+        """CASSANDRA-7281: SELECT on tuple relations are broken for mixed ASC/DESC clustering order
+        """
+        cursor = self.prepare()
+
+        self.tuple_query_mixed_order_columns_prepare(cursor, 'ASC', 'DESC', 'DESC', 'ASC')
+        res = cursor.execute("SELECT * FROM foo WHERE a=0 AND (b, c, d, e) <= (0, 1, 1, 0);")
+        assert rows_to_list(res) == [[0, -1 , 2, 2, 2], [0, 0, 1, 1, -1], [0, 0, 1, 1, 0], 
+                                     [0, 0, 1, 0, 2], [0, 0, 0, 0, 0]], res
+
+    def tuple_query_mixed_order_columns_test9(self):
+        """CASSANDRA-7281: SELECT on tuple relations are broken for mixed ASC/DESC clustering order
+        """
+        cursor = self.prepare()
+
+        self.tuple_query_mixed_order_columns_prepare(cursor, 'DESC', 'ASC', 'DESC', 'DESC')
+        res = cursor.execute("SELECT * FROM foo WHERE a=0 AND (b, c, d, e) <= (0, 1, 1, 0);")
+        assert rows_to_list(res) == [[0, 0, 0, 0, 0], [0, 0, 1, 1, 0], [0, 0, 1, 1, -1], 
+                                     [0, 0, 1, 0, 2], [0, -1 , 2, 2, 2],], res
+
     def limit_sparse_test(self):
         """ Validate LIMIT option for sparse table in SELECT statements """
         cursor = self.prepare()
