@@ -883,6 +883,12 @@ class TestCQL(Tester):
         cursor.execute("INSERT INTO test1 (Key_23, Column) VALUES (0, 0)")
         cursor.execute("INSERT INTO test1 (KEY_23, COLUMN) VALUES (0, 0)")
 
+        # invalid due to repeated identifiers
+        assert_invalid(cursor, "INSERT INTO test1 (key_23, column, column) VALUES (0, 0, 0)")
+        assert_invalid(cursor, "INSERT INTO test1 (key_23, column, COLUMN) VALUES (0, 0, 0)")
+        assert_invalid(cursor, "INSERT INTO test1 (key_23, key_23, column) VALUES (0, 0, 0)")
+        assert_invalid(cursor, "INSERT INTO test1 (key_23, KEY_23, column) VALUES (0, 0, 0)")
+
         # Reserved keywords
         assert_invalid(cursor, "CREATE TABLE test1 (select int PRIMARY KEY, column int)", expected=SyntaxException)
 
