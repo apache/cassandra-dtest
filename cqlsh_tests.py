@@ -422,6 +422,49 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         self.assertNotIn('list index out of range', err)
         ##If this assertion fails check CASSANDRA-7891
 
+    def test_list_queries(self):
+        config = {'authenticator': 'org.apache.cassandra.auth.PasswordAuthenticator',
+                  'authorizer': 'org.apache.cassandra.auth.CassandraAuthorizer',
+                  'permissions_validity_in_ms': '0'}
+        self.cluster.set_configuration_options(values=config)
+        self.cluster.populate(1)
+        self.cluster.start()
+        node1, = self.cluster.nodelist()
+        node1.watch_log_for('Created default superuser')
+
+        conn = self.patient_cql_connection(node1, user='cassandra', password='cassandra')
+        conn.execute("CREATE KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor':1}")
+        conn.execute("CREATE TABLE ks.t1 (k int PRIMARY KEY, v int)")
+        conn.execute("CREATE USER user1 WITH PASSWORD 'user1'")
+        conn.execute("GRANT ALL ON ks.t1 TO user1")
+
+        def verify_output(query, expected):
+            output, err = self.run_cqlsh(node1, query, ['-u', 'cassandra', '-p', 'cassandra'])
+            if common.is_win():
+                output = output.replace('\r', '')
+            self.assertTrue(expected in output, "Output \n {%s} \n doesn't contain expected\n {%s}" % (output, expected))
+
+        verify_output("LIST USERS", """
+ name      | super
+-----------+-------
+     user1 | False
+ cassandra |  True
+
+(2 rows)
+""")
+
+        verify_output("LIST ALL PERMISSIONS OF user1", """
+ username | resource      | permission
+----------+---------------+------------
+    user1 | <table ks.t1> |     CREATE
+    user1 | <table ks.t1> |      ALTER
+    user1 | <table ks.t1> |       DROP
+    user1 | <table ks.t1> |     SELECT
+    user1 | <table ks.t1> |     MODIFY
+    user1 | <table ks.t1> |  AUTHORIZE
+
+(6 rows)
+""")
 
     def run_cqlsh(self, node, cmds, cqlsh_options=[]):
         cdir = node.get_install_dir()
