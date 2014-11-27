@@ -1,5 +1,5 @@
 from __future__ import with_statement
-import os, tempfile, sys, shutil, subprocess, types, time, threading, ConfigParser, logging, fnmatch, re, copy
+import os, tempfile, sys, shutil, subprocess, types, time, threading, traceback, ConfigParser, logging, fnmatch, re, copy
 
 from ccmlib.cluster import Cluster
 from ccmlib.cluster_factory import ClusterFactory
@@ -515,6 +515,7 @@ def canReuseCluster(Tester):
     Tester.__init__ = __init__ # set the class' __init__ to the new one
     return Tester
 
+
 class freshCluster():
 
     def __call__(self, f):
@@ -525,3 +526,56 @@ class freshCluster():
         wrapped.__name__ = f.__name__
         wrapped.__doc__ = f.__doc__
         return wrapped
+
+
+class MultiError(Exception):
+    """
+    Extends Exception to provide reporting multiple exceptions at once.
+    """
+    def __init__(self, exceptions, tracebacks):
+        self.exceptions = exceptions
+        self.tracebacks = tracebacks
+
+    def __str__(self):
+        output = "\n****************************** BEGIN MultiError ******************************\n"
+
+        for (exc, tb) in zip(self.exceptions, self.tracebacks):
+            output += str(exc)
+            output += tb + "\n"
+
+        output += "****************************** END MultiError ******************************"
+
+        return output
+
+
+def run_scenarios(scenarios, handler, deferred_exceptions=tuple()):
+    """
+    Runs multiple scenarios from within a single test method.
+
+    "Scenarios" are mini-tests where a common procedure can be reused with several different configurations.
+    They are intended for situations where complex/expensive setup isn't required and where some shared state is acceptible (or trivial to reset).
+
+    Arguments: scenarios should be an iterable, handler should be a callable, and deferred_exceptions should be a tuple of exceptions.
+
+    For each item in scenarios, handler(item) will be called, and if there are any deferred_exceptions they will be silenced
+    until all scenarios have been executed.
+
+    If deferred_exceptions is not passed, exceptions are raised normally and will prevent any remaining scenarios from running.
+    """
+    errors = []
+    tracebacks = []
+
+    for i, scenario in enumerate(scenarios, 1):
+        debug("running scenario {}/{}: {}".format(i, len(scenarios), scenario))
+
+        if deferred_exceptions:
+            try:
+                handler(scenario)
+            except deferred_exceptions as e:
+                errors.append(type(e)(e.message + ' running scenario: {}\n'.format(scenario)))
+                tracebacks.append(traceback.format_exc(sys.exc_info()))
+        else:
+            handler(scenario)
+
+    if errors:
+        raise MultiError(errors, tracebacks)

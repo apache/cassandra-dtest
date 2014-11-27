@@ -4,7 +4,7 @@ import uuid
 from cassandra import ConsistencyLevel as CL
 from cassandra import InvalidRequest
 from cassandra.query import SimpleStatement, dict_factory
-from dtest import Tester
+from dtest import Tester, run_scenarios
 from pytools import since
 
 from datahelp import create_rows, parse_data_into_dicts, flatten_into_set
@@ -406,44 +406,42 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
     def test_with_limit(self):
         cursor = self.prepare()
         self.create_ks(cursor, 'test_paging_size', 2)
-        cursor.execute("CREATE TABLE paging_test ( id int PRIMARY KEY, value text )")
+        cursor.execute("CREATE TABLE paging_test ( id int, value text, PRIMARY KEY (id, value) )")
+
+        def random_txt(text):
+            return unicode(uuid.uuid4())
 
         data = """
-            |id|value           |
-            |1 |testing         |
-            |2 |and more testing|
-            |3 |and more testing|
-            |4 |and more testing|
-            |5 |and more testing|
-            |6 |testing         |
-            |7 |and more testing|
-            |8 |and more testing|
-            |9 |and more testing|
+               | id | value         |
+            *10| 1  | [random text] |
+            *20| 2  | [random text] |
             """
-        expected_data = create_rows(data, cursor, 'paging_test', cl=CL.ALL, format_funcs={'id': int, 'value': unicode})
+        expected_data = create_rows(data, cursor, 'paging_test', cl=CL.ALL, format_funcs={'id': int, 'value': random_txt})
 
-        future = cursor.execute_async(
-            SimpleStatement("select * from paging_test limit 5", fetch_size=9, consistency_level=CL.ALL)
-        )
+        scenarios = [
+            {'limit': 10, 'fetch': 20, 'data_size': 30, 'whereclause': 'WHERE id in (1,2)', 'expect_pgcount': 1, 'expect_pgsizes': [10]},      # limit < fetch < data
+            {'limit': 10, 'fetch': 30, 'data_size': 20, 'whereclause': 'WHERE id = 2', 'expect_pgcount': 1, 'expect_pgsizes': [10]},      # limit < data < fetch
+            {'limit': 20, 'fetch': 10, 'data_size': 30, 'whereclause': 'WHERE id in (1,2)', 'expect_pgcount': 2, 'expect_pgsizes': [10, 10]},  # fetch < limit < data
+            {'limit': 30, 'fetch': 10, 'data_size': 20, 'whereclause': 'WHERE id = 2', 'expect_pgcount': 2, 'expect_pgsizes': [10, 10]},  # fetch < data < limit
+            {'limit': 20, 'fetch': 30, 'data_size': 10, 'whereclause': 'WHERE id = 1', 'expect_pgcount': 1, 'expect_pgsizes': [10]},      # data < limit < fetch
+            {'limit': 30, 'fetch': 20, 'data_size': 10, 'whereclause': 'WHERE id = 1', 'expect_pgcount': 1, 'expect_pgsizes': [10]},      # data < fetch < limit
+        ]
 
-        pf = PageFetcher(future).request_all()
+        def handle_scenario(scenario):
+            future = cursor.execute_async(
+                SimpleStatement(
+                    "select * from paging_test {} limit {}".format(scenario['whereclause'], scenario['limit']),
+                    fetch_size=scenario['fetch'], consistency_level=CL.ALL)
+            )
 
-        self.assertEqual(pf.pagecount(), 1)
-        self.assertEqual(pf.num_results_all(), [5])
+            pf = PageFetcher(future).request_all()
+            self.assertEqual(pf.pagecount(), scenario['expect_pgcount'])
+            self.assertEqual(pf.num_results_all(), scenario['expect_pgsizes'])
 
-        # make sure all the data retrieved is a subset of input data
-        self.assertIsSubsetOf(pf.all_data(), expected_data)
+            # make sure all the data retrieved is a subset of input data
+            self.assertIsSubsetOf(pf.all_data(), expected_data)
 
-        # let's do another query with a limit larger than one page
-        future = cursor.execute_async(
-            SimpleStatement("select * from paging_test limit 8", fetch_size=5, consistency_level=CL.ALL)
-        )
-
-        pf = PageFetcher(future).request_all()
-
-        self.assertEqual(pf.pagecount(), 2)
-        self.assertEqual(pf.num_results_all(), [5, 3])
-        self.assertIsSubsetOf(pf.all_data(), expected_data)
+        run_scenarios(scenarios, handle_scenario, deferred_exceptions=(AssertionError,))
 
     @since('2.0')
     def test_with_allow_filtering(self):
