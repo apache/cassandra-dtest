@@ -533,6 +533,8 @@ class MultiError(Exception):
     Extends Exception to provide reporting multiple exceptions at once.
     """
     def __init__(self, exceptions, tracebacks):
+        # an exception and the corresponding traceback should be found at the same
+        # position in their respective lists, otherwise __str__ will be incorrect
         self.exceptions = exceptions
         self.tracebacks = tracebacks
 
