@@ -1,5 +1,5 @@
 from dtest import Tester, debug
-from pytools import replace_in_file
+from pytools import replace_in_file, since
 import tempfile, shutil, glob, os, time
 import distutils.dir_util
 
@@ -112,6 +112,7 @@ class TestArchiveCommitlog(SnapshotTester):
         debug("snapshot_dir is : " + snapshot_dir)
         distutils.dir_util.copy_tree(snapshot_dir, os.path.join(data_dir, ks, cf_id))
 
+    @since('2.1')
     def test_archive_commitlog(self):
         self.run_archive_commitlog(restore_point_in_time = False)
 
