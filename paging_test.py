@@ -432,7 +432,7 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
             {'limit': 30, 'fetch': 20, 'data_size': 10, 'whereclause': 'WHERE id = 3', 'expect_pgcount': 1, 'expect_pgsizes': [10]},      # data < fetch < limit
 
             # using 'in' clause w/multi partitions
-            {'limit': 10, 'fetch': 20, 'data_size': 30, 'whereclause': 'WHERE id in (4,5)', 'expect_pgcount': 1, 'expect_pgsizes': [10]},      # limit < fetch < data
+            {'limit': 9, 'fetch': 20, 'data_size': 80, 'whereclause': 'WHERE id in (1,2,3,4,5,6)', 'expect_pgcount': 1, 'expect_pgsizes': [9]},  # limit < fetch < data
             {'limit': 10, 'fetch': 30, 'data_size': 20, 'whereclause': 'WHERE id in (3,4)', 'expect_pgcount': 1, 'expect_pgsizes': [10]},      # limit < data < fetch
             {'limit': 20, 'fetch': 10, 'data_size': 30, 'whereclause': 'WHERE id in (4,5)', 'expect_pgcount': 2, 'expect_pgsizes': [10, 10]},  # fetch < limit < data
             {'limit': 30, 'fetch': 10, 'data_size': 20, 'whereclause': 'WHERE id in (3,4)', 'expect_pgcount': 2, 'expect_pgsizes': [10, 10]},  # fetch < data < limit
@@ -448,8 +448,8 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
             )
 
             pf = PageFetcher(future).request_all()
-            self.assertEqual(pf.pagecount(), scenario['expect_pgcount'])
             self.assertEqual(pf.num_results_all(), scenario['expect_pgsizes'])
+            self.assertEqual(pf.pagecount(), scenario['expect_pgcount'])
 
             # make sure all the data retrieved is a subset of input data
             self.assertIsSubsetOf(pf.all_data(), expected_data)
