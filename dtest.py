@@ -1,5 +1,5 @@
 from __future__ import with_statement
-import os, tempfile, sys, shutil, subprocess, types, time, threading, ConfigParser, logging, fnmatch, re, copy
+import os, tempfile, sys, shutil, subprocess, types, time, threading, traceback, ConfigParser, logging, fnmatch, re, copy
 
 from ccmlib.cluster import Cluster
 from ccmlib.cluster_factory import ClusterFactory
@@ -515,6 +515,7 @@ def canReuseCluster(Tester):
     Tester.__init__ = __init__ # set the class' __init__ to the new one
     return Tester
 
+
 class freshCluster():
 
     def __call__(self, f):
@@ -525,3 +526,61 @@ class freshCluster():
         wrapped.__name__ = f.__name__
         wrapped.__doc__ = f.__doc__
         return wrapped
+
+
+class MultiError(Exception):
+    """
+    Extends Exception to provide reporting multiple exceptions at once.
+    """
+    def __init__(self, exceptions, tracebacks):
+        # an exception and the corresponding traceback should be found at the same
+        # position in their respective lists, otherwise __str__ will be incorrect
+        self.exceptions = exceptions
+        self.tracebacks = tracebacks
+
+    def __str__(self):
+        output = "\n****************************** BEGIN MultiError ******************************\n"
+
+        for (exc, tb) in zip(self.exceptions, self.tracebacks):
+            output += str(exc)
+            output += tb + "\n"
+
+        output += "****************************** END MultiError ******************************"
+
+        return output
+
+
+def run_scenarios(scenarios, handler, deferred_exceptions=tuple()):
+    """
+    Runs multiple scenarios from within a single test method.
+
+    "Scenarios" are mini-tests where a common procedure can be reused with several different configurations.
+    They are intended for situations where complex/expensive setup isn't required and some shared state is acceptable (or trivial to reset).
+
+    Arguments: scenarios should be an iterable, handler should be a callable, and deferred_exceptions should be a tuple of exceptions which
+    are safe to delay until the scenarios are all run. For each item in scenarios, handler(item) will be called in turn.
+
+    Exceptions which occur will be bundled up and raised as a single MultiError exception, either when: a) all scenarios have run,
+    or b) on the first exception encountered which is not whitelisted in deferred_exceptions.
+    """
+    errors = []
+    tracebacks = []
+
+    for i, scenario in enumerate(scenarios, 1):
+        debug("running scenario {}/{}: {}".format(i, len(scenarios), scenario))
+
+        try:
+            handler(scenario)
+        except deferred_exceptions as e:
+            tracebacks.append(traceback.format_exc(sys.exc_info()))
+            errors.append(type(e)('encountered {} {} running scenario:\n  {}\n'.format(e.__class__.__name__, e.message, scenario)))
+            debug("scenario {}/{} encountered a deferrable exception, continuing".format(i, len(scenarios)))
+        except Exception as e:
+            # catch-all for any exceptions not intended to be deferred
+            tracebacks.append(traceback.format_exc(sys.exc_info()))
+            errors.append(type(e)('encountered {} {} running scenario:\n  {}\n'.format(e.__class__.__name__, e.message, scenario)))
+            debug("scenario {}/{} encountered a non-deferrable exception, aborting".format(i, len(scenarios)))
+            raise MultiError(errors, tracebacks)
+
+    if errors:
+        raise MultiError(errors, tracebacks)
