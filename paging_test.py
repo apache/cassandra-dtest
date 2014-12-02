@@ -413,18 +413,31 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
 
         data = """
                | id | value         |
-            *10| 1  | [random text] |
-            *20| 2  | [random text] |
+             *5| 1  | [random text] |
+             *5| 2  | [random text] |
+            *10| 3  | [random text] |
+            *10| 4  | [random text] |
+            *20| 5  | [random text] |
+            *30| 6  | [random text] |
             """
         expected_data = create_rows(data, cursor, 'paging_test', cl=CL.ALL, format_funcs={'id': int, 'value': random_txt})
 
         scenarios = [
-            {'limit': 10, 'fetch': 20, 'data_size': 30, 'whereclause': 'WHERE id in (1,2)', 'expect_pgcount': 1, 'expect_pgsizes': [10]},      # limit < fetch < data
-            {'limit': 10, 'fetch': 30, 'data_size': 20, 'whereclause': 'WHERE id = 2', 'expect_pgcount': 1, 'expect_pgsizes': [10]},      # limit < data < fetch
-            {'limit': 20, 'fetch': 10, 'data_size': 30, 'whereclause': 'WHERE id in (1,2)', 'expect_pgcount': 2, 'expect_pgsizes': [10, 10]},  # fetch < limit < data
-            {'limit': 30, 'fetch': 10, 'data_size': 20, 'whereclause': 'WHERE id = 2', 'expect_pgcount': 2, 'expect_pgsizes': [10, 10]},  # fetch < data < limit
-            {'limit': 20, 'fetch': 30, 'data_size': 10, 'whereclause': 'WHERE id = 1', 'expect_pgcount': 1, 'expect_pgsizes': [10]},      # data < limit < fetch
-            {'limit': 30, 'fetch': 20, 'data_size': 10, 'whereclause': 'WHERE id = 1', 'expect_pgcount': 1, 'expect_pgsizes': [10]},      # data < fetch < limit
+            # using equals clause w/single partition
+            {'limit': 10, 'fetch': 20, 'data_size': 30, 'whereclause': 'WHERE id = 6', 'expect_pgcount': 1, 'expect_pgsizes': [10]},      # limit < fetch < data
+            {'limit': 10, 'fetch': 30, 'data_size': 20, 'whereclause': 'WHERE id = 5', 'expect_pgcount': 1, 'expect_pgsizes': [10]},      # limit < data < fetch
+            {'limit': 20, 'fetch': 10, 'data_size': 30, 'whereclause': 'WHERE id = 6', 'expect_pgcount': 2, 'expect_pgsizes': [10, 10]},  # fetch < limit < data
+            {'limit': 30, 'fetch': 10, 'data_size': 20, 'whereclause': 'WHERE id = 5', 'expect_pgcount': 2, 'expect_pgsizes': [10, 10]},  # fetch < data < limit
+            {'limit': 20, 'fetch': 30, 'data_size': 10, 'whereclause': 'WHERE id = 3', 'expect_pgcount': 1, 'expect_pgsizes': [10]},      # data < limit < fetch
+            {'limit': 30, 'fetch': 20, 'data_size': 10, 'whereclause': 'WHERE id = 3', 'expect_pgcount': 1, 'expect_pgsizes': [10]},      # data < fetch < limit
+
+            # using 'in' clause w/multi partitions
+            {'limit': 10, 'fetch': 20, 'data_size': 30, 'whereclause': 'WHERE id in (4,5)', 'expect_pgcount': 1, 'expect_pgsizes': [10]},      # limit < fetch < data
+            {'limit': 10, 'fetch': 30, 'data_size': 20, 'whereclause': 'WHERE id in (3,4)', 'expect_pgcount': 1, 'expect_pgsizes': [10]},      # limit < data < fetch
+            {'limit': 20, 'fetch': 10, 'data_size': 30, 'whereclause': 'WHERE id in (4,5)', 'expect_pgcount': 2, 'expect_pgsizes': [10, 10]},  # fetch < limit < data
+            {'limit': 30, 'fetch': 10, 'data_size': 20, 'whereclause': 'WHERE id in (3,4)', 'expect_pgcount': 2, 'expect_pgsizes': [10, 10]},  # fetch < data < limit
+            {'limit': 20, 'fetch': 30, 'data_size': 10, 'whereclause': 'WHERE id in (1,2)', 'expect_pgcount': 1, 'expect_pgsizes': [10]},      # data < limit < fetch
+            {'limit': 30, 'fetch': 20, 'data_size': 10, 'whereclause': 'WHERE id in (1,2)', 'expect_pgcount': 1, 'expect_pgsizes': [10]},      # data < fetch < limit
         ]
 
         def handle_scenario(scenario):
