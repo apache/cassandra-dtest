@@ -555,14 +555,13 @@ def run_scenarios(scenarios, handler, deferred_exceptions=tuple()):
     Runs multiple scenarios from within a single test method.
 
     "Scenarios" are mini-tests where a common procedure can be reused with several different configurations.
-    They are intended for situations where complex/expensive setup isn't required and where some shared state is acceptible (or trivial to reset).
+    They are intended for situations where complex/expensive setup isn't required and some shared state is acceptable (or trivial to reset).
 
-    Arguments: scenarios should be an iterable, handler should be a callable, and deferred_exceptions should be a tuple of exceptions.
+    Arguments: scenarios should be an iterable, handler should be a callable, and deferred_exceptions should be a tuple of exceptions which
+    are safe to delay until the scenarios are all run. For each item in scenarios, handler(item) will be called in turn.
 
-    For each item in scenarios, handler(item) will be called, and if there are any deferred_exceptions they will be silenced
-    until all scenarios have been executed.
-
-    If deferred_exceptions is not passed, exceptions are raised normally and will prevent any remaining scenarios from running.
+    Exceptions which occur will be bundled up and raised as a single MultiError exception, either when: a) all scenarios have run,
+    or b) on the first exception encountered which is not whitelisted in deferred_exceptions.
     """
     errors = []
     tracebacks = []
@@ -570,14 +569,18 @@ def run_scenarios(scenarios, handler, deferred_exceptions=tuple()):
     for i, scenario in enumerate(scenarios, 1):
         debug("running scenario {}/{}: {}".format(i, len(scenarios), scenario))
 
-        if deferred_exceptions:
-            try:
-                handler(scenario)
-            except deferred_exceptions as e:
-                errors.append(type(e)(e.message + ' running scenario: {}\n'.format(scenario)))
-                tracebacks.append(traceback.format_exc(sys.exc_info()))
-        else:
+        try:
             handler(scenario)
+        except deferred_exceptions as e:
+            tracebacks.append(traceback.format_exc(sys.exc_info()))
+            errors.append(type(e)('encountered {} {} running scenario:\n  {}\n'.format(e.__class__.__name__, e.message, scenario)))
+            debug("scenario {}/{} encountered a deferrable exception, continuing".format(i, len(scenarios)))
+        except Exception as e:
+            # catch-all for any exceptions not intended to be deferred
+            tracebacks.append(traceback.format_exc(sys.exc_info()))
+            errors.append(type(e)('encountered {} {} running scenario:\n  {}\n'.format(e.__class__.__name__, e.message, scenario)))
+            debug("scenario {}/{} encountered a non-deferrable exception, aborting".format(i, len(scenarios)))
+            raise MultiError(errors, tracebacks)
 
     if errors:
         raise MultiError(errors, tracebacks)
