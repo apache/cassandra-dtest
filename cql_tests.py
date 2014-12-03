@@ -4322,7 +4322,10 @@ class TestCQL(Tester):
 
             if self.cluster.version() > "2.1.1":
                 cursor.execute("INSERT INTO tmap(k, m) VALUES (1, null)")
-                assert_one(cursor, "UPDATE tmap set m['foo'] = 'bar', m['bar'] = 'foo' WHERE k = 1 IF m['foo'] IN ('blah', null)", [True])
+                if frozen:
+                    assert_invalid(cursor, "UPDATE tmap set m['foo'] = 'bar', m['bar'] = 'foo' WHERE k = 1 IF m['foo'] IN ('blah', null)")
+                else:
+                    assert_one(cursor, "UPDATE tmap set m['foo'] = 'bar', m['bar'] = 'foo' WHERE k = 1 IF m['foo'] IN ('blah', null)", [True])
 
     @since('2.1.1')
     def expanded_map_item_conditional_test(self):
