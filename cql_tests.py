@@ -359,7 +359,7 @@ class TestCQL(Tester):
 
         self.tuple_query_mixed_order_columns_prepare(cursor, 'DESC', 'ASC', 'DESC', 'ASC')
         res = cursor.execute("SELECT * FROM foo WHERE a=0 AND (b, c, d, e) > (0, 1, 1, 0);")
-        assert rows_to_list(res) == [[0, 2, 0, 0, 0], [0, 1, 0, 0, 0], [0, 0, 1, 2, -1], 
+        assert rows_to_list(res) == [[0, 2, 0, 0, 0], [0, 1, 0, 0, 0], [0, 0, 1, 2, -1],
                                      [0, 0, 1, 1, 1], [0, 0, 2, 1, -3], [0, 0, 2, 0, 3]], res
 
     def tuple_query_mixed_order_columns_test2(self):
@@ -370,7 +370,7 @@ class TestCQL(Tester):
 
         self.tuple_query_mixed_order_columns_prepare(cursor, 'DESC', 'DESC', 'DESC', 'ASC')
         res = cursor.execute("SELECT * FROM foo WHERE a=0 AND (b, c, d, e) > (0, 1, 1, 0);")
-        assert rows_to_list(res) == [[0, 2, 0, 0, 0], [0, 1, 0, 0, 0], [0, 0, 2, 1, -3], 
+        assert rows_to_list(res) == [[0, 2, 0, 0, 0], [0, 1, 0, 0, 0], [0, 0, 2, 1, -3],
                                      [0, 0, 2, 0, 3], [0, 0, 1, 2, -1], [0, 0, 1, 1, 1]], res
 
     def tuple_query_mixed_order_columns_test3(self):
@@ -381,7 +381,7 @@ class TestCQL(Tester):
 
         self.tuple_query_mixed_order_columns_prepare(cursor, 'ASC', 'DESC', 'DESC', 'ASC')
         res = cursor.execute("SELECT * FROM foo WHERE a=0 AND (b, c, d, e) > (0, 1, 1, 0);")
-        assert rows_to_list(res) == [[0, 0, 2, 1, -3], [0, 0, 2, 0, 3], [0, 0, 1, 2, -1], 
+        assert rows_to_list(res) == [[0, 0, 2, 1, -3], [0, 0, 2, 0, 3], [0, 0, 1, 2, -1],
                                      [0, 0, 1, 1, 1], [0, 1, 0, 0, 0], [0, 2, 0, 0, 0]], res
 
     def tuple_query_mixed_order_columns_test4(self):
@@ -392,7 +392,7 @@ class TestCQL(Tester):
 
         self.tuple_query_mixed_order_columns_prepare(cursor, 'DESC', 'ASC', 'ASC', 'DESC')
         res = cursor.execute("SELECT * FROM foo WHERE a=0 AND (b, c, d, e) > (0, 1, 1, 0);")
-        assert rows_to_list(res) == [[0, 2, 0, 0, 0], [0, 1, 0, 0, 0], [0, 0, 1, 1, 1], 
+        assert rows_to_list(res) == [[0, 2, 0, 0, 0], [0, 1, 0, 0, 0], [0, 0, 1, 1, 1],
                                      [0, 0, 1, 2, -1], [0, 0, 2, 0, 3], [0, 0, 2, 1, -3]], res
 
 
@@ -404,7 +404,7 @@ class TestCQL(Tester):
 
         self.tuple_query_mixed_order_columns_prepare(cursor, 'DESC', 'DESC', 'DESC', 'DESC')
         res = cursor.execute("SELECT * FROM foo WHERE a=0 AND (b, c, d, e) > (0, 1, 1, 0);")
-        assert rows_to_list(res) == [[0, 2, 0, 0, 0], [0, 1, 0, 0, 0], [0, 0, 2, 1, -3], 
+        assert rows_to_list(res) == [[0, 2, 0, 0, 0], [0, 1, 0, 0, 0], [0, 0, 2, 1, -3],
                                      [0, 0, 2, 0, 3], [0, 0, 1, 2, -1], [0, 0, 1, 1, 1]], res
 
     def tuple_query_mixed_order_columns_test6(self):
@@ -425,7 +425,7 @@ class TestCQL(Tester):
 
         self.tuple_query_mixed_order_columns_prepare(cursor, 'DESC', 'ASC', 'DESC', 'ASC')
         res = cursor.execute("SELECT * FROM foo WHERE a=0 AND (b, c, d, e) <= (0, 1, 1, 0);")
-        assert rows_to_list(res) == [[0, 0, 0, 0, 0], [0, 0, 1, 1, -1], [0, 0, 1, 1, 0], 
+        assert rows_to_list(res) == [[0, 0, 0, 0, 0], [0, 0, 1, 1, -1], [0, 0, 1, 1, 0],
                                      [0, 0, 1, 0, 2], [0, -1 , 2, 2, 2]], res
 
     def tuple_query_mixed_order_columns_test8(self):
@@ -435,7 +435,7 @@ class TestCQL(Tester):
 
         self.tuple_query_mixed_order_columns_prepare(cursor, 'ASC', 'DESC', 'DESC', 'ASC')
         res = cursor.execute("SELECT * FROM foo WHERE a=0 AND (b, c, d, e) <= (0, 1, 1, 0);")
-        assert rows_to_list(res) == [[0, -1 , 2, 2, 2], [0, 0, 1, 1, -1], [0, 0, 1, 1, 0], 
+        assert rows_to_list(res) == [[0, -1 , 2, 2, 2], [0, 0, 1, 1, -1], [0, 0, 1, 1, 0],
                                      [0, 0, 1, 0, 2], [0, 0, 0, 0, 0]], res
 
     def tuple_query_mixed_order_columns_test9(self):
@@ -445,7 +445,7 @@ class TestCQL(Tester):
 
         self.tuple_query_mixed_order_columns_prepare(cursor, 'DESC', 'ASC', 'DESC', 'DESC')
         res = cursor.execute("SELECT * FROM foo WHERE a=0 AND (b, c, d, e) <= (0, 1, 1, 0);")
-        assert rows_to_list(res) == [[0, 0, 0, 0, 0], [0, 0, 1, 1, 0], [0, 0, 1, 1, -1], 
+        assert rows_to_list(res) == [[0, 0, 0, 0, 0], [0, 0, 1, 1, 0], [0, 0, 1, 1, -1],
                                      [0, 0, 1, 0, 2], [0, -1 , 2, 2, 2],], res
 
     def limit_sparse_test(self):
@@ -1609,7 +1609,7 @@ class TestCQL(Tester):
         assert rows_to_list(res) == [['ɸ', 'ɸ', set([u'ɸ']), 'ɸ']], res
 
         if self.cluster.version() < "2.1":
-            assert_invalid(cursor, "ALTER TABLE test ALTER s TYPE set<blob>")
+            assert_invalid(cursor, "ALTER TABLE test ALTER s TYPE set<blob>", expected=ConfigurationException)
         else:
             cursor.execute("ALTER TABLE test ALTER s TYPE set<blob>")
             res = cursor.execute("SELECT * FROM test")
