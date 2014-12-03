@@ -331,7 +331,10 @@ class TestCQL(Tester):
         # Check that we do limit the output to 1 *and* that we respect query
         # order of keys (even though 48 is after 2)
         res = cursor.execute("SELECT * FROM clicks WHERE userid IN (48, 2) LIMIT 1")
-        assert rows_to_list(res) == [[ 48, 'http://foo.com', 42 ]], res
+        if self.cluster.version() >= '3.0':
+            assert rows_to_list(res) == [[ 2, 'http://foo.com', 42 ]], res
+        else:
+            assert rows_to_list(res) == [[ 48, 'http://foo.com', 42 ]], res
 
     def tuple_query_mixed_order_columns_prepare(self, cursor, *col_order):
         cursor.execute("""
