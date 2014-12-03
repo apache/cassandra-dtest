@@ -4300,7 +4300,7 @@ class TestCQL(Tester):
     def map_item_conditional_test(self):
         cursor = self.prepare()
 
-        frozen_values = (False, True) if self.cluster.version() > "2.1.3" else (False,)
+        frozen_values = (False, True) if self.cluster.version() >= "2.1.3" else (False,)
         for frozen in frozen_values:
 
             cursor.execute("DROP TABLE IF EXISTS tmap")
@@ -4332,7 +4332,7 @@ class TestCQL(Tester):
         # expanded functionality from CASSANDRA-6839
         cursor = self.prepare()
 
-        frozen_values = (False, True) if self.cluster.version() > "2.1.3" else (False,)
+        frozen_values = (False, True) if self.cluster.version() >= "2.1.3" else (False,)
         for frozen in frozen_values:
 
             cursor.execute("DROP TABLE IF EXISTS tmap")
