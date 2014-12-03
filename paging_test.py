@@ -168,6 +168,7 @@ class PageAssertionMixin(object):
     def assertIsSubsetOf(self, subset, superset):
         assert flatten_into_set(subset).issubset(flatten_into_set(superset))
 
+
 class BasePagingTester(Tester):
     def prepare(self):
         cluster = self.cluster
@@ -312,36 +313,6 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
 
         pf = PageFetcher(future).request_all()
 
-        self.assertEqual(pf.num_results_all(), [5000, 1])
-
-        # make sure expected and actual have same data elements (ignoring order)
-        self.assertEqualIgnoreOrder(pf.all_data(), expected_data)
-
-    @since('2.0')
-    def test_zero_page_size_default(self):
-        """
-        If the page size isn't sent then the default fetch size is used.
-        """
-        cursor = self.prepare()
-        self.create_ks(cursor, 'test_paging_size', 2)
-        cursor.execute("CREATE TABLE paging_test ( id uuid PRIMARY KEY, value text )")
-
-        def random_txt(text):
-            return uuid.uuid4()
-
-        data = """
-               | id     |value   |
-          *5001| [uuid] |testing |
-            """
-        expected_data = create_rows(data, cursor, 'paging_test', cl=CL.ALL, format_funcs={'id': random_txt, 'value': unicode})
-
-        future = cursor.execute_async(
-            SimpleStatement("select * from paging_test", fetch_size=0, consistency_level=CL.ALL)
-        )
-
-        pf = PageFetcher(future).request_all()
-
-        # may fail for now, see PYTHON-161
         self.assertEqual(pf.num_results_all(), [5000, 1])
 
         # make sure expected and actual have same data elements (ignoring order)
