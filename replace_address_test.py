@@ -113,7 +113,7 @@ class TestReplaceAddress(Tester):
 
         with self.assertRaises(NodeError):
             try:
-                node4.start(replace_address='127.0.0.3')
+                node4.start(replace_address='127.0.0.3', wait_for_binary_proto=True)
             except (NodeError, TimeoutError):
                 raise NodeError("Node could not start.")
 
@@ -142,7 +142,7 @@ class TestReplaceAddress(Tester):
         #try to replace an unassigned ip address
         with self.assertRaises(NodeError):
             try:
-                node4.start(replace_address='127.0.0.5')
+                node4.start(replace_address='127.0.0.5', wait_for_binary_proto=True)
             except (NodeError, TimeoutError):
                 raise NodeError("Node could not start.")
 
