@@ -1818,19 +1818,19 @@ class TestCQL(Tester):
         res = cursor.execute("SELECT blog_id, content FROM blogs WHERE author='foo'")
         assert rows_to_list(res) == [[1, 'bar1'], [1, 'bar2'], [2, 'baz']], res
 
-        res = cursor.execute("SELECT blog_id, content FROM blogs WHERE time1 > 0 AND author='foo'")
+        res = cursor.execute("SELECT blog_id, content FROM blogs WHERE time1 > 0 AND author='foo' ALLOW FILTERING")
         assert rows_to_list(res) == [[2, 'baz']], res
 
-        res = cursor.execute("SELECT blog_id, content FROM blogs WHERE time1 = 1 AND author='foo'")
+        res = cursor.execute("SELECT blog_id, content FROM blogs WHERE time1 = 1 AND author='foo' ALLOW FILTERING")
         assert rows_to_list(res) == [[2, 'baz']], res
 
-        res = cursor.execute("SELECT blog_id, content FROM blogs WHERE time1 = 1 AND time2 = 0 AND author='foo'")
+        res = cursor.execute("SELECT blog_id, content FROM blogs WHERE time1 = 1 AND time2 = 0 AND author='foo' ALLOW FILTERING")
         assert rows_to_list(res) == [[2, 'baz']], res
 
-        res = cursor.execute("SELECT content FROM blogs WHERE time1 = 1 AND time2 = 1 AND author='foo'")
+        res = cursor.execute("SELECT content FROM blogs WHERE time1 = 1 AND time2 = 1 AND author='foo' ALLOW FILTERING")
         assert rows_to_list(res) == [], res
 
-        res = cursor.execute("SELECT content FROM blogs WHERE time1 = 1 AND time2 > 0 AND author='foo'")
+        res = cursor.execute("SELECT content FROM blogs WHERE time1 = 1 AND time2 > 0 AND author='foo' ALLOW FILTERING")
         assert rows_to_list(res) == [], res
 
         assert_invalid(cursor, "SELECT content FROM blogs WHERE time2 >= 0 AND author='foo'")
