@@ -1,5 +1,5 @@
 import re
-from cassandra import InvalidRequest, Unavailable, ConsistencyLevel
+from cassandra import InvalidRequest, Unavailable, ConsistencyLevel, WriteTimeout, ReadTimeout
 from cassandra.query import SimpleStatement
 from pytools import rows_to_list
 
@@ -9,9 +9,8 @@ def assert_unavailable(fun, *args):
             fun(None)
         else:
             fun(*args)
-    except Unavailable as e:
-        msg = str(e)
-        assert re.search('[Unavailable exception]', msg), "Expecting unavailable exception, got: " + msg
+    except (Unavailable, WriteTimeout, ReadTimeout) as e:
+        pass
     except Exception as e:
         assert False, "Expecting unavailable exception, got: " + str(e)
     else:
