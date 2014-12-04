@@ -1,43 +1,12 @@
-import struct
-import time
-import uuid
-import re
-from dtest import Tester, debug
+import time, uuid, re
+from dtest import Tester
 from pytools import since
 from pyassertions import assert_invalid
 from cassandra import Unauthorized
 
-
-def decode_text(string):
+def listify(item):
     """
-    decode bytestring as utf-8
-    """
-    return string.decode('utf-8')
-
-
-def len_unpacker(val):
-    return struct.Struct('>i').unpack(val)[0]
-
-
-def unpack(bytestr):
-    # The composite format for each component is:
-    #   <len>   <value>
-    # 4 bytes | <len> bytes
-    components = []
-    while bytestr:
-        length = len_unpacker(bytestr[:4])
-        if length < 0:
-            components.append(None)
-            bytestr = bytestr[4:]
-        else:
-            components.append(decode_text(bytestr[4:4 + length]))
-            bytestr = bytestr[4 + length:]
-    return tuple(components)
-
-
-def decode(item):
-    """
-    decode a query result consisting of user types
+    listify a query result consisting of user types
 
     returns nested arrays representing user type ordering
     """
@@ -48,14 +17,10 @@ def decode(item):
           item = item[0]
         nested = []
         for i in item:
-            nested.extend(decode(i))
+            nested.extend(listify(i))
         decoded.append(nested)
     else:
-        if item is not None and item.startswith('\x00'):
-            unpacked = unpack(item)
-            decoded.append(decode(unpacked))
-        else:
-            decoded.append(item)
+        decoded.append(item)
 
     return decoded
 
@@ -323,9 +288,9 @@ class TestUserTypes(Tester):
         rows = cursor.execute(stmt)
 
         primary_item, other_items, other_containers = rows[0]
-        self.assertEqual(decode(primary_item), [[u'test', u'test2']])
-        self.assertEqual(decode(other_items), [[u'stuff', [u'one', u'two']]])
-        self.assertEqual(decode(other_containers), [[[u'stuff2', [u'one_other', u'two_other']], [u'stuff3', [u'one_2_other', u'two_2_other']], [u'stuff4', [u'one_3_other', u'two_3_other']]]])
+        self.assertEqual(listify(primary_item), [[u'test', u'test2']])
+        self.assertEqual(listify(other_items), [[u'stuff', [u'one', u'two']]])
+        self.assertEqual(listify(other_containers), [[[u'stuff2', [u'one_other', u'two_other']], [u'stuff3', [u'one_2_other', u'two_2_other']], [u'stuff4', [u'one_3_other', u'two_3_other']]]])
 
         #  Generate some repetitive data and check it for it's contents:
         for x in xrange(50):
@@ -348,7 +313,7 @@ class TestUserTypes(Tester):
             rows = cursor.execute(stmt)
 
             items = rows[0][0]
-            self.assertEqual(decode(items), [[[u'stuff3', [u'one_2_other', u'two_2_other']], [u'stuff4', [u'one_3_other', u'two_3_other']]]])
+            self.assertEqual(listify(items), [[[u'stuff3', [u'one_2_other', u'two_2_other']], [u'stuff4', [u'one_3_other', u'two_3_other']]]])
 
     @since('2.1')
     def test_type_as_part_of_pkey(self):
@@ -639,10 +604,10 @@ class TestUserTypes(Tester):
         cursor.execute("INSERT INTO bucket (id, my_item) VALUES (1, {sub_one: 'test'})")
 
         rows = cursor.execute("SELECT my_item FROM bucket WHERE id=0")
-        self.assertEqual(decode(rows[0]), [[u'test', None]])
+        self.assertEqual(listify(rows[0]), [[u'test', None]])
 
         rows = cursor.execute("SELECT my_item FROM bucket WHERE id=1")
-        self.assertEqual(decode(rows[0]), [[u'test', None]])
+        self.assertEqual(listify(rows[0]), [[u'test', None]])
 
     @since('2.1')
     def test_no_counters_in_user_types(self):
@@ -707,4 +672,4 @@ class TestUserTypes(Tester):
 
         for _id in ids:
             res = cursor.execute("SELECT letterpair FROM letters where id = {}".format(_id))
-            self.assertEqual(decode(res), [[[u'a', u'z'], [u'c', u'a'], [u'c', u'f'], [u'c', u'z'], [u'd', u'e'], [u'z', u'a']]])
+            self.assertEqual(listify(res), [[[u'a', u'z'], [u'c', u'a'], [u'c', u'f'], [u'c', u'z'], [u'd', u'e'], [u'z', u'a']]])
