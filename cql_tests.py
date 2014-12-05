@@ -3788,13 +3788,22 @@ class TestCQL(Tester):
         """, [True])
         assert_all(cursor, "SELECT * FROM test WHERE id=1", [[1, 'k1', 1, 'val1'], [1, 'k2', 1, 'newVal'], [1, 'k3', 1, 'val3']])
 
-        assert_invalid(cursor,
-        """
-          BEGIN BATCH
-            UPDATE test SET v='newVal1' WHERE id=1 AND k='k2' IF v='val2';
-            UPDATE test SET v='newVal2' WHERE id=1 AND k='k2' IF v='val3';
-          APPLY BATCH
-        """)
+        if self.cluster.version() >= '2.1':
+            assert_one(cursor,
+            """
+              BEGIN BATCH
+                UPDATE test SET v='newVal1' WHERE id=1 AND k='k2' IF v='val2';
+                UPDATE test SET v='newVal2' WHERE id=1 AND k='k2' IF v='val3';
+              APPLY BATCH
+            """, [False, 1, 'k2', 'newVal'])
+        else:
+            assert_invalid(cursor,
+            """
+              BEGIN BATCH
+                UPDATE test SET v='newVal1' WHERE id=1 AND k='k2' IF v='val2';
+                UPDATE test SET v='newVal2' WHERE id=1 AND k='k2' IF v='val3';
+              APPLY BATCH
+            """)
 
 
     @since('2.0')
