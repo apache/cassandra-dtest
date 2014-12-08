@@ -1,10 +1,11 @@
 from dtest import Tester, debug
-from pytools import insert_c1c2
+from pytools import insert_c1c2, since
 from cassandra import ConsistencyLevel
 import unittest
 
 class TestRepairCompaction(Tester):
 
+    @since('2.1')
     def repair_compaction_fine_test(self):
         """Check that we do not stream data for repairs past the last repair.
         Check cases i) node goes down, data inserted, node comes up run repair
