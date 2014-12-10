@@ -1174,6 +1174,25 @@ class TestCQL(Tester):
             else:
                 assert isinstance(r[3], (int, long)), res
 
+        # wrap writetime(), ttl() in other functions (test for CASSANDRA-8451)
+        res = cursor.execute("SELECT k, c, blobAsBigint(bigintAsBlob(writetime(c))), ttl(c) FROM test")
+        assert len(res) == 2, res
+        for r in res:
+            assert isinstance(r[2], (int, long))
+            if r[0] == 1:
+                assert r[3] == None, res
+            else:
+                assert isinstance(r[3], (int, long)), res
+
+        res = cursor.execute("SELECT k, c, writetime(c), blobAsInt(intAsBlob(ttl(c))) FROM test")
+        assert len(res) == 2, res
+        for r in res:
+            assert isinstance(r[2], (int, long))
+            if r[0] == 1:
+                assert r[3] == None, res
+            else:
+                assert isinstance(r[3], (int, long)), res
+
         assert_invalid(cursor, "SELECT k, c, writetime(k) FROM test")
 
         res = cursor.execute("SELECT k, d, writetime(d) FROM test WHERE k = 1")
