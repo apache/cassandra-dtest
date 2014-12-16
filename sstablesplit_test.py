@@ -43,17 +43,19 @@ class TestSSTableSplit(Tester):
         node.flush()
         node.compact()
         node.flush()
-        sstables = node.get_sstables('Keyspace1', '')
+        keyspace = 'keyspace1' if self.cluster.version() >= '2.1' else 'Keyspace1'
+        sstables = node.get_sstables(keyspace, '')
         debug("Number of sstables after compaction: %s" % len(sstables))
 
     def _do_split(self, node, version):
         debug("Run sstablesplit")
         time.sleep(5.0)
         node.stop()
-        origsstable = node.get_sstables('Keyspace1', '')
+        keyspace = 'keyspace1' if self.cluster.version() >= '2.1' else 'Keyspace1'
+        origsstable = node.get_sstables(keyspace, '')
         debug("Original sstable before split: %s" % origsstable)
-        node.run_sstablesplit( keyspace='Keyspace1' )
-        sstables = node.get_sstables('Keyspace1', '')
+        node.run_sstablesplit( keyspace=keyspace )
+        sstables = node.get_sstables(keyspace, '')
         debug("Number of sstables after split: %s" % len(sstables))
         if version < "2.1":
             assert len(sstables) == 6, "Incorrect number of sstables after running sstablesplit."

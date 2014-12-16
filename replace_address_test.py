@@ -51,7 +51,8 @@ class TestReplaceAddress(Tester):
 
         cursor = self.patient_cql_connection(node1)
         cursor.default_timeout = 45
-        query = SimpleStatement('select * from "Keyspace1"."Standard1" LIMIT 1', consistency_level=ConsistencyLevel.THREE)
+        stress_table = 'keyspace1.standard1' if self.cluster.version() >= '2.1' else '"Keyspace1"."Standard1"'
+        query = SimpleStatement('select * from %s LIMIT 1' % stress_table, consistency_level=ConsistencyLevel.THREE)
         initialData = cursor.execute(query)
 
         #stop node, query should not work with consistency 3
@@ -61,7 +62,7 @@ class TestReplaceAddress(Tester):
         debug("Testing node stoppage (query should fail).")
         with self.assertRaises(NodeUnavailable):
             try:
-                query = SimpleStatement('select * from "Keyspace1"."Standard1" LIMIT 1', consistency_level=ConsistencyLevel.THREE)
+                query = SimpleStatement('select * from %s LIMIT 1' % stress_table, consistency_level=ConsistencyLevel.THREE)
                 cursor.execute(query)
             except (Unavailable, ReadTimeout):
                 raise NodeUnavailable("Node could not be queried.")
@@ -74,7 +75,7 @@ class TestReplaceAddress(Tester):
 
         #query should work again
         debug("Verifying querying works again.")
-        query = SimpleStatement('select * from "Keyspace1"."Standard1" LIMIT 1', consistency_level=ConsistencyLevel.THREE)
+        query = SimpleStatement('select * from %s LIMIT 1' % stress_table, consistency_level=ConsistencyLevel.THREE)
         finalData = cursor.execute(query)
         self.assertListEqual(initialData, finalData)
 
@@ -103,7 +104,8 @@ class TestReplaceAddress(Tester):
         else:
             node1.stress(['write', 'n=10000', '-schema', 'replication(factor=3)'])
         cursor = self.patient_cql_connection(node1)
-        query = SimpleStatement('select * from "Keyspace1"."Standard1" LIMIT 1', consistency_level=ConsistencyLevel.THREE)
+        stress_table = 'keyspace1.standard1' if self.cluster.version() >= '2.1' else '"Keyspace1"."Standard1"'
+        query = SimpleStatement('select * from %s LIMIT 1' % stress_table, consistency_level=ConsistencyLevel.THREE)
         initialData = cursor.execute(query)
 
         #replace active node 3 with node 4
@@ -132,7 +134,8 @@ class TestReplaceAddress(Tester):
         else:
             node1.stress(['write', 'n=10000', '-schema', 'replication(factor=3)'])
         cursor = self.patient_cql_connection(node1)
-        query = SimpleStatement('select * from "Keyspace1"."Standard1" LIMIT 1', consistency_level=ConsistencyLevel.THREE)
+        stress_table = 'keyspace1.standard1' if self.cluster.version() >= '2.1' else '"Keyspace1"."Standard1"'
+        query = SimpleStatement('select * from %s LIMIT 1' % stress_table, consistency_level=ConsistencyLevel.THREE)
         initialData = cursor.execute(query)
 
         debug('Start node 4 and replace an address with no node')
@@ -168,7 +171,8 @@ class TestReplaceAddress(Tester):
             node1.stress(['write', 'n=10000', '-schema', 'replication(factor=3)'])
 
         cursor = self.patient_cql_connection(node1)
-        query = SimpleStatement('select * from "Keyspace1"."Standard1" LIMIT 1', consistency_level=ConsistencyLevel.THREE)
+        stress_table = 'keyspace1.standard1' if self.cluster.version() >= '2.1' else '"Keyspace1"."Standard1"'
+        query = SimpleStatement('select * from %s LIMIT 1' % stress_table, consistency_level=ConsistencyLevel.THREE)
         initialData = cursor.execute(query)
 
         #stop node, query should not work with consistency 3
