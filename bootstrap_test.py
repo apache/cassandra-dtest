@@ -74,5 +74,6 @@ class TestBootstrap(Tester):
         node4.start()
 
         session = self.patient_cql_connection(node4)
-        rows = session.execute('select * from "Keyspace1"."Standard1" limit 10')
+        stress_table = 'keyspace1.standard1' if self.cluster.version() >= '2.1' else '"Keyspace1"."Standard1"'
+        rows = session.execute('select * from %s limit 10' % stress_table)
         assert len(list(rows)) == 10

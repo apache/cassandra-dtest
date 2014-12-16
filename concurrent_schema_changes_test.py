@@ -342,7 +342,13 @@ class TestConcurrentSchemaChanges(Tester):
         wait(1)
 
         # now the cluster is under a lot of load. Make some schema changes.
-        if version >= "1.2":
+        if version >= "2.1":
+            cursor.execute('USE keyspace1')
+            wait(1)
+            cursor.execute('DROP TABLE standard1')
+            wait(3)
+            cursor.execute('CREATE TABLE standard1 (KEY text PRIMARY KEY)')
+        elif version >= "1.2":
             cursor.execute('USE "Keyspace1"')
             wait(1)
             cursor.execute('DROP COLUMNFAMILY "Standard1"')
