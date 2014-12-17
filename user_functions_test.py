@@ -1,31 +1,20 @@
-# coding: utf-8
+import math, os, sys, time
 
-import math
-import time
-
-from dtest import Tester
-from pyassertions import assert_invalid
-from pytools import since
-
-cql_version = "3.0.0"
+from dtest import Tester, debug
+from pyassertions import assert_invalid, assert_one, assert_all, assert_none
+from pytools import since, rows_to_list
 
 
 class TestUserFunctions(Tester):
 
-    def prepare(self, ordered=False, create_keyspace=True, use_cache=False, nodes=1, rf=1):
+    def prepare(self, create_keyspace=True, nodes=1, rf=1):
         cluster = self.cluster
-
-        if (ordered):
-            cluster.set_partitioner("org.apache.cassandra.dht.ByteOrderedPartitioner")
-
-        if (use_cache):
-            cluster.set_configuration_options(values={'row_cache_size_in_mb': 100})
 
         cluster.populate(nodes).start()
         node1 = cluster.nodelist()[0]
         time.sleep(0.2)
 
-        cursor = self.patient_cql_connection(node1, version=cql_version)
+        cursor = self.patient_cql_connection(node1)
         if create_keyspace:
             self.create_ks(cursor, 'ks', rf)
         return cursor
@@ -42,10 +31,12 @@ class TestUserFunctions(Tester):
         node3 = cluster.nodelist()[2]
         time.sleep(0.2)
 
-        cursor1 = self.patient_cql_connection(node1, version=cql_version)
-        cursor2 = self.patient_cql_connection(node2, version=cql_version)
-        cursor3 = self.patient_cql_connection(node3, version=cql_version)
+        cursor1 = self.patient_exclusive_cql_connection(node1)
+        cursor2 = self.patient_exclusive_cql_connection(node2)
+        cursor3 = self.patient_exclusive_cql_connection(node3)
         self.create_ks(cursor1, 'ks', 1)
+        cursor2.execute("use ks")
+        cursor3.execute("use ks")
 
         cursor1.execute("""
             CREATE TABLE udf_kv (
@@ -65,14 +56,19 @@ class TestUserFunctions(Tester):
 
         time.sleep(1)
 
-        res = cursor1.execute("SELECT key, value, x_sin(value), x_cos(value), x_tan(value) FROM ks.udf_kv where key = %d" % 1)
-        assert res == [[1, 1.0, 0.8414709848078965, 0.5403023058681398, 1.5574077246549023]], res
+        assert_one(cursor1, "SELECT key, value, x_sin(value), x_cos(value), x_tan(value) FROM ks.udf_kv where key = %d" % 1, [1, 1.0, 0.8414709848078965, 0.5403023058681398, 1.5574077246549023])
 
-        res = cursor2.execute("SELECT key, value, x_sin(value), x_cos(value), x_tan(value) FROM ks.udf_kv where key = %d" % 2)
-        assert res == [[2, 2.0, math.sin(2.0), math.cos(2.0), math.tan(2.0)]], res
+        assert_one(cursor2, "SELECT key, value, x_sin(value), x_cos(value), x_tan(value) FROM ks.udf_kv where key = %d" % 2, [2, 2.0, math.sin(2.0), math.cos(2.0), math.tan(2.0)])
 
-        res = cursor3.execute("SELECT key, value, x_sin(value), x_cos(value), x_tan(value) FROM ks.udf_kv where key = %d" % 3)
-        assert res == [[3, 3.0, math.sin(3.0), math.cos(3.0), math.tan(3.0)]], res
+        assert_one(cursor3, "SELECT key, value, x_sin(value), x_cos(value), x_tan(value) FROM ks.udf_kv where key = %d" % 3, [3, 3.0, math.sin(3.0), math.cos(3.0), math.tan(3.0)])
+
+        cursor4 = self.patient_cql_connection(node1)
+
+        #check that functions are correctly confined to namespaces
+        assert_invalid(cursor4, "SELECT key, value, sin(value), cos(value), tan(value) FROM ks.udf_kv where key = 4", "Unknown function 'sin'")
+
+        #try giving existing function bad input, should error
+        assert_invalid(cursor1, "SELECT key, value, x_sin(key), foo_cos(KEYy), foo_tan(key) FROM ks.udf_kv where key = 1", "Type error: key cannot be passed as argument 0 of function ks.x_sin of type double")
 
         cursor2.execute("drop function x_sin")
         cursor3.execute("drop function x_cos")
@@ -81,3 +77,42 @@ class TestUserFunctions(Tester):
         assert_invalid(cursor1, "SELECT key, value, sin(value), cos(value), tan(value) FROM udf_kv where key = 1")
         assert_invalid(cursor2, "SELECT key, value, sin(value), cos(value), tan(value) FROM udf_kv where key = 1")
         assert_invalid(cursor3, "SELECT key, value, sin(value), cos(value), tan(value) FROM udf_kv where key = 1")
+
+        #try creating function returning the wrong type, should error
+        assert_invalid(cursor1, "CREATE FUNCTION bad_sin ( input double ) RETURNS double LANGUAGE java AS 'return Math.sin(input.doubleValue());'", "Could not compile function 'ks.bad_sin' from Java source:")
+
+    @since('3.0')
+    def udf_overload_test(self):
+
+        session = self.prepare(nodes=3)
+
+        session.execute("CREATE TABLE tab (k text PRIMARY KEY, v int)");
+        test = "foo"
+        session.execute("INSERT INTO tab (k, v) VALUES ('foo' , 1);")
+
+        # create overloaded udfs
+        session.execute("CREATE FUNCTION overloaded(v varchar) RETURNS text LANGUAGE java AS 'return \"f1\";'");
+        session.execute("CREATE OR REPLACE FUNCTION overloaded(i int) RETURNS text LANGUAGE java AS 'return \"f2\";'");
+        session.execute("CREATE OR REPLACE FUNCTION overloaded(v1 text, v2 text) RETURNS text LANGUAGE java AS 'return \"f3\";'");
+        session.execute("CREATE OR REPLACE FUNCTION overloaded(v ascii) RETURNS text LANGUAGE java AS 'return \"f1\";'");
+
+        #ensure that works with correct specificity
+        assert_invalid(session, "SELECT v FROM tab WHERE k = overloaded('foo')");
+        assert_none(session, "SELECT v FROM tab WHERE k = overloaded((text) 'foo')");
+        assert_none(session, "SELECT v FROM tab WHERE k = overloaded((ascii) 'foo')");
+        assert_none(session, "SELECT v FROM tab WHERE k = overloaded((varchar) 'foo')");
+
+        #try non-existent functions
+        assert_invalid(session, "DROP FUNCTION overloaded(boolean)");
+        assert_invalid(session, "DROP FUNCTION overloaded(bigint)");
+
+        #try dropping overloaded - should fail because ambiguous
+        assert_invalid(session, "DROP FUNCTION overloaded");
+        session.execute("DROP FUNCTION overloaded(varchar)");
+        assert_invalid(session, "SELECT v FROM tab WHERE k = overloaded((text)'foo')");
+        session.execute("DROP FUNCTION overloaded(text, text)");
+        assert_invalid(session, "SELECT v FROM tab WHERE k = overloaded((text)'foo',(text)'bar')");
+        session.execute("DROP FUNCTION overloaded(ascii)");
+        assert_invalid(session, "SELECT v FROM tab WHERE k = overloaded((ascii)'foo')");
+        #should now work - unambiguous
+        session.execute("DROP FUNCTION overloaded");
