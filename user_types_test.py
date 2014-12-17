@@ -360,7 +360,10 @@ class TestUserTypes(Tester):
               SELECT id, name.first from person_likes where id={id};
            """.format(id=_id)
 
-        assert_invalid(cursor, stmt, 'Partition key part name must be restricted since preceding part is')
+        if self.cluster.version() >= '3.0':
+            assert_invalid(cursor, stmt, 'Partition key parts: name must be restricted as other parts are')
+        else:
+            assert_invalid(cursor, stmt, 'Partition key part name must be restricted since preceding part is')
 
         stmt = """
               SELECT id, name.first, like from person_likes where id={id} and name = {{first:'Nero', middle: 'Claudius Caesar Augustus', last: 'Germanicus'}};
