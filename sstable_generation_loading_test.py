@@ -70,9 +70,9 @@ class TestSSTableGenerationAndLoading(Tester):
         if version < "2.1":
             path = os.path.join(node1.get_path(), 'data', 'Keyspace1', 'Standard1')
         else:
-            basepath = os.path.join(node1.get_path(), 'data', 'Keyspace1')
+            basepath = os.path.join(node1.get_path(), 'data', 'keyspace1')
             for x in os.listdir(basepath):
-                if x.startswith("Standard1"):
+                if x.startswith("standard1"):
                     path = os.path.join(basepath, x)
 
         os.system('rm %s/*Index.db' % path)
