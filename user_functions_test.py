@@ -4,7 +4,7 @@ import math
 import time
 
 from dtest import Tester
-from pyassertions import assert_invalid
+from pyassertions import assert_invalid, assert_one
 from pytools import since
 
 cql_version = "3.0.0"
@@ -42,10 +42,12 @@ class TestUserFunctions(Tester):
         node3 = cluster.nodelist()[2]
         time.sleep(0.2)
 
-        cursor1 = self.patient_cql_connection(node1, version=cql_version)
-        cursor2 = self.patient_cql_connection(node2, version=cql_version)
-        cursor3 = self.patient_cql_connection(node3, version=cql_version)
+        cursor1 = self.patient_exclusive_cql_connection(node1, version=cql_version)
+        cursor2 = self.patient_exclusive_cql_connection(node2, version=cql_version)
+        cursor3 = self.patient_exclusive_cql_connection(node3, version=cql_version)
         self.create_ks(cursor1, 'ks', 1)
+        cursor2.execute("use ks")
+        cursor3.execute("use ks")
 
         cursor1.execute("""
             CREATE TABLE udf_kv (
@@ -65,14 +67,11 @@ class TestUserFunctions(Tester):
 
         time.sleep(1)
 
-        res = cursor1.execute("SELECT key, value, x_sin(value), x_cos(value), x_tan(value) FROM ks.udf_kv where key = %d" % 1)
-        assert res == [[1, 1.0, 0.8414709848078965, 0.5403023058681398, 1.5574077246549023]], res
+        assert_one(cursor1, "SELECT key, value, x_sin(value), x_cos(value), x_tan(value) FROM ks.udf_kv where key = %d" % 1, [1, 1.0, 0.8414709848078965, 0.5403023058681398, 1.5574077246549023])
 
-        res = cursor2.execute("SELECT key, value, x_sin(value), x_cos(value), x_tan(value) FROM ks.udf_kv where key = %d" % 2)
-        assert res == [[2, 2.0, math.sin(2.0), math.cos(2.0), math.tan(2.0)]], res
+        assert_one(cursor2, "SELECT key, value, x_sin(value), x_cos(value), x_tan(value) FROM ks.udf_kv where key = %d" % 2, [2, 2.0, math.sin(2.0), math.cos(2.0), math.tan(2.0)])
 
-        res = cursor3.execute("SELECT key, value, x_sin(value), x_cos(value), x_tan(value) FROM ks.udf_kv where key = %d" % 3)
-        assert res == [[3, 3.0, math.sin(3.0), math.cos(3.0), math.tan(3.0)]], res
+        assert_one(cursor3, "SELECT key, value, x_sin(value), x_cos(value), x_tan(value) FROM ks.udf_kv where key = %d" % 3, [3, 3.0, math.sin(3.0), math.cos(3.0), math.tan(3.0)])
 
         cursor2.execute("drop function x_sin")
         cursor3.execute("drop function x_cos")
