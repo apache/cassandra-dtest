@@ -87,7 +87,7 @@ class TestCompaction(Tester):
 
     def sstable_deletion_test(self):
         """Test that sstables are deleted properly when able to be.
-        Insert data setting gc_grace_seconds to 0, and determine sstable 
+        Insert data setting gc_grace_seconds to 0, and determine sstable
         is deleted upon data deletion.
         """
         cluster = self.cluster
@@ -100,7 +100,7 @@ class TestCompaction(Tester):
         for x in range(0, 100):
             cursor.execute('insert into cf (key, c1) values (' + str(x) + ',1)')
         node1.flush()
-        for x in range(0, 100);
+        for x in range(0, 100):
             cursor.execute('delete from cf where key = ' + str(x))
         node1.flush()
         node1.nodetool('compact')
