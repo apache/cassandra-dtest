@@ -4,6 +4,7 @@ from ccmlib.cluster import Cluster
 import re, os, time
 from collections import defaultdict
 from cassandra.query import SimpleStatement
+from cassandra import ConsistencyLevel
 
 TRACE_DETERMINE_REPLICAS = re.compile('Determining replicas for mutation')
 TRACE_SEND_MESSAGE = re.compile('Sending message to /([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)')
@@ -52,17 +53,22 @@ class ReplicationTest(Tester):
         nodes_contacted = defaultdict(set) #node -> list of nodes that were contacted
 
         for trace_event in trace.events:
+            # Step 1, find coordinator node:
+            activity = trace_event.description
+            source = trace_event.source
+            if activity.startswith('Determining replicas for mutation'):
+                if not coordinator:
+                    coordinator = source
+                    break
+            if not coordinator:
+                continue
+
+        for trace_event in trace.events:
             session = trace._session
             activity = trace_event.description
             source = trace_event.source
             source_elapsed = trace_event.source_elapsed
             thread = trace_event.thread_name
-            # Step 1, find coordinator node:
-            if activity.startswith('Determining replicas for mutation'):
-                if not coordinator:
-                    coordinator = source
-            if not coordinator:
-                continue
 
             # Step 2, find all the nodes that each node talked to:
             send_match = TRACE_SEND_MESSAGE.search(activity)
@@ -171,10 +177,10 @@ class ReplicationTest(Tester):
         time.sleep(5)
 
         for key, token in murmur3_hashes.items():
-            query = SimpleStatement("INSERT INTO test (id, value) VALUES (%s, 'asdf')" % key)
-            cursor.execute(query, trace=True)
-            time.sleep(5)
-            trace = query.trace
+            query = SimpleStatement("INSERT INTO test (id, value) VALUES (%s, 'asdf')" % key, consistency_level=ConsistencyLevel.ALL)
+            future = cursor.execute_async(query, trace=True)
+            future.result()
+            trace = future.get_query_trace(max_wait=120)
             stats = self.get_replicas_from_trace(trace)
             replicas_should_be = set(self.get_replicas_for_token(
                 token, replication_factor))
@@ -200,7 +206,6 @@ class ReplicationTest(Tester):
         # Install a tracing cursor so we can get info about who the
         # coordinator is contacting:
         cursor = self.conn
-        cursor.max_trace_wait = 120
 
         replication_factor = {'dc1':2, 'dc2':2}
         self.create_ks(cursor, 'test', replication_factor)
@@ -212,10 +217,10 @@ class ReplicationTest(Tester):
         forwarders_used = set()
 
         for key, token in murmur3_hashes.items():
-            query = SimpleStatement("INSERT INTO test (id, value) VALUES (%s, 'asdf')" % key)
-            cursor.execute(query, trace=True)
-            time.sleep(5)
-            trace = query.trace
+            query = SimpleStatement("INSERT INTO test (id, value) VALUES (%s, 'asdf')" % key, consistency_level=ConsistencyLevel.ALL)
+            future = cursor.execute_async(query, trace=True)
+            future.result()
+            trace = future.get_query_trace(max_wait=120)
             stats = self.get_replicas_from_trace(trace)
             replicas_should_be = set(self.get_replicas_for_token(
                 token, replication_factor, strategy='NetworkTopologyStrategy'))
