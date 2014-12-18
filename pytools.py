@@ -168,9 +168,8 @@ class since(object):
             cluster_version = LooseVersion(obj.cluster.version())
             if cluster_version < self.cass_version:
                 obj.skip("%s < %s" % (cluster_version, self.cass_version))
-            if self.max_version and \
-                    cluster_version[:len(self.max_version)] > self.max_version:
-                obj.skip("%s > %s" %(cluster_version, self.max_version))
+            if self.max_version and cluster_version > self.max_version:
+                obj.skip("%s > %s" % (cluster_version, self.max_version))
             f(obj)
         wrapped.__name__ = f.__name__
         wrapped.__doc__ = f.__doc__
