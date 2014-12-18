@@ -1,6 +1,7 @@
 from dtest import Tester, debug
 from pytools import insert_c1c2, since
 from cassandra import ConsistencyLevel
+from ccmlib.node import Node
 import unittest
 
 class TestRepairCompaction(Tester):
@@ -80,7 +81,7 @@ class TestRepairCompaction(Tester):
         fileRead = node5.grep_log("reading file from .*, repairedAt = 0")
         self.assertGreaterEqual(len(fileRead), 1)
 
-        #additionally should see 14 distinct keys in data(this prints to command line)
+        # additionally should see 14 distinct keys in data(this prints to command line)
         debug((node2.run_sstable2json()))
 
         rows = cursor.execute("SELECT COUNT(*) FROM ks.cf LIMIT 100")
