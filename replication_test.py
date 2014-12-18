@@ -181,12 +181,12 @@ class ReplicationTest(Tester):
             future = cursor.execute_async(query, trace=True)
             future.result()
             trace = future.get_query_trace(max_wait=120)
+            self.pprint_trace(trace)
             stats = self.get_replicas_from_trace(trace)
             replicas_should_be = set(self.get_replicas_for_token(
                 token, replication_factor))
             debug('\nreplicas should be: %s' % replicas_should_be)
             debug('replicas were: %s' % stats['replicas'])
-            self.pprint_trace(trace)
 
             #Make sure the correct nodes are replicas:
             self.assertEqual(stats['replicas'], replicas_should_be)
@@ -221,13 +221,13 @@ class ReplicationTest(Tester):
             future = cursor.execute_async(query, trace=True)
             future.result()
             trace = future.get_query_trace(max_wait=120)
+            self.pprint_trace(trace)
             stats = self.get_replicas_from_trace(trace)
             replicas_should_be = set(self.get_replicas_for_token(
                 token, replication_factor, strategy='NetworkTopologyStrategy'))
             debug('Current token is %s' % token)
             debug('\nreplicas should be: %s' % replicas_should_be)
             debug('replicas were: %s' % stats['replicas'])
-            self.pprint_trace(trace)
 
             #Make sure the coordinator only talked to a single node in
             #the second datacenter - CASSANDRA-5632:
