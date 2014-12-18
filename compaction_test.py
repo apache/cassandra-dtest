@@ -65,8 +65,8 @@ class TestCompaction(Tester):
 
         output = node1.nodetool('cfstats', True)[0]
         initialValue = 0
-        if output.find("Standard1") != -1:
-            output = output[output.find("Standard1"):]
+        if output.find("standard1") != -1:
+            output = output[output.find("standard1"):]
             output = output[output.find("Space used (live):"):]
             initialValue = output[output.find(":")+1:output.find("\n")].strip()
         else:
@@ -76,8 +76,8 @@ class TestCompaction(Tester):
 
         output = node1.nodetool('cfstats', True)[0]
         finalValue = 0
-        if output.find("Standard1") != -1:
-            output = output[output.find("Standard1"):]
+        if output.find("standard1") != -1:
+            output = output[output.find("standard1"):]
             output = output[output.find("Space used (live):"):]
             finalValue = output[output.find(":")+1:output.find("\n")].strip()
         else:
@@ -128,13 +128,14 @@ class TestCompaction(Tester):
 
         node1.watch_log_for("100.00MB/s")
 
-    def compaction_strategy_switiching_test(self):
+    def compaction_strategy_switching_test(self):
         """Ensure that switching strategies does not result in problems.
         Insert data, switch strategies, then check against data loss.
         """
         strategies = ['LeveledCompactionStrategy', 'SizeTieredCompactionStrategy', 'DateTieredCompactionStrategy']
 
-        if self.strategy in strategies: strategies.remove(self.strategy):
+        if self.strategy in strategies:
+            strategies.remove(self.strategy)
             for strat in strategies:
                 cluster = self.cluster
                 cluster.populate(3).start()
@@ -155,7 +156,7 @@ class TestCompaction(Tester):
                 cursor.execute("alter table ks.cf with compaction = {'class':" + strat + "};")
 
                 for x in range(11,100):
-                    assert_one(cursor.execute("select * from ks.cf where key =" + str(x))
+                    assert_one(cursor.execute("select * from ks.cf where key =" + str(x)))
 
                 for x in range(0, 10):
                     assert_none(cursor.execute('select * from cf where key = ' + str(x)))
