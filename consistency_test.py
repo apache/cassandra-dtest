@@ -233,7 +233,7 @@ class TestConsistency(Tester):
 
         log_mark = node1.mark_log()
         node2.start()
-        node1.watch_log_for(["Finished hinted"], from_mark=log_mark, timeout=90)
+        node1.watch_log_for(["Finished hinted"], from_mark=log_mark, timeout=120)
 
         node1.stop(wait_other_notice=True)
 
