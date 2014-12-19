@@ -108,7 +108,8 @@ class TestSCUpgrade(Tester):
             time.sleep(.5)
         else:
             node1.drain()
-            node1.stop(wait_other_notice=True)
+            node1.watch_log_for("DRAINED")
+            node1.stop(wait_other_notice=False)
             self.set_node_to_current_version(node1)
             node1.start(wait_other_notice=True)
 
@@ -141,8 +142,10 @@ class TestSCUpgrade(Tester):
         else:
             node2.drain()
             node3.drain()
-            node2.stop(wait_other_notice=True)
-            node3.stop(wait_other_notice=True)
+            node2.watch_log_for("DRAINED")
+            node3.watch_log_for("DRAINED")
+            node2.stop(wait_other_notice=False)
+            node3.stop(wait_other_notice=False)
             self.set_node_to_current_version(node2)
             self.set_node_to_current_version(node3)
             node2.start(wait_other_notice=True)
