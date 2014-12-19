@@ -409,14 +409,43 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
             {'limit': 30, 'fetch': 10, 'data_size': 20, 'whereclause': 'WHERE id in (3,4)', 'expect_pgcount': 2, 'expect_pgsizes': [10, 10]},  # fetch < data < limit
             {'limit': 20, 'fetch': 30, 'data_size': 10, 'whereclause': 'WHERE id in (1,2)', 'expect_pgcount': 1, 'expect_pgsizes': [10]},      # data < limit < fetch
             {'limit': 30, 'fetch': 20, 'data_size': 10, 'whereclause': 'WHERE id in (1,2)', 'expect_pgcount': 1, 'expect_pgsizes': [10]},      # data < fetch < limit
+
+            # no limit but with a defined pagesize. Scenarios added for CASSANDRA-8408.
+            {'limit': None, 'fetch': 20, 'data_size': 80, 'whereclause': 'WHERE id in (1,2,3,4,5,6)', 'expect_pgcount': 4, 'expect_pgsizes': [20, 20, 20, 20]},  # fetch < data
+            {'limit': None, 'fetch': 30, 'data_size': 20, 'whereclause': 'WHERE id in (3,4)', 'expect_pgcount': 1, 'expect_pgsizes': [20]},          # data < fetch
+            {'limit': None, 'fetch': 10, 'data_size': 30, 'whereclause': 'WHERE id in (4,5)', 'expect_pgcount': 3, 'expect_pgsizes': [10, 10, 10]},  # fetch < data
+            {'limit': None, 'fetch': 30, 'data_size': 10, 'whereclause': 'WHERE id in (1,2)', 'expect_pgcount': 1, 'expect_pgsizes': [10]},          # data < fetch
+
+            # not setting fetch_size (unpaged) but using limit. Scenarios added for CASSANDRA-8408.
+            {'limit': 9, 'fetch': None, 'data_size': 80, 'whereclause': 'WHERE id in (1,2,3,4,5,6)', 'expect_pgcount': 1, 'expect_pgsizes': [9]},  # limit < data
+            {'limit': 30, 'fetch': None, 'data_size': 10, 'whereclause': 'WHERE id in (1,2)', 'expect_pgcount': 1, 'expect_pgsizes': [10]},        # data < limit
         ]
 
         def handle_scenario(scenario):
-            future = cursor.execute_async(
-                SimpleStatement(
-                    "select * from paging_test {} limit {}".format(scenario['whereclause'], scenario['limit']),
-                    fetch_size=scenario['fetch'], consistency_level=CL.ALL)
-            )
+            # using a limit and a fetch
+            if scenario['limit'] and scenario['fetch']:
+                future = cursor.execute_async(
+                    SimpleStatement(
+                        "select * from paging_test {} limit {}".format(scenario['whereclause'], scenario['limit']),
+                        fetch_size=scenario['fetch'], consistency_level=CL.ALL)
+                )
+            # using a limit but not specifying a fetch_size
+            elif scenario['limit'] and scenario['fetch'] is None:
+                future = cursor.execute_async(
+                    SimpleStatement(
+                        "select * from paging_test {} limit {}".format(scenario['whereclause'], scenario['limit']),
+                        consistency_level=CL.ALL)
+                )
+            # no limit but a fetch_size specified
+            elif scenario['limit'] is None and scenario['fetch']:
+                future = cursor.execute_async(
+                    SimpleStatement(
+                        "select * from paging_test {}".format(scenario['whereclause']),
+                        fetch_size=scenario['fetch'], consistency_level=CL.ALL)
+                )
+            else:
+                # this should not happen
+                assert False
 
             pf = PageFetcher(future).request_all()
             self.assertEqual(pf.num_results_all(), scenario['expect_pgsizes'])
