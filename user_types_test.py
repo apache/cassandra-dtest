@@ -743,7 +743,7 @@ class TestUserTypes(Tester):
         session.execute("INSERT INTO t (id, v) VALUES (0, {first:'cass', second:3, third:0})")
         session.execute("INSERT INTO t (id, v) VALUES (0, {first:null})")
         rows = session.execute("SELECT * FROM t WHERE id=0")
-        self.assertEqual(listify(rows[0]), [0, [None, 3, 0])
+        self.assertEqual(listify(rows[0]), [0, [None, 3, 0]])
 
         #Create UDT with collection, update just collection, read back
         session.execute("CREATE TYPE uc (a int, b set<int>)")
