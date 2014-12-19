@@ -1,6 +1,7 @@
 # coding: utf-8
 
-import random, math, time
+import random
+import time
 from collections import OrderedDict
 from uuid import uuid4, UUID
 
@@ -3534,6 +3535,7 @@ class TestCQL(Tester):
             )
         """)
 
+        cursor.default_fetch_size=10000
         # We know we page at 10K, so test counting just before, at 10K, just after and
         # a bit after that.
         for k in range(1, 10000):
@@ -3918,6 +3920,52 @@ class TestCQL(Tester):
         self.assertEqual(range(10), [r[0] for r in rows])
         self.assertEqual(range(10), [r[1] for r in rows])
 
+        # additional testing for CASSANRA-8087
+        cursor.execute("""
+            CREATE TABLE test2 (
+                k int,
+                c1 int,
+                c2 int,
+                s1 int static,
+                s2 int static,
+                PRIMARY KEY (k, c1, c2)
+            )
+        """)
+
+        for i in range(10):
+            for j in range(5):
+                for k in range(5):
+                    cursor.execute("INSERT INTO test2 (k, c1, c2, s1, s2) VALUES (%s, %s, %s, %s, %s)", (i, j, k, i, i + 1))
+
+        for fetch_size in (None, 2, 5, 7, 10, 24, 25, 26, 1000):
+            cursor.default_fetch_size = fetch_size
+            rows = list(cursor.execute("SELECT DISTINCT k, s1 FROM test2"))
+            self.assertEqual(range(10), sorted([r[0] for r in rows]))
+            self.assertEqual(range(10), sorted([r[1] for r in rows]))
+
+            rows = list(cursor.execute("SELECT DISTINCT k, s2 FROM test2"))
+            self.assertEqual(range(10), sorted([r[0] for r in rows]))
+            self.assertEqual(range(1, 11), sorted([r[1] for r in rows]))
+
+            print "page size: ", fetch_size
+            rows = list(cursor.execute("SELECT DISTINCT k, s1 FROM test2 LIMIT 10"))
+            self.assertEqual(range(10), sorted([r[0] for r in rows]))
+            self.assertEqual(range(10), sorted([r[1] for r in rows]))
+
+            keys = ",".join(map(str, range(10)))
+            rows = list(cursor.execute("SELECT DISTINCT k, s1 FROM test2 WHERE k IN (%s)" % (keys,)))
+            self.assertEqual(range(10), [r[0] for r in rows])
+            self.assertEqual(range(10), [r[1] for r in rows])
+
+            keys = ",".join(map(str, range(10)))
+            rows = list(cursor.execute("SELECT DISTINCT k, s2 FROM test2 WHERE k IN (%s)" % (keys,)))
+            self.assertEqual(range(10), [r[0] for r in rows])
+            self.assertEqual(range(1, 11), [r[1] for r in rows])
+
+            keys = ",".join(map(str, range(10)))
+            rows = list(cursor.execute("SELECT DISTINCT k, s1 FROM test2 WHERE k IN (%s) LIMIT 10" % (keys,)))
+            self.assertEqual(range(10), sorted([r[0] for r in rows]))
+            self.assertEqual(range(10), sorted([r[1] for r in rows]))
 
     def select_count_paging_test(self):
         """ Test for the #6579 'select count' paging bug """
