@@ -1,9 +1,17 @@
 import time
 from collections import OrderedDict
 from cassandra.util import sortedset
+from cassandra.query import SimpleStatement
+from cassandra import ConsistencyLevel
 from dtest import Tester
 from pytools import since
-from pyassertions import assert_all, assert_row_count
+from pyassertions import (
+    assert_all,
+    assert_none,
+    assert_row_count,
+    assert_almost_equal,
+    assert_unavailable
+)
 
 
 class TestTTL(Tester):
@@ -11,10 +19,10 @@ class TestTTL(Tester):
 
     def setUp(self):
         super(TestTTL, self).setUp()
-        self.cluster.populate(3).start()
-        [node1, node2, node3] = self.cluster.nodelist()
+        self.cluster.populate(1).start()
+        [node1] = self.cluster.nodelist()
         self.cursor1 = self.patient_cql_connection(node1)
-        self.create_ks(self.cursor1, 'ks', 3)
+        self.create_ks(self.cursor1, 'ks', 1)
 
     def prepare(self, default_time_to_live=None):
         self.cursor1.execute("DROP TABLE IF EXISTS ttl_table;")
@@ -313,3 +321,149 @@ class TestTTL(Tester):
         )
         self.smart_sleep(start, 5.5)
         assert_row_count(self.cursor1, 'ttl_table', 0)
+
+
+class TestDistributedTTL(Tester):
+    """ Test Time To Live Feature in a distributed environment """
+
+    def setUp(self):
+        super(TestDistributedTTL, self).setUp()
+        self.cluster.populate(2).start()
+        [self.node1, self.node2] = self.cluster.nodelist()
+        self.cursor1 = self.patient_cql_connection(self.node1)
+        self.create_ks(self.cursor1, 'ks', 2)
+
+    def prepare(self, default_time_to_live=None):
+        self.cursor1.execute("DROP TABLE IF EXISTS ttl_table;")
+        query = """
+            CREATE TABLE ttl_table (
+                key int primary key,
+                col1 int,
+                col2 int,
+                col3 int,
+            )
+        """
+        if default_time_to_live:
+            query += " WITH default_time_to_live = {};".format(default_time_to_live)
+
+        self.cursor1.execute(query)
+
+    def ttl_is_replicated_test(self):
+        """
+        Test that the ttl setting is replicated properly on all nodes
+        """
+
+        self.prepare(default_time_to_live=3)
+        cursor2 = self.patient_cql_connection(self.node2)
+        cursor2.execute("USE ks;")
+        query = SimpleStatement(
+            "INSERT INTO ttl_table (key, col1) VALUES (1, 1);",
+            consistency_level=ConsistencyLevel.ALL
+        )
+        self.cursor1.execute(query)
+        assert_all(
+            self.cursor1,
+            "SELECT * FROM ttl_table;",
+            [[1, 1, None, None]],
+            cl=ConsistencyLevel.ALL
+        )
+        ttl_cursor1 = self.cursor1.execute('SELECT ttl(col1) FROM ttl_table;')
+        ttl_cursor2 = cursor2.execute('SELECT ttl(col1) FROM ttl_table;')
+        assert_almost_equal(ttl_cursor1[0][0], ttl_cursor2[0][0], error=0.05)
+
+        time.sleep(3.5)
+
+        assert_none(self.cursor1, "SELECT * FROM ttl_table;", cl=ConsistencyLevel.ALL)
+
+    def ttl_is_respected_on_delayed_replication_test(self):
+        """ Test that ttl is respected on delayed replication """
+
+        self.prepare()
+        self.node2.stop()
+        self.cursor1.execute("""
+            INSERT INTO ttl_table (key, col1) VALUES (1, 1) USING TTL 3;
+        """)
+        self.cursor1.execute("""
+            INSERT INTO ttl_table (key, col1) VALUES (2, 2) USING TTL 60;
+        """)
+        assert_all(
+            self.cursor1,
+            "SELECT * FROM ttl_table;",
+            [[1, 1, None, None], [2, 2, None, None]]
+        )
+        time.sleep(3.5)
+        self.node1.stop()
+        self.node2.start()
+        self.node2.watch_log_for("Listening for thrift clients...")
+        cursor2 = self.patient_exclusive_cql_connection(self.node2)
+        cursor2.execute("USE ks;")
+        assert_row_count(cursor2, 'ttl_table', 0)  # should be 0 since node1 is down, no replica yet
+        self.node1.start()
+        self.node1.watch_log_for("Listening for thrift clients...")
+        self.cursor1 = self.patient_exclusive_cql_connection(self.node1)
+        self.cursor1.execute("USE ks;")
+        self.node1.cleanup()
+
+        # Check that the expired data has not been replicated
+        assert_row_count(cursor2, 'ttl_table', 1)
+        assert_all(
+            cursor2,
+            "SELECT * FROM ttl_table;",
+            [[2, 2, None, None]],
+            cl=ConsistencyLevel.ALL
+        )
+
+        # Check that the TTL on both server are the same
+        ttl_cursor1 = self.cursor1.execute('SELECT ttl(col1) FROM ttl_table;')
+        ttl_cursor2 = cursor2.execute('SELECT ttl(col1) FROM ttl_table;')
+        assert_almost_equal(ttl_cursor1[0][0], ttl_cursor2[0][0], error=0.05)
+
+    def ttl_is_respected_on_repair_test(self):
+        """ Test that ttl is respected on repair """
+
+        self.prepare()
+        self.cursor1.execute("""
+            ALTER KEYSPACE ks WITH REPLICATION =
+            {'class' : 'SimpleStrategy', 'replication_factor' : 1};
+        """)
+        self.cursor1.execute("""
+            INSERT INTO ttl_table (key, col1) VALUES (1, 1) USING TTL 3;
+        """)
+        self.cursor1.execute("""
+            INSERT INTO ttl_table (key, col1) VALUES (2, 2) USING TTL 1000;
+        """)
+
+        assert_all(
+            self.cursor1,
+            "SELECT * FROM ttl_table;",
+            [[1, 1, None, None], [2, 2, None, None]]
+        )
+        time.sleep(3.5)
+        self.node1.stop()
+        cursor2 = self.patient_exclusive_cql_connection(self.node2)
+        cursor2.execute("USE ks;")
+        assert_unavailable(cursor2.execute, "SELECT * FROM ttl_table;")
+        self.node1.start()
+        self.node1.watch_log_for("Listening for thrift clients...")
+        self.cursor1 = self.patient_exclusive_cql_connection(self.node1)
+        self.cursor1.execute("USE ks;")
+        self.cursor1.execute("""
+            ALTER KEYSPACE ks WITH REPLICATION =
+            {'class' : 'SimpleStrategy', 'replication_factor' : 2};
+        """)
+        self.node1.repair(['ks'])
+        ttl_start = time.time()
+        ttl_cursor1 = self.cursor1.execute('SELECT ttl(col1) FROM ttl_table;')
+        self.node1.stop()
+
+        assert_row_count(cursor2, 'ttl_table', 1)
+        assert_all(
+            cursor2,
+            "SELECT * FROM ttl_table;",
+            [[2, 2, None, None]]
+        )
+
+        # Check that the TTL on both server are the same
+        ttl_cursor2 = cursor2.execute('SELECT ttl(col1) FROM ttl_table;')
+        ttl_cursor1 = ttl_cursor1[0][0] - (time.time() - ttl_start)
+        assert_almost_equal(ttl_cursor1, ttl_cursor2[0][0], error=0.005)
