@@ -9,7 +9,7 @@ from dtest import Tester, canReuseCluster, freshCluster
 from pyassertions import assert_invalid, assert_one, assert_none, assert_all
 from pytools import since, require, rows_to_list
 from cassandra import ConsistencyLevel, InvalidRequest
-from cassandra.protocol import ProtocolException, SyntaxException, ConfigurationException
+from cassandra.protocol import ProtocolException, SyntaxException, ConfigurationException, InvalidRequestException
 from cassandra.query import SimpleStatement
 try:
     from blist import sortedset
@@ -5054,3 +5054,48 @@ class TestCQL(Tester):
         assert_invalid(cursor, "SELECT v[2..0] FROM test")
 
         assert_all(cursor, "SELECT sizeof(v) FROM test", [[4], [4]])
+
+    @since('2.0')
+    def prepared_statement_invalidation_test(self):
+        # test for CASSANDRA-7910
+        import logging
+
+        log = logging.getLogger()
+        log.setLevel('DEBUG')
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s"))
+        log.addHandler(handler)
+
+
+        cursor = self.prepare()
+
+        cursor.execute("CREATE TABLE test (k int PRIMARY KEY, a int, b int, c int)")
+        cursor.execute("INSERT INTO test (k, a, b, c) VALUES (0, 0, 0, 0)")
+
+        wildcard_prepared = cursor.prepare("SELECT * FROM test")
+        explicit_prepared = cursor.prepare("SELECT k, a, b, c FROM test")
+        result = cursor.execute(wildcard_prepared.bind(None))
+        self.assertEqual(result, [(0, 0, 0, 0)])
+
+        cursor.execute("ALTER TABLE test DROP c")
+        result = cursor.execute(wildcard_prepared.bind(None))
+        # wildcard select can be automatically re-prepared by the driver
+        self.assertEqual(result, [(0, 0, 0)])
+        # but re-preparing the statement with explicit columns should fail
+        # (see PYTHON-207 for why we expect InvalidRequestException instead of the normal exc)
+        assert_invalid(cursor, explicit_prepared.bind(None), expected=InvalidRequestException)
+
+        cursor.execute("ALTER TABLE test ADD d int")
+        result = cursor.execute(wildcard_prepared.bind(None))
+        self.assertEqual(result, [(0, 0, 0, None)])
+
+        explicit_prepared = cursor.prepare("SELECT k, a, b, d FROM test")
+
+        # when the type is altered, both statements will need to be re-prepared
+        # by the driver, but the re-preparation should succeed
+        cursor.execute("ALTER TABLE test ALTER d TYPE blob")
+        result = cursor.execute(wildcard_prepared.bind(None))
+        self.assertEqual(result, [(0, 0, 0, None)])
+
+        result = cursor.execute(explicit_prepared.bind(None))
+        self.assertEqual(result, [(0, 0, 0, None)])
