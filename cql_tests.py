@@ -5055,7 +5055,7 @@ class TestCQL(Tester):
 
         assert_all(cursor, "SELECT sizeof(v) FROM test", [[4], [4]])
 
-    @since('2.0')
+    @since('2.1')
     def prepared_statement_invalidation_test(self):
         # test for CASSANDRA-7910
         import logging
