@@ -69,6 +69,9 @@ class TestSCUpgrade(Tester):
         cli.do("get sc_test['k0']['sc1']['c1']")
         assert_columns(cli, ['c1'])
 
+        assert not cli.has_errors(), cli.errors()
+        cli.close()
+
     #CASSANDRA-7188
     @since('2.0')
     def upgrade_with_counters_test(self):
