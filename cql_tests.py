@@ -5080,3 +5080,19 @@ class TestCQL(Tester):
 
         result = cursor.execute(explicit_prepared.bind(None))
         self.assertEqual(result, [(0, 0, 0, None)])
+
+    def bug_8558_test(self):
+        session = self.prepare()
+
+        session.execute("CREATE  KEYSPACE space1 WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}")
+        session.execute("CREATE  TABLE space1.table3(a int, b int, c text,primary key(a,b))")
+        session.execute("CREATE  KEYSPACE space2 WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}")
+
+        session.execute("CREATE  TABLE space2.table1(a int, b int, c int, primary key(a,b))")
+        session.execute("CREATE  TABLE space2.table2(a int, b int, c int, primary key(a,b))")
+        session.execute("INSERT INTO space1.table3(a,b,c) VALUES(1,1,'1')")
+        session.execute("drop table space2.table1")
+        session.execute("DELETE FROM space1.table3 where a=1 and b=1")
+        session.execute("drop table space2.table2")
+
+        assert_none(session, "select * from space1.table3 where a=1 and b=1")
