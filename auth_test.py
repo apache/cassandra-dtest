@@ -445,9 +445,30 @@ class TestAuth(Tester):
 
         # wait until the cache definitely expires and retry - should succeed now
         time.sleep(1.5)
-        for c in cathys:
-            rows = c.execute("SELECT * FROM ks.cf")
-            self.assertEqual(0, len(rows))
+        # refresh of user permissions is done asynchronously, the first request
+        # will trigger the refresh, but we'll continue to use the cached set until
+        # that completes (CASSANDRA-8194).
+        # make a request to trigger the refresh
+        try:
+            cathy.execute("SELECT * FROM ks.cf")
+        except Unauthorized:
+            pass
+
+        # once the async refresh completes, both clients should have the granted permissions
+        success = False
+        cnt = 0
+        while not success and cnt < 10:
+            try:
+                for c in cathys:
+                    rows = c.execute("SELECT * FROM ks.cf")
+                    self.assertEqual(0, len(rows))
+                success = True
+            except Unauthorized:
+                pass
+            cnt += 1
+            time.sleep(0.1)
+
+        assert success
 
     def list_permissions_test(self):
         self.prepare()
