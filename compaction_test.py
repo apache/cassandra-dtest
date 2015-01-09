@@ -2,11 +2,10 @@ from dtest import Tester, debug, DISABLE_VNODES
 import unittest
 from ccmlib.cluster import Cluster
 from ccmlib.node import Node, NodeError, TimeoutError
-from cassandra import ConsistencyLevel, Unavailable, ReadTimeout
-from cassandra.query import SimpleStatement
 import time, re
-from pyassertions import assert_invalid, assert_all, assert_none
-
+from pyassertions import assert_invalid, assert_all, assert_none, assert_one
+import tempfile
+import os
 
 class TestCompaction(Tester):
 
@@ -21,35 +20,33 @@ class TestCompaction(Tester):
         [node1] = cluster.nodelist()
 
         cursor = self.patient_cql_connection(node1)
-
         self.create_ks(cursor, 'ks', 1)
-        cursor.execute("create table ks.cf (key int PRIMARY KEY, val int) with gc_grace = 0 and compaction= {'class':" + self.strategy + "};")
+
+
+        cursor.execute("create table ks.cf (key int PRIMARY KEY, val int) with compaction = {'class':'" + self.strategy + "'} and gc_grace_seconds = 30;")
 
         for x in range(0, 100):
-            cursor.execute('insert into ks.cf (key, val) values (' + str(x) + ',1)')
+            cursor.execute('insert into cf (key, val) values (' + str(x) + ',1)')
 
         node1.flush()
-
         for x in range(0, 10):
             cursor.execute('delete from cf where key = ' + str(x))
 
         node1.flush()
-
         for x in range(0, 10):
-            assert_none(cursor.execute('select * from cf where key = ' + str(x)))
+            assert_none(cursor, 'select * from cf where key = ' + str(x))
 
-        json_path = tempfile.mktemp(suffix='.json')
-        with open(json_path, 'w') as f:
+        json_path = tempfile.mkstemp(suffix='.json')
+        jname = json_path[1]
+        with open(jname, 'w') as f:
             node1.run_sstable2json(f)
 
-        with open(json_path, 'r') as g:
+        with open(jname, 'r') as g:
             jsoninfo = g.read()
 
-        numfound = jsoninfo.count("true]]")
-        debug(numfound)
+        numfound = jsoninfo.count("markedForDeleteAt")
 
         self.assertEqual(numfound, 10)
-
 
     def data_size_test(self):
         """Ensure that data size does not have unwarranted increases after compaction.
@@ -59,7 +56,7 @@ class TestCompaction(Tester):
         cluster.populate(1).start()
         [node1] = cluster.nodelist()
         cursor = self.patient_cql_connection(node1)
-        node1.stress(['write', 'n=100000', '-schema', 'replication(factor=3)'])
+        node1.stress(['write', 'n=100000'])
 
         node1.flush()
 
@@ -71,6 +68,7 @@ class TestCompaction(Tester):
             initialValue = output[output.find(":")+1:output.find("\n")].strip()
         else:
             debug("datasize not found")
+            debug(output)
 
         node1.nodetool('compact')
 
@@ -87,7 +85,7 @@ class TestCompaction(Tester):
 
     def sstable_deletion_test(self):
         """Test that sstables are deleted properly when able to be.
-        Insert data setting gc_grace_seconds to 0, and determine sstable
+        Insert data setting gc_grace_seconds to 0, and determine sstable 
         is deleted upon data deletion.
         """
         cluster = self.cluster
@@ -95,10 +93,10 @@ class TestCompaction(Tester):
         [node1] = cluster.nodelist()
         cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'ks', 1)
-        cursor.execute("create table cf (key int PRIMARY KEY, val int) with gc_grace = 0 and compaction= {'class':" +self.strategy+"}")
+        cursor.execute("create table cf (key int PRIMARY KEY, val int) with gc_grace_seconds = 0 and compaction= {'class':'" +self.strategy+"'}")
 
         for x in range(0, 100):
-            cursor.execute('insert into cf (key, c1) values (' + str(x) + ',1)')
+            cursor.execute('insert into cf (key, val) values (' + str(x) + ',1)')
         node1.flush()
         for x in range(0, 100):
             cursor.execute('delete from cf where key = ' + str(x))
@@ -117,16 +115,24 @@ class TestCompaction(Tester):
         Set throughput, insert data and ensure compaction performance corresponds.
         """
         cluster = self.cluster
-        cluster.populate(3).start()
+        cluster.populate(1).start()
         [node1] = cluster.nodelist()
         cursor = self.patient_cql_connection(node1)
         node1.stress(['write', "n=100000"])
         node1.flush()
 
-        node1.nodetool('setcompactionthroughput -- 100')
+        threshold = "10"
+
+        node1.nodetool('setcompactionthroughput -- ' + threshold)
         node1.nodetool('compact')
 
-        node1.watch_log_for("100.00MB/s")
+        matches = node1.watch_log_for("Compacted")
+
+        stringline = matches[0]
+        avgthroughput = stringline[stringline.find('=')+1:stringline.find("MB/s")]
+        debug(avgthroughput)
+
+        self.assertGreaterEqual(threshold, avgthroughput)
 
     def compaction_strategy_switching_test(self):
         """Ensure that switching strategies does not result in problems.
@@ -134,16 +140,18 @@ class TestCompaction(Tester):
         """
         strategies = ['LeveledCompactionStrategy', 'SizeTieredCompactionStrategy', 'DateTieredCompactionStrategy']
 
-        if self.strategy in strategies:
+        if self.strategy in strategies: 
             strategies.remove(self.strategy)
-            for strat in strategies:
-                cluster = self.cluster
-                cluster.populate(3).start()
-                [node1] = cluster.nodelist()
-                cursor = self.patient_cql_connection(node1)
+            cluster = self.cluster
+            cluster.populate(1).start()
+            [node1] = cluster.nodelist()
 
+
+            for strat in strategies:
+                cursor = self.patient_cql_connection(node1)
                 self.create_ks(cursor, 'ks', 1)
-                cursor.execute("create table ks.cf (key int PRIMARY KEY, val int) with gc_grace = 0 and compaction= {'class':" + self.strategy + "};")
+
+                cursor.execute("create table ks.cf (key int PRIMARY KEY, val int) with gc_grace_seconds = 0 and compaction= {'class':'" + self.strategy + "'};")
 
                 for x in range(0, 100):
                     cursor.execute('insert into ks.cf (key, val) values (' + str(x) + ',1)')
@@ -153,15 +161,21 @@ class TestCompaction(Tester):
                 for x in range(0, 10):
                     cursor.execute('delete from cf where key = ' + str(x))
 
-                cursor.execute("alter table ks.cf with compaction = {'class':" + strat + "};")
+                cursor.execute("alter table ks.cf with compaction = {'class':'" + strat + "'};")
 
                 for x in range(11,100):
-                    assert_one(cursor.execute("select * from ks.cf where key =" + str(x)))
+                    assert_one(cursor, "select * from ks.cf where key =" + str(x),[x, 1])
 
                 for x in range(0, 10):
-                    assert_none(cursor.execute('select * from cf where key = ' + str(x)))
+                    assert_none(cursor, 'select * from cf where key = ' + str(x))
+
+                node1.flush()
+                cluster.clear()
+                time.sleep(5)
+                cluster.start()
 
 strategies = ['LeveledCompactionStrategy', 'SizeTieredCompactionStrategy', 'DateTieredCompactionStrategy']
 for strategy in strategies:
     cls_name = ('TestCompaction_with_' + strategy)
     vars()[cls_name] = type(cls_name, (TestCompaction,), {'strategy': strategy, '__test__':True})
+
