@@ -11,10 +11,7 @@ from pytools import since, require, rows_to_list
 from cassandra import ConsistencyLevel, InvalidRequest
 from cassandra.protocol import ProtocolException, SyntaxException, ConfigurationException, InvalidRequestException
 from cassandra.query import SimpleStatement
-try:
-    from blist import sortedset
-except ImportError:
-    pass
+from cassandra.util import sortedset
 
 cql_version = "3.0.0"
 

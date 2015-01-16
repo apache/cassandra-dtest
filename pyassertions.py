@@ -54,3 +54,13 @@ def assert_almost_equal(*args, **kwargs):
     vmax = max(args)
     vmin = min(args)
     assert vmin > vmax * (1.0 - error), "values not within %.2f%% of the max: %s" % (error * 100, args)
+
+def assert_row_count(cursor, table_name, expected):
+    """ Function to validate the row count expected in table_name """
+
+    query = "SELECT count(*) FROM {};".format(table_name)
+    res = cursor.execute(query)
+    count = res[0][0]
+    assert count == expected, "Expected a row count of {} in table '{}', but got {}".format(
+        expected, table_name, count
+    )
