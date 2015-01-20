@@ -6,6 +6,8 @@ from dtest import Tester
 from assertions import *
 from tools import since
 
+#Second value is superuser status
+#Third value is login status, See #7653 for explanation.
 mike_role = ['mike', False, True]
 role1_role = ['role1', False, False]
 role2_role = ['role2', False, False]
