@@ -1,7 +1,7 @@
 # coding: utf-8
 
 from dtest import Tester
-from pytools import since
+from tools import since
 from cassandra import ConsistencyLevel, WriteTimeout
 from cassandra.query import SimpleStatement
 

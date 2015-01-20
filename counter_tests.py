@@ -3,8 +3,8 @@ from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
 
 import random, time, uuid
-from pyassertions import assert_invalid, assert_one
-from pytools import rows_to_list, since
+from assertions import assert_invalid, assert_one
+from tools import rows_to_list, since
 
 class TestCounters(Tester):
 

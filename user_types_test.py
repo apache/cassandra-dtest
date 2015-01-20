@@ -2,8 +2,8 @@ import time
 import uuid
 import re
 from dtest import Tester, debug
-from pytools import since, require
-from pyassertions import assert_invalid
+from tools import since, require
+from assertions import assert_invalid
 from cassandra import Unauthorized, ConsistencyLevel
 from cassandra.query import SimpleStatement
 

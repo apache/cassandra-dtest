@@ -1,7 +1,7 @@
 from dtest import Tester
-from pytools import since
+from tools import since
 
-import os, sys, time, pytools
+import os, sys, time, tools
 from uuid import UUID
 from ccmlib.cluster import Cluster
 

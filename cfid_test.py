@@ -1,5 +1,5 @@
 from dtest import Tester
-from pytools import since
+from tools import since
 import unittest, os, sys, time
 from ccmlib.cluster import Cluster
 from ccmlib import common

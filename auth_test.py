@@ -3,9 +3,9 @@ import time, re
 from cassandra import Unauthorized, AuthenticationFailed
 from cassandra.cluster import NoHostAvailable
 from dtest import debug, Tester
-from pytools import since
-from pyassertions import assert_invalid
-from pytools import require
+from tools import since
+from assertions import assert_invalid
+from tools import require
 
 class TestAuth(Tester):
 
@@ -542,9 +542,9 @@ class TestAuth(Tester):
         cassandra.execute("GRANT CREATE ON KEYSPACE ks TO cathy")
         cathy.execute("CREATE TYPE ks.address (street text, city text)")
         cassandra.execute("GRANT ALTER ON KEYSPACE ks TO cathy")
-        cathy.execute("ALTER TYPE ks.address ADD zip_code int")    
+        cathy.execute("ALTER TYPE ks.address ADD zip_code int")
         cassandra.execute("GRANT DROP ON KEYSPACE ks TO cathy")
-        cathy.execute("DROP TYPE ks.address")    
+        cathy.execute("DROP TYPE ks.address")
 
     @since('3.0')
     @require('https://issues.apache.org/jira/browse/CASSANDRA-7557')
@@ -566,9 +566,9 @@ class TestAuth(Tester):
         cassandra.execute("GRANT CREATE ON KEYSPACE ks TO cathy")
         cathy.execute(udf)
         cassandra.execute("GRANT DROP ON KEYSPACE ks TO cathy")
-        cathy.execute(dropUdf)    
-        
-        
+        cathy.execute(dropUdf)
+
+
     def prepare(self, nodes=1, permissions_validity=0):
         config = {'authenticator' : 'org.apache.cassandra.auth.PasswordAuthenticator',
                   'authorizer' : 'org.apache.cassandra.auth.CassandraAuthorizer',

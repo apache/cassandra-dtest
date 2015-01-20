@@ -1,8 +1,8 @@
 import random, re, time, uuid
 
 from dtest import Tester, debug
-from pytools import since
-from pyassertions import assert_invalid
+from tools import since
+from assertions import assert_invalid
 from cassandra import InvalidRequest
 from cassandra.query import BatchStatement, SimpleStatement
 from cassandra.protocol import ConfigurationException
