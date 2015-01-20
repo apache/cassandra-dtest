@@ -116,3 +116,48 @@ class TestUserFunctions(Tester):
         assert_invalid(session, "SELECT v FROM tab WHERE k = overloaded((ascii)'foo')");
         #should now work - unambiguous
         session.execute("DROP FUNCTION overloaded");
+
+    @since("3.0")
+    def udf_scripting_test(self):
+        session = self.prepare()
+        session.execute("create table nums (key int primary key, val double);")
+
+        for x in range (1,4):
+            session.execute("INSERT INTO nums (key, val) VALUES (%d, %d)" % (x, float(x)))
+
+        session.execute("CREATE FUNCTION x_sin(val double) returns double language javascript as 'Math.sin(val)'");
+
+        assert_one(session, "SELECT key, val, x_sin(val) FROM nums where key = %d" % 1, [1, 1.0, math.sin(1.0)])
+        assert_one(session, "SELECT key, val, x_sin(val) FROM nums where key = %d" % 2, [2, 2.0, math.sin(2.0)])
+        assert_one(session, "SELECT key, val, x_sin(val) FROM nums where key = %d" % 3, [3, 3.0, math.sin(3.0)])
+    
+    @since("3.0")
+    def default_aggregate_test(self):
+        session = self.prepare()
+        session.execute("create table nums (key int primary key, val double);")
+
+        for x in range(1, 10):
+            session.execute("INSERT INTO nums (key, val) VALUES (%d, %d)" % (x, float(x)))
+
+        assert_one(session, "SELECT min(key) FROM nums", [1])
+        assert_one(session, "SELECT max(val) FROM nums", [9.0])
+        assert_one(session, "SELECT sum(key) FROM nums", [45])
+        assert_one(session, "SELECT avg(val) FROM nums", [5.0])
+        assert_one(session, "SELECT count(*) FROM nums", [9])
+
+
+    @since("3.0")
+    def aggregate_udf_test(self):
+        session = self.prepare()
+        session.execute("create table nums (key int primary key, val int);")
+
+        for x in range(1, 4):
+            session.execute("INSERT INTO nums (key, val) VALUES (%d, %d)" % (x, x))
+        session.execute("create function plus(key int, val int) returns int language java as 'return Integer.valueOf(key.intValue() + val.intValue());'")
+        session.execute("create function stri(key int) returns text language java as 'return key.toString();'")
+        session.execute("create aggregate suma (int) sfunc plus stype int finalfunc stri initcond 10")
+
+        assert_one(session, "select suma(val) from nums", ["16"])
+
+    #@since("3.0")
+    # def udf_with_udt_test(self):
