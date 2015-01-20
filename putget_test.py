@@ -1,6 +1,6 @@
 from dtest import Tester
-import pytools as tools
-from pytools import no_vnodes, create_c1c2_table, retry_till_success
+import tools as tools
+from tools import no_vnodes, create_c1c2_table, retry_till_success
 from cassandra import ConsistencyLevel
 
 import time, re

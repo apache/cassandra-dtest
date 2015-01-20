@@ -1,8 +1,8 @@
 import time
 
 from dtest import Tester, debug, DISABLE_VNODES
-from pyassertions import assert_unavailable
-from pytools import (create_c1c2_table, insert_c1c2, query_c1c2, retry_till_success,
+from assertions import assert_unavailable
+from tools import (create_c1c2_table, insert_c1c2, query_c1c2, retry_till_success,
                    insert_columns)
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement

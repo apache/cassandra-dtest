@@ -1,5 +1,5 @@
 from dtest import Tester, debug
-from pytools import rows_to_list
+from tools import rows_to_list
 import tempfile, os
 
 class TestJson(Tester):

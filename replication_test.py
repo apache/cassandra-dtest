@@ -1,5 +1,5 @@
 from dtest import Tester, debug, PRINT_DEBUG
-from pytools import no_vnodes
+from tools import no_vnodes
 from ccmlib.cluster import Cluster
 import re, os, time
 from collections import defaultdict

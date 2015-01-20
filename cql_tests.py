@@ -6,8 +6,8 @@ from collections import OrderedDict
 from uuid import uuid4, UUID
 
 from dtest import Tester, canReuseCluster, freshCluster
-from pyassertions import assert_invalid, assert_one, assert_none, assert_all
-from pytools import since, require, rows_to_list
+from assertions import assert_invalid, assert_one, assert_none, assert_all
+from tools import since, require, rows_to_list
 from cassandra import ConsistencyLevel, InvalidRequest
 from cassandra.protocol import ProtocolException, SyntaxException, ConfigurationException, InvalidRequestException
 from cassandra.query import SimpleStatement

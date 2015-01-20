@@ -1,6 +1,6 @@
 import time
 
-from pyassertions import assert_invalid, assert_unavailable
+from assertions import assert_invalid, assert_unavailable
 from dtest import Tester
 from cassandra import ConsistencyLevel, Timeout
 from cassandra.query import SimpleStatement

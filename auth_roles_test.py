@@ -3,8 +3,8 @@ import time
 from cassandra import AuthenticationFailed, Unauthorized
 from cassandra.cluster import NoHostAvailable
 from dtest import Tester
-from pyassertions import *
-from pytools import since
+from assertions import *
+from tools import since
 
 mike_role = ['mike', False, True]
 role1_role = ['role1', False, False]
@@ -113,7 +113,7 @@ class TestAuthRoles(Tester):
 
         assert_invalid(cassandra, "GRANT role1 TO mike", "role1 doesn't exist")
         cassandra.execute("CREATE ROLE role1")
-        
+
         assert_invalid(cassandra, "GRANT role1 TO john", "john doesn't exist")
         assert_invalid(cassandra, "GRANT role1 TO role2", "role2 doesn't exist")
 
@@ -190,10 +190,10 @@ class TestAuthRoles(Tester):
                        "INSERT INTO ks.cf (id, val) VALUES (0, 0)",
                        "mike has no MODIFY permission on <table ks.cf> or any of its parents",
                        Unauthorized)
-        
+
         cassandra.execute("GRANT role1 TO mike")
         cassandra.execute("REVOKE ALL ON ks.cf FROM role1")
-        
+
         assert_invalid(mike,
                        "INSERT INTO ks.cf (id, val) VALUES (0, 0)",
                        "mike has no MODIFY permission on <table ks.cf> or any of its parents",

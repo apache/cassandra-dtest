@@ -1,7 +1,7 @@
 from dtest import Tester, debug
 from ccmlib.cluster import Cluster
 from ccmlib.common import get_version_from_build
-from pytools import since
+from tools import since
 import random, os, time, re
 
 # Tests upgrade between 1.2->2.0 for super columns (since that's where

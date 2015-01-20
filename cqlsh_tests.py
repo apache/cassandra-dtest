@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from dtest import Tester, debug
-from pytools import since, require
+from tools import since, require
 from ccmlib import common
 import subprocess
 import binascii
@@ -8,7 +8,7 @@ from decimal import Decimal
 import sys, os, datetime
 from uuid import UUID
 from distutils.version import LooseVersion
-from pytools import create_c1c2_table, insert_c1c2, since
+from tools import create_c1c2_table, insert_c1c2, since
 
 class TestCqlsh(Tester):
 
