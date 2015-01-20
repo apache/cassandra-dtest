@@ -1,5 +1,5 @@
 from dtest import Tester, debug
-from pytools import replace_in_file, since
+from tools import replace_in_file, since
 import tempfile, shutil, glob, os, time
 import distutils.dir_util
 

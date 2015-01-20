@@ -3,7 +3,7 @@ import unittest
 from ccmlib.cluster import Cluster
 from ccmlib.node import Node, NodeError, TimeoutError
 import time, re
-from pyassertions import assert_invalid, assert_all, assert_none, assert_one
+from assertions import assert_invalid, assert_all, assert_none, assert_one
 import tempfile
 import os
 
@@ -85,7 +85,7 @@ class TestCompaction(Tester):
 
     def sstable_deletion_test(self):
         """Test that sstables are deleted properly when able to be.
-        Insert data setting gc_grace_seconds to 0, and determine sstable 
+        Insert data setting gc_grace_seconds to 0, and determine sstable
         is deleted upon data deletion.
         """
         cluster = self.cluster
@@ -140,7 +140,7 @@ class TestCompaction(Tester):
         """
         strategies = ['LeveledCompactionStrategy', 'SizeTieredCompactionStrategy', 'DateTieredCompactionStrategy']
 
-        if self.strategy in strategies: 
+        if self.strategy in strategies:
             strategies.remove(self.strategy)
             cluster = self.cluster
             cluster.populate(1).start()

@@ -2,7 +2,7 @@ import time, re
 from dtest import Tester, debug
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
-from pytools import no_vnodes, insert_c1c2, query_c1c2
+from tools import no_vnodes, insert_c1c2, query_c1c2
 
 class TestRepair(Tester):
 

@@ -4,8 +4,8 @@ from cassandra.util import sortedset
 from cassandra.query import SimpleStatement
 from cassandra import ConsistencyLevel
 from dtest import Tester
-from pytools import since
-from pyassertions import (
+from tools import since
+from assertions import (
     assert_all,
     assert_none,
     assert_row_count,

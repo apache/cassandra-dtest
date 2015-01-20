@@ -1,8 +1,8 @@
 import math, os, sys, time
 
 from dtest import Tester, debug
-from pyassertions import assert_invalid, assert_one, assert_all, assert_none
-from pytools import since, rows_to_list
+from assertions import assert_invalid, assert_one, assert_all, assert_none
+from tools import since, rows_to_list
 
 
 class TestUserFunctions(Tester):

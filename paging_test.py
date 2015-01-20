@@ -5,7 +5,7 @@ from cassandra import ConsistencyLevel as CL
 from cassandra import InvalidRequest
 from cassandra.query import SimpleStatement, dict_factory
 from dtest import Tester, run_scenarios
-from pytools import since
+from tools import since
 
 from datahelp import create_rows, parse_data_into_dicts, flatten_into_set
 

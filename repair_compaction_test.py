@@ -1,5 +1,5 @@
 from dtest import Tester, debug
-from pytools import insert_c1c2, since
+from tools import insert_c1c2, since
 from cassandra import ConsistencyLevel
 from ccmlib.node import Node
 import unittest

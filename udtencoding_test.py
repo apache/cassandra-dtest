@@ -1,6 +1,6 @@
 from dtest import Tester
-from pyassertions import assert_invalid
-from pytools import since
+from assertions import assert_invalid
+from tools import since
 
 import os, sys, time
 from ccmlib.cluster import Cluster
