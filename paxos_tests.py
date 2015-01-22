@@ -1,7 +1,8 @@
 # coding: utf-8
 
 from dtest import Tester
-from tools import since
+from tools import since, no_vnodes
+from assertions import assert_unavailable
 from cassandra import ConsistencyLevel, WriteTimeout
 from cassandra.query import SimpleStatement
 
@@ -28,6 +29,48 @@ class TestPaxos(Tester):
         if create_keyspace:
             self.create_ks(cursor, 'ks', rf)
         return cursor
+
+    @since('2.0.6')
+    def replica_availability_test(self):
+        #See CASSANDRA-8640
+        session = self.prepare(nodes=3, rf=3)
+        session.execute("CREATE TABLE test (k int PRIMARY KEY, v int)")
+        session.execute("INSERT INTO test (k, v) VALUES (0, 0) IF NOT EXISTS")
+
+        self.cluster.nodelist()[2].stop()
+        session.execute("INSERT INTO test (k, v) VALUES (1, 1) IF NOT EXISTS")
+
+        self.cluster.nodelist()[1].stop()
+        assert_unavailable(session.execute, "INSERT INTO test (k, v) VALUES (2, 2) IF NOT EXISTS")
+
+        self.cluster.nodelist()[1].start()
+        session.execute("INSERT INTO test (k, v) VALUES (3, 3) IF NOT EXISTS")
+
+        self.cluster.nodelist()[2].start()
+        session.execute("INSERT INTO test (k, v) VALUES (4, 4) IF NOT EXISTS")
+
+    @since('2.0.6')
+    @no_vnodes()
+    def cluster_availability_test(self):
+        #Warning, a change in partitioner or a change in CCM token allocation
+        #may require the partition keys of these inserts to be changed.
+        #This must not use vnodes as it relies on assumed token values.
+
+        session = self.prepare(nodes=3)
+        session.execute("CREATE TABLE test (k int PRIMARY KEY, v int)")
+        session.execute("INSERT INTO test (k, v) VALUES (0, 0) IF NOT EXISTS")
+
+        self.cluster.nodelist()[2].stop()
+        session.execute("INSERT INTO test (k, v) VALUES (1, 1) IF NOT EXISTS")
+
+        self.cluster.nodelist()[1].stop()
+        session.execute("INSERT INTO test (k, v) VALUES (3, 2) IF NOT EXISTS")
+
+        self.cluster.nodelist()[1].start()
+        session.execute("INSERT INTO test (k, v) VALUES (5, 5) IF NOT EXISTS")
+
+        self.cluster.nodelist()[2].start()
+        session.execute("INSERT INTO test (k, v) VALUES (6, 6) IF NOT EXISTS")
 
     @since('2.0.6')
     def contention_test_multi_iterations(self):
