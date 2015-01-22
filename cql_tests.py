@@ -1971,23 +1971,35 @@ class TestCQL(Tester):
         cursor.execute("CREATE KEYSPACE ks1 WITH replication={ 'class' : 'SimpleStrategy', 'replication_factor' : 1 }")
         cursor.execute("CREATE KEYSPACE ks2 WITH replication={ 'class' : 'SimpleStrategy', 'replication_factor' : 1 } AND durable_writes=false")
 
-        res = cursor.execute("SELECT keyspace_name, durable_writes FROM system.schema_keyspaces")
-        assert rows_to_list(res) == [['ks1', True], ['system', True], ['system_traces', True], ['ks2', False]], res
+        if self.cluster.version() >= '3.0':
+            assert_all(cursor, "SELECT keyspace_name, durable_writes FROM system.schema_keyspaces",
+                    [['system_auth', True],['ks1', True], ['system', True], ['system_traces', True], ['ks2', False]])
+        else:
+            assert_all(cursor, "SELECT keyspace_name, durable_writes FROM system.schema_keyspaces",
+                    [['ks1', True], ['system', True], ['system_traces', True], ['ks2', False]])
 
         cursor.execute("ALTER KEYSPACE ks1 WITH replication = { 'class' : 'NetworkTopologyStrategy', 'dc1' : 1 } AND durable_writes=False")
         cursor.execute("ALTER KEYSPACE ks2 WITH durable_writes=true")
-        res = cursor.execute("SELECT keyspace_name, durable_writes, strategy_class FROM system.schema_keyspaces")
-        assert rows_to_list(res) == [[u'ks1', False, u'org.apache.cassandra.locator.NetworkTopologyStrategy'],
-                      [u'system', True, u'org.apache.cassandra.locator.LocalStrategy'],
-                      [u'system_traces', True, u'org.apache.cassandra.locator.SimpleStrategy'],
-                      [u'ks2', True, u'org.apache.cassandra.locator.SimpleStrategy']]
+
+        if self.cluster.version() >= '3.0':
+            assert_all(cursor, "SELECT keyspace_name, durable_writes, strategy_class FROM system.schema_keyspaces",
+                          [[u'system_auth', True, u'org.apache.cassandra.locator.SimpleStrategy'],
+                          [u'ks1', False, u'org.apache.cassandra.locator.NetworkTopologyStrategy'],
+                          [u'system', True, u'org.apache.cassandra.locator.LocalStrategy'],
+                          [u'system_traces', True, u'org.apache.cassandra.locator.SimpleStrategy'],
+                          [u'ks2', True, u'org.apache.cassandra.locator.SimpleStrategy']])
+        else:
+            assert_all(cursor, "SELECT keyspace_name, durable_writes, strategy_class FROM system.schema_keyspaces",
+                          [[u'ks1', False, u'org.apache.cassandra.locator.NetworkTopologyStrategy'],
+                          [u'system', True, u'org.apache.cassandra.locator.LocalStrategy'],
+                          [u'system_traces', True, u'org.apache.cassandra.locator.SimpleStrategy'],
+                          [u'ks2', True, u'org.apache.cassandra.locator.SimpleStrategy']])
 
         cursor.execute("USE ks1")
 
         assert_invalid(cursor, "CREATE TABLE cf1 (a int PRIMARY KEY, b int) WITH compaction = { 'min_threshold' : 4 }", expected=ConfigurationException)
         cursor.execute("CREATE TABLE cf1 (a int PRIMARY KEY, b int) WITH compaction = { 'class' : 'SizeTieredCompactionStrategy', 'min_threshold' : 7 }")
-        res = cursor.execute("SELECT columnfamily_name, min_compaction_threshold FROM system.schema_columnfamilies WHERE keyspace_name='ks1'")
-        assert rows_to_list(res) == [['cf1', 7]], res
+        assert_one(cursor, "SELECT columnfamily_name, min_compaction_threshold FROM system.schema_columnfamilies WHERE keyspace_name='ks1'", ['cf1', 7])
 
     def remove_range_slice_test(self):
         cursor = self.prepare()
