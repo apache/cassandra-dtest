@@ -444,7 +444,17 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
                 output = output.replace('\r', '')
             self.assertTrue(expected in output, "Output \n {%s} \n doesn't contain expected\n {%s}" % (output, expected))
 
-        verify_output("LIST USERS", """
+        if self.cluster.version() >= '3.0':
+            verify_output("LIST USERS", """
+ name      | super
+-----------+-------
+ cassandra |  True
+     user1 | False
+
+(2 rows)
+""")
+        else:
+            verify_output("LIST USERS", """
  name      | super
 -----------+-------
      user1 | False
@@ -453,7 +463,21 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
 (2 rows)
 """)
 
-        verify_output("LIST ALL PERMISSIONS OF user1", """
+        if self.cluster.version() >= '3.0':
+            verify_output("LIST ALL PERMISSIONS OF user1", """
+ role  | username | resource      | permission
+-------+----------+---------------+------------
+ user1 |    user1 | <table ks.t1> |     CREATE
+ user1 |    user1 | <table ks.t1> |      ALTER
+ user1 |    user1 | <table ks.t1> |       DROP
+ user1 |    user1 | <table ks.t1> |     SELECT
+ user1 |    user1 | <table ks.t1> |     MODIFY
+ user1 |    user1 | <table ks.t1> |  AUTHORIZE
+
+(6 rows)
+""")
+        else:
+            verify_output("LIST ALL PERMISSIONS OF user1", """
  username | resource      | permission
 ----------+---------------+------------
     user1 | <table ks.t1> |     CREATE
