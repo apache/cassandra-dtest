@@ -17,7 +17,7 @@ class TestRepairCompaction(Tester):
         ]
         Tester.__init__(self, *args, **kwargs)
 
-    @since('3.0')
+    @since('2.1')
     def sstable_marking_test(self):
         cluster = self.cluster
         cluster.populate(3).start()
@@ -31,7 +31,11 @@ class TestRepairCompaction(Tester):
 
         node3.start(wait_other_notice=True)
         time.sleep(3)
-        node3.repair()
+
+        if cluster.version() > "2.1":
+            node3.repair()
+        else:
+            node3.nodetool("repair -par -inc")
 
         output = ""
         with open('sstables.txt', 'w') as f:
@@ -46,7 +50,7 @@ class TestRepairCompaction(Tester):
 
         os.remove('sstables.txt')
 
-    @since('3.0')
+    @since('2.1')
     def multiple_repair_test(self):
         cluster = self.cluster
         cluster.populate(3).start()
@@ -74,7 +78,11 @@ class TestRepairCompaction(Tester):
 
         debug("restarting and repairing node 3")
         node3.start()
-        node3.repair()
+
+        if cluster.version() > "2.1":
+            node3.repair()
+        else:
+            node3.nodetool("repair -par -inc")
 
         debug("stopping node 2")
         node2.stop(gently=False)
@@ -87,7 +95,11 @@ class TestRepairCompaction(Tester):
         debug("start and repair node 2")
         node2.flush()
         node2.start()
-        node2.repair()
+
+        if cluster.version() > "2.1":
+            node2.repair()
+        else:
+            node2.nodetool("repair -par -inc")
 
         debug("replace node and check data integrity")
         node3.stop(gently=False)
@@ -95,9 +107,9 @@ class TestRepairCompaction(Tester):
         cluster.add(node5, False)
         node5.start(replace_address = '127.0.0.3', wait_other_notice=True)
 
-        assert_one(cursor, "SELECT COUNT(*) FROM ks.cf LIMIT 100", [14])
+        assert_one(cursor, "SELECT COUNT(*) FROM ks.cf LIMIT 200", [149])
 
-    @since('3.0')
+    @since('2.1')
     def sstable_repairedset_test(self):
         cluster = self.cluster
         cluster.populate(2).start()
@@ -123,7 +135,11 @@ class TestRepairCompaction(Tester):
         node2.stress(['write', 'n=10000', '-schema', 'replication(factor=2)'])
         node2.flush()
         node1.start()
-        node1.repair()
+
+        if cluster.version() > "2.1":
+            node1.repair()
+        else:
+            node1.nodetool("repair -par -inc")
 
         with open('final.txt', 'w') as h:
             node1.run_sstablemetadata(output_file=h, keyspace='keyspace1')
@@ -155,7 +171,7 @@ class TestRepairCompaction(Tester):
         os.remove('initial.txt')
         os.remove('final.txt')
     
-    @since('3.0')
+    @since('2.1')
     def compaction_test(self):
         cluster = self.cluster
         cluster.populate(3).start()
@@ -173,7 +189,10 @@ class TestRepairCompaction(Tester):
 
         node3.start()
 
-        node3.repair()
+        if cluster.version() > "2.1":
+            node3.repair()
+        else:
+            node3.nodetool("repair -par -inc")
 
         for x in range(0, 150):
             cursor.execute("insert into tab(key,val) values(" + str(x) + ",1)")
