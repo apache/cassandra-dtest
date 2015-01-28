@@ -130,7 +130,17 @@ class TestUserFunctions(Tester):
         assert_one(session, "SELECT key, val, x_sin(val) FROM nums where key = %d" % 1, [1, 1.0, math.sin(1.0)])
         assert_one(session, "SELECT key, val, x_sin(val) FROM nums where key = %d" % 2, [2, 2.0, math.sin(2.0)])
         assert_one(session, "SELECT key, val, x_sin(val) FROM nums where key = %d" % 3, [3, 3.0, math.sin(3.0)])
-    
+        
+        session.execute("create function y_sin(val double) returns double language javascript as 'Math.sin(val).toString()'")
+
+        assert_invalid(session, "select y_sin(val) from nums where key = 1")
+
+        assert_invalid(session, "create function compilefail(key int) returns double language javascript as 'foo bar';")
+
+        session.execute("create function plustwo(key int) returns double language javascript as 'key+2'")        
+
+        assert_one(session, "select plustwo(key) from nums where key = 3", [5])
+
     @since("3.0")
     def default_aggregate_test(self):
         session = self.prepare()
@@ -159,5 +169,29 @@ class TestUserFunctions(Tester):
 
         assert_one(session, "select suma(val) from nums", ["16"])
 
-    #@since("3.0")
-    # def udf_with_udt_test(self):
+        session.execute("create function test(a int, b double) returns int language javascript as 'a + b;'")
+        session.execute("create aggregate aggy(double) sfunc test stype int")
+
+        assert_invalid(session, "create aggregate aggtwo(int) sfunc aggy stype int")
+
+        assert_invalid(session, "create aggregate aggthree(int) sfunc test stype int finalfunc aggtwo")
+
+    @since("3.0")
+    def udf_with_udt_test(self):
+        session = self.prepare()
+
+        session.execute("create type test (a text, b int);")
+
+        assert_invalid(session,"create table tab (key int primary key, udt test);")
+
+        session.execute("create table tab (key int primary key, udt frozen<test>);")
+
+        session.execute("insert into tab (key, udt) values (1, {a: 'une', b:1});")
+        session.execute("insert into tab (key, udt) values (2, {a: 'deux', b:2});")
+        session.execute("insert into tab (key, udt) values (3, {a: 'trois', b:3});")
+
+        session.execute("create function funk(udt frozen<test>) returns int language java as 'return Integer.valueOf(udt.getInt(\"b\"));';")
+
+        assert_one(session, "select sum(funk(udt)) from tab", [6])
+
+        assert_invalid(session, "drop type test;")
