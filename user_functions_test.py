@@ -170,7 +170,7 @@ class TestUserFunctions(Tester):
         assert_one(session, "select suma(val) from nums", ["16"])
 
         session.execute("create function test(a int, b double) returns int language javascript as 'a + b;'")
-        session.execute("create aggregate aggy(int) sfunc test stype int")
+        session.execute("create aggregate aggy(double) sfunc test stype int")
 
         assert_invalid(session, "create aggregate aggtwo(int) sfunc aggy stype int")
 

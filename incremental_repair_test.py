@@ -8,7 +8,7 @@ import time
 import os
 from assertions import assert_invalid, assert_one, assert_all, assert_none
 
-class TestRepairCompaction(Tester):
+class TestIncRepair(Tester):
 
     def __init__(self, *args, **kwargs):
         # Ignore these log patterns:
@@ -32,7 +32,7 @@ class TestRepairCompaction(Tester):
         node3.start(wait_other_notice=True)
         time.sleep(3)
 
-        if cluster.version() > "2.1":
+        if cluster.version() >= "3.0":
             node3.repair()
         else:
             node3.nodetool("repair -par -inc")
@@ -79,7 +79,7 @@ class TestRepairCompaction(Tester):
         debug("restarting and repairing node 3")
         node3.start()
 
-        if cluster.version() > "2.1":
+        if cluster.version() >= "3.0":
             node3.repair()
         else:
             node3.nodetool("repair -par -inc")
@@ -96,7 +96,7 @@ class TestRepairCompaction(Tester):
         node2.flush()
         node2.start()
 
-        if cluster.version() > "2.1":
+        if cluster.version() >= "3.0":
             node2.repair()
         else:
             node2.nodetool("repair -par -inc")
@@ -132,11 +132,11 @@ class TestRepairCompaction(Tester):
             initialoutput = g.read()
 
         node1.stop()
-        node2.stress(['write', 'n=10000', '-schema', 'replication(factor=2)'])
+        node2.stress(['write', 'n=15000', '-schema', 'replication(factor=2)'])
         node2.flush()
         node1.start()
 
-        if cluster.version() > "2.1":
+        if cluster.version() >= "3.0":
             node1.repair()
         else:
             node1.nodetool("repair -par -inc")
@@ -162,9 +162,9 @@ class TestRepairCompaction(Tester):
                 index = uniquematches.index(value)
                 matchcount[index] = matchcount[index] + 1
 
-        self.assertEqual(len(uniquematches), 3)
+        self.assertGreaterEqual(len(uniquematches), 2)
 
-        self.assertEqual(max(matchcount), 3)
+        self.assertGreaterEqual(max(matchcount), 2)
 
         self.assertNotIn('repairedAt: 0', finaloutput)
 
@@ -177,7 +177,7 @@ class TestRepairCompaction(Tester):
         cluster.populate(3).start()
         [node1,node2,node3] = cluster.nodelist()
 
-        cursor = self.patient_cql_connection(node1)
+        cursor = self.patient_cql_connection(node1) 
         self.create_ks(cursor, 'ks', 3)
         cursor.execute("create table tab(key int PRIMARY KEY, val int);")
 
@@ -189,7 +189,7 @@ class TestRepairCompaction(Tester):
 
         node3.start()
 
-        if cluster.version() > "2.1":
+        if cluster.version() >= "3.0":
             node3.repair()
         else:
             node3.nodetool("repair -par -inc")

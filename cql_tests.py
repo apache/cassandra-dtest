@@ -449,7 +449,10 @@ class TestCQL(Tester):
         assert rows_to_list(res) == [[0, 0, 0, 0, 0], [0, 0, 1, 1, 0], [0, 0, 1, 1, -1],
                                      [0, 0, 1, 0, 2], [0, -1, 2, 2, 2]], res
 
-    def simple_tuple_query_prepare(self, cursor):
+    def simple_tuple_query_test(self):
+        """Covers CASSANDRA-8613"""
+        cursor = self.prepare()
+
         cursor.execute("create table bard (a int, b int, c int, d int , e int, PRIMARY KEY (a, b, c, d, e))")
 
         cursor.execute("""INSERT INTO bard (a, b, c, d, e) VALUES (0, 2, 0, 0, 0);""")
@@ -460,14 +463,9 @@ class TestCQL(Tester):
         cursor.execute("""INSERT INTO bard (a, b, c, d, e) VALUES (0, 0, 3, 3, 3);""")
         cursor.execute("""INSERT INTO bard (a, b, c, d, e) VALUES (0, 0, 1, 1, 1);""")
 
-    def simple_tuple_query_test(self):
-        "Covers CASSANDRA-8613"
-        cursor = self.prepare()
-
-        self.simple_tuple_query_prepare(cursor)
         res = cursor.execute("SELECT * FROM bard WHERE b=0 AND (c, d, e) > (1, 1, 1) ALLOW FILTERING;")
         assert rows_to_list(res) == [[0, 0, 2, 2, 2], [0, 0, 3, 3, 3]]
-    
+
     def limit_sparse_test(self):
         """ Validate LIMIT option for sparse table in SELECT statements """
         cursor = self.prepare()
