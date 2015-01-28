@@ -53,7 +53,7 @@ def assert_almost_equal(*args, **kwargs):
 
     vmax = max(args)
     vmin = min(args)
-    assert vmin > vmax * (1.0 - error), "values not within %.2f%% of the max: %s" % (error * 100, args)
+    assert vmin > vmax * (1.0 - error) or vmin == vmax, "values not within %.2f%% of the max: %s" % (error * 100, args)
 
 def assert_row_count(cursor, table_name, expected):
     """ Function to validate the row count expected in table_name """
