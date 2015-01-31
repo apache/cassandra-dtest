@@ -9,7 +9,6 @@ from tools import since
 
 from datahelp import create_rows, parse_data_into_dicts, flatten_into_set
 
-
 class Page(object):
     data = None
 
@@ -38,17 +37,18 @@ class PageFetcher(object):
     def __init__(self, future):
         self.pages = []
 
-        self.future = future
-        self.future.add_callbacks(
-            callback=self.handle_page,
-            errback=self.handle_error
-        )
         # the first page is automagically returned (eventually)
         # so we'll count this as a request, but the retrieved count
         # won't be incremented until it actually arrives
         self.requested_pages = 1
         self.retrieved_pages = 0
         self.retrieved_empty_pages = 0
+
+        self.future = future
+        self.future.add_callbacks(
+            callback=self.handle_page,
+            errback=self.handle_error
+        )
 
         # wait for the first page to arrive, otherwise we may call
         # future.has_more_pages too early, since it should only be
@@ -916,14 +916,14 @@ class TestPagingQueryIsolation(BasePagingTester, PageAssertionMixin):
         self.assertEqual(page_fetchers[9].pagecount(), 4)
         self.assertEqual(page_fetchers[10].pagecount(), 34)
 
-        self.assertEqualIgnoreOrder(page_fetchers[0].all_data(), expected_data[:5000])
-        self.assertEqualIgnoreOrder(page_fetchers[1].all_data(), expected_data[5000:10000])
-        self.assertEqualIgnoreOrder(page_fetchers[2].all_data(), expected_data[10000:15000])
-        self.assertEqualIgnoreOrder(page_fetchers[3].all_data(), expected_data[15000:20000])
-        self.assertEqualIgnoreOrder(page_fetchers[4].all_data(), expected_data[20000:25000])
-        self.assertEqualIgnoreOrder(page_fetchers[5].all_data(), expected_data[:5000])
-        self.assertEqualIgnoreOrder(page_fetchers[6].all_data(), expected_data[5000:10000])
-        self.assertEqualIgnoreOrder(page_fetchers[7].all_data(), expected_data[10000:15000])
-        self.assertEqualIgnoreOrder(page_fetchers[8].all_data(), expected_data[15000:20000])
-        self.assertEqualIgnoreOrder(page_fetchers[9].all_data(), expected_data[20000:25000])
-        self.assertEqualIgnoreOrder(page_fetchers[10].all_data(), expected_data[:50000])
+        self.assertEqualIgnoreOrder(flatten_into_set(page_fetchers[0].all_data()), flatten_into_set(expected_data[:5000]))
+        self.assertEqualIgnoreOrder(flatten_into_set(page_fetchers[1].all_data()), flatten_into_set(expected_data[5000:10000]))
+        self.assertEqualIgnoreOrder(flatten_into_set(page_fetchers[2].all_data()), flatten_into_set(expected_data[10000:15000]))
+        self.assertEqualIgnoreOrder(flatten_into_set(page_fetchers[3].all_data()), flatten_into_set(expected_data[15000:20000]))
+        self.assertEqualIgnoreOrder(flatten_into_set(page_fetchers[4].all_data()), flatten_into_set(expected_data[20000:25000]))
+        self.assertEqualIgnoreOrder(flatten_into_set(page_fetchers[5].all_data()), flatten_into_set(expected_data[:5000]))
+        self.assertEqualIgnoreOrder(flatten_into_set(page_fetchers[6].all_data()), flatten_into_set(expected_data[5000:10000]))
+        self.assertEqualIgnoreOrder(flatten_into_set(page_fetchers[7].all_data()), flatten_into_set(expected_data[10000:15000]))
+        self.assertEqualIgnoreOrder(flatten_into_set(page_fetchers[8].all_data()), flatten_into_set(expected_data[15000:20000]))
+        self.assertEqualIgnoreOrder(flatten_into_set(page_fetchers[9].all_data()), flatten_into_set(expected_data[20000:25000]))
+        self.assertEqualIgnoreOrder(flatten_into_set(page_fetchers[10].all_data()), flatten_into_set(expected_data[:50000]))
