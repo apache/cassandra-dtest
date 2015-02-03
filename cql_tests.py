@@ -1554,19 +1554,19 @@ class TestCQL(Tester):
 
         cursor.execute(q % "tags = [ 'm', 'n' ] + tags")
         res = cursor.execute("SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'")
-        self.assertItemsEqual(rows_to_list(res), [[['n', 'm', 'a', 'c', 'b', 'c']]])
+        self.assertItemsEqual(rows_to_list(res), [[['m', 'n', 'a', 'c', 'b', 'c']]])
 
         cursor.execute(q % "tags[2] = 'foo', tags[4] = 'bar'")
         res = cursor.execute("SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'")
-        self.assertItemsEqual(rows_to_list(res), [[['n', 'm', 'foo', 'c', 'bar', 'c']]])
+        self.assertItemsEqual(rows_to_list(res), [[['m', 'n', 'foo', 'c', 'bar', 'c']]])
 
         cursor.execute("DELETE tags[2] FROM user WHERE fn='Bilbo' AND ln='Baggins'")
         res = cursor.execute("SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'")
-        self.assertItemsEqual(rows_to_list(res), [[['n', 'm', 'c', 'bar', 'c']]])
+        self.assertItemsEqual(rows_to_list(res), [[['m', 'n', 'c', 'bar', 'c']]])
 
         cursor.execute(q % "tags = tags - [ 'bar' ]")
         res = cursor.execute("SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'")
-        self.assertItemsEqual(rows_to_list(res), [[['n', 'm', 'c', 'c']]])
+        self.assertItemsEqual(rows_to_list(res), [[['m', 'n', 'c', 'c']]])
 
     def multi_collection_test(self):
         cursor = self.prepare()
