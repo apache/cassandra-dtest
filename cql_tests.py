@@ -1990,7 +1990,7 @@ class TestCQL(Tester):
 
         if self.cluster.version() >= '3.0':
             assert_all(cursor, "SELECT keyspace_name, durable_writes FROM system.schema_keyspaces",
-                    [['system_auth', True],['ks1', True], ['system', True], ['system_traces', True], ['ks2', False]])
+                    [['system_auth', True], ['ks1', True], ['system', True], ['system_traces', True], ['ks2', False]])
         else:
             assert_all(cursor, "SELECT keyspace_name, durable_writes FROM system.schema_keyspaces",
                     [['ks1', True], ['system', True], ['system_traces', True], ['ks2', False]])
