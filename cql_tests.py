@@ -3049,6 +3049,7 @@ class TestCQL(Tester):
 
         # Shouldn't apply
         assert_one(cursor, "UPDATE test SET v1 = 3, v2 = 'bar' WHERE k = 0 IF v1 = 4", [False])
+        assert_one(cursor, "UPDATE test SET v1 = 3, v2 = 'bar' WHERE k = 0 IF EXISTS", [False])
 
         # Should apply
         assert_one(cursor, "INSERT INTO test (k, v1, v2) VALUES (0, 2, 'foo') IF NOT EXISTS", [True])
@@ -3063,6 +3064,7 @@ class TestCQL(Tester):
 
         # Should apply (note: we want v2 before v1 in the statement order to exercise #5786)
         assert_one(cursor, "UPDATE test SET v2 = 'bar', v1 = 3 WHERE k = 0 IF v1 = 2", [True])
+        assert_one(cursor, "UPDATE test SET v2 = 'bar', v1 = 3 WHERE k = 0 IF EXISTS", [True])
         assert_one(cursor, "SELECT * FROM test", [0, 3, 'bar', None])
 
         # Shouldn't apply, only one condition is ok
@@ -3095,6 +3097,9 @@ class TestCQL(Tester):
         # Should apply
         assert_one(cursor, "DELETE FROM test WHERE k = 0 IF v1 = null", [True])
         assert_none(cursor, "SELECT * FROM test")
+
+        # Shouldn't apply
+        assert_one(cursor, "UPDATE test SET v1 = 3, v2 = 'bar' WHERE k = 0 IF EXISTS", [False])
 
         if self.cluster.version() > "2.1.1":
             # Should apply
