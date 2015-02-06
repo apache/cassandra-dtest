@@ -40,6 +40,7 @@ OFFHEAP_MEMTABLES = os.environ.get('OFFHEAP_MEMTABLES', '').lower() in ('yes', '
 NUM_TOKENS = os.environ.get('NUM_TOKENS', '256')
 RECORD_COVERAGE = os.environ.get('RECORD_COVERAGE', '').lower() in ('yes', 'true')
 REUSE_CLUSTER = os.environ.get('REUSE_CLUSTER', '').lower() in ('yes', 'true')
+SILENCE_DRIVER_ON_SHUTDOWN = os.environ.get('SILENCE_DRIVER_ON_SHUTDOWN', 'true').lower() in ('yes', 'true')
 
 
 CURRENT_TEST = ""
@@ -153,6 +154,10 @@ class Tester(TestCase):
         return cluster
 
     def _cleanup_cluster(self):
+        if SILENCE_DRIVER_ON_SHUTDOWN:
+            # driver logging is very verbose when nodes start going down -- bump up the level
+            logging.getLogger('cassandra').setLevel(logging.CRITICAL)
+
         if KEEP_TEST_DIR:
             self.cluster.stop(gently=RECORD_COVERAGE)
         else:
