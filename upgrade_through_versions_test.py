@@ -534,4 +534,3 @@ for (from_branch, to_branch) in POINT_UPGRADES:
         cls_name,
         (PointToPointUpgradeBase,),
         {'test_versions': [make_branch_str(from_branch), to_ver_latest_tag], '__test__': True})
-exit(0)
