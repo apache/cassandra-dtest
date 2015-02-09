@@ -84,7 +84,7 @@ class GitSemVer(object):
 
 def latest_tag_matching(ver_tuple):
     """
-    Returns the latest tag matching match_string*
+    Returns the latest tag matching a version tuple, such as (1, 2) to represent version 1.2
     """
     ver_str = make_ver_str(ver_tuple)
 
