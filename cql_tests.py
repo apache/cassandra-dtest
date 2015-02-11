@@ -5071,14 +5071,6 @@ class TestCQL(Tester):
     @since('2.1')
     def prepared_statement_invalidation_test(self):
         # test for CASSANDRA-7910
-        import logging
-
-        log = logging.getLogger()
-        log.setLevel('DEBUG')
-        handler = logging.StreamHandler()
-        handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s"))
-        log.addHandler(handler)
-
         cursor = self.prepare()
 
         cursor.execute("CREATE TABLE test (k int PRIMARY KEY, a int, b int, c int)")
