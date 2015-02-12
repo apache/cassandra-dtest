@@ -143,7 +143,7 @@ class TestUpgradeThroughVersions(Tester):
     @property
     def test_versions(self):
         # Murmur was not present until 1.2+
-        return [make_branch_str(v) for v in UPGRADE_PATH if make_ver_str(v) >= '1.2']
+        return [make_branch_str(v) for v in UPGRADE_PATH]
 
     def _init_local(self, git_ref):
         cdir = os.environ.get('CASSANDRA_DIR', DEFAULT_DIR)
