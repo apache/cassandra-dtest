@@ -1,5 +1,6 @@
 import bisect
 import os
+import pprint
 import random
 import re
 import subprocess
@@ -15,21 +16,53 @@ import tarfile
 from cassandra import ConsistencyLevel, WriteTimeout
 from cassandra.query import SimpleStatement
 
-TRUNK_VER = '2.2'
 
+# Versions are tuples of (major_ver, minor_ver)
 # Used to build upgrade path(s) for tests. Some tests will go from start to finish,
 # other tests will focus on single upgrades from UPGRADE_PATH[n] to UPGRADE_PATH[n+1]
-# Note that these strings should match git branch names, and will be used to search for
-# tags which are related to a particular branch as well.
 
-DEFAULT_PATH = ['cassandra-1.2', 'cassandra-2.0', 'cassandra-2.1', 'trunk']
+TRUNK_VER = (3, 0)
+DEFAULT_PATH = [(1, 2), (2, 0), (2, 1), TRUNK_VER]
+
 CUSTOM_PATH = os.environ.get('UPGRADE_PATH', None)
-UPGRADE_PATH = CUSTOM_PATH and CUSTOM_PATH.split(':') or DEFAULT_PATH
-LOCAL_MODE = os.environ.get('LOCAL_MODE', '').lower() in ('yes', 'true')
+if CUSTOM_PATH:
+    # provide a custom path like so: "1_2:2_0:2_1" to test upgrading from 1.2 to 2.0 to 2.1
+    UPGRADE_PATH = []
+    for _vertup in CUSTOM_PATH.split(':'):
+        _major, _minor = _vertup.split('_')
+        UPGRADE_PATH.append((int(_major), int(_minor)))
+else:
+    UPGRADE_PATH = DEFAULT_PATH
 
+LOCAL_MODE = os.environ.get('LOCAL_MODE', '').lower() in ('yes', 'true')
+if LOCAL_MODE:
+    REPO_LOCATION = os.environ.get('CASSANDRA_DIR')
+else:
+    REPO_LOCATION = "https://git-wip-us.apache.org/repos/asf/cassandra.git"
+
+# lets cache this once so we don't make a bunch of remote requests
+GIT_LS = subprocess.check_output(["git", "ls-remote", "-h", "-t", REPO_LOCATION]).rstrip()
+
+# maps ref type (branch, tags) to ref names and sha's
+MAPPED_REFS = defaultdict(dict)
+for row in GIT_LS.split('\n'):
+    sha, _fullref = row.split('\t')
+    _, ref_type, ref = _fullref.split('/')
+    MAPPED_REFS[ref_type][ref.split('^')[0]] = sha
+
+# We often want this post-mortem when debugging may have been disabled, so print/pprint is intentional here
+print("************************************* GIT REFS USED FOR THIS TEST RUN *********************************************")
+print("************************** KEEP IN MIND THAT A SHA MAY POINT TO ANOTHER COMMIT SHA! *******************************")
+for ref_type in MAPPED_REFS.keys():
+    print("Git refs for {}:").format(ref_type.upper())
+    pprint.pprint(MAPPED_REFS[ref_type], indent=4)
 
 if os.environ.get('CASSANDRA_VERSION'):
     debug('CASSANDRA_VERSION is not used by upgrade tests!')
+
+
+def sha_for_ref_name(ref_name, ref_type='tags'):
+    return MAPPED_REFS[ref_type][ref_name]
 
 
 class GitSemVer(object):
@@ -43,54 +76,49 @@ class GitSemVer(object):
         self.git_ref = git_ref
         self.semver = LooseVersion(semver_str)
         if semver_str == 'trunk':
-            self.semver = LooseVersion(TRUNK_VER)
+            self.semver = LooseVersion(make_ver_str(TRUNK_VER))
 
     def __cmp__(self, other):
         return cmp(self.semver, other.semver)
 
 
-def latest_tag_matching(match_string='cassandra-1.1'):
+def latest_tag_matching(ver_tuple):
     """
-    Returns the latest tag matching match_string*
+    Returns the latest tag matching a version tuple, such as (1, 2) to represent version 1.2
     """
-    git_path = os.environ.get('CASSANDRA_DIR', DEFAULT_DIR)
-
-    tags = subprocess.check_output(
-        ["git", "tag", "-l", "{search}*".format(search=match_string)], cwd=git_path)\
-        .rstrip()\
-        .split('\n')
+    ver_str = make_ver_str(ver_tuple)
 
     wrappers = []
-    for t in tags:
-        match = re.match('^cassandra-(\d+\.\d+\.\d+(-+\w+)*)$', t)
+    # step through each tag found in the git repo
+    # check if the tag is a match for the base version provided in ver_tuple
+    # if it's a match add it to wrappers and when we complete this process give back the latest version found
+    for t in MAPPED_REFS['tags'].keys():
+        # let's short circuit if the tag we are checking matches the cassandra-x.y.z format, otherwise make another attempt for x.y.z-foo in case it's something line 1.2.3-tentative
+        match = re.match('^cassandra-({ver_str}\.\d+(-+\w+)*)$'.format(ver_str=ver_str), t) or re.match('^({ver_str}\.\d*(-+\w+)*)$'.format(ver_str=ver_str), t)
         if match:
             gsv = GitSemVer(t, match.group(1))
             bisect.insort(wrappers, gsv)
 
     if wrappers:
-        return wrappers.pop().git_ref
+        latest = wrappers.pop().git_ref
+        return latest
+
     return None
 
 
-def get_version_from_tag(tag):
-    if tag == 'trunk':
-        return TRUNK_VER
-
-    match = re.match('^(git:)*cassandra-(\d+\.\d+\.*\d*(-+\w+)*)$', tag)
-    if match:
-        return match.group(2)
-    return None
+def make_ver_str(_tuple):
+    """Takes a tuple like (1,2) and returns a string like '1.2' """
+    return '{}.{}'.format(_tuple[0], _tuple[1])
 
 
-def get_version_from_build():
-    path = os.environ.get('CASSANDRA_DIR', DEFAULT_DIR)
+def make_branch_str(_tuple):
+    """Takes a tuple like (1,2) and formats that version specifier as something like 'cassandra-1.2' to match the branch naming convention"""
 
-    build = os.path.join(path, 'build.xml')
-    with open(build) as f:
-        for line in f:
-            match = re.search('name="base\.version" value="([0-9.]+)[^"]*"', line)
-            if match:
-                return LooseVersion(match.group(1))
+    # special case trunk version to just return 'trunk'
+    if _tuple == TRUNK_VER:
+        return 'trunk'
+
+    return 'cassandra-{}.{}'.format(_tuple[0], _tuple[1])
 
 
 class TestUpgradeThroughVersions(Tester):
@@ -115,7 +143,7 @@ class TestUpgradeThroughVersions(Tester):
     @property
     def test_versions(self):
         # Murmur was not present until 1.2+
-        return [v for v in UPGRADE_PATH if get_version_from_tag(v) >= '1.2']
+        return [make_branch_str(v) for v in UPGRADE_PATH]
 
     def _init_local(self, git_ref):
         cdir = os.environ.get('CASSANDRA_DIR', DEFAULT_DIR)
@@ -365,7 +393,7 @@ class TestRandomPartitionerUpgrade(TestUpgradeThroughVersions):
 
     @property
     def test_versions(self):
-        return [v for v in UPGRADE_PATH]
+        return [make_branch_str(v) for v in UPGRADE_PATH]
 
 
 class PointToPointUpgradeBase(TestUpgradeThroughVersions):
@@ -449,26 +477,25 @@ class PointToPointUpgradeBase(TestUpgradeThroughVersions):
                 PRIMARY KEY (k1, k2)
                 );""")
 
-
 # create test classes for upgrading from latest tag on branch to the head of that same branch
 for from_ver in UPGRADE_PATH:
     # we only want to do single upgrade tests for 1.2+
     # and trunk is the final version, so there's no test where trunk is upgraded to something else
-    if get_version_from_tag(from_ver) >= '1.2' and from_ver != 'trunk':
-        cls_name = ('TestUpgrade_from_' + from_ver + '_latest_tag_to_' + from_ver + '_HEAD').replace('-', '_').replace('.', '_')
+    if make_ver_str(from_ver) >= '1.2' and from_ver != TRUNK_VER:
+        cls_name = ('TestUpgrade_from_' + make_ver_str(from_ver) + '_latest_tag_to_' + make_ver_str(from_ver) + '_HEAD').replace('-', '_').replace('.', '_')
         start_ver_latest_tag = latest_tag_matching(from_ver)
-        debug('Creating test upgrade class: {} with start tag of: {}'.format(cls_name, start_ver_latest_tag))
+        debug('Creating test upgrade class: {} with start tag of: {} ({})'.format(cls_name, start_ver_latest_tag, sha_for_ref_name(start_ver_latest_tag)))
         vars()[cls_name] = type(
             cls_name,
             (PointToPointUpgradeBase,),
-            {'test_versions': [start_ver_latest_tag, from_ver], '__test__': True})
+            {'test_versions': [start_ver_latest_tag, make_branch_str(from_ver)], '__test__': True})
 
 # build a list of tuples like so:
 # [(A, B), (B, C) ... ]
 # each pair in the list represents an upgrade test (A, B)
 # where we will upgrade from the latest *tag* matching A, to the HEAD of branch B
 POINT_UPGRADES = []
-points = [v for v in UPGRADE_PATH if get_version_from_tag(v) >= '1.2']
+points = [v for v in UPGRADE_PATH if make_ver_str(v) >= '1.2']
 for i, _ in enumerate(points):
     verslice = tuple(points[i:i + 2])
     if len(verslice) == 2:  # exclude dangling version at end
@@ -476,35 +503,34 @@ for i, _ in enumerate(points):
 
 # create test classes for upgrading from latest tag on one branch, to head of the next branch (see comment above)
 for (from_ver, to_branch) in POINT_UPGRADES:
-    cls_name = ('TestUpgrade_from_' + from_ver + '_latest_tag_to_' + to_branch + '_HEAD').replace('-', '_').replace('.', '_')
+    cls_name = ('TestUpgrade_from_' + make_ver_str(from_ver) + '_latest_tag_to_' + make_branch_str(to_branch) + '_HEAD').replace('-', '_').replace('.', '_')
     from_ver_latest_tag = latest_tag_matching(from_ver)
-    debug('Creating test upgrade class: {} with start tag of: {}'.format(cls_name, from_ver_latest_tag))
+    debug('Creating test upgrade class: {} with start tag of: {} ({})'.format(cls_name, from_ver_latest_tag, sha_for_ref_name(from_ver_latest_tag)))
     vars()[cls_name] = type(
         cls_name,
         (PointToPointUpgradeBase,),
-        {'test_versions': [from_ver_latest_tag, to_branch], '__test__': True})
+        {'test_versions': [from_ver_latest_tag, make_branch_str(to_branch)], '__test__': True})
 
 # create test classes for upgrading from HEAD of one branch to HEAD of next.
 for (from_branch, to_branch) in POINT_UPGRADES:
-    cls_name = ('TestUpgrade_from_' + from_branch + '_HEAD_to_' + to_branch + '_HEAD').replace('-', '_').replace('.', '_')
+    cls_name = ('TestUpgrade_from_' + make_branch_str(from_branch) + '_HEAD_to_' + make_branch_str(to_branch) + '_HEAD').replace('-', '_').replace('.', '_')
     debug('Creating test upgrade class: {}'.format(cls_name))
     vars()[cls_name] = type(
         cls_name,
         (PointToPointUpgradeBase,),
-        {'test_versions': [from_branch, to_branch], '__test__': True})
+        {'test_versions': [make_branch_str(from_branch), make_branch_str(to_branch)], '__test__': True})
 
 # create test classes for upgrading from HEAD of one branch, to latest tag of next branch
 for (from_branch, to_branch) in POINT_UPGRADES:
-    cls_name = ('TestUpgrade_from_' + from_branch + '_HEAD_to_' + to_branch + '_latest_tag').replace('-', '_').replace('.', '_')
+    cls_name = ('TestUpgrade_from_' + make_branch_str(from_branch) + '_HEAD_to_' + make_branch_str(to_branch) + '_latest_tag').replace('-', '_').replace('.', '_')
     to_ver_latest_tag = latest_tag_matching(to_branch)
-    debug('Creating test upgrade class: {} with end tag of: {}'.format(cls_name, to_ver_latest_tag))
-
     # in some cases we might not find a tag (like when the to_branch is trunk)
     # so these will be skipped.
     if to_ver_latest_tag is None:
         continue
+    debug('Creating test upgrade class: {} with end tag of: {} ({})'.format(cls_name, to_ver_latest_tag, sha_for_ref_name(to_ver_latest_tag)))
 
     vars()[cls_name] = type(
         cls_name,
         (PointToPointUpgradeBase,),
-        {'test_versions': [from_branch, to_ver_latest_tag], '__test__': True})
+        {'test_versions': [make_branch_str(from_branch), to_ver_latest_tag], '__test__': True})
