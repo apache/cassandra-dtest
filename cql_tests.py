@@ -1684,7 +1684,10 @@ class TestCQL(Tester):
         assert rows_to_list(res) == [[0, 1, 1, 1], [0, 3, 3, 3]], res
 
         assert_invalid(cursor, "SELECT * FROM test WHERE k2 = 3")
-        assert_invalid(cursor, "SELECT * FROM test WHERE k1 IN (0, 1) and k2 = 3")
+
+        v = self.cluster.version()
+        if v < "3.0.0":
+            assert_invalid(cursor, "SELECT * FROM test WHERE k1 IN (0, 1) and k2 = 3")
 
         res = cursor.execute("SELECT * FROM test WHERE token(k1, k2) = token(0, 1)")
         assert rows_to_list(res) == [[0, 1, 1, 1]], res
