@@ -28,7 +28,7 @@ class TestCommitLog(Tester):
         super(TestCommitLog, self).tearDown()
 
     def prepare(self, configuration={}, create_test_keyspace=True, **kwargs):
-        conf = {}
+        conf = {'commitlog_sync_period_in_ms': 1000}
         if self.cluster.version() >= "2.1":
             conf['memtable_heap_space_in_mb'] = 512
         conf.update(configuration)
@@ -88,6 +88,7 @@ class TestCommitLog(Tester):
             segment_size_in_mb *= 0.7
         segment_size = segment_size_in_mb * 1024 * 1024
         self.node1.stress(['write', 'n=150000', '-rate', 'threads=25'])
+        time.sleep(1)
 
         if not ccmlib.common.is_win():
             assert_almost_equal(self._get_commitlog_size(), commitlog_size,
