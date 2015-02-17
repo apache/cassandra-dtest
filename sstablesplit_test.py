@@ -12,15 +12,10 @@ class TestSSTableSplit(Tester):
         after carrying out these operations.
         """
         cluster = self.cluster
-        cluster.populate(1).start()
+        cluster.populate(1).start(wait_for_binary_proto=True)
         node = cluster.nodelist()[0]
         version = cluster.version()
 
-        # Here we need to wait to connect
-        # to the node. This is required for windows
-        # to prevent stress starting before the node
-        # is ready for connections
-        node.watch_log_for('thrift clients...')
         debug("Run stress to insert data")
         if version < "2.1":
             node.stress( ['-o', 'insert'] )
