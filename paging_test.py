@@ -374,6 +374,63 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
             cursor.execute(stmt)
 
     @since('2.0')
+    def test_with_order_by_reversed(self):
+        """"
+        Paging over a single partition with ordering and a reversed clustering order.
+        """
+        cursor = self.prepare()
+        self.create_ks(cursor, 'test_paging', 2)
+        cursor.execute(
+            """
+            CREATE TABLE paging_test (
+                id int,
+                value text,
+                PRIMARY KEY (id, value)
+            ) WITH CLUSTERING ORDER BY (value DESC)
+            """)
+
+        data = """
+            |id|value|
+            |1 |a    |
+            |1 |b    |
+            |1 |c    |
+            |1 |d    |
+            |1 |e    |
+            |1 |f    |
+            |1 |g    |
+            |1 |h    |
+            |1 |i    |
+            |1 |j    |
+            """
+
+        expected_data = create_rows(data, cursor, 'paging_test', cl=CL.ALL, format_funcs={'id': int, 'value': unicode})
+
+        future = cursor.execute_async(
+            SimpleStatement("select * from paging_test where id = 1 order by value asc", fetch_size=5, consistency_level=CL.ALL)
+        )
+
+        pf = PageFetcher(future).request_all()
+
+        self.assertEqual(pf.pagecount(), 2)
+        self.assertEqual(pf.num_results_all(), [5, 5])
+
+        # these should be equal (in the same order)
+        self.assertEqual(pf.all_data(), expected_data)
+
+        # drop the ORDER BY
+        future = cursor.execute_async(
+            SimpleStatement("select * from paging_test where id = 1", fetch_size=5, consistency_level=CL.ALL)
+        )
+
+        pf = PageFetcher(future).request_all()
+
+        self.assertEqual(pf.pagecount(), 2)
+        self.assertEqual(pf.num_results_all(), [5, 5])
+
+        # these should be equal (in the same order)
+        self.assertEqual(pf.all_data(), list(reversed(expected_data)))
+
+    @since('2.0')
     def test_with_limit(self):
         cursor = self.prepare()
         self.create_ks(cursor, 'test_paging_size', 2)
