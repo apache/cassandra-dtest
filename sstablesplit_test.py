@@ -1,7 +1,10 @@
 from dtest import Tester, debug
+from tools import since
 
 from os.path import getsize
 import time
+import subprocess
+import tempfile
 
 class TestSSTableSplit(Tester):
 
@@ -60,3 +63,29 @@ class TestSSTableSplit(Tester):
             sstables.remove(origsstable[0])  # newer sstablesplit does not remove the original sstable after split
             assert max( [ getsize( sstable ) for sstable in sstables ] ) <= 52428980, "Max sstables size should be 52428980."
         node.start()
+
+    @since("2.1")
+    def single_file_split_test(self):
+        """
+        Covers CASSANDRA-8623
+
+        Check that sstablesplit doesn't crash when splitting a single sstable at the time.
+        """
+        cluster = self.cluster
+        cluster.populate(1).start(wait_for_binary_proto=True)
+        node = cluster.nodelist()[0]
+        version = cluster.version()
+
+        debug("Run stress to insert data")
+        node.stress(['write', 'n=2000000', '-rate', 'threads=50',
+                     '-schema', 'compaction(strategy=LeveledCompactionStrategy, sstable_size_in_mb=10)'])
+        self._do_compaction(node)
+        with tempfile.TemporaryFile(mode='w+') as tmpfile:
+            node.run_sstablesplit(keyspace='keyspace1', size=2, no_snapshot=True,
+                                  stdout=tmpfile, stderr=subprocess.STDOUT)
+            tmpfile.seek(0)
+            output = tmpfile.read()
+
+        debug(output)
+        failure = output.find("java.lang.AssertionError: Data component is missing")
+        self.assertEqual(failure, -1, "Error during sstablesplit")
