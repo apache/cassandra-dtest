@@ -385,47 +385,48 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
             CREATE TABLE paging_test (
                 id int,
                 value text,
+                value2 text,
                 PRIMARY KEY (id, value)
             ) WITH CLUSTERING ORDER BY (value DESC)
             """)
 
         data = """
-            |id|value|
-            |1 |a    |
-            |1 |b    |
-            |1 |c    |
-            |1 |d    |
-            |1 |e    |
-            |1 |f    |
-            |1 |g    |
-            |1 |h    |
-            |1 |i    |
-            |1 |j    |
+            |id|value|value2|
+            |1 |a    |a     |
+            |1 |b    |b     |
+            |1 |c    |c     |
+            |1 |d    |d     |
+            |1 |e    |e     |
+            |1 |f    |f     |
+            |1 |g    |g     |
+            |1 |h    |h     |
+            |1 |i    |i     |
+            |1 |j    |j     |
             """
 
-        expected_data = create_rows(data, cursor, 'paging_test', cl=CL.ALL, format_funcs={'id': int, 'value': unicode})
+        expected_data = create_rows(data, cursor, 'paging_test', cl=CL.ALL, format_funcs={'id': int, 'value': unicode, 'value2': unicode})
 
         future = cursor.execute_async(
-            SimpleStatement("select * from paging_test where id = 1 order by value asc", fetch_size=5, consistency_level=CL.ALL)
+            SimpleStatement("select * from paging_test where id = 1 order by value asc", fetch_size=3, consistency_level=CL.ALL)
         )
 
         pf = PageFetcher(future).request_all()
 
-        self.assertEqual(pf.pagecount(), 2)
-        self.assertEqual(pf.num_results_all(), [5, 5])
+        self.assertEqual(pf.pagecount(), 4)
+        self.assertEqual(pf.num_results_all(), [3, 3, 3, 1])
 
         # these should be equal (in the same order)
         self.assertEqual(pf.all_data(), expected_data)
 
         # drop the ORDER BY
         future = cursor.execute_async(
-            SimpleStatement("select * from paging_test where id = 1", fetch_size=5, consistency_level=CL.ALL)
+            SimpleStatement("select * from paging_test where id = 1", fetch_size=3, consistency_level=CL.ALL)
         )
 
         pf = PageFetcher(future).request_all()
 
-        self.assertEqual(pf.pagecount(), 2)
-        self.assertEqual(pf.num_results_all(), [5, 5])
+        self.assertEqual(pf.pagecount(), 4)
+        self.assertEqual(pf.num_results_all(), [3, 3, 3, 1])
 
         # these should be equal (in the same order)
         self.assertEqual(pf.all_data(), list(reversed(expected_data)))
