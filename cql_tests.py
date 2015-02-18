@@ -353,6 +353,7 @@ class TestCQL(Tester):
         cursor.execute("""INSERT INTO foo (a, b, c, d, e) VALUES (0, 0, 2, 0, 3);""")
         cursor.execute("""INSERT INTO foo (a, b, c, d, e) VALUES (0, -1, 2, 2, 2);""")
 
+    @require("7281")
     def tuple_query_mixed_order_columns_test(self):
         """CASSANDRA-7281: SELECT on tuple relations are broken for mixed ASC/DESC clustering order
 
@@ -364,6 +365,7 @@ class TestCQL(Tester):
         assert rows_to_list(res) == [[0, 2, 0, 0, 0], [0, 1, 0, 0, 0], [0, 0, 1, 2, -1],
                                      [0, 0, 1, 1, 1], [0, 0, 2, 1, -3], [0, 0, 2, 0, 3]], res
 
+    @require("7281")
     def tuple_query_mixed_order_columns_test2(self):
         """CASSANDRA-7281: SELECT on tuple relations are broken for mixed ASC/DESC clustering order
 
@@ -375,6 +377,7 @@ class TestCQL(Tester):
         assert rows_to_list(res) == [[0, 2, 0, 0, 0], [0, 1, 0, 0, 0], [0, 0, 2, 1, -3],
                                      [0, 0, 2, 0, 3], [0, 0, 1, 2, -1], [0, 0, 1, 1, 1]], res
 
+    @require("7281")
     def tuple_query_mixed_order_columns_test3(self):
         """CASSANDRA-7281: SELECT on tuple relations are broken for mixed ASC/DESC clustering order
 
@@ -386,6 +389,7 @@ class TestCQL(Tester):
         assert rows_to_list(res) == [[0, 0, 2, 1, -3], [0, 0, 2, 0, 3], [0, 0, 1, 2, -1],
                                      [0, 0, 1, 1, 1], [0, 1, 0, 0, 0], [0, 2, 0, 0, 0]], res
 
+    @require("7281")
     def tuple_query_mixed_order_columns_test4(self):
         """CASSANDRA-7281: SELECT on tuple relations are broken for mixed ASC/DESC clustering order
 
@@ -397,6 +401,7 @@ class TestCQL(Tester):
         assert rows_to_list(res) == [[0, 2, 0, 0, 0], [0, 1, 0, 0, 0], [0, 0, 1, 1, 1],
                                      [0, 0, 1, 2, -1], [0, 0, 2, 0, 3], [0, 0, 2, 1, -3]], res
 
+    @require("7281")
     def tuple_query_mixed_order_columns_test5(self):
         """CASSANDRA-7281: SELECT on tuple relations are broken for mixed ASC/DESC clustering order
             Test that non mixed columns are still working.
@@ -408,6 +413,7 @@ class TestCQL(Tester):
         assert rows_to_list(res) == [[0, 2, 0, 0, 0], [0, 1, 0, 0, 0], [0, 0, 2, 1, -3],
                                      [0, 0, 2, 0, 3], [0, 0, 1, 2, -1], [0, 0, 1, 1, 1]], res
 
+    @require("7281")
     def tuple_query_mixed_order_columns_test6(self):
         """CASSANDRA-7281: SELECT on tuple relations are broken for mixed ASC/DESC clustering order
             Test that non mixed columns are still working.
@@ -419,6 +425,7 @@ class TestCQL(Tester):
         assert rows_to_list(res) == [[0, 0, 1, 1, 1], [0, 0, 1, 2, -1], [0, 0, 2, 0, 3],
                                       [0, 0, 2, 1, -3], [0, 1, 0, 0, 0], [0, 2, 0, 0, 0]], res
 
+    @require("7281")
     def tuple_query_mixed_order_columns_test7(self):
         """CASSANDRA-7281: SELECT on tuple relations are broken for mixed ASC/DESC clustering order
         """
@@ -429,6 +436,7 @@ class TestCQL(Tester):
         assert rows_to_list(res) == [[0, 0, 0, 0, 0], [0, 0, 1, 1, -1], [0, 0, 1, 1, 0],
                                      [0, 0, 1, 0, 2], [0, -1, 2, 2, 2]], res
 
+    @require("7281")
     def tuple_query_mixed_order_columns_test8(self):
         """CASSANDRA-7281: SELECT on tuple relations are broken for mixed ASC/DESC clustering order
         """
@@ -439,6 +447,7 @@ class TestCQL(Tester):
         assert rows_to_list(res) == [[0, -1, 2, 2, 2], [0, 0, 1, 1, -1], [0, 0, 1, 1, 0],
                                      [0, 0, 1, 0, 2], [0, 0, 0, 0, 0]], res
 
+    @require("7281")
     def tuple_query_mixed_order_columns_test9(self):
         """CASSANDRA-7281: SELECT on tuple relations are broken for mixed ASC/DESC clustering order
         """
