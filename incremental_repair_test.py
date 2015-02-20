@@ -6,7 +6,8 @@ from re import search, findall
 import unittest
 import time
 import os
-from assertions import assert_invalid, assert_one, assert_all, assert_none
+from assertions import assert_invalid, assert_one, assert_all, assert_none, assert_almost_equal
+from nose.plugins.attrib import attr
 
 class TestIncRepair(Tester):
 
@@ -193,7 +194,6 @@ class TestIncRepair(Tester):
             node3.repair()
         else:
             node3.nodetool("repair -par -inc")
-
         for x in range(0, 150):
             cursor.execute("insert into tab(key,val) values(" + str(x) + ",1)")
         node1.flush()
@@ -205,7 +205,49 @@ class TestIncRepair(Tester):
         for x in range(0, 150):
             assert_one(cursor, "select val from tab where key =" + str(x), [1])
 
+    @since('2.1')
+    @attr('long')
+    def multiple_subsequent_repair_test(self):
+        """
+        Covers CASSANDRA-8366
 
+        There is an issue with subsequent inc repairs.
+        """
+        cluster = self.cluster
+        cluster.populate(3).start()
+        [node1,node2,node3] = cluster.nodelist()
 
+        expected_load_size = 4.5  # In GB
+        node1.stress(['write', 'n=5000000', '-schema', 'replication(factor=3)'])
 
+        node1.flush()
+        node2.flush()
+        node3.flush()
 
+        node1.nodetool("repair -par -inc")
+        node2.nodetool("repair -par -inc")
+        node3.nodetool("repair -par -inc")
+
+        node1.cleanup()
+        node2.cleanup()
+        node3.cleanup()
+
+        node1.compact()
+        node2.compact()
+        node3.compact()
+
+        # wait some time to be sure the load size is propagated between nodes
+        time.sleep(45)
+
+        output = node1.nodetool('status', capture_output=True)[0]
+        lines = output.split("\n")  # stdout line
+        load_size = 0.0
+        for line in lines:
+            if line.startswith('UN'):
+                args = line.split()
+                load_size += float(args[2])
+
+        debug(output)
+        debug("Total Load size: {}GB".format(load_size))
+        # There is still some overhead, but it's lot better. We tolerate 25%.
+        assert_almost_equal(load_size, expected_load_size, error=0.25)
