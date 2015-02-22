@@ -646,6 +646,16 @@ class TestAuthRoles(Tester):
                                         ["db_admin", True, False],
                                         ["mike", False, True]])
 
+    @since('3.0')
+    def list_users_considers_inherited_superuser_status_test(self):
+        self.prepare()
+        cassandra = self.get_session(user='cassandra', password='cassandra')
+        cassandra.execute("CREATE ROLE db_admin SUPERUSER")
+        cassandra.execute("CREATE ROLE mike WITH PASSWORD '12345' NOSUPERUSER LOGIN")
+        cassandra.execute("GRANT db_admin TO mike")
+        assert_all(cassandra, "LIST USERS", [['cassandra', True],
+                                             ["mike", True]])
+
     def assert_unauthenticated(self, message, user, password):
         with self.assertRaises(NoHostAvailable) as response:
             node = self.cluster.nodelist()[0]
