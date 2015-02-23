@@ -2,6 +2,8 @@ import time
 
 from cassandra import AuthenticationFailed, Unauthorized
 from cassandra.cluster import NoHostAvailable
+from cassandra.protocol import SyntaxException
+from auth_test import data_resource_creator_permissions, role_creator_permissions
 from dtest import Tester
 from assertions import *
 from tools import since
@@ -51,17 +53,142 @@ class TestAuthRoles(Tester):
 
         assert_invalid(mike,
                        "CREATE ROLE role2",
-                       "Only superusers are allowed to perform CREATE \[ROLE\|USER\] queries",
+                       "User mike does not have sufficient privileges to perform the requested operation",
                        Unauthorized)
         cassandra.execute("CREATE ROLE role1")
 
         assert_invalid(mike,
                        "DROP ROLE role1",
-                       "Only superusers are allowed to perform DROP \[ROLE\|USER\] queries",
+                       "User mike does not have sufficient privileges to perform the requested operation",
                        Unauthorized)
+
         assert_invalid(cassandra, "CREATE ROLE role1", "role1 already exists")
         cassandra.execute("DROP ROLE role1")
         assert_invalid(cassandra, "DROP ROLE role1", "role1 doesn't exist")
+
+    @since('3.0')
+    def role_admin_validation_test(self):
+        self.prepare()
+        cassandra = self.get_session(user='cassandra', password='cassandra')
+        cassandra.execute("CREATE ROLE administrator NOSUPERUSER NOLOGIN")
+        cassandra.execute("GRANT ALL ON ALL ROLES TO administrator")
+        cassandra.execute("CREATE ROLE mike WITH PASSWORD '12345' NOSUPERUSER LOGIN")
+        cassandra.execute("GRANT administrator TO mike")
+        cassandra.execute("CREATE ROLE klaus WITH PASSWORD '54321' NOSUPERUSER LOGIN")
+        mike = self.get_session(user='mike', password='12345')
+        klaus = self.get_session(user='klaus', password='54321')
+
+        # roles with CREATE on ALL ROLES can create roles
+        mike.execute("CREATE ROLE role1 WITH PASSWORD '11111' NOLOGIN")
+
+        # require ALTER on ALL ROLES or a SPECIFIC ROLE to modify
+        self.assert_unauthenticated('role1 is not permitted to log in', 'role1', '11111')
+        cassandra.execute("GRANT ALTER on ROLE role1 TO klaus")
+        klaus.execute("ALTER ROLE role1 LOGIN")
+        mike.execute("ALTER ROLE role1 WITH PASSWORD '22222'")
+        role1 = self.get_session(user='role1', password='22222')
+
+        # only superusers can set superuser status
+        assert_invalid(mike, "ALTER ROLE role1 SUPERUSER",
+                       "Only superusers are allowed to alter superuser status",
+                       Unauthorized)
+        assert_invalid(mike, "ALTER ROLE mike SUPERUSER",
+                       "You aren't allowed to alter your own superuser status or that of a role granted to you",
+                       Unauthorized)
+
+        # roles without necessary permissions cannot create, drop or alter roles except themselves
+        assert_invalid(role1, "CREATE ROLE role2 NOLOGIN",
+                       "User role1 does not have sufficient privileges to perform the requested operation",
+                       Unauthorized)
+        assert_invalid(role1, "ALTER ROLE mike NOLOGIN",
+                       "User role1 does not have sufficient privileges to perform the requested operation",
+                       Unauthorized)
+        assert_invalid(role1, "DROP ROLE mike",
+                       "User role1 does not have sufficient privileges to perform the requested operation",
+                       Unauthorized)
+        role1.execute("ALTER ROLE role1 WITH PASSWORD '33333'")
+
+        # roles with roleadmin can drop roles
+        mike.execute("DROP ROLE role1")
+        assert_all(cassandra, "LIST ROLES", [['administrator', False, False],
+                                             cassandra_role,
+                                             ['klaus', False, True],
+                                             mike_role])
+
+        # revoking role admin removes its privileges
+        cassandra.execute("REVOKE administrator FROM mike")
+        assert_invalid(mike, "CREATE ROLE role3 NOLOGIN",
+                       "User mike does not have sufficient privileges to perform the requested operation",
+                       Unauthorized)
+
+    @since('3.0')
+    def creator_of_db_resource_granted_all_permissions_test(self):
+        self.prepare()
+        cassandra = self.get_session(user='cassandra', password='cassandra')
+        cassandra.execute("CREATE ROLE mike WITH PASSWORD '12345' NOSUPERUSER LOGIN")
+        cassandra.execute("GRANT CREATE ON ALL KEYSPACES TO mike")
+        cassandra.execute("GRANT CREATE ON ALL ROLES TO mike")
+
+        mike = self.get_session(user='mike', password='12345')
+        # mike should automatically be granted permissions on any resource he creates, i.e. tables or roles
+        mike.execute("CREATE KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor':1}")
+        mike.execute("CREATE TABLE ks.cf (id int primary key, val int)")
+        mike.execute("CREATE ROLE role1 WITH PASSWORD '11111' NOSUPERUSER LOGIN")
+
+        cassandra_permissions = role_creator_permissions('cassandra', '<role mike>')
+        mike_permissions = [('mike', '<all roles>', 'CREATE'), ('mike', '<all keyspaces>', 'CREATE')]
+        mike_permissions.extend(role_creator_permissions('mike', '<role role1>'))
+        mike_permissions.extend(data_resource_creator_permissions('mike', '<keyspace ks>'))
+        mike_permissions.extend(data_resource_creator_permissions('mike', '<table ks.cf>'))
+
+        self.assert_permissions_listed(cassandra_permissions + mike_permissions,
+                                       cassandra,
+                                       "LIST ALL PERMISSIONS")
+
+    @since('3.0')
+    def create_and_grant_roles_with_superuser_status_test(self):
+        self.prepare()
+        cassandra = self.get_session(user='cassandra', password='cassandra')
+        cassandra.execute("CREATE ROLE another_superuser SUPERUSER NOLOGIN")
+        cassandra.execute("CREATE ROLE non_superuser NOSUPERUSER NOLOGIN")
+        cassandra.execute("CREATE ROLE mike WITH PASSWORD '12345' NOSUPERUSER LOGIN")
+        # mike can create and grant any role, except superusers
+        cassandra.execute("GRANT CREATE ON ALL ROLES TO mike")
+        cassandra.execute("GRANT AUTHORIZE ON ALL ROLES TO mike")
+
+        # mike can create roles, but not with superuser status
+        # and can grant any role, including those with superuser status
+        mike = self.get_session(user='mike', password='12345')
+        mike.execute("CREATE ROLE role1 NOSUPERUSER")
+        mike.execute("GRANT non_superuser TO role1")
+        mike.execute("GRANT another_superuser TO role1")
+        assert_invalid(mike, "CREATE ROLE role2 SUPERUSER",
+                       "Only superusers can create a role with superuser status",
+                       Unauthorized)
+        assert_all(cassandra, "LIST ROLES OF role1", [['another_superuser', True, False],
+                                                      ['non_superuser', False, False],
+                                                      ['role1', False, False]])
+
+    @since('3.0')
+    def drop_and_revoke_roles_with_superuser_status_test(self):
+        self.prepare()
+        cassandra = self.get_session(user='cassandra', password='cassandra')
+        cassandra.execute("CREATE ROLE another_superuser SUPERUSER NOLOGIN")
+        cassandra.execute("CREATE ROLE non_superuser NOSUPERUSER NOLOGIN")
+        cassandra.execute("CREATE ROLE role1 NOSUPERUSER")
+        cassandra.execute("GRANT another_superuser TO role1")
+        cassandra.execute("GRANT non_superuser TO role1")
+        cassandra.execute("CREATE ROLE mike WITH PASSWORD '12345' NOSUPERUSER LOGIN")
+        cassandra.execute("GRANT DROP ON ALL ROLES TO mike")
+        cassandra.execute("GRANT AUTHORIZE ON ALL ROLES TO mike")
+
+        # mike can drop and revoke any role, including superusers
+        mike = self.get_session(user='mike', password='12345')
+        mike.execute("REVOKE another_superuser FROM role1")
+        mike.execute("REVOKE non_superuser FROM role1")
+        mike.execute("DROP ROLE non_superuser")
+        mike.execute("DROP ROLE role1")
+
 
     @since('3.0')
     def drop_role_removes_memberships_test(self):
@@ -85,6 +212,25 @@ class TestAuthRoles(Tester):
         cassandra.execute("DROP ROLE role1")
         assert_one(cassandra, "LIST ROLES OF mike", mike_role)
         assert_all(cassandra, "LIST ROLES", [cassandra_role, mike_role, role2_role])
+
+    @since('3.0')
+    def drop_role_revokes_permissions_granted_on_it_test(self):
+        self.prepare()
+        cassandra = self.get_session(user='cassandra', password='cassandra')
+        cassandra.execute("CREATE ROLE role1")
+        cassandra.execute("CREATE ROLE role2")
+        cassandra.execute("CREATE ROLE mike WITH PASSWORD '12345' NOSUPERUSER LOGIN")
+        cassandra.execute("GRANT ALTER ON ROLE role1 TO mike")
+        cassandra.execute("GRANT AUTHORIZE ON ROLE role2 TO mike")
+
+        self.assert_permissions_listed([("mike", "<role role1>", "ALTER"),
+                                        ("mike", "<role role2>", "AUTHORIZE")],
+                                       cassandra,
+                                       "LIST ALL PERMISSIONS OF mike")
+
+        cassandra.execute("DROP ROLE role1")
+        cassandra.execute("DROP ROLE role2")
+        assert cassandra.execute("LIST ALL PERMISSIONS OF mike") is None
 
     @since('3.0')
     def grant_revoke_roles_test(self):
@@ -117,31 +263,29 @@ class TestAuthRoles(Tester):
         cassandra.execute("CREATE ROLE role1")
 
         assert_invalid(cassandra, "GRANT role1 TO john", "john doesn't exist")
-        assert_invalid(cassandra, "GRANT role1 TO role2", "role2 doesn't exist")
+        assert_invalid(cassandra, "GRANT role2 TO john", "role2 doesn't exist")
 
         cassandra.execute("CREATE ROLE john WITH PASSWORD '12345' NOSUPERUSER LOGIN")
         cassandra.execute("CREATE ROLE role2")
 
         assert_invalid(mike,
-                       "GRANT role1 TO john",
-                       "Only superusers are allowed to perform role management queries",
-                       Unauthorized)
-        assert_invalid(mike,
-                       "GRANT role1 TO role2",
-                       "Only superusers are allowed to perform role management queries",
+                       "GRANT role2 TO john",
+                       "User mike does not have sufficient privileges to perform the requested operation",
                        Unauthorized)
 
+        # superusers can always grant roles
         cassandra.execute("GRANT role1 TO john")
-        cassandra.execute("GRANT role1 TO role2")
+        # but regular users need AUTHORIZE permission on the granted role
+        cassandra.execute("GRANT AUTHORIZE ON ROLE role2 TO mike")
+        mike.execute("GRANT role2 TO john")
 
+        # same applies to REVOKEing roles
         assert_invalid(mike,
                        "REVOKE role1 FROM john",
-                       "Only superusers are allowed to perform role management queries",
+                       "User mike does not have sufficient privileges to perform the requested operation",
                        Unauthorized)
-        assert_invalid(mike,
-                       "REVOKE role1 FROM role2",
-                       "Only superusers are allowed to perform role management queries",
-                       Unauthorized)
+        cassandra.execute("REVOKE role1 FROM john")
+        mike.execute("REVOKE role2 from john")
 
     @since('3.0')
     def list_roles_test(self):
@@ -165,10 +309,17 @@ class TestAuthRoles(Tester):
                        "LIST ROLES OF cassandra",
                        "You are not authorized to view roles granted to cassandra",
                        Unauthorized)
+
         assert_all(mike, "LIST ROLES", [mike_role, role1_role, role2_role])
         assert_all(mike, "LIST ROLES OF mike", [mike_role, role1_role, role2_role])
         assert_all(mike, "LIST ROLES OF mike NORECURSIVE", [mike_role, role2_role])
         assert_all(mike, "LIST ROLES OF role2", [role1_role, role2_role])
+
+        # without SELECT permission on the root level roles resource, LIST ROLES with no OF
+        # returns only the roles granted to the user. With it, it includes all roles.
+        assert_all(mike, "LIST ROLES", [mike_role, role1_role, role2_role])
+        cassandra.execute("GRANT DESCRIBE ON ALL ROLES TO mike")
+        assert_all(mike, "LIST ROLES", [cassandra_role, mike_role, role1_role, role2_role])
 
 
     @since('3.0')
@@ -202,6 +353,72 @@ class TestAuthRoles(Tester):
                        Unauthorized)
 
     @since('3.0')
+    def filter_granted_permissions_by_resource_type_test(self):
+        self.prepare()
+        cassandra = self.get_session(user='cassandra', password='cassandra')
+        cassandra.execute("CREATE KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor':1}")
+        cassandra.execute("CREATE TABLE ks.cf (id int primary key, val int)")
+        cassandra.execute("CREATE ROLE mike WITH PASSWORD '12345' NOSUPERUSER LOGIN")
+        cassandra.execute("CREATE ROLE role1 NOSUPERUSER NOLOGIN")
+
+        # GRANT ALL ON ALL KEYSPACES grants Permission.ALL_DATA
+
+        # GRANT ALL ON KEYSPACE grants Permission.ALL_DATA
+        cassandra.execute("GRANT ALL ON KEYSPACE ks TO mike")
+        self.assert_permissions_listed([("mike", "<keyspace ks>", "CREATE"),
+                                        ("mike", "<keyspace ks>", "ALTER"),
+                                        ("mike", "<keyspace ks>", "DROP"),
+                                        ("mike", "<keyspace ks>", "SELECT"),
+                                        ("mike", "<keyspace ks>", "MODIFY"),
+                                        ("mike", "<keyspace ks>", "AUTHORIZE")],
+                                       cassandra,
+                                       "LIST ALL PERMISSIONS OF mike")
+        cassandra.execute("REVOKE ALL ON KEYSPACE ks FROM mike")
+
+        # GRANT ALL ON TABLE does not include CREATE (because the table must already be created before the GRANT)
+        cassandra.execute("GRANT ALL ON ks.cf TO MIKE")
+        self.assert_permissions_listed([("mike", "<table ks.cf>", "ALTER"),
+                                        ("mike", "<table ks.cf>", "DROP"),
+                                        ("mike", "<table ks.cf>", "SELECT"),
+                                        ("mike", "<table ks.cf>", "MODIFY"),
+                                        ("mike", "<table ks.cf>", "AUTHORIZE")],
+                                       cassandra,
+                                       "LIST ALL PERMISSIONS OF mike")
+        cassandra.execute("REVOKE ALL ON ks.cf FROM mike")
+        assert_invalid(cassandra,
+                       "GRANT CREATE ON ks.cf TO MIKE",
+                       "Resource type DataResource does not support any of the requested permissions",
+                       SyntaxException)
+
+        # GRANT ALL ON ALL ROLES includes SELECT & CREATE on the root level roles resource
+        cassandra.execute("GRANT ALL ON ALL ROLES TO mike")
+        self.assert_permissions_listed([("mike", "<all roles>", "CREATE"),
+                                        ("mike", "<all roles>", "ALTER"),
+                                        ("mike", "<all roles>", "DROP"),
+                                        ("mike", "<all roles>", "DESCRIBE"),
+                                        ("mike", "<all roles>", "AUTHORIZE")],
+                                       cassandra,
+                                       "LIST ALL PERMISSIONS OF mike")
+        cassandra.execute("REVOKE ALL ON ALL ROLES FROM mike")
+        assert_invalid(cassandra,
+                       "GRANT SELECT ON ALL ROLES TO MIKE",
+                       "Resource type RoleResource does not support any of the requested permissions",
+                       SyntaxException)
+
+        # GRANT ALL ON ROLE does not include CREATE (because the role must already be created before the GRANT)
+        cassandra.execute("GRANT ALL ON ROLE role1 TO mike")
+        self.assert_permissions_listed([("mike", "<role role1>", "ALTER"),
+                                        ("mike", "<role role1>", "DROP"),
+                                        ("mike", "<role role1>", "AUTHORIZE")],
+                                       cassandra,
+                                       "LIST ALL PERMISSIONS OF mike")
+        assert_invalid(cassandra,
+                       "GRANT CREATE ON ROLE role1 TO MIKE",
+                       "Resource type RoleResource does not support any of the requested permissions",
+                       SyntaxException)
+
+
+    @since('3.0')
     def list_permissions_test(self):
         self.prepare()
         cassandra = self.get_session(user='cassandra', password='cassandra')
@@ -213,28 +430,61 @@ class TestAuthRoles(Tester):
         cassandra.execute("GRANT SELECT ON table ks.cf TO role1")
         cassandra.execute("GRANT ALTER ON table ks.cf TO role2")
         cassandra.execute("GRANT MODIFY ON table ks.cf TO mike")
+        cassandra.execute("GRANT ALTER ON ROLE role1 TO role2")
         cassandra.execute("GRANT role1 TO role2")
         cassandra.execute("GRANT role2 TO mike")
 
-        self.assert_permissions_listed([("mike", "<table ks.cf>", "MODIFY"),
-                                        ("role1", "<table ks.cf>", "SELECT"),
-                                        ("role2", "<table ks.cf>", "ALTER")],
-                                       cassandra,
-                                       "LIST ALL PERMISSIONS")
+        expected_permissions = [("mike", "<table ks.cf>", "MODIFY"),
+                                ("role1", "<table ks.cf>", "SELECT"),
+                                ("role2", "<table ks.cf>", "ALTER"),
+                                ("role2", "<role role1>", "ALTER")]
+        expected_permissions.extend(data_resource_creator_permissions('cassandra', '<keyspace ks>'))
+        expected_permissions.extend(data_resource_creator_permissions('cassandra', '<table ks.cf>'))
+        expected_permissions.extend(role_creator_permissions('cassandra', '<role mike>'))
+        expected_permissions.extend(role_creator_permissions('cassandra', '<role role1>'))
+        expected_permissions.extend(role_creator_permissions('cassandra', '<role role2>'))
+
+        self.assert_permissions_listed(expected_permissions, cassandra, "LIST ALL PERMISSIONS")
 
         self.assert_permissions_listed([("role1", "<table ks.cf>", "SELECT")],
                                        cassandra,
                                        "LIST ALL PERMISSIONS OF role1")
 
         self.assert_permissions_listed([("role1", "<table ks.cf>", "SELECT"),
-                                        ("role2", "<table ks.cf>", "ALTER")],
+                                        ("role2", "<table ks.cf>", "ALTER"),
+                                        ("role2", "<role role1>", "ALTER")],
                                        cassandra,
                                        "LIST ALL PERMISSIONS OF role2")
 
+        self.assert_permissions_listed([("cassandra", "<role role1>", "ALTER"),
+                                        ("cassandra", "<role role1>", "DROP"),
+                                        ("cassandra", "<role role1>", "AUTHORIZE"),
+                                        ("role2", "<role role1>", "ALTER")],
+                                       cassandra,
+                                       "LIST ALL PERMISSIONS ON ROLE role1")
+        # we didn't specifically grant DROP on role1, so only it's creator should have it
+        self.assert_permissions_listed([("cassandra", "<role role1>", "DROP")],
+                                       cassandra,
+                                       "LIST DROP PERMISSION ON ROLE role1")
+        # but we did specifically grant ALTER role1 to role2
+        # so that should be listed whether we include an OF clause or not
+        self.assert_permissions_listed([("cassandra", "<role role1>", "ALTER"),
+                                        ("role2", "<role role1>", "ALTER")],
+                                       cassandra,
+                                       "LIST ALTER PERMISSION ON ROLE role1")
+        self.assert_permissions_listed([("role2", "<role role1>", "ALTER")],
+                                       cassandra,
+                                       "LIST ALTER PERMISSION ON ROLE role1 OF role2")
+        # make sure ALTER on role2 is excluded properly when OF is for another role
+        cassandra.execute("CREATE ROLE role3 NOSUPERUSER NOLOGIN")
+        assert cassandra.execute("LIST ALTER PERMISSION ON ROLE role1 OF role3") is None
+
+        # now check users can list their own permissions
         mike = self.get_session(user='mike', password='12345')
         self.assert_permissions_listed([("mike", "<table ks.cf>", "MODIFY"),
                                         ("role1", "<table ks.cf>", "SELECT"),
-                                        ("role2", "<table ks.cf>", "ALTER")],
+                                        ("role2", "<table ks.cf>", "ALTER"),
+                                        ("role2", "<role role1>", "ALTER")],
                                        mike,
                                        "LIST ALL PERMISSIONS OF mike")
 
@@ -386,7 +636,7 @@ class TestAuthRoles(Tester):
         mike = self.get_session(user='mike', password='12345')
         assert_invalid(mike,
                        "CREATE ROLE another_role NOSUPERUSER NOLOGIN",
-                       "Only superusers are allowed to perform CREATE \[ROLE\|USER\] queries",
+                       "User mike does not have sufficient privileges to perform the requested operation",
                        Unauthorized)
 
         cassandra.execute("GRANT db_admin TO mike")

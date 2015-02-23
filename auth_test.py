@@ -62,6 +62,8 @@ class TestAuth(Tester):
         except NoHostAvailable as e:
             assert isinstance(e.errors.values()[0], AuthenticationFailed)
 
+    # from 3.0 role creation is granted by CREATE_ROLE permissions, not superuser status
+    @since('1.2', max_version='2.1.x')
     def only_superuser_can_create_users_test(self):
         self.prepare()
 
@@ -112,6 +114,8 @@ class TestAuth(Tester):
         # handle different error messages between versions 2.x & 3.x
         assert_invalid(cursor, "DROP USER cassandra", "(Users aren't allowed to DROP themselves|Cannot DROP primary role for current login)")
 
+    # from 3.0 role deletion is granted by DROP_ROLE permissions, not superuser status
+    @since('1.2', max_version='2.1.x')
     def only_superusers_can_drop_users_test(self):
         self.prepare()
 
@@ -148,7 +152,7 @@ class TestAuth(Tester):
         cathy = self.get_cursor(user='cathy', password='12345')
         cathy.execute("ALTER USER cathy WITH PASSWORD '54321'")
         cathy = self.get_cursor(user='cathy', password='54321')
-        self.assertUnauthorized("You aren't allowed to alter this (user|role)",
+        self.assertUnauthorized("You aren't allowed to alter this user|User cathy does not have sufficient privileges to perform the requested operation",
                                 cathy, "ALTER USER bob WITH PASSWORD 'cantchangeit'")
 
     def users_cant_alter_their_superuser_status_test(self):
@@ -487,25 +491,40 @@ class TestAuth(Tester):
         cassandra.execute("GRANT MODIFY ON ks.cf2 TO bob")
         cassandra.execute("GRANT SELECT ON ks.cf2 TO cathy")
 
-        self.assertPermissionsListed([('cathy', '<all keyspaces>', 'CREATE'),
-                                      ('cathy', '<table ks.cf>', 'MODIFY'),
-                                      ('cathy', '<table ks.cf2>', 'SELECT'),
-                                      ('bob', '<keyspace ks>', 'ALTER'),
-                                      ('bob', '<table ks.cf>', 'DROP'),
-                                      ('bob', '<table ks.cf2>', 'MODIFY')],
-                                     cassandra, "LIST ALL PERMISSIONS")
+        all_permissions = [('cathy', '<all keyspaces>', 'CREATE'),
+                           ('cathy', '<table ks.cf>', 'MODIFY'),
+                           ('cathy', '<table ks.cf2>', 'SELECT'),
+                           ('bob', '<keyspace ks>', 'ALTER'),
+                           ('bob', '<table ks.cf>', 'DROP'),
+                           ('bob', '<table ks.cf2>', 'MODIFY')];
+
+        # CASSANDRA-7216 automatically grants permissions on a role to its creator
+        if self.cluster.cassandra_version() >= '3.0.0':
+            all_permissions.extend(data_resource_creator_permissions('cassandra', '<keyspace ks>'))
+            all_permissions.extend(data_resource_creator_permissions('cassandra', '<table ks.cf>'))
+            all_permissions.extend(data_resource_creator_permissions('cassandra', '<table ks.cf2>'))
+            all_permissions.extend(role_creator_permissions('cassandra', '<role bob>'))
+            all_permissions.extend(role_creator_permissions('cassandra', '<role cathy>'))
+
+        self.assertPermissionsListed(all_permissions, cassandra, "LIST ALL PERMISSIONS")
 
         self.assertPermissionsListed([('cathy', '<all keyspaces>', 'CREATE'),
                                       ('cathy', '<table ks.cf>', 'MODIFY'),
                                       ('cathy', '<table ks.cf2>', 'SELECT')],
                                      cassandra, "LIST ALL PERMISSIONS OF cathy")
 
-        self.assertPermissionsListed([('cathy', '<table ks.cf>', 'MODIFY'),
-                                      ('bob', '<table ks.cf>', 'DROP')],
-                                     cassandra, "LIST ALL PERMISSIONS ON ks.cf NORECURSIVE")
+        expected_permissions = [('cathy', '<table ks.cf>', 'MODIFY'), ('bob', '<table ks.cf>', 'DROP')]
+        if self.cluster.cassandra_version() >= '3.0.0':
+            expected_permissions.extend(data_resource_creator_permissions('cassandra', '<table ks.cf>'))
+        self.assertPermissionsListed(expected_permissions, cassandra, "LIST ALL PERMISSIONS ON ks.cf NORECURSIVE")
 
-        self.assertPermissionsListed([('cathy', '<table ks.cf2>', 'SELECT')],
-                                     cassandra, "LIST SELECT ON ks.cf2")
+        expected_permissions = [('cathy', '<table ks.cf2>', 'SELECT')]
+        # CASSANDRA-7216 automatically grants permissions on a role to its creator
+        if self.cluster.cassandra_version() >= '3.0.0':
+            expected_permissions.append(('cassandra', '<table ks.cf2>', 'SELECT'))
+            expected_permissions.append(('cassandra', '<keyspace ks>', 'SELECT'))
+        debug(sorted(expected_permissions))
+        self.assertPermissionsListed(expected_permissions, cassandra, "LIST SELECT ON ks.cf2")
 
         self.assertPermissionsListed([('cathy', '<all keyspaces>', 'CREATE'),
                                       ('cathy', '<table ks.cf>', 'MODIFY')],
@@ -601,4 +620,17 @@ class TestAuth(Tester):
         assert re.search(message, cm.exception.message), "Expected: %s" % message
 
 
+def data_resource_creator_permissions(creator, resource):
+    permissions = []
+    for perm in 'SELECT', 'MODIFY', 'ALTER', 'DROP', 'AUTHORIZE':
+        permissions.append((creator, resource, perm))
+    if resource.startswith("<keyspace "):
+        permissions.append((creator, resource, 'CREATE'))
+    return permissions
 
+
+def role_creator_permissions(creator, role):
+    permissions = []
+    for perm in 'ALTER', 'DROP', 'AUTHORIZE':
+        permissions.append((creator, role, perm))
+    return permissions
