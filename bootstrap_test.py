@@ -44,8 +44,7 @@ class TestBootstrap(Tester):
 
         # Boostraping a new node
         node2 = new_node(cluster, token=tokens[1])
-        node2.start()
-        node2.watch_log_for("Listening for thrift clients...")
+        node2.start(wait_for_binary_proto=True)
 
         reader.check()
         node1.cleanup()
