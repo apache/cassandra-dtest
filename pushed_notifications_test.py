@@ -20,7 +20,7 @@ class NotificationWaiter(object):
 
         # get a single, new connection
         session = tester.patient_cql_connection(node)
-        connection = session.cluster.connection_factory(self.address)
+        connection = session.cluster.connection_factory(self.address, is_control_connection=True)
 
         # coordinate with an Event
         self.event = Event()
