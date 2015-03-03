@@ -65,8 +65,6 @@ class TestPushedNotifications(Tester):
         """
         Moving a token should result in NODE_MOVED notifications.
         """
-        # Disable hinted handoff and set batch commit log so this doesn't
-        # interfer with the test (this must be after the populate)
         self.cluster.populate(3).start()
 
         waiters = [NotificationWaiter(self, node, "TOPOLOGY_CHANGE")
