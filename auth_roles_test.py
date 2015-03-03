@@ -46,7 +46,7 @@ class TestAuthRoles(Tester):
     def create_drop_role_validation_test(self):
         self.prepare()
         cassandra = self.get_session(user='cassandra', password='cassandra')
-        cassandra.execute("CREATE ROLE mike WITH PASSWORD '12345' NOSUPERUSER LOGIN")
+        cassandra.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND SUPERUSER = false AND LOGIN = true")
         mike = self.get_session(user='mike', password='12345')
 
         assert_invalid(mike,
@@ -67,43 +67,43 @@ class TestAuthRoles(Tester):
     def role_admin_validation_test(self):
         self.prepare()
         cassandra = self.get_session(user='cassandra', password='cassandra')
-        cassandra.execute("CREATE ROLE administrator NOSUPERUSER NOLOGIN")
+        cassandra.execute("CREATE ROLE administrator WITH SUPERUSER = false AND LOGIN = false")
         cassandra.execute("GRANT ALL ON ALL ROLES TO administrator")
-        cassandra.execute("CREATE ROLE mike WITH PASSWORD '12345' NOSUPERUSER LOGIN")
+        cassandra.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND SUPERUSER = false AND LOGIN = true")
         cassandra.execute("GRANT administrator TO mike")
-        cassandra.execute("CREATE ROLE klaus WITH PASSWORD '54321' NOSUPERUSER LOGIN")
+        cassandra.execute("CREATE ROLE klaus WITH PASSWORD = '54321' AND SUPERUSER = false AND LOGIN = true")
         mike = self.get_session(user='mike', password='12345')
         klaus = self.get_session(user='klaus', password='54321')
 
         # roles with CREATE on ALL ROLES can create roles
-        mike.execute("CREATE ROLE role1 WITH PASSWORD '11111' NOLOGIN")
+        mike.execute("CREATE ROLE role1 WITH PASSWORD = '11111' AND LOGIN = false")
 
         # require ALTER on ALL ROLES or a SPECIFIC ROLE to modify
         self.assert_unauthenticated('role1 is not permitted to log in', 'role1', '11111')
         cassandra.execute("GRANT ALTER on ROLE role1 TO klaus")
-        klaus.execute("ALTER ROLE role1 LOGIN")
-        mike.execute("ALTER ROLE role1 WITH PASSWORD '22222'")
+        klaus.execute("ALTER ROLE role1 WITH LOGIN = true")
+        mike.execute("ALTER ROLE role1 WITH PASSWORD = '22222'")
         role1 = self.get_session(user='role1', password='22222')
 
         # only superusers can set superuser status
-        assert_invalid(mike, "ALTER ROLE role1 SUPERUSER",
+        assert_invalid(mike, "ALTER ROLE role1 WITH SUPERUSER = true",
                        "Only superusers are allowed to alter superuser status",
                        Unauthorized)
-        assert_invalid(mike, "ALTER ROLE mike SUPERUSER",
+        assert_invalid(mike, "ALTER ROLE mike WITH SUPERUSER = true",
                        "You aren't allowed to alter your own superuser status or that of a role granted to you",
                        Unauthorized)
 
         # roles without necessary permissions cannot create, drop or alter roles except themselves
-        assert_invalid(role1, "CREATE ROLE role2 NOLOGIN",
+        assert_invalid(role1, "CREATE ROLE role2 WITH LOGIN = false",
                        "User role1 does not have sufficient privileges to perform the requested operation",
                        Unauthorized)
-        assert_invalid(role1, "ALTER ROLE mike NOLOGIN",
+        assert_invalid(role1, "ALTER ROLE mike WITH LOGIN = false",
                        "User role1 does not have sufficient privileges to perform the requested operation",
                        Unauthorized)
         assert_invalid(role1, "DROP ROLE mike",
                        "User role1 does not have sufficient privileges to perform the requested operation",
                        Unauthorized)
-        role1.execute("ALTER ROLE role1 WITH PASSWORD '33333'")
+        role1.execute("ALTER ROLE role1 WITH PASSWORD = '33333'")
 
         # roles with roleadmin can drop roles
         mike.execute("DROP ROLE role1")
@@ -114,14 +114,14 @@ class TestAuthRoles(Tester):
 
         # revoking role admin removes its privileges
         cassandra.execute("REVOKE administrator FROM mike")
-        assert_invalid(mike, "CREATE ROLE role3 NOLOGIN",
+        assert_invalid(mike, "CREATE ROLE role3 WITH LOGIN = false",
                        "User mike does not have sufficient privileges to perform the requested operation",
                        Unauthorized)
 
     def creator_of_db_resource_granted_all_permissions_test(self):
         self.prepare()
         cassandra = self.get_session(user='cassandra', password='cassandra')
-        cassandra.execute("CREATE ROLE mike WITH PASSWORD '12345' NOSUPERUSER LOGIN")
+        cassandra.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND SUPERUSER = false AND LOGIN = true")
         cassandra.execute("GRANT CREATE ON ALL KEYSPACES TO mike")
         cassandra.execute("GRANT CREATE ON ALL ROLES TO mike")
 
@@ -129,7 +129,7 @@ class TestAuthRoles(Tester):
         # mike should automatically be granted permissions on any resource he creates, i.e. tables or roles
         mike.execute("CREATE KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor':1}")
         mike.execute("CREATE TABLE ks.cf (id int primary key, val int)")
-        mike.execute("CREATE ROLE role1 WITH PASSWORD '11111' NOSUPERUSER LOGIN")
+        mike.execute("CREATE ROLE role1 WITH PASSWORD = '11111' AND SUPERUSER = false AND LOGIN = true")
 
         cassandra_permissions = role_creator_permissions('cassandra', '<role mike>')
         mike_permissions = [('mike', '<all roles>', 'CREATE'), ('mike', '<all keyspaces>', 'CREATE')]
@@ -144,9 +144,9 @@ class TestAuthRoles(Tester):
     def create_and_grant_roles_with_superuser_status_test(self):
         self.prepare()
         cassandra = self.get_session(user='cassandra', password='cassandra')
-        cassandra.execute("CREATE ROLE another_superuser SUPERUSER NOLOGIN")
-        cassandra.execute("CREATE ROLE non_superuser NOSUPERUSER NOLOGIN")
-        cassandra.execute("CREATE ROLE mike WITH PASSWORD '12345' NOSUPERUSER LOGIN")
+        cassandra.execute("CREATE ROLE another_superuser WITH SUPERUSER = true AND LOGIN = false")
+        cassandra.execute("CREATE ROLE non_superuser WITH SUPERUSER = false AND LOGIN = false")
+        cassandra.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND SUPERUSER = false AND LOGIN = true")
         # mike can create and grant any role, except superusers
         cassandra.execute("GRANT CREATE ON ALL ROLES TO mike")
         cassandra.execute("GRANT AUTHORIZE ON ALL ROLES TO mike")
@@ -154,10 +154,10 @@ class TestAuthRoles(Tester):
         # mike can create roles, but not with superuser status
         # and can grant any role, including those with superuser status
         mike = self.get_session(user='mike', password='12345')
-        mike.execute("CREATE ROLE role1 NOSUPERUSER")
+        mike.execute("CREATE ROLE role1 WITH SUPERUSER = false")
         mike.execute("GRANT non_superuser TO role1")
         mike.execute("GRANT another_superuser TO role1")
-        assert_invalid(mike, "CREATE ROLE role2 SUPERUSER",
+        assert_invalid(mike, "CREATE ROLE role2 WITH SUPERUSER = true",
                        "Only superusers can create a role with superuser status",
                        Unauthorized)
         assert_all(cassandra, "LIST ROLES OF role1", [['another_superuser', True, False, {}],
@@ -167,12 +167,12 @@ class TestAuthRoles(Tester):
     def drop_and_revoke_roles_with_superuser_status_test(self):
         self.prepare()
         cassandra = self.get_session(user='cassandra', password='cassandra')
-        cassandra.execute("CREATE ROLE another_superuser SUPERUSER NOLOGIN")
-        cassandra.execute("CREATE ROLE non_superuser NOSUPERUSER NOLOGIN")
-        cassandra.execute("CREATE ROLE role1 NOSUPERUSER")
+        cassandra.execute("CREATE ROLE another_superuser WITH SUPERUSER = true AND LOGIN = false")
+        cassandra.execute("CREATE ROLE non_superuser WITH SUPERUSER = false AND LOGIN = false")
+        cassandra.execute("CREATE ROLE role1 WITH SUPERUSER = false")
         cassandra.execute("GRANT another_superuser TO role1")
         cassandra.execute("GRANT non_superuser TO role1")
-        cassandra.execute("CREATE ROLE mike WITH PASSWORD '12345' NOSUPERUSER LOGIN")
+        cassandra.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND SUPERUSER = false AND LOGIN = true")
         cassandra.execute("GRANT DROP ON ALL ROLES TO mike")
         cassandra.execute("GRANT AUTHORIZE ON ALL ROLES TO mike")
 
@@ -189,7 +189,7 @@ class TestAuthRoles(Tester):
         cassandra = self.get_session(user='cassandra', password='cassandra')
         cassandra.execute("CREATE ROLE role1")
         cassandra.execute("CREATE ROLE role2")
-        cassandra.execute("CREATE ROLE mike WITH PASSWORD '12345' NOSUPERUSER LOGIN")
+        cassandra.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND SUPERUSER = false AND LOGIN = true")
         cassandra.execute("GRANT role2 TO role1")
         cassandra.execute("GRANT role1 TO mike")
         assert_all(cassandra, "LIST ROLES OF mike", [mike_role, role1_role, role2_role])
@@ -211,7 +211,7 @@ class TestAuthRoles(Tester):
         cassandra = self.get_session(user='cassandra', password='cassandra')
         cassandra.execute("CREATE ROLE role1")
         cassandra.execute("CREATE ROLE role2")
-        cassandra.execute("CREATE ROLE mike WITH PASSWORD '12345' NOSUPERUSER LOGIN")
+        cassandra.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND SUPERUSER = false AND LOGIN = true")
         cassandra.execute("GRANT ALTER ON ROLE role1 TO mike")
         cassandra.execute("GRANT AUTHORIZE ON ROLE role2 TO mike")
 
@@ -227,7 +227,7 @@ class TestAuthRoles(Tester):
     def grant_revoke_roles_test(self):
         self.prepare()
         cassandra = self.get_session(user='cassandra', password='cassandra')
-        cassandra.execute("CREATE ROLE mike WITH PASSWORD '12345' NOSUPERUSER LOGIN")
+        cassandra.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND SUPERUSER = false AND LOGIN = true")
         cassandra.execute("CREATE ROLE role1")
         cassandra.execute("CREATE ROLE role2")
         cassandra.execute("GRANT role1 TO role2")
@@ -246,7 +246,7 @@ class TestAuthRoles(Tester):
     def grant_revoke_role_validation_test(self):
         self.prepare()
         cassandra = self.get_session(user='cassandra', password='cassandra')
-        cassandra.execute("CREATE ROLE mike WITH PASSWORD '12345' NOSUPERUSER LOGIN")
+        cassandra.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND SUPERUSER = false AND LOGIN = true")
         mike = self.get_session(user='mike', password='12345')
 
         assert_invalid(cassandra, "GRANT role1 TO mike", "role1 doesn't exist")
@@ -255,7 +255,7 @@ class TestAuthRoles(Tester):
         assert_invalid(cassandra, "GRANT role1 TO john", "john doesn't exist")
         assert_invalid(cassandra, "GRANT role2 TO john", "role2 doesn't exist")
 
-        cassandra.execute("CREATE ROLE john WITH PASSWORD '12345' NOSUPERUSER LOGIN")
+        cassandra.execute("CREATE ROLE john WITH PASSWORD = '12345' AND SUPERUSER = false AND LOGIN = true")
         cassandra.execute("CREATE ROLE role2")
 
         assert_invalid(mike,
@@ -280,7 +280,7 @@ class TestAuthRoles(Tester):
     def list_roles_test(self):
         self.prepare()
         cassandra = self.get_session(user='cassandra', password='cassandra')
-        cassandra.execute("CREATE ROLE mike WITH PASSWORD '12345' NOSUPERUSER LOGIN")
+        cassandra.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND SUPERUSER = false AND LOGIN = true")
         cassandra.execute("CREATE ROLE role1")
         cassandra.execute("CREATE ROLE role2")
 
@@ -316,7 +316,7 @@ class TestAuthRoles(Tester):
         cassandra = self.get_session(user='cassandra', password='cassandra')
         cassandra.execute("CREATE KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor':1}")
         cassandra.execute("CREATE TABLE ks.cf (id int primary key, val int)")
-        cassandra.execute("CREATE ROLE mike WITH PASSWORD '12345' NOSUPERUSER LOGIN")
+        cassandra.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND SUPERUSER = false AND LOGIN = true")
         cassandra.execute("CREATE ROLE role1")
         cassandra.execute("GRANT ALL ON table ks.cf TO role1")
         cassandra.execute("GRANT role1 TO mike")
@@ -345,8 +345,8 @@ class TestAuthRoles(Tester):
         cassandra = self.get_session(user='cassandra', password='cassandra')
         cassandra.execute("CREATE KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor':1}")
         cassandra.execute("CREATE TABLE ks.cf (id int primary key, val int)")
-        cassandra.execute("CREATE ROLE mike WITH PASSWORD '12345' NOSUPERUSER LOGIN")
-        cassandra.execute("CREATE ROLE role1 NOSUPERUSER NOLOGIN")
+        cassandra.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND SUPERUSER = false AND LOGIN = true")
+        cassandra.execute("CREATE ROLE role1 WITH SUPERUSER = false AND LOGIN = false")
 
         # GRANT ALL ON ALL KEYSPACES grants Permission.ALL_DATA
 
@@ -410,7 +410,7 @@ class TestAuthRoles(Tester):
         cassandra = self.get_session(user='cassandra', password='cassandra')
         cassandra.execute("CREATE KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor':1}")
         cassandra.execute("CREATE TABLE ks.cf (id int primary key, val int)")
-        cassandra.execute("CREATE ROLE mike WITH PASSWORD '12345' NOSUPERUSER LOGIN")
+        cassandra.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND SUPERUSER = false AND LOGIN = true")
         cassandra.execute("CREATE ROLE role1")
         cassandra.execute("CREATE ROLE role2")
         cassandra.execute("GRANT SELECT ON table ks.cf TO role1")
@@ -462,7 +462,7 @@ class TestAuthRoles(Tester):
                                        cassandra,
                                        "LIST ALTER PERMISSION ON ROLE role1 OF role2")
         # make sure ALTER on role2 is excluded properly when OF is for another role
-        cassandra.execute("CREATE ROLE role3 NOSUPERUSER NOLOGIN")
+        cassandra.execute("CREATE ROLE role3 WITH SUPERUSER = false AND LOGIN = false")
         assert cassandra.execute("LIST ALTER PERMISSION ON ROLE role1 OF role3") is None
 
         # now check users can list their own permissions
@@ -480,8 +480,8 @@ class TestAuthRoles(Tester):
         cassandra = self.get_session(user='cassandra', password='cassandra')
         cassandra.execute("CREATE KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor':1}")
         cassandra.execute("CREATE TABLE ks.cf (id int primary key, val int)")
-        cassandra.execute("CREATE ROLE mike WITH PASSWORD '12345' NOSUPERUSER LOGIN")
-        cassandra.execute("CREATE ROLE john WITH PASSWORD '12345' NOSUPERUSER LOGIN")
+        cassandra.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND SUPERUSER = false AND LOGIN = true")
+        cassandra.execute("CREATE ROLE john WITH PASSWORD = '12345' AND SUPERUSER = false AND LOGIN = true")
         cassandra.execute("CREATE ROLE role1")
         cassandra.execute("CREATE ROLE role2")
 
@@ -519,7 +519,7 @@ class TestAuthRoles(Tester):
         cassandra = self.get_session(user='cassandra', password='cassandra')
         cassandra.execute("CREATE KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor':1}")
         cassandra.execute("CREATE TABLE ks.cf (id int primary key, val int)")
-        cassandra.execute("CREATE ROLE mike WITH PASSWORD '12345' NOSUPERUSER LOGIN")
+        cassandra.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND SUPERUSER = false AND LOGIN = true")
         cassandra.execute("CREATE ROLE role1")
         cassandra.execute("GRANT ALL ON table ks.cf TO role1")
         cassandra.execute("GRANT role1 TO mike")
@@ -546,7 +546,7 @@ class TestAuthRoles(Tester):
     def prevent_circular_grants_test(self):
         self.prepare()
         cassandra = self.get_session(user='cassandra', password='cassandra')
-        cassandra.execute("CREATE USER mike WITH PASSWORD '12345' NOSUPERUSER")
+        cassandra.execute("CREATE ROLE mike")
         cassandra.execute("CREATE ROLE role1")
         cassandra.execute("CREATE ROLE role2")
         cassandra.execute("GRANT role2 to role1")
@@ -572,23 +572,23 @@ class TestAuthRoles(Tester):
     def role_requires_login_privilege_to_authenticate_test(self):
         self.prepare()
         cassandra = self.get_session(user='cassandra', password='cassandra')
-        cassandra.execute("CREATE ROLE mike WITH PASSWORD '12345' NOSUPERUSER LOGIN")
+        cassandra.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND SUPERUSER = false AND LOGIN = true")
         assert_one(cassandra, "LIST ROLES OF mike", mike_role)
         self.get_session(user='mike', password='12345')
 
-        cassandra.execute("ALTER ROLE mike NOLOGIN")
+        cassandra.execute("ALTER ROLE mike WITH LOGIN = false")
         assert_one(cassandra, "LIST ROLES OF mike", ["mike", False, False, {}])
         self.assert_unauthenticated('mike is not permitted to log in', 'mike', '12345')
 
-        cassandra.execute("ALTER ROLE mike LOGIN")
+        cassandra.execute("ALTER ROLE mike WITH LOGIN = true")
         assert_one(cassandra, "LIST ROLES OF mike", ["mike", False, True, {}])
         self.get_session(user='mike', password='12345')
 
     def roles_do_not_inherit_login_privilege_test(self):
         self.prepare()
         cassandra = self.get_session(user='cassandra', password='cassandra')
-        cassandra.execute("CREATE ROLE mike WITH PASSWORD '12345' NOSUPERUSER NOLOGIN")
-        cassandra.execute("CREATE ROLE with_login WITH PASSWORD '54321' NOSUPERUSER LOGIN")
+        cassandra.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND SUPERUSER = false AND LOGIN = false")
+        cassandra.execute("CREATE ROLE with_login WITH PASSWORD = '54321' AND SUPERUSER = false AND LOGIN = true")
         cassandra.execute("GRANT with_login to mike")
 
         assert_all(cassandra, "LIST ROLES OF mike", [["mike", False, False, {}],
@@ -600,25 +600,25 @@ class TestAuthRoles(Tester):
     def role_requires_password_to_login_test(self):
         self.prepare()
         cassandra = self.get_session(user='cassandra', password='cassandra')
-        cassandra.execute("CREATE ROLE mike NOSUPERUSER LOGIN")
+        cassandra.execute("CREATE ROLE mike WITH SUPERUSER = false AND LOGIN = true")
         self.assert_unauthenticated("Username and/or password are incorrect", 'mike', None)
-        cassandra.execute("ALTER ROLE mike WITH PASSWORD '12345'")
+        cassandra.execute("ALTER ROLE mike WITH PASSWORD = '12345'")
         self.get_session(user='mike', password='12345')
 
     def superuser_status_is_inherited_test(self):
         self.prepare()
         cassandra = self.get_session(user='cassandra', password='cassandra')
-        cassandra.execute("CREATE ROLE mike WITH PASSWORD '12345' NOSUPERUSER LOGIN")
-        cassandra.execute("CREATE ROLE db_admin SUPERUSER")
+        cassandra.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND SUPERUSER = false AND LOGIN = true")
+        cassandra.execute("CREATE ROLE db_admin WITH SUPERUSER = true")
 
         mike = self.get_session(user='mike', password='12345')
         assert_invalid(mike,
-                       "CREATE ROLE another_role NOSUPERUSER NOLOGIN",
+                       "CREATE ROLE another_role WITH SUPERUSER = false AND LOGIN = false",
                        "User mike does not have sufficient privileges to perform the requested operation",
                        Unauthorized)
 
         cassandra.execute("GRANT db_admin TO mike")
-        mike.execute("CREATE ROLE another_role NOSUPERUSER NOLOGIN")
+        mike.execute("CREATE ROLE another_role WITH SUPERUSER = false AND LOGIN = false")
         assert_all(mike, "LIST ROLES", [["another_role", False, False, {}],
                                         cassandra_role,
                                         ["db_admin", True, False, {}],
@@ -628,8 +628,8 @@ class TestAuthRoles(Tester):
     def list_users_considers_inherited_superuser_status_test(self):
         self.prepare()
         cassandra = self.get_session(user='cassandra', password='cassandra')
-        cassandra.execute("CREATE ROLE db_admin SUPERUSER")
-        cassandra.execute("CREATE ROLE mike WITH PASSWORD '12345' NOSUPERUSER LOGIN")
+        cassandra.execute("CREATE ROLE db_admin WITH SUPERUSER = true")
+        cassandra.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND SUPERUSER = false AND LOGIN = true")
         cassandra.execute("GRANT db_admin TO mike")
         assert_all(cassandra, "LIST USERS", [['cassandra', True],
                                              ["mike", True]])
