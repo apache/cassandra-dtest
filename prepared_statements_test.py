@@ -41,5 +41,5 @@ class TestPreparedStatements(Tester):
             session.execute(query_statement, (0,))
         except InvalidRequest as ir:
             print ir
-        except:
+        except Exception:
             raise

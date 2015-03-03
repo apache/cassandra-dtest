@@ -1,5 +1,4 @@
 import time
-from nose.plugins.attrib import attr
 from dtest import Tester, debug
 from tools import no_vnodes
 from threading import Event
@@ -94,7 +93,6 @@ class TestPushedNotifications(Tester):
             self.assertEquals("MOVED_NODE", change_type)
             self.assertEquals(self.get_ip_from_node(node1), address)
 
-    @attr('selected')
     def restart_node_test(self):
         """
         Restarting a node should generate exactly one DOWN and one UP notification
@@ -102,8 +100,7 @@ class TestPushedNotifications(Tester):
 
         self.cluster.populate(2).start()
 
-        node1 = self.cluster.nodes.values()[0]   
-        node2 = self.cluster.nodes.values()[1]
+        node1, node2 = self.cluster.nodelist()
 
         waiter = NotificationWaiter(self, node1, "STATUS_CHANGE", num_notifications=2)
 
