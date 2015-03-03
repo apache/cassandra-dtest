@@ -3362,6 +3362,27 @@ class TestCQL(Tester):
         assert_invalid(cursor, 'SELECT DISTINCT pk0 FROM regular', matching="queries must request all the partition key columns")
         assert_invalid(cursor, 'SELECT DISTINCT pk0, pk1, ck0 FROM regular', matching="queries must only request partition key columns")
 
+    def select_distinct_with_deletions_test(self):
+        cursor = self.prepare()
+        cursor.execute('CREATE TABLE t1 (k int PRIMARY KEY, c int, v int)')
+        for i in range(10):
+            cursor.execute('INSERT INTO t1 (k, c, v) VALUES (%d, %d, %d)' % (i, i, i))
+
+        rows = cursor.execute('SELECT DISTINCT k FROM t1')
+        self.assertEqual(10, len(rows))
+        key_to_delete = rows[3].k
+
+        cursor.execute('DELETE FROM t1 WHERE k=%d' % (key_to_delete,))
+        rows = list(cursor.execute('SELECT DISTINCT k FROM t1'))
+        self.assertEqual(9, len(rows))
+
+        rows = list(cursor.execute('SELECT DISTINCT k FROM t1 LIMIT 5'))
+        self.assertEqual(5, len(rows))
+
+        cursor.default_fetch_size = 5
+        rows = list(cursor.execute('SELECT DISTINCT k FROM t1'))
+        self.assertEqual(9, len(rows))
+
     def function_with_null_test(self):
         cursor = self.prepare()
 
