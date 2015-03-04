@@ -5147,7 +5147,6 @@ class TestCQL(Tester):
 
         assert_none(session, "select * from space1.table1 where a=1 and b=1")
 
-    @since('1.1')
     def bug_5732_test(self):
         cursor = self.prepare(use_cache=True)
 
@@ -5169,5 +5168,5 @@ class TestCQL(Tester):
         self.cluster.start()
         time.sleep(0.5)
 
-        cursor = self.patient_cql_connection(self.cluster.nodelist()[0], version=cql_version)
+        cursor = self.patient_cql_connection(self.cluster.nodelist()[0])
         assert_all(cursor, "SELECT k FROM ks.test WHERE v = 0", [[0]])
