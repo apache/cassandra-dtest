@@ -5146,3 +5146,28 @@ class TestCQL(Tester):
         node1.nodetool('flush')
 
         assert_none(session, "select * from space1.table1 where a=1 and b=1")
+
+    @since('1.1')
+    def bug_5732_test(self):
+        cursor = self.prepare(use_cache=True)
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k int PRIMARY KEY,
+                v int,
+            )
+        """)
+
+        cursor.execute("ALTER TABLE test WITH CACHING='ALL'")
+        cursor.execute("INSERT INTO test (k,v) VALUES (0,0)")
+        cursor.execute("INSERT INTO test (k,v) VALUES (1,1)")
+        cursor.execute("CREATE INDEX on test(v)")
+        assert_all(cursor, "SELECT k FROM test WHERE v = 0", [[0]])
+
+        self.cluster.stop()
+        time.sleep(0.5)
+        self.cluster.start()
+        time.sleep(0.5)
+
+        cursor = self.patient_cql_connection(self.cluster.nodelist()[0], version=cql_version)
+        assert_all(cursor, "SELECT k FROM ks.test WHERE v = 0", [[0]])
