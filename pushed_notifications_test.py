@@ -1,3 +1,4 @@
+import time
 from dtest import Tester, debug
 from tools import no_vnodes
 from threading import Event
@@ -9,7 +10,7 @@ class NotificationWaiter(object):
     Cassandra over the native protocol.
     """
 
-    def __init__(self, tester, node, notification_type):
+    def __init__(self, tester, node, notification_type, num_notifications=1):
         """
         `address` should be a ccmlib.node.Node instance
         `notification_type` should either be "TOPOLOGY_CHANGE", "STATUS_CHANGE",
@@ -26,7 +27,8 @@ class NotificationWaiter(object):
         self.event = Event()
 
         # the pushed notification
-        self.notification = None
+        self.notifications = []
+        self.num_notifications = num_notifications
 
         # register a callback for the notification type
         connection.register_watcher(
@@ -37,22 +39,28 @@ class NotificationWaiter(object):
         Called when a notification is pushed from Cassandra.
         """
 
-        self.notification = notification
+        debug("Source %s sent %s for %s" % (self.address, notification["change_type"], notification["address"][0],))
+        
+        self.notifications.append(notification)
         self.event.set()
 
-    def wait_for_notification(self, timeout):
+    def wait_for_notifications(self, timeout):
         """
-        Waits up to `timeout` seconds for a notification from Cassandra.
+        Waits up to `timeout` seconds for a notifications from Cassandra.
         """
 
-        # Python 2.6 doesn't return None for timeouts only, so we need
-        # to perform a different check
-        self.event.wait(timeout)
-        if self.notification is None:
-            raise Exception("Timed out waiting for a %s notification from %s"
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            self.event.wait(deadline - time.time())
+            self.event.clear()
+            if len(self.notifications) >= self.num_notifications:
+                break
+
+        if len(self.notifications) < self.num_notifications:
+            raise Exception("Timed out waiting for %s notifications from %s"
                             % (self.notification_type, self.address))
         else:
-            return self.notification
+            return self.notifications
 
 
 class TestPushedNotifications(Tester):
@@ -75,8 +83,36 @@ class TestPushedNotifications(Tester):
 
         for waiter in waiters:
             debug("Waiting for notification from %s" % (waiter.address,))
-            notification = waiter.wait_for_notification(60.0)
+            notifications = waiter.wait_for_notifications(60.0)
+            self.assertEquals(1, len(notifications))
+            notification = notifications[0]
             change_type = notification["change_type"]
             address, port = notification["address"]
             self.assertEquals("MOVED_NODE", change_type)
             self.assertEquals(self.get_ip_from_node(node1), address)
+
+    def restart_node_test(self):
+        """
+        Restarting a node should generate exactly one DOWN and one UP notification
+        """        
+
+        self.cluster.populate(2).start()
+
+        node1, node2 = self.cluster.nodelist()
+
+        waiter = NotificationWaiter(self, node1, "STATUS_CHANGE", num_notifications=2)
+
+        for i in range(3):
+            debug("Restarting second node...")
+            node2.stop()
+            node2.start()
+            debug("Waiting for notifications from %s" % (waiter.address,))
+            notifications = waiter.wait_for_notifications(60.0)
+            self.assertEquals(2, len(notifications))
+            self.assertEquals(self.get_ip_from_node(node2), notifications[0]["address"][0])
+            self.assertEquals("DOWN", notifications[0]["change_type"])
+            self.assertEquals(self.get_ip_from_node(node2), notifications[1]["address"][0])
+            self.assertEquals("UP", notifications[1]["change_type"])
+
+
+
