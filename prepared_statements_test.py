@@ -1,5 +1,6 @@
 from dtest import Tester, debug
 from cassandra import InvalidRequest
+from tools import since
 
 KEYSPACE = "foo"
 
@@ -9,6 +10,7 @@ class TestPreparedStatements(Tester):
     Tests for pushed native protocol notification from Cassandra.
     """
 
+    @since('2.1')
     def dropped_index_test(self):
         """
         Prepared statements using dropped indexes should be handled correctly
@@ -22,7 +24,7 @@ class TestPreparedStatements(Tester):
             CREATE KEYSPACE IF NOT EXISTS %s
             WITH replication = { 'class': 'SimpleStrategy', 'replication_factor': '1' }
             """ % KEYSPACE)
-    
+
         session.set_keyspace(KEYSPACE)
         session.execute("CREATE TABLE IF NOT EXISTS mytable (a int PRIMARY KEY, b int)")
         session.execute("CREATE INDEX IF NOT EXISTS bindex ON mytable(b)")
@@ -36,7 +38,7 @@ class TestPreparedStatements(Tester):
 
         session.execute("DROP INDEX bindex")
 
-        try:    
+        try:
             print "Executing prepared statement with dropped index..."
             session.execute(query_statement, (0,))
         except InvalidRequest as ir:
