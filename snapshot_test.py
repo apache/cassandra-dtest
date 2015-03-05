@@ -199,9 +199,9 @@ class TestArchiveCommitlog(SnapshotTester):
             cluster.compact()
             node1.drain()
             if archive_active_commitlogs:
-                # Copy the active commitlogs to the backup directory:
-                for f in glob.glob(commitlog_dir+"/*"):
-                    shutil.copy2(f, tmp_commitlog)
+                # restart the node which causes the active commitlogs to be archived
+                node1.stop()
+                node1.start()
 
             # Destroy the cluster
             cluster.stop()
