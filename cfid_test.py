@@ -4,9 +4,9 @@ import unittest, os, sys, time
 from ccmlib.cluster import Cluster
 from ccmlib import common
 
+@since('2.1')
 class TestCFID(Tester):
 
-    @since('2.1')
     def cfid_test(self):
         """ Test through adding/dropping cf's that the path to sstables for each cf are unique and formatted correctly """
         cluster = self.cluster

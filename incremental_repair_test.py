@@ -8,6 +8,7 @@ import time
 import os
 from assertions import assert_invalid, assert_one, assert_all, assert_none
 
+@since('2.1')
 class TestIncRepair(Tester):
 
     def __init__(self, *args, **kwargs):
@@ -17,7 +18,6 @@ class TestIncRepair(Tester):
         ]
         Tester.__init__(self, *args, **kwargs)
 
-    @since('2.1')
     def sstable_marking_test(self):
         cluster = self.cluster
         cluster.populate(3).start()
@@ -45,12 +45,11 @@ class TestIncRepair(Tester):
 
         with open("sstables.txt", 'r') as r:
             output = r.read().replace('\n', '')
-        
+
         self.assertNotIn('repairedAt: 0', output)
 
         os.remove('sstables.txt')
 
-    @since('2.1')
     def multiple_repair_test(self):
         cluster = self.cluster
         cluster.populate(3).start()
@@ -109,7 +108,6 @@ class TestIncRepair(Tester):
 
         assert_one(cursor, "SELECT COUNT(*) FROM ks.cf LIMIT 200", [149])
 
-    @since('2.1')
     def sstable_repairedset_test(self):
         cluster = self.cluster
         cluster.populate(2).start()

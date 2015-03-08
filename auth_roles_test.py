@@ -16,9 +16,9 @@ role2_role = ['role2', False, False]
 cassandra_role = ['cassandra', True, True]
 
 
+@since('3.0')
 class TestAuthRoles(Tester):
 
-    @since('3.0')
     def create_drop_role_test(self):
         self.prepare()
         cassandra = self.get_session(user='cassandra', password='cassandra')
@@ -30,7 +30,6 @@ class TestAuthRoles(Tester):
         cassandra.execute("DROP ROLE role1")
         assert_one(cassandra, "LIST ROLES", cassandra_role)
 
-    @since('3.0')
     def conditional_create_drop_role_test(self):
         self.prepare()
         cassandra = self.get_session(user='cassandra', password='cassandra')
@@ -44,7 +43,6 @@ class TestAuthRoles(Tester):
         cassandra.execute("DROP ROLE IF EXISTS role1")
         assert_one(cassandra, "LIST ROLES", cassandra_role)
 
-    @since('3.0')
     def create_drop_role_validation_test(self):
         self.prepare()
         cassandra = self.get_session(user='cassandra', password='cassandra')
@@ -66,7 +64,6 @@ class TestAuthRoles(Tester):
         cassandra.execute("DROP ROLE role1")
         assert_invalid(cassandra, "DROP ROLE role1", "role1 doesn't exist")
 
-    @since('3.0')
     def role_admin_validation_test(self):
         self.prepare()
         cassandra = self.get_session(user='cassandra', password='cassandra')
@@ -121,7 +118,6 @@ class TestAuthRoles(Tester):
                        "User mike does not have sufficient privileges to perform the requested operation",
                        Unauthorized)
 
-    @since('3.0')
     def creator_of_db_resource_granted_all_permissions_test(self):
         self.prepare()
         cassandra = self.get_session(user='cassandra', password='cassandra')
@@ -145,7 +141,6 @@ class TestAuthRoles(Tester):
                                        cassandra,
                                        "LIST ALL PERMISSIONS")
 
-    @since('3.0')
     def create_and_grant_roles_with_superuser_status_test(self):
         self.prepare()
         cassandra = self.get_session(user='cassandra', password='cassandra')
@@ -169,7 +164,6 @@ class TestAuthRoles(Tester):
                                                       ['non_superuser', False, False],
                                                       ['role1', False, False]])
 
-    @since('3.0')
     def drop_and_revoke_roles_with_superuser_status_test(self):
         self.prepare()
         cassandra = self.get_session(user='cassandra', password='cassandra')
@@ -190,7 +184,6 @@ class TestAuthRoles(Tester):
         mike.execute("DROP ROLE role1")
 
 
-    @since('3.0')
     def drop_role_removes_memberships_test(self):
         self.prepare()
         cassandra = self.get_session(user='cassandra', password='cassandra')
@@ -213,7 +206,6 @@ class TestAuthRoles(Tester):
         assert_one(cassandra, "LIST ROLES OF mike", mike_role)
         assert_all(cassandra, "LIST ROLES", [cassandra_role, mike_role, role2_role])
 
-    @since('3.0')
     def drop_role_revokes_permissions_granted_on_it_test(self):
         self.prepare()
         cassandra = self.get_session(user='cassandra', password='cassandra')
@@ -232,7 +224,6 @@ class TestAuthRoles(Tester):
         cassandra.execute("DROP ROLE role2")
         assert cassandra.execute("LIST ALL PERMISSIONS OF mike") is None
 
-    @since('3.0')
     def grant_revoke_roles_test(self):
         self.prepare()
         cassandra = self.get_session(user='cassandra', password='cassandra')
@@ -252,7 +243,6 @@ class TestAuthRoles(Tester):
         cassandra.execute("REVOKE role1 FROM role2")
         assert_one(cassandra, "LIST ROLES OF role2", role2_role)
 
-    @since('3.0')
     def grant_revoke_role_validation_test(self):
         self.prepare()
         cassandra = self.get_session(user='cassandra', password='cassandra')
@@ -287,7 +277,6 @@ class TestAuthRoles(Tester):
         cassandra.execute("REVOKE role1 FROM john")
         mike.execute("REVOKE role2 from john")
 
-    @since('3.0')
     def list_roles_test(self):
         self.prepare()
         cassandra = self.get_session(user='cassandra', password='cassandra')
@@ -322,7 +311,6 @@ class TestAuthRoles(Tester):
         assert_all(mike, "LIST ROLES", [cassandra_role, mike_role, role1_role, role2_role])
 
 
-    @since('3.0')
     def grant_revoke_permissions_test(self):
         self.prepare()
         cassandra = self.get_session(user='cassandra', password='cassandra')
@@ -352,7 +340,6 @@ class TestAuthRoles(Tester):
                        "mike has no MODIFY permission on <table ks.cf> or any of its parents",
                        Unauthorized)
 
-    @since('3.0')
     def filter_granted_permissions_by_resource_type_test(self):
         self.prepare()
         cassandra = self.get_session(user='cassandra', password='cassandra')
@@ -418,7 +405,6 @@ class TestAuthRoles(Tester):
                        SyntaxException)
 
 
-    @since('3.0')
     def list_permissions_test(self):
         self.prepare()
         cassandra = self.get_session(user='cassandra', password='cassandra')
@@ -488,7 +474,6 @@ class TestAuthRoles(Tester):
                                        mike,
                                        "LIST ALL PERMISSIONS OF mike")
 
-    @since('3.0')
     def list_permissions_validation_test(self):
         self.prepare()
 
@@ -527,7 +512,6 @@ class TestAuthRoles(Tester):
                        "You are not authorized to view john's permissions",
                        Unauthorized)
 
-    @since('3.0')
     def role_caching_authenticated_user_test(self):
         # This test is to show that the role caching in AuthenticatedUser
         # works correctly and revokes the roles from a logged in user
@@ -559,7 +543,6 @@ class TestAuthRoles(Tester):
 
         assert unauthorized is not None
 
-    @since('3.0')
     def prevent_circular_grants_test(self):
         self.prepare()
         cassandra = self.get_session(user='cassandra', password='cassandra')
@@ -577,7 +560,6 @@ class TestAuthRoles(Tester):
                        "mike is a member of role2",
                        InvalidRequest)
 
-    @since('3.0')
     def create_user_as_alias_for_create_role_test(self):
         self.prepare()
         cassandra = self.get_session(user='cassandra', password='cassandra')
@@ -587,7 +569,6 @@ class TestAuthRoles(Tester):
         cassandra.execute("CREATE USER super_user WITH PASSWORD '12345' SUPERUSER")
         assert_one(cassandra, "LIST ROLES OF super_user", ["super_user", True, True])
 
-    @since('3.0')
     def role_requires_login_privilege_to_authenticate_test(self):
         self.prepare()
         cassandra = self.get_session(user='cassandra', password='cassandra')
@@ -603,7 +584,6 @@ class TestAuthRoles(Tester):
         assert_one(cassandra, "LIST ROLES OF mike", ["mike", False, True])
         self.get_session(user='mike', password='12345')
 
-    @since('3.0')
     def roles_do_not_inherit_login_privilege_test(self):
         self.prepare()
         cassandra = self.get_session(user='cassandra', password='cassandra')
@@ -617,7 +597,6 @@ class TestAuthRoles(Tester):
 
         self.assert_unauthenticated("mike is not permitted to log in", "mike", "12345")
 
-    @since('3.0')
     def role_requires_password_to_login_test(self):
         self.prepare()
         cassandra = self.get_session(user='cassandra', password='cassandra')
@@ -626,7 +605,6 @@ class TestAuthRoles(Tester):
         cassandra.execute("ALTER ROLE mike WITH PASSWORD '12345'")
         self.get_session(user='mike', password='12345')
 
-    @since('3.0')
     def superuser_status_is_inherited_test(self):
         self.prepare()
         cassandra = self.get_session(user='cassandra', password='cassandra')

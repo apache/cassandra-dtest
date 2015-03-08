@@ -5,9 +5,9 @@ from tools import since
 import os, sys, time
 from ccmlib.cluster import Cluster
 
+@since('2.1')
 class TestUDTEncoding(Tester):
 
-    @since('2.1')
     def udt_test(self):
         """ Test (somewhat indirectly) that user queries involving UDT's are properly encoded (due to driver not recognizing UDT syntax) """
         cluster = self.cluster

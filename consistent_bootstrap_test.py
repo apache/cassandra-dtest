@@ -6,10 +6,10 @@ from tools import (create_c1c2_table, insert_c1c2, query_c1c2, retry_till_succes
                    insert_columns, new_node, no_vnodes, since)
 from cassandra import ConsistencyLevel
 
+@since('2.1')
 class TestBootstrapConsistency(Tester):
 
     @no_vnodes()
-    @since('2.1')
     def consistent_reads_after_move_test(self):
         debug("Creating a ring")
         cluster = self.cluster
@@ -50,7 +50,6 @@ class TestBootstrapConsistency(Tester):
         for n in xrange(30,1000):
             query_c1c2(n2cursor, n, ConsistencyLevel.ALL)
 
-    @since('2.1')
     def consistent_reads_after_bootstrap_test(self):
         debug("Creating a ring")
         cluster = self.cluster

@@ -10,6 +10,7 @@ import time
 from threading import Thread
 from ccmlib.cluster import Cluster
 
+@since('2.0.6')
 class TestPaxos(Tester):
 
     def prepare(self, ordered=False, create_keyspace=True, use_cache=False, nodes=1, rf=1):
@@ -30,7 +31,6 @@ class TestPaxos(Tester):
             self.create_ks(cursor, 'ks', rf)
         return cursor
 
-    @since('2.0.6')
     def replica_availability_test(self):
         #See CASSANDRA-8640
         session = self.prepare(nodes=3, rf=3)
@@ -49,7 +49,6 @@ class TestPaxos(Tester):
         self.cluster.nodelist()[2].start()
         session.execute("INSERT INTO test (k, v) VALUES (4, 4) IF NOT EXISTS")
 
-    @since('2.0.6')
     @no_vnodes()
     def cluster_availability_test(self):
         #Warning, a change in partitioner or a change in CCM token allocation
@@ -72,11 +71,9 @@ class TestPaxos(Tester):
         self.cluster.nodelist()[2].start()
         session.execute("INSERT INTO test (k, v) VALUES (6, 6) IF NOT EXISTS")
 
-    @since('2.0.6')
     def contention_test_multi_iterations(self):
         self._contention_test(8, 100)
 
-    @since('2.0.6')
     ##Warning, this test will require you to raise the open
     ##file limit on OSX. Use 'ulimit -n 1000'
     def contention_test_many_threds(self):

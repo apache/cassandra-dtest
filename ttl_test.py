@@ -13,7 +13,7 @@ from assertions import (
     assert_unavailable
 )
 
-
+@since('2.0')
 class TestTTL(Tester):
     """ Test Time To Live Feature """
 
@@ -53,7 +53,6 @@ class TestTTL(Tester):
         if real_time_to_wait > 0:
             time.sleep(real_time_to_wait)
 
-    @since('2.0')
     def default_ttl_test(self):
         """ Test default_time_to_live specified on a table """
 
@@ -65,7 +64,6 @@ class TestTTL(Tester):
         self.smart_sleep(start, 1.5)
         assert_row_count(self.cursor1, 'ttl_table', 0)
 
-    @since('2.0')
     def insert_ttl_has_priority_on_defaut_ttl_test(self):
         """ Test that a ttl specified during an insert has priority on the default table ttl """
 
@@ -80,7 +78,6 @@ class TestTTL(Tester):
         self.smart_sleep(start, 3.5)
         assert_row_count(self.cursor1, 'ttl_table', 0)
 
-    @since('2.0')
     def insert_ttl_works_without_defaut_ttl_test(self):
         """ Test that a ttl specified during an insert works even if a table has no default ttl """
 
@@ -93,7 +90,6 @@ class TestTTL(Tester):
         self.smart_sleep(start, 1.5)
         assert_row_count(self.cursor1, 'ttl_table', 0)
 
-    @since('2.0')
     def default_ttl_can_be_removed_test(self):
         """ Test that default_time_to_live can be removed """
 
@@ -107,7 +103,6 @@ class TestTTL(Tester):
         self.smart_sleep(start, 1.5)
         assert_row_count(self.cursor1, 'ttl_table', 1)
 
-    @since('2.0')
     def removing_default_ttl_does_not_affect_existing_rows_test(self):
         """ Test that removing a default_time_to_live doesn't affect the existings rows """
 
@@ -130,7 +125,6 @@ class TestTTL(Tester):
         self.smart_sleep(start, 5.5)
         assert_row_count(self.cursor1, 'ttl_table', 1)
 
-    @since('2.0')
     def update_single_column_ttl_test(self):
         """ Test that specifying a TTL on a single column works """
 
@@ -145,7 +139,6 @@ class TestTTL(Tester):
         self.smart_sleep(start, 2.5)
         assert_all(self.cursor1, "SELECT * FROM ttl_table;", [[1, None, 1, 1]])
 
-    @since('2.0')
     def update_multiple_columns_ttl_test(self):
         """ Test that specifying a TTL on multiple columns works """
 
@@ -162,7 +155,6 @@ class TestTTL(Tester):
         self.smart_sleep(start, 2.5)
         assert_all(self.cursor1, "SELECT * FROM ttl_table;", [[1, None, None, None]])
 
-    @since('2.0')
     def update_column_ttl_with_default_ttl_test(self):
         """
         Test that specifying a column ttl works when a default ttl is set.
@@ -182,7 +174,6 @@ class TestTTL(Tester):
         self.smart_sleep(start, 4.5)
         assert_row_count(self.cursor1, 'ttl_table', 0)
 
-    @since('2.0')
     def update_column_ttl_with_default_ttl_test2(self):
         """
         Test that specifying a column ttl works when a default ttl is set.
@@ -201,7 +192,6 @@ class TestTTL(Tester):
         self.smart_sleep(start, 4.5)
         assert_row_count(self.cursor1, 'ttl_table', 0)
 
-    @since('2.0')
     def remove_column_ttl_test(self):
         """
         Test that removing a column ttl works.
@@ -217,7 +207,6 @@ class TestTTL(Tester):
         self.smart_sleep(start, 2.5)
         assert_all(self.cursor1, "SELECT * FROM ttl_table;", [[1, 42, None, None]])
 
-    @since('2.0')
     def remove_column_ttl_with_default_ttl_test(self):
         """
         Test that we cannot remove a column ttl when a default ttl is set.
@@ -240,7 +229,6 @@ class TestTTL(Tester):
         self.smart_sleep(start, 4.5)
         assert_row_count(self.cursor1, 'ttl_table', 0)
 
-    @since('2.0')
     def collection_list_ttl_test(self):
         """
         Test that ttl has a granularity of elements using a list collection.
@@ -262,7 +250,6 @@ class TestTTL(Tester):
         self.smart_sleep(start, 5.5)
         assert_row_count(self.cursor1, 'ttl_table', 0)
 
-    @since('2.0')
     def collection_set_ttl_test(self):
         """
         Test that ttl has a granularity of elements using a set collection.
@@ -292,7 +279,6 @@ class TestTTL(Tester):
         self.smart_sleep(start, 5.5)
         assert_row_count(self.cursor1, 'ttl_table', 0)
 
-    @since('2.0')
     def collection_map_ttl_test(self):
         """
         Test that ttl has a granularity of elements using a map collection.
