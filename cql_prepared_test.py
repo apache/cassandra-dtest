@@ -7,6 +7,7 @@ from ccmlib.cluster import Cluster
 
 cql_version="3.0.0"
 
+@since("1.2")
 class TestCQL(Tester):
 
     def prepare(self):
@@ -20,7 +21,6 @@ class TestCQL(Tester):
         self.create_ks(cursor, 'ks', 1)
         return cursor
 
-    @since("1.2")
     def batch_preparation_test(self):
         """ Test preparation of batch statement (#4202) """
         cursor = self.prepare()

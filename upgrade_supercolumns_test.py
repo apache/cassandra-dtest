@@ -3,9 +3,10 @@ from ccmlib.cluster import Cluster
 from ccmlib.common import get_version_from_build
 from tools import since
 import random, os, time, re
-
 # Tests upgrade between 1.2->2.0 for super columns (since that's where
 # we removed then internally)
+
+@since('2.0')
 class TestSCUpgrade(Tester):
 
     def __init__(self, *args, **kwargs):
@@ -17,7 +18,6 @@ class TestSCUpgrade(Tester):
         ]
         Tester.__init__(self, *args, **kwargs)
 
-    @since('2.0')
     def upgrade_with_index_creation_test(self):
         cluster = self.cluster
 
@@ -73,7 +73,6 @@ class TestSCUpgrade(Tester):
         cli.close()
 
     #CASSANDRA-7188
-    @since('2.0')
     def upgrade_with_counters_test(self):
         cluster = self.cluster
 

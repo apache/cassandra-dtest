@@ -1,10 +1,12 @@
 from ccmlib.node import Node
 from decorator  import decorator
 from distutils.version import LooseVersion
-import re, os, sys, fileinput, time
+import re, os, sys, fileinput, time, unittest, functools
 
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
+
+from dtest import Tester
 
 def rows_to_list(rows):
     new_list = [list(row) for row in rows]
@@ -163,17 +165,42 @@ class since(object):
         if self.max_version is not None:
             self.max_version = LooseVersion(self.max_version)
 
-    def __call__(self, f):
+    def _skip_msg(self, version):
+        if version < self.cass_version:
+            return "%s < %s" % (version, self.cass_version)
+        if self.max_version and version > self.max_version:
+            return "%s > %s" % (version, self.max_version)
+
+    def _wrap_setUp(self, cls):
+        backup_setUp_name = '_since_setUp'
+
+        @functools.wraps(cls.setUp)
         def wrapped(obj):
-            cluster_version = LooseVersion(obj.cluster.version())
-            if cluster_version < self.cass_version:
-                obj.skip("%s < %s" % (cluster_version, self.cass_version))
-            if self.max_version and cluster_version > self.max_version:
-                obj.skip("%s > %s" % (cluster_version, self.max_version))
+            getattr(obj, backup_setUp_name)()
+            version = LooseVersion(obj.cluster.version())
+            msg = self._skip_msg(version)
+            if msg:
+                obj.skip(msg)
+
+        setattr(cls, backup_setUp_name, cls.setUp)
+        cls.setUp = wrapped
+        return cls
+
+    def _wrap_function(self, f):
+        @functools.wraps(f)
+        def wrapped(obj):
+            version = LooseVersion(obj.cluster.version())
+            msg = self._skip_msg(version)
+            if msg:
+                obj.skip(msg)
             f(obj)
-        wrapped.__name__ = f.__name__
-        wrapped.__doc__ = f.__doc__
         return wrapped
+
+    def __call__(self, skippable):
+        if isinstance(skippable, type):
+            return self._wrap_setUp(skippable)
+        return self._wrap_function(skippable)
+
 
 from dtest import DISABLE_VNODES
 # Use this decorator to skip a test when vnodes are enabled.

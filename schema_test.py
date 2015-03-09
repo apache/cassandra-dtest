@@ -4,8 +4,8 @@ from tools import since, rows_to_list
 from assertions import assert_invalid
 import time
 
+@since('2.0')
 class TestSchema(Tester):
-    @since('2.0')
     def drop_column_compact_test(self):
         cursor = self.prepare()
 
@@ -14,7 +14,6 @@ class TestSchema(Tester):
 
         assert_invalid(cursor, "ALTER TABLE cf DROP c1", "Cannot drop columns from a")
 
-    @since('2.0')
     def drop_column_compaction_test(self):
         cursor = self.prepare()
         cursor.execute("USE ks")
@@ -49,7 +48,6 @@ class TestSchema(Tester):
         rows = cursor.execute("SELECT c1 FROM ks.cf")
         self.assertEqual([[None], [None], [None], [4]], sorted(rows_to_list(rows)))
 
-    @since('2.0')
     def drop_column_queries_test(self):
         cursor = self.prepare()
 

@@ -5,6 +5,7 @@ from assertions import assert_invalid, assert_one, assert_all, assert_none
 from tools import since, rows_to_list
 
 
+@since('3.0')
 class TestUserFunctions(Tester):
 
     def prepare(self, create_keyspace=True, nodes=1, rf=1):
@@ -19,7 +20,6 @@ class TestUserFunctions(Tester):
             self.create_ks(cursor, 'ks', rf)
         return cursor
 
-    @since('3.0')
     def test_migration(self):
         """ Test migration of user functions """
         cluster = self.cluster
@@ -81,7 +81,6 @@ class TestUserFunctions(Tester):
         #try creating function returning the wrong type, should error
         assert_invalid(cursor1, "CREATE FUNCTION bad_sin ( input double ) RETURNS double LANGUAGE java AS 'return Math.sin(input.doubleValue());'", "Could not compile function 'ks.bad_sin' from Java source:")
 
-    @since('3.0')
     def udf_overload_test(self):
 
         session = self.prepare(nodes=3)
@@ -117,7 +116,6 @@ class TestUserFunctions(Tester):
         #should now work - unambiguous
         session.execute("DROP FUNCTION overloaded");
 
-    @since("3.0")
     def udf_scripting_test(self):
         session = self.prepare()
         session.execute("create table nums (key int primary key, val double);")
@@ -141,7 +139,6 @@ class TestUserFunctions(Tester):
 
         assert_one(session, "select plustwo(key) from nums where key = 3", [5])
 
-    @since("3.0")
     def default_aggregate_test(self):
         session = self.prepare()
         session.execute("create table nums (key int primary key, val double);")
@@ -156,7 +153,6 @@ class TestUserFunctions(Tester):
         assert_one(session, "SELECT count(*) FROM nums", [9])
 
 
-    @since("3.0")
     def aggregate_udf_test(self):
         session = self.prepare()
         session.execute("create table nums (key int primary key, val int);")
@@ -176,7 +172,6 @@ class TestUserFunctions(Tester):
 
         assert_invalid(session, "create aggregate aggthree(int) sfunc test stype int finalfunc aggtwo")
 
-    @since("3.0")
     def udf_with_udt_test(self):
         session = self.prepare()
 

@@ -28,6 +28,7 @@ def listify(item):
     return decoded
 
 
+@since('2.1')
 class TestUserTypes(Tester):
 
     def __init__(self, *args, **kwargs):
@@ -38,7 +39,6 @@ class TestUserTypes(Tester):
             cursor.execute(query)
         assert re.search(message, cm.exception.message), "Expected: %s" % message
 
-    @since('2.1')
     def test_type_dropping(self):
         """
         Tests that a type cannot be dropped when in use, and otherwise can be dropped.
@@ -105,7 +105,6 @@ class TestUserTypes(Tester):
         rows = cursor.execute(stmt)
         self.assertEqual(0, len(rows))
 
-    @since('2.1')
     def test_nested_type_dropping(self):
         """
         Confirm a user type can't be dropped when being used by another user type.
@@ -159,7 +158,6 @@ class TestUserTypes(Tester):
         rows = cursor.execute(stmt)
         self.assertEqual(0, len(rows))
 
-    @since('2.1')
     def test_type_enforcement(self):
         """
         Confirm error when incorrect data type used for user type
@@ -210,7 +208,6 @@ class TestUserTypes(Tester):
         rows = cursor.execute(stmt)
         self.assertEqual(0, len(rows))
 
-    @since('2.1')
     def test_nested_user_types(self):
         """Tests user types within user types"""
         cluster = self.cluster
@@ -318,7 +315,6 @@ class TestUserTypes(Tester):
             items = rows[0][0]
             self.assertEqual(listify(items), [[[u'stuff3', [u'one_2_other', u'two_2_other']], [u'stuff4', [u'one_3_other', u'two_3_other']]]])
 
-    @since('2.1')
     def test_type_as_part_of_pkey(self):
         """Tests user types as part of a composite pkey"""
         # make sure we can define a table with a user type as part of the pkey
@@ -377,7 +373,6 @@ class TestUserTypes(Tester):
         self.assertEqual(first_name, u'Nero')
         self.assertEqual(like, u'arson')
 
-    @since('2.1')
     def test_type_secondary_indexing(self):
         """
         Confirm that user types are secondary-indexable
@@ -503,7 +498,6 @@ class TestUserTypes(Tester):
         self.assertEqual(first_name, u'Abraham')
         self.assertEqual(like, u'preserving unions')
 
-    @since('2.1')
     def test_type_keyspace_permission_isolation(self):
         """
         Confirm permissions are respected for types in different keyspaces
@@ -570,7 +564,6 @@ class TestUserTypes(Tester):
         rows = superuser_cursor.execute("SELECT * from system.schema_usertypes")
         self.assertEqual(0, len(rows))
 
-    @since('2.1')
     def test_nulls_in_user_types(self):
         """Tests user types with null values"""
         cluster = self.cluster
@@ -615,7 +608,6 @@ class TestUserTypes(Tester):
         rows = cursor.execute("SELECT my_item FROM bucket WHERE id=1")
         self.assertEqual(listify(rows[0]), [[u'test', None]])
 
-    @since('2.1')
     def test_no_counters_in_user_types(self):
         # CASSANDRA-7672
         cluster = self.cluster
@@ -636,7 +628,6 @@ class TestUserTypes(Tester):
 
         assert_invalid(cursor, stmt, 'A user type cannot contain counters')
 
-    @since('2.1')
     def test_type_as_clustering_col(self):
         """Tests user types as clustering column"""
         # make sure we can define a table with a user type as a clustering column
