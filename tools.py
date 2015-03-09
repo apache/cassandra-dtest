@@ -6,7 +6,7 @@ import re, os, sys, fileinput, time, unittest, functools
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
 
-from dtest import Tester
+from dtest import Tester, DISABLE_VNODES
 
 def rows_to_list(rows):
     new_list = [list(row) for row in rows]
@@ -202,17 +202,9 @@ class since(object):
         return self._wrap_function(skippable)
 
 
-from dtest import DISABLE_VNODES
-# Use this decorator to skip a test when vnodes are enabled.
-class no_vnodes(object):
-    def __call__(self, f):
-        def wrapped(obj):
-            if not DISABLE_VNODES:
-                obj.skip("Test disabled for vnodes")
-            f(obj)
-        wrapped.__name__ = f.__name__
-        wrapped.__doc__ = f.__doc__
-        return wrapped
+def no_vnodes():
+    """Skips the decorated test or test class if using vnodes."""
+    return unittest.skipIf(not DISABLE_VNODES, 'Test disabled for vnodes')
 
 
 def require(msg):
