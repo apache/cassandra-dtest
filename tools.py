@@ -214,14 +214,9 @@ class no_vnodes(object):
         wrapped.__doc__ = f.__doc__
         return wrapped
 
-class require(object):
-    def __init__(self, msg):
-        self.msg = msg
 
-    def __call__(self, f):
-        def wrapped(obj):
-            obj.skip("require " + self.msg)
-            f(obj)
-        wrapped.__name__ = f.__name__
-        wrapped.__doc__ = f.__doc__
-        return wrapped
+def require(msg):
+    """Skips the decorated class or method with a message about which Jira
+    ticket it requires."""
+    # equivalent to decorating with @unittest.skip
+    return unittest.skip('require ' + msg)
