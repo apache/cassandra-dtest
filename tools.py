@@ -150,13 +150,6 @@ def replace_in_file(filepath, search_replacements):
             line = re.sub(regex, replacement, line)
         sys.stdout.write(line)
 
-def not_implemented(f):
-    def wrapped(obj):
-        obj.skip("this test not implemented")
-        f(obj)
-    wrapped.__name__ = f.__name__
-    wrapped.__doc__ = f.__doc__
-    return wrapped
 
 class since(object):
     def __init__(self, cass_version, max_version=None):
