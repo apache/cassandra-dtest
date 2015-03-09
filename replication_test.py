@@ -38,6 +38,7 @@ murmur3_hashes = {
 }
 
 
+@no_vnodes()
 class ReplicationTest(Tester):
     """This test suite looks at how data is replicated across a cluster
     and who the coordinator, replicas and forwarders involved are.
@@ -156,7 +157,6 @@ class ReplicationTest(Tester):
                 print("%s\t%s\t%s\t%s" % (t.source, t.source_elapsed, t.description, t.thread_name))
             print("-" * 40)
 
-    @no_vnodes()
     def simple_test(self):
         """Test the SimpleStrategy on a 3 node cluster"""
         self.cluster.populate(3).start()
@@ -194,7 +194,6 @@ class ReplicationTest(Tester):
             #acknowledged the write:
             self.assertEqual(stats['nodes_sent_write'], stats['nodes_responded_write'])
 
-    @no_vnodes()
     def network_topology_test(self):
         """Test the NetworkTopologyStrategy on a 2DC 3:3 node cluster"""
         self.cluster.populate([3,3]).start()
