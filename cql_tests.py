@@ -2,13 +2,14 @@
 
 import random
 import time
+import math
 from collections import OrderedDict
 from uuid import uuid4, UUID
 
 from dtest import Tester, canReuseCluster, freshCluster
 from assertions import assert_invalid, assert_one, assert_none, assert_all
 from tools import since, require, rows_to_list
-from cassandra import ConsistencyLevel, InvalidRequest
+from cassandra import ConsistencyLevel, InvalidRequest, AlreadyExists
 from cassandra.protocol import ProtocolException, SyntaxException, ConfigurationException, InvalidRequestException
 from cassandra.query import SimpleStatement
 from cassandra.util import sortedset
@@ -1035,62 +1036,70 @@ class TestCQL(Tester):
         # Reserved keywords
         assert_invalid(cursor, "CREATE TABLE test1 (select int PRIMARY KEY, column int)", expected=SyntaxException)
 
-    #def keyspace_test(self):
-    #    cursor = self.prepare()
+    def keyspace_test(self):
+        cursor = self.prepare()
 
-    #    assert_invalid(cursor, "CREATE KEYSPACE test1")
-    #    cursor.execute("CREATE KEYSPACE test2 WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 }")
-    #    assert_invalid(cursor, "CREATE KEYSPACE My_much_much_too_long_identifier_that_should_not_work WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 }")
+        assert_invalid(cursor, "CREATE KEYSPACE test1",
+                       expected=SyntaxException,
+                       matching="code=2000")
+        cursor.execute("CREATE KEYSPACE test2 WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 }")
+        assert_invalid(cursor, "CREATE KEYSPACE My_much_much_too_long_identifier_that_should_not_work WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 }")
 
-    #    cursor.execute("DROP KEYSPACE test2")
-    #    assert_invalid(cursor, "DROP KEYSPACE non_existing")
-    #    cursor.execute("CREATE KEYSPACE test2 WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 }")
+        cursor.execute("DROP KEYSPACE test2")
+        assert_invalid(cursor, "DROP KEYSPACE non_existing",
+                       expected=ConfigurationException,
+                       matching="code=2300")
+        cursor.execute("CREATE KEYSPACE test2 WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 }")
 
-    #def table_test(self):
-    #    cursor = self.prepare()
+    def table_test(self):
+        cursor = self.prepare()
 
-    #    cursor.execute("""
-    #        CREATE TABLE test1 (
-    #            k int PRIMARY KEY,
-    #            c int
-    #        )
-    #    """)
+        cursor.execute("""
+            CREATE TABLE test1 (
+                k int PRIMARY KEY,
+                c int
+            )
+        """)
 
-    #    cursor.execute("""
-    #        CREATE TABLE test2 (
-    #            k int,
-    #            name int,
-    #            value int,
-    #            PRIMARY KEY(k, name)
-    #        ) WITH COMPACT STORAGE
-    #    """)
+        cursor.execute("""
+            CREATE TABLE test2 (
+                k int,
+                name int,
+                value int,
+                PRIMARY KEY(k, name)
+            ) WITH COMPACT STORAGE
+        """)
 
-    #    cursor.execute("""
-    #        CREATE TABLE test3 (
-    #            k int,
-    #            c int,
-    #            PRIMARY KEY (k),
-    #        )
-    #    """)
+        cursor.execute("""
+            CREATE TABLE test3 (
+                k int,
+                c int,
+                PRIMARY KEY (k),
+            )
+        """)
 
-    #    # existing table
-    #    assert_invalid(cursor, "CREATE TABLE test3 (k int PRIMARY KEY, c int)")
-    #    # repeated column
-    #    assert_invalid(cursor, "CREATE TABLE test4 (k int PRIMARY KEY, c int, k text)")
+        # existing table
+        assert_invalid(cursor, "CREATE TABLE test3 (k int PRIMARY KEY, c int)",
+                       expected=AlreadyExists,
+                       matching="ks.test3")
+        # repeated column
+        assert_invalid(cursor, "CREATE TABLE test4 (k int PRIMARY KEY, c int, k text)",
+                       matching="code=2200")
 
-    #    # compact storage limitations
-    #    assert_invalid(cursor, "CREATE TABLE test4 (k int, name, int, c1 int, c2 int, PRIMARY KEY(k, name)) WITH COMPACT STORAGE")
+        # compact storage limitations
+        assert_invalid(cursor, "CREATE TABLE test4 (k int, name, int, c1 int, c2 int, PRIMARY KEY(k, name)) WITH COMPACT STORAGE",
+                       expected=SyntaxException)
 
-    #    cursor.execute("DROP TABLE test1")
-    #    cursor.execute("TRUNCATE test2")
+        cursor.execute("DROP TABLE test1")
+        cursor.execute("TRUNCATE test2")
 
-    #    cursor.execute("""
-    #        CREATE TABLE test1 (
-    #            k int PRIMARY KEY,
-    #            c1 int,
-    #            c2 int,
-    #        )
-    #    """)
+        cursor.execute("""
+            CREATE TABLE test1 (
+                k int PRIMARY KEY,
+                c1 int,
+                c2 int,
+            )
+        """)
 
     def batch_test(self):
         cursor = self.prepare()
@@ -3690,17 +3699,25 @@ class TestCQL(Tester):
         # we're not allowed to create a value index if we already have a key one
         assert_invalid(cursor, "CREATE INDEX ON test(m)")
 
-    #def nan_infinity_test(self):
-    #    cursor = self.prepare()
+    def nan_infinity_test(self):
+        cursor = self.prepare()
 
-    #    cursor.execute("CREATE TABLE test (f float PRIMARY KEY)")
+        cursor.execute("CREATE TABLE test (f float PRIMARY KEY)")
 
-    #    cursor.execute("INSERT INTO test(f) VALUES (NaN)")
-    #    cursor.execute("INSERT INTO test(f) VALUES (-NaN)")
-    #    cursor.execute("INSERT INTO test(f) VALUES (Infinity)")
-    #    cursor.execute("INSERT INTO test(f) VALUES (-Infinity)")
+        cursor.execute("INSERT INTO test(f) VALUES (NaN)")
+        cursor.execute("INSERT INTO test(f) VALUES (-NaN)")
+        cursor.execute("INSERT INTO test(f) VALUES (Infinity)")
+        cursor.execute("INSERT INTO test(f) VALUES (-Infinity)")
 
-    #    assert_all(cursor, "SELECT * FROM test", [[nan], [inf], [-inf]])
+        selected = rows_to_list(cursor.execute("SELECT * FROM test"))
+
+        # selected should be [[nan], [inf], [-inf]],
+        # but assert element-wise because NaN != NaN
+        assert len(selected) == 3
+        assert len(selected[0]) == 1
+        assert math.isnan(selected[0][0])
+        assert selected[1] == [float("inf")]
+        assert selected[2] == [float("-inf")]
 
     @since('2.0')
     def static_columns_test(self):
