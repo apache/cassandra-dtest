@@ -1,22 +1,14 @@
-import os
-import stat
-import glob
-import subprocess
-import ccmlib
 import uuid
-
-from dtest import Tester, debug
-from thrift_tests import get_thrift_client
 
 from cassandra import WriteTimeout, WriteFailure
 from cassandra import ConsistencyLevel
-from cassandra.query import SimpleStatement
-from cassandra.cluster import InvalidRequest
+
+from dtest import Tester
+
+from thrift_tests import get_thrift_client
+from thrift_bindings.v30 import ttypes as thrift_types
 
 from tools import since
-from assertions import assert_one, assert_none
-
-from thrift_bindings.v30 import ttypes as thrift_types
 
 KEYSPACE = "foo"
 
