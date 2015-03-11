@@ -1876,8 +1876,16 @@ class TestCQL(Tester):
 
         assert_invalid(cursor, "SELECT content FROM blogs WHERE time2 >= 0 AND author='foo'")
 
+        # as discussed in CASSANDRA-8148, some queries that should have required ALLOW FILTERING
+        # in 2.0 have been fixed for 3.0
         v = self.cluster.version()
-        if v >= "3.0.0":
+        if v < "3.0.0":
+            cursor.execute("SELECT blog_id, content FROM blogs WHERE time1 > 0 AND author='foo'")
+            cursor.execute("SELECT blog_id, content FROM blogs WHERE time1 = 1 AND author='foo'")
+            cursor.execute("SELECT blog_id, content FROM blogs WHERE time1 = 1 AND time2 = 0 AND author='foo'")
+            cursor.execute("SELECT content FROM blogs WHERE time1 = 1 AND time2 = 1 AND author='foo'")
+            cursor.execute("SELECT content FROM blogs WHERE time1 = 1 AND time2 > 0 AND author='foo'")
+        else:
             assert_invalid(cursor, "SELECT blog_id, content FROM blogs WHERE time1 > 0 AND author='foo'")
             assert_invalid(cursor, "SELECT blog_id, content FROM blogs WHERE time1 = 1 AND author='foo'")
             assert_invalid(cursor, "SELECT blog_id, content FROM blogs WHERE time1 = 1 AND time2 = 0 AND author='foo'")
