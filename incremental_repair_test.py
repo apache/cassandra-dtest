@@ -216,7 +216,7 @@ class TestIncRepair(Tester):
         [node1,node2,node3] = cluster.nodelist()
 
         expected_load_size = 4.5  # In GB
-        node1.stress(['write', 'n=5000000', '-schema', 'replication(factor=3)'])
+        node1.stress(['write', 'n=5000000', '-rate', 'threads=50', '-schema', 'replication(factor=3)'])
 
         node1.flush()
         node2.flush()
