@@ -1,8 +1,9 @@
 import random, time
 from dtest import debug, Tester
-from tools import new_node, insert_c1c2, query_c1c2
+from tools import new_node, insert_c1c2, query_c1c2, since, InterruptBootstrap
 from assertions import assert_almost_equal
 from ccmlib.cluster import Cluster
+from ccmlib.node import NodeError
 from cassandra import ConsistencyLevel
 
 
@@ -15,6 +16,9 @@ class TestBootstrap(Tester):
             # node that hasn't started yet, and when it does, it gets
             # replayed and everything is fine.
             r'Can\'t send migration request: node.*is down',
+            # ignore streaming error during bootstrap
+            r'Exception encountered during startup',
+            r'Streaming error occurred'
         ]
         Tester.__init__(self, *args, **kwargs)
 
@@ -76,3 +80,80 @@ class TestBootstrap(Tester):
         stress_table = 'keyspace1.standard1' if self.cluster.version() >= '2.1' else '"Keyspace1"."Standard1"'
         rows = session.execute('select * from %s limit 10' % stress_table)
         assert len(list(rows)) == 10
+
+    @since('3.0')
+    def resumable_bootstrap_test(self):
+        """Test resuming bootstrap after data streaming failure"""
+
+        cluster = self.cluster
+        cluster.populate(2).start(wait_other_notice=True)
+
+        node1 = cluster.nodes['node1']
+        node1.stress(['write', 'n=100000', '-schema', 'replication(factor=2)'])
+        node1.flush()
+
+        # kill node1 in the middle of streaming to let it fail
+        t = InterruptBootstrap(node1)
+        t.start()
+
+        # start bootstrapping node3 and wait for streaming
+        node3 = new_node(cluster)
+        node3.set_configuration_options(values={'stream_throughput_outbound_megabits_per_sec': 1})
+        try:
+            node3.start()
+        except NodeError:
+            pass # node doesn't start as expected
+        t.join()
+        node1.start()
+
+        # restart node3 bootstrap
+        node3.start()
+        # check if we skipped already retrieved ranges
+        node3.watch_log_for("already available. Skipping streaming.")
+        # wait for node3 ready to query
+        node3.watch_log_for("Listening for thrift clients...")
+
+        # check if 2nd bootstrap succeeded
+        cursor = self.exclusive_cql_connection(node3)
+        rows = cursor.execute("SELECT bootstrapped FROM system.local WHERE key='local'")
+        assert len(rows) == 1
+        assert rows[0][0] == 'COMPLETED', rows[0][0]
+
+    @since('3.0')
+    def bootstrap_with_reset_bootstrap_state_test(self):
+        """Test bootstrap with resetting bootstrap progress"""
+
+        cluster = self.cluster
+        cluster.populate(2).start(wait_other_notice=True)
+
+        node1 = cluster.nodes['node1']
+        node1.stress(['write', 'n=100000', '-schema', 'replication(factor=2)'])
+        node1.flush()
+
+        # kill node1 in the middle of streaming to let it fail
+        t = InterruptBootstrap(node1)
+        t.start()
+
+        # start bootstrapping node3 and wait for streaming
+        node3 = new_node(cluster)
+        node3.set_configuration_options(values={'stream_throughput_outbound_megabits_per_sec': 1})
+        try:
+            node3.start()
+        except NodeError:
+            pass # node doesn't start as expected
+        t.join()
+        node1.start()
+
+        # restart node3 bootstrap with resetting bootstrap progress
+        node3.start(jvm_args=["-Dcassandra.reset_bootstrap_progress=true"])
+        # check if we reset bootstrap state
+        node3.watch_log_for("Resetting bootstrap progress to start fresh")
+        # wait for node3 ready to query
+        node3.watch_log_for("Listening for thrift clients...")
+
+        # check if 2nd bootstrap succeeded
+        cursor = self.exclusive_cql_connection(node3)
+        rows = cursor.execute("SELECT bootstrapped FROM system.local WHERE key='local'")
+        assert len(rows) == 1
+        assert rows[0][0] == 'COMPLETED', rows[0][0]
+

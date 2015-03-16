@@ -4,6 +4,7 @@ from ccmlib.cluster import Cluster
 from ccmlib.node import Node, NodeError, TimeoutError
 from cassandra import ConsistencyLevel, Unavailable, ReadTimeout
 from cassandra.query import SimpleStatement
+from tools import since, InterruptBootstrap
 import time, re
 
 class NodeUnavailable(Exception):
@@ -21,7 +22,9 @@ class TestReplaceAddress(Tester):
             # This is caused by starting a node improperly (replacing active/nonexistent)
             r'Exception encountered during startup',
             # This is caused by trying to replace a nonexistent node
-            r'Exception in thread Thread'
+            r'Exception in thread Thread',
+            # ignore streaming error during bootstrap
+            r'Streaming error occurred'
         ]
         Tester.__init__(self, *args, **kwargs)
 
@@ -224,8 +227,104 @@ class TestReplaceAddress(Tester):
         debug(movedTokensList[0])
         self.assertEqual(len(movedTokensList), numNodes)
 
+    @since('3.0')
+    def resumable_replace_test(self):
+        """Test resumable bootstrap while replacing node"""
 
+        cluster = self.cluster
+        cluster.populate(3).start()
+        [node1,node2, node3] = cluster.nodelist()
 
+        node1.stress(['write', 'n=100000', '-schema', 'replication(factor=3)'])
 
+        cursor = self.patient_cql_connection(node1)
+        stress_table = 'keyspace1.standard1' if self.cluster.version() >= '2.1' else '"Keyspace1"."Standard1"'
+        query = SimpleStatement('select * from %s LIMIT 1' % stress_table, consistency_level=ConsistencyLevel.THREE)
+        initialData = cursor.execute(query)
 
+        node3.stop(gently=False)
+
+        # kill node1 in the middle of streaming to let it fail
+        t = InterruptBootstrap(node1)
+        t.start()
+        # replace node 3 with node 4
+        debug("Starting node 4 to replace node 3")
+        node4 = Node('node4', cluster, True, ('127.0.0.4', 9160), ('127.0.0.4', 7000), '7400', '0', None, ('127.0.0.4',9042))
+        cluster.add(node4, False)
+        try:
+            node4.start(jvm_args=["-Dcassandra.replace_address_first_boot=127.0.0.3"])
+        except NodeError:
+            pass # node doesn't start as expected
+        t.join()
+        node1.start()
+
+        # restart node4 bootstrap
+        node4.start(jvm_args=["-Dcassandra.replace_address_first_boot=127.0.0.3"])
+        # check if we skipped already retrieved ranges
+        node4.watch_log_for("already available. Skipping streaming.")
+        # wait for node3 ready to query
+        node4.watch_log_for("Listening for thrift clients...")
+
+        # check if 2nd bootstrap succeeded
+        cursor = self.exclusive_cql_connection(node4)
+        rows = cursor.execute("SELECT bootstrapped FROM system.local WHERE key='local'")
+        assert len(rows) == 1
+        assert rows[0][0] == 'COMPLETED', rows[0][0]
+
+        #query should work again
+        debug("Verifying querying works again.")
+        finalData = cursor.execute(query)
+        self.assertListEqual(initialData, finalData)
+
+    @since('3.0')
+    def replace_with_reset_resume_state_test(self):
+        """Test replace with resetting bootstrap progress"""
+
+        cluster = self.cluster
+        cluster.populate(3).start()
+        [node1,node2, node3] = cluster.nodelist()
+
+        node1.stress(['write', 'n=100000', '-schema', 'replication(factor=3)'])
+
+        cursor = self.patient_cql_connection(node1)
+        stress_table = 'keyspace1.standard1' if self.cluster.version() >= '2.1' else '"Keyspace1"."Standard1"'
+        query = SimpleStatement('select * from %s LIMIT 1' % stress_table, consistency_level=ConsistencyLevel.THREE)
+        initialData = cursor.execute(query)
+
+        node3.stop(gently=False)
+
+        # kill node1 in the middle of streaming to let it fail
+        t = InterruptBootstrap(node1)
+        t.start()
+        # replace node 3 with node 4
+        debug("Starting node 4 to replace node 3")
+        node4 = Node('node4', cluster, True, ('127.0.0.4', 9160), ('127.0.0.4', 7000), '7400', '0', None, ('127.0.0.4',9042))
+        cluster.add(node4, False)
+        try:
+            node4.start(jvm_args=["-Dcassandra.replace_address_first_boot=127.0.0.3"])
+        except NodeError:
+            pass # node doesn't start as expected
+        t.join()
+        node1.start()
+
+        # restart node4 bootstrap with resetting bootstrap state
+        node4.start(jvm_args=[
+                    "-Dcassandra.replace_address_first_boot=127.0.0.3",
+                    "-Dcassandra.reset_bootstrap_progress=true"
+                   ])
+        # check if we reset bootstrap state
+        node4.watch_log_for("Resetting bootstrap progress to start fresh")
+        # wait for node3 ready to query
+        node4.watch_log_for("Listening for thrift clients...")
+
+        # check if 2nd bootstrap succeeded
+        cursor = self.exclusive_cql_connection(node4)
+        rows = cursor.execute("SELECT bootstrapped FROM system.local WHERE key='local'")
+        assert len(rows) == 1
+        assert rows[0][0] == 'COMPLETED', rows[0][0]
+
+        #query should work again
+        debug("Verifying querying works again.")
+        finalData = cursor.execute(query)
+        self.assertListEqual(initialData, finalData)
 
