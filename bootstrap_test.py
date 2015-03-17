@@ -22,6 +22,7 @@ class TestBootstrap(Tester):
             r'Streaming error occurred'
         ]
         Tester.__init__(self, *args, **kwargs)
+        self.allow_log_errors = True
 
     def simple_bootstrap_test(self):
         cluster = self.cluster
@@ -105,19 +106,22 @@ class TestBootstrap(Tester):
         except NodeError:
             pass # node doesn't start as expected
         t.join()
-        node1.start()
 
-        # restart node3 bootstrap
-        node3.start()
-        # check if we skipped already retrieved ranges
-        node3.watch_log_for("already available. Skipping streaming.")
         # wait for node3 ready to query
         node3.watch_log_for("Listening for thrift clients...")
-
-        # check if 2nd bootstrap succeeded
+        mark = node3.mark_log()
+        # check if node3 is still in bootstrap mode
         cursor = self.exclusive_cql_connection(node3)
         rows = cursor.execute("SELECT bootstrapped FROM system.local WHERE key='local'")
         assert len(rows) == 1
+        assert rows[0][0] == 'IN_PROGRESS', rows[0][0]
+        # bring back node1 and invoke nodetool bootstrap to resume bootstrapping
+        node1.start(wait_other_notice=True)
+        node3.nodetool('bootstrap resume')
+        # check if we skipped already retrieved ranges
+        node3.watch_log_for("already available. Skipping streaming.")
+        node3.watch_log_for("Resume complete", from_mark=mark)
+        rows = cursor.execute("SELECT bootstrapped FROM system.local WHERE key='local'")
         assert rows[0][0] == 'COMPLETED', rows[0][0]
 
     @since('3.0')
@@ -146,11 +150,13 @@ class TestBootstrap(Tester):
         node1.start()
 
         # restart node3 bootstrap with resetting bootstrap progress
+        node3.stop()
+        mark = node3.mark_log()
         node3.start(jvm_args=["-Dcassandra.reset_bootstrap_progress=true"])
         # check if we reset bootstrap state
-        node3.watch_log_for("Resetting bootstrap progress to start fresh")
+        node3.watch_log_for("Resetting bootstrap progress to start fresh", from_mark=mark)
         # wait for node3 ready to query
-        node3.watch_log_for("Listening for thrift clients...")
+        node3.watch_log_for("Listening for thrift clients...", from_mark=mark)
 
         # check if 2nd bootstrap succeeded
         cursor = self.exclusive_cql_connection(node3)
