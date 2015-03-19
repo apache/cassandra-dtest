@@ -4860,10 +4860,20 @@ class TestCQL(Tester):
 
         # create and confirm
         cursor.execute("CREATE INDEX IF NOT EXISTS myindex ON my_test_table (value1)")
-        assert_one(
-            cursor,
-            """select index_name from system."IndexInfo" where table_name = 'my_test_ks'""",
-            ['my_test_table.myindex'])
+
+        # index building is asynch, wait for it to finish
+        for i in range(10):
+            results = cursor.execute(
+                """select index_name from system."IndexInfo" where table_name = 'my_test_ks'""")
+
+            if results:
+                self.assertEqual([('my_test_table.myindex',)], results)
+                break
+
+            time.sleep(0.5)
+        else:
+            # this is executed when 'break' is never called
+            self.fail("Didn't see my_test_table.myindex after polling for 5 seconds")
 
         # unsuccessful create since it's already there
         cursor.execute("CREATE INDEX IF NOT EXISTS myindex ON my_test_table (value1)")
