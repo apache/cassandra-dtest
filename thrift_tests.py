@@ -1765,11 +1765,9 @@ class TestMutations(ThriftTester):
         _set_keyspace('Keyspace1')
         column = Column('cttl3', 'value1', 0, 2)
         client.insert('key1', ColumnParent('Standard1'), column, ConsistencyLevel.ONE)
-        time.sleep(1)
         c = client.get('key1', ColumnPath('Standard1', column='cttl3'), ConsistencyLevel.ONE).column
         assert c == column
-        assert client.get('key1', ColumnPath('Standard1', column='cttl3'), ConsistencyLevel.ONE).column == column
-        time.sleep(2)
+        time.sleep(3)
         _expect_missing(lambda: client.get('key1', ColumnPath('Standard1', column='cttl3'), ConsistencyLevel.ONE))
 
     def test_simple_expiration_batch_mutate(self):
@@ -1778,12 +1776,10 @@ class TestMutations(ThriftTester):
         column = Column('cttl4', 'value1', 0, 2)
         cfmap = {'Standard1': [Mutation(ColumnOrSuperColumn(column))]}
         client.batch_mutate({'key1': cfmap}, ConsistencyLevel.ONE)
-        time.sleep(1)
         c = client.get('key1', ColumnPath('Standard1', column='cttl4'), ConsistencyLevel.ONE).column
         assert c == column
-        assert client.get('key1', ColumnPath('Standard1', column='cttl4'), ConsistencyLevel.ONE).column == column
-        time.sleep(2)
-        _expect_missing(lambda: client.get('key1', ColumnPath('Standard1', column='cttl3'), ConsistencyLevel.ONE))
+        time.sleep(3)
+        _expect_missing(lambda: client.get('key1', ColumnPath('Standard1', column='cttl4'), ConsistencyLevel.ONE))
 
     def test_update_expiring(self):
         """ Test that updating a column with ttl override the ttl """
@@ -2152,7 +2148,7 @@ class TestMutations(ThriftTester):
     def test_index_scan_expiring(self):
         """ Test that column ttled expires from KEYS index"""
         _set_keyspace('Keyspace1')
-        client.insert('key1', ColumnParent('Indexed1'), Column('birthdate', _i64(1), 0, 1), ConsistencyLevel.ONE)
+        client.insert('key1', ColumnParent('Indexed1'), Column('birthdate', _i64(1), 0, 2), ConsistencyLevel.ONE)
         cp = ColumnParent('Indexed1')
         sp = SlicePredicate(slice_range=SliceRange('', ''))
         key_range = KeyRange('', '', None, None, [IndexExpression('birthdate', IndexOperator.EQ, _i64(1))], 100)
@@ -2160,7 +2156,7 @@ class TestMutations(ThriftTester):
         result = client.get_range_slices(cp, sp, key_range, ConsistencyLevel.ONE)
         assert len(result) == 1, result
         # wait for expiration and requery
-        time.sleep(2)
+        time.sleep(3)
         result = client.get_range_slices(cp, sp, key_range, ConsistencyLevel.ONE)
         assert len(result) == 0, result
 
