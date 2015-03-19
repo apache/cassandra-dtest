@@ -1,6 +1,7 @@
 from ccmlib.node import Node
 from decorator  import decorator
 from distutils.version import LooseVersion
+from threading import Thread
 import re, os, sys, fileinput, time, unittest, functools
 
 from cassandra import ConsistencyLevel
@@ -205,3 +206,12 @@ def require(msg):
     ticket it requires."""
     # equivalent to decorating with @unittest.skip
     return unittest.skip('require ' + msg)
+
+class InterruptBootstrap(Thread):
+    def __init__(self, node):
+        Thread.__init__(self)
+        self.node = node
+
+    def run(self):
+        self.node.watch_log_for("Prepare completed")
+        self.node.stop(gently=False)
