@@ -1,4 +1,5 @@
 import random, time
+import subprocess, tempfile
 from dtest import debug, Tester
 from tools import new_node, insert_c1c2, query_c1c2, since, InterruptBootstrap
 from assertions import assert_almost_equal
@@ -157,3 +158,45 @@ class TestBootstrap(Tester):
         assert len(rows) == 1
         assert rows[0][0] == 'COMPLETED', rows[0][0]
 
+    def manual_bootstrap_test(self):
+        """Test adding a new node and bootstrappig it manually. No auto_bootstrap.
+           This test also verify that all data are OK after the addition of the new node.
+           eg. CASSANDRA-9022
+        """
+        cluster = self.cluster
+
+        for i in range(3):
+            cluster.populate(2).start(wait_other_notice=True)
+            version = cluster.version()
+            (node1, node2) = cluster.nodelist()
+
+            if cluster.version() < "2.1":
+                node1.stress(['-o', 'insert', '-n', '1000', '-l', '2', '-t', '1'])
+            else:
+                node1.stress(['write', 'n=1000', '-schema', 'replication(factor=2)',
+                              '-rate',  'threads=1'])
+
+            # Add a new node
+            node3 = new_node(cluster, bootstrap=False)
+            node3.start()
+            node3.repair()
+            node1.cleanup()
+
+            # Verify the data
+            with tempfile.TemporaryFile(mode='w+') as tmpfile:
+                if cluster.version() < "2.1":
+                    node2.stress(['-o', 'read', '-n', '1000', '-e', 'ALL', '-t', '1'],
+                                 stdout=tmpfile, stderr=subprocess.STDOUT)
+                else:
+                    node2.stress(['read', 'n=1000', 'cl=ALL', '-rate',  'threads=1'],
+                                 stdout=tmpfile, stderr=subprocess.STDOUT)
+
+                tmpfile.seek(0)
+                output = tmpfile.read()
+
+            debug(output)
+            failure = output.find("Data returned was not validated")
+            self.assertEqual(failure, -1, "Stress failed to validate all data")
+
+            for node in [node1, node2, node3]:
+                cluster.remove(node)
