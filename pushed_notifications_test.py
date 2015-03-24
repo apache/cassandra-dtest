@@ -43,9 +43,9 @@ class NotificationWaiter(object):
         self.notifications.append(notification)
         self.event.set()
 
-    def wait_for_notifications(self, timeout, num_notifications=None):
+    def wait_for_notifications(self, timeout, num_notifications=1):
         """
-        Waits up to `timeout` seconds for a notifications from Cassandra. If
+        Waits up to `timeout` seconds for notifications from Cassandra. If
         passed `num_notifications`, stop waiting when that many notifications
         are observed.
         """
@@ -54,9 +54,7 @@ class NotificationWaiter(object):
         while time.time() < deadline:
             self.event.wait(deadline - time.time())
             self.event.clear()
-            done = (num_notifications is not None
-                    and len(self.notifications) >= num_notifications)
-            if done:
+            if len(self.notifications) >= num_notifications:
                 break
 
         return self.notifications
@@ -74,6 +72,7 @@ class TestPushedNotifications(Tester):
     @no_vnodes()
     def move_single_node_test(self):
         """
+        CASSANDRA-8516
         Moving a token should result in NODE_MOVED notifications.
         """
         self.cluster.populate(3).start()
@@ -96,6 +95,7 @@ class TestPushedNotifications(Tester):
 
     def restart_node_test(self):
         """
+        CASSANDRA-7816
         Restarting a node should generate exactly one DOWN and one UP notification
         """
 
@@ -109,7 +109,7 @@ class TestPushedNotifications(Tester):
             node2.stop()
             node2.start()
             debug("Waiting for notifications from %s" % (waiter.address,))
-            notifications = waiter.wait_for_notifications(60.0)
+            notifications = waiter.wait_for_notifications(timeout=60.0, num_notifications=2)
             self.assertEquals(2, len(notifications))
             self.assertEquals(self.get_ip_from_node(node2), notifications[0]["address"][0])
             self.assertEquals("DOWN", notifications[0]["change_type"])
