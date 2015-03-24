@@ -18,6 +18,7 @@ class JolokiaAgent(object):
     Example usage:
 
         node = cluster.nodelist()[0]
+        mbean = make_mbean('db', 'IndexSummaries')
         with JolokiaAgent(node) as jmx:
             avg_interval = jmx.read_attribute(mbean, 'AverageIndexInterval')
             jmx.write_attribute(mbean, 'MemoryPoolCapacityInMB', 0)
