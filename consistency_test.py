@@ -1,7 +1,7 @@
 import time
 
 from dtest import Tester, debug, DISABLE_VNODES
-from assertions import assert_unavailable
+from assertions import assert_unavailable, assert_none
 from tools import (create_c1c2_table, insert_c1c2, query_c1c2, retry_till_success,
                    insert_columns)
 from cassandra import ConsistencyLevel
@@ -211,6 +211,42 @@ class TestConsistency(Tester):
         query = SimpleStatement('SELECT c, v FROM cf WHERE key=\'k0\' LIMIT 1', consistency_level=ConsistencyLevel.QUORUM)
         res = cursor.execute(query)
         assert len(res) == 0, res
+
+    def short_read_quorum_delete_test(self):
+        """Test CASSANDRA-8933"""
+        cluster = self.cluster
+        #Consider however 3 nodes A, B, C (RF=3), and following sequence of operations (all done at QUORUM):
+
+        # Disable hinted handoff and set batch commit log so this doesn't
+        # interfere with the test
+        cluster.set_configuration_options(values={ 'hinted_handoff_enabled' : False}, batch_commitlog=True)
+
+        cluster.populate(3).start(wait_other_notice=True)
+        node1, node2, node3 = cluster.nodelist()
+
+        session = self.patient_cql_connection(node1)
+        self.create_ks(session, 'ks', 3)
+
+        session.execute("CREATE TABLE t (id int, v int, PRIMARY KEY(id, v)) WITH read_repair_chance = 0.0")
+        # we write 1 and 2 in a partition: all nodes get it.
+        session.execute(SimpleStatement("INSERT INTO t (id, v) VALUES (0, 1)", consistency_level=ConsistencyLevel.ALL))
+        session.execute(SimpleStatement("INSERT INTO t (id, v) VALUES (0, 2)", consistency_level=ConsistencyLevel.ALL))
+
+        # we delete 1: only A and C get it.
+        node2.flush()
+        node2.stop(wait_other_notice=True)
+        session.execute(SimpleStatement("DELETE FROM t WHERE id = 0 AND v = 1", consistency_level=ConsistencyLevel.QUORUM))
+        node2.start(wait_other_notice=True)
+
+        # we delete 2: only B and C get it.
+        node1.flush()
+        node1.stop(wait_other_notice=True)
+        session.execute(SimpleStatement("DELETE FROM t WHERE id = 0 AND v = 2", consistency_level=ConsistencyLevel.QUORUM))
+        node1.start(wait_other_notice=True)
+
+        # we read the first row in the partition (so with a LIMIT 1) and A and B answer first.
+        node3.stop()
+        assert_none(session, "SELECT * FROM t WHERE id = 0 LIMIT 1", cl=ConsistencyLevel.QUORUM)
 
     def hintedhandoff_test(self):
         cluster = self.cluster
