@@ -27,6 +27,7 @@ class TestReplaceAddress(Tester):
             r'Streaming error occurred'
         ]
         Tester.__init__(self, *args, **kwargs)
+        self.allow_log_errors = True
 
     def replace_stopped_node_test(self):
         """Check that the replace address function correctly replaces a node that has failed in a cluster.
@@ -256,10 +257,10 @@ class TestReplaceAddress(Tester):
         except NodeError:
             pass # node doesn't start as expected
         t.join()
-        node1.start()
 
-        # restart node4 bootstrap
-        node4.start(jvm_args=["-Dcassandra.replace_address_first_boot=127.0.0.3"])
+        # bring back node1 and invoke nodetool bootstrap to resume bootstrapping
+        node1.start()
+        node4.nodetool('bootstrap resume')
         # check if we skipped already retrieved ranges
         node4.watch_log_for("already available. Skipping streaming.")
         # wait for node3 ready to query
@@ -308,14 +309,16 @@ class TestReplaceAddress(Tester):
         node1.start()
 
         # restart node4 bootstrap with resetting bootstrap state
+        node4.stop()
+        mark = node4.mark_log()
         node4.start(jvm_args=[
                     "-Dcassandra.replace_address_first_boot=127.0.0.3",
                     "-Dcassandra.reset_bootstrap_progress=true"
                    ])
         # check if we reset bootstrap state
-        node4.watch_log_for("Resetting bootstrap progress to start fresh")
+        node4.watch_log_for("Resetting bootstrap progress to start fresh", from_mark=mark)
         # wait for node3 ready to query
-        node4.watch_log_for("Listening for thrift clients...")
+        node4.watch_log_for("Listening for thrift clients...", from_mark=mark)
 
         # check if 2nd bootstrap succeeded
         cursor = self.exclusive_cql_connection(node4)
