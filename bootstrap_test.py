@@ -1,11 +1,14 @@
-import random, time
-import subprocess, tempfile
+import random
+import subprocess
+import time
+import tempfile
+
 from dtest import debug, Tester
-from tools import new_node, insert_c1c2, query_c1c2, since, InterruptBootstrap
+from tools import new_node, query_c1c2, since, InterruptBootstrap
 from assertions import assert_almost_equal
-from ccmlib.cluster import Cluster
 from ccmlib.node import NodeError
 from cassandra import ConsistencyLevel
+from cassandra.concurrent import execute_concurrent_with_args
 
 
 class TestBootstrap(Tester):
@@ -36,17 +39,21 @@ class TestBootstrap(Tester):
 
         session = self.patient_cql_connection(node1)
         self.create_ks(session, 'ks', 1)
-        self.create_cf(session, 'cf', columns={ 'c1' : 'text', 'c2' : 'text' })
+        self.create_cf(session, 'cf', columns={'c1': 'text', 'c2': 'text'})
 
-        for n in xrange(0, keys):
-            insert_c1c2(session, n, ConsistencyLevel.ONE)
+        # record the size before inserting any of our own data
+        empty_size = node1.data_size()
+
+        insert_statement = session.prepare("INSERT INTO ks.cf (key, c1, c2) VALUES (?, 'value1', 'value2')")
+        execute_concurrent_with_args(session, insert_statement, [['k%d' % k] for k in range(keys)])
 
         node1.flush()
+        node1.compact()
         initial_size = node1.data_size()
 
         # Reads inserted data all during the boostrap process. We shouldn't
         # get any error
-        reader = self.go(lambda _: query_c1c2(session, random.randint(0, keys-1), ConsistencyLevel.ONE))
+        reader = self.go(lambda _: query_c1c2(session, random.randint(0, keys - 1), ConsistencyLevel.ONE))
 
         # Boostraping a new node
         node2 = new_node(cluster, token=tokens[1])
@@ -54,13 +61,14 @@ class TestBootstrap(Tester):
 
         reader.check()
         node1.cleanup()
+        node1.compact()
         time.sleep(.5)
         reader.check()
 
-        size1 = node1.data_size()
-        size2 = node2.data_size()
+        size1 = float(node1.data_size())
+        size2 = float(node2.data_size())
         assert_almost_equal(size1, size2, error=0.3)
-        assert_almost_equal(initial_size, 2 * size1)
+        assert_almost_equal(float(initial_size - empty_size), 2 * (size1 - float(empty_size)))
 
     def read_from_bootstrapped_node_test(self):
         """Test bootstrapped node sees existing data, eg. CASSANDRA-6648"""
@@ -104,7 +112,7 @@ class TestBootstrap(Tester):
         try:
             node3.start()
         except NodeError:
-            pass # node doesn't start as expected
+            pass  # node doesn't start as expected
         t.join()
 
         # wait for node3 ready to query
@@ -145,7 +153,7 @@ class TestBootstrap(Tester):
         try:
             node3.start()
         except NodeError:
-            pass # node doesn't start as expected
+            pass  # node doesn't start as expected
         t.join()
         node1.start()
 
@@ -171,14 +179,13 @@ class TestBootstrap(Tester):
         """
         cluster = self.cluster
         cluster.populate(2).start(wait_other_notice=True)
-        version = cluster.version()
         (node1, node2) = cluster.nodelist()
 
         if cluster.version() < "2.1":
             node1.stress(['-o', 'insert', '-n', '1000', '-l', '2', '-t', '1'])
         else:
             node1.stress(['write', 'n=1000', '-schema', 'replication(factor=2)',
-                          '-rate',  'threads=1', '-pop', 'dist=UNIFORM(1..1000)'])
+                          '-rate', 'threads=1', '-pop', 'dist=UNIFORM(1..1000)'])
 
         # Add a new node
         node3 = new_node(cluster, bootstrap=False)
@@ -192,7 +199,7 @@ class TestBootstrap(Tester):
                 node2.stress(['-o', 'read', '-n', '1000', '-e', 'ALL', '-t', '1'],
                              stdout=tmpfile, stderr=subprocess.STDOUT)
             else:
-                node2.stress(['read', 'n=1000', 'cl=ALL', '-rate',  'threads=1',
+                node2.stress(['read', 'n=1000', 'cl=ALL', '-rate', 'threads=1',
                               '-pop', 'dist=UNIFORM(1..1000000)'],
                              stdout=tmpfile, stderr=subprocess.STDOUT)
 
