@@ -112,8 +112,6 @@ class TestCompaction(Tester):
         except OSError:
             self.fail("Path to sstables not valid.")
 
-        self.assertEqual(len(cfs), 1)
-
     def dtcs_deletion_test(self):
         """Test that sstables are deleted properly when able to be.
         Insert data setting max_sstable_age_days low, and determine sstable
