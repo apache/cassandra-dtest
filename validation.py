@@ -6,6 +6,9 @@ import subprocess, tempfile, os, shutil
 class TestValidation(Tester):
 
     def prepare(self):
+        """
+        Sets up cluster to test against. Currently 3 CCM Nodes
+        """
         cluster = self.cluster
 
         cluster.populate(3).start()
@@ -13,9 +16,16 @@ class TestValidation(Tester):
         return cluster
 
     def stress_write(self, node):
+        """
+        Writes data via stress. Should write exact data expected by stress_read()
+        """
         node.stress(['write', 'n=1M', '-mode', 'native', 'cql3', '-rate', 'threads=10', '-pop', 'dist=UNIFORM(1..1M)'])
 
     def stress_read(self, node):
+        """
+        Reads previously written data via stress. Should check for exact data written
+        by stress_write().
+        """
         # Verify the data
         tmpfile = tempfile.mktemp()
         with open(tmpfile, 'w+') as tmp:
@@ -23,8 +33,16 @@ class TestValidation(Tester):
                 stdout=tmp, stderr=subprocess.STDOUT)
         return tmpfile
 
-    def validate_stress_output(self, tmpfile, expect_failure=False, expect_errors=False):
-        with open(tmpfile, 'r') as tmp:
+    def validate_stress_output(self, outfile, expect_failure=False, expect_errors=False):
+        """
+        Validates if data was lost, or determines if stress encountered errors.
+        Should be updated once stress has more sophisticated validation.
+
+        outfile - an output file with stress output.
+        expect_failure - if data loss should be expected
+        expect_errors - if exceptions should be expected
+        """
+        with open(outfile, 'r') as tmp:
             output = tmp.read()
 
             debug(output)
@@ -41,6 +59,10 @@ class TestValidation(Tester):
                 self.assertEqual(failure, -1, "Error while reading data")
 
     def lose_stress_data(self, node):
+        """
+        Simulate data loss.
+        Currently works by deleting sstable files.
+        """
         node.flush()
         path = os.path.join(node.get_path(), 'data', 'keyspace1')
         for folder in os.listdir(path):
@@ -50,14 +72,21 @@ class TestValidation(Tester):
             if folder.find('Data') >= 0:
                 os.remove(os.path.join(path, folder))
 
-    def base_test(self):
+    def simple_write_read_test(self):
+        """
+        A basic test that writes data at CL=ONE, RF=1
+        Tests to ensure no data is lost or errors thrown.
+        """
         cluster = self.prepare()
         node1, node2, node3 = cluster.nodelist()
         self.stress_write(node1)
 
         self.stress_read(node2)
 
-    def reverse_test(self):
+    def down_node_test(self):
+        """
+        Removes a node and checks for data loss. Assumes RF=1.
+        """
         cluster = self.prepare()
         node1, node2, node3 = cluster.nodelist()
         self.stress_write(node1)
@@ -65,7 +94,10 @@ class TestValidation(Tester):
         tmpfile = self.stress_read(node2)
         self.validate_stress_output(tmpfile, expect_failure=True, expect_errors=True)
 
-    def delete_data_test(self):
+    def delete_sstables_test(self):
+        """
+        Deletes sstables from a node and checks for data loss. Assumes RF=1.
+        """
         self.ignore_log_patterns = ['CompactionExecutor',
             'java.lang.RuntimeException: Tried to hard link to file that does not exist']
         cluster = self.prepare()
