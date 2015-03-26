@@ -9,7 +9,7 @@ import os
 
 class TestCompaction(Tester):
 
-    __test__= False
+    #__test__= False
 
     def compaction_delete_test(self):
         """Test that executing a delete properly tombstones a row.
@@ -110,6 +110,47 @@ class TestCompaction(Tester):
 
         self.assertEqual(len(cfs), 1)
 
+    # NOTE: test is modified to be able to only run this using: nosetests -v compaction_test.py:TestCompaction.dtcs_deletion_test
+    def dtcs_deletion_test(self):
+        """Test that sstables are deleted properly when able to be.
+        Insert data setting max_sstable_age_days low, and determine sstable
+        is deleted upon data deletion past max_sstable_age_days.
+        """
+        cluster = self.cluster
+        cluster.populate(1).start()
+        [node1] = cluster.nodelist()
+        cursor = self.patient_cql_connection(node1)
+        self.create_ks(cursor, 'ks', 1)
+
+        self.strategy = 'DateTieredCompactionStrategy'
+
+        if self.strategy == 'DateTieredCompactionStrategy':
+            # we set max_sstable_age_days to 10 seconds
+            cursor.execute("create table cf (key int PRIMARY KEY, val int) with gc_grace_seconds = 0 and compaction= {'class':'DateTieredCompactionStrategy', 'max_sstable_age_days':0.000116}")
+        else:
+            cursor.execute("create table cf (key int PRIMARY KEY, val int) with gc_grace_seconds = 0 and compaction= {'class':'" +self.strategy+"'}")
+
+        for x in range(0, 100):
+            cursor.execute('insert into cf (key, val) values (' + str(x) + ',1)')
+        node1.flush()
+        for x in range(0, 100):
+            cursor.execute('delete from cf where key = ' + str(x))
+        node1.flush()
+
+        time.sleep(20)
+
+        # if reproducible should not remove all sstables
+        node1.nodetool('compact')
+
+        try:
+            debug(node1.get_path())
+            cfs = os.listdir(node1.get_path() + "/data/ks")
+        except OSError:
+            #should fail here!
+            self.fail("Path to sstables invalid.")
+
+        self.assertEqual(len(cfs), 1)
+
     def compaction_throughput_test(self):
         """Test setting compaction throughput.
         Set throughput, insert data and ensure compaction performance corresponds.
@@ -174,8 +215,8 @@ class TestCompaction(Tester):
                 time.sleep(5)
                 cluster.start()
 
-strategies = ['LeveledCompactionStrategy', 'SizeTieredCompactionStrategy', 'DateTieredCompactionStrategy']
-for strategy in strategies:
-    cls_name = ('TestCompaction_with_' + strategy)
-    vars()[cls_name] = type(cls_name, (TestCompaction,), {'strategy': strategy, '__test__':True})
+# strategies = ['LeveledCompactionStrategy', 'SizeTieredCompactionStrategy', 'DateTieredCompactionStrategy']
+# for strategy in strategies:
+#     cls_name = ('TestCompaction_with_' + strategy)
+#     vars()[cls_name] = type(cls_name, (TestCompaction,), {'strategy': strategy, '__test__':True})
 
