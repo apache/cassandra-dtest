@@ -118,8 +118,8 @@ class TestCompaction(Tester):
         is deleted upon data deletion past max_sstable_age_days.
         """
         if not hasattr(self, 'strategy'):
-            self.stategy = 'DateTieredCompactionStrategy'
-        elif self.stategy != 'DateTieredCompactionStrategy':
+            self.strategy = 'DateTieredCompactionStrategy'
+        elif self.strategy != 'DateTieredCompactionStrategy':
             self.skip('Not implemented unless DateTieredCompactionStrategy is used')
             
         cluster = self.cluster
