@@ -5206,7 +5206,20 @@ class TestCQL(Tester):
         cursor.execute("ALTER TABLE test WITH CACHING='ALL'")
         cursor.execute("INSERT INTO test (k,v) VALUES (0,0)")
         cursor.execute("INSERT INTO test (k,v) VALUES (1,1)")
-        cursor.execute("CREATE INDEX on test(v)")
+        cursor.execute("CREATE INDEX testindex on test(v)")
+
+        # wait for the index to be fully built
+        start = time.time()
+        while True:
+            results = cursor.execute("""SELECT * FROM system."IndexInfo" WHERE table_name = 'ks' AND index_name = 'test.testindex'""")
+            if results:
+                break
+
+            if time.time() - start > 10.0:
+                results = list(cursor.execute('SELECT * FROM system."IndexInfo"'))
+                raise Exception("Failed to build secondary index within ten seconds: %s" % (results,))
+            time.sleep(0.1)
+
         assert_all(cursor, "SELECT k FROM test WHERE v = 0", [[0]])
 
         self.cluster.stop()
