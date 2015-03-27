@@ -164,7 +164,7 @@ class TestCompaction(Tester):
 
                 #expired and tombstone sstables should be gone
                 for expiredsstable in initialsstables:
-                    self.assertFalse(expiredsstable in finalsstables)
+                    self.assertFalse(expiredsstable in finalsstables, 'expired and tombstone sstables are not gone')
             except OSError:
                 self.fail("Invalid path to sstables.")
         else:
