@@ -5,6 +5,8 @@ import subprocess, tempfile, os, shutil
 @since('3.0')
 class TestValidation(Tester):
 
+    __test__= False
+
     def prepare(self):
         """
         Sets up cluster to test against. Currently 3 CCM Nodes
@@ -19,7 +21,8 @@ class TestValidation(Tester):
         """
         Writes data via stress. Should write exact data expected by stress_read()
         """
-        node.stress(['write', 'n=1M', '-mode', 'native', 'cql3', '-rate', 'threads=10', '-pop', 'dist=UNIFORM(1..1M)'])
+        node.stress(['write', 'n=1M', '-mode', 'native', 'cql3', '-rate', 'threads=10',
+            '-pop', 'dist=UNIFORM(1..1M)', '-schema', 'compaction(strategy=%s)' % self.strategy])
 
     def stress_read(self, node):
         """
@@ -109,3 +112,8 @@ class TestValidation(Tester):
         self.lose_stress_data(node1)
         tmpfile = self.stress_read(node2)
         self.validate_stress_output(tmpfile, expect_failure=True, expect_errors=True)
+
+strategies = ['LeveledCompactionStrategy', 'SizeTieredCompactionStrategy', 'DateTieredCompactionStrategy']
+for strategy in strategies:
+    cls_name = ('TestValidation_with_' + strategy)
+    vars()[cls_name] = type(cls_name, (TestValidation,), {'strategy': strategy, '__test__':True})
