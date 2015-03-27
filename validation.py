@@ -68,9 +68,11 @@ class TestValidation(Tester):
         for folder in os.listdir(path):
             if folder.find('standard') >= 0:
                 path = os.path.join(path, folder)
-        for folder in os.listdir(path):
-            if folder.find('Data') >= 0:
-                os.remove(os.path.join(path, folder))
+        for sstable_file in os.listdir(path):
+            if sstable_file.find('Data') >= 0:
+                with open(os.path.join(path, sstable_file), 'w') as data_file:
+                    data_file.seek(0)
+                    data_file.truncate()
 
     def simple_write_read_test(self):
         """
