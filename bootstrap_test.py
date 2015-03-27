@@ -200,7 +200,7 @@ class TestBootstrap(Tester):
                              stdout=tmpfile, stderr=subprocess.STDOUT)
             else:
                 node2.stress(['read', 'n=1000', 'cl=ALL', '-rate', 'threads=1',
-                              '-pop', 'dist=UNIFORM(1..1000000)'],
+                              '-pop', 'dist=UNIFORM(1..1000)'],
                              stdout=tmpfile, stderr=subprocess.STDOUT)
 
             tmpfile.seek(0)
