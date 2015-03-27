@@ -117,58 +117,60 @@ class TestCompaction(Tester):
         Insert data setting max_sstable_age_days low, and determine sstable
         is deleted upon data deletion past max_sstable_age_days.
         """
-        if self.strategy == 'DateTieredCompactionStrategy':
-            cluster = self.cluster
-            cluster.populate(1).start()
-            [node1] = cluster.nodelist()
-            cursor = self.patient_cql_connection(node1)
-            self.create_ks(cursor, 'ks', 1)
-            # we set max_sstable_age_days to 10 seconds
-            cursor.execute("create table cf (key int PRIMARY KEY, val int) with gc_grace_seconds = 0 and compaction= {'class':'DateTieredCompactionStrategy', 'max_sstable_age_days':0.000116, 'min_threshold':2}")
+        if not hasattr(self, 'strategy'):
+            self.stategy = 'DateTieredCompactionStrategy'
+        elif self.stategy != 'DateTieredCompactionStrategy':
+            self.skip('Not implemented unless DateTieredCompactionStrategy is used')
+            
+        cluster = self.cluster
+        cluster.populate(1).start()
+        [node1] = cluster.nodelist()
+        cursor = self.patient_cql_connection(node1)
+        self.create_ks(cursor, 'ks', 1)
+        # we set max_sstable_age_days to 10 seconds
+        cursor.execute("create table cf (key int PRIMARY KEY, val int) with gc_grace_seconds = 0 and compaction= {'class':'DateTieredCompactionStrategy', 'max_sstable_age_days':0.000116, 'min_threshold':2}")
 
-            #insert data
-            for x in range(0, 300):
-                cursor.execute('insert into cf (key, val) values (' + str(x) + ',1)')
-            node1.flush()
-            time.sleep(15)
+        #insert data
+        for x in range(0, 300):
+            cursor.execute('insert into cf (key, val) values (' + str(x) + ',1)')
+        node1.flush()
+        time.sleep(15)
 
-            #write tombstones
-            for x in range(0, 300):
-                cursor.execute('delete from cf where key = ' + str(x))
-            node1.flush()
-            time.sleep(15)
+        #write tombstones
+        for x in range(0, 300):
+            cursor.execute('delete from cf where key = ' + str(x))
+        node1.flush()
+        time.sleep(15)
 
-            #get all sstables right now
-            cfs = os.listdir(node1.get_path() + "/data/ks")
-            ssdir = os.listdir(node1.get_path() + "/data/ks/" + cfs[0])
-            initialsstables = []
-            for afile in ssdir:
-                if "Data" in afile:
-                    initialsstables.append(afile)
-            debug(initialsstables)
+        #get all sstables right now
+        cfs = os.listdir(node1.get_path() + "/data/ks")
+        ssdir = os.listdir(node1.get_path() + "/data/ks/" + cfs[0])
+        initialsstables = []
+        for afile in ssdir:
+            if "Data" in afile:
+                initialsstables.append(afile)
+        debug(initialsstables)
 
-            #trigger minor compaction by writing more data
-            for x in range(300, 400):
-                cursor.execute('insert into cf (key, val) values (' + str(x) + ',1)')
-            node1.flush()
-            time.sleep(10)
+        #trigger minor compaction by writing more data
+        for x in range(300, 400):
+            cursor.execute('insert into cf (key, val) values (' + str(x) + ',1)')
+        node1.flush()
+        time.sleep(10)
 
-            try:
-                #should see no expired sstables from initial write and deletion
-                finalsstables = []
-                newssdir = os.listdir(node1.get_path() + "/data/ks/" + cfs[0])
-                for anfile in newssdir:
-                    if "Data" in anfile:
-                        finalsstables.append(anfile)
-                debug(finalsstables)
+        try:
+            #should see no expired sstables from initial write and deletion
+            finalsstables = []
+            newssdir = os.listdir(node1.get_path() + "/data/ks/" + cfs[0])
+            for anfile in newssdir:
+                if "Data" in anfile:
+                    finalsstables.append(anfile)
+            debug(finalsstables)
 
-                #expired and tombstone sstables should be gone
-                for expiredsstable in initialsstables:
-                    self.assertFalse(expiredsstable in finalsstables, 'expired and tombstone sstables are not gone')
-            except OSError:
-                self.fail("Invalid path to sstables.")
-        else:
-            pass
+            #expired and tombstone sstables should be gone
+            for expiredsstable in initialsstables:
+                self.assertFalse(expiredsstable in finalsstables, 'expired and tombstone sstables are not gone')
+        except OSError:
+            self.fail("Invalid path to sstables.")
 
     def compaction_throughput_test(self):
         """Test setting compaction throughput.
