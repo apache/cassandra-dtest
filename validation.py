@@ -113,7 +113,9 @@ class TestValidation(Tester):
         tmpfile = self.stress_read(node2)
         self.validate_stress_output(tmpfile, expect_failure=True, expect_errors=True)
 
-strategies = ['LeveledCompactionStrategy', 'SizeTieredCompactionStrategy', 'DateTieredCompactionStrategy']
-for strategy in strategies:
-    cls_name = ('TestValidation_with_' + strategy)
+strategies = {'LeveledCompactionStrategy' : 'LCS', 'SizeTieredCompactionStrategy' : 'STCS',
+    'DateTieredCompactionStrategy' : 'DTCS'}
+
+for strategy in strategies.keys():
+    cls_name = ('TestValidation_with_' + strategies[strategy])
     vars()[cls_name] = type(cls_name, (TestValidation,), {'strategy': strategy, '__test__':True})
