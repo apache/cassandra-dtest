@@ -120,7 +120,7 @@ class TestCompaction(Tester):
         if not hasattr(self, 'strategy'):
             self.strategy = 'DateTieredCompactionStrategy'
         elif self.strategy != 'DateTieredCompactionStrategy':
-            self.skip('Not implemented unless DateTieredCompactionStrategy is used')
+            self.skipTest('Not implemented unless DateTieredCompactionStrategy is used')
             
         cluster = self.cluster
         cluster.populate(1).start()
