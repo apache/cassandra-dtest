@@ -308,6 +308,19 @@ class TestTTL(Tester):
         self.smart_sleep(start, 5.5)
         assert_row_count(self.cursor1, 'ttl_table', 0)
 
+    def delete_with_ttl_expired_test(self):
+        """
+        Updating a row with a ttl does not prevent deletion, test for CASSANDRA-6363
+        """
+        self.cursor1.execute("DROP TABLE IF EXISTS session")
+        self.cursor1.execute("CREATE TABLE session (id text, usr text, valid int, PRIMARY KEY (id))")
+
+        self.cursor1.execute("insert into session (id, usr) values ('abc', 'abc')")
+        self.cursor1.execute("update session using ttl 1 set valid = 1 where id = 'abc'")
+        self.smart_sleep(time.time(), 1)
+
+        self.cursor1.execute("delete from session where id = 'abc' if usr ='abc'")
+        assert_row_count(self.cursor1, 'session', 0)
 
 class TestDistributedTTL(Tester):
     """ Test Time To Live Feature in a distributed environment """
