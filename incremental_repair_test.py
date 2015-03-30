@@ -169,14 +169,14 @@ class TestIncRepair(Tester):
 
         os.remove('initial.txt')
         os.remove('final.txt')
-    
+
     @since('2.1')
     def compaction_test(self):
         cluster = self.cluster
         cluster.populate(3).start()
         [node1,node2,node3] = cluster.nodelist()
 
-        cursor = self.patient_cql_connection(node1) 
+        cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'ks', 3)
         cursor.execute("create table tab(key int PRIMARY KEY, val int);")
 
@@ -216,15 +216,20 @@ class TestIncRepair(Tester):
         [node1,node2,node3] = cluster.nodelist()
 
         expected_load_size = 4.5  # In GB
-        node1.stress(['write', 'n=5000000', '-rate', 'threads=50', '-schema', 'replication(factor=3)'])
+        node1.stress(['write', 'n=5M', '-rate', 'threads=50', 'limit=5000/s', '-schema', 'replication(factor=3)'])
 
         node1.flush()
         node2.flush()
         node3.flush()
 
-        node1.nodetool("repair -par -inc")
-        node2.nodetool("repair -par -inc")
-        node3.nodetool("repair -par -inc")
+        if self.cluster.version() >= '3.0':
+            node1.nodetool("repair")
+            node2.nodetool("repair")
+            node3.nodetool("repair")
+        else:
+            node1.nodetool("repair -par -inc")
+            node2.nodetool("repair -par -inc")
+            node3.nodetool("repair -par -inc")
 
         node1.cleanup()
         node2.cleanup()
