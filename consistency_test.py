@@ -1,15 +1,12 @@
-import time
-
 from dtest import Tester, debug, DISABLE_VNODES
 from assertions import assert_unavailable, assert_none
-from tools import (create_c1c2_table, insert_c1c2, query_c1c2, retry_till_success,
-                   insert_columns)
+from tools import (create_c1c2_table, insert_c1c2, query_c1c2, insert_columns)
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
 
 class TestConsistency(Tester):
 
-    def cl_cl_prepare(self, write_cl, read_cl):
+    def cl_cl_prepare(self, write_cl, read_cl, tolerate_missing=False):
         cluster = self.cluster
 
         cluster.populate(3).start()
@@ -24,7 +21,7 @@ class TestConsistency(Tester):
         # insert and get at CL.QUORUM
         for n in xrange(0, 100):
             insert_c1c2(session, n, write_cl)
-            query_c1c2(session2, n, read_cl)
+            query_c1c2(session2, n, read_cl, tolerate_missing)
 
         return session, session2
 
@@ -47,20 +44,21 @@ class TestConsistency(Tester):
         assert_unavailable(insert_c1c2, session, 100, ConsistencyLevel.ALL)
 
     def one_one_test(self):
-        session, session2 = self.cl_cl_prepare(ConsistencyLevel.ONE, ConsistencyLevel.ONE)
+        session, session2 = self.cl_cl_prepare(
+            ConsistencyLevel.ONE, ConsistencyLevel.ONE, tolerate_missing=True)
 
         #Stop a node and retest
         self.cluster.nodelist()[2].stop()
         for n in xrange(0, 100):
             insert_c1c2(session, n, ConsistencyLevel.ONE)
-            query_c1c2(session2, n, ConsistencyLevel.ONE)
+            query_c1c2(session2, n, ConsistencyLevel.ONE, tolerate_missing=True)
 
 
         #Stop a node and retest
         self.cluster.nodelist()[1].stop()
         for n in xrange(0, 100):
             insert_c1c2(session, n, ConsistencyLevel.ONE)
-            query_c1c2(session2, n, ConsistencyLevel.ONE)
+            query_c1c2(session2, n, ConsistencyLevel.ONE, tolerate_missing=False)
 
     def one_all_test(self):
         session, session2 = self.cl_cl_prepare(ConsistencyLevel.ONE, ConsistencyLevel.ALL)
