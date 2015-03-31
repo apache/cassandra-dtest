@@ -1,9 +1,17 @@
+import glob
+import os
+import shutil
+import subprocess
+import tempfile
+import time
+
 from dtest import Tester, debug
 from tools import replace_in_file, since
-import tempfile, shutil, glob, os, time
 import distutils.dir_util
 
+
 class SnapshotTester(Tester):
+
     def __init__(self, *args, **kwargs):
         Tester.__init__(self, *args, **kwargs)
 
@@ -39,7 +47,17 @@ class SnapshotTester(Tester):
         node_dir = node.get_path()
         snapshot_dir = os.path.join(snapshot_dir, ks, cf)
         ip = node.address()
-        os.system('{node_dir}/bin/sstableloader -d {ip} {snapshot_dir}'.format(**locals()))
+
+        executable = '%s/bin/sstableloader' % (node_dir,)
+        args = [executable, '-d', ip, snapshot_dir]
+        p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        stdout, stderr = p.communicate()
+        exit_status = p.wait()
+
+        if exit_status != 0:
+            raise Exception("sstableloader command '%s' failed; exit status: %d'; stdout: %s; stderr: %s" %
+                            (" ".join(args), exit_status, stdout, stderr))
+
 
 class TestSnapshot(SnapshotTester):
 
