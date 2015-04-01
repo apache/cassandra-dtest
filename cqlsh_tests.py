@@ -467,7 +467,6 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
             verify_output("LIST ALL PERMISSIONS OF user1", """
  role  | username | resource      | permission
 -------+----------+---------------+------------
- user1 |    user1 | <table ks.t1> |     CREATE
  user1 |    user1 | <table ks.t1> |      ALTER
  user1 |    user1 | <table ks.t1> |       DROP
  user1 |    user1 | <table ks.t1> |     SELECT
