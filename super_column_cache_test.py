@@ -1,15 +1,12 @@
+from thrift_bindings.v30.ttypes import (KsDef, CfDef, Mutation, ColumnOrSuperColumn,
+                                        Column, SuperColumn, SliceRange, SlicePredicate,
+                                        ColumnParent)
+from thrift_bindings.v30.ttypes import ConsistencyLevel as ThriftConsistencyLevel
+
+from thrift_tests import get_thrift_client
+
 from dtest import Tester
 
-import os, sys, time, re
-from uuid import UUID
-from ccmlib.cluster import Cluster
-
-def assert_columns(cli, names):
-    assert not cli.has_errors(), cli.errors()
-    output = cli.last_output()
-
-    for name in names:
-        assert re.search('name=%s' % name, output) is not None, 'Cannot find column %s in %s' % (name, output)
 
 class TestSCCache(Tester):
 
@@ -21,23 +18,83 @@ class TestSCCache(Tester):
         node1 = cluster.nodelist()[0]
         self.patient_cql_connection(node1)
 
-        cli = node1.cli()
-        cli.do("create keyspace ks")
-        cli.do("use ks")
-        cli.do("""
-           create column family Users
-           with column_type='Super' and key_validation_class='UTF8Type' and comparator='UTF8Type' and subcomparator='UTF8Type' and default_validation_class='UTF8Type'
-           and caching='ROWS_ONLY';
-        """)
+        node = self.cluster.nodelist()[0]
+        host, port = node.network_interfaces['thrift']
+        client = get_thrift_client(host, port)
+        client.transport.open()
 
-        cli.do("set Users['mina']['attrs']['name'] = 'Mina'")
-        cli.do("get Users['mina']")
-        assert_columns(cli, ['name'])
+        ksdef = KsDef()
+        ksdef.name = 'ks'
+        ksdef.strategy_class = 'SimpleStrategy'
+        ksdef.strategy_options = {'replication_factor': '1'}
+        ksdef.cf_defs = []
 
-        cli.do("set Users['mina']['attrs']['country'] = 'Canada'")
-        cli.do("get Users['mina']")
-        assert_columns(cli, ['name', 'country'])
+        client.system_add_keyspace(ksdef)
+        client.set_keyspace('ks')
 
-        cli.do("set Users['mina']['attrs']['region'] = 'Quebec'")
-        cli.do("get Users['mina']")
-        assert_columns(cli, ['name', 'country', 'region'])
+        # create a super column family with UTF8 for all types
+        cfdef = CfDef()
+        cfdef.keyspace = 'ks'
+        cfdef.name = 'Users'
+        cfdef.column_type = 'Super'
+        cfdef.comparator_type = 'UTF8Type'
+        cfdef.subcomparator_type = 'UTF8Type'
+        cfdef.key_validation_class = 'UTF8Type'
+        cfdef.default_validation_class = 'UTF8Type'
+        cfdef.caching = 'rows_only'
+
+        client.system_add_column_family(cfdef)
+
+        column = Column(name='name', value='Mina', timestamp=100)
+        client.batch_mutate(
+            {'mina': {'Users': [Mutation(ColumnOrSuperColumn(super_column=SuperColumn('attrs', [column])))]}},
+            ThriftConsistencyLevel.ONE)
+
+        column_parent = ColumnParent(column_family='Users')
+        predicate = SlicePredicate(slice_range=SliceRange("", "", False, 100))
+        super_columns = client.get_slice('mina', column_parent, predicate, ThriftConsistencyLevel.ONE)
+        self.assertEqual(1, len(super_columns))
+        super_column = super_columns[0].super_column
+        self.assertEqual('attrs', super_column.name)
+        self.assertEqual(1, len(super_column.columns))
+        self.assertEqual('name', super_column.columns[0].name)
+        self.assertEqual('Mina', super_column.columns[0].value)
+
+        # add a 'country' subcolumn
+        column = Column(name='country', value='Canada', timestamp=100)
+        client.batch_mutate(
+            {'mina': {'Users': [Mutation(ColumnOrSuperColumn(super_column=SuperColumn('attrs', [column])))]}},
+            ThriftConsistencyLevel.ONE)
+
+        super_columns = client.get_slice('mina', column_parent, predicate, ThriftConsistencyLevel.ONE)
+        self.assertEqual(1, len(super_columns))
+        super_column = super_columns[0].super_column
+        self.assertEqual('attrs', super_column.name)
+        self.assertEqual(2, len(super_column.columns))
+
+        self.assertEqual('country', super_column.columns[0].name)
+        self.assertEqual('Canada', super_column.columns[0].value)
+
+        self.assertEqual('name', super_column.columns[1].name)
+        self.assertEqual('Mina', super_column.columns[1].value)
+
+        # add a 'region' subcolumn
+        column = Column(name='region', value='Quebec', timestamp=100)
+        client.batch_mutate(
+            {'mina': {'Users': [Mutation(ColumnOrSuperColumn(super_column=SuperColumn('attrs', [column])))]}},
+            ThriftConsistencyLevel.ONE)
+
+        super_columns = client.get_slice('mina', column_parent, predicate, ThriftConsistencyLevel.ONE)
+        self.assertEqual(1, len(super_columns))
+        super_column = super_columns[0].super_column
+        self.assertEqual('attrs', super_column.name)
+        self.assertEqual(3, len(super_column.columns))
+
+        self.assertEqual('country', super_column.columns[0].name)
+        self.assertEqual('Canada', super_column.columns[0].value)
+
+        self.assertEqual('name', super_column.columns[1].name)
+        self.assertEqual('Mina', super_column.columns[1].value)
+
+        self.assertEqual('region', super_column.columns[2].name)
+        self.assertEqual('Quebec', super_column.columns[2].value)
