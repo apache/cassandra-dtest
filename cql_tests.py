@@ -1,12 +1,14 @@
 # coding: utf-8
 
 import random
+import struct
 import time
 import math
 from collections import OrderedDict
 from uuid import uuid4, UUID
 
-from thrift_bindings.v30.ttypes import CfDef
+from thrift_bindings.v30.ttypes import CfDef, Mutation, ColumnOrSuperColumn, Column
+from thrift_bindings.v30.ttypes import ConsistencyLevel as ThriftConsistencyLevel
 
 from dtest import Tester, canReuseCluster, freshCluster
 from assertions import assert_invalid, assert_one, assert_none, assert_all
@@ -1720,14 +1722,22 @@ class TestCQL(Tester):
             )
         """)
 
-        cli = self.cluster.nodelist()[0].cli()
-        cli.do("use ks")
-        cli.do("set test[2]['4:v'] = int(200)")
-        assert not cli.has_errors(), cli.errors()
-        time.sleep(1.5)
+        node = self.cluster.nodelist()[0]
+        host, port = node.network_interfaces['thrift']
+        client = get_thrift_client(host, port)
+        client.transport.open()
+        client.set_keyspace('ks')
+        key = struct.pack('>i', 2)
+        column_name_component = struct.pack('>i', 4)
+        # component length + component + EOC + component length + component + EOC
+        column_name = '\x00\x04' + column_name_component + '\x00' + '\x00\x01' + 'v' + '\x00'
+        value = struct.pack('>i', 8)
+        client.batch_mutate(
+            {key: {'test': [Mutation(ColumnOrSuperColumn(column=Column(name=column_name, value=value, timestamp=100)))]}},
+            ThriftConsistencyLevel.ONE)
 
         res = cursor.execute("SELECT * FROM test")
-        assert rows_to_list(res) == [[2, 4, 200]], res
+        assert rows_to_list(res) == [[2, 4, 8]], res
 
     def row_existence_test(self):
         """ Check the semantic of CQL row existence (part of #4361) """
