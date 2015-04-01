@@ -1733,10 +1733,8 @@ class TestCQL(Tester):
         column_name = '\x00\x04' + column_name_component + '\x00' + '\x00\x01' + 'v' + '\x00'
         value = struct.pack('>i', 8)
         client.batch_mutate(
-            {key: {'test': Mutation(ColumnOrSuperColumn(column=Column(name=column_name, value=value, timestamp=100)))}},
+            {key: {'test': [Mutation(ColumnOrSuperColumn(column=Column(name=column_name, value=value, timestamp=100)))]}},
             ThriftConsistencyLevel.ONE)
-
-        time.sleep(1.5)
 
         res = cursor.execute("SELECT * FROM test")
         assert rows_to_list(res) == [[2, 4, 8]], res
