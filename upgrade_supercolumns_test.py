@@ -1,13 +1,25 @@
-from dtest import Tester, debug
-from ccmlib.cluster import Cluster
+import os
+import time
+
 from ccmlib.common import get_version_from_build
+
+from thrift_bindings.v30.ttypes import (KsDef, CfDef, Mutation, ColumnOrSuperColumn,
+                                        Column, SuperColumn, SliceRange, SlicePredicate,
+                                        ColumnParent, CounterColumn)
+from thrift_bindings.v30.ttypes import ConsistencyLevel as ThriftConsistencyLevel
+
+from thrift_tests import get_thrift_client
+
+from dtest import Tester, debug
 from tools import since
-import random, os, time, re
-# Tests upgrade between 1.2->2.0 for super columns (since that's where
-# we removed then internally)
+
 
 @since('2.0')
 class TestSCUpgrade(Tester):
+    """
+    Tests upgrade between 1.2->2.0 for super columns (since that's where we
+    removed then internally).
+    """
 
     def __init__(self, *args, **kwargs):
         self.ignore_log_patterns = [
@@ -27,22 +39,51 @@ class TestSCUpgrade(Tester):
 
         [node1, node2] = cluster.nodelist()
 
-        cli = node1.cli()
-        cli.do("create keyspace test with placement_strategy = 'SimpleStrategy' and strategy_options = {replication_factor : 2} and durable_writes = true")
-        cli.do("use test")
-        cli.do("create column family sc_test with column_type = 'Super' and comparator = 'UTF8Type' and subcomparator = 'UTF8Type' and default_validation_class = 'UTF8Type' and key_validation_class = 'UTF8Type'")
+        # wait for the rpc server to start
+        self.patient_cql_connection(node1)
 
-        for i in range(0, 2):
-            for j in range(0, 2):
-                cli.do("set sc_test['k0']['sc%d']['c%d'] = 'v'" % (i, j))
+        host, port = node1.network_interfaces['thrift']
+        client = get_thrift_client(host, port)
+        client.transport.open()
 
-        assert not cli.has_errors(), cli.errors()
-        cli.close()
+        ksdef = KsDef()
+        ksdef.name = 'test'
+        ksdef.strategy_class = 'SimpleStrategy'
+        ksdef.strategy_options = {'replication_factor': '2'}
+        ksdef.durable_writes = True
+        ksdef.cf_defs = []
+
+        client.system_add_keyspace(ksdef)
+        client.set_keyspace('test')
+
+        # create a super column family with UTF8 for all types
+        cfdef = CfDef()
+        cfdef.keyspace = 'test'
+        cfdef.name = 'sc_test'
+        cfdef.column_type = 'Super'
+        cfdef.comparator_type = 'UTF8Type'
+        cfdef.subcomparator_type = 'UTF8Type'
+        cfdef.key_validation_class = 'UTF8Type'
+        cfdef.default_validation_class = 'UTF8Type'
+        cfdef.caching = 'rows_only'
+
+        client.system_add_column_family(cfdef)
+
+        for i in range(2):
+            supercol_name = 'sc%d' % i
+            for j in range(2):
+                col_name = 'c%d' % j
+                column = Column(name=col_name, value='v', timestamp=100)
+                client.batch_mutate(
+                    {'k0': {'sc_test': [Mutation(ColumnOrSuperColumn(super_column=SuperColumn(supercol_name, [column])))]}},
+                    ThriftConsistencyLevel.ONE)
+
+        client.transport.close()
 
         CASSANDRA_DIR = os.environ.get('CASSANDRA_DIR')
         if get_version_from_build(CASSANDRA_DIR) >= '2.1':
-            #Upgrade nodes to 2.0.
-            #See CASSANDRA-7008
+            # Upgrade nodes to 2.0.
+            # See CASSANDRA-7008
             self.upgrade_to_version("git:cassandra-2.0")
             time.sleep(.5)
 
@@ -54,25 +95,41 @@ class TestSCUpgrade(Tester):
         node1.start(wait_other_notice=True)
         time.sleep(.5)
 
-        cli = node1.cli()
-        cli.do("use test")
-        cli.do("consistencylevel as quorum")
+        client = get_thrift_client(host, port)
+        client.transport.open()
+        client.set_keyspace('test')
 
-        # Check we can still get data properly
-        cli.do("get sc_test['k0']")
-        assert_scs(cli, ['sc0', 'sc1'])
-        assert_columns(cli, ['c0', 'c1'])
+        # fetch all supercolumns
+        column_parent = ColumnParent(column_family='sc_test')
+        predicate = SlicePredicate(slice_range=SliceRange("", "", False, 100))
+        super_columns = client.get_slice('k0', column_parent, predicate, ThriftConsistencyLevel.QUORUM)
+        self.assertEqual(2, len(super_columns))
+        for i in range(2):
+            super_column = super_columns[i].super_column
+            self.assertEqual('sc%d' % i, super_column.name)
+            self.assertEqual(2, len(super_column.columns))
+            for j in range(2):
+                column = super_column.columns[j]
+                self.assertEqual('c%d' % j, column.name)
+                self.assertEqual('v', column.value)
 
-        cli.do("get sc_test['k0']['sc1']")
-        assert_columns(cli, ['c0', 'c1'])
+        # fetch a single supercolumn
+        column_parent = ColumnParent(column_family='sc_test', super_column='sc1')
+        columns = client.get_slice('k0', column_parent, predicate, ThriftConsistencyLevel.QUORUM)
+        self.assertEqual(2, len(columns))
+        for j in range(2):
+            column = columns[j].column
+            self.assertEqual('c%d' % j, column.name)
+            self.assertEqual('v', column.value)
 
-        cli.do("get sc_test['k0']['sc1']['c1']")
-        assert_columns(cli, ['c1'])
+        # fetch a single subcolumn
+        predicate = SlicePredicate(column_names=['c1'])
+        columns = client.get_slice('k0', column_parent, predicate, ThriftConsistencyLevel.QUORUM)
+        self.assertEqual(1, len(columns))
+        column = columns[0].column
+        self.assertEqual('c%d' % j, column.name)
+        self.assertEqual('v', column.value)
 
-        assert not cli.has_errors(), cli.errors()
-        cli.close()
-
-    #CASSANDRA-7188
     def upgrade_with_counters_test(self):
         cluster = self.cluster
 
@@ -82,30 +139,52 @@ class TestSCUpgrade(Tester):
 
         node1, node2, node3 = cluster.nodelist()
 
-        cli = node1.cli()
-        cli.do("create keyspace test with placement_strategy = 'SimpleStrategy' and strategy_options = {replication_factor : 2} and durable_writes = true")
-        cli.do("use test")
-        cli.do("create column family sc_test with column_type = 'Super' and default_validation_class = 'CounterColumnType' AND key_validation_class=UTF8Type AND comparator=UTF8Type")
+        # wait for the rpc server to start
+        self.patient_cql_connection(node1)
 
-        for i in xrange(2):
-            for j in xrange(2):
-                for k in xrange(20):
-                    cli.do("incr sc_test['Counter1']['sc%d']['c%d'] by 1" % (i, j))
+        host, port = node1.network_interfaces['thrift']
+        client = get_thrift_client(host, port)
+        client.transport.open()
 
-        assert not cli.has_errors(), cli.errors()
-        cli.close()
+        ksdef = KsDef()
+        ksdef.name = 'test'
+        ksdef.strategy_class = 'SimpleStrategy'
+        ksdef.strategy_options = {'replication_factor': '2'}
+        ksdef.durable_writes = True
+        ksdef.cf_defs = []
 
+        client.system_add_keyspace(ksdef)
+        client.set_keyspace('test')
 
-        ##If we are on 2.1 or any higher version,
-        ##upgrade to 2.0.latest.
-        ##Otherwise, we must be on a 2.0.x, so we
-        ##should be upgrading to that version.
-        ##This will let us test upgrading
-        ##from 1.2.19 to each of the 2.0 minor releases.
+        # create a super column family with UTF8 for all types except for the
+        # values, which are counters
+        cfdef = CfDef()
+        cfdef.keyspace = 'test'
+        cfdef.name = 'sc_test'
+        cfdef.column_type = 'Super'
+        cfdef.comparator_type = 'UTF8Type'
+        cfdef.subcomparator_type = 'UTF8Type'
+        cfdef.key_validation_class = 'UTF8Type'
+        cfdef.default_validation_class = 'CounterColumnType'
+
+        client.system_add_column_family(cfdef)
+
+        for i in range(2):
+            supercol_name = 'sc%d' % i
+            column_parent = ColumnParent(column_family='sc_test', super_column=supercol_name)
+            for j in range(2):
+                col_name = 'c%d' % j
+                column = CounterColumn(name=col_name, value=1)
+                for k in range(20):
+                    client.add('Counter1', column_parent, column, ThriftConsistencyLevel.ONE)
+
+        # If we are on 2.1 or any higher version upgrade to 2.0.latest.
+        # Otherwise, we must be on a 2.0.x, so we should be upgrading to that version.
+        # This will let us test upgrading from 1.2.19 to each of the 2.0 minor releases.
         CASSANDRA_DIR = os.environ.get('CASSANDRA_DIR')
         if get_version_from_build(CASSANDRA_DIR) >= '2.1':
-            #Upgrade nodes to 2.0.
-            #See CASSANDRA-7008
+            # Upgrade nodes to 2.0.
+            # See CASSANDRA-7008
             self.upgrade_to_version("git:cassandra-2.0", [node1])
             time.sleep(.5)
         else:
@@ -115,30 +194,25 @@ class TestSCUpgrade(Tester):
             self.set_node_to_current_version(node1)
             node1.start(wait_other_notice=True)
 
-        cli = node1.cli()
-        cli.do("use test")
-        for i in xrange(2):
-            for j in xrange(2):
-                for k in xrange(50):
-                    cli.do("incr sc_test['Counter1']['sc%d']['c%d'] by 1" % (i, j))
+        for node in (node1, node2, node3):
+            host, port = node.network_interfaces['thrift']
+            client = get_thrift_client(host, port)
+            client.transport.open()
+            client.set_keyspace('test')
+            for i in range(2):
+                supercol_name = 'sc%d' % i
+                column_parent = ColumnParent(column_family='sc_test', super_column=supercol_name)
+                for j in range(2):
+                    col_name = 'c%d' % j
+                    column = CounterColumn(name=col_name, value=1)
+                    for k in range(50):
+                        client.add('Counter1', column_parent, column, ThriftConsistencyLevel.ONE)
 
-        cli2 = node2.cli()
-        cli2.do("use test")
-        for i in xrange(2):
-            for j in xrange(2):
-                for k in xrange(50):
-                    cli2.do("incr sc_test['Counter1']['sc%d']['c%d'] by 1" % (i, j))
-
-        cli3 = node3.cli()
-        cli3.do("use test")
-        for i in xrange(2):
-            for j in xrange(2):
-                for k in xrange(50):
-                    cli3.do("incr sc_test['Counter1']['sc%d']['c%d'] by 1" % (i, j))
+            client.transport.close()
 
         if get_version_from_build(CASSANDRA_DIR) >= '2.1':
-            #Upgrade nodes to 2.0.
-            #See CASSANDRA-7008
+            # Upgrade nodes to 2.0.
+            # See CASSANDRA-7008
             self.upgrade_to_version("git:cassandra-2.0", [node2, node3])
             time.sleep(.5)
         else:
@@ -153,23 +227,40 @@ class TestSCUpgrade(Tester):
             node2.start(wait_other_notice=True)
             node3.start(wait_other_notice=True)
 
-        cli = node1.cli()
-        cli.do("use test")
-        cli.do("consistencylevel as quorum")
+        host, port = node.network_interfaces['thrift']
+        client = get_thrift_client(host, port)
+        client.transport.open()
+        client.set_keyspace('test')
 
-        # Check we can still get data properly
-        cli.do("get sc_test['Counter1']")
-        assert_scs(cli, ['sc0', 'sc1'])
-        assert_counter_columns(cli, ['c0', 'c1'])
+        column_parent = ColumnParent(column_family='sc_test')
+        predicate = SlicePredicate(slice_range=SliceRange("", "", False, 100))
+        super_columns = client.get_slice('Counter1', column_parent, predicate, ThriftConsistencyLevel.QUORUM)
+        self.assertEqual(2, len(super_columns))
+        for i in range(2):
+            super_column = super_columns[i].counter_super_column
+            self.assertEqual('sc%d' % i, super_column.name)
+            self.assertEqual(2, len(super_column.columns))
+            for j in range(2):
+                column = super_column.columns[j]
+                self.assertEqual('c%d' % j, column.name)
+                self.assertEqual(170, column.value)
 
-        cli.do("get sc_test['Counter1']['sc1']")
-        assert_counter_columns(cli, ['c0', 'c1'])
+        # fetch a single supercolumn
+        column_parent = ColumnParent(column_family='sc_test', super_column='sc1')
+        columns = client.get_slice('Counter1', column_parent, predicate, ThriftConsistencyLevel.QUORUM)
+        self.assertEqual(2, len(columns))
+        for j in range(2):
+            column = columns[j].counter_column
+            self.assertEqual('c%d' % j, column.name)
+            self.assertEqual(170, column.value)
 
-        cli.do("get sc_test['Counter1']['sc1']['c1']")
-        assert_counter_columns(cli, ['c1'])
-
-        assert not cli.has_errors(), cli.errors()
-        cli.close()
+        # fetch a single subcolumn
+        predicate = SlicePredicate(column_names=['c1'])
+        columns = client.get_slice('Counter1', column_parent, predicate, ThriftConsistencyLevel.QUORUM)
+        self.assertEqual(1, len(columns))
+        column = columns[0].counter_column
+        self.assertEqual('c%d' % j, column.name)
+        self.assertEqual(170, column.value)
 
     def upgrade_to_version(self, tag, nodes=None):
         debug('Upgrading to ' + tag)
@@ -195,24 +286,3 @@ class TestSCUpgrade(Tester):
             node.set_log_level("INFO")
             node.start(wait_other_notice=True)
             node.nodetool('upgradesstables -a')
-
-def assert_scs(cli, names):
-    assert not cli.has_errors(), cli.errors()
-    output = cli.last_output()
-
-    for name in names:
-        assert re.search('super_column=%s' % name, output) is not None, 'Cannot find super column %s in %s' % (name, output)
-
-def assert_columns(cli, names):
-    assert not cli.has_errors(), cli.errors()
-    output = cli.last_output()
-
-    for name in names:
-        assert re.search('name=%s' % name, output) is not None, 'Cannot find column %s in %s' % (name, output)
-
-def assert_counter_columns(cli, names):
-    assert not cli.has_errors(), cli.errors()
-    output = cli.last_output()
-
-    for name in names:
-        assert re.search('counter=%s' % name, output) is not None, 'Cannot find column %s in %s' % (name, output)
