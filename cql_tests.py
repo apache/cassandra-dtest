@@ -6,8 +6,11 @@ import math
 from collections import OrderedDict
 from uuid import uuid4, UUID
 
+from thrift_bindings.v30.ttypes import CfDef
+
 from dtest import Tester, canReuseCluster, freshCluster
 from assertions import assert_invalid, assert_one, assert_none, assert_all
+from thrift_tests import get_thrift_client
 from tools import since, require, rows_to_list
 from cassandra import ConsistencyLevel, InvalidRequest, AlreadyExists
 from cassandra.protocol import ProtocolException, SyntaxException, ConfigurationException, InvalidRequestException
@@ -3042,13 +3045,23 @@ class TestCQL(Tester):
     def rename_test(self):
         cursor = self.prepare()
 
-        # The goal is to test renaming from an old cli value
-        cli = self.cluster.nodelist()[0].cli()
-        cli.do("use ks")
-        cli.do("create column family test with comparator='CompositeType(Int32Type, Int32Type, Int32Type)' "
-                + "and key_validation_class=UTF8Type and default_validation_class=UTF8Type")
-        cli.do("set test['foo']['4:3:2'] = 'bar'")
-        assert not cli.has_errors(), cli.errors()
+        node = self.cluster.nodelist()[0]
+        host, port = node.network_interfaces['thrift']
+        client = get_thrift_client(host, port)
+        client.transport.open()
+
+        cfdef = CfDef()
+        cfdef.keyspace = 'ks'
+        cfdef.name = 'test'
+        cfdef.column_type = 'Standard'
+        cfdef.comparator_type = 'CompositeType(Int32Type, Int32Type, Int32Type)'
+        cfdef.key_validation_class = 'UTF8Type'
+        cfdef.default_validation_class = 'UTF8Type'
+
+        client.set_keyspace('ks')
+        client.system_add_column_family(cfdef)
+
+        cursor.execute("INSERT INTO ks.test (key, column1, column2, column3, value) VALUES ('foo', 4, 3, 2, 'bar')")
 
         time.sleep(1)
 
