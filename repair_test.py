@@ -29,14 +29,43 @@ class TestRepair(Tester):
             for node in stopped_nodes:
                 node.start(wait_other_notice=True)
 
-    def simple_repair_test(self, ):
-        self._simple_repair()
+    def simple_sequential_repair_test(self, ):
+        self._simple_repair(sequential=True)
+
+    def simple_parallel_repair_test(self, ):
+        self._simple_repair(sequential=False)
+
+    def empty_vs_gcable_sequential_repair_test(self):
+        self._empty_vs_gcable_no_repair(sequential=True)
+
+    def empty_vs_gcable_parallel_repair_test(self):
+        self._empty_vs_gcable_no_repair(sequential=False)
 
     @no_vnodes()  # https://issues.apache.org/jira/browse/CASSANDRA-5220
     def simple_repair_order_preserving_test(self, ):
         self._simple_repair(order_preserving_partitioner=True)
 
-    def _simple_repair(self, order_preserving_partitioner=False):
+    def _repair_options(self, ks='', cf=[], sequential=True):
+        opts = []
+        version = self.cluster.version()
+        # since version 3.0, default is parallel, otherwise it's sequential
+        if sequential:
+            if version >= '3.0':
+                opts += ['-seq']
+        else:
+            if version < '3.0':
+                opts += ['-par']
+
+        # test with full repair
+        if version >= '3.0':
+            opts += ['-full']
+        if ks:
+            opts += [ks]
+        if cf:
+            opts += cf
+        return opts
+
+    def _simple_repair(self, order_preserving_partitioner=False, sequential=True):
         cluster = self.cluster
 
         if order_preserving_partitioner:
@@ -83,7 +112,7 @@ class TestRepair(Tester):
         # Run repair
         start = time.time()
         debug("starting repair...")
-        node1.repair()
+        node1.repair(self._repair_options(ks='ks', sequential=sequential))
         debug("Repair time: {end}".format(end=time.time() - start))
 
         # Validate that only one range was transfered
@@ -104,7 +133,7 @@ class TestRepair(Tester):
         # Check node3 now has the key
         self.check_rows_on_node(node3, 2001, found=[1000], restart=False)
 
-    def empty_vs_gcable_no_repair_test(self):
+    def _empty_vs_gcable_no_repair(self, sequential):
         """
         Repairing empty partition and tombstoned partition older than gc grace
         should be treated as the same and no repair is necessary.
@@ -172,7 +201,7 @@ class TestRepair(Tester):
 
         # bring up node2 and repair
         node2.start()
-        node2.repair(['ks'])
+        node2.repair(self._repair_options(ks='ks', sequential=sequential))
 
         # check no rows will be returned
         for cf in ['cf1', 'cf2']:
