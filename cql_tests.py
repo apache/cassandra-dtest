@@ -5105,8 +5105,8 @@ class TestCQL(Tester):
         cursor.execute("INSERT INTO test (k, v) VALUES ( 1, {1:'a', 2:'b', 5:'e', 6:'f'})")
 
         assert_all(cursor, "SELECT v[1] FROM test", [['a'], ['a']])
-        assert_all(cursor, "SELECT v[5] FROM test", [[], []])
-        assert_all(cursor, "SELECT v[1] FROM test", [[], []])
+        assert_all(cursor, "SELECT v[5] FROM test", [[], ['e']])
+        assert_all(cursor, "SELECT v[4] FROM test", [['d'], []])
 
         assert_all(cursor, "SELECT v[1..3] FROM test", [['a', 'b', 'c'], ['a', 'b', 'e']])
         assert_all(cursor, "SELECT v[3..5] FROM test", [['c', 'd'], ['e']])
