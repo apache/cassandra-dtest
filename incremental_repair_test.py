@@ -2,11 +2,10 @@ from dtest import Tester, debug
 from tools import insert_c1c2, since
 from cassandra import ConsistencyLevel
 from ccmlib.node import Node
-from re import search, findall
-import unittest
+from re import findall
 import time
 import os
-from assertions import assert_invalid, assert_one, assert_all, assert_none, assert_almost_equal
+from assertions import assert_one, assert_almost_equal
 from nose.plugins.attrib import attr
 
 @since('2.1')
@@ -91,9 +90,9 @@ class TestIncRepair(Tester):
         for z in range(100, 150):
             insert_c1c2(cursor, z, ConsistencyLevel.TWO)
         node1.flush()
+        node3.flush()
 
         debug("start and repair node 2")
-        node2.flush()
         node2.start()
 
         if cluster.version() >= "3.0":
