@@ -1,92 +1,140 @@
 import time
 
 from dtest import Tester, debug
-from loadmaker import LoadMaker
+
+from cassandra.concurrent import execute_concurrent_with_args
+
 
 class TestGlobalRowKeyCache(Tester):
 
-    def __init__(self, *argv, **kwargs):
-        super(TestGlobalRowKeyCache, self).__init__(*argv, **kwargs)
-        # When a node goes down under load it prints an error in it's log.
-        # If we don't allow log errors, then the test will fail.
-#        self.allow_log_errors = True
-
     def functional_test(self):
-        """
-        Test global caches.
-
-        Test that save and load work in the situation when you write to
-        different CFs. Read 2 or 3 times to make sure the page cache doesn't
-        skew the results.
-        """
-
-        # create some rows to insert
-        NUM_INSERTS = 100
-        NUM_UPDATES = 10
-        NUM_DELETES = 1
-
         cluster = self.cluster
         cluster.populate(3)
         node1 = cluster.nodelist()[0]
 
-        for kcsim in (0, 10):
-            for rcsim in (0, 10):
-                setup_name = "%d_%d" % (kcsim, rcsim)
-                ks_name = 'ks_' + setup_name
+        for keycache_size in (0, 10):
+            for rowcache_size in (0, 10):
+                debug("Testing with keycache size of %d MB, rowcache size of %d MB " %
+                      (keycache_size, rowcache_size))
+                keyspace_name = 'ks_%d_%d' % (keycache_size, rowcache_size)
 
-                debug("setup " + setup_name)
+                # make the caches save every five seconds
                 cluster.set_configuration_options(values={
-                        'key_cache_size_in_mb': kcsim,
-                        'row_cache_size_in_mb': rcsim,
-                        'row_cache_save_period': 5,
-                        'key_cache_save_period': 5,
-                        })
+                    'key_cache_size_in_mb': keycache_size,
+                    'row_cache_size_in_mb': rowcache_size,
+                    'row_cache_save_period': 5,
+                    'key_cache_save_period': 5,
+                })
+
                 cluster.start()
-                time.sleep(.5)
-                cursor = self.cql_connection(node1)
-                self.create_ks(cursor, ks_name, 3)
-                time.sleep(1) # wait for propagation
+                cursor = self.patient_cql_connection(node1)
 
-                host, port = node1.network_interfaces['thrift']
+                self.create_ks(cursor, keyspace_name, rf=3)
 
-                # create some load makers
-                lm_standard = LoadMaker(host, port,
-                        keyspace_name=ks_name, column_family_type='standard')
-                lm_counter = LoadMaker(host, port,
-                        keyspace_name=ks_name, column_family_type='standard', is_counter=True)
+                cursor.set_keyspace(keyspace_name)
+                cursor.execute("CREATE TABLE test (k int PRIMARY KEY, v1 int, v2 int)")
+                cursor.execute("CREATE TABLE test_clustering (k int, v1 int, v2 int, PRIMARY KEY (k, v1))")
+                cursor.execute("CREATE TABLE test_counter (k int PRIMARY KEY, v1 counter)")
+                cursor.execute("CREATE TABLE test_counter_clustering (k int, v1 int, v2 counter, PRIMARY KEY (k, v1))")
 
-                # insert some rows
-                lm_standard.generate(NUM_INSERTS)
-                lm_counter.generate(NUM_INSERTS)
+                # insert 100 rows into each table
+                for cf in ('test', 'test_clustering'):
+                    execute_concurrent_with_args(
+                        cursor, cursor.prepare("INSERT INTO %s (k, v1, v2) VALUES (?, ?, ?)" % (cf,)),
+                        [(i, i, i) for i in range(100)])
+
+                execute_concurrent_with_args(
+                    cursor, cursor.prepare("UPDATE test_counter SET v1 = v1 + ? WHERE k = ?"),
+                    [(i, i) for i in range(100)])
+
+                execute_concurrent_with_args(
+                    cursor, cursor.prepare("UPDATE test_counter_clustering SET v2 = v2 + ? WHERE k = ? AND v1 = ?"),
+                    [(i, i, i) for i in range(100)])
 
                 # flush everything to get it into sstables
                 for node in cluster.nodelist():
                     node.flush()
 
-                debug("Validating")
-                for i in range(3):
-                    # read and modify multiple times to get data into and invalidated out of the cache.
-                    lm_standard.update(NUM_UPDATES).delete(NUM_DELETES).validate()
-                    lm_counter.generate().validate()
+                # update the first 10 rows in every table
+                # on non-counter tables, delete the first (remaining) row each round
+                num_updates = 10
+                for validation_round in range(3):
+                    cursor.execute("DELETE FROM test WHERE k = %s", (validation_round,))
+                    execute_concurrent_with_args(
+                        cursor, cursor.prepare("UPDATE test SET v1 = ?, v2 = ? WHERE k = ?"),
+                        [(i, validation_round, i) for i in range(validation_round + 1, num_updates)])
+
+                    cursor.execute("DELETE FROM test_clustering WHERE k = %s AND v1 = %s", (validation_round, validation_round))
+                    execute_concurrent_with_args(
+                        cursor, cursor.prepare("UPDATE test_clustering SET v2 = ? WHERE k = ? AND v1 = ?"),
+                        [(validation_round, i, i) for i in range(validation_round + 1, num_updates)])
+
+                    execute_concurrent_with_args(
+                        cursor, cursor.prepare("UPDATE test_counter SET v1 = v1 + ? WHERE k = ?"),
+                        [(1, i) for i in range(num_updates)])
+
+                    execute_concurrent_with_args(
+                        cursor, cursor.prepare("UPDATE test_counter_clustering SET v2 = v2 + ? WHERE k = ? AND v1 = ?"),
+                        [(1, i, i) for i in range(num_updates)])
+
+                    self._validate_values(cursor, num_updates, validation_round)
+
+                cursor.shutdown()
 
                 # let the data be written to the row/key caches.
-                debug("Letting caches be written")
+                debug("Letting caches be saved to disk")
                 time.sleep(10)
                 debug("Stopping cluster")
                 cluster.stop()
                 time.sleep(1)
                 debug("Starting cluster")
                 cluster.start()
-                time.sleep(5) # read the data back from row and key caches
+                time.sleep(5)  # read the data back from row and key caches
 
-                lm_standard.refresh_connection()
-                lm_counter.refresh_connection()
+                cursor = self.patient_cql_connection(node1)
+                cursor.set_keyspace(keyspace_name)
 
-                debug("Validating again...")
-                for i in range(2):
-                    # read and modify multiple times to get data into and invalidated out of the cache.
-                    lm_standard.validate()
-                    lm_counter.validate()
+                # check all values again
+                self._validate_values(cursor, num_updates, validation_round=2)
 
+    def _validate_values(self, cursor, num_updates, validation_round):
+        # check values of non-counter tables
+        for cf in ('test', 'test_clustering'):
+            rows = list(cursor.execute("SELECT * FROM %s" % (cf,)))
 
-                cluster.stop()
+            # one row gets deleted each validation round
+            self.assertEquals(100 - (validation_round + 1), len(rows))
+
+            # adjust enumeration start to account for row deletions
+            for i, row in enumerate(sorted(rows), start=(validation_round + 1)):
+                self.assertEquals(i, row.k)
+                self.assertEquals(i, row.v1)
+
+                # updated rows will have different values
+                expected_value = validation_round if i < num_updates else i
+                self.assertEquals(expected_value, row.v2)
+
+        # check values of counter tables
+        rows = list(cursor.execute("SELECT * FROM test_counter"))
+        self.assertEquals(100, len(rows))
+        for i, row in enumerate(sorted(rows)):
+            self.assertEquals(i, row.k)
+
+            # updated rows will get incremented once each round
+            expected_value = i
+            if i < num_updates:
+                expected_value += validation_round + 1
+
+            self.assertEquals(expected_value, row.v1)
+
+        rows = list(cursor.execute("SELECT * FROM test_counter_clustering"))
+        self.assertEquals(100, len(rows))
+        for i, row in enumerate(sorted(rows)):
+            self.assertEquals(i, row.k)
+            self.assertEquals(i, row.v1)
+
+            expected_value = i
+            if i < num_updates:
+                expected_value += validation_round + 1
+
+            self.assertEquals(expected_value, row.v2)
