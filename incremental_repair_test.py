@@ -214,31 +214,43 @@ class TestIncRepair(Tester):
         cluster.populate(3).start()
         [node1,node2,node3] = cluster.nodelist()
 
+        debug("Inserting data with stress")
         expected_load_size = 4.5  # In GB
         node1.stress(['write', 'n=5M', '-rate', 'threads=50', '-schema', 'replication(factor=3)'])
 
+        debug("Flushing nodes")
         node1.flush()
         node2.flush()
         node3.flush()
 
         if self.cluster.version() >= '3.0':
+            debug("Repairing node1")
             node1.nodetool("repair")
+            debug("Repairing node2")
             node2.nodetool("repair")
+            debug("Repairing node3")
             node3.nodetool("repair")
         else:
+            debug("Repairing node1")
             node1.nodetool("repair -par -inc")
+            debug("Repairing node2")
             node2.nodetool("repair -par -inc")
+            debug("Repairing node3")
             node3.nodetool("repair -par -inc")
 
-        node1.cleanup()
-        node2.cleanup()
-        node3.cleanup()
-
+        # Using "print" instead of debug() here is on purpose.  The compactions
+        # take a long time and don't print anything by default, which can result
+        # in the test being timed out after 20 minutes.  These print statements
+        # prevent it from being timed out.
+        print "compacting node1"
         node1.compact()
+        print "compacting node2"
         node2.compact()
+        print "compacting node3"
         node3.compact()
 
         # wait some time to be sure the load size is propagated between nodes
+        debug("Waiting for load size info to be propagated between nodes")
         time.sleep(45)
 
         output = node1.nodetool('status', capture_output=True)[0]
