@@ -2,11 +2,10 @@ from dtest import Tester, debug
 from tools import insert_c1c2, since
 from cassandra import ConsistencyLevel
 from ccmlib.node import Node
-from re import search, findall
-import unittest
+from re import findall
 import time
 import os
-from assertions import assert_invalid, assert_one, assert_all, assert_none, assert_almost_equal
+from assertions import assert_one, assert_almost_equal
 from nose.plugins.attrib import attr
 
 @since('2.1')
@@ -91,9 +90,9 @@ class TestIncRepair(Tester):
         for z in range(100, 150):
             insert_c1c2(cursor, z, ConsistencyLevel.TWO)
         node1.flush()
+        node3.flush()
 
         debug("start and repair node 2")
-        node2.flush()
         node2.start()
 
         if cluster.version() >= "3.0":
@@ -169,14 +168,14 @@ class TestIncRepair(Tester):
 
         os.remove('initial.txt')
         os.remove('final.txt')
-    
+
     @since('2.1')
     def compaction_test(self):
         cluster = self.cluster
         cluster.populate(3).start()
         [node1,node2,node3] = cluster.nodelist()
 
-        cursor = self.patient_cql_connection(node1) 
+        cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'ks', 3)
         cursor.execute("create table tab(key int PRIMARY KEY, val int);")
 
@@ -216,15 +215,20 @@ class TestIncRepair(Tester):
         [node1,node2,node3] = cluster.nodelist()
 
         expected_load_size = 4.5  # In GB
-        node1.stress(['write', 'n=5000000', '-rate', 'threads=50', '-schema', 'replication(factor=3)'])
+        node1.stress(['write', 'n=5M', '-rate', 'threads=50', '-schema', 'replication(factor=3)'])
 
         node1.flush()
         node2.flush()
         node3.flush()
 
-        node1.nodetool("repair -par -inc")
-        node2.nodetool("repair -par -inc")
-        node3.nodetool("repair -par -inc")
+        if self.cluster.version() >= '3.0':
+            node1.nodetool("repair")
+            node2.nodetool("repair")
+            node3.nodetool("repair")
+        else:
+            node1.nodetool("repair -par -inc")
+            node2.nodetool("repair -par -inc")
+            node3.nodetool("repair -par -inc")
 
         node1.cleanup()
         node2.cleanup()

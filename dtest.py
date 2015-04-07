@@ -374,8 +374,12 @@ class Tester(TestCase):
             query = 'CREATE COLUMNFAMILY %s (key %s, c varchar, v varchar, PRIMARY KEY(key, c)) WITH comment=\'test cf\'' % (name, key_type)
         else:
             query = 'CREATE COLUMNFAMILY %s (key %s PRIMARY KEY%s) WITH comment=\'test cf\'' % (name, key_type, additional_columns)
+
         if compression is not None:
             query = '%s AND compression = { \'sstable_compression\': \'%sCompressor\' }' % (query, compression)
+        else:
+            # if a compression option is omitted, C* will default to lz4 compression
+            query += ' AND compression = {}'
 
         if read_repair is not None:
             query = '%s AND read_repair_chance=%f' % (query, read_repair)
