@@ -1,8 +1,9 @@
-import random, re, time, uuid
+import os, random, re, time, uuid
 
+from ccmlib.common import get_version_from_build
 from dtest import Tester, debug
 from tools import since
-from assertions import assert_invalid
+from assertions import assert_invalid, assert_one
 from cassandra import InvalidRequest
 from cassandra.query import BatchStatement, SimpleStatement
 from cassandra.protocol import ConfigurationException
@@ -593,3 +594,80 @@ class TestSecondaryIndexesOnCollections(Tester):
 
             self.assertTrue(shared_uuid in db_uuids)
             self.assertTrue(log_entry['unshared_uuid2'] in db_uuids.values())
+
+
+class TestUpgradeSecondaryIndexes(Tester):
+    def __init__(self, *args, **kwargs):
+        Tester.__init__(self, *args, **kwargs)
+
+    @since('2.1')
+    def test_read_old_sstables_after_upgrade(self):
+        """ from 2.1 the location of sstables changed (CASSANDRA-5202), but existing sstables continue
+        to be read from the old location. Verify that this works for index sstables as well as regular
+        data column families (CASSANDRA-9116)
+        """
+        cluster = self.cluster
+
+        # Forcing cluster version on purpose
+        cluster.set_install_dir(version="2.0.12")
+        cluster.populate(1).start()
+
+        [node1] = cluster.nodelist()
+        cursor = self.patient_cql_connection(node1)
+        self.create_ks(cursor, 'index_upgrade', 1)
+        cursor.execute("CREATE TABLE index_upgrade.table1 (k int PRIMARY KEY, v int)")
+        cursor.execute("CREATE INDEX ON index_upgrade.table1(v)")
+        cursor.execute("INSERT INTO index_upgrade.table1 (k,v) VALUES (0,0)")
+
+        query = "SELECT * FROM index_upgrade.table1 WHERE v=0"
+        assert_one(cursor, query, [0, 0])
+
+        # If we are on 3.0 or any higher version upgrade to 2.1.latest.
+        # Otherwise, we must be on a 3.x, so we should be upgrading to that version.
+        # This will let us test upgrading from 2.0.12 to each of the 2.1 minor releases.
+        CASSANDRA_DIR = os.environ.get('CASSANDRA_DIR')
+        if get_version_from_build(CASSANDRA_DIR) >= '3.0':
+            # Upgrade nodes to 2.1
+            # See CASSANDRA-9116
+            debug("Upgrading to cassandra-2.1 latest")
+            self.upgrade_to_version("git:cassandra-2.1", [node1])
+            time.sleep(.5)
+        else:
+            node1.drain()
+            node1.watch_log_for("DRAINED")
+            node1.stop(wait_other_notice=False)
+            debug("Upgrading to current version")
+            self.set_node_to_current_version(node1)
+            node1.start(wait_other_notice=True)
+
+        [node1] = cluster.nodelist()
+        cursor = self.patient_cql_connection(node1)
+        debug(cluster.cassandra_version())
+        assert_one(cursor, query, [0, 0])
+
+    def upgrade_to_version(self, tag, nodes=None):
+        debug('Upgrading to ' + tag)
+        if nodes is None:
+            nodes = self.cluster.nodelist()
+
+        for node in nodes:
+            debug('Shutting down node: ' + node.name)
+            node.drain()
+            node.watch_log_for("DRAINED")
+            node.stop(wait_other_notice=False)
+
+        # Update Cassandra Directory
+        for node in nodes:
+            node.set_install_dir(version=tag)
+            debug("Set new cassandra dir for %s: %s" % (node.name, node.get_install_dir()))
+        self.cluster.set_install_dir(version=tag)
+
+        # Restart nodes on new version
+        for node in nodes:
+            debug('Starting %s on new version (%s)' % (node.name, tag))
+            # Setup log4j / logback again (necessary moving from 2.0 -> 2.1):
+            node.set_log_level("INFO")
+            node.start(wait_other_notice=True)
+            # node.nodetool('upgradesstables -a')
+
+
