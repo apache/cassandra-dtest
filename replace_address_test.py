@@ -1,14 +1,13 @@
 from dtest import Tester, debug, DISABLE_VNODES
-import unittest
-from ccmlib.cluster import Cluster
 from ccmlib.node import Node, NodeError, TimeoutError
 from cassandra import ConsistencyLevel, Unavailable, ReadTimeout
 from cassandra.query import SimpleStatement
 from tools import since, InterruptBootstrap
-import time, re
+
 
 class NodeUnavailable(Exception):
     pass
+
 
 class TestReplaceAddress(Tester):
 
@@ -102,16 +101,6 @@ class TestReplaceAddress(Tester):
         cluster.populate(3).start()
         [node1,node2, node3] = cluster.nodelist()
 
-        debug("Inserting Data...")
-        if cluster.version() < "2.1":
-            node1.stress(['-o', 'insert', '--num-keys=10000', '--replication-factor=3'])
-        else:
-            node1.stress(['write', 'n=10000', '-schema', 'replication(factor=3)'])
-        cursor = self.patient_cql_connection(node1)
-        stress_table = 'keyspace1.standard1' if self.cluster.version() >= '2.1' else '"Keyspace1"."Standard1"'
-        query = SimpleStatement('select * from %s LIMIT 1' % stress_table, consistency_level=ConsistencyLevel.THREE)
-        initialData = cursor.execute(query)
-
         #replace active node 3 with node 4
         debug("Starting node 4 to replace active node 3")
         node4 = Node('node4', cluster, True, ('127.0.0.4', 9160), ('127.0.0.4', 7000), '7400', '0', None, ('127.0.0.4',9042))
@@ -132,16 +121,6 @@ class TestReplaceAddress(Tester):
         cluster.populate(3).start()
         [node1,node2, node3] = cluster.nodelist()
 
-        debug("Inserting Data...")
-        if cluster.version() < "2.1":
-            node1.stress(['-o', 'insert', '--num-keys=10000', '--replication-factor=3'])
-        else:
-            node1.stress(['write', 'n=10000', '-schema', 'replication(factor=3)'])
-        cursor = self.patient_cql_connection(node1)
-        stress_table = 'keyspace1.standard1' if self.cluster.version() >= '2.1' else '"Keyspace1"."Standard1"'
-        query = SimpleStatement('select * from %s LIMIT 1' % stress_table, consistency_level=ConsistencyLevel.THREE)
-        initialData = cursor.execute(query)
-
         debug('Start node 4 and replace an address with no node')
         node4 = Node('node4', cluster, True, ('127.0.0.4', 9160), ('127.0.0.4', 7000), '7400', '0', None, ('127.0.0.4',9042))
         cluster.add(node4, False)
@@ -152,7 +131,6 @@ class TestReplaceAddress(Tester):
                 node4.start(replace_address='127.0.0.5', wait_for_binary_proto=True)
             except (NodeError, TimeoutError):
                 raise NodeError("Node could not start.")
-
 
     def replace_first_boot_test(self):
         debug("Starting cluster with 3 nodes.")
