@@ -253,52 +253,42 @@ class Tester(TestCase):
                 os.symlink(basedir, name)
 
     def cql_connection(self, node, keyspace=None, version=None, user=None,
-        password=None, compression=True, protocol_version=None):
+                       password=None, compression=True, protocol_version=None):
+
+        return self._create_session(node, keyspace, user, password, compression,
+                                    protocol_version)
+
+    def exclusive_cql_connection(self, node, keyspace=None, version=None, user=None,
+                                 password=None, compression=True, protocol_version=None):
 
         node_ip = self.get_ip_from_node(node)
-
-        if protocol_version is None:
-            if self.cluster.version() >= '2.1':
-                protocol_version = 3
-            elif self.cluster.version() >= '2.0':
-                protocol_version = 2
-            else:
-                protocol_version = 1
-
-        if user is None:
-            cluster = PyCluster([node_ip], compression=compression, protocol_version=protocol_version)
-        else:
-            auth_provider=self.get_auth_provider(user=user, password=password)
-            cluster = PyCluster([node_ip], auth_provider=auth_provider, compression=compression, protocol_version=protocol_version)
-        session = cluster.connect()
-        if keyspace is not None:
-            session.execute('USE %s' % keyspace)
-
-        self.connections.append(session)
-        return session
-
-    def exclusive_cql_connection(self, node, keyspace=None, version=None,
-        user=None, password=None, compression=True, protocol_version=None):
-
-        node_ip = self.get_ip_from_node(node)
-
-        if protocol_version is None:
-            if self.cluster.version() >= '2.1':
-                protocol_version = 3
-            elif self.cluster.version() >= '2.0':
-                protocol_version = 2
-            else:
-                protocol_version = 1
-
         wlrr = WhiteListRoundRobinPolicy([node_ip])
-        if user is None:
-            cluster = PyCluster([node_ip], compression=compression, protocol_version=protocol_version, load_balancing_policy=wlrr)
+
+        return self._create_session(node, keyspace, user, password, compression,
+                                    protocol_version, wlrr)
+
+    def _create_session(self, node, keyspace, user, password, compression, protocol_version, load_balancing_policy=None):
+        node_ip = self.get_ip_from_node(node)
+
+        if protocol_version is None:
+            if self.cluster.version() >= '2.1':
+                protocol_version = 3
+            elif self.cluster.version() >= '2.0':
+                protocol_version = 2
+            else:
+                protocol_version = 1
+
+        if user is not None:
+            auth_provider = self.get_auth_provider(user=user, password=password)
         else:
-            auth_provider=self.get_auth_provider(user=user, password=password)
-            cluster = PyCluster([node_ip], auth_provider=auth_provider, compression=compression, protocol_version=protocol_version, load_balancing_policy=wlrr)
+            auth_provider = None
+
+        cluster = PyCluster([node_ip], auth_provider=auth_provider, compression=compression,
+                            protocol_version=protocol_version, load_balancing_policy=load_balancing_policy)
         session = cluster.connect()
+
         if keyspace is not None:
-            session.execute('USE %s' % keyspace)
+            session.set_keyspace(keyspace)
 
         self.connections.append(session)
         return session
