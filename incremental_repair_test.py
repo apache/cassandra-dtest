@@ -238,6 +238,10 @@ class TestIncRepair(Tester):
             debug("Repairing node3")
             node3.nodetool("repair -par -inc")
 
+        node1.cleanup()
+        node2.cleanup()
+        node3.cleanup()
+
         # Using "print" instead of debug() here is on purpose.  The compactions
         # take a long time and don't print anything by default, which can result
         # in the test being timed out after 20 minutes.  These print statements
