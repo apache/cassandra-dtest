@@ -71,11 +71,11 @@ class TestTTL(Tester):
 
         start = time.time()
         self.cursor1.execute("""
-            INSERT INTO ttl_table (key, col1) VALUES (%d, %d) USING TTL 3;
+            INSERT INTO ttl_table (key, col1) VALUES (%d, %d) USING TTL 5;
         """ % (1, 1))
-        self.smart_sleep(start, 1)
+        self.smart_sleep(start, 2)
         assert_row_count(self.cursor1, 'ttl_table', 1)  # should still exist
-        self.smart_sleep(start, 5)
+        self.smart_sleep(start, 7)
         assert_row_count(self.cursor1, 'ttl_table', 0)
 
     def insert_ttl_works_without_default_ttl_test(self):
@@ -234,7 +234,7 @@ class TestTTL(Tester):
         Test that ttl has a granularity of elements using a list collection.
         """
 
-        self.prepare(default_time_to_live=6)
+        self.prepare(default_time_to_live=10)
 
         self.cursor1.execute("ALTER TABLE ttl_table ADD mylist list<int>;""")
         start = time.time()
@@ -242,12 +242,12 @@ class TestTTL(Tester):
             INSERT INTO ttl_table (key, col1, mylist) VALUES (%d, %d, %s);
         """  % (1, 1, [1, 2, 3, 4, 5]))
         self.cursor1.execute("""
-            UPDATE ttl_table USING TTL 2 SET mylist[0] = 42, mylist[4] = 42 WHERE key=1;
+            UPDATE ttl_table USING TTL 5 SET mylist[0] = 42, mylist[4] = 42 WHERE key=1;
         """)
         assert_all(self.cursor1, "SELECT * FROM ttl_table;", [[1, 1, None, None, [42, 2, 3, 4, 42]]])
-        self.smart_sleep(start, 4)
+        self.smart_sleep(start, 7)
         assert_all(self.cursor1, "SELECT * FROM ttl_table;", [[1, 1, None, None, [2, 3, 4]]])
-        self.smart_sleep(start, 8)
+        self.smart_sleep(start, 12)
         assert_row_count(self.cursor1, 'ttl_table', 0)
 
     def collection_set_ttl_test(self):
@@ -363,7 +363,7 @@ class TestDistributedTTL(Tester):
         )
         cursor1.execute(query)
         assert_all(
-            self.cursor1,
+            cursor1,
             "SELECT * FROM ttl_table;",
             [[1, 1, None, None]],
             cl=ConsistencyLevel.ALL
@@ -382,7 +382,7 @@ class TestDistributedTTL(Tester):
         self.prepare()
         self.node2.stop()
         self.cursor1.execute("""
-            INSERT INTO ttl_table (key, col1) VALUES (1, 1) USING TTL 3;
+            INSERT INTO ttl_table (key, col1) VALUES (1, 1) USING TTL 5;
         """)
         self.cursor1.execute("""
             INSERT INTO ttl_table (key, col1) VALUES (2, 2) USING TTL 60;
@@ -392,7 +392,7 @@ class TestDistributedTTL(Tester):
             "SELECT * FROM ttl_table;",
             [[1, 1, None, None], [2, 2, None, None]]
         )
-        time.sleep(5)
+        time.sleep(7)
         self.node1.stop()
         self.node2.start()
         self.node2.watch_log_for("Listening for thrift clients...")
