@@ -407,7 +407,7 @@ class Tester(TestCase):
         reset_environment_vars()
 
         for con in self.connections:
-            con.shutdown()
+            con.cluster.shutdown()
 
         for runner in self.runners:
             try:
