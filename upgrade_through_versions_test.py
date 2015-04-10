@@ -210,6 +210,7 @@ class TestUpgradeThroughVersions(Tester):
 
                     self._check_values()
                     self._check_counters()
+                    self._check_select_count()
 
                     debug('Successfully upgraded %d of %d nodes to %s' %
                           (num + 1, len(self.cluster.nodelist()), tag))
@@ -224,6 +225,8 @@ class TestUpgradeThroughVersions(Tester):
 
                 self._check_values()
                 self._check_counters()
+                self._check_select_count()
+
 
             # run custom post-upgrade callables
             for call in after_upgrade_call:
@@ -372,6 +375,23 @@ class TestUpgradeThroughVersions(Tester):
                     actual_value = None
 
                 assert actual_value == expected_value, "Counter not at expected value. Got %s, expected %s" % (actual_value, expected_value)
+    
+    def _check_select_count(self, consistency_level=ConsistencyLevel.ALL):
+        debug("Checking SELECT COUNT(*)")
+        cursor = self.patient_cql_connection(self.node2, version="3.0.0", protocol_version=1)
+        cursor.execute("use upgrade;")
+
+        expected_num_rows = len(self.row_values)
+
+        countquery = SimpleStatement("SELECT COUNT(*) FROM cf;", consistency_level=consistency_level)
+        result = cursor.execute(countquery)
+
+        if result is not None:
+            actual_num_rows = result[0][0]
+            self.assertEqual(actual_num_rows, expected_num_rows, "SELECT COUNT(*) returned %s when expecting %s" % (actual_num_rows,expected_num_rows))
+        else:
+            self.fail("Count query did not return")
+
 
 
 class TestRandomPartitionerUpgrade(TestUpgradeThroughVersions):
