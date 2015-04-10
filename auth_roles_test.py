@@ -761,13 +761,23 @@ class TestAuthRoles(Tester):
         cassandra.execute("GRANT AUTHORIZE ON FUNCTION ks.plus_one(int) TO mike")
         mike.execute(cql)
 
-        # can't drop a function without DROP on the parent keyspace
+        # can't drop a function without DROP
         cql = "DROP FUNCTION ks.plus_one(int)"
         assert_invalid(mike, cql,
                        "User mike has no DROP permission on <function ks.plus_one\(int\)> or any of its parents",
                        Unauthorized)
         cassandra.execute("GRANT DROP ON FUNCTION ks.plus_one(int) TO mike")
         mike.execute(cql)
+
+        # DROP IF EXISTS on a non-existent function should return silently, DROP on a non-existent function
+        # behaves like DROP TABLE and returns an "Unconfigured XXX" error
+        cql = "DROP FUNCTION IF EXISTS ks.no_such_function(int,int)"
+        mike.execute(cql)
+
+        cql = "DROP FUNCTION ks.no_such_function(int,int)"
+        assert_invalid(mike, cql,
+                       "Unconfigured function ks.no_such_function\(int,int\)",
+                       InvalidRequest)
 
         # can't create a new function without CREATE on the parent keyspace's collection of functions
         cql = "CREATE FUNCTION ks.plus_one ( input int ) RETURNS int LANGUAGE javascript AS 'input + 1'"
