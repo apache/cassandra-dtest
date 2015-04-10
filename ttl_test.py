@@ -108,21 +108,21 @@ class TestTTL(Tester):
 
         self.prepare(default_time_to_live=1)
 
-        self.cursor1.execute("ALTER TABLE ttl_table WITH default_time_to_live = 5;")
+        self.cursor1.execute("ALTER TABLE ttl_table WITH default_time_to_live = 10;")
         start = time.time()
         self.cursor1.execute("""
             INSERT INTO ttl_table (key, col1) VALUES (%d, %d);
         """ % (1, 1))
         self.cursor1.execute("""
-            INSERT INTO ttl_table (key, col1) VALUES (%d, %d) USING TTL 10;
+            INSERT INTO ttl_table (key, col1) VALUES (%d, %d) USING TTL 15;
         """ % (2, 1))
         self.cursor1.execute("ALTER TABLE ttl_table WITH default_time_to_live = 0;")
         self.cursor1.execute("INSERT INTO ttl_table (key, col1) VALUES (%d, %d);" % (3, 1))
-        self.smart_sleep(start, 3)
+        self.smart_sleep(start, 5)
         assert_row_count(self.cursor1, 'ttl_table', 3)
-        self.smart_sleep(start, 8)
-        assert_row_count(self.cursor1, 'ttl_table', 2)
         self.smart_sleep(start, 12)
+        assert_row_count(self.cursor1, 'ttl_table', 2)
+        self.smart_sleep(start, 20)
         assert_row_count(self.cursor1, 'ttl_table', 1)
 
     def update_single_column_ttl_test(self):
@@ -417,7 +417,7 @@ class TestDistributedTTL(Tester):
         # Check that the TTL on both server are the same
         ttl_cursor1 = self.cursor1.execute('SELECT ttl(col1) FROM ttl_table;')
         ttl_cursor2 = cursor2.execute('SELECT ttl(col1) FROM ttl_table;')
-        assert_almost_equal(ttl_cursor1[0][0], ttl_cursor2[0][0], error=0.05)
+        assert_almost_equal(ttl_cursor1[0][0], ttl_cursor2[0][0], error=0.1)
 
     def ttl_is_respected_on_repair_test(self):
         """ Test that ttl is respected on repair """
@@ -428,7 +428,7 @@ class TestDistributedTTL(Tester):
             {'class' : 'SimpleStrategy', 'replication_factor' : 1};
         """)
         self.cursor1.execute("""
-            INSERT INTO ttl_table (key, col1) VALUES (1, 1) USING TTL 3;
+            INSERT INTO ttl_table (key, col1) VALUES (1, 1) USING TTL 5;
         """)
         self.cursor1.execute("""
             INSERT INTO ttl_table (key, col1) VALUES (2, 2) USING TTL 1000;
@@ -439,7 +439,7 @@ class TestDistributedTTL(Tester):
             "SELECT * FROM ttl_table;",
             [[1, 1, None, None], [2, 2, None, None]]
         )
-        time.sleep(5)
+        time.sleep(7)
         self.node1.stop()
         cursor2 = self.patient_exclusive_cql_connection(self.node2)
         cursor2.execute("USE ks;")
