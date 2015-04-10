@@ -257,15 +257,9 @@ class TestIncRepair(Tester):
         debug("Waiting for load size info to be propagated between nodes")
         time.sleep(45)
 
-        output = node1.nodetool('status', capture_output=True)[0]
-        lines = output.split("\n")  # stdout line
-        load_size = 0.0
-        for line in lines:
-            if line.startswith('UN'):
-                args = line.split()
-                load_size += float(args[2])
-
-        debug(output)
+        load_size_in_kb = float( sum(map(lambda n: n.data_size(), [node1, node2, node3])) )
+        load_size = load_size_in_kb/1024/1024
         debug("Total Load size: {}GB".format(load_size))
+
         # There is still some overhead, but it's lot better. We tolerate 25%.
         assert_almost_equal(load_size, expected_load_size, error=0.25)
