@@ -15,6 +15,7 @@ from assertions import assert_invalid, assert_one, assert_none, assert_all
 from thrift_tests import get_thrift_client
 from tools import since, require, rows_to_list
 from cassandra import ConsistencyLevel, InvalidRequest, AlreadyExists
+from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.protocol import ProtocolException, SyntaxException, ConfigurationException, InvalidRequestException
 from cassandra.query import SimpleStatement
 from cassandra.util import sortedset
@@ -2750,12 +2751,25 @@ class TestCQL(Tester):
             )
         """)
 
-        cursor.execute("INSERT INTO test (k, c, v) VALUES (0, 0, 0)")
-        p = cursor.prepare("SELECT * FROM test WHERE k=? AND c IN ?")
+        insert_statement = cursor.prepare("INSERT INTO test (k, c, v) VALUES (?, ?, ?)")
+        cursor.execute(insert_statement, (0, 0, 0))
+
+        select_statement = cursor.prepare("SELECT * FROM test WHERE k=? AND c IN ?")
         in_values = list(range(10000))
-        rows = cursor.execute(p, [0, in_values])
+
+        # try to fetch one existing row and 9999 non-existing rows
+        rows = cursor.execute(select_statement, [0, in_values])
         self.assertEqual(1, len(rows))
         self.assertEqual((0, 0, 0), rows[0])
+
+        # insert approximately 1000 random rows between 0 and 10k
+        clustering_values = set([random.randint(0, 9999) for _ in range(1000)])
+        clustering_values.add(0)
+        args = [(0, i, i) for i in clustering_values]
+        execute_concurrent_with_args(cursor, insert_statement, args)
+
+        rows = cursor.execute(select_statement, [0, in_values])
+        self.assertEqual(len(clustering_values), len(rows))
 
     @since('1.2.1')
     def timeuuid_test(self):
