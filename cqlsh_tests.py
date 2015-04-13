@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
+from dtest import Tester, debug
+from cassandra import InvalidRequest
+from ccmlib import common
 import binascii
 from cassandra.concurrent import execute_concurrent_with_args
-from ccmlib import common
 import csv
 import datetime
 from decimal import Decimal
@@ -11,9 +13,9 @@ import sys
 from tempfile import NamedTemporaryFile
 from uuid import UUID, uuid4
 from distutils.version import LooseVersion
+from tools import create_c1c2_table, insert_c1c2, since, rows_to_list
+from assertions import assert_all, assert_none
 
-from dtest import Tester, debug
-from tools import create_c1c2_table, insert_c1c2, since
 
 class TestCqlsh(Tester):
 
@@ -549,3 +551,285 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
             p.stdin.write(cmd + ';\n')
         p.stdin.write("quit;\n")
         return p.communicate()
+
+
+class CqlshSmokeTest(Tester):
+    '''
+    Tests simple use cases for clqsh.
+    '''
+    def setUp(self):
+        super(CqlshSmokeTest, self).setUp()
+        self.cluster.populate(1).start(wait_for_binary_proto=True)
+        [self.node1] = self.cluster.nodelist()
+        self.cursor = self.patient_cql_connection(self.node1)
+
+    def test_uuid(self):
+        """
+        the `uuid()` function can generate UUIDs from cqlsh.
+        """
+        self.create_ks(self.cursor, 'ks', 1)
+        self.create_cf(self.cursor, 'test', key_type='uuid', columns={'i': 'int'})
+
+        out, err = self.node1.run_cqlsh("INSERT INTO ks.test (key) VALUES (uuid())",
+                                        return_output=True)
+        self.assertEqual(err, "")
+
+        result = self.cursor.execute("SELECT key FROM ks.test")
+        self.assertEqual(len(result), 1)
+        self.assertEqual(len(result[0]), 1)
+        self.assertIsInstance(result[0][0], UUID)
+
+        out, err = self.node1.run_cqlsh("INSERT INTO ks.test (key) VALUES (uuid())",
+                                        return_output=True)
+        self.assertEqual(err, "")
+
+        result = self.cursor.execute("SELECT key FROM ks.test")
+        self.assertEqual(len(result), 2)
+        self.assertEqual(len(result[0]), 1)
+        self.assertEqual(len(result[1]), 1)
+        self.assertIsInstance(result[0][0], UUID)
+        self.assertIsInstance(result[1][0], UUID)
+        self.assertNotEqual(result[0][0], result[1][0])
+
+    def test_commented_lines(self):
+        self.create_ks(self.cursor, 'ks', 1)
+        self.create_cf(self.cursor, 'test')
+
+        self.node1.run_cqlsh(
+            """
+            -- commented line
+            // Another comment
+            /* multiline
+             *
+             * comment */
+            """)
+        out, err = self.node1.run_cqlsh("DESCRIBE KEYSPACE ks; // post-line comment",
+                                        return_output=True)
+        self.assertEqual(err, "")
+        self.assertTrue(out.strip().startswith("CREATE KEYSPACE ks"))
+
+    def test_colons_in_string_literals(self):
+        self.create_ks(self.cursor, 'ks', 1)
+        self.create_cf(self.cursor, 'test', columns={'i': 'int'})
+
+        self.node1.run_cqlsh(
+            """
+            INSERT INTO ks.test (key) VALUES ('Cassandra:TheMovie');
+            """)
+        assert_all(self.cursor, "SELECT key FROM test",
+                   [[u'Cassandra:TheMovie']])
+
+    def test_select(self):
+        self.create_ks(self.cursor, 'ks', 1)
+        self.create_cf(self.cursor, 'test')
+
+        self.cursor.execute("INSERT INTO ks.test (key, c, v) VALUES ('a', 'a', 'a')")
+        assert_all(self.cursor, "SELECT key, c, v FROM test",
+                   [[u'a', u'a', u'a']])
+
+        out, err = self.node1.run_cqlsh("SELECT key, c, v FROM ks.test",
+                                        return_output=True)
+        out_lines = [x.strip() for x in out.split("\n")]
+
+        # there should be only 1 row returned & it should contain the inserted values
+        self.assertIn("(1 rows)", out_lines)
+        self.assertIn("a | a | a", out_lines)
+        self.assertEqual(err, '')
+
+    def test_insert(self):
+        self.create_ks(self.cursor, 'ks', 1)
+        self.create_cf(self.cursor, 'test')
+
+        self.node1.run_cqlsh("INSERT INTO ks.test (key, c, v) VALUES ('a', 'a', 'a')")
+        assert_all(self.cursor, "SELECT key, c, v FROM test", [[u"a", u"a", u"a"]])
+
+    def test_update(self):
+        self.create_ks(self.cursor, 'ks', 1)
+        self.create_cf(self.cursor, 'test')
+
+        self.cursor.execute("INSERT INTO test (key, c, v) VALUES ('a', 'a', 'a')")
+        assert_all(self.cursor, "SELECT key, c, v FROM test", [[u"a", u"a", u"a"]])
+        self.node1.run_cqlsh("UPDATE ks.test SET v = 'b' WHERE key = 'a' AND c = 'a'")
+        assert_all(self.cursor, "SELECT key, c, v FROM test", [[u"a", u"a", u"b"]])
+
+    def test_delete(self):
+        self.create_ks(self.cursor, 'ks', 1)
+        self.create_cf(self.cursor, 'test', columns={'i': 'int'})
+
+        self.cursor.execute("INSERT INTO test (key) VALUES ('a')")
+        self.cursor.execute("INSERT INTO test (key) VALUES ('b')")
+        self.cursor.execute("INSERT INTO test (key) VALUES ('c')")
+        self.cursor.execute("INSERT INTO test (key) VALUES ('d')")
+        self.cursor.execute("INSERT INTO test (key) VALUES ('e')")
+        assert_all(self.cursor, 'SELECT key from test',
+                   [[u'a'], [u'c'], [u'e'], [u'd'], [u'b']])
+
+        self.node1.run_cqlsh("DELETE FROM ks.test WHERE key = 'c'")
+
+        assert_all(self.cursor, 'SELECT key from test',
+                   [[u'a'], [u'e'], [u'd'], [u'b']])
+
+    def test_batch(self):
+        self.create_ks(self.cursor, 'ks', 1)
+        self.create_cf(self.cursor, 'test', columns={'i': 'int'})
+        # run batch statement (inserts are fine)
+        self.node1.run_cqlsh(
+            '''
+            BEGIN BATCH
+                INSERT INTO ks.test (key) VALUES ('eggs')
+                INSERT INTO ks.test (key) VALUES ('sausage')
+                INSERT INTO ks.test (key) VALUES ('spam')
+            APPLY BATCH;
+            ''')
+        # make sure everything inserted is actually there
+        assert_all(self.cursor, 'SELECT key FROM ks.test',
+                   [[u'eggs'], [u'spam'], [u'sausage']])
+
+    def test_create_keyspace(self):
+        self.assertNotIn(u'created', self.get_keyspace_names())
+
+        self.node1.run_cqlsh("CREATE KEYSPACE created WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 }")
+        self.assertIn(u'created', self.get_keyspace_names())
+
+    def test_drop_keyspace(self):
+        self.create_ks(self.cursor, 'ks', 1)
+        self.assertIn(u'ks', self.get_keyspace_names())
+
+        self.node1.run_cqlsh('DROP KEYSPACE ks')
+
+        self.assertNotIn(u'ks', self.get_keyspace_names())
+
+    def test_create_table(self):
+        self.create_ks(self.cursor, 'ks', 1)
+
+        self.node1.run_cqlsh('CREATE TABLE ks.test (i int PRIMARY KEY);')
+        self.assertEquals(self.get_tables_in_keyspace('ks'), [u'test'])
+
+    def test_drop_table(self):
+        self.create_ks(self.cursor, 'ks', 1)
+        self.create_cf(self.cursor, 'test')
+
+        assert_none(self.cursor, 'SELECT key FROM test')
+
+        self.node1.run_cqlsh('DROP TABLE ks.test;')
+        result = rows_to_list(self.cursor.execute("SELECT columnfamily_name FROM system.schema_columnfamilies WHERE keyspace_name='ks';"))
+        self.assertEqual([], result)
+
+    def test_truncate(self):
+        self.create_ks(self.cursor, 'ks', 1)
+        self.create_cf(self.cursor, 'test', columns={'i': 'int'})
+
+        self.cursor.execute("INSERT INTO test (key) VALUES ('a')")
+        self.cursor.execute("INSERT INTO test (key) VALUES ('b')")
+        self.cursor.execute("INSERT INTO test (key) VALUES ('c')")
+        self.cursor.execute("INSERT INTO test (key) VALUES ('d')")
+        self.cursor.execute("INSERT INTO test (key) VALUES ('e')")
+        assert_all(self.cursor, 'SELECT key from test',
+                   [[u'a'], [u'c'], [u'e'], [u'd'], [u'b']])
+
+        self.node1.run_cqlsh('TRUNCATE ks.test;')
+        self.assertEqual([], rows_to_list(self.cursor.execute('SELECT * from test')))
+
+    def test_alter_table(self):
+        self.create_ks(self.cursor, 'ks', 1, )
+        self.create_cf(self.cursor, 'test', columns={'i': 'ascii'})
+
+        def get_ks_columns():
+            return rows_to_list(self.cursor.execute(
+                "SELECT columnfamily_name, column_name, validator FROM system.schema_columns WHERE keyspace_name='ks';"
+            ))
+
+        old_column_spec = [u'test', u'i',
+                           u'org.apache.cassandra.db.marshal.AsciiType']
+        self.assertIn(old_column_spec, get_ks_columns())
+
+        self.node1.run_cqlsh('ALTER TABLE ks.test ALTER i TYPE text;')
+
+        new_columns = get_ks_columns()
+        self.assertNotIn(old_column_spec, new_columns)
+        self.assertIn([u'test', u'i',
+                       u'org.apache.cassandra.db.marshal.UTF8Type'],
+                      new_columns)
+
+    def test_use_keyspace(self):
+        # ks1 contains ks1table, ks2 contains ks2table
+        self.create_ks(self.cursor, 'ks1', 1)
+        self.create_cf(self.cursor, 'ks1table')
+        self.create_ks(self.cursor, 'ks2', 1)
+        self.create_cf(self.cursor, 'ks2table')
+
+        ks1_stdout, ks1_stderr = self.node1.run_cqlsh(
+            '''
+            USE ks1;
+            DESCRIBE TABLES;
+            ''',
+            return_output=True)
+        self.assertEqual([x for x in ks1_stdout.split() if x], ['ks1table'])
+        self.assertEqual(ks1_stderr, '')
+
+        ks2_stdout, ks2_stderr = self.node1.run_cqlsh(
+            '''
+            USE ks2;
+            DESCRIBE TABLES;
+            ''',
+            return_output=True)
+        self.assertEqual([x for x in ks2_stdout.split() if x], ['ks2table'])
+        self.assertEqual(ks2_stderr, '')
+
+    # DROP INDEX statement fails in 2.0 (see CASSANDRA-9247)
+    @since('2.1')
+    def test_drop_index(self):
+        self.create_ks(self.cursor, 'ks', 1)
+        self.create_cf(self.cursor, 'test', columns={'i': 'int'})
+
+        # create a statement that will only work if there's an index on i
+        requires_index = 'SELECT * from test WHERE i = 5'
+
+        def execute_requires_index():
+            return self.cursor.execute(requires_index)
+
+        # make sure it fails as expected
+        self.assertRaises(InvalidRequest, execute_requires_index)
+
+        # make sure it doesn't fail when an index exists
+        self.cursor.execute('CREATE INDEX index_to_drop ON test (i);')
+        assert_none(self.cursor, requires_index)
+
+        # drop the index via cqlsh, then make sure it fails
+        self.node1.run_cqlsh('DROP INDEX ks.index_to_drop;')
+        self.assertRaises(InvalidRequest, execute_requires_index)
+
+    # DROP INDEX statement fails in 2.0 (see CASSANDRA-9247)
+    @since('2.1')
+    def test_create_index(self):
+        self.create_ks(self.cursor, 'ks', 1)
+        self.create_cf(self.cursor, 'test', columns={'i': 'int'})
+
+        # create a statement that will only work if there's an index on i
+        requires_index = 'SELECT * from test WHERE i = 5;'
+
+        def execute_requires_index():
+            return self.cursor.execute(requires_index)
+
+        # make sure it fails as expected
+        self.assertRaises(InvalidRequest, execute_requires_index)
+
+        # make sure index exists after creating via cqlsh
+        self.node1.run_cqlsh('CREATE INDEX index_to_drop ON ks.test (i);')
+        assert_none(self.cursor, requires_index)
+
+        # drop the index, then make sure it fails again
+        self.cursor.execute('DROP INDEX ks.index_to_drop;')
+        self.assertRaises(InvalidRequest, execute_requires_index)
+
+    def get_keyspace_names(self):
+        return [x[0] for x in
+                rows_to_list(self.cursor.execute(
+                    'SELECT keyspace_name from system.schema_keyspaces'))]
+
+    def get_tables_in_keyspace(self, keyspace=None):
+        cmd = "SELECT columnfamily_name FROM system.schema_columnfamilies"
+        cmd += " WHERE keyspace_name='{keyspace}'".format(keyspace=keyspace) if keyspace else ""
+        cmd += ";"
+
+        return [x[0] for x in rows_to_list(self.cursor.execute(cmd))]
