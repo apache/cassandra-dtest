@@ -882,7 +882,7 @@ class TestAuthRoles(Tester):
                        "User mike has no EXECUTE permission on <function ks.plus_one\(int\)> or any of its parents",
                        Unauthorized)
 
-        cassandra.execute("GRANT EXECUTE ON FUNCTION ks.plus_one(int) TO mike")
+        cassandra.execute("GRANT function_user TO mike")
         assert_one(mike, select, [1, 1, 2])
 
     def builtin_functions_require_no_special_permissions_test(self):
