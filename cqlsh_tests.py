@@ -18,10 +18,9 @@ class TestCqlsh(Tester):
     def test_simple_insert(self):
 
         self.cluster.populate(1)
-        self.cluster.start()
+        self.cluster.start(wait_for_binary_proto=True)
 
         node1, = self.cluster.nodelist()
-        node1.watch_log_for('thrift clients...')# We need to delay for the node to startup on windows
 
         node1.run_cqlsh(cmds = """
             CREATE KEYSPACE simple WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
@@ -42,10 +41,9 @@ class TestCqlsh(Tester):
     def test_eat_glass(self):
 
         self.cluster.populate(1)
-        self.cluster.start()
+        self.cluster.start(wait_for_binary_proto=True)
 
         node1, = self.cluster.nodelist()
-        node1.watch_log_for('thrift clients...')# We need to delay for the node to startup on windows
 
         node1.run_cqlsh(cmds = u"""create KEYSPACE testks WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
 use testks;
@@ -286,10 +284,9 @@ UPDATE varcharmaptable SET varcharvarintmap['Vitrum edere possum, mihi non nocet
         CASSANDRA-7196. Make sure the server returns empty values and CQLSH prints them properly
         """
         self.cluster.populate(1)
-        self.cluster.start()
+        self.cluster.start(wait_for_binary_proto=True)
 
         node1, = self.cluster.nodelist()
-        node1.watch_log_for('thrift clients...')# We need to delay for the node to startup on windows
 
         node1.run_cqlsh(cmds = u"""create keyspace  CASSANDRA_7196 WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1} ;
 
@@ -365,10 +362,9 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
 
     @since('2.0')
     def tracing_from_system_traces_test(self):
-        self.cluster.populate(1).start()
+        self.cluster.populate(1).start(wait_for_binary_proto=True)
 
         node1, = self.cluster.nodelist()
-        node1.watch_log_for('thrift clients...')
 
         session = self.patient_cql_connection(node1)
 
