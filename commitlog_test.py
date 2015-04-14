@@ -2,10 +2,10 @@ import os
 import stat
 import glob
 import time
-import platform
 import subprocess
 import ccmlib
 from tools import since
+from cassandra import WriteTimeout
 from cassandra.cluster import NoHostAvailable, OperationTimedOut
 from dtest import Tester, debug
 from assertions import assert_one, assert_none, assert_almost_equal
@@ -171,13 +171,13 @@ class TestCommitLog(Tester):
         self.assertTrue(self.node1.is_running(), "Node1 should still be running")
 
         # Cannot write anymore after the failure
-        with self.assertRaises(NoHostAvailable) as cm:
+        with self.assertRaises(NoHostAvailable):
             self.cursor1.execute("""
               INSERT INTO test (key, col1) VALUES (2, 2);
             """)
 
         # Should not be able to read neither
-        with self.assertRaises(NoHostAvailable) as cm:
+        with self.assertRaises(NoHostAvailable):
             self.cursor1.execute("""
               "SELECT * FROM test;"
             """)
@@ -199,7 +199,7 @@ class TestCommitLog(Tester):
         self.assertTrue(self.node1.is_running(), "Node1 should still be running")
 
         # Cannot write anymore after the failure
-        with self.assertRaises(OperationTimedOut) as cm:
+        with self.assertRaises((OperationTimedOut, WriteTimeout)):
             self.cursor1.execute("""
               INSERT INTO test (key, col1) VALUES (2, 2);
             """)
@@ -235,7 +235,7 @@ class TestCommitLog(Tester):
         self.assertTrue(failure, "Cannot find the commitlog failure message in logs")
         self.assertTrue(self.node1.is_running(), "Node1 should still be running")
 
-        with self.assertRaises(OperationTimedOut) as cm:
+        with self.assertRaises((OperationTimedOut, WriteTimeout)):
             self.cursor1.execute("""
               INSERT INTO test (key, col1) VALUES (2, 2);
             """)
