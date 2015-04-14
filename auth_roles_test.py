@@ -543,6 +543,24 @@ class TestAuthRoles(Tester):
 
         assert unauthorized is not None
 
+    def drop_non_existent_role_should_not_update_cache(self):
+        # The su status check during DROP ROLE IF EXISTS <role>
+        # should not cause a non-existent role to be cached (CASSANDRA-9189)
+        self.prepare(roles_expiry=10000)
+        cassandra = self.get_session(user='cassandra', password='cassandra')
+        cassandra.execute("CREATE KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor':1}")
+        cassandra.execute("CREATE TABLE ks.cf (id int primary key, val int)")
+
+        # Dropping a role which doesn't exist should be a no-op. If we cache the fact
+        # that the role doesn't exist though, subsequent authz attempts which should
+        # succeed will fail due to the erroneous cache entry
+        cassandra.execute("DROP ROLE IF EXISTS mike")
+        cassandra.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND LOGIN = true")
+        cassandra.execute("GRANT ALL ON ks.cf TO mike")
+
+        mike = self.get_session(user='mike', password='12345')
+        mike.execute("SELECT * FROM ks.cf")
+
     def prevent_circular_grants_test(self):
         self.prepare()
         cassandra = self.get_session(user='cassandra', password='cassandra')
