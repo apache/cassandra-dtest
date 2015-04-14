@@ -1404,7 +1404,7 @@ class TestMutations(ThriftTester):
     def test_describe_keyspace(self):
         kspaces = client.describe_keyspaces()
         if self.cluster.version() >= '3.0':
-            assert len(kspaces) == 5, kspaces # ['Keyspace2', 'Keyspace1', 'system', 'system_traces', 'system_auth']
+            assert len(kspaces) == 6, kspaces # ['Keyspace2', 'Keyspace1', 'system', 'system_traces', 'system_auth', 'system_distributed']
         else:
             assert len(kspaces) == 4, kspaces # ['Keyspace2', 'Keyspace1', 'system', 'system_traces']
 
