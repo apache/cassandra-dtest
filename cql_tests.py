@@ -2041,7 +2041,7 @@ class TestCQL(Tester):
 
         if self.cluster.version() >= '3.0':
             assert_all(cursor, "SELECT keyspace_name, durable_writes FROM system.schema_keyspaces",
-                    [['system_auth', True], ['ks1', True], ['system', True], ['system_traces', True], ['ks2', False]])
+                    [['system_auth', True], ['ks1', True], ['system_distributed', True], ['system', True], ['system_traces', True], ['ks2', False]])
         else:
             assert_all(cursor, "SELECT keyspace_name, durable_writes FROM system.schema_keyspaces",
                     [['ks1', True], ['system', True], ['system_traces', True], ['ks2', False]])
@@ -2053,6 +2053,7 @@ class TestCQL(Tester):
             assert_all(cursor, "SELECT keyspace_name, durable_writes, strategy_class FROM system.schema_keyspaces",
                           [[u'system_auth', True, u'org.apache.cassandra.locator.SimpleStrategy'],
                           [u'ks1', False, u'org.apache.cassandra.locator.NetworkTopologyStrategy'],
+                          [u'system_distributed', True, u'org.apache.cassandra.locator.SimpleStrategy'],
                           [u'system', True, u'org.apache.cassandra.locator.LocalStrategy'],
                           [u'system_traces', True, u'org.apache.cassandra.locator.SimpleStrategy'],
                           [u'ks2', True, u'org.apache.cassandra.locator.SimpleStrategy']])
