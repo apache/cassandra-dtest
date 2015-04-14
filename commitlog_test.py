@@ -81,7 +81,7 @@ class TestCommitLog(Tester):
 
     def _commitlog_test(self, segment_size_in_mb, commitlog_size,
                         num_commitlog_files, compressed=False,
-                        size_error=0.05, files_error=0):
+                        files_error=0):
         """ Execute a basic commitlog test and validate the commitlog files """
 
         if compressed:
@@ -91,8 +91,10 @@ class TestCommitLog(Tester):
         time.sleep(1)
 
         if not ccmlib.common.is_win():
+            tolerated_error = 0.15 if compressed else 0.05
             assert_almost_equal(self._get_commitlog_size(), commitlog_size,
-                                error=size_error)
+                                error=tolerated_error)
+
         commitlogs = self._get_commitlog_files()
         assert_almost_equal(len(commitlogs), num_commitlog_files,
                             error=files_error)
@@ -101,7 +103,10 @@ class TestCommitLog(Tester):
             size_in_mb = int(size/1024/1024)
             if size_in_mb < 1 or size < (segment_size*0.1):
                 continue   # commitlog not yet used
-            assert_almost_equal(size, segment_size, error=0.05)
+
+            tolerated_error = 0.15 if compressed else 0.05
+
+            assert_almost_equal(size, segment_size, error=tolerated_error)
 
     def _provoke_commitlog_failure(self):
         """ Provoke the commitlog failure """
@@ -148,7 +153,7 @@ class TestCommitLog(Tester):
         self.prepare(configuration={
             'commitlog_compression': [{'class_name': 'LZ4Compressor'}]
         }, create_test_keyspace=False)
-        self._commitlog_test(32, 23, 2, compressed=True, files_error=0.5)
+        self._commitlog_test(32, 42, 2, compressed=True, files_error=0.5)
 
     @since('3.0')
     def small_compressed_segment_size_test(self):
