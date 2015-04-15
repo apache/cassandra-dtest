@@ -88,12 +88,17 @@ class TestScrub(Tester):
             self.launch_standalone_scrub(KEYSPACE, '%s.%s' % (table, index))
         return self.get_sstables(table, indexes)
 
-    """ Increment sstable versions (the number in the file name) """
-    def increment_ss_table(self, sstable):
-        return re.sub('\d(?!\d)', lambda x: str(int(x.group(0)) + 1), sstable)
+    def increment_generation_by(self, sstable, generation_increment):
+        """ Sets the generation number for an sstable file name """
+        return re.sub('\d(?!\d)', lambda x: str(int(x.group(0)) + generation_increment), sstable)
 
-    def increment_ss_tables(self, sstables):
-        sstables[:] = [self.increment_ss_table(s) for s in sstables]
+    def increase_sstable_generations(self, sstables):
+        """
+        After finding the max esting generation, increases all of the
+        generations to be higher than the max existing generation.
+        """
+        max_existing = max(int(re.match('.*(\d)[^0-9].*', s).group(1)) for s in sstables)
+        sstables[:] = [self.increment_generation_by(s, max_existing) for s in sstables]
         debug('sstables after increment %s' % (str(sstables)))
 
     def create_users(self, cursor):
@@ -142,7 +147,7 @@ class TestScrub(Tester):
         initial_sstables = self.flush('users', 'gender_idx', 'state_idx', 'birth_year_idx')
         scrubbed_sstables = self.scrub('users', 'gender_idx', 'state_idx', 'birth_year_idx')
 
-        self.increment_ss_tables(initial_sstables)
+        self.increase_sstable_generations(initial_sstables)
         self.assertListEqual(initial_sstables, scrubbed_sstables)
 
         users = self.query_users(cursor)
@@ -150,7 +155,7 @@ class TestScrub(Tester):
 
         # Scrub and check sstables and data again
         scrubbed_sstables = self.scrub('users', 'gender_idx', 'state_idx', 'birth_year_idx')
-        self.increment_ss_tables(initial_sstables)
+        self.increase_sstable_generations(initial_sstables)
         self.assertListEqual(initial_sstables, scrubbed_sstables)
 
         users = self.query_users(cursor)
@@ -184,7 +189,7 @@ class TestScrub(Tester):
         cluster.stop()
 
         scrubbed_sstables = self.standalonescrub('users', 'gender_idx', 'state_idx', 'birth_year_idx')
-        self.increment_ss_tables(initial_sstables)
+        self.increase_sstable_generations(initial_sstables)
         self.assertListEqual(initial_sstables, scrubbed_sstables)
 
         cluster.start()
@@ -219,7 +224,7 @@ class TestScrub(Tester):
         initial_sstables = self.flush('users', 'user_uuids_idx')
         scrubbed_sstables = self.scrub('users', 'user_uuids_idx')
 
-        self.increment_ss_tables(initial_sstables)
+        self.increase_sstable_generations(initial_sstables)
         self.assertListEqual(initial_sstables, scrubbed_sstables)
 
         users = cursor.execute(("SELECT * from users where uuids contains {some_uuid}").format(some_uuid=_id))
@@ -227,7 +232,7 @@ class TestScrub(Tester):
 
         scrubbed_sstables = self.scrub('users', 'user_uuids_idx')
 
-        self.increment_ss_tables(initial_sstables)
+        self.increase_sstable_generations(initial_sstables)
         self.assertListEqual(initial_sstables, scrubbed_sstables)
 
         users = cursor.execute(("SELECT * from users where uuids contains {some_uuid}").format(some_uuid=_id))
