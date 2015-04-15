@@ -6,8 +6,28 @@ import subprocess
 JOLOKIA_JAR = os.path.join('lib', 'jolokia-jvm-1.2.3-agent.jar')
 
 
-def make_mbean(package, mbean):
-    return 'org.apache.cassandra.%s:type=%s' % (package, mbean)
+def make_mbean(package, type, **kwargs):
+    '''
+    Builds the name for an mbean.
+
+    `package` is appended to the org.apache.cassandra domain.
+
+    `type` is used as the 'type' property.
+
+    All other keyword arguments are used as properties in the mbean's name.
+
+    Example usage:
+
+    >>> make_mbean('db', 'IndexSummaries')
+    'org.apache.cassandra.db:type=IndexSummaries'
+    >>> make_mbean('metrics', type='ColumnFamily', name='MemtableColumnsCount', keyspace='ks', scope='table')
+    'org.apache.cassandra.metrics:type=ColumnFamily,keyspace=ks,name=MemtableColumnsCount,scope=table'
+    '''
+    rv = 'org.apache.cassandra.%s:type=%s' % (package, type)
+    if kwargs:
+        rv += ',' + ','.join('{k}={v}'.format(k=k, v=v)
+                             for k, v in kwargs.iteritems())
+    return rv
 
 
 class JolokiaAgent(object):
