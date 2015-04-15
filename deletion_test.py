@@ -2,6 +2,9 @@ from dtest import Tester
 
 import os, sys, time
 from ccmlib.cluster import Cluster
+from tools import require, since
+from jmxutils import make_mbean, JolokiaAgent
+
 
 class TestDeletion(Tester):
 
@@ -37,3 +40,36 @@ class TestDeletion(Tester):
         result = cursor.execute('select * from cf;')
         assert len(result) == 1 and len(result[0]) == 2, result
 
+    @require(9194)
+    def tombstone_size_test(self):
+        self.cluster.populate(1).start(wait_for_binary_proto=True)
+        [node1] = self.cluster.nodelist()
+        cursor = self.patient_cql_connection(node1)
+        self.create_ks(cursor, 'ks', 1)
+        cursor.execute('CREATE TABLE test (i int PRIMARY KEY)')
+
+        stmt = cursor.prepare('DELETE FROM test where i = ?')
+        for i in range(100):
+            cursor.execute(stmt, [i])
+
+        self.assertEqual(memtable_count(node1, 'ks', 'test'), 100)
+        self.assertGreater(memtable_size(node1, 'ks', 'test'), 0)
+
+
+def memtable_size(node, keyspace, table):
+    new_name = node.get_cassandra_version() >= '2.1'
+    name = 'MemtableLiveDataSize' if new_name else 'MemtableDataSize'
+    return columnfamily_metric(node, keyspace, table, name)
+
+
+def memtable_count(node, keyspace, table):
+    return columnfamily_metric(node, keyspace, table, 'MemtableColumnsCount')
+
+
+def columnfamily_metric(node, keyspace, table, name):
+    with JolokiaAgent(node) as jmx:
+        mbean = make_mbean('metrics', type='ColumnFamily',
+                           name=name, keyspace=keyspace, scope=table)
+        value = jmx.read_attribute(mbean, 'Value')
+
+    return value
