@@ -206,7 +206,7 @@ def require(msg):
     """Skips the decorated class or method with a message about which Jira
     ticket it requires."""
     # equivalent to decorating with @unittest.skip
-    return unittest.skip('require ' + msg)
+    return unittest.skip('require ' + str(msg))
 
 class InterruptBootstrap(Thread):
     def __init__(self, node):
