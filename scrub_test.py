@@ -94,11 +94,11 @@ class TestScrub(Tester):
 
     def increase_sstable_generations(self, sstables):
         """
-        After finding the max esting generation, increases all of the
-        generations to be higher than the max existing generation.
+        After finding the number of existing sstables, this increases all of the
+        generations by that amount.
         """
-        max_existing = max(int(re.match('.*(\d)[^0-9].*', s).group(1)) for s in sstables)
-        sstables[:] = [self.increment_generation_by(s, max_existing) for s in sstables]
+        increment_by = len(set(re.match('.*(\d)[^0-9].*', s).group(1) for s in sstables))
+        sstables[:] = [self.increment_generation_by(s, increment_by) for s in sstables]
         debug('sstables after increment %s' % (str(sstables)))
 
     def create_users(self, cursor):
