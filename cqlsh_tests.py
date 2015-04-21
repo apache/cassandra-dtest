@@ -507,12 +507,12 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
             )""")
 
         insert_statement = session.prepare("INSERT INTO testcopyto (a, b, c, d) VALUES (?, ?, ?, ?)")
-        args = [(i, str(i), float(i) + 0.5, uuid4()) for i in range(15000)]
+        args = [(i, str(i), float(i) + 0.5, uuid4()) for i in range(1000)]
         execute_concurrent_with_args(session, insert_statement, args)
 
         results = list(session.execute("SELECT * FROM testcopyto"))
 
-        tempfile = NamedTemporaryFile(delete=False)
+        tempfile = NamedTemporaryFile()
         debug('Exporting to csv file: %s' % (tempfile.name,))
         node1.run_cqlsh(cmds="COPY ks.testcopyto TO '%s'" % (tempfile.name,))
 
