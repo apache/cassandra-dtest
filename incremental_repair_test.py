@@ -211,6 +211,9 @@ class TestIncRepair(Tester):
         There is an issue with subsequent inc repairs.
         """
         cluster = self.cluster
+        cluster.set_configuration_options(values={
+            'compaction_throughput_mb_per_sec': 0
+        })
         cluster.populate(3).start()
         [node1,node2,node3] = cluster.nodelist()
 
@@ -237,10 +240,6 @@ class TestIncRepair(Tester):
             node2.nodetool("repair -par -inc")
             debug("Repairing node3")
             node3.nodetool("repair -par -inc")
-
-        node1.cleanup()
-        node2.cleanup()
-        node3.cleanup()
 
         # Using "print" instead of debug() here is on purpose.  The compactions
         # take a long time and don't print anything by default, which can result
