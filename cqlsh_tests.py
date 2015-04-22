@@ -13,7 +13,7 @@ from uuid import UUID, uuid4
 from distutils.version import LooseVersion
 
 from dtest import Tester, debug
-from tools import create_c1c2_table, insert_c1c2, since, require
+from tools import create_c1c2_table, insert_c1c2, since
 
 class TestCqlsh(Tester):
 
@@ -490,7 +490,6 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
 (6 rows)
 """)
 
-    @require('thobbs/CASSANDRA-9217')
     def test_copy_to(self):
         self.cluster.populate(1).start()
         node1, = self.cluster.nodelist()
