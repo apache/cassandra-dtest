@@ -40,7 +40,7 @@ class TestSCUpgrade(Tester):
         [node1, node2] = cluster.nodelist()
 
         # wait for the rpc server to start
-        self.patient_cql_connection(node1)
+        session = self.patient_exclusive_cql_connection(node1)
 
         host, port = node1.network_interfaces['thrift']
         client = get_thrift_client(host, port)
@@ -69,6 +69,8 @@ class TestSCUpgrade(Tester):
 
         client.system_add_column_family(cfdef)
 
+        session.cluster.control_connection.wait_for_schema_agreement()
+
         for i in range(2):
             supercol_name = 'sc%d' % i
             for j in range(2):
@@ -78,6 +80,7 @@ class TestSCUpgrade(Tester):
                     {'k0': {'sc_test': [Mutation(ColumnOrSuperColumn(super_column=SuperColumn(supercol_name, [column])))]}},
                     ThriftConsistencyLevel.ONE)
 
+        session.cluster.shutdown()
         client.transport.close()
 
         CASSANDRA_DIR = os.environ.get('CASSANDRA_DIR')
@@ -94,6 +97,9 @@ class TestSCUpgrade(Tester):
         self.set_node_to_current_version(node1)
         node1.start(wait_other_notice=True)
         time.sleep(.5)
+
+        # wait for the RPC server to start
+        session = self.patient_exclusive_cql_connection(node1)
 
         client = get_thrift_client(host, port)
         client.transport.open()
@@ -140,7 +146,7 @@ class TestSCUpgrade(Tester):
         node1, node2, node3 = cluster.nodelist()
 
         # wait for the rpc server to start
-        self.patient_cql_connection(node1)
+        session = self.patient_exclusive_cql_connection(node1)
 
         host, port = node1.network_interfaces['thrift']
         client = get_thrift_client(host, port)
@@ -169,6 +175,8 @@ class TestSCUpgrade(Tester):
 
         client.system_add_column_family(cfdef)
 
+        session.cluster.control_connection.wait_for_schema_agreement()
+
         for i in range(2):
             supercol_name = 'sc%d' % i
             column_parent = ColumnParent(column_family='sc_test', super_column=supercol_name)
@@ -193,6 +201,9 @@ class TestSCUpgrade(Tester):
             node1.stop(wait_other_notice=False)
             self.set_node_to_current_version(node1)
             node1.start(wait_other_notice=True)
+
+        # wait for the RPC server to start
+        session = self.patient_exclusive_cql_connection(node1)
 
         for node in (node1, node2, node3):
             host, port = node.network_interfaces['thrift']
@@ -227,7 +238,7 @@ class TestSCUpgrade(Tester):
             node2.start(wait_other_notice=True)
             node3.start(wait_other_notice=True)
 
-        host, port = node.network_interfaces['thrift']
+        host, port = node1.network_interfaces['thrift']
         client = get_thrift_client(host, port)
         client.transport.open()
         client.set_keyspace('test')
