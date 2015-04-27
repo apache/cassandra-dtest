@@ -5,7 +5,7 @@ import subprocess
 import sys
 from distutils.version import LooseVersion
 from ccmlib import common
-from dtest import debug, Tester
+from dtest import Tester
 from tools import since
 
 
@@ -168,6 +168,7 @@ def run_func_docstring(tester, test_func, globs=None, verbose=False, compileflag
         raise RuntimeError("No tests were run!")
 
 
+@since('3.0')
 class ToJsonSelectTests(Tester):
     """
     Tests using toJson with a SELECT statement
@@ -426,6 +427,7 @@ class ToJsonSelectTests(Tester):
         run_func_docstring(tester=self, test_func=self.complex_data_types_test)
 
 
+@since('3.0')
 class FromJsonUpdateTests(Tester):
     """
     Tests using fromJson within UPDATE statements.
@@ -725,6 +727,7 @@ class FromJsonUpdateTests(Tester):
         run_func_docstring(tester=self, test_func=self.collection_update_test)
 
 
+@since('3.0')
 class FromJsonSelectTests(Tester):
     """
     Tests using fromJson in conjunction with a SELECT statement
@@ -805,6 +808,7 @@ class FromJsonSelectTests(Tester):
         run_func_docstring(tester=self, test_func=self.select_using_secondary_index_test)
 
 
+@since('3.0')
 class FromJsonInsertTests(Tester):
     """
     Tests using fromJson within INSERT statements.
@@ -1026,6 +1030,7 @@ class FromJsonInsertTests(Tester):
         run_func_docstring(tester=self, test_func=self.complex_data_types_test)
 
 
+@since('3.0')
 class FromJsonDeleteTests(Tester):
     """
     Tests using fromJson within DELETE statements.
@@ -1084,6 +1089,7 @@ class FromJsonDeleteTests(Tester):
         run_func_docstring(tester=self, test_func=self.delete_using_pkey_json_test)
 
 
+@since('3.0')
 class JsonFullRowInsertSelect(Tester):
     """
     Tests for creating full rows from json documents, selecting full rows back as json documents, and related functionality.
