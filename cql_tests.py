@@ -1,15 +1,21 @@
 # coding: utf-8
 
 import random
+import struct
 import time
 import math
 from collections import OrderedDict
 from uuid import uuid4, UUID
 
+from thrift_bindings.v30.ttypes import CfDef, Mutation, ColumnOrSuperColumn, Column
+from thrift_bindings.v30.ttypes import ConsistencyLevel as ThriftConsistencyLevel
+
 from dtest import Tester, canReuseCluster, freshCluster
 from assertions import assert_invalid, assert_one, assert_none, assert_all
+from thrift_tests import get_thrift_client
 from tools import since, require, rows_to_list
 from cassandra import ConsistencyLevel, InvalidRequest, AlreadyExists
+from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.protocol import ProtocolException, SyntaxException, ConfigurationException, InvalidRequestException
 from cassandra.query import SimpleStatement
 from cassandra.util import sortedset
@@ -1717,14 +1723,22 @@ class TestCQL(Tester):
             )
         """)
 
-        cli = self.cluster.nodelist()[0].cli()
-        cli.do("use ks")
-        cli.do("set test[2]['4:v'] = int(200)")
-        assert not cli.has_errors(), cli.errors()
-        time.sleep(1.5)
+        node = self.cluster.nodelist()[0]
+        host, port = node.network_interfaces['thrift']
+        client = get_thrift_client(host, port)
+        client.transport.open()
+        client.set_keyspace('ks')
+        key = struct.pack('>i', 2)
+        column_name_component = struct.pack('>i', 4)
+        # component length + component + EOC + component length + component + EOC
+        column_name = '\x00\x04' + column_name_component + '\x00' + '\x00\x01' + 'v' + '\x00'
+        value = struct.pack('>i', 8)
+        client.batch_mutate(
+            {key: {'test': [Mutation(ColumnOrSuperColumn(column=Column(name=column_name, value=value, timestamp=100)))]}},
+            ThriftConsistencyLevel.ONE)
 
         res = cursor.execute("SELECT * FROM test")
-        assert rows_to_list(res) == [[2, 4, 200]], res
+        assert rows_to_list(res) == [[2, 4, 8]], res
 
     def row_existence_test(self):
         """ Check the semantic of CQL row existence (part of #4361) """
@@ -2027,7 +2041,7 @@ class TestCQL(Tester):
 
         if self.cluster.version() >= '3.0':
             assert_all(cursor, "SELECT keyspace_name, durable_writes FROM system.schema_keyspaces",
-                    [['system_auth', True], ['ks1', True], ['system', True], ['system_traces', True], ['ks2', False]])
+                    [['system_auth', True], ['ks1', True], ['system_distributed', True], ['system', True], ['system_traces', True], ['ks2', False]])
         else:
             assert_all(cursor, "SELECT keyspace_name, durable_writes FROM system.schema_keyspaces",
                     [['ks1', True], ['system', True], ['system_traces', True], ['ks2', False]])
@@ -2039,6 +2053,7 @@ class TestCQL(Tester):
             assert_all(cursor, "SELECT keyspace_name, durable_writes, strategy_class FROM system.schema_keyspaces",
                           [[u'system_auth', True, u'org.apache.cassandra.locator.SimpleStrategy'],
                           [u'ks1', False, u'org.apache.cassandra.locator.NetworkTopologyStrategy'],
+                          [u'system_distributed', True, u'org.apache.cassandra.locator.SimpleStrategy'],
                           [u'system', True, u'org.apache.cassandra.locator.LocalStrategy'],
                           [u'system_traces', True, u'org.apache.cassandra.locator.SimpleStrategy'],
                           [u'ks2', True, u'org.apache.cassandra.locator.SimpleStrategy']])
@@ -2737,12 +2752,25 @@ class TestCQL(Tester):
             )
         """)
 
-        cursor.execute("INSERT INTO test (k, c, v) VALUES (0, 0, 0)")
-        p = cursor.prepare("SELECT * FROM test WHERE k=? AND c IN ?")
+        insert_statement = cursor.prepare("INSERT INTO test (k, c, v) VALUES (?, ?, ?)")
+        cursor.execute(insert_statement, (0, 0, 0))
+
+        select_statement = cursor.prepare("SELECT * FROM test WHERE k=? AND c IN ?")
         in_values = list(range(10000))
-        rows = cursor.execute(p, [0, in_values])
+
+        # try to fetch one existing row and 9999 non-existing rows
+        rows = cursor.execute(select_statement, [0, in_values])
         self.assertEqual(1, len(rows))
         self.assertEqual((0, 0, 0), rows[0])
+
+        # insert approximately 1000 random rows between 0 and 10k
+        clustering_values = set([random.randint(0, 9999) for _ in range(1000)])
+        clustering_values.add(0)
+        args = [(0, i, i) for i in clustering_values]
+        execute_concurrent_with_args(cursor, insert_statement, args)
+
+        rows = cursor.execute(select_statement, [0, in_values])
+        self.assertEqual(len(clustering_values), len(rows))
 
     @since('1.2.1')
     def timeuuid_test(self):
@@ -3042,13 +3070,23 @@ class TestCQL(Tester):
     def rename_test(self):
         cursor = self.prepare()
 
-        # The goal is to test renaming from an old cli value
-        cli = self.cluster.nodelist()[0].cli()
-        cli.do("use ks")
-        cli.do("create column family test with comparator='CompositeType(Int32Type, Int32Type, Int32Type)' "
-                + "and key_validation_class=UTF8Type and default_validation_class=UTF8Type")
-        cli.do("set test['foo']['4:3:2'] = 'bar'")
-        assert not cli.has_errors(), cli.errors()
+        node = self.cluster.nodelist()[0]
+        host, port = node.network_interfaces['thrift']
+        client = get_thrift_client(host, port)
+        client.transport.open()
+
+        cfdef = CfDef()
+        cfdef.keyspace = 'ks'
+        cfdef.name = 'test'
+        cfdef.column_type = 'Standard'
+        cfdef.comparator_type = 'CompositeType(Int32Type, Int32Type, Int32Type)'
+        cfdef.key_validation_class = 'UTF8Type'
+        cfdef.default_validation_class = 'UTF8Type'
+
+        client.set_keyspace('ks')
+        client.system_add_column_family(cfdef)
+
+        cursor.execute("INSERT INTO ks.test (key, column1, column2, column3, value) VALUES ('foo', 4, 3, 2, 'bar')")
 
         time.sleep(1)
 
@@ -4860,10 +4898,20 @@ class TestCQL(Tester):
 
         # create and confirm
         cursor.execute("CREATE INDEX IF NOT EXISTS myindex ON my_test_table (value1)")
-        assert_one(
-            cursor,
-            """select index_name from system."IndexInfo" where table_name = 'my_test_ks'""",
-            ['my_test_table.myindex'])
+
+        # index building is asynch, wait for it to finish
+        for i in range(10):
+            results = cursor.execute(
+                """select index_name from system."IndexInfo" where table_name = 'my_test_ks'""")
+
+            if results:
+                self.assertEqual([('my_test_table.myindex',)], results)
+                break
+
+            time.sleep(0.5)
+        else:
+            # this is executed when 'break' is never called
+            self.fail("Didn't see my_test_table.myindex after polling for 5 seconds")
 
         # unsuccessful create since it's already there
         cursor.execute("CREATE INDEX IF NOT EXISTS myindex ON my_test_table (value1)")
@@ -5072,8 +5120,8 @@ class TestCQL(Tester):
         cursor.execute("INSERT INTO test (k, v) VALUES ( 1, {1:'a', 2:'b', 5:'e', 6:'f'})")
 
         assert_all(cursor, "SELECT v[1] FROM test", [['a'], ['a']])
-        assert_all(cursor, "SELECT v[5] FROM test", [[], []])
-        assert_all(cursor, "SELECT v[1] FROM test", [[], []])
+        assert_all(cursor, "SELECT v[5] FROM test", [[], ['e']])
+        assert_all(cursor, "SELECT v[4] FROM test", [['d'], []])
 
         assert_all(cursor, "SELECT v[1..3] FROM test", [['a', 'b', 'c'], ['a', 'b', 'e']])
         assert_all(cursor, "SELECT v[3..5] FROM test", [['c', 'd'], ['e']])
@@ -5196,7 +5244,20 @@ class TestCQL(Tester):
         cursor.execute("ALTER TABLE test WITH CACHING='ALL'")
         cursor.execute("INSERT INTO test (k,v) VALUES (0,0)")
         cursor.execute("INSERT INTO test (k,v) VALUES (1,1)")
-        cursor.execute("CREATE INDEX on test(v)")
+        cursor.execute("CREATE INDEX testindex on test(v)")
+
+        # wait for the index to be fully built
+        start = time.time()
+        while True:
+            results = cursor.execute("""SELECT * FROM system."IndexInfo" WHERE table_name = 'ks' AND index_name = 'test.testindex'""")
+            if results:
+                break
+
+            if time.time() - start > 10.0:
+                results = list(cursor.execute('SELECT * FROM system."IndexInfo"'))
+                raise Exception("Failed to build secondary index within ten seconds: %s" % (results,))
+            time.sleep(0.1)
+
         assert_all(cursor, "SELECT k FROM test WHERE v = 0", [[0]])
 
         self.cluster.stop()

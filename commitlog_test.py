@@ -2,10 +2,10 @@ import os
 import stat
 import glob
 import time
-import platform
 import subprocess
 import ccmlib
 from tools import since
+from cassandra import WriteTimeout
 from cassandra.cluster import NoHostAvailable, OperationTimedOut
 from dtest import Tester, debug
 from assertions import assert_one, assert_none, assert_almost_equal
@@ -69,7 +69,7 @@ class TestCommitLog(Tester):
         """ Returns the commitlog directory size in MB """
 
         path = self._get_commitlog_path()
-        cmd_args = ['du', '-B', '1', path]
+        cmd_args = ['du', '-m', path]
         p = subprocess.Popen(cmd_args, stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE)
         stdout, stderr = p.communicate()
@@ -77,11 +77,11 @@ class TestCommitLog(Tester):
         self.assertEqual(0, exit_status,
                          "du exited with a non-zero status: %d" % exit_status)
         size = int(stdout.split('\t')[0])
-        return size/1024/1024  # in MB
+        return size
 
     def _commitlog_test(self, segment_size_in_mb, commitlog_size,
                         num_commitlog_files, compressed=False,
-                        size_error=0.05, files_error=0):
+                        files_error=0):
         """ Execute a basic commitlog test and validate the commitlog files """
 
         if compressed:
@@ -91,8 +91,10 @@ class TestCommitLog(Tester):
         time.sleep(1)
 
         if not ccmlib.common.is_win():
+            tolerated_error = 0.15 if compressed else 0.05
             assert_almost_equal(self._get_commitlog_size(), commitlog_size,
-                                error=size_error)
+                                error=tolerated_error)
+
         commitlogs = self._get_commitlog_files()
         assert_almost_equal(len(commitlogs), num_commitlog_files,
                             error=files_error)
@@ -101,7 +103,10 @@ class TestCommitLog(Tester):
             size_in_mb = int(size/1024/1024)
             if size_in_mb < 1 or size < (segment_size*0.1):
                 continue   # commitlog not yet used
-            assert_almost_equal(size, segment_size, error=0.05)
+
+            tolerated_error = 0.15 if compressed else 0.05
+
+            assert_almost_equal(size, segment_size, error=tolerated_error)
 
     def _provoke_commitlog_failure(self):
         """ Provoke the commitlog failure """
@@ -148,7 +153,7 @@ class TestCommitLog(Tester):
         self.prepare(configuration={
             'commitlog_compression': [{'class_name': 'LZ4Compressor'}]
         }, create_test_keyspace=False)
-        self._commitlog_test(32, 23, 2, compressed=True, files_error=0.5)
+        self._commitlog_test(32, 42, 2, compressed=True, files_error=0.5)
 
     @since('3.0')
     def small_compressed_segment_size_test(self):
@@ -171,13 +176,13 @@ class TestCommitLog(Tester):
         self.assertTrue(self.node1.is_running(), "Node1 should still be running")
 
         # Cannot write anymore after the failure
-        with self.assertRaises(NoHostAvailable) as cm:
+        with self.assertRaises(NoHostAvailable):
             self.cursor1.execute("""
               INSERT INTO test (key, col1) VALUES (2, 2);
             """)
 
         # Should not be able to read neither
-        with self.assertRaises(NoHostAvailable) as cm:
+        with self.assertRaises(NoHostAvailable):
             self.cursor1.execute("""
               "SELECT * FROM test;"
             """)
@@ -199,7 +204,7 @@ class TestCommitLog(Tester):
         self.assertTrue(self.node1.is_running(), "Node1 should still be running")
 
         # Cannot write anymore after the failure
-        with self.assertRaises(OperationTimedOut) as cm:
+        with self.assertRaises((OperationTimedOut, WriteTimeout)):
             self.cursor1.execute("""
               INSERT INTO test (key, col1) VALUES (2, 2);
             """)
@@ -235,7 +240,7 @@ class TestCommitLog(Tester):
         self.assertTrue(failure, "Cannot find the commitlog failure message in logs")
         self.assertTrue(self.node1.is_running(), "Node1 should still be running")
 
-        with self.assertRaises(OperationTimedOut) as cm:
+        with self.assertRaises((OperationTimedOut, WriteTimeout)):
             self.cursor1.execute("""
               INSERT INTO test (key, col1) VALUES (2, 2);
             """)

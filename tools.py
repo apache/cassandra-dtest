@@ -1,6 +1,7 @@
 from ccmlib.node import Node
 from decorator  import decorator
 from distutils.version import LooseVersion
+from threading import Thread
 import re, os, sys, fileinput, time, unittest, functools
 
 from cassandra import ConsistencyLevel
@@ -19,12 +20,13 @@ def insert_c1c2(session, key, consistency=ConsistencyLevel.QUORUM):
     query = SimpleStatement('UPDATE cf SET c1=\'value1\', c2=\'value2\' WHERE key=\'k%d\'' % key, consistency_level=consistency)
     session.execute(query)
 
-def query_c1c2(session, key, consistency=ConsistencyLevel.QUORUM):
+def query_c1c2(session, key, consistency=ConsistencyLevel.QUORUM, tolerate_missing=False):
     query = SimpleStatement('SELECT c1, c2 FROM cf WHERE key=\'k%d\'' % key, consistency_level=consistency)
     rows = session.execute(query)
-    assert len(rows) == 1
-    res = rows[0]
-    assert len(res) == 2 and res[0] == 'value1' and res[1] == 'value2', res
+    if not tolerate_missing:
+        assert len(rows) == 1
+        res = rows[0]
+        assert len(res) == 2 and res[0] == 'value1' and res[1] == 'value2', res
 
 # work for cluster started by populate
 def new_node(cluster, bootstrap=True, token=None, remote_debug_port='2000', data_center=None):
@@ -204,4 +206,13 @@ def require(msg):
     """Skips the decorated class or method with a message about which Jira
     ticket it requires."""
     # equivalent to decorating with @unittest.skip
-    return unittest.skip('require ' + msg)
+    return unittest.skip('require ' + str(msg))
+
+class InterruptBootstrap(Thread):
+    def __init__(self, node):
+        Thread.__init__(self)
+        self.node = node
+
+    def run(self):
+        self.node.watch_log_for("Prepare completed")
+        self.node.stop(gently=False)

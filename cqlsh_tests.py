@@ -1,13 +1,18 @@
 # -*- coding: utf-8 -*-
-from dtest import Tester, debug
-from tools import since, require
-from ccmlib import common
-import subprocess
 import binascii
+from cassandra.concurrent import execute_concurrent_with_args
+from ccmlib import common
+import csv
+import datetime
 from decimal import Decimal
-import sys, os, datetime
-from uuid import UUID
+import os
+import subprocess
+import sys
+from tempfile import NamedTemporaryFile
+from uuid import UUID, uuid4
 from distutils.version import LooseVersion
+
+from dtest import Tester, debug
 from tools import create_c1c2_table, insert_c1c2, since
 
 class TestCqlsh(Tester):
@@ -18,10 +23,9 @@ class TestCqlsh(Tester):
     def test_simple_insert(self):
 
         self.cluster.populate(1)
-        self.cluster.start()
+        self.cluster.start(wait_for_binary_proto=True)
 
         node1, = self.cluster.nodelist()
-        node1.watch_log_for('thrift clients...')# We need to delay for the node to startup on windows
 
         node1.run_cqlsh(cmds = """
             CREATE KEYSPACE simple WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
@@ -42,10 +46,9 @@ class TestCqlsh(Tester):
     def test_eat_glass(self):
 
         self.cluster.populate(1)
-        self.cluster.start()
+        self.cluster.start(wait_for_binary_proto=True)
 
         node1, = self.cluster.nodelist()
-        node1.watch_log_for('thrift clients...')# We need to delay for the node to startup on windows
 
         node1.run_cqlsh(cmds = u"""create KEYSPACE testks WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
 use testks;
@@ -286,10 +289,9 @@ UPDATE varcharmaptable SET varcharvarintmap['Vitrum edere possum, mihi non nocet
         CASSANDRA-7196. Make sure the server returns empty values and CQLSH prints them properly
         """
         self.cluster.populate(1)
-        self.cluster.start()
+        self.cluster.start(wait_for_binary_proto=True)
 
         node1, = self.cluster.nodelist()
-        node1.watch_log_for('thrift clients...')# We need to delay for the node to startup on windows
 
         node1.run_cqlsh(cmds = u"""create keyspace  CASSANDRA_7196 WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1} ;
 
@@ -365,10 +367,9 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
 
     @since('2.0')
     def tracing_from_system_traces_test(self):
-        self.cluster.populate(1).start()
+        self.cluster.populate(1).start(wait_for_binary_proto=True)
 
         node1, = self.cluster.nodelist()
-        node1.watch_log_for('thrift clients...')
 
         session = self.patient_cql_connection(node1)
 
@@ -467,14 +468,13 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
             verify_output("LIST ALL PERMISSIONS OF user1", """
  role  | username | resource      | permission
 -------+----------+---------------+------------
- user1 |    user1 | <table ks.t1> |     CREATE
  user1 |    user1 | <table ks.t1> |      ALTER
  user1 |    user1 | <table ks.t1> |       DROP
  user1 |    user1 | <table ks.t1> |     SELECT
  user1 |    user1 | <table ks.t1> |     MODIFY
  user1 |    user1 | <table ks.t1> |  AUTHORIZE
 
-(6 rows)
+(5 rows)
 """)
         else:
             verify_output("LIST ALL PERMISSIONS OF user1", """
@@ -489,6 +489,47 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
 
 (6 rows)
 """)
+
+    def test_copy_to(self):
+        self.cluster.populate(1).start()
+        node1, = self.cluster.nodelist()
+
+        session = self.patient_cql_connection(node1)
+        self.create_ks(session, 'ks', 1)
+        session.execute("""
+            CREATE TABLE testcopyto (
+                a int,
+                b text,
+                c float,
+                d uuid,
+                PRIMARY KEY (a, b)
+            )""")
+
+        insert_statement = session.prepare("INSERT INTO testcopyto (a, b, c, d) VALUES (?, ?, ?, ?)")
+        args = [(i, str(i), float(i) + 0.5, uuid4()) for i in range(1000)]
+        execute_concurrent_with_args(session, insert_statement, args)
+
+        results = list(session.execute("SELECT * FROM testcopyto"))
+
+        tempfile = NamedTemporaryFile()
+        debug('Exporting to csv file: %s' % (tempfile.name,))
+        node1.run_cqlsh(cmds="COPY ks.testcopyto TO '%s'" % (tempfile.name,))
+
+        # session
+        with open(tempfile.name, 'r') as csvfile:
+            row_count = 0
+            csvreader = csv.reader(csvfile)
+            for cql_row, csv_row in zip(results, csvreader):
+                self.assertEquals(map(str, cql_row), csv_row)
+                row_count += 1
+
+            self.assertEquals(len(results), row_count)
+
+        # import the CSV file with COPY FROM
+        session.execute("TRUNCATE ks.testcopyto")
+        node1.run_cqlsh(cmds="COPY ks.testcopyto FROM '%s'" % (tempfile.name,))
+        new_results = list(session.execute("SELECT * FROM testcopyto"))
+        self.assertEquals(results, new_results)
 
     def run_cqlsh(self, node, cmds, cqlsh_options=[]):
         cdir = node.get_install_dir()

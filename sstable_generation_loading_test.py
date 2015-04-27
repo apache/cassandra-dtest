@@ -51,12 +51,11 @@ class TestSSTableGenerationAndLoading(Tester):
         https://issues.apache.org/jira/browse/CASSANDRA-343
         """
         cluster = self.cluster
-        cluster.populate(1).start()
+        cluster.populate(1).start(wait_for_binary_proto=True)
         node1 = cluster.nodelist()[0]
 
         # Makinge sure the cluster is ready to accept the subsequent
         # stress connection. This was an issue on Windows.
-        node1.watch_log_for('thrift clients...')
         version = cluster.version()
         if version < "2.1":
             node1.stress(['--num-keys=10000'])

@@ -2,11 +2,10 @@ from dtest import Tester, debug
 from tools import insert_c1c2, since
 from cassandra import ConsistencyLevel
 from ccmlib.node import Node
-from re import search, findall
-import unittest
+from re import findall
 import time
 import os
-from assertions import assert_invalid, assert_one, assert_all, assert_none, assert_almost_equal
+from assertions import assert_one, assert_almost_equal
 from nose.plugins.attrib import attr
 
 @since('2.1')
@@ -91,9 +90,9 @@ class TestIncRepair(Tester):
         for z in range(100, 150):
             insert_c1c2(cursor, z, ConsistencyLevel.TWO)
         node1.flush()
+        node3.flush()
 
         debug("start and repair node 2")
-        node2.flush()
         node2.start()
 
         if cluster.version() >= "3.0":
@@ -169,14 +168,14 @@ class TestIncRepair(Tester):
 
         os.remove('initial.txt')
         os.remove('final.txt')
-    
+
     @since('2.1')
     def compaction_test(self):
         cluster = self.cluster
         cluster.populate(3).start()
         [node1,node2,node3] = cluster.nodelist()
 
-        cursor = self.patient_cql_connection(node1) 
+        cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'ks', 3)
         cursor.execute("create table tab(key int PRIMARY KEY, val int);")
 
@@ -212,40 +211,54 @@ class TestIncRepair(Tester):
         There is an issue with subsequent inc repairs.
         """
         cluster = self.cluster
+        cluster.set_configuration_options(values={
+            'compaction_throughput_mb_per_sec': 0
+        })
         cluster.populate(3).start()
         [node1,node2,node3] = cluster.nodelist()
 
+        debug("Inserting data with stress")
         expected_load_size = 4.5  # In GB
-        node1.stress(['write', 'n=5000000', '-rate', 'threads=50', '-schema', 'replication(factor=3)'])
+        node1.stress(['write', 'n=5M', '-rate', 'threads=50', '-schema', 'replication(factor=3)'])
 
+        debug("Flushing nodes")
         node1.flush()
         node2.flush()
         node3.flush()
 
-        node1.nodetool("repair -par -inc")
-        node2.nodetool("repair -par -inc")
-        node3.nodetool("repair -par -inc")
+        if self.cluster.version() >= '3.0':
+            debug("Repairing node1")
+            node1.nodetool("repair")
+            debug("Repairing node2")
+            node2.nodetool("repair")
+            debug("Repairing node3")
+            node3.nodetool("repair")
+        else:
+            debug("Repairing node1")
+            node1.nodetool("repair -par -inc")
+            debug("Repairing node2")
+            node2.nodetool("repair -par -inc")
+            debug("Repairing node3")
+            node3.nodetool("repair -par -inc")
 
-        node1.cleanup()
-        node2.cleanup()
-        node3.cleanup()
-
+        # Using "print" instead of debug() here is on purpose.  The compactions
+        # take a long time and don't print anything by default, which can result
+        # in the test being timed out after 20 minutes.  These print statements
+        # prevent it from being timed out.
+        print "compacting node1"
         node1.compact()
+        print "compacting node2"
         node2.compact()
+        print "compacting node3"
         node3.compact()
 
         # wait some time to be sure the load size is propagated between nodes
+        debug("Waiting for load size info to be propagated between nodes")
         time.sleep(45)
 
-        output = node1.nodetool('status', capture_output=True)[0]
-        lines = output.split("\n")  # stdout line
-        load_size = 0.0
-        for line in lines:
-            if line.startswith('UN'):
-                args = line.split()
-                load_size += float(args[2])
-
-        debug(output)
+        load_size_in_kb = float( sum(map(lambda n: n.data_size(), [node1, node2, node3])) )
+        load_size = load_size_in_kb/1024/1024
         debug("Total Load size: {}GB".format(load_size))
+
         # There is still some overhead, but it's lot better. We tolerate 25%.
         assert_almost_equal(load_size, expected_load_size, error=0.25)

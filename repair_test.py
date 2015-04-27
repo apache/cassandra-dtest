@@ -29,14 +29,43 @@ class TestRepair(Tester):
             for node in stopped_nodes:
                 node.start(wait_other_notice=True)
 
-    def simple_repair_test(self, ):
-        self._simple_repair()
+    def simple_sequential_repair_test(self, ):
+        self._simple_repair(sequential=True)
+
+    def simple_parallel_repair_test(self, ):
+        self._simple_repair(sequential=False)
+
+    def empty_vs_gcable_sequential_repair_test(self):
+        self._empty_vs_gcable_no_repair(sequential=True)
+
+    def empty_vs_gcable_parallel_repair_test(self):
+        self._empty_vs_gcable_no_repair(sequential=False)
 
     @no_vnodes()  # https://issues.apache.org/jira/browse/CASSANDRA-5220
     def simple_repair_order_preserving_test(self, ):
         self._simple_repair(order_preserving_partitioner=True)
 
-    def _simple_repair(self, order_preserving_partitioner=False):
+    def _repair_options(self, ks='', cf=[], sequential=True):
+        opts = []
+        version = self.cluster.version()
+        # since version 3.0, default is parallel, otherwise it's sequential
+        if sequential:
+            if version >= '3.0':
+                opts += ['-seq']
+        else:
+            if version < '3.0':
+                opts += ['-par']
+
+        # test with full repair
+        if version >= '3.0':
+            opts += ['-full']
+        if ks:
+            opts += [ks]
+        if cf:
+            opts += cf
+        return opts
+
+    def _simple_repair(self, order_preserving_partitioner=False, sequential=True):
         cluster = self.cluster
 
         if order_preserving_partitioner:
@@ -83,7 +112,7 @@ class TestRepair(Tester):
         # Run repair
         start = time.time()
         debug("starting repair...")
-        node1.repair()
+        node1.repair(self._repair_options(ks='ks', sequential=sequential))
         debug("Repair time: {end}".format(end=time.time() - start))
 
         # Validate that only one range was transfered
@@ -104,3 +133,86 @@ class TestRepair(Tester):
         # Check node3 now has the key
         self.check_rows_on_node(node3, 2001, found=[1000], restart=False)
 
+    def _empty_vs_gcable_no_repair(self, sequential):
+        """
+        Repairing empty partition and tombstoned partition older than gc grace
+        should be treated as the same and no repair is necessary.
+        See CASSANDRA-8979.
+        """
+        cluster = self.cluster
+        cluster.populate(2)
+        cluster.set_configuration_options(values={ 'hinted_handoff_enabled' : False}, batch_commitlog=True)
+        cluster.start()
+        [node1, node2] = cluster.nodelist()
+
+        cursor = self.patient_cql_connection(node1)
+        # create keyspace with RF=2 to be able to be repaired
+        self.create_ks(cursor, 'ks', 2)
+        # we create two tables, one has low gc grace seconds so that the data
+        # can be dropped during test (but we don't actually drop them).
+        # the other has default gc.
+        # compaction is disabled not to purge data
+        query = """
+            CREATE TABLE cf1 (
+                key text,
+                c1 text,
+                c2 text,
+                PRIMARY KEY (key, c1)
+            )
+            WITH gc_grace_seconds=1
+            AND compaction = {'class': 'SizeTieredCompactionStrategy', 'enabled': 'false'};
+        """
+        cursor.execute(query)
+        time.sleep(.5)
+        query = """
+            CREATE TABLE cf2 (
+                key text,
+                c1 text,
+                c2 text,
+                PRIMARY KEY (key, c1)
+            )
+            WITH compaction = {'class': 'SizeTieredCompactionStrategy', 'enabled': 'false'};
+        """
+        cursor.execute(query)
+        time.sleep(.5)
+
+        # take down node2, so that only node1 has gc-able data
+        node2.stop(wait_other_notice=True)
+        for cf in ['cf1', 'cf2']:
+            # insert some data
+            for i in xrange(0, 10):
+                for j in xrange(0, 1000):
+                    query = SimpleStatement("INSERT INTO %s (key, c1, c2) VALUES ('k%d', 'v%d', 'value')" % (cf, i, j), consistency_level=ConsistencyLevel.ONE)
+                    cursor.execute(query)
+            node1.flush()
+            # delete those data, half with row tombstone, and the rest with cell range tombstones
+            for i in xrange(0, 5):
+                query = SimpleStatement("DELETE FROM %s WHERE key='k%d'" % (cf, i), consistency_level=ConsistencyLevel.ONE)
+                cursor.execute(query)
+            node1.flush()
+            for i in xrange(5, 10):
+                for j in xrange(0, 1000):
+                    query = SimpleStatement("DELETE FROM %s WHERE key='k%d' AND c1='v%d'" % (cf, i, j), consistency_level=ConsistencyLevel.ONE)
+                    cursor.execute(query)
+            node1.flush()
+
+        # sleep until gc grace seconds pass so that cf1 can be dropped
+        time.sleep(2)
+
+        # bring up node2 and repair
+        node2.start()
+        node2.repair(self._repair_options(ks='ks', sequential=sequential))
+
+        # check no rows will be returned
+        for cf in ['cf1', 'cf2']:
+            for i in xrange(0, 10):
+                query = SimpleStatement("SELECT c1, c2 FROM %s WHERE key='k%d'" % (cf, i), consistency_level=ConsistencyLevel.ALL)
+                res = cursor.execute(query)
+                assert len(filter(lambda x: len(x) != 0, res)) == 0, res
+
+        # check log for no repair happened for gcable data
+        l = node2.grep_log("/([0-9.]+) and /([0-9.]+) have ([0-9]+) range\(s\) out of sync for cf1")
+        assert len(l) == 0, "GC-able data does not need to be repaired with empty data: " + str([elt[0] for elt in l])
+        # check log for actual repair for non gcable data
+        l = node2.grep_log("/([0-9.]+) and /([0-9.]+) have ([0-9]+) range\(s\) out of sync for cf2")
+        assert len(l) > 0, "Non GC-able data should be repaired"

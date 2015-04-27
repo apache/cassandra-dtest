@@ -80,6 +80,7 @@ class TestSSTableSplit(Tester):
         node.stress(['write', 'n=2000000', '-rate', 'threads=50',
                      '-schema', 'compaction(strategy=LeveledCompactionStrategy, sstable_size_in_mb=10)'])
         self._do_compaction(node)
+        node.stop()
         with tempfile.TemporaryFile(mode='w+') as tmpfile:
             node.run_sstablesplit(keyspace='keyspace1', size=2, no_snapshot=True,
                                   stdout=tmpfile, stderr=subprocess.STDOUT)

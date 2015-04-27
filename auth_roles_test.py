@@ -3,8 +3,8 @@ import time
 from cassandra import AuthenticationFailed, Unauthorized
 from cassandra.cluster import NoHostAvailable
 from cassandra.protocol import SyntaxException
-from auth_test import data_resource_creator_permissions, role_creator_permissions
-from dtest import Tester
+from auth_test import data_resource_creator_permissions, role_creator_permissions, function_resource_creator_permissions
+from dtest import debug,Tester
 from assertions import *
 from tools import since
 
@@ -130,12 +130,23 @@ class TestAuthRoles(Tester):
         mike.execute("CREATE KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor':1}")
         mike.execute("CREATE TABLE ks.cf (id int primary key, val int)")
         mike.execute("CREATE ROLE role1 WITH PASSWORD = '11111' AND SUPERUSER = false AND LOGIN = true")
+        mike.execute("""CREATE FUNCTION ks.state_function_1(a int, b int)
+                        RETURNS int
+                        LANGUAGE javascript
+                        AS ' a + b'""")
+        mike.execute("""CREATE AGGREGATE ks.simple_aggregate_1(int)
+                        SFUNC state_function_1
+                        STYPE int
+                        INITCOND 0""")
 
         cassandra_permissions = role_creator_permissions('cassandra', '<role mike>')
-        mike_permissions = [('mike', '<all roles>', 'CREATE'), ('mike', '<all keyspaces>', 'CREATE')]
+        mike_permissions = [('mike', '<all roles>', 'CREATE'),
+                            ('mike', '<all keyspaces>', 'CREATE')]
         mike_permissions.extend(role_creator_permissions('mike', '<role role1>'))
         mike_permissions.extend(data_resource_creator_permissions('mike', '<keyspace ks>'))
         mike_permissions.extend(data_resource_creator_permissions('mike', '<table ks.cf>'))
+        mike_permissions.extend(function_resource_creator_permissions('mike', '<function ks.state_function_1(int, int)>'))
+        mike_permissions.extend(function_resource_creator_permissions('mike', '<function ks.simple_aggregate_1(int)>'))
 
         self.assert_permissions_listed(cassandra_permissions + mike_permissions,
                                        cassandra,
@@ -347,6 +358,8 @@ class TestAuthRoles(Tester):
         cassandra.execute("CREATE TABLE ks.cf (id int primary key, val int)")
         cassandra.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND SUPERUSER = false AND LOGIN = true")
         cassandra.execute("CREATE ROLE role1 WITH SUPERUSER = false AND LOGIN = false")
+        cassandra.execute("CREATE FUNCTION ks.state_func(a int, b int) RETURNS int LANGUAGE javascript AS 'a+b'")
+        cassandra.execute("CREATE AGGREGATE ks.agg_func(int) SFUNC state_func STYPE int")
 
         # GRANT ALL ON ALL KEYSPACES grants Permission.ALL_DATA
 
@@ -403,7 +416,48 @@ class TestAuthRoles(Tester):
                        "GRANT CREATE ON ROLE role1 TO MIKE",
                        "Resource type RoleResource does not support any of the requested permissions",
                        SyntaxException)
+        cassandra.execute("REVOKE ALL ON ROLE role1 FROM mike")
 
+        # GRANT ALL ON ALL FUNCTIONS or on all functions for a single keyspace includes AUTHORIZE, EXECUTE and USAGE
+        cassandra.execute("GRANT ALL ON ALL FUNCTIONS TO mike")
+        self.assert_permissions_listed([("mike", "<all functions>", "CREATE"),
+                                        ("mike", "<all functions>", "ALTER"),
+                                        ("mike", "<all functions>", "DROP"),
+                                        ("mike", "<all functions>", "AUTHORIZE"),
+                                        ("mike", "<all functions>", "EXECUTE")],
+                                       cassandra,
+                                       "LIST ALL PERMISSIONS OF mike")
+        cassandra.execute("REVOKE ALL ON ALL FUNCTIONS FROM mike")
+
+        cassandra.execute("GRANT ALL ON ALL FUNCTIONS IN KEYSPACE ks TO mike")
+        self.assert_permissions_listed([("mike", "<all functions in ks>", "CREATE"),
+                                        ("mike", "<all functions in ks>", "ALTER"),
+                                        ("mike", "<all functions in ks>", "DROP"),
+                                        ("mike", "<all functions in ks>", "AUTHORIZE"),
+                                        ("mike", "<all functions in ks>", "EXECUTE")],
+                                       cassandra,
+                                       "LIST ALL PERMISSIONS OF mike")
+        cassandra.execute("REVOKE ALL ON ALL FUNCTIONS IN KEYSPACE ks FROM mike")
+
+        # GRANT ALL ON FUNCTION includes AUTHORIZE, EXECUTE and USAGE for scalar functions and
+        # AUTHORIZE and EXECUTE for aggregates
+        cassandra.execute("GRANT ALL ON FUNCTION ks.state_func(int, int) TO mike")
+        self.assert_permissions_listed([("mike", "<function ks.state_func(int, int)>", "ALTER"),
+                                        ("mike", "<function ks.state_func(int, int)>", "DROP"),
+                                        ("mike", "<function ks.state_func(int, int)>", "AUTHORIZE"),
+                                        ("mike", "<function ks.state_func(int, int)>", "EXECUTE")],
+                                       cassandra,
+                                       "LIST ALL PERMISSIONS OF mike")
+        cassandra.execute("REVOKE ALL ON FUNCTION ks.state_func(int, int) FROM mike")
+
+        cassandra.execute("GRANT ALL ON FUNCTION ks.agg_func(int) TO mike")
+        self.assert_permissions_listed([("mike", "<function ks.agg_func(int)>", "ALTER"),
+                                        ("mike", "<function ks.agg_func(int)>", "DROP"),
+                                        ("mike", "<function ks.agg_func(int)>", "AUTHORIZE"),
+                                        ("mike", "<function ks.agg_func(int)>", "EXECUTE")],
+                                       cassandra,
+                                       "LIST ALL PERMISSIONS OF mike")
+        cassandra.execute("REVOKE ALL ON FUNCTION ks.agg_func(int) FROM mike")
 
     def list_permissions_test(self):
         self.prepare()
@@ -624,7 +678,6 @@ class TestAuthRoles(Tester):
                                         ["db_admin", True, False, {}],
                                         mike_role])
 
-    @since('3.0')
     def list_users_considers_inherited_superuser_status_test(self):
         self.prepare()
         cassandra = self.get_session(user='cassandra', password='cassandra')
@@ -633,6 +686,434 @@ class TestAuthRoles(Tester):
         cassandra.execute("GRANT db_admin TO mike")
         assert_all(cassandra, "LIST USERS", [['cassandra', True],
                                              ["mike", True]])
+
+    # UDF permissions tests TODO move to separate fixture & refactor this + auth_test.py
+    def grant_revoke_udf_permissions_test(self):
+        self.prepare()
+        cassandra = self.get_session(user='cassandra', password='cassandra')
+        self.setup_table(cassandra)
+        cassandra.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND LOGIN = true")
+        cassandra.execute("CREATE FUNCTION ks.plus_one ( input int ) RETURNS int LANGUAGE javascript AS 'input + 1'")
+        cassandra.execute("CREATE FUNCTION ks.\"plusOne\" ( input int ) RETURNS int LANGUAGE javascript AS 'input + 1'")
+
+        # grant / revoke on a specific function
+        cassandra.execute("GRANT EXECUTE ON FUNCTION ks.plus_one(int) TO mike")
+        cassandra.execute("GRANT EXECUTE ON FUNCTION ks.\"plusOne\"(int) TO mike")
+
+        self.assert_permissions_listed([("mike", "<function ks.plus_one(int)>", "EXECUTE"),
+                                        ("mike", "<function ks.plusOne(int)>", "EXECUTE")],
+                                       cassandra,
+                                       "LIST ALL PERMISSIONS OF mike")
+        cassandra.execute("REVOKE ALL PERMISSIONS ON FUNCTION ks.plus_one(int) FROM mike")
+        self.assert_permissions_listed([("mike", "<function ks.plusOne(int)>", "EXECUTE")],
+                                       cassandra,
+                                       "LIST ALL PERMISSIONS OF mike")
+        cassandra.execute("REVOKE EXECUTE PERMISSION ON FUNCTION ks.\"plusOne\"(int) FROM mike")
+        self.assert_no_permissions(cassandra, "LIST ALL PERMISSIONS OF mike")
+
+        # grant / revoke on all functions in a given keyspace
+        cassandra.execute("GRANT EXECUTE PERMISSION ON ALL FUNCTIONS IN KEYSPACE ks TO mike")
+        self.assert_permissions_listed([("mike", "<all functions in ks>", "EXECUTE")],
+                                       cassandra,
+                                       "LIST ALL PERMISSIONS OF mike")
+        cassandra.execute("REVOKE EXECUTE PERMISSION ON ALL FUNCTIONS IN KEYSPACE ks FROM mike")
+        self.assert_no_permissions(cassandra, "LIST ALL PERMISSIONS OF mike")
+
+        # grant / revoke on all (non-builtin) functions
+        cassandra.execute("GRANT EXECUTE PERMISSION ON ALL FUNCTIONS TO mike")
+        self.assert_permissions_listed([("mike", "<all functions>", "EXECUTE")],
+                                       cassandra,
+                                       "LIST ALL PERMISSIONS OF mike")
+        cassandra.execute("REVOKE EXECUTE PERMISSION ON ALL FUNCTIONS FROM mike")
+        self.assert_no_permissions(cassandra, "LIST ALL PERMISSIONS OF mike")
+
+    def grant_revoke_are_idempotent_test(self):
+        self.prepare()
+        cassandra = self.get_session(user='cassandra', password='cassandra')
+        self.setup_table(cassandra)
+        cassandra.execute("CREATE ROLE mike")
+        cassandra.execute("CREATE FUNCTION ks.plus_one ( input int ) RETURNS int LANGUAGE javascript AS 'input + 1'")
+        cassandra.execute("GRANT EXECUTE ON FUNCTION ks.plus_one(int) TO mike")
+        cassandra.execute("GRANT EXECUTE ON FUNCTION ks.plus_one(int) TO mike")
+        self.assert_permissions_listed([("mike", "<function ks.plus_one(int)>", "EXECUTE")],
+                                       cassandra,
+                                       "LIST ALL PERMISSIONS OF mike")
+        cassandra.execute("REVOKE EXECUTE ON FUNCTION ks.plus_one(int) FROM mike")
+        self.assert_no_permissions(cassandra, "LIST ALL PERMISSIONS OF mike")
+        cassandra.execute("REVOKE EXECUTE ON FUNCTION ks.plus_one(int) FROM mike")
+        self.assert_no_permissions(cassandra, "LIST ALL PERMISSIONS OF mike")
+
+    def function_resource_hierarchy_permissions_test(self):
+        self.prepare()
+        cassandra = self.get_session(user='cassandra', password='cassandra')
+        self.setup_table(cassandra)
+        cassandra.execute("INSERT INTO ks.t1 (k,v) values (1,1)")
+        cassandra.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND LOGIN = true")
+        cassandra.execute("GRANT SELECT ON ks.t1 TO mike")
+        cassandra.execute("CREATE FUNCTION ks.func_one ( input int ) RETURNS int LANGUAGE javascript AS 'input + 1'")
+        cassandra.execute("CREATE FUNCTION ks.func_two ( input int ) RETURNS int LANGUAGE javascript AS 'input + 1'")
+
+        mike = self.get_session(user='mike', password='12345')
+        select_one = "SELECT k, v, ks.func_one(v) FROM ks.t1 WHERE k = 1"
+        select_two = "SELECT k, v, ks.func_two(v) FROM ks.t1 WHERE k = 1"
+
+        # grant EXECUTE on only one of the two functions
+        cassandra.execute("GRANT EXECUTE ON FUNCTION ks.func_one(int) TO mike")
+        mike.execute(select_one)
+        assert_invalid(mike, select_two,
+                       "User mike has no EXECUTE permission on <function ks.func_two\(int\)> or any of its parents",
+                       Unauthorized)
+        # granting EXECUTE on all of the parent keyspace's should enable mike to use both functions
+        cassandra.execute("GRANT EXECUTE ON ALL FUNCTIONS IN KEYSPACE ks TO mike")
+        mike.execute(select_one)
+        mike.execute(select_two)
+        # revoke the keyspace level privilege and verify that the function specific perms are unaffected
+        cassandra.execute("REVOKE EXECUTE ON ALL FUNCTIONS IN KEYSPACE ks FROM mike")
+        mike.execute(select_one)
+        assert_invalid(mike, select_two,
+                       "User mike has no EXECUTE permission on <function ks.func_two\(int\)> or any of its parents",
+                       Unauthorized)
+        # now check that EXECUTE on ALL FUNCTIONS works in the same way
+        cassandra.execute("GRANT EXECUTE ON ALL FUNCTIONS TO mike")
+        mike.execute(select_one)
+        mike.execute(select_two)
+        cassandra.execute("REVOKE EXECUTE ON ALL FUNCTIONS FROM mike")
+        mike.execute(select_one)
+        assert_invalid(mike, select_two,
+                       "User mike has no EXECUTE permission on <function ks.func_two\(int\)> or any of its parents",
+                       Unauthorized)
+        # finally, check that revoking function level permissions doesn't affect root/keyspace level perms
+        cassandra.execute("GRANT EXECUTE ON ALL FUNCTIONS IN KEYSPACE ks TO mike")
+        cassandra.execute("REVOKE EXECUTE ON FUNCTION ks.func_one(int) FROM mike")
+        mike.execute(select_one)
+        mike.execute(select_two)
+        cassandra.execute("REVOKE EXECUTE ON ALL FUNCTIONS IN KEYSPACE ks FROM mike")
+        cassandra.execute("GRANT EXECUTE ON FUNCTION ks.func_one(int) TO mike")
+        cassandra.execute("GRANT EXECUTE ON ALL FUNCTIONS TO mike")
+        mike.execute(select_one)
+        mike.execute(select_two)
+        cassandra.execute("REVOKE EXECUTE ON FUNCTION ks.func_one(int) FROM mike")
+        mike.execute(select_one)
+        mike.execute(select_two)
+
+    def udf_permissions_validation_test(self):
+        self.prepare()
+        cassandra = self.get_session(user='cassandra', password='cassandra')
+        self.setup_table(cassandra)
+        cassandra.execute("CREATE FUNCTION ks.plus_one ( input int ) RETURNS int LANGUAGE javascript AS 'input + 1'")
+        cassandra.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND LOGIN = true")
+        mike = self.get_session(user='mike', password='12345')
+
+        # can't replace an existing function without ALTER permission on the parent ks
+        cql = "CREATE OR REPLACE FUNCTION ks.plus_one( input int ) RETURNS int LANGUAGE javascript as '1 + input'"
+        assert_invalid(mike, cql,
+                       "User mike has no ALTER permission on <function ks.plus_one\(int\)> or any of its parents",
+                       Unauthorized)
+        cassandra.execute("GRANT ALTER ON FUNCTION ks.plus_one(int) TO mike")
+        mike.execute(cql)
+
+        # can't grant permissions on a function without AUTHORIZE (and without the grantor having EXECUTE themself)
+        cassandra.execute("GRANT EXECUTE ON FUNCTION ks.plus_one(int) TO mike")
+        cassandra.execute("CREATE ROLE role1")
+        cql = "GRANT EXECUTE ON FUNCTION ks.plus_one(int) TO role1"
+        assert_invalid(mike, cql,
+                       "User mike has no AUTHORIZE permission on <function ks.plus_one\(int\)> or any of its parents",
+                       Unauthorized)
+        cassandra.execute("GRANT AUTHORIZE ON FUNCTION ks.plus_one(int) TO mike")
+        mike.execute(cql)
+        # now revoke AUTHORIZE from mike
+        cassandra.execute("REVOKE AUTHORIZE ON FUNCTION ks.plus_one(int) FROM mike")
+        cql = "REVOKE EXECUTE ON FUNCTION ks.plus_one(int) FROM role1"
+        assert_invalid(mike, cql,
+                       "User mike has no AUTHORIZE permission on <function ks.plus_one\(int\)> or any of its parents",
+                       Unauthorized)
+        cassandra.execute("GRANT AUTHORIZE ON FUNCTION ks.plus_one(int) TO mike")
+        mike.execute(cql)
+
+        # can't drop a function without DROP
+        cql = "DROP FUNCTION ks.plus_one(int)"
+        assert_invalid(mike, cql,
+                       "User mike has no DROP permission on <function ks.plus_one\(int\)> or any of its parents",
+                       Unauthorized)
+        cassandra.execute("GRANT DROP ON FUNCTION ks.plus_one(int) TO mike")
+        mike.execute(cql)
+
+        # DROP IF EXISTS on a non-existent function should return silently, DROP on a non-existent function
+        # behaves like DROP TABLE and returns an "Unconfigured XXX" error
+        cql = "DROP FUNCTION IF EXISTS ks.no_such_function(int,int)"
+        mike.execute(cql)
+
+        cql = "DROP FUNCTION ks.no_such_function(int,int)"
+        assert_invalid(mike, cql,
+                       "Unconfigured function ks.no_such_function\(int,int\)",
+                       InvalidRequest)
+
+        # can't create a new function without CREATE on the parent keyspace's collection of functions
+        cql = "CREATE FUNCTION ks.plus_one ( input int ) RETURNS int LANGUAGE javascript AS 'input + 1'"
+        assert_invalid(mike, cql,
+                       "User mike has no CREATE permission on <all functions in ks> or any of its parents",
+                       Unauthorized)
+        cassandra.execute("GRANT CREATE ON ALL FUNCTIONS IN KEYSPACE ks TO mike")
+        mike.execute(cql)
+
+    def drop_role_cleans_up_udf_permissions_test(self):
+        self.prepare()
+        cassandra = self.get_session(user='cassandra', password='cassandra')
+        self.setup_table(cassandra)
+        cassandra.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND LOGIN = true")
+        cassandra.execute("CREATE FUNCTION ks.plus_one ( input int ) RETURNS int LANGUAGE javascript AS 'input + 1'")
+        cassandra.execute("GRANT EXECUTE ON FUNCTION ks.plus_one(int) TO mike")
+        cassandra.execute("GRANT EXECUTE ON ALL FUNCTIONS IN KEYSPACE ks TO mike")
+        cassandra.execute("GRANT EXECUTE ON ALL FUNCTIONS TO mike")
+
+        self.assert_permissions_listed([("mike", "<all functions>", "EXECUTE"),
+                                        ("mike", "<all functions in ks>", "EXECUTE"),
+                                        ("mike", "<function ks.plus_one(int)>", "EXECUTE")],
+                                       cassandra,
+                                       "LIST ALL PERMISSIONS OF mike")
+
+        # drop and recreate the role to ensure permissions are cleared
+        cassandra.execute("DROP ROLE mike")
+        cassandra.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND LOGIN = true")
+        self.assert_no_permissions(cassandra, "LIST ALL PERMISSIONS OF mike")
+
+    def drop_function_and_keyspace_cleans_up_udf_permissions_test(self):
+        self.prepare()
+        cassandra = self.get_session(user='cassandra', password='cassandra')
+        self.setup_table(cassandra)
+        cassandra.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND LOGIN = true")
+        cassandra.execute("CREATE FUNCTION ks.plus_one ( input int ) RETURNS int LANGUAGE javascript AS 'input + 1'")
+        cassandra.execute("GRANT EXECUTE ON FUNCTION ks.plus_one(int) TO mike")
+        cassandra.execute("GRANT EXECUTE ON ALL FUNCTIONS IN KEYSPACE ks TO mike")
+
+        self.assert_permissions_listed([("mike", "<all functions in ks>", "EXECUTE"),
+                                        ("mike", "<function ks.plus_one(int)>", "EXECUTE")],
+                                       cassandra,
+                                       "LIST ALL PERMISSIONS OF mike")
+
+        # drop the function
+        cassandra.execute("DROP FUNCTION ks.plus_one")
+        self.assert_permissions_listed([("mike", "<all functions in ks>", "EXECUTE")],
+                                       cassandra,
+                                       "LIST ALL PERMISSIONS OF mike")
+        # drop the keyspace
+        cassandra.execute("DROP KEYSPACE ks")
+        self.assert_no_permissions(cassandra, "LIST ALL PERMISSIONS OF mike")
+
+    def udf_with_overloads_permissions_test(self):
+        self.prepare()
+        cassandra = self.get_session(user='cassandra', password='cassandra')
+        self.setup_table(cassandra)
+        cassandra.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND LOGIN = true")
+        cassandra.execute("CREATE FUNCTION ks.plus_one ( input int ) RETURNS int LANGUAGE javascript AS 'input + 1'")
+        cassandra.execute("CREATE FUNCTION ks.plus_one ( input double ) RETURNS double LANGUAGE javascript AS 'input + 1'")
+
+        # grant execute on one variant
+        cassandra.execute("GRANT EXECUTE ON FUNCTION ks.plus_one(int) TO mike")
+        self.assert_permissions_listed([("mike", "<function ks.plus_one(int)>", "EXECUTE")],
+                                       cassandra,
+                                       "LIST ALL PERMISSIONS OF mike")
+
+        # and now on the other
+        cassandra.execute("GRANT EXECUTE ON FUNCTION ks.plus_one(double) TO mike")
+        self.assert_permissions_listed([("mike", "<function ks.plus_one(int)>", "EXECUTE"),
+                                        ("mike", "<function ks.plus_one(double)>", "EXECUTE")],
+                                       cassandra,
+                                       "LIST ALL PERMISSIONS OF mike")
+
+        # revoke permissions on one of the functions only
+        cassandra.execute("REVOKE EXECUTE ON FUNCTION ks.plus_one(double) FROM mike")
+        self.assert_permissions_listed([("mike", "<function ks.plus_one(int)>", "EXECUTE")],
+                                       cassandra,
+                                       "LIST ALL PERMISSIONS OF mike")
+
+        # drop the function that the role has no permissions on
+        cassandra.execute("DROP FUNCTION ks.plus_one(double)")
+        self.assert_permissions_listed([("mike", "<function ks.plus_one(int)>", "EXECUTE")],
+                                       cassandra,
+                                       "LIST ALL PERMISSIONS OF mike")
+
+        # finally, drop the function that the role does have permissions on
+        cassandra.execute("DROP FUNCTION ks.plus_one(int)")
+        self.assert_no_permissions(cassandra, "LIST ALL PERMISSIONS OF mike")
+
+    def drop_keyspace_cleans_up_function_level_permissions_test(self):
+        self.prepare()
+        cassandra = self.get_session(user='cassandra', password='cassandra')
+        self.setup_table(cassandra)
+        cassandra.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND LOGIN = true")
+        cassandra.execute("CREATE FUNCTION ks.plus_one ( input int ) RETURNS int LANGUAGE javascript AS 'input + 1'")
+        cassandra.execute("GRANT EXECUTE ON FUNCTION ks.plus_one(int) TO mike")
+
+        self.assert_permissions_listed([("mike", "<function ks.plus_one(int)>", "EXECUTE")],
+                                       cassandra,
+                                       "LIST ALL PERMISSIONS OF mike")
+        # drop the keyspace
+        cassandra.execute("DROP KEYSPACE ks")
+        self.assert_no_permissions(cassandra, "LIST ALL PERMISSIONS OF mike")
+
+    def udf_permissions_in_selection_test(self):
+        self.verify_udf_permissions("SELECT k, v, ks.plus_one(v) FROM ks.t1 WHERE k = 1")
+
+    def udf_permissions_in_select_where_clause_test(self):
+        self.verify_udf_permissions("SELECT k, v FROM ks.t1 WHERE k = ks.plus_one(0)")
+
+    def udf_permissions_in_insert_test(self):
+        self.verify_udf_permissions("INSERT INTO ks.t1 (k, v) VALUES (1, ks.plus_one(1))")
+
+    def udf_permissions_in_update_test(self):
+        self.verify_udf_permissions("UPDATE ks.t1 SET v = ks.plus_one(2) WHERE k = ks.plus_one(0)")
+
+    def udf_permissions_in_delete_test(self):
+        self.verify_udf_permissions("DELETE FROM ks.t1 WHERE k = ks.plus_one(0)")
+
+    def verify_udf_permissions(self, cql):
+        self.prepare()
+        cassandra = self.get_session(user='cassandra', password='cassandra')
+        self.setup_table(cassandra)
+        cassandra.execute("CREATE FUNCTION ks.plus_one ( input int ) RETURNS int LANGUAGE javascript AS 'input + 1'")
+        cassandra.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND LOGIN = true")
+        cassandra.execute("GRANT ALL PERMISSIONS ON ks.t1 TO mike")
+        cassandra.execute("INSERT INTO ks.t1 (k,v) values (1,1)")
+        mike = self.get_session(user='mike', password='12345')
+        assert_invalid(mike,
+                       cql,
+                       "User mike has no EXECUTE permission on <function ks.plus_one\(int\)> or any of its parents",
+                       Unauthorized)
+
+        cassandra.execute("GRANT EXECUTE ON FUNCTION ks.plus_one(int) TO mike")
+        return mike.execute(cql)
+
+    def inheritence_of_udf_permissions_test(self):
+        self.prepare()
+        cassandra = self.get_session(user='cassandra', password='cassandra')
+        self.setup_table(cassandra)
+        cassandra.execute("CREATE ROLE function_user")
+        cassandra.execute("GRANT EXECUTE ON ALL FUNCTIONS IN KEYSPACE ks TO function_user")
+        cassandra.execute("CREATE FUNCTION ks.plus_one ( input int ) RETURNS int LANGUAGE javascript AS 'input + 1'")
+        cassandra.execute("INSERT INTO ks.t1 (k,v) VALUES (1,1)")
+        cassandra.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND LOGIN = true")
+        cassandra.execute("GRANT SELECT ON ks.t1 TO mike")
+        mike = self.get_session(user='mike', password='12345')
+        select = "SELECT k, v, ks.plus_one(v) FROM ks.t1 WHERE k = 1"
+        assert_invalid(mike,
+                       select,
+                       "User mike has no EXECUTE permission on <function ks.plus_one\(int\)> or any of its parents",
+                       Unauthorized)
+
+        cassandra.execute("GRANT function_user TO mike")
+        assert_one(mike, select, [1, 1, 2])
+
+    def builtin_functions_require_no_special_permissions_test(self):
+        self.prepare()
+        cassandra = self.get_session(user='cassandra', password='cassandra')
+        cassandra.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND LOGIN = true")
+        self.setup_table(cassandra)
+        cassandra.execute("INSERT INTO ks.t1 (k,v) VALUES (1,1)")
+        mike = self.get_session(user='mike', password='12345')
+        cassandra.execute("GRANT ALL PERMISSIONS ON ks.t1 TO mike")
+        assert_one(mike, "SELECT * from ks.t1 WHERE k=blobasint(intasblob(1))", [1, 1])
+
+    def disallow_grant_revoke_on_builtin_functions_test(self):
+        self.prepare()
+        cassandra = self.get_session(user='cassandra', password='cassandra')
+        self.setup_table(cassandra)
+        cassandra.execute("CREATE ROLE mike")
+        assert_invalid(cassandra, "GRANT EXECUTE ON FUNCTION system.intasblob(int) TO mike",
+                       "Altering permissions on builtin functions is not supported",
+                       InvalidRequest)
+        assert_invalid(cassandra, "REVOKE ALL PERMISSIONS ON FUNCTION system.intasblob(int) FROM mike",
+                       "Altering permissions on builtin functions is not supported",
+                       InvalidRequest)
+        assert_invalid(cassandra, "GRANT EXECUTE ON ALL FUNCTIONS IN KEYSPACE system TO mike",
+                       "Altering permissions on builtin functions is not supported",
+                       InvalidRequest)
+        assert_invalid(cassandra, "REVOKE ALL PERMISSIONS ON ALL FUNCTIONS IN KEYSPACE system FROM mike",
+                       "Altering permissions on builtin functions is not supported",
+                       InvalidRequest)
+
+    def disallow_grant_execute_on_non_function_resources_test(self):
+        self.prepare()
+        cassandra = self.get_session(user='cassandra', password='cassandra')
+        self.setup_table(cassandra)
+        cassandra.execute("CREATE ROLE mike")
+        cassandra.execute("CREATE ROLE role1")
+
+        # can't grant EXECUTE on data or role resources
+        assert_invalid(cassandra, "GRANT EXECUTE ON ALL KEYSPACES TO mike",
+                       "Resource type DataResource does not support any of the requested permissions",
+                       SyntaxException)
+        assert_invalid(cassandra, "GRANT EXECUTE ON KEYSPACE ks TO mike",
+                       "Resource type DataResource does not support any of the requested permissions",
+                       SyntaxException)
+        assert_invalid(cassandra, "GRANT EXECUTE ON TABLE ks.t1 TO mike",
+                       "Resource type DataResource does not support any of the requested permissions",
+                       SyntaxException)
+        assert_invalid(cassandra, "GRANT EXECUTE ON ALL ROLES TO mike",
+                       "Resource type RoleResource does not support any of the requested permissions",
+                       SyntaxException)
+        assert_invalid(cassandra, "GRANT EXECUTE ON ROLE mike TO role1",
+                       "Resource type RoleResource does not support any of the requested permissions",
+                       SyntaxException)
+
+    def aggregate_function_permissions_test(self):
+        self.prepare()
+        cassandra = self.get_session(user='cassandra', password='cassandra')
+        self.setup_table(cassandra)
+        cassandra.execute("INSERT INTO ks.t1 (k,v) VALUES (1,1)")
+        cassandra.execute("INSERT INTO ks.t1 (k,v) VALUES (2,2)")
+        cassandra.execute("""CREATE FUNCTION ks.state_function( a int, b int )
+                             RETURNS int
+                             LANGUAGE java
+                             AS 'return Integer.valueOf( (a != null ? a.intValue() : 0) + b.intValue());'""")
+        cassandra.execute("""CREATE FUNCTION ks.final_function( a int )
+                             RETURNS int
+                             LANGUAGE java
+                             AS 'return a;'""")
+        cassandra.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND LOGIN = true")
+        cassandra.execute("GRANT CREATE ON ALL FUNCTIONS IN KEYSPACE ks TO mike")
+        cassandra.execute("GRANT ALL PERMISSIONS ON ks.t1 TO mike")
+        mike = self.get_session(user='mike', password='12345')
+        create_aggregate_cql = """CREATE AGGREGATE ks.simple_aggregate(int)
+                          SFUNC state_function
+                          STYPE int
+                          FINALFUNC final_function
+                          INITCOND 0"""
+        # check permissions to create the aggregate
+        assert_invalid(mike,
+                       create_aggregate_cql,
+                       "User mike has no EXECUTE permission on <function ks.state_function\(int, int\)> or any of its parents",
+                       Unauthorized)
+        cassandra.execute("GRANT EXECUTE ON FUNCTION ks.state_function(int, int) TO mike")
+        assert_invalid(mike,
+                       create_aggregate_cql,
+                       "User mike has no EXECUTE permission on <function ks.final_function\(int\)> or any of its parents",
+                       Unauthorized)
+        cassandra.execute("GRANT EXECUTE ON FUNCTION ks.final_function(int) TO mike")
+        mike.execute(create_aggregate_cql)
+
+        # without execute permissions on the state or final function we
+        # cannot use the aggregate, so revoke them to verify
+        cassandra.execute("REVOKE EXECUTE ON FUNCTION ks.state_function(int, int) FROM mike")
+        cassandra.execute("REVOKE EXECUTE ON FUNCTION ks.final_function(int) FROM mike")
+        execute_aggregate_cql = "SELECT ks.simple_aggregate(v) FROM ks.t1"
+        assert_invalid(mike,
+                       execute_aggregate_cql,
+                       "User mike has no EXECUTE permission on <function ks.state_function\(int, int\)> or any of its parents",
+                       Unauthorized)
+        cassandra.execute("GRANT EXECUTE ON FUNCTION ks.state_function(int, int) TO mike")
+        assert_invalid(mike,
+                       execute_aggregate_cql,
+                       "User mike has no EXECUTE permission on <function ks.final_function\(int\)> or any of its parents",
+                       Unauthorized)
+        cassandra.execute("GRANT EXECUTE ON FUNCTION ks.final_function(int) TO mike")
+
+        # mike *does* have execute permission on the aggregate function, as its creator
+        assert_one(mike, execute_aggregate_cql, [3])
+
+    def setup_table(self, session):
+        session.execute("CREATE KEYSPACE ks WITH REPLICATION = {'class':'SimpleStrategy', 'replication_factor':1}")
+        session.execute("CREATE TABLE ks.t1 (k int PRIMARY KEY, v int)")
 
     def assert_unauthenticated(self, message, user, password):
         with self.assertRaises(NoHostAvailable) as response:
@@ -666,8 +1147,9 @@ class TestAuthRoles(Tester):
         return conn
 
     def assert_permissions_listed(self, expected, cursor, query):
-        # from cassandra.query import named_tuple_factory
-        # cursor.row_factory = named_tuple_factory
         rows = cursor.execute(query)
         perms = [(str(r.role), str(r.resource), str(r.permission)) for r in rows]
         self.assertEqual(sorted(expected), sorted(perms))
+
+    def assert_no_permissions(self, cursor, query):
+        assert cursor.execute(query) is None

@@ -523,7 +523,6 @@ class TestAuth(Tester):
         if self.cluster.cassandra_version() >= '3.0.0':
             expected_permissions.append(('cassandra', '<table ks.cf2>', 'SELECT'))
             expected_permissions.append(('cassandra', '<keyspace ks>', 'SELECT'))
-        debug(sorted(expected_permissions))
         self.assertPermissionsListed(expected_permissions, cassandra, "LIST SELECT ON ks.cf2")
 
         self.assertPermissionsListed([('cathy', '<all keyspaces>', 'CREATE'),
@@ -626,6 +625,10 @@ def data_resource_creator_permissions(creator, resource):
         permissions.append((creator, resource, perm))
     if resource.startswith("<keyspace "):
         permissions.append((creator, resource, 'CREATE'))
+        keyspace = resource[10:-1]
+        # also grant the creator of a ks perms on functions in that ks
+        for perm in 'CREATE', 'ALTER', 'DROP', 'AUTHORIZE', 'EXECUTE':
+            permissions.append((creator, '<all functions in %s>' % keyspace, perm))
     return permissions
 
 
@@ -633,4 +636,11 @@ def role_creator_permissions(creator, role):
     permissions = []
     for perm in 'ALTER', 'DROP', 'AUTHORIZE':
         permissions.append((creator, role, perm))
+    return permissions
+
+
+def function_resource_creator_permissions(creator, resource):
+    permissions = []
+    for perm in 'ALTER', 'DROP', 'AUTHORIZE', 'EXECUTE':
+        permissions.append((creator, resource, perm))
     return permissions

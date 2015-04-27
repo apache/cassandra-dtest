@@ -10,7 +10,7 @@ class NotificationWaiter(object):
     Cassandra over the native protocol.
     """
 
-    def __init__(self, tester, node, notification_type, num_notifications=1):
+    def __init__(self, tester, node, notification_type):
         """
         `address` should be a ccmlib.node.Node instance
         `notification_type` should either be "TOPOLOGY_CHANGE", "STATUS_CHANGE",
@@ -28,7 +28,6 @@ class NotificationWaiter(object):
 
         # the pushed notification
         self.notifications = []
-        self.num_notifications = num_notifications
 
         # register a callback for the notification type
         connection.register_watcher(
@@ -40,31 +39,29 @@ class NotificationWaiter(object):
         """
 
         debug("Source %s sent %s for %s" % (self.address, notification["change_type"], notification["address"][0],))
-        
+
         self.notifications.append(notification)
         self.event.set()
 
-    def wait_for_notifications(self, timeout):
+    def wait_for_notifications(self, timeout, num_notifications=1):
         """
-        Waits up to `timeout` seconds for a notifications from Cassandra.
+        Waits up to `timeout` seconds for notifications from Cassandra. If
+        passed `num_notifications`, stop waiting when that many notifications
+        are observed.
         """
 
         deadline = time.time() + timeout
         while time.time() < deadline:
             self.event.wait(deadline - time.time())
             self.event.clear()
-            if len(self.notifications) >= self.num_notifications:
+            if len(self.notifications) >= num_notifications:
                 break
 
-        if len(self.notifications) < self.num_notifications:
-            raise Exception("Timed out waiting for %s notifications from %s"
-                            % (self.notification_type, self.address))
-        else:
-            return self.notifications
+        return self.notifications
 
     def clear_notifications(self):
         self.notifications = []
-        self.event.clear()        
+        self.event.clear()
 
 
 class TestPushedNotifications(Tester):
@@ -75,6 +72,7 @@ class TestPushedNotifications(Tester):
     @no_vnodes()
     def move_single_node_test(self):
         """
+        CASSANDRA-8516
         Moving a token should result in NODE_MOVED notifications.
         """
         self.cluster.populate(3).start()
@@ -97,26 +95,24 @@ class TestPushedNotifications(Tester):
 
     def restart_node_test(self):
         """
+        CASSANDRA-7816
         Restarting a node should generate exactly one DOWN and one UP notification
-        """        
+        """
 
         self.cluster.populate(2).start()
         node1, node2 = self.cluster.nodelist()
 
-        waiter = NotificationWaiter(self, node1, "STATUS_CHANGE", num_notifications=2)
+        waiter = NotificationWaiter(self, node1, "STATUS_CHANGE")
 
         for i in range(5):
             debug("Restarting second node...")
             node2.stop()
             node2.start()
             debug("Waiting for notifications from %s" % (waiter.address,))
-            notifications = waiter.wait_for_notifications(60.0)
+            notifications = waiter.wait_for_notifications(timeout=60.0, num_notifications=2)
             self.assertEquals(2, len(notifications))
             self.assertEquals(self.get_ip_from_node(node2), notifications[0]["address"][0])
             self.assertEquals("DOWN", notifications[0]["change_type"])
             self.assertEquals(self.get_ip_from_node(node2), notifications[1]["address"][0])
             self.assertEquals("UP", notifications[1]["change_type"])
             waiter.clear_notifications()
-
-
-
