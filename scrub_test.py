@@ -7,6 +7,7 @@ import uuid
 from ccmlib import common
 from dtest import Tester, debug
 from tools import since
+import time
 
 KEYSPACE = 'ks'
 
@@ -253,4 +254,25 @@ class TestScrub(Tester):
         self.assertEqual(initial_sstables, scrubbed_sstables)
 
         users = cursor.execute(("SELECT * from users where uuids contains {some_uuid}").format(some_uuid=_id))
+
         self.assertEqual(initial_users, users)
+
+        self.assertListEqual(initial_users, users)
+
+    def test_nodetool_scrub(self):
+        cluster = self.cluster
+        cluster.populate(1).start()
+        node1 = cluster.nodelist()[0]
+
+        cursor = self.patient_cql_connection(node1)
+        cursor.execute("CREATE KEYSPACE test WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1 };")
+        cursor.execute("use test;")
+        cursor.execute("CREATE TYPE point_t (x double, y double);")
+
+        try:
+            node1.nodetool("scrub")
+            time.sleep(2)
+            match = node1.grep_log("org.apache.cassandra.serializers.MarshalException: Not enough bytes to read a set")
+            self.assertEqual(len(match), 0)
+        except Exception, e:
+            self.fail(str(e))
