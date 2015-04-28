@@ -15,14 +15,15 @@ class TestLargeColumn(Tester):
         node.stress(['read', 'n=5', "no-warmup", "cl=ALL", "-pop", "seq=1...5", "-schema", "replication(factor=2)", "-col", "n=fixed(1)", "size=fixed(" + size + ")", "-rate", "threads=1"])
 
     def directbytes(self, node):
-            output = node.nodetool( "gcstats", capture_output=True);
-            output = output[0].split("\n");
-            assert output[0].strip().startswith("Interval"), "Expected output from nodetool gcstats starts with a header line with first column Interval"
-            fields = output[1].split();
-            assert len(fields) >= 6, "Expected output from nodetool gcstats has at least six fields"
-            for field in fields:
-                assert field.strip().isdigit(), "Expected numeric from fields from nodetool gcstats"
-            return fields[6]
+        output = node.nodetool( "gcstats", capture_output=True);
+        output = output[0].split("\n");
+        assert output[0].strip().startswith("Interval"), "Expected output from nodetool gcstats starts with a header line with first column Interval"
+        fields = output[1].split();
+        assert len(fields) >= 6, "Expected output from nodetool gcstats has at least six fields"
+        for field in fields:
+            assert field.strip().isdigit() or field == 'NaN', "Expected numeric from fields from nodetool gcstats"
+        return fields[6]
+
     def cleanup_test(self):
         """
         See CASSANDRA-8670
