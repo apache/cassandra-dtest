@@ -642,6 +642,44 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         self.assertEqual(pf.num_results_all(), [400, 200])
         self.assertEqualIgnoreOrder(expected_data, pf.all_data())
 
+    @since('2.0')
+    def test_paging_using_secondary_indexes_with_static_cols(self):
+        cursor = self.prepare()
+        self.create_ks(cursor, 'test_paging_size', 2)
+        cursor.execute("CREATE TABLE paging_test ( id int, s1 int static, s2 int static, mybool boolean, sometext text, PRIMARY KEY (id, sometext) )")
+        cursor.execute("CREATE INDEX ON paging_test(mybool)")
+
+        def random_txt(text):
+            return unicode(uuid.uuid4())
+
+        def bool_from_str_int(text):
+            return bool(int(text))
+
+        data = """
+             | id | s1 | s2 | mybool| sometext |
+         *100| 1  | 1  | 4  | 1     | [random] |
+         *300| 2  | 2  | 3  | 0     | [random] |
+         *500| 3  | 3  | 2  | 1     | [random] |
+         *400| 4  | 4  | 1  | 0     | [random] |
+            """
+        all_data = create_rows(
+            data, cursor, 'paging_test', cl=CL.ALL,
+            format_funcs={'id': int, 'mybool': bool_from_str_int, 'sometext': random_txt, 's1': int, 's2': int}
+        )
+
+        future = cursor.execute_async(
+            SimpleStatement("select * from paging_test where mybool = true", fetch_size=400, consistency_level=CL.ALL)
+        )
+
+        pf = PageFetcher(future).request_all()
+
+        # the query only searched for True rows, so let's pare down the expectations for comparison
+        expected_data = filter(lambda x: x.get('mybool') is True, all_data)
+
+        self.assertEqual(pf.pagecount(), 2)
+        self.assertEqual(pf.num_results_all(), [400, 200])
+        self.assertEqualIgnoreOrder(expected_data, pf.all_data())
+
 
 @since('2.0')
 class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
