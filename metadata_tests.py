@@ -39,7 +39,7 @@ class TestMetadata(Tester):
             node1.stress(['-o', 'read', '-n', '30000', '-l', '2', '-t', '1', '-I', 'LZ4Compressor'])
         else:
             node1.stress(['read', 'no-warmup', 'n=30000', '-schema', 'replication(factor=2)', 'compression=LZ4Compressor',
-                              '-rate', 'threads=1', '-pop', 'dist=UNIFORM(1..30000)'])
+                              '-rate', 'threads=1'])
 
     def metadata_reset_while_compact_test(self):
         """ Resets the schema while a compact, read and repair happens. 
@@ -57,7 +57,7 @@ class TestMetadata(Tester):
                 node1.stress(['-o', 'insert', '-n', '30000', '-l', '2', '-t', '5', '-I', 'LZ4Compressor'])
             else:
                 node1.stress(['write', 'no-warmup', 'n=30000', '-schema', 'replication(factor=2)', 'compression=LZ4Compressor',
-                              '-rate', 'threads=5', '-pop', 'dist=UNIFORM(1..30000)'])
+                              '-rate', 'threads=5', '-pop', 'seq=1..30000'])
             node1.flush()
         
         thread = threading.Thread(target=self.force_compact)
