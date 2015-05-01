@@ -57,8 +57,8 @@ class TestDeletion(Tester):
 
 
 def memtable_size(node, keyspace, table):
-    new_name = node.get_cassandra_version() >= '2.1'
-    name = 'MemtableLiveDataSize' if new_name else 'MemtableDataSize'
+    version = node.get_cassandra_version()
+    name = 'MemtableOnHeapSize' if version >= '2.1' else 'MemtableDataSize'
     return columnfamily_metric(node, keyspace, table, name)
 
 
