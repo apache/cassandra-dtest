@@ -565,7 +565,6 @@ class TestAuth(Tester):
         cathy.execute("DROP TYPE ks.address")
 
     @since('3.0')
-    @require('https://issues.apache.org/jira/browse/CASSANDRA-7557')
     def func_auth_test(self):
         self.prepare()
         udf = "CREATE FUNCTION sin ( input double ) RETURNS double LANGUAGE java AS 'return Double.valueOf(Math.sin(input.doubleValue()));'"
