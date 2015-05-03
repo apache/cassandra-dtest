@@ -4,6 +4,7 @@ import uuid
 from cassandra import ConsistencyLevel as CL
 from cassandra import InvalidRequest
 from cassandra.query import SimpleStatement, dict_factory
+from cassandra.cluster import NoHostAvailable
 from dtest import Tester, run_scenarios
 from tools import since, require
 
@@ -173,7 +174,7 @@ class BasePagingTester(Tester):
     def prepare(self):
         cluster = self.cluster
         cluster.populate(3).start()
-        node1, node2, node3 = cluster.nodelist()
+        node1 = cluster.nodelist()[0]
         cursor = self.cql_connection(node1)
         cursor.row_factory = dict_factory
         return cursor
@@ -1102,7 +1103,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
     @require('6237')
     def test_multiple_row_deletions(self):
         """Test multiple row deletions.
-           TODO enable/fix that test.
+           This test should be finished when CASSANDRA-6237 is done.
         """
         self.cursor = self.prepare()
         expected_data = self.setup_data()
@@ -1206,3 +1207,53 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
                             )
         self.check_all_paging_results(expected_data, 8,
                                       [25, 25, 25, 25, 25, 25, 25, 25])
+
+    def test_ttl_deletions(self):
+        """Test ttl deletions. Paging over a query that has only tombstones """
+        self.cursor = self.prepare()
+        data = self.setup_data()
+
+        # Set TTL to all row
+        for row in data:
+            s = ("insert into paging_test (id, mytext, col1, col2, col3) "
+                 "values ({}, '{}', {}, {}, {}) using ttl 3;").format(
+                     row['id'], row['mytext'], row['col1'],
+                     row['col2'], row['col3'])
+            self.cursor.execute(
+                SimpleStatement(s, consistency_level=CL.ALL)
+            )
+        time.sleep(5)
+        self.check_all_paging_results([], 0, [])
+
+    def test_failure_threshold_deletions(self):
+        """Test that paging throws a failure in case of tombstone threshold """
+        self.allow_log_errors = True
+        self.cluster.set_configuration_options(
+            values={ 'tombstone_failure_threshold' : 350 }
+        )
+        self.cursor = self.prepare()
+
+        data = self.setup_data()
+
+        # Add more data
+        values = map(lambda i: uuid.uuid4(), range(350))
+        for value in values:
+            self.cursor.execute(SimpleStatement(
+                "insert into paging_test (id, mytext) values (1, '{}') ".format(
+                    value
+                ),
+                consistency_level=CL.ALL
+            ))
+
+
+        self.cursor.execute(SimpleStatement(
+            "delete from paging_test where id in (1,2,3,4,5);",
+            consistency_level=CL.ALL
+        ))
+
+        self.assertRaises(
+            NoHostAvailable, self.check_all_paging_results, [], 0, []
+        )
+        failure = self.node1.grep_log(("Scanned over 500 tombstones in "
+                                       "test_paging_size.paging_test; query aborted"))
+        self.assertTrue(failure, "Cannot find tombstone failure threshold error in log")
