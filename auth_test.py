@@ -564,28 +564,6 @@ class TestAuth(Tester):
         cassandra.execute("GRANT DROP ON KEYSPACE ks TO cathy")
         cathy.execute("DROP TYPE ks.address")
 
-    @since('3.0')
-    def func_auth_test(self):
-        self.prepare()
-        udf = "CREATE FUNCTION sin ( input double ) RETURNS double LANGUAGE java AS 'return Double.valueOf(Math.sin(input.doubleValue()));'"
-        dropUdf = "DROP FUNCTION sin"
-
-        cassandra = self.get_cursor(user='cassandra', password='cassandra')
-        cassandra.execute("CREATE USER cathy WITH PASSWORD '12345'")
-        cassandra.execute("CREATE KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor':1}")
-
-        cathy = self.get_cursor(user='cathy', password='12345')
-        self.assertUnauthorized("User cathy has no CREATE permission on <keyspace ks> or any of its parents",
-                                cathy, udf)
-        self.assertUnauthorized("User cathy has no DROP permission on <keyspace ks> or any of its parents",
-                                cathy, dropUdf)
-
-        cassandra.execute("GRANT CREATE ON KEYSPACE ks TO cathy")
-        cathy.execute(udf)
-        cassandra.execute("GRANT DROP ON KEYSPACE ks TO cathy")
-        cathy.execute(dropUdf)
-
-
     def prepare(self, nodes=1, permissions_validity=0):
         config = {'authenticator' : 'org.apache.cassandra.auth.PasswordAuthenticator',
                   'authorizer' : 'org.apache.cassandra.auth.CassandraAuthorizer',
@@ -615,7 +593,7 @@ class TestAuth(Tester):
     def assertUnauthorized(self, message, cursor, query):
         with self.assertRaises(Unauthorized) as cm:
             cursor.execute(query)
-        assert re.search(message, cm.exception.message), "Expected: %s" % message
+        assert re.search(message, cm.exception.message), "Expected '%s', but got '%s'" % (message, cm.exception.message)
 
 
 def data_resource_creator_permissions(creator, resource):
