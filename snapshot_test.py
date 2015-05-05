@@ -5,6 +5,8 @@ import subprocess
 import tempfile
 import time
 
+from cassandra.concurrent import execute_concurrent_with_args
+
 from dtest import Tester, debug
 from tools import replace_in_file, since
 import distutils.dir_util
@@ -16,8 +18,9 @@ class SnapshotTester(Tester):
         Tester.__init__(self, *args, **kwargs)
 
     def insert_rows(self, cursor, start, end):
-        for r in range(start, end):
-            cursor.execute("INSERT INTO ks.cf (key, val) VALUES ({r}, 'asdf');".format(r=r))
+        insert_statement = cursor.prepare("INSERT INTO ks.cf (key, val) VALUES (?, 'asdf')")
+        args = [(r,) for r in range(start, end)]
+        execute_concurrent_with_args(cursor, insert_statement, args, concurrency=20)
 
     def make_snapshot(self, node, ks, cf, name):
         debug("Making snapshot....")
