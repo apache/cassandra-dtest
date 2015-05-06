@@ -1,9 +1,7 @@
 import random
-import subprocess
 import time
-import tempfile
 
-from dtest import debug, Tester
+from dtest import Tester
 from tools import new_node, query_c1c2, since, InterruptBootstrap
 from assertions import assert_almost_equal
 from ccmlib.node import NodeError
@@ -187,25 +185,14 @@ class TestBootstrap(Tester):
             node1.stress(['write', 'n=1000', '-schema', 'replication(factor=2)',
                           '-rate', 'threads=1', '-pop', 'dist=UNIFORM(1..1000)'])
 
+        session = self.patient_exclusive_cql_connection(node2)
+        original_rows = list(session.execute("SELECT * FROM keyspace1.standard1"))
+
         # Add a new node
         node3 = new_node(cluster, bootstrap=False)
         node3.start()
         node3.repair()
         node1.cleanup()
 
-        # Verify the data
-        with tempfile.TemporaryFile(mode='w+') as tmpfile:
-            if cluster.version() < "2.1":
-                node2.stress(['-o', 'read', '-n', '1000', '-e', 'ALL', '-t', '1'],
-                             stdout=tmpfile, stderr=subprocess.STDOUT)
-            else:
-                node2.stress(['read', 'n=1000', 'cl=ALL', '-rate', 'threads=1',
-                              '-pop', 'dist=UNIFORM(1..1000)'],
-                             stdout=tmpfile, stderr=subprocess.STDOUT)
-
-            tmpfile.seek(0)
-            output = tmpfile.read()
-
-        debug(output)
-        failure = output.find("Data returned was not validated")
-        self.assertEqual(failure, -1, "Stress failed to validate all data")
+        current_rows = list(session.execute("SELECT * FROM keyspace1.standard1"))
+        self.assertEquals(original_rows, current_rows)
