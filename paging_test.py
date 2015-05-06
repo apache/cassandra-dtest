@@ -5,7 +5,7 @@ from cassandra import ConsistencyLevel as CL
 from cassandra import InvalidRequest
 from cassandra.query import SimpleStatement, dict_factory
 from dtest import Tester, run_scenarios
-from tools import since
+from tools import since, require
 
 from datahelp import create_rows, parse_data_into_dicts, flatten_into_set
 
@@ -173,7 +173,7 @@ class BasePagingTester(Tester):
     def prepare(self):
         cluster = self.cluster
         cluster.populate(3).start()
-        node1, node2, node3 = cluster.nodelist()
+        node1 = cluster.nodelist()[0]
         cursor = self.cql_connection(node1)
         cursor.row_factory = dict_factory
         return cursor
@@ -753,36 +753,6 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
         expected_data.append({u'id': 2, u'mytext': u'foo'})
         self.assertEqualIgnoreOrder(pf.all_data(), expected_data)
 
-    def test_data_delete_removing_remainder(self):
-        cursor = self.prepare()
-        self.create_ks(cursor, 'test_paging_size', 2)
-        cursor.execute("CREATE TABLE paging_test ( id int, mytext text, PRIMARY KEY (id, mytext) )")
-
-        def random_txt(text):
-            return unicode(uuid.uuid4())
-
-        data = """
-              | id | mytext   |
-          *500| 1  | [random] |
-          *500| 2  | [random] |
-            """
-
-        create_rows(data, cursor, 'paging_test', cl=CL.ALL, format_funcs={'id': int, 'mytext': random_txt})
-
-        future = cursor.execute_async(
-            SimpleStatement("select * from paging_test where id in (1,2)", fetch_size=500, consistency_level=CL.ALL)
-        )
-
-        pf = PageFetcher(future)
-        # no need to request page here, because the first page is automatically retrieved
-
-        # delete the results that would have shown up on page 2
-        cursor.execute(SimpleStatement("delete from paging_test where id = 2", consistency_level=CL.ALL))
-
-        pf.request_all()
-        self.assertEqual(pf.pagecount(), 1)
-        self.assertEqual(pf.num_results_all(), [500])
-
     def test_row_TTL_expiry_during_paging(self):
         cursor = self.prepare()
         self.create_ks(cursor, 'test_paging_size', 2)
@@ -1007,3 +977,325 @@ class TestPagingQueryIsolation(BasePagingTester, PageAssertionMixin):
         self.assertEqualIgnoreOrder(flatten_into_set(page_fetchers[8].all_data()), flatten_into_set(expected_data[15000:20000]))
         self.assertEqualIgnoreOrder(flatten_into_set(page_fetchers[9].all_data()), flatten_into_set(expected_data[20000:25000]))
         self.assertEqualIgnoreOrder(flatten_into_set(page_fetchers[10].all_data()), flatten_into_set(expected_data[:50000]))
+
+
+@since('2.0')
+class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
+    """
+    Tests concerned with paging when deletions occur.
+    """
+
+    def setup_data(self):
+
+        self.create_ks(self.cursor, 'test_paging_size', 2)
+        self.cursor.execute(("CREATE TABLE paging_test ( "
+                        "id int, mytext text, col1 int, col2 int, col3 int, "
+                        "PRIMARY KEY (id, mytext) )"))
+
+        def random_txt(text):
+            return unicode(uuid.uuid4())
+
+        data = """
+             | id | mytext   | col1 | col2 | col3 |
+          *40| 1  | [random] | 1    | 1    | 1    |
+          *40| 2  | [random] | 2    | 2    | 2    |
+          *40| 3  | [random] | 4    | 3    | 3    |
+          *40| 4  | [random] | 4    | 4    | 4    |
+          *40| 5  | [random] | 5    | 5    | 5    |
+        """
+
+        create_rows(data, self.cursor, 'paging_test', cl=CL.ALL,
+                    format_funcs={
+                        'id': int,
+                        'mytext': random_txt,
+                        'col1': int,
+                        'col2': int,
+                        'col3': int
+                    })
+
+        pf = self.get_page_fetcher()
+        pf.request_all()
+        return pf.all_data()
+
+    def get_page_fetcher(self):
+        future = self.cursor.execute_async(
+            SimpleStatement("select * from paging_test where id in (1,2,3,4,5)", fetch_size=25,
+                            consistency_level=CL.ALL)
+        )
+
+        return PageFetcher(future)
+
+    def check_all_paging_results(self, expected_data, pagecount, num_page_results):
+        """Check all paging results: pagecount, num_results per page, data."""
+
+        page_size = 25
+        expected_pages_data = [expected_data[x:x+page_size] for x in \
+                               range(0, len(expected_data), page_size)]
+
+        pf = self.get_page_fetcher()
+        pf.request_all()
+        self.assertEqual(pf.pagecount(), pagecount)
+        self.assertEqual(pf.num_results_all(), num_page_results)
+
+        for i in range(pf.pagecount()):
+            page_data = pf.page_data(i+1)
+            self.assertEquals(page_data, expected_pages_data[i])
+
+    def test_single_partition_deletions(self):
+        """Test single partition deletions """
+        self.cursor = self.prepare()
+        expected_data = self.setup_data()
+
+        # Delete the a single partition at the beginning
+        self.cursor.execute(
+            SimpleStatement("delete from paging_test where id = 1",
+                            consistency_level=CL.ALL)
+        )
+        expected_data = [row for row in expected_data if row['id'] != 1]
+        self.check_all_paging_results(expected_data, 7,
+                                      [25, 25, 25, 25, 25, 25, 10])
+
+        # Delete the a single partition in the middle
+        self.cursor.execute(
+            SimpleStatement("delete from paging_test where id = 3",
+                            consistency_level=CL.ALL)
+        )
+        expected_data = [row for row in expected_data if row['id'] != 3]
+        self.check_all_paging_results(expected_data, 5, [25, 25, 25, 25, 20])
+
+        # Delete the a single partition at the end
+        self.cursor.execute(
+            SimpleStatement("delete from paging_test where id = 5",
+                            consistency_level=CL.ALL)
+        )
+        expected_data = [row for row in expected_data if row['id'] != 5]
+        self.check_all_paging_results(expected_data, 4, [25, 25, 25, 5])
+
+        # Keep only the partition '2'
+        self.cursor.execute(
+            SimpleStatement("delete from paging_test where id = 4",
+                            consistency_level=CL.ALL)
+        )
+        expected_data = [row for row in expected_data if row['id'] != 4]
+        self.check_all_paging_results(expected_data, 2, [25, 15])
+
+    def test_multiple_partition_deletions(self):
+        """Test multiple partition deletions """
+        self.cursor = self.prepare()
+        expected_data = self.setup_data()
+
+        # Keep only the partition '1'
+        self.cursor.execute(
+            SimpleStatement("delete from paging_test where id in (2,3,4,5)",
+                            consistency_level=CL.ALL)
+        )
+        expected_data = [row for row in expected_data if row['id'] == 1]
+        self.check_all_paging_results(expected_data, 2, [25, 15])
+
+    def test_single_row_deletions(self):
+        """Test single row deletions """
+        self.cursor = self.prepare()
+        expected_data = self.setup_data()
+
+        # Delete the first row
+        row = expected_data.pop(0)
+        self.cursor.execute(SimpleStatement(
+            ("delete from paging_test where "
+             "id = {} and mytext = '{}'".format(row['id'], row['mytext'])),
+            consistency_level=CL.ALL)
+        )
+        self.check_all_paging_results(expected_data, 8,
+                                      [25, 25, 25, 25, 25, 25, 25, 24])
+
+        # Delete a row in the middle
+        row = expected_data.pop(100)
+        self.cursor.execute(SimpleStatement(
+            ("delete from paging_test where "
+             "id = {} and mytext = '{}'".format(row['id'], row['mytext'])),
+            consistency_level=CL.ALL)
+        )
+        self.check_all_paging_results(expected_data, 8,
+                                      [25, 25, 25, 25, 25, 25, 25, 23])
+
+        # Delete the last row
+        row = expected_data.pop()
+        self.cursor.execute(SimpleStatement(
+            ("delete from paging_test where "
+             "id = {} and mytext = '{}'".format(row['id'], row['mytext'])),
+            consistency_level=CL.ALL)
+        )
+        self.check_all_paging_results(expected_data, 8,
+                                      [25, 25, 25, 25, 25, 25, 25, 22])
+
+        # Delete all the last page row by row
+        rows = expected_data[-22:]
+        for row in rows:
+            self.cursor.execute(SimpleStatement(
+                ("delete from paging_test where "
+                 "id = {} and mytext = '{}'".format(row['id'], row['mytext'])),
+                consistency_level=CL.ALL)
+            )
+        self.check_all_paging_results(expected_data, 7,
+                                      [25, 25, 25, 25, 25, 25, 25])
+    @require('6237')
+    def test_multiple_row_deletions(self):
+        """Test multiple row deletions.
+           This test should be finished when CASSANDRA-6237 is done.
+        """
+        self.cursor = self.prepare()
+        expected_data = self.setup_data()
+
+        # Delete a bunch of rows
+        rows = expected_data[100:105]
+        expected_data = expected_data[0:100] + expected_data[105:]
+        in_condition = ','.join("'{}'".format(r['mytext']) for r in rows)
+
+        self.cursor.execute(SimpleStatement(
+            ("delete from paging_test where "
+             "id = {} and mytext in ({})".format(3, in_condition)),
+            consistency_level=CL.ALL)
+        )
+        self.check_all_paging_results(expected_data, 8,
+                                      [25, 25, 25, 25, 25, 25, 25, 20])
+
+    def test_single_cell_deletions(self):
+        """Test single cell deletions """
+        self.cursor = self.prepare()
+        expected_data = self.setup_data()
+
+        # Delete the first cell of some rows of the last partition
+        pkeys = [r['mytext'] for r in expected_data if r['id'] == 5][:20]
+        for r in expected_data:
+            if r['id'] == 5 and r['mytext'] in pkeys:
+                r['col1'] = None
+
+        for pkey in pkeys:
+            self.cursor.execute(SimpleStatement(
+                ("delete col1 from paging_test where id = 5 "
+                 "and mytext = '{}'".format(pkey)),
+                consistency_level=CL.ALL)
+                            )
+        self.check_all_paging_results(expected_data, 8,
+                                      [25, 25, 25, 25, 25, 25, 25, 25])
+
+        # Delete the mid cell of some rows of the first partition
+        pkeys = [r['mytext'] for r in expected_data if r['id'] == 1][20:]
+        for r in expected_data:
+            if r['id'] == 1 and r['mytext'] in pkeys:
+                r['col2'] = None
+
+        for pkey in pkeys:
+            self.cursor.execute(SimpleStatement(
+                ("delete col2 from paging_test where id = 1 "
+                 "and mytext = '{}'".format(pkey)),
+                consistency_level=CL.ALL)
+                            )
+        self.check_all_paging_results(expected_data, 8,
+                                      [25, 25, 25, 25, 25, 25, 25, 25])
+
+        # Delete the last cell of all rows of the mid partition
+        pkeys = [r['mytext'] for r in expected_data if r['id'] == 3]
+        for r in expected_data:
+            if r['id'] == 3 and r['mytext'] in pkeys:
+                r['col3'] = None
+
+        for pkey in pkeys:
+            self.cursor.execute(SimpleStatement(
+                ("delete col3 from paging_test where id = 3 "
+                 "and mytext = '{}'".format(pkey)),
+                consistency_level=CL.ALL)
+                            )
+        self.check_all_paging_results(expected_data, 8,
+                                      [25, 25, 25, 25, 25, 25, 25, 25])
+
+    def test_multiple_cell_deletions(self):
+        """Test multiple cell deletions """
+        self.cursor = self.prepare()
+        expected_data = self.setup_data()
+
+        # Delete the multiple cells of some rows of the second partition
+        pkeys = [r['mytext'] for r in expected_data if r['id'] == 2][20:]
+        for r in expected_data:
+            if r['id'] == 2 and r['mytext'] in pkeys:
+                r['col1'] = None
+                r['col2'] = None
+
+        for pkey in pkeys:
+            self.cursor.execute(SimpleStatement(
+                ("delete col1, col2 from paging_test where id = 2 "
+                 "and mytext = '{}'".format(pkey)),
+                consistency_level=CL.ALL)
+                            )
+        self.check_all_paging_results(expected_data, 8,
+                                      [25, 25, 25, 25, 25, 25, 25, 25])
+
+        # Delete the multiple cells of all rows of the fourth partition
+        pkeys = [r['mytext'] for r in expected_data if r['id'] == 4]
+        for r in expected_data:
+            if r['id'] == 4 and r['mytext'] in pkeys:
+                r['col2'] = None
+                r['col3'] = None
+
+        for pkey in pkeys:
+            self.cursor.execute(SimpleStatement(
+                ("delete col2, col3 from paging_test where id = 4 "
+                 "and mytext = '{}'".format(pkey)),
+                consistency_level=CL.ALL)
+                            )
+        self.check_all_paging_results(expected_data, 8,
+                                      [25, 25, 25, 25, 25, 25, 25, 25])
+
+    def test_ttl_deletions(self):
+        """Test ttl deletions. Paging over a query that has only tombstones """
+        self.cursor = self.prepare()
+        data = self.setup_data()
+
+        # Set TTL to all row
+        for row in data:
+            s = ("insert into paging_test (id, mytext, col1, col2, col3) "
+                 "values ({}, '{}', {}, {}, {}) using ttl 3;").format(
+                     row['id'], row['mytext'], row['col1'],
+                     row['col2'], row['col3'])
+            self.cursor.execute(
+                SimpleStatement(s, consistency_level=CL.ALL)
+            )
+        time.sleep(5)
+        self.check_all_paging_results([], 0, [])
+
+    def test_failure_threshold_deletions(self):
+        """Test that paging throws a failure in case of tombstone threshold """
+        self.allow_log_errors = True
+        self.cluster.set_configuration_options(
+            values={ 'tombstone_failure_threshold' : 300 }
+        )
+        self.cursor = self.prepare()
+        node1, node2, node3 = self.cluster.nodelist()
+
+        data = self.setup_data()
+
+        # Add more data
+        values = map(lambda i: uuid.uuid4(), range(300))
+        for value in values:
+            self.cursor.execute(SimpleStatement(
+                "insert into paging_test (id, mytext) values (1, '{}') ".format(
+                    value
+                ),
+                consistency_level=CL.ALL
+            ))
+
+
+        self.cursor.execute(SimpleStatement(
+            "delete from paging_test where id in (1,2,3,4,5);",
+            consistency_level=CL.ALL
+        ))
+
+        self.assertRaises(
+            RuntimeError, self.check_all_paging_results, [], 0, []
+        )
+        failure_msg = ("Scanned over.* tombstones in test_paging_size."
+                       "paging_test.* query aborted")
+        failure = (node1.grep_log(failure_msg) or
+                   node2.grep_log(failure_msg) or
+                   node3.grep_log(failure_msg))
+
+        self.assertTrue(failure, "Cannot find tombstone failure threshold error in log")
