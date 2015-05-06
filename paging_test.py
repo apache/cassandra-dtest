@@ -4,7 +4,6 @@ import uuid
 from cassandra import ConsistencyLevel as CL
 from cassandra import InvalidRequest
 from cassandra.query import SimpleStatement, dict_factory
-from cassandra.cluster import NoHostAvailable
 from dtest import Tester, run_scenarios
 from tools import since, require
 
@@ -1229,14 +1228,15 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
         """Test that paging throws a failure in case of tombstone threshold """
         self.allow_log_errors = True
         self.cluster.set_configuration_options(
-            values={ 'tombstone_failure_threshold' : 350 }
+            values={ 'tombstone_failure_threshold' : 300 }
         )
         self.cursor = self.prepare()
+        node1, node2, node3 = self.cluster.nodelist()
 
         data = self.setup_data()
 
         # Add more data
-        values = map(lambda i: uuid.uuid4(), range(350))
+        values = map(lambda i: uuid.uuid4(), range(300))
         for value in values:
             self.cursor.execute(SimpleStatement(
                 "insert into paging_test (id, mytext) values (1, '{}') ".format(
@@ -1252,8 +1252,12 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
         ))
 
         self.assertRaises(
-            NoHostAvailable, self.check_all_paging_results, [], 0, []
+            RuntimeError, self.check_all_paging_results, [], 0, []
         )
-        failure = self.node1.grep_log(("Scanned over 500 tombstones in "
-                                       "test_paging_size.paging_test; query aborted"))
+        failure_msg = ("Scanned over.* tombstones in test_paging_size."
+                       "paging_test.* query aborted")
+        failure = (node1.grep_log(failure_msg) or
+                   node2.grep_log(failure_msg) or
+                   node3.grep_log(failure_msg))
+
         self.assertTrue(failure, "Cannot find tombstone failure threshold error in log")
