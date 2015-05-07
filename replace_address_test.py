@@ -36,7 +36,7 @@ class TestReplaceAddress(Tester):
         debug("Starting cluster with 3 nodes.")
         cluster = self.cluster
         cluster.populate(3).start()
-        [node1,node2, node3] = cluster.nodelist()
+        [node1, node2, node3] = cluster.nodelist()
 
         if DISABLE_VNODES:
             numNodes = 1
@@ -72,7 +72,7 @@ class TestReplaceAddress(Tester):
 
         #replace node 3 with node 4
         debug("Starting node 4 to replace node 3")
-        node4 = Node('node4', cluster, True, ('127.0.0.4', 9160), ('127.0.0.4', 7000), '7400', '0', None, ('127.0.0.4',9042))
+        node4 = Node('node4', cluster, True, ('127.0.0.4', 9160), ('127.0.0.4', 7000), '7400', '0', None, ('127.0.0.4', 9042))
         cluster.add(node4, False)
         node4.start(replace_address='127.0.0.3')
 
@@ -99,11 +99,11 @@ class TestReplaceAddress(Tester):
         debug("Starting cluster with 3 nodes.")
         cluster = self.cluster
         cluster.populate(3).start()
-        [node1,node2, node3] = cluster.nodelist()
+        [node1, node2, node3] = cluster.nodelist()
 
         #replace active node 3 with node 4
         debug("Starting node 4 to replace active node 3")
-        node4 = Node('node4', cluster, True, ('127.0.0.4', 9160), ('127.0.0.4', 7000), '7400', '0', None, ('127.0.0.4',9042))
+        node4 = Node('node4', cluster, True, ('127.0.0.4', 9160), ('127.0.0.4', 7000), '7400', '0', None, ('127.0.0.4', 9042))
         cluster.add(node4, False)
 
         with self.assertRaises(NodeError):
@@ -119,10 +119,10 @@ class TestReplaceAddress(Tester):
         debug("Starting cluster with 3 nodes.")
         cluster = self.cluster
         cluster.populate(3).start()
-        [node1,node2, node3] = cluster.nodelist()
+        [node1, node2, node3] = cluster.nodelist()
 
         debug('Start node 4 and replace an address with no node')
-        node4 = Node('node4', cluster, True, ('127.0.0.4', 9160), ('127.0.0.4', 7000), '7400', '0', None, ('127.0.0.4',9042))
+        node4 = Node('node4', cluster, True, ('127.0.0.4', 9160), ('127.0.0.4', 7000), '7400', '0', None, ('127.0.0.4', 9042))
         cluster.add(node4, False)
 
         #try to replace an unassigned ip address
@@ -136,12 +136,12 @@ class TestReplaceAddress(Tester):
         debug("Starting cluster with 3 nodes.")
         cluster = self.cluster
         cluster.populate(3).start()
-        [node1,node2, node3] = cluster.nodelist()
+        [node1, node2, node3] = cluster.nodelist()
 
         if DISABLE_VNODES:
             numNodes = 1
         else:
-            #a little hacky but grep_log returns the whole line...
+            # a little hacky but grep_log returns the whole line...
             numNodes = int(node3.get_conf_option('num_tokens'))
 
         debug(numNodes)
@@ -157,7 +157,7 @@ class TestReplaceAddress(Tester):
         query = SimpleStatement('select * from %s LIMIT 1' % stress_table, consistency_level=ConsistencyLevel.THREE)
         initialData = cursor.execute(query)
 
-        #stop node, query should not work with consistency 3
+        # stop node, query should not work with consistency 3
         debug("Stopping node 3.")
         node3.stop(gently=False)
 
@@ -168,13 +168,13 @@ class TestReplaceAddress(Tester):
             except (Unavailable, ReadTimeout):
                 raise NodeUnavailable("Node could not be queried.")
 
-        #replace node 3 with node 4
+        # replace node 3 with node 4
         debug("Starting node 4 to replace node 3")
-        node4 = Node('node4', cluster, True, ('127.0.0.4', 9160), ('127.0.0.4', 7000), '7400', '0', None, ('127.0.0.4',9042))
+        node4 = Node('node4', cluster, True, ('127.0.0.4', 9160), ('127.0.0.4', 7000), '7400', '0', None, ('127.0.0.4', 9042))
         cluster.add(node4, False)
         node4.start(jvm_args=["-Dcassandra.replace_address_first_boot=127.0.0.3"])
 
-        #query should work again
+        # query should work again
         debug("Verifying querying works again.")
         finalData = cursor.execute(query)
         self.assertListEqual(initialData, finalData)
@@ -184,23 +184,22 @@ class TestReplaceAddress(Tester):
         debug(movedTokensList[0])
         self.assertEqual(len(movedTokensList), numNodes)
 
-        #check that restarting node 3 doesn't work
+        # check that restarting node 3 doesn't work
         debug("Try to restart node 3 (should fail)")
         node3.start()
         checkCollision = node1.grep_log("between /127.0.0.3 and /127.0.0.4; /127.0.0.4 is the new owner")
         debug(checkCollision)
         self.assertEqual(len(checkCollision), 1)
 
-        #restart node4 (if error's might have to change num_tokens)
+        # restart node4 (if error's might have to change num_tokens)
         node4.stop(gently=False)
-        #node4.set_configuration_options(values={'num_tokens': 1})
         node4.start()
 
         debug("Verifying querying works again.")
         finalData = cursor.execute(query)
         self.assertListEqual(initialData, finalData)
 
-        #we redo this check because restarting node should not result in tokens being moved again, ie number should be same
+        # we redo this check because restarting node should not result in tokens being moved again, ie number should be same
         debug("Verifying tokens migrated sucessfully")
         movedTokensList = node4.grep_log("Token .* changing ownership from /127.0.0.3 to /127.0.0.4")
         debug(movedTokensList[0])
@@ -212,7 +211,7 @@ class TestReplaceAddress(Tester):
 
         cluster = self.cluster
         cluster.populate(3).start()
-        [node1,node2, node3] = cluster.nodelist()
+        [node1, node2, node3] = cluster.nodelist()
 
         node1.stress(['write', 'n=100000', '-schema', 'replication(factor=3)'])
 
@@ -228,12 +227,12 @@ class TestReplaceAddress(Tester):
         t.start()
         # replace node 3 with node 4
         debug("Starting node 4 to replace node 3")
-        node4 = Node('node4', cluster, True, ('127.0.0.4', 9160), ('127.0.0.4', 7000), '7400', '0', None, ('127.0.0.4',9042))
+        node4 = Node('node4', cluster, True, ('127.0.0.4', 9160), ('127.0.0.4', 7000), '7400', '0', None, ('127.0.0.4', 9042))
         cluster.add(node4, False)
         try:
             node4.start(jvm_args=["-Dcassandra.replace_address_first_boot=127.0.0.3"])
         except NodeError:
-            pass # node doesn't start as expected
+            pass  # node doesn't start as expected
         t.join()
 
         # bring back node1 and invoke nodetool bootstrap to resume bootstrapping
@@ -261,7 +260,7 @@ class TestReplaceAddress(Tester):
 
         cluster = self.cluster
         cluster.populate(3).start()
-        [node1,node2, node3] = cluster.nodelist()
+        [node1, node2, node3] = cluster.nodelist()
 
         node1.stress(['write', 'n=100000', '-schema', 'replication(factor=3)'])
 
@@ -277,12 +276,12 @@ class TestReplaceAddress(Tester):
         t.start()
         # replace node 3 with node 4
         debug("Starting node 4 to replace node 3")
-        node4 = Node('node4', cluster, True, ('127.0.0.4', 9160), ('127.0.0.4', 7000), '7400', '0', None, ('127.0.0.4',9042))
+        node4 = Node('node4', cluster, True, ('127.0.0.4', 9160), ('127.0.0.4', 7000), '7400', '0', None, ('127.0.0.4', 9042))
         cluster.add(node4, False)
         try:
             node4.start(jvm_args=["-Dcassandra.replace_address_first_boot=127.0.0.3"])
         except NodeError:
-            pass # node doesn't start as expected
+            pass  # node doesn't start as expected
         t.join()
         node1.start()
 
@@ -308,4 +307,3 @@ class TestReplaceAddress(Tester):
         debug("Verifying querying works again.")
         finalData = cursor.execute(query)
         self.assertListEqual(initialData, finalData)
-
