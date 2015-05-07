@@ -47,12 +47,10 @@ class SnapshotTester(Tester):
 
     def restore_snapshot(self, snapshot_dir, node, ks, cf):
         debug("Restoring snapshot....")
-        node_dir = node.get_path()
         snapshot_dir = os.path.join(snapshot_dir, ks, cf)
         ip = node.address()
 
-        executable = '%s/bin/sstableloader' % (node_dir,)
-        args = [executable, '-d', ip, snapshot_dir]
+        args = [node.get_tool('sstableloader'), '-d', ip, snapshot_dir]
         p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         stdout, stderr = p.communicate()
         exit_status = p.wait()
