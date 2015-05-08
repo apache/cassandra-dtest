@@ -216,3 +216,14 @@ class InterruptBootstrap(Thread):
     def run(self):
         self.node.watch_log_for("Prepare completed")
         self.node.stop(gently=False)
+
+class InterruptCompaction(Thread):
+    def __init__(self, node, tablename):
+        Thread.__init__(self)
+        self.node = node
+        self.tablename = tablename
+        self.mark = node.mark_log()
+
+    def run(self):
+        self.node.watch_log_for("Compacting(.*)%s"%(self.tablename,), from_mark=self.mark)
+        self.node.stop(gently=False)
