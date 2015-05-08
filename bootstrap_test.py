@@ -81,13 +81,16 @@ class TestBootstrap(Tester):
         else:
             node1.stress(['write', 'n=10000', '-rate', 'threads=8'])
 
+        session = self.patient_cql_connection(node1)
+        stress_table = 'keyspace1.standard1' if self.cluster.version() >= '2.1' else '"Keyspace1"."Standard1"'
+        original_rows = list(session.execute("SELECT * FROM %s" % (stress_table,)))
+
         node4 = new_node(cluster)
         node4.start(wait_for_binary_proto=True)
 
-        session = self.patient_cql_connection(node4)
-        stress_table = 'keyspace1.standard1' if self.cluster.version() >= '2.1' else '"Keyspace1"."Standard1"'
-        rows = session.execute('select * from %s limit 10' % stress_table)
-        assert len(list(rows)) == 10
+        session = self.patient_exclusive_cql_connection(node4)
+        new_rows = list(session.execute("SELECT * FROM %s" % (stress_table,)))
+        self.assertEquals(original_rows, new_rows)
 
     @since('3.0')
     def resumable_bootstrap_test(self):
