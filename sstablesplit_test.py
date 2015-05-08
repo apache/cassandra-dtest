@@ -55,14 +55,9 @@ class TestSSTableSplit(Tester):
         node.run_sstablesplit( keyspace=keyspace )
         sstables = node.get_sstables(keyspace, '')
         debug("Number of sstables after split: %s" % len(sstables))
-        if version < "2.1":
-            assert len(sstables) == 6, "Incorrect number of sstables after running sstablesplit."
-            assert max( [ getsize( sstable ) for sstable in sstables ] ) <= 52428960, "Max sstables size should be 52428960."
-        else:
-            assert len(sstables) == 7, "Incorrect number of sstables after running sstablesplit."
-            sstables.remove(origsstable[0])  # newer sstablesplit does not remove the original sstable after split
-            assert max( [ getsize( sstable ) for sstable in sstables ] ) <= 52428980, "Max sstables size should be 52428980."
-        node.start()
+        self.assertEqual(6, len(sstables))
+        self.assertTrue(max([getsize(sstable) for sstable in sstables]) <= 52428960)
+        node.start(wait_for_binary_proto=True)
 
     @since("2.1")
     def single_file_split_test(self):
