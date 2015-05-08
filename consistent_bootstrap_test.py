@@ -82,7 +82,7 @@ class TestBootstrapConsistency(Tester):
 
         debug("Boostraping node3")
         node3 = new_node(cluster)
-        node3.start()
+        node3.start(wait_for_binary_proto=True)
 
         n3cursor = self.patient_cql_connection(node3)
         n3cursor.execute("USE ks");
