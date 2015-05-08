@@ -82,7 +82,7 @@ class TestBootstrap(Tester):
             node1.stress(['write', 'n=10000', '-rate', 'threads=8'])
 
         node4 = new_node(cluster)
-        node4.start()
+        node4.start(wait_for_binary_proto=True)
 
         session = self.patient_cql_connection(node4)
         stress_table = 'keyspace1.standard1' if self.cluster.version() >= '2.1' else '"Keyspace1"."Standard1"'
