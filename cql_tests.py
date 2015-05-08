@@ -98,19 +98,19 @@ class TestCQL(Tester):
         """ For large collections, make sure that we are printing warnings """
 
         # We only warn with protocol 2
-        cursor = self.prepare(protocol_version = 2)
+        cursor = self.prepare(protocol_version=2)
 
         cluster = self.cluster
         node1 = cluster.nodelist()[0]
         self.ignore_log_patterns = ["Detected collection for table"]
-        
+
         cursor.execute("""
             CREATE TABLE maps (
                 userid text PRIMARY KEY,
                 properties map<int, text>
             );
         """)
-        
+
         # Insert more than the max, which is 65535
         for i in range(70000):
             cursor.execute("UPDATE maps SET properties[%i] = 'x' WHERE userid = 'user'" % i)
