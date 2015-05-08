@@ -26,7 +26,7 @@ cql_version = "3.0.0"
 @canReuseCluster
 class TestCQL(Tester):
 
-    def prepare(self, ordered=False, create_keyspace=True, use_cache=False, nodes=1, rf=1):
+    def prepare(self, ordered=False, create_keyspace=True, use_cache=False, nodes=1, rf=1, protocol_version=None):
         cluster = self.cluster
 
         if (ordered):
@@ -40,7 +40,7 @@ class TestCQL(Tester):
         node1 = cluster.nodelist()[0]
         time.sleep(0.2)
 
-        session = self.patient_cql_connection(node1, version=cql_version)
+        session = self.patient_cql_connection(node1, version=cql_version, protocol_version=protocol_version)
         if create_keyspace:
             if self._preserve_cluster:
                 session.execute("DROP KEYSPACE IF EXISTS ks")
@@ -93,6 +93,31 @@ class TestCQL(Tester):
             [UUID('f47ac10b-58cc-4372-a567-0e02b2c3d479'), 37, None, None],
             [UUID('550e8400-e29b-41d4-a716-446655440000'), 36, None, None],
         ], res
+
+    def large_collection_errors(self):
+        """ For large collections, make sure that we are printing warnings """
+
+        # We only warn with protocol 2
+        cursor = self.prepare(protocol_version = 2)
+
+        cluster = self.cluster
+        node1 = cluster.nodelist()[0]
+        self.ignore_log_patterns = ["Detected collection for table"]
+        
+        cursor.execute("""
+            CREATE TABLE maps (
+                userid text PRIMARY KEY,
+                properties map<int, text>
+            );
+        """)
+        
+        # Insert more than the max, which is 65535
+        for i in range(70000):
+            cursor.execute("UPDATE maps SET properties[%i] = 'x' WHERE userid = 'user'" % i)
+
+        # Query for the data and throw exception
+        cursor.execute("SELECT properties FROM maps WHERE userid = 'user'")
+        node1.watch_log_for("Detected collection for table ks.maps with 70000 elements, more than the 65535 limit. Only the first 65535 elements will be returned to the client. Please see http://cassandra.apache.org/doc/cql3/CQL.html#collections for more details.")
 
     def noncomposite_static_cf_test(self):
         """ Test non-composite static CF syntax """
