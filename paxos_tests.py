@@ -43,10 +43,10 @@ class TestPaxos(Tester):
         self.cluster.nodelist()[1].stop()
         assert_unavailable(session.execute, "INSERT INTO test (k, v) VALUES (2, 2) IF NOT EXISTS")
 
-        self.cluster.nodelist()[1].start()
+        self.cluster.nodelist()[1].start(wait_for_binary_proto=True)
         session.execute("INSERT INTO test (k, v) VALUES (3, 3) IF NOT EXISTS")
 
-        self.cluster.nodelist()[2].start()
+        self.cluster.nodelist()[2].start(wait_for_binary_proto=True)
         session.execute("INSERT INTO test (k, v) VALUES (4, 4) IF NOT EXISTS")
 
     @no_vnodes()

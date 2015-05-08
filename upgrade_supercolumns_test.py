@@ -95,7 +95,7 @@ class TestSCUpgrade(Tester):
         time.sleep(.5)
         node1.stop(wait_other_notice=True)
         self.set_node_to_current_version(node1)
-        node1.start(wait_other_notice=True)
+        node1.start(wait_other_notice=True, wait_for_binary_proto=True)
         time.sleep(.5)
 
         # wait for the RPC server to start

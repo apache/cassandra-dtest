@@ -190,7 +190,7 @@ class TestBootstrap(Tester):
 
         # Add a new node
         node3 = new_node(cluster, bootstrap=False)
-        node3.start()
+        node3.start(wait_for_binary_proto=True)
         node3.repair()
         node1.cleanup()
 
