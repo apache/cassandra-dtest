@@ -200,7 +200,7 @@ class TestRepair(Tester):
         time.sleep(2)
 
         # bring up node2 and repair
-        node2.start(wait_for_binary_proto=True)
+        node2.start(wait_for_binary_proto=True, wait_other_notice=True)
         node2.repair(self._repair_options(ks='ks', sequential=sequential))
 
         # check no rows will be returned
