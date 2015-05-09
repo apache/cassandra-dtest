@@ -1,7 +1,6 @@
 *.pyc
 logs
 last_test_dir
-cassandra-attack.jar
 upgrade
 *.iml
 html/
