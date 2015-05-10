@@ -2,7 +2,7 @@ from dtest import Tester, debug, DEFAULT_DIR
 import unittest, time, os, subprocess, shlex, pycassa, glob, sys
 
 JNA_PATH = '/usr/share/java/jna.jar'
-ATTACK_JAR = 'cassandra-attack.jar'
+ATTACK_JAR = 'lib/cassandra-attack.jar'
 
 # Use jna.jar in {CASSANDRA_DIR,DEFAULT_DIR}/lib/, since >=2.1 needs correct version
 try:
