@@ -1,7 +1,11 @@
+import os
 import random
 import time
-
-from dtest import Tester
+import tempfile
+import subprocess
+import tempfile
+import re
+from dtest import Tester, debug
 from tools import new_node, query_c1c2, since, InterruptBootstrap
 from assertions import assert_almost_equal
 from ccmlib.node import NodeError
@@ -199,3 +203,69 @@ class TestBootstrap(Tester):
 
         current_rows = list(session.execute("SELECT * FROM keyspace1.standard1"))
         self.assertEquals(original_rows, current_rows)
+
+    def local_quorum_bootstrap_test(self):
+        """Test that CL local_quorum works while a node is bootstrapping. CASSANDRA-8058"""
+
+        cluster = self.cluster
+        cluster.populate([1, 1])
+        version = cluster.version()
+        cluster.start()
+
+        node1 = cluster.nodes['node1']
+        if version < "2.1":
+            node1.stress(['-n', '2000000', '-t', '50', '-S', '100',
+                          '--replication-strategy', 'NetworkTopologyStrategy',
+                          '--strategy-properties', 'dc1:1,dc2:1'])
+        else:
+            yaml_config = """
+            # Create the keyspace and table
+            keyspace: keyspace1
+            keyspace_definition: |
+              CREATE KEYSPACE keyspace1 WITH replication = {'class': 'NetworkTopologyStrategy', 'dc1': 1, 'dc2': 1};
+            table: users
+            table_definition:
+              CREATE TABLE users (
+                username text,
+                first_name text,
+                last_name text,
+                email text,
+                PRIMARY KEY(username)
+              ) WITH compaction = {'class':'SizeTieredCompactionStrategy'};
+            insert:
+              partitions: fixed(1)
+              batchtype: UNLOGGED
+            queries:
+              read:
+                cql: select * from users where username = ?
+                fields: samerow
+            """
+            stress_config = tempfile.NamedTemporaryFile(mode='w+', delete=False)
+            stress_config.write(yaml_config)
+            stress_config.close()
+            node1.stress(['user', 'profile='+stress_config.name, 'n=2000000',
+                          'ops(insert=1)', '-rate', 'threads=50'])
+
+        node3 = new_node(cluster, data_center='dc2')
+        node3.start(no_wait=True)
+        time.sleep(3)
+
+        with tempfile.TemporaryFile(mode='w+') as tmpfile:
+            if version < "2.1":
+                node1.stress(['-o', 'insert', '-n', '500000', '-t', '5', '-e', 'LOCAL_QUORUM', '-K', '2'],
+                             stdout=tmpfile, stderr=subprocess.STDOUT)
+            else:
+                node1.stress(['user', 'profile='+stress_config.name, 'ops(insert=1)',
+                              'n=500000', 'cl=LOCAL_QUORUM',
+                              '-rate', 'threads=5',
+                              '-errors', 'retries=2'],
+                             stdout=tmpfile, stderr=subprocess.STDOUT)
+                os.unlink(stress_config.name)
+
+            tmpfile.seek(0)
+            output = tmpfile.read()
+
+        debug(output)
+        regex = re.compile("Operation.+error inserting key.+Exception")
+        failure = regex.search(output)
+        self.assertIsNone(failure, "Error during stress while bootstrapping")
