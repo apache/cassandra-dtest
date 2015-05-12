@@ -194,7 +194,7 @@ class TestReplaceAddress(Tester):
 
         # restart node4 (if error's might have to change num_tokens)
         node4.stop(gently=False)
-        node4.start()
+        node4.start(wait_for_binary_proto=True)
 
         debug("Verifying querying works again.")
         finalData = cursor.execute(query)
