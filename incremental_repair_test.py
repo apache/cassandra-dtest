@@ -8,6 +8,7 @@ import os
 from assertions import assert_one, assert_almost_equal
 from nose.plugins.attrib import attr
 
+
 @since('2.1')
 class TestIncRepair(Tester):
 
@@ -22,7 +23,7 @@ class TestIncRepair(Tester):
     def sstable_marking_test(self):
         cluster = self.cluster
         cluster.populate(3).start()
-        [node1,node2,node3] = cluster.nodelist()
+        [node1, node2, node3] = cluster.nodelist()
 
         node3.stop(gently=True)
 
@@ -103,16 +104,16 @@ class TestIncRepair(Tester):
 
         debug("replace node and check data integrity")
         node3.stop(gently=False)
-        node5 = Node('node5', cluster, True, ('127.0.0.5', 9160), ('127.0.0.5', 7000), '7500', '0', None, ('127.0.0.5',9042))
+        node5 = Node('node5', cluster, True, ('127.0.0.5', 9160), ('127.0.0.5', 7000), '7500', '0', None, ('127.0.0.5', 9042))
         cluster.add(node5, False)
-        node5.start(replace_address = '127.0.0.3', wait_other_notice=True)
+        node5.start(replace_address='127.0.0.3', wait_other_notice=True)
 
         assert_one(cursor, "SELECT COUNT(*) FROM ks.cf LIMIT 200", [149])
 
     def sstable_repairedset_test(self):
         cluster = self.cluster
         cluster.populate(2).start()
-        [node1,node2] = cluster.nodelist()
+        [node1, node2] = cluster.nodelist()
         node1.stress(['write', 'n=10000', '-schema', 'replication(factor=2)'])
 
         node1.flush()
@@ -126,9 +127,6 @@ class TestIncRepair(Tester):
         with open('initial.txt', 'w') as f:
             node2.run_sstablemetadata(output_file=f, keyspace='keyspace1')
             node1.run_sstablemetadata(output_file=f, keyspace='keyspace1')
-
-        with open('initial.txt', 'r') as g:
-            initialoutput = g.read()
 
         node1.stop()
         node2.stress(['write', 'n=15000', '-schema', 'replication(factor=2)'])
@@ -174,7 +172,7 @@ class TestIncRepair(Tester):
     def compaction_test(self):
         cluster = self.cluster
         cluster.populate(3).start()
-        [node1,node2,node3] = cluster.nodelist()
+        [node1, node2, node3] = cluster.nodelist()
 
         cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'ks', 3)
@@ -216,7 +214,7 @@ class TestIncRepair(Tester):
             'compaction_throughput_mb_per_sec': 0
         })
         cluster.populate(3).start()
-        [node1,node2,node3] = cluster.nodelist()
+        [node1, node2, node3] = cluster.nodelist()
 
         debug("Inserting data with stress")
         expected_load_size = 4.5  # In GB
@@ -257,8 +255,8 @@ class TestIncRepair(Tester):
         debug("Waiting for load size info to be propagated between nodes")
         time.sleep(45)
 
-        load_size_in_kb = float( sum(map(lambda n: n.data_size(), [node1, node2, node3])) )
-        load_size = load_size_in_kb/1024/1024
+        load_size_in_kb = float(sum(map(lambda n: n.data_size(), [node1, node2, node3])))
+        load_size = load_size_in_kb / 1024 / 1024
         debug("Total Load size: {}GB".format(load_size))
 
         # There is still some overhead, but it's lot better. We tolerate 25%.
