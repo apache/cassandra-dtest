@@ -2,12 +2,13 @@ import time
 import uuid
 
 from cassandra import ConsistencyLevel as CL
-from cassandra import InvalidRequest
+from cassandra import InvalidRequest, ReadTimeout
 from cassandra.query import SimpleStatement, dict_factory
 from dtest import Tester, run_scenarios
 from tools import since, require
 
 from datahelp import create_rows, parse_data_into_dicts, flatten_into_set
+from assertions import assert_invalid
 
 class Page(object):
     data = None
@@ -1274,7 +1275,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
         data = self.setup_data()
 
         # Add more data
-        values = map(lambda i: uuid.uuid4(), range(500))
+        values = map(lambda i: uuid.uuid4(), range(3000))
         for value in values:
             self.cursor.execute(SimpleStatement(
                 "insert into paging_test (id, mytext, col1) values (1, '{}', null) ".format(
@@ -1283,9 +1284,8 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
                 consistency_level=CL.ALL
             ))
 
-        self.assertRaises(
-            RuntimeError, self.check_all_paging_results, [], 0, []
-        )
+        assert_invalid(self.cursor, SimpleStatement("select * from paging_test", fetch_size=1000, consistency_level=CL.ALL), expected=ReadTimeout)
+
         failure_msg = ("Scanned over.* tombstones in test_paging_size."
                        "paging_test.* query aborted")
         failure = (node1.grep_log(failure_msg) or
