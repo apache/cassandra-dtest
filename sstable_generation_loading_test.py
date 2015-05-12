@@ -8,6 +8,7 @@ from ccmlib import common as ccmcommon
 class TestSSTableGenerationAndLoading(Tester):
 
     def __init__(self, *argv, **kwargs):
+        kwargs['cluster_options'] = {'start_rpc': 'true'}
         super(TestSSTableGenerationAndLoading, self).__init__(*argv, **kwargs)
         self.allow_log_errors = True
 

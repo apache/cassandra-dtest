@@ -12,6 +12,7 @@ class NodeUnavailable(Exception):
 class TestReplaceAddress(Tester):
 
     def __init__(self, *args, **kwargs):
+        kwargs['cluster_options'] = {'start_rpc': 'true'}
         # Ignore these log patterns:
         self.ignore_log_patterns = [
             # This one occurs when trying to send the migration to a

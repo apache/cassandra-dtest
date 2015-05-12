@@ -12,6 +12,7 @@ from nose.plugins.attrib import attr
 class TestIncRepair(Tester):
 
     def __init__(self, *args, **kwargs):
+        kwargs['cluster_options'] = {'start_rpc': 'true'}
         # Ignore these log patterns:
         self.ignore_log_patterns = [
             r'Can\'t send migration request: node.*is down',

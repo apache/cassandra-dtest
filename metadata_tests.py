@@ -6,6 +6,10 @@ from dtest import Tester
 
 class TestMetadata(Tester):
 
+    def __init__(self, *args, **kwargs):
+        kwargs['cluster_options'] = {'start_rpc': 'true'}
+        Tester.__init__(self, *args, **kwargs)
+
     def force_compact(self):
         cluster = self.cluster
         (node1, node2) = cluster.nodelist()

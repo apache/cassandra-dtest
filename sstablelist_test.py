@@ -14,6 +14,10 @@ TableName = 'standard1'
 @since('3.0')
 class SSTableListTest(Tester):
 
+    def __init__(self, *args, **kwargs):
+        kwargs['cluster_options'] = {'start_rpc': 'true'}
+        Tester.__init__(self, *args, **kwargs)
+
     def listfiles_oncompaction_test(self):
         """
         Check we can list the sstable files after successfull compaction (no temporary sstable files)

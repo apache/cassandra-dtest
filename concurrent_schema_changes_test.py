@@ -13,6 +13,7 @@ def wait(delay=2):
 class TestConcurrentSchemaChanges(Tester):
 
     def __init__(self, *argv, **kwargs):
+        kwargs['cluster_options'] = {'start_rpc': 'true'}
         super(TestConcurrentSchemaChanges, self).__init__(*argv, **kwargs)
         self.allow_log_errors = True
 

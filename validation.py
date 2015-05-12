@@ -7,6 +7,10 @@ class TestValidation(Tester):
 
     __test__= False
 
+    def __init__(self, *args, **kwargs):
+        kwargs['cluster_options'] = {'start_rpc': 'true'}
+        Tester.__init__(self, *args, **kwargs)
+
     def prepare(self):
         """
         Sets up cluster to test against. Currently 3 CCM Nodes

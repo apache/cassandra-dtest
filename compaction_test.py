@@ -11,6 +11,10 @@ class TestCompaction(Tester):
 
     __test__= False
 
+    def __init__(self, *args, **kwargs):
+        kwargs['cluster_options'] = {'start_rpc': 'true'}
+        Tester.__init__(self, *args, **kwargs)
+
     def compaction_delete_test(self):
         """Test that executing a delete properly tombstones a row.
         Insert data, delete a partition of data and check that the requesite rows are tombstoned
@@ -107,7 +111,7 @@ class TestCompaction(Tester):
             cfs = os.listdir(node1.get_path() + "/data/ks")
             ssdir = os.listdir(node1.get_path() + "/data/ks/" + cfs[0])
             for afile in ssdir:
-                self.assertFalse("Data" in afile)            
+                self.assertFalse("Data" in afile)
 
         except OSError:
             self.fail("Path to sstables not valid.")
@@ -121,7 +125,7 @@ class TestCompaction(Tester):
             self.strategy = 'DateTieredCompactionStrategy'
         elif self.strategy != 'DateTieredCompactionStrategy':
             self.skipTest('Not implemented unless DateTieredCompactionStrategy is used')
-            
+
         cluster = self.cluster
         cluster.populate(1).start()
         [node1] = cluster.nodelist()
