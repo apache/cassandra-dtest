@@ -174,7 +174,7 @@ class BasePagingTester(Tester):
         cluster = self.cluster
         cluster.populate(3).start()
         node1 = cluster.nodelist()[0]
-        cursor = self.cql_connection(node1)
+        cursor = self.patient_cql_connection(node1)
         cursor.row_factory = dict_factory
         return cursor
 
@@ -1266,7 +1266,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
         """Test that paging throws a failure in case of tombstone threshold """
         self.allow_log_errors = True
         self.cluster.set_configuration_options(
-            values={ 'tombstone_failure_threshold' : 300 }
+            values={ 'tombstone_failure_threshold' : 500 }
         )
         self.cursor = self.prepare()
         node1, node2, node3 = self.cluster.nodelist()
@@ -1274,7 +1274,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
         data = self.setup_data()
 
         # Add more data
-        values = map(lambda i: uuid.uuid4(), range(300))
+        values = map(lambda i: uuid.uuid4(), range(500))
         for value in values:
             self.cursor.execute(SimpleStatement(
                 "insert into paging_test (id, mytext) values (1, '{}') ".format(
