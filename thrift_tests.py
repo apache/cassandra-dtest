@@ -28,7 +28,8 @@ class BaseTester(Tester):
     extra_args = []
 
     def __init__(self, *args, **kwargs):
-        kwargs['cluster_options'] = {'partitioner': 'org.apache.cassandra.dht.ByteOrderedPartitioner'}
+        kwargs['cluster_options'] = {'partitioner': 'org.apache.cassandra.dht.ByteOrderedPartitioner',
+                                     'start_rpc': 'true'}
         Tester.__init__(self, *args, **kwargs)
 
     def open_client(self):
