@@ -60,7 +60,10 @@ class TestSSTableSplit(Tester):
         sstables = node.get_sstables(keyspace, '')
         debug("Number of sstables after split: %s" % len(sstables))
         self.assertEqual(6, len(sstables))
-        self.assertTrue(max([getsize(sstable) for sstable in sstables]) <= 52428960)
+        sstable_sizes = map(getsize, sstables)
+        # default split size is 50MB, add a bit extra for overhead
+        expected_max_size = (50 * 1024 * 1024) + 512
+        self.assertLessEqual(max(sstable_sizes), expected_max_size)
         node.start(wait_for_binary_proto=True)
 
     @since("2.1")
