@@ -1277,17 +1277,11 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
         values = map(lambda i: uuid.uuid4(), range(500))
         for value in values:
             self.cursor.execute(SimpleStatement(
-                "insert into paging_test (id, mytext) values (1, '{}') ".format(
+                "insert into paging_test (id, mytext, col1) values (1, '{}', null) ".format(
                     value
                 ),
                 consistency_level=CL.ALL
             ))
-
-
-        self.cursor.execute(SimpleStatement(
-            "delete from paging_test where id in (1,2,3,4,5);",
-            consistency_level=CL.ALL
-        ))
 
         self.assertRaises(
             RuntimeError, self.check_all_paging_results, [], 0, []
