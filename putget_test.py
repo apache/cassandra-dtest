@@ -10,6 +10,10 @@ from thrift.protocol import TBinaryProtocol
 
 class TestPutGet(Tester):
 
+    def __init__(self, *args, **kwargs):
+        kwargs['cluster_options'] = {'start_rpc': 'true'}
+        Tester.__init__(self, *args, **kwargs)
+
     def putget_test(self):
         """ Simple put/get on a single row, hitting multiple sstables """
         self._putget()

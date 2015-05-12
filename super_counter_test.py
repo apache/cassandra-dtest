@@ -13,6 +13,9 @@ class TestSuperCounterClusterRestart(Tester):
     This test is part of this issue:
     https://issues.apache.org/jira/browse/CASSANDRA-3821
     """
+    def __init__(self, *args, **kwargs):
+        kwargs['cluster_options'] = {'start_rpc': 'true'}
+        Tester.__init__(self, *args, **kwargs)
 
     def functional_test(self):
         NUM_SUBCOLS = 100

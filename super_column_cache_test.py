@@ -10,6 +10,10 @@ from dtest import Tester
 
 class TestSCCache(Tester):
 
+    def __init__(self, *args, **kwargs):
+        kwargs['cluster_options'] = {'start_rpc': 'true'}
+        Tester.__init__(self, *args, **kwargs)
+
     def sc_with_row_cache_test(self):
         """ Test for bug reported in #4190 """
         cluster = self.cluster

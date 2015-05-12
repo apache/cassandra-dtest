@@ -26,7 +26,7 @@ cql_version = "3.0.0"
 @canReuseCluster
 class TestCQL(Tester):
 
-    def prepare(self, ordered=False, create_keyspace=True, use_cache=False, nodes=1, rf=1, protocol_version=None):
+    def prepare(self, ordered=False, create_keyspace=True, use_cache=False, nodes=1, rf=1, protocol_version=None, **kwargs):
         cluster = self.cluster
 
         if (ordered):
@@ -34,6 +34,10 @@ class TestCQL(Tester):
 
         if (use_cache):
             cluster.set_configuration_options(values={'row_cache_size_in_mb': 100})
+
+        start_rpc = kwargs.pop('start_rpc', False)
+        if start_rpc:
+            cluster.set_configuration_options(values={'start_rpc':True})
 
         if not cluster.nodelist():
             cluster.populate(nodes).start()
@@ -1737,7 +1741,7 @@ class TestCQL(Tester):
 
     def cql3_insert_thrift_test(self):
         """ Check that we can insert from thrift into a CQL3 table (#4377) """
-        cursor = self.prepare()
+        cursor = self.prepare(start_rpc=True)
 
         cursor.execute("""
             CREATE TABLE test (
@@ -3093,7 +3097,7 @@ class TestCQL(Tester):
 
     @since('2.0')
     def rename_test(self):
-        cursor = self.prepare()
+        cursor = self.prepare(start_rpc=True)
 
         node = self.cluster.nodelist()[0]
         host, port = node.network_interfaces['thrift']

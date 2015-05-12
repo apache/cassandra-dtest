@@ -22,6 +22,7 @@ class TestSCUpgrade(Tester):
     """
 
     def __init__(self, *args, **kwargs):
+        kwargs['cluster_options'] = {'start_rpc': 'true'}
         self.ignore_log_patterns = [
             # This one occurs if we do a non-rolling upgrade, the node
             # it's trying to send the migration to hasn't started yet,
