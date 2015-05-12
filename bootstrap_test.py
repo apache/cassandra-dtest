@@ -1,7 +1,6 @@
 import os
 import random
 import time
-import tempfile
 import subprocess
 import tempfile
 import re
@@ -122,7 +121,7 @@ class TestBootstrap(Tester):
         t.join()
 
         # wait for node3 ready to query
-        node3.watch_log_for("Listening for thrift clients...")
+        node3.watch_log_for("Starting listening for CQL clients")
         mark = node3.mark_log()
         # check if node3 is still in bootstrap mode
         cursor = self.exclusive_cql_connection(node3)
@@ -248,7 +247,7 @@ class TestBootstrap(Tester):
             stress_config = tempfile.NamedTemporaryFile(mode='w+', delete=False)
             stress_config.write(yaml_config)
             stress_config.close()
-            node1.stress(['user', 'profile='+stress_config.name, 'n=2000000',
+            node1.stress(['user', 'profile=' + stress_config.name, 'n=2000000',
                           'ops(insert=1)', '-rate', 'threads=50'])
 
         node3 = new_node(cluster, data_center='dc2')
@@ -260,7 +259,7 @@ class TestBootstrap(Tester):
                 node1.stress(['-o', 'insert', '-n', '500000', '-t', '5', '-e', 'LOCAL_QUORUM', '-K', '2'],
                              stdout=tmpfile, stderr=subprocess.STDOUT)
             else:
-                node1.stress(['user', 'profile='+stress_config.name, 'ops(insert=1)',
+                node1.stress(['user', 'profile=' + stress_config.name, 'ops(insert=1)',
                               'n=500000', 'cl=LOCAL_QUORUM',
                               '-rate', 'threads=5',
                               '-errors', 'retries=2'],
