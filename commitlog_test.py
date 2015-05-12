@@ -147,7 +147,7 @@ class TestCommitLog(Tester):
         }, create_test_keyspace=False)
         self._commitlog_test(segment_size_in_mb, 60, 13, files_error=0.12)
 
-    @since('3.0')
+    @since('2.2')
     def default_compressed_segment_size_test(self):
         """ Test default compressed commitlog_segment_size_in_mb (32MB) """
 
@@ -156,7 +156,7 @@ class TestCommitLog(Tester):
         }, create_test_keyspace=False)
         self._commitlog_test(32, 42, 2, compressed=True, files_error=0.5)
 
-    @since('3.0')
+    @since('2.2')
     def small_compressed_segment_size_test(self):
         """ Test a small compressed commitlog_segment_size_in_mb (5MB) """
         segment_size_in_mb = 5

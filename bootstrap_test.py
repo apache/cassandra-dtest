@@ -97,7 +97,7 @@ class TestBootstrap(Tester):
         new_rows = list(session.execute("SELECT * FROM %s" % (stress_table,)))
         self.assertEquals(original_rows, new_rows)
 
-    @since('3.0')
+    @since('2.2')
     def resumable_bootstrap_test(self):
         """Test resuming bootstrap after data streaming failure"""
 
@@ -138,7 +138,7 @@ class TestBootstrap(Tester):
         rows = cursor.execute("SELECT bootstrapped FROM system.local WHERE key='local'")
         assert rows[0][0] == 'COMPLETED', rows[0][0]
 
-    @since('3.0')
+    @since('2.2')
     def bootstrap_with_reset_bootstrap_state_test(self):
         """Test bootstrap with resetting bootstrap progress"""
 

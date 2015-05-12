@@ -206,7 +206,7 @@ class TestReplaceAddress(Tester):
         debug(movedTokensList[0])
         self.assertEqual(len(movedTokensList), numNodes)
 
-    @since('3.0')
+    @since('2.2')
     def resumable_replace_test(self):
         """Test resumable bootstrap while replacing node"""
 
@@ -255,7 +255,7 @@ class TestReplaceAddress(Tester):
         finalData = cursor.execute(query)
         self.assertListEqual(initialData, finalData)
 
-    @since('3.0')
+    @since('2.2')
     def replace_with_reset_resume_state_test(self):
         """Test replace with resetting bootstrap progress"""
 

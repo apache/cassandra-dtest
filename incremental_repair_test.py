@@ -33,7 +33,7 @@ class TestIncRepair(Tester):
         node3.start(wait_other_notice=True)
         time.sleep(3)
 
-        if cluster.version() >= "3.0":
+        if cluster.version() >= "2.2":
             node3.repair()
         else:
             node3.nodetool("repair -par -inc")
@@ -79,7 +79,7 @@ class TestIncRepair(Tester):
         debug("restarting and repairing node 3")
         node3.start()
 
-        if cluster.version() >= "3.0":
+        if cluster.version() >= "2.2":
             node3.repair()
         else:
             node3.nodetool("repair -par -inc")
@@ -96,7 +96,7 @@ class TestIncRepair(Tester):
         debug("start and repair node 2")
         node2.start()
 
-        if cluster.version() >= "3.0":
+        if cluster.version() >= "2.2":
             node2.repair()
         else:
             node2.nodetool("repair -par -inc")
@@ -135,7 +135,7 @@ class TestIncRepair(Tester):
         node2.flush()
         node1.start()
 
-        if cluster.version() >= "3.0":
+        if cluster.version() >= "2.2":
             node1.repair()
         else:
             node1.nodetool("repair -par -inc")
@@ -188,7 +188,7 @@ class TestIncRepair(Tester):
 
         node3.start()
 
-        if cluster.version() >= "3.0":
+        if cluster.version() >= "2.2":
             node3.repair()
         else:
             node3.nodetool("repair -par -inc")
@@ -227,7 +227,7 @@ class TestIncRepair(Tester):
         node2.flush()
         node3.flush()
 
-        if self.cluster.version() >= '3.0':
+        if self.cluster.version() >= '2.2':
             debug("Repairing node1")
             node1.nodetool("repair")
             debug("Repairing node2")

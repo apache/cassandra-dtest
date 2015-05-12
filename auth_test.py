@@ -111,10 +111,10 @@ class TestAuth(Tester):
         self.prepare()
 
         cursor = self.get_cursor(user='cassandra', password='cassandra')
-        # handle different error messages between versions 2.x & 3.x
+        # handle different error messages between versions pre and post 2.2.0
         assert_invalid(cursor, "DROP USER cassandra", "(Users aren't allowed to DROP themselves|Cannot DROP primary role for current login)")
 
-    # from 3.0 role deletion is granted by DROP_ROLE permissions, not superuser status
+    # from 2.2 role deletion is granted by DROP_ROLE permissions, not superuser status
     @since('1.2', max_version='2.1.x')
     def only_superusers_can_drop_users_test(self):
         self.prepare()
@@ -499,7 +499,7 @@ class TestAuth(Tester):
                            ('bob', '<table ks.cf2>', 'MODIFY')];
 
         # CASSANDRA-7216 automatically grants permissions on a role to its creator
-        if self.cluster.cassandra_version() >= '3.0.0':
+        if self.cluster.cassandra_version() >= '2.2.0':
             all_permissions.extend(data_resource_creator_permissions('cassandra', '<keyspace ks>'))
             all_permissions.extend(data_resource_creator_permissions('cassandra', '<table ks.cf>'))
             all_permissions.extend(data_resource_creator_permissions('cassandra', '<table ks.cf2>'))
@@ -514,13 +514,13 @@ class TestAuth(Tester):
                                      cassandra, "LIST ALL PERMISSIONS OF cathy")
 
         expected_permissions = [('cathy', '<table ks.cf>', 'MODIFY'), ('bob', '<table ks.cf>', 'DROP')]
-        if self.cluster.cassandra_version() >= '3.0.0':
+        if self.cluster.cassandra_version() >= '2.2.0':
             expected_permissions.extend(data_resource_creator_permissions('cassandra', '<table ks.cf>'))
         self.assertPermissionsListed(expected_permissions, cassandra, "LIST ALL PERMISSIONS ON ks.cf NORECURSIVE")
 
         expected_permissions = [('cathy', '<table ks.cf2>', 'SELECT')]
         # CASSANDRA-7216 automatically grants permissions on a role to its creator
-        if self.cluster.cassandra_version() >= '3.0.0':
+        if self.cluster.cassandra_version() >= '2.2.0':
             expected_permissions.append(('cassandra', '<table ks.cf2>', 'SELECT'))
             expected_permissions.append(('cassandra', '<keyspace ks>', 'SELECT'))
         self.assertPermissionsListed(expected_permissions, cassandra, "LIST SELECT ON ks.cf2")
