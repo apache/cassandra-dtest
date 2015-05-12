@@ -77,7 +77,7 @@ class TestIncRepair(Tester):
         node2.flush()
 
         debug("restarting and repairing node 3")
-        node3.start()
+        node3.start(wait_for_binary_proto=True)
 
         if cluster.version() >= "3.0":
             node3.repair()
@@ -94,7 +94,7 @@ class TestIncRepair(Tester):
         node3.flush()
 
         debug("start and repair node 2")
-        node2.start()
+        node2.start(wait_for_binary_proto=True)
 
         if cluster.version() >= "3.0":
             node2.repair()
@@ -121,7 +121,7 @@ class TestIncRepair(Tester):
         node2.stop(gently=False)
 
         node2.run_sstablerepairedset(keyspace='keyspace1')
-        node2.start()
+        node2.start(wait_for_binary_proto=True)
 
         with open('initial.txt', 'w') as f:
             node2.run_sstablemetadata(output_file=f, keyspace='keyspace1')
@@ -133,7 +133,7 @@ class TestIncRepair(Tester):
         node1.stop()
         node2.stress(['write', 'n=15000', '-schema', 'replication(factor=2)'])
         node2.flush()
-        node1.start()
+        node1.start(wait_for_binary_proto=True)
 
         if cluster.version() >= "3.0":
             node1.repair()
@@ -186,7 +186,7 @@ class TestIncRepair(Tester):
             cursor.execute("insert into tab(key,val) values(" + str(x) + ",0)")
         node1.flush()
 
-        node3.start()
+        node3.start(wait_for_binary_proto=True)
 
         if cluster.version() >= "3.0":
             node3.repair()
