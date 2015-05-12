@@ -21,12 +21,12 @@ class ThriftHSHATest(Tester):
     def __init__(self, *args, **kwargs):
         Tester.__init__(self, *args, **kwargs)
 
-
     @unittest.skipIf(sys.platform == "win32", 'Could not be executed on Windows')
     def test_closing_connections(self):
         """Test CASSANDRA-6546 - do connections get closed when disabling / renabling thrift service?"""
         cluster = self.cluster
         cluster.set_configuration_options(values={
+            'start_rpc': 'true',
             'rpc_server_type' : 'hsha',
             'rpc_max_threads' : 20
         })
@@ -69,6 +69,7 @@ class ThriftHSHATest(Tester):
         """
         cluster = self.cluster
         cluster.set_configuration_options(values={
+            'start_rpc': 'true',
             'rpc_server_type' : 'hsha',
             'rpc_max_threads' : 20
         })
