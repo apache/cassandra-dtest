@@ -129,7 +129,8 @@ class TokenGenerator(Tester):
         [50, 100, 250],
         [100, 100, 100],
         [250, 250, 250],
-        [1000, 1000, 1000]
+        [1000, 1000, 1000],
+        [2500, 2500, 2500, 2500]
     ]
 
     def _multi_dc_tokens(self, random=None):
