@@ -193,7 +193,7 @@ class TestBootstrap(Tester):
                           '-rate', 'threads=1', '-pop', 'dist=UNIFORM(1..1000)'])
 
         session = self.patient_exclusive_cql_connection(node2)
-        if cluster.version() < "2.0":
+        if cluster.version() < "2.1":
             stress_table = '"Keyspace1"."Standard1"'
         else:
             stress_table = 'keyspace1.standard1'
