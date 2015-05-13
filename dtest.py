@@ -28,6 +28,7 @@ config = ConfigParser.RawConfigParser()
 if len(config.read(os.path.expanduser('~/.cassandra-dtest'))) > 0:
     if config.has_option('main', 'default_dir'):
         DEFAULT_DIR=os.path.expanduser(config.get('main', 'default_dir'))
+CASSANDRA_DIR = os.environ.get('CASSANDRA_DIR', DEFAULT_DIR)
 
 NO_SKIP = os.environ.get('SKIP', '').lower() in ('no', 'false')
 DEBUG = os.environ.get('DEBUG', '').lower() in ('yes', 'true')
@@ -135,7 +136,7 @@ class Tester(TestCase):
             self.test_path = subprocess.Popen(["cygpath", "-m", self.test_path], stdout = subprocess.PIPE, stderr = subprocess.STDOUT).communicate()[0].rstrip()
         debug("cluster ccm directory: "+self.test_path)
         version = os.environ.get('CASSANDRA_VERSION')
-        cdir = os.environ.get('CASSANDRA_DIR', DEFAULT_DIR)
+        cdir = CASSANDRA_DIR
 
         if version:
             cluster = Cluster(self.test_path, name, cassandra_version=version)
@@ -176,7 +177,7 @@ class Tester(TestCase):
 
     def set_node_to_current_version(self, node):
         version = os.environ.get('CASSANDRA_VERSION')
-        cdir = os.environ.get('CASSANDRA_DIR', DEFAULT_DIR)
+        cdir = CASSANDRA_DIR
 
         if version:
             node.set_install_dir(version=version)
@@ -459,7 +460,7 @@ class Tester(TestCase):
         """Setup JaCoCo code coverage support"""
         # use explicit agent and execfile locations
         # or look for a cassandra build if they are not specified
-        cdir = os.environ.get('CASSANDRA_DIR', DEFAULT_DIR)
+        cdir = CASSANDRA_DIR
 
         agent_location = os.environ.get('JACOCO_AGENT_JAR', os.path.join(cdir, 'build/lib/jars/jacocoagent.jar'))
         jacoco_execfile = os.environ.get('JACOCO_EXECFILE', os.path.join(cdir, 'build/jacoco/jacoco.exec'))
