@@ -20,7 +20,7 @@ class TestCompaction(Tester):
         Insert data, delete a partition of data and check that the requesite rows are tombstoned
         """
         cluster = self.cluster
-        cluster.populate(1).start()
+        cluster.populate(1).start(wait_for_binary_proto=True)
         [node1] = cluster.nodelist()
 
         cursor = self.patient_cql_connection(node1)
@@ -57,19 +57,20 @@ class TestCompaction(Tester):
         Insert data and check data size before and after a compaction.
         """
         cluster = self.cluster
-        cluster.populate(1).start()
+        cluster.populate(1).start(wait_for_binary_proto=True)
         [node1] = cluster.nodelist()
         cursor = self.patient_cql_connection(node1)
-        node1.stress(['write', 'n=100000'])
+
+        stress_write(node1)
 
         node1.flush()
 
+        table_name = 'Standard1' if node1.get_cassandra_version() < '2.1' else 'standard1'
         output = node1.nodetool('cfstats', True)[0]
-        initialValue = 0
-        if output.find("standard1") != -1:
-            output = output[output.find("standard1"):]
-            output = output[output.find("Space used (live):"):]
-            initialValue = output[output.find(":")+1:output.find("\n")].strip()
+        if output.find(table_name) != -1:
+            output = output[output.find(table_name):]
+            output = output[output.find("Space used (live)"):]
+            initialValue = int(output[output.find(":")+1:output.find("\n")].strip())
         else:
             debug("datasize not found")
             debug(output)
@@ -77,15 +78,14 @@ class TestCompaction(Tester):
         node1.nodetool('compact')
 
         output = node1.nodetool('cfstats', True)[0]
-        finalValue = 0
-        if output.find("standard1") != -1:
-            output = output[output.find("standard1"):]
-            output = output[output.find("Space used (live):"):]
-            finalValue = output[output.find(":")+1:output.find("\n")].strip()
+        if output.find(table_name) != -1:
+            output = output[output.find(table_name):]
+            output = output[output.find("Space used (live)"):]
+            finalValue = int(output[output.find(":")+1:output.find("\n")].strip())
         else:
             debug("datasize not found")
 
-        self.assertFalse(finalValue >= initialValue)
+        self.assertLess(finalValue, initialValue)
 
     def sstable_deletion_test(self):
         """Test that sstables are deleted properly when able to be.
@@ -93,7 +93,7 @@ class TestCompaction(Tester):
         is deleted upon data deletion.
         """
         cluster = self.cluster
-        cluster.populate(1).start()
+        cluster.populate(1).start(wait_for_binary_proto=True)
         [node1] = cluster.nodelist()
         cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'ks', 1)
@@ -127,7 +127,7 @@ class TestCompaction(Tester):
             self.skipTest('Not implemented unless DateTieredCompactionStrategy is used')
 
         cluster = self.cluster
-        cluster.populate(1).start()
+        cluster.populate(1).start(wait_for_binary_proto=True)
         [node1] = cluster.nodelist()
         cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'ks', 1)
@@ -140,7 +140,7 @@ class TestCompaction(Tester):
         node1.flush()
         time.sleep(40)
         expired_sstables = node1.get_sstables('ks', 'cf')
-        assert len(expired_sstables) == 1
+        self.assertEqual(len(expired_sstables), 1)
         expired_sstable = expired_sstables[0]
         # write a new sstable to make DTCS check for expired sstables:
         for x in range(0, 100):
@@ -154,10 +154,12 @@ class TestCompaction(Tester):
         Set throughput, insert data and ensure compaction performance corresponds.
         """
         cluster = self.cluster
-        cluster.populate(1).start()
+        cluster.populate(1).start(wait_for_binary_proto=True)
         [node1] = cluster.nodelist()
         cursor = self.patient_cql_connection(node1)
-        node1.stress(['write', "n=100000"])
+
+        stress_write(node1)
+
         node1.flush()
 
         threshold = "10"
@@ -182,7 +184,7 @@ class TestCompaction(Tester):
         if self.strategy in strategies:
             strategies.remove(self.strategy)
             cluster = self.cluster
-            cluster.populate(1).start()
+            cluster.populate(1).start(wait_for_binary_proto=True)
             [node1] = cluster.nodelist()
 
 
@@ -211,7 +213,15 @@ class TestCompaction(Tester):
                 node1.flush()
                 cluster.clear()
                 time.sleep(5)
-                cluster.start()
+                cluster.start(wait_for_binary_proto=True)
+
+
+def stress_write(node):
+    if node.get_cassandra_version() < '2.1':
+        node.stress(['--num-keys=100000'])
+    else:
+        node.stress(['write', 'n=100000'])
+
 
 strategies = ['LeveledCompactionStrategy', 'SizeTieredCompactionStrategy', 'DateTieredCompactionStrategy']
 for strategy in strategies:
