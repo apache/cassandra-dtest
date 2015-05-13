@@ -1,10 +1,15 @@
-import os, glob, re, uuid, subprocess
+import glob
+import os
+import re
+import subprocess
+import uuid
 
 from ccmlib import common
 from dtest import Tester, debug
 from tools import since
 
 KEYSPACE = 'ks'
+
 
 class TestScrub(Tester):
 
@@ -28,7 +33,7 @@ class TestScrub(Tester):
     def get_sstable_files(self, path):
         ret = []
         debug('Checking sstables in %s' % (path))
-        for fname in glob.glob(os.path.join(path,'*.db')):
+        for fname in glob.glob(os.path.join(path, '*.db')):
             bname = os.path.basename(fname)
             debug('Found sstable %s' % (bname))
             ret.append(bname)
@@ -36,22 +41,23 @@ class TestScrub(Tester):
 
     """ Return the sstables for a table and the specified indexes of this table """
     def get_sstables(self, table, indexes):
-        ret = self.get_sstable_files(self.get_table_path(table))
-        assert len(ret) > 0
+        sstables = {}
+        table_sstables = self.get_sstable_files(self.get_table_path(table))
+        assert len(table_sstables) > 0
+        sstables[table] = sorted(table_sstables)
 
         for index in indexes:
-            index_ret = self.get_sstable_files(self.get_index_path(table, index))
-            assert len(index_ret) > 0
-            for ir in index_ret:
-                ret.append('%s/%s' % (index, ir))
+            index_sstables = self.get_sstable_files(self.get_index_path(table, index))
+            assert len(index_sstables) > 0
+            sstables[index] = sorted('%s/%s' % (index, sstable) for sstable in index_sstables)
 
-        return sorted(ret)
+        return sstables
 
     """ Launch a nodetool command and check the result is empty (no error) """
     def launch_nodetool_cmd(self, cmd):
         node1 = self.cluster.nodelist()[0]
         response = node1.nodetool(cmd, capture_output=True)[0]
-        assert len(response) == 0 # nodetool does not print anything unless there is an error
+        assert len(response) == 0  # nodetool does not print anything unless there is an error
 
     """ Launch the standalone scrub """
     def launch_standalone_scrub(self, ks, cf):
@@ -60,7 +66,7 @@ class TestScrub(Tester):
         scrub_bin = node1.get_tool('sstablescrub')
         debug(scrub_bin)
 
-        args = [ scrub_bin, ks, cf]
+        args = [scrub_bin, ks, cf]
         p = subprocess.Popen(args, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         response = p.communicate()
         debug(response)
@@ -71,18 +77,27 @@ class TestScrub(Tester):
         for index in indexes:
             self.launch_nodetool_cmd('%s %s %s.%s' % (cmd, KEYSPACE, table, index))
 
-    """ Flush table and indexes via nodetool, return all sstables """
     def flush(self, table, *indexes):
+        """
+        Flushes table and indexes via nodetool, and then returns all sstables
+        in a dict keyed by the table or index name.
+        """
         self.perform_node_tool_cmd('flush', table, indexes)
         return self.get_sstables(table, indexes)
 
-    """ Scrub table and indexes via nodetool, return all sstables """
     def scrub(self, table, *indexes):
+        """
+        Scrubs table and indexes via nodetool, and then return all sstables
+        in a dict keyed by the table or index name.
+        """
         self.perform_node_tool_cmd('scrub', table, indexes)
         return self.get_sstables(table, indexes)
 
-    """ Launch standalone scrub on table and indexes, return all sstables """
     def standalonescrub(self, table, *indexes):
+        """
+        Launches standalone scrub on table and indexes, and then return all sstables
+        in a dict keyed by the table or index name.
+        """
         self.launch_standalone_scrub(KEYSPACE, table)
         for index in indexes:
             self.launch_standalone_scrub(KEYSPACE, '%s.%s' % (table, index))
@@ -97,8 +112,10 @@ class TestScrub(Tester):
         After finding the number of existing sstables, this increases all of the
         generations by that amount.
         """
-        increment_by = len(set(re.match('.*(\d)[^0-9].*', s).group(1) for s in sstables))
-        sstables[:] = [self.increment_generation_by(s, increment_by) for s in sstables]
+        for table_or_index, table_sstables in sstables.items():
+            increment_by = len(set(re.match('.*(\d)[^0-9].*', s).group(1) for s in table_sstables))
+            sstables[table_or_index] = [self.increment_generation_by(s, increment_by) for s in table_sstables]
+
         debug('sstables after increment %s' % (str(sstables)))
 
     def create_users(self, cursor):
@@ -148,18 +165,18 @@ class TestScrub(Tester):
         scrubbed_sstables = self.scrub('users', 'gender_idx', 'state_idx', 'birth_year_idx')
 
         self.increase_sstable_generations(initial_sstables)
-        self.assertListEqual(initial_sstables, scrubbed_sstables)
+        self.assertEqual(initial_sstables, scrubbed_sstables)
 
         users = self.query_users(cursor)
-        self.assertListEqual(initial_users, users)
+        self.assertEqual(initial_users, users)
 
         # Scrub and check sstables and data again
         scrubbed_sstables = self.scrub('users', 'gender_idx', 'state_idx', 'birth_year_idx')
         self.increase_sstable_generations(initial_sstables)
-        self.assertListEqual(initial_sstables, scrubbed_sstables)
+        self.assertEqual(initial_sstables, scrubbed_sstables)
 
         users = self.query_users(cursor)
-        self.assertListEqual(initial_users, users)
+        self.assertEqual(initial_users, users)
 
         # Restart and check data again
         cluster.stop()
@@ -169,7 +186,7 @@ class TestScrub(Tester):
         cursor.execute('USE %s' % (KEYSPACE))
 
         users = self.query_users(cursor)
-        self.assertListEqual(initial_users, users)
+        self.assertEqual(initial_users, users)
 
     @since('3.0')
     def test_standalone_scrub(self):
@@ -190,14 +207,14 @@ class TestScrub(Tester):
 
         scrubbed_sstables = self.standalonescrub('users', 'gender_idx', 'state_idx', 'birth_year_idx')
         self.increase_sstable_generations(initial_sstables)
-        self.assertListEqual(initial_sstables, scrubbed_sstables)
+        self.assertEqual(initial_sstables, scrubbed_sstables)
 
         cluster.start()
         cursor = self.patient_cql_connection(node1)
         cursor.execute('USE %s' % (KEYSPACE))
 
         users = self.query_users(cursor)
-        self.assertListEqual(initial_users, users)
+        self.assertEqual(initial_users, users)
 
     @since('3.0')
     def test_scrub_collections_table(self):
@@ -225,15 +242,15 @@ class TestScrub(Tester):
         scrubbed_sstables = self.scrub('users', 'user_uuids_idx')
 
         self.increase_sstable_generations(initial_sstables)
-        self.assertListEqual(initial_sstables, scrubbed_sstables)
+        self.assertEqual(initial_sstables, scrubbed_sstables)
 
         users = cursor.execute(("SELECT * from users where uuids contains {some_uuid}").format(some_uuid=_id))
-        self.assertListEqual(initial_users, users)
+        self.assertEqual(initial_users, users)
 
         scrubbed_sstables = self.scrub('users', 'user_uuids_idx')
 
         self.increase_sstable_generations(initial_sstables)
-        self.assertListEqual(initial_sstables, scrubbed_sstables)
+        self.assertEqual(initial_sstables, scrubbed_sstables)
 
         users = cursor.execute(("SELECT * from users where uuids contains {some_uuid}").format(some_uuid=_id))
-        self.assertListEqual(initial_users, users)
+        self.assertEqual(initial_users, users)
