@@ -1,4 +1,5 @@
 from dtest import Tester, debug, DEFAULT_DIR
+from tools import require
 import unittest, time, os, subprocess, shlex, pycassa, glob, sys
 
 JNA_PATH = '/usr/share/java/jna.jar'
@@ -21,6 +22,7 @@ class ThriftHSHATest(Tester):
     def __init__(self, *args, **kwargs):
         Tester.__init__(self, *args, **kwargs)
 
+    @require('CASSANDRA-9369')
     @unittest.skipIf(sys.platform == "win32", 'Could not be executed on Windows')
     def test_closing_connections(self):
         """Test CASSANDRA-6546 - do connections get closed when disabling / renabling thrift service?"""
