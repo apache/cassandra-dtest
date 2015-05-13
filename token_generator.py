@@ -5,10 +5,11 @@ import subprocess
 import time
 
 from ccmlib import common
-from dtest import Tester
-from tools import rows_to_list
+from dtest import Tester, debug
+from tools import rows_to_list, require
 from cassandra.util import sortedset
 
+@require('9300')
 class TokenGenerator(Tester):
     """
     Basic tools/bin/token-generator test.
@@ -20,15 +21,17 @@ class TokenGenerator(Tester):
             executable += ".bat"
 
         args = [executable]
+
+        if randomPart is not None:
+            if randomPart:
+                args.append("--random")
+            else:
+                args.append("--murmur3")
+
         for n in nodes:
             args.append(str(n))
 
-        if randomPart:
-            if randomPart:
-                args.insert(1, "--random")
-            else:
-                args.insert(1, "--murmur3")
-
+        debug('Invoking %s' % (args,))
         token_gen_output = subprocess.check_output(args)
         lines = token_gen_output.split("\n")
         dc_tokens = None
