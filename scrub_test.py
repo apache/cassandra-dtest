@@ -148,7 +148,7 @@ class TestScrub(Tester):
         assert len(ret) == 8
         return ret
 
-    @since('3.0')
+    @since('2.2')
     def test_scrub_static_table(self):
         cluster = self.cluster
         cluster.populate(1).start()
@@ -188,7 +188,7 @@ class TestScrub(Tester):
         users = self.query_users(cursor)
         self.assertEqual(initial_users, users)
 
-    @since('3.0')
+    @since('2.2')
     def test_standalone_scrub(self):
         cluster = self.cluster
         cluster.populate(1).start()
@@ -216,7 +216,7 @@ class TestScrub(Tester):
         users = self.query_users(cursor)
         self.assertEqual(initial_users, users)
 
-    @since('3.0')
+    @since('2.2')
     def test_scrub_collections_table(self):
         cluster = self.cluster
         cluster.populate(1).start()

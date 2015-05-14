@@ -427,7 +427,7 @@ class Iface:
 
   def execute_cql_query(self, query, compression):
     """
-    @deprecated Throws InvalidRequestException since 3.0. Please use the CQL3 version instead.
+    @deprecated Throws InvalidRequestException since 2.2. Please use the CQL3 version instead.
 
     Parameters:
      - query
@@ -449,7 +449,7 @@ class Iface:
 
   def prepare_cql_query(self, query, compression):
     """
-    @deprecated Throws InvalidRequestException since 3.0. Please use the CQL3 version instead.
+    @deprecated Throws InvalidRequestException since 2.2. Please use the CQL3 version instead.
 
     Parameters:
      - query
@@ -472,7 +472,7 @@ class Iface:
 
   def execute_prepared_cql_query(self, itemId, values):
     """
-    @deprecated Throws InvalidRequestException since 3.0. Please use the CQL3 version instead.
+    @deprecated Throws InvalidRequestException since 2.2. Please use the CQL3 version instead.
 
     Parameters:
      - itemId
@@ -1965,7 +1965,7 @@ class Client(Iface):
 
   def execute_cql_query(self, query, compression):
     """
-    @deprecated Throws InvalidRequestException since 3.0. Please use the CQL3 version instead.
+    @deprecated Throws InvalidRequestException since 2.2. Please use the CQL3 version instead.
 
     Parameters:
      - query
@@ -2052,7 +2052,7 @@ class Client(Iface):
 
   def prepare_cql_query(self, query, compression):
     """
-    @deprecated Throws InvalidRequestException since 3.0. Please use the CQL3 version instead.
+    @deprecated Throws InvalidRequestException since 2.2. Please use the CQL3 version instead.
 
     Parameters:
      - query
@@ -2127,7 +2127,7 @@ class Client(Iface):
 
   def execute_prepared_cql_query(self, itemId, values):
     """
-    @deprecated Throws InvalidRequestException since 3.0. Please use the CQL3 version instead.
+    @deprecated Throws InvalidRequestException since 2.2. Please use the CQL3 version instead.
 
     Parameters:
      - itemId

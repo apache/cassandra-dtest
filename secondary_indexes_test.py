@@ -561,7 +561,7 @@ class TestSecondaryIndexesOnCollections(Tester):
 
         # attempt to add an index on map values as well (should fail)
         stmt = "CREATE INDEX user_uuids on map_index_search.users (uuids);"
-        if self.cluster.version() >= '3.0':
+        if self.cluster.version() >= '2.2':
             matching =  "Cannot create index on values\(uuids\): an index on keys\(uuids\) already exists and indexing a map on more than one dimension at the same time is not currently supported"
         else:
             matching =  "Cannot create index on uuids values, an index on uuids keys already exists and indexing a map on both keys and values at the same time is not currently supported"
@@ -622,11 +622,11 @@ class TestUpgradeSecondaryIndexes(Tester):
         query = "SELECT * FROM index_upgrade.table1 WHERE v=0"
         assert_one(cursor, query, [0, 0])
 
-        # If we are on 3.0 or any higher version upgrade to 2.1.latest.
-        # Otherwise, we must be on a 3.x, so we should be upgrading to that version.
+        # If we are on 2.2 or any higher version upgrade to 2.1.latest.
+        # Otherwise, we must be on a 2.2.x, so we should be upgrading to that version.
         # This will let us test upgrading from 2.0.12 to each of the 2.1 minor releases.
         CASSANDRA_DIR = os.environ.get('CASSANDRA_DIR')
-        if get_version_from_build(CASSANDRA_DIR) >= '3.0':
+        if get_version_from_build(CASSANDRA_DIR) >= '2.2':
             # Upgrade nodes to 2.1
             # See CASSANDRA-9116
             debug("Upgrading to cassandra-2.1 latest")

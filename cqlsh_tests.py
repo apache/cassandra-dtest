@@ -447,7 +447,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
                 output = output.replace('\r', '')
             self.assertTrue(expected in output, "Output \n {%s} \n doesn't contain expected\n {%s}" % (output, expected))
 
-        if self.cluster.version() >= '3.0':
+        if self.cluster.version() >= '2.2':
             verify_output("LIST USERS", """
  name      | super
 -----------+-------
@@ -466,7 +466,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
 (2 rows)
 """)
 
-        if self.cluster.version() >= '3.0':
+        if self.cluster.version() >= '2.2':
             verify_output("LIST ALL PERMISSIONS OF user1", """
  role  | username | resource      | permission
 -------+----------+---------------+------------

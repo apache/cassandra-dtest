@@ -366,7 +366,7 @@ class TestCQL(Tester):
         # Check that we do limit the output to 1 *and* that we respect query
         # order of keys (even though 48 is after 2)
         res = cursor.execute("SELECT * FROM clicks WHERE userid IN (48, 2) LIMIT 1")
-        if self.cluster.version() >= '3.0':
+        if self.cluster.version() >= '2.2':
             assert rows_to_list(res) == [[2, 'http://foo.com', 42]], res
         else:
             assert rows_to_list(res) == [[48, 'http://foo.com', 42]], res
@@ -703,7 +703,7 @@ class TestCQL(Tester):
             cursor.execute("INSERT INTO test2 (k, c1, c2, v) VALUES (0, 0, %i, %i)" % (x, x))
 
         # Check first we don't allow IN everywhere
-        if self.cluster.version() >= '3.0':
+        if self.cluster.version() >= '2.2':
             assert_none(cursor, "SELECT v FROM test2 WHERE k = 0 AND c1 IN (5, 2, 8) AND c2 = 3")
         else:
             assert_invalid(cursor, "SELECT v FROM test2 WHERE k = 0 AND c1 IN (5, 2, 8) AND c2 = 3")
@@ -1730,7 +1730,7 @@ class TestCQL(Tester):
         assert_invalid(cursor, "SELECT * FROM test WHERE k2 = 3")
 
         v = self.cluster.version()
-        if v < "3.0.0":
+        if v < "2.2.0":
             assert_invalid(cursor, "SELECT * FROM test WHERE k1 IN (0, 1) and k2 = 3")
 
         res = cursor.execute("SELECT * FROM test WHERE token(k1, k2) = token(0, 1)")
@@ -1929,9 +1929,9 @@ class TestCQL(Tester):
         assert_invalid(cursor, "SELECT content FROM blogs WHERE time2 >= 0 AND author='foo'")
 
         # as discussed in CASSANDRA-8148, some queries that should have required ALLOW FILTERING
-        # in 2.0 have been fixed for 3.0
+        # in 2.0 have been fixed for 2.2
         v = self.cluster.version()
-        if v < "3.0.0":
+        if v < "2.2.0":
             cursor.execute("SELECT blog_id, content FROM blogs WHERE time1 > 0 AND author='foo'")
             cursor.execute("SELECT blog_id, content FROM blogs WHERE time1 = 1 AND author='foo'")
             cursor.execute("SELECT blog_id, content FROM blogs WHERE time1 = 1 AND time2 = 0 AND author='foo'")
@@ -2068,7 +2068,7 @@ class TestCQL(Tester):
         cursor.execute("CREATE KEYSPACE ks1 WITH replication={ 'class' : 'SimpleStrategy', 'replication_factor' : 1 }")
         cursor.execute("CREATE KEYSPACE ks2 WITH replication={ 'class' : 'SimpleStrategy', 'replication_factor' : 1 } AND durable_writes=false")
 
-        if self.cluster.version() >= '3.0':
+        if self.cluster.version() >= '2.2':
             assert_all(cursor, "SELECT keyspace_name, durable_writes FROM system.schema_keyspaces",
                     [['system_auth', True], ['ks1', True], ['system_distributed', True], ['system', True], ['system_traces', True], ['ks2', False]])
         else:
@@ -2078,7 +2078,7 @@ class TestCQL(Tester):
         cursor.execute("ALTER KEYSPACE ks1 WITH replication = { 'class' : 'NetworkTopologyStrategy', 'dc1' : 1 } AND durable_writes=False")
         cursor.execute("ALTER KEYSPACE ks2 WITH durable_writes=true")
 
-        if self.cluster.version() >= '3.0':
+        if self.cluster.version() >= '2.2':
             assert_all(cursor, "SELECT keyspace_name, durable_writes, strategy_class FROM system.schema_keyspaces",
                           [[u'system_auth', True, u'org.apache.cassandra.locator.SimpleStrategy'],
                           [u'ks1', False, u'org.apache.cassandra.locator.NetworkTopologyStrategy'],
@@ -2667,11 +2667,11 @@ class TestCQL(Tester):
 
         assert_invalid(cursor, "SELECT * FROM foo WHERE a=1")
 
-    @since('3.0')
+    @since('2.2')
     def multi_in_test(self):
         self.__multi_in(False)
 
-    @since('3.0')
+    @since('2.2')
     def multi_in_compact_test(self):
         self.__multi_in(True)
 
@@ -2748,7 +2748,7 @@ class TestCQL(Tester):
         res = cursor.execute("select zipcode from zipcodes where group='test' AND zipcode IN ('06902','73301','94102') and state IN ('CT','CA') and fips_regions < 0")
         assert len(res) == 0, res
 
-    @since('3.0')
+    @since('2.2')
     def multi_in_compact_non_composite_test(self):
         cursor = self.prepare()
 
@@ -4127,7 +4127,7 @@ class TestCQL(Tester):
         cursor.execute("insert into test(field1, field2, field3) values ('hola', now(), false);")
         cursor.execute("insert into test(field1, field2, field3) values ('hola', now(), false);")
 
-        if self.cluster.version() > '3.0':
+        if self.cluster.version() > '2.2':
             assert_one(cursor, "select count(*) from test where field3 = false limit 1;", [2])
         else:
             assert_one(cursor, "select count(*) from test where field3 = false limit 1;", [1])
@@ -4216,7 +4216,7 @@ class TestCQL(Tester):
         assert_all(cursor, "SELECT v FROM test WHERE k=0 AND c1 = 0 AND c2 IN (2, 0)", [[0], [2]])
         assert_all(cursor, "SELECT v FROM test WHERE k=0 AND c1 = 0 AND c2 IN (2, 0) ORDER BY c1 ASC", [[0], [2]])
         assert_all(cursor, "SELECT v FROM test WHERE k=0 AND c1 = 0 AND c2 IN (2, 0) ORDER BY c1 DESC", [[2], [0]])
-        if self.cluster.version() >= '3.0':
+        if self.cluster.version() >= '2.2':
             assert_all(cursor, "SELECT v FROM test WHERE k IN (1, 0)", [[0], [1], [2], [3], [4], [5]])
         else:
             assert_all(cursor, "SELECT v FROM test WHERE k IN (1, 0)", [[3], [4], [5], [0], [1], [2]])

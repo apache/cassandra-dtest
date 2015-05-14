@@ -5,7 +5,7 @@ from assertions import assert_invalid, assert_one, assert_all, assert_none
 from tools import since, rows_to_list
 
 
-@since('3.0')
+@since('2.2')
 class TestUserFunctions(Tester):
 
     def prepare(self, create_keyspace=True, nodes=1, rf=1):

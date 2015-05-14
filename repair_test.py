@@ -48,16 +48,16 @@ class TestRepair(Tester):
     def _repair_options(self, ks='', cf=[], sequential=True):
         opts = []
         version = self.cluster.version()
-        # since version 3.0, default is parallel, otherwise it's sequential
+        # since version 2.2, default is parallel, otherwise it's sequential
         if sequential:
-            if version >= '3.0':
+            if version >= '2.2':
                 opts += ['-seq']
         else:
-            if version < '3.0':
+            if version < '2.2':
                 opts += ['-par']
 
         # test with full repair
-        if version >= '3.0':
+        if version >= '2.2':
             opts += ['-full']
         if ks:
             opts += [ks]

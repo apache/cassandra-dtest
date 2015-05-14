@@ -359,7 +359,7 @@ class TestUserTypes(Tester):
               SELECT id, name.first from person_likes where id={id};
            """.format(id=_id)
 
-        if self.cluster.version() >= '3.0':
+        if self.cluster.version() >= '2.2':
             assert_invalid(cursor, stmt, 'Partition key parts: name must be restricted as other parts are')
         else:
             assert_invalid(cursor, stmt, 'Partition key part name must be restricted since preceding part is')
