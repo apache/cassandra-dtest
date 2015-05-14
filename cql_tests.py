@@ -20,9 +20,6 @@ from cassandra.protocol import ProtocolException, SyntaxException, Configuration
 from cassandra.query import SimpleStatement
 from cassandra.util import sortedset
 
-cql_version = "3.0.0"
-
-
 @canReuseCluster
 class TestCQL(Tester):
 
@@ -44,7 +41,7 @@ class TestCQL(Tester):
         node1 = cluster.nodelist()[0]
         time.sleep(0.2)
 
-        session = self.patient_cql_connection(node1, version=cql_version, protocol_version=protocol_version)
+        session = self.patient_cql_connection(node1, protocol_version=protocol_version)
         if create_keyspace:
             if self._preserve_cluster:
                 session.execute("DROP KEYSPACE IF EXISTS ks")
@@ -1346,7 +1343,7 @@ class TestCQL(Tester):
         node1 = cluster.nodelist()[0]
         time.sleep(0.2)
 
-        cursor = self.patient_cql_connection(node1, version=cql_version)
+        cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'ks', 1)
 
         cursor.execute("""
@@ -1868,7 +1865,7 @@ class TestCQL(Tester):
         node1 = cluster.nodelist()[0]
         time.sleep(0.2)
 
-        cursor = self.patient_cql_connection(node1, version=cql_version)
+        cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'ks', 1)
 
         cursor.execute("""

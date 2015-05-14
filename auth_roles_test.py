@@ -1136,7 +1136,7 @@ class TestAuthRoles(Tester):
     def assert_unauthenticated(self, message, user, password):
         with self.assertRaises(NoHostAvailable) as response:
             node = self.cluster.nodelist()[0]
-            self.cql_connection(node, version="3.1.7", user=user, password=password)
+            self.cql_connection(node, user=user, password=password)
         host, error = response.exception.errors.popitem()
         pattern = 'Failed to authenticate to %s: code=0100 \[Bad credentials\] message="%s"' % (host, message)
         assert type(error) == AuthenticationFailed, "Expected AuthenticationFailed, got %s" % type(error)
@@ -1161,7 +1161,7 @@ class TestAuthRoles(Tester):
 
     def get_session(self, node_idx=0, user=None, password=None):
         node = self.cluster.nodelist()[node_idx]
-        conn = self.patient_cql_connection(node, version="3.1.7", user=user, password=password)
+        conn = self.patient_cql_connection(node, user=user, password=password)
         return conn
 
     def assert_permissions_listed(self, expected, cursor, query):

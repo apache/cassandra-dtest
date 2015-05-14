@@ -253,13 +253,13 @@ class Tester(TestCase):
             if not is_win():
                 os.symlink(basedir, name)
 
-    def cql_connection(self, node, keyspace=None, version=None, user=None,
+    def cql_connection(self, node, keyspace=None, user=None,
                        password=None, compression=True, protocol_version=None):
 
         return self._create_session(node, keyspace, user, password, compression,
                                     protocol_version)
 
-    def exclusive_cql_connection(self, node, keyspace=None, version=None, user=None,
+    def exclusive_cql_connection(self, node, keyspace=None,
                                  password=None, compression=True, protocol_version=None):
 
         node_ip = self.get_ip_from_node(node)
@@ -298,7 +298,7 @@ class Tester(TestCase):
         self.connections.append(session)
         return session
 
-    def patient_cql_connection(self, node, keyspace=None, version=None,
+    def patient_cql_connection(self, node, keyspace=None,
         user=None, password=None, timeout=10, compression=True,
         protocol_version=None):
         """
@@ -313,7 +313,6 @@ class Tester(TestCase):
             self.cql_connection,
             node,
             keyspace=keyspace,
-            version=version,
             user=user,
             password=password,
             timeout=timeout,
@@ -322,7 +321,7 @@ class Tester(TestCase):
             bypassed_exception=NoHostAvailable
         )
 
-    def patient_exclusive_cql_connection(self, node, keyspace=None, version=None,
+    def patient_exclusive_cql_connection(self, node, keyspace=None,
         user=None, password=None, timeout=10, compression=True,
         protocol_version=None):
         """
@@ -337,7 +336,6 @@ class Tester(TestCase):
             self.exclusive_cql_connection,
             node,
             keyspace=keyspace,
-            version=version,
             user=user,
             password=password,
             timeout=timeout,

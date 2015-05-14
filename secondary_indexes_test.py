@@ -54,7 +54,7 @@ class TestSecondaryIndexes(Tester):
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
 
-        conn = self.patient_cql_connection(node1, version='3.0.0')
+        conn = self.patient_cql_connection(node1)
         cursor = conn
         cursor.max_trace_wait = 120
         cursor.execute("CREATE KEYSPACE ks WITH REPLICATION = {'class': 'SimpleStrategy', 'replication_factor': '1'};")

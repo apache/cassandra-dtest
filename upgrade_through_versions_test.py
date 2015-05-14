@@ -290,7 +290,7 @@ class TestUpgradeThroughVersions(Tester):
                 vers[:curr_index] + ['***' + current_tag + '***'] + vers[curr_index + 1:]))
 
     def _create_schema(self):
-        cursor = self.patient_cql_connection(self.node2, version="3.0.0", protocol_version=1)
+        cursor = self.patient_cql_connection(self.node2, protocol_version=1)
 
         cursor.execute("""CREATE KEYSPACE upgrade WITH replication = {'class':'SimpleStrategy',
             'replication_factor':2};
@@ -329,7 +329,7 @@ class TestUpgradeThroughVersions(Tester):
 
     def _increment_counters(self, opcount=25000):
         debug("performing {opcount} counter increments".format(opcount=opcount))
-        cursor = self.patient_cql_connection(self.node2, version="3.0.0", protocol_version=1)
+        cursor = self.patient_cql_connection(self.node2, protocol_version=1)
         cursor.execute("use upgrade;")
 
         update_counter_query = ("UPDATE countertable SET c = c + 1 WHERE k1='{key1}' and k2={key2}")
@@ -357,7 +357,7 @@ class TestUpgradeThroughVersions(Tester):
 
     def _check_counters(self):
         debug("Checking counter values...")
-        cursor = self.patient_cql_connection(self.node2, version="3.0.0", protocol_version=1)
+        cursor = self.patient_cql_connection(self.node2, protocol_version=1)
         cursor.execute("use upgrade;")
 
         for key1 in self.expected_counts.keys():
@@ -375,10 +375,10 @@ class TestUpgradeThroughVersions(Tester):
                     actual_value = None
 
                 assert actual_value == expected_value, "Counter not at expected value. Got %s, expected %s" % (actual_value, expected_value)
-    
+
     def _check_select_count(self, consistency_level=ConsistencyLevel.ALL):
         debug("Checking SELECT COUNT(*)")
-        cursor = self.patient_cql_connection(self.node2, version="3.0.0", protocol_version=1)
+        cursor = self.patient_cql_connection(self.node2, protocol_version=1)
         cursor.execute("use upgrade;")
 
         expected_num_rows = len(self.row_values)
@@ -471,7 +471,7 @@ class PointToPointUpgradeBase(TestUpgradeThroughVersions):
         self.upgrade_scenario(populate=False, create_schema=False, after_upgrade_call=(self._bootstrap_new_node_multidc,))
 
     def _multidc_schema_create(self):
-        cursor = self.patient_cql_connection(self.cluster.nodelist()[0], version="3.0.0", protocol_version=1)
+        cursor = self.patient_cql_connection(self.cluster.nodelist()[0], protocol_version=1)
 
         if self.cluster.version() >= '1.2':
             # DDL for C* 1.2+

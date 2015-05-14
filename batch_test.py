@@ -6,8 +6,6 @@ from cassandra import ConsistencyLevel, Timeout
 from cassandra.query import SimpleStatement
 from cassandra.policies import RetryPolicy
 
-cql_version="3.0.0"
-
 class TestBatch(Tester):
 
     def counter_batch_accepts_counter_mutations_test(self):
@@ -203,7 +201,7 @@ class TestBatch(Tester):
             self.cluster.populate(nodes).start(wait_other_notice=True)
 
         node1 = self.cluster.nodelist()[0]
-        session = self.patient_cql_connection(node1, version=cql_version)
+        session = self.patient_cql_connection(node1)
         self.create_ks(session, 'ks', nodes)
         session.execute("""
             CREATE TABLE clicks (
