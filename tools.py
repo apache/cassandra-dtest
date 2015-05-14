@@ -3,11 +3,12 @@ from decorator  import decorator
 from distutils.version import LooseVersion
 from threading import Thread
 import re, os, sys, fileinput, time, unittest, functools
+import subprocess
 
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
 
-from dtest import Tester, DISABLE_VNODES
+from dtest import Tester, DISABLE_VNODES, CASSANDRA_DIR, debug
 
 def rows_to_list(rows):
     new_list = [list(row) for row in rows]
@@ -202,11 +203,60 @@ def no_vnodes():
     return unittest.skipIf(not DISABLE_VNODES, 'Test disabled for vnodes')
 
 
-def require(msg):
-    """Skips the decorated class or method with a message about which Jira
-    ticket it requires."""
-    # equivalent to decorating with @unittest.skip
-    return unittest.skip('require ' + str(msg))
+def require(require_name):
+    """Skips the decorated class or method, unless the argument 'require_name'
+    case-insensitively matches the name of the git branch in the directory from
+    which Cassandra is running. For example, the method defined here:
+
+        @require('compaction-fixes')
+        def compaction_test(self):
+            ...
+
+    will run if Cassandra is running from a directory whose current git branch
+    is named 'compaction-fixes'.
+
+    To accomodate current branch-naming conventions, it also will run if the
+    current Cassandra branch is named 'CASSANDRA-{require_name}'. This allows
+    users to run tests like:
+
+        @require(4200)
+        class TestNewFeature(self):
+            ...
+
+    on branches named 'CASSANDRA-4200'.
+
+    If neither 'require_name' nor 'CASSANDRA-{require_name}' is a
+    case-insensitive match for the name of Cassandra's current git branch, the
+    test function or class will be skipped with unittest.skip.
+    """
+    require_name = str(require_name)
+    skipme = True
+    git_branch = ''
+    try:
+        git_branch = cassandra_git_branch().lower()
+    except OSError as e:
+        debug('git branch check failed with error {e}'.format(e=e))
+        return unittest.skip(msg='failed git branch name check in {f}()'.format(f=require.__name__))
+
+    if git_branch:
+        run_test_on_branches = (require_name, 'cassandra-{b}'.format(b=require_name))
+        if git_branch.lower() in run_test_on_branches:
+            skipme = False
+
+    return unittest.skipIf(skipme, 'require ' + str(require_name))
+
+
+def cassandra_git_branch():
+    '''Get the name of the git branch at CASSANDRA_DIR.
+    '''
+    p = subprocess.Popen(['git', 'branch'], cwd=CASSANDRA_DIR,
+                         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    out, err = p.communicate()
+    if err:
+        raise RuntimeError('Git printed error: {err}'.format(err=err))
+    [current_branch_line] = [line for line in out.splitlines() if line.startswith('*')]
+    return current_branch_line[1:].strip()
+
 
 class InterruptBootstrap(Thread):
     def __init__(self, node):
