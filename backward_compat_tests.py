@@ -403,7 +403,7 @@ class TestCQL(Tester):
             # Check that we do limit the output to 1 *and* that we respect query
             # order of keys (even though 48 is after 2)
             res = cursor.execute("SELECT * FROM clicks WHERE userid IN (48, 2) LIMIT 1")
-            if self.get_version() >= '3.0':
+            if self.get_version() >= '2.2':
                 assert rows_to_list(res) == [[2, 'http://foo.com', 42]], res
             else:
                 assert rows_to_list(res) == [[48, 'http://foo.com', 42]], res
@@ -636,7 +636,7 @@ class TestCQL(Tester):
                 cursor.execute("INSERT INTO test2 (k, c1, c2, v) VALUES (0, 0, %i, %i)" % (x, x))
 
             # Check first we don't allow IN everywhere
-            if self.get_version() >= '3.0':
+            if self.get_version() >= '2.2':
                 assert_none(cursor, "SELECT v FROM test2 WHERE k = 0 AND c1 IN (5, 2, 8) AND c2 = 3")
             else:
                 assert_invalid(cursor, "SELECT v FROM test2 WHERE k = 0 AND c1 IN (5, 2, 8) AND c2 = 3")
@@ -1505,7 +1505,7 @@ class TestCQL(Tester):
             assert_invalid(cursor, "SELECT * FROM test WHERE k2 = 3")
 
             v = self.get_version()
-            if v < "3.0.0":
+            if v < "2.2":
                 assert_invalid(cursor, "SELECT * FROM test WHERE k1 IN (0, 1) and k2 = 3")
 
             res = cursor.execute("SELECT * FROM test WHERE token(k1, k2) = token(0, 1)")
@@ -1715,7 +1715,7 @@ class TestCQL(Tester):
             assert_invalid(cursor, "SELECT content FROM blogs WHERE time2 >= 0 AND author='foo'")
 
             # as discussed in CASSANDRA-8148, some queries that should have required ALLOW FILTERING
-            # in 2.0 have been fixed for 3.0
+            # in 2.0 have been fixed for 2.2
             v = self.get_version()
             if v < "2.2":
                 cursor.execute("SELECT blog_id, content FROM blogs WHERE time1 > 0 AND author='foo'")
@@ -2339,11 +2339,11 @@ class TestCQL(Tester):
 
             assert_invalid(cursor, "SELECT * FROM foo WHERE a=1")
 
-    @since('3.0')
+    @since('2.2')
     def multi_in_test(self):
         self.__multi_in(False)
 
-    @since('3.0')
+    @since('2.2')
     def multi_in_compact_test(self):
         self.__multi_in(True)
 
@@ -2423,7 +2423,7 @@ class TestCQL(Tester):
             res = cursor.execute("select zipcode from zipcodes where group='test' AND zipcode IN ('06902','73301','94102') and state IN ('CT','CA') and fips_regions < 0")
             assert len(res) == 0, res
 
-    @since('3.0')
+    @since('2.2')
     def multi_in_compact_non_composite_test(self):
         cursor = self.prepare()
 
@@ -4749,7 +4749,7 @@ class TestCQL(Tester):
 
             assert_one(cursor, "SELECT writetime(v) FROM TEST WHERE k = 1", [-42])
 
-    @since('3.0')
+    @since('2.2')
     @require("7396")
     def select_map_key_single_row_test(self):
         cursor = self.prepare()
@@ -4776,7 +4776,7 @@ class TestCQL(Tester):
 
             assert_one(cursor, "SELECT sizeof(v) FROM test where k = 0", [4])
 
-    @since('3.0')
+    @since('2.2')
     @require("7396")
     def select_set_key_single_row_test(self):
         cursor = self.prepare()
@@ -4806,7 +4806,7 @@ class TestCQL(Tester):
 
             assert_one(cursor, "SELECT sizeof(v) FROM test where k = 0", [4])
 
-    @since('3.0')
+    @since('2.2')
     @require("7396")
     def select_list_key_single_row_test(self):
         cursor = self.prepare()
@@ -4833,7 +4833,7 @@ class TestCQL(Tester):
 
             assert_one(cursor, "SELECT sizeof(v) FROM test where k = 0", [4])
 
-    @since('3.0')
+    @since('2.2')
     @require("7396")
     def select_map_key_multi_row_test(self):
         cursor = self.prepare()
@@ -4861,7 +4861,7 @@ class TestCQL(Tester):
 
             assert_all(cursor, "SELECT sizeof(v) FROM test", [[4], [4]])
 
-    @since('3.0')
+    @since('2.2')
     @require("7396")
     def select_set_key_multi_row_test(self):
         cursor = self.prepare()
@@ -4891,7 +4891,7 @@ class TestCQL(Tester):
 
             assert_all(cursor, "SELECT sizeof(v) FROM test", [[4], [4]])
 
-    @since('3.0')
+    @since('2.2')
     @require("7396")
     def select_list_key_multi_row_test(self):
         cursor = self.prepare()
@@ -4965,7 +4965,7 @@ class TestCQL(Tester):
 
         self.cluster.stop()
         time.sleep(0.5)
-        self.cluster.start()
+        self.cluster.start(wait_for_binary_proto=True)
         time.sleep(0.5)
 
         for cursor in self.do_upgrade(cursor):
