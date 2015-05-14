@@ -1,5 +1,5 @@
 from dtest import Tester, debug
-from tools import since
+from tools import since, require
 
 from cassandra.concurrent import execute_concurrent_with_args
 
@@ -9,6 +9,7 @@ from jmxutils import JolokiaAgent, make_mbean
 class TestUpgradeIndexSummary(Tester):
 
     @since('2.1')
+    @require('Fixes to ccm around upgrades')
     def test_upgrade_index_summary(self):
         cluster = self.cluster
         cluster.populate(1)
