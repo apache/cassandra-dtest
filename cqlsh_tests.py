@@ -833,3 +833,76 @@ class CqlshSmokeTest(Tester):
         cmd += ";"
 
         return [x[0] for x in rows_to_list(self.cursor.execute(cmd))]
+
+class CqlLoginTest(Tester):
+    '''
+    Tests login which requires password authenticator
+    '''
+    def setUp(self):
+        super(CqlLoginTest, self).setUp()
+        config = {'authenticator' : 'org.apache.cassandra.auth.PasswordAuthenticator'}
+        self.cluster.set_configuration_options(values=config)
+        self.cluster.populate(1).start(wait_for_binary_proto=True)
+        [self.node1] = self.cluster.nodelist()
+        self.node1.watch_log_for('Created default superuser')
+        self.cursor = self.patient_cql_connection(self.node1, version="3.0.1", user='cassandra', password='cassandra')
+
+    def test_login_keeps_keyspace(self):
+        self.create_ks(self.cursor, 'ks1', 1)
+        self.create_cf(self.cursor, 'ks1table')
+        self.cursor.execute("CREATE USER user1 WITH PASSWORD 'changeme';")
+
+        cqlsh_stdout, cqlsh_stderr = self.node1.run_cqlsh(
+            '''
+            USE ks1;
+            DESCRIBE TABLES;
+            LOGIN user1 'changeme';
+            DESCRIBE TABLES;
+            ''',
+            return_output=True,
+            cqlsh_options=['-u', 'cassandra', '-p', 'cassandra'])
+        self.assertEqual([x for x in cqlsh_stdout.split() if x], ['ks1table', 'ks1table'])
+        self.assertEqual(cqlsh_stderr, '')
+
+    def test_login_rejects_bad_pass(self):
+        self.create_ks(self.cursor, 'ks1', 1)
+        self.create_cf(self.cursor, 'ks1table')
+        self.cursor.execute("CREATE USER user1 WITH PASSWORD 'changeme';")
+
+        cqlsh_stdout, cqlsh_stderr = self.node1.run_cqlsh(
+            '''
+            LOGIN user1 'badpass';
+            ''',
+            return_output=True,
+            cqlsh_options=['-u', 'cassandra', '-p', 'cassandra'])
+        self.assertEqual(['''Username and/or password are incorrect''' in x for x in cqlsh_stderr.split("\n") if x], [True])
+
+    def test_login_authenticates_correct_user(self):
+        self.create_ks(self.cursor, 'ks1', 1)
+        self.create_cf(self.cursor, 'ks1table')
+        self.cursor.execute("CREATE USER user1 WITH PASSWORD 'changeme';")
+
+        cqlsh_stdout, cqlsh_stderr = self.node1.run_cqlsh(
+            '''
+            LOGIN user1 'changeme';
+            CREATE USER user2 WITH PASSWORD 'fail';
+            ''',
+            return_output=True,
+            cqlsh_options=['-u', 'cassandra', '-p', 'cassandra'])
+        self.assertEqual(['''Only superusers are allowed to perform CREATE USER queries''' in x for x in cqlsh_stderr.split("\n") if x], [True])
+
+    def test_login_allows_bad_pass_and_continued_use(self):
+        self.create_ks(self.cursor, 'ks1', 1)
+        self.create_cf(self.cursor, 'ks1table')
+        self.cursor.execute("CREATE USER user1 WITH PASSWORD 'changeme';")
+
+        cqlsh_stdout, cqlsh_stderr = self.node1.run_cqlsh(
+            '''
+            LOGIN user1 'badpass';
+            USE ks1;
+            DESCRIBE TABLES;
+            ''',
+            return_output=True,
+            cqlsh_options=['-u', 'cassandra', '-p', 'cassandra'])
+        self.assertEqual([x for x in cqlsh_stdout.split() if x], ['ks1table'])
+        self.assertEqual(['''Username and/or password are incorrect''' in x for x in cqlsh_stderr.split("\n") if x], [True])
