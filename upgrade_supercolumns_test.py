@@ -3,10 +3,10 @@ import time
 
 from ccmlib.common import get_version_from_build
 
-from thrift_bindings.v30.ttypes import (KsDef, CfDef, Mutation, ColumnOrSuperColumn,
+from thrift_bindings.v22.ttypes import (KsDef, CfDef, Mutation, ColumnOrSuperColumn,
                                         Column, SuperColumn, SliceRange, SlicePredicate,
                                         ColumnParent, CounterColumn)
-from thrift_bindings.v30.ttypes import ConsistencyLevel as ThriftConsistencyLevel
+from thrift_bindings.v22.ttypes import ConsistencyLevel as ThriftConsistencyLevel
 
 from thrift_tests import get_thrift_client
 

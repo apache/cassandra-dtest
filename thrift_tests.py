@@ -7,8 +7,8 @@ from thrift.Thrift import TApplicationException
 
 from dtest import Tester, debug, NUM_TOKENS, DISABLE_VNODES
 from tools import since
-from thrift_bindings.v30 import Cassandra
-from thrift_bindings.v30.Cassandra import *
+from thrift_bindings.v22 import Cassandra
+from thrift_bindings.v22.Cassandra import *
 
 def get_thrift_client(host='127.0.0.1', port=9160):
     socket = TSocket.TSocket(host, port)

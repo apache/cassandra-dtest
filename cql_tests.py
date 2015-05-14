@@ -7,8 +7,8 @@ import math
 from collections import OrderedDict
 from uuid import uuid4, UUID
 
-from thrift_bindings.v30.ttypes import CfDef, Mutation, ColumnOrSuperColumn, Column
-from thrift_bindings.v30.ttypes import ConsistencyLevel as ThriftConsistencyLevel
+from thrift_bindings.v22.ttypes import CfDef, Mutation, ColumnOrSuperColumn, Column
+from thrift_bindings.v22.ttypes import ConsistencyLevel as ThriftConsistencyLevel
 
 from dtest import Tester, canReuseCluster, freshCluster
 from assertions import assert_invalid, assert_one, assert_none, assert_all
