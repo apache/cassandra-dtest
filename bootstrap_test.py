@@ -45,6 +45,7 @@ class TestBootstrap(Tester):
 
         # record the size before inserting any of our own data
         empty_size = node1.data_size()
+        debug("node1 empty size : %s" % float(empty_size))
 
         insert_statement = session.prepare("INSERT INTO ks.cf (key, c1, c2) VALUES (?, 'value1', 'value2')")
         execute_concurrent_with_args(session, insert_statement, [['k%d' % k] for k in range(keys)])
@@ -52,6 +53,7 @@ class TestBootstrap(Tester):
         node1.flush()
         node1.compact()
         initial_size = node1.data_size()
+        debug("node1 size before bootstrapping node2: %s" % float(initial_size))
 
         # Reads inserted data all during the boostrap process. We shouldn't
         # get any error
@@ -62,8 +64,11 @@ class TestBootstrap(Tester):
         node2.start(wait_for_binary_proto=True)
 
         reader.check()
+        debug("node1 size before cleanup: %s" % float(node1.data_size()))
         node1.cleanup()
+        debug("node1 size after cleanup: %s" % float(node1.data_size()))
         node1.compact()
+        debug("node1 size after compacting: %s" % float(node1.data_size()))
         time.sleep(.5)
         reader.check()
 
