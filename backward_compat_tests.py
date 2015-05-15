@@ -1509,7 +1509,7 @@ class TestCQL(Tester):
 
             assert_invalid(cursor, "SELECT * FROM test WHERE k2 = 3")
 
-            if node_number == 0:
+            if node_number != 0:
                 # the coordinator is the upgraded 2.2+ node
                 assert_invalid(cursor, "SELECT * FROM test WHERE k1 IN (0, 1) and k2 = 3")
 
