@@ -429,6 +429,9 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
             output, err = self.run_cqlsh(node, query, ['-u', 'cassandra', '-p', 'cassandra'])
             if common.is_win():
                 output = output.replace('\r', '')
+            if len(err) > 0:
+                debug(err)
+                assert False, "Failed to execute cqlsh"
             debug(output)
             self.assertTrue(expected in output, "Output \n {%s} \n doesn't contain expected\n {%s}" % (output, expected))
 
@@ -711,6 +714,150 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
     0 |  5 | 1e-15 | 1e-15
     0 |  6 | 1e-16 | 1e-16
 """)
+
+    @since('2.2')
+    def test_int_values(self):
+        """ Tests for CASSANDRA-9399, check tables with int, bigint, smallint and tinyint values"""
+        self.cluster.populate(1)
+        self.cluster.start(wait_for_binary_proto=True)
+
+        node1, = self.cluster.nodelist()
+
+        stdout, stderr = self.run_cqlsh(node1,cmds = """
+            CREATE KEYSPACE int_checks WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
+            USE int_checks;
+            CREATE TABLE values (part text, val1 int, val2 bigint, val3 smallint, val4 tinyint, PRIMARY KEY (part));
+            INSERT INTO values (part, val1, val2, val3, val4) VALUES ('1', 1, 1, 1, 1);
+            INSERT INTO values (part, val1, val2, val3, val4) VALUES ('0', 0, 0, 0, 0);
+            INSERT INTO values (part, val1, val2, val3, val4) VALUES ('min', %d, %d, -32768, -128);
+            INSERT INTO values (part, val1, val2, val3, val4) VALUES ('max', %d, %d, 32767, 127)""" % (-1<<31, -1<<63, (1<<31) - 1, (1<<63) -1))
+
+        if len(stderr) > 0:
+            debug(stderr)
+            assert False, "Failed to execute cqlsh"
+
+        self.verify_output("select * from int_checks.values", node1, """
+ part | val1        | val2                 | val3   | val4
+------+-------------+----------------------+--------+------
+  min | -2147483648 | -9223372036854775808 | -32768 | -128
+  max |  2147483647 |  9223372036854775807 |  32767 |  127
+    0 |           0 |                    0 |      0 |    0
+    1 |           1 |                    1 |      1 |    1
+""")
+
+        self.verify_output("DESCRIBE TABLE int_checks.values", node1, """
+CREATE TABLE int_checks.values (
+    part text PRIMARY KEY,
+    val1 int,
+    val2 bigint,
+    val3 smallint,
+    val4 tinyint
+""")
+
+    @since('2.2')
+    def test_datetime_values(self):
+        """ Tests for CASSANDRA-9399, check tables with date and time values"""
+        self.cluster.populate(1)
+        self.cluster.start(wait_for_binary_proto=True)
+
+        node1, = self.cluster.nodelist()
+
+        stdout, stderr = self.run_cqlsh(node1,cmds = """
+            CREATE KEYSPACE datetime_checks WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
+            USE datetime_checks;
+            CREATE TABLE values (d date, t time, PRIMARY KEY (d, t));
+            INSERT INTO values (d, t) VALUES ('9800-12-31', '23:59:59.999999999');
+            INSERT INTO values (d, t) VALUES ('2015-05-14', '16:30:00.555555555');
+            INSERT INTO values (d, t) VALUES ('1582-1-1', '00:00:00.000000000');
+            INSERT INTO values (d, t) VALUES ('%d-1-1', '00:00:00.000000000');
+            INSERT INTO values (d, t) VALUES ('%d-1-1', '01:00:00.000000000');
+            INSERT INTO values (d, t) VALUES ('%d-1-1', '02:00:00.000000000');
+            INSERT INTO values (d, t) VALUES ('%d-1-1', '03:00:00.000000000')"""
+            % (datetime.MINYEAR-1, datetime.MINYEAR, datetime.MAXYEAR, datetime.MAXYEAR+1,))
+            # outside the MIN and MAX range it should print the number of days from the epoch
+
+        if len(stderr) > 0:
+            debug(stderr)
+            assert False, "Failed to execute cqlsh"
+
+        self.verify_output("select * from datetime_checks.values", node1, """
+ d          | t
+------------+--------------------
+    -719528 | 00:00:00.000000000
+ 9800-12-31 | 23:59:59.999999999
+ 0001-01-01 | 01:00:00.000000000
+ 1582-01-01 | 00:00:00.000000000
+    2932897 | 03:00:00.000000000
+ 9999-01-01 | 02:00:00.000000000
+ 2015-05-14 | 16:30:00.555555555
+""")
+
+        self.verify_output("DESCRIBE TABLE datetime_checks.values", node1, """
+CREATE TABLE datetime_checks.values (
+    d date,
+    t time,
+    PRIMARY KEY (d, t)
+""")
+
+    @since('2.2')
+    def test_tracing(self):
+        """
+        Tests for CASSANDRA-9399, check tracing works.
+        We care mostly that we do not crash, not so much on the tracing content, which may change and would
+        therefore make this test too brittle.
+        """
+        self.cluster.populate(1)
+        self.cluster.start(wait_for_binary_proto=True)
+
+        node1, = self.cluster.nodelist()
+
+        stdout, stderr = self.run_cqlsh(node1,cmds = """
+            CREATE KEYSPACE tracing_checks WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
+            USE tracing_checks;
+            CREATE TABLE test (id int, val text, PRIMARY KEY (id));
+            INSERT INTO test (id, val) VALUES (1, 'adfad');
+            INSERT INTO test (id, val) VALUES (2, 'lkjlk');
+            INSERT INTO test (id, val) VALUES (3, 'iuiou')""")
+
+        if len(stderr) > 0:
+            debug(stderr)
+            assert False, "Failed to execute cqlsh"
+
+        self.verify_output("use tracing_checks; tracing on; select * from test", node1, """Now Tracing is enabled
+
+ id | val
+----+-------
+  1 | adfad
+  2 | lkjlk
+  3 | iuiou
+
+(3 rows)
+
+Tracing session:""")
+
+    @since('2.2')
+    def test_client_warnings(self):
+        """
+        Tests for CASSANDRA-9399, check client warnings.
+        """
+        self.cluster.populate(1)
+        self.cluster.start(wait_for_binary_proto=True)
+
+        node1, = self.cluster.nodelist()
+
+        stdout, stderr = self.run_cqlsh(node1,cmds = """
+            CREATE KEYSPACE client_warnings WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
+            USE client_warnings;
+            CREATE TABLE test (id int, val text, PRIMARY KEY (id))""")
+
+        if len(stderr) > 0:
+            debug(stderr)
+            assert False, "Failed to execute cqlsh"
+
+        self.verify_output("USE client_warnings; BEGIN UNLOGGED BATCH INSERT INTO test (id, val) VALUES (1, 'abc') INSERT INTO test (id, val) VALUES (2, 'def') APPLY BATCH",
+                            node1, """
+Warnings :
+Unlogged batch covering 2 partitions detected against table [client_warnings.test]. You should use a logged batch for atomicity, or asynchronous writes for performance.""")
 
     def run_cqlsh(self, node, cmds, cqlsh_options=[]):
         cdir = node.get_install_dir()
