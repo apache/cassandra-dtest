@@ -79,7 +79,7 @@ class TestUserFunctions(Tester):
         assert_invalid(cursor3, "SELECT key, value, sin(value), cos(value), tan(value) FROM udf_kv where key = 1")
 
         #try creating function returning the wrong type, should error
-        assert_invalid(cursor1, "CREATE FUNCTION bad_sin ( input double ) RETURNS double LANGUAGE java AS 'return Math.sin(input.doubleValue());'", "Could not compile function 'ks.bad_sin' from Java source:")
+        assert_invalid(cursor1, "CREATE FUNCTION bad_sin ( input double ) RETURNS uuid LANGUAGE java AS 'return Math.sin(input.doubleValue());'", "Could not compile function 'ks.bad_sin' from Java source:")
 
     def udf_overload_test(self):
 
