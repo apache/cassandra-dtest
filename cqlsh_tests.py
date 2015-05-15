@@ -845,7 +845,7 @@ class CqlLoginTest(Tester):
         self.cluster.populate(1).start(wait_for_binary_proto=True)
         [self.node1] = self.cluster.nodelist()
         self.node1.watch_log_for('Created default superuser')
-        self.cursor = self.patient_cql_connection(self.node1, version="3.0.1", user='cassandra', password='cassandra')
+        self.cursor = self.patient_cql_connection(self.node1, user='cassandra', password='cassandra')
 
     def test_login_keeps_keyspace(self):
         self.create_ks(self.cursor, 'ks1', 1)
