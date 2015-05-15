@@ -392,7 +392,7 @@ class TestCQL(Tester):
             ) WITH COMPACT STORAGE;
         """)
 
-        for cursor in self.do_upgrade(cursor):
+        for node_number, cursor in enumerate(self.do_upgrade(cursor)):
             cursor.execute("TRUNCATE clicks")
 
             # Inserts
@@ -403,9 +403,12 @@ class TestCQL(Tester):
             # Check that we do limit the output to 1 *and* that we respect query
             # order of keys (even though 48 is after 2)
             res = cursor.execute("SELECT * FROM clicks WHERE userid IN (48, 2) LIMIT 1")
-            if self.get_version() >= '2.2':
+
+            if node_number == 0:
+                # the coordinator is the upgraded 2.2+ node
                 assert rows_to_list(res) == [[2, 'http://foo.com', 42]], res
             else:
+                # the coordinator is the non-upgraded 2.1 node
                 assert rows_to_list(res) == [[48, 'http://foo.com', 42]], res
 
     def simple_tuple_query_test(self):
@@ -470,7 +473,7 @@ class TestCQL(Tester):
         """)
 
         for cursor in self.do_upgrade(cursor):
-            cursor.execute("TRUNCATE maps")
+            cursor.execute("TRUNCATE clicks")
 
             cursor.execute("UPDATE clicks SET total = total + 1 WHERE userid = 1 AND url = 'http://foo.com'")
             res = cursor.execute("SELECT total FROM clicks WHERE userid = 1 AND url = 'http://foo.com'")
@@ -620,7 +623,7 @@ class TestCQL(Tester):
             ) WITH COMPACT STORAGE;
         """)
 
-        for cursor in self.do_upgrade(cursor):
+        for node_number, cursor in enumerate(self.do_upgrade(cursor)):
             cursor.execute("TRUNCATE test1")
             cursor.execute("TRUNCATE test2")
 
@@ -636,9 +639,11 @@ class TestCQL(Tester):
                 cursor.execute("INSERT INTO test2 (k, c1, c2, v) VALUES (0, 0, %i, %i)" % (x, x))
 
             # Check first we don't allow IN everywhere
-            if self.get_version() >= '2.2':
+            if node_number == 0:
+                # the coordinator is the upgraded 2.2+ node
                 assert_none(cursor, "SELECT v FROM test2 WHERE k = 0 AND c1 IN (5, 2, 8) AND c2 = 3")
             else:
+                # the coordinator is the non-upgraded 2.1 node
                 assert_invalid(cursor, "SELECT v FROM test2 WHERE k = 0 AND c1 IN (5, 2, 8) AND c2 = 3")
 
             res = cursor.execute("SELECT v FROM test2 WHERE k = 0 AND c1 = 0 AND c2 IN (5, 2, 8)")
@@ -893,7 +898,7 @@ class TestCQL(Tester):
         cursor.execute("CREATE INDEX on users(birth_year)")
 
         for cursor in self.do_upgrade(cursor):
-            cursor.execute("TRUNCATE maps")
+            cursor.execute("TRUNCATE users")
 
             cursor.execute("INSERT INTO users (id, birth_year) VALUES ('Tom', 42)")
             cursor.execute("INSERT INTO users (id, birth_year) VALUES ('Paul', 24)")
@@ -1115,7 +1120,7 @@ class TestCQL(Tester):
 
         for cursor in self.do_upgrade(cursor):
             cursor.execute("TRUNCATE test")
-            cursor.execute("TRUNCATE users")
+            cursor.execute("TRUNCATE ks1.users")
 
             for k in range(0, 5):
                 cursor.execute("INSERT INTO test (k, v) VALUES (%d, 0)" % k)
@@ -1489,7 +1494,7 @@ class TestCQL(Tester):
             )
         """)
 
-        for cursor in self.do_upgrade(cursor):
+        for node_number, cursor in enumerate(self.do_upgrade(cursor)):
             cursor.execute("TRUNCATE test")
 
             req = "INSERT INTO test (k1, k2, c, v) VALUES (%d, %d, %d, %d)"
@@ -1504,8 +1509,8 @@ class TestCQL(Tester):
 
             assert_invalid(cursor, "SELECT * FROM test WHERE k2 = 3")
 
-            v = self.get_version()
-            if v < "2.2":
+            if node_number == 0:
+                # the coordinator is the upgraded 2.2+ node
                 assert_invalid(cursor, "SELECT * FROM test WHERE k1 IN (0, 1) and k2 = 3")
 
             res = cursor.execute("SELECT * FROM test WHERE token(k1, k2) = token(0, 1)")
@@ -1685,7 +1690,7 @@ class TestCQL(Tester):
 
         cursor.execute("CREATE INDEX ON blogs(author)")
 
-        for cursor in self.do_upgrade(cursor):
+        for node_number, cursor in enumerate(self.do_upgrade(cursor)):
             cursor.execute("TRUNCATE blogs")
 
             req = "INSERT INTO blogs (blog_id, time1, time2, author, content) VALUES (%d, %d, %d, '%s', '%s')"
@@ -1716,14 +1721,15 @@ class TestCQL(Tester):
 
             # as discussed in CASSANDRA-8148, some queries that should have required ALLOW FILTERING
             # in 2.0 have been fixed for 2.2
-            v = self.get_version()
-            if v < "2.2":
+            if node_number > 0:
+                # the coordinator is the non-upgraded 2.1 node
                 cursor.execute("SELECT blog_id, content FROM blogs WHERE time1 > 0 AND author='foo'")
                 cursor.execute("SELECT blog_id, content FROM blogs WHERE time1 = 1 AND author='foo'")
                 cursor.execute("SELECT blog_id, content FROM blogs WHERE time1 = 1 AND time2 = 0 AND author='foo'")
                 cursor.execute("SELECT content FROM blogs WHERE time1 = 1 AND time2 = 1 AND author='foo'")
                 cursor.execute("SELECT content FROM blogs WHERE time1 = 1 AND time2 > 0 AND author='foo'")
             else:
+                # the coordinator is the upgraded 2.2+ node
                 assert_invalid(cursor, "SELECT blog_id, content FROM blogs WHERE time1 > 0 AND author='foo'")
                 assert_invalid(cursor, "SELECT blog_id, content FROM blogs WHERE time1 = 1 AND author='foo'")
                 assert_invalid(cursor, "SELECT blog_id, content FROM blogs WHERE time1 = 1 AND time2 = 0 AND author='foo'")
@@ -1746,8 +1752,17 @@ class TestCQL(Tester):
             );
         """)
 
+        cursor.execute("""
+            CREATE TABLE testcf2 (
+                a int primary key,
+                b int,
+                c int,
+            );
+        """)
+
         for cursor in self.do_upgrade(cursor):
             cursor.execute("TRUNCATE testcf")
+            cursor.execute("TRUNCATE testcf2")
 
             cursor.execute("INSERT INTO testcf (a, b, c, d, e) VALUES (1, 1, 1, 1, 1);")
             cursor.execute("INSERT INTO testcf (a, b, c, d, e) VALUES (2, 2, 2, 2, 2);")
@@ -1762,14 +1777,6 @@ class TestCQL(Tester):
 
             res = cursor.execute("SELECT * FROM testcf LIMIT 2;")  # columns d and e in last result row are null
             assert rows_to_list(res) == [[1, 1, 1, 1, 1], [2, 2, 2, 2, 2]], res
-
-            cursor.execute("""
-                CREATE TABLE testcf2 (
-                    a int primary key,
-                    b int,
-                    c int,
-                );
-            """)
 
             cursor.execute("INSERT INTO testcf2 (a, b, c) VALUES (1, 1, 1);")
             cursor.execute("INSERT INTO testcf2 (a, b, c) VALUES (2, 2, 2);")
@@ -2385,7 +2392,7 @@ class TestCQL(Tester):
 
         cursor.execute(create)
 
-        for cursor in self.do_upgrade(cursor):
+        for node_number, cursor in enumerate(self.do_upgrade(cursor)):
             cursor.execute("TRUNCATE zipcodes")
 
             for d in data:
@@ -2405,23 +2412,26 @@ class TestCQL(Tester):
             res = cursor.execute("select zipcode from zipcodes where group='test' and zipcode='06902'")
             assert len(res) == 1, res
 
-            res = cursor.execute("select zipcode from zipcodes where group='test' and zipcode IN ('06902','73301','94102')")
-            assert len(res) == 3, res
+            if node_number == 0:
+                # the coordinator is the upgraded 2.2+ node
 
-            res = cursor.execute("select zipcode from zipcodes where group='test' AND zipcode IN ('06902','73301','94102') and state IN ('CT','CA')")
-            assert len(res) == 2, res
+                res = cursor.execute("select zipcode from zipcodes where group='test' and zipcode IN ('06902','73301','94102')")
+                assert len(res) == 3, res
 
-            res = cursor.execute("select zipcode from zipcodes where group='test' AND zipcode IN ('06902','73301','94102') and state IN ('CT','CA') and fips_regions = 9")
-            assert len(res) == 1, res
+                res = cursor.execute("select zipcode from zipcodes where group='test' AND zipcode IN ('06902','73301','94102') and state IN ('CT','CA')")
+                assert len(res) == 2, res
 
-            res = cursor.execute("select zipcode from zipcodes where group='test' AND zipcode IN ('06902','73301','94102') and state IN ('CT','CA') ORDER BY zipcode DESC")
-            assert len(res) == 2, res
+                res = cursor.execute("select zipcode from zipcodes where group='test' AND zipcode IN ('06902','73301','94102') and state IN ('CT','CA') and fips_regions = 9")
+                assert len(res) == 1, res
 
-            res = cursor.execute("select zipcode from zipcodes where group='test' AND zipcode IN ('06902','73301','94102') and state IN ('CT','CA') and fips_regions > 0")
-            assert len(res) == 2, res
+                res = cursor.execute("select zipcode from zipcodes where group='test' AND zipcode IN ('06902','73301','94102') and state IN ('CT','CA') ORDER BY zipcode DESC")
+                assert len(res) == 2, res
 
-            res = cursor.execute("select zipcode from zipcodes where group='test' AND zipcode IN ('06902','73301','94102') and state IN ('CT','CA') and fips_regions < 0")
-            assert len(res) == 0, res
+                res = cursor.execute("select zipcode from zipcodes where group='test' AND zipcode IN ('06902','73301','94102') and state IN ('CT','CA') and fips_regions > 0")
+                assert len(res) == 2, res
+
+                res = cursor.execute("select zipcode from zipcodes where group='test' AND zipcode IN ('06902','73301','94102') and state IN ('CT','CA') and fips_regions < 0")
+                assert len(res) == 0, res
 
     @since('2.2')
     def multi_in_compact_non_composite_test(self):
@@ -3721,22 +3731,13 @@ class TestCQL(Tester):
             """, [True])
             assert_all(cursor, "SELECT * FROM test WHERE id=1", [[1, 'k1', 1, 'val1'], [1, 'k2', 1, 'newVal'], [1, 'k3', 1, 'val3']])
 
-            if self.get_version() >= '2.1':
-                assert_one(cursor,
-                """
-                  BEGIN BATCH
-                    UPDATE test SET v='newVal1' WHERE id=1 AND k='k2' IF v='val2';
-                    UPDATE test SET v='newVal2' WHERE id=1 AND k='k2' IF v='val3';
-                  APPLY BATCH
-                """, [False, 1, 'k2', 'newVal'])
-            else:
-                assert_invalid(cursor,
-                """
-                  BEGIN BATCH
-                    UPDATE test SET v='newVal1' WHERE id=1 AND k='k2' IF v='val2';
-                    UPDATE test SET v='newVal2' WHERE id=1 AND k='k2' IF v='val3';
-                  APPLY BATCH
-                """)
+            assert_one(cursor,
+            """
+              BEGIN BATCH
+                UPDATE test SET v='newVal1' WHERE id=1 AND k='k2' IF v='val2';
+                UPDATE test SET v='newVal2' WHERE id=1 AND k='k2' IF v='val3';
+              APPLY BATCH
+            """, [False, 1, 'k2', 'newVal'])
 
     @since('2.0')
     def static_columns_with_2i_test(self):
@@ -3872,15 +3873,18 @@ class TestCQL(Tester):
         cursor.execute("create table test(field1 text, field2 timeuuid, field3 boolean, primary key(field1, field2));")
         cursor.execute("create index test_index on test(field3);")
 
-        for cursor in self.do_upgrade(cursor):
+        for node_number, cursor in enumerate(self.do_upgrade(cursor)):
             cursor.execute("TRUNCATE test")
 
             cursor.execute("insert into test(field1, field2, field3) values ('hola', now(), false);")
             cursor.execute("insert into test(field1, field2, field3) values ('hola', now(), false);")
 
-            if self.get_version() >= '2.2':
+            # the result depends on which node we're connected to, see CASSANDRA-8216
+            if node_number == 0:
+                # the coordinator is the upgraded 2.2+ node
                 assert_one(cursor, "select count(*) from test where field3 = false limit 1;", [2])
             else:
+                # the coordinator is the not-upgraded 2.1 node
                 assert_one(cursor, "select count(*) from test where field3 = false limit 1;", [1])
 
     @since('2.0')
@@ -3966,7 +3970,7 @@ class TestCQL(Tester):
         cursor = self.prepare()
         cursor.execute("CREATE TABLE test (k int, c1 int, c2 int, v int, PRIMARY KEY (k, c1, c2))")
 
-        for cursor in self.do_upgrade(cursor):
+        for node_number, cursor in enumerate(self.do_upgrade(cursor)):
             cursor.execute("TRUNCATE test")
             cursor.default_fetch_size = None
 
@@ -3984,9 +3988,11 @@ class TestCQL(Tester):
             assert_all(cursor, "SELECT v FROM test WHERE k=0 AND c1 = 0 AND c2 IN (2, 0)", [[0], [2]])
             assert_all(cursor, "SELECT v FROM test WHERE k=0 AND c1 = 0 AND c2 IN (2, 0) ORDER BY c1 ASC", [[0], [2]])
             assert_all(cursor, "SELECT v FROM test WHERE k=0 AND c1 = 0 AND c2 IN (2, 0) ORDER BY c1 DESC", [[2], [0]])
-            if self.get_version() >= '2.2':
+            if node_number == 0:
+                # the coordinator is the upgraded 2.2+ node
                 assert_all(cursor, "SELECT v FROM test WHERE k IN (1, 0)", [[0], [1], [2], [3], [4], [5]])
             else:
+                # the coordinator is the non-upgraded 2.1 node
                 assert_all(cursor, "SELECT v FROM test WHERE k IN (1, 0)", [[3], [4], [5], [0], [1], [2]])
             assert_all(cursor, "SELECT v FROM test WHERE k IN (1, 0) ORDER BY c1 ASC", [[0], [1], [2], [3], [4], [5]])
 
@@ -4125,9 +4131,6 @@ class TestCQL(Tester):
 
                 assert_invalid(cursor, "DELETE FROM %s WHERE k=0 IF l[null] = 'foobar'" % (table,))
                 assert_invalid(cursor, "DELETE FROM %s WHERE k=0 IF l[-2] = 'foobar'" % (table,))
-                if self.get_version() < "2.1":
-                    # no longer invalid after CASSANDRA-6839
-                    assert_invalid(cursor, "DELETE FROM %s WHERE k=0 IF l[3] = 'foobar'" % (table,))
                 assert_one(cursor, "DELETE FROM %s WHERE k=0 IF l[1] = null" % (table,), [False, ['foo', 'bar', 'foobar']])
                 assert_one(cursor, "DELETE FROM %s WHERE k=0 IF l[1] = 'foobar'" % (table,), [False, ['foo', 'bar', 'foobar']])
                 assert_one(cursor, "SELECT * FROM %s" % (table,), [0, ['foo', 'bar', 'foobar']])
