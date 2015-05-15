@@ -259,7 +259,7 @@ class Tester(TestCase):
         return self._create_session(node, keyspace, user, password, compression,
                                     protocol_version)
 
-    def exclusive_cql_connection(self, node, keyspace=None,
+    def exclusive_cql_connection(self, node, keyspace=None, user=None,
                                  password=None, compression=True, protocol_version=None):
 
         node_ip = self.get_ip_from_node(node)
