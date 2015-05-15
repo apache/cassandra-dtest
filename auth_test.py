@@ -580,7 +580,7 @@ class TestAuth(Tester):
 
     def get_cursor(self, node_idx=0, user=None, password=None):
         node = self.cluster.nodelist()[node_idx]
-        conn = self.patient_cql_connection(node, version="3.0.1", user=user, password=password)
+        conn = self.patient_cql_connection(node, user=user, password=password)
         return conn
 
     def assertPermissionsListed(self, expected, cursor, query):

@@ -26,7 +26,7 @@ class TestPaxos(Tester):
         node1 = cluster.nodelist()[0]
         time.sleep(0.2)
 
-        cursor = self.patient_cql_connection(node1, version="3.0.0")
+        cursor = self.patient_cql_connection(node1)
         if create_keyspace:
             self.create_ks(cursor, 'ks', rf)
         return cursor
@@ -145,7 +145,7 @@ class TestPaxos(Tester):
         nodes = self.cluster.nodelist()
         workers = []
 
-        c = self.patient_cql_connection(nodes[0], version="3.0.0", keyspace='ks')
+        c = self.patient_cql_connection(nodes[0], keyspace='ks')
         q = c.prepare("""
                 BEGIN BATCH
                    UPDATE test SET v = ? WHERE k = 0 IF v = ?;
