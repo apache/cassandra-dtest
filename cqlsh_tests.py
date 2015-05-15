@@ -425,6 +425,13 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         self.assertNotIn('list index out of range', err)
         ##If this assertion fails check CASSANDRA-7891
 
+    def verify_output(self, query, node, expected):
+            output, err = self.run_cqlsh(node, query, ['-u', 'cassandra', '-p', 'cassandra'])
+            if common.is_win():
+                output = output.replace('\r', '')
+            debug(output)
+            self.assertTrue(expected in output, "Output \n {%s} \n doesn't contain expected\n {%s}" % (output, expected))
+
     def test_list_queries(self):
         config = {'authenticator': 'org.apache.cassandra.auth.PasswordAuthenticator',
                   'authorizer': 'org.apache.cassandra.auth.CassandraAuthorizer',
@@ -441,14 +448,8 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         conn.execute("CREATE USER user1 WITH PASSWORD 'user1'")
         conn.execute("GRANT ALL ON ks.t1 TO user1")
 
-        def verify_output(query, expected):
-            output, err = self.run_cqlsh(node1, query, ['-u', 'cassandra', '-p', 'cassandra'])
-            if common.is_win():
-                output = output.replace('\r', '')
-            self.assertTrue(expected in output, "Output \n {%s} \n doesn't contain expected\n {%s}" % (output, expected))
-
         if self.cluster.version() >= '2.2':
-            verify_output("LIST USERS", """
+            self.verify_output("LIST USERS", node1, """
  name      | super
 -----------+-------
  cassandra |  True
@@ -457,7 +458,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
 (2 rows)
 """)
         else:
-            verify_output("LIST USERS", """
+            self.verify_output("LIST USERS", node1, """
  name      | super
 -----------+-------
      user1 | False
@@ -467,7 +468,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
 """)
 
         if self.cluster.version() >= '2.2':
-            verify_output("LIST ALL PERMISSIONS OF user1", """
+            self.verify_output("LIST ALL PERMISSIONS OF user1", node1, """
  role  | username | resource      | permission
 -------+----------+---------------+------------
  user1 |    user1 | <table ks.t1> |      ALTER
@@ -479,7 +480,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
 (5 rows)
 """)
         else:
-            verify_output("LIST ALL PERMISSIONS OF user1", """
+            self.verify_output("LIST ALL PERMISSIONS OF user1", node1, """
  username | resource      | permission
 ----------+---------------+------------
     user1 | <table ks.t1> |     CREATE
@@ -532,6 +533,184 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         node1.run_cqlsh(cmds="COPY ks.testcopyto FROM '%s'" % (tempfile.name,))
         new_results = list(session.execute("SELECT * FROM testcopyto"))
         self.assertEquals(results, new_results)
+
+    @since('2.1')
+    def test_float_formatting(self):
+        """ Tests for CASSANDRA-9224, check format of float and double values"""
+        self.cluster.populate(1)
+        self.cluster.start(wait_for_binary_proto=True)
+
+        node1, = self.cluster.nodelist()
+
+        stdout, stderr = self.run_cqlsh(node1,cmds = """
+            CREATE KEYSPACE formatting WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
+            use formatting;
+            create TABLE values ( part text, id int, val1 double, val2 float, PRIMARY KEY (part, id) );
+            insert into values (part, id, val1, val2) VALUES ('+', 1, 0.00000006, 0.00000006);
+            insert into values (part, id, val1, val2) VALUES ('+', 2, 0.0000006, 0.0000006);
+            insert into values (part, id, val1, val2) VALUES ('+', 3, 0.000006, 0.000006);
+            insert into values (part, id, val1, val2) VALUES ('+', 4, 0.00006, 0.00006);
+            insert into values (part, id, val1, val2) VALUES ('+', 5, 0.0006, 0.0006);
+            insert into values (part, id, val1, val2) VALUES ('+', 6, 0.006, 0.006);
+            insert into values (part, id, val1, val2) VALUES ('+', 7, 0.06, 0.06);
+            insert into values (part, id, val1, val2) VALUES ('+', 8, 0.6, 0.6);
+            insert into values (part, id, val1, val2) VALUES ('+', 9, 6, 6);
+            insert into values (part, id, val1, val2) VALUES ('+', 10, 6.0, 6.0);
+            insert into values (part, id, val1, val2) VALUES ('+', 11, 6.00, 6.00);
+            insert into values (part, id, val1, val2) VALUES ('+', 12, 6.000, 6.000);
+            insert into values (part, id, val1, val2) VALUES ('+', 13, 6.00000, 6.00000);
+            insert into values (part, id, val1, val2) VALUES ('+', 14, 6.000000, 6.000000);
+            insert into values (part, id, val1, val2) VALUES ('+', 15, 6.1, 6.1);
+            insert into values (part, id, val1, val2) VALUES ('+', 16, 6.12, 6.12);
+            insert into values (part, id, val1, val2) VALUES ('+', 17, 6.123, 6.123);
+            insert into values (part, id, val1, val2) VALUES ('+', 18, 6.1234, 6.1234);
+            insert into values (part, id, val1, val2) VALUES ('+', 19, 6.12345, 6.12345);
+            insert into values (part, id, val1, val2) VALUES ('+', 20, 6.123454, 6.123454);
+            insert into values (part, id, val1, val2) VALUES ('+', 21, 6.123455, 6.123455);
+            insert into values (part, id, val1, val2) VALUES ('+', 22, 6.123456, 6.123456);
+            insert into values (part, id, val1, val2) VALUES ('+', 23, 6.1234565, 6.1234565);
+            insert into values (part, id, val1, val2) VALUES ('+', 24, 6.1234555, 6.1234555);
+            insert into values (part, id, val1, val2) VALUES ('+', 25, 6.12345555, 6.12345555);
+            insert into values (part, id, val1, val2) VALUES ('+', 26, 6.12345555555555, 6.12345555555555);
+            insert into values (part, id, val1, val2) VALUES ('+', 27, 16.12345, 16.12345);
+            insert into values (part, id, val1, val2) VALUES ('+', 28, 116.12345, 116.12345);
+            insert into values (part, id, val1, val2) VALUES ('+', 29, 1116.12345, 1116.12345);
+            insert into values (part, id, val1, val2) VALUES ('+', 30, 11116.12345, 11116.12345);
+            insert into values (part, id, val1, val2) VALUES ('+', 31, 111116.12345, 111116.12345);
+            insert into values (part, id, val1, val2) VALUES ('+', 32, 1111116.12345, 1111116.12345);
+            insert into values (part, id, val1, val2) VALUES ('+', 33, 11111116.12345, 11111116.12345)""")
+
+        self.verify_output("select * from formatting.values where part = '+'", node1, """
+ part | id | val1        | val2
+------+----+-------------+-------------
+    + |  1 |       6e-08 |       6e-08
+    + |  2 |       6e-07 |       6e-07
+    + |  3 |       6e-06 |       6e-06
+    + |  4 |       6e-05 |       6e-05
+    + |  5 |      0.0006 |      0.0006
+    + |  6 |       0.006 |       0.006
+    + |  7 |        0.06 |        0.06
+    + |  8 |         0.6 |         0.6
+    + |  9 |           6 |           6
+    + | 10 |           6 |           6
+    + | 11 |           6 |           6
+    + | 12 |           6 |           6
+    + | 13 |           6 |           6
+    + | 14 |           6 |           6
+    + | 15 |         6.1 |         6.1
+    + | 16 |        6.12 |        6.12
+    + | 17 |       6.123 |       6.123
+    + | 18 |      6.1234 |      6.1234
+    + | 19 |     6.12345 |     6.12345
+    + | 20 |     6.12345 |     6.12345
+    + | 21 |     6.12345 |     6.12346
+    + | 22 |     6.12346 |     6.12346
+    + | 23 |     6.12346 |     6.12346
+    + | 24 |     6.12346 |     6.12346
+    + | 25 |     6.12346 |     6.12346
+    + | 26 |     6.12346 |     6.12346
+    + | 27 |    16.12345 |    16.12345
+    + | 28 |   116.12345 |   116.12345
+    + | 29 |  1116.12345 |  1116.12341
+    + | 30 | 11116.12345 | 11116.12305
+    + | 31 |  1.1112e+05 |  1.1112e+05
+    + | 32 |  1.1111e+06 |  1.1111e+06
+    + | 33 |  1.1111e+07 |  1.1111e+07
+""")
+
+        stdout, stderr = self.run_cqlsh(node1,cmds = """
+            use formatting;
+            insert into values (part, id, val1, val2) VALUES ('-', 1, -0.00000006, -0.00000006);
+            insert into values (part, id, val1, val2) VALUES ('-', 2, -0.0000006, -0.0000006);
+            insert into values (part, id, val1, val2) VALUES ('-', 3, -0.000006, -0.000006);
+            insert into values (part, id, val1, val2) VALUES ('-', 4, -0.00006, -0.00006);
+            insert into values (part, id, val1, val2) VALUES ('-', 5, -0.0006, -0.0006);
+            insert into values (part, id, val1, val2) VALUES ('-', 6, -0.006, -0.006);
+            insert into values (part, id, val1, val2) VALUES ('-', 7, -0.06, -0.06);
+            insert into values (part, id, val1, val2) VALUES ('-', 8, -0.6, -0.6);
+            insert into values (part, id, val1, val2) VALUES ('-', 9, -6, -6);
+            insert into values (part, id, val1, val2) VALUES ('-', 10, -6.0, -6.0);
+            insert into values (part, id, val1, val2) VALUES ('-', 11, -6.00, -6.00);
+            insert into values (part, id, val1, val2) VALUES ('-', 12, -6.000, -6.000);
+            insert into values (part, id, val1, val2) VALUES ('-', 13, -6.00000, -6.00000);
+            insert into values (part, id, val1, val2) VALUES ('-', 14, -6.000000, -6.000000);
+            insert into values (part, id, val1, val2) VALUES ('-', 15, -6.1, -6.1);
+            insert into values (part, id, val1, val2) VALUES ('-', 16, -6.12, -6.12);
+            insert into values (part, id, val1, val2) VALUES ('-', 17, -6.123, -6.123);
+            insert into values (part, id, val1, val2) VALUES ('-', 18, -6.1234, -6.1234);
+            insert into values (part, id, val1, val2) VALUES ('-', 19, -6.12345, -6.12345);
+            insert into values (part, id, val1, val2) VALUES ('-', 20, -6.123454, -6.123454);
+            insert into values (part, id, val1, val2) VALUES ('-', 21, -6.123455, -6.123455);
+            insert into values (part, id, val1, val2) VALUES ('-', 22, -6.123456, -6.123456);
+            insert into values (part, id, val1, val2) VALUES ('-', 23, -6.1234565, -6.1234565);
+            insert into values (part, id, val1, val2) VALUES ('-', 24, -6.1234555, -6.1234555);
+            insert into values (part, id, val1, val2) VALUES ('-', 25, -6.12345555, -6.12345555);
+            insert into values (part, id, val1, val2) VALUES ('-', 26, -6.12345555555555, -6.12345555555555);
+            insert into values (part, id, val1, val2) VALUES ('-', 27, -16.12345, -16.12345);
+            insert into values (part, id, val1, val2) VALUES ('-', 28, -116.12345, -116.12345);
+            insert into values (part, id, val1, val2) VALUES ('-', 29, -1116.12345, -1116.12345);
+            insert into values (part, id, val1, val2) VALUES ('-', 30, -11116.12345, -11116.12345);
+            insert into values (part, id, val1, val2) VALUES ('-', 31, -111116.12345, -111116.12345);
+            insert into values (part, id, val1, val2) VALUES ('-', 32, -1111116.12345, -1111116.12345);
+            insert into values (part, id, val1, val2) VALUES ('-', 33, -11111116.12345, -11111116.12345)""")
+
+        self.verify_output("select * from formatting.values where part = '-'", node1, """
+ part | id | val1         | val2
+------+----+--------------+--------------
+    - |  1 |       -6e-08 |       -6e-08
+    - |  2 |       -6e-07 |       -6e-07
+    - |  3 |       -6e-06 |       -6e-06
+    - |  4 |       -6e-05 |       -6e-05
+    - |  5 |      -0.0006 |      -0.0006
+    - |  6 |       -0.006 |       -0.006
+    - |  7 |        -0.06 |        -0.06
+    - |  8 |         -0.6 |         -0.6
+    - |  9 |           -6 |           -6
+    - | 10 |           -6 |           -6
+    - | 11 |           -6 |           -6
+    - | 12 |           -6 |           -6
+    - | 13 |           -6 |           -6
+    - | 14 |           -6 |           -6
+    - | 15 |         -6.1 |         -6.1
+    - | 16 |        -6.12 |        -6.12
+    - | 17 |       -6.123 |       -6.123
+    - | 18 |      -6.1234 |      -6.1234
+    - | 19 |     -6.12345 |     -6.12345
+    - | 20 |     -6.12345 |     -6.12345
+    - | 21 |     -6.12345 |     -6.12346
+    - | 22 |     -6.12346 |     -6.12346
+    - | 23 |     -6.12346 |     -6.12346
+    - | 24 |     -6.12346 |     -6.12346
+    - | 25 |     -6.12346 |     -6.12346
+    - | 26 |     -6.12346 |     -6.12346
+    - | 27 |    -16.12345 |    -16.12345
+    - | 28 |   -116.12345 |   -116.12345
+    - | 29 |  -1116.12345 |  -1116.12341
+    - | 30 | -11116.12345 | -11116.12305
+    - | 31 |  -1.1112e+05 |  -1.1112e+05
+    - | 32 |  -1.1111e+06 |  -1.1111e+06
+    - | 33 |  -1.1111e+07 |  -1.1111e+07
+""")
+
+        stdout, stderr = self.run_cqlsh(node1,cmds = """
+            use formatting;
+            insert into values (part, id, val1, val2) VALUES ('0', 1, 0, 0);
+            insert into values (part, id, val1, val2) VALUES ('0', 2, 0.000000000001, 0.000000000001);
+            insert into values (part, id, val1, val2) VALUES ('0', 3, 0.0000000000001, 0.0000000000001);
+            insert into values (part, id, val1, val2) VALUES ('0', 4, 0.00000000000001, 0.00000000000001);
+            insert into values (part, id, val1, val2) VALUES ('0', 5, 0.000000000000001, 0.000000000000001);
+            insert into values (part, id, val1, val2) VALUES ('0', 6, 0.0000000000000001, 0.0000000000000001)""")
+
+        self.verify_output("select * from formatting.values where part = '0'", node1, """
+ part | id | val1  | val2
+------+----+-------+-------
+    0 |  1 |     0 |     0
+    0 |  2 | 1e-12 | 1e-12
+    0 |  3 | 1e-13 | 1e-13
+    0 |  4 | 1e-14 | 1e-14
+    0 |  5 | 1e-15 | 1e-15
+    0 |  6 | 1e-16 | 1e-16
+""")
 
     def run_cqlsh(self, node, cmds, cqlsh_options=[]):
         cdir = node.get_install_dir()
