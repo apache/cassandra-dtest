@@ -2170,7 +2170,10 @@ class TestCQL(Tester):
         """ Test for the validation bug of #4706 """
 
         cursor = self.prepare()
-        assert_invalid(cursor, "CREATE TABLE test (id bigint PRIMARY KEY, count counter, things set<text>)", matching="Cannot add a counter column", expected=ConfigurationException)
+        if self.cluster.version() >= '3.0':
+            assert_invalid(cursor, "CREATE TABLE test (id bigint PRIMARY KEY, count counter, things set<text>)", matching="Cannot add a non counter column", expected=ConfigurationException)
+        else:
+            assert_invalid(cursor, "CREATE TABLE test (id bigint PRIMARY KEY, count counter, things set<text>)", matching="Cannot add a counter column", expected=ConfigurationException)
 
     def reversed_compact_test(self):
         """ Test for #4716 bug and more generally for good behavior of ordering"""
