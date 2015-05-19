@@ -882,14 +882,31 @@ class CqlLoginTest(Tester):
         self.create_cf(self.cursor, 'ks1table')
         self.cursor.execute("CREATE USER user1 WITH PASSWORD 'changeme';")
 
+        if self.cluster.version() >= '2.2':
+            query = '''
+                    LOGIN user1 'changeme';
+                    CREATE USER user2 WITH PASSWORD 'fail' SUPERUSER;
+                    '''
+            expected_error = "Only superusers can create a role with superuser status"
+        else:
+            query = '''
+                    LOGIN user1 'changeme';
+                    CREATE USER user2 WITH PASSWORD 'fail';
+                    '''
+            expected_error = 'Only superusers are allowed to perform CREATE USER queries'
+
         cqlsh_stdout, cqlsh_stderr = self.node1.run_cqlsh(
-            '''
-            LOGIN user1 'changeme';
-            CREATE USER user2 WITH PASSWORD 'fail';
-            ''',
+            query,
             return_output=True,
             cqlsh_options=['-u', 'cassandra', '-p', 'cassandra'])
-        self.assertEqual(['''Only superusers are allowed to perform CREATE USER queries''' in x for x in cqlsh_stderr.split("\n") if x], [True])
+
+        err_lines = cqlsh_stderr.splitlines()
+        for err_line in err_lines:
+            if expected_error in err_line:
+                break
+        else:
+            self.fail("Did not find expected error '%s' in cqlsh stderr output: %s" %
+                      expected_error, '\n'.join(err_lines))
 
     def test_login_allows_bad_pass_and_continued_use(self):
         self.create_ks(self.cursor, 'ks1', 1)
