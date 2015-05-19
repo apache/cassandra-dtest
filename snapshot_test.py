@@ -100,7 +100,6 @@ class TestSnapshot(SnapshotTester):
 
         self.assertEqual(rows[0][0], 100)
 
-@require('8049')
 class TestArchiveCommitlog(SnapshotTester):
     def __init__(self, *args, **kwargs):
         kwargs['cluster_options'] = {'commitlog_segment_size_in_mb':1}
