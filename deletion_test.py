@@ -40,7 +40,6 @@ class TestDeletion(Tester):
         result = cursor.execute('select * from cf;')
         assert len(result) == 1 and len(result[0]) == 2, result
 
-    @require(9194)
     def tombstone_size_test(self):
         self.cluster.populate(1).start(wait_for_binary_proto=True)
         [node1] = self.cluster.nodelist()
