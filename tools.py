@@ -203,20 +203,23 @@ def no_vnodes():
     return unittest.skipIf(not DISABLE_VNODES, 'Test disabled for vnodes')
 
 
-def require(require_name):
-    """Skips the decorated class or method, unless the argument 'require_name'
-    case-insensitively matches the name of the git branch in the directory from
-    which Cassandra is running. For example, the method defined here:
+def require(require_pattern):
+    """Skips the decorated class or method, unless the argument
+    'require_pattern' is a case-insensitive regex match for the name of the git
+    branch in the directory from which Cassandra is running. For example, the
+    method defined here:
 
         @require('compaction-fixes')
         def compaction_test(self):
             ...
 
     will run if Cassandra is running from a directory whose current git branch
-    is named 'compaction-fixes'.
+    is named 'compaction-fixes'. If 'require_pattern' were
+    '.*compaction-fixes.*', it would run only when Cassandra is being run from a
+    branch whose name contains 'compaction-fixes'.
 
-    To accomodate current branch-naming conventions, it also will run if the
-    current Cassandra branch is named 'CASSANDRA-{require_name}'. This allows
+    To accommodate current branch-naming conventions, it also will run if the
+    current Cassandra branch matches 'CASSANDRA-{require_pattern}'. This allows
     users to run tests like:
 
         @require(4200)
@@ -225,11 +228,11 @@ def require(require_name):
 
     on branches named 'CASSANDRA-4200'.
 
-    If neither 'require_name' nor 'CASSANDRA-{require_name}' is a
+    If neither 'require_pattern' nor 'CASSANDRA-{require_pattern}' is a
     case-insensitive match for the name of Cassandra's current git branch, the
     test function or class will be skipped with unittest.skip.
     """
-    require_name = str(require_name)
+    require_pattern = str(require_pattern)
     skipme = True
     git_branch = ''
     try:
@@ -239,11 +242,11 @@ def require(require_name):
         return unittest.skip(msg='failed git branch name check in {f}()'.format(f=require.__name__))
 
     if git_branch:
-        run_test_on_branches = (require_name, 'cassandra-{b}'.format(b=require_name))
-        if git_branch.lower() in run_test_on_branches:
+        run_on_branch_patterns = (require_pattern, 'cassandra-{b}'.format(b=require_pattern))
+        if any(re.match(p, git_branch, re.IGNORECASE) for p in run_on_branch_patterns):
             skipme = False
 
-    return unittest.skipIf(skipme, 'require ' + str(require_name))
+    return unittest.skipIf(skipme, 'require ' + str(require_pattern))
 
 
 def cassandra_git_branch():
