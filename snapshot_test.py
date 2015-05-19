@@ -263,7 +263,7 @@ class TestArchiveCommitlog(SnapshotTester):
 
             debug("Restarting node1..")
             node1.stop()
-            node1.start()
+            node1.start(wait_for_binary_proto=True)
 
             node1.nodetool('flush')
             node1.nodetool('compact')
