@@ -9,7 +9,6 @@ from dtest import Tester, debug
 from tools import rows_to_list, require
 from cassandra.util import sortedset
 
-@require('9300')
 class TokenGenerator(Tester):
     """
     Basic tools/bin/token-generator test.
