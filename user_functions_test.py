@@ -185,7 +185,7 @@ class TestUserFunctions(Tester):
 
         session.execute("create table tab (key int primary key, udt frozen<test>);")
 
-        session.execute("insert into tab (key, udt) values (1, {a: 'une', b:1});")
+        session.execute("insert into tab (key, udt) values (1, {a: 'un', b:1});")
         session.execute("insert into tab (key, udt) values (2, {a: 'deux', b:2});")
         session.execute("insert into tab (key, udt) values (3, {a: 'trois', b:3});")
 
@@ -194,3 +194,45 @@ class TestUserFunctions(Tester):
         assert_one(session, "select sum(funk(udt)) from tab", [6])
 
         assert_invalid(session, "drop type test;")
+
+    @since('2.2')
+    def udf_with_udt_keyspace_isolation_test(self):
+        """
+        Ensure functions dont allow a UDT from another keyspace
+        @jira_ticket CASSANDRA-9409
+        @since 2.2
+        """
+        session = self.prepare()
+
+        session.execute("create type udt (a text, b int);")
+        self.create_ks(session, 'user_ks', 1)
+
+        # ensure we cannot use a udt from another keyspace as function argument
+        assert_invalid(
+            session,
+            "CREATE FUNCTION overloaded(v frozen<ks.udt>) called on null input RETURNS text LANGUAGE java AS 'return \"f1\";'",
+            "Statement on keyspace user_ks cannot refer to a user type in keyspace ks"
+        )
+
+        # ensure we cannot use a udt from another keyspace as return value
+        assert_invalid(
+            session,
+            ("CREATE FUNCTION test(v text) called on null input RETURNS frozen<ks.udt> "
+             "LANGUAGE java AS 'return null;';"),
+            "Statement on keyspace user_ks cannot refer to a user type in keyspace ks"
+        )
+
+    def aggregate_with_udt_keyspace_isolation_test(self):
+        """
+        Ensure aggregates dont allow a UDT from another keyspace
+        @jira_ticket CASSANDRA-9409
+        """
+        session = self.prepare()
+
+        session.execute("create type udt (a int);")
+        self.create_ks(session, 'user_ks', 1)
+        assert_invalid(
+            session,
+            "create aggregate suma (frozen<ks.udt>) sfunc plus stype int finalfunc stri initcond 10",
+            "Statement on keyspace user_ks cannot refer to a user type in keyspace ks"
+        )

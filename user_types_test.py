@@ -743,3 +743,28 @@ class TestUserTypes(Tester):
         session.execute("UPDATE tc SET v[b] = v[b] + {4,5} where id=0")
         rows = session.execute("SELECT * from tc WHERE id=0")
         self.assertEqual(listify(rows[0]), [0, [0, [1,2,3,4,5]]])
+
+    @since('2.2')
+    def test_user_type_isolation(self):
+        """
+        Ensure UDT cannot be used from another keyspace
+        @jira_ticket CASSANDRA-9409
+        @since 2.2
+        """
+
+        cluster = self.cluster
+        cluster.populate(1).start()
+        node1 = cluster.nodelist()[0]
+        session = self.patient_cql_connection(node1)
+        self.create_ks(session, 'user_types', 1)
+
+        # create a user defined type in a keyspace
+        session.execute("CREATE TYPE udt (first text, second int, third int)")
+
+        # ensure we cannot use a udt from another keyspace
+        self.create_ks(session, 'user_ks', 1)
+        assert_invalid(
+            session,
+            "CREATE TABLE t (id int PRIMARY KEY, v frozen<user_types.udt>)",
+            "Statement on keyspace user_ks cannot refer to a user type in keyspace user_types"
+        )
