@@ -23,7 +23,7 @@ class TestSchemaChanges(Tester):
         if original_version.startswith('2.0'):
             upgraded_version = 'git:cassandra-2.1'
         elif original_version.startswith('2.1'):
-            upgraded_version = 'git:trunk'
+            upgraded_version = 'git:cassandra-2.2'
         else:
             self.skip("This test is only designed to work with 2.0 and 2.1 right now")
 
