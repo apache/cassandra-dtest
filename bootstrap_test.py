@@ -62,15 +62,17 @@ class TestBootstrap(Tester):
         # Boostraping a new node
         node2 = new_node(cluster, token=tokens[1])
         node2.start(wait_for_binary_proto=True)
+        node2.compact()
 
         reader.check()
-        debug("node1 size before cleanup: %s" % float(node1.data_size()))
         node1.cleanup()
         debug("node1 size after cleanup: %s" % float(node1.data_size()))
         node1.compact()
         debug("node1 size after compacting: %s" % float(node1.data_size()))
         time.sleep(.5)
         reader.check()
+
+        debug("node2 size after compacting: %s" % float(node2.data_size()))
 
         size1 = float(node1.data_size())
         size2 = float(node2.data_size())
