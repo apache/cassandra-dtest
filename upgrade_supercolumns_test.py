@@ -14,7 +14,7 @@ from dtest import Tester, debug
 from tools import since
 
 
-@since('2.0')
+@since('2.0', max_version='2.1.99')
 class TestSCUpgrade(Tester):
     """
     Tests upgrade between 1.2->2.0 for super columns (since that's where we
