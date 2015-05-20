@@ -86,6 +86,10 @@ class TestCQL(Tester):
         session2 = self.patient_exclusive_cql_connection(node2, protocol_version=self.protocol_version)
         session2.set_keyspace('ks')
 
+        # FIXME remove after support for paging is added
+        session.default_fetch_size = None
+        session2.default_fetch_size = None
+
         sessions = []
         if QUERY_UPGRADED:
             sessions.append((True, session))
