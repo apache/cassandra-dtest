@@ -8,7 +8,7 @@ import time
 from cassandra.concurrent import execute_concurrent_with_args
 
 from dtest import Tester, debug
-from tools import replace_in_file, since, require
+from tools import replace_in_file, since
 import distutils.dir_util
 
 
@@ -220,7 +220,7 @@ class TestArchiveCommitlog(SnapshotTester):
             if archive_active_commitlogs:
                 # restart the node which causes the active commitlogs to be archived
                 node1.stop()
-                node1.start()
+                node1.start(wait_for_binary_proto=True)
 
             # Destroy the cluster
             cluster.stop()
@@ -238,7 +238,7 @@ class TestArchiveCommitlog(SnapshotTester):
             self.restore_snapshot(system_cfs_snapshot_dir, node1, 'system', 'schema_columnfamilies', 'cfs')
             self.restore_snapshot(snapshot_dir, node1, 'ks', 'cf', 'basic')
 
-            cluster.start()
+            cluster.start(wait_for_binary_proto=True)
 
             cursor = self.patient_cql_connection(node1)
             node1.nodetool('refresh ks cf')
