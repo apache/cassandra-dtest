@@ -1,6 +1,8 @@
-import os, random, re, time, uuid
+import random
+import re
+import time
+import uuid
 
-from ccmlib.common import get_version_from_build
 from dtest import Tester, debug
 from tools import since
 from assertions import assert_invalid, assert_one
@@ -597,10 +599,8 @@ class TestSecondaryIndexesOnCollections(Tester):
 
 
 class TestUpgradeSecondaryIndexes(Tester):
-    def __init__(self, *args, **kwargs):
-        Tester.__init__(self, *args, **kwargs)
 
-    @since('2.1')
+    @since('2.1', max_version='2.1.x')
     def test_read_old_sstables_after_upgrade(self):
         """ from 2.1 the location of sstables changed (CASSANDRA-5202), but existing sstables continue
         to be read from the old location. Verify that this works for index sstables as well as regular
@@ -622,23 +622,13 @@ class TestUpgradeSecondaryIndexes(Tester):
         query = "SELECT * FROM index_upgrade.table1 WHERE v=0"
         assert_one(cursor, query, [0, 0])
 
-        # If we are on 2.2 or any higher version upgrade to 2.1.latest.
-        # Otherwise, we must be on a 2.2.x, so we should be upgrading to that version.
-        # This will let us test upgrading from 2.0.12 to each of the 2.1 minor releases.
-        CASSANDRA_DIR = os.environ.get('CASSANDRA_DIR')
-        if get_version_from_build(CASSANDRA_DIR) >= '2.2':
-            # Upgrade nodes to 2.1
-            # See CASSANDRA-9116
-            debug("Upgrading to cassandra-2.1 latest")
-            self.upgrade_to_version("git:cassandra-2.1", [node1])
-            time.sleep(.5)
-        else:
-            node1.drain()
-            node1.watch_log_for("DRAINED")
-            node1.stop(wait_other_notice=False)
-            debug("Upgrading to current version")
-            self.set_node_to_current_version(node1)
-            node1.start(wait_other_notice=True)
+        # Upgrade to the 2.1.x version
+        node1.drain()
+        node1.watch_log_for("DRAINED")
+        node1.stop(wait_other_notice=False)
+        debug("Upgrading to current version")
+        self.set_node_to_current_version(node1)
+        node1.start(wait_other_notice=True)
 
         [node1] = cluster.nodelist()
         cursor = self.patient_cql_connection(node1)
