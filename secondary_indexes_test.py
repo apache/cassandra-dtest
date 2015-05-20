@@ -600,7 +600,7 @@ class TestSecondaryIndexesOnCollections(Tester):
 
 class TestUpgradeSecondaryIndexes(Tester):
 
-    @since('2.1', max_version='2.1.99')
+    @since('2.1', max_version='2.1.x')
     def test_read_old_sstables_after_upgrade(self):
         """ from 2.1 the location of sstables changed (CASSANDRA-5202), but existing sstables continue
         to be read from the old location. Verify that this works for index sstables as well as regular
