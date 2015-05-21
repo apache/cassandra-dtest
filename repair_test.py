@@ -1,8 +1,10 @@
 import time, re
+from collections import namedtuple
 from dtest import Tester, debug
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
-from tools import no_vnodes, insert_c1c2, query_c1c2
+from tools import no_vnodes, insert_c1c2, query_c1c2, since
+
 
 class TestRepair(Tester):
 
@@ -216,3 +218,104 @@ class TestRepair(Tester):
         # check log for actual repair for non gcable data
         l = node2.grep_log("/([0-9.]+) and /([0-9.]+) have ([0-9]+) range\(s\) out of sync for cf2")
         assert len(l) > 0, "Non GC-able data should be repaired"
+
+
+RepairTableContents = namedtuple('RepairTableContents',
+                                 ['parent_repair_history', 'repair_history'])
+
+
+@since('2.2')
+class TestRepairDataSystemTable(Tester):
+    """
+    @jira_ticket CASSANDRA-5839
+
+    Tests the `system_distributed.parent_repair_history` and
+    `system_distributed.repair_history` tables by writing thousands of records
+    to a cluster, then ensuring these tables are in valid states before and
+    after running repair.
+    """
+    def setUp(self):
+        """
+        Prepares a cluster for tests of the repair history tables by starting
+        a 5-node cluster, then inserting 5000 values with RF=3.
+        """
+
+        Tester.setUp(self)
+        self.cluster.populate(5).start(wait_for_binary_proto=True)
+        self.node1 = self.cluster.nodelist()[0]
+        self.session = self.patient_cql_connection(self.node1)
+
+        self.node1.stress(stress_options=['write', 'n=5000', 'cl=ONE', '-schema', 'replication(factor=3)'])
+
+        self.cluster.flush()
+
+    def repair_table_contents(self, node, include_system_keyspaces=True):
+        """
+        @param node the node to connect to and query
+        @param include_system_keyspaces if truthy, return repair information about all keyspaces. If falsey, filter out keyspaces whose name contains 'system'
+
+        Return a `RepairTableContents` `namedtuple` containing the rows in
+        `node`'s `system_distributed.parent_repair_history` and
+        `system_distributed.repair_history` tables. If `include_system_keyspaces`,
+        include all results. If not `include_system_keyspaces`, filter out
+        repair information about system keyspaces, or at least keyspaces with
+        'system' in their names.
+        """
+        session = self.patient_cql_connection(node)
+
+        def execute_with_all(stmt):
+            return session.execute(SimpleStatement(stmt, consistency_level=ConsistencyLevel.ALL))
+
+        parent_repair_history = execute_with_all('SELECT * FROM system_distributed.parent_repair_history;')
+        repair_history = execute_with_all('SELECT * FROM system_distributed.repair_history;')
+
+        if not include_system_keyspaces:
+            parent_repair_history = [row for row in parent_repair_history
+                                     if 'system' not in row.keyspace_name]
+            repair_history = [row for row in repair_history if
+                              'system' not in row.keyspace_name]
+        return RepairTableContents(parent_repair_history=parent_repair_history,
+                                   repair_history=repair_history)
+
+    def initial_empty_repair_tables_test(self):
+        debug('repair tables:')
+        debug(self.repair_table_contents(node=self.node1, include_system_keyspaces=False))
+        repair_tables_dict = self.repair_table_contents(node=self.node1, include_system_keyspaces=False)._asdict()
+        for table_name, table_contents in repair_tables_dict.items():
+            self.assertFalse(table_contents, '{} is non-empty'.format(table_name))
+
+    def repair_history_template(self, node, parent):
+        """
+        @param repair_node calls repair and checks the contents of the repair history tables on this node
+        @param parent whether to check the parent_repair_history or repair_history table
+
+        A parameterized test of `system_distributed.parent_repair_history`
+        and `system_distributed.parent_repair_history`. Tests them by:
+
+        - running repair on `node` and
+        - getting the contents of the `parent_repair_history` and `repair_history` tables on `node`.
+
+        If `parent`, then this checks that there are a non-zero number of entries in `parent_repair_history`.
+        If not `parent`, then this checks that there are a non-zero number of entries in `repair_history`.
+        """
+        # this error is from tripping an anticompaction guard, not catastrophic failure
+        self.ignore_log_patterns = ['may not update a reader that has been obsoleted']
+        node.repair()
+        (parent_repair_history,
+         repair_history) = self.repair_table_contents(node=node, include_system_keyspaces=False)
+
+        self.assertTrue(len(parent_repair_history if parent else repair_history))
+
+    def repair_parent_table_test(self):
+        """
+        Uses repair_history_template to test that `parent_repair_history` on a
+        node is populated correctly after running repair.
+        """
+        self.repair_history_template(node=self.node1, parent=True)
+
+    def repair_table_test(self):
+        """
+        Uses repair_history_template to test that `repair_history` on a node
+        is populated correctly after running repair.
+        """
+        self.repair_history_template(node=self.node1, parent=False)
