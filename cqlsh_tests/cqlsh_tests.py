@@ -492,47 +492,6 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
 (6 rows)
 """)
 
-    def test_copy_to(self):
-        self.cluster.populate(1).start()
-        node1, = self.cluster.nodelist()
-
-        session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'ks', 1)
-        session.execute("""
-            CREATE TABLE testcopyto (
-                a int,
-                b text,
-                c float,
-                d uuid,
-                PRIMARY KEY (a, b)
-            )""")
-
-        insert_statement = session.prepare("INSERT INTO testcopyto (a, b, c, d) VALUES (?, ?, ?, ?)")
-        args = [(i, str(i), float(i) + 0.5, uuid4()) for i in range(1000)]
-        execute_concurrent_with_args(session, insert_statement, args)
-
-        results = list(session.execute("SELECT * FROM testcopyto"))
-
-        tempfile = NamedTemporaryFile()
-        debug('Exporting to csv file: %s' % (tempfile.name,))
-        node1.run_cqlsh(cmds="COPY ks.testcopyto TO '%s'" % (tempfile.name,))
-
-        # session
-        with open(tempfile.name, 'r') as csvfile:
-            row_count = 0
-            csvreader = csv.reader(csvfile)
-            for cql_row, csv_row in zip(results, csvreader):
-                self.assertEquals(map(str, cql_row), csv_row)
-                row_count += 1
-
-            self.assertEquals(len(results), row_count)
-
-        # import the CSV file with COPY FROM
-        session.execute("TRUNCATE ks.testcopyto")
-        node1.run_cqlsh(cmds="COPY ks.testcopyto FROM '%s'" % (tempfile.name,))
-        new_results = list(session.execute("SELECT * FROM testcopyto"))
-        self.assertEquals(results, new_results)
-
     def run_cqlsh(self, node, cmds, cqlsh_options=[]):
         cdir = node.get_install_dir()
         cli = os.path.join(cdir, 'bin', common.platform_binary('cqlsh'))
