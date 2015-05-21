@@ -32,12 +32,17 @@ class TestBootstrap(Tester):
     def simple_bootstrap_test(self):
         cluster = self.cluster
         tokens = cluster.balanced_tokens(2)
+        cluster.set_configuration_options(values={'num_tokens': 1})
+
+        debug("[node1, node2] tokens: %r" % (tokens,))
 
         keys = 10000
 
         # Create a single node cluster
-        cluster.populate(1, tokens=[tokens[0]]).start(wait_other_notice=True)
-        node1 = cluster.nodes["node1"]
+        cluster.populate(1)
+        node1 = cluster.nodelist()[0]
+        node1.set_configuration_options(values={'initial_token': tokens[0]})
+        cluster.start(wait_other_notice=True)
 
         session = self.patient_cql_connection(node1)
         self.create_ks(session, 'ks', 1)
@@ -60,7 +65,8 @@ class TestBootstrap(Tester):
         reader = self.go(lambda _: query_c1c2(session, random.randint(0, keys - 1), ConsistencyLevel.ONE))
 
         # Boostraping a new node
-        node2 = new_node(cluster, token=tokens[1])
+        node2 = new_node(cluster)
+        node2.set_configuration_options(values={'initial_token': tokens[1]})
         node2.start(wait_for_binary_proto=True)
         node2.compact()
 
