@@ -385,7 +385,7 @@ class TestDistributedTTL(Tester):
             INSERT INTO ttl_table (key, col1) VALUES (1, 1) USING TTL 5;
         """)
         self.cursor1.execute("""
-            INSERT INTO ttl_table (key, col1) VALUES (2, 2) USING TTL 60;
+            INSERT INTO ttl_table (key, col1) VALUES (2, 2) USING TTL 1000;
         """)
         assert_all(
             self.cursor1,
