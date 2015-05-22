@@ -1,9 +1,7 @@
 from dtest import Tester
 
-import os, sys, time
-from ccmlib.cluster import Cluster
-from tools import require, since
-from jmxutils import make_mbean, JolokiaAgent
+import time
+from jmxutils import make_mbean, JolokiaAgent, remove_perf_disable_shared_mem
 
 
 class TestDeletion(Tester):
@@ -29,7 +27,7 @@ class TestDeletion(Tester):
 
         cursor.execute('delete from cf where key=1')
         result = cursor.execute('select * from cf;')
-        if cluster.version() < '1.2': # > 1.2 doesn't show tombstones
+        if cluster.version() < '1.2':  # > 1.2 doesn't show tombstones
             assert len(result) == 2 and len(result[0]) == 1 and len(result[1]) == 1, result
 
         node1.flush()
@@ -41,7 +39,12 @@ class TestDeletion(Tester):
         assert len(result) == 1 and len(result[0]) == 2, result
 
     def tombstone_size_test(self):
-        self.cluster.populate(1).start(wait_for_binary_proto=True)
+        self.cluster.populate(1)
+        node1 = self.cluster.nodelist()[0]
+
+        remove_perf_disable_shared_mem(node1)
+
+        self.cluster.start(wait_for_binary_proto=True)
         [node1] = self.cluster.nodelist()
         cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'ks', 1)
