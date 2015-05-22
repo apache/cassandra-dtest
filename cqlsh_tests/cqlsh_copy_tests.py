@@ -26,6 +26,7 @@ DEFAULT_FLOAT_PRECISION = 5  # magic number copied from cqlsh script
 
 
 @canReuseCluster
+@since('2.1')  # version differences break formatting code on 2.0.x
 class CqlshCopyTest(Tester):
     '''
     Tests the COPY TO and COPY FROM features in cqlsh.
