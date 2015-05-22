@@ -403,8 +403,7 @@ class TestDistributedTTL(Tester):
         self.cursor1.execute("USE ks;")
         self.node1.cleanup()
 
-        # Check that the expired data has not been replicated
-        assert_row_count(cursor2, 'ttl_table', 1)
+        assert_all(cursor2, "SELECT count(*) FROM ttl_table", [[1]], cl=ConsistencyLevel.ALL)
         assert_all(
             cursor2,
             "SELECT * FROM ttl_table;",
