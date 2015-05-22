@@ -3,7 +3,7 @@ from tools import since, require
 
 from cassandra.concurrent import execute_concurrent_with_args
 
-from jmxutils import JolokiaAgent, make_mbean
+from jmxutils import JolokiaAgent, make_mbean, remove_perf_disable_shared_mem
 
 
 class TestUpgradeIndexSummary(Tester):
@@ -20,6 +20,9 @@ class TestUpgradeIndexSummary(Tester):
         node.set_install_dir(version='2.0.12')
         node.set_log_level("INFO")
         node.stop()
+
+        remove_perf_disable_shared_mem(node)
+
         cluster.start()
 
         # Insert enough partitions to fill a full sample's worth of entries
@@ -45,6 +48,9 @@ class TestUpgradeIndexSummary(Tester):
 
         # setup log4j / logback again (necessary moving from 2.0 -> 2.1)
         node.set_log_level("INFO")
+
+        remove_perf_disable_shared_mem(node)
+
         node.start()
 
         session = self.patient_cql_connection(node)
@@ -72,6 +78,9 @@ class TestUpgradeIndexSummary(Tester):
         debug("Set new cassandra dir for %s: %s" % (node.name, node.get_install_dir()))
 
         node.set_log_level("INFO")
+
+        remove_perf_disable_shared_mem(node)
+
         node.start()
 
         # on startup, it should detect that the old-format sstable had its

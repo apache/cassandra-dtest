@@ -1,3 +1,4 @@
+import ccmlib.common as common
 from urllib2 import urlopen
 import json
 import os
@@ -28,6 +29,22 @@ def make_mbean(package, type, **kwargs):
         rv += ',' + ','.join('{k}={v}'.format(k=k, v=v)
                              for k, v in kwargs.iteritems())
     return rv
+
+
+def remove_perf_disable_shared_mem(node):
+    """
+    The Jolokia agent is incompatible with the -XX:+PerfDisableSharedMem JVM
+    option (see https://github.com/rhuss/jolokia/issues/198 for details).  This
+    edits cassandra-env.sh (or the Windows equivalent) to remove that option.
+    """
+    if common.is_win() and node.get_base_cassandra_version() >= 2.1:
+        conf_file = os.path.join(node.get_conf_dir(), common.CASSANDRA_WIN_ENV)
+    else:
+        conf_file = os.path.join(node.get_conf_dir(), common.CASSANDRA_ENV)
+
+    pattern = 'PerfDisableSharedMem'
+    replacement = ''
+    common.replace_in_file(conf_file, pattern, replacement)
 
 
 class JolokiaAgent(object):
