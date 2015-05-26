@@ -84,7 +84,7 @@ class TestRepair(Tester):
 
         # Disable hinted handoff and set batch commit log so this doesn't
         # interfer with the test (this must be after the populate)
-        cluster.set_configuration_options(values={ 'hinted_handoff_enabled' : False}, batch_commitlog=True)
+        cluster.set_configuration_options(values={'hinted_handoff_enabled': False}, batch_commitlog=True)
         debug("Starting cluster..")
         cluster.populate(3).start()
         [node1, node2, node3] = cluster.nodelist()
@@ -110,7 +110,6 @@ class TestRepair(Tester):
         debug("Checking data on node3...")
         self.check_rows_on_node(node3, 2000, missings=[1000])
 
-
         # Verify that node1 has 2001 keys
         debug("Checking data on node1...")
         self.check_rows_on_node(node1, 2001, found=[1000])
@@ -119,7 +118,7 @@ class TestRepair(Tester):
         debug("Checking data on node2...")
         self.check_rows_on_node(node2, 2001, found=[1000])
 
-        time.sleep(10) # see CASSANDRA-4373
+        time.sleep(10)  # see CASSANDRA-4373
         # Run repair
         start = time.time()
         debug("starting repair...")
@@ -152,7 +151,7 @@ class TestRepair(Tester):
         """
         cluster = self.cluster
         cluster.populate(2)
-        cluster.set_configuration_options(values={ 'hinted_handoff_enabled' : False}, batch_commitlog=True)
+        cluster.set_configuration_options(values={'hinted_handoff_enabled': False}, batch_commitlog=True)
         cluster.start()
         [node1, node2] = cluster.nodelist()
 
