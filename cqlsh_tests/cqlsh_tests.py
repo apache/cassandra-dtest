@@ -16,11 +16,21 @@ from distutils.version import LooseVersion
 from tools import create_c1c2_table, insert_c1c2, since, rows_to_list
 from assertions import assert_all, assert_none
 
+from cqlsh_tools import monkeypatch_driver, unmonkeypatch_driver
+
 
 class TestCqlsh(Tester):
 
     def __init__(self, *args, **kwargs):
         Tester.__init__(self, *args, **kwargs)
+
+    @classmethod
+    def setUpClass(cls):
+        monkeypatch_driver(cls)
+
+    @classmethod
+    def tearDownClass(cls):
+        unmonkeypatch_driver(cls)
 
     def test_simple_insert(self):
 
@@ -880,9 +890,9 @@ Unlogged batch covering 2 partitions detected against table [client_warnings.tes
 
 
 class CqlshSmokeTest(Tester):
-    '''
+    """
     Tests simple use cases for clqsh.
-    '''
+    """
     def setUp(self):
         super(CqlshSmokeTest, self).setUp()
         self.cluster.populate(1).start(wait_for_binary_proto=True)
@@ -1161,9 +1171,9 @@ class CqlshSmokeTest(Tester):
         return [x[0] for x in rows_to_list(self.cursor.execute(cmd))]
 
 class CqlLoginTest(Tester):
-    '''
+    """
     Tests login which requires password authenticator
-    '''
+    """
     def setUp(self):
         super(CqlLoginTest, self).setUp()
         config = {'authenticator' : 'org.apache.cassandra.auth.PasswordAuthenticator'}

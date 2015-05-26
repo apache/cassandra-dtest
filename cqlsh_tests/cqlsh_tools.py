@@ -6,6 +6,8 @@ import time
 
 from nose.tools import assert_items_equal
 
+import cassandra
+
 
 class DummyColorMap(object):
     def __getitem__(self, *args):
@@ -13,9 +15,9 @@ class DummyColorMap(object):
 
 
 def csv_rows(filename, delimiter=None):
-    '''
+    """
     Given a filename, opens a csv file and yields it line by line.
-    '''
+    """
     reader_opts = {}
     if delimiter is not None:
         reader_opts['delimiter'] = delimiter
@@ -58,3 +60,24 @@ def write_rows_to_csv(filename, data):
         writer = csv.writer(csvfile)
         for row in data:
             writer.writerow(row)
+
+
+def monkeypatch_driver(obj):
+    """
+    Monkeypatches the `cassandra` driver module in the same way
+    that clqsh does. Stores the original values of monkeypatched names on
+    `obj`.
+    """
+    obj._cached_deserialize = cassandra.cqltypes.BytesType.deserialize
+    cassandra.cqltypes.BytesType.deserialize = staticmethod(lambda byts, protocol_version: bytearray(byts))
+    obj._cached_support_empty_values = cassandra.cqltypes.CassandraType.support_empty_values
+    cassandra.cqltypes.CassandraType.support_empty_values = True
+
+
+def unmonkeypatch_driver(obj):
+    """
+    Given an object that was used to cache parts of `cassandra` for
+    monkeypatching, restore those values to the `cassandra` module.
+    """
+    cassandra.cqltypes.BytesType.deserialize = obj._cached_deserialize
+    cassandra.cqltypes.CassandraType.support_empty_values = obj._cached_support_empty_values
