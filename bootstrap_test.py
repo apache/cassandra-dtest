@@ -8,6 +8,7 @@ import re
 from dtest import Tester, debug
 from tools import new_node, query_c1c2, since, KillOnBootstrap, InterruptBootstrap
 from assertions import assert_almost_equal
+from assertions import assert_almost_equal, assert_one
 from ccmlib.node import NodeError
 from cassandra import ConsistencyLevel
 from cassandra.concurrent import execute_concurrent_with_args
@@ -428,3 +429,49 @@ class TestBootstrap(Tester):
         mark = node2.mark_log()
         node2.start(wait_other_notice=True)
         node2.watch_log_for("JOINING:", from_mark=mark)
+
+    @since('2.1.1')
+    def simultaneous_bootstrap_test(self):
+        """
+        Attempt to bootstrap two nodes at once, to assert the second bootstrapped node fails, and does not interfere.
+
+        Start a one node cluster and run a stress write workload.
+        Start up a second node, and wait for the first node to detect it has joined the cluster.
+        While the second node is bootstrapping, start a third node. This should fail.
+
+        @jira_ticket CASSANDRA-7069
+        @jira_ticket CASSANDRA-9484
+        """
+
+        bootstrap_error = ("Other bootstrapping/leaving/moving nodes detected,"
+                           " cannot bootstrap while cassandra.consistent.rangemovement is true")
+
+        self.ignore_log_patterns.append(bootstrap_error)
+
+        cluster = self.cluster
+        cluster.populate(1)
+        cluster.start(wait_for_binary_proto=True)
+
+        node1, = cluster.nodelist()
+
+        node1.stress(['write', 'n=500K', '-schema', 'replication(factor=1)',
+                          '-rate', 'threads=10'])
+
+        node2 = new_node(cluster)
+        node2.start(wait_other_notice=True)
+
+        node3 = new_node(cluster, remote_debug_port='2003')
+        process = node3.start()
+        stdout, stderr = process.communicate()
+        self.assertIn(bootstrap_error, stderr, msg=stderr)
+        self.assertFalse(node3.is_running(), msg="Two nodes bootstrapped simultaneously")
+
+        node2.watch_log_for("Starting listening for CQL clients")
+
+        session = self.patient_exclusive_cql_connection(node2)
+
+        # Repeat the select count(*) query, to help catch
+        # bugs like 9484, where count(*) fails at higher
+        # data loads.
+        for _ in xrange(5):
+            assert_one(session, "SELECT count(*) from keyspace1.standard1", [500000], cl=ConsistencyLevel.ONE)
