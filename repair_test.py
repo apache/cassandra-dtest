@@ -5,7 +5,7 @@ from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
 
 from dtest import Tester, debug
-from tools import insert_c1c2, no_vnodes, query_c1c2, since
+from tools import insert_c1c2, no_vnodes, query_c1c2, since, require
 
 
 class TestRepair(Tester):
@@ -233,6 +233,7 @@ RepairTableContents = namedtuple('RepairTableContents',
 
 
 @since('2.2')
+@require('CASSANDRA-9482')  # not a test for this ticket, but fails because of it
 class TestRepairDataSystemTable(Tester):
     """
     @jira_ticket CASSANDRA-5839
