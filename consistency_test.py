@@ -605,23 +605,29 @@ class TestConsistency(Tester):
         cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'ks', 3)
         self.create_cf(cursor, 'cf', read_repair=0.0)
-        # insert 9 columns in one row
-        insert_columns(self, cursor, 0, 9)
 
-        # Deleting 3 first columns with a different node dead each time
-        self.stop_delete_and_restart(1, 0)
-        self.stop_delete_and_restart(2, 1)
-        self.stop_delete_and_restart(3, 2)
+        # Repeat this test 10 times to make it more easy to spot a null pointer exception caused by a race, see CASSANDRA-9460
+        for k in xrange(10):
+            # insert 9 columns in one row
+            insert_columns(self, cursor, 0, 9)
 
-        # Query 3 firsts columns
-        cursor = self.patient_cql_connection(node1, 'ks')
-        query = SimpleStatement('SELECT c, v FROM cf WHERE key=\'k0\' LIMIT 3', consistency_level=ConsistencyLevel.QUORUM)
-        rows = cursor.execute(query)
-        res = rows
-        assert len(res) == 3, 'Expecting 3 values, got %d (%s)' % (len(res), str(res))
-        # value 0, 1 and 2 have been deleted
-        for i in xrange(1, 4):
-            assert res[i-1][1] == 'value%d' % (i+2), 'Expecting value%d, got %s (%s)' % (i+2, res[i-1][1], str(res))
+            # Deleting 3 first columns with a different node dead each time
+            self.stop_delete_and_restart(1, 0)
+            self.stop_delete_and_restart(2, 1)
+            self.stop_delete_and_restart(3, 2)
+
+            # Query 3 firsts columns
+            cursor = self.patient_cql_connection(node1, 'ks')
+            query = SimpleStatement('SELECT c, v FROM cf WHERE key=\'k0\' LIMIT 3', consistency_level=ConsistencyLevel.QUORUM)
+            rows = cursor.execute(query)
+            res = rows
+            assert len(res) == 3, 'Expecting 3 values, got %d (%s)' % (len(res), str(res))
+            # value 0, 1 and 2 have been deleted
+            for i in xrange(1, 4):
+                assert res[i-1][1] == 'value%d' % (i+2), 'Expecting value%d, got %s (%s)' % (i+2, res[i-1][1], str(res))
+
+            truncate_statement = SimpleStatement('TRUNCATE cf', consistency_level=ConsistencyLevel.QUORUM)
+            cursor.execute(truncate_statement)
 
     def short_read_delete_test(self):
         """ Test short reads ultimately leaving no columns alive [#4000] """
@@ -741,23 +747,29 @@ class TestConsistency(Tester):
         cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'ks', 3)
         self.create_cf(cursor, 'cf', read_repair=0.0)
-        # insert 9 columns in one row
-        insert_columns(self, cursor, 0, 9)
 
-        # Deleting 3 last columns with a different node dead each time
-        self.stop_delete_and_restart(1, 6)
-        self.stop_delete_and_restart(2, 7)
-        self.stop_delete_and_restart(3, 8)
+        # Repeat this test 10 times to make it more easy to spot a null pointer exception caused by a race, see CASSANDRA-9460
+        for k in xrange(10):
+            # insert 9 columns in one row
+            insert_columns(self, cursor, 0, 9)
 
-        # Query 3 firsts columns
-        cursor = self.patient_cql_connection(node1, 'ks')
-        query = SimpleStatement('SELECT c, v FROM cf WHERE key=\'k0\' ORDER BY c DESC LIMIT 3', consistency_level=ConsistencyLevel.QUORUM)
-        rows = cursor.execute(query)
-        res = rows
-        assert len(res) == 3, 'Expecting 3 values, got %d (%s)' % (len(res), str(res))
-        # value 6, 7 and 8 have been deleted
-        for i in xrange(0, 3):
-            assert res[i][1] == 'value%d' % (5-i), 'Expecting value%d, got %s (%s)' % (5-i, res[i][1], str(res))
+            # Deleting 3 last columns with a different node dead each time
+            self.stop_delete_and_restart(1, 6)
+            self.stop_delete_and_restart(2, 7)
+            self.stop_delete_and_restart(3, 8)
+
+            # Query 3 firsts columns
+            cursor = self.patient_cql_connection(node1, 'ks')
+            query = SimpleStatement('SELECT c, v FROM cf WHERE key=\'k0\' ORDER BY c DESC LIMIT 3', consistency_level=ConsistencyLevel.QUORUM)
+            rows = cursor.execute(query)
+            res = rows
+            assert len(res) == 3, 'Expecting 3 values, got %d (%s)' % (len(res), str(res))
+            # value 6, 7 and 8 have been deleted
+            for i in xrange(0, 3):
+                assert res[i][1] == 'value%d' % (5-i), 'Expecting value%d, got %s (%s)' % (5-i, res[i][1], str(res))
+
+            truncate_statement = SimpleStatement('TRUNCATE cf', consistency_level=ConsistencyLevel.QUORUM)
+            cursor.execute(truncate_statement)
 
     def quorum_available_during_failure_test(self):
         CL = ConsistencyLevel.QUORUM
