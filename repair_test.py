@@ -10,8 +10,13 @@ from tools import insert_c1c2, no_vnodes, query_c1c2, since
 
 class TestRepair(Tester):
 
-    def check_rows_on_node(self, node_to_check, rows, found=[], missings=[], restart=True):
+    def check_rows_on_node(self, node_to_check, rows, found=None, missings=None, restart=True):
+        if found is None:
+            found = []
+        if missings is None:
+            missings = []
         stopped_nodes = []
+
         for node in self.cluster.nodes.values():
             if node.is_running() and node is not node_to_check:
                 stopped_nodes.append(node)
@@ -49,7 +54,9 @@ class TestRepair(Tester):
     def simple_repair_order_preserving_test(self, ):
         self._simple_repair(order_preserving_partitioner=True)
 
-    def _repair_options(self, ks='', cf=[], sequential=True):
+    def _repair_options(self, ks='', cf=None, sequential=True):
+        if cf is None:
+            cf = []
         opts = []
         version = self.cluster.version()
         # since version 2.2, default is parallel, otherwise it's sequential
