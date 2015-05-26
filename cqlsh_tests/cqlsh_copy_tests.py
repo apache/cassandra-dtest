@@ -24,6 +24,7 @@ from cqlsh_tools import (csv_rows, random_list, DummyColorMap,
                          unmonkeypatch_driver)
 
 DEFAULT_FLOAT_PRECISION = 5  # magic number copied from cqlsh script
+DEFAULT_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'  # based on cqlsh script; timezone stripped
 
 
 @canReuseCluster
@@ -137,7 +138,7 @@ class CqlshCopyTest(Tester):
         return format_value(type(val), val,
                             encoding=encoding_name,
                             date_time_format=date_time_format,
-                            time_format='',
+                            time_format=DEFAULT_TIME_FORMAT,
                             float_precision=DEFAULT_FLOAT_PRECISION,
                             colormap=DummyColorMap(),
                             nullval=None).strval
