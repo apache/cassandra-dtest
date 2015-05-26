@@ -20,30 +20,25 @@ from dtest import debug, Tester, canReuseCluster
 from tools import rows_to_list, since
 from cqlsh_tools import (csv_rows, random_list, DummyColorMap,
                          assert_csvs_items_equal, write_rows_to_csv,
-                         strip_timezone_if_time_string)
+                         strip_timezone_if_time_string, monkeypatch_driver,
+                         unmonkeypatch_driver)
 
 DEFAULT_FLOAT_PRECISION = 5  # magic number copied from cqlsh script
 
 
 @canReuseCluster
 class CqlshCopyTest(Tester):
-    '''
+    """
     Tests the COPY TO and COPY FROM features in cqlsh.
     @jira_ticket CASSANDRA-3906
-    '''
+    """
     @classmethod
     def setUpClass(cls):
-        # monkeypatch cassandra library in the same way cqlsh does
-        cls._cached_deserialize = cassandra.cqltypes.BytesType.deserialize
-        cassandra.cqltypes.BytesType.deserialize = staticmethod(lambda byts, protocol_version: bytearray(byts))
-        cls._cached_support_empty_values = cassandra.cqltypes.CassandraType.support_empty_values
-        cassandra.cqltypes.CassandraType.support_empty_values = True
+        monkeypatch_driver(cls)
 
     @classmethod
     def tearDownClass(cls):
-        # undo monkeypatching from setUpClass
-        cassandra.cqltypes.BytesType.deserialize = cls._cached_deserialize
-        cassandra.cqltypes.CassandraType.support_empty_values = cls._cached_support_empty_values
+        unmonkeypatch_driver(cls)
 
     def prepare(self):
         if not self.cluster.nodelist():
@@ -94,9 +89,9 @@ class CqlshCopyTest(Tester):
 
     @contextmanager
     def _cqlshlib(self):
-        '''
+        """
         Returns the cqlshlib module, as defined in self.cluster's first node.
-        '''
+        """
         # This method accomplishes its goal by manually adding the library to
         # sys.path, returning the module, then restoring the old path once the
         # context manager exits. This isn't great for maintainability and should
@@ -147,23 +142,23 @@ class CqlshCopyTest(Tester):
                             nullval=None).strval
 
     def result_to_csv_rows(self, result):
-        '''
+        """
         Given an object returned from a CQL query, returns a string formatted by
         the cqlsh formatting utilities.
-        '''
+        """
         # This has no real dependencies on Tester except that self._cqlshlib has
         # to grab self.cluster's install directory. This should be pulled out
         # into a bare function if cqlshlib is made easier to interact with.
         return [[self.format_for_csv(v) for v in row] for row in result]
 
     def test_list_data(self):
-        '''
+        """
         Tests the COPY TO command with the list datatype by:
 
         - populating a table with lists of uuids,
         - exporting the table to a CSV file with COPY TO,
         - comparing the CSV file to the SELECTed contents of the table.
-        '''
+        """
         self.prepare()
         self.session.execute("""
             CREATE TABLE testlist (
@@ -184,13 +179,13 @@ class CqlshCopyTest(Tester):
         self.assertCsvResultEqual(tempfile.name, results)
 
     def test_tuple_data(self):
-        '''
+        """
         Tests the COPY TO command with the tuple datatype by:
 
         - populating a table with tuples of uuids,
         - exporting the table to a CSV file with COPY TO,
         - comparing the CSV file to the SELECTed contents of the table.
-        '''
+        """
         self.prepare()
         self.session.execute("""
             CREATE TABLE testtuple (
@@ -211,7 +206,7 @@ class CqlshCopyTest(Tester):
         self.assertCsvResultEqual(tempfile.name, results)
 
     def non_default_delimiter_template(self, delimiter):
-        '''
+        """
         @param delimiter the delimiter to use for the CSV file.
 
         Test exporting to CSV files using delimiters other than ',' by:
@@ -219,7 +214,7 @@ class CqlshCopyTest(Tester):
         - populating a table with integers,
         - exporting to a CSV file, specifying a delimiter, then
         - comparing the contents of the csv file to the SELECTed contents of the table.
-        '''
+        """
 
         self.prepare()
         self.session.execute("""
@@ -241,29 +236,29 @@ class CqlshCopyTest(Tester):
         self.assertCsvResultEqual(tempfile.name, results)
 
     def test_colon_delimiter(self):
-        '''
+        """
         Use non_default_delimiter_template to test COPY with the delimiter ':'.
-        '''
+        """
         self.non_default_delimiter_template(':')
 
     def test_letter_delimiter(self):
-        '''
+        """
         Use non_default_delimiter_template to test COPY with the delimiter 'a'.
-        '''
+        """
         self.non_default_delimiter_template('a')
 
     def test_number_delimiter(self):
-        '''
+        """
         Use non_default_delimiter_template to test COPY with the delimiter '1'.
-        '''
+        """
         self.non_default_delimiter_template('1')
 
     def custom_null_indicator_template(self, indicator):
-        '''
+        """
         @param indicator the null indicator to be used in COPY
 
         A parametrized test that tests COPY with a given null indicator.
-        '''
+        """
         self.prepare()
         self.session.execute("""
             CREATE TABLE testnullindicator (
@@ -289,19 +284,19 @@ class CqlshCopyTest(Tester):
         self.assertCsvResultEqual(tempfile.name, results)
 
     def test_undefined_as_null_indicator(self):
-        '''
+        """
         Use custom_null_indicator_template to test COPY with NULL = undefined.
-        '''
+        """
         self.custom_null_indicator_template('undefined')
 
     def test_null_as_null_indicator(self):
-        '''
+        """
         Use custom_null_indicator_template to test COPY with NULL = 'null'.
-        '''
+        """
         self.custom_null_indicator_template('null')
 
     def test_writing_use_header(self):
-        '''
+        """
         Test that COPY can write a CSV with a header by:
 
         - creating and populating a table,
@@ -309,7 +304,7 @@ class CqlshCopyTest(Tester):
         HEADER = true
         - checking that the contents of the CSV file are the written values plus
         the header.
-        '''
+        """
         self.prepare()
         self.session.execute("""
             CREATE TABLE testheader (
@@ -333,14 +328,14 @@ class CqlshCopyTest(Tester):
                                  [['a', 'b'], ['1', '10'], ['2', '20'], ['3', '30']])
 
     def test_reading_use_header(self):
-        '''
+        """
         Test that COPY can read a CSV with a header by:
 
         - creating a table,
         - writing a CSV with a header,
         - importing the contents of the CSV file using COPY WITH HEADER = true,
         - checking that the contents of the table are the written values.
-        '''
+        """
         self.prepare()
         self.session.execute("""
             CREATE TABLE testheader (
@@ -367,7 +362,7 @@ class CqlshCopyTest(Tester):
                               [tuple(r) for r in rows_to_list(result)])
 
     def test_explicit_column_order_writing(self):
-        '''
+        """
         Test that COPY can write to a CSV file when the order of columns is
         explicitly specified by:
 
@@ -376,7 +371,7 @@ class CqlshCopyTest(Tester):
         appeared in the CREATE TABLE statement,
         - writing a CSV file with the columns in that order, and
         - asserting that the two CSV files contain the same values.
-        '''
+        """
         self.prepare()
         self.session.execute("""
             CREATE TABLE testorder (
@@ -404,7 +399,7 @@ class CqlshCopyTest(Tester):
         assert_csvs_items_equal(tempfile.name, reference_file.name)
 
     def test_explicit_column_order_reading(self):
-        '''
+        """
         Test that COPY can write to a CSV file when the order of columns is
         explicitly specified by:
 
@@ -414,7 +409,7 @@ class CqlshCopyTest(Tester):
         - COPYing the contents of that CSV into the table by specifying the
         order of the columns,
         - asserting that the values in the CSV file match those in the table.
-        '''
+        """
         self.prepare()
         self.session.execute("""
             CREATE TABLE testorder (
@@ -442,7 +437,7 @@ class CqlshCopyTest(Tester):
         self.assertCsvResultEqual(reference_file.name, results)
 
     def quoted_column_names_reading_template(self, specify_column_names):
-        '''
+        """
         @param specify_column_names if truthy, specify column names in COPY statement
         A parameterized test. Tests that COPY can read from a CSV file into a
         table with quoted column names by:
@@ -454,7 +449,7 @@ class CqlshCopyTest(Tester):
 
         If the specify_column_names parameter is truthy, the COPY statement
         explicitly names the columns.
-        '''
+        """
         self.prepare()
         self.session.execute("""
             CREATE TABLE testquoted (
@@ -478,23 +473,23 @@ class CqlshCopyTest(Tester):
         self.assertCsvResultEqual(tempfile.name, results)
 
     def test_quoted_column_names_reading_specify_names(self):
-        '''
+        """
         Use quoted_column_names_reading_template to test reading from a CSV file
         into a table with quoted column names, explicitly specifying the column
         names in the COPY statement.
-        '''
+        """
         self.quoted_column_names_reading_template(specify_column_names=True)
 
     def test_quoted_column_names_reading_dont_specify_names(self):
-        '''
+        """
         Use quoted_column_names_reading_template to test reading from a CSV file
         into a table with quoted column names, without explicitly specifying the
         column names in the COPY statement.
-        '''
+        """
         self.quoted_column_names_reading_template(specify_column_names=False)
 
     def quoted_column_names_writing_template(self, specify_column_names):
-        '''
+        """
         @param specify_column_names if truthy, specify column names in COPY statement
         A parameterized test. Test that COPY can write to a table with quoted
         column names by:
@@ -507,7 +502,7 @@ class CqlshCopyTest(Tester):
 
         If the specify_column_names parameter is truthy, the COPY statement
         explicitly names the columns.
-        '''
+        """
         self.prepare()
         self.session.execute("""
             CREATE TABLE testquoted (
@@ -538,7 +533,7 @@ class CqlshCopyTest(Tester):
         self.quoted_column_names_writing_template(specify_column_names=False)
 
     def data_validation_on_read_template(self, load_as_int, expect_invalid):
-        '''
+        """
         @param load_as_int the value that will be loaded into a table as an int value
         @param expect_invalid whether or not to expect the COPY statement to fail
 
@@ -553,7 +548,7 @@ class CqlshCopyTest(Tester):
         with a "Bad request" error message. If not expect_invalid, this test
         will succeed when the COPY command prints no errors and the table
         matches the loaded CSV file.
-        '''
+        """
         self.prepare()
         self.session.execute("""
             CREATE TABLE testvalidate (
@@ -578,44 +573,44 @@ class CqlshCopyTest(Tester):
             self.assertCsvResultEqual(tempfile.name, results)
 
     def test_read_valid_data(self):
-        '''
+        """
         Use data_validation_on_read_template to test COPYing an int value from a
         CSV into an int column. This test exists to make sure the parameterized
         test works.
-        '''
+        """
         # make sure the template works properly
         self.data_validation_on_read_template(2, expect_invalid=False)
 
     def test_read_invalid_float(self):
-        '''
+        """
         Use data_validation_on_read_template to test COPYing a float value from a
         CSV into an int column.
-        '''
+        """
         self.data_validation_on_read_template(2.14, expect_invalid=True)
 
     def test_read_invalid_uuid(self):
-        '''
+        """
         Use data_validation_on_read_template to test COPYing a uuid value from a
         CSV into an int column.
-        '''
+        """
         self.data_validation_on_read_template(uuid4(), expect_invalid=True)
 
     def test_read_invalid_text(self):
-        '''
+        """
         Use data_validation_on_read_template to test COPYing a text value from a
         CSV into an int column.
-        '''
+        """
         self.data_validation_on_read_template('test', expect_invalid=True)
 
     def test_all_datatypes_write(self):
-        '''
+        """
         Test that, after COPYing a table containing all CQL datatypes to a CSV
         file, that the table contains the same values as the CSV by:
 
         - creating and populating a table containing all datatypes,
         - COPYing the contents of that table to a CSV file, and
         - asserting that the CSV file contains the same data as the table.
-        '''
+        """
         self.all_datatypes_prepare()
 
         insert_statement = self.session.prepare(
@@ -632,7 +627,7 @@ class CqlshCopyTest(Tester):
         self.assertCsvResultEqual(tempfile.name, results)
 
     def test_all_datatypes_read(self):
-        '''
+        """
         Test that, after COPYing a CSV file to a table containing all CQL
         datatypes, that the table contains the same values as the CSV by:
 
@@ -640,7 +635,7 @@ class CqlshCopyTest(Tester):
         - writing a corresponding CSV file containing each datatype,
         - COPYing the CSV file into the table, and
         - asserting that the CSV file contains the same data as the table.
-        '''
+        """
         self.all_datatypes_prepare()
 
         tempfile = NamedTemporaryFile()
@@ -656,7 +651,7 @@ class CqlshCopyTest(Tester):
         self.assertCsvResultEqual(tempfile.name, results)
 
     def test_all_datatypes_round_trip(self):
-        '''
+        """
         Test that a table containing all CQL datatypes successfully round-trips
         to and from a CSV file via COPY by:
 
@@ -667,7 +662,7 @@ class CqlshCopyTest(Tester):
         - COPYing the written CSV file back into the table, and
         - asserting that the previously-SELECTed contents of the table match the
         current contents of the table.
-        '''
+        """
         self.all_datatypes_prepare()
 
         insert_statement = self.session.prepare(
@@ -689,7 +684,7 @@ class CqlshCopyTest(Tester):
         self.assertEqual(exported_results, imported_results)
 
     def test_wrong_number_of_columns(self):
-        '''
+        """
         Test that a COPY statement will fail when trying to import from a CSV
         file with the wrong number of columns by:
 
@@ -697,7 +692,7 @@ class CqlshCopyTest(Tester):
         - writing a CSV file with two columns,
         - attempting to COPY the CSV file into the table, and
         - asserting that the COPY operation failed.
-        '''
+        """
         self.prepare()
         self.session.execute("""
             CREATE TABLE testcolumns (
@@ -717,7 +712,7 @@ class CqlshCopyTest(Tester):
         self.assertIn('Aborting import', err)
 
     def test_round_trip(self):
-        '''
+        """
         Test a simple round trip of a small CQL table to and from a CSV file via
         COPY.
 
@@ -728,7 +723,7 @@ class CqlshCopyTest(Tester):
         - COPYing the written CSV file back into the table, and
         - asserting that the previously-SELECTed contents of the table match the
         current contents of the table.
-        '''
+        """
         self.prepare()
         self.session.execute("""
             CREATE TABLE testcopyto (
