@@ -1,9 +1,11 @@
-import time, re
+import time
 from collections import namedtuple
-from dtest import Tester, debug
+
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
-from tools import no_vnodes, insert_c1c2, query_c1c2, since
+
+from dtest import Tester, debug
+from tools import insert_c1c2, no_vnodes, query_c1c2, since
 
 
 class TestRepair(Tester):
