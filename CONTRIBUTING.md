@@ -9,7 +9,7 @@ Description       | Brief description of the test
 @return           | Description of expected return value (Usually used for helper methods)
 @expected_errors  | What exceptions this test is expected to throw on normal behavior (should be caught and expected in the test)
 @throws           | What exceptions this test would throw upon failure (if expecting a specific regression)
-@since            | The development version(s) of C* when this test was first introduced. NOT to be confused with the since decorator, which marks the earliest version of C* to run against.
+@since            | I am unsure what we will use this for. Do not use until we have reached a decision.
 @jira_ticket      | Associated JIRA ticket number
 @expected_result  | Brief summary of what the expected results of this test are
 @test_assumptions | Test requirements (auth, hints disabled , etc)
