@@ -62,7 +62,7 @@ class TestAuth(Tester):
         except NoHostAvailable as e:
             assert isinstance(e.errors.values()[0], AuthenticationFailed)
 
-    # from 3.0 role creation is granted by CREATE_ROLE permissions, not superuser status
+    # from 2.2 role creation is granted by CREATE_ROLE permissions, not superuser status
     @since('1.2', max_version='2.1.x')
     def only_superuser_can_create_users_test(self):
         self.prepare()
