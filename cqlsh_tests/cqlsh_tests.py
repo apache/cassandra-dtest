@@ -26,11 +26,11 @@ class TestCqlsh(Tester):
 
     @classmethod
     def setUpClass(cls):
-        monkeypatch_driver(cls)
+        cls._cached_driver_methods = monkeypatch_driver()
 
     @classmethod
     def tearDownClass(cls):
-        unmonkeypatch_driver(cls)
+        unmonkeypatch_driver(cls._cached_driver_methods)
 
     def test_simple_insert(self):
 

@@ -62,22 +62,25 @@ def write_rows_to_csv(filename, data):
             writer.writerow(row)
 
 
-def monkeypatch_driver(obj):
+def monkeypatch_driver():
     """
     Monkeypatches the `cassandra` driver module in the same way
-    that clqsh does. Stores the original values of monkeypatched names on
-    `obj`.
+    that clqsh does. Returns a dictionary containing the original values of
+    the monkeypatched names.
     """
-    obj._cached_deserialize = cassandra.cqltypes.BytesType.deserialize
+    cache = {'deserialize': cassandra.cqltypes.BytesType.deserialize,
+             'support_empty_values': cassandra.cqltypes.CassandraType.support_empty_values}
+
     cassandra.cqltypes.BytesType.deserialize = staticmethod(lambda byts, protocol_version: bytearray(byts))
-    obj._cached_support_empty_values = cassandra.cqltypes.CassandraType.support_empty_values
     cassandra.cqltypes.CassandraType.support_empty_values = True
 
+    return cache
 
-def unmonkeypatch_driver(obj):
+
+def unmonkeypatch_driver(cache):
     """
-    Given an object that was used to cache parts of `cassandra` for
+    Given a dictionary that was used to cache parts of `cassandra` for
     monkeypatching, restore those values to the `cassandra` module.
     """
-    cassandra.cqltypes.BytesType.deserialize = obj._cached_deserialize
-    cassandra.cqltypes.CassandraType.support_empty_values = obj._cached_support_empty_values
+    cassandra.cqltypes.BytesType.deserialize = staticmethod(cache['deserialize'])
+    cassandra.cqltypes.CassandraType.support_empty_values = cache['support_empty_values']
