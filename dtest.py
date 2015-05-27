@@ -187,6 +187,24 @@ class Tester(TestCase):
     def setUp(self):
         global CURRENT_TEST
         CURRENT_TEST = self.id() + self._testMethodName
+
+        # On Windows, forcefully terminate any leftover previously running cassandra processes. This is a temporary
+        # workaround until we can determine the cause of intermittent hung-open tests and file-handles.
+        if is_win():
+            try:
+                import psutil
+                for proc in psutil.process_iter():
+                    try:
+                        pinfo = proc.as_dict(attrs=['pid', 'name', 'cmdline'])
+                    except psutil.NoSuchProcess:
+                        pass
+                    else:
+                        if (pinfo['name'] == 'java.exe' and '-Dcassandra' in pinfo['cmdline']):
+                            print 'Found running cassandra process with pid: ' + str(pinfo['pid']) + '. Killing.'
+                            psutil.Process(pinfo['pid']).kill()
+            except ImportError:
+                debug("WARN: psutil not installed. Cannot detect and kill running cassandra processes - you may see cascading dtest failures.")
+
         # cleaning up if a previous execution didn't trigger tearDown (which
         # can happen if it is interrupted by KeyboardInterrupt)
         # TODO: move that part to a generic fixture
