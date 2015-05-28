@@ -643,7 +643,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         self.assertEqual(pf.num_results_all(), [400, 200])
         self.assertEqualIgnoreOrder(expected_data, pf.all_data())
 
-    @since('2.0')
+    @since('2.0.6')
     def test_paging_using_secondary_indexes_with_static_cols(self):
         cursor = self.prepare()
         self.create_ks(cursor, 'test_paging_size', 2)
