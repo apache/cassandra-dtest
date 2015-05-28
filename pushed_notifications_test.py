@@ -80,7 +80,12 @@ class TestPushedNotifications(Tester):
         CASSANDRA-8516
         Moving a token should result in NODE_MOVED notifications.
         """
-        self.cluster.populate(3).start()
+        self.cluster.populate(3).start(wait_for_binary_proto=True, wait_other_notice=True)
+
+        # Despite waiting for each node to see the other nodes as UP, there is apparently
+        # still a race condition that can result in NEW_NODE events being sent.  We don't
+        # want to accidentally collect those, so for now we will just sleep a few seconds.
+        time.sleep(3)
 
         waiters = [NotificationWaiter(self, node, "TOPOLOGY_CHANGE")
                    for node in self.cluster.nodes.values()]
