@@ -26,6 +26,7 @@ cql_version = "3.0.0"
 
 QUERY_UPGRADED = os.environ.get('QUERY_UPGRADED', 'true').lower() in ('yes', 'true')
 QUERY_OLD = os.environ.get('QUERY_OLD', 'true').lower() in ('yes', 'true')
+OLD_CASSANDRA_DIR = os.environ.get('OLD_CASSANDRA_DIR', None)
 
 
 class TestCQL(Tester):
@@ -50,7 +51,10 @@ class TestCQL(Tester):
         if not cluster.nodelist():
             cluster.populate(nodes)
             self.original_install_dir = cluster.nodelist()[0].get_install_dir()
-            cluster.set_install_dir(version='git:cassandra-2.1')
+            if OLD_CASSANDRA_DIR:
+                cluster.set_install_dir(install_dir=OLD_CASSANDRA_DIR)
+            else:
+                cluster.set_install_dir(version='git:cassandra-2.1')
             cluster.start()
 
         node1 = cluster.nodelist()[0]
