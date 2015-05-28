@@ -3,12 +3,13 @@ import uuid
 
 from cassandra import ConsistencyLevel as CL
 from cassandra import InvalidRequest, ReadTimeout
-from cassandra.query import SimpleStatement, dict_factory
+from cassandra.query import SimpleStatement, dict_factory, named_tuple_factory
 from dtest import Tester, run_scenarios
 from tools import since, require
 
 from datahelp import create_rows, parse_data_into_dicts, flatten_into_set
 from assertions import assert_invalid
+
 
 class Page(object):
     data = None
@@ -178,6 +179,7 @@ class BasePagingTester(Tester):
         cursor = self.patient_cql_connection(node1)
         cursor.row_factory = dict_factory
         return cursor
+
 
 @since('2.0')
 class TestPagingSize(BasePagingTester, PageAssertionMixin):
@@ -553,6 +555,7 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
             )
         )
 
+
 @since('2.0')
 class TestPagingData(BasePagingTester, PageAssertionMixin):
     def test_paging_a_single_wide_row(self):
@@ -642,6 +645,198 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         self.assertEqual(pf.pagecount(), 2)
         self.assertEqual(pf.num_results_all(), [400, 200])
         self.assertEqualIgnoreOrder(expected_data, pf.all_data())
+
+    @since('2.0.6')
+    def static_columns_paging_test(self):
+        """
+        Exercises paging with static columns to detect bugs like CASSANDRA-8502.
+        """
+
+        cursor = self.prepare()
+        self.create_ks(cursor, 'test_paging_static_cols', 2)
+        cursor.execute("CREATE TABLE test (a int, b int, c int, s1 int static, s2 int static, PRIMARY KEY (a, b))")
+        cursor.row_factory = named_tuple_factory
+
+        for i in range(4):
+            for j in range(4):
+                cursor.execute("INSERT INTO test (a, b, c, s1, s2) VALUES (%d, %d, %d, %d, %d)" % (i, j, j, 17, 42))
+
+        selectors = (
+            "*",
+            "a, b, c, s1, s2",
+            "a, b, c, s1",
+            "a, b, c, s2",
+            "a, b, c")
+
+        for page_size in (2, 3, 4, 5, 15, 16, 17, 100):
+            cursor.default_fetch_size = page_size
+            for selector in selectors:
+                results = list(cursor.execute("SELECT %s FROM test" % selector))
+                self.assertEqual(16, len(results))
+                self.assertEqual([0] * 4 + [1] * 4 + [2] * 4 + [3] * 4, sorted([r.a for r in results]))
+                self.assertEqual([0, 1, 2, 3] * 4, [r.b for r in results])
+                self.assertEqual([0, 1, 2, 3] * 4, [r.c for r in results])
+                if "s1" in selector:
+                    self.assertEqual([17] * 16, [r.s1 for r in results])
+                if "s2" in selector:
+                    self.assertEqual([42] * 16, [r.s2 for r in results])
+
+        # IN over the partitions
+        for page_size in (2, 3, 4, 5, 15, 16, 17, 100):
+            cursor.default_fetch_size = page_size
+            for selector in selectors:
+                results = list(cursor.execute("SELECT %s FROM test WHERE a IN (0, 1, 2, 3)" % selector))
+                self.assertEqual(16, len(results))
+                self.assertEqual([0] * 4 + [1] * 4 + [2] * 4 + [3] * 4, sorted([r.a for r in results]))
+                self.assertEqual([0, 1, 2, 3] * 4, [r.b for r in results])
+                self.assertEqual([0, 1, 2, 3] * 4, [r.c for r in results])
+                if "s1" in selector:
+                    self.assertEqual([17] * 16, [r.s1 for r in results])
+                if "s2" in selector:
+                    self.assertEqual([42] * 16, [r.s2 for r in results])
+
+        # single partition
+        for i in range(16):
+            cursor.execute("INSERT INTO test (a, b, c, s1, s2) VALUES (%d, %d, %d, %d, %d)" % (99, i, i, 17, 42))
+
+        for page_size in (2, 3, 4, 5, 15, 16, 17, 100):
+            cursor.default_fetch_size = page_size
+            for selector in selectors:
+                results = list(cursor.execute("SELECT %s FROM test WHERE a = 99" % selector))
+                self.assertEqual(16, len(results))
+                self.assertEqual([99] * 16, [r.a for r in results])
+                self.assertEqual(range(16), [r.b for r in results])
+                self.assertEqual(range(16), [r.c for r in results])
+                if "s1" in selector:
+                    self.assertEqual([17] * 16, [r.s1 for r in results])
+                if "s2" in selector:
+                    self.assertEqual([42] * 16, [r.s2 for r in results])
+
+        # reversed
+        for page_size in (2, 3, 4, 5, 15, 16, 17, 100):
+            cursor.default_fetch_size = page_size
+            for selector in selectors:
+                results = list(cursor.execute("SELECT %s FROM test WHERE a = 99 ORDER BY b DESC" % selector))
+                self.assertEqual(16, len(results))
+                self.assertEqual([99] * 16, [r.a for r in results])
+                self.assertEqual(list(reversed(range(16))), [r.b for r in results])
+                self.assertEqual(list(reversed(range(16))), [r.c for r in results])
+                if "s1" in selector:
+                    self.assertEqual([17] * 16, [r.s1 for r in results])
+                if "s2" in selector:
+                    self.assertEqual([42] * 16, [r.s2 for r in results])
+
+        # IN on clustering column
+        for page_size in (2, 3, 4, 5, 15, 16, 17, 100):
+            cursor.default_fetch_size = page_size
+            for selector in selectors:
+                results = list(cursor.execute("SELECT %s FROM test WHERE a = 99 AND b IN (3, 4, 8, 14, 15)" % selector))
+                self.assertEqual(5, len(results))
+                self.assertEqual([99] * 5, [r.a for r in results])
+                self.assertEqual([3, 4, 8, 14, 15], [r.b for r in results])
+                self.assertEqual([3, 4, 8, 14, 15], [r.c for r in results])
+                if "s1" in selector:
+                    self.assertEqual([17] * 5, [r.s1 for r in results])
+                if "s2" in selector:
+                    self.assertEqual([42] * 5, [r.s2 for r in results])
+
+        # reversed IN on clustering column
+        for page_size in (2, 3, 4, 5, 15, 16, 17, 100):
+            cursor.default_fetch_size = page_size
+            for selector in selectors:
+                results = list(cursor.execute("SELECT %s FROM test WHERE a = 99 AND b IN (3, 4, 8, 14, 15) ORDER BY b DESC" % selector))
+                self.assertEqual(5, len(results))
+                self.assertEqual([99] * 5, [r.a for r in results])
+                self.assertEqual(list(reversed([3, 4, 8, 14, 15])), [r.b for r in results])
+                self.assertEqual(list(reversed([3, 4, 8, 14, 15])), [r.c for r in results])
+                if "s1" in selector:
+                    self.assertEqual([17] * 5, [r.s1 for r in results])
+                if "s2" in selector:
+                    self.assertEqual([42] * 5, [r.s2 for r in results])
+
+        # slice on clustering column with set start
+        for page_size in (2, 3, 4, 5, 15, 16, 17, 100):
+            cursor.default_fetch_size = page_size
+            for selector in selectors:
+                results = list(cursor.execute("SELECT %s FROM test WHERE a = 99 AND b > 3" % selector))
+                self.assertEqual(12, len(results))
+                self.assertEqual([99] * 12, [r.a for r in results])
+                self.assertEqual(range(4, 16), [r.b for r in results])
+                self.assertEqual(range(4, 16), [r.c for r in results])
+                if "s1" in selector:
+                    self.assertEqual([17] * 12, [r.s1 for r in results])
+                if "s2" in selector:
+                    self.assertEqual([42] * 12, [r.s2 for r in results])
+
+        # reversed slice on clustering column with set finish
+        for page_size in (2, 3, 4, 5, 15, 16, 17, 100):
+            cursor.default_fetch_size = page_size
+            for selector in selectors:
+                results = list(cursor.execute("SELECT %s FROM test WHERE a = 99 AND b > 3 ORDER BY b DESC" % selector))
+                self.assertEqual(12, len(results))
+                self.assertEqual([99] * 12, [r.a for r in results])
+                self.assertEqual(list(reversed(range(4, 16))), [r.b for r in results])
+                self.assertEqual(list(reversed(range(4, 16))), [r.c for r in results])
+                if "s1" in selector:
+                    self.assertEqual([17] * 12, [r.s1 for r in results])
+                if "s2" in selector:
+                    self.assertEqual([42] * 12, [r.s2 for r in results])
+
+        # slice on clustering column with set finish
+        for page_size in (2, 3, 4, 5, 15, 16, 17, 100):
+            cursor.default_fetch_size = page_size
+            for selector in selectors:
+                results = list(cursor.execute("SELECT %s FROM test WHERE a = 99 AND b < 14" % selector))
+                self.assertEqual(14, len(results))
+                self.assertEqual([99] * 14, [r.a for r in results])
+                self.assertEqual(range(14), [r.b for r in results])
+                self.assertEqual(range(14), [r.c for r in results])
+                if "s1" in selector:
+                    self.assertEqual([17] * 14, [r.s1 for r in results])
+                if "s2" in selector:
+                    self.assertEqual([42] * 14, [r.s2 for r in results])
+
+        # reversed slice on clustering column with set start
+        for page_size in (2, 3, 4, 5, 15, 16, 17, 100):
+            cursor.default_fetch_size = page_size
+            for selector in selectors:
+                results = list(cursor.execute("SELECT %s FROM test WHERE a = 99 AND b < 14 ORDER BY b DESC" % selector))
+                self.assertEqual(14, len(results))
+                self.assertEqual([99] * 14, [r.a for r in results])
+                self.assertEqual(list(reversed(range(14))), [r.b for r in results])
+                self.assertEqual(list(reversed(range(14))), [r.c for r in results])
+                if "s1" in selector:
+                    self.assertEqual([17] * 14, [r.s1 for r in results])
+                if "s2" in selector:
+                    self.assertEqual([42] * 14, [r.s2 for r in results])
+
+        # slice on clustering column with start and finish
+        for page_size in (2, 3, 4, 5, 15, 16, 17, 100):
+            cursor.default_fetch_size = page_size
+            for selector in selectors:
+                results = list(cursor.execute("SELECT %s FROM test WHERE a = 99 AND b > 3 AND b < 14" % selector))
+                self.assertEqual(10, len(results))
+                self.assertEqual([99] * 10, [r.a for r in results])
+                self.assertEqual(range(4, 14), [r.b for r in results])
+                self.assertEqual(range(4, 14), [r.c for r in results])
+                if "s1" in selector:
+                    self.assertEqual([17] * 10, [r.s1 for r in results])
+                if "s2" in selector:
+                    self.assertEqual([42] * 10, [r.s2 for r in results])
+
+        # reversed slice on clustering column with start and finish
+        for page_size in (2, 3, 4, 5, 15, 16, 17, 100):
+            cursor.default_fetch_size = page_size
+            for selector in selectors:
+                results = list(cursor.execute("SELECT %s FROM test WHERE a = 99 AND b > 3 AND b < 14 ORDER BY b DESC" % selector))
+                self.assertEqual(10, len(results))
+                self.assertEqual([99] * 10, [r.a for r in results])
+                self.assertEqual(list(reversed(range(4, 14))), [r.b for r in results])
+                self.assertEqual(list(reversed(range(4, 14))), [r.c for r in results])
+                if "s1" in selector:
+                    self.assertEqual([17] * 10, [r.s1 for r in results])
+                if "s2" in selector:
+                    self.assertEqual([42] * 10, [r.s2 for r in results])
 
     @since('2.0.6')
     def test_paging_using_secondary_indexes_with_static_cols(self):
@@ -1030,7 +1225,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
         """Check all paging results: pagecount, num_results per page, data."""
 
         page_size = 25
-        expected_pages_data = [expected_data[x:x+page_size] for x in \
+        expected_pages_data = [expected_data[x:x + page_size] for x in \
                                range(0, len(expected_data), page_size)]
 
         pf = self.get_page_fetcher()
@@ -1039,7 +1234,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
         self.assertEqual(pf.num_results_all(), num_page_results)
 
         for i in range(pf.pagecount()):
-            page_data = pf.page_data(i+1)
+            page_data = pf.page_data(i + 1)
             self.assertEquals(page_data, expected_pages_data[i])
 
     def test_single_partition_deletions(self):
@@ -1138,6 +1333,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
             )
         self.check_all_paging_results(expected_data, 7,
                                       [25, 25, 25, 25, 25, 25, 25])
+
     @require('6237')
     def test_multiple_row_deletions(self):
         """Test multiple row deletions.
@@ -1267,12 +1463,12 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
         """Test that paging throws a failure in case of tombstone threshold """
         self.allow_log_errors = True
         self.cluster.set_configuration_options(
-            values={ 'tombstone_failure_threshold' : 500 }
+            values={'tombstone_failure_threshold': 500}
         )
         self.cursor = self.prepare()
         node1, node2, node3 = self.cluster.nodelist()
 
-        data = self.setup_data()
+        self.setup_data()
 
         # Add more data
         values = map(lambda i: uuid.uuid4(), range(3000))
