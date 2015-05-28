@@ -65,10 +65,10 @@ class TestPaxos(Tester):
         self.cluster.nodelist()[1].stop()
         session.execute("INSERT INTO test (k, v) VALUES (3, 2) IF NOT EXISTS")
 
-        self.cluster.nodelist()[1].start()
+        self.cluster.nodelist()[1].start(wait_for_binary_proto=True)
         session.execute("INSERT INTO test (k, v) VALUES (5, 5) IF NOT EXISTS")
 
-        self.cluster.nodelist()[2].start()
+        self.cluster.nodelist()[2].start(wait_for_binary_proto=True)
         session.execute("INSERT INTO test (k, v) VALUES (6, 6) IF NOT EXISTS")
 
     def contention_test_multi_iterations(self):
