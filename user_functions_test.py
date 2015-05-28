@@ -189,7 +189,7 @@ class TestUserFunctions(Tester):
         session.execute("insert into tab (key, udt) values (2, {a: 'deux', b:2});")
         session.execute("insert into tab (key, udt) values (3, {a: 'trois', b:3});")
 
-        session.execute("create function funk(udt frozen<test>) called on null input returns int language java as 'return Integer.valueOf(udt.getInt(\"b\"));';")
+        session.execute("create function funk(udt test) called on null input returns int language java as 'return Integer.valueOf(udt.getInt(\"b\"));';")
 
         assert_one(session, "select sum(funk(udt)) from tab", [6])
 
@@ -210,14 +210,14 @@ class TestUserFunctions(Tester):
         # ensure we cannot use a udt from another keyspace as function argument
         assert_invalid(
             session,
-            "CREATE FUNCTION overloaded(v frozen<ks.udt>) called on null input RETURNS text LANGUAGE java AS 'return \"f1\";'",
+            "CREATE FUNCTION overloaded(v ks.udt) called on null input RETURNS text LANGUAGE java AS 'return \"f1\";'",
             "Statement on keyspace user_ks cannot refer to a user type in keyspace ks"
         )
 
         # ensure we cannot use a udt from another keyspace as return value
         assert_invalid(
             session,
-            ("CREATE FUNCTION test(v text) called on null input RETURNS frozen<ks.udt> "
+            ("CREATE FUNCTION test(v text) called on null input RETURNS ks.udt "
              "LANGUAGE java AS 'return null;';"),
             "Statement on keyspace user_ks cannot refer to a user type in keyspace ks"
         )
@@ -233,6 +233,6 @@ class TestUserFunctions(Tester):
         self.create_ks(session, 'user_ks', 1)
         assert_invalid(
             session,
-            "create aggregate suma (frozen<ks.udt>) sfunc plus stype int finalfunc stri initcond 10",
+            "create aggregate suma (ks.udt) sfunc plus stype int finalfunc stri initcond 10",
             "Statement on keyspace user_ks cannot refer to a user type in keyspace ks"
         )
