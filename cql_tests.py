@@ -1,28 +1,29 @@
 # coding: utf-8
 
 import random
+import struct
 import time
+import math
 from collections import OrderedDict
 from uuid import uuid4, UUID
 
+from thrift_bindings.v22.ttypes import CfDef, Mutation, ColumnOrSuperColumn, Column
+from thrift_bindings.v22.ttypes import ConsistencyLevel as ThriftConsistencyLevel
+
 from dtest import Tester, canReuseCluster, freshCluster
-from pyassertions import assert_invalid, assert_one, assert_none, assert_all
-from pytools import since, require, rows_to_list
-from cassandra import ConsistencyLevel, InvalidRequest
+from assertions import assert_invalid, assert_one, assert_none, assert_all
+from thrift_tests import get_thrift_client
+from tools import since, require, rows_to_list
+from cassandra import ConsistencyLevel, InvalidRequest, AlreadyExists
+from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.protocol import ProtocolException, SyntaxException, ConfigurationException, InvalidRequestException
 from cassandra.query import SimpleStatement
-try:
-    from blist import sortedset
-except ImportError:
-    pass
-
-cql_version = "3.0.0"
-
+from cassandra.util import sortedset
 
 @canReuseCluster
 class TestCQL(Tester):
 
-    def prepare(self, ordered=False, create_keyspace=True, use_cache=False, nodes=1, rf=1):
+    def prepare(self, ordered=False, create_keyspace=True, use_cache=False, nodes=1, rf=1, protocol_version=None, **kwargs):
         cluster = self.cluster
 
         if (ordered):
@@ -31,12 +32,16 @@ class TestCQL(Tester):
         if (use_cache):
             cluster.set_configuration_options(values={'row_cache_size_in_mb': 100})
 
+        start_rpc = kwargs.pop('start_rpc', False)
+        if start_rpc:
+            cluster.set_configuration_options(values={'start_rpc':True})
+
         if not cluster.nodelist():
             cluster.populate(nodes).start()
         node1 = cluster.nodelist()[0]
         time.sleep(0.2)
 
-        session = self.patient_cql_connection(node1, version=cql_version)
+        session = self.patient_cql_connection(node1, protocol_version=protocol_version)
         if create_keyspace:
             if self._preserve_cluster:
                 session.execute("DROP KEYSPACE IF EXISTS ks")
@@ -89,6 +94,31 @@ class TestCQL(Tester):
             [UUID('f47ac10b-58cc-4372-a567-0e02b2c3d479'), 37, None, None],
             [UUID('550e8400-e29b-41d4-a716-446655440000'), 36, None, None],
         ], res
+
+    def large_collection_errors(self):
+        """ For large collections, make sure that we are printing warnings """
+
+        # We only warn with protocol 2
+        cursor = self.prepare(protocol_version=2)
+
+        cluster = self.cluster
+        node1 = cluster.nodelist()[0]
+        self.ignore_log_patterns = ["Detected collection for table"]
+
+        cursor.execute("""
+            CREATE TABLE maps (
+                userid text PRIMARY KEY,
+                properties map<int, text>
+            );
+        """)
+
+        # Insert more than the max, which is 65535
+        for i in range(70000):
+            cursor.execute("UPDATE maps SET properties[%i] = 'x' WHERE userid = 'user'" % i)
+
+        # Query for the data and throw exception
+        cursor.execute("SELECT properties FROM maps WHERE userid = 'user'")
+        node1.watch_log_for("Detected collection for table ks.maps with 70000 elements, more than the 65535 limit. Only the first 65535 elements will be returned to the client. Please see http://cassandra.apache.org/doc/cql3/CQL.html#collections for more details.")
 
     def noncomposite_static_cf_test(self):
         """ Test non-composite static CF syntax """
@@ -333,7 +363,7 @@ class TestCQL(Tester):
         # Check that we do limit the output to 1 *and* that we respect query
         # order of keys (even though 48 is after 2)
         res = cursor.execute("SELECT * FROM clicks WHERE userid IN (48, 2) LIMIT 1")
-        if self.cluster.version() >= '3.0':
+        if self.cluster.version() >= '2.2':
             assert rows_to_list(res) == [[2, 'http://foo.com', 42]], res
         else:
             assert rows_to_list(res) == [[48, 'http://foo.com', 42]], res
@@ -356,6 +386,7 @@ class TestCQL(Tester):
         cursor.execute("""INSERT INTO foo (a, b, c, d, e) VALUES (0, 0, 2, 0, 3);""")
         cursor.execute("""INSERT INTO foo (a, b, c, d, e) VALUES (0, -1, 2, 2, 2);""")
 
+    @require("7281")
     def tuple_query_mixed_order_columns_test(self):
         """CASSANDRA-7281: SELECT on tuple relations are broken for mixed ASC/DESC clustering order
 
@@ -367,6 +398,7 @@ class TestCQL(Tester):
         assert rows_to_list(res) == [[0, 2, 0, 0, 0], [0, 1, 0, 0, 0], [0, 0, 1, 2, -1],
                                      [0, 0, 1, 1, 1], [0, 0, 2, 1, -3], [0, 0, 2, 0, 3]], res
 
+    @require("7281")
     def tuple_query_mixed_order_columns_test2(self):
         """CASSANDRA-7281: SELECT on tuple relations are broken for mixed ASC/DESC clustering order
 
@@ -378,6 +410,7 @@ class TestCQL(Tester):
         assert rows_to_list(res) == [[0, 2, 0, 0, 0], [0, 1, 0, 0, 0], [0, 0, 2, 1, -3],
                                      [0, 0, 2, 0, 3], [0, 0, 1, 2, -1], [0, 0, 1, 1, 1]], res
 
+    @require("7281")
     def tuple_query_mixed_order_columns_test3(self):
         """CASSANDRA-7281: SELECT on tuple relations are broken for mixed ASC/DESC clustering order
 
@@ -389,6 +422,7 @@ class TestCQL(Tester):
         assert rows_to_list(res) == [[0, 0, 2, 1, -3], [0, 0, 2, 0, 3], [0, 0, 1, 2, -1],
                                      [0, 0, 1, 1, 1], [0, 1, 0, 0, 0], [0, 2, 0, 0, 0]], res
 
+    @require("7281")
     def tuple_query_mixed_order_columns_test4(self):
         """CASSANDRA-7281: SELECT on tuple relations are broken for mixed ASC/DESC clustering order
 
@@ -400,6 +434,7 @@ class TestCQL(Tester):
         assert rows_to_list(res) == [[0, 2, 0, 0, 0], [0, 1, 0, 0, 0], [0, 0, 1, 1, 1],
                                      [0, 0, 1, 2, -1], [0, 0, 2, 0, 3], [0, 0, 2, 1, -3]], res
 
+    @require("7281")
     def tuple_query_mixed_order_columns_test5(self):
         """CASSANDRA-7281: SELECT on tuple relations are broken for mixed ASC/DESC clustering order
             Test that non mixed columns are still working.
@@ -411,6 +446,7 @@ class TestCQL(Tester):
         assert rows_to_list(res) == [[0, 2, 0, 0, 0], [0, 1, 0, 0, 0], [0, 0, 2, 1, -3],
                                      [0, 0, 2, 0, 3], [0, 0, 1, 2, -1], [0, 0, 1, 1, 1]], res
 
+    @require("7281")
     def tuple_query_mixed_order_columns_test6(self):
         """CASSANDRA-7281: SELECT on tuple relations are broken for mixed ASC/DESC clustering order
             Test that non mixed columns are still working.
@@ -422,6 +458,7 @@ class TestCQL(Tester):
         assert rows_to_list(res) == [[0, 0, 1, 1, 1], [0, 0, 1, 2, -1], [0, 0, 2, 0, 3],
                                       [0, 0, 2, 1, -3], [0, 1, 0, 0, 0], [0, 2, 0, 0, 0]], res
 
+    @require("7281")
     def tuple_query_mixed_order_columns_test7(self):
         """CASSANDRA-7281: SELECT on tuple relations are broken for mixed ASC/DESC clustering order
         """
@@ -432,6 +469,7 @@ class TestCQL(Tester):
         assert rows_to_list(res) == [[0, 0, 0, 0, 0], [0, 0, 1, 1, -1], [0, 0, 1, 1, 0],
                                      [0, 0, 1, 0, 2], [0, -1, 2, 2, 2]], res
 
+    @require("7281")
     def tuple_query_mixed_order_columns_test8(self):
         """CASSANDRA-7281: SELECT on tuple relations are broken for mixed ASC/DESC clustering order
         """
@@ -442,6 +480,7 @@ class TestCQL(Tester):
         assert rows_to_list(res) == [[0, -1, 2, 2, 2], [0, 0, 1, 1, -1], [0, 0, 1, 1, 0],
                                      [0, 0, 1, 0, 2], [0, 0, 0, 0, 0]], res
 
+    @require("7281")
     def tuple_query_mixed_order_columns_test9(self):
         """CASSANDRA-7281: SELECT on tuple relations are broken for mixed ASC/DESC clustering order
         """
@@ -451,6 +490,23 @@ class TestCQL(Tester):
         res = cursor.execute("SELECT * FROM foo WHERE a=0 AND (b, c, d, e) <= (0, 1, 1, 0);")
         assert rows_to_list(res) == [[0, 0, 0, 0, 0], [0, 0, 1, 1, 0], [0, 0, 1, 1, -1],
                                      [0, 0, 1, 0, 2], [0, -1, 2, 2, 2]], res
+
+    def simple_tuple_query_test(self):
+        """Covers CASSANDRA-8613"""
+        cursor = self.prepare()
+
+        cursor.execute("create table bard (a int, b int, c int, d int , e int, PRIMARY KEY (a, b, c, d, e))")
+
+        cursor.execute("""INSERT INTO bard (a, b, c, d, e) VALUES (0, 2, 0, 0, 0);""")
+        cursor.execute("""INSERT INTO bard (a, b, c, d, e) VALUES (0, 1, 0, 0, 0);""")
+        cursor.execute("""INSERT INTO bard (a, b, c, d, e) VALUES (0, 0, 0, 0, 0);""")
+        cursor.execute("""INSERT INTO bard (a, b, c, d, e) VALUES (0, 0, 1, 1, 1);""")
+        cursor.execute("""INSERT INTO bard (a, b, c, d, e) VALUES (0, 0, 2, 2, 2);""")
+        cursor.execute("""INSERT INTO bard (a, b, c, d, e) VALUES (0, 0, 3, 3, 3);""")
+        cursor.execute("""INSERT INTO bard (a, b, c, d, e) VALUES (0, 0, 1, 1, 1);""")
+
+        res = cursor.execute("SELECT * FROM bard WHERE b=0 AND (c, d, e) > (1, 1, 1) ALLOW FILTERING;")
+        assert rows_to_list(res) == [[0, 0, 2, 2, 2], [0, 0, 3, 3, 3]]
 
     def limit_sparse_test(self):
         """ Validate LIMIT option for sparse table in SELECT statements """
@@ -644,7 +700,7 @@ class TestCQL(Tester):
             cursor.execute("INSERT INTO test2 (k, c1, c2, v) VALUES (0, 0, %i, %i)" % (x, x))
 
         # Check first we don't allow IN everywhere
-        if self.cluster.version() >= '3.0':
+        if self.cluster.version() >= '2.2':
             assert_none(cursor, "SELECT v FROM test2 WHERE k = 0 AND c1 IN (5, 2, 8) AND c2 = 3")
         else:
             assert_invalid(cursor, "SELECT v FROM test2 WHERE k = 0 AND c1 IN (5, 2, 8) AND c2 = 3")
@@ -1012,62 +1068,70 @@ class TestCQL(Tester):
         # Reserved keywords
         assert_invalid(cursor, "CREATE TABLE test1 (select int PRIMARY KEY, column int)", expected=SyntaxException)
 
-    #def keyspace_test(self):
-    #    cursor = self.prepare()
+    def keyspace_test(self):
+        cursor = self.prepare()
 
-    #    assert_invalid(cursor, "CREATE KEYSPACE test1")
-    #    cursor.execute("CREATE KEYSPACE test2 WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 }")
-    #    assert_invalid(cursor, "CREATE KEYSPACE My_much_much_too_long_identifier_that_should_not_work WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 }")
+        assert_invalid(cursor, "CREATE KEYSPACE test1",
+                       expected=SyntaxException,
+                       matching="code=2000")
+        cursor.execute("CREATE KEYSPACE test2 WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 }")
+        assert_invalid(cursor, "CREATE KEYSPACE My_much_much_too_long_identifier_that_should_not_work WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 }")
 
-    #    cursor.execute("DROP KEYSPACE test2")
-    #    assert_invalid(cursor, "DROP KEYSPACE non_existing")
-    #    cursor.execute("CREATE KEYSPACE test2 WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 }")
+        cursor.execute("DROP KEYSPACE test2")
+        assert_invalid(cursor, "DROP KEYSPACE non_existing",
+                       expected=ConfigurationException,
+                       matching="code=2300")
+        cursor.execute("CREATE KEYSPACE test2 WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 }")
 
-    #def table_test(self):
-    #    cursor = self.prepare()
+    def table_test(self):
+        cursor = self.prepare()
 
-    #    cursor.execute("""
-    #        CREATE TABLE test1 (
-    #            k int PRIMARY KEY,
-    #            c int
-    #        )
-    #    """)
+        cursor.execute("""
+            CREATE TABLE test1 (
+                k int PRIMARY KEY,
+                c int
+            )
+        """)
 
-    #    cursor.execute("""
-    #        CREATE TABLE test2 (
-    #            k int,
-    #            name int,
-    #            value int,
-    #            PRIMARY KEY(k, name)
-    #        ) WITH COMPACT STORAGE
-    #    """)
+        cursor.execute("""
+            CREATE TABLE test2 (
+                k int,
+                name int,
+                value int,
+                PRIMARY KEY(k, name)
+            ) WITH COMPACT STORAGE
+        """)
 
-    #    cursor.execute("""
-    #        CREATE TABLE test3 (
-    #            k int,
-    #            c int,
-    #            PRIMARY KEY (k),
-    #        )
-    #    """)
+        cursor.execute("""
+            CREATE TABLE test3 (
+                k int,
+                c int,
+                PRIMARY KEY (k),
+            )
+        """)
 
-    #    # existing table
-    #    assert_invalid(cursor, "CREATE TABLE test3 (k int PRIMARY KEY, c int)")
-    #    # repeated column
-    #    assert_invalid(cursor, "CREATE TABLE test4 (k int PRIMARY KEY, c int, k text)")
+        # existing table
+        assert_invalid(cursor, "CREATE TABLE test3 (k int PRIMARY KEY, c int)",
+                       expected=AlreadyExists,
+                       matching="ks.test3")
+        # repeated column
+        assert_invalid(cursor, "CREATE TABLE test4 (k int PRIMARY KEY, c int, k text)",
+                       matching="code=2200")
 
-    #    # compact storage limitations
-    #    assert_invalid(cursor, "CREATE TABLE test4 (k int, name, int, c1 int, c2 int, PRIMARY KEY(k, name)) WITH COMPACT STORAGE")
+        # compact storage limitations
+        assert_invalid(cursor, "CREATE TABLE test4 (k int, name, int, c1 int, c2 int, PRIMARY KEY(k, name)) WITH COMPACT STORAGE",
+                       expected=SyntaxException)
 
-    #    cursor.execute("DROP TABLE test1")
-    #    cursor.execute("TRUNCATE test2")
+        cursor.execute("DROP TABLE test1")
+        cursor.execute("TRUNCATE test2")
 
-    #    cursor.execute("""
-    #        CREATE TABLE test1 (
-    #            k int PRIMARY KEY,
-    #            c1 int,
-    #            c2 int,
-    #        )
-    #    """)
+        cursor.execute("""
+            CREATE TABLE test1 (
+                k int PRIMARY KEY,
+                c1 int,
+                c2 int,
+            )
+        """)
 
     def batch_test(self):
         cursor = self.prepare()
@@ -1279,7 +1343,7 @@ class TestCQL(Tester):
         node1 = cluster.nodelist()[0]
         time.sleep(0.2)
 
-        cursor = self.patient_cql_connection(node1, version=cql_version)
+        cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'ks', 1)
 
         cursor.execute("""
@@ -1540,19 +1604,19 @@ class TestCQL(Tester):
 
         cursor.execute(q % "tags = [ 'm', 'n' ] + tags")
         res = cursor.execute("SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'")
-        self.assertItemsEqual(rows_to_list(res), [[['n', 'm', 'a', 'c', 'b', 'c']]])
+        self.assertItemsEqual(rows_to_list(res), [[['m', 'n', 'a', 'c', 'b', 'c']]])
 
         cursor.execute(q % "tags[2] = 'foo', tags[4] = 'bar'")
         res = cursor.execute("SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'")
-        self.assertItemsEqual(rows_to_list(res), [[['n', 'm', 'foo', 'c', 'bar', 'c']]])
+        self.assertItemsEqual(rows_to_list(res), [[['m', 'n', 'foo', 'c', 'bar', 'c']]])
 
         cursor.execute("DELETE tags[2] FROM user WHERE fn='Bilbo' AND ln='Baggins'")
         res = cursor.execute("SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'")
-        self.assertItemsEqual(rows_to_list(res), [[['n', 'm', 'c', 'bar', 'c']]])
+        self.assertItemsEqual(rows_to_list(res), [[['m', 'n', 'c', 'bar', 'c']]])
 
         cursor.execute(q % "tags = tags - [ 'bar' ]")
         res = cursor.execute("SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'")
-        self.assertItemsEqual(rows_to_list(res), [[['n', 'm', 'c', 'c']]])
+        self.assertItemsEqual(rows_to_list(res), [[['m', 'n', 'c', 'c']]])
 
     def multi_collection_test(self):
         cursor = self.prepare()
@@ -1661,7 +1725,10 @@ class TestCQL(Tester):
         assert rows_to_list(res) == [[0, 1, 1, 1], [0, 3, 3, 3]], res
 
         assert_invalid(cursor, "SELECT * FROM test WHERE k2 = 3")
-        assert_invalid(cursor, "SELECT * FROM test WHERE k1 IN (0, 1) and k2 = 3")
+
+        v = self.cluster.version()
+        if v < "2.2.0":
+            assert_invalid(cursor, "SELECT * FROM test WHERE k1 IN (0, 1) and k2 = 3")
 
         res = cursor.execute("SELECT * FROM test WHERE token(k1, k2) = token(0, 1)")
         assert rows_to_list(res) == [[0, 1, 1, 1]], res
@@ -1671,7 +1738,7 @@ class TestCQL(Tester):
 
     def cql3_insert_thrift_test(self):
         """ Check that we can insert from thrift into a CQL3 table (#4377) """
-        cursor = self.prepare()
+        cursor = self.prepare(start_rpc=True)
 
         cursor.execute("""
             CREATE TABLE test (
@@ -1682,14 +1749,22 @@ class TestCQL(Tester):
             )
         """)
 
-        cli = self.cluster.nodelist()[0].cli()
-        cli.do("use ks")
-        cli.do("set test[2]['4:v'] = int(200)")
-        assert not cli.has_errors(), cli.errors()
-        time.sleep(1.5)
+        node = self.cluster.nodelist()[0]
+        host, port = node.network_interfaces['thrift']
+        client = get_thrift_client(host, port)
+        client.transport.open()
+        client.set_keyspace('ks')
+        key = struct.pack('>i', 2)
+        column_name_component = struct.pack('>i', 4)
+        # component length + component + EOC + component length + component + EOC
+        column_name = '\x00\x04' + column_name_component + '\x00' + '\x00\x01' + 'v' + '\x00'
+        value = struct.pack('>i', 8)
+        client.batch_mutate(
+            {key: {'test': [Mutation(ColumnOrSuperColumn(column=Column(name=column_name, value=value, timestamp=100)))]}},
+            ThriftConsistencyLevel.ONE)
 
         res = cursor.execute("SELECT * FROM test")
-        assert rows_to_list(res) == [[2, 4, 200]], res
+        assert rows_to_list(res) == [[2, 4, 8]], res
 
     def row_existence_test(self):
         """ Check the semantic of CQL row existence (part of #4361) """
@@ -1790,7 +1865,7 @@ class TestCQL(Tester):
         node1 = cluster.nodelist()[0]
         time.sleep(0.2)
 
-        cursor = self.patient_cql_connection(node1, version=cql_version)
+        cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'ks', 1)
 
         cursor.execute("""
@@ -1833,22 +1908,38 @@ class TestCQL(Tester):
         res = cursor.execute("SELECT blog_id, content FROM blogs WHERE author='foo'")
         assert rows_to_list(res) == [[1, 'bar1'], [1, 'bar2'], [2, 'baz']], res
 
-        res = cursor.execute("SELECT blog_id, content FROM blogs WHERE time1 > 0 AND author='foo'")
+        res = cursor.execute("SELECT blog_id, content FROM blogs WHERE time1 > 0 AND author='foo' ALLOW FILTERING")
         assert rows_to_list(res) == [[2, 'baz']], res
 
-        res = cursor.execute("SELECT blog_id, content FROM blogs WHERE time1 = 1 AND author='foo'")
+        res = cursor.execute("SELECT blog_id, content FROM blogs WHERE time1 = 1 AND author='foo' ALLOW FILTERING")
         assert rows_to_list(res) == [[2, 'baz']], res
 
-        res = cursor.execute("SELECT blog_id, content FROM blogs WHERE time1 = 1 AND time2 = 0 AND author='foo'")
+        res = cursor.execute("SELECT blog_id, content FROM blogs WHERE time1 = 1 AND time2 = 0 AND author='foo' ALLOW FILTERING")
         assert rows_to_list(res) == [[2, 'baz']], res
 
-        res = cursor.execute("SELECT content FROM blogs WHERE time1 = 1 AND time2 = 1 AND author='foo'")
+        res = cursor.execute("SELECT content FROM blogs WHERE time1 = 1 AND time2 = 1 AND author='foo' ALLOW FILTERING")
         assert rows_to_list(res) == [], res
 
-        res = cursor.execute("SELECT content FROM blogs WHERE time1 = 1 AND time2 > 0 AND author='foo'")
+        res = cursor.execute("SELECT content FROM blogs WHERE time1 = 1 AND time2 > 0 AND author='foo' ALLOW FILTERING")
         assert rows_to_list(res) == [], res
 
         assert_invalid(cursor, "SELECT content FROM blogs WHERE time2 >= 0 AND author='foo'")
+
+        # as discussed in CASSANDRA-8148, some queries that should have required ALLOW FILTERING
+        # in 2.0 have been fixed for 2.2
+        v = self.cluster.version()
+        if v < "2.2.0":
+            cursor.execute("SELECT blog_id, content FROM blogs WHERE time1 > 0 AND author='foo'")
+            cursor.execute("SELECT blog_id, content FROM blogs WHERE time1 = 1 AND author='foo'")
+            cursor.execute("SELECT blog_id, content FROM blogs WHERE time1 = 1 AND time2 = 0 AND author='foo'")
+            cursor.execute("SELECT content FROM blogs WHERE time1 = 1 AND time2 = 1 AND author='foo'")
+            cursor.execute("SELECT content FROM blogs WHERE time1 = 1 AND time2 > 0 AND author='foo'")
+        else:
+            assert_invalid(cursor, "SELECT blog_id, content FROM blogs WHERE time1 > 0 AND author='foo'")
+            assert_invalid(cursor, "SELECT blog_id, content FROM blogs WHERE time1 = 1 AND author='foo'")
+            assert_invalid(cursor, "SELECT blog_id, content FROM blogs WHERE time1 = 1 AND time2 = 0 AND author='foo'")
+            assert_invalid(cursor, "SELECT content FROM blogs WHERE time1 = 1 AND time2 = 1 AND author='foo'")
+            assert_invalid(cursor, "SELECT content FROM blogs WHERE time1 = 1 AND time2 > 0 AND author='foo'")
 
     @freshCluster()
     def limit_bugs_test(self):
@@ -1974,23 +2065,36 @@ class TestCQL(Tester):
         cursor.execute("CREATE KEYSPACE ks1 WITH replication={ 'class' : 'SimpleStrategy', 'replication_factor' : 1 }")
         cursor.execute("CREATE KEYSPACE ks2 WITH replication={ 'class' : 'SimpleStrategy', 'replication_factor' : 1 } AND durable_writes=false")
 
-        res = cursor.execute("SELECT keyspace_name, durable_writes FROM system.schema_keyspaces")
-        assert rows_to_list(res) == [['ks1', True], ['system', True], ['system_traces', True], ['ks2', False]], res
+        if self.cluster.version() >= '2.2':
+            assert_all(cursor, "SELECT keyspace_name, durable_writes FROM system.schema_keyspaces",
+                    [['system_auth', True], ['ks1', True], ['system_distributed', True], ['system', True], ['system_traces', True], ['ks2', False]])
+        else:
+            assert_all(cursor, "SELECT keyspace_name, durable_writes FROM system.schema_keyspaces",
+                    [['ks1', True], ['system', True], ['system_traces', True], ['ks2', False]])
 
         cursor.execute("ALTER KEYSPACE ks1 WITH replication = { 'class' : 'NetworkTopologyStrategy', 'dc1' : 1 } AND durable_writes=False")
         cursor.execute("ALTER KEYSPACE ks2 WITH durable_writes=true")
-        res = cursor.execute("SELECT keyspace_name, durable_writes, strategy_class FROM system.schema_keyspaces")
-        assert rows_to_list(res) == [[u'ks1', False, u'org.apache.cassandra.locator.NetworkTopologyStrategy'],
-                      [u'system', True, u'org.apache.cassandra.locator.LocalStrategy'],
-                      [u'system_traces', True, u'org.apache.cassandra.locator.SimpleStrategy'],
-                      [u'ks2', True, u'org.apache.cassandra.locator.SimpleStrategy']]
+
+        if self.cluster.version() >= '2.2':
+            assert_all(cursor, "SELECT keyspace_name, durable_writes, strategy_class FROM system.schema_keyspaces",
+                          [[u'system_auth', True, u'org.apache.cassandra.locator.SimpleStrategy'],
+                          [u'ks1', False, u'org.apache.cassandra.locator.NetworkTopologyStrategy'],
+                          [u'system_distributed', True, u'org.apache.cassandra.locator.SimpleStrategy'],
+                          [u'system', True, u'org.apache.cassandra.locator.LocalStrategy'],
+                          [u'system_traces', True, u'org.apache.cassandra.locator.SimpleStrategy'],
+                          [u'ks2', True, u'org.apache.cassandra.locator.SimpleStrategy']])
+        else:
+            assert_all(cursor, "SELECT keyspace_name, durable_writes, strategy_class FROM system.schema_keyspaces",
+                          [[u'ks1', False, u'org.apache.cassandra.locator.NetworkTopologyStrategy'],
+                          [u'system', True, u'org.apache.cassandra.locator.LocalStrategy'],
+                          [u'system_traces', True, u'org.apache.cassandra.locator.SimpleStrategy'],
+                          [u'ks2', True, u'org.apache.cassandra.locator.SimpleStrategy']])
 
         cursor.execute("USE ks1")
 
         assert_invalid(cursor, "CREATE TABLE cf1 (a int PRIMARY KEY, b int) WITH compaction = { 'min_threshold' : 4 }", expected=ConfigurationException)
         cursor.execute("CREATE TABLE cf1 (a int PRIMARY KEY, b int) WITH compaction = { 'class' : 'SizeTieredCompactionStrategy', 'min_threshold' : 7 }")
-        res = cursor.execute("SELECT columnfamily_name, min_compaction_threshold FROM system.schema_columnfamilies WHERE keyspace_name='ks1'")
-        assert rows_to_list(res) == [['cf1', 7]], res
+        assert_one(cursor, "SELECT columnfamily_name, min_compaction_threshold FROM system.schema_columnfamilies WHERE keyspace_name='ks1'", ['cf1', 7])
 
     def remove_range_slice_test(self):
         cursor = self.prepare()
@@ -2066,7 +2170,10 @@ class TestCQL(Tester):
         """ Test for the validation bug of #4706 """
 
         cursor = self.prepare()
-        assert_invalid(cursor, "CREATE TABLE test (id bigint PRIMARY KEY, count counter, things set<text>)", matching="Cannot add a counter column", expected=ConfigurationException)
+        if self.cluster.version() >= '3.0':
+            assert_invalid(cursor, "CREATE TABLE test (id bigint PRIMARY KEY, count counter, things set<text>)", matching="Cannot add a non counter column", expected=ConfigurationException)
+        else:
+            assert_invalid(cursor, "CREATE TABLE test (id bigint PRIMARY KEY, count counter, things set<text>)", matching="Cannot add a counter column", expected=ConfigurationException)
 
     def reversed_compact_test(self):
         """ Test for #4716 bug and more generally for good behavior of ordering"""
@@ -2560,11 +2667,11 @@ class TestCQL(Tester):
 
         assert_invalid(cursor, "SELECT * FROM foo WHERE a=1")
 
-    @since('3.0')
+    @since('2.2')
     def multi_in_test(self):
         self.__multi_in(False)
 
-    @since('3.0')
+    @since('2.2')
     def multi_in_compact_test(self):
         self.__multi_in(True)
 
@@ -2641,7 +2748,7 @@ class TestCQL(Tester):
         res = cursor.execute("select zipcode from zipcodes where group='test' AND zipcode IN ('06902','73301','94102') and state IN ('CT','CA') and fips_regions < 0")
         assert len(res) == 0, res
 
-    @since('3.0')
+    @since('2.2')
     def multi_in_compact_non_composite_test(self):
         cursor = self.prepare()
 
@@ -2674,12 +2781,25 @@ class TestCQL(Tester):
             )
         """)
 
-        cursor.execute("INSERT INTO test (k, c, v) VALUES (0, 0, 0)")
-        p = cursor.prepare("SELECT * FROM test WHERE k=? AND c IN ?")
+        insert_statement = cursor.prepare("INSERT INTO test (k, c, v) VALUES (?, ?, ?)")
+        cursor.execute(insert_statement, (0, 0, 0))
+
+        select_statement = cursor.prepare("SELECT * FROM test WHERE k=? AND c IN ?")
         in_values = list(range(10000))
-        rows = cursor.execute(p, [0, in_values])
+
+        # try to fetch one existing row and 9999 non-existing rows
+        rows = cursor.execute(select_statement, [0, in_values])
         self.assertEqual(1, len(rows))
         self.assertEqual((0, 0, 0), rows[0])
+
+        # insert approximately 1000 random rows between 0 and 10k
+        clustering_values = set([random.randint(0, 9999) for _ in range(1000)])
+        clustering_values.add(0)
+        args = [(0, i, i) for i in clustering_values]
+        execute_concurrent_with_args(cursor, insert_statement, args)
+
+        rows = cursor.execute(select_statement, [0, in_values])
+        self.assertEqual(len(clustering_values), len(rows))
 
     @since('1.2.1')
     def timeuuid_test(self):
@@ -2977,15 +3097,25 @@ class TestCQL(Tester):
 
     @since('2.0')
     def rename_test(self):
-        cursor = self.prepare()
+        cursor = self.prepare(start_rpc=True)
 
-        # The goal is to test renaming from an old cli value
-        cli = self.cluster.nodelist()[0].cli()
-        cli.do("use ks")
-        cli.do("create column family test with comparator='CompositeType(Int32Type, Int32Type, Int32Type)' "
-                + "and key_validation_class=UTF8Type and default_validation_class=UTF8Type")
-        cli.do("set test['foo']['4:3:2'] = 'bar'")
-        assert not cli.has_errors(), cli.errors()
+        node = self.cluster.nodelist()[0]
+        host, port = node.network_interfaces['thrift']
+        client = get_thrift_client(host, port)
+        client.transport.open()
+
+        cfdef = CfDef()
+        cfdef.keyspace = 'ks'
+        cfdef.name = 'test'
+        cfdef.column_type = 'Standard'
+        cfdef.comparator_type = 'CompositeType(Int32Type, Int32Type, Int32Type)'
+        cfdef.key_validation_class = 'UTF8Type'
+        cfdef.default_validation_class = 'UTF8Type'
+
+        client.set_keyspace('ks')
+        client.system_add_column_family(cfdef)
+
+        cursor.execute("INSERT INTO ks.test (key, column1, column2, column3, value) VALUES ('foo', 4, 3, 2, 'bar')")
 
         time.sleep(1)
 
@@ -3023,6 +3153,7 @@ class TestCQL(Tester):
 
         # Shouldn't apply
         assert_one(cursor, "UPDATE test SET v1 = 3, v2 = 'bar' WHERE k = 0 IF v1 = 4", [False])
+        assert_one(cursor, "UPDATE test SET v1 = 3, v2 = 'bar' WHERE k = 0 IF EXISTS", [False])
 
         # Should apply
         assert_one(cursor, "INSERT INTO test (k, v1, v2) VALUES (0, 2, 'foo') IF NOT EXISTS", [True])
@@ -3037,6 +3168,7 @@ class TestCQL(Tester):
 
         # Should apply (note: we want v2 before v1 in the statement order to exercise #5786)
         assert_one(cursor, "UPDATE test SET v2 = 'bar', v1 = 3 WHERE k = 0 IF v1 = 2", [True])
+        assert_one(cursor, "UPDATE test SET v2 = 'bar', v1 = 3 WHERE k = 0 IF EXISTS", [True])
         assert_one(cursor, "SELECT * FROM test", [0, 3, 'bar', None])
 
         # Shouldn't apply, only one condition is ok
@@ -3069,6 +3201,9 @@ class TestCQL(Tester):
         # Should apply
         assert_one(cursor, "DELETE FROM test WHERE k = 0 IF v1 = null", [True])
         assert_none(cursor, "SELECT * FROM test")
+
+        # Shouldn't apply
+        assert_one(cursor, "UPDATE test SET v1 = 3, v2 = 'bar' WHERE k = 0 IF EXISTS", [False])
 
         if self.cluster.version() > "2.1.1":
             # Should apply
@@ -3321,6 +3456,27 @@ class TestCQL(Tester):
         # Test selection validation.
         assert_invalid(cursor, 'SELECT DISTINCT pk0 FROM regular', matching="queries must request all the partition key columns")
         assert_invalid(cursor, 'SELECT DISTINCT pk0, pk1, ck0 FROM regular', matching="queries must only request partition key columns")
+
+    def select_distinct_with_deletions_test(self):
+        cursor = self.prepare()
+        cursor.execute('CREATE TABLE t1 (k int PRIMARY KEY, c int, v int)')
+        for i in range(10):
+            cursor.execute('INSERT INTO t1 (k, c, v) VALUES (%d, %d, %d)' % (i, i, i))
+
+        rows = cursor.execute('SELECT DISTINCT k FROM t1')
+        self.assertEqual(10, len(rows))
+        key_to_delete = rows[3].k
+
+        cursor.execute('DELETE FROM t1 WHERE k=%d' % (key_to_delete,))
+        rows = list(cursor.execute('SELECT DISTINCT k FROM t1'))
+        self.assertEqual(9, len(rows))
+
+        rows = list(cursor.execute('SELECT DISTINCT k FROM t1 LIMIT 5'))
+        self.assertEqual(5, len(rows))
+
+        cursor.default_fetch_size = 5
+        rows = list(cursor.execute('SELECT DISTINCT k FROM t1'))
+        self.assertEqual(9, len(rows))
 
     def function_with_null_test(self):
         cursor = self.prepare()
@@ -3618,17 +3774,25 @@ class TestCQL(Tester):
         # we're not allowed to create a value index if we already have a key one
         assert_invalid(cursor, "CREATE INDEX ON test(m)")
 
-    #def nan_infinity_test(self):
-    #    cursor = self.prepare()
+    def nan_infinity_test(self):
+        cursor = self.prepare()
 
-    #    cursor.execute("CREATE TABLE test (f float PRIMARY KEY)")
+        cursor.execute("CREATE TABLE test (f float PRIMARY KEY)")
 
-    #    cursor.execute("INSERT INTO test(f) VALUES (NaN)")
-    #    cursor.execute("INSERT INTO test(f) VALUES (-NaN)")
-    #    cursor.execute("INSERT INTO test(f) VALUES (Infinity)")
-    #    cursor.execute("INSERT INTO test(f) VALUES (-Infinity)")
+        cursor.execute("INSERT INTO test(f) VALUES (NaN)")
+        cursor.execute("INSERT INTO test(f) VALUES (-NaN)")
+        cursor.execute("INSERT INTO test(f) VALUES (Infinity)")
+        cursor.execute("INSERT INTO test(f) VALUES (-Infinity)")
 
-    #    assert_all(cursor, "SELECT * FROM test", [[nan], [inf], [-inf]])
+        selected = rows_to_list(cursor.execute("SELECT * FROM test"))
+
+        # selected should be [[nan], [inf], [-inf]],
+        # but assert element-wise because NaN != NaN
+        assert len(selected) == 3
+        assert len(selected[0]) == 1
+        assert math.isnan(selected[0][0])
+        assert selected[1] == [float("inf")]
+        assert selected[2] == [float("-inf")]
 
     @since('2.0')
     def static_columns_test(self):
@@ -3963,7 +4127,7 @@ class TestCQL(Tester):
         cursor.execute("insert into test(field1, field2, field3) values ('hola', now(), false);")
         cursor.execute("insert into test(field1, field2, field3) values ('hola', now(), false);")
 
-        if self.cluster.version() > '3.0':
+        if self.cluster.version() > '2.2':
             assert_one(cursor, "select count(*) from test where field3 = false limit 1;", [2])
         else:
             assert_one(cursor, "select count(*) from test where field3 = false limit 1;", [1])
@@ -4052,7 +4216,7 @@ class TestCQL(Tester):
         assert_all(cursor, "SELECT v FROM test WHERE k=0 AND c1 = 0 AND c2 IN (2, 0)", [[0], [2]])
         assert_all(cursor, "SELECT v FROM test WHERE k=0 AND c1 = 0 AND c2 IN (2, 0) ORDER BY c1 ASC", [[0], [2]])
         assert_all(cursor, "SELECT v FROM test WHERE k=0 AND c1 = 0 AND c2 IN (2, 0) ORDER BY c1 DESC", [[2], [0]])
-        if self.cluster.version() >= '3.0':
+        if self.cluster.version() >= '2.2':
             assert_all(cursor, "SELECT v FROM test WHERE k IN (1, 0)", [[0], [1], [2], [3], [4], [5]])
         else:
             assert_all(cursor, "SELECT v FROM test WHERE k IN (1, 0)", [[3], [4], [5], [0], [1], [2]])
@@ -4763,10 +4927,20 @@ class TestCQL(Tester):
 
         # create and confirm
         cursor.execute("CREATE INDEX IF NOT EXISTS myindex ON my_test_table (value1)")
-        assert_one(
-            cursor,
-            """select index_name from system."IndexInfo" where table_name = 'my_test_ks'""",
-            ['my_test_table.myindex'])
+
+        # index building is asynch, wait for it to finish
+        for i in range(10):
+            results = cursor.execute(
+                """select index_name from system."IndexInfo" where table_name = 'my_test_ks'""")
+
+            if results:
+                self.assertEqual([('my_test_table.myindex',)], results)
+                break
+
+            time.sleep(0.5)
+        else:
+            # this is executed when 'break' is never called
+            self.fail("Didn't see my_test_table.myindex after polling for 5 seconds")
 
         # unsuccessful create since it's already there
         cursor.execute("CREATE INDEX IF NOT EXISTS myindex ON my_test_table (value1)")
@@ -4975,8 +5149,8 @@ class TestCQL(Tester):
         cursor.execute("INSERT INTO test (k, v) VALUES ( 1, {1:'a', 2:'b', 5:'e', 6:'f'})")
 
         assert_all(cursor, "SELECT v[1] FROM test", [['a'], ['a']])
-        assert_all(cursor, "SELECT v[5] FROM test", [[], []])
-        assert_all(cursor, "SELECT v[1] FROM test", [[], []])
+        assert_all(cursor, "SELECT v[5] FROM test", [[], ['e']])
+        assert_all(cursor, "SELECT v[4] FROM test", [['d'], []])
 
         assert_all(cursor, "SELECT v[1..3] FROM test", [['a', 'b', 'c'], ['a', 'b', 'e']])
         assert_all(cursor, "SELECT v[3..5] FROM test", [['c', 'd'], ['e']])
@@ -5040,14 +5214,6 @@ class TestCQL(Tester):
     @since('2.1')
     def prepared_statement_invalidation_test(self):
         # test for CASSANDRA-7910
-        import logging
-
-        log = logging.getLogger()
-        log.setLevel('DEBUG')
-        handler = logging.StreamHandler()
-        handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s"))
-        log.addHandler(handler)
-
         cursor = self.prepare()
 
         cursor.execute("CREATE TABLE test (k int PRIMARY KEY, a int, b int, c int)")
@@ -5093,3 +5259,40 @@ class TestCQL(Tester):
         node1.nodetool('flush')
 
         assert_none(session, "select * from space1.table1 where a=1 and b=1")
+
+    def bug_5732_test(self):
+        cursor = self.prepare(use_cache=True)
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k int PRIMARY KEY,
+                v int,
+            )
+        """)
+
+        cursor.execute("ALTER TABLE test WITH CACHING='ALL'")
+        cursor.execute("INSERT INTO test (k,v) VALUES (0,0)")
+        cursor.execute("INSERT INTO test (k,v) VALUES (1,1)")
+        cursor.execute("CREATE INDEX testindex on test(v)")
+
+        # wait for the index to be fully built
+        start = time.time()
+        while True:
+            results = cursor.execute("""SELECT * FROM system."IndexInfo" WHERE table_name = 'ks' AND index_name = 'test.testindex'""")
+            if results:
+                break
+
+            if time.time() - start > 10.0:
+                results = list(cursor.execute('SELECT * FROM system."IndexInfo"'))
+                raise Exception("Failed to build secondary index within ten seconds: %s" % (results,))
+            time.sleep(0.1)
+
+        assert_all(cursor, "SELECT k FROM test WHERE v = 0", [[0]])
+
+        self.cluster.stop()
+        time.sleep(0.5)
+        self.cluster.start()
+        time.sleep(0.5)
+
+        cursor = self.patient_cql_connection(self.cluster.nodelist()[0])
+        assert_all(cursor, "SELECT k FROM ks.test WHERE v = 0", [[0]])

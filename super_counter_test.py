@@ -2,15 +2,20 @@ import time
 
 from dtest import Tester, debug
 
-import cql
+from thrift_tests import get_thrift_client
+
 from cql.cassandra.ttypes import CfDef, ColumnParent, CounterColumn, \
         ConsistencyLevel, ColumnPath
+
 
 class TestSuperCounterClusterRestart(Tester):
     """
     This test is part of this issue:
     https://issues.apache.org/jira/browse/CASSANDRA-3821
     """
+    def __init__(self, *args, **kwargs):
+        kwargs['cluster_options'] = {'start_rpc': 'true'}
+        Tester.__init__(self, *args, **kwargs)
 
     def functional_test(self):
         NUM_SUBCOLS = 100
@@ -23,14 +28,16 @@ class TestSuperCounterClusterRestart(Tester):
         time.sleep(.5)
         cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'ks', 3)
-        time.sleep(1) # wait for propagation
+        time.sleep(1)  # wait for propagation
 
         # create the columnfamily using thrift
         host, port = node1.network_interfaces['thrift']
-        thrift_conn = cql.connect(host, port, keyspace='ks')
+        thrift_conn = get_thrift_client(host, port)
+        thrift_conn.transport.open()
+        thrift_conn.set_keyspace('ks')
         cf_def = CfDef(keyspace='ks', name='cf', column_type='Super',
                 default_validation_class='CounterColumnType')
-        thrift_conn.client.system_add_column_family(cf_def)
+        thrift_conn.system_add_column_family(cf_def)
 
         # let the sediment settle to to the bottom before drinking...
         time.sleep(2)
@@ -40,13 +47,9 @@ class TestSuperCounterClusterRestart(Tester):
                 column_parent = ColumnParent(column_family='cf',
                         super_column='subcol_%d' % subcol)
                 counter_column = CounterColumn('col_0', 1)
-                thrift_conn.client.add('row_0', column_parent, counter_column,
+                thrift_conn.add('row_0', column_parent, counter_column,
                         ConsistencyLevel.QUORUM)
         time.sleep(1)
-
-        # flush everything and the problem will be mostly corrected.
-#        for node in cluster.nodelist():
-#            node.flush()
 
         debug("Stopping cluster")
         cluster.stop()
@@ -55,14 +58,16 @@ class TestSuperCounterClusterRestart(Tester):
         cluster.start()
         time.sleep(5)
 
-        thrift_conn = cql.connect(host, port, keyspace='ks')
+        thrift_conn = get_thrift_client(host, port)
+        thrift_conn.transport.open()
+        thrift_conn.set_keyspace('ks')
 
         from_db = []
 
         for i in xrange(NUM_SUBCOLS):
             column_path = ColumnPath(column_family='cf', column='col_0',
-                    super_column='subcol_%d'%i)
-            column_or_super_column = thrift_conn.client.get('row_0', column_path,
+                    super_column='subcol_%d' % i)
+            column_or_super_column = thrift_conn.get('row_0', column_path,
                     ConsistencyLevel.QUORUM)
             val = column_or_super_column.counter_column.value
             debug(str(val)),

@@ -1,12 +1,11 @@
 from dtest import Tester
-from pytools import since
+from tools import since
 
-import os, sys, time, pytools
+import os, sys, time, tools
 from uuid import UUID
 from ccmlib.cluster import Cluster
 
-cql_version="3.0.0"
-
+@since("1.2")
 class TestCQL(Tester):
 
     def prepare(self):
@@ -16,11 +15,10 @@ class TestCQL(Tester):
         node1 = cluster.nodelist()[0]
         time.sleep(0.2)
 
-        cursor = self.patient_cql_connection(node1, version=cql_version)
+        cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'ks', 1)
         return cursor
 
-    @since("1.2")
     def batch_preparation_test(self):
         """ Test preparation of batch statement (#4202) """
         cursor = self.prepare()

@@ -3,8 +3,8 @@ from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
 
 import random, time, uuid
-from pyassertions import assert_invalid, assert_one
-from pytools import rows_to_list, since
+from assertions import assert_invalid, assert_one
+from tools import rows_to_list, since
 
 class TestCounters(Tester):
 
@@ -48,9 +48,7 @@ class TestCounters(Tester):
         cluster.populate(2).start()
         nodes = cluster.nodelist()
 
-        cql_version=None
-
-        cursor = self.patient_cql_connection(nodes[0], version=cql_version)
+        cursor = self.patient_cql_connection(nodes[0])
         self.create_ks(cursor, 'ks', 2)
 
         query = """
@@ -68,7 +66,7 @@ class TestCounters(Tester):
         updates = 50
 
         def make_updates():
-            cursor = self.patient_cql_connection(nodes[0], keyspace='ks', version=cql_version)
+            cursor = self.patient_cql_connection(nodes[0], keyspace='ks')
             upd = "UPDATE counterTable SET c = c + 1 WHERE k = %d;"
             batch = " ".join(["BEGIN COUNTER BATCH"] + [upd % x for x in keys] + ["APPLY BATCH;"])
 
@@ -78,7 +76,7 @@ class TestCounters(Tester):
                 cursor.execute(query)
 
         def check(i):
-            cursor = self.patient_cql_connection(nodes[0], keyspace='ks', version=cql_version)
+            cursor = self.patient_cql_connection(nodes[0], keyspace='ks')
             query = SimpleStatement("SELECT * FROM counterTable", consistency_level=ConsistencyLevel.QUORUM)
             rows = cursor.execute(query)
 

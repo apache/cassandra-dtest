@@ -13,6 +13,7 @@ def wait(delay=2):
 class TestConcurrentSchemaChanges(Tester):
 
     def __init__(self, *argv, **kwargs):
+        kwargs['cluster_options'] = {'start_rpc': 'true'}
         super(TestConcurrentSchemaChanges, self).__init__(*argv, **kwargs)
         self.allow_log_errors = True
 
@@ -230,8 +231,8 @@ class TestConcurrentSchemaChanges(Tester):
         cluster.add(node2, False)
 
         [node1, node2] = cluster.nodelist()
-        node1.start()
-        node2.start()
+        node1.start(wait_for_binary_proto=True)
+        node2.start(wait_for_binary_proto=True)
         wait(2)
 
         cursor = self.patient_cql_connection(node1)
@@ -254,7 +255,7 @@ class TestConcurrentSchemaChanges(Tester):
                     None)
 
         cluster.add(node3, True)
-        node3.start()
+        node3.start(wait_for_binary_proto=True)
 
         wait(30)
         self.validate_schema_consistent(node1)

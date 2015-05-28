@@ -1,7 +1,8 @@
 # coding: utf-8
 
 from dtest import Tester
-from pytools import since
+from tools import since, no_vnodes
+from assertions import assert_unavailable
 from cassandra import ConsistencyLevel, WriteTimeout
 from cassandra.query import SimpleStatement
 
@@ -9,6 +10,7 @@ import time
 from threading import Thread
 from ccmlib.cluster import Cluster
 
+@since('2.0.6')
 class TestPaxos(Tester):
 
     def prepare(self, ordered=False, create_keyspace=True, use_cache=False, nodes=1, rf=1):
@@ -24,16 +26,54 @@ class TestPaxos(Tester):
         node1 = cluster.nodelist()[0]
         time.sleep(0.2)
 
-        cursor = self.patient_cql_connection(node1, version="3.0.0")
+        cursor = self.patient_cql_connection(node1)
         if create_keyspace:
             self.create_ks(cursor, 'ks', rf)
         return cursor
 
-    @since('2.0.6')
+    def replica_availability_test(self):
+        #See CASSANDRA-8640
+        session = self.prepare(nodes=3, rf=3)
+        session.execute("CREATE TABLE test (k int PRIMARY KEY, v int)")
+        session.execute("INSERT INTO test (k, v) VALUES (0, 0) IF NOT EXISTS")
+
+        self.cluster.nodelist()[2].stop()
+        session.execute("INSERT INTO test (k, v) VALUES (1, 1) IF NOT EXISTS")
+
+        self.cluster.nodelist()[1].stop()
+        assert_unavailable(session.execute, "INSERT INTO test (k, v) VALUES (2, 2) IF NOT EXISTS")
+
+        self.cluster.nodelist()[1].start(wait_for_binary_proto=True, wait_other_notice=True)
+        session.execute("INSERT INTO test (k, v) VALUES (3, 3) IF NOT EXISTS")
+
+        self.cluster.nodelist()[2].start(wait_for_binary_proto=True)
+        session.execute("INSERT INTO test (k, v) VALUES (4, 4) IF NOT EXISTS")
+
+    @no_vnodes()
+    def cluster_availability_test(self):
+        #Warning, a change in partitioner or a change in CCM token allocation
+        #may require the partition keys of these inserts to be changed.
+        #This must not use vnodes as it relies on assumed token values.
+
+        session = self.prepare(nodes=3)
+        session.execute("CREATE TABLE test (k int PRIMARY KEY, v int)")
+        session.execute("INSERT INTO test (k, v) VALUES (0, 0) IF NOT EXISTS")
+
+        self.cluster.nodelist()[2].stop()
+        session.execute("INSERT INTO test (k, v) VALUES (1, 1) IF NOT EXISTS")
+
+        self.cluster.nodelist()[1].stop()
+        session.execute("INSERT INTO test (k, v) VALUES (3, 2) IF NOT EXISTS")
+
+        self.cluster.nodelist()[1].start()
+        session.execute("INSERT INTO test (k, v) VALUES (5, 5) IF NOT EXISTS")
+
+        self.cluster.nodelist()[2].start()
+        session.execute("INSERT INTO test (k, v) VALUES (6, 6) IF NOT EXISTS")
+
     def contention_test_multi_iterations(self):
         self._contention_test(8, 100)
 
-    @since('2.0.6')
     ##Warning, this test will require you to raise the open
     ##file limit on OSX. Use 'ulimit -n 1000'
     def contention_test_many_threds(self):
@@ -105,7 +145,7 @@ class TestPaxos(Tester):
         nodes = self.cluster.nodelist()
         workers = []
 
-        c = self.patient_cql_connection(nodes[0], version="3.0.0", keyspace='ks')
+        c = self.patient_cql_connection(nodes[0], keyspace='ks')
         q = c.prepare("""
                 BEGIN BATCH
                    UPDATE test SET v = ? WHERE k = 0 IF v = ?;

@@ -1,15 +1,26 @@
+import glob
+import os
+import shutil
+import subprocess
+import tempfile
+import time
+
+from cassandra.concurrent import execute_concurrent_with_args
+
 from dtest import Tester, debug
-from pytools import replace_in_file, since
-import tempfile, shutil, glob, os, time
+from tools import replace_in_file, since
 import distutils.dir_util
 
+
 class SnapshotTester(Tester):
+
     def __init__(self, *args, **kwargs):
         Tester.__init__(self, *args, **kwargs)
 
     def insert_rows(self, cursor, start, end):
-        for r in range(start, end):
-            cursor.execute("INSERT INTO ks.cf (key, val) VALUES ({r}, 'asdf');".format(r=r))
+        insert_statement = cursor.prepare("INSERT INTO ks.cf (key, val) VALUES (?, 'asdf')")
+        args = [(r,) for r in range(start, end)]
+        execute_concurrent_with_args(cursor, insert_statement, args, concurrency=20)
 
     def make_snapshot(self, node, ks, cf, name):
         debug("Making snapshot....")
@@ -36,10 +47,18 @@ class SnapshotTester(Tester):
 
     def restore_snapshot(self, snapshot_dir, node, ks, cf):
         debug("Restoring snapshot....")
-        node_dir = node.get_path()
         snapshot_dir = os.path.join(snapshot_dir, ks, cf)
         ip = node.address()
-        os.system('{node_dir}/bin/sstableloader -d {ip} {snapshot_dir}'.format(**locals()))
+
+        args = [node.get_tool('sstableloader'), '-d', ip, snapshot_dir]
+        p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        stdout, stderr = p.communicate()
+        exit_status = p.wait()
+
+        if exit_status != 0:
+            raise Exception("sstableloader command '%s' failed; exit status: %d'; stdout: %s; stderr: %s" %
+                            (" ".join(args), exit_status, stdout, stderr))
+
 
 class TestSnapshot(SnapshotTester):
 
@@ -199,9 +218,9 @@ class TestArchiveCommitlog(SnapshotTester):
             cluster.compact()
             node1.drain()
             if archive_active_commitlogs:
-                # Copy the active commitlogs to the backup directory:
-                for f in glob.glob(commitlog_dir+"/*"):
-                    shutil.copy2(f, tmp_commitlog)
+                # restart the node which causes the active commitlogs to be archived
+                node1.stop()
+                node1.start(wait_for_binary_proto=True)
 
             # Destroy the cluster
             cluster.stop()
@@ -219,7 +238,7 @@ class TestArchiveCommitlog(SnapshotTester):
             self.restore_snapshot(system_cfs_snapshot_dir, node1, 'system', 'schema_columnfamilies', 'cfs')
             self.restore_snapshot(snapshot_dir, node1, 'ks', 'cf', 'basic')
 
-            cluster.start()
+            cluster.start(wait_for_binary_proto=True)
 
             cursor = self.patient_cql_connection(node1)
             node1.nodetool('refresh ks cf')
@@ -244,7 +263,7 @@ class TestArchiveCommitlog(SnapshotTester):
 
             debug("Restarting node1..")
             node1.stop()
-            node1.start()
+            node1.start(wait_for_binary_proto=True)
 
             node1.nodetool('flush')
             node1.nodetool('compact')

@@ -1,8 +1,9 @@
 from dtest import Tester, debug, DEFAULT_DIR
+from tools import require
 import unittest, time, os, subprocess, shlex, pycassa, glob, sys
 
 JNA_PATH = '/usr/share/java/jna.jar'
-ATTACK_JAR = 'cassandra-attack.jar'
+ATTACK_JAR = 'lib/cassandra-attack.jar'
 
 # Use jna.jar in {CASSANDRA_DIR,DEFAULT_DIR}/lib/, since >=2.1 needs correct version
 try:
@@ -21,18 +22,18 @@ class ThriftHSHATest(Tester):
     def __init__(self, *args, **kwargs):
         Tester.__init__(self, *args, **kwargs)
 
-
     @unittest.skipIf(sys.platform == "win32", 'Could not be executed on Windows')
     def test_closing_connections(self):
         """Test CASSANDRA-6546 - do connections get closed when disabling / renabling thrift service?"""
         cluster = self.cluster
         cluster.set_configuration_options(values={
+            'start_rpc': 'true',
             'rpc_server_type' : 'hsha',
             'rpc_max_threads' : 20
         })
 
         cluster.populate(1)
-        cluster.start()
+        cluster.start(wait_for_binary_proto=True)
         (node1,) = cluster.nodelist()
 
         cursor = self.patient_cql_connection(node1)
@@ -69,6 +70,7 @@ class ThriftHSHATest(Tester):
         """
         cluster = self.cluster
         cluster.set_configuration_options(values={
+            'start_rpc': 'true',
             'rpc_server_type' : 'hsha',
             'rpc_max_threads' : 20
         })

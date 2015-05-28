@@ -1,6 +1,6 @@
 from dtest import Tester
-import pytools as tools
-from pytools import no_vnodes, create_c1c2_table, retry_till_success
+import tools as tools
+from tools import no_vnodes, create_c1c2_table, retry_till_success
 from cassandra import ConsistencyLevel
 
 import time, re
@@ -9,6 +9,10 @@ from thrift.transport import TTransport, TSocket
 from thrift.protocol import TBinaryProtocol
 
 class TestPutGet(Tester):
+
+    def __init__(self, *args, **kwargs):
+        kwargs['cluster_options'] = {'start_rpc': 'true'}
+        Tester.__init__(self, *args, **kwargs)
 
     def putget_test(self):
         """ Simple put/get on a single row, hitting multiple sstables """

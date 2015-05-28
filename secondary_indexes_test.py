@@ -1,8 +1,11 @@
-import random, re, time, uuid
+import random
+import re
+import time
+import uuid
 
 from dtest import Tester, debug
-from pytools import since
-from pyassertions import assert_invalid
+from tools import since
+from assertions import assert_invalid, assert_one
 from cassandra import InvalidRequest
 from cassandra.query import BatchStatement, SimpleStatement
 from cassandra.protocol import ConfigurationException
@@ -53,7 +56,7 @@ class TestSecondaryIndexes(Tester):
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
 
-        conn = self.patient_cql_connection(node1, version='3.0.0')
+        conn = self.patient_cql_connection(node1)
         cursor = conn
         cursor.max_trace_wait = 120
         cursor.execute("CREATE KEYSPACE ks WITH REPLICATION = {'class': 'SimpleStrategy', 'replication_factor': '1'};")
@@ -560,7 +563,7 @@ class TestSecondaryIndexesOnCollections(Tester):
 
         # attempt to add an index on map values as well (should fail)
         stmt = "CREATE INDEX user_uuids on map_index_search.users (uuids);"
-        if self.cluster.version() >= '3.0':
+        if self.cluster.version() >= '2.2':
             matching =  "Cannot create index on values\(uuids\): an index on keys\(uuids\) already exists and indexing a map on more than one dimension at the same time is not currently supported"
         else:
             matching =  "Cannot create index on uuids values, an index on uuids keys already exists and indexing a map on both keys and values at the same time is not currently supported"
@@ -593,3 +596,68 @@ class TestSecondaryIndexesOnCollections(Tester):
 
             self.assertTrue(shared_uuid in db_uuids)
             self.assertTrue(log_entry['unshared_uuid2'] in db_uuids.values())
+
+
+class TestUpgradeSecondaryIndexes(Tester):
+
+    @since('2.1', max_version='2.1.x')
+    def test_read_old_sstables_after_upgrade(self):
+        """ from 2.1 the location of sstables changed (CASSANDRA-5202), but existing sstables continue
+        to be read from the old location. Verify that this works for index sstables as well as regular
+        data column families (CASSANDRA-9116)
+        """
+        cluster = self.cluster
+
+        # Forcing cluster version on purpose
+        cluster.set_install_dir(version="2.0.12")
+        cluster.populate(1).start()
+
+        [node1] = cluster.nodelist()
+        cursor = self.patient_cql_connection(node1)
+        self.create_ks(cursor, 'index_upgrade', 1)
+        cursor.execute("CREATE TABLE index_upgrade.table1 (k int PRIMARY KEY, v int)")
+        cursor.execute("CREATE INDEX ON index_upgrade.table1(v)")
+        cursor.execute("INSERT INTO index_upgrade.table1 (k,v) VALUES (0,0)")
+
+        query = "SELECT * FROM index_upgrade.table1 WHERE v=0"
+        assert_one(cursor, query, [0, 0])
+
+        # Upgrade to the 2.1.x version
+        node1.drain()
+        node1.watch_log_for("DRAINED")
+        node1.stop(wait_other_notice=False)
+        debug("Upgrading to current version")
+        self.set_node_to_current_version(node1)
+        node1.start(wait_other_notice=True)
+
+        [node1] = cluster.nodelist()
+        cursor = self.patient_cql_connection(node1)
+        debug(cluster.cassandra_version())
+        assert_one(cursor, query, [0, 0])
+
+    def upgrade_to_version(self, tag, nodes=None):
+        debug('Upgrading to ' + tag)
+        if nodes is None:
+            nodes = self.cluster.nodelist()
+
+        for node in nodes:
+            debug('Shutting down node: ' + node.name)
+            node.drain()
+            node.watch_log_for("DRAINED")
+            node.stop(wait_other_notice=False)
+
+        # Update Cassandra Directory
+        for node in nodes:
+            node.set_install_dir(version=tag)
+            debug("Set new cassandra dir for %s: %s" % (node.name, node.get_install_dir()))
+        self.cluster.set_install_dir(version=tag)
+
+        # Restart nodes on new version
+        for node in nodes:
+            debug('Starting %s on new version (%s)' % (node.name, tag))
+            # Setup log4j / logback again (necessary moving from 2.0 -> 2.1):
+            node.set_log_level("INFO")
+            node.start(wait_other_notice=True)
+            # node.nodetool('upgradesstables -a')
+
+

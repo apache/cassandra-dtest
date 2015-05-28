@@ -1,0 +1,2 @@
+This is the test reproduction jar from https://issues.apache.org/jira/browse/CASSANDRA-6285
+Source code is available as an attachment on that JIRA - https://issues.apache.org/jira/secure/attachment/12633659/cassandra-attack-src.zip
