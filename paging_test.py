@@ -649,7 +649,8 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
     @since('2.0.6')
     def static_columns_paging_test(self):
         """
-        Exercises paging with static columns to detect bugs like CASSANDRA-8502.
+        Exercises paging with static columns to detect bugs
+        @jira_ticket CASSANDRA-8502.
         """
 
         cursor = self.prepare()
