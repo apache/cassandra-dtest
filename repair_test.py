@@ -233,7 +233,6 @@ RepairTableContents = namedtuple('RepairTableContents',
 
 
 @since('2.2')
-@require('CASSANDRA-9482')  # not a test for this ticket, but fails because of it
 class TestRepairDataSystemTable(Tester):
     """
     @jira_ticket CASSANDRA-5839
@@ -293,38 +292,27 @@ class TestRepairDataSystemTable(Tester):
         for table_name, table_contents in repair_tables_dict.items():
             self.assertFalse(table_contents, '{} is non-empty'.format(table_name))
 
-    def repair_history_template(self, node, parent):
-        """
-        @param repair_node calls repair and checks the contents of the repair history tables on this node
-        @param parent whether to check the parent_repair_history or repair_history table
-
-        A parameterized test of `system_distributed.parent_repair_history`
-        and `system_distributed.parent_repair_history`. Tests them by:
-
-        - running repair on `node` and
-        - getting the contents of the `parent_repair_history` and `repair_history` tables on `node`.
-
-        If `parent`, then this checks that there are a non-zero number of entries in `parent_repair_history`.
-        If not `parent`, then this checks that there are a non-zero number of entries in `repair_history`.
-        """
-        # this error is from tripping an anticompaction guard, not catastrophic failure
-        self.ignore_log_patterns = ['may not update a reader that has been obsoleted']
-        node.repair()
-        (parent_repair_history,
-         repair_history) = self.repair_table_contents(node=node, include_system_keyspaces=False)
-
-        self.assertTrue(len(parent_repair_history if parent else repair_history))
-
+    @require('parent-repair-history-table.*')
     def repair_parent_table_test(self):
         """
-        Uses repair_history_template to test that `parent_repair_history` on a
-        node is populated correctly after running repair.
+        Test that `system_distributed.parent_repair_history` is properly populated
+        after repair by:
+
+        - running repair on `node` and
+        - checking that there are a non-zero number of entries in `parent_repair_history`.
         """
-        self.repair_history_template(node=self.node1, parent=True)
+        self.node1.repair()
+        parent_repair_history, _ = self.repair_table_contents(node=self.node1, include_system_keyspaces=False)
+        self.assertTrue(len(parent_repair_history))
 
     def repair_table_test(self):
         """
-        Uses repair_history_template to test that `repair_history` on a node
-        is populated correctly after running repair.
+        Test that `system_distributed.repair_history` is properly populated
+        after repair by:
+
+        - running repair on `node` and
+        - checking that there are a non-zero number of entries in `repair_history`.
         """
-        self.repair_history_template(node=self.node1, parent=False)
+        self.node1.repair()
+        _, repair_history = self.repair_table_contents(node=self.node1, include_system_keyspaces=False)
+        self.assertTrue(len(repair_history))
