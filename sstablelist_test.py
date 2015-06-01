@@ -1,6 +1,7 @@
 from dtest import Tester, debug
 from tools import since, require, InterruptCompaction
 from ccmlib import common
+from ccmlib.node import NodetoolError
 
 import subprocess
 import glob
@@ -51,7 +52,12 @@ class SSTableListTest(Tester):
         t = InterruptCompaction(node, TableName)
         t.start()
 
-        node.compact()
+        try:
+            node.compact()
+            assert False, "Compaction should have failed"
+        except NodetoolError:
+            pass #expected to fail
+
         t.join()
 
         # should compaction finish before the node is killed, this test would fail,
@@ -102,7 +108,7 @@ class SSTableListTest(Tester):
         self.assertEqual(expected_tmpfiles, tmpfiles)
 
         debug("Comparing op logs...")
-        expectedoplogs = sorted(self._get_sstable_operation_logs(node, ks, table))
+        expectedoplogs = sorted(self._get_sstable_transaction_logs(node, ks, table))
         oplogs = sorted(list(set(self._list_sstable_files(ks, table, type='tmp', oplogs=True)) - set(tmpfiles)))
         self.assertEqual(expectedoplogs, oplogs)
 
@@ -142,8 +148,8 @@ class SSTableListTest(Tester):
 
         return sorted(ret)
 
-    def _get_sstable_operation_logs(self, node, ks, table):
+    def _get_sstable_transaction_logs(self, node, ks, table):
         keyspace_dir = os.path.join(node.get_path(), 'data', ks)
-        ret = glob.glob(os.path.join(keyspace_dir, table + '-*', "operations", "*.log"))
+        ret = glob.glob(os.path.join(keyspace_dir, table + '-*', "transactions", "*.log"))
 
         return sorted(ret)

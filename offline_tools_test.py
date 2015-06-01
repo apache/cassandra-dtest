@@ -1,6 +1,8 @@
 from dtest import Tester, debug
 import os
 import re
+import subprocess
+from ccmlib import common
 from tools import since
 
 
@@ -128,7 +130,7 @@ class TestOfflineTools(Tester):
         cluster.start()
         cursor = self.patient_cql_connection(node1)
         cursor.execute("ALTER TABLE keyspace1.standard1 with compaction={'class': 'LeveledCompactionStrategy', 'sstable_size_in_mb':3};")
-        
+
         node1.stress(['write', 'n=1000', '-schema', 'replication(factor=3)'])
 
         node1.flush()
@@ -192,8 +194,7 @@ class TestOfflineTools(Tester):
         outlines = out.split("\n")
 
         #check output is correct for each sstable
-        allsstables = node1.get_sstables("keyspace1", "standard1")
-        sstables = [sstable for sstable in allsstables if "tmp" not in sstable[50:]]
+        sstables = self._get_final_sstables(node1, "keyspace1", "standard1")
 
         for sstable in sstables:
             verified = False
@@ -230,3 +231,26 @@ class TestOfflineTools(Tester):
 
         self.assertIn("java.lang.Exception: Invalid SSTable", error)
         self.assertEqual(rc, 1, msg=str(rc))
+
+    def _get_final_sstables(self, node, ks, table):
+        """
+        Return the node final sstable data files, excluding the temporary tables.
+        If sstablelister exists (>= 3.0) then we rely on this tool since the table
+        file names no longer contain tmp in their names (CASSANDRA-7066).
+        """
+        # Get all sstable data files
+        allsstables = node.get_sstables(ks, table)
+
+        # Remove any temporary files
+        tool_bin = node.get_tool('sstablelister')
+        if os.path.isfile(tool_bin):
+            args = [ tool_bin, '--type', 'tmp', ks, table]
+            env = common.make_cassandra_env(node.get_install_cassandra_root(), node.get_node_cassandra_root())
+            p = subprocess.Popen(args, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            (stdin, stderr) = p.communicate()
+            tmpsstables = stdin.split('\n')
+            ret = list(set(allsstables) - set(tmpsstables))
+        else:
+            ret = [sstable for sstable in allsstables if "tmp" not in sstable[50:]]
+
+        return ret
