@@ -24,7 +24,7 @@ class TestRepair(Tester):
 
         cursor = self.patient_cql_connection(node_to_check, 'ks')
         result = cursor.execute("SELECT * FROM cf LIMIT %d" % (rows * 2))
-        assert len(result) == rows, len(result)
+        self.assertEqual(len(result), rows, len(result))
 
         for k in found:
             query_c1c2(cursor, k, ConsistencyLevel.ONE)
@@ -32,7 +32,7 @@ class TestRepair(Tester):
         for k in missings:
             query = SimpleStatement("SELECT c1, c2 FROM cf WHERE key='k%d'" % k, consistency_level=ConsistencyLevel.ONE)
             res = cursor.execute(query)
-            assert len(filter(lambda x: len(x) != 0, res)) == 0, res
+            self.assertEqual(len(filter(lambda x: len(x) != 0, res)), 0, res)
 
         if restart:
             for node in stopped_nodes:
@@ -126,17 +126,17 @@ class TestRepair(Tester):
         debug("Repair time: {end}".format(end=time.time() - start))
 
         # Validate that only one range was transfered
-        l = node1.grep_log("/([0-9.]+) and /([0-9.]+) have ([0-9]+) range\(s\) out of sync")
+        out_of_sync_logs = node1.grep_log("/([0-9.]+) and /([0-9.]+) have ([0-9]+) range\(s\) out of sync")
         if cluster.version() > "1":
-            assert len(l) == 2, "Lines matching: " + str([elt[0] for elt in l])
+            self.assertEqual(len(out_of_sync_logs), 2, "Lines matching: " + str([elt[0] for elt in out_of_sync_logs]))
         else:
             # In pre-1.0, we should have only one line
-            assert len(l) == 1, "Lines matching: " + str([elt[0] for elt in l])
+            self.assertEqual(len(out_of_sync_logs), 1, "Lines matching: " + str([elt[0] for elt in out_of_sync_logs]))
         valid = [(node1.address(), node3.address()), (node3.address(), node1.address()),
                  (node2.address(), node3.address()), (node3.address(), node2.address())]
-        for line, m in l:
-            assert int(m.group(3)) == 1, "Expecting 1 range out of sync, got " + int(m.group(1))
-            assert (m.group(1), m.group(2)) in valid, str((m.group(1), m.group(2)))
+        for line, m in out_of_sync_logs:
+            self.assertEqual(int(m.group(3)), 1, "Expecting 1 range out of sync, got " + m.group(3))
+            self.assertIn((m.group(1), m.group(2)), valid, str((m.group(1), m.group(2))))
             valid.remove((m.group(1), m.group(2)))
             valid.remove((m.group(2), m.group(1)))
 
@@ -218,14 +218,14 @@ class TestRepair(Tester):
             for i in xrange(0, 10):
                 query = SimpleStatement("SELECT c1, c2 FROM %s WHERE key='k%d'" % (cf, i), consistency_level=ConsistencyLevel.ALL)
                 res = cursor.execute(query)
-                assert len(filter(lambda x: len(x) != 0, res)) == 0, res
+                self.assertEqual(len(filter(lambda x: len(x) != 0, res)), 0, res)
 
         # check log for no repair happened for gcable data
-        l = node2.grep_log("/([0-9.]+) and /([0-9.]+) have ([0-9]+) range\(s\) out of sync for cf1")
-        assert len(l) == 0, "GC-able data does not need to be repaired with empty data: " + str([elt[0] for elt in l])
+        out_of_sync_logs = node2.grep_log("/([0-9.]+) and /([0-9.]+) have ([0-9]+) range\(s\) out of sync for cf1")
+        self.assertEqual(len(out_of_sync_logs), 0, "GC-able data does not need to be repaired with empty data: " + str([elt[0] for elt in out_of_sync_logs]))
         # check log for actual repair for non gcable data
-        l = node2.grep_log("/([0-9.]+) and /([0-9.]+) have ([0-9]+) range\(s\) out of sync for cf2")
-        assert len(l) > 0, "Non GC-able data should be repaired"
+        out_of_sync_logs = node2.grep_log("/([0-9.]+) and /([0-9.]+) have ([0-9]+) range\(s\) out of sync for cf2")
+        self.assertGreater(len(out_of_sync_logs), 0, "Non GC-able data should be repaired")
 
     def local_dc_repair_test(self):
         cluster = self._setup_multi_dc()
@@ -237,15 +237,15 @@ class TestRepair(Tester):
         opts += self._repair_options(ks="ks")
         node1.repair(opts)
 
-        # Verify that only nodes in dc1 is involved in repair
-        l = node1.grep_log("/([0-9.]+) and /([0-9.]+) have ([0-9]+) range\(s\) out of sync")
-        assert len(l) == 1, "Lines matching: %d" % len(l)
-        line, m = l[0]
-        assert int(m.group(3)) == 1, "Expecting 1 range out of sync, got " + int(m.group(1))
+        # Verify that only nodes in dc1 are involved in repair
+        out_of_sync_logs = node1.grep_log("/([0-9.]+) and /([0-9.]+) have ([0-9]+) range\(s\) out of sync")
+        self.assertEqual(len(out_of_sync_logs), 1, "Lines matching: %d" % len(out_of_sync_logs))
+        line, m = out_of_sync_logs[0]
+        self.assertEqual(int(m.group(3)), 1, "Expecting 1 range out of sync, got " + m.group(3))
         valid = [node1.address(), node2.address()]
-        assert m.group(1) in valid, "Unrelated node found in local repair: " + str(m.group(1))
+        self.assertIn(m.group(1), valid, "Unrelated node found in local repair: " + m.group(1))
         valid.remove(m.group(1))
-        assert m.group(2) in valid, "Unrelated node found in local repair: " + str(m.group(2))
+        self.assertIn(m.group(2), valid, "Unrelated node found in local repair: " + m.group(2))
         # Check node2 now has the key
         self.check_rows_on_node(node2, 2001, found=[1000], restart=False)
 
@@ -260,14 +260,14 @@ class TestRepair(Tester):
         opts += self._repair_options(ks="ks")
         node1.repair(opts)
 
-        # Verify that only nodes in dc1 is involved in repair
-        l = node1.grep_log("/([0-9.]+) and /([0-9.]+) have ([0-9]+) range\(s\) out of sync")
-        assert len(l) == 2, "Lines matching: " + str([elt[0] for elt in l])
+        # Verify that only nodes in dc1 and dc2 are involved in repair
+        out_of_sync_logs = node1.grep_log("/([0-9.]+) and /([0-9.]+) have ([0-9]+) range\(s\) out of sync")
+        self.assertEqual(len(out_of_sync_logs),  2, "Lines matching: " + str([elt[0] for elt in out_of_sync_logs]))
         valid = [(node1.address(), node2.address()), (node2.address(), node1.address()),
                  (node2.address(), node3.address()), (node3.address(), node2.address())]
-        for line, m in l:
-            assert int(m.group(3)) == 1, "Expecting 1 range out of sync, got " + int(m.group(1))
-            assert (m.group(1), m.group(2)) in valid, str((m.group(1), m.group(2)))
+        for line, m in out_of_sync_logs:
+            self.assertEqual(int(m.group(3)), 1, "Expecting 1 range out of sync, got " + m.group(3))
+            self.assertIn((m.group(1), m.group(2)), valid, str((m.group(1), m.group(2))))
             valid.remove((m.group(1), m.group(2)))
             valid.remove((m.group(2), m.group(1)))
         # Check node2 now has the key
