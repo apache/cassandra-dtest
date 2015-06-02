@@ -292,7 +292,7 @@ class TestRepairDataSystemTable(Tester):
         for table_name, table_contents in repair_tables_dict.items():
             self.assertFalse(table_contents, '{} is non-empty'.format(table_name))
 
-    @require('parent-repair-history-table.*')
+    @require(9534)
     def repair_parent_table_test(self):
         """
         Test that `system_distributed.parent_repair_history` is properly populated
@@ -305,6 +305,7 @@ class TestRepairDataSystemTable(Tester):
         parent_repair_history, _ = self.repair_table_contents(node=self.node1, include_system_keyspaces=False)
         self.assertTrue(len(parent_repair_history))
 
+    @require(9534)
     def repair_table_test(self):
         """
         Test that `system_distributed.repair_history` is properly populated
