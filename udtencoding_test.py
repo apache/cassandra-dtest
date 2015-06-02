@@ -2,8 +2,7 @@ from dtest import Tester
 from assertions import assert_invalid
 from tools import since
 
-import os, sys, time
-from ccmlib.cluster import Cluster
+import time
 
 @since('2.1')
 class TestUDTEncoding(Tester):
@@ -13,7 +12,7 @@ class TestUDTEncoding(Tester):
         cluster = self.cluster
 
         cluster.populate(3).start()
-        [node1, node2, node3] = cluster.nodelist()
+        node1, node2, node3 = cluster.nodelist()
 
         time.sleep(.5)
         cursor = self.patient_cql_connection(node1)

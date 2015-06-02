@@ -1,11 +1,11 @@
-import time
+import time, re
 
-from cassandra import AuthenticationFailed, Unauthorized
+from cassandra import AuthenticationFailed, Unauthorized, InvalidRequest
 from cassandra.cluster import NoHostAvailable
 from cassandra.protocol import SyntaxException
 from auth_test import data_resource_creator_permissions, role_creator_permissions, function_resource_creator_permissions
-from dtest import debug,Tester
-from assertions import *
+from dtest import Tester
+from assertions import assert_one, assert_all, assert_invalid
 from tools import since
 
 #Second value is superuser status

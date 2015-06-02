@@ -8,7 +8,6 @@ from cassandra.query import SimpleStatement
 
 import time
 from threading import Thread
-from ccmlib.cluster import Cluster
 
 @since('2.0.6')
 class TestPaxos(Tester):

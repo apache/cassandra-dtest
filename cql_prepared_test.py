@@ -1,9 +1,7 @@
 from dtest import Tester
 from tools import since
 
-import os, sys, time, tools
-from uuid import UUID
-from ccmlib.cluster import Cluster
+import time
 
 @since("1.2")
 class TestCQL(Tester):

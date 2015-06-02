@@ -5,7 +5,7 @@ from thrift.transport import TSocket
 from thrift.protocol import TBinaryProtocol
 from thrift.Thrift import TApplicationException
 
-from dtest import Tester, debug, NUM_TOKENS, DISABLE_VNODES
+from dtest import Tester, NUM_TOKENS, DISABLE_VNODES
 from tools import since
 from thrift_bindings.v22 import Cassandra
 from thrift_bindings.v22.Cassandra import *

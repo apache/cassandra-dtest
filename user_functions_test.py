@@ -1,8 +1,8 @@
-import math, os, sys, time
+import math, time
 
-from dtest import Tester, debug
-from assertions import assert_invalid, assert_one, assert_all, assert_none
-from tools import since, rows_to_list
+from dtest import Tester
+from assertions import assert_invalid, assert_one, assert_none
+from tools import since
 
 
 @since('2.2')
@@ -90,7 +90,6 @@ class TestUserFunctions(Tester):
         session = self.prepare(nodes=3)
 
         session.execute("CREATE TABLE tab (k text PRIMARY KEY, v int)");
-        test = "foo"
         session.execute("INSERT INTO tab (k, v) VALUES ('foo' , 1);")
 
         # create overloaded udfs
@@ -132,7 +131,7 @@ class TestUserFunctions(Tester):
         assert_one(session, "SELECT key, val, x_sin(val) FROM nums where key = %d" % 1, [1, 1.0, math.sin(1.0)])
         assert_one(session, "SELECT key, val, x_sin(val) FROM nums where key = %d" % 2, [2, 2.0, math.sin(2.0)])
         assert_one(session, "SELECT key, val, x_sin(val) FROM nums where key = %d" % 3, [3, 3.0, math.sin(3.0)])
-        
+
         session.execute("create function y_sin(val double) called on null input returns double language javascript as 'Math.sin(val).toString()'")
 
         assert_invalid(session, "select y_sin(val) from nums where key = 1")

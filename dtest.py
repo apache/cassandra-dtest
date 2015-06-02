@@ -1,11 +1,9 @@
 from __future__ import with_statement
-import os, tempfile, sys, shutil, subprocess, types, time, threading, traceback, ConfigParser, logging, fnmatch, re, copy
+import os, tempfile, sys, shutil, subprocess, types, time, threading, traceback, ConfigParser, logging, re, copy
 
 from ccmlib.cluster import Cluster
 from ccmlib.cluster_factory import ClusterFactory
-from ccmlib.node import Node
 from ccmlib.common import is_win
-from uuid import UUID
 from nose.exc import SkipTest
 from unittest import TestCase
 from cassandra.cluster import NoHostAvailable

@@ -1,6 +1,5 @@
 from dtest import Tester, debug
-from tools import new_node, since
-import time
+from tools import since
 
 """
 Check that inserting and reading large columns to the database doesn't cause off heap memory usage

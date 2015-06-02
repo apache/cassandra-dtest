@@ -1,5 +1,4 @@
 from dtest import Tester, debug, DEFAULT_DIR
-from tools import require
 import unittest, time, os, subprocess, shlex, pycassa, glob, sys
 
 JNA_PATH = '/usr/share/java/jna.jar'

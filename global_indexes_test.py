@@ -1,11 +1,6 @@
-import random, re, time, uuid
-
-from dtest import Tester, debug
+from dtest import Tester
 from tools import since, require
 from assertions import assert_invalid
-from cassandra import InvalidRequest
-from cassandra.query import BatchStatement, SimpleStatement
-from cassandra.protocol import ConfigurationException
 
 
 @since('3.0')

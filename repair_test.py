@@ -87,7 +87,7 @@ class TestRepair(Tester):
         cluster.set_configuration_options(values={'hinted_handoff_enabled': False}, batch_commitlog=True)
         debug("Starting cluster..")
         cluster.populate(3).start()
-        [node1, node2, node3] = cluster.nodelist()
+        node1, node2, node3 = cluster.nodelist()
 
         cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'ks', 3)
@@ -153,7 +153,7 @@ class TestRepair(Tester):
         cluster.populate(2)
         cluster.set_configuration_options(values={'hinted_handoff_enabled': False}, batch_commitlog=True)
         cluster.start()
-        [node1, node2] = cluster.nodelist()
+        node1, node2 = cluster.nodelist()
 
         cursor = self.patient_cql_connection(node1)
         # create keyspace with RF=2 to be able to be repaired

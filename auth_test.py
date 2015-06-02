@@ -5,7 +5,6 @@ from cassandra.cluster import NoHostAvailable
 from dtest import debug, Tester
 from tools import since
 from assertions import assert_invalid
-from tools import require
 
 class TestAuth(Tester):
 

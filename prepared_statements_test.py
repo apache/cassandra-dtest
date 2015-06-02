@@ -1,4 +1,4 @@
-from dtest import Tester, debug
+from dtest import Tester
 from cassandra import InvalidRequest
 from tools import since
 

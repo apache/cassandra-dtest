@@ -1,14 +1,13 @@
 from ccmlib.node import Node
-from decorator  import decorator
 from distutils.version import LooseVersion
 from threading import Thread
-import re, os, sys, fileinput, time, unittest, functools
+import re, sys, fileinput, time, unittest, functools
 import subprocess
 
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
 
-from dtest import Tester, DISABLE_VNODES, CASSANDRA_DIR, debug
+from dtest import DISABLE_VNODES, CASSANDRA_DIR, debug
 
 def rows_to_list(rows):
     new_list = [list(row) for row in rows]
