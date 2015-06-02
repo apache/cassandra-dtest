@@ -1,11 +1,5 @@
-from dtest import Tester, debug, DISABLE_VNODES
-from ccmlib.node import Node, NodeError, TimeoutError
-from cassandra import ConsistencyLevel, Unavailable, ReadTimeout
-from cassandra.query import SimpleStatement
-from tools import since, InterruptBootstrap
-import time
+from dtest import Tester, debug
 from jmxutils import make_mbean, JolokiaAgent
-from multiprocessing import Process
 
 class TestJMX(Tester):
 

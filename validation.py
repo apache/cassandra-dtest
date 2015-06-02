@@ -1,6 +1,6 @@
 from dtest import Tester, debug
 from tools import since
-import subprocess, tempfile, os, shutil
+import subprocess, tempfile, os
 
 @since('2.2')
 class TestValidation(Tester):

@@ -1,9 +1,6 @@
-from dtest import Tester, debug, DISABLE_VNODES
-import unittest
-from ccmlib.cluster import Cluster
-from ccmlib.node import Node, NodeError, TimeoutError
-import time, re
-from assertions import assert_invalid, assert_all, assert_none, assert_one
+from dtest import Tester, debug
+import time
+from assertions import assert_none, assert_one
 import tempfile
 import os
 

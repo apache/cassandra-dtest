@@ -1,10 +1,5 @@
-from dtest import Tester, debug, DISABLE_VNODES
-from ccmlib.node import Node, NodeError, TimeoutError
-from cassandra import ConsistencyLevel, Unavailable, ReadTimeout
-from cassandra.query import SimpleStatement
-from tools import since
+from dtest import Tester, debug
 import re
-import subprocess
 import os
 
 class TestOfflineTools(Tester):
@@ -91,7 +86,7 @@ class TestOfflineTools(Tester):
         """
         cluster = self.cluster
         cluster.populate(3).start()
-        [node1,node2, node3] = cluster.nodelist()
+        node1, node2, node3 = cluster.nodelist()
 
 
         # NOTE - As of now this does not return when it encounters Exception and causes test to hang, temporarily commented out
@@ -141,18 +136,6 @@ class TestOfflineTools(Tester):
         for x in range(0, len(final_levels)):
             initial = "intial level: " + str(initial_levels[x])
             self.assertEqual(final_levels[x], 0, msg=initial)
-
-    def get_levels(self, data):
-        levels = []
-        for sstable in data:
-            (metadata, error, rc) = sstable
-            level = int(re.findall("SSTable Level: [0-9]", metadata)[0][-1])
-            levels.append(level)
-        return levels
-
-        for x in range(0, len(final_levels)):
-            lev = "initial: " + str(initial_levels[x]) + " final: " + str(final_levels[x])
-            self.assertGreaterEqual(final_levels[x], initial_level[x], msg=lev)
 
     def sstableverify_test(self):
         """

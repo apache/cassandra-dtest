@@ -76,7 +76,6 @@ class TestSSTableSplit(Tester):
         cluster = self.cluster
         cluster.populate(1).start(wait_for_binary_proto=True)
         node = cluster.nodelist()[0]
-        version = cluster.version()
 
         debug("Run stress to insert data")
         node.stress(['write', 'n=2000000', '-rate', 'threads=50',

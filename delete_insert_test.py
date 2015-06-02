@@ -1,7 +1,7 @@
-from dtest import Tester, debug
+from dtest import Tester
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
-import uuid, os, threading, random
+import uuid, threading, random
 
 class DeleteInsertTest(Tester):
     """
@@ -19,10 +19,6 @@ class DeleteInsertTest(Tester):
         self.create_ks(cursor, 'delete_insert_search_test', rf)
         cursor.execute('CREATE TABLE test (id uuid PRIMARY KEY, val1 text, group text)')
         cursor.execute('CREATE INDEX group_idx ON test (group)')
-
-    def delete_all_rows(self, cursor):
-        for id, val, group in self.rows:
-            cursor.execute("DELETE FROM test WHERE id=%s" % u)
 
     def delete_group_rows(self, cursor, group):
         """Delete rows from a given group and return them"""

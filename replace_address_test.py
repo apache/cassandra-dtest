@@ -37,7 +37,7 @@ class TestReplaceAddress(Tester):
         debug("Starting cluster with 3 nodes.")
         cluster = self.cluster
         cluster.populate(3).start()
-        [node1, node2, node3] = cluster.nodelist()
+        node1, node2, node3 = cluster.nodelist()
 
         if DISABLE_VNODES:
             numNodes = 1
@@ -100,7 +100,7 @@ class TestReplaceAddress(Tester):
         debug("Starting cluster with 3 nodes.")
         cluster = self.cluster
         cluster.populate(3).start()
-        [node1, node2, node3] = cluster.nodelist()
+        node1, node2, node3 = cluster.nodelist()
 
         #replace active node 3 with node 4
         debug("Starting node 4 to replace active node 3")
@@ -120,7 +120,7 @@ class TestReplaceAddress(Tester):
         debug("Starting cluster with 3 nodes.")
         cluster = self.cluster
         cluster.populate(3).start()
-        [node1, node2, node3] = cluster.nodelist()
+        node1, node2, node3 = cluster.nodelist()
 
         debug('Start node 4 and replace an address with no node')
         node4 = Node('node4', cluster, True, ('127.0.0.4', 9160), ('127.0.0.4', 7000), '7400', '0', None, ('127.0.0.4', 9042))
@@ -137,7 +137,7 @@ class TestReplaceAddress(Tester):
         debug("Starting cluster with 3 nodes.")
         cluster = self.cluster
         cluster.populate(3).start()
-        [node1, node2, node3] = cluster.nodelist()
+        node1, node2, node3 = cluster.nodelist()
 
         if DISABLE_VNODES:
             numNodes = 1
@@ -212,7 +212,7 @@ class TestReplaceAddress(Tester):
 
         cluster = self.cluster
         cluster.populate(3).start()
-        [node1, node2, node3] = cluster.nodelist()
+        node1, node2, node3 = cluster.nodelist()
 
         node1.stress(['write', 'n=100000', '-schema', 'replication(factor=3)'])
 
@@ -261,7 +261,7 @@ class TestReplaceAddress(Tester):
 
         cluster = self.cluster
         cluster.populate(3).start()
-        [node1, node2, node3] = cluster.nodelist()
+        node1, node2, node3 = cluster.nodelist()
 
         node1.stress(['write', 'n=100000', '-schema', 'replication(factor=3)'])
 

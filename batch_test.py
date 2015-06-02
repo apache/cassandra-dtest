@@ -4,7 +4,6 @@ from assertions import assert_invalid, assert_unavailable
 from dtest import Tester
 from cassandra import ConsistencyLevel, Timeout
 from cassandra.query import SimpleStatement
-from cassandra.policies import RetryPolicy
 
 class TestBatch(Tester):
 

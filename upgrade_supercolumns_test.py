@@ -38,7 +38,7 @@ class TestSCUpgrade(Tester):
         cluster.set_install_dir(version="1.2.16")
         cluster.populate(2).start()
 
-        [node1, node2] = cluster.nodelist()
+        node1, node2 = cluster.nodelist()
 
         # wait for the rpc server to start
         session = self.patient_exclusive_cql_connection(node1)

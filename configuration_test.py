@@ -1,7 +1,6 @@
 from dtest import Tester
 
-import re, ast
-from ccmlib.cluster import Cluster
+import ast
 
 class TestConfiguration(Tester):
 

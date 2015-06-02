@@ -23,7 +23,7 @@ class TestIncRepair(Tester):
     def sstable_marking_test(self):
         cluster = self.cluster
         cluster.populate(3).start()
-        [node1, node2, node3] = cluster.nodelist()
+        node1, node2, node3 = cluster.nodelist()
 
         node3.stop(gently=True)
 
@@ -55,7 +55,7 @@ class TestIncRepair(Tester):
     def multiple_repair_test(self):
         cluster = self.cluster
         cluster.populate(3).start()
-        [node1, node2, node3] = cluster.nodelist()
+        node1, node2, node3 = cluster.nodelist()
 
         cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'ks', 3)
@@ -113,7 +113,7 @@ class TestIncRepair(Tester):
     def sstable_repairedset_test(self):
         cluster = self.cluster
         cluster.populate(2).start()
-        [node1, node2] = cluster.nodelist()
+        node1, node2 = cluster.nodelist()
         node1.stress(['write', 'n=10000', '-schema', 'replication(factor=2)'])
 
         node1.flush()
@@ -172,7 +172,7 @@ class TestIncRepair(Tester):
     def compaction_test(self):
         cluster = self.cluster
         cluster.populate(3).start()
-        [node1, node2, node3] = cluster.nodelist()
+        node1, node2, node3 = cluster.nodelist()
 
         cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'ks', 3)

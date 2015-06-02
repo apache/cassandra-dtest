@@ -153,7 +153,7 @@ class TestConsistency(Tester):
         cluster.set_configuration_options(values={ 'hinted_handoff_enabled' : False}, batch_commitlog=True)
 
         cluster.populate(3).start(wait_other_notice=True)
-        [node1, node2, node3] = cluster.nodelist()
+        node1, node2, node3 = cluster.nodelist()
 
         cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'ks', 3)
@@ -185,7 +185,7 @@ class TestConsistency(Tester):
         cluster.set_configuration_options(values={ 'hinted_handoff_enabled' : False}, batch_commitlog=True)
 
         cluster.populate(2).start(wait_other_notice=True)
-        [node1, node2] = cluster.nodelist()
+        node1, node2 = cluster.nodelist()
 
         cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'ks', 3)
@@ -254,7 +254,7 @@ class TestConsistency(Tester):
         else:
             tokens = cluster.balanced_tokens(2)
             cluster.populate(2, tokens=tokens).start()
-        [node1, node2] = cluster.nodelist()
+        node1, node2 = cluster.nodelist()
 
         cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'ks', 2)
@@ -285,7 +285,7 @@ class TestConsistency(Tester):
         else:
             tokens = cluster.balanced_tokens(2)
             cluster.populate(2, tokens=tokens).start()
-        [node1, node2] = cluster.nodelist()
+        node1, node2 = cluster.nodelist()
 
         cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'ks', 2)
@@ -317,7 +317,7 @@ class TestConsistency(Tester):
         cluster.set_configuration_options(values={ 'hinted_handoff_enabled' : False}, batch_commitlog=True)
 
         cluster.populate(3).start(wait_other_notice=True)
-        [node1, node2, node3] = cluster.nodelist()
+        node1, node2, node3 = cluster.nodelist()
 
         cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'ks', 3)
@@ -351,7 +351,7 @@ class TestConsistency(Tester):
         else:
             tokens = cluster.balanced_tokens(3)
             cluster.populate(3, tokens=tokens).start()
-        [node1, node2, node3] = cluster.nodelist()
+        node1, node2, node3 = cluster.nodelist()
         cluster.start()
 
         debug("Set to talk to node 2")

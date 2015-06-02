@@ -2,9 +2,7 @@ from dtest import Tester
 from tools import insert_c1c2, query_c1c2, no_vnodes, new_node, debug, require, since
 from assertions import assert_almost_equal
 
-import os, sys, time
-from nose.tools import raises
-from ccmlib.cluster import Cluster
+import time
 from ccmlib.node import TimeoutError
 from cassandra import ConsistencyLevel
 
@@ -16,7 +14,7 @@ class TestTopology(Tester):
 
         # Create an unbalanced ring
         cluster.populate(3, tokens=[0, 2**48, 2**62]).start()
-        [node1, node2, node3] = cluster.nodelist()
+        node1, node2, node3 = cluster.nodelist()
 
         cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'ks', 1)
@@ -55,7 +53,7 @@ class TestTopology(Tester):
 
         tokens = cluster.balanced_tokens(4)
         cluster.populate(4, tokens=tokens).start()
-        [node1, node2, node3, node4] = cluster.nodelist()
+        node1, node2, node3, node4 = cluster.nodelist()
 
         cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'ks', 2)

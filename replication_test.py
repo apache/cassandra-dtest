@@ -1,7 +1,6 @@
 from dtest import Tester, debug, PRINT_DEBUG
 from tools import no_vnodes
-from ccmlib.cluster import Cluster
-import re, os, time
+import re, time
 from collections import defaultdict
 from cassandra.query import SimpleStatement
 from cassandra import ConsistencyLevel
