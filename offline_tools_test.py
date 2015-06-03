@@ -2,7 +2,12 @@ from dtest import Tester, debug
 import re
 import os
 
+
 class TestOfflineTools(Tester):
+
+    # In 2.0, we will get this error log message due to jamm not being
+    # in the classpath
+    ignore_log_patterns = ["Unable to initialize MemoryMeter"]
 
     def sstablelevelreset_test(self):
         """
@@ -87,7 +92,6 @@ class TestOfflineTools(Tester):
         cluster = self.cluster
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
-
 
         # NOTE - As of now this does not return when it encounters Exception and causes test to hang, temporarily commented out
         # test by trying to run on nonexistent keyspace
@@ -190,7 +194,6 @@ class TestOfflineTools(Tester):
             debug(hashcomputed)
             debug(sstable)
             self.assertTrue(verified and hashcomputed)
-
 
         # try removing an sstable and running verify with extended option to ensure missing table is found
         os.remove(sstables[0])
