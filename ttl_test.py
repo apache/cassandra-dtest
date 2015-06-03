@@ -13,6 +13,7 @@ from assertions import (
     assert_unavailable
 )
 
+
 @since('2.0')
 class TestTTL(Tester):
     """ Test Time To Live Feature """
@@ -132,7 +133,7 @@ class TestTTL(Tester):
 
         self.cursor1.execute("""
             INSERT INTO ttl_table (key, col1, col2, col3) VALUES (%d, %d, %d, %d);
-        """  % (1, 1, 1, 1))
+        """ % (1, 1, 1, 1))
         start = time.time()
         self.cursor1.execute("UPDATE ttl_table USING TTL 3 set col1=42 where key=%s;" % (1,))
         assert_all(self.cursor1, "SELECT * FROM ttl_table;", [[1, 42, 1, 1]])
@@ -146,7 +147,7 @@ class TestTTL(Tester):
 
         self.cursor1.execute("""
             INSERT INTO ttl_table (key, col1, col2, col3) VALUES (%d, %d, %d, %d);
-        """  % (1, 1, 1, 1))
+        """ % (1, 1, 1, 1))
         start = time.time()
         self.cursor1.execute("""
             UPDATE ttl_table USING TTL 2 set col1=42, col2=42, col3=42 where key=%s;
@@ -166,7 +167,7 @@ class TestTTL(Tester):
         start = time.time()
         self.cursor1.execute("""
             INSERT INTO ttl_table (key, col1, col2, col3) VALUES (%d, %d, %d, %d);
-        """  % (1, 1, 1, 1))
+        """ % (1, 1, 1, 1))
         self.cursor1.execute("UPDATE ttl_table USING TTL 3 set col1=42 where key=%s;" % (1,))
         assert_all(self.cursor1, "SELECT * FROM ttl_table;", [[1, 42, 1, 1]])
         self.smart_sleep(start, 5)
@@ -185,7 +186,7 @@ class TestTTL(Tester):
         start = time.time()
         self.cursor1.execute("""
             INSERT INTO ttl_table (key, col1, col2, col3) VALUES (%d, %d, %d, %d);
-        """  % (1, 1, 1, 1))
+        """ % (1, 1, 1, 1))
         self.cursor1.execute("UPDATE ttl_table USING TTL 6 set col1=42 where key=%s;" % (1,))
         self.smart_sleep(start, 4)
         assert_all(self.cursor1, "SELECT * FROM ttl_table;", [[1, 42, None, None]])
@@ -202,7 +203,7 @@ class TestTTL(Tester):
         start = time.time()
         self.cursor1.execute("""
             INSERT INTO ttl_table (key, col1, col2, col3) VALUES (%d, %d, %d, %d) USING TTL 2;
-        """  % (1, 1, 1, 1))
+        """ % (1, 1, 1, 1))
         self.cursor1.execute("UPDATE ttl_table set col1=42 where key=%s;" % (1,))
         self.smart_sleep(start, 4)
         assert_all(self.cursor1, "SELECT * FROM ttl_table;", [[1, 42, None, None]])
@@ -217,10 +218,10 @@ class TestTTL(Tester):
         start = time.time()
         self.cursor1.execute("""
             INSERT INTO ttl_table (key, col1, col2, col3) VALUES (%d, %d, %d, %d);
-        """  % (1, 1, 1, 1))
+        """ % (1, 1, 1, 1))
         self.cursor1.execute("""
             INSERT INTO ttl_table (key, col1, col2, col3) VALUES (%d, %d, %d, %d);
-        """  % (2, 1, 1, 1))
+        """ % (2, 1, 1, 1))
         self.cursor1.execute("UPDATE ttl_table using ttl 0 set col1=42 where key=%s;" % (1,))
         self.cursor1.execute("UPDATE ttl_table using ttl 8 set col1=42 where key=%s;" % (2,))
         self.smart_sleep(start, 5)
@@ -240,7 +241,7 @@ class TestTTL(Tester):
         start = time.time()
         self.cursor1.execute("""
             INSERT INTO ttl_table (key, col1, mylist) VALUES (%d, %d, %s);
-        """  % (1, 1, [1, 2, 3, 4, 5]))
+        """ % (1, 1, [1, 2, 3, 4, 5]))
         self.cursor1.execute("""
             UPDATE ttl_table USING TTL 5 SET mylist[0] = 42, mylist[4] = 42 WHERE key=1;
         """)
@@ -261,7 +262,7 @@ class TestTTL(Tester):
         start = time.time()
         self.cursor1.execute("""
             INSERT INTO ttl_table (key, col1, myset) VALUES (%d, %d, %s);
-        """  % (1, 1, '{1,2,3,4,5}'))
+        """ % (1, 1, '{1,2,3,4,5}'))
         self.cursor1.execute("""
             UPDATE ttl_table USING TTL 3 SET myset = myset + {42} WHERE key=1;
         """)
@@ -290,7 +291,7 @@ class TestTTL(Tester):
         start = time.time()
         self.cursor1.execute("""
             INSERT INTO ttl_table (key, col1, mymap) VALUES (%d, %d, %s);
-        """  % (1, 1, '{1:1,2:2,3:3,4:4,5:5}'))
+        """ % (1, 1, '{1:1,2:2,3:3,4:4,5:5}'))
         self.cursor1.execute("""
             UPDATE ttl_table USING TTL 2 SET mymap[1] = 42, mymap[5] = 42 WHERE key=1;
         """)
@@ -321,6 +322,7 @@ class TestTTL(Tester):
 
         self.cursor1.execute("delete from session where id = 'abc' if usr ='abc'")
         assert_row_count(self.cursor1, 'session', 0)
+
 
 class TestDistributedTTL(Tester):
     """ Test Time To Live Feature in a distributed environment """
