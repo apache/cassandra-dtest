@@ -370,7 +370,10 @@ class TestDistributedTTL(Tester):
         )
         ttl_cursor1 = cursor1.execute('SELECT ttl(col1) FROM ttl_table;')
         ttl_cursor2 = cursor2.execute('SELECT ttl(col1) FROM ttl_table;')
-        assert_almost_equal(ttl_cursor1[0][0], ttl_cursor2[0][0], error=0.05)
+
+        # since the two queries are not executed simultaneously, the remaining
+        # TTLs can differ by one second
+        self.assertLessEqual(abs(ttl_cursor1 - ttl_cursor2), 1)
 
         time.sleep(7)
 
