@@ -1,7 +1,6 @@
 from dtest import Tester, debug
-from jmxutils import make_mbean, JolokiaAgent
+from jmxutils import make_mbean, JolokiaAgent, remove_perf_disable_shared_mem 
 from tools import since
-
 
 class TestJMX(Tester):
 
@@ -90,23 +89,27 @@ class TestJMX(Tester):
         cluster.populate(3).start(wait_for_binary_proto=True)
         node1, node2, node3 = cluster.nodelist()
 
-        node1.stress(['write', 'n=5000', '-schema', 'replication(factor=3)'])
+        if cluster.version() < "2.1":
+            node1.stress(['-o', 'insert', '--num-keys=10000', '--replication-factor=3'])
+        else:
+            node1.stress(['write', 'n=10000', '-schema', 'replication(factor=3)'])
 
         # TODO the keyspace and table name are capitalized in 2.0
         memtable_size = make_mbean('metrics', type='ColumnFamily', keyspace='keyspace1', scope='standard1', name='AllMemtablesHeapSize')
         disk_size = make_mbean('metrics', type='ColumnFamily', keyspace='keyspace1', scope='standard1', name='LiveDiskSpaceUsed')
         sstable_count = make_mbean('metrics', type='ColumnFamily', keyspace='keyspace1', scope='standard1', name='LiveSSTableCount')
 
+        remove_perf_disable_shared_mem(node1)
         with JolokiaAgent(node1) as jmx:
             mem_size = jmx.read_attribute(memtable_size, "Value")
             self.assertGreater(int(mem_size), 10000)
 
-            on_disk_size = jmx.read_attribute(disk_size, "Value")
+            on_disk_size = jmx.read_attribute(disk_size, "Count")
             self.assertEquals(int(on_disk_size), 0)
 
             node1.flush()
 
-            on_disk_size = jmx.read_attribute(disk_size, "Value")
+            on_disk_size = jmx.read_attribute(disk_size, "Count")
             self.assertGreater(int(on_disk_size), 10000)
 
             sstables = jmx.read_attribute(sstable_count, "Value")

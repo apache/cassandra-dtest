@@ -10,6 +10,7 @@ class TestOfflineTools(Tester):
     # in the classpath
     ignore_log_patterns = ["Unable to initialize MemoryMeter"]
 
+    @since('2.1')
     def sstablelevelreset_test(self):
         """
         Insert data and call sstablelevelreset on a series of
@@ -31,7 +32,10 @@ class TestOfflineTools(Tester):
 
         #now test by generating keyspace but not flushing sstables
         cluster.start()
-        node1.stress(['write', 'n=100', '-schema', 'replication(factor=3)'])
+        if cluster.version() < "2.1":
+            node1.stress(['-o', 'insert', '--num-keys=100', '--replication-factor=3'])
+        else:
+            node1.stress(['write', 'n=100', '-schema', 'replication(factor=3)'])
         cluster.stop(gently=False)
 
         (output, error, rc) = node1.run_sstablelevelreset("keyspace1", "standard1", output=True)
@@ -43,7 +47,10 @@ class TestOfflineTools(Tester):
         cluster.start()
         cursor = self.patient_cql_connection(node1)
         cursor.execute("ALTER TABLE keyspace1.standard1 with compaction={'class': 'LeveledCompactionStrategy', 'sstable_size_in_mb':3};")
-        node1.stress(['write', 'n=10000', '-schema', 'replication(factor=3)'])
+        if cluster.version() < "2.1":
+            node1.stress(['-o', 'insert', '--num-keys=10000', '--replication-factor=3'])
+        else:
+            node1.stress(['write', 'n=10000', '-schema', 'replication(factor=3)'])
         node1.flush()
         cluster.stop(gently=False)
 
@@ -53,7 +60,11 @@ class TestOfflineTools(Tester):
 
         #test by loading large amount data so we have multiple levels and checking all levels are 0 at end
         cluster.start()
-        node1.stress(['write', 'n=1M', '-schema', 'replication(factor=3)'])
+
+        if cluster.version() < "2.1":
+            node1.stress(['-o', 'insert', '--num-keys=1000000', '--replication-factor=3'])
+        else:
+            node1.stress(['write', 'n=1M', '-schema', 'replication(factor=3)'])
         self.wait_for_compactions(node1)
         cluster.stop()
 
@@ -82,6 +93,7 @@ class TestOfflineTools(Tester):
             if pattern.search(output):
                 break
 
+    @since('2.1')
     def sstableofflinerelevel_test(self):
         """
         Generate sstables of varying levels.
@@ -116,6 +128,9 @@ class TestOfflineTools(Tester):
         cluster.start()
         cursor = self.patient_cql_connection(node1)
         cursor.execute("ALTER TABLE keyspace1.standard1 with compaction={'class': 'LeveledCompactionStrategy', 'sstable_size_in_mb':3};")
+        
+        node1.stress(['write', 'n=1000', '-schema', 'replication(factor=3)'])
+
         node1.flush()
         cluster.stop()
 
@@ -190,7 +205,7 @@ class TestOfflineTools(Tester):
                     elif "Checking computed hash of BigTableReader" in line:
                         hashcomputed = True
                     else:
-                        self.fail("Unexpected line in output")
+                        debug(line)
 
             debug(verified)
             debug(hashcomputed)
