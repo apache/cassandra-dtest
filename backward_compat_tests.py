@@ -48,6 +48,7 @@ class TestCQL(Tester):
         if start_rpc:
             cluster.set_configuration_options(values={'start_rpc': True})
 
+        cluster.set_configuration_options(values={'internode_compression': 'none'})
         if not cluster.nodelist():
             cluster.populate(nodes)
             self.original_install_dir = cluster.nodelist()[0].get_install_dir()
@@ -81,6 +82,7 @@ class TestCQL(Tester):
 
         node1.set_install_dir(version=self.original_install_dir)
         node1.set_log_level("INFO")
+        node1.set_configuration_options(values={'internode_compression': 'none'})
         node1.start(wait_for_binary_proto=True)
         session = self.patient_exclusive_cql_connection(node1, protocol_version=self.protocol_version)
         session.set_keyspace('ks')
