@@ -84,23 +84,23 @@ class TestCQL(Tester):
         node1.set_log_level("DEBUG" if DEBUG else "INFO")
         node1.set_configuration_options(values={'internode_compression': 'none'})
         node1.start(wait_for_binary_proto=True)
-        session = self.patient_exclusive_cql_connection(node1, protocol_version=self.protocol_version)
-        session.set_keyspace('ks')
-
-        node2 = self.cluster.nodelist()[1]
-        # open a second session with the node on the old version
-        session2 = self.patient_exclusive_cql_connection(node2, protocol_version=self.protocol_version)
-        session2.set_keyspace('ks')
-
-        # FIXME remove after support for paging is added
-        session.default_fetch_size = None
-        session2.default_fetch_size = None
 
         sessions = []
         if QUERY_UPGRADED:
+            session = self.patient_exclusive_cql_connection(node1, protocol_version=self.protocol_version)
+            session.set_keyspace('ks')
+            # FIXME remove after support for paging is added
+            session.default_fetch_size = None
             sessions.append((True, session))
         if QUERY_OLD:
-            sessions.append((False, session2))
+            # open a second session with the node on the old version
+            node2 = self.cluster.nodelist()[1]
+            session = self.patient_exclusive_cql_connection(node2, protocol_version=self.protocol_version)
+            session.set_keyspace('ks')
+            # FIXME remove after support for paging is added
+            session.default_fetch_size = None
+            sessions.append((False, session))
+
         return sessions
 
     def get_version(self):
