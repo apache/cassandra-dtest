@@ -46,12 +46,12 @@ class TestGlobalRowKeyCache(Tester):
                 execute_concurrent_with_args(
                     cursor, cursor.prepare("UPDATE test_counter SET v1 = v1 + ? WHERE k = ?"),
                     [(i, i) for i in range(100)],
-                    concurrency=10)
+                    concurrency=2)
 
                 execute_concurrent_with_args(
                     cursor, cursor.prepare("UPDATE test_counter_clustering SET v2 = v2 + ? WHERE k = ? AND v1 = ?"),
                     [(i, i, i) for i in range(100)],
-                    concurrency=10)
+                    concurrency=2)
 
                 # flush everything to get it into sstables
                 for node in cluster.nodelist():
@@ -74,12 +74,12 @@ class TestGlobalRowKeyCache(Tester):
                     execute_concurrent_with_args(
                         cursor, cursor.prepare("UPDATE test_counter SET v1 = v1 + ? WHERE k = ?"),
                         [(1, i) for i in range(num_updates)],
-                        concurrency=10)
+                        concurrency=2)
 
                     execute_concurrent_with_args(
                         cursor, cursor.prepare("UPDATE test_counter_clustering SET v2 = v2 + ? WHERE k = ? AND v1 = ?"),
                         [(1, i, i) for i in range(num_updates)],
-                        concurrency=10)
+                        concurrency=2)
 
                     self._validate_values(cursor, num_updates, validation_round)
 
