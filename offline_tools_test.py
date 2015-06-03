@@ -1,6 +1,7 @@
 from dtest import Tester, debug
-import re
 import os
+import re
+from tools import since
 
 
 class TestOfflineTools(Tester):
@@ -141,6 +142,7 @@ class TestOfflineTools(Tester):
             initial = "intial level: " + str(initial_levels[x])
             self.assertEqual(final_levels[x], 0, msg=initial)
 
+    @since('2.2')
     def sstableverify_test(self):
         """
         Generate sstables and test offline verification works correctly
