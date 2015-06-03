@@ -1,9 +1,11 @@
 from dtest import Tester, debug
 from jmxutils import make_mbean, JolokiaAgent
+from tools import since
 
 
 class TestJMX(Tester):
 
+    @since('2.1')
     def cfhistograms_test(self):
         """
         Test cfhistograms on large and small datasets
@@ -11,7 +13,7 @@ class TestJMX(Tester):
         """
 
         cluster = self.cluster
-        cluster.populate(3).start()
+        cluster.populate(3).start(wait_for_binary_proto=True)
         node1, node2, node3 = cluster.nodelist()
 
         #issue large stress write to load data into cluster
@@ -19,6 +21,7 @@ class TestJMX(Tester):
         node1.flush()
 
         try:
+            # TODO the keyspace and table name are capitalized in 2.0
             histogram = node1.nodetool("cfhistograms keyspace1 standard1", capture_output=True)
             error_msg = "Unable to compute when histogram overflowed"
             debug(histogram)
@@ -45,6 +48,7 @@ class TestJMX(Tester):
             debug(finalhistogram)
             self.fail("Cfhistograms command failed: " + str(e))
 
+    @since('2.1')
     def netstats_test(self):
         """
         Check functioning of nodetool netstats, especially with restarts.
@@ -52,7 +56,7 @@ class TestJMX(Tester):
         """
 
         cluster = self.cluster
-        cluster.populate(3).start()
+        cluster.populate(3).start(wait_for_binary_proto=True)
         node1, node2, node3 = cluster.nodelist()
 
         node1.stress(['write', 'n=5M', '-schema', 'replication(factor=3)'])
@@ -66,7 +70,7 @@ class TestJMX(Tester):
             else:
                 debug(str(e))
 
-        node1.start()
+        node1.start(wait_for_binary_proto=True)
 
         try:
             node1.nodetool("netstats")
@@ -77,16 +81,18 @@ class TestJMX(Tester):
             else:
                 self.fail(str(e))
 
+    @since('2.1')
     def table_metric_mbeans_test(self):
         """
         Test some basic table metric mbeans with simple writes.
         """
         cluster = self.cluster
-        cluster.populate(3).start()
+        cluster.populate(3).start(wait_for_binary_proto=True)
         node1, node2, node3 = cluster.nodelist()
 
         node1.stress(['write', 'n=5000', '-schema', 'replication(factor=3)'])
 
+        # TODO the keyspace and table name are capitalized in 2.0
         memtable_size = make_mbean('metrics', type='ColumnFamily', keyspace='keyspace1', scope='standard1', name='AllMemtablesHeapSize')
         disk_size = make_mbean('metrics', type='ColumnFamily', keyspace='keyspace1', scope='standard1', name='LiveDiskSpaceUsed')
         sstable_count = make_mbean('metrics', type='ColumnFamily', keyspace='keyspace1', scope='standard1', name='LiveSSTableCount')
