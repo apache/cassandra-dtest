@@ -25,7 +25,7 @@ class TestOfflineTools(Tester):
         #test by trying to run on nonexistent keyspace
         cluster.stop(gently=False)
         (output, error, rc) = node1.run_sstablelevelreset("keyspace1", "standard1", output=True)
-        self.assertTrue("ColumnFamily not found: keyspace1/standard1" in error, msg=error)
+        self.assertIn("ColumnFamily not found: keyspace1/standard1", error)
         # this should return exit code 1
         self.assertEqual(rc, 1, msg=str(rc))
 
@@ -36,7 +36,7 @@ class TestOfflineTools(Tester):
 
         (output, error, rc) = node1.run_sstablelevelreset("keyspace1", "standard1", output=True)
         debug(error)
-        self.assertTrue("Found no sstables, did you give the correct keyspace" in output, msg=output)
+        self.assertIn("Found no sstables, did you give the correct keyspace", output)
         self.assertEqual(rc, 0, msg=str(rc))
 
         #test by writing small amount of data and flushing (all sstables should be level 0)
@@ -48,7 +48,7 @@ class TestOfflineTools(Tester):
         cluster.stop(gently=False)
 
         (output, error, rc) = node1.run_sstablelevelreset("keyspace1", "standard1", output=True)
-        self.assertTrue("since it is already on level 0" in output, msg=debug(output))
+        self.assertIn("since it is already on level 0", output)
         self.assertEqual(rc, 0, msg=str(rc))
 
         #test by loading large amount data so we have multiple levels and checking all levels are 0 at end
@@ -109,7 +109,7 @@ class TestOfflineTools(Tester):
 
         (output, error, rc) = node1.run_sstableofflinerelevel("keyspace1", "standard1", output=True)
 
-        self.assertTrue("No sstables to relevel for keyspace1.standard1" in output, msg="Improper error msg with no sstables")
+        self.assertIn("No sstables to relevel for keyspace1.standard1", output)
         self.assertEqual(rc, 1, msg=str(rc))
 
         #test by flushing (sstable should be level 0)
@@ -120,7 +120,7 @@ class TestOfflineTools(Tester):
         cluster.stop()
 
         (output, error, rc) = node1.run_sstableofflinerelevel("keyspace1", "standard1", output=True)
-        self.assertTrue("L0=1" in output)
+        self.assertIn("L0=1", output)
         self.assertEqual(rc, 0, msg=str(rc))
 
         #test by loading large amount data so we have multiple sstables
@@ -156,7 +156,7 @@ class TestOfflineTools(Tester):
 
         # test on nonexistent keyspace
         (out, err, rc) = node1.run_sstableverify("keyspace1", "standard1", output=True)
-        self.assertTrue("Unknown keyspace/table keyspace1.standard1" in err)
+        self.assertIn("Unknown keyspace/table keyspace1.standard1", err)
         self.assertEqual(rc, 1, msg=str(rc))
 
         # test on nonexistent sstables:
@@ -202,7 +202,7 @@ class TestOfflineTools(Tester):
         (out, error, rc) = node1.run_sstableverify("keyspace1", "standard1", options=['-e'], output=True)
 
         self.assertEqual(rc, 0, msg=str(rc))
-        self.assertTrue("was not released before the reference was garbage collected" in out)
+        self.assertIn("was not released before the reference was garbage collected", out)
 
         #now try intentionally corrupting an sstable to see if hash computed is different and error recognized
         with open(sstables[1], 'r') as f:
@@ -213,5 +213,5 @@ class TestOfflineTools(Tester):
         #use verbose to get some coverage on it
         (out, error, rc) = node1.run_sstableverify("keyspace1", "standard1", options=['-v'], output=True)
 
-        self.assertTrue("java.lang.Exception: Invalid SSTable" in error)
+        self.assertIn("java.lang.Exception: Invalid SSTable", error)
         self.assertEqual(rc, 1, msg=str(rc))
