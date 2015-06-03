@@ -375,7 +375,7 @@ class TestDistributedTTL(Tester):
 
         # since the two queries are not executed simultaneously, the remaining
         # TTLs can differ by one second
-        self.assertLessEqual(abs(ttl_cursor1 - ttl_cursor2), 1)
+        self.assertLessEqual(abs(ttl_cursor1[0][0] - ttl_cursor2[0][0]), 1)
 
         time.sleep(7)
 
@@ -419,7 +419,7 @@ class TestDistributedTTL(Tester):
         # Check that the TTL on both server are the same
         ttl_cursor1 = self.cursor1.execute('SELECT ttl(col1) FROM ttl_table;')
         ttl_cursor2 = cursor2.execute('SELECT ttl(col1) FROM ttl_table;')
-        assert_almost_equal(ttl_cursor1[0][0], ttl_cursor2[0][0], error=0.1)
+        self.assertLessEqual(abs(ttl_cursor1[0][0] - ttl_cursor2[0][0]), 1)
 
     def ttl_is_respected_on_repair_test(self):
         """ Test that ttl is respected on repair """
