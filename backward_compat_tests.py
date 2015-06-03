@@ -11,7 +11,7 @@ from uuid import uuid4, UUID
 from thrift_bindings.v30.ttypes import CfDef, Mutation, ColumnOrSuperColumn, Column
 from thrift_bindings.v30.ttypes import ConsistencyLevel as ThriftConsistencyLevel
 
-from dtest import Tester, freshCluster
+from dtest import Tester, freshCluster, DEBUG
 from assertions import assert_invalid, assert_one, assert_none, assert_all
 from thrift_tests import get_thrift_client
 from tools import since, require, rows_to_list
@@ -81,7 +81,7 @@ class TestCQL(Tester):
         node1.stop(gently=True)
 
         node1.set_install_dir(version=self.original_install_dir)
-        node1.set_log_level("INFO")
+        node1.set_log_level("DEBUG" if DEBUG else "INFO")
         node1.set_configuration_options(values={'internode_compression': 'none'})
         node1.start(wait_for_binary_proto=True)
         session = self.patient_exclusive_cql_connection(node1, protocol_version=self.protocol_version)
