@@ -1,6 +1,7 @@
 from dtest import Tester, debug
 from jmxutils import make_mbean, JolokiaAgent
 
+
 class TestJMX(Tester):
 
     def cfhistograms_test(self):
@@ -76,7 +77,6 @@ class TestJMX(Tester):
             else:
                 self.fail(str(e))
 
-
     def table_metric_mbeans_test(self):
         """
         Test some basic table metric mbeans with simple writes.
@@ -91,10 +91,9 @@ class TestJMX(Tester):
         disk_size = make_mbean('metrics', type='ColumnFamily', keyspace='keyspace1', scope='standard1', name='LiveDiskSpaceUsed')
         sstable_count = make_mbean('metrics', type='ColumnFamily', keyspace='keyspace1', scope='standard1', name='LiveSSTableCount')
 
-
         with JolokiaAgent(node1) as jmx:
             mem_size = jmx.read_attribute(memtable_size, "Value")
-            self.assertGreaterThan(int(mem_size), 10000)
+            self.assertGreater(int(mem_size), 10000)
 
             on_disk_size = jmx.read_attribute(disk_size, "Value")
             self.assertEquals(int(on_disk_size), 0)
@@ -102,7 +101,7 @@ class TestJMX(Tester):
             node1.flush()
 
             on_disk_size = jmx.read_attribute(disk_size, "Value")
-            self.assertGreaterThan(int(on_disk_size), 10000)
+            self.assertGreater(int(on_disk_size), 10000)
 
             sstables = jmx.read_attribute(sstable_count, "Value")
             self.assertGreaterEqual(int(sstables), 1)
