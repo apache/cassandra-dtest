@@ -20,6 +20,7 @@ from cassandra.protocol import ProtocolException, SyntaxException, Configuration
 from cassandra.query import SimpleStatement
 from cassandra.util import sortedset
 
+
 @canReuseCluster
 class TestCQL(Tester):
 
@@ -34,7 +35,7 @@ class TestCQL(Tester):
 
         start_rpc = kwargs.pop('start_rpc', False)
         if start_rpc:
-            cluster.set_configuration_options(values={'start_rpc':True})
+            cluster.set_configuration_options(values={'start_rpc': True})
 
         if not cluster.nodelist():
             cluster.populate(nodes).start()
@@ -2170,7 +2171,8 @@ class TestCQL(Tester):
         """ Test for the validation bug of #4706 """
 
         cursor = self.prepare()
-        assert_invalid(cursor, "CREATE TABLE test (id bigint PRIMARY KEY, count counter, things set<text>)", matching="Cannot add a non counter column", expected=ConfigurationException)
+        assert_invalid(cursor, "CREATE TABLE test (id bigint PRIMARY KEY, count counter, things set<text>)",
+                       matching=r"Cannot add a( non)? counter column", expected=ConfigurationException)
 
     def reversed_compact_test(self):
         """ Test for #4716 bug and more generally for good behavior of ordering"""
