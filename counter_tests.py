@@ -90,7 +90,7 @@ class TestCounters(Tester):
                 time.sleep(.2)
                 nodes[i].nodetool("drain")
                 nodes[i].stop(wait_other_notice=False)
-                nodes[i].start(wait_other_notice=True)
+                nodes[i].start(wait_other_notice=True, wait_for_binary_proto=True)
                 time.sleep(.2)
 
         make_updates()
