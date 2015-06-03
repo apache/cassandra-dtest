@@ -55,6 +55,9 @@ class TestSCUpgrade(Tester):
         ksdef.cf_defs = []
 
         client.system_add_keyspace(ksdef)
+
+        session.cluster.control_connection.wait_for_schema_agreement()
+
         client.set_keyspace('test')
 
         # create a super column family with UTF8 for all types
