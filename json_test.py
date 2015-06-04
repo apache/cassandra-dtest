@@ -1,10 +1,12 @@
 import doctest
 import inspect
 import os
+import re
 import subprocess
 import sys
 from distutils.version import LooseVersion
 from ccmlib import common
+from ccmlib.common import is_win
 from dtest import Tester
 from tools import since
 
@@ -93,6 +95,13 @@ def build_doc_context(tester, test_name, prepare=True, connection=None, nodes=No
         Run cqlsh commands and print output.
         """
         output = cqlsh(cmds, supress_err=supress_err)
+
+        # python coerces LF to OS-specific line-endings on print or write calls
+        # unless the stream is opened in binary mode. It's cleaner just to
+        # patch that up here so subsequent doctest comparisons to <BLANKLINE>
+        # pass, as they'll fail on Windows w/whitespace + ^M (CRLF)
+        if is_win():
+            output = re.sub(os.linesep, '\n', output)
 
         if output:
             print(output)
