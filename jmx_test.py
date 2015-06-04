@@ -1,5 +1,5 @@
 from dtest import Tester, debug
-from jmxutils import make_mbean, JolokiaAgent, remove_perf_disable_shared_mem 
+from jmxutils import make_mbean, JolokiaAgent, remove_perf_disable_shared_mem
 from tools import since
 
 class TestJMX(Tester):
@@ -15,7 +15,7 @@ class TestJMX(Tester):
         cluster.populate(3).start(wait_for_binary_proto=True)
         node1, node2, node3 = cluster.nodelist()
 
-        #issue large stress write to load data into cluster
+        # issue large stress write to load data into cluster
         node1.stress(['write', 'n=15M', '-schema', 'replication(factor=3)'])
         node1.flush()
 
@@ -86,8 +86,10 @@ class TestJMX(Tester):
         Test some basic table metric mbeans with simple writes.
         """
         cluster = self.cluster
-        cluster.populate(3).start(wait_for_binary_proto=True)
+        cluster.populate(3)
         node1, node2, node3 = cluster.nodelist()
+        remove_perf_disable_shared_mem(node1)
+        cluster.start(wait_for_binary_proto=True)
 
         if cluster.version() < "2.1":
             node1.stress(['-o', 'insert', '--num-keys=10000', '--replication-factor=3'])
@@ -99,7 +101,6 @@ class TestJMX(Tester):
         disk_size = make_mbean('metrics', type='ColumnFamily', keyspace='keyspace1', scope='standard1', name='LiveDiskSpaceUsed')
         sstable_count = make_mbean('metrics', type='ColumnFamily', keyspace='keyspace1', scope='standard1', name='LiveSSTableCount')
 
-        remove_perf_disable_shared_mem(node1)
         with JolokiaAgent(node1) as jmx:
             mem_size = jmx.read_attribute(memtable_size, "Value")
             self.assertGreater(int(mem_size), 10000)
