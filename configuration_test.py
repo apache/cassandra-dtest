@@ -21,13 +21,13 @@ class TestConfiguration(Tester):
         create_table_query = "CREATE TABLE test_table (row varchar, name varchar, value int, PRIMARY KEY (row, name));"
         alter_chunk_len_query = "ALTER TABLE test_table WITH compression = {{'sstable_compression' : 'SnappyCompressor', 'chunk_length_kb' : {chunk_length}}};"
 
-        cursor.execute( create_table_query)
+        cursor.execute(create_table_query)
 
-        cursor.execute( alter_chunk_len_query.format(chunk_length=32) )
-        self._check_chunk_length( cursor, 32 )
+        cursor.execute(alter_chunk_len_query.format(chunk_length=32))
+        self._check_chunk_length(cursor, 32)
 
-        cursor.execute( alter_chunk_len_query.format(chunk_length=64) )
-        self._check_chunk_length( cursor, 64 )
+        cursor.execute(alter_chunk_len_query.format(chunk_length=64))
+        self._check_chunk_length(cursor, 64)
 
     @require(9560)
     def change_durable_writes_test(self):
@@ -94,9 +94,9 @@ class TestConfiguration(Tester):
 
     def _check_chunk_length(self, cursor, value):
         describe_table_query = "SELECT * FROM system.schema_columnfamilies WHERE keyspace_name='ks' AND columnfamily_name='test_table';"
-        rows = cursor.execute( describe_table_query )
+        rows = cursor.execute(describe_table_query)
         results = rows[0]
-        #Now extract the param list
+        # Now extract the param list
         params = ''
         for result in results:
             if 'sstable_compression' in str(result):
@@ -104,8 +104,8 @@ class TestConfiguration(Tester):
 
         assert params is not '', "Looking for a row with the string 'sstable_compression' in system.schema_columnfamilies, but could not find it."
 
-        params = ast.literal_eval( params )
-        chunk_length = int( params['chunk_length_kb'] )
+        params = ast.literal_eval(params)
+        chunk_length = int(params['chunk_length_kb'])
 
         assert chunk_length == value, "Expected chunk_length: %s.  We got: %s" % (value, chunk_length)
 
