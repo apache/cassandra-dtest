@@ -1,14 +1,11 @@
+import ast
+
+from cassandra.concurrent import execute_concurrent_with_args
+
 from dtest import Tester
 from jmxutils import JolokiaAgent, make_mbean, remove_perf_disable_shared_mem
 from tools import debug, require
 
-import ast
-import time
-from jmxutils import make_mbean, JolokiaAgent, remove_perf_disable_shared_mem
-from tools import since, debug
-import os
-from ccmlib import common
-from cassandra.concurrent import execute_concurrent_with_args
 
 class TestConfiguration(Tester):
 
