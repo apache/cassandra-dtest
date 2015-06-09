@@ -5295,3 +5295,19 @@ class TestCQL(Tester):
 
         cursor = self.patient_cql_connection(self.cluster.nodelist()[0])
         assert_all(cursor, "SELECT k FROM ks.test WHERE v = 0", [[0]])
+
+    @require(9565)
+    def double_with_npe_test(self):
+        session = self.prepare()
+        statements = ['ALTER KEYSPACE WITH WITH DURABLE_WRITES = true',
+                      'ALTER KEYSPACE ks WITH WITH DURABLE_WRITES = true',
+                      'CREATE KEYSPACE WITH WITH DURABLE_WRITES = true',
+                      'CREATE KEYSPACE ks WITH WITH DURABLE_WRITES = true']
+
+        for s in statements:
+            session.execute('DROP KEYSPACE IF EXISTS ks')
+            try:
+                session.execute(s)
+            except Exception as e:
+                self.assertIsInstance(e, SyntaxException)
+                self.assertNotIn('NullPointerException', str(e))
