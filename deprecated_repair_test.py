@@ -10,6 +10,8 @@ from jmxutils import JolokiaAgent, make_mbean, remove_perf_disable_shared_mem
 @since("2.2")
 class TestDeprecatedRepairAPI(Tester):
     """
+    @jira_ticket CASSANDRA-9570
+
     Test if depreated repair JMX API runs with expected parameters
     """
 
