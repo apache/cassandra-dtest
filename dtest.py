@@ -153,16 +153,12 @@ class Tester(TestCase):
         return cluster
 
     def var_debug(self, cluster):
-        general_DEBUG = os.environ.get('DEBUG', 'no').lower() not in ('no', 'false', 'yes', 'true')
-        classes_to_debug = []
-        if general_DEBUG:
+        if os.environ.get('DEBUG', 'no').lower() not in ('no', 'false', 'yes', 'true'):
             classes_to_debug = os.environ.get('DEBUG').split(":")
             cluster.set_log_level('DEBUG', None if len(classes_to_debug) == 0 else classes_to_debug)
 
     def var_trace(self, cluster):
-        general_TRACE = os.environ.get('TRACE', 'no').lower() not in ('no', 'false', 'yes', 'true')
-        classes_to_trace = []
-        if general_TRACE:
+        if os.environ.get('TRACE', 'no').lower() not in ('no', 'false', 'yes', 'true'):
             classes_to_trace = os.environ.get('TRACE').split(":")
             cluster.set_log_level('TRACE', None if len(classes_to_trace) == 0 else classes_to_trace)
 
