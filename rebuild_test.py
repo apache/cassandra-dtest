@@ -1,9 +1,11 @@
 import time
-from dtest import Tester, debug
-from tools import insert_c1c2, query_c1c2, new_node, require
-from ccmlib.node import Node, NodetoolError
-from cassandra import ConsistencyLevel
 from threading import Thread
+
+from cassandra import ConsistencyLevel
+
+from ccmlib.node import NodetoolError
+from dtest import Tester
+from tools import insert_c1c2, query_c1c2, require
 
 
 class TestRebuild(Tester):
