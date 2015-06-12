@@ -1,6 +1,6 @@
 import time
 from dtest import Tester, debug
-from tools import insert_c1c2, query_c1c2, new_node
+from tools import insert_c1c2, query_c1c2, new_node, require
 from ccmlib.node import Node, NodetoolError
 from cassandra import ConsistencyLevel
 from threading import Thread
@@ -23,8 +23,11 @@ class TestRebuild(Tester):
         Tester.__init__(self, *args, **kwargs)
         self.allow_log_errors = True
 
+    @require(9119)
     def simple_rebuild_test(self):
         """
+        @jira_ticket 9119
+
         Test rebuild from other dc works as expected.
         """
 
