@@ -23,7 +23,6 @@ class TestRebuild(Tester):
             r'Streaming error occurred'
         ]
         Tester.__init__(self, *args, **kwargs)
-        self.allow_log_errors = True
 
     @require(9119)
     def simple_rebuild_test(self):
