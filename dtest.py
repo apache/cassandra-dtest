@@ -389,7 +389,9 @@ class Tester(TestCase):
         session.execute('USE %s' % name)
 
     # We default to UTF8Type because it's simpler to use in tests
-    def create_cf(self, session, name, key_type="varchar", speculative_retry=None, read_repair=None, compression=None, gc_grace=None, columns=None, validation="UTF8Type"):
+    def create_cf(self, session, name, key_type="varchar", speculative_retry=None, read_repair=None, compression=None,
+                  gc_grace=None, columns=None, validation="UTF8Type", compact_storage=False):
+
         additional_columns = ""
         if columns is not None:
             for k, v in columns.items():
@@ -413,6 +415,9 @@ class Tester(TestCase):
         if self.cluster.version() >= "2.0":
             if speculative_retry is not None:
                 query = '%s AND speculative_retry=\'%s\'' % (query, speculative_retry)
+
+        if compact_storage:
+            query += ' AND COMPACT STORAGE'
 
         session.execute(query)
         time.sleep(0.2)
