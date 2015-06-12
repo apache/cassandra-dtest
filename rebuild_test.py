@@ -1,9 +1,11 @@
 import time
-from dtest import Tester, debug
-from tools import insert_c1c2, query_c1c2, new_node
-from ccmlib.node import Node, NodetoolError
-from cassandra import ConsistencyLevel
 from threading import Thread
+
+from cassandra import ConsistencyLevel
+
+from ccmlib.node import NodetoolError
+from dtest import Tester
+from tools import insert_c1c2, query_c1c2, require
 
 
 class TestRebuild(Tester):
@@ -21,10 +23,12 @@ class TestRebuild(Tester):
             r'Streaming error occurred'
         ]
         Tester.__init__(self, *args, **kwargs)
-        self.allow_log_errors = True
 
+    @require(9119)
     def simple_rebuild_test(self):
         """
+        @jira_ticket 9119
+
         Test rebuild from other dc works as expected.
         """
 
@@ -44,7 +48,7 @@ class TestRebuild(Tester):
 
         # populate data in dc1
         session = self.patient_exclusive_cql_connection(node1)
-        self.create_ks(session, 'ks', {'dc1':1})
+        self.create_ks(session, 'ks', {'dc1': 1})
         self.create_cf(session, 'cf', columns={'c1': 'text', 'c2': 'text'})
         for i in xrange(0, keys):
             insert_c1c2(session, i, ConsistencyLevel.ALL)
@@ -90,4 +94,3 @@ class TestRebuild(Tester):
         # check data
         for i in xrange(0, keys):
             query_c1c2(session, i, ConsistencyLevel.ALL)
-
