@@ -32,7 +32,7 @@ class TestConfiguration(Tester):
     @require(9560)
     def change_durable_writes_test(self):
         """
-        @jira_ticket 9560
+        @jira_ticket CASSANDRA-9560
 
         Test that changes to the DURABLE_WRITES option on keyspaces is
         respected in subsequent writes.

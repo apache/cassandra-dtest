@@ -27,7 +27,7 @@ class TestRebuild(Tester):
     @require(9119)
     def simple_rebuild_test(self):
         """
-        @jira_ticket 9119
+        @jira_ticket CASSANDRA-9119
 
         Test rebuild from other dc works as expected.
         """

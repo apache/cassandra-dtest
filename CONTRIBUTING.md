@@ -10,7 +10,7 @@ Description       | Brief description of the test
 @expected_errors  | What exceptions this test is expected to throw on normal behavior (should be caught and expected in the test)
 @throws           | What exceptions this test would throw upon failure (if expecting a specific regression)
 @since            | I am unsure what we will use this for. Do not use until we have reached a decision.
-@jira_ticket      | Associated JIRA ticket number
+@jira_ticket      | Associated JIRA ticket identifier, including the project name (e.g. `CASSANDRA-42`, not `42`).
 @expected_result  | Brief summary of what the expected results of this test are
 @test_assumptions | Test requirements (auth, hints disabled , etc)
 @note             | (future improvments, todo, etc)
