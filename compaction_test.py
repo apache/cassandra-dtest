@@ -89,6 +89,7 @@ class TestCompaction(Tester):
         Insert data setting gc_grace_seconds to 0, and determine sstable
         is deleted upon data deletion.
         """
+        self.skip_if_no_major_compaction()
         cluster = self.cluster
         cluster.populate(1).start(wait_for_binary_proto=True)
         [node1] = cluster.nodelist()
@@ -213,6 +214,10 @@ class TestCompaction(Tester):
                 cluster.clear()
                 time.sleep(5)
                 cluster.start(wait_for_binary_proto=True)
+
+    def skip_if_no_major_compaction(self):
+        if self.cluster.version() < '2.2' and self.strategy == 'LeveledCompactionStrategy':
+            self.skipTest('major compaction not implemented for LCS in this version of Cassandra')
 
 
 def block_on_compaction_log(node):
