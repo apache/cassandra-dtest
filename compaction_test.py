@@ -57,7 +57,6 @@ class TestCompaction(Tester):
         cluster = self.cluster
         cluster.populate(1).start(wait_for_binary_proto=True)
         [node1] = cluster.nodelist()
-        cursor = self.patient_cql_connection(node1)
 
         stress_write(node1)
 
@@ -154,7 +153,6 @@ class TestCompaction(Tester):
         cluster = self.cluster
         cluster.populate(1).start(wait_for_binary_proto=True)
         [node1] = cluster.nodelist()
-        cursor = self.patient_cql_connection(node1)
 
         stress_write(node1)
 
