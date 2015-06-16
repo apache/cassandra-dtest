@@ -1,9 +1,10 @@
-from dtest import Tester, debug
-import time
-from assertions import assert_none, assert_one
-import tempfile
 import os
 import re
+import tempfile
+import time
+
+from assertions import assert_almost_equal, assert_none, assert_one
+from dtest import Tester, debug
 
 
 class TestCompaction(Tester):
