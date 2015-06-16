@@ -72,7 +72,7 @@ class TestCompaction(Tester):
             debug("datasize not found")
             debug(output)
 
-        node1.nodetool('compact')
+        block_on_compaction_log(node1)
 
         output = node1.nodetool('cfstats', True)[0]
         if output.find(table_name) != -1:
@@ -101,8 +101,8 @@ class TestCompaction(Tester):
         node1.flush()
         for x in range(0, 100):
             cursor.execute('delete from cf where key = ' + str(x))
-        node1.flush()
-        node1.nodetool('compact')
+
+        block_on_compaction_log(node1)
 
         try:
             cfs = os.listdir(node1.get_path() + "/data/ks")
@@ -157,14 +157,11 @@ class TestCompaction(Tester):
 
         stress_write(node1)
 
-        node1.flush()
-
         threshold = "10"
 
         node1.nodetool('setcompactionthroughput -- ' + threshold)
-        node1.nodetool('compact')
 
-        matches = node1.watch_log_for("Compacted")
+        matches = block_on_compaction_log(node1)
 
         stringline = matches[0]
         avgthroughput = stringline[stringline.find('=')+1:stringline.find("MB/s")]
@@ -211,6 +208,27 @@ class TestCompaction(Tester):
                 cluster.clear()
                 time.sleep(5)
                 cluster.start(wait_for_binary_proto=True)
+
+
+def block_on_compaction_log(node):
+    """
+    @param node the node on which to trigger and block on compaction
+
+    Helper method for testing compaction. This triggers compactions by
+    calling flush and compact on node. In situations where major
+    compaction won't apply to a table, such as in pre-2.2 LCS tables, the
+    flush will trigger minor compactions.
+
+    This method uses log-watching to block until compaction is completed.
+
+    Calling flush before calling this method may cause it to hang; if
+    compaction completes before the method starts, it may not occur again
+    during this method.
+    """
+    mark = node.mark_log()
+    node.flush()
+    node.nodetool('compact')
+    return node.watch_log_for('Compacted', from_mark=mark)
 
 
 def stress_write(node):
