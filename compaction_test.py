@@ -3,6 +3,7 @@ import time
 from assertions import assert_none, assert_one
 import tempfile
 import os
+import re
 
 
 class TestCompaction(Tester):
@@ -164,10 +165,17 @@ class TestCompaction(Tester):
         matches = block_on_compaction_log(node1)
 
         stringline = matches[0]
-        avgthroughput = stringline[stringline.find('=')+1:stringline.find("MB/s")]
+
+        throughput_pattern = re.compile('''.*          # it doesn't matter what the line starts with
+                                           =           # wait for an equals sign
+                                           ([\s\d\.]*) # capture a decimal number, possibly surrounded by whitespace
+                                           MB/s.*      # followed by 'MB/s'
+                                        ''', re.X)
+
+        avgthroughput = re.match(throughput_pattern, stringline).group(1).strip()
         debug(avgthroughput)
 
-        self.assertGreaterEqual(threshold, avgthroughput)
+        self.assertGreaterEqual(float(threshold) * 1.25, float(avgthroughput))
 
     def compaction_strategy_switching_test(self):
         """Ensure that switching strategies does not result in problems.
