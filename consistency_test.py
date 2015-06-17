@@ -38,13 +38,13 @@ class TestHelper(Tester):
         }[cl]
 
     def _is_local(self, cl):
-        return cl == ConsistencyLevel.LOCAL_QUORUM or \
-               cl == ConsistencyLevel.LOCAL_ONE or \
-               cl == ConsistencyLevel.LOCAL_SERIAL
+        return (cl == ConsistencyLevel.LOCAL_QUORUM or
+                cl == ConsistencyLevel.LOCAL_ONE or
+                cl == ConsistencyLevel.LOCAL_SERIAL)
 
     def _is_conditional(self, cl):
-        return cl == ConsistencyLevel.SERIAL or \
-               cl == ConsistencyLevel.LOCAL_SERIAL
+        return (cl == ConsistencyLevel.SERIAL or
+                cl == ConsistencyLevel.LOCAL_SERIAL)
 
     def _required_nodes(self, cl, rf_factors, dc):
         """
@@ -66,7 +66,7 @@ class TestHelper(Tester):
             ConsistencyLevel.LOCAL_ONE : 1,
         }[cl]
 
-    def _should_suceed(self, cl, rf_factors, num_nodes_alive, current):
+    def _should_succeed(self, cl, rf_factors, num_nodes_alive, current):
         """
         Return true if the read or write operation should succeed based on
         the consistency level requested, the replication factors and the
@@ -78,7 +78,7 @@ class TestHelper(Tester):
             for i in xrange(0, len(rf_factors)):
                 if num_nodes_alive[i] < self._required_nodes(cl, rf_factors, i):
                     return False
-                return True
+            return True
         else:
             return sum(num_nodes_alive) >= self._required_nodes(cl, rf_factors, current)
 
@@ -91,7 +91,7 @@ class TestHelper(Tester):
         cluster.populate(nodes).start(wait_for_binary_proto=True, wait_other_notice=True)
 
         self.ksname = 'mytestks'
-        session = self.patient_cql_connection(cluster.nodelist()[0])
+        session = self.patient_exclusive_cql_connection(cluster.nodelist()[0])
 
         self.create_ks(session, self.ksname, rf)
         self.create_tables(session)
@@ -100,15 +100,7 @@ class TestHelper(Tester):
             self.sessions = []
             self.sessions.append(session)
             for node in cluster.nodelist()[1:]:
-                self.sessions.append(self.patient_cql_connection(node, self.ksname))
-
-    def _restart_cluster(self):
-        cluster = self.cluster
-
-        cluster.start(wait_for_binary_proto=True, wait_other_notice=True)
-
-        session = self.patient_cql_connection(cluster.nodelist()[0], self.ksname)
-        self.truncate_tables(session)
+                self.sessions.append(self.patient_exclusive_cql_connection(node, self.ksname))
 
     def create_tables(self, session):
         self.create_users_table(session)
@@ -178,9 +170,13 @@ class TestHelper(Tester):
         return ret
 
     def read_counter(self, session, id, consistency):
+        """
+        Return the current counter value. If we find no value we return zero
+        because after the next update the counter will become one.
+        """
         statement = SimpleStatement("SELECT c from counters WHERE id = %d" % (id,), consistency_level=consistency)
         res = rows_to_list(session.execute(statement))
-        return res[0][0] if len(res) > 0 else 0
+        return res[0][0] if res else 0
 
 class TestAvailability(TestHelper):
     """
@@ -188,7 +184,7 @@ class TestAvailability(TestHelper):
     """
     def _test_simple_strategy(self, combinations):
         """
-        Helper test function for a sinle data center: invoke _test_insert_query_from_node() for each node
+        Helper test function for a single data center: invoke _test_insert_query_from_node() for each node
         and each combination, progressively stopping nodes.
         """
         cluster = self.cluster
@@ -242,13 +238,13 @@ class TestAvailability(TestHelper):
         end = 100
         age = 30
 
-        if self._should_suceed(write_cl, rf_factors, num_nodes_alive, dc_idx):
+        if self._should_succeed(write_cl, rf_factors, num_nodes_alive, dc_idx):
             for n in xrange(start, end):
                 self.insert_user(session, n, age, write_cl, serial_cl)
         else:
             assert_unavailable(self.insert_user, session, end, age, write_cl, serial_cl)
 
-        if self._should_suceed(read_cl, rf_factors, num_nodes_alive, dc_idx):
+        if self._should_succeed(read_cl, rf_factors, num_nodes_alive, dc_idx):
             for n in xrange(start, end):
                 self.query_user(session, n, age, read_cl, check_ret)
         else:
@@ -334,8 +330,8 @@ class TestAccuracy(TestHelper):
             self.read_cl = read_cl
             self.serial_cl = serial_cl
 
-            outer.log('Testing accuracy for %s/%s/%s (keys : %d to %d)' \
-                    % (outer._name(write_cl), outer._name(read_cl), outer._name(serial_cl), start, end))
+            outer.log('Testing accuracy for %s/%s/%s (keys : %d to %d)'
+            % (outer._name(write_cl), outer._name(read_cl), outer._name(serial_cl), start, end))
 
         def get_num_nodes(self, idx):
             """
@@ -386,8 +382,8 @@ class TestAccuracy(TestHelper):
                     if outer.query_user(s, n, val, read_cl, check_ret=strong_consistency):
                         num = num + 1
                 assert num >= write_nodes, \
-                       "Failed to read value from sufficient number of nodes, required %d but  got %d - [%d, %s]" \
-                       % (write_nodes, num, n, val)
+                "Failed to read value from sufficient number of nodes, required %d but  got %d - [%d, %s]" \
+                % (write_nodes, num, n, val)
 
             for n in xrange(start, end):
                 age = 30
@@ -425,8 +421,8 @@ class TestAccuracy(TestHelper):
                     if outer.query_counter(s, n, val, read_cl, check_ret=strong_consistency):
                         num = num + 1
                 assert num >= write_nodes, \
-                       "Failed to read value from sufficient number of nodes, required %d but got %d - [%d, %s]" \
-                       % (write_nodes, num, n, val)
+                "Failed to read value from sufficient number of nodes, required %d but got %d - [%d, %s]" \
+                % (write_nodes, num, n, val)
 
             for n in xrange(start, end):
                 c = outer.read_counter(sessions[0], n, ConsistencyLevel.ALL)
