@@ -1,5 +1,3 @@
-import time
-
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
 

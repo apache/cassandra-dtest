@@ -1,12 +1,11 @@
 from dtest import Tester, debug, DISABLE_VNODES
 from assertions import assert_unavailable, assert_none
-from tools import create_c1c2_table, insert_c1c2, query_c1c2, insert_columns, rows_to_list, require
+from tools import create_c1c2_table, insert_c1c2, query_c1c2, insert_columns, rows_to_list
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
 
 from collections import OrderedDict
 from copy import deepcopy
-from json import dumps
 
 import time, sys
 import threading, Queue, traceback
