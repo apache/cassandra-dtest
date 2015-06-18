@@ -415,7 +415,10 @@ class TestScrub(TestHelper):
         self.assertEqual(initial_users, users)
 
     @since('2.1')
-    def test_nodetool_scrub(self):
+    def test_scrub_with_UDT(self):
+        """
+        @jira_ticket CASSANDRA-7665
+        """
         cluster = self.cluster
         cluster.populate(1).start()
         node1 = cluster.nodelist()[0]
