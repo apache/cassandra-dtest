@@ -1,3 +1,15 @@
+## Style
+
+We plan to move to Python 3 in the near future. Where possible, new code should be Python 3-compatible. In particular:
+
+- favor `format` over `%` for formatting strings.
+
+Contributions will be evaluated by PEP8, though we do not enforce compliance strictly. We do not enforce limits on line length, but please keep lines readable.
+
+We do not enforce import sorting, but if you choose to organize imports by some convention, use the `isort` tool (`pip install isort`).
+
+## Doxygen Docstrings
+
 We are now colocating our test plans directly with the source code. We have decided to do so in a manner compatible with Doxygen, to turn the test plans into easily navigated HTML. Please view the following list of tags, as well as an example test. While this full list of tags is available for use, there is no need to use every tag for a given test. The description and since fields should be included, but most others should only be used when appropriate. The test plan will live in a comment block below the test method declaration.
 
 
@@ -10,7 +22,7 @@ Description       | Brief description of the test
 @expected_errors  | What exceptions this test is expected to throw on normal behavior (should be caught and expected in the test)
 @throws           | What exceptions this test would throw upon failure (if expecting a specific regression)
 @since            | I am unsure what we will use this for. Do not use until we have reached a decision.
-@jira_ticket      | Associated JIRA ticket number
+@jira_ticket      | Associated JIRA ticket identifier, including the project name (e.g. `CASSANDRA-42`, not `42`).
 @expected_result  | Brief summary of what the expected results of this test are
 @test_assumptions | Test requirements (auth, hints disabled , etc)
 @note             | (future improvments, todo, etc)

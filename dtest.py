@@ -152,6 +152,24 @@ class Tester(TestCase):
 
         return cluster
 
+    def var_debug(self, cluster):
+        if os.environ.get('DEBUG', 'no').lower() not in ('no', 'false', 'yes', 'true'):
+            classes_to_debug = os.environ.get('DEBUG').split(":")
+            cluster.set_log_level('DEBUG', None if len(classes_to_debug) == 0 else classes_to_debug)
+
+    def var_trace(self, cluster):
+        if os.environ.get('TRACE', 'no').lower() not in ('no', 'false', 'yes', 'true'):
+            classes_to_trace = os.environ.get('TRACE').split(":")
+            cluster.set_log_level('TRACE', None if len(classes_to_trace) == 0 else classes_to_trace)
+
+    def modify_log(self, cluster):
+        if DEBUG:
+            cluster.set_log_level("DEBUG")
+        if TRACE:
+            cluster.set_log_level("TRACE")
+        self.var_debug(cluster)
+        self.var_trace(cluster)
+
     def _cleanup_cluster(self):
         if SILENCE_DRIVER_ON_SHUTDOWN:
             # driver logging is very verbose when nodes start going down -- bump up the level
@@ -240,10 +258,8 @@ class Tester(TestCase):
         with open(LAST_TEST_DIR, 'w') as f:
             f.write(self.test_path + '\n')
             f.write(self.cluster.name)
-        if DEBUG:
-            self.cluster.set_log_level("DEBUG")
-        if TRACE:
-            self.cluster.set_log_level("TRACE")
+
+        self.modify_log(self.cluster)
         self.connections = []
         self.runners = []
 
@@ -373,7 +389,9 @@ class Tester(TestCase):
         session.execute('USE %s' % name)
 
     # We default to UTF8Type because it's simpler to use in tests
-    def create_cf(self, session, name, key_type="varchar", speculative_retry=None, read_repair=None, compression=None, gc_grace=None, columns=None, validation="UTF8Type"):
+    def create_cf(self, session, name, key_type="varchar", speculative_retry=None, read_repair=None, compression=None,
+                  gc_grace=None, columns=None, validation="UTF8Type", compact_storage=False):
+
         additional_columns = ""
         if columns is not None:
             for k, v in columns.items():
@@ -397,6 +415,9 @@ class Tester(TestCase):
         if self.cluster.version() >= "2.0":
             if speculative_retry is not None:
                 query = '%s AND speculative_retry=\'%s\'' % (query, speculative_retry)
+
+        if compact_storage:
+            query += ' AND COMPACT STORAGE'
 
         session.execute(query)
         time.sleep(0.2)
