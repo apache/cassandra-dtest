@@ -221,7 +221,7 @@ class TestAvailability(TestHelper):
                 for combination in combinations:
                     self._test_insert_query_from_node(session, i, rf_factors, nodes_alive, *combination)
 
-                self.cluster.nodelist()[node].stop()
+                self.cluster.nodelist()[node].stop(wait_other_notice=True)
                 nodes_alive[i] = nodes_alive[i] - 1
 
     def _test_insert_query_from_node(self, session, dc_idx, rf_factors, num_nodes_alive, write_cl, read_cl, serial_cl=None, check_ret=True):
