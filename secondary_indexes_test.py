@@ -291,7 +291,11 @@ class TestSecondaryIndexesOnCollections(Tester):
         # no index present yet, make sure there's an error trying to query column
         stmt = ("SELECT * from list_index_search.users where uuids contains {some_uuid}"
             ).format(some_uuid=uuid.uuid4())
-        assert_invalid(cursor, stmt, 'No secondary indexes on the restricted columns support the provided operators')
+
+        if self.cluster.version() < "3":
+            assert_invalid(cursor, stmt, 'No secondary indexes on the restricted columns support the provided operators')
+        else:
+            assert_invalid(cursor, stmt, 'No supported secondary index found for the non primary key columns restrictions')
 
         # add index and query again (even though there are no rows in the table yet)
         stmt = "CREATE INDEX user_uuids on list_index_search.users (uuids);"
@@ -385,7 +389,10 @@ class TestSecondaryIndexesOnCollections(Tester):
 
         # no index present yet, make sure there's an error trying to query column
         stmt = ("SELECT * from set_index_search.users where uuids contains {some_uuid}").format(some_uuid=uuid.uuid4())
-        assert_invalid(cursor, stmt, 'No secondary indexes on the restricted columns support the provided operators')
+        if self.cluster.version() < "3":
+            assert_invalid(cursor, stmt, 'No secondary indexes on the restricted columns support the provided operators')
+        else:
+            assert_invalid(cursor, stmt, 'No supported secondary index found for the non primary key columns restrictions')
 
         # add index and query again (even though there are no rows in the table yet)
         stmt = "CREATE INDEX user_uuids on set_index_search.users (uuids);"
@@ -477,7 +484,11 @@ class TestSecondaryIndexesOnCollections(Tester):
 
         # no index present yet, make sure there's an error trying to query column
         stmt = ("SELECT * from map_index_search.users where uuids contains {some_uuid}").format(some_uuid=uuid.uuid4())
-        assert_invalid(cursor, stmt, 'No secondary indexes on the restricted columns support the provided operators')
+        if self.cluster.version() < "3":
+            assert_invalid(cursor, stmt, 'No secondary indexes on the restricted columns support the provided operators')
+        else:
+            assert_invalid(cursor, stmt, 'No supported secondary index found for the non primary key columns restrictions')
+
 
         stmt = ("SELECT * from map_index_search.users where uuids contains key {some_uuid}"
             ).format(some_uuid=uuid.uuid4())

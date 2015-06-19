@@ -171,7 +171,7 @@ class TestVariousNotifications(Tester):
                 consistency_level=CL.ALL
             ))
 
-        failure_msg = ("Scanned over.* tombstones in.* query aborted")
+        failure_msg = ("Scanned over.* tombstones.* query aborted")
 
         @timed(25)
         def read_request_timeout_query():
