@@ -1236,8 +1236,8 @@ class TestCQL(Tester):
         res = cursor.execute("SELECT k FROM test WHERE token(k) >= %d" % min_token)
         assert len(res) == c, "%s [all: %s]" % (str(res), str(inOrder))
 
-        #assert_invalid(cursor, "SELECT k FROM test WHERE token(k) >= 0")
-        #cursor.execute("SELECT k FROM test WHERE token(k) >= 0")
+        # make sure comparing tokens to int literals doesn't fall down
+        cursor.execute("SELECT k FROM test WHERE token(k) >= 0")
 
         res = cursor.execute("SELECT k FROM test WHERE token(k) >= token(%d) AND token(k) < token(%d)" % (inOrder[32], inOrder[65]))
         assert rows_to_list(res) == [[inOrder[x]] for x in range(32, 65)], "%s [all: %s]" % (str(res), str(inOrder))
@@ -5133,7 +5133,7 @@ class TestCQL(Tester):
             );
         """)
 
-        #cursor.execute("create index sessionIndex ON session_data (session_id)")
+        cursor.execute("create index sessionIndex ON session_data (session_id)")
         cursor.execute("create index sessionAppName ON session_data (app_name)")
         cursor.execute("create index lastAccessIndex ON session_data (last_access)")
 
