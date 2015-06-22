@@ -1,24 +1,28 @@
 # coding: utf-8
 
+import math
 import random
 import struct
 import time
-import math
 from collections import OrderedDict
-from uuid import uuid4, UUID
+from uuid import UUID, uuid4
 
-from thrift_bindings.v22.ttypes import CfDef, Mutation, ColumnOrSuperColumn, Column
-from thrift_bindings.v22.ttypes import ConsistencyLevel as ThriftConsistencyLevel
-
-from dtest import Tester, canReuseCluster, freshCluster
-from assertions import assert_invalid, assert_one, assert_none, assert_all
-from thrift_tests import get_thrift_client
-from tools import since, require, rows_to_list
-from cassandra import ConsistencyLevel, InvalidRequest, AlreadyExists
+from cassandra import AlreadyExists, ConsistencyLevel, InvalidRequest
 from cassandra.concurrent import execute_concurrent_with_args
-from cassandra.protocol import ProtocolException, SyntaxException, ConfigurationException, InvalidRequestException
+from cassandra.protocol import (ConfigurationException,
+                                InvalidRequestException, ProtocolException,
+                                SyntaxException)
 from cassandra.query import SimpleStatement
 from cassandra.util import sortedset
+
+from assertions import assert_all, assert_invalid, assert_none, assert_one
+from dtest import Tester, canReuseCluster, freshCluster
+from thrift_bindings.v22.ttypes import \
+    ConsistencyLevel as ThriftConsistencyLevel
+from thrift_bindings.v22.ttypes import (CfDef, Column, ColumnOrSuperColumn,
+                                        Mutation)
+from thrift_tests import get_thrift_client
+from tools import require, rows_to_list, since
 
 
 @canReuseCluster
