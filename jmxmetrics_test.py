@@ -1,37 +1,58 @@
 from dtest import Tester
 from jmxutils import JolokiaAgent, make_mbean, remove_perf_disable_shared_mem
 
-# Currently only have attributes that are incrementing. 
+# Currently only have attributes that are incrementing.
 # MBEAN_VALUES are expressed in tuple with the first value being the class, 
 # the package (may be tuple), the attribute, and then the value. 
-MBEAN_VALUES_PRE = [('metrics', ('ColumnFamily', 'AllMemtablesLiveDataSize'), 'Value', 'MBeanIncrement'),
-                        ('metrics', ('ColumnFamily', 'AllMemtablesHeapSize'), 'Value', 'MBeanIncrement'),
-                        ('metrics', ('ColumnFamily', 'AllMemtablesOffHeapSize'), 'Value', 'MBeanEqual'),
-                        ('metrics', ('ColumnFamily', 'BloomFilterDiskSpaceUsed'), 'Value', 'MBeanIncrement'),
-                        ('metrics', ('ColumnFamily', 'BloomFilterFalsePositives'), 'Value', 'MBeanEqual'),
-                        ('metrics', ('ColumnFamily', 'IndexSummaryOffHeapMemoryUsed'), 'Value', 'MBeanIncrement'),
-                        ('metrics', ('ColumnFamily', 'LiveDiskSpaceUsed'), 'Value', 'MBeanIncrement'),
-                        ('metrics', ('ColumnFamily', 'LiveSSTableCount'), 'Value', 'MBeanIncrement'), 
-                        ('metrics', ('ColumnFamily', 'MemtableColumnsCount'), 'Value', 'MBeanIncrement'),
-                        ('metrics', ('ColumnFamily', 'MemtableLiveDataSize'), 'Value', 'MBeanIncrement'),
-                        ('metrics', ('ColumnFamily', 'MemtableOnHeapSize'), 'Value', 'MBeanIncrement'),
-                        ('metrics', ('ColumnFamily', 'MemtableSwitchCount'), 'Value', 'MBeanIncrement'),
-                        ('db', 'IndexSummaries', 'MemoryPoolSizeInMB', 'MBeanIncrement'),
-                        ('db', 'IndexSummaries', 'IndexIntervals', 'MBeanIncrement'),
-                        ('db', 'Caches', 'CounterCacheKeysToSave', 2147483647),
-                        ('db', 'Caches', 'CounterCacheSavePeriodInSeconds', 7200),
-                        ('metrics', ('ColumnFamily', 'MaxRowSize'), 'Value', 'MBeanEqual'),
-                        ('metrics', ('ColumnFamily', 'MemtableOffHeapSize'), 'Value', 'MBeanEqual'),
-                        ('metrics', ('ColumnFamily', 'MinRowSize'), 'Value', 'MBeanEqual'),
-                        ('metrics', ('ColumnFamily', 'PendingCompactions'), 'Value', 'MBeanEqual'),
-                        ('metrics', ('ColumnFamily', 'RowCacheHit'), 'Value', 'MBeanEqual'),
-                        ('metrics', ('ColumnFamily', 'CompressionRatio'), 'Value', 'MBeanDecrement'),
-                        ('metrics', ('ColumnFamily', 'MeanRowSize'), 'Value', 'MBeanDecrement'),
-                        ('db', 'BatchlogManager', 'TotalBatchesReplayed', 0),
-                        ('db', 'Caches', 'RowCacheSavePeriodInSeconds', 0)]
+def MBEAN_VALUES_PRE(version, ks, table):
+    typeName = 'ColumnFamily' if version <= '2.2.X' else 'Table'
+
+    ret = [ ('metrics', typeName, {'name' : 'AllMemtablesLiveDataSize'}, 'Value', 'MBeanIncrement'),
+            ('metrics', typeName, {'name' : 'AllMemtablesHeapSize'} , 'Value', 'MBeanIncrement'),
+            ('metrics', typeName, {'name' : 'AllMemtablesOffHeapSize'}, 'Value', 'MBeanEqual'),
+            ('metrics', typeName, {'name' : 'BloomFilterDiskSpaceUsed'}, 'Value', 'MBeanIncrement'),
+            ('metrics', typeName, {'name' : 'BloomFilterFalsePositives'}, 'Value', 'MBeanEqual'),
+            ('metrics', typeName, {'name' : 'IndexSummaryOffHeapMemoryUsed'}, 'Value', 'MBeanIncrement'),
+            ('metrics', typeName, {'name' : 'LiveDiskSpaceUsed'}, 'Value', 'MBeanIncrement'),
+            ('metrics', typeName, {'name' : 'LiveSSTableCount'}, 'Value', 'MBeanIncrement'),
+            ('metrics', typeName, {'name' : 'MemtableColumnsCount'}, 'Value', 'MBeanIncrement'),
+            ('metrics', typeName, {'name' : 'MemtableLiveDataSize'}, 'Value', 'MBeanIncrement'),
+            ('metrics', typeName, {'name' : 'MemtableOnHeapSize'}, 'Value', 'MBeanIncrement'),
+            ('metrics', typeName, {'name' : 'MemtableSwitchCount'}, 'Value', 'MBeanIncrement'),
+            ('db', 'IndexSummaries', {}, 'MemoryPoolSizeInMB', 'MBeanIncrement'),
+            ('db', 'IndexSummaries', {}, 'IndexIntervals', 'MBeanIncrement'),
+            ('db', 'Caches', {}, 'CounterCacheKeysToSave', 2147483647),
+            ('db', 'Caches', {}, 'CounterCacheSavePeriodInSeconds', 7200),
+            ('metrics', typeName, {'name' : 'MemtableOffHeapSize'}, 'Value', 'MBeanEqual'),
+            ('metrics', typeName, {'name' : 'PendingCompactions'}, 'Value', 'MBeanEqual'),
+            ('metrics', typeName, {'name' : 'CompressionRatio'}, 'Value', 'MBeanDecrement'),
+            ('db', 'BatchlogManager', {}, 'TotalBatchesReplayed', 0),
+            ('db', 'Caches', {}, 'RowCacheSavePeriodInSeconds', 0)]
+
+    if version <= '2.2.X':
+        ret.extend([
+            ('metrics', typeName, {'name' : 'MaxRowSize'}, 'Value', 'MBeanEqual'),
+            ('metrics', typeName, {'name' : 'MinRowSize'}, 'Value', 'MBeanEqual'),
+            ('metrics', typeName, {'name' : 'MeanRowSize'}, 'Value', 'MBeanDecrement'),
+            ('metrics', typeName, {'name' : 'RowCacheHit'}, 'Value', 'MBeanEqual'),
+            ('metrics', typeName, {'name' : 'RowCacheHitOutOfRange'}, 'Value', 'MBeanEqual'),
+            ('metrics', typeName, {'name' : 'RowCacheMiss'}, 'Value', 'MBeanEqual'),
+            ('metrics', typeName, {'name' : 'EstimatedRowSizeHistogram', 'keyspace' : ks, 'scope' : table}, 'Value', 'MBeanEqual'),
+            ('metrics', typeName, {'name' : 'EstimatedRowCount', 'keyspace' : ks, 'scope' : table}, 'Value', 'MBeanEqual')])
+    else:
+        ret.extend([
+            ('metrics', typeName, {'name' : 'MaxPartitionSize'}, 'Value', 'MBeanEqual'),
+            ('metrics', typeName, {'name' : 'MinPartitionSize'}, 'Value', 'MBeanEqual'),
+            ('metrics', typeName, {'name' : 'MeanPartitionSize'}, 'Value', 'MBeanDecrement'),
+            ('metrics', typeName, {'name' : 'PartitionCacheHit'}, 'Value', 'MBeanEqual'),
+            ('metrics', typeName, {'name' : 'PartitionCacheHitOutOfRange'}, 'Value', 'MBeanEqual'),
+            ('metrics', typeName, {'name' : 'PartitionCacheMiss'}, 'Value', 'MBeanEqual'),
+            ('metrics', typeName, {'name' : 'EstimatedPartitionSizeHistogram',  'keyspace' : ks, 'scope' : table}, 'Value', 'MBeanEqual'),
+            ('metrics', typeName, {'name' : 'EstimatedPartitionCount',  'keyspace' : ks, 'scope' : table}, 'Value', 'MBeanEqual')])
+
+    return ret
 
 # MBEAN_VALUES_POST_3.0 = 
-
 class TestJMXMetrics(Tester):
 
     def __init__(self, *args, **kwargs):
@@ -75,15 +96,12 @@ class TestJMXMetrics(Tester):
                         """)
 
         with JolokiaAgent(node) as jmx:
+            mbean_values = MBEAN_VALUES_PRE(cluster.version(), 'keyspace1', 'counter1')
             before = []
             mbeans = []
             errors = []
-            for package, bean, attribute, expected in MBEAN_VALUES_PRE:
-                # In the case that the file name is longer, then we put it in the form of tuple in bean.
-                if type(bean) == tuple:
-                    mbean = make_mbean(package, type = bean[0], name = bean[1])
-                else:
-                    mbean = make_mbean(package, bean)
+            for package, bean, attribute, expected in MBEAN_VALUES:
+                mbean = make_mbean(package, type=bean, **bean_args)
                 mbeans.append(mbean)
                 before.append(jmx.read_attribute(mbean, attribute))
 
@@ -93,7 +111,7 @@ class TestJMXMetrics(Tester):
                 node.stress(['write', 'n=100K', '-port jmx=7100'])
 
             attr_counter = 0
-            for package, bean, attribute, expected in MBEAN_VALUES_PRE:
+            for package, bean, bean_args, attribute, expected in mbean_values:
                 a_value = jmx.read_attribute(mbeans[attr_counter], attribute)
                 b_value = before[attr_counter]
                 if expected == 'MBeanIncrement':
