@@ -193,7 +193,7 @@ class TestAvailability(TestHelper):
         num_alive = nodes;
         for node in xrange(nodes):
             debug('Testing node %d in single dc with %d nodes alive' % (node, num_alive,))
-            session = self.patient_cql_connection(cluster.nodelist()[node], self.ksname)
+            session = self.patient_exclusive_cql_connection(cluster.nodelist()[node], self.ksname)
             for combination in combinations:
                 self._test_insert_query_from_node(session, 0, [rf], [num_alive], *combination)
 
@@ -217,7 +217,7 @@ class TestAvailability(TestHelper):
             for n in xrange(nodes[i]): # for each node in this dc
                 self.log('Testing node %d in dc %d with %s nodes alive' % (n, i, nodes_alive))
                 node = n + sum(nodes[:i])
-                session = self.patient_cql_connection(cluster.nodelist()[node], self.ksname)
+                session = self.patient_exclusive_cql_connection(cluster.nodelist()[node], self.ksname)
                 for combination in combinations:
                     self._test_insert_query_from_node(session, i, rf_factors, nodes_alive, *combination)
 
