@@ -1292,7 +1292,7 @@ class TestCQL(Tester):
         for r in res:
             assert isinstance(r[2], (int, long))
             if r[0] == 1:
-                assert r[3] == None, res
+                assert r[3] is None, res
             else:
                 assert isinstance(r[3], (int, long)), res
 
@@ -1302,7 +1302,7 @@ class TestCQL(Tester):
         for r in res:
             assert isinstance(r[2], (int, long))
             if r[0] == 1:
-                assert r[3] == None, res
+                assert r[3] is None, res
             else:
                 assert isinstance(r[3], (int, long)), res
 
@@ -1311,7 +1311,7 @@ class TestCQL(Tester):
         for r in res:
             assert isinstance(r[2], (int, long))
             if r[0] == 1:
-                assert r[3] == None, res
+                assert r[3] is None, res
             else:
                 assert isinstance(r[3], (int, long)), res
 
