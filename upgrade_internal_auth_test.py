@@ -62,7 +62,6 @@ class TestAuthUpgrade(Tester):
         self.upgrade_to_version("git:trunk", nodes=[node1])
         # conversion of legacy auth info won't complete on the first upgraded node
         node1.watch_log_for('Unable to complete conversion of legacy permissions')
-        time.sleep(1)
         # run the permissions checking queries on the upgraded node
         # this will be using the legacy tables as the conversion didn't complete
         self.check_permissions(node1)
@@ -72,7 +71,6 @@ class TestAuthUpgrade(Tester):
 
         # now upgrade the remaining nodes
         self.restart_nodes_to_upgrade([node2, node3])
-        time.sleep(15)
         self.check_permissions(node2)
         self.check_permissions(node3)
 
