@@ -493,7 +493,7 @@ class TestCQL(Tester):
         self.tuple_query_mixed_order_columns_prepare(cursor, 'ASC', 'ASC', 'ASC', 'ASC')
         res = cursor.execute("SELECT * FROM foo WHERE a=0 AND (b, c, d, e) > (0, 1, 1, 0);")
         assert rows_to_list(res) == [[0, 0, 1, 1, 1], [0, 0, 1, 2, -1], [0, 0, 2, 0, 3],
-                                      [0, 0, 2, 1, -3], [0, 1, 0, 0, 0], [0, 2, 0, 0, 0]], res
+                                     [0, 0, 2, 1, -3], [0, 1, 0, 0, 0], [0, 2, 0, 0, 0]], res
 
     @require("7281")
     def tuple_query_mixed_order_columns_test7(self):
@@ -2123,28 +2123,28 @@ class TestCQL(Tester):
 
         if self.cluster.version() >= '2.2':
             assert_all(cursor, "SELECT keyspace_name, durable_writes FROM system.schema_keyspaces",
-                    [['system_auth', True], ['ks1', True], ['system_distributed', True], ['system', True], ['system_traces', True], ['ks2', False]])
+                       [['system_auth', True], ['ks1', True], ['system_distributed', True], ['system', True], ['system_traces', True], ['ks2', False]])
         else:
             assert_all(cursor, "SELECT keyspace_name, durable_writes FROM system.schema_keyspaces",
-                    [['ks1', True], ['system', True], ['system_traces', True], ['ks2', False]])
+                       [['ks1', True], ['system', True], ['system_traces', True], ['ks2', False]])
 
         cursor.execute("ALTER KEYSPACE ks1 WITH replication = { 'class' : 'NetworkTopologyStrategy', 'dc1' : 1 } AND durable_writes=False")
         cursor.execute("ALTER KEYSPACE ks2 WITH durable_writes=true")
 
         if self.cluster.version() >= '2.2':
             assert_all(cursor, "SELECT keyspace_name, durable_writes, strategy_class FROM system.schema_keyspaces",
-                          [[u'system_auth', True, u'org.apache.cassandra.locator.SimpleStrategy'],
-                          [u'ks1', False, u'org.apache.cassandra.locator.NetworkTopologyStrategy'],
-                          [u'system_distributed', True, u'org.apache.cassandra.locator.SimpleStrategy'],
-                          [u'system', True, u'org.apache.cassandra.locator.LocalStrategy'],
-                          [u'system_traces', True, u'org.apache.cassandra.locator.SimpleStrategy'],
-                          [u'ks2', True, u'org.apache.cassandra.locator.SimpleStrategy']])
+                       [[u'system_auth', True, u'org.apache.cassandra.locator.SimpleStrategy'],
+                        [u'ks1', False, u'org.apache.cassandra.locator.NetworkTopologyStrategy'],
+                        [u'system_distributed', True, u'org.apache.cassandra.locator.SimpleStrategy'],
+                        [u'system', True, u'org.apache.cassandra.locator.LocalStrategy'],
+                        [u'system_traces', True, u'org.apache.cassandra.locator.SimpleStrategy'],
+                        [u'ks2', True, u'org.apache.cassandra.locator.SimpleStrategy']])
         else:
             assert_all(cursor, "SELECT keyspace_name, durable_writes, strategy_class FROM system.schema_keyspaces",
-                          [[u'ks1', False, u'org.apache.cassandra.locator.NetworkTopologyStrategy'],
-                          [u'system', True, u'org.apache.cassandra.locator.LocalStrategy'],
-                          [u'system_traces', True, u'org.apache.cassandra.locator.SimpleStrategy'],
-                          [u'ks2', True, u'org.apache.cassandra.locator.SimpleStrategy']])
+                       [[u'ks1', False, u'org.apache.cassandra.locator.NetworkTopologyStrategy'],
+                        [u'system', True, u'org.apache.cassandra.locator.LocalStrategy'],
+                        [u'system_traces', True, u'org.apache.cassandra.locator.SimpleStrategy'],
+                        [u'ks2', True, u'org.apache.cassandra.locator.SimpleStrategy']])
 
         cursor.execute("USE ks1")
 
@@ -2315,9 +2315,9 @@ class TestCQL(Tester):
             )
         """)
 
-        #The \ in this query string is not forwarded to cassandra.
-        #The ' is being escaped in python, but only ' is forwarded
-        #over the wire instead of \'.
+        # The \ in this query string is not forwarded to cassandra.
+        # The ' is being escaped in python, but only ' is forwarded
+        # over the wire instead of \'.
         assert_invalid(cursor, "INSERT INTO test (k, c) VALUES ('foo', 'CQL is cassandra\'s best friend')", expected=SyntaxException)
 
     def reversed_compact_multikey_test(self):
@@ -2614,7 +2614,7 @@ class TestCQL(Tester):
 
         # Require filtering, allowed only with ALLOW FILTERING
         queries = ["SELECT * FROM test WHERE c = 2",
-                    "SELECT * FROM test WHERE c > 2 AND c <= 4"]
+                   "SELECT * FROM test WHERE c > 2 AND c <= 4"]
         for q in queries:
             assert_invalid(cursor, q)
             cursor.execute(q + " ALLOW FILTERING")
@@ -3714,7 +3714,7 @@ class TestCQL(Tester):
               SELECT addresses FROM users WHERE id = {id}
         """.format(id=userID_1)
         res = cursor.execute(stmt)
-        ## TODO: deserialize the value here and check it's right.
+        # TODO: deserialize the value here and check it's right.
 
     @since('2.1')
     def more_user_types_test(self):
@@ -3995,103 +3995,103 @@ class TestCQL(Tester):
 
         # Testing batches
         assert_one(cursor,
-        """
-          BEGIN BATCH
-            UPDATE test SET v='foobar' WHERE id=0 AND k='k1';
-            UPDATE test SET v='barfoo' WHERE id=0 AND k='k2';
-            UPDATE test SET version=3 WHERE id=0 IF version=1;
-          APPLY BATCH
-        """, [False, 0, None, 2])
+                   """
+                     BEGIN BATCH
+                       UPDATE test SET v='foobar' WHERE id=0 AND k='k1';
+                       UPDATE test SET v='barfoo' WHERE id=0 AND k='k2';
+                       UPDATE test SET version=3 WHERE id=0 IF version=1;
+                     APPLY BATCH
+                   """, [False, 0, None, 2])
 
         assert_one(cursor,
-        """
-          BEGIN BATCH
-            UPDATE test SET v='foobar' WHERE id=0 AND k='k1';
-            UPDATE test SET v='barfoo' WHERE id=0 AND k='k2';
-            UPDATE test SET version=3 WHERE id=0 IF version=2;
-          APPLY BATCH
-        """, [True])
+                   """
+                     BEGIN BATCH
+                       UPDATE test SET v='foobar' WHERE id=0 AND k='k1';
+                       UPDATE test SET v='barfoo' WHERE id=0 AND k='k2';
+                       UPDATE test SET version=3 WHERE id=0 IF version=2;
+                     APPLY BATCH
+                   """, [True])
         assert_all(cursor, "SELECT * FROM test", [[0, 'k1', 3, 'foobar'], [0, 'k2', 3, 'barfoo']])
 
         assert_all(cursor,
-        """
-          BEGIN BATCH
-            UPDATE test SET version=4 WHERE id=0 IF version=3;
-            UPDATE test SET v='row1' WHERE id=0 AND k='k1' IF v='foo';
-            UPDATE test SET v='row2' WHERE id=0 AND k='k2' IF v='bar';
-          APPLY BATCH
-        """, [[False, 0, 'k1', 3, 'foobar'], [False, 0, 'k2', 3, 'barfoo']])
+                   """
+                   BEGIN BATCH
+                       UPDATE test SET version=4 WHERE id=0 IF version=3;
+                       UPDATE test SET v='row1' WHERE id=0 AND k='k1' IF v='foo';
+                       UPDATE test SET v='row2' WHERE id=0 AND k='k2' IF v='bar';
+                   APPLY BATCH
+                   """, [[False, 0, 'k1', 3, 'foobar'], [False, 0, 'k2', 3, 'barfoo']])
 
         assert_one(cursor,
-        """
-          BEGIN BATCH
-            UPDATE test SET version=4 WHERE id=0 IF version=3;
-            UPDATE test SET v='row1' WHERE id=0 AND k='k1' IF v='foobar';
-            UPDATE test SET v='row2' WHERE id=0 AND k='k2' IF v='barfoo';
-          APPLY BATCH
-        """, [True])
+                   """
+                     BEGIN BATCH
+                       UPDATE test SET version=4 WHERE id=0 IF version=3;
+                       UPDATE test SET v='row1' WHERE id=0 AND k='k1' IF v='foobar';
+                       UPDATE test SET v='row2' WHERE id=0 AND k='k2' IF v='barfoo';
+                     APPLY BATCH
+                   """, [True])
         assert_all(cursor, "SELECT * FROM test", [[0, 'k1', 4, 'row1'], [0, 'k2', 4, 'row2']])
 
         assert_invalid(cursor,
-        """
-          BEGIN BATCH
-            UPDATE test SET version=5 WHERE id=0 IF version=4;
-            UPDATE test SET v='row1' WHERE id=0 AND k='k1';
-            UPDATE test SET v='row2' WHERE id=1 AND k='k2';
-          APPLY BATCH
-        """)
+                       """
+                         BEGIN BATCH
+                           UPDATE test SET version=5 WHERE id=0 IF version=4;
+                           UPDATE test SET v='row1' WHERE id=0 AND k='k1';
+                           UPDATE test SET v='row2' WHERE id=1 AND k='k2';
+                         APPLY BATCH
+                       """)
 
         assert_one(cursor,
-        """
-          BEGIN BATCH
-            INSERT INTO TEST (id, k, v) VALUES(1, 'k1', 'val1') IF NOT EXISTS;
-            INSERT INTO TEST (id, k, v) VALUES(1, 'k2', 'val2') IF NOT EXISTS;
-          APPLY BATCH
-        """, [True])
+                   """
+                     BEGIN BATCH
+                       INSERT INTO TEST (id, k, v) VALUES(1, 'k1', 'val1') IF NOT EXISTS;
+                       INSERT INTO TEST (id, k, v) VALUES(1, 'k2', 'val2') IF NOT EXISTS;
+                     APPLY BATCH
+                   """, [True])
         assert_all(cursor, "SELECT * FROM test WHERE id=1", [[1, 'k1', None, 'val1'], [1, 'k2', None, 'val2']])
 
         assert_one(cursor,
-        """
-          BEGIN BATCH
-            INSERT INTO TEST (id, k, v) VALUES(1, 'k2', 'val2') IF NOT EXISTS;
-            INSERT INTO TEST (id, k, v) VALUES(1, 'k3', 'val3') IF NOT EXISTS;
-          APPLY BATCH
-        """, [False, 1, 'k2', None, 'val2'])
+                   """
+                     BEGIN BATCH
+                       INSERT INTO TEST (id, k, v) VALUES(1, 'k2', 'val2') IF NOT EXISTS;
+                       INSERT INTO TEST (id, k, v) VALUES(1, 'k3', 'val3') IF NOT EXISTS;
+                     APPLY BATCH
+                   """, [False, 1, 'k2', None, 'val2'])
 
         assert_one(cursor,
-        """
-          BEGIN BATCH
-            UPDATE test SET v='newVal' WHERE id=1 AND k='k2' IF v='val0';
-            INSERT INTO TEST (id, k, v) VALUES(1, 'k3', 'val3') IF NOT EXISTS;
-          APPLY BATCH
-        """, [False, 1, 'k2', None, 'val2'])
+                   """
+                     BEGIN BATCH
+                       UPDATE test SET v='newVal' WHERE id=1 AND k='k2' IF v='val0';
+                       INSERT INTO TEST (id, k, v) VALUES(1, 'k3', 'val3') IF NOT EXISTS;
+                     APPLY BATCH
+                   """, [False, 1, 'k2', None, 'val2'])
         assert_all(cursor, "SELECT * FROM test WHERE id=1", [[1, 'k1', None, 'val1'], [1, 'k2', None, 'val2']])
 
         assert_one(cursor,
-        """
-          BEGIN BATCH
-            UPDATE test SET v='newVal' WHERE id=1 AND k='k2' IF v='val2';
-            INSERT INTO TEST (id, k, v, version) VALUES(1, 'k3', 'val3', 1) IF NOT EXISTS;
-          APPLY BATCH
-        """, [True])
+                   """
+                     BEGIN BATCH
+                       UPDATE test SET v='newVal' WHERE id=1 AND k='k2' IF v='val2';
+                       INSERT INTO TEST (id, k, v, version) VALUES(1, 'k3', 'val3', 1) IF NOT EXISTS;
+                     APPLY BATCH
+                   """, [True])
         assert_all(cursor, "SELECT * FROM test WHERE id=1", [[1, 'k1', 1, 'val1'], [1, 'k2', 1, 'newVal'], [1, 'k3', 1, 'val3']])
 
         if self.cluster.version() >= '2.1':
             assert_one(cursor,
-            """
-              BEGIN BATCH
-                UPDATE test SET v='newVal1' WHERE id=1 AND k='k2' IF v='val2';
-                UPDATE test SET v='newVal2' WHERE id=1 AND k='k2' IF v='val3';
-              APPLY BATCH
-            """, [False, 1, 'k2', 'newVal'])
+                       """
+                         BEGIN BATCH
+                           UPDATE test SET v='newVal1' WHERE id=1 AND k='k2' IF v='val2';
+                           UPDATE test SET v='newVal2' WHERE id=1 AND k='k2' IF v='val3';
+                         APPLY BATCH
+                       """, [False, 1, 'k2', 'newVal'])
         else:
             assert_invalid(cursor,
-            """
-              BEGIN BATCH
-                UPDATE test SET v='newVal1' WHERE id=1 AND k='k2' IF v='val2';
-                UPDATE test SET v='newVal2' WHERE id=1 AND k='k2' IF v='val3';
-              APPLY BATCH
-            """)
+                           """
+                             BEGIN BATCH
+                               UPDATE test SET v='newVal1' WHERE id=1 AND k='k2' IF v='val2';
+                               UPDATE test SET v='newVal2' WHERE id=1 AND k='k2' IF v='val3';
+                             APPLY BATCH
+                           """)
 
     @since('2.0')
     def static_columns_with_2i_test(self):
@@ -4987,7 +4987,7 @@ class TestCQL(Tester):
             WITH replication = {'class':'SimpleStrategy', 'replication_factor':1} and durable_writes = true
             """)
         assert_one(cursor, "select durable_writes from system.schema_keyspaces where keyspace_name = 'my_test_ks';",
-            [True], cl=ConsistencyLevel.ALL)
+                   [True], cl=ConsistencyLevel.ALL)
 
         # unsuccessful create since it's already there, confirm settings don't change
         cursor.execute("""
@@ -4996,7 +4996,7 @@ class TestCQL(Tester):
             """)
 
         assert_one(cursor, "select durable_writes from system.schema_keyspaces where keyspace_name = 'my_test_ks';",
-            [True], cl=ConsistencyLevel.ALL)
+                   [True], cl=ConsistencyLevel.ALL)
 
         # drop and confirm
         cursor.execute("""
@@ -5024,9 +5024,9 @@ class TestCQL(Tester):
             """)
 
         assert_one(cursor,
-            """select comment from system.schema_columnfamilies
-               where keyspace_name = 'my_test_ks' and columnfamily_name = 'my_test_table'""",
-            ['foo'])
+                   """select comment from system.schema_columnfamilies
+                      where keyspace_name = 'my_test_ks' and columnfamily_name = 'my_test_table'""",
+                   ['foo'])
 
         # unsuccessful create since it's already there, confirm settings don't change
         cursor.execute("""
@@ -5036,9 +5036,9 @@ class TestCQL(Tester):
             """)
 
         assert_one(cursor,
-            """select comment from system.schema_columnfamilies
-               where keyspace_name = 'my_test_ks' and columnfamily_name = 'my_test_table'""",
-            ['foo'])
+                   """select comment from system.schema_columnfamilies
+                      where keyspace_name = 'my_test_ks' and columnfamily_name = 'my_test_table'""",
+                   ['foo'])
 
         # drop and confirm
         cursor.execute("""
@@ -5046,8 +5046,8 @@ class TestCQL(Tester):
             """)
 
         assert_none(cursor,
-            """select * from system.schema_columnfamilies
-               where keyspace_name = 'my_test_ks' and columnfamily_name = 'my_test_table'""")
+                    """select * from system.schema_columnfamilies
+                       where keyspace_name = 'my_test_ks' and columnfamily_name = 'my_test_table'""")
 
     @since('2.0')
     def conditional_ddl_index_test(self):
