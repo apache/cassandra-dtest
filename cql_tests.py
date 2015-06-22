@@ -50,7 +50,9 @@ class TestCQL(Tester):
         return session
 
     def static_cf_test(self):
-        """ Test static CF syntax """
+        """
+        Test static CF syntax.
+        """
         cursor = self.prepare()
 
         # Create
@@ -97,7 +99,9 @@ class TestCQL(Tester):
         ], res
 
     def large_collection_errors(self):
-        """ For large collections, make sure that we are printing warnings """
+        """
+        For large collections, make sure that we are printing warnings.
+        """
 
         # We only warn with protocol 2
         cursor = self.prepare(protocol_version=2)
@@ -122,7 +126,9 @@ class TestCQL(Tester):
         node1.watch_log_for("Detected collection for table ks.maps with 70000 elements, more than the 65535 limit. Only the first 65535 elements will be returned to the client. Please see http://cassandra.apache.org/doc/cql3/CQL.html#collections for more details.")
 
     def noncomposite_static_cf_test(self):
-        """ Test non-composite static CF syntax """
+        """
+        Test non-composite static CF syntax.
+        """
         cursor = self.prepare()
 
         # Create
@@ -169,7 +175,9 @@ class TestCQL(Tester):
         ], res
 
     def dynamic_cf_test(self):
-        """ Test non-composite dynamic CF syntax """
+        """
+        Test non-composite dynamic CF syntax.
+        """
         cursor = self.prepare()
 
         cursor.execute("""
@@ -206,7 +214,9 @@ class TestCQL(Tester):
         assert_invalid(cursor, "INSERT INTO clicks (userid, url, time) VALUES (810e8500-e29b-41d4-a716-446655440000, '', 42)")
 
     def dense_cf_test(self):
-        """ Test composite 'dense' CF syntax """
+        """
+        Test composite 'dense' CF syntax.
+        """
         cursor = self.prepare()
 
         cursor.execute("""
@@ -262,7 +272,9 @@ class TestCQL(Tester):
         self.assertEqual([], res)
 
     def sparse_cf_test(self):
-        """ Test composite 'sparse' CF syntax """
+        """
+        Test composite 'sparse' CF syntax.
+        """
         cursor = self.prepare()
 
         cursor.execute("""
@@ -300,7 +312,9 @@ class TestCQL(Tester):
         ], res
 
     def create_invalid_test(self):
-        """ Check invalid CREATE TABLE requests """
+        """
+        Check invalid CREATE TABLE requests.
+        """
 
         cursor = self.prepare()
 
@@ -319,7 +333,9 @@ class TestCQL(Tester):
 
     @freshCluster()
     def limit_ranges_test(self):
-        """ Validate LIMIT option for 'range queries' in SELECT statements """
+        """
+        Validate LIMIT option for 'range queries' in SELECT statements.
+        """
         cursor = self.prepare(ordered=True)
 
         cursor.execute("""
@@ -344,7 +360,9 @@ class TestCQL(Tester):
         assert rows_to_list(res) == [[3, 'http://foo.com', 42]], res
 
     def limit_multiget_test(self):
-        """ Validate LIMIT option for 'multiget' in SELECT statements """
+        """
+        Validate LIMIT option for 'multiget' in SELECT statements.
+        """
         cursor = self.prepare()
 
         cursor.execute("""
@@ -389,8 +407,11 @@ class TestCQL(Tester):
 
     @require("7281")
     def tuple_query_mixed_order_columns_test(self):
-        """CASSANDRA-7281: SELECT on tuple relations are broken for mixed ASC/DESC clustering order
+        """
+        @jira_ticket CASSANDRA-7281
 
+        Regression test for broken SELECT statements on tuple relations with
+        mixed ASC/DESC clustering order.
         """
         cursor = self.prepare()
 
@@ -401,8 +422,11 @@ class TestCQL(Tester):
 
     @require("7281")
     def tuple_query_mixed_order_columns_test2(self):
-        """CASSANDRA-7281: SELECT on tuple relations are broken for mixed ASC/DESC clustering order
+        """
+        @jira_ticket CASSANDRA-7281
 
+        Regression test for broken SELECT statements on tuple relations with
+        mixed ASC/DESC clustering order.
         """
         cursor = self.prepare()
 
@@ -413,8 +437,11 @@ class TestCQL(Tester):
 
     @require("7281")
     def tuple_query_mixed_order_columns_test3(self):
-        """CASSANDRA-7281: SELECT on tuple relations are broken for mixed ASC/DESC clustering order
+        """
+        @jira_ticket CASSANDRA-7281
 
+        Regression test for broken SELECT statements on tuple relations with
+        mixed ASC/DESC clustering order.
         """
         cursor = self.prepare()
 
@@ -425,8 +452,11 @@ class TestCQL(Tester):
 
     @require("7281")
     def tuple_query_mixed_order_columns_test4(self):
-        """CASSANDRA-7281: SELECT on tuple relations are broken for mixed ASC/DESC clustering order
+        """
+        @jira_ticket CASSANDRA-7281
 
+        Regression test for broken SELECT statements on tuple relations with
+        mixed ASC/DESC clustering order.
         """
         cursor = self.prepare()
 
@@ -437,8 +467,10 @@ class TestCQL(Tester):
 
     @require("7281")
     def tuple_query_mixed_order_columns_test5(self):
-        """CASSANDRA-7281: SELECT on tuple relations are broken for mixed ASC/DESC clustering order
-            Test that non mixed columns are still working.
+        """
+        @jira_ticket CASSANDRA-7281
+
+        Test that tuple relations with non-mixed ASC/DESC order still works.
         """
         cursor = self.prepare()
 
@@ -461,7 +493,10 @@ class TestCQL(Tester):
 
     @require("7281")
     def tuple_query_mixed_order_columns_test7(self):
-        """CASSANDRA-7281: SELECT on tuple relations are broken for mixed ASC/DESC clustering order
+        """
+        @jira_ticket CASSANDRA-7281
+
+        Test that tuple relations with non-mixed ASC/DESC order still works.
         """
         cursor = self.prepare()
 
@@ -472,7 +507,10 @@ class TestCQL(Tester):
 
     @require("7281")
     def tuple_query_mixed_order_columns_test8(self):
-        """CASSANDRA-7281: SELECT on tuple relations are broken for mixed ASC/DESC clustering order
+        """
+        @jira_ticket CASSANDRA-7281
+
+        Test that tuple relations with non-mixed ASC/DESC order still works.
         """
         cursor = self.prepare()
 
@@ -483,7 +521,10 @@ class TestCQL(Tester):
 
     @require("7281")
     def tuple_query_mixed_order_columns_test9(self):
-        """CASSANDRA-7281: SELECT on tuple relations are broken for mixed ASC/DESC clustering order
+        """
+        @jira_ticket CASSANDRA-7281
+
+        Test that tuple relations with non-mixed ASC/DESC order still works.
         """
         cursor = self.prepare()
 
@@ -493,7 +534,9 @@ class TestCQL(Tester):
                                      [0, 0, 1, 0, 2], [0, -1, 2, 2, 2]], res
 
     def simple_tuple_query_test(self):
-        """Covers CASSANDRA-8613"""
+        """
+        @jira_ticket CASSANDRA-8613
+        """
         cursor = self.prepare()
 
         cursor.execute("create table bard (a int, b int, c int, d int , e int, PRIMARY KEY (a, b, c, d, e))")
@@ -510,7 +553,9 @@ class TestCQL(Tester):
         assert rows_to_list(res) == [[0, 0, 2, 2, 2], [0, 0, 3, 3, 3]]
 
     def limit_sparse_test(self):
-        """ Validate LIMIT option for sparse table in SELECT statements """
+        """
+        Validate LIMIT option for sparse table in SELECT statements.
+        """
         cursor = self.prepare()
 
         cursor.execute("""
@@ -535,7 +580,9 @@ class TestCQL(Tester):
         assert len(res) == 4, res
 
     def counters_test(self):
-        """ Validate counter support """
+        """
+        Validate counter support.
+        """
         cursor = self.prepare()
 
         cursor.execute("""
@@ -591,7 +638,9 @@ class TestCQL(Tester):
         assert rows_to_list(res) == [['Samwise']], res
 
     def select_key_in_test(self):
-        """ Query for KEY IN (...) """
+        """
+        Query for KEY IN (...).
+        """
         cursor = self.prepare()
 
         # Create
@@ -623,7 +672,9 @@ class TestCQL(Tester):
         assert len(res) == 2, res
 
     def exclusive_slice_test(self):
-        """ Test SELECT respects inclusive and exclusive bounds """
+        """
+        Test SELECT respects inclusive and exclusive bounds.
+        """
         cursor = self.prepare()
 
         cursor.execute("""
@@ -2168,14 +2219,22 @@ class TestCQL(Tester):
         assert_invalid(cursor, "select * from t1 where col2 in ('bar1', 'bar2');")
 
     def validate_counter_regular_test(self):
-        """ Test for the validation bug of #4706 """
+        """
+        @jira_ticket CASSANDRA-4706
+
+        Regression test for a validation bug.
+        """
 
         cursor = self.prepare()
         assert_invalid(cursor, "CREATE TABLE test (id bigint PRIMARY KEY, count counter, things set<text>)",
                        matching=r"Cannot add a( non)? counter column", expected=ConfigurationException)
 
     def reversed_compact_test(self):
-        """ Test for #4716 bug and more generally for good behavior of ordering"""
+        """
+        @jira_ticket CASSANDRA-4716
+
+        Regression test for #4716 bug and more generally for good behavior of ordering.
+        """
 
         cursor = self.prepare()
         cursor.execute("""
@@ -2240,6 +2299,9 @@ class TestCQL(Tester):
         assert rows_to_list(res) == [[6], [5], [4], [3], [2]], res
 
     def unescaped_string_test(self):
+        """
+        Test that unescaped strings in CQL statements raise syntax exceptions.
+        """
 
         cursor = self.prepare()
         cursor.execute("""
@@ -2255,7 +2317,12 @@ class TestCQL(Tester):
         assert_invalid(cursor, "INSERT INTO test (k, c) VALUES ('foo', 'CQL is cassandra\'s best friend')", expected=SyntaxException)
 
     def reversed_compact_multikey_test(self):
-        """ Test for the bug from #4760 and #4759 """
+        """
+        @jira_ticket CASSANDRA-4760
+        @jira_ticket CASSANDRA-4759
+
+        Regression test for two related tickets.
+        """
 
         cursor = self.prepare()
         cursor.execute("""
@@ -2597,7 +2664,12 @@ class TestCQL(Tester):
         assert len(res) == nb_keys / 2, "Expected %d but got %d" % (nb_keys / 2, len(res))
 
     def alter_with_collections_test(self):
-        """ Test you can add columns in a table with collections (#4982 bug) """
+        """
+        @jira_ticket CASSANDRA-4982
+
+        Test you can add columns in a table with collections. Regression test
+        for CASSANDRA-4982.
+        """
         cursor = self.prepare()
 
         cursor.execute("CREATE TABLE collections (key int PRIMARY KEY, aset set<text>)")
@@ -2652,7 +2724,11 @@ class TestCQL(Tester):
         """, expected=(InvalidRequest, SyntaxException))
 
     def composite_partition_key_validation_test(self):
-        """ Test for bug from #5122 """
+        """
+        @jira_ticket CASSANDRA-5122
+
+        Regression test for CASSANDRA-5122.
+        """
         cursor = self.prepare()
 
         cursor.execute("CREATE TABLE foo (a int, b text, c uuid, PRIMARY KEY ((a, b)));")
@@ -2768,7 +2844,9 @@ class TestCQL(Tester):
         assert rows_to_list(res) == [[0, 0, 0], [0, 2, 2]], res
 
     def large_clustering_in_test(self):
-        # Test for CASSANDRA-8410
+        """
+        @jira_ticket CASSANDRA-8410
+        """
         cursor = self.prepare()
 
         cursor.execute("""
@@ -2856,7 +2934,11 @@ class TestCQL(Tester):
         cursor.execute("INSERT INTO test(k, d, f) VALUES (2, 3, -2)")
 
     def compact_metadata_test(self):
-        """ Test regression from #5189 """
+        """
+        @jira_ticket CASSANDRA-5189
+
+        Regression test for CASSANDRA-5189.
+        """
         cursor = self.prepare()
 
         cursor.execute("""
@@ -3031,7 +3113,9 @@ class TestCQL(Tester):
         assert rows_to_list(res) == [[3, 'foobar']], res
 
     def alter_bug_test(self):
-        """ Test for bug of 5232 """
+        """
+        @jira_ticket CASSANDRA-5232
+        """
         cursor = self.prepare()
 
         cursor.execute("CREATE TABLE t1 (id int PRIMARY KEY, t text);")
@@ -3065,7 +3149,9 @@ class TestCQL(Tester):
         assert_invalid(cursor, "select * from test where key = 'foo' and c in (1,3,4);")
 
     def function_and_reverse_type_test(self):
-        """ Test for #5386 """
+        """
+        @jira_ticket CASSANDRA-5386
+        """
 
         cursor = self.prepare()
         cursor.execute("""
@@ -3345,7 +3431,9 @@ class TestCQL(Tester):
         assert_invalid(cursor, 'SELECT id AS user_id, name AS user_name FROM users WHERE id IN (0) ORDER BY user_name', matching="Aliases are not allowed in order by clause")
 
     def nonpure_function_collection_test(self):
-        """ Test for bug #5795 """
+        """
+        @jira_ticket CASSANDRA-5795
+        """
 
         cursor = self.prepare()
         cursor.execute("CREATE TABLE test (k int PRIMARY KEY, v list<timeuuid>)")
@@ -3398,7 +3486,9 @@ class TestCQL(Tester):
         assert_nothing_changed("test_compact")
 
     def collection_flush_test(self):
-        """ Test for 5805 bug """
+        """
+        @jira_ticket CASSANDRA-5805
+        """
         cursor = self.prepare()
 
         cursor.execute("CREATE TABLE test (k int PRIMARY KEY, s set<int>)")
@@ -3624,7 +3714,10 @@ class TestCQL(Tester):
 
     @since('2.1')
     def more_user_types_test(self):
-        """ user type test that does a little more nesting"""
+        """
+        Test creating tables with nested user types, then inserting into and
+        selecting from them.
+        """
 
         cursor = self.prepare()
 
@@ -4117,7 +4210,10 @@ class TestCQL(Tester):
             self.assertEqual(range(10), sorted([r[1] for r in rows]))
 
     def select_count_paging_test(self):
-        """ Test for the #6579 'select count' paging bug """
+        """
+        @jira_ticket CASSANDRA-6579
+        Regression test for 'select count' paging bug.
+        """
 
         cursor = self.prepare()
         cursor.execute("create table test(field1 text, field2 timeuuid, field3 boolean, primary key(field1, field2));")
@@ -4143,7 +4239,11 @@ class TestCQL(Tester):
 
     @since('2.0')
     def tuple_notation_test(self):
-        """ Test the syntax introduced by #4851 """
+        """
+        @jira_ticket CASSANDRA-4851
+
+        Test for new tuple syntax introduced in CASSANDRA-4851.
+        """
         cursor = self.prepare()
 
         cursor.execute("CREATE TABLE test (k int, v1 int, v2 int, v3 int, PRIMARY KEY (k, v1, v2, v3))")
@@ -4169,7 +4269,9 @@ class TestCQL(Tester):
 
     @since('2.1.1')
     def test_v2_protocol_IN_with_tuples(self):
-        """ Test for CASSANDRA-8062 """
+        """
+        @jira_ticket CASSANDRA-8062
+        """
         cursor = self.prepare()
         cursor = self.cql_connection(self.cluster.nodelist()[0], keyspace='ks', protocol_version=2)
         cursor.execute("CREATE TABLE test (k int, c1 int, c2 text, PRIMARY KEY (k, c1, c2))")
@@ -4228,7 +4330,11 @@ class TestCQL(Tester):
 
     @since('2.0')
     def cas_and_compact_test(self):
-        """ Test for CAS with compact storage table, and #6813 in particular """
+        """
+        @jira_ticket CASSANDRA-6813
+
+        Test for CAS with compact storage table, and #6813 in particular.
+        """
         cursor = self.prepare()
 
         cursor.execute("""
@@ -4348,7 +4454,11 @@ class TestCQL(Tester):
 
     @since('2.1.1')
     def expanded_list_item_conditional_test(self):
-        # expanded functionality from CASSANDRA-6839
+        """
+        @jira_ticket CASSANDRA-6839
+
+        Test new features introduced in CASSANDRA-6839.
+        """
 
         cursor = self.prepare()
 
@@ -4643,7 +4753,9 @@ class TestCQL(Tester):
 
     @since("2.1.1")
     def cas_and_list_index_test(self):
-        """ Test for 7499 test """
+        """
+        @jira_ticket CASSANDRA-7499
+        """
         cursor = self.prepare()
 
         cursor.execute("""
@@ -4663,7 +4775,11 @@ class TestCQL(Tester):
 
     @since("2.0")
     def static_with_limit_test(self):
-        """ Test LIMIT when static columns are present (#6956) """
+        """
+        @jira_ticket CASSANDRA-6956
+
+        Test LIMIT when static columns are present.
+        """
         cursor = self.prepare()
 
         cursor.execute("""
@@ -4685,7 +4801,11 @@ class TestCQL(Tester):
 
     @since("2.0")
     def static_with_empty_clustering_test(self):
-        """ Test for bug of #7455 """
+        """
+        @jira_ticket CASSANDRA-7455
+
+        Regression test for CASSANDRA-7455.
+        """
         cursor = self.prepare()
 
         cursor.execute("""
@@ -4705,7 +4825,11 @@ class TestCQL(Tester):
 
     @since("1.2")
     def limit_compact_table(self):
-        """ Check for #7052 bug """
+        """
+        @jira_ticket CASSANDRA-7052
+
+        Regression test for CASSANDRA-7052.
+        """
         cursor = self.prepare()
 
         cursor.execute("""
@@ -4731,7 +4855,11 @@ class TestCQL(Tester):
         #assert_all(cursor, "SELECT * FROM test WHERE v > 1 AND v <= 3 LIMIT 6 ALLOW FILTERING", [[1, 2], [1, 3], [0, 2], [0, 3], [2, 2], [2, 3]])
 
     def key_index_with_reverse_clustering(self):
-        """ Test for #6950 bug """
+        """
+        @jira_ticket CASSANDRA-6950
+
+        Regression test for CASSANDRA-6950.
+        """
         cursor = self.prepare()
 
         cursor.execute("""
@@ -4793,7 +4921,11 @@ class TestCQL(Tester):
 
     @since('1.2')
     def clustering_order_in_test(self):
-        """Test for #7105 bug"""
+        """
+        @jira_ticket CASSANDRA-7105
+
+        Regression test for CASSANDRA-7105.
+        """
         cursor = self.prepare()
 
         cursor.execute("""
@@ -4813,7 +4945,11 @@ class TestCQL(Tester):
 
     @since('1.2')
     def bug7105_test(self):
-        """Test for #7105 bug"""
+        """
+        @jira_ticket CASSANDRA-7105
+
+        Regression test for CASSANDRA-7105.
+        """
         cursor = self.prepare()
 
         cursor.execute("""
@@ -5025,7 +5161,9 @@ class TestCQL(Tester):
         assert_invalid(cursor, "ALTER TABLE foo ADD bar2 text static")
 
     def drop_and_readd_collection_test(self):
-        """ Test for 6276 """
+        """
+        @jira_ticket CASSANDRA-6276
+        """
         cursor = self.prepare()
 
         cursor.execute("create table test (k int primary key, v set<text>, x int)")
@@ -5035,7 +5173,9 @@ class TestCQL(Tester):
         assert_invalid(cursor, "alter table test add v set<int>")
 
     def downgrade_to_compact_bug_test(self):
-        """ Test for 7744 """
+        """
+        @jira_ticket CASSANDRA-7744
+        """
         cursor = self.prepare()
 
         cursor.execute("create table test (k int primary key, v set<text>)")
@@ -5045,7 +5185,9 @@ class TestCQL(Tester):
         cursor.execute("alter table test add v int")
 
     def invalid_string_literals_test(self):
-        """ Test for CASSANDRA-8101 """
+        """
+        @jira_ticket CASSANDRA-8101
+        """
         cursor = self.prepare()
         assert_invalid(cursor, u"insert into invalid_string_literals (k, a) VALUES (0, '\u038E\u0394\u03B4\u03E0')")
 
@@ -5069,6 +5211,9 @@ class TestCQL(Tester):
     @since('3.0')
     @require("7396")
     def select_map_key_single_row_test(self):
+        """
+        @jira_ticket CASSANDRA-7396
+        """
         cursor = self.prepare()
 
         cursor.execute("CREATE TABLE test (k int PRIMARY KEY, v map<int, text>)")
@@ -5092,6 +5237,9 @@ class TestCQL(Tester):
     @since('3.0')
     @require("7396")
     def select_set_key_single_row_test(self):
+        """
+        @jira_ticket CASSANDRA-7396
+        """
         cursor = self.prepare()
 
         cursor.execute("CREATE TABLE test (k int PRIMARY KEY, v set<text>)")
@@ -5118,6 +5266,9 @@ class TestCQL(Tester):
     @since('3.0')
     @require("7396")
     def select_list_key_single_row_test(self):
+        """
+        @jira_ticket CASSANDRA-7396
+        """
         cursor = self.prepare()
 
         cursor.execute("CREATE TABLE test (k int PRIMARY KEY, v list<text>)")
@@ -5141,6 +5292,9 @@ class TestCQL(Tester):
     @since('3.0')
     @require("7396")
     def select_map_key_multi_row_test(self):
+        """
+        @jira_ticket CASSANDRA-7396
+        """
         cursor = self.prepare()
 
         cursor.execute("CREATE TABLE test (k int PRIMARY KEY, v map<int, text>)")
@@ -5165,6 +5319,9 @@ class TestCQL(Tester):
     @since('3.0')
     @require("7396")
     def select_set_key_multi_row_test(self):
+        """
+        @jira_ticket CASSANDRA-7396
+        """
         cursor = self.prepare()
 
         cursor.execute("CREATE TABLE test (k int PRIMARY KEY, v set<text>)")
@@ -5191,6 +5348,9 @@ class TestCQL(Tester):
     @since('3.0')
     @require("7396")
     def select_list_key_multi_row_test(self):
+        """
+        @jira_ticket CASSANDRA-7396
+        """
         cursor = self.prepare()
 
         cursor.execute("CREATE TABLE test (k int PRIMARY KEY, v list<text>)")
@@ -5212,7 +5372,9 @@ class TestCQL(Tester):
 
     @since('2.1')
     def prepared_statement_invalidation_test(self):
-        # test for CASSANDRA-7910
+        """
+        @jira_ticket CASSANDRA-7910
+        """
         cursor = self.prepare()
 
         cursor.execute("CREATE TABLE test (k int PRIMARY KEY, a int, b int, c int)")
@@ -5298,6 +5460,12 @@ class TestCQL(Tester):
 
     @require(9565)
     def double_with_npe_test(self):
+        """
+        @jira_ticket CASSANDRA-9565
+
+        Regression test for a null pointer exception that occurred in the CQL
+        parser when parsing a statement that erroneously used 'WITH WITH'.
+        """
         session = self.prepare()
         statements = ['ALTER KEYSPACE WITH WITH DURABLE_WRITES = true',
                       'ALTER KEYSPACE ks WITH WITH DURABLE_WRITES = true',
