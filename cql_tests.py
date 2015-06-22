@@ -2171,12 +2171,8 @@ class TestCQL(Tester):
         """ Test for the validation bug of #4706 """
 
         cursor = self.prepare()
-        if self.cluster.version() < "3":
-            assert_invalid(cursor, "CREATE TABLE test (id bigint PRIMARY KEY, count counter, things set<text>)",
-                           matching=r"Cannot add a( non)? counter column", expected=ConfigurationException)
-        else:
-            assert_invalid(cursor, "CREATE TABLE test (id bigint PRIMARY KEY, count counter, things set<text>)",
-                           matching=r"Cannot mix counter and non counter columns in the same table")
+        assert_invalid(cursor, "CREATE TABLE test (id bigint PRIMARY KEY, count counter, things set<text>)",
+                       matching=r"Cannot add a( non)? counter column", expected=ConfigurationException)
 
     def reversed_compact_test(self):
         """ Test for #4716 bug and more generally for good behavior of ordering"""
