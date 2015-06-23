@@ -20,7 +20,7 @@ from cassandra.query import SimpleStatement
 # other tests will focus on single upgrades from UPGRADE_PATH[n] to UPGRADE_PATH[n+1]
 
 TRUNK_VER = (3, 0)
-DEFAULT_PATH = [(2, 1), TRUNK_VER]
+DEFAULT_PATH = [(2, 1), (2, 2), TRUNK_VER]
 
 CUSTOM_PATH = os.environ.get('UPGRADE_PATH', None)
 if CUSTOM_PATH:
