@@ -114,6 +114,8 @@ class PageFetcher(object):
         while time.time() < expiry:
             if self.requested_pages == (self.retrieved_pages + self.retrieved_empty_pages):
                 return self
+            # small wait so we don't need excess cpu to keep checking
+            time.sleep(0.1)
 
         raise RuntimeError(
                 "Requested pages were not delivered before timeout." + \
