@@ -274,7 +274,7 @@ class TestUpgradeThroughVersions(Tester):
             debug('Starting %s on new version (%s)' % (node.name, tag))
             # Setup log4j / logback again (necessary moving from 2.0 -> 2.1):
             node.set_log_level("INFO")
-            node.start(wait_other_notice=True)
+            node.start(wait_other_notice=True, wait_for_binary_proto=True)
             node.nodetool('upgradesstables -a')
 
     def _log_current_ver(self, current_tag):
