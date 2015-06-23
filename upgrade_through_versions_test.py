@@ -439,7 +439,7 @@ class PointToPointUpgradeBase(TestUpgradeThroughVersions):
         # Check we can bootstrap a new node on the upgraded cluster:
         debug("Adding a node to the cluster")
         nnode = new_node(self.cluster, remote_debug_port=str(2000 + len(self.cluster.nodes)))
-        nnode.start(use_jna=True, wait_other_notice=True)
+        nnode.start(use_jna=True, wait_other_notice=True, wait_for_binary_proto=True)
         self._write_values()
         self._increment_counters()
         self._check_values()
@@ -450,7 +450,7 @@ class PointToPointUpgradeBase(TestUpgradeThroughVersions):
         debug("Adding a node to the cluster")
         nnode = new_node(self.cluster, remote_debug_port=str(2000 + len(self.cluster.nodes)), data_center='dc2')
 
-        nnode.start(use_jna=True, wait_other_notice=True)
+        nnode.start(use_jna=True, wait_other_notice=True, wait_for_binary_proto=True)
         self._write_values()
         self._increment_counters()
         self._check_values()
@@ -464,7 +464,7 @@ class PointToPointUpgradeBase(TestUpgradeThroughVersions):
         # try and add a new node
         # multi dc, 2 nodes in each dc
         self.cluster.populate([2, 2])
-        [node.start(use_jna=True) for node in self.cluster.nodelist()]
+        [node.start(use_jna=True, wait_for_binary_proto=True) for node in self.cluster.nodelist()]
         self._multidc_schema_create()
         self.upgrade_scenario(populate=False, create_schema=False, after_upgrade_call=(self._bootstrap_new_node_multidc,))
 
