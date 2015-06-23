@@ -15,8 +15,9 @@ class TestCompaction(Tester):
         Tester.__init__(self, *args, **kwargs)
 
     def compaction_delete_test(self):
-        """Test that executing a delete properly tombstones a row.
-        Insert data, delete a partition of data and check that the requesite rows are tombstoned
+        """
+        Test that executing a delete properly tombstones a row.
+        Insert data, delete a partition of data and check that the requesite rows are tombstoned.
         """
         cluster = self.cluster
         cluster.populate(1).start(wait_for_binary_proto=True)
@@ -51,7 +52,8 @@ class TestCompaction(Tester):
         self.assertEqual(numfound, 10)
 
     def data_size_test(self):
-        """Ensure that data size does not have unwarranted increases after compaction.
+        """
+        Ensure that data size does not have unwarranted increases after compaction.
         Insert data and check data size before and after a compaction.
         """
         cluster = self.cluster
@@ -85,7 +87,8 @@ class TestCompaction(Tester):
         self.assertLess(finalValue, initialValue)
 
     def sstable_deletion_test(self):
-        """Test that sstables are deleted properly when able to be.
+        """
+        Test that sstables are deleted properly when able after compaction.
         Insert data setting gc_grace_seconds to 0, and determine sstable
         is deleted upon data deletion.
         """
@@ -115,7 +118,9 @@ class TestCompaction(Tester):
             self.fail("Path to sstables not valid.")
 
     def dtcs_deletion_test(self):
-        """Test that sstables are deleted properly when able to be.
+        """
+        Test that sstables are deleted properly when able after compaction with
+        DateTieredCompactionStrategy.
         Insert data setting max_sstable_age_days low, and determine sstable
         is deleted upon data deletion past max_sstable_age_days.
         """
@@ -148,7 +153,8 @@ class TestCompaction(Tester):
         assert expired_sstable not in node1.get_sstables('ks', 'cf')
 
     def compaction_throughput_test(self):
-        """Test setting compaction throughput.
+        """
+        Test setting compaction throughput.
         Set throughput, insert data and ensure compaction performance corresponds.
         """
         cluster = self.cluster
