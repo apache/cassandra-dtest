@@ -154,8 +154,10 @@ class TestCompaction(Tester):
         cluster = self.cluster
         cluster.populate(1).start(wait_for_binary_proto=True)
         [node1] = cluster.nodelist()
+
+        # disableautocompaction only disables compaction for existing tables,
+        # so initialize stress tables with stress first
         stress_write(node1, keycount=1)
-        # disableautocompaction only disables compaction for existing tables, so disable after creating tables:
         node1.nodetool('disableautocompaction')
         stress_write(node1, keycount=200000)
 
