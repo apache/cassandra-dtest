@@ -20,7 +20,7 @@ from cassandra.query import SimpleStatement
 # other tests will focus on single upgrades from UPGRADE_PATH[n] to UPGRADE_PATH[n+1]
 
 TRUNK_VER = (3, 0)
-DEFAULT_PATH = [(1, 2), (2, 0), (2, 1), TRUNK_VER]
+DEFAULT_PATH = [(2, 1), TRUNK_VER]
 
 CUSTOM_PATH = os.environ.get('UPGRADE_PATH', None)
 if CUSTOM_PATH:
@@ -178,7 +178,7 @@ class TestUpgradeThroughVersions(Tester):
             # Start with 3 node cluster
             debug('Creating cluster (%s)' % self.test_versions[0])
             cluster.populate(3)
-            [node.start(use_jna=True) for node in cluster.nodelist()]
+            [node.start(use_jna=True, wait_for_binary_proto=True) for node in cluster.nodelist()]
         else:
             debug("Skipping cluster creation (should already be built)")
 
