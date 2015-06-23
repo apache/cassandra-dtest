@@ -249,10 +249,9 @@ def block_on_compaction_log(node):
 
 def stress_write(node, keycount=100000):
     if node.get_cassandra_version() < '2.1':
-        node.stress(['--num-keys=%d'%keycount])
+        node.stress(['--num-keys={keycount}'.format(keycount=keycount)])
     else:
-        node.stress(['write', 'n=%d'%keycount])
-
+        node.stress(['write', 'n={keycount}'.format(keycount=keycount)])
 
 
 strategies = ['LeveledCompactionStrategy', 'SizeTieredCompactionStrategy', 'DateTieredCompactionStrategy']
