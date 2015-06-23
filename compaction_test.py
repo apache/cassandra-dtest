@@ -154,10 +154,12 @@ class TestCompaction(Tester):
         cluster = self.cluster
         cluster.populate(1).start(wait_for_binary_proto=True)
         [node1] = cluster.nodelist()
+        stress_write(node1, keycount=1)
+        # disableautocompaction only disables compaction for existing tables, so disable after creating tables:
+        node1.nodetool('disableautocompaction')
+        stress_write(node1, keycount=200000)
 
-        stress_write(node1)
-
-        threshold = "10"
+        threshold = "5"
 
         node1.nodetool('setcompactionthroughput -- ' + threshold)
 
@@ -174,7 +176,7 @@ class TestCompaction(Tester):
         avgthroughput = re.match(throughput_pattern, stringline).group(1).strip()
         debug(avgthroughput)
 
-        self.assertGreaterEqual(float(threshold) * 1.25, float(avgthroughput))
+        assert_almost_equal(float(threshold), float(avgthroughput), error=0.1)
 
     def compaction_strategy_switching_test(self):
         """Ensure that switching strategies does not result in problems.
@@ -237,15 +239,20 @@ def block_on_compaction_log(node):
     """
     mark = node.mark_log()
     node.flush()
-    node.nodetool('compact')
+    if node.get_cassandra_version() < '2.1':
+        node.nodetool('compact Keyspace1 Standard1')
+    else:
+        node.nodetool('compact keyspace1 standard1')
+
     return node.watch_log_for('Compacted', from_mark=mark)
 
 
-def stress_write(node):
+def stress_write(node, keycount=100000):
     if node.get_cassandra_version() < '2.1':
-        node.stress(['--num-keys=100000'])
+        node.stress(['--num-keys=%d'%keycount])
     else:
-        node.stress(['write', 'n=100000'])
+        node.stress(['write', 'n=%d'%keycount])
+
 
 
 strategies = ['LeveledCompactionStrategy', 'SizeTieredCompactionStrategy', 'DateTieredCompactionStrategy']
