@@ -1,8 +1,6 @@
 from dtest import Tester, debug, DISABLE_VNODES
-from assertions import assert_unavailable, assert_none
-from tools import require, create_c1c2_table, insert_c1c2, query_c1c2, insert_columns, rows_to_list
+from tools import require, create_c1c2_table, insert_c1c2, query_c1c2
 from cassandra import ConsistencyLevel
-from cassandra.query import SimpleStatement
 
 @require("9035")
 class TestHintedHandoff(Tester):
@@ -29,7 +27,7 @@ class TestHintedHandoff(Tester):
         Launch a nodetool command and check there is no error, return the result
         """
         out, err = node.nodetool(cmd, capture_output=True)
-        assert len(err) == 0
+        self.assertEqual('', err)
         return out
 
     def _do_hinted_handoff(self, node1, node2, enabled):
@@ -37,7 +35,7 @@ class TestHintedHandoff(Tester):
         Test that if we stop one node the other one
         will store hints only when hinted handoff is enabled
         """
-        cursor = self.patient_cql_connection(node1)
+        cursor = self.patient_exclusive_cql_connection(node1)
         self.create_ks(cursor, 'ks', 2)
         create_c1c2_table(self, cursor)
 
@@ -55,9 +53,12 @@ class TestHintedHandoff(Tester):
         node1.stop(wait_other_notice=True)
 
         # Check node2 for all the keys that should have been delivered via HH if enabled or not if not enabled
-        cursor = self.patient_cql_connection(node2, keyspace='ks')
+        cursor = self.patient_exclusive_cql_connection(node2, keyspace='ks')
         for n in xrange(0, 100):
-            query_c1c2(cursor, n, ConsistencyLevel.ONE, tolerate_missing=not enabled, must_be_missing=not enabled)
+            if enabled:
+                query_c1c2(cursor, n, ConsistencyLevel.ONE)
+            else:
+                query_c1c2(cursor, n, ConsistencyLevel.ONE, tolerate_missing=True, must_be_missing=True)
 
     def nodetool_test(self):
         """
@@ -67,23 +68,23 @@ class TestHintedHandoff(Tester):
 
         for node in node1, node2:
             res = self._launch_nodetool_cmd(node, 'statushandoff')
-            assert res.rstrip() == 'Hinted handoff is running', res
+            self.assertEqual('Hinted handoff is running', res.rstrip())
 
             self._launch_nodetool_cmd(node, 'disablehandoff')
             res = self._launch_nodetool_cmd(node, 'statushandoff')
-            assert res.rstrip() == 'Hinted handoff is not running', res
+            self.assertEqual('Hinted handoff is not running', res.rstrip())
 
             self._launch_nodetool_cmd(node, 'enablehandoff')
             res = self._launch_nodetool_cmd(node, 'statushandoff')
-            assert res.rstrip() == 'Hinted handoff is running', res
+            self.assertEqual('Hinted handoff is running', res.rstrip())
 
             self._launch_nodetool_cmd(node, 'disablehintsfordc dc1')
             res = self._launch_nodetool_cmd(node, 'statushandoff')
-            assert res.rstrip() == 'Hinted handoff is running\nData center dc1 is disabled', res
+            self.assertEqual('Hinted handoff is running\nData center dc1 is disabled', res.rstrip())
 
             self._launch_nodetool_cmd(node, 'enablehintsfordc dc1')
             res = self._launch_nodetool_cmd(node, 'statushandoff')
-            assert res.rstrip() == 'Hinted handoff is running', res
+            self.assertEqual('Hinted handoff is running', res.rstrip())
 
     def hintedhandoff_disabled_test(self):
         """
@@ -93,7 +94,7 @@ class TestHintedHandoff(Tester):
 
         for node in node1, node2:
             res = self._launch_nodetool_cmd(node, 'statushandoff')
-            assert res.rstrip() == 'Hinted handoff is not running', res
+            self.assertEqual('Hinted handoff is not running', res.rstrip())
 
         self._do_hinted_handoff(node1, node2, False)
 
@@ -105,11 +106,11 @@ class TestHintedHandoff(Tester):
 
         for node in node1, node2:
             res = self._launch_nodetool_cmd(node, 'statushandoff')
-            assert res.rstrip() == 'Hinted handoff is running', res
+            self.assertEqual('Hinted handoff is running', res.rstrip())
 
         self._do_hinted_handoff(node1, node2, True)
 
-    def hintedhandoff_dc_disabled(self):
+    def hintedhandoff_dc_disabled_test(self):
         """
         Test global hinted handoff enabled with the dc disabled
         """
@@ -118,12 +119,12 @@ class TestHintedHandoff(Tester):
 
         for node in node1, node2:
             res = self._launch_nodetool_cmd(node, 'statushandoff')
-            assert res.rstrip() == 'Hinted handoff is running\nData center dc1 is disabled', res
+            self.assertEqual('Hinted handoff is running\nData center dc1 is disabled', res.rstrip())
 
         self._do_hinted_handoff(node1, node2, False)
 
 
-    def hintedhandoff_dc_reenabled(self):
+    def hintedhandoff_dc_reenabled_test(self):
         """
         Test global hinted handoff enabled with the dc disabled first and then re-enabled
         """
@@ -132,11 +133,11 @@ class TestHintedHandoff(Tester):
 
         for node in node1, node2:
             res = self._launch_nodetool_cmd(node, 'statushandoff')
-            assert res.rstrip() == 'Hinted handoff is running\nData center dc1 is disabled', res
+            self.assertEqual('Hinted handoff is running\nData center dc1 is disabled', res.rstrip())
 
         for node in node1, node2:
             self._launch_nodetool_cmd(node, 'enablehintsfordc dc1')
             res = self._launch_nodetool_cmd(node, 'statushandoff')
-            assert res.rstrip() == 'Hinted handoff is running', res
+            self.assertEqual('Hinted handoff is running', res.rstrip())
 
         self._do_hinted_handoff(node1, node2, True)
