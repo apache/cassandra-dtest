@@ -20,13 +20,15 @@ def insert_c1c2(session, key, consistency=ConsistencyLevel.QUORUM):
     query = SimpleStatement('UPDATE cf SET c1=\'value1\', c2=\'value2\' WHERE key=\'k%d\'' % key, consistency_level=consistency)
     session.execute(query)
 
-def query_c1c2(session, key, consistency=ConsistencyLevel.QUORUM, tolerate_missing=False):
+def query_c1c2(session, key, consistency=ConsistencyLevel.QUORUM, tolerate_missing=False, must_be_missing=False):
     query = SimpleStatement('SELECT c1, c2 FROM cf WHERE key=\'k%d\'' % key, consistency_level=consistency)
     rows = session.execute(query)
     if not tolerate_missing:
         assert len(rows) == 1
         res = rows[0]
         assert len(res) == 2 and res[0] == 'value1' and res[1] == 'value2', res
+    if must_be_missing:
+        assert len(rows) == 0
 
 # work for cluster started by populate
 def new_node(cluster, bootstrap=True, token=None, remote_debug_port='2000', data_center=None):

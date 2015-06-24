@@ -695,36 +695,6 @@ class TestConsistency(Tester):
         node3.stop()
         assert_none(session, "SELECT * FROM t WHERE id = 0 LIMIT 1", cl=ConsistencyLevel.QUORUM)
 
-    def hintedhandoff_test(self):
-        cluster = self.cluster
-
-        if DISABLE_VNODES:
-            cluster.populate(2).start()
-        else:
-            tokens = cluster.balanced_tokens(2)
-            cluster.populate(2, tokens=tokens).start()
-        node1, node2 = cluster.nodelist()
-
-        cursor = self.patient_cql_connection(node1)
-        self.create_ks(cursor, 'ks', 2)
-        create_c1c2_table(self, cursor)
-
-        node2.stop(wait_other_notice=True)
-
-        for n in xrange(0, 100):
-            insert_c1c2(cursor, n, ConsistencyLevel.ONE)
-
-        log_mark = node1.mark_log()
-        node2.start()
-        node1.watch_log_for(["Finished hinted"], from_mark=log_mark, timeout=120)
-
-        node1.stop(wait_other_notice=True)
-
-        # Check node2 for all the keys that should have been delivered via HH
-        cursor = self.patient_cql_connection(node2, keyspace='ks')
-        for n in xrange(0, 100):
-            query_c1c2(cursor, n, ConsistencyLevel.ONE)
-
     def readrepair_test(self):
         cluster = self.cluster
         cluster.set_configuration_options(values={ 'hinted_handoff_enabled' : False})
