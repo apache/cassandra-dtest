@@ -5,12 +5,11 @@ import random
 import struct
 import time
 from collections import OrderedDict
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from cassandra import AlreadyExists, ConsistencyLevel, InvalidRequest
 from cassandra.concurrent import execute_concurrent_with_args
-from cassandra.protocol import (ConfigurationException,
-                                InvalidRequestException, ProtocolException,
+from cassandra.protocol import (ConfigurationException, ProtocolException,
                                 SyntaxException)
 from cassandra.query import SimpleStatement
 from cassandra.util import sortedset
