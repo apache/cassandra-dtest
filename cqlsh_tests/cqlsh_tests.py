@@ -509,11 +509,12 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
     @require("7814")
     @since('2.1')
     def test_describe(self):
+        """
+            Test for @jira_ticket CASSANDRA-7814
+        """
         self.cluster.populate(1)
-        self.cluster.start()
-
+        self.cluster.start(wait_for_binary_proto=True)
         node1, = self.cluster.nodelist()
-        node1.watch_log_for('thrift clients...')
 
         self.execute(
             cql =
