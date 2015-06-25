@@ -5,12 +5,11 @@ import random
 import struct
 import time
 from collections import OrderedDict
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from cassandra import AlreadyExists, ConsistencyLevel, InvalidRequest
 from cassandra.concurrent import execute_concurrent_with_args
-from cassandra.protocol import (ConfigurationException,
-                                InvalidRequestException, ProtocolException,
+from cassandra.protocol import (ConfigurationException, ProtocolException,
                                 SyntaxException)
 from cassandra.query import SimpleStatement
 from cassandra.util import sortedset
@@ -24,7 +23,8 @@ from thrift_bindings.v22.ttypes import (CfDef, Column, ColumnOrSuperColumn,
 from thrift_tests import get_thrift_client
 from tools import require, rows_to_list, since
 
-@since('1.0.x', max_version='2.0.x') 
+
+@since('1.0.x', max_version='2.0.x')
 @canReuseCluster
 class TestCQL(Tester):
 
@@ -4503,7 +4503,6 @@ class TestCQL(Tester):
         cursor = self.patient_cql_connection(self.cluster.nodelist()[0])
         assert_all(cursor, "SELECT k FROM ks.test WHERE v = 0", [[0]])
 
-    @require(9565)
     def double_with_npe_test(self):
         """
         @jira_ticket CASSANDRA-9565
