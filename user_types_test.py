@@ -409,10 +409,10 @@ class TestUserTypes(Tester):
               SELECT * from person_likes where name = {first:'Nero', middle: 'Claudius Caesar Augustus', last: 'Germanicus'};
             """
 
-       if self.cluster.version() < "3":
-           assert_invalid(cursor, stmt, 'No secondary indexes on the restricted columns support the provided operators')
-       else:
-           assert_invalid(cursor, stmt, 'No supported secondary index found for the non primary key columns restrictions')
+        if self.cluster.version() < "3":
+            assert_invalid(cursor, stmt, 'No secondary indexes on the restricted columns support the provided operators')
+        else:
+            assert_invalid(cursor, stmt, 'No supported secondary index found for the non primary key columns restrictions')
 
 
         # add index and query again (even though there are no rows in the table yet)
