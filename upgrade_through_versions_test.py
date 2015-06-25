@@ -20,7 +20,7 @@ from cassandra.query import SimpleStatement
 # other tests will focus on single upgrades from UPGRADE_PATH[n] to UPGRADE_PATH[n+1]
 
 TRUNK_VER = (3, 0)
-DEFAULT_PATH = [(2, 1), (2, 2), TRUNK_VER]
+DEFAULT_PATH = [(1, 2), (2, 0), (2, 1), (2, 2), TRUNK_VER]
 
 CUSTOM_PATH = os.environ.get('UPGRADE_PATH', None)
 if CUSTOM_PATH:
@@ -118,6 +118,28 @@ def make_branch_str(_tuple):
 
     return 'cassandra-{}.{}'.format(_tuple[0], _tuple[1])
 
+def sanitize_version(version):
+    """
+        Takes versions of the form cassandra-1.2, 2.0.10, or trunk.
+        Returns just the version string 'X.Y.Z'
+    """
+    if version.find('-') >= 0:
+        return LooseVersion(version.split('-')[1])
+    elif version == 'trunk':
+        return LooseVersion(make_ver_str(TRUNK_VER))
+    else:
+        return LooseVersion(version)
+
+def switch_jdks(version):
+    version = sanitize_version(version)
+    try:
+        if version < '2.1':
+            os.environ['JAVA_HOME'] = os.environ['JAVA7_HOME']
+        else:
+            os.environ['JAVA_HOME'] = os.environ['JAVA8_HOME']
+    except KeyError as e:
+        raise RuntimeError("You need to set JAVA7_HOME and JAVA8_HOME to run these tests!")
+
 
 class TestUpgradeThroughVersions(Tester):
     """
@@ -160,6 +182,7 @@ class TestUpgradeThroughVersions(Tester):
             os.environ['CASSANDRA_VERSION'] = 'git:' + self.test_versions[0]
 
         debug("Versions to test (%s): %s" % (type(self), str([v for v in self.test_versions])))
+        switch_jdks(os.environ['CASSANDRA_VERSION'][-3:])
         super(TestUpgradeThroughVersions, self).setUp()
 
     def upgrade_test(self):
@@ -241,6 +264,8 @@ class TestUpgradeThroughVersions(Tester):
         and upgrade all nodes.
         """
         debug('Upgrading {nodes} to {tag}'.format(nodes=[n.name for n in nodes] if nodes is not None else 'all nodes',tag=tag))
+        switch_jdks(tag)
+        debug(os.environ['JAVA_HOME'])
         if not mixed_version:
             nodes = self.cluster.nodelist()
 
