@@ -510,7 +510,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
     @since('2.1')
     def test_describe(self):
         """
-            Test for @jira_ticket CASSANDRA-7814
+        @jira_ticket CASSANDRA-7814
         """
         self.cluster.populate(1)
         self.cluster.start(wait_for_binary_proto=True)
