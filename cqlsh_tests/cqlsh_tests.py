@@ -13,7 +13,7 @@ import sys
 from tempfile import NamedTemporaryFile
 from uuid import UUID, uuid4
 from distutils.version import LooseVersion
-from tools import create_c1c2_table, insert_c1c2, since, rows_to_list
+from tools import create_c1c2_table, insert_c1c2, since, rows_to_list, require
 from assertions import assert_all, assert_none
 
 from cqlsh_tools import monkeypatch_driver, unmonkeypatch_driver
@@ -505,6 +505,180 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
 
 (6 rows)
 """)
+
+    @require("7814")
+    @since('2.1')
+    def test_describe(self):
+        """
+            Test for @jira_ticket CASSANDRA-7814
+        """
+        self.cluster.populate(1)
+        self.cluster.start(wait_for_binary_proto=True)
+        node1, = self.cluster.nodelist()
+
+        self.execute(
+            cql =
+                """
+                CREATE KEYSPACE test WITH REPLICATION = {'class' : 'SimpleStrategy', 'replication_factor' : 1};
+                CREATE TABLE test.users ( userid text PRIMARY KEY, firstname text, lastname text, age int);
+                CREATE INDEX myindex ON test.users (age);
+                CREATE TABLE test.test (id int, col int, val text, PRIMARY KEY(id, col));
+                CREATE INDEX ON test.test (col);
+                CREATE INDEX ON test.test (val)
+                """)
+
+        # Describe keyspace
+        self.execute(cql = "DESCRIBE KEYSPACE test", expected_output = self.get_keyspace_output())
+        self.execute(cql = "DESCRIBE test", expected_output = self.get_keyspace_output())
+        self.execute(cql = "DESCRIBE test2", expected_err = "'test2' not found in keyspaces")
+        self.execute(cql = "USE test; DESCRIBE KEYSPACE", expected_output = self.get_keyspace_output())
+
+        # Describe table
+        self.execute(cql = "DESCRIBE TABLE test.test", expected_output = self.get_test_table_output())
+        self.execute(cql = "DESCRIBE TABLE test.users", expected_output = self.get_users_table_output())
+        self.execute(cql = "DESCRIBE test.test", expected_output = self.get_test_table_output())
+        self.execute(cql = "DESCRIBE test.users", expected_output = self.get_users_table_output())
+        self.execute(cql = "DESCRIBE test.users2", expected_err = "'users2' not found in keyspace 'test'")
+        self.execute(cql = "USE test; DESCRIBE TABLE test", expected_output = self.get_test_table_output())
+        self.execute(cql = "USE test; DESCRIBE TABLE users", expected_output = self.get_users_table_output())
+        self.execute(cql = "USE test; DESCRIBE test", expected_output = self.get_keyspace_output())
+        self.execute(cql = "USE test; DESCRIBE users", expected_output = self.get_users_table_output())
+        self.execute(cql = "USE test; DESCRIBE users2", expected_err = "'users2' not found in keyspace 'test'")
+
+        # Describe index
+        self.execute(cql = 'DESCRIBE INDEX test.myindex', expected_output = self.get_index_output('myindex', 'test', 'users', 'age'))
+        self.execute(cql = 'DESCRIBE INDEX test.test_col_idx', expected_output = self.get_index_output('test_col_idx', 'test', 'test', 'col'))
+        self.execute(cql = 'DESCRIBE INDEX test.test_val_idx', expected_output = self.get_index_output('test_val_idx', 'test', 'test', 'val'))
+        self.execute(cql = 'DESCRIBE test.myindex', expected_output = self.get_index_output('myindex', 'test', 'users', 'age'))
+        self.execute(cql = 'DESCRIBE test.test_col_idx', expected_output = self.get_index_output('test_col_idx', 'test', 'test', 'col'))
+        self.execute(cql = 'DESCRIBE test.test_val_idx', expected_output = self.get_index_output('test_val_idx', 'test', 'test', 'val'))
+        self.execute(cql = 'DESCRIBE test.myindex2', expected_err = "'myindex2' not found in keyspace 'test'")
+        self.execute(cql = 'USE test; DESCRIBE INDEX myindex', expected_output = self.get_index_output('myindex', 'test', 'users', 'age'))
+        self.execute(cql = 'USE test; DESCRIBE INDEX test_col_idx', expected_output = self.get_index_output('test_col_idx', 'test', 'test', 'col'))
+        self.execute(cql = 'USE test; DESCRIBE INDEX test_val_idx', expected_output = self.get_index_output('test_val_idx', 'test', 'test', 'val'))
+        self.execute(cql = 'USE test; DESCRIBE myindex', expected_output = self.get_index_output('myindex', 'test', 'users', 'age'))
+        self.execute(cql = 'USE test; DESCRIBE test_col_idx', expected_output = self.get_index_output('test_col_idx', 'test', 'test', 'col'))
+        self.execute(cql = 'USE test; DESCRIBE test_val_idx', expected_output = self.get_index_output('test_val_idx', 'test', 'test', 'val'))
+        self.execute(cql = 'USE test; DESCRIBE myindex2', expected_err = "'myindex2' not found in keyspace 'test'")
+
+        # Drop table and recreate
+        self.execute(cql = 'DROP TABLE test.users')
+        self.execute(cql = 'DESCRIBE test.users', expected_err = "'users' not found in keyspace 'test'")
+        self.execute(cql = 'DESCRIBE test.myindex', expected_err = "'myindex' not found in keyspace 'test'")
+        self.execute(cql = """
+                CREATE TABLE test.users ( userid text PRIMARY KEY, firstname text, lastname text, age int);
+                CREATE INDEX myindex ON test.users (age)
+                """)
+        self.execute(cql = "DESCRIBE test.users", expected_output = self.get_users_table_output())
+        self.execute(cql = 'DESCRIBE test.myindex', expected_output = self.get_index_output('myindex', 'test', 'users', 'age'))
+
+        # Drop index and recreate
+        self.execute(cql = 'DROP INDEX test.myindex')
+        self.execute(cql = 'DESCRIBE test.myindex', expected_err = "'myindex' not found in keyspace 'test'")
+        self.execute(cql = 'CREATE INDEX myindex ON test.users (age)')
+        self.execute(cql = 'DESCRIBE INDEX test.myindex', expected_output = self.get_index_output('myindex', 'test', 'users', 'age'))
+
+        # Alter table (rename of column with idx is currently not allowed)
+        self.execute(cql = 'ALTER TABLE test.test DROP val')
+        self.execute(cql = "DESCRIBE test.test", expected_output = self.get_test_table_output(has_val=False, has_val_idx=False))
+        self.execute(cql = 'DESCRIBE test.test_val_idx', expected_err = "'test_val_idx' not found in keyspace 'test'")
+        self.execute(cql = 'ALTER TABLE test.test ADD val text')
+        self.execute(cql = "DESCRIBE test.test", expected_output = self.get_test_table_output(has_val=True, has_val_idx=False))
+        self.execute(cql = 'DESCRIBE test.test_val_idx', expected_err = "'test_val_idx' not found in keyspace 'test'")
+
+    def get_keyspace_output(self):
+        return \
+            "CREATE KEYSPACE test WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}  AND durable_writes = true;" + \
+            self.get_test_table_output() + \
+            self.get_users_table_output();
+
+    def get_test_table_output(self, has_val=True, has_val_idx=True):
+        if has_val:
+            ret = """
+                CREATE TABLE test.test (
+                    id int,
+                    col int,
+                    val text,
+                PRIMARY KEY (id, col)
+                """
+        else:
+            ret = """
+                CREATE TABLE test.test (
+                    id int,
+                    col int,
+                PRIMARY KEY (id, col)
+                """
+
+        ret += """
+        ) WITH CLUSTERING ORDER BY (col ASC)
+            AND bloom_filter_fp_chance = 0.01
+            AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
+            AND comment = ''
+            AND compaction = {'min_threshold': '4', 'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32'}
+            AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+            AND dclocal_read_repair_chance = 0.1
+            AND default_time_to_live = 0
+            AND gc_grace_seconds = 864000
+            AND max_index_interval = 2048
+            AND memtable_flush_period_in_ms = 0
+            AND min_index_interval = 128
+            AND read_repair_chance = 0.0
+            AND speculative_retry = '99.0PERCENTILE';
+        """ + \
+        self.get_index_output('test_col_idx', 'test', 'test', 'col')
+
+        if has_val_idx:
+            return ret + "\n" + self.get_index_output('test_val_idx', 'test', 'test', 'val')
+        else:
+            return ret;
+
+    def get_users_table_output(self):
+        return """
+        CREATE TABLE test.users (
+            userid text PRIMARY KEY,
+            age int,
+            firstname text,
+            lastname text
+        ) WITH bloom_filter_fp_chance = 0.01
+            AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
+            AND comment = ''
+            AND compaction = {'min_threshold': '4', 'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32'}
+            AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+            AND dclocal_read_repair_chance = 0.1
+            AND default_time_to_live = 0
+            AND gc_grace_seconds = 864000
+            AND max_index_interval = 2048
+            AND memtable_flush_period_in_ms = 0
+            AND min_index_interval = 128
+            AND read_repair_chance = 0.0
+            AND speculative_retry = '99.0PERCENTILE';
+        """ + \
+        self.get_index_output('myindex', 'test', 'users', 'age')
+
+    def get_index_output(self, index, ks, table, col):
+        return "CREATE INDEX {} ON {}.{} ({});".format(index, ks, table, col)
+
+    def execute(self, cql, expected_output=None, expected_err=None):
+        debug(cql)
+        node1, = self.cluster.nodelist()
+        output, err = self.run_cqlsh(node1, cql)
+
+        if err:
+            if expected_err:
+                err = err[10:] # strip <stdin>:2:
+                self.check_response(err, expected_err)
+                return
+            else:
+                debug('{} returned error {}'.format(cql, err))
+                self.assertTrue(False)
+
+        if expected_output:
+            self.check_response(output, expected_output)
+
+    def check_response(self, response, expected_response):
+        lines = [s.strip() for s in response.split("\n") if s.strip()]
+        expected_lines = [s.strip() for s in expected_response.split("\n") if s.strip()]
+        self.assertEqual(expected_lines, lines);
 
     def test_copy_to(self):
         self.cluster.populate(1).start()
