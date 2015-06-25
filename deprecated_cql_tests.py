@@ -23,7 +23,8 @@ from thrift_bindings.v22.ttypes import (CfDef, Column, ColumnOrSuperColumn,
 from thrift_tests import get_thrift_client
 from tools import require, rows_to_list, since
 
-@since('1.0.x', max_version='2.0.x') 
+
+@since('1.0.x', max_version='2.0.x')
 @canReuseCluster
 class TestCQL(Tester):
 
