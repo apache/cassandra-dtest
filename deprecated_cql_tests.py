@@ -4503,7 +4503,6 @@ class TestCQL(Tester):
         cursor = self.patient_cql_connection(self.cluster.nodelist()[0])
         assert_all(cursor, "SELECT k FROM ks.test WHERE v = 0", [[0]])
 
-    @require(9565)
     def double_with_npe_test(self):
         """
         @jira_ticket CASSANDRA-9565
