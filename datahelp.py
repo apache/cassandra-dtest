@@ -65,14 +65,31 @@ def parse_row_into_dict(row, headers, format_funcs=None):
     return row_map
 
 
+def row_describes_data(row):
+    """
+    Returns True if this appears to be a row describing data, otherwise False.
+
+    Meant to be used in conjunction with filter to prune out those rows
+    that don't actually describe data, such as empty strings or decorations
+    that delimit headers from actual data (i.e. '+----|----|-----+')
+    """
+    if row:
+        if row.startswith('+') and row.endswith('+'):
+            return False
+
+        return True
+
+    return False
+
+
 def parse_data_into_dicts(data, format_funcs=None):
     # throw out leading/trailing space and pipes
     # so we can split on the data without getting
     # extra empty fields
     rows = map(strip, data.split('\n'))
 
-    # remove any remaining empty lines (i.e. '') from data
-    rows = filter(None, rows)
+    # remove any remaining empty/decoration lines (i.e. '') from data
+    rows = filter(row_describes_data, rows)
 
     # remove headers
     headers = parse_headers_into_list(rows.pop(0))
@@ -94,6 +111,7 @@ def create_rows(data, cursor, table_name, cl=None, format_funcs=None, prefix='',
     using data formatted like:
 
     |colname1|colname2|
+    +--------+--------+
     |value2  |value2  |
 
     format_funcs should be a dictionary of {columnname: function} if data needs to be formatted

@@ -4,11 +4,11 @@ import uuid
 from cassandra import ConsistencyLevel as CL
 from cassandra import InvalidRequest, ReadTimeout
 from cassandra.query import SimpleStatement, dict_factory, named_tuple_factory
-from dtest import Tester, run_scenarios
-from tools import since, require
 
-from datahelp import create_rows, parse_data_into_dicts, flatten_into_set
 from assertions import assert_invalid
+from datahelp import create_rows, flatten_into_set, parse_data_into_dicts
+from dtest import Tester, run_scenarios
+from tools import require, since
 
 
 class Page(object):
@@ -218,6 +218,7 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
 
         data = """
             |id| value          |
+            +--+----------------+
             |1 |testing         |
             |2 |and more testing|
             |3 |and more testing|
@@ -242,6 +243,7 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
 
         data = """
             |id| value          |
+            +--+----------------+
             |1 |testing         |
             |2 |and more testing|
             |3 |and more testing|
@@ -273,6 +275,7 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
 
         data = """
             |id| value          |
+            +--+----------------+
             |1 |testing         |
             |2 |and more testing|
             |3 |and more testing|
@@ -306,6 +309,7 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
 
         data = """
                | id     |value   |
+               +--------+--------+
           *5001| [uuid] |testing |
             """
         expected_data = create_rows(data, cursor, 'paging_test', cl=CL.ALL, format_funcs={'id': random_txt, 'value': unicode})
@@ -345,6 +349,7 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
 
         data = """
             |id|value|
+            +--+-----+
             |1 |a    |
             |1 |b    |
             |1 |c    |
@@ -394,6 +399,7 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
 
         data = """
             |id|value|value2|
+            +--+-----+------+
             |1 |a    |a     |
             |1 |b    |b     |
             |1 |c    |c     |
@@ -443,6 +449,7 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
 
         data = """
                | id | value         |
+               +----+---------------+
              *5| 1  | [random text] |
              *5| 2  | [random text] |
             *10| 3  | [random text] |
@@ -522,6 +529,7 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
 
         data = """
             |id|value           |
+            +--+----------------+
             |1 |testing         |
             |2 |and more testing|
             |3 |and more testing|
@@ -549,6 +557,7 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
             parse_data_into_dicts(
                 """
                 |id|value           |
+                +--+----------------+
                 |2 |and more testing|
                 |3 |and more testing|
                 |4 |and more testing|
@@ -573,6 +582,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
         data = """
               | id | value                  |
+              +----+------------------------+
         *10000| 1  | [replaced with random] |
             """
         expected_data = create_rows(data, cursor, 'paging_test', cl=CL.ALL, format_funcs={'id': int, 'value': random_txt})
@@ -598,6 +608,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
         data = """
               | id | value                  |
+              +----+------------------------+
          *5000| 1  | [replaced with random] |
          *5000| 2  | [replaced with random] |
             """
@@ -628,6 +639,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
         data = """
              | id | mybool| sometext |
+             +----+-------+----------+
          *100| 1  | 1     | [random] |
          *300| 2  | 0     | [random] |
          *500| 3  | 1     | [random] |
@@ -859,6 +871,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
         data = """
              | id | s1 | s2 | mybool| sometext |
+             +----+----+----+-------+----------+
          *100| 1  | 1  | 4  | 1     | [random] |
          *300| 2  | 2  | 3  | 0     | [random] |
          *500| 3  | 3  | 2  | 1     | [random] |
@@ -898,6 +911,7 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
 
         data = """
               | id | mytext   |
+              +----+----------+
           *500| 1  | [random] |
           *500| 2  | [random] |
             """
@@ -931,6 +945,7 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
 
         data = """
               | id | mytext   |
+              +----+----------+
           *500| 1  | [random] |
           *499| 2  | [random] |
             """
@@ -967,6 +982,7 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
         create_rows(
             """
                 | id | mytext   |
+                +----+----------+
             *300| 1  | [random] |
             *400| 2  | [random] |
             """,
@@ -977,6 +993,7 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
         create_rows(
             """
                 | id | mytext   |
+                +----+----------+
             *500| 3  | [random] |
             """,
             cursor, 'paging_test', cl=CL.ALL, format_funcs={'id': int, 'mytext': random_txt}
@@ -1015,6 +1032,7 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
         data = create_rows(
             """
                 | id | mytext   | somevalue | anothervalue |
+                +----+----------+-----------+--------------+
             *500| 1  | [random] | foo       |  bar         |
             *500| 2  | [random] | foo       |  bar         |
             *500| 3  | [random] | foo       |  bar         |
@@ -1075,6 +1093,7 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
         create_rows(
             """
                   | id      | mytext |
+                  +---------+--------+
             *10000| [uuid]  | foo    |
             """,
             cursor, 'paging_test', cl=CL.ALL, format_funcs={'id': make_uuid}
@@ -1113,6 +1132,7 @@ class TestPagingQueryIsolation(BasePagingTester, PageAssertionMixin):
 
         data = """
                | id | mytext   |
+               +----+----------+
           *5000| 1  | [random] |
           *5000| 2  | [random] |
           *5000| 3  | [random] |
@@ -1199,6 +1219,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
 
         data = """
              | id | mytext   | col1 | col2 | col3 |
+             +----+----------+------+------+------+
           *40| 1  | [random] | 1    | 1    | 1    |
           *40| 2  | [random] | 2    | 2    | 2    |
           *40| 3  | [random] | 4    | 3    | 3    |
