@@ -1,12 +1,13 @@
-import time, uuid, re, struct
+import re
+import struct
+import time
+import uuid
 
-from thrift.transport import TTransport
-from thrift.transport import TSocket
 from thrift.protocol import TBinaryProtocol
 from thrift.Thrift import TApplicationException
+from thrift.transport import TSocket, TTransport
 
-from dtest import Tester, NUM_TOKENS, DISABLE_VNODES
-from tools import since
+from dtest import DISABLE_VNODES, NUM_TOKENS, Tester
 from thrift_bindings.v22 import Cassandra
 from thrift_bindings.v22.Cassandra import (CfDef, Column, ColumnDef,
                                            ColumnOrSuperColumn, ColumnParent,
@@ -19,6 +20,8 @@ from thrift_bindings.v22.Cassandra import (CfDef, Column, ColumnDef,
                                            Mutation, NotFoundException,
                                            SlicePredicate, SliceRange,
                                            SuperColumn)
+from tools import since
+
 
 def get_thrift_client(host='127.0.0.1', port=9160):
     socket = TSocket.TSocket(host, port)

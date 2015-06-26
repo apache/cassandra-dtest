@@ -1,6 +1,8 @@
-from dtest import Tester, DISABLE_VNODES
-from tools import require, create_c1c2_table, insert_c1c2, query_c1c2
 from cassandra import ConsistencyLevel
+
+from dtest import DISABLE_VNODES, Tester
+from tools import create_c1c2_table, insert_c1c2, query_c1c2, require
+
 
 @require("9035")
 class TestHintedHandoff(Tester):

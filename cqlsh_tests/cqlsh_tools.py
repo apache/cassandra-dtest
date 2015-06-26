@@ -3,9 +3,8 @@ import datetime
 import random
 import time
 
-from nose.tools import assert_items_equal
-
 import cassandra
+from nose.tools import assert_items_equal
 
 
 class DummyColorMap(object):
