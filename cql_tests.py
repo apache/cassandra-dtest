@@ -1,28 +1,20 @@
 # coding: utf-8
 
-import math
-import random
 import struct
 import time
-from collections import OrderedDict
-from uuid import UUID, uuid4
 
-from cassandra import AlreadyExists, ConsistencyLevel, InvalidRequest
-from cassandra.concurrent import execute_concurrent_with_args
-from cassandra.protocol import (ConfigurationException,
-                                InvalidRequestException, ProtocolException,
-                                SyntaxException)
+from cassandra import ConsistencyLevel, InvalidRequest
+from cassandra.protocol import ProtocolException
 from cassandra.query import SimpleStatement
-from cassandra.util import sortedset
 
-from assertions import assert_all, assert_invalid, assert_none, assert_one
+from assertions import assert_invalid, assert_one
 from dtest import Tester, canReuseCluster, freshCluster
 from thrift_bindings.v22.ttypes import \
     ConsistencyLevel as ThriftConsistencyLevel
 from thrift_bindings.v22.ttypes import (CfDef, Column, ColumnOrSuperColumn,
                                         Mutation)
 from thrift_tests import get_thrift_client
-from tools import require, rows_to_list, since
+from tools import rows_to_list, since
 
 
 class CQLTester(Tester):
