@@ -1,6 +1,5 @@
 import csv
 import datetime
-from datetime import tzinfo, timedelta
 import random
 import time
 

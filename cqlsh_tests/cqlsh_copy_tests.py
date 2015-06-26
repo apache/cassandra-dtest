@@ -6,14 +6,10 @@ import datetime
 from decimal import Decimal
 import locale
 import os
-import random
 import sys
 from tempfile import NamedTemporaryFile
-import time
-import unittest
 from uuid import uuid1, uuid4
 
-import cassandra
 from cassandra.concurrent import execute_concurrent_with_args
 
 from dtest import debug, Tester, canReuseCluster

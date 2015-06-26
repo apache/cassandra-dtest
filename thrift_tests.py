@@ -8,7 +8,17 @@ from thrift.Thrift import TApplicationException
 from dtest import Tester, NUM_TOKENS, DISABLE_VNODES
 from tools import since
 from thrift_bindings.v22 import Cassandra
-from thrift_bindings.v22.Cassandra import *
+from thrift_bindings.v22.Cassandra import (CfDef, Column, ColumnDef,
+                                           ColumnOrSuperColumn, ColumnParent,
+                                           ColumnPath, ColumnSlice,
+                                           ConsistencyLevel, CounterColumn,
+                                           Deletion, IndexExpression,
+                                           IndexOperator, IndexType,
+                                           InvalidRequestException, KeyRange,
+                                           KeySlice, KsDef, MultiSliceRequest,
+                                           Mutation, NotFoundException,
+                                           SlicePredicate, SliceRange,
+                                           SuperColumn)
 
 def get_thrift_client(host='127.0.0.1', port=9160):
     socket = TSocket.TSocket(host, port)
@@ -1071,7 +1081,7 @@ class TestMutations(ThriftTester):
                                               columns=[Column(_i64(6), 'value6', 0), Column(_i64(7), 'value7', 0)])]
 
         super_columns = [result.super_column for result in _big_slice('key1', ColumnParent('Super1'))]
-        assert super_columns == super_columns_expected, actual
+        assert super_columns == super_columns_expected, super_columns
 
         # Test resurrection.  First, re-insert the value w/ older timestamp,
         # and make sure it stays removed:

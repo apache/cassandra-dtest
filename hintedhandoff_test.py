@@ -1,4 +1,4 @@
-from dtest import Tester, debug, DISABLE_VNODES
+from dtest import Tester, DISABLE_VNODES
 from tools import require, create_c1c2_table, insert_c1c2, query_c1c2
 from cassandra import ConsistencyLevel
 
