@@ -4,7 +4,7 @@ We plan to move to Python 3 in the near future. Where possible, new code should 
 
 - favor `format` over `%` for formatting strings.
 
-Contributions will be evaluated by PEP8, though we do not enforce compliance strictly. We do not enforce limits on line length, but please keep lines readable.
+Contributions will be evaluated by PEP8. We now strictly enforce compliance, via a linter run with Travis CI against all new pull requests. We do not enforce the default limits on line length, but have established a maximum length of 200 chars as a sanity check.
 
 We do not enforce import sorting, but if you choose to organize imports by some convention, use the `isort` tool (`pip install isort`).
 
