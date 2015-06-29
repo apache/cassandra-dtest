@@ -1056,6 +1056,42 @@ Unlogged batch covering 2 partitions detected against table [client_warnings.tes
         stdout, stderr = self.run_cqlsh(node1, cmds='USE system', cqlsh_options=['--debug', '--connect-timeout=10'])
         self.assertTrue("Using connect timeout: 10 seconds" in stderr)
 
+    def test_describe_round_trip(self):
+        """
+        @jira_ticket CASSANDRA-9064
+
+        Tests for the error reported in 9064 by:
+
+        - creating the table described in the bug report, using LCS,
+        - DESCRIBE-ing that table via cqlsh, then DROPping it,
+        - running the output of the DESCRIBE statement as a CREATE TABLE statement, and
+        - inserting a value into the table.
+
+        The final two steps of the test should not fall down. If one does, that
+        indicates the output of DESCRIBE is not a correct CREATE TABLE statement.
+        """
+        self.cluster.populate(1)
+        self.cluster.start(wait_for_binary_proto=True)
+        node1, = self.cluster.nodelist()
+        session = self.patient_cql_connection(node1)
+
+        self.create_ks(session, 'test_ks', 1)
+        session.execute("CREATE TABLE lcs_describe (key int PRIMARY KEY) WITH compaction = "
+                        "{'class': 'LeveledCompactionStrategy'}")
+        describe_out, describe_err = self.run_cqlsh(node1, 'DESCRIBE TABLE test_ks.lcs_describe')
+
+        session.execute('DROP TABLE test_ks.lcs_describe')
+
+        create_statement = ' '.join(describe_out.splitlines())
+        create_out, create_err = self.run_cqlsh(node1, create_statement)
+
+        # these statements shouldn't fall down
+        reloaded_describe_out, reloaded_describe_err = self.run_cqlsh(node1, 'DESCRIBE TABLE test_ks.lcs_describe')
+        session.execute('INSERT INTO lcs_describe (key) VALUES (1)')
+
+        # the table created before and after should be the same
+        self.assertEqual(reloaded_describe_out, describe_out)
+
     def run_cqlsh(self, node, cmds, cqlsh_options=[]):
         cdir = node.get_install_dir()
         cli = os.path.join(cdir, 'bin', common.platform_binary('cqlsh'))
