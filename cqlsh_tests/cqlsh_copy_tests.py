@@ -1,27 +1,23 @@
 # coding: utf-8
 import codecs
-from contextlib import contextmanager
 import csv
 import datetime
-from decimal import Decimal
 import locale
 import os
-import random
 import sys
+from contextlib import contextmanager
+from decimal import Decimal
 from tempfile import NamedTemporaryFile
-import time
-import unittest
 from uuid import uuid1, uuid4
 
-import cassandra
 from cassandra.concurrent import execute_concurrent_with_args
 
-from dtest import debug, Tester, canReuseCluster
+from cqlsh_tools import (DummyColorMap, assert_csvs_items_equal, csv_rows,
+                         monkeypatch_driver, random_list,
+                         strip_timezone_if_time_string, unmonkeypatch_driver,
+                         write_rows_to_csv)
+from dtest import Tester, canReuseCluster, debug
 from tools import rows_to_list, since
-from cqlsh_tools import (csv_rows, random_list, DummyColorMap,
-                         assert_csvs_items_equal, write_rows_to_csv,
-                         strip_timezone_if_time_string, monkeypatch_driver,
-                         unmonkeypatch_driver)
 
 DEFAULT_FLOAT_PRECISION = 5  # magic number copied from cqlsh script
 DEFAULT_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'  # based on cqlsh script; timezone stripped
