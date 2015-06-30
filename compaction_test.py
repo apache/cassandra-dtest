@@ -5,6 +5,7 @@ import time
 
 from assertions import assert_almost_equal, assert_none, assert_one
 from dtest import Tester, debug
+from tools import require, since
 
 
 class TestCompaction(Tester):
@@ -223,6 +224,31 @@ class TestCompaction(Tester):
                 cluster.clear()
                 time.sleep(5)
                 cluster.start(wait_for_binary_proto=True)
+
+    @require("9643")
+    @since("2.1")
+    def large_compaction_warning_test(self):
+        """
+        @jira_ticket CASSANDRA-9643
+        Check that we log a warning when the partition size is bigger than compaction_large_partition_warning_threshold_mb
+        """
+        cluster = self.cluster
+        cluster.set_configuration_options({'compaction_large_partition_warning_threshold_mb': 1})
+        cluster.populate(1).start(wait_for_binary_proto=True)
+        [node] = cluster.nodelist()
+
+        cursor = self.patient_cql_connection(node)
+        self.create_ks(cursor, 'ks', 1)
+
+        mark = node.mark_log()
+        cursor.execute("CREATE TABLE large(userid text PRIMARY KEY, properties map<int, text>)")
+        for i in range(50000):  # ensures partition size larger than compaction_large_partition_warning_threshold_mb
+            cursor.execute("UPDATE ks.large SET properties[%i] = 'x' WHERE userid = 'user'" % i)
+
+        node.flush()
+
+        node.nodetool('compact ks large')
+        node.watch_log_for('Compacting large row ks/large:user \(\d+ bytes\) incrementally', from_mark=mark)
 
     def skip_if_no_major_compaction(self):
         if self.cluster.version() < '2.2' and self.strategy == 'LeveledCompactionStrategy':
