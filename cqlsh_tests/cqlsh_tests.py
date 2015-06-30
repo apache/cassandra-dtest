@@ -1054,7 +1054,7 @@ Unlogged batch covering 2 partitions detected against table [client_warnings.tes
 
         node1, = self.cluster.nodelist()
 
-        stdout, stderr = self.run_cqlsh(node1, cmds = 'USE system', cqlsh_options=['--debug', '--connect_timeout=10'])
+        stdout, stderr = self.run_cqlsh(node1, cmds='USE system', cqlsh_options=['--debug', '--connect-timeout=10'])
         self.assertTrue("Using connect timeout: 10 seconds" in stderr)
 
     def run_cqlsh(self, node, cmds, cqlsh_options=[]):
