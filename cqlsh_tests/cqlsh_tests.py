@@ -1046,6 +1046,9 @@ Unlogged batch covering 2 partitions detected against table [client_warnings.tes
     @require("9601")
     @since('2.2')
     def test_connect_timeout(self):
+        """
+        @jira_ticket CASSANDRA-9601
+        """
         self.cluster.populate(1)
         self.cluster.start(wait_for_binary_proto=True)
 
