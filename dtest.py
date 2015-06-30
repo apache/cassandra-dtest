@@ -80,9 +80,6 @@ def retry_till_success(fun, *args, **kwargs):
                 # brief pause before next attempt
                 time.sleep(0.25)
 
-def is_win():
-    return True if sys.platform == "cygwin" or sys.platform == "win32" else False
-
 class Runner(threading.Thread):
     def __init__(self, func):
         threading.Thread.__init__(self)
