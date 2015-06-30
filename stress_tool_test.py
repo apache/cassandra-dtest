@@ -42,7 +42,7 @@ class TestStressSparsenessRatio(Tester):
         node = self.cluster.nodelist()[0]
         node.stress(['write', 'n=1000', '-rate', 'threads=50', '-col', 'n=FIXED(50)',
                      '-insert', 'row-population-ratio={ratio_spec}'.format(ratio_spec=ratio_spec)])
-        session = self.patient_exclusive_cql_connection(node)
+        session = self.patient_cql_connection(node)
         written = rows_to_list(session.execute('SELECT * FROM keyspace1.standard1;'))
 
         num_nones = sum(row.count(None) for row in written)
