@@ -13,7 +13,7 @@ import sys
 from tempfile import NamedTemporaryFile
 from uuid import UUID, uuid4
 from distutils.version import LooseVersion
-from tools import create_c1c2_table, insert_c1c2, since, rows_to_list, require
+from tools import create_c1c2_table, insert_c1c2, since, rows_to_list
 from assertions import assert_all, assert_none
 
 from cqlsh_tools import monkeypatch_driver, unmonkeypatch_driver
@@ -506,7 +506,6 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
 (6 rows)
 """)
 
-    @require("7814")
     @since('2.1')
     def test_describe(self):
         """
