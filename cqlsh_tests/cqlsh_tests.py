@@ -585,11 +585,24 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         self.execute(cql="DESCRIBE test.test", expected_output=self.get_test_table_output(has_val=True, has_val_idx=False))
         self.execute(cql='DESCRIBE test.test_val_idx', expected_err="'test_val_idx' not found in keyspace 'test'")
 
+    def test_describe_describes_non_default_compaction_parameters(self):
+        self.cluster.populate(1)
+        self.cluster.start(wait_for_binary_proto=True)
+        node, = self.cluster.nodelist()
+        session = self.patient_cql_connection(node)
+        self.create_ks(session, 'ks', 1)
+        session.execute("CREATE TABLE tab (key int PRIMARY KEY ) "
+                        "WITH compaction = {'class': 'SizeTieredCompactionStrategy',"
+                        "'min_threshold': 10, 'max_threshold': 100 }")
+        describe_cmd = 'DESCRIBE ks.tab' if self.cluster.version > '2.0' else 'DESCRIBE TABLE ks.tab'
+        stdout, _ = self.run_cqlsh(node, describe_cmd)
+        self.assertIn("'min_threshold': '10'", stdout)
+        self.assertIn("'max_threshold': '100'", stdout)
+
     def get_keyspace_output(self):
-        return \
-            "CREATE KEYSPACE test WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}  AND durable_writes = true;" + \
-            self.get_test_table_output() + \
-            self.get_users_table_output()
+        return ("CREATE KEYSPACE test WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}  AND durable_writes = true;" +
+                self.get_test_table_output() +
+                self.get_users_table_output())
 
     def get_test_table_output(self, has_val=True, has_val_idx=True):
         if has_val:
@@ -613,7 +626,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
             AND bloom_filter_fp_chance = 0.01
             AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
             AND comment = ''
-            AND compaction = {'min_threshold': '4', 'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32'}
+            AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy'}
             AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
             AND dclocal_read_repair_chance = 0.1
             AND default_time_to_live = 0
@@ -640,7 +653,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         ) WITH bloom_filter_fp_chance = 0.01
             AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
             AND comment = ''
-            AND compaction = {'min_threshold': '4', 'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32'}
+            AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy'}
             AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
             AND dclocal_read_repair_chance = 0.1
             AND default_time_to_live = 0
