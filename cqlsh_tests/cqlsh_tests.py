@@ -613,7 +613,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
             AND bloom_filter_fp_chance = 0.01
             AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
             AND comment = ''
-            AND compaction = {'min_threshold': '4', 'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32'}
+            AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy'}
             AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
             AND dclocal_read_repair_chance = 0.1
             AND default_time_to_live = 0
@@ -640,7 +640,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         ) WITH bloom_filter_fp_chance = 0.01
             AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
             AND comment = ''
-            AND compaction = {'min_threshold': '4', 'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32'}
+            AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy'}
             AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
             AND dclocal_read_repair_chance = 0.1
             AND default_time_to_live = 0
