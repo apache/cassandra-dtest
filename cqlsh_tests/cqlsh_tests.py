@@ -526,6 +526,11 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
                 CREATE INDEX ON test.test (val)
                 """)
 
+        # Describe keyspaces
+        output = self.execute(cql="DESCRIBE KEYSPACES")
+        self.assertIn("test", output)
+        self.assertIn("system", output)
+
         # Describe keyspace
         self.execute(cql="DESCRIBE KEYSPACE test", expected_output=self.get_keyspace_output())
         self.execute(cql="DESCRIBE test", expected_output=self.get_keyspace_output())
@@ -684,6 +689,8 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
 
         if expected_output:
             self.check_response(output, expected_output)
+
+        return output
 
     def check_response(self, response, expected_response):
         lines = [s.strip() for s in response.split("\n") if s.strip()]
