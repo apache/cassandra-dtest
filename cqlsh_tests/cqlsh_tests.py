@@ -600,10 +600,9 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         self.assertIn("'max_threshold': '100'", stdout)
 
     def get_keyspace_output(self):
-        return \
-            "CREATE KEYSPACE test WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}  AND durable_writes = true;" + \
-            self.get_test_table_output() + \
-            self.get_users_table_output()
+        return ("CREATE KEYSPACE test WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}  AND durable_writes = true;" +
+                self.get_test_table_output() +
+                self.get_users_table_output())
 
     def get_test_table_output(self, has_val=True, has_val_idx=True):
         if has_val:
