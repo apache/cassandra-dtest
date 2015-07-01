@@ -25,6 +25,7 @@ class TestAuthUpgrade(Tester):
         self.do_upgrade_with_internal_auth("git:cassandra-2.2")
 
     # todo: when we branch for 3.0 switch this from trunk to cassandra-3.0
+    @since('3.0')
     def upgrade_to_30_test(self):
         self.do_upgrade_with_internal_auth("git:trunk")
 
