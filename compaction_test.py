@@ -5,7 +5,7 @@ import time
 
 from assertions import assert_almost_equal, assert_none, assert_one
 from dtest import Tester, debug
-from tools import require, since
+from tools import since
 
 
 class TestCompaction(Tester):
