@@ -225,7 +225,6 @@ class TestCompaction(Tester):
                 time.sleep(5)
                 cluster.start(wait_for_binary_proto=True)
 
-    @require("9643")
     @since("2.1")
     def large_compaction_warning_test(self):
         """
@@ -248,7 +247,7 @@ class TestCompaction(Tester):
         node.flush()
 
         node.nodetool('compact ks large')
-        node.watch_log_for('Compacting large row ks/large:user \(\d+ bytes\) incrementally', from_mark=mark)
+        node.watch_log_for('Compacting large partition ks/large:user \(\d+ bytes\)', from_mark=mark, timeout=180)
 
     def skip_if_no_major_compaction(self):
         if self.cluster.version() < '2.2' and self.strategy == 'LeveledCompactionStrategy':

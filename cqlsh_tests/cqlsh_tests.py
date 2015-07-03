@@ -1060,7 +1060,6 @@ Tracing session:""")
 Warnings :
 Unlogged batch covering 2 partitions detected against table [client_warnings.test]. You should use a logged batch for atomicity, or asynchronous writes for performance.""")
 
-    @require("9601")
     @since('2.2')
     def test_connect_timeout(self):
         """
