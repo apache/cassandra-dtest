@@ -17,7 +17,7 @@ from assertions import assert_all, assert_none
 from ccmlib import common
 from cqlsh_tools import monkeypatch_driver, unmonkeypatch_driver
 from dtest import Tester, debug
-from tools import create_c1c2_table, insert_c1c2, require, rows_to_list, since
+from tools import create_c1c2_table, insert_c1c2, rows_to_list, since
 
 
 class TestCqlsh(Tester):
@@ -1060,7 +1060,6 @@ Tracing session:""")
 Warnings :
 Unlogged batch covering 2 partitions detected against table [client_warnings.test]. You should use a logged batch for atomicity, or asynchronous writes for performance.""")
 
-    @require("9601")
     @since('2.2')
     def test_connect_timeout(self):
         """

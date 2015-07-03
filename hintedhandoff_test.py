@@ -1,10 +1,10 @@
 from cassandra import ConsistencyLevel
 
 from dtest import DISABLE_VNODES, Tester
-from tools import create_c1c2_table, insert_c1c2, query_c1c2, require
+from tools import create_c1c2_table, insert_c1c2, query_c1c2, since
 
 
-@require("9035")
+@since('3.0')
 class TestHintedHandoff(Tester):
 
     def _start_two_node_cluster(self, config_options=None):
