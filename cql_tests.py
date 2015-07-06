@@ -7,14 +7,14 @@ from cassandra import ConsistencyLevel, InvalidRequest
 from cassandra.protocol import ProtocolException
 from cassandra.query import SimpleStatement
 
-from assertions import assert_invalid, assert_one
+from assertions import assert_invalid, assert_one, assert_unavailable
 from dtest import Tester, canReuseCluster, freshCluster
 from thrift_bindings.v22.ttypes import \
     ConsistencyLevel as ThriftConsistencyLevel
 from thrift_bindings.v22.ttypes import (CfDef, Column, ColumnOrSuperColumn,
                                         Mutation)
 from thrift_tests import get_thrift_client
-from tools import rows_to_list, since
+from tools import rows_to_list, since, require, debug
 
 
 class CQLTester(Tester):
@@ -394,3 +394,96 @@ class MiscellaneousCQLTester(CQLTester):
 
         res = cursor.execute("SELECT * FROM test")
         assert len(res) == 2, res
+
+
+@since('3.0')
+@require("7392")
+class AbortedQueriesTester(CQLTester):
+    """
+    @jira_ticket CASSANDRA-7392
+    Test that we can abort long queries that are already in progress
+    """
+    def local_query_test(self):
+        """
+        Abort a query running on the local coordinator node
+        """
+        cluster = self.cluster
+        cluster.set_configuration_options(values={'read_request_timeout_in_ms': 1000})
+
+        cluster.populate(1).start(wait_for_binary_proto=True, jvm_args=["-Dcassandra.test.read_iteration_delay_ms=100"])
+        node = cluster.nodelist()[0]
+        cursor = self.patient_cql_connection(node)
+
+        self.create_ks(cursor, 'ks', 1)
+        cursor.execute("""
+            CREATE TABLE test1 (
+                id int PRIMARY KEY,
+                val text
+            );
+        """)
+
+        for i in xrange(500):
+            cursor.execute("INSERT INTO test1 (id, val) VALUES ({}, 'foo')".format(i))
+
+        mark = node.mark_log()
+        assert_unavailable(lambda c: debug(c.execute("SELECT * from test1")), cursor)
+        node.watch_log_for("<SELECT \* FROM ks.test1 (.*)> timed out", from_mark=mark, timeout=30)
+
+    def remote_query_test(self):
+        """
+        Abort a query running on a node other than the coordinator
+        """
+        cluster = self.cluster
+        cluster.set_configuration_options(values={'read_request_timeout_in_ms': 1000})
+
+        cluster.populate(2)
+        node1, node2 = cluster.nodelist()
+
+        node1.start(wait_for_binary_proto=True, jvm_args=["-Djoin_ring=false"])  # ensure other node executes queries
+        node2.start(wait_for_binary_proto=True, jvm_args=["-Dcassandra.test.read_iteration_delay_ms=100"])
+
+        cursor = self.patient_exclusive_cql_connection(node1)
+
+        self.create_ks(cursor, 'ks', 1)
+        cursor.execute("""
+            CREATE TABLE test2 (
+                id int PRIMARY KEY,
+                val text
+            );
+        """)
+
+        for i in xrange(500):
+            cursor.execute("INSERT INTO test2 (id, val) VALUES ({}, 'foo')".format(i))
+
+        mark = node2.mark_log()
+        assert_unavailable(lambda c: debug(c.execute("SELECT * from test2")), cursor)
+        node2.watch_log_for("<SELECT \* FROM ks.test2 (.*)> timed out", from_mark=mark, timeout=30)
+
+    def index_query_test(self):
+        """
+        Abort an index query
+        """
+        cluster = self.cluster
+        cluster.set_configuration_options(values={'read_request_timeout_in_ms': 1000})
+
+        cluster.populate(1).start(wait_for_binary_proto=True, jvm_args=["-Dcassandra.test.read_iteration_delay_ms=100"])
+        node = cluster.nodelist()[0]
+        cursor = self.patient_cql_connection(node)
+
+        self.create_ks(cursor, 'ks', 1)
+        cursor.execute("""
+            CREATE TABLE test3 (
+                id int PRIMARY KEY,
+                col int,
+                val text
+            );
+        """)
+
+        cursor.execute("CREATE INDEX ON test3 (col)")
+
+        for i in xrange(500):
+            cursor.execute("INSERT INTO test3 (id, col, val) VALUES ({}, {}, 'foo')".format(i, i / 10))
+
+        mark = node.mark_log()
+        assert_unavailable(lambda c: debug(c.execute("SELECT * from test3 WHERE col < 50 ALLOW FILTERING")), cursor)
+        node.watch_log_for("<SELECT \* FROM ks.test3 WHERE col < 50 (.*)> timed out", from_mark=mark, timeout=30)
