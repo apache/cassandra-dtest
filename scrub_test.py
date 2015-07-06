@@ -48,12 +48,13 @@ class TestHelper(Tester):
                 ret.append(bname)
         return ret
 
-    def delete_non_data_sstable_files(self, table):
+    def delete_non_essential_sstable_files(self, table):
         """
-        Delete all sstable files except for the -Data.db file
+        Delete all sstable files except for the -Data.db file and the
+        -Statistics.db file (only available in >= 3.0)
         """
         for fname in self.get_sstable_files(self.get_table_path(table)):
-            if not fname.endswith("-Data.db"):
+            if not fname.endswith("-Data.db") and not fname.endswith("-Statistics.db"):
                 fullname = os.path.join(self.get_table_path(table), fname)
                 debug('Deleting {}'.format(fullname))
                 os.remove(fullname)
@@ -385,7 +386,7 @@ class TestScrub(TestHelper):
         self.assertEqual(initial_users, users)
 
     @require('9591*')
-    def test_standalone_scrub_data_file_only(self):
+    def test_standalone_scrub_essential_files_only(self):
         cluster = self.cluster
         cluster.populate(1).start()
         node1 = cluster.nodelist()[0]
@@ -401,7 +402,7 @@ class TestScrub(TestHelper):
 
         cluster.stop()
 
-        self.delete_non_data_sstable_files('users')
+        self.delete_non_essential_sstable_files('users')
 
         scrubbed_sstables = self.standalonescrub('users')
         self.increase_sstable_generations(initial_sstables)
