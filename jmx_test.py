@@ -1,10 +1,12 @@
 from dtest import Tester, debug
-from jmxutils import make_mbean, JolokiaAgent, remove_perf_disable_shared_mem
-from tools import since
+from jmxutils import JolokiaAgent, make_mbean, remove_perf_disable_shared_mem
+from tools import require, since
+
 
 class TestJMX(Tester):
 
     @since('2.1')
+    @require(9741)  # flaps on 2.2
     def cfhistograms_test(self):
         """
         Test cfhistograms on large and small datasets
