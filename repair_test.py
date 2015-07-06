@@ -301,7 +301,7 @@ class TestRepair(Tester):
         node2.flush()
         node2.stop()
         insert_c1c2(cursor, 1000, ConsistencyLevel.THREE)
-        node2.start(wait_other_notice=True)
+        node2.start(wait_for_binary_proto=True, wait_other_notice=True)
         for i in xrange(1001, 2001):
             insert_c1c2(cursor, i, ConsistencyLevel.ALL)
 
