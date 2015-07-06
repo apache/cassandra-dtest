@@ -16,6 +16,7 @@ class TestCompaction(Tester):
         kwargs['cluster_options'] = {'start_rpc': 'true'}
         Tester.__init__(self, *args, **kwargs)
 
+    @since('0', '2.2.X')
     def compaction_delete_test(self):
         """
         Test that executing a delete properly tombstones a row.

@@ -16,7 +16,7 @@ class TestOfflineTools(Tester):
     def sstablelevelreset_test(self):
         """
         Insert data and call sstablelevelreset on a series of
-        tables. Confirm level is reset to 0 using sstable2json to read tables.
+        tables. Confirm level is reset to 0 using its output.
         Test a variety of possible errors and ensure response is resonable.
         @since 2.1.5
         @jira_ticket CASSANDRA-7614
