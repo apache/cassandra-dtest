@@ -1,13 +1,20 @@
-from ccmlib.node import Node
+import fileinput
+import functools
+import re
+import subprocess
+import sys
+import time
+import unittest
 from distutils.version import LooseVersion
 from threading import Thread
-import re, sys, fileinput, time, unittest, functools
-import subprocess
 
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
+from nose.plugins.attrib import attr
 
-from dtest import DISABLE_VNODES, CASSANDRA_DIR, debug
+from ccmlib.node import Node
+from dtest import CASSANDRA_DIR, DISABLE_VNODES, IGNORE_REQUIRE, debug
+
 
 def rows_to_list(rows):
     new_list = [list(row) for row in rows]
@@ -232,7 +239,16 @@ def require(require_pattern):
     If neither 'require_pattern' nor 'CASSANDRA-{require_pattern}' is a
     case-insensitive match for the name of Cassandra's current git branch, the
     test function or class will be skipped with unittest.skip.
+
+    To run decorated methods as if they were not decorated with @require, set
+    the environment variable IGNORE_REQUIRE to 'yes' or 'true'. To only run
+    methods decorated with require, set IGNORE_REQUIRE to 'yes' or 'true' and
+    run `nosetests` with `-a required`. (This uses the built-in `attrib`
+    plugin.)
     """
+    tagging_decorator = attr('required')
+    if IGNORE_REQUIRE:
+        return tagging_decorator
     require_pattern = str(require_pattern)
     skipme = True
     git_branch = ''
@@ -247,7 +263,10 @@ def require(require_pattern):
         if any(re.match(p, git_branch, re.IGNORECASE) for p in run_on_branch_patterns):
             skipme = False
 
-    return unittest.skipIf(skipme, 'require ' + str(require_pattern))
+    def tag_and_skip_decorator(test_item):
+        test_item = tagging_decorator(test_item)
+        return unittest.skipIf(skipme, 'require ' + str(require_pattern))(test_item)
+    return tag_and_skip_decorator
 
 
 def cassandra_git_branch():
