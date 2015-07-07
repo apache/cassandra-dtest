@@ -1,13 +1,15 @@
-from dtest import Tester, debug
-from tools import insert_c1c2, since
+import os
+import time
+from re import findall
+
 from cassandra import ConsistencyLevel
 from ccmlib.node import Node
-from re import findall
-import time
-import os
-from assertions import assert_one, assert_almost_equal
 from nose.plugins.attrib import attr
+
+from assertions import assert_almost_equal, assert_one
+from dtest import Tester, debug
 from flaky import flaky
+from tools import insert_c1c2, since
 
 
 @since('2.1')
