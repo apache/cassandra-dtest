@@ -7,6 +7,7 @@ import time
 import os
 from assertions import assert_one, assert_almost_equal
 from nose.plugins.attrib import attr
+from flaky import flaky
 
 
 @since('2.1')
@@ -203,6 +204,7 @@ class TestIncRepair(Tester):
 
     @since('2.1')
     @attr('long')
+    @flaky  # see CASSANDRA-9752
     def multiple_subsequent_repair_test(self):
         """
         Covers CASSANDRA-8366
