@@ -748,3 +748,48 @@ class CqlshCopyTest(Tester):
         self.node1.run_cqlsh(cmds="COPY ks.testcopyto FROM '{name}'".format(name=tempfile.name))
         new_results = list(self.session.execute("SELECT * FROM testcopyto"))
         self.assertEqual(results, new_results)
+
+    def test_source_copy_round_trip(self):
+        """
+        Like test_round_trip, but uses the SOURCE command to execute the
+        COPY command.  This checks that we don't have unicode-related
+        problems when sourcing COPY commands (CASSANDRA-9083).
+        """
+        self.prepare()
+        self.session.execute("""
+            CREATE TABLE testcopyto (
+                a int,
+                b text,
+                c float,
+                d uuid,
+                PRIMARY KEY (a, b)
+            )""")
+
+        insert_statement = self.session.prepare("INSERT INTO testcopyto (a, b, c, d) VALUES (?, ?, ?, ?)")
+        args = [(i, str(i), float(i) + 0.5, uuid4()) for i in range(1000)]
+        execute_concurrent_with_args(self.session, insert_statement, args)
+
+        results = list(self.session.execute("SELECT * FROM testcopyto"))
+
+        tempfile = NamedTemporaryFile()
+        debug('Exporting to csv file: {name}'.format(name=tempfile.name))
+
+        commandfile = NamedTemporaryFile()
+        with open(commandfile.name, 'w') as commands:
+            commands.write('USE ks;\n')
+            commands.write("COPY ks.testcopyto TO '{name}' WITH HEADER=false;".format(name=tempfile.name))
+
+        self.node1.run_cqlsh(cmds="SOURCE '{name}'".format(name=commandfile.name))
+
+        # import the CSV file with COPY FROM
+        self.session.execute("TRUNCATE ks.testcopyto")
+        debug('Importing from csv file: {name}'.format(name=tempfile.name))
+
+        commandfile = NamedTemporaryFile()
+        with open(commandfile.name, 'w') as commands:
+            commands.write('USE ks;\n')
+            commands.write("COPY ks.testcopyto FROM '{name}' WITH HEADER=false;".format(name=tempfile.name))
+
+        self.node1.run_cqlsh(cmds="SOURCE '{name}'".format(name=commandfile.name))
+        new_results = list(self.session.execute("SELECT * FROM testcopyto"))
+        self.assertEqual(results, new_results)
