@@ -5,6 +5,7 @@ from cassandra.cluster import NoHostAvailable
 from dtest import debug, Tester
 from tools import since
 from assertions import assert_invalid
+from flaky import flaky
 
 class TestAuth(Tester):
 
@@ -17,6 +18,7 @@ class TestAuth(Tester):
         ]
         Tester.__init__(self, *args, **kwargs)
 
+    @flaky
     def system_auth_ks_is_alterable_test(self):
         self.prepare(nodes=3)
         debug("nodes started")
