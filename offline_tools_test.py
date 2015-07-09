@@ -160,6 +160,7 @@ class TestOfflineTools(Tester):
             self.assertEqual(final_levels[x], 0, msg=initial)
 
     @since('2.2')
+    @require(9774, broken_in='3.0')
     def sstableverify_test(self):
         """
         Generate sstables and test offline verification works correctly
