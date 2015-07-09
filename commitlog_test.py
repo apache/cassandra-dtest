@@ -4,7 +4,7 @@ import glob
 import time
 import subprocess
 import ccmlib
-from tools import since
+from tools import require, since
 from cassandra import WriteTimeout
 from cassandra.cluster import NoHostAvailable, OperationTimedOut
 from dtest import Tester, debug
@@ -132,6 +132,7 @@ class TestCommitLog(Tester):
                 self.node1.stress(['write', 'n=500000', '-rate', 'threads=25'], stdout=devnull, stderr=subprocess.STDOUT)
 
     @since('2.1')
+    @require(9717, broken_in='3.0')
     def default_segment_size_test(self):
         """ Test default commitlog_segment_size_in_mb (32MB) """
 
@@ -139,6 +140,7 @@ class TestCommitLog(Tester):
         self._commitlog_test(32, 60, 2, files_error=0.5)
 
     @since('2.1')
+    @require(9717, broken_in='3.0')
     def small_segment_size_test(self):
         """ Test a small commitlog_segment_size_in_mb (5MB) """
         segment_size_in_mb = 5
