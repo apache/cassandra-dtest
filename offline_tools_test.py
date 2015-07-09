@@ -1,8 +1,9 @@
-from dtest import Tester, debug
 import os
 import re
 import subprocess
+
 from ccmlib import common
+from dtest import Tester, debug
 from tools import since
 
 
