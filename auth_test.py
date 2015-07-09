@@ -1,11 +1,14 @@
-import time, re
+import re
+import time
 
-from cassandra import Unauthorized, AuthenticationFailed
+from cassandra import AuthenticationFailed, Unauthorized
 from cassandra.cluster import NoHostAvailable
-from dtest import debug, Tester
-from tools import since
+
 from assertions import assert_invalid
+from dtest import Tester, debug
 from flaky import flaky
+from tools import since
+
 
 class TestAuth(Tester):
 
