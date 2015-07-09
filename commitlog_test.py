@@ -1,14 +1,16 @@
+import glob
 import os
 import stat
-import glob
-import time
 import subprocess
-import ccmlib
-from tools import require, since
+import time
+
 from cassandra import WriteTimeout
 from cassandra.cluster import NoHostAvailable, OperationTimedOut
+
+import ccmlib
+from assertions import assert_almost_equal, assert_none, assert_one
 from dtest import Tester, debug
-from assertions import assert_one, assert_none, assert_almost_equal
+from tools import require, since
 
 
 class TestCommitLog(Tester):
