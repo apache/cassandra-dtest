@@ -401,15 +401,19 @@ class MiscellaneousCQLTester(CQLTester):
 class AbortedQueriesTester(CQLTester):
     """
     @jira_ticket CASSANDRA-7392
-    Test that we can abort long queries that are already in progress
+    Test that read-queries that take longer than read_request_timeout_in_ms time out
     """
     def local_query_test(self):
         """
-        Abort a query running on the local coordinator node
+        Check that a query running on the local coordinator node times out
         """
         cluster = self.cluster
         cluster.set_configuration_options(values={'read_request_timeout_in_ms': 1000})
 
+        # cassandra.test.read_iteration_delay_ms causes the state tracking read iterators
+        # introduced by CASSANDRA-7392 to pause by the specified amount of milliseconds during each
+        # iteration of non system queries, so that these queries take much longer to complete,
+        # see ReadCommand.withStateTracking()
         cluster.populate(1).start(wait_for_binary_proto=True, jvm_args=["-Dcassandra.test.read_iteration_delay_ms=100"])
         node = cluster.nodelist()[0]
         cursor = self.patient_cql_connection(node)
@@ -431,7 +435,7 @@ class AbortedQueriesTester(CQLTester):
 
     def remote_query_test(self):
         """
-        Abort a query running on a node other than the coordinator
+        Check that a query running on a node other than the coordinator times out
         """
         cluster = self.cluster
         cluster.set_configuration_options(values={'read_request_timeout_in_ms': 1000})
@@ -440,7 +444,7 @@ class AbortedQueriesTester(CQLTester):
         node1, node2 = cluster.nodelist()
 
         node1.start(wait_for_binary_proto=True, jvm_args=["-Djoin_ring=false"])  # ensure other node executes queries
-        node2.start(wait_for_binary_proto=True, jvm_args=["-Dcassandra.test.read_iteration_delay_ms=100"])
+        node2.start(wait_for_binary_proto=True, jvm_args=["-Dcassandra.test.read_iteration_delay_ms=100"])  # see above for explanation
 
         cursor = self.patient_exclusive_cql_connection(node1)
 
@@ -461,12 +465,12 @@ class AbortedQueriesTester(CQLTester):
 
     def index_query_test(self):
         """
-        Abort an index query
+        Check that a secondary index query times out
         """
         cluster = self.cluster
         cluster.set_configuration_options(values={'read_request_timeout_in_ms': 1000})
 
-        cluster.populate(1).start(wait_for_binary_proto=True, jvm_args=["-Dcassandra.test.read_iteration_delay_ms=100"])
+        cluster.populate(1).start(wait_for_binary_proto=True, jvm_args=["-Dcassandra.test.read_iteration_delay_ms=100"])  # see above for explanation
         node = cluster.nodelist()[0]
         cursor = self.patient_cql_connection(node)
 
@@ -482,8 +486,15 @@ class AbortedQueriesTester(CQLTester):
         cursor.execute("CREATE INDEX ON test3 (col)")
 
         for i in xrange(500):
-            cursor.execute("INSERT INTO test3 (id, col, val) VALUES ({}, {}, 'foo')".format(i, i / 10))
+            cursor.execute("INSERT INTO test3 (id, col, val) VALUES ({}, {}, 'foo')".format(i, i // 10))
 
         mark = node.mark_log()
         assert_unavailable(lambda c: debug(c.execute("SELECT * from test3 WHERE col < 50 ALLOW FILTERING")), cursor)
         node.watch_log_for("<SELECT \* FROM ks.test3 WHERE col < 50 (.*)> timed out", from_mark=mark, timeout=30)
+
+    @require("6477")
+    def materialized_view_test(self):
+        """
+        Check that a materialized view query times out
+        """
+        self.fail("Not yet implemented")
