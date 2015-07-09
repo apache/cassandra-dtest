@@ -1,8 +1,11 @@
-from cassandra import Unauthorized
-from dtest import Tester, debug
-from assertions import assert_all, assert_invalid
-from tools import since, require
 import time
+
+from cassandra import Unauthorized
+
+from assertions import assert_all, assert_invalid
+from dtest import Tester, debug
+from tools import require, since
+
 
 @since('2.2')
 class TestAuthUpgrade(Tester):
