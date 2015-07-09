@@ -176,18 +176,17 @@ class since(object):
             return "%s > %s" % (version, self.max_version)
 
     def _wrap_setUp(self, cls):
-        backup_setUp_name = '_since_setUp'
+        orig_setUp = cls.setUp
 
         @functools.wraps(cls.setUp)
-        def wrapped(obj):
-            getattr(obj, backup_setUp_name)()
+        def wrapped_setUp(obj, *args, **kwargs):
+            orig_setUp(obj, *args, **kwargs)
             version = LooseVersion(obj.cluster.version())
             msg = self._skip_msg(version)
             if msg:
                 obj.skip(msg)
 
-        setattr(cls, backup_setUp_name, cls.setUp)
-        cls.setUp = wrapped
+        cls.setUp = wrapped_setUp
         return cls
 
     def _wrap_function(self, f):
