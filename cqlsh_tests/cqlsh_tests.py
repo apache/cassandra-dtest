@@ -974,7 +974,7 @@ CREATE TABLE int_checks.values (
             INSERT INTO values (d, t) VALUES ('%d-1-1', '01:00:00.000000000');
             INSERT INTO values (d, t) VALUES ('%d-1-1', '02:00:00.000000000');
             INSERT INTO values (d, t) VALUES ('%d-1-1', '03:00:00.000000000')"""
-                                        % (datetime.MINYEAR-1, datetime.MINYEAR, datetime.MAXYEAR, datetime.MAXYEAR+1,))
+                                        % (datetime.MINYEAR - 1, datetime.MINYEAR, datetime.MAXYEAR, datetime.MAXYEAR + 1,))
         # outside the MIN and MAX range it should print the number of days from the epoch
 
         if len(stderr) > 0:
@@ -1060,7 +1060,7 @@ Tracing session:""")
 Warnings :
 Unlogged batch covering 2 partitions detected against table [client_warnings.test]. You should use a logged batch for atomicity, or asynchronous writes for performance.""")
 
-    @since('2.2')
+    @since('2.1')
     def test_connect_timeout(self):
         """
         @jira_ticket CASSANDRA-9601
