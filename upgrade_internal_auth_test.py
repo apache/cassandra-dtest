@@ -1,8 +1,11 @@
-from cassandra import Unauthorized
-from dtest import Tester, debug
-from assertions import assert_all, assert_invalid
-from tools import since
 import time
+
+from cassandra import Unauthorized
+
+from assertions import assert_all, assert_invalid
+from dtest import Tester, debug
+from tools import require, since
+
 
 @since('2.2')
 class TestAuthUpgrade(Tester):
@@ -26,6 +29,7 @@ class TestAuthUpgrade(Tester):
 
     # todo: when we branch for 3.0 switch this from trunk to cassandra-3.0
     @since('3.0')
+    @require(9704)
     def upgrade_to_30_test(self):
         self.do_upgrade_with_internal_auth("git:trunk")
 
