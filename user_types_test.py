@@ -39,6 +39,14 @@ class TestUserTypes(Tester):
             cursor.execute(query)
         assert re.search(message, cm.exception.message), "Expected: %s" % message
 
+    # FIXME: use python-driver metadata API
+    def assertNoTypes(self, cursor):
+        if self.cluster.version() >= '3.0':
+            query = "SELECT * from system_schema.types"
+        else:
+            query = "SELECT * from system.schema_usertypes"
+        self.assertEqual(0, len(cursor.execute(query)))
+
     def test_type_dropping(self):
         """
         Tests that a type cannot be dropped when in use, and otherwise can be dropped.
@@ -99,11 +107,7 @@ class TestUserTypes(Tester):
         cursor.execute(stmt)
 
         # now let's have a look at the system schema and make sure no user types are defined
-        stmt = """
-              SELECT type_name from system.schema_usertypes;
-           """
-        rows = cursor.execute(stmt)
-        self.assertEqual(0, len(rows))
+        self.assertNoTypes(cursor)
 
     def test_nested_type_dropping(self):
         """
@@ -152,11 +156,7 @@ class TestUserTypes(Tester):
         cursor.execute(stmt)
 
         # now let's have a look at the system schema and make sure no user types are defined
-        stmt = """
-              SELECT type_name from system.schema_usertypes;
-           """
-        rows = cursor.execute(stmt)
-        self.assertEqual(0, len(rows))
+        self.assertNoTypes(cursor)
 
     def test_type_enforcement(self):
         """
@@ -565,8 +565,7 @@ class TestUserTypes(Tester):
         user2_cursor.execute("DROP TYPE ks2.simple_type;")
 
         #verify user type metadata is gone from the system schema
-        rows = superuser_cursor.execute("SELECT * from system.schema_usertypes")
-        self.assertEqual(0, len(rows))
+        self.assertNoTypes(cursor)
 
     def test_nulls_in_user_types(self):
         """Tests user types with null values"""

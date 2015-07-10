@@ -1288,7 +1288,14 @@ class CqlshSmokeTest(Tester):
         assert_none(self.cursor, 'SELECT key FROM test')
 
         self.node1.run_cqlsh('DROP TABLE ks.test;')
-        result = rows_to_list(self.cursor.execute("SELECT columnfamily_name FROM system.schema_columnfamilies WHERE keyspace_name='ks';"))
+
+        # FIXME: use python-driver metadata API
+        if self.cluster.version() >= '3.0':
+            query = "SELECT table_name FROM system_schema.tables WHERE keyspace_name='ks';"
+        else:
+            query = "SELECT columnfamily_name FROM system.schema_columnfamilies WHERE keyspace_name='ks';"
+
+        result = rows_to_list(self.cursor.execute(query))
         self.assertEqual([], result)
 
     def test_truncate(self):
@@ -1311,9 +1318,13 @@ class CqlshSmokeTest(Tester):
         self.create_cf(self.cursor, 'test', columns={'i': 'ascii'})
 
         def get_ks_columns():
-            return rows_to_list(self.cursor.execute(
-                "SELECT columnfamily_name, column_name, validator FROM system.schema_columns WHERE keyspace_name='ks';"
-            ))
+            # FIXME: use python-driver metadata API
+            if self.cluster.version() >= '3.0':
+                query = "SELECT table_name, column_name, validator FROM system_schema.columns WHERE keyspace_name='ks';"
+            else:
+                query = "SELECT columnfamily_name, column_name, validator FROM system.schema_columns WHERE keyspace_name='ks';"
+
+            return rows_to_list(self.cursor.execute(query))
 
         old_column_spec = [u'test', u'i',
                            u'org.apache.cassandra.db.marshal.AsciiType']
@@ -1399,12 +1410,21 @@ class CqlshSmokeTest(Tester):
         self.assertRaises(InvalidRequest, execute_requires_index)
 
     def get_keyspace_names(self):
-        return [x[0] for x in
-                rows_to_list(self.cursor.execute(
-                    'SELECT keyspace_name from system.schema_keyspaces'))]
+        # FIXME: use python-driver metadata API
+        if self.cluster.version() >= '3.0':
+            query = 'SELECT keyspace_name from system_schema.keyspaces'
+        else:
+            query = 'SELECT keyspace_name from system.schema_keyspaces'
+
+        return [x[0] for x in rows_to_list(self.cursor.execute(query))]
 
     def get_tables_in_keyspace(self, keyspace=None):
-        cmd = "SELECT columnfamily_name FROM system.schema_columnfamilies"
+        # FIXME: use python-driver metadata API
+        if self.cluster.version() >= '3.0':
+            cmd = "SELECT table_name FROM system_schema.tables"
+        else:
+            cmd = "SELECT columnfamily_name FROM system.schema_columnfamilies"
+
         cmd += " WHERE keyspace_name='{keyspace}'".format(keyspace=keyspace) if keyspace else ""
         cmd += ";"
 

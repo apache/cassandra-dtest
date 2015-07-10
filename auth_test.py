@@ -20,6 +20,8 @@ class TestAuth(Tester):
     def system_auth_ks_is_alterable_test(self):
         self.prepare(nodes=3)
         debug("nodes started")
+
+        # FIXME: use python-driver metadata API
         schema_query = """SELECT strategy_options
                           FROM system.schema_keyspaces
                           WHERE keyspace_name = 'system_auth'"""

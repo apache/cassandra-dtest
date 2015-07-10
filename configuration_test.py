@@ -93,7 +93,11 @@ class TestConfiguration(Tester):
                            msg='ALTER KEYSPACE was not respected')
 
     def _check_chunk_length(self, cursor, value):
-        describe_table_query = "SELECT * FROM system.schema_columnfamilies WHERE keyspace_name='ks' AND columnfamily_name='test_table';"
+        # FIXME: use python-driver metadata API
+        if self.cluster.version() >= '3.0':
+            describe_table_query = "SELECT * FROM system_schema.tables WHERE keyspace_name='ks' AND table_name='test_table';"
+        else:
+            describe_table_query = "SELECT * FROM system.schema_columnfamilies WHERE keyspace_name='ks' AND columnfamily_name='test_table';"
         rows = cursor.execute(describe_table_query)
         results = rows[0]
         # Now extract the param list
@@ -102,7 +106,7 @@ class TestConfiguration(Tester):
             if 'sstable_compression' in str(result):
                 params = result
 
-        assert params is not '', "Looking for a row with the string 'sstable_compression' in system.schema_columnfamilies, but could not find it."
+        assert params is not '', "Looking for a row with the string 'sstable_compression', but could not find it."
 
         params = ast.literal_eval(params)
         chunk_length = int(params['chunk_length_kb'])
