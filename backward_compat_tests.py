@@ -796,7 +796,18 @@ class TestCQL(Tester):
             ) WITH COMPACT STORAGE
         """)
 
+        cursor.execute("""
+            CREATE COLUMNFAMILY test2 (
+                row text,
+                number int,
+                number2 int,
+                string text,
+                PRIMARY KEY (row, number, number2)
+            ) WITH COMPACT STORAGE
+        """)
+
         for is_upgraded, cursor in self.do_upgrade(cursor):
+            debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE test")
 
             cursor.execute("INSERT INTO Test (row, number, string) VALUES ('row', 1, 'one');")
@@ -821,6 +832,32 @@ class TestCQL(Tester):
 
             res = cursor.execute("SELECT number FROM Test WHERE row='row' AND number <= 3 ORDER BY number DESC;")
             assert rows_to_list(res) == [[3], [2], [1]], res
+
+            # composite clustering
+            cursor.execute("INSERT INTO test2 (row, number, number2, string) VALUES ('a', 1, 0, 'a');")
+            cursor.execute("INSERT INTO test2 (row, number, number2, string) VALUES ('a', 2, 0, 'a');")
+            cursor.execute("INSERT INTO test2 (row, number, number2, string) VALUES ('a', 2, 1, 'a');")
+            cursor.execute("INSERT INTO test2 (row, number, number2, string) VALUES ('a', 3, 0, 'a');")
+            cursor.execute("INSERT INTO test2 (row, number, number2, string) VALUES ('a', 3, 1, 'a');")
+            cursor.execute("INSERT INTO test2 (row, number, number2, string) VALUES ('a', 4, 0, 'a');")
+
+            res = cursor.execute("SELECT number, number2 FROM test2 WHERE row='a' AND number < 3 ORDER BY number ASC;")
+            assert rows_to_list(res) == [[1, 0], [2, 0], [2, 1]], res
+
+            res = cursor.execute("SELECT number, number2 FROM test2 WHERE row='a' AND number >= 3 ORDER BY number ASC;")
+            assert rows_to_list(res) == [[3, 0], [3, 1], [4, 0]], res
+
+            res = cursor.execute("SELECT number, number2 FROM test2 WHERE row='a' AND number < 3 ORDER BY number DESC;")
+            assert rows_to_list(res) == [[2, 1], [2, 0], [1, 0]], res
+
+            res = cursor.execute("SELECT number, number2 FROM test2 WHERE row='a' AND number >= 3 ORDER BY number DESC;")
+            assert rows_to_list(res) == [[4, 0], [3, 1], [3, 0]], res
+
+            res = cursor.execute("SELECT number, number2 FROM test2 WHERE row='a' AND number > 3 ORDER BY number DESC;")
+            assert rows_to_list(res) == [[4, 0]], res
+
+            res = cursor.execute("SELECT number, number2 FROM test2 WHERE row='a' AND number <= 3 ORDER BY number DESC;")
+            assert rows_to_list(res) == [[3, 1], [3, 0], [2, 1], [2, 0], [1, 0]], res
 
     def order_by_validation_test(self):
         """ Check we don't allow order by on row key (#4246) """
