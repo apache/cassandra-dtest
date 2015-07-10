@@ -3820,7 +3820,9 @@ class TestCQL(Tester):
             # Check we do correctly get the static column value with a SELECT *, even
             # if we're only slicing part of the partition
             assert_one(cursor, "SELECT * FROM test WHERE k=0 AND p=0", [0, 0, 24, 0])
+            assert_one(cursor, "SELECT * FROM test WHERE k=0 AND p=0 ORDER BY p DESC", [0, 0, 24, 0])
             assert_one(cursor, "SELECT * FROM test WHERE k=0 AND p=1", [0, 1, 24, 1])
+            assert_one(cursor, "SELECT * FROM test WHERE k=0 AND p=1 ORDER BY p DESC", [0, 1, 24, 1])
 
             # Test for IN on the clustering key (#6769)
             assert_all(cursor, "SELECT * FROM test WHERE k=0 AND p IN (0, 1)", [[0, 0, 24, 0], [0, 1, 24, 1]])
