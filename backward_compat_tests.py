@@ -384,37 +384,41 @@ class TestCQL(Tester):
                 userid uuid,
                 posted_month int,
                 posted_day int,
-                body text,
-                posted_by text,
+                body ascii,
+                posted_by ascii,
                 PRIMARY KEY (userid, posted_month, posted_day)
             );
         """)
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
+            debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE timeline")
 
+            frodo_id = UUID('550e8400-e29b-41d4-a716-446655440000')
+            sam_id = UUID('f47ac10b-58cc-4372-a567-0e02b2c3d479')
+
             # Inserts
-            cursor.execute("INSERT INTO timeline (userid, posted_month, posted_day, body, posted_by) VALUES (550e8400-e29b-41d4-a716-446655440000, 1, 12, 'Something else', 'Frodo Baggins')")
-            cursor.execute("INSERT INTO timeline (userid, posted_month, posted_day, body, posted_by) VALUES (550e8400-e29b-41d4-a716-446655440000, 1, 24, 'Something something', 'Frodo Baggins')")
-            cursor.execute("UPDATE timeline SET body = 'Yo Froddo', posted_by = 'Samwise Gamgee' WHERE userid = f47ac10b-58cc-4372-a567-0e02b2c3d479 AND posted_month = 1 AND posted_day = 3")
-            cursor.execute("UPDATE timeline SET body = 'Yet one more message' WHERE userid = 550e8400-e29b-41d4-a716-446655440000 AND posted_month = 1 and posted_day = 30")
+            cursor.execute("INSERT INTO timeline (userid, posted_month, posted_day, body, posted_by) VALUES (%s, 1, 12, 'Something else', 'Frodo Baggins')", (frodo_id,))
+            cursor.execute("INSERT INTO timeline (userid, posted_month, posted_day, body, posted_by) VALUES (%s, 1, 24, 'Something something', 'Frodo Baggins')", (frodo_id,))
+            cursor.execute("UPDATE timeline SET body = 'Yo Froddo', posted_by = 'Samwise Gamgee' WHERE userid = %s AND posted_month = 1 AND posted_day = 3", (sam_id,))
+            cursor.execute("UPDATE timeline SET body = 'Yet one more message' WHERE userid = %s AND posted_month = 1 and posted_day = 30", (frodo_id,))
 
             # Queries
-            res = cursor.execute("SELECT body, posted_by FROM timeline WHERE userid = 550e8400-e29b-41d4-a716-446655440000 AND posted_month = 1 AND posted_day = 24")
-            assert rows_to_list(res) == [['Something something', 'Frodo Baggins']], res
+            res = cursor.execute("SELECT body, posted_by FROM timeline WHERE userid = %s AND posted_month = 1 AND posted_day = 24", (frodo_id,))
+            self.assertEqual([['Something something', 'Frodo Baggins']], rows_to_list(res))
 
-            res = cursor.execute("SELECT posted_day, body, posted_by FROM timeline WHERE userid = 550e8400-e29b-41d4-a716-446655440000 AND posted_month = 1 AND posted_day > 12")
-            assert rows_to_list(res) == [
+            res = cursor.execute("SELECT posted_day, body, posted_by FROM timeline WHERE userid = %s AND posted_month = 1 AND posted_day > 12", (frodo_id,))
+            self.assertEqual([
                 [24, 'Something something', 'Frodo Baggins'],
                 [30, 'Yet one more message', None]
-            ], res
+            ], rows_to_list(res))
 
-            res = cursor.execute("SELECT posted_day, body, posted_by FROM timeline WHERE userid = 550e8400-e29b-41d4-a716-446655440000 AND posted_month = 1")
-            assert rows_to_list(res) == [
+            res = cursor.execute("SELECT posted_day, body, posted_by FROM timeline WHERE userid = %s AND posted_month = 1", (frodo_id,))
+            self.assertEqual([
                 [12, 'Something else', 'Frodo Baggins'],
                 [24, 'Something something', 'Frodo Baggins'],
                 [30, 'Yet one more message', None]
-            ], res
+            ], rows_to_list(res))
 
     @freshCluster()
     def limit_ranges_test(self):
@@ -643,34 +647,35 @@ class TestCQL(Tester):
         """)
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
+            debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE test")
 
             # Inserts
             for x in range(0, 10):
-                cursor.execute("INSERT INTO test (k, c, v) VALUES (0, %i, %i)" % (x, x))
+                cursor.execute("INSERT INTO test (k, c, v) VALUES (0, %s, %s)", (x, x))
 
             # Queries
             res = cursor.execute("SELECT v FROM test WHERE k = 0")
-            assert len(res) == 10, res
+            self.assertEqual([[x] for x in range(10)], rows_to_list(res))
 
             res = cursor.execute("SELECT v FROM test WHERE k = 0 AND c >= 2 AND c <= 6")
-            assert len(res) == 5 and res[0][0] == 2 and res[len(res) - 1][0] == 6, res
+            self.assertEqual([[x] for x in range(2, 7)], rows_to_list(res))
 
             res = cursor.execute("SELECT v FROM test WHERE k = 0 AND c > 2 AND c <= 6")
-            assert len(res) == 4 and res[0][0] == 3 and res[len(res) - 1][0] == 6, res
+            self.assertEqual([[x] for x in range(3, 7)], rows_to_list(res))
 
             res = cursor.execute("SELECT v FROM test WHERE k = 0 AND c >= 2 AND c < 6")
-            assert len(res) == 4 and res[0][0] == 2 and res[len(res) - 1][0] == 5, res
+            self.assertEqual([[x] for x in range(2, 6)], rows_to_list(res))
 
             res = cursor.execute("SELECT v FROM test WHERE k = 0 AND c > 2 AND c < 6")
-            assert len(res) == 3 and res[0][0] == 3 and res[len(res) - 1][0] == 5, res
+            self.assertEqual([[x] for x in range(3, 6)], rows_to_list(res))
 
             # With LIMIT
             res = cursor.execute("SELECT v FROM test WHERE k = 0 AND c > 2 AND c <= 6 LIMIT 2")
-            assert len(res) == 2 and res[0][0] == 3 and res[len(res) - 1][0] == 4, res
+            self.assertEqual([[3], [4]], rows_to_list(res))
 
             res = cursor.execute("SELECT v FROM test WHERE k = 0 AND c >= 2 AND c < 6 ORDER BY c DESC LIMIT 2")
-            assert len(res) == 2 and res[0][0] == 5 and res[len(res) - 1][0] == 4, res
+            self.assertEqual([[5], [4]], rows_to_list(res))
 
     def in_clause_wide_rows_test(self):
         """ Check IN support for 'wide rows' in SELECT statement """
@@ -757,7 +762,8 @@ class TestCQL(Tester):
                 cursor.execute("INSERT INTO test1 (k, c, v) VALUES (0, %i, %i)" % (x, x))
 
             res = cursor.execute("SELECT v FROM test1 WHERE k = 0 ORDER BY c DESC")
-            assert rows_to_list(res) == [[x] for x in range(9, -1, -1)], res
+            expected = [[x] for x in reversed(range(10))]
+            self.assertEqual(expected, rows_to_list(res))
 
             # Inserts
             for x in range(0, 4):
@@ -1016,31 +1022,37 @@ class TestCQL(Tester):
         """)
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
+            debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE testcf")
             cursor.execute("TRUNCATE testcf2")
 
-            q = "INSERT INTO testcf (username, id, name, stuff) VALUES ('%s', %d, '%s', '%s');"
+            q = "INSERT INTO testcf (username, id, name, stuff) VALUES (%s, %s, %s, %s);"
             row1 = ('abc', 2, 'rst', 'some value')
             row2 = ('abc', 4, 'xyz', 'some other value')
-            cursor.execute(q % row1)
-            cursor.execute(q % row2)
+            cursor.execute(q, row1)
+            cursor.execute(q, row2)
 
             res = cursor.execute("SELECT * FROM testcf")
-            assert rows_to_list(res) == [list(row1), list(row2)], res
+            self.assertEqual([list(row1), list(row2)], rows_to_list(res))
 
             cursor.execute("DELETE FROM testcf WHERE username='abc' AND id=2")
 
             res = cursor.execute("SELECT * FROM testcf")
-            assert rows_to_list(res) == [list(row2)], res
+            self.assertEqual([list(row2)], rows_to_list(res))
 
-            q = "INSERT INTO testcf2 (username, id, name, stuff) VALUES ('%s', %d, '%s', '%s');"
+            q = "INSERT INTO testcf2 (username, id, name, stuff) VALUES (%s, %s, %s, %s);"
             row1 = ('abc', 2, 'rst', 'some value')
             row2 = ('abc', 4, 'xyz', 'some other value')
-            cursor.execute(q % row1)
-            cursor.execute(q % row2)
+            cursor.execute(q, row1)
+            cursor.execute(q, row2)
 
             res = cursor.execute("SELECT * FROM testcf2")
-            assert rows_to_list(res) == [list(row1), list(row2)], res
+            self.assertEqual([list(row1), list(row2)], rows_to_list(res))
+
+            cursor.execute("DELETE FROM testcf2 WHERE username='abc' AND id=2")
+
+            res = cursor.execute("SELECT * FROM testcf")
+            self.assertEqual([list(row2)], rows_to_list(res))
 
     def count_test(self):
         cursor = self.prepare()
@@ -1719,18 +1731,18 @@ class TestCQL(Tester):
             cursor.execute("TRUNCATE test")
             cursor.execute("TRUNCATE test2")
 
-            q = "INSERT INTO test (k, c) VALUES (%d, %d)"
+            q = "INSERT INTO test (k, c) VALUES (%s, %s)"
             for k in range(0, 2):
                 for c in range(0, 2):
-                    cursor.execute(q % (k, c))
+                    cursor.execute(q, (k, c))
 
             res = cursor.execute("SELECT * FROM test")
             assert rows_to_list(res) == [[x, y] for x in range(0, 2) for y in range(0, 2)], res
 
-            q = "INSERT INTO test2 (k, c) VALUES (%d, %d)"
+            q = "INSERT INTO test2 (k, c) VALUES (%s, %s)"
             for k in range(0, 2):
                 for c in range(0, 2):
-                    cursor.execute(q % (k, c))
+                    cursor.execute(q, (k, c))
 
             res = cursor.execute("SELECT * FROM test2")
             assert rows_to_list(res) == [[x, y] for x in range(0, 2) for y in range(0, 2)], res
@@ -2079,7 +2091,7 @@ class TestCQL(Tester):
             cursor.execute("TRUNCATE test2")
 
             for i in range(0, 10):
-                cursor.execute("INSERT INTO test1(k, c, v) VALUES ('foo', %i, %i)" % (i, i))
+                cursor.execute("INSERT INTO test1(k, c, v) VALUES ('foo', %s, %s)", (i, i))
 
             res = cursor.execute("SELECT c FROM test1 WHERE c > 2 AND c < 6 AND k = 'foo'")
             assert rows_to_list(res) == [[5], [4], [3]], res
@@ -2100,7 +2112,7 @@ class TestCQL(Tester):
             assert rows_to_list(res) == [[6], [5], [4], [3], [2]], res
 
             for i in range(0, 10):
-                cursor.execute("INSERT INTO test2(k, c, v) VALUES ('foo', %i, %i)" % (i, i))
+                cursor.execute("INSERT INTO test2(k, c, v) VALUES ('foo', %s, %s)", (i, i))
 
             res = cursor.execute("SELECT c FROM test2 WHERE c > 2 AND c < 6 AND k = 'foo'")
             assert rows_to_list(res) == [[3], [4], [5]], res
@@ -3184,7 +3196,7 @@ class TestCQL(Tester):
             # test aliasing ttl
             res = cursor.execute('SELECT ttl(name) AS name_ttl FROM users WHERE id = 0')
             self.assertEqual('name_ttl', res[0]._fields[0])
-            assert res[0].name_ttl in (9, 10)
+            self.assertIn(res[0].name_ttl, (9, 10))
 
             # test aliasing a regular function
             res = cursor.execute('SELECT intAsBlob(id) AS id_blob FROM users WHERE id = 0')
@@ -3275,7 +3287,7 @@ class TestCQL(Tester):
 
     @since('2.0.1')
     def select_distinct_test(self):
-        cursor = self.prepare()
+        cursor = self.prepare(ordered=True)
 
         # Test a regular (CQL3) table.
         cursor.execute('CREATE TABLE regular (pk0 int, pk1 int, ck0 int, val int, PRIMARY KEY((pk0, pk1), ck0))')
@@ -4606,6 +4618,7 @@ class TestCQL(Tester):
             cursor.execute("TRUNCATE frozentmap")
 
             for frozen in (False, True):
+                debug("Testing %s maps" % ("frozen" if frozen else "normal"))
 
                 table = "frozentmap" if frozen else "tmap"
                 cursor.execute("INSERT INTO %s(k, m) VALUES (0, {'foo' : 'bar'})" % (table,))
