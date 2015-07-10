@@ -3210,6 +3210,7 @@ class TestCQL(Tester):
         cursor.execute('CREATE TABLE users (id int PRIMARY KEY, name text)')
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
+            debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE users")
 
             for id in range(0, 5):
@@ -4201,13 +4202,19 @@ class TestCQL(Tester):
         cursor.execute("CREATE TABLE test (k int, c1 int, c2 int, PRIMARY KEY (k, c1, c2))")
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
+            debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE test")
 
             cursor.execute("INSERT INTO test(k, c1, c2) VALUES (0, 0, 0)")
             cursor.execute("INSERT INTO test(k, c1, c2) VALUES (0, 0, 1)")
             cursor.execute("INSERT INTO test(k, c1, c2) VALUES (0, 0, 2)")
 
+            assert_all(cursor, "SELECT * FROM test WHERE k=0 AND c1 = 0 AND c2 IN (0, 2)", [[0, 0, 0], [0, 0, 2]])
+            assert_all(cursor, "SELECT * FROM test WHERE k=0 AND c1 = 0 AND c2 IN (2, 0)", [[0, 0, 0], [0, 0, 2]])
+            assert_all(cursor, "SELECT * FROM test WHERE k=0 AND c1 = 0 AND c2 IN (2, 0) ORDER BY c1 ASC", [[0, 0, 0], [0, 0, 2]])
             assert_all(cursor, "SELECT * FROM test WHERE k=0 AND c1 = 0 AND c2 IN (2, 0) ORDER BY c1 DESC", [[0, 0, 2], [0, 0, 0]])
+            assert_all(cursor, "SELECT * FROM test WHERE k=0 AND c1 = 0 AND c2 IN (0, 2) ORDER BY c1 ASC", [[0, 0, 0], [0, 0, 2]])
+            assert_all(cursor, "SELECT * FROM test WHERE k=0 AND c1 = 0 AND c2 IN (0, 2) ORDER BY c1 DESC", [[0, 0, 2], [0, 0, 0]])
 
     @since('2.1')
     def in_order_by_without_selecting_test(self):
