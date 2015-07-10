@@ -110,6 +110,39 @@ class TestCQL(Tester):
         node1 = self.cluster.nodelist()[0]
         return node1.version()
 
+    def basic_paging_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k int,
+                c int,
+                v text,
+                PRIMARY KEY (k, c)
+            );
+        """)
+
+        for is_upgraded, cursor in self.do_upgrade(cursor):
+            debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
+            cursor.execute("TRUNCATE test")
+
+            expected = []
+            # match the key ordering for murmur3
+            for k in (1, 0, 2):
+                for c in range(5):
+                    value = "%d.%d" % (k, c)
+                    cursor.execute("INSERT INTO test (k, c, v) VALUES (%s, %s, %s)", (k, c, value))
+                    expected.append([k, c, value])
+
+            for fetch_size in (2, 3, 5, 10, 100):
+                debug("Using fetch size %d" % fetch_size)
+                cursor.default_fetch_size = fetch_size
+                results = rows_to_list(cursor.execute("SELECT * FROM test"))
+                import pprint
+                pprint.pprint(results)
+                self.assertEqual(len(expected), len(results))
+                self.assertEqual(expected, results)
+
     def static_cf_test(self):
         """ Test static CF syntax """
         cursor = self.prepare()
