@@ -27,6 +27,7 @@ cql_version = "3.0.0"
 QUERY_UPGRADED = os.environ.get('QUERY_UPGRADED', 'true').lower() in ('yes', 'true')
 QUERY_OLD = os.environ.get('QUERY_OLD', 'true').lower() in ('yes', 'true')
 OLD_CASSANDRA_DIR = os.environ.get('OLD_CASSANDRA_DIR', None)
+SKIP_UPGRADE = os.environ.get('SKIP_UPGRADE', 'false').lower() in ('yes', 'true')
 
 
 class TestCQL(Tester):
@@ -77,13 +78,15 @@ class TestCQL(Tester):
         """
         session.cluster.shutdown()
         node1 = self.cluster.nodelist()[0]
-        node1.drain()
-        node1.stop(gently=True)
 
-        node1.set_install_dir(version=self.original_install_dir)
-        node1.set_log_level("DEBUG" if DEBUG else "INFO")
-        node1.set_configuration_options(values={'internode_compression': 'none'})
-        node1.start(wait_for_binary_proto=True)
+        if not SKIP_UPGRADE:
+            node1.drain()
+            node1.stop(gently=True)
+
+            node1.set_install_dir(version=self.original_install_dir)
+            node1.set_log_level("DEBUG" if DEBUG else "INFO")
+            node1.set_configuration_options(values={'internode_compression': 'none'})
+            node1.start(wait_for_binary_proto=True)
 
         sessions = []
         if QUERY_UPGRADED:
