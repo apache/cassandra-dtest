@@ -3609,12 +3609,36 @@ class TestCQL(Tester):
             )
         """)
 
+        cursor.execute("""
+            CREATE TABLE test2 (
+                k int,
+                v int,
+                c1 int,
+                c2 int,
+                PRIMARY KEY (k, v)
+            )
+        """)
+
         for is_upgraded, cursor in self.do_upgrade(cursor):
+            debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE test")
 
             cursor.execute("INSERT INTO test (k, v) VALUES (0, 0)")
             self.cluster.flush()
             assert_one(cursor, "SELECT v FROM test WHERE k=0 AND v IN (1, 0)", [0])
+            assert_one(cursor, "SELECT v FROM test WHERE v IN (1, 0) ALLOW FILTERING", [0])
+
+            cursor.execute("INSERT INTO test2 (k, v) VALUES (0, 0)")
+            self.cluster.flush()
+            assert_one(cursor, "SELECT v FROM test2 WHERE k=0 AND v IN (1, 0)", [0])
+            assert_one(cursor, "SELECT v FROM test2 WHERE v IN (1, 0) ALLOW FILTERING", [0])
+
+            cursor.execute("DELETE FROM test2 WHERE k = 0")
+            cursor.execute("UPDATE test2 SET c2 = 1 WHERE k = 0 AND v = 0")
+            assert_one(cursor, "SELECT v FROM test2 WHERE k=0 AND v IN (1, 0)", [0])
+            cursor.execute("DELETE c2 FROM test2 WHERE k = 0 AND v = 0")
+            assert_none(cursor, "SELECT v FROM test2 WHERE k=0 AND v IN (1, 0)")
+            assert_none(cursor, "SELECT v FROM test2 WHERE v IN (1, 0) ALLOW FILTERING")
 
     @since('1.2')
     def large_count_test(self):
