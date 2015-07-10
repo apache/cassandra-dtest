@@ -565,7 +565,7 @@ class TestUserTypes(Tester):
         user2_cursor.execute("DROP TYPE ks2.simple_type;")
 
         #verify user type metadata is gone from the system schema
-        self.assertNoTypes(cursor)
+        self.assertNoTypes(superuser_cursor)
 
     def test_nulls_in_user_types(self):
         """Tests user types with null values"""
