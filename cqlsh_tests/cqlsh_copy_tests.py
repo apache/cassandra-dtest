@@ -325,7 +325,7 @@ class CqlshCopyTest(Tester):
         with open(self.tempfile.name, 'r') as csvfile:
             csv_values = list(csv.reader(csvfile))
 
-        self.assertSequenceEqual(csv_values,
+        self.assertItemsEqual(csv_values,
                                  [['a', 'b'], ['1', '10'], ['2', '20'], ['3', '30']])
 
     def test_reading_use_header(self):
