@@ -256,7 +256,7 @@ class TestRepair(Tester):
         node3 = cluster.nodes["node3"]
 
         debug("starting repair...")
-        opts = ["-dc", "dc1,dc2"]
+        opts = ["-dc", "dc1", "-dc", "dc2"]
         opts += self._repair_options(ks="ks")
         node1.repair(opts)
 
@@ -302,6 +302,7 @@ class TestRepair(Tester):
         node2.stop()
         insert_c1c2(cursor, 1000, ConsistencyLevel.THREE)
         node2.start(wait_for_binary_proto=True, wait_other_notice=True)
+        node1.watch_log_for_alive(node2)
         for i in xrange(1001, 2001):
             insert_c1c2(cursor, i, ConsistencyLevel.ALL)
 
