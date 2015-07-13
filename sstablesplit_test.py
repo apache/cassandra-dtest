@@ -1,10 +1,12 @@
+
+import subprocess
+import tempfile
+import time
+from os.path import getsize
+
 from dtest import Tester, debug
 from tools import since
 
-from os.path import getsize
-import time
-import subprocess
-import tempfile
 
 class TestSSTableSplit(Tester):
 
