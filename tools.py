@@ -176,18 +176,17 @@ class since(object):
             return "%s > %s" % (version, self.max_version)
 
     def _wrap_setUp(self, cls):
-        backup_setUp_name = '_since_setUp'
+        orig_setUp = cls.setUp
 
         @functools.wraps(cls.setUp)
-        def wrapped(obj):
-            getattr(obj, backup_setUp_name)()
+        def wrapped_setUp(obj, *args, **kwargs):
+            orig_setUp(obj, *args, **kwargs)
             version = LooseVersion(obj.cluster.version())
             msg = self._skip_msg(version)
             if msg:
                 obj.skip(msg)
 
-        setattr(cls, backup_setUp_name, cls.setUp)
-        cls.setUp = wrapped
+        cls.setUp = wrapped_setUp
         return cls
 
     def _wrap_function(self, f):
@@ -211,7 +210,7 @@ def no_vnodes():
     return unittest.skipIf(not DISABLE_VNODES, 'Test disabled for vnodes')
 
 
-def require(require_pattern):
+def require(require_pattern, broken_in=None):
     """Skips the decorated class or method, unless the argument
     'require_pattern' is a case-insensitive regex match for the name of the git
     branch in the directory from which Cassandra is running. For example, the
@@ -250,7 +249,6 @@ def require(require_pattern):
     if IGNORE_REQUIRE:
         return tagging_decorator
     require_pattern = str(require_pattern)
-    skipme = True
     git_branch = ''
     try:
         git_branch = cassandra_git_branch().lower()
@@ -260,13 +258,19 @@ def require(require_pattern):
 
     if git_branch:
         run_on_branch_patterns = (require_pattern, 'cassandra-{b}'.format(b=require_pattern))
+        # always run the test if the git branch name matches
         if any(re.match(p, git_branch, re.IGNORECASE) for p in run_on_branch_patterns):
-            skipme = False
-
-    def tag_and_skip_decorator(test_item):
-        test_item = tagging_decorator(test_item)
-        return unittest.skipIf(skipme, 'require ' + str(require_pattern))(test_item)
-    return tag_and_skip_decorator
+            return tagging_decorator
+        # if skipping a buggy/flapping test, use since
+        elif broken_in:
+            def tag_and_skip_after_version(decorated):
+                return since('0', broken_in)(tagging_decorator(decorated))
+            return tag_and_skip_after_version
+        # otherwise, skip with a message
+        else:
+            def tag_and_skip(decorated):
+                return unittest.skip('require ' + str(require_pattern))(tagging_decorator(decorated))
+            return tag_and_skip
 
 
 def cassandra_git_branch():
