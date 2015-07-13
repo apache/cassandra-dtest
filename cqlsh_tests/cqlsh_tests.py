@@ -1288,15 +1288,9 @@ class CqlshSmokeTest(Tester):
         assert_none(self.cursor, 'SELECT key FROM test')
 
         self.node1.run_cqlsh('DROP TABLE ks.test;')
+        self.cursor.cluster.refresh_schema_metadata()
 
-        # FIXME: use python-driver metadata API
-        if self.cluster.version() >= '3.0':
-            query = "SELECT table_name FROM system_schema.tables WHERE keyspace_name='ks';"
-        else:
-            query = "SELECT columnfamily_name FROM system.schema_columnfamilies WHERE keyspace_name='ks';"
-
-        result = rows_to_list(self.cursor.execute(query))
-        self.assertEqual([], result)
+        self.assertEqual(0, len(self.cursor.cluster.metadata.keyspaces['ks'].tables))
 
     def test_truncate(self):
         self.create_ks(self.cursor, 'ks', 1)
@@ -1318,24 +1312,21 @@ class CqlshSmokeTest(Tester):
         self.create_cf(self.cursor, 'test', columns={'i': 'ascii'})
 
         def get_ks_columns():
-            # FIXME: use python-driver metadata API
-            if self.cluster.version() >= '3.0':
-                query = "SELECT table_name, column_name, validator FROM system_schema.columns WHERE keyspace_name='ks';"
-            else:
-                query = "SELECT columnfamily_name, column_name, validator FROM system.schema_columns WHERE keyspace_name='ks';"
+            table = self.cursor.cluster.metadata.keyspaces['ks'].tables['test']
 
-            return rows_to_list(self.cursor.execute(query))
+            return [[table.name, column.name, column.data_type.cassname] for column in table.columns.values()]
 
         old_column_spec = [u'test', u'i',
-                           u'org.apache.cassandra.db.marshal.AsciiType']
+                           u'AsciiType']
         self.assertIn(old_column_spec, get_ks_columns())
 
         self.node1.run_cqlsh('ALTER TABLE ks.test ALTER i TYPE text;')
+        self.cursor.cluster.refresh_table_metadata("ks", "test")
 
         new_columns = get_ks_columns()
         self.assertNotIn(old_column_spec, new_columns)
         self.assertIn([u'test', u'i',
-                       u'org.apache.cassandra.db.marshal.UTF8Type'],
+                       u'UTF8Type'],
                       new_columns)
 
     def test_use_keyspace(self):
@@ -1410,25 +1401,12 @@ class CqlshSmokeTest(Tester):
         self.assertRaises(InvalidRequest, execute_requires_index)
 
     def get_keyspace_names(self):
-        # FIXME: use python-driver metadata API
-        if self.cluster.version() >= '3.0':
-            query = 'SELECT keyspace_name from system_schema.keyspaces'
-        else:
-            query = 'SELECT keyspace_name from system.schema_keyspaces'
+        self.cursor.cluster.refresh_schema_metadata()
+        return [ks.name for ks in self.cursor.cluster.metadata.keyspaces.values()]
 
-        return [x[0] for x in rows_to_list(self.cursor.execute(query))]
-
-    def get_tables_in_keyspace(self, keyspace=None):
-        # FIXME: use python-driver metadata API
-        if self.cluster.version() >= '3.0':
-            cmd = "SELECT table_name FROM system_schema.tables"
-        else:
-            cmd = "SELECT columnfamily_name FROM system.schema_columnfamilies"
-
-        cmd += " WHERE keyspace_name='{keyspace}'".format(keyspace=keyspace) if keyspace else ""
-        cmd += ";"
-
-        return [x[0] for x in rows_to_list(self.cursor.execute(cmd))]
+    def get_tables_in_keyspace(self, keyspace):
+        self.cursor.cluster.refresh_schema_metadata()
+        return [table.name for table in self.cursor.cluster.metadata.keyspaces[keyspace].tables.values()]
 
 
 class CqlLoginTest(Tester):
