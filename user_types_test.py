@@ -39,13 +39,9 @@ class TestUserTypes(Tester):
             cursor.execute(query)
         assert re.search(message, cm.exception.message), "Expected: %s" % message
 
-    # FIXME: use python-driver metadata API
     def assertNoTypes(self, cursor):
-        if self.cluster.version() >= '3.0':
-            query = "SELECT * from system_schema.types"
-        else:
-            query = "SELECT * from system.schema_usertypes"
-        self.assertEqual(0, len(cursor.execute(query)))
+        for keyspace in cursor.cluster.metadata.keyspaces.values():
+            self.assertEqual(0, len(keyspace.user_types))
 
     def test_type_dropping(self):
         """
