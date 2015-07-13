@@ -1,10 +1,14 @@
-import time, re
+import re
+import time
 
-from cassandra import Unauthorized, AuthenticationFailed
+from cassandra import AuthenticationFailed, Unauthorized
 from cassandra.cluster import NoHostAvailable
-from dtest import debug, Tester
-from tools import since
+
 from assertions import assert_invalid
+from dtest import Tester, debug
+from flaky import flaky
+from tools import since
+
 
 class TestAuth(Tester):
 
@@ -17,6 +21,7 @@ class TestAuth(Tester):
         ]
         Tester.__init__(self, *args, **kwargs)
 
+    @flaky
     def system_auth_ks_is_alterable_test(self):
         self.prepare(nodes=3)
         debug("nodes started")
@@ -181,19 +186,19 @@ class TestAuth(Tester):
         cursor = self.get_cursor(user='cassandra', password='cassandra')
 
         users = cursor.execute("LIST USERS")
-        self.assertEqual(1, len(users)) # cassandra
+        self.assertEqual(1, len(users))  # cassandra
 
         cursor.execute("CREATE USER IF NOT EXISTS aleksey WITH PASSWORD 'sup'")
         cursor.execute("CREATE USER IF NOT EXISTS aleksey WITH PASSWORD 'ignored'")
 
         users = cursor.execute("LIST USERS")
-        self.assertEqual(2, len(users)) # cassandra + aleksey
+        self.assertEqual(2, len(users))  # cassandra + aleksey
 
         cursor.execute("DROP USER IF EXISTS aleksey")
         cursor.execute("DROP USER IF EXISTS aleksey")
 
         users = cursor.execute("LIST USERS")
-        self.assertEqual(1, len(users)) # cassandra
+        self.assertEqual(1, len(users))  # cassandra
 
     def create_ks_auth_test(self):
         self.prepare()
@@ -337,7 +342,7 @@ class TestAuth(Tester):
         self.assertEquals(1, len(rows))
 
         rows = cathy.execute("TRUNCATE ks.cf")
-        assert rows == None
+        assert rows is None
 
     def grant_revoke_auth_test(self):
         self.prepare()
@@ -491,7 +496,7 @@ class TestAuth(Tester):
                            ('cathy', '<table ks.cf2>', 'SELECT'),
                            ('bob', '<keyspace ks>', 'ALTER'),
                            ('bob', '<table ks.cf>', 'DROP'),
-                           ('bob', '<table ks.cf2>', 'MODIFY')];
+                           ('bob', '<table ks.cf2>', 'MODIFY')]
 
         # CASSANDRA-7216 automatically grants permissions on a role to its creator
         if self.cluster.cassandra_version() >= '2.2.0':
@@ -560,9 +565,9 @@ class TestAuth(Tester):
         cathy.execute("DROP TYPE ks.address")
 
     def prepare(self, nodes=1, permissions_validity=0):
-        config = {'authenticator' : 'org.apache.cassandra.auth.PasswordAuthenticator',
-                  'authorizer' : 'org.apache.cassandra.auth.CassandraAuthorizer',
-                  'permissions_validity_in_ms' : permissions_validity}
+        config = {'authenticator': 'org.apache.cassandra.auth.PasswordAuthenticator',
+                  'authorizer': 'org.apache.cassandra.auth.CassandraAuthorizer',
+                  'permissions_validity_in_ms': permissions_validity}
         self.cluster.set_configuration_options(values=config)
         self.cluster.populate(nodes).start(no_wait=True)
         # default user setup is delayed by 10 seconds to reduce log spam
