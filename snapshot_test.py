@@ -183,11 +183,26 @@ class TestArchiveCommitlog(SnapshotTester):
             os.remove(f)
 
         snapshot_dir = self.make_snapshot(node1, 'ks', 'cf', 'basic')
-        system_ks_snapshot_dir = self.make_snapshot(node1, 'system', 'schema_keyspaces', 'keyspaces')
-        system_col_snapshot_dir = self.make_snapshot(node1, 'system', 'schema_columns', 'columns')
-        if self.cluster.version() >= '2.1':
+
+        if self.cluster.version() >= '3.0':
+            system_ks_snapshot_dir = self.make_snapshot(node1, 'system_schema', 'keyspaces', 'keyspaces')
+        else:
+            system_ks_snapshot_dir = self.make_snapshot(node1, 'system', 'schema_keyspaces', 'keyspaces')
+
+        if self.cluster.version() >= '3.0':
+            system_col_snapshot_dir = self.make_snapshot(node1, 'system_schema', 'columns', 'columns')
+        else:
+            system_col_snapshot_dir = self.make_snapshot(node1, 'system', 'schema_columns', 'columns')
+
+        if self.cluster.version() >= '3.0':
+            system_ut_snapshot_dir = self.make_snapshot(node1, 'system_schema', 'types', 'usertypes')
+        elif self.cluster.version() >= '2.1':
             system_ut_snapshot_dir = self.make_snapshot(node1, 'system', 'schema_usertypes', 'usertypes')
-        system_cfs_snapshot_dir = self.make_snapshot(node1, 'system', 'schema_columnfamilies', 'cfs')
+
+        if self.cluster.version() >= '3.0':
+            system_cfs_snapshot_dir = self.make_snapshot(node1, 'system_schema', 'tables', 'cfs')
+        else:
+            system_cfs_snapshot_dir = self.make_snapshot(node1, 'system', 'schema_columnfamilies', 'cfs')
 
         try:
             # Write more data:
@@ -231,11 +246,27 @@ class TestArchiveCommitlog(SnapshotTester):
             node1, = cluster.nodelist()
 
             # Restore schema from snapshots:
-            self.restore_snapshot(system_ks_snapshot_dir, node1, 'system', 'schema_keyspaces', 'keyspaces')
-            self.restore_snapshot(system_col_snapshot_dir, node1, 'system', 'schema_columns', 'columns')
+            if self.cluster.version() >= '3.0':
+                self.restore_snapshot(system_ks_snapshot_dir, node1, 'system_schema', 'keyspaces', 'keyspaces')
+            else:
+                self.restore_snapshot(system_ks_snapshot_dir, node1, 'system', 'schema_keyspaces', 'keyspaces')
+
+            if self.cluster.version() >= '3.0':
+                self.restore_snapshot(system_col_snapshot_dir, node1, 'system_schema', 'columns', 'columns')
+            else:
+                self.restore_snapshot(system_col_snapshot_dir, node1, 'system', 'schema_columns', 'columns')
+
+            if self.cluster.version() >= '3.0':
+                self.restore_snapshot(system_ut_snapshot_dir, node1, 'system_schema', 'types', 'usertypes')
             if self.cluster.version() >= '2.1':
                 self.restore_snapshot(system_ut_snapshot_dir, node1, 'system', 'schema_usertypes', 'usertypes')
-            self.restore_snapshot(system_cfs_snapshot_dir, node1, 'system', 'schema_columnfamilies', 'cfs')
+
+            if self.cluster.version() >= '3.0':
+                self.restore_snapshot(system_cfs_snapshot_dir, node1, 'system_schema', 'tables', 'cfs')
+            else:
+                self.restore_snapshot(system_cfs_snapshot_dir, node1, 'system', 'schema_columnfamilies', 'cfs')
+
+
             self.restore_snapshot(snapshot_dir, node1, 'ks', 'cf', 'basic')
 
             cluster.start(wait_for_binary_proto=True)

@@ -25,19 +25,16 @@ class TestAuth(Tester):
     def system_auth_ks_is_alterable_test(self):
         self.prepare(nodes=3)
         debug("nodes started")
-        schema_query = """SELECT strategy_options
-                          FROM system.schema_keyspaces
-                          WHERE keyspace_name = 'system_auth'"""
 
-        cursor = self.get_cursor(0, user='cassandra', password='cassandra')
-        rows = cursor.execute(schema_query)
-        row = rows[0]
-        self.assertEqual('{"replication_factor":"1"}', row[0])
+        session = self.get_cursor(user='cassandra', password='cassandra')
+        self.assertEquals(1, session.cluster.metadata.keyspaces['system_auth'].replication_strategy.replication_factor)
 
-        cursor.execute("""
+        session.execute("""
             ALTER KEYSPACE system_auth
                 WITH replication = {'class':'SimpleStrategy', 'replication_factor':3};
         """)
+
+        self.assertEquals(3, session.cluster.metadata.keyspaces['system_auth'].replication_strategy.replication_factor)
 
         # make sure schema change is persistent
         debug("Stopping cluster..")
@@ -45,12 +42,12 @@ class TestAuth(Tester):
         debug("Restarting cluster..")
         self.cluster.start(wait_other_notice=True)
 
+        # check each node directly
         for i in range(3):
             debug('Checking node: {i}'.format(i=i))
-            cursor = self.get_cursor(i, user='cassandra', password='cassandra')
-            rows = cursor.execute(schema_query)
-            row = rows[0]
-            self.assertEqual('{"replication_factor":"3"}', row[0])
+            node = self.cluster.nodelist()[i]
+            session = self.patient_exclusive_cql_connection(node, user='cassandra', password='cassandra')
+            self.assertEquals(3, session.cluster.metadata.keyspaces['system_auth'].replication_strategy.replication_factor)
 
     def login_test(self):
         # also tests default user creation (cassandra/cassandra)

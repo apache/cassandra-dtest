@@ -35,14 +35,6 @@ class TestSchema(Tester):
         node.flush()
         node.compact()
 
-        # erase info on dropped 'c1' column and restart.
-        cursor.execute("""UPDATE system.schema_columnfamilies
-                          SET dropped_columns = null
-                          WHERE keyspace_name = 'ks' AND columnfamily_name = 'cf'""")
-        node.stop(gently=False)
-        node.start()
-        time.sleep(.5)
-
         # test that c1 values have been compacted away.
         cursor = self.patient_cql_connection(node)
         rows = cursor.execute("SELECT c1 FROM ks.cf")

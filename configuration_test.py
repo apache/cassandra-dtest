@@ -1,4 +1,4 @@
-import ast
+import re
 
 from cassandra.concurrent import execute_concurrent_with_args
 
@@ -93,19 +93,21 @@ class TestConfiguration(Tester):
                            msg='ALTER KEYSPACE was not respected')
 
     def _check_chunk_length(self, cursor, value):
-        describe_table_query = "SELECT * FROM system.schema_columnfamilies WHERE keyspace_name='ks' AND columnfamily_name='test_table';"
-        rows = cursor.execute(describe_table_query)
-        results = rows[0]
+        result = cursor.cluster.metadata.keyspaces['ks'].tables['test_table'].as_cql_query()
         # Now extract the param list
         params = ''
-        for result in results:
-            if 'sstable_compression' in str(result):
+
+        if self.cluster.version() < '3.0':
+            if 'sstable_compression' in result:
+                params = result
+        else:
+            if 'compression' in result:
                 params = result
 
-        assert params is not '', "Looking for a row with the string 'sstable_compression' in system.schema_columnfamilies, but could not find it."
+        assert params is not '', "Looking for the string 'sstable_compression', but could not find it in {str}".format(str=result)
 
-        params = ast.literal_eval(params)
-        chunk_length = int(params['chunk_length_kb'])
+        chunk_string = "chunk_length_kb" if self.cluster.version() < '3.0' else "chunk_length_in_kb"
+        chunk_length = int(re.search("{chunk}.*?:.*?'(\d*?)'".format(chunk=chunk_string), result).groups()[0])
 
         assert chunk_length == value, "Expected chunk_length: %s.  We got: %s" % (value, chunk_length)
 
