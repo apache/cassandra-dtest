@@ -29,8 +29,8 @@ class SnapshotTester(Tester):
         debug("Running snapshot cmd: {snapshot_cmd}".format(snapshot_cmd=snapshot_cmd))
         node.nodetool(snapshot_cmd)
         tmpdir = tempfile.mkdtemp()
-        os.mkdir(os.path.join(tmpdir,ks))
-        os.mkdir(os.path.join(tmpdir,ks,cf))
+        os.mkdir(os.path.join(tmpdir, ks))
+        os.mkdir(os.path.join(tmpdir, ks, cf))
         node_dir = node.get_path()
 
         # Find the snapshot dir, it's different in various C* versions:
@@ -104,7 +104,7 @@ class TestSnapshot(SnapshotTester):
 @require('dtest issue #393', broken_in='3.0')
 class TestArchiveCommitlog(SnapshotTester):
     def __init__(self, *args, **kwargs):
-        kwargs['cluster_options'] = {'commitlog_segment_size_in_mb':1}
+        kwargs['cluster_options'] = {'commitlog_segment_size_in_mb': 1}
         SnapshotTester.__init__(self, *args, **kwargs)
 
     def make_snapshot(self, node, ks, cf, name):
@@ -117,7 +117,7 @@ class TestArchiveCommitlog(SnapshotTester):
         node_dir = node.get_path()
 
         # Copy files from the snapshot dir to existing temp dir
-        distutils.dir_util.copy_tree(os.path.join(node.get_path(),'data', ks), tmpdir)
+        distutils.dir_util.copy_tree(os.path.join(node.get_path(), 'data', ks), tmpdir)
 
         return tmpdir
 
@@ -135,23 +135,23 @@ class TestArchiveCommitlog(SnapshotTester):
 
     @since('2.1')
     def test_archive_commitlog(self):
-        self.run_archive_commitlog(restore_point_in_time = False)
+        self.run_archive_commitlog(restore_point_in_time=False)
 
     def test_archive_commitlog_with_active_commitlog(self):
         """Copy the active commitlogs to the archive directory before restoration"""
-        self.run_archive_commitlog(restore_point_in_time = False, archive_active_commitlogs=True)
+        self.run_archive_commitlog(restore_point_in_time=False, archive_active_commitlogs=True)
 
     def dont_test_archive_commitlog(self):
         """Run the archive commitlog test, but forget to add the restore commands:"""
-        self.run_archive_commitlog(restore_point_in_time = False, restore_archived_commitlog=False)
+        self.run_archive_commitlog(restore_point_in_time=False, restore_archived_commitlog=False)
 
     def test_archive_commitlog_point_in_time(self):
         """Test archive commit log with restore_point_in_time setting"""
-        self.run_archive_commitlog(restore_point_in_time = True)
+        self.run_archive_commitlog(restore_point_in_time=True)
 
     def test_archive_commitlog_point_in_time_with_active_commitlog(self):
         """Test archive commit log with restore_point_in_time setting"""
-        self.run_archive_commitlog(restore_point_in_time = True, archive_active_commitlogs=True)
+        self.run_archive_commitlog(restore_point_in_time=True, archive_active_commitlogs=True)
 
     def run_archive_commitlog(self, restore_point_in_time=False, restore_archived_commitlog=True, archive_active_commitlogs=False):
         """Run archive commit log restoration test"""
@@ -166,7 +166,7 @@ class TestArchiveCommitlog(SnapshotTester):
 
         # Edit commitlog_archiving.properties and set an archive
         # command:
-        replace_in_file(os.path.join(node1.get_path(),'conf','commitlog_archiving.properties'),
+        replace_in_file(os.path.join(node1.get_path(), 'conf', 'commitlog_archiving.properties'),
                         [(r'^archive_command=.*$', 'archive_command=cp %path {tmp_commitlog}/%name'.format(
                             tmp_commitlog=tmp_commitlog))])
 
@@ -216,7 +216,7 @@ class TestArchiveCommitlog(SnapshotTester):
             insert_cutoff_times.append(time.gmtime())
 
             debug("Writing final 5,000 rows...")
-            self.insert_rows(cursor,60000, 65000)
+            self.insert_rows(cursor, 60000, 65000)
             # Record when the third set of inserts finished:
             insert_cutoff_times.append(time.gmtime())
 
@@ -268,7 +268,6 @@ class TestArchiveCommitlog(SnapshotTester):
             else:
                 self.restore_snapshot(system_cfs_snapshot_dir, node1, 'system', 'schema_columnfamilies', 'cfs')
 
-
             self.restore_snapshot(snapshot_dir, node1, 'ks', 'cf', 'basic')
 
             cluster.start(wait_for_binary_proto=True)
@@ -283,7 +282,7 @@ class TestArchiveCommitlog(SnapshotTester):
             # Edit commitlog_archiving.properties. Remove the archive
             # command  and set a restore command and restore_directories:
             if restore_archived_commitlog:
-                replace_in_file(os.path.join(node1.get_path(),'conf','commitlog_archiving.properties'),
+                replace_in_file(os.path.join(node1.get_path(), 'conf', 'commitlog_archiving.properties'),
                                 [(r'^archive_command=.*$', 'archive_command='),
                                  (r'^restore_command=.*$', 'restore_command=cp -f %from %to'),
                                  (r'^restore_directories=.*$', 'restore_directories={tmp_commitlog}'.format(
@@ -291,7 +290,7 @@ class TestArchiveCommitlog(SnapshotTester):
 
                 if restore_point_in_time:
                     restore_time = time.strftime("%Y:%m:%d %H:%M:%S", insert_cutoff_times[1])
-                    replace_in_file(os.path.join(node1.get_path(),'conf','commitlog_archiving.properties'),
+                    replace_in_file(os.path.join(node1.get_path(), 'conf', 'commitlog_archiving.properties'),
                                     [(r'^restore_point_in_time=.*$', 'restore_point_in_time={restore_time}'.format(**locals()))])
 
             debug("Restarting node1..")
