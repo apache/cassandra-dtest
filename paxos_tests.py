@@ -1,13 +1,15 @@
 # coding: utf-8
 
-from dtest import Tester
-from tools import since, no_vnodes
-from assertions import assert_unavailable
+import time
+from threading import Thread
+
 from cassandra import ConsistencyLevel, WriteTimeout
 from cassandra.query import SimpleStatement
 
-import time
-from threading import Thread
+from assertions import assert_unavailable
+from dtest import Tester
+from tools import no_vnodes, since
+
 
 @since('2.0.6')
 class TestPaxos(Tester):
