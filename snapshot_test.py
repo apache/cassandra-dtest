@@ -9,7 +9,7 @@ import time
 from cassandra.concurrent import execute_concurrent_with_args
 
 from dtest import Tester, debug
-from tools import replace_in_file, since
+from tools import replace_in_file, require, since
 
 
 class SnapshotTester(Tester):
@@ -100,6 +100,8 @@ class TestSnapshot(SnapshotTester):
 
         self.assertEqual(rows[0][0], 100)
 
+
+@require('dtest issue #393', broken_in='3.0')
 class TestArchiveCommitlog(SnapshotTester):
     def __init__(self, *args, **kwargs):
         kwargs['cluster_options'] = {'commitlog_segment_size_in_mb':1}
