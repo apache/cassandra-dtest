@@ -21,7 +21,7 @@ class TestPaxos(Tester):
             cluster.set_partitioner("org.apache.cassandra.dht.ByteOrderedPartitioner")
 
         if (use_cache):
-            cluster.set_configuration_options(values={ 'row_cache_size_in_mb' : 100 })
+            cluster.set_configuration_options(values={'row_cache_size_in_mb': 100})
 
         cluster.populate(nodes).start()
         node1 = cluster.nodelist()[0]
@@ -33,7 +33,7 @@ class TestPaxos(Tester):
         return cursor
 
     def replica_availability_test(self):
-        #See CASSANDRA-8640
+        # See CASSANDRA-8640
         session = self.prepare(nodes=3, rf=3)
         session.execute("CREATE TABLE test (k int PRIMARY KEY, v int)")
         session.execute("INSERT INTO test (k, v) VALUES (0, 0) IF NOT EXISTS")
@@ -52,9 +52,9 @@ class TestPaxos(Tester):
 
     @no_vnodes()
     def cluster_availability_test(self):
-        #Warning, a change in partitioner or a change in CCM token allocation
-        #may require the partition keys of these inserts to be changed.
-        #This must not use vnodes as it relies on assumed token values.
+        # Warning, a change in partitioner or a change in CCM token allocation
+        # may require the partition keys of these inserts to be changed.
+        # This must not use vnodes as it relies on assumed token values.
 
         session = self.prepare(nodes=3)
         session.execute("CREATE TABLE test (k int PRIMARY KEY, v int)")
@@ -76,8 +76,8 @@ class TestPaxos(Tester):
     def contention_test_multi_iterations(self):
         self._contention_test(8, 100)
 
-    ##Warning, this test will require you to raise the open
-    ##file limit on OSX. Use 'ulimit -n 1000'
+    # Warning, this test will require you to raise the open
+    # file limit on OSX. Use 'ulimit -n 1000'
     def contention_test_many_threds(self):
         self._contention_test(300, 1)
 
@@ -88,7 +88,7 @@ class TestPaxos(Tester):
 
         cursor = self.prepare(nodes=3)
         cursor.execute("CREATE TABLE test (k int, v int static, id int, PRIMARY KEY (k, id))")
-        cursor.execute("INSERT INTO test(k, v) VALUES (0, 0)");
+        cursor.execute("INSERT INTO test(k, v) VALUES (0, 0)")
 
         class Worker(Thread):
             def __init__(self, wid, cursor, iterations, query):
@@ -108,7 +108,7 @@ class TestPaxos(Tester):
                     done = False
                     while not done:
                         try:
-                            res = self.cursor.execute(self.query, (prev+1, prev, self.wid ))
+                            res = self.cursor.execute(self.query, (prev+1, prev, self.wid))
                             if verbose:
                                 print "[%3d] CAS %3d -> %3d (res: %s)" % (self.wid, prev, prev+1, str(res))
                             if res[0][0] is True:
@@ -140,7 +140,7 @@ class TestPaxos(Tester):
                     while True:
                         try:
                             self.cursor.execute("DELETE FROM test WHERE k = 0 AND id = %d IF EXISTS" % self.wid)
-                            break;
+                            break
                         except WriteTimeout as e:
                             pass
 
@@ -181,4 +181,3 @@ class TestPaxos(Tester):
             retries = retries + w.retries
 
         assert (value == threads * iterations) and (errors == 0), "value=%d, errors=%d, retries=%d" % (value, errors, retries)
-
