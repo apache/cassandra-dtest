@@ -118,9 +118,9 @@ class PageFetcher(object):
             time.sleep(0.1)
 
         raise RuntimeError(
-                "Requested pages were not delivered before timeout." + \
-                "Requested: %d; retrieved: %d; empty retreived: %d" %
-                (self.requested_pages, self.retrieved_pages, self.retrieved_empty_pages))
+            "Requested pages were not delivered before timeout." +
+            "Requested: %d; retrieved: %d; empty retreived: %d" %
+            (self.requested_pages, self.retrieved_pages, self.retrieved_empty_pages))
 
     def pagecount(self):
         """
@@ -1213,9 +1213,9 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
     def setup_data(self):
 
         self.create_ks(self.cursor, 'test_paging_size', 2)
-        self.cursor.execute(("CREATE TABLE paging_test ( "
-                        "id int, mytext text, col1 int, col2 int, col3 int, "
-                        "PRIMARY KEY (id, mytext) )"))
+        self.cursor.execute("CREATE TABLE paging_test ( "
+                            "id int, mytext text, col1 int, col2 int, col3 int, "
+                            "PRIMARY KEY (id, mytext) )")
 
         def random_txt(text):
             return unicode(uuid.uuid4())
@@ -1255,7 +1255,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
         """Check all paging results: pagecount, num_results per page, data."""
 
         page_size = 25
-        expected_pages_data = [expected_data[x:x + page_size] for x in \
+        expected_pages_data = [expected_data[x:x + page_size] for x in
                                range(0, len(expected_data), page_size)]
 
         pf = self.get_page_fetcher()
@@ -1400,8 +1400,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
             self.cursor.execute(SimpleStatement(
                 ("delete col1 from paging_test where id = 5 "
                  "and mytext = '{}'".format(pkey)),
-                consistency_level=CL.ALL)
-                            )
+                consistency_level=CL.ALL))
         self.check_all_paging_results(expected_data, 8,
                                       [25, 25, 25, 25, 25, 25, 25, 25])
 
@@ -1415,8 +1414,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
             self.cursor.execute(SimpleStatement(
                 ("delete col2 from paging_test where id = 1 "
                  "and mytext = '{}'".format(pkey)),
-                consistency_level=CL.ALL)
-                            )
+                consistency_level=CL.ALL))
         self.check_all_paging_results(expected_data, 8,
                                       [25, 25, 25, 25, 25, 25, 25, 25])
 
@@ -1430,8 +1428,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
             self.cursor.execute(SimpleStatement(
                 ("delete col3 from paging_test where id = 3 "
                  "and mytext = '{}'".format(pkey)),
-                consistency_level=CL.ALL)
-                            )
+                consistency_level=CL.ALL))
         self.check_all_paging_results(expected_data, 8,
                                       [25, 25, 25, 25, 25, 25, 25, 25])
 
@@ -1451,8 +1448,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
             self.cursor.execute(SimpleStatement(
                 ("delete col1, col2 from paging_test where id = 2 "
                  "and mytext = '{}'".format(pkey)),
-                consistency_level=CL.ALL)
-                            )
+                consistency_level=CL.ALL))
         self.check_all_paging_results(expected_data, 8,
                                       [25, 25, 25, 25, 25, 25, 25, 25])
 
@@ -1467,8 +1463,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
             self.cursor.execute(SimpleStatement(
                 ("delete col2, col3 from paging_test where id = 4 "
                  "and mytext = '{}'".format(pkey)),
-                consistency_level=CL.ALL)
-                            )
+                consistency_level=CL.ALL))
         self.check_all_paging_results(expected_data, 8,
                                       [25, 25, 25, 25, 25, 25, 25, 25])
 
