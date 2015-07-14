@@ -315,14 +315,14 @@ class TestBootstrap(Tester):
             node1.stress(['write', 'n=10000', '-rate', 'threads=8'])
 
         session = self.patient_cql_connection(node1)
-        original_rows = list(session.execute("SELECT * FROM %s" % (stress_table,)))
+        original_rows = list(session.execute("SELECT * FROM {}".format(stress_table,)))
 
         # Add a new node, bootstrap=True ensures that it is not a seed
         node2 = new_node(cluster, bootstrap=True)
         node2.start(wait_for_binary_proto=True)
 
         session = self.patient_cql_connection(node2)
-        self.assertEquals(original_rows, list(session.execute("SELECT * FROM %s" % (stress_table,))))
+        self.assertEquals(original_rows, list(session.execute("SELECT * FROM {}".format(stress_table,))))
 
         # Stop the new node and wipe its data
         node2.stop()
