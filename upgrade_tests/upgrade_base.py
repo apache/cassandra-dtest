@@ -8,7 +8,18 @@ cql_version = "3.0.0"
 QUERY_UPGRADED = os.environ.get('QUERY_UPGRADED', 'true').lower() in ('yes', 'true')
 QUERY_OLD = os.environ.get('QUERY_OLD', 'true').lower() in ('yes', 'true')
 OLD_CASSANDRA_DIR = os.environ.get('OLD_CASSANDRA_DIR', None)
-SKIP_UPGRADE = os.environ.get('SKIP_UPGRADE', 'false').lower() in ('yes', 'true')
+
+# This controls how many of the nodes are upgraded.  Accepted values are
+# "normal", "none", and "all".
+# The "normal" setting results in one of the two nodes being upgraded before
+# queries are run.
+# The "none" setting doesn't upgrade any nodes.  When combined with debug
+# logging, this is useful for seeing exactly what commands and responses
+# a 2.1 cluster will use.
+# The "all" setting upgrades all nodes before querying.  When combined with debug
+# logging, this is useful for seeing exactly what commands and responses
+# a 3.0 cluster will use.
+UPGRADE_MODE = os.environ.get('UPGRADE_MODE', 'normal').lower()
 
 
 class UpgradeTester(Tester):
@@ -58,8 +69,12 @@ class UpgradeTester(Tester):
         """
         session.cluster.shutdown()
         node1 = self.cluster.nodelist()[0]
+        node2 = self.cluster.nodelist()[1]
 
-        if not SKIP_UPGRADE:
+        if UPGRADE_MODE not in ('normal', 'all', 'none'):
+            raise Exception("UPGRADE_MODE should be one of 'normal', 'all', or 'none'")
+
+        if UPGRADE_MODE != "none":
             node1.drain()
             node1.stop(gently=True)
 
@@ -68,6 +83,15 @@ class UpgradeTester(Tester):
             node1.set_configuration_options(values={'internode_compression': 'none'})
             node1.start(wait_for_binary_proto=True)
 
+        if UPGRADE_MODE == "all":
+            node2.drain()
+            node2.stop(gently=True)
+
+            node2.set_install_dir(version=self.original_install_dir)
+            node2.set_log_level("DEBUG" if DEBUG else "INFO")
+            node2.set_configuration_options(values={'internode_compression': 'none'})
+            node2.start(wait_for_binary_proto=True)
+
         sessions = []
         if QUERY_UPGRADED:
             session = self.patient_exclusive_cql_connection(node1, protocol_version=self.protocol_version)
@@ -75,7 +99,6 @@ class UpgradeTester(Tester):
             sessions.append((True, session))
         if QUERY_OLD:
             # open a second session with the node on the old version
-            node2 = self.cluster.nodelist()[1]
             session = self.patient_exclusive_cql_connection(node2, protocol_version=self.protocol_version)
             session.set_keyspace('ks')
             sessions.append((False, session))
