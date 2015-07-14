@@ -1,3 +1,4 @@
+import distutils.dir_util
 import glob
 import os
 import shutil
@@ -9,7 +10,6 @@ from cassandra.concurrent import execute_concurrent_with_args
 
 from dtest import Tester, debug
 from tools import replace_in_file, since
-import distutils.dir_util
 
 
 class SnapshotTester(Tester):
