@@ -33,7 +33,9 @@ class TestPaxos(Tester):
         return cursor
 
     def replica_availability_test(self):
-        # See CASSANDRA-8640
+        """
+        @jira_ticket CASSANDRA-8640
+        """
         session = self.prepare(nodes=3, rf=3)
         session.execute("CREATE TABLE test (k int PRIMARY KEY, v int)")
         session.execute("INSERT INTO test (k, v) VALUES (0, 0) IF NOT EXISTS")
@@ -82,7 +84,9 @@ class TestPaxos(Tester):
         self._contention_test(300, 1)
 
     def _contention_test(self, threads, iterations):
-        """ Test threads repeatedly contending on the same row """
+        """
+        Test threads repeatedly contending on the same row.
+        """
 
         verbose = False
 
