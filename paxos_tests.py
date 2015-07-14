@@ -78,7 +78,7 @@ class TestPaxos(Tester):
 
     # Warning, this test will require you to raise the open
     # file limit on OSX. Use 'ulimit -n 1000'
-    def contention_test_many_threds(self):
+    def contention_test_many_threads(self):
         self._contention_test(300, 1)
 
     def _contention_test(self, threads, iterations):
