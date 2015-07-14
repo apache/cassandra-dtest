@@ -268,6 +268,7 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
         # make sure expected and actual have same data elements (ignoring order)
         self.assertEqualIgnoreOrder(pf.all_data(), expected_data)
 
+    @require(9775, broken_in='3.0')
     def test_with_equal_results_to_page_size(self):
         cursor = self.prepare()
         self.create_ks(cursor, 'test_paging_size', 2)
@@ -296,6 +297,7 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
         # make sure expected and actual have same data elements (ignoring order)
         self.assertEqualIgnoreOrder(pf.all_data(), expected_data)
 
+    @require(9775, broken_in='3.0')
     def test_undefined_page_size_default(self):
         """
         If the page size isn't sent then the default fetch size is used.
@@ -664,6 +666,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         self.assertEqualIgnoreOrder(expected_data, pf.all_data())
 
     @since('2.0.6')
+    @require(9775, broken_in='3.0')
     def static_columns_paging_test(self):
         """
         Exercises paging with static columns to detect bugs
@@ -1486,6 +1489,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
         time.sleep(5)
         self.check_all_paging_results([], 0, [])
 
+    @require(9775, broken_in='3.0')
     def test_failure_threshold_deletions(self):
         """Test that paging throws a failure in case of tombstone threshold """
         self.allow_log_errors = True
