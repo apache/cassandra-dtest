@@ -1,6 +1,5 @@
 # coding: utf-8
 
-import os
 import random
 import struct
 import time
@@ -22,14 +21,6 @@ from cassandra.query import SimpleStatement
 from cassandra.util import sortedset
 
 from upgrade_base import UpgradeTester
-
-cql_version = "3.0.0"
-
-
-QUERY_UPGRADED = os.environ.get('QUERY_UPGRADED', 'true').lower() in ('yes', 'true')
-QUERY_OLD = os.environ.get('QUERY_OLD', 'true').lower() in ('yes', 'true')
-OLD_CASSANDRA_DIR = os.environ.get('OLD_CASSANDRA_DIR', None)
-SKIP_UPGRADE = os.environ.get('SKIP_UPGRADE', 'false').lower() in ('yes', 'true')
 
 
 class TestCQL(UpgradeTester):
