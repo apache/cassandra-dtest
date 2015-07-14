@@ -196,6 +196,7 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
         cursor.execute("CREATE TABLE paging_test ( id int PRIMARY KEY, value text )")
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
+            cursor.row_factory = dict_factory
             debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
 
             # run a query that has no results and make sure it's exhausted
@@ -213,6 +214,7 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
         cursor.execute("CREATE TABLE paging_test ( id int PRIMARY KEY, value text )")
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
+            cursor.row_factory = dict_factory
             debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE paging_test")
 
@@ -240,6 +242,7 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
         cursor.execute("CREATE TABLE paging_test ( id int PRIMARY KEY, value text )")
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
+            cursor.row_factory = dict_factory
             debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE paging_test")
 
@@ -274,6 +277,7 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
         cursor.execute("CREATE TABLE paging_test ( id int PRIMARY KEY, value text )")
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
+            cursor.row_factory = dict_factory
             debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE paging_test")
 
@@ -310,6 +314,7 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
             return uuid.uuid4()
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
+            cursor.row_factory = dict_factory
             debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE paging_test")
 
@@ -343,7 +348,6 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
         (Spanning multiple partitions won't though, by design. See CASSANDRA-6722).
         """
         cursor = self.prepare()
-        self.create_ks(cursor, 'test_paging', 2)
         cursor.execute(
             """
             CREATE TABLE paging_test (
@@ -354,6 +358,7 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
             """)
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
+            cursor.row_factory = dict_factory
             debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE paging_test")
 
@@ -395,33 +400,34 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
         Paging over a single partition with ordering and a reversed clustering order.
         """
         cursor = self.prepare()
-        self.create_ks(cursor, 'test_paging', 2)
         cursor.execute(
             """
             CREATE TABLE paging_test (
                 id int,
                 value text,
                 value2 text,
+                value3 text,
                 PRIMARY KEY (id, value)
             ) WITH CLUSTERING ORDER BY (value DESC)
             """)
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
+            cursor.row_factory = dict_factory
             debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE paging_test")
 
             data = """
-                |id|value|value2|
-                |1 |a    |a     |
-                |1 |b    |b     |
-                |1 |c    |c     |
-                |1 |d    |d     |
-                |1 |e    |e     |
-                |1 |f    |f     |
-                |1 |g    |g     |
-                |1 |h    |h     |
-                |1 |i    |i     |
-                |1 |j    |j     |
+                |id|value|value2|value3|
+                |1 |a    |a     |a     |
+                |1 |b    |b     |b     |
+                |1 |c    |c     |c     |
+                |1 |d    |d     |d     |
+                |1 |e    |e     |e     |
+                |1 |f    |f     |f     |
+                |1 |g    |g     |g     |
+                |1 |h    |h     |h     |
+                |1 |i    |i     |i     |
+                |1 |j    |j     |j     |
                 """
 
             expected_data = create_rows(data, cursor, 'paging_test', cl=CL.ALL, format_funcs={'id': int, 'value': unicode, 'value2': unicode})
@@ -432,6 +438,7 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
 
             pf = PageFetcher(future).request_all()
 
+            print "pages:", pf.num_results_all()
             self.assertEqual(pf.pagecount(), 4)
             self.assertEqual(pf.num_results_all(), [3, 3, 3, 1])
 
@@ -459,6 +466,7 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
             return unicode(uuid.uuid4())
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
+            cursor.row_factory = dict_factory
             debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE paging_test")
 
@@ -541,6 +549,7 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
         cursor.execute("CREATE TABLE paging_test ( id int, value text, PRIMARY KEY (id, value) )")
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
+            cursor.row_factory = dict_factory
             debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE paging_test")
 
@@ -596,6 +605,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
             return unicode(uuid.uuid4())
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
+            cursor.row_factory = dict_factory
             debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE paging_test")
 
@@ -627,6 +637,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
             return unicode(uuid.uuid4())
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
+            cursor.row_factory = dict_factory
             debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE paging_test")
 
@@ -660,6 +671,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
             return bool(int(text))
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
+            cursor.row_factory = dict_factory
             debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE paging_test")
 
@@ -701,6 +713,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
             return bool(int(text))
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
+            cursor.row_factory = dict_factory
             debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE paging_test")
 
@@ -743,6 +756,7 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
             return unicode(uuid.uuid4())
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
+            cursor.row_factory = dict_factory
             debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE paging_test")
 
@@ -779,6 +793,7 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
             return unicode(uuid.uuid4())
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
+            cursor.row_factory = dict_factory
             debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE paging_test")
 
@@ -816,6 +831,7 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
             return unicode(uuid.uuid4())
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
+            cursor.row_factory = dict_factory
             debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE paging_test")
 
@@ -868,6 +884,7 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
             return unicode(uuid.uuid4())
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
+            cursor.row_factory = dict_factory
             debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE paging_test")
 
@@ -920,42 +937,6 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
             page3 = pf.page_data(3)
             self.assertEqualIgnoreOrder(page3, page3expected)
 
-    def test_node_unavailabe_during_paging(self):
-        cluster = self.cluster
-        cluster.populate(3).start()
-        node1, node2, node3 = cluster.nodelist()
-        cursor = self.cql_connection(node1)
-        cursor.execute("CREATE TABLE paging_test ( id uuid, mytext text, PRIMARY KEY (id, mytext) )")
-
-        def make_uuid(text):
-            return uuid.uuid4()
-
-        for is_upgraded, cursor in self.do_upgrade(cursor):
-            debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
-            cursor.execute("TRUNCATE paging_test")
-
-            create_rows(
-                """
-                      | id      | mytext |
-                *10000| [uuid]  | foo    |
-                """,
-                cursor, 'paging_test', cl=CL.ALL, format_funcs={'id': make_uuid}
-            )
-
-            future = cursor.execute_async(
-                SimpleStatement("select * from paging_test where mytext = 'foo' allow filtering", fetch_size=2000, consistency_level=CL.ALL)
-            )
-
-            pf = PageFetcher(future)
-            # no need to request page here, because the first page is automatically retrieved
-
-            # stop a node and make sure we get an error trying to page the rest
-            node1.stop()
-            with self.assertRaisesRegexp(RuntimeError, 'Requested pages were not delivered before timeout'):
-                pf.request_all()
-
-            # TODO: can we resume the node and expect to get more results from the result set or is it done?
-
 
 @since('2.0')
 class TestPagingQueryIsolation(BasePagingTester, PageAssertionMixin):
@@ -973,6 +954,7 @@ class TestPagingQueryIsolation(BasePagingTester, PageAssertionMixin):
             return unicode(uuid.uuid4())
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
+            cursor.row_factory = dict_factory
             debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE paging_test")
 
@@ -1052,12 +1034,12 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
     Tests concerned with paging when deletions occur.
     """
 
-    def setup_schema(self):
-        self.cursor.execute(("CREATE TABLE paging_test ( "
-                        "id int, mytext text, col1 int, col2 int, col3 int, "
-                        "PRIMARY KEY (id, mytext) )"))
+    def setup_schema(self, cursor):
+        cursor.execute("CREATE TABLE paging_test ( "
+                       "id int, mytext text, col1 int, col2 int, col3 int, "
+                       "PRIMARY KEY (id, mytext) )")
 
-    def setup_data(self):
+    def setup_data(self, cursor):
 
         def random_txt(text):
             return unicode(uuid.uuid4())
@@ -1071,7 +1053,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
           *40| 5  | [random] | 5    | 5    | 5    |
         """
 
-        create_rows(data, self.cursor, 'paging_test', cl=CL.ALL,
+        create_rows(data, cursor, 'paging_test', cl=CL.ALL,
                     format_funcs={
                         'id': int,
                         'mytext': random_txt,
@@ -1080,26 +1062,26 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
                         'col3': int
                     })
 
-        pf = self.get_page_fetcher()
+        pf = self.get_page_fetcher(cursor)
         pf.request_all()
         return pf.all_data()
 
-    def get_page_fetcher(self):
-        future = self.cursor.execute_async(
+    def get_page_fetcher(self, cursor):
+        future = cursor.execute_async(
             SimpleStatement("select * from paging_test where id in (1,2,3,4,5)", fetch_size=25,
                             consistency_level=CL.ALL)
         )
 
         return PageFetcher(future)
 
-    def check_all_paging_results(self, expected_data, pagecount, num_page_results):
+    def check_all_paging_results(self, cursor, expected_data, pagecount, num_page_results):
         """Check all paging results: pagecount, num_results per page, data."""
 
         page_size = 25
         expected_pages_data = [expected_data[x:x + page_size] for x in \
                                range(0, len(expected_data), page_size)]
 
-        pf = self.get_page_fetcher()
+        pf = self.get_page_fetcher(cursor)
         pf.request_all()
         self.assertEqual(pf.pagecount(), pagecount)
         self.assertEqual(pf.num_results_all(), num_page_results)
@@ -1110,115 +1092,115 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
 
     def test_single_partition_deletions(self):
         """Test single partition deletions """
-        self.cursor = self.prepare()
-        self.setup_schema()
+        cursor = self.prepare()
+        self.setup_schema(cursor)
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
+            cursor.row_factory = dict_factory
             debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE paging_test")
 
-            expected_data = self.setup_data()
+            expected_data = self.setup_data(cursor)
 
             # Delete the a single partition at the beginning
-            self.cursor.execute(
+            cursor.execute(
                 SimpleStatement("delete from paging_test where id = 1",
                                 consistency_level=CL.ALL)
             )
             expected_data = [row for row in expected_data if row['id'] != 1]
-            self.check_all_paging_results(expected_data, 7,
+            self.check_all_paging_results(cursor, expected_data, 7,
                                           [25, 25, 25, 25, 25, 25, 10])
 
             # Delete the a single partition in the middle
-            self.cursor.execute(
+            cursor.execute(
                 SimpleStatement("delete from paging_test where id = 3",
                                 consistency_level=CL.ALL)
             )
             expected_data = [row for row in expected_data if row['id'] != 3]
-            self.check_all_paging_results(expected_data, 5, [25, 25, 25, 25, 20])
+            self.check_all_paging_results(cursor, expected_data, 5, [25, 25, 25, 25, 20])
 
             # Delete the a single partition at the end
-            self.cursor.execute(
+            cursor.execute(
                 SimpleStatement("delete from paging_test where id = 5",
-                                consistency_level=CL.ALL)
-            )
+                                consistency_level=CL.ALL))
             expected_data = [row for row in expected_data if row['id'] != 5]
-            self.check_all_paging_results(expected_data, 4, [25, 25, 25, 5])
+            self.check_all_paging_results(cursor, expected_data, 4, [25, 25, 25, 5])
 
             # Keep only the partition '2'
-            self.cursor.execute(
+            cursor.execute(
                 SimpleStatement("delete from paging_test where id = 4",
-                                consistency_level=CL.ALL)
-            )
+                                consistency_level=CL.ALL))
             expected_data = [row for row in expected_data if row['id'] != 4]
-            self.check_all_paging_results(expected_data, 2, [25, 15])
+            self.check_all_paging_results(cursor, expected_data, 2, [25, 15])
 
     def test_multiple_partition_deletions(self):
         """Test multiple partition deletions """
-        self.cursor = self.prepare()
-        self.setup_schema()
+        cursor = self.prepare()
+        self.setup_schema(cursor)
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
+            cursor.row_factory = dict_factory
             debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE paging_test")
-            expected_data = self.setup_data()
+            expected_data = self.setup_data(cursor)
 
             # Keep only the partition '1'
-            self.cursor.execute(
+            cursor.execute(
                 SimpleStatement("delete from paging_test where id in (2,3,4,5)",
                                 consistency_level=CL.ALL)
             )
             expected_data = [row for row in expected_data if row['id'] == 1]
-            self.check_all_paging_results(expected_data, 2, [25, 15])
+            self.check_all_paging_results(cursor, expected_data, 2, [25, 15])
 
     def test_single_row_deletions(self):
         """Test single row deletions """
-        self.cursor = self.prepare()
-        self.setup_schema()
+        cursor = self.prepare()
+        self.setup_schema(cursor)
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
+            cursor.row_factory = dict_factory
             debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE paging_test")
-            expected_data = self.setup_data()
+            expected_data = self.setup_data(cursor)
 
             # Delete the first row
             row = expected_data.pop(0)
-            self.cursor.execute(SimpleStatement(
+            cursor.execute(SimpleStatement(
                 ("delete from paging_test where "
                  "id = {} and mytext = '{}'".format(row['id'], row['mytext'])),
-                consistency_level=CL.ALL)
-            )
-            self.check_all_paging_results(expected_data, 8,
+                consistency_level=CL.ALL))
+            self.check_all_paging_results(cursor, expected_data, 8,
                                           [25, 25, 25, 25, 25, 25, 25, 24])
 
             # Delete a row in the middle
             row = expected_data.pop(100)
-            self.cursor.execute(SimpleStatement(
+            cursor.execute(SimpleStatement(
                 ("delete from paging_test where "
                  "id = {} and mytext = '{}'".format(row['id'], row['mytext'])),
                 consistency_level=CL.ALL)
             )
-            self.check_all_paging_results(expected_data, 8,
+            self.check_all_paging_results(cursor, expected_data, 8,
                                           [25, 25, 25, 25, 25, 25, 25, 23])
 
             # Delete the last row
             row = expected_data.pop()
-            self.cursor.execute(SimpleStatement(
+            cursor.execute(SimpleStatement(
                 ("delete from paging_test where "
                  "id = {} and mytext = '{}'".format(row['id'], row['mytext'])),
                 consistency_level=CL.ALL)
             )
-            self.check_all_paging_results(expected_data, 8,
+            self.check_all_paging_results(cursor, expected_data, 8,
                                           [25, 25, 25, 25, 25, 25, 25, 22])
 
             # Delete all the last page row by row
             rows = expected_data[-22:]
             for row in rows:
-                self.cursor.execute(SimpleStatement(
+                cursor.execute(SimpleStatement(
                     ("delete from paging_test where "
                      "id = {} and mytext = '{}'".format(row['id'], row['mytext'])),
                     consistency_level=CL.ALL)
                 )
-            self.check_all_paging_results(expected_data, 7,
+            self.check_all_paging_results(cursor, expected_data, 7,
                                           [25, 25, 25, 25, 25, 25, 25])
 
     @require('6237')
@@ -1226,36 +1208,38 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
         """Test multiple row deletions.
            This test should be finished when CASSANDRA-6237 is done.
         """
-        self.cursor = self.prepare()
-        self.setup_schema()
+        cursor = self.prepare()
+        self.setup_schema(cursor)
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
+            cursor.row_factory = dict_factory
             debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE paging_test")
-            expected_data = self.setup_data()
+            expected_data = self.setup_data(cursor)
 
             # Delete a bunch of rows
             rows = expected_data[100:105]
             expected_data = expected_data[0:100] + expected_data[105:]
             in_condition = ','.join("'{}'".format(r['mytext']) for r in rows)
 
-            self.cursor.execute(SimpleStatement(
+            cursor.execute(SimpleStatement(
                 ("delete from paging_test where "
                  "id = {} and mytext in ({})".format(3, in_condition)),
                 consistency_level=CL.ALL)
             )
-            self.check_all_paging_results(expected_data, 8,
+            self.check_all_paging_results(cursor, expected_data, 8,
                                           [25, 25, 25, 25, 25, 25, 25, 20])
 
     def test_single_cell_deletions(self):
         """Test single cell deletions """
-        self.cursor = self.prepare()
-        self.setup_schema()
+        cursor = self.prepare()
+        self.setup_schema(cursor)
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
+            cursor.row_factory = dict_factory
             debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE paging_test")
-            expected_data = self.setup_data()
+            expected_data = self.setup_data(cursor)
 
             # Delete the first cell of some rows of the last partition
             pkeys = [r['mytext'] for r in expected_data if r['id'] == 5][:20]
@@ -1264,12 +1248,11 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
                     r['col1'] = None
 
             for pkey in pkeys:
-                self.cursor.execute(SimpleStatement(
+                cursor.execute(SimpleStatement(
                     ("delete col1 from paging_test where id = 5 "
                      "and mytext = '{}'".format(pkey)),
-                    consistency_level=CL.ALL)
-                                )
-            self.check_all_paging_results(expected_data, 8,
+                    consistency_level=CL.ALL))
+            self.check_all_paging_results(cursor, expected_data, 8,
                                           [25, 25, 25, 25, 25, 25, 25, 25])
 
             # Delete the mid cell of some rows of the first partition
@@ -1279,12 +1262,11 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
                     r['col2'] = None
 
             for pkey in pkeys:
-                self.cursor.execute(SimpleStatement(
+                cursor.execute(SimpleStatement(
                     ("delete col2 from paging_test where id = 1 "
                      "and mytext = '{}'".format(pkey)),
-                    consistency_level=CL.ALL)
-                                )
-            self.check_all_paging_results(expected_data, 8,
+                    consistency_level=CL.ALL))
+            self.check_all_paging_results(cursor, expected_data, 8,
                                           [25, 25, 25, 25, 25, 25, 25, 25])
 
             # Delete the last cell of all rows of the mid partition
@@ -1294,23 +1276,23 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
                     r['col3'] = None
 
             for pkey in pkeys:
-                self.cursor.execute(SimpleStatement(
+                cursor.execute(SimpleStatement(
                     ("delete col3 from paging_test where id = 3 "
                      "and mytext = '{}'".format(pkey)),
-                    consistency_level=CL.ALL)
-                                )
-            self.check_all_paging_results(expected_data, 8,
+                    consistency_level=CL.ALL))
+            self.check_all_paging_results(cursor, expected_data, 8,
                                           [25, 25, 25, 25, 25, 25, 25, 25])
 
     def test_multiple_cell_deletions(self):
         """Test multiple cell deletions """
-        self.cursor = self.prepare()
-        self.setup_schema()
+        cursor = self.prepare()
+        self.setup_schema(cursor)
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
+            cursor.row_factory = dict_factory
             debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE paging_test")
-            expected_data = self.setup_data()
+            expected_data = self.setup_data(cursor)
 
             # Delete the multiple cells of some rows of the second partition
             pkeys = [r['mytext'] for r in expected_data if r['id'] == 2][20:]
@@ -1320,12 +1302,11 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
                     r['col2'] = None
 
             for pkey in pkeys:
-                self.cursor.execute(SimpleStatement(
+                cursor.execute(SimpleStatement(
                     ("delete col1, col2 from paging_test where id = 2 "
                      "and mytext = '{}'".format(pkey)),
-                    consistency_level=CL.ALL)
-                                )
-            self.check_all_paging_results(expected_data, 8,
+                    consistency_level=CL.ALL))
+            self.check_all_paging_results(cursor, expected_data, 8,
                                           [25, 25, 25, 25, 25, 25, 25, 25])
 
             # Delete the multiple cells of all rows of the fourth partition
@@ -1336,23 +1317,23 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
                     r['col3'] = None
 
             for pkey in pkeys:
-                self.cursor.execute(SimpleStatement(
+                cursor.execute(SimpleStatement(
                     ("delete col2, col3 from paging_test where id = 4 "
                      "and mytext = '{}'".format(pkey)),
-                    consistency_level=CL.ALL)
-                                )
-            self.check_all_paging_results(expected_data, 8,
+                    consistency_level=CL.ALL))
+            self.check_all_paging_results(cursor, expected_data, 8,
                                           [25, 25, 25, 25, 25, 25, 25, 25])
 
     def test_ttl_deletions(self):
         """Test ttl deletions. Paging over a query that has only tombstones """
-        self.cursor = self.prepare()
-        self.setup_schema()
+        cursor = self.prepare()
+        self.setup_schema(cursor)
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
+            cursor.row_factory = dict_factory
             debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE paging_test")
-            data = self.setup_data()
+            data = self.setup_data(cursor)
 
             # Set TTL to all row
             for row in data:
@@ -1360,11 +1341,9 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
                      "values ({}, '{}', {}, {}, {}) using ttl 3;").format(
                          row['id'], row['mytext'], row['col1'],
                          row['col2'], row['col3'])
-                self.cursor.execute(
-                    SimpleStatement(s, consistency_level=CL.ALL)
-                )
+                cursor.execute(SimpleStatement(s, consistency_level=CL.ALL))
             time.sleep(5)
-            self.check_all_paging_results([], 0, [])
+            self.check_all_paging_results(cursor, [], 0, [])
 
     def test_failure_threshold_deletions(self):
         """Test that paging throws a failure in case of tombstone threshold """
@@ -1372,32 +1351,32 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
         self.cluster.set_configuration_options(
             values={'tombstone_failure_threshold': 500}
         )
-        self.cursor = self.prepare()
-        node1, node2, node3 = self.cluster.nodelist()
+        cursor = self.prepare()
+        node1, node2 = self.cluster.nodelist()
 
-        self.setup_schema()
+        self.setup_schema(cursor)
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
+            cursor.row_factory = dict_factory
             debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE paging_test")
-            self.setup_data()
+            self.setup_data(cursor)
 
             # Add more data
             values = map(lambda i: uuid.uuid4(), range(3000))
             for value in values:
-                self.cursor.execute(SimpleStatement(
+                cursor.execute(SimpleStatement(
                     "insert into paging_test (id, mytext, col1) values (1, '{}', null) ".format(
                         value
                     ),
                     consistency_level=CL.ALL
                 ))
 
-            assert_invalid(self.cursor, SimpleStatement("select * from paging_test", fetch_size=1000, consistency_level=CL.ALL), expected=ReadTimeout)
+            assert_invalid(cursor, SimpleStatement("select * from paging_test", fetch_size=1000, consistency_level=CL.ALL), expected=ReadTimeout)
 
             failure_msg = ("Scanned over.* tombstones in ks."
                            "paging_test.* query aborted")
             failure = (node1.grep_log(failure_msg) or
-                       node2.grep_log(failure_msg) or
-                       node3.grep_log(failure_msg))
+                       node2.grep_log(failure_msg))
 
             self.assertTrue(failure, "Cannot find tombstone failure threshold error in log")
