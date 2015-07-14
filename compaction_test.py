@@ -5,7 +5,7 @@ import time
 
 from assertions import assert_almost_equal, assert_none, assert_one
 from dtest import Tester, debug
-from tools import since
+from tools import require, since
 
 
 class TestCompaction(Tester):
@@ -155,6 +155,7 @@ class TestCompaction(Tester):
         time.sleep(5)
         assert expired_sstable not in node1.get_sstables('ks', 'cf')
 
+    @require('dtest PR #373', broken_in='3.0')
     def compaction_throughput_test(self):
         """
         Test setting compaction throughput.

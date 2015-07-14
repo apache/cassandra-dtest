@@ -118,9 +118,9 @@ class PageFetcher(object):
             time.sleep(0.1)
 
         raise RuntimeError(
-                "Requested pages were not delivered before timeout." + \
-                "Requested: %d; retrieved: %d; empty retreived: %d" %
-                (self.requested_pages, self.retrieved_pages, self.retrieved_empty_pages))
+            "Requested pages were not delivered before timeout." +
+            "Requested: %d; retrieved: %d; empty retreived: %d" %
+            (self.requested_pages, self.retrieved_pages, self.retrieved_empty_pages))
 
     def pagecount(self):
         """
@@ -268,6 +268,7 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
         # make sure expected and actual have same data elements (ignoring order)
         self.assertEqualIgnoreOrder(pf.all_data(), expected_data)
 
+    @require(9775, broken_in='3.0')
     def test_with_equal_results_to_page_size(self):
         cursor = self.prepare()
         self.create_ks(cursor, 'test_paging_size', 2)
@@ -296,6 +297,7 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
         # make sure expected and actual have same data elements (ignoring order)
         self.assertEqualIgnoreOrder(pf.all_data(), expected_data)
 
+    @require(9775, broken_in='3.0')
     def test_undefined_page_size_default(self):
         """
         If the page size isn't sent then the default fetch size is used.
@@ -664,6 +666,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         self.assertEqualIgnoreOrder(expected_data, pf.all_data())
 
     @since('2.0.6')
+    @require(9775, broken_in='3.0')
     def static_columns_paging_test(self):
         """
         Exercises paging with static columns to detect bugs
@@ -1210,9 +1213,9 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
     def setup_data(self):
 
         self.create_ks(self.cursor, 'test_paging_size', 2)
-        self.cursor.execute(("CREATE TABLE paging_test ( "
-                        "id int, mytext text, col1 int, col2 int, col3 int, "
-                        "PRIMARY KEY (id, mytext) )"))
+        self.cursor.execute("CREATE TABLE paging_test ( "
+                            "id int, mytext text, col1 int, col2 int, col3 int, "
+                            "PRIMARY KEY (id, mytext) )")
 
         def random_txt(text):
             return unicode(uuid.uuid4())
@@ -1252,7 +1255,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
         """Check all paging results: pagecount, num_results per page, data."""
 
         page_size = 25
-        expected_pages_data = [expected_data[x:x + page_size] for x in \
+        expected_pages_data = [expected_data[x:x + page_size] for x in
                                range(0, len(expected_data), page_size)]
 
         pf = self.get_page_fetcher()
@@ -1397,8 +1400,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
             self.cursor.execute(SimpleStatement(
                 ("delete col1 from paging_test where id = 5 "
                  "and mytext = '{}'".format(pkey)),
-                consistency_level=CL.ALL)
-                            )
+                consistency_level=CL.ALL))
         self.check_all_paging_results(expected_data, 8,
                                       [25, 25, 25, 25, 25, 25, 25, 25])
 
@@ -1412,8 +1414,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
             self.cursor.execute(SimpleStatement(
                 ("delete col2 from paging_test where id = 1 "
                  "and mytext = '{}'".format(pkey)),
-                consistency_level=CL.ALL)
-                            )
+                consistency_level=CL.ALL))
         self.check_all_paging_results(expected_data, 8,
                                       [25, 25, 25, 25, 25, 25, 25, 25])
 
@@ -1427,8 +1428,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
             self.cursor.execute(SimpleStatement(
                 ("delete col3 from paging_test where id = 3 "
                  "and mytext = '{}'".format(pkey)),
-                consistency_level=CL.ALL)
-                            )
+                consistency_level=CL.ALL))
         self.check_all_paging_results(expected_data, 8,
                                       [25, 25, 25, 25, 25, 25, 25, 25])
 
@@ -1448,8 +1448,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
             self.cursor.execute(SimpleStatement(
                 ("delete col1, col2 from paging_test where id = 2 "
                  "and mytext = '{}'".format(pkey)),
-                consistency_level=CL.ALL)
-                            )
+                consistency_level=CL.ALL))
         self.check_all_paging_results(expected_data, 8,
                                       [25, 25, 25, 25, 25, 25, 25, 25])
 
@@ -1464,8 +1463,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
             self.cursor.execute(SimpleStatement(
                 ("delete col2, col3 from paging_test where id = 4 "
                  "and mytext = '{}'".format(pkey)),
-                consistency_level=CL.ALL)
-                            )
+                consistency_level=CL.ALL))
         self.check_all_paging_results(expected_data, 8,
                                       [25, 25, 25, 25, 25, 25, 25, 25])
 
@@ -1486,6 +1484,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
         time.sleep(5)
         self.check_all_paging_results([], 0, [])
 
+    @require(9775, broken_in='3.0')
     def test_failure_threshold_deletions(self):
         """Test that paging throws a failure in case of tombstone threshold """
         self.allow_log_errors = True
