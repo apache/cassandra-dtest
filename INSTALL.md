@@ -74,6 +74,10 @@ will often need to modify them in some fashion at some later point:
 
         sudo apt-get install python-nose
 
+* flaky
+
+		sudo pip install flaky
+
 * cassandra
 
         cd ~/git/cstar
@@ -104,6 +108,11 @@ will often need to modify them in some fashion at some later point:
 
          cd ~/git/cstar/cassandra-dtest
          nosetests
+
+* Run the full dtest suite, retrying tests decorated with `flaky` (see [the `flaky` plugin](https://github.com/box/flaky) for more documentation):
+
+         cd ~/git/cstar/cassandra-dtest
+         nosetests --with-flaky
 
 * Run a single dtest, printing debug info, stopping at the first error encountered (if any):
 

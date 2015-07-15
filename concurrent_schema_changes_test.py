@@ -139,7 +139,7 @@ class TestConcurrentSchemaChanges(Tester):
         debug("changes_to_different_nodes_test()")
         cluster = self.cluster
         cluster.populate(2).start()
-        [node1, node2] = cluster.nodelist()
+        node1, node2 = cluster.nodelist()
         wait(2)
         cursor = self.cql_connection(node1)
         self.prepare_for_changes(cursor, namespace='ns1')
@@ -168,7 +168,7 @@ class TestConcurrentSchemaChanges(Tester):
         debug("changes_while_node_down_test()")
         cluster = self.cluster
         cluster.populate(2).start()
-        [node1, node2] = cluster.nodelist()
+        node1, node2 = cluster.nodelist()
         wait(2)
         cursor = self.patient_cql_connection(node2)
 
@@ -196,7 +196,7 @@ class TestConcurrentSchemaChanges(Tester):
         debug("changes_while_node_toggle_test()")
         cluster = self.cluster
         cluster.populate(2).start()
-        [node1, node2] = cluster.nodelist()
+        node1, node2 = cluster.nodelist()
         wait(2)
         cursor = self.patient_cql_connection(node2)
 
@@ -230,7 +230,7 @@ class TestConcurrentSchemaChanges(Tester):
                     None)
         cluster.add(node2, False)
 
-        [node1, node2] = cluster.nodelist()
+        node1, node2 = cluster.nodelist()
         node1.start(wait_for_binary_proto=True)
         node2.start(wait_for_binary_proto=True)
         wait(2)
@@ -265,7 +265,7 @@ class TestConcurrentSchemaChanges(Tester):
         debug("snapshot_test()")
         cluster = self.cluster
         cluster.populate(2).start()
-        [node1, node2] = cluster.nodelist()
+        node1, node2 = cluster.nodelist()
         wait(2)
         cursor = self.cql_connection(node1)
         self.prepare_for_changes(cursor, namespace='ns2')

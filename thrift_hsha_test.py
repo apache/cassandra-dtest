@@ -1,5 +1,4 @@
 from dtest import Tester, debug, DEFAULT_DIR
-from tools import require
 import unittest, time, os, subprocess, shlex, pycassa, glob, sys
 
 JNA_PATH = '/usr/share/java/jna.jar'
@@ -22,10 +21,13 @@ class ThriftHSHATest(Tester):
     def __init__(self, *args, **kwargs):
         Tester.__init__(self, *args, **kwargs)
 
-    @require('CASSANDRA-9369')
     @unittest.skipIf(sys.platform == "win32", 'Could not be executed on Windows')
     def test_closing_connections(self):
-        """Test CASSANDRA-6546 - do connections get closed when disabling / renabling thrift service?"""
+        """
+        @jira_ticket CASSANDRA-6546
+
+        Test CASSANDRA-6546 - do connections get closed when disabling / renabling thrift service?
+        """
         cluster = self.cluster
         cluster.set_configuration_options(values={
             'start_rpc': 'true',
@@ -34,7 +36,7 @@ class ThriftHSHATest(Tester):
         })
 
         cluster.populate(1)
-        cluster.start()
+        cluster.start(wait_for_binary_proto=True)
         (node1,) = cluster.nodelist()
 
         cursor = self.patient_cql_connection(node1)
@@ -63,7 +65,10 @@ class ThriftHSHATest(Tester):
     @unittest.skipIf(not os.path.exists(ATTACK_JAR), "No attack jar found")
     @unittest.skipIf(not os.path.exists(JNA_PATH), "No JNA jar found")
     def test_6285(self):
-        """Test CASSANDRA-6285 with Viktor Kuzmin's  attack jar.
+        """
+        @jira_ticket CASSANDRA-6285
+
+        Test CASSANDRA-6285 with Viktor Kuzmin's  attack jar.
 
         This jar file is not a part of this repository, you can
         compile it yourself from sources found on CASSANDRA-6285. This

@@ -1,7 +1,11 @@
-from dtest import Tester, debug
-from tools import rows_to_list
-import tempfile, os
+import os
+import tempfile
 
+from dtest import Tester, debug
+from tools import rows_to_list, since
+
+
+@since('0', '2.2.X')
 class TestJson(Tester):
 
     def json_tools_test(self):

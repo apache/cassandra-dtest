@@ -135,7 +135,7 @@ class TestSSTableGenerationAndLoading(Tester):
 
         cluster = self.cluster
         cluster.populate(2).start()
-        [node1, node2] = cluster.nodelist()
+        node1, node2 = cluster.nodelist()
         time.sleep(.5)
 
         def create_schema(cursor, compression):

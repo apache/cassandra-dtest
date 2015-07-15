@@ -1,9 +1,9 @@
 from dtest import Tester
-from tools import insert_c1c2, query_c1c2, no_vnodes, new_node
+from tools import insert_c1c2, query_c1c2, no_vnodes, new_node, debug, require, since
 from assertions import assert_almost_equal
 
-import os, sys, time
-from ccmlib.cluster import Cluster
+import time
+from ccmlib.node import TimeoutError
 from cassandra import ConsistencyLevel
 
 @no_vnodes()
@@ -14,7 +14,7 @@ class TestTopology(Tester):
 
         # Create an unbalanced ring
         cluster.populate(3, tokens=[0, 2**48, 2**62]).start()
-        [node1, node2, node3] = cluster.nodelist()
+        node1, node2, node3 = cluster.nodelist()
 
         cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'ks', 1)
@@ -53,7 +53,7 @@ class TestTopology(Tester):
 
         tokens = cluster.balanced_tokens(4)
         cluster.populate(4, tokens=tokens).start()
-        [node1, node2, node3, node4] = cluster.nodelist()
+        node1, node2, node3, node4 = cluster.nodelist()
 
         cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'ks', 2)
@@ -140,3 +140,46 @@ class TestTopology(Tester):
         # Check we can get all the keys
         for n in xrange(0, 10000):
             query_c1c2(cursor, n, ConsistencyLevel.ONE)
+
+    @require(8801)
+    @since('3.0')
+    def decommissioned_node_cant_rejoin_test(self):
+        '''
+        @jira_ticket CASSANDRA-8801
+
+        Test that a decomissioned node can't rejoin the cluster by:
+
+        - creating a cluster,
+        - decomissioning a node, and
+        - asserting that the "decomissioned node won't rejoin" error is in the
+        logs for that node and
+        - asserting that the node is not running.
+        '''
+        rejoin_err = 'This node was decommissioned and will not rejoin the ring'
+        try:
+            self.ignore_log_patterns = list(self.ignore_log_patterns)
+        except AttributeError:
+            self.ignore_log_patterns = []
+        self.ignore_log_patterns.append(rejoin_err)
+
+        self.cluster.populate(3).start(wait_for_binary_proto=True)
+        [node1, node2, node3] = self.cluster.nodelist()
+
+        debug('decommissioning...')
+        node3.decommission()
+        debug('stopping...')
+        node3.stop()
+        debug('attempting restart...')
+        node3.start()
+        try:
+            # usually takes 3 seconds, so give it a generous 15
+            node3.watch_log_for(rejoin_err, timeout=15)
+        except TimeoutError:
+            # TimeoutError is not very helpful to the reader of the test output;
+            # let that pass and move on to string assertion below
+            pass
+
+        self.assertIn(rejoin_err,
+                      '\n'.join(['\n'.join(err_list)
+                                 for err_list in node3.grep_log_for_errors()]))
+        self.assertFalse(node3.is_running())

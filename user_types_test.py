@@ -1,7 +1,7 @@
 import time
 import uuid
 import re
-from dtest import Tester, debug
+from dtest import Tester
 from tools import since, require
 from assertions import assert_invalid
 from cassandra import Unauthorized, ConsistencyLevel
@@ -38,6 +38,10 @@ class TestUserTypes(Tester):
         with self.assertRaises(Unauthorized) as cm:
             cursor.execute(query)
         assert re.search(message, cm.exception.message), "Expected: %s" % message
+
+    def assertNoTypes(self, cursor):
+        for keyspace in cursor.cluster.metadata.keyspaces.values():
+            self.assertEqual(0, len(keyspace.user_types))
 
     def test_type_dropping(self):
         """
@@ -99,11 +103,7 @@ class TestUserTypes(Tester):
         cursor.execute(stmt)
 
         # now let's have a look at the system schema and make sure no user types are defined
-        stmt = """
-              SELECT type_name from system.schema_usertypes;
-           """
-        rows = cursor.execute(stmt)
-        self.assertEqual(0, len(rows))
+        self.assertNoTypes(cursor)
 
     def test_nested_type_dropping(self):
         """
@@ -152,11 +152,7 @@ class TestUserTypes(Tester):
         cursor.execute(stmt)
 
         # now let's have a look at the system schema and make sure no user types are defined
-        stmt = """
-              SELECT type_name from system.schema_usertypes;
-           """
-        rows = cursor.execute(stmt)
-        self.assertEqual(0, len(rows))
+        self.assertNoTypes(cursor)
 
     def test_type_enforcement(self):
         """
@@ -359,7 +355,7 @@ class TestUserTypes(Tester):
               SELECT id, name.first from person_likes where id={id};
            """.format(id=_id)
 
-        if self.cluster.version() >= '3.0':
+        if self.cluster.version() >= '2.2':
             assert_invalid(cursor, stmt, 'Partition key parts: name must be restricted as other parts are')
         else:
             assert_invalid(cursor, stmt, 'Partition key part name must be restricted since preceding part is')
@@ -409,7 +405,11 @@ class TestUserTypes(Tester):
               SELECT * from person_likes where name = {first:'Nero', middle: 'Claudius Caesar Augustus', last: 'Germanicus'};
             """
 
-        assert_invalid(cursor, stmt, 'No secondary indexes on the restricted columns support the provided operators')
+        if self.cluster.version() < "3":
+            assert_invalid(cursor, stmt, 'No secondary indexes on the restricted columns support the provided operators')
+        else:
+            assert_invalid(cursor, stmt, 'No supported secondary index found for the non primary key columns restrictions')
+
 
         # add index and query again (even though there are no rows in the table yet)
         stmt = """
@@ -561,8 +561,7 @@ class TestUserTypes(Tester):
         user2_cursor.execute("DROP TYPE ks2.simple_type;")
 
         #verify user type metadata is gone from the system schema
-        rows = superuser_cursor.execute("SELECT * from system.schema_usertypes")
-        self.assertEqual(0, len(rows))
+        self.assertNoTypes(superuser_cursor)
 
     def test_nulls_in_user_types(self):
         """Tests user types with null values"""
@@ -743,3 +742,28 @@ class TestUserTypes(Tester):
         session.execute("UPDATE tc SET v[b] = v[b] + {4,5} where id=0")
         rows = session.execute("SELECT * from tc WHERE id=0")
         self.assertEqual(listify(rows[0]), [0, [0, [1,2,3,4,5]]])
+
+    @since('2.2')
+    def test_user_type_isolation(self):
+        """
+        Ensure UDT cannot be used from another keyspace
+        @jira_ticket CASSANDRA-9409
+        @since 2.2
+        """
+
+        cluster = self.cluster
+        cluster.populate(1).start()
+        node1 = cluster.nodelist()[0]
+        session = self.patient_cql_connection(node1)
+        self.create_ks(session, 'user_types', 1)
+
+        # create a user defined type in a keyspace
+        session.execute("CREATE TYPE udt (first text, second int, third int)")
+
+        # ensure we cannot use a udt from another keyspace
+        self.create_ks(session, 'user_ks', 1)
+        assert_invalid(
+            session,
+            "CREATE TABLE t (id int PRIMARY KEY, v frozen<user_types.udt>)",
+            "Statement on keyspace user_ks cannot refer to a user type in keyspace user_types"
+        )

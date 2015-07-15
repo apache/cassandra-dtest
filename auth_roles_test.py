@@ -1,11 +1,11 @@
-import time
+import time, re
 
-from cassandra import AuthenticationFailed, Unauthorized
+from cassandra import AuthenticationFailed, Unauthorized, InvalidRequest
 from cassandra.cluster import NoHostAvailable
 from cassandra.protocol import SyntaxException
 from auth_test import data_resource_creator_permissions, role_creator_permissions, function_resource_creator_permissions
-from dtest import debug,Tester
-from assertions import *
+from dtest import Tester
+from assertions import assert_one, assert_all, assert_invalid
 from tools import since
 
 #Second value is superuser status
@@ -16,8 +16,12 @@ role2_role = ['role2', False, False, {}]
 cassandra_role = ['cassandra', True, True, {}]
 
 
-@since('3.0')
+@since('2.2')
 class TestAuthRoles(Tester):
+
+    def __init__(self, *args, **kwargs):
+        kwargs['cluster_options'] = {'enable_user_defined_functions': 'true'}
+        Tester.__init__(self, *args, **kwargs)
 
     def create_drop_role_test(self):
         self.prepare()
@@ -131,6 +135,7 @@ class TestAuthRoles(Tester):
         mike.execute("CREATE TABLE ks.cf (id int primary key, val int)")
         mike.execute("CREATE ROLE role1 WITH PASSWORD = '11111' AND SUPERUSER = false AND LOGIN = true")
         mike.execute("""CREATE FUNCTION ks.state_function_1(a int, b int)
+                        CALLED ON NULL INPUT
                         RETURNS int
                         LANGUAGE javascript
                         AS ' a + b'""")
@@ -358,7 +363,7 @@ class TestAuthRoles(Tester):
         cassandra.execute("CREATE TABLE ks.cf (id int primary key, val int)")
         cassandra.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND SUPERUSER = false AND LOGIN = true")
         cassandra.execute("CREATE ROLE role1 WITH SUPERUSER = false AND LOGIN = false")
-        cassandra.execute("CREATE FUNCTION ks.state_func(a int, b int) RETURNS int LANGUAGE javascript AS 'a+b'")
+        cassandra.execute("CREATE FUNCTION ks.state_func(a int, b int) CALLED ON NULL INPUT RETURNS int LANGUAGE javascript AS 'a+b'")
         cassandra.execute("CREATE AGGREGATE ks.agg_func(int) SFUNC state_func STYPE int")
 
         # GRANT ALL ON ALL KEYSPACES grants Permission.ALL_DATA
@@ -711,8 +716,8 @@ class TestAuthRoles(Tester):
         cassandra = self.get_session(user='cassandra', password='cassandra')
         self.setup_table(cassandra)
         cassandra.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND LOGIN = true")
-        cassandra.execute("CREATE FUNCTION ks.plus_one ( input int ) RETURNS int LANGUAGE javascript AS 'input + 1'")
-        cassandra.execute("CREATE FUNCTION ks.\"plusOne\" ( input int ) RETURNS int LANGUAGE javascript AS 'input + 1'")
+        cassandra.execute("CREATE FUNCTION ks.plus_one ( input int ) CALLED ON NULL INPUT RETURNS int LANGUAGE javascript AS 'input + 1'")
+        cassandra.execute("CREATE FUNCTION ks.\"plusOne\" ( input int ) CALLED ON NULL INPUT RETURNS int LANGUAGE javascript AS 'input + 1'")
 
         # grant / revoke on a specific function
         cassandra.execute("GRANT EXECUTE ON FUNCTION ks.plus_one(int) TO mike")
@@ -750,7 +755,7 @@ class TestAuthRoles(Tester):
         cassandra = self.get_session(user='cassandra', password='cassandra')
         self.setup_table(cassandra)
         cassandra.execute("CREATE ROLE mike")
-        cassandra.execute("CREATE FUNCTION ks.plus_one ( input int ) RETURNS int LANGUAGE javascript AS 'input + 1'")
+        cassandra.execute("CREATE FUNCTION ks.plus_one ( input int ) CALLED ON NULL INPUT RETURNS int LANGUAGE javascript AS 'input + 1'")
         cassandra.execute("GRANT EXECUTE ON FUNCTION ks.plus_one(int) TO mike")
         cassandra.execute("GRANT EXECUTE ON FUNCTION ks.plus_one(int) TO mike")
         self.assert_permissions_listed([("mike", "<function ks.plus_one(int)>", "EXECUTE")],
@@ -768,8 +773,8 @@ class TestAuthRoles(Tester):
         cassandra.execute("INSERT INTO ks.t1 (k,v) values (1,1)")
         cassandra.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND LOGIN = true")
         cassandra.execute("GRANT SELECT ON ks.t1 TO mike")
-        cassandra.execute("CREATE FUNCTION ks.func_one ( input int ) RETURNS int LANGUAGE javascript AS 'input + 1'")
-        cassandra.execute("CREATE FUNCTION ks.func_two ( input int ) RETURNS int LANGUAGE javascript AS 'input + 1'")
+        cassandra.execute("CREATE FUNCTION ks.func_one ( input int ) CALLED ON NULL INPUT RETURNS int LANGUAGE javascript AS 'input + 1'")
+        cassandra.execute("CREATE FUNCTION ks.func_two ( input int ) CALLED ON NULL INPUT RETURNS int LANGUAGE javascript AS 'input + 1'")
 
         mike = self.get_session(user='mike', password='12345')
         select_one = "SELECT k, v, ks.func_one(v) FROM ks.t1 WHERE k = 1"
@@ -818,12 +823,12 @@ class TestAuthRoles(Tester):
         self.prepare()
         cassandra = self.get_session(user='cassandra', password='cassandra')
         self.setup_table(cassandra)
-        cassandra.execute("CREATE FUNCTION ks.plus_one ( input int ) RETURNS int LANGUAGE javascript AS 'input + 1'")
+        cassandra.execute("CREATE FUNCTION ks.plus_one ( input int ) CALLED ON NULL INPUT RETURNS int LANGUAGE javascript AS 'input + 1'")
         cassandra.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND LOGIN = true")
         mike = self.get_session(user='mike', password='12345')
 
         # can't replace an existing function without ALTER permission on the parent ks
-        cql = "CREATE OR REPLACE FUNCTION ks.plus_one( input int ) RETURNS int LANGUAGE javascript as '1 + input'"
+        cql = "CREATE OR REPLACE FUNCTION ks.plus_one( input int ) CALLED ON NULL INPUT RETURNS int LANGUAGE javascript as '1 + input'"
         assert_invalid(mike, cql,
                        "User mike has no ALTER permission on <function ks.plus_one\(int\)> or any of its parents",
                        Unauthorized)
@@ -867,7 +872,7 @@ class TestAuthRoles(Tester):
                        InvalidRequest)
 
         # can't create a new function without CREATE on the parent keyspace's collection of functions
-        cql = "CREATE FUNCTION ks.plus_one ( input int ) RETURNS int LANGUAGE javascript AS 'input + 1'"
+        cql = "CREATE FUNCTION ks.plus_one ( input int ) CALLED ON NULL INPUT RETURNS int LANGUAGE javascript AS 'input + 1'"
         assert_invalid(mike, cql,
                        "User mike has no CREATE permission on <all functions in ks> or any of its parents",
                        Unauthorized)
@@ -879,7 +884,7 @@ class TestAuthRoles(Tester):
         cassandra = self.get_session(user='cassandra', password='cassandra')
         self.setup_table(cassandra)
         cassandra.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND LOGIN = true")
-        cassandra.execute("CREATE FUNCTION ks.plus_one ( input int ) RETURNS int LANGUAGE javascript AS 'input + 1'")
+        cassandra.execute("CREATE FUNCTION ks.plus_one ( input int ) CALLED ON NULL INPUT RETURNS int LANGUAGE javascript AS 'input + 1'")
         cassandra.execute("GRANT EXECUTE ON FUNCTION ks.plus_one(int) TO mike")
         cassandra.execute("GRANT EXECUTE ON ALL FUNCTIONS IN KEYSPACE ks TO mike")
         cassandra.execute("GRANT EXECUTE ON ALL FUNCTIONS TO mike")
@@ -900,7 +905,7 @@ class TestAuthRoles(Tester):
         cassandra = self.get_session(user='cassandra', password='cassandra')
         self.setup_table(cassandra)
         cassandra.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND LOGIN = true")
-        cassandra.execute("CREATE FUNCTION ks.plus_one ( input int ) RETURNS int LANGUAGE javascript AS 'input + 1'")
+        cassandra.execute("CREATE FUNCTION ks.plus_one ( input int ) CALLED ON NULL INPUT RETURNS int LANGUAGE javascript AS 'input + 1'")
         cassandra.execute("GRANT EXECUTE ON FUNCTION ks.plus_one(int) TO mike")
         cassandra.execute("GRANT EXECUTE ON ALL FUNCTIONS IN KEYSPACE ks TO mike")
 
@@ -923,8 +928,8 @@ class TestAuthRoles(Tester):
         cassandra = self.get_session(user='cassandra', password='cassandra')
         self.setup_table(cassandra)
         cassandra.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND LOGIN = true")
-        cassandra.execute("CREATE FUNCTION ks.plus_one ( input int ) RETURNS int LANGUAGE javascript AS 'input + 1'")
-        cassandra.execute("CREATE FUNCTION ks.plus_one ( input double ) RETURNS double LANGUAGE javascript AS 'input + 1'")
+        cassandra.execute("CREATE FUNCTION ks.plus_one ( input int ) CALLED ON NULL INPUT RETURNS int LANGUAGE javascript AS 'input + 1'")
+        cassandra.execute("CREATE FUNCTION ks.plus_one ( input double ) CALLED ON NULL INPUT RETURNS double LANGUAGE javascript AS 'input + 1'")
 
         # grant execute on one variant
         cassandra.execute("GRANT EXECUTE ON FUNCTION ks.plus_one(int) TO mike")
@@ -960,7 +965,7 @@ class TestAuthRoles(Tester):
         cassandra = self.get_session(user='cassandra', password='cassandra')
         self.setup_table(cassandra)
         cassandra.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND LOGIN = true")
-        cassandra.execute("CREATE FUNCTION ks.plus_one ( input int ) RETURNS int LANGUAGE javascript AS 'input + 1'")
+        cassandra.execute("CREATE FUNCTION ks.plus_one ( input int ) CALLED ON NULL INPUT RETURNS int LANGUAGE javascript AS 'input + 1'")
         cassandra.execute("GRANT EXECUTE ON FUNCTION ks.plus_one(int) TO mike")
 
         self.assert_permissions_listed([("mike", "<function ks.plus_one(int)>", "EXECUTE")],
@@ -989,7 +994,7 @@ class TestAuthRoles(Tester):
         self.prepare()
         cassandra = self.get_session(user='cassandra', password='cassandra')
         self.setup_table(cassandra)
-        cassandra.execute("CREATE FUNCTION ks.plus_one ( input int ) RETURNS int LANGUAGE javascript AS 'input + 1'")
+        cassandra.execute("CREATE FUNCTION ks.plus_one ( input int ) CALLED ON NULL INPUT RETURNS int LANGUAGE javascript AS 'input + 1'")
         cassandra.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND LOGIN = true")
         cassandra.execute("GRANT ALL PERMISSIONS ON ks.t1 TO mike")
         cassandra.execute("INSERT INTO ks.t1 (k,v) values (1,1)")
@@ -1008,7 +1013,7 @@ class TestAuthRoles(Tester):
         self.setup_table(cassandra)
         cassandra.execute("CREATE ROLE function_user")
         cassandra.execute("GRANT EXECUTE ON ALL FUNCTIONS IN KEYSPACE ks TO function_user")
-        cassandra.execute("CREATE FUNCTION ks.plus_one ( input int ) RETURNS int LANGUAGE javascript AS 'input + 1'")
+        cassandra.execute("CREATE FUNCTION ks.plus_one ( input int ) CALLED ON NULL INPUT RETURNS int LANGUAGE javascript AS 'input + 1'")
         cassandra.execute("INSERT INTO ks.t1 (k,v) VALUES (1,1)")
         cassandra.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND LOGIN = true")
         cassandra.execute("GRANT SELECT ON ks.t1 TO mike")
@@ -1081,10 +1086,12 @@ class TestAuthRoles(Tester):
         cassandra.execute("INSERT INTO ks.t1 (k,v) VALUES (1,1)")
         cassandra.execute("INSERT INTO ks.t1 (k,v) VALUES (2,2)")
         cassandra.execute("""CREATE FUNCTION ks.state_function( a int, b int )
+                             CALLED ON NULL INPUT
                              RETURNS int
                              LANGUAGE java
                              AS 'return Integer.valueOf( (a != null ? a.intValue() : 0) + b.intValue());'""")
         cassandra.execute("""CREATE FUNCTION ks.final_function( a int )
+                             CALLED ON NULL INPUT
                              RETURNS int
                              LANGUAGE java
                              AS 'return a;'""")
@@ -1129,6 +1136,22 @@ class TestAuthRoles(Tester):
         # mike *does* have execute permission on the aggregate function, as its creator
         assert_one(mike, execute_aggregate_cql, [3])
 
+    def ignore_invalid_roles_test(self):
+        """
+        The system_auth.roles table includes a set of roles of which each role
+        is a member. If that list were to get out of sync, so that it indicated
+        that roleA is a member of roleB, but roleB does not exist in the roles
+        table, then the result of LIST ROLES OF roleA should not include roleB
+        @jira_ticket CASSANDRA-9551
+        """
+
+        self.prepare()
+        cassandra = self.get_session(user='cassandra', password='cassandra')
+        cassandra.execute("CREATE ROLE mike WITH LOGIN = true")
+        # hack an invalid entry into the roles table for roleA
+        cassandra.execute("UPDATE system_auth.roles SET member_of = {'role1'} where role = 'mike'")
+        assert_all(cassandra, "LIST ROLES OF mike", [mike_role])
+
     def setup_table(self, session):
         session.execute("CREATE KEYSPACE ks WITH REPLICATION = {'class':'SimpleStrategy', 'replication_factor':1}")
         session.execute("CREATE TABLE ks.t1 (k int PRIMARY KEY, v int)")
@@ -1136,7 +1159,7 @@ class TestAuthRoles(Tester):
     def assert_unauthenticated(self, message, user, password):
         with self.assertRaises(NoHostAvailable) as response:
             node = self.cluster.nodelist()[0]
-            self.cql_connection(node, version="3.1.7", user=user, password=password)
+            self.cql_connection(node, user=user, password=password)
         host, error = response.exception.errors.popitem()
         pattern = 'Failed to authenticate to %s: code=0100 \[Bad credentials\] message="%s"' % (host, message)
         assert type(error) == AuthenticationFailed, "Expected AuthenticationFailed, got %s" % type(error)
@@ -1161,7 +1184,7 @@ class TestAuthRoles(Tester):
 
     def get_session(self, node_idx=0, user=None, password=None):
         node = self.cluster.nodelist()[node_idx]
-        conn = self.patient_cql_connection(node, version="3.1.7", user=user, password=password)
+        conn = self.patient_cql_connection(node, user=user, password=password)
         return conn
 
     def assert_permissions_listed(self, expected, cursor, query):

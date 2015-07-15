@@ -1,12 +1,15 @@
-from dtest import Tester, debug
-from tools import insert_c1c2, since
+import os
+import time
+from re import findall
+
 from cassandra import ConsistencyLevel
 from ccmlib.node import Node
-from re import findall
-import time
-import os
-from assertions import assert_one, assert_almost_equal
 from nose.plugins.attrib import attr
+
+from assertions import assert_almost_equal, assert_one
+from dtest import Tester, debug
+from flaky import flaky
+from tools import insert_c1c2, since
 
 
 @since('2.1')
@@ -23,7 +26,7 @@ class TestIncRepair(Tester):
     def sstable_marking_test(self):
         cluster = self.cluster
         cluster.populate(3).start()
-        [node1, node2, node3] = cluster.nodelist()
+        node1, node2, node3 = cluster.nodelist()
 
         node3.stop(gently=True)
 
@@ -34,7 +37,7 @@ class TestIncRepair(Tester):
         node3.start(wait_other_notice=True)
         time.sleep(3)
 
-        if cluster.version() >= "3.0":
+        if cluster.version() >= "2.2":
             node3.repair()
         else:
             node3.nodetool("repair -par -inc")
@@ -55,7 +58,7 @@ class TestIncRepair(Tester):
     def multiple_repair_test(self):
         cluster = self.cluster
         cluster.populate(3).start()
-        [node1, node2, node3] = cluster.nodelist()
+        node1, node2, node3 = cluster.nodelist()
 
         cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'ks', 3)
@@ -80,7 +83,7 @@ class TestIncRepair(Tester):
         debug("restarting and repairing node 3")
         node3.start(wait_for_binary_proto=True)
 
-        if cluster.version() >= "3.0":
+        if cluster.version() >= "2.2":
             node3.repair()
         else:
             node3.nodetool("repair -par -inc")
@@ -97,7 +100,7 @@ class TestIncRepair(Tester):
         debug("start and repair node 2")
         node2.start(wait_for_binary_proto=True)
 
-        if cluster.version() >= "3.0":
+        if cluster.version() >= "2.2":
             node2.repair()
         else:
             node2.nodetool("repair -par -inc")
@@ -113,7 +116,7 @@ class TestIncRepair(Tester):
     def sstable_repairedset_test(self):
         cluster = self.cluster
         cluster.populate(2).start()
-        [node1, node2] = cluster.nodelist()
+        node1, node2 = cluster.nodelist()
         node1.stress(['write', 'n=10000', '-schema', 'replication(factor=2)'])
 
         node1.flush()
@@ -133,7 +136,7 @@ class TestIncRepair(Tester):
         node2.flush()
         node1.start(wait_for_binary_proto=True)
 
-        if cluster.version() >= "3.0":
+        if cluster.version() >= "2.2":
             node1.repair()
         else:
             node1.nodetool("repair -par -inc")
@@ -172,7 +175,7 @@ class TestIncRepair(Tester):
     def compaction_test(self):
         cluster = self.cluster
         cluster.populate(3).start()
-        [node1, node2, node3] = cluster.nodelist()
+        node1, node2, node3 = cluster.nodelist()
 
         cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'ks', 3)
@@ -186,7 +189,7 @@ class TestIncRepair(Tester):
 
         node3.start(wait_for_binary_proto=True)
 
-        if cluster.version() >= "3.0":
+        if cluster.version() >= "2.2":
             node3.repair()
         else:
             node3.nodetool("repair -par -inc")
@@ -203,6 +206,7 @@ class TestIncRepair(Tester):
 
     @since('2.1')
     @attr('long')
+    @flaky  # see CASSANDRA-9752
     def multiple_subsequent_repair_test(self):
         """
         Covers CASSANDRA-8366
@@ -225,7 +229,7 @@ class TestIncRepair(Tester):
         node2.flush()
         node3.flush()
 
-        if self.cluster.version() >= '3.0':
+        if self.cluster.version() >= '2.2':
             debug("Repairing node1")
             node1.nodetool("repair")
             debug("Repairing node2")

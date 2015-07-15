@@ -1,8 +1,6 @@
 from dtest import Tester
 from tools import since
-import unittest, os, sys, time
-from ccmlib.cluster import Cluster
-from ccmlib import common
+import os
 
 @since('2.1')
 class TestCFID(Tester):

@@ -1,14 +1,27 @@
-import time, uuid, re, struct
+import re
+import struct
+import time
+import uuid
 
-from thrift.transport import TTransport
-from thrift.transport import TSocket
 from thrift.protocol import TBinaryProtocol
 from thrift.Thrift import TApplicationException
+from thrift.transport import TSocket, TTransport
 
-from dtest import Tester, debug, NUM_TOKENS, DISABLE_VNODES
-from tools import since
-from thrift_bindings.v30 import Cassandra
-from thrift_bindings.v30.Cassandra import *
+from dtest import DISABLE_VNODES, NUM_TOKENS, Tester
+from thrift_bindings.v22 import Cassandra
+from thrift_bindings.v22.Cassandra import (CfDef, Column, ColumnDef,
+                                           ColumnOrSuperColumn, ColumnParent,
+                                           ColumnPath, ColumnSlice,
+                                           ConsistencyLevel, CounterColumn,
+                                           Deletion, IndexExpression,
+                                           IndexOperator, IndexType,
+                                           InvalidRequestException, KeyRange,
+                                           KeySlice, KsDef, MultiSliceRequest,
+                                           Mutation, NotFoundException,
+                                           SlicePredicate, SliceRange,
+                                           SuperColumn)
+from tools import since, require
+
 
 def get_thrift_client(host='127.0.0.1', port=9160):
     socket = TSocket.TSocket(host, port)
@@ -640,6 +653,7 @@ class TestMutations(ThriftTester):
                 for key in keys:
                     _assert_no_columnpath(key, ColumnPath(column_family, column=c.name))
 
+    @require(9722, broken_in='3.0')
     def test_batch_mutate_remove_super_columns_with_standard_under(self):
         _set_keyspace('Keyspace1')
         column_families = ['Super1', 'Super2']
@@ -664,6 +678,7 @@ class TestMutations(ThriftTester):
                     for key in keys:
                         _assert_no_columnpath(key, ColumnPath(column_family, super_column=sc.name, column=c.name))
 
+    @require(9722, broken_in='3.0')
     def test_batch_mutate_remove_super_columns_with_none_given_underneath(self):
         _set_keyspace('Keyspace1')
 
@@ -721,6 +736,7 @@ class TestMutations(ThriftTester):
             for key in keys:
                 _assert_no_columnpath(key, ColumnPath('Super1', super_column=sc.name))
 
+    @require(9722, broken_in='3.0')
     def test_batch_mutate_remove_slice_standard(self):
         _set_keyspace('Keyspace1')
 
@@ -742,6 +758,7 @@ class TestMutations(ThriftTester):
         _assert_no_columnpath('key', ColumnPath('Standard1', column='c4'))
         _assert_columnpath_exists('key', ColumnPath('Standard1', column='c5'))
 
+    @require(9722, broken_in='3.0')
     def test_batch_mutate_remove_slice_of_entire_supercolumns(self):
         _set_keyspace('Keyspace1')
 
@@ -768,6 +785,7 @@ class TestMutations(ThriftTester):
         _assert_no_columnpath('key', ColumnPath('Super1', super_column='sc4', column=_i64(6)))
         _assert_columnpath_exists('key', ColumnPath('Super1', super_column='sc5', column=_i64(7)))
 
+    @require(9722, broken_in='3.0')
     def test_batch_mutate_remove_slice_part_of_supercolumns(self):
         _set_keyspace('Keyspace1')
 
@@ -1071,7 +1089,7 @@ class TestMutations(ThriftTester):
                                               columns=[Column(_i64(6), 'value6', 0), Column(_i64(7), 'value7', 0)])]
 
         super_columns = [result.super_column for result in _big_slice('key1', ColumnParent('Super1'))]
-        assert super_columns == super_columns_expected, actual
+        assert super_columns == super_columns_expected, super_columns
 
         # Test resurrection.  First, re-insert the value w/ older timestamp,
         # and make sure it stays removed:
@@ -1379,6 +1397,7 @@ class TestMutations(ThriftTester):
             key = 'key'+str(i)
             assert counts[key] == i
 
+    @require(9722, broken_in='3.0')
     def test_batch_mutate_super_deletion(self):
         _set_keyspace('Keyspace1')
         _insert_super('test')
@@ -1404,7 +1423,7 @@ class TestMutations(ThriftTester):
 
     def test_describe_keyspace(self):
         kspaces = client.describe_keyspaces()
-        if self.cluster.version() >= '3.0':
+        if self.cluster.version() >= '2.2':
             assert len(kspaces) == 6, kspaces # ['Keyspace2', 'Keyspace1', 'system', 'system_traces', 'system_auth', 'system_distributed']
         else:
             assert len(kspaces) == 4, kspaces # ['Keyspace2', 'Keyspace1', 'system', 'system_traces']
@@ -2009,6 +2028,7 @@ class TestMutations(ThriftTester):
         _assert_no_columnpath('key2', ColumnPath(column_family='Counter1', column='c1'))
 
     @since('2.0')
+    @require(9722, broken_in='3.0')
     def test_range_deletion(self):
         """ Tests CASSANDRA-7990 """
         _set_keyspace('Keyspace1')

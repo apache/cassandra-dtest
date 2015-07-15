@@ -3,7 +3,7 @@ import tools as tools
 from tools import no_vnodes, create_c1c2_table, retry_till_success
 from cassandra import ConsistencyLevel
 
-import time, re
+import time
 
 from thrift.transport import TTransport, TSocket
 from thrift.protocol import TBinaryProtocol
@@ -32,7 +32,7 @@ class TestPutGet(Tester):
         cluster = self.cluster
 
         cluster.populate(3).start()
-        [node1, node2, node3] = cluster.nodelist()
+        node1, node2, node3 = cluster.nodelist()
 
         cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'ks', 3)
@@ -45,7 +45,7 @@ class TestPutGet(Tester):
         cluster = self.cluster
 
         cluster.populate(3).start()
-        [node1, node2, node3] = cluster.nodelist()
+        node1, node2, node3 = cluster.nodelist()
 
         cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'ks', 2)
@@ -62,7 +62,7 @@ class TestPutGet(Tester):
         cluster = self.cluster
 
         cluster.populate(3).start()
-        [node1, node2, node3] = cluster.nodelist()
+        node1, node2, node3 = cluster.nodelist()
 
         cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'ks', 2)
@@ -75,7 +75,7 @@ class TestPutGet(Tester):
         cluster = self.cluster
 
         cluster.populate(3).start()
-        [node1, node2, node3] = cluster.nodelist()
+        node1, node2, node3 = cluster.nodelist()
 
         cursor = self.patient_cql_connection(node1)
         self.create_ks(cursor, 'ks', 1)
@@ -120,7 +120,7 @@ class TestPutGet(Tester):
         cluster = self.cluster
         cluster.set_configuration_options(values={'partitioner': 'org.apache.cassandra.dht.ByteOrderedPartitioner'})
         cluster.populate(2)
-        [node1, node2] = cluster.nodelist()
+        node1, node2 = cluster.nodelist()
         node1.set_configuration_options(values={'initial_token': "a".encode('hex')  })
         node1.set_configuration_options(values={'initial_token': "b".encode('hex')  })
         cluster.start()

@@ -1,11 +1,14 @@
-import time, re
+import re
+import time
 
-from cassandra import Unauthorized, AuthenticationFailed
+from cassandra import AuthenticationFailed, Unauthorized
 from cassandra.cluster import NoHostAvailable
-from dtest import debug, Tester
-from tools import since
+
 from assertions import assert_invalid
-from tools import require
+from dtest import Tester, debug
+from flaky import flaky
+from tools import since
+
 
 class TestAuth(Tester):
 
@@ -18,23 +21,20 @@ class TestAuth(Tester):
         ]
         Tester.__init__(self, *args, **kwargs)
 
+    @flaky
     def system_auth_ks_is_alterable_test(self):
         self.prepare(nodes=3)
         debug("nodes started")
-        schema_query = """SELECT strategy_options
-                          FROM system.schema_keyspaces
-                          WHERE keyspace_name = 'system_auth'"""
 
-        cursor = self.get_cursor(0, user='cassandra', password='cassandra')
-        rows = cursor.execute(schema_query)
-        row = rows[0]
-        self.assertEqual('{"replication_factor":"1"}', row[0])
+        session = self.get_cursor(user='cassandra', password='cassandra')
+        self.assertEquals(1, session.cluster.metadata.keyspaces['system_auth'].replication_strategy.replication_factor)
 
-
-        cursor.execute("""
+        session.execute("""
             ALTER KEYSPACE system_auth
                 WITH replication = {'class':'SimpleStrategy', 'replication_factor':3};
         """)
+
+        self.assertEquals(3, session.cluster.metadata.keyspaces['system_auth'].replication_strategy.replication_factor)
 
         # make sure schema change is persistent
         debug("Stopping cluster..")
@@ -42,12 +42,12 @@ class TestAuth(Tester):
         debug("Restarting cluster..")
         self.cluster.start(wait_other_notice=True)
 
+        # check each node directly
         for i in range(3):
             debug('Checking node: {i}'.format(i=i))
-            cursor = self.get_cursor(i, user='cassandra', password='cassandra')
-            rows = cursor.execute(schema_query)
-            row = rows[0]
-            self.assertEqual('{"replication_factor":"3"}', row[0])
+            node = self.cluster.nodelist()[i]
+            session = self.patient_exclusive_cql_connection(node, user='cassandra', password='cassandra')
+            self.assertEquals(3, session.cluster.metadata.keyspaces['system_auth'].replication_strategy.replication_factor)
 
     def login_test(self):
         # also tests default user creation (cassandra/cassandra)
@@ -62,7 +62,7 @@ class TestAuth(Tester):
         except NoHostAvailable as e:
             assert isinstance(e.errors.values()[0], AuthenticationFailed)
 
-    # from 3.0 role creation is granted by CREATE_ROLE permissions, not superuser status
+    # from 2.2 role creation is granted by CREATE_ROLE permissions, not superuser status
     @since('1.2', max_version='2.1.x')
     def only_superuser_can_create_users_test(self):
         self.prepare()
@@ -111,10 +111,10 @@ class TestAuth(Tester):
         self.prepare()
 
         cursor = self.get_cursor(user='cassandra', password='cassandra')
-        # handle different error messages between versions 2.x & 3.x
+        # handle different error messages between versions pre and post 2.2.0
         assert_invalid(cursor, "DROP USER cassandra", "(Users aren't allowed to DROP themselves|Cannot DROP primary role for current login)")
 
-    # from 3.0 role deletion is granted by DROP_ROLE permissions, not superuser status
+    # from 2.2 role deletion is granted by DROP_ROLE permissions, not superuser status
     @since('1.2', max_version='2.1.x')
     def only_superusers_can_drop_users_test(self):
         self.prepare()
@@ -186,19 +186,19 @@ class TestAuth(Tester):
         cursor = self.get_cursor(user='cassandra', password='cassandra')
 
         users = cursor.execute("LIST USERS")
-        self.assertEqual(1, len(users)) # cassandra
+        self.assertEqual(1, len(users))  # cassandra
 
         cursor.execute("CREATE USER IF NOT EXISTS aleksey WITH PASSWORD 'sup'")
         cursor.execute("CREATE USER IF NOT EXISTS aleksey WITH PASSWORD 'ignored'")
 
         users = cursor.execute("LIST USERS")
-        self.assertEqual(2, len(users)) # cassandra + aleksey
+        self.assertEqual(2, len(users))  # cassandra + aleksey
 
         cursor.execute("DROP USER IF EXISTS aleksey")
         cursor.execute("DROP USER IF EXISTS aleksey")
 
         users = cursor.execute("LIST USERS")
-        self.assertEqual(1, len(users)) # cassandra
+        self.assertEqual(1, len(users))  # cassandra
 
     def create_ks_auth_test(self):
         self.prepare()
@@ -342,7 +342,7 @@ class TestAuth(Tester):
         self.assertEquals(1, len(rows))
 
         rows = cathy.execute("TRUNCATE ks.cf")
-        assert rows == None
+        assert rows is None
 
     def grant_revoke_auth_test(self):
         self.prepare()
@@ -496,10 +496,10 @@ class TestAuth(Tester):
                            ('cathy', '<table ks.cf2>', 'SELECT'),
                            ('bob', '<keyspace ks>', 'ALTER'),
                            ('bob', '<table ks.cf>', 'DROP'),
-                           ('bob', '<table ks.cf2>', 'MODIFY')];
+                           ('bob', '<table ks.cf2>', 'MODIFY')]
 
         # CASSANDRA-7216 automatically grants permissions on a role to its creator
-        if self.cluster.cassandra_version() >= '3.0.0':
+        if self.cluster.cassandra_version() >= '2.2.0':
             all_permissions.extend(data_resource_creator_permissions('cassandra', '<keyspace ks>'))
             all_permissions.extend(data_resource_creator_permissions('cassandra', '<table ks.cf>'))
             all_permissions.extend(data_resource_creator_permissions('cassandra', '<table ks.cf2>'))
@@ -514,13 +514,13 @@ class TestAuth(Tester):
                                      cassandra, "LIST ALL PERMISSIONS OF cathy")
 
         expected_permissions = [('cathy', '<table ks.cf>', 'MODIFY'), ('bob', '<table ks.cf>', 'DROP')]
-        if self.cluster.cassandra_version() >= '3.0.0':
+        if self.cluster.cassandra_version() >= '2.2.0':
             expected_permissions.extend(data_resource_creator_permissions('cassandra', '<table ks.cf>'))
         self.assertPermissionsListed(expected_permissions, cassandra, "LIST ALL PERMISSIONS ON ks.cf NORECURSIVE")
 
         expected_permissions = [('cathy', '<table ks.cf2>', 'SELECT')]
         # CASSANDRA-7216 automatically grants permissions on a role to its creator
-        if self.cluster.cassandra_version() >= '3.0.0':
+        if self.cluster.cassandra_version() >= '2.2.0':
             expected_permissions.append(('cassandra', '<table ks.cf2>', 'SELECT'))
             expected_permissions.append(('cassandra', '<keyspace ks>', 'SELECT'))
         self.assertPermissionsListed(expected_permissions, cassandra, "LIST SELECT ON ks.cf2")
@@ -565,9 +565,9 @@ class TestAuth(Tester):
         cathy.execute("DROP TYPE ks.address")
 
     def prepare(self, nodes=1, permissions_validity=0):
-        config = {'authenticator' : 'org.apache.cassandra.auth.PasswordAuthenticator',
-                  'authorizer' : 'org.apache.cassandra.auth.CassandraAuthorizer',
-                  'permissions_validity_in_ms' : permissions_validity}
+        config = {'authenticator': 'org.apache.cassandra.auth.PasswordAuthenticator',
+                  'authorizer': 'org.apache.cassandra.auth.CassandraAuthorizer',
+                  'permissions_validity_in_ms': permissions_validity}
         self.cluster.set_configuration_options(values=config)
         self.cluster.populate(nodes).start(no_wait=True)
         # default user setup is delayed by 10 seconds to reduce log spam
@@ -580,7 +580,7 @@ class TestAuth(Tester):
 
     def get_cursor(self, node_idx=0, user=None, password=None):
         node = self.cluster.nodelist()[node_idx]
-        conn = self.patient_cql_connection(node, version="3.0.1", user=user, password=password)
+        conn = self.patient_cql_connection(node, user=user, password=password)
         return conn
 
     def assertPermissionsListed(self, expected, cursor, query):

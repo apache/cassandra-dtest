@@ -1,6 +1,8 @@
-import os, random, re, time, uuid
+import random
+import re
+import time
+import uuid
 
-from ccmlib.common import get_version_from_build
 from dtest import Tester, debug
 from tools import since
 from assertions import assert_invalid, assert_one
@@ -54,7 +56,7 @@ class TestSecondaryIndexes(Tester):
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
 
-        conn = self.patient_cql_connection(node1, version='3.0.0')
+        conn = self.patient_cql_connection(node1)
         cursor = conn
         cursor.max_trace_wait = 120
         cursor.execute("CREATE KEYSPACE ks WITH REPLICATION = {'class': 'SimpleStrategy', 'replication_factor': '1'};")
@@ -289,7 +291,11 @@ class TestSecondaryIndexesOnCollections(Tester):
         # no index present yet, make sure there's an error trying to query column
         stmt = ("SELECT * from list_index_search.users where uuids contains {some_uuid}"
             ).format(some_uuid=uuid.uuid4())
-        assert_invalid(cursor, stmt, 'No secondary indexes on the restricted columns support the provided operators')
+
+        if self.cluster.version() < "3":
+            assert_invalid(cursor, stmt, 'No secondary indexes on the restricted columns support the provided operators')
+        else:
+            assert_invalid(cursor, stmt, 'No supported secondary index found for the non primary key columns restrictions')
 
         # add index and query again (even though there are no rows in the table yet)
         stmt = "CREATE INDEX user_uuids on list_index_search.users (uuids);"
@@ -383,7 +389,10 @@ class TestSecondaryIndexesOnCollections(Tester):
 
         # no index present yet, make sure there's an error trying to query column
         stmt = ("SELECT * from set_index_search.users where uuids contains {some_uuid}").format(some_uuid=uuid.uuid4())
-        assert_invalid(cursor, stmt, 'No secondary indexes on the restricted columns support the provided operators')
+        if self.cluster.version() < "3":
+            assert_invalid(cursor, stmt, 'No secondary indexes on the restricted columns support the provided operators')
+        else:
+            assert_invalid(cursor, stmt, 'No supported secondary index found for the non primary key columns restrictions')
 
         # add index and query again (even though there are no rows in the table yet)
         stmt = "CREATE INDEX user_uuids on set_index_search.users (uuids);"
@@ -473,13 +482,16 @@ class TestSecondaryIndexesOnCollections(Tester):
                "uuids map<uuid, uuid>);")
         cursor.execute(stmt)
 
+        no_index_error = ('No secondary indexes on the restricted columns support the provided operators'
+                          if self.cluster.version() < '3' else
+                          'No supported secondary index found for the non primary key columns restrictions')
         # no index present yet, make sure there's an error trying to query column
         stmt = ("SELECT * from map_index_search.users where uuids contains {some_uuid}").format(some_uuid=uuid.uuid4())
-        assert_invalid(cursor, stmt, 'No secondary indexes on the restricted columns support the provided operators')
+        assert_invalid(cursor, stmt, no_index_error)
 
         stmt = ("SELECT * from map_index_search.users where uuids contains key {some_uuid}"
             ).format(some_uuid=uuid.uuid4())
-        assert_invalid(cursor, stmt, 'No secondary indexes on the restricted columns support the provided operators')
+        assert_invalid(cursor, stmt, no_index_error)
 
         # add index on keys and query again (even though there are no rows in the table yet)
         stmt = "CREATE INDEX user_uuids on map_index_search.users (KEYS(uuids));"
@@ -561,7 +573,7 @@ class TestSecondaryIndexesOnCollections(Tester):
 
         # attempt to add an index on map values as well (should fail)
         stmt = "CREATE INDEX user_uuids on map_index_search.users (uuids);"
-        if self.cluster.version() >= '3.0':
+        if self.cluster.version() >= '2.2':
             matching =  "Cannot create index on values\(uuids\): an index on keys\(uuids\) already exists and indexing a map on more than one dimension at the same time is not currently supported"
         else:
             matching =  "Cannot create index on uuids values, an index on uuids keys already exists and indexing a map on both keys and values at the same time is not currently supported"
@@ -597,10 +609,8 @@ class TestSecondaryIndexesOnCollections(Tester):
 
 
 class TestUpgradeSecondaryIndexes(Tester):
-    def __init__(self, *args, **kwargs):
-        Tester.__init__(self, *args, **kwargs)
 
-    @since('2.1')
+    @since('2.1', max_version='2.1.x')
     def test_read_old_sstables_after_upgrade(self):
         """ from 2.1 the location of sstables changed (CASSANDRA-5202), but existing sstables continue
         to be read from the old location. Verify that this works for index sstables as well as regular
@@ -622,23 +632,13 @@ class TestUpgradeSecondaryIndexes(Tester):
         query = "SELECT * FROM index_upgrade.table1 WHERE v=0"
         assert_one(cursor, query, [0, 0])
 
-        # If we are on 3.0 or any higher version upgrade to 2.1.latest.
-        # Otherwise, we must be on a 3.x, so we should be upgrading to that version.
-        # This will let us test upgrading from 2.0.12 to each of the 2.1 minor releases.
-        CASSANDRA_DIR = os.environ.get('CASSANDRA_DIR')
-        if get_version_from_build(CASSANDRA_DIR) >= '3.0':
-            # Upgrade nodes to 2.1
-            # See CASSANDRA-9116
-            debug("Upgrading to cassandra-2.1 latest")
-            self.upgrade_to_version("git:cassandra-2.1", [node1])
-            time.sleep(.5)
-        else:
-            node1.drain()
-            node1.watch_log_for("DRAINED")
-            node1.stop(wait_other_notice=False)
-            debug("Upgrading to current version")
-            self.set_node_to_current_version(node1)
-            node1.start(wait_other_notice=True)
+        # Upgrade to the 2.1.x version
+        node1.drain()
+        node1.watch_log_for("DRAINED")
+        node1.stop(wait_other_notice=False)
+        debug("Upgrading to current version")
+        self.set_node_to_current_version(node1)
+        node1.start(wait_other_notice=True)
 
         [node1] = cluster.nodelist()
         cursor = self.patient_cql_connection(node1)

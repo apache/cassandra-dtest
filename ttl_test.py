@@ -13,6 +13,7 @@ from assertions import (
     assert_unavailable
 )
 
+
 @since('2.0')
 class TestTTL(Tester):
     """ Test Time To Live Feature """
@@ -132,7 +133,7 @@ class TestTTL(Tester):
 
         self.cursor1.execute("""
             INSERT INTO ttl_table (key, col1, col2, col3) VALUES (%d, %d, %d, %d);
-        """  % (1, 1, 1, 1))
+        """ % (1, 1, 1, 1))
         start = time.time()
         self.cursor1.execute("UPDATE ttl_table USING TTL 3 set col1=42 where key=%s;" % (1,))
         assert_all(self.cursor1, "SELECT * FROM ttl_table;", [[1, 42, 1, 1]])
@@ -146,7 +147,7 @@ class TestTTL(Tester):
 
         self.cursor1.execute("""
             INSERT INTO ttl_table (key, col1, col2, col3) VALUES (%d, %d, %d, %d);
-        """  % (1, 1, 1, 1))
+        """ % (1, 1, 1, 1))
         start = time.time()
         self.cursor1.execute("""
             UPDATE ttl_table USING TTL 2 set col1=42, col2=42, col3=42 where key=%s;
@@ -166,7 +167,7 @@ class TestTTL(Tester):
         start = time.time()
         self.cursor1.execute("""
             INSERT INTO ttl_table (key, col1, col2, col3) VALUES (%d, %d, %d, %d);
-        """  % (1, 1, 1, 1))
+        """ % (1, 1, 1, 1))
         self.cursor1.execute("UPDATE ttl_table USING TTL 3 set col1=42 where key=%s;" % (1,))
         assert_all(self.cursor1, "SELECT * FROM ttl_table;", [[1, 42, 1, 1]])
         self.smart_sleep(start, 5)
@@ -185,7 +186,7 @@ class TestTTL(Tester):
         start = time.time()
         self.cursor1.execute("""
             INSERT INTO ttl_table (key, col1, col2, col3) VALUES (%d, %d, %d, %d);
-        """  % (1, 1, 1, 1))
+        """ % (1, 1, 1, 1))
         self.cursor1.execute("UPDATE ttl_table USING TTL 6 set col1=42 where key=%s;" % (1,))
         self.smart_sleep(start, 4)
         assert_all(self.cursor1, "SELECT * FROM ttl_table;", [[1, 42, None, None]])
@@ -202,7 +203,7 @@ class TestTTL(Tester):
         start = time.time()
         self.cursor1.execute("""
             INSERT INTO ttl_table (key, col1, col2, col3) VALUES (%d, %d, %d, %d) USING TTL 2;
-        """  % (1, 1, 1, 1))
+        """ % (1, 1, 1, 1))
         self.cursor1.execute("UPDATE ttl_table set col1=42 where key=%s;" % (1,))
         self.smart_sleep(start, 4)
         assert_all(self.cursor1, "SELECT * FROM ttl_table;", [[1, 42, None, None]])
@@ -217,10 +218,10 @@ class TestTTL(Tester):
         start = time.time()
         self.cursor1.execute("""
             INSERT INTO ttl_table (key, col1, col2, col3) VALUES (%d, %d, %d, %d);
-        """  % (1, 1, 1, 1))
+        """ % (1, 1, 1, 1))
         self.cursor1.execute("""
             INSERT INTO ttl_table (key, col1, col2, col3) VALUES (%d, %d, %d, %d);
-        """  % (2, 1, 1, 1))
+        """ % (2, 1, 1, 1))
         self.cursor1.execute("UPDATE ttl_table using ttl 0 set col1=42 where key=%s;" % (1,))
         self.cursor1.execute("UPDATE ttl_table using ttl 8 set col1=42 where key=%s;" % (2,))
         self.smart_sleep(start, 5)
@@ -240,7 +241,7 @@ class TestTTL(Tester):
         start = time.time()
         self.cursor1.execute("""
             INSERT INTO ttl_table (key, col1, mylist) VALUES (%d, %d, %s);
-        """  % (1, 1, [1, 2, 3, 4, 5]))
+        """ % (1, 1, [1, 2, 3, 4, 5]))
         self.cursor1.execute("""
             UPDATE ttl_table USING TTL 5 SET mylist[0] = 42, mylist[4] = 42 WHERE key=1;
         """)
@@ -261,7 +262,7 @@ class TestTTL(Tester):
         start = time.time()
         self.cursor1.execute("""
             INSERT INTO ttl_table (key, col1, myset) VALUES (%d, %d, %s);
-        """  % (1, 1, '{1,2,3,4,5}'))
+        """ % (1, 1, '{1,2,3,4,5}'))
         self.cursor1.execute("""
             UPDATE ttl_table USING TTL 3 SET myset = myset + {42} WHERE key=1;
         """)
@@ -290,7 +291,7 @@ class TestTTL(Tester):
         start = time.time()
         self.cursor1.execute("""
             INSERT INTO ttl_table (key, col1, mymap) VALUES (%d, %d, %s);
-        """  % (1, 1, '{1:1,2:2,3:3,4:4,5:5}'))
+        """ % (1, 1, '{1:1,2:2,3:3,4:4,5:5}'))
         self.cursor1.execute("""
             UPDATE ttl_table USING TTL 2 SET mymap[1] = 42, mymap[5] = 42 WHERE key=1;
         """)
@@ -321,6 +322,7 @@ class TestTTL(Tester):
 
         self.cursor1.execute("delete from session where id = 'abc' if usr ='abc'")
         assert_row_count(self.cursor1, 'session', 0)
+
 
 class TestDistributedTTL(Tester):
     """ Test Time To Live Feature in a distributed environment """
@@ -370,7 +372,10 @@ class TestDistributedTTL(Tester):
         )
         ttl_cursor1 = cursor1.execute('SELECT ttl(col1) FROM ttl_table;')
         ttl_cursor2 = cursor2.execute('SELECT ttl(col1) FROM ttl_table;')
-        assert_almost_equal(ttl_cursor1[0][0], ttl_cursor2[0][0], error=0.05)
+
+        # since the two queries are not executed simultaneously, the remaining
+        # TTLs can differ by one second
+        self.assertLessEqual(abs(ttl_cursor1[0][0] - ttl_cursor2[0][0]), 1)
 
         time.sleep(7)
 
@@ -385,7 +390,7 @@ class TestDistributedTTL(Tester):
             INSERT INTO ttl_table (key, col1) VALUES (1, 1) USING TTL 5;
         """)
         self.cursor1.execute("""
-            INSERT INTO ttl_table (key, col1) VALUES (2, 2) USING TTL 60;
+            INSERT INTO ttl_table (key, col1) VALUES (2, 2) USING TTL 1000;
         """)
         assert_all(
             self.cursor1,
@@ -403,8 +408,7 @@ class TestDistributedTTL(Tester):
         self.cursor1.execute("USE ks;")
         self.node1.cleanup()
 
-        # Check that the expired data has not been replicated
-        assert_row_count(cursor2, 'ttl_table', 1)
+        assert_all(cursor2, "SELECT count(*) FROM ttl_table", [[1]], cl=ConsistencyLevel.ALL)
         assert_all(
             cursor2,
             "SELECT * FROM ttl_table;",
@@ -415,7 +419,7 @@ class TestDistributedTTL(Tester):
         # Check that the TTL on both server are the same
         ttl_cursor1 = self.cursor1.execute('SELECT ttl(col1) FROM ttl_table;')
         ttl_cursor2 = cursor2.execute('SELECT ttl(col1) FROM ttl_table;')
-        assert_almost_equal(ttl_cursor1[0][0], ttl_cursor2[0][0], error=0.1)
+        self.assertLessEqual(abs(ttl_cursor1[0][0] - ttl_cursor2[0][0]), 1)
 
     def ttl_is_respected_on_repair_test(self):
         """ Test that ttl is respected on repair """

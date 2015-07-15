@@ -1,10 +1,14 @@
+from __future__ import division
+
+import subprocess
+import tempfile
+import time
+from math import ceil
+from os.path import getsize
+
 from dtest import Tester, debug
 from tools import since
 
-from os.path import getsize
-import time
-import subprocess
-import tempfile
 
 class TestSSTableSplit(Tester):
 
@@ -53,17 +57,24 @@ class TestSSTableSplit(Tester):
         debug("Run sstablesplit")
         time.sleep(5.0)
         node.stop()
+        expected_sstable_size = (50 * 1024 * 1024)
+
         keyspace = 'keyspace1' if self.cluster.version() >= '2.1' else 'Keyspace1'
-        origsstable = node.get_sstables(keyspace, '')
-        debug("Original sstable before split: %s" % origsstable)
-        node.run_sstablesplit( keyspace=keyspace )
+        origsstables = node.get_sstables(keyspace, '')
+        debug("Original sstable and sizes before split: {}".format([(name, getsize(name)) for name in origsstables]))
+        origsstable_size = sum([getsize(sstable) for sstable in origsstables])
+
+        node.run_sstablesplit(keyspace=keyspace)
+
         sstables = node.get_sstables(keyspace, '')
         debug("Number of sstables after split: %s" % len(sstables))
-        self.assertEqual(6, len(sstables))
+        expected_sstables_float = ceil(origsstable_size / expected_sstable_size)
+        debug('sstables as float = {}'.format(expected_sstables_float))
+        expected_num_sstables = ceil(expected_sstables_float)
+        self.assertEqual(expected_num_sstables, len(sstables))
         sstable_sizes = map(getsize, sstables)
         # default split size is 50MB, add a bit extra for overhead
-        expected_max_size = (50 * 1024 * 1024) + 512
-        self.assertLessEqual(max(sstable_sizes), expected_max_size)
+        self.assertLessEqual(max(sstable_sizes), expected_sstable_size + 512)
         node.start(wait_for_binary_proto=True)
 
     @since("2.1")
@@ -76,7 +87,6 @@ class TestSSTableSplit(Tester):
         cluster = self.cluster
         cluster.populate(1).start(wait_for_binary_proto=True)
         node = cluster.nodelist()[0]
-        version = cluster.version()
 
         debug("Run stress to insert data")
         node.stress(['write', 'n=2000000', '-rate', 'threads=50',

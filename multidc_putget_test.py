@@ -1,6 +1,5 @@
 from dtest import Tester
 from tools import putget
-from ccmlib.cluster import Cluster
 
 class TestMultiDCPutGet(Tester):
 

@@ -1,14 +1,16 @@
+import glob
 import os
 import stat
-import glob
-import time
 import subprocess
-import ccmlib
-from tools import since
+import time
+
 from cassandra import WriteTimeout
 from cassandra.cluster import NoHostAvailable, OperationTimedOut
+
+import ccmlib
+from assertions import assert_almost_equal, assert_none, assert_one
 from dtest import Tester, debug
-from assertions import assert_one, assert_none, assert_almost_equal
+from tools import require, since
 
 
 class TestCommitLog(Tester):
@@ -132,6 +134,7 @@ class TestCommitLog(Tester):
                 self.node1.stress(['write', 'n=500000', '-rate', 'threads=25'], stdout=devnull, stderr=subprocess.STDOUT)
 
     @since('2.1')
+    @require(9717, broken_in='3.0')
     def default_segment_size_test(self):
         """ Test default commitlog_segment_size_in_mb (32MB) """
 
@@ -139,6 +142,7 @@ class TestCommitLog(Tester):
         self._commitlog_test(32, 60, 2, files_error=0.5)
 
     @since('2.1')
+    @require(9717, broken_in='3.0')
     def small_segment_size_test(self):
         """ Test a small commitlog_segment_size_in_mb (5MB) """
         segment_size_in_mb = 5
@@ -147,7 +151,7 @@ class TestCommitLog(Tester):
         }, create_test_keyspace=False)
         self._commitlog_test(segment_size_in_mb, 60, 13, files_error=0.12)
 
-    @since('3.0')
+    @since('2.2')
     def default_compressed_segment_size_test(self):
         """ Test default compressed commitlog_segment_size_in_mb (32MB) """
 
@@ -156,7 +160,7 @@ class TestCommitLog(Tester):
         }, create_test_keyspace=False)
         self._commitlog_test(32, 42, 2, compressed=True, files_error=0.5)
 
-    @since('3.0')
+    @since('2.2')
     def small_compressed_segment_size_test(self):
         """ Test a small compressed commitlog_segment_size_in_mb (5MB) """
         segment_size_in_mb = 5

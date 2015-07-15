@@ -1,11 +1,9 @@
 from __future__ import with_statement
-import os, tempfile, sys, shutil, subprocess, types, time, threading, traceback, ConfigParser, logging, fnmatch, re, copy
+import os, tempfile, sys, shutil, subprocess, types, time, threading, traceback, ConfigParser, logging, re, copy
 
 from ccmlib.cluster import Cluster
 from ccmlib.cluster_factory import ClusterFactory
-from ccmlib.node import Node
 from ccmlib.common import is_win
-from uuid import UUID
 from nose.exc import SkipTest
 from unittest import TestCase
 from cassandra.cluster import NoHostAvailable
@@ -28,6 +26,7 @@ config = ConfigParser.RawConfigParser()
 if len(config.read(os.path.expanduser('~/.cassandra-dtest'))) > 0:
     if config.has_option('main', 'default_dir'):
         DEFAULT_DIR=os.path.expanduser(config.get('main', 'default_dir'))
+CASSANDRA_DIR = os.environ.get('CASSANDRA_DIR', DEFAULT_DIR)
 
 NO_SKIP = os.environ.get('SKIP', '').lower() in ('no', 'false')
 DEBUG = os.environ.get('DEBUG', '').lower() in ('yes', 'true')
@@ -41,7 +40,7 @@ NUM_TOKENS = os.environ.get('NUM_TOKENS', '256')
 RECORD_COVERAGE = os.environ.get('RECORD_COVERAGE', '').lower() in ('yes', 'true')
 REUSE_CLUSTER = os.environ.get('REUSE_CLUSTER', '').lower() in ('yes', 'true')
 SILENCE_DRIVER_ON_SHUTDOWN = os.environ.get('SILENCE_DRIVER_ON_SHUTDOWN', 'true').lower() in ('yes', 'true')
-
+IGNORE_REQUIRE = os.environ.get('IGNORE_REQUIRE', '').lower() in ('yes', 'true')
 
 CURRENT_TEST = ""
 
@@ -80,9 +79,6 @@ def retry_till_success(fun, *args, **kwargs):
             else:
                 # brief pause before next attempt
                 time.sleep(0.25)
-
-def is_win():
-    return True if sys.platform == "cygwin" or sys.platform == "win32" else False
 
 class Runner(threading.Thread):
     def __init__(self, func):
@@ -135,7 +131,7 @@ class Tester(TestCase):
             self.test_path = subprocess.Popen(["cygpath", "-m", self.test_path], stdout = subprocess.PIPE, stderr = subprocess.STDOUT).communicate()[0].rstrip()
         debug("cluster ccm directory: "+self.test_path)
         version = os.environ.get('CASSANDRA_VERSION')
-        cdir = os.environ.get('CASSANDRA_DIR', DEFAULT_DIR)
+        cdir = CASSANDRA_DIR
 
         if version:
             cluster = Cluster(self.test_path, name, cassandra_version=version)
@@ -152,6 +148,24 @@ class Tester(TestCase):
                 cluster.set_configuration_options(values={'memtable_allocation_type': 'offheap_objects'})
 
         return cluster
+
+    def var_debug(self, cluster):
+        if os.environ.get('DEBUG', 'no').lower() not in ('no', 'false', 'yes', 'true'):
+            classes_to_debug = os.environ.get('DEBUG').split(":")
+            cluster.set_log_level('DEBUG', None if len(classes_to_debug) == 0 else classes_to_debug)
+
+    def var_trace(self, cluster):
+        if os.environ.get('TRACE', 'no').lower() not in ('no', 'false', 'yes', 'true'):
+            classes_to_trace = os.environ.get('TRACE').split(":")
+            cluster.set_log_level('TRACE', None if len(classes_to_trace) == 0 else classes_to_trace)
+
+    def modify_log(self, cluster):
+        if DEBUG:
+            cluster.set_log_level("DEBUG")
+        if TRACE:
+            cluster.set_log_level("TRACE")
+        self.var_debug(cluster)
+        self.var_trace(cluster)
 
     def _cleanup_cluster(self):
         if SILENCE_DRIVER_ON_SHUTDOWN:
@@ -176,7 +190,7 @@ class Tester(TestCase):
 
     def set_node_to_current_version(self, node):
         version = os.environ.get('CASSANDRA_VERSION')
-        cdir = os.environ.get('CASSANDRA_DIR', DEFAULT_DIR)
+        cdir = CASSANDRA_DIR
 
         if version:
             node.set_install_dir(version=version)
@@ -186,6 +200,24 @@ class Tester(TestCase):
     def setUp(self):
         global CURRENT_TEST
         CURRENT_TEST = self.id() + self._testMethodName
+
+        # On Windows, forcefully terminate any leftover previously running cassandra processes. This is a temporary
+        # workaround until we can determine the cause of intermittent hung-open tests and file-handles.
+        if is_win():
+            try:
+                import psutil
+                for proc in psutil.process_iter():
+                    try:
+                        pinfo = proc.as_dict(attrs=['pid', 'name', 'cmdline'])
+                    except psutil.NoSuchProcess:
+                        pass
+                    else:
+                        if (pinfo['name'] == 'java.exe' and '-Dcassandra' in pinfo['cmdline']):
+                            print 'Found running cassandra process with pid: ' + str(pinfo['pid']) + '. Killing.'
+                            psutil.Process(pinfo['pid']).kill()
+            except ImportError:
+                debug("WARN: psutil not installed. Cannot detect and kill running cassandra processes - you may see cascading dtest failures.")
+
         # cleaning up if a previous execution didn't trigger tearDown (which
         # can happen if it is interrupted by KeyboardInterrupt)
         # TODO: move that part to a generic fixture
@@ -223,10 +255,8 @@ class Tester(TestCase):
         with open(LAST_TEST_DIR, 'w') as f:
             f.write(self.test_path + '\n')
             f.write(self.cluster.name)
-        if DEBUG:
-            self.cluster.set_log_level("DEBUG")
-        if TRACE:
-            self.cluster.set_log_level("TRACE")
+
+        self.modify_log(self.cluster)
         self.connections = []
         self.runners = []
 
@@ -252,13 +282,13 @@ class Tester(TestCase):
             if not is_win():
                 os.symlink(basedir, name)
 
-    def cql_connection(self, node, keyspace=None, version=None, user=None,
+    def cql_connection(self, node, keyspace=None, user=None,
                        password=None, compression=True, protocol_version=None):
 
         return self._create_session(node, keyspace, user, password, compression,
                                     protocol_version)
 
-    def exclusive_cql_connection(self, node, keyspace=None, version=None, user=None,
+    def exclusive_cql_connection(self, node, keyspace=None, user=None,
                                  password=None, compression=True, protocol_version=None):
 
         node_ip = self.get_ip_from_node(node)
@@ -297,7 +327,7 @@ class Tester(TestCase):
         self.connections.append(session)
         return session
 
-    def patient_cql_connection(self, node, keyspace=None, version=None,
+    def patient_cql_connection(self, node, keyspace=None,
         user=None, password=None, timeout=10, compression=True,
         protocol_version=None):
         """
@@ -312,7 +342,6 @@ class Tester(TestCase):
             self.cql_connection,
             node,
             keyspace=keyspace,
-            version=version,
             user=user,
             password=password,
             timeout=timeout,
@@ -321,7 +350,7 @@ class Tester(TestCase):
             bypassed_exception=NoHostAvailable
         )
 
-    def patient_exclusive_cql_connection(self, node, keyspace=None, version=None,
+    def patient_exclusive_cql_connection(self, node, keyspace=None,
         user=None, password=None, timeout=10, compression=True,
         protocol_version=None):
         """
@@ -336,7 +365,6 @@ class Tester(TestCase):
             self.exclusive_cql_connection,
             node,
             keyspace=keyspace,
-            version=version,
             user=user,
             password=password,
             timeout=timeout,
@@ -358,7 +386,9 @@ class Tester(TestCase):
         session.execute('USE %s' % name)
 
     # We default to UTF8Type because it's simpler to use in tests
-    def create_cf(self, session, name, key_type="varchar", speculative_retry=None, read_repair=None, compression=None, gc_grace=None, columns=None, validation="UTF8Type"):
+    def create_cf(self, session, name, key_type="varchar", speculative_retry=None, read_repair=None, compression=None,
+                  gc_grace=None, columns=None, validation="UTF8Type", compact_storage=False):
+
         additional_columns = ""
         if columns is not None:
             for k, v in columns.items():
@@ -382,6 +412,9 @@ class Tester(TestCase):
         if self.cluster.version() >= "2.0":
             if speculative_retry is not None:
                 query = '%s AND speculative_retry=\'%s\'' % (query, speculative_retry)
+
+        if compact_storage:
+            query += ' AND COMPACT STORAGE'
 
         session.execute(query)
         time.sleep(0.2)
@@ -459,7 +492,7 @@ class Tester(TestCase):
         """Setup JaCoCo code coverage support"""
         # use explicit agent and execfile locations
         # or look for a cassandra build if they are not specified
-        cdir = os.environ.get('CASSANDRA_DIR', DEFAULT_DIR)
+        cdir = CASSANDRA_DIR
 
         agent_location = os.environ.get('JACOCO_AGENT_JAR', os.path.join(cdir, 'build/lib/jars/jacocoagent.jar'))
         jacoco_execfile = os.environ.get('JACOCO_EXECFILE', os.path.join(cdir, 'build/jacoco/jacoco.exec'))

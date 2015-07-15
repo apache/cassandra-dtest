@@ -1,8 +1,8 @@
 from dtest import Tester, debug
 from tools import since
-import subprocess, tempfile, os, shutil
+import subprocess, tempfile, os
 
-@since('3.0')
+@since('2.2')
 class TestValidation(Tester):
 
     __test__= False

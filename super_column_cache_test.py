@@ -1,7 +1,7 @@
-from thrift_bindings.v30.ttypes import (KsDef, CfDef, Mutation, ColumnOrSuperColumn,
+from thrift_bindings.v22.ttypes import (KsDef, CfDef, Mutation, ColumnOrSuperColumn,
                                         Column, SuperColumn, SliceRange, SlicePredicate,
                                         ColumnParent)
-from thrift_bindings.v30.ttypes import ConsistencyLevel as ThriftConsistencyLevel
+from thrift_bindings.v22.ttypes import ConsistencyLevel as ThriftConsistencyLevel
 
 from thrift_tests import get_thrift_client
 

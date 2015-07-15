@@ -6,10 +6,9 @@ import time
 
 from ccmlib import common
 from dtest import Tester, debug
-from tools import rows_to_list, require
+from tools import rows_to_list
 from cassandra.util import sortedset
 
-@require('9300')
 class TokenGenerator(Tester):
     """
     Basic tools/bin/token-generator test.

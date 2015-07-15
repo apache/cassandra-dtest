@@ -3,10 +3,10 @@ import time
 
 from ccmlib.common import get_version_from_build
 
-from thrift_bindings.v30.ttypes import (KsDef, CfDef, Mutation, ColumnOrSuperColumn,
+from thrift_bindings.v22.ttypes import (KsDef, CfDef, Mutation, ColumnOrSuperColumn,
                                         Column, SuperColumn, SliceRange, SlicePredicate,
                                         ColumnParent, CounterColumn)
-from thrift_bindings.v30.ttypes import ConsistencyLevel as ThriftConsistencyLevel
+from thrift_bindings.v22.ttypes import ConsistencyLevel as ThriftConsistencyLevel
 
 from thrift_tests import get_thrift_client
 
@@ -14,7 +14,7 @@ from dtest import Tester, debug
 from tools import since
 
 
-@since('2.0')
+@since('2.0', max_version='2.1.x')
 class TestSCUpgrade(Tester):
     """
     Tests upgrade between 1.2->2.0 for super columns (since that's where we
@@ -38,7 +38,7 @@ class TestSCUpgrade(Tester):
         cluster.set_install_dir(version="1.2.16")
         cluster.populate(2).start()
 
-        [node1, node2] = cluster.nodelist()
+        node1, node2 = cluster.nodelist()
 
         # wait for the rpc server to start
         session = self.patient_exclusive_cql_connection(node1)
@@ -55,6 +55,9 @@ class TestSCUpgrade(Tester):
         ksdef.cf_defs = []
 
         client.system_add_keyspace(ksdef)
+
+        session.cluster.control_connection.wait_for_schema_agreement()
+
         client.set_keyspace('test')
 
         # create a super column family with UTF8 for all types

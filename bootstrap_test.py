@@ -32,12 +32,17 @@ class TestBootstrap(Tester):
     def simple_bootstrap_test(self):
         cluster = self.cluster
         tokens = cluster.balanced_tokens(2)
+        cluster.set_configuration_options(values={'num_tokens': 1})
+
+        debug("[node1, node2] tokens: %r" % (tokens,))
 
         keys = 10000
 
         # Create a single node cluster
-        cluster.populate(1, tokens=[tokens[0]]).start(wait_other_notice=True)
-        node1 = cluster.nodes["node1"]
+        cluster.populate(1)
+        node1 = cluster.nodelist()[0]
+        node1.set_configuration_options(values={'initial_token': tokens[0]})
+        cluster.start(wait_other_notice=True)
 
         session = self.patient_cql_connection(node1)
         self.create_ks(session, 'ks', 1)
@@ -45,6 +50,7 @@ class TestBootstrap(Tester):
 
         # record the size before inserting any of our own data
         empty_size = node1.data_size()
+        debug("node1 empty size : %s" % float(empty_size))
 
         insert_statement = session.prepare("INSERT INTO ks.cf (key, c1, c2) VALUES (?, 'value1', 'value2')")
         execute_concurrent_with_args(session, insert_statement, [['k%d' % k] for k in range(keys)])
@@ -52,20 +58,27 @@ class TestBootstrap(Tester):
         node1.flush()
         node1.compact()
         initial_size = node1.data_size()
+        debug("node1 size before bootstrapping node2: %s" % float(initial_size))
 
         # Reads inserted data all during the boostrap process. We shouldn't
         # get any error
         reader = self.go(lambda _: query_c1c2(session, random.randint(0, keys - 1), ConsistencyLevel.ONE))
 
         # Boostraping a new node
-        node2 = new_node(cluster, token=tokens[1])
+        node2 = new_node(cluster)
+        node2.set_configuration_options(values={'initial_token': tokens[1]})
         node2.start(wait_for_binary_proto=True)
+        node2.compact()
 
         reader.check()
         node1.cleanup()
+        debug("node1 size after cleanup: %s" % float(node1.data_size()))
         node1.compact()
+        debug("node1 size after compacting: %s" % float(node1.data_size()))
         time.sleep(.5)
         reader.check()
+
+        debug("node2 size after compacting: %s" % float(node2.data_size()))
 
         size1 = float(node1.data_size())
         size2 = float(node2.data_size())
@@ -96,7 +109,7 @@ class TestBootstrap(Tester):
         new_rows = list(session.execute("SELECT * FROM %s" % (stress_table,)))
         self.assertEquals(original_rows, new_rows)
 
-    @since('3.0')
+    @since('2.2')
     def resumable_bootstrap_test(self):
         """Test resuming bootstrap after data streaming failure"""
 
@@ -137,7 +150,7 @@ class TestBootstrap(Tester):
         rows = cursor.execute("SELECT bootstrapped FROM system.local WHERE key='local'")
         assert rows[0][0] == 'COMPLETED', rows[0][0]
 
-    @since('3.0')
+    @since('2.2')
     def bootstrap_with_reset_bootstrap_state_test(self):
         """Test bootstrap with resetting bootstrap progress"""
 

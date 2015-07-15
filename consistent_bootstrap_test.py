@@ -1,9 +1,6 @@
-import time
-
 from dtest import Tester, debug
-from assertions import assert_unavailable
-from tools import (create_c1c2_table, insert_c1c2, query_c1c2, retry_till_success,
-                   insert_columns, new_node, no_vnodes, since)
+from tools import (create_c1c2_table, insert_c1c2, query_c1c2,
+                   new_node, no_vnodes, since)
 from cassandra import ConsistencyLevel
 
 @since('2.1')
@@ -57,7 +54,7 @@ class TestBootstrapConsistency(Tester):
 
         cluster.populate(2).start()
         [node1, node2] = cluster.nodelist()
-        cluster.start()
+        cluster.start(wait_for_binary_proto=True, wait_other_notice=True)
 
         debug("Set to talk to node 2")
         n2cursor = self.patient_cql_connection(node2)

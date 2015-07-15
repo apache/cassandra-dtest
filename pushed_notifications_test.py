@@ -1,7 +1,12 @@
 import time
+from nose.tools import timed
+from cassandra import ReadTimeout
+from cassandra import ConsistencyLevel as CL
+from cassandra.query import SimpleStatement
 from dtest import Tester, debug
-from tools import no_vnodes
+from tools import no_vnodes, since
 from threading import Event
+from assertions import assert_invalid
 
 
 class NotificationWaiter(object):
@@ -75,7 +80,12 @@ class TestPushedNotifications(Tester):
         CASSANDRA-8516
         Moving a token should result in NODE_MOVED notifications.
         """
-        self.cluster.populate(3).start()
+        self.cluster.populate(3).start(wait_for_binary_proto=True, wait_other_notice=True)
+
+        # Despite waiting for each node to see the other nodes as UP, there is apparently
+        # still a race condition that can result in NEW_NODE events being sent.  We don't
+        # want to accidentally collect those, so for now we will just sleep a few seconds.
+        time.sleep(3)
 
         waiters = [NotificationWaiter(self, node, "TOPOLOGY_CHANGE")
                    for node in self.cluster.nodes.values()]
@@ -116,3 +126,84 @@ class TestPushedNotifications(Tester):
             self.assertEquals(self.get_ip_from_node(node2), notifications[1]["address"][0])
             self.assertEquals("UP", notifications[1]["change_type"])
             waiter.clear_notifications()
+
+
+class TestVariousNotifications(Tester):
+    """
+    Tests for various notifications/messages from Cassandra.
+    """
+
+    @since('2.2')
+    def tombstone_failure_threshold_message_test(self):
+        """
+        Ensure nodes return an error message in case of TombstoneOverwhelmingExceptions rather
+        than dropping the request. A drop makes the coordinator waits for the specified
+        read_request_timeout_in_ms.
+        @jira_ticket CASSANDRA-7886
+        """
+
+        self.allow_log_errors = True
+        self.cluster.set_configuration_options(
+            values={
+                'tombstone_failure_threshold': 500,
+                'read_request_timeout_in_ms': 30000,  # 30 seconds
+                'range_request_timeout_in_ms': 40000
+            }
+        )
+        self.cluster.populate(3).start()
+        node1, node2, node3 = self.cluster.nodelist()
+        cursor = self.patient_cql_connection(node1)
+
+        self.create_ks(cursor, 'test', 3)
+        cursor.execute(
+            "CREATE TABLE test ( "
+            "id int, mytext text, col1 int, col2 int, col3 int, "
+            "PRIMARY KEY (id, mytext) )"
+        )
+
+        # Add data with tombstones
+        values = map(lambda i: str(i), range(1000))
+        for value in values:
+            cursor.execute(SimpleStatement(
+                "insert into test (id, mytext, col1) values (1, '{}', null) ".format(
+                    value
+                ),
+                consistency_level=CL.ALL
+            ))
+
+        failure_msg = ("Scanned over.* tombstones.* query aborted")
+
+        @timed(25)
+        def read_request_timeout_query():
+            assert_invalid(
+                cursor, SimpleStatement("select * from test where id in (1,2,3,4,5)", consistency_level=CL.ALL),
+                expected=ReadTimeout,
+            )
+
+        read_request_timeout_query()
+
+        failure = (node1.grep_log(failure_msg) or
+                   node2.grep_log(failure_msg) or
+                   node3.grep_log(failure_msg))
+
+        self.assertTrue(failure, ("Cannot find tombstone failure threshold error in log "
+                                  "after read_request_timeout_query"))
+        mark1 = node1.mark_log()
+        mark2 = node2.mark_log()
+        mark3 = node3.mark_log()
+
+        @timed(35)
+        def range_request_timeout_query():
+            assert_invalid(
+                cursor, SimpleStatement("select * from test", consistency_level=CL.ALL),
+                expected=ReadTimeout,
+            )
+
+        range_request_timeout_query()
+
+        failure = (node1.watch_log_for(failure_msg, from_mark=mark1, timeout=5) or
+                   node2.watch_log_for(failure_msg, from_mark=mark2, timeout=5) or
+                   node3.watch_log_for(failure_msg, from_mark=mark3, timeout=5))
+
+        self.assertTrue(failure, ("Cannot find tombstone failure threshold error in log "
+                                  "after range_request_timeout_query"))
