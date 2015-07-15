@@ -3264,7 +3264,7 @@ class TestCQL(UpgradeTester):
                 cursor.execute("INSERT INTO wide (pk, name, val) VALUES (%d, 'name1', 1)" % i)
 
             res = cursor.execute('SELECT DISTINCT pk FROM wide LIMIT 1')
-            self.assertEqual([[1]], rows_to_list(res))
+            self.assertEqual([[0]], rows_to_list(res))
 
             res = cursor.execute('SELECT DISTINCT pk FROM wide LIMIT 3')
             self.assertEqual([[0], [1], [2]], rows_to_list(sorted(res)))
@@ -3560,22 +3560,18 @@ class TestCQL(UpgradeTester):
             cursor.default_fetch_size = 10000
             # We know we page at 10K, so test counting just before, at 10K, just after and
             # a bit after that.
-            for k in range(1, 10000):
-                cursor.execute("INSERT INTO test(k) VALUES (%d)" % k)
+            insert_statement = cursor.prepare("INSERT INTO test(k) VALUES (?)")
+            execute_concurrent_with_args(cursor, insert_statement, [(i,) for i in range(1, 10000)])
 
             assert_one(cursor, "SELECT COUNT(*) FROM test", [9999])
 
-            cursor.execute("INSERT INTO test(k) VALUES (%d)" % 10000)
-
+            cursor.execute(insert_statement, (10000,))
             assert_one(cursor, "SELECT COUNT(*) FROM test", [10000])
 
-            cursor.execute("INSERT INTO test(k) VALUES (%d)" % 10001)
-
+            cursor.execute(insert_statement, (10001,))
             assert_one(cursor, "SELECT COUNT(*) FROM test", [10001])
 
-            for k in range(10002, 15001):
-                cursor.execute("INSERT INTO test(k) VALUES (%d)" % k)
-
+            execute_concurrent_with_args(cursor, insert_statement, [(i,) for i in range(10002, 15001)])
             assert_one(cursor, "SELECT COUNT(*) FROM test", [15000])
 
     @since('2.1')
@@ -4024,7 +4020,7 @@ class TestCQL(UpgradeTester):
             cursor.execute("insert into test(field1, field2, field3) values ('hola', now(), false);")
 
             # the result depends on which node we're connected to, see CASSANDRA-8216
-            if is_upgraded == 0:
+            if is_upgraded:
                 # the coordinator is the upgraded 2.2+ node
                 assert_one(cursor, "select count(*) from test where field3 = false limit 1;", [2])
             else:
