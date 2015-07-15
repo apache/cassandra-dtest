@@ -25,39 +25,6 @@ from upgrade_base import UpgradeTester
 
 class TestCQL(UpgradeTester):
 
-    def basic_paging_test(self):
-        cursor = self.prepare()
-
-        cursor.execute("""
-            CREATE TABLE test (
-                k int,
-                c int,
-                v text,
-                PRIMARY KEY (k, c)
-            );
-        """)
-
-        for is_upgraded, cursor in self.do_upgrade(cursor):
-            debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
-            cursor.execute("TRUNCATE test")
-
-            expected = []
-            # match the key ordering for murmur3
-            for k in (1, 0, 2):
-                for c in range(5):
-                    value = "%d.%d" % (k, c)
-                    cursor.execute("INSERT INTO test (k, c, v) VALUES (%s, %s, %s)", (k, c, value))
-                    expected.append([k, c, value])
-
-            for fetch_size in (2, 3, 5, 10, 100):
-                debug("Using fetch size %d" % fetch_size)
-                cursor.default_fetch_size = fetch_size
-                results = rows_to_list(cursor.execute("SELECT * FROM test"))
-                import pprint
-                pprint.pprint(results)
-                self.assertEqual(len(expected), len(results))
-                self.assertEqual(expected, results)
-
     def static_cf_test(self):
         """ Test static CF syntax """
         cursor = self.prepare()
@@ -1701,6 +1668,21 @@ class TestCQL(UpgradeTester):
 
             res = cursor.execute("SELECT * FROM test2")
             assert rows_to_list(res) == [[x, y] for x in range(0, 2) for y in range(0, 2)], res
+
+    def no_clustering_test(self):
+        cursor = self.prepare()
+        cursor.execute("CREATE TABLE test (k int PRIMARY KEY, v int)")
+        for is_upgraded, cursor in self.do_upgrade(cursor):
+            debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
+
+            for i in range(10):
+                cursor.execute("INSERT INTO test (k, v) VALUES (%s, %s)", (i, i))
+
+            cursor.default_fetch_size = None
+            results = rows_to_list(cursor.execute("SELECT * FROM test"))
+            results.sort()
+            self.assertEqual(10, len(results))
+            self.assertEqual([[i, i] for i in range(10)], results)
 
     def date_test(self):
         """ Check dates are correctly recognized and validated """
