@@ -146,8 +146,8 @@ class TestCQL(UpgradeTester):
         cursor.execute("""
             CREATE TABLE users (
                 userid uuid PRIMARY KEY,
-                firstname text,
-                lastname text,
+                firstname ascii,
+                lastname ascii,
                 age int
             ) WITH COMPACT STORAGE;
         """)
@@ -166,6 +166,9 @@ class TestCQL(UpgradeTester):
 
             res = cursor.execute("SELECT * FROM users WHERE userid = 550e8400-e29b-41d4-a716-446655440000")
             self.assertEqual([[UUID('550e8400-e29b-41d4-a716-446655440000'), 32, 'Frodo', 'Baggins']], rows_to_list(res))
+
+            res = cursor.execute("SELECT * FROM users WHERE userid = f47ac10b-58cc-4372-a567-0e02b2c3d479")
+            self.assertEqual([[UUID('f47ac10b-58cc-4372-a567-0e02b2c3d479'), 33, 'Samwise', 'Gamgee']], rows_to_list(res))
 
             res = cursor.execute("SELECT * FROM users")
             self.assertEqual([
