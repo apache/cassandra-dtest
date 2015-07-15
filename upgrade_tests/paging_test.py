@@ -5,7 +5,7 @@ from cassandra import ConsistencyLevel as CL
 from cassandra import InvalidRequest, ReadTimeout
 from cassandra.query import SimpleStatement, dict_factory
 from dtest import run_scenarios, debug
-from tools import since, require
+from tools import since, require, rows_to_list
 
 from datahelp import create_rows, parse_data_into_dicts, flatten_into_set
 from assertions import assert_invalid
@@ -596,6 +596,102 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
 
 @since('2.0')
 class TestPagingData(BasePagingTester, PageAssertionMixin):
+
+    def basic_paging_test(self):
+        """
+        A simple paging test that is easy to debug.
+        """
+
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k int,
+                c int,
+                v text,
+                PRIMARY KEY (k, c)
+            );
+        """)
+
+        cursor.execute("""
+            CREATE TABLE test2 (
+                k int,
+                c int,
+                v text,
+                PRIMARY KEY (k, c)
+            ) WITH COMPACT STORAGE;
+        """)
+
+        for is_upgraded, cursor in self.do_upgrade(cursor):
+            debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
+            cursor.execute("TRUNCATE test")
+            cursor.execute("TRUNCATE test2")
+
+            for table in ("test", "test2"):
+                debug("Querying table %s" % (table,))
+                expected = []
+                # match the key ordering for murmur3
+                for k in (1, 0, 2):
+                    for c in range(5):
+                        value = "%d.%d" % (k, c)
+                        cursor.execute("INSERT INTO " + table + " (k, c, v) VALUES (%s, %s, %s)", (k, c, value))
+                        expected.append([k, c, value])
+
+                for fetch_size in (2, 3, 5, 10, 100):
+                    debug("Using fetch size %d" % fetch_size)
+                    cursor.default_fetch_size = fetch_size
+                    results = rows_to_list(cursor.execute("SELECT * FROM %s" % (table,)))
+                    import pprint
+                    pprint.pprint(results)
+                    self.assertEqual(len(expected), len(results))
+                    self.assertEqual(expected, results)
+
+    def basic_compound_paging_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("""
+            CREATE TABLE test (
+                k int,
+                c1 int,
+                c2 int,
+                v text,
+                PRIMARY KEY (k, c1, c2)
+            );
+        """)
+
+        cursor.execute("""
+            CREATE TABLE test2 (
+                k int,
+                c1 int,
+                c2 int,
+                v text,
+                PRIMARY KEY (k, c1, c2)
+            ) WITH COMPACT STORAGE;
+        """)
+
+        for is_upgraded, cursor in self.do_upgrade(cursor):
+            debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
+            cursor.execute("TRUNCATE test")
+            cursor.execute("TRUNCATE test2")
+
+            for table in ("test", "test2"):
+                debug("Querying table %s" % (table,))
+                expected = []
+                # match the key ordering for murmur3
+                for k in (1, 0, 2):
+                    for c in range(5):
+                        value = "%d.%d" % (k, c)
+                        cursor.execute("INSERT INTO " + table + " (k, c1, c2, v) VALUES (%s, %s, 0, %s)", (k, c, value))
+                        expected.append([k, c, 0, value])
+
+                for fetch_size in (2, 3, 5, 10, 100):
+                    debug("Using fetch size %d" % fetch_size)
+                    cursor.default_fetch_size = fetch_size
+                    results = rows_to_list(cursor.execute("SELECT * FROM %s" % (table,)))
+                    import pprint
+                    pprint.pprint(results)
+                    self.assertEqual(len(expected), len(results))
+                    self.assertEqual(expected, results)
 
     def test_paging_a_single_wide_row(self):
         cursor = self.prepare()
