@@ -1099,7 +1099,7 @@ Unlogged batch covering 2 partitions detected against table [client_warnings.tes
 
         session.execute('DROP TABLE test_ks.lcs_describe')
 
-        create_statement = ' '.join(describe_out.splitlines())
+        create_statement = 'USE test_ks; ' + ' '.join(describe_out.splitlines())
         create_out, create_err = self.run_cqlsh(node1, create_statement)
 
         # these statements shouldn't fall down
