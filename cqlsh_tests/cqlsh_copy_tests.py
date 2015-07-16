@@ -2,11 +2,9 @@
 import codecs
 import csv
 import datetime
-import time
 import locale
 import os
 import sys
-import platform
 from contextlib import contextmanager
 from decimal import Decimal
 from tempfile import NamedTemporaryFile
