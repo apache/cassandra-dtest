@@ -556,9 +556,9 @@ class TestUserTypes(Tester):
         user1_cursor.execute("ALTER TYPE ks1.simple_type RENAME user_number TO user_num;")
         user2_cursor.execute("ALTER TYPE ks2.simple_type RENAME user_number TO user_num;")
 
-        # finally, drop the types using the correct user w/permissions to do so
-        user1_cursor.execute("DROP TYPE ks1.simple_type;")
-        user2_cursor.execute("DROP TYPE ks2.simple_type;")
+        # finally, drop the types using the correct user w/permissions to do so, consistency all avoids using a sleep
+        user1_cursor.execute(SimpleStatement("DROP TYPE ks1.simple_type;", ConsistencyLevel.ALL))
+        user2_cursor.execute(SimpleStatement("DROP TYPE ks2.simple_type;", ConsistencyLevel.ALL))
 
         #verify user type metadata is gone from the system schema
         self.assertNoTypes(superuser_cursor)
