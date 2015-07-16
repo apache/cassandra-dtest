@@ -36,6 +36,8 @@ class TestSCUpgrade(Tester):
 
         # Forcing cluster version on purpose
         cluster.set_install_dir(version="1.2.16")
+        if "memtable_allocation_type" in cluster._config_options:
+            cluster._config_options.__delitem__("memtable_allocation_type")
         cluster.populate(2).start()
 
         node1, node2 = cluster.nodelist()
@@ -145,6 +147,8 @@ class TestSCUpgrade(Tester):
 
         # Forcing cluster version on purpose
         cluster.set_install_dir(version="1.2.19")
+        if "memtable_allocation_type" in cluster._config_options:
+            cluster._config_options.__delitem__("memtable_allocation_type")
         cluster.populate(3).start()
 
         node1, node2, node3 = cluster.nodelist()
@@ -291,6 +295,9 @@ class TestSCUpgrade(Tester):
         # Update Cassandra Directory
         for node in nodes:
             node.set_install_dir(version=tag)
+            if tag < "2.1":
+                if "memtable_allocation_type" in node.config_options:
+                    node.config_options.__delitem__("memtable_allocation_type")
             debug("Set new cassandra dir for %s: %s" % (node.name, node.get_install_dir()))
         self.cluster.set_install_dir(version=tag)
 

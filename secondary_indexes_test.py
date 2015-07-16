@@ -620,6 +620,8 @@ class TestUpgradeSecondaryIndexes(Tester):
 
         # Forcing cluster version on purpose
         cluster.set_install_dir(version="2.0.12")
+        if "memtable_allocation_type" in cluster._config_options:
+            cluster._config_options.__delitem__("memtable_allocation_type")
         cluster.populate(1).start()
 
         [node1] = cluster.nodelist()
