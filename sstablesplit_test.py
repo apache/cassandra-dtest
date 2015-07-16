@@ -57,24 +57,32 @@ class TestSSTableSplit(Tester):
         debug("Run sstablesplit")
         time.sleep(5.0)
         node.stop()
+
+        # default split size is 50MB
         expected_sstable_size = (50 * 1024 * 1024)
-
         keyspace = 'keyspace1' if self.cluster.version() >= '2.1' else 'Keyspace1'
-        origsstables = node.get_sstables(keyspace, '')
-        debug("Original sstable and sizes before split: {}".format([(name, getsize(name)) for name in origsstables]))
-        origsstable_size = sum([getsize(sstable) for sstable in origsstables])
 
+        # get the initial sstables and their total size
+        origsstables = node.get_sstables(keyspace, '')
+        origsstable_size = sum([getsize(sstable) for sstable in origsstables])
+        debug("Original sstable and sizes before split: {}".format([(name, getsize(name)) for name in origsstables]))
+
+        # calculate the expected number of sstables post-split
+        expected_num_sstables = ceil(origsstable_size / expected_sstable_size)
+
+        # split the sstables
         node.run_sstablesplit(keyspace=keyspace)
 
+        # get the sstables post-split and their total size
         sstables = node.get_sstables(keyspace, '')
         debug("Number of sstables after split: %s" % len(sstables))
-        expected_sstables_float = ceil(origsstable_size / expected_sstable_size)
-        debug('sstables as float = {}'.format(expected_sstables_float))
-        expected_num_sstables = ceil(expected_sstables_float)
         self.assertEqual(expected_num_sstables, len(sstables))
-        sstable_sizes = map(getsize, sstables)
-        # default split size is 50MB, add a bit extra for overhead
+
+        # make sure none of the tables are bigger than the max expected size
+        sstable_sizes = [getsize(sstable) for sstable in sstables]
+        # add a bit extra for overhead
         self.assertLessEqual(max(sstable_sizes), expected_sstable_size + 512)
+        # make sure node can start with changed sstables
         node.start(wait_for_binary_proto=True)
 
     @since("2.1")
