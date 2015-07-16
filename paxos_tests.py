@@ -35,6 +35,10 @@ class TestPaxos(Tester):
     def replica_availability_test(self):
         """
         @jira_ticket CASSANDRA-8640
+
+        Regression test for a bug (CASSANDRA-8640) that required all nodes to
+        be available in order to run LWT queries, even if the query could
+        complete correctly with quorum nodes available.
         """
         session = self.prepare(nodes=3, rf=3)
         session.execute("CREATE TABLE test (k int PRIMARY KEY, v int)")
