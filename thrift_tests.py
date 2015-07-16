@@ -1423,10 +1423,12 @@ class TestMutations(ThriftTester):
 
     def test_describe_keyspace(self):
         kspaces = client.describe_keyspaces()
-        if self.cluster.version() >= '2.2':
-            assert len(kspaces) == 6, kspaces # ['Keyspace2', 'Keyspace1', 'system', 'system_traces', 'system_auth', 'system_distributed']
+        if self.cluster.version() >= '3.0':
+            assert len(kspaces) == 7, [x.name for x in kspaces] # ['Keyspace2', 'Keyspace1', 'system', 'system_traces', 'system_auth', 'system_distributed', 'system_schema']
+        elif self.cluster.version() >= '2.2':
+            assert len(kspaces) == 6, [x.name for x in kspaces] # ['Keyspace2', 'Keyspace1', 'system', 'system_traces', 'system_auth', 'system_distributed']
         else:
-            assert len(kspaces) == 4, kspaces # ['Keyspace2', 'Keyspace1', 'system', 'system_traces']
+            assert len(kspaces) == 4, [x.name for x in kspaces] # ['Keyspace2', 'Keyspace1', 'system', 'system_traces']
 
         sysks = client.describe_keyspace("system")
         assert sysks in kspaces
