@@ -3,7 +3,7 @@ import re
 import subprocess
 
 from ccmlib import common
-from dtest import Tester, debug
+from dtest import Tester, debug, require
 from tools import since
 
 

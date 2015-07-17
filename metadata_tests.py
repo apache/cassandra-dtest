@@ -2,6 +2,7 @@ import time
 import threading
 
 from dtest import Tester
+from tools import require
 
 
 class TestMetadata(Tester):
