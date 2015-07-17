@@ -2,7 +2,6 @@ import csv
 import datetime
 import random
 import time
-import sys
 
 import cassandra
 from nose.tools import assert_items_equal
