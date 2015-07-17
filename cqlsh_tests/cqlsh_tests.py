@@ -33,6 +33,11 @@ class TestCqlsh(Tester):
     def tearDownClass(cls):
         unmonkeypatch_driver(cls._cached_driver_methods)
 
+    def tearDown(self):
+        if self.tempfile:
+            os.unlink(self.tempfile.name)
+            super(TestCqlsh, self).tearDown()
+
     def test_simple_insert(self):
 
         self.cluster.populate(1)
@@ -718,12 +723,12 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
 
         results = list(session.execute("SELECT * FROM testcopyto"))
 
-        tempfile = NamedTemporaryFile()
-        debug('Exporting to csv file: %s' % (tempfile.name,))
-        node1.run_cqlsh(cmds="COPY ks.testcopyto TO '%s'" % (tempfile.name,))
+        self.tempfile = NamedTemporaryFile(delete=False)
+        debug('Exporting to csv file: %s' % (self.tempfile.name,))
+        node1.run_cqlsh(cmds="COPY ks.testcopyto TO '%s'" % (self.tempfile.name,))
 
         # session
-        with open(tempfile.name, 'r') as csvfile:
+        with open(self.tempfile.name, 'r') as csvfile:
             row_count = 0
             csvreader = csv.reader(csvfile)
             for cql_row, csv_row in zip(results, csvreader):
@@ -734,7 +739,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
 
         # import the CSV file with COPY FROM
         session.execute("TRUNCATE ks.testcopyto")
-        node1.run_cqlsh(cmds="COPY ks.testcopyto FROM '%s'" % (tempfile.name,))
+        node1.run_cqlsh(cmds="COPY ks.testcopyto FROM '%s'" % (self.tempfile.name,))
         new_results = list(session.execute("SELECT * FROM testcopyto"))
         self.assertEquals(results, new_results)
 
