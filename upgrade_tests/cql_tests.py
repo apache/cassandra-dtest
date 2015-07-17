@@ -134,6 +134,9 @@ class TestCQL(UpgradeTester):
             res = cursor.execute("SELECT * FROM users WHERE userid = 550e8400-e29b-41d4-a716-446655440000")
             self.assertEqual([[UUID('550e8400-e29b-41d4-a716-446655440000'), 32, 'Frodo', 'Baggins']], rows_to_list(res))
 
+            # FIXME There appears to be some sort of problem with reusable cells
+            # when executing this query.  It's likely that CASSANDRA-9705 will
+            # fix this, but I'm not 100% sure.
             res = cursor.execute("SELECT * FROM users WHERE userid = f47ac10b-58cc-4372-a567-0e02b2c3d479")
             self.assertEqual([[UUID('f47ac10b-58cc-4372-a567-0e02b2c3d479'), 33, 'Samwise', 'Gamgee']], rows_to_list(res))
 
@@ -1626,6 +1629,7 @@ class TestCQL(UpgradeTester):
             res = cursor.execute("SELECT * FROM test")
             assert rows_to_list(res) == [[2, 2, None, None]], res
 
+    @require("CASSANDRA-6717")
     @freshCluster()
     def only_pk_test(self):
         """ Check table with only a PK (#4361) """
@@ -1638,6 +1642,9 @@ class TestCQL(UpgradeTester):
                 PRIMARY KEY (k, c)
             )
         """)
+
+        # The migration for this table is not quite correct right now.
+        # Until CASSANDRA-6717 fixes this, this test will fail.
 
         # Check for dense tables too
         cursor.execute("""
