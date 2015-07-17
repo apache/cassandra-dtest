@@ -1,11 +1,12 @@
 import os
 import random
 import time
+import shutil
 import subprocess
 import tempfile
 import re
 from dtest import Tester, debug
-from tools import new_node, query_c1c2, since, InterruptBootstrap
+from tools import new_node, query_c1c2, since, require, KillOnBootstrap, InterruptBootstrap
 from assertions import assert_almost_equal
 from ccmlib.node import NodeError
 from cassandra import ConsistencyLevel
@@ -287,3 +288,141 @@ class TestBootstrap(Tester):
         regex = re.compile("Operation.+error inserting key.+Exception")
         failure = regex.search(output)
         self.assertIsNone(failure, "Error during stress while bootstrapping")
+
+    @require("9765")
+    def shutdown_wiped_node_cannot_join_test(self):
+        self._wiped_node_cannot_join_test(gently=True)
+
+    @require("9765")
+    def killed_wiped_node_cannot_join_test(self):
+        self._wiped_node_cannot_join_test(gently=False)
+
+    def _wiped_node_cannot_join_test(self, gently):
+        """
+        @jira_ticket CASSANDRA-9765
+        Test that if we stop a node and wipe its data then the node cannot join
+        when it is not a seed. Test both a nice shutdown or a forced shutdown, via
+        the gently parameter.
+        """
+        cluster = self.cluster
+        cluster.populate(3)
+        cluster.start(wait_for_binary_proto=True)
+
+        version = cluster.version()
+        stress_table = 'keyspace1.standard1' if self.cluster.version() >= '2.1' else '"Keyspace1"."Standard1"'
+
+        # write some data
+        node1 = cluster.nodelist()[0]
+        if version < "2.1":
+            node1.stress(['-n', '10000'])
+        else:
+            node1.stress(['write', 'n=10000', '-rate', 'threads=8'])
+
+        session = self.patient_cql_connection(node1)
+        original_rows = list(session.execute("SELECT * FROM {}".format(stress_table,)))
+
+        # Add a new node, bootstrap=True ensures that it is not a seed
+        node2 = new_node(cluster, bootstrap=True)
+        node2.start(wait_for_binary_proto=True)
+
+        session = self.patient_cql_connection(node2)
+        self.assertEquals(original_rows, list(session.execute("SELECT * FROM {}".format(stress_table,))))
+
+        # Stop the new node and wipe its data
+        node2.stop(gently=gently)
+        data_dir = os.path.join(node2.get_path(), 'data')
+        debug("Deleting {}".format(data_dir))
+        shutil.rmtree(data_dir)
+
+        # Now start it, it should not be allowed to join.
+        mark = node2.mark_log()
+        node2.start(no_wait=True)
+        node2.watch_log_for("A node with address /127.0.0.4 already exists, cancelling join", from_mark=mark, timeout=60)
+
+    @require("9765")
+    def decommissioned_wiped_node_can_join_test(self):
+        """
+        @jira_ticket CASSANDRA-9765
+        Test that if we decommission a node and then wipe its data, it can join the cluster.
+        """
+        cluster = self.cluster
+        cluster.populate(3)
+        cluster.start(wait_for_binary_proto=True)
+
+        version = cluster.version()
+        stress_table = 'keyspace1.standard1' if self.cluster.version() >= '2.1' else '"Keyspace1"."Standard1"'
+
+        # write some data
+        node1 = cluster.nodelist()[0]
+        if version < "2.1":
+            node1.stress(['-n', '10000'])
+        else:
+            node1.stress(['write', 'n=10000', '-rate', 'threads=8'])
+
+        session = self.patient_cql_connection(node1)
+        original_rows = list(session.execute("SELECT * FROM {}".format(stress_table,)))
+
+        # Add a new node, bootstrap=True ensures that it is not a seed
+        node2 = new_node(cluster, bootstrap=True)
+        node2.start(wait_for_binary_proto=True)
+
+        session = self.patient_cql_connection(node2)
+        self.assertEquals(original_rows, list(session.execute("SELECT * FROM {}".format(stress_table,))))
+
+        # Decommision the new node and wipe its data
+        node2.nodetool('decommission')
+        node2.stop(gently=True)
+        data_dir = os.path.join(node2.get_path(), 'data')
+        debug("Deleting {}".format(data_dir))
+        shutil.rmtree(data_dir)
+
+        # Now start it, it should be allowed to join
+        mark = node2.mark_log()
+        node2.start(wait_other_notice=True)
+        node2.watch_log_for("JOINING:", from_mark=mark, timeout=60)
+
+    @require("9765")
+    def failed_bootstap_wiped_node_can_join_test(self):
+        """
+        @jira_ticket CASSANDRA-9765
+        Test that if a node fails to bootstrap, it can join the cluster even if the data is wiped.
+        """
+        cluster = self.cluster
+        cluster.populate(1)
+        cluster.start(wait_for_binary_proto=True)
+
+        version = cluster.version()
+        stress_table = 'keyspace1.standard1' if self.cluster.version() >= '2.1' else '"Keyspace1"."Standard1"'
+
+        # write some data, enough for the bootstrap to fail later on
+        node1 = cluster.nodelist()[0]
+        if version < "2.1":
+            node1.stress(['-n', '100000'])
+        else:
+            node1.stress(['write', 'n=100000', '-rate', 'threads=8'])
+        node1.flush()
+
+        session = self.patient_cql_connection(node1)
+        original_rows = list(session.execute("SELECT * FROM {}".format(stress_table,)))
+
+        # Add a new node, bootstrap=True ensures that it is not a seed
+        node2 = new_node(cluster, bootstrap=True)
+        node2.set_configuration_options(values={'stream_throughput_outbound_megabits_per_sec': 1})
+
+        # kill node2 in the middle of bootstrap
+        t = KillOnBootstrap(node2)
+        t.start()
+
+        node2.start()
+        t.join()
+        self.assertFalse(node2.is_running())
+
+        # wipe any data for node2
+        data_dir = os.path.join(node2.get_path(), 'data')
+        debug("Deleting {}".format(data_dir))
+        shutil.rmtree(data_dir)
+
+        # Now start it again, it should be allowed to join
+        mark = node2.mark_log()
+        node2.start(wait_other_notice=True)
+        node2.watch_log_for("JOINING:", from_mark=mark, timeout=60)
