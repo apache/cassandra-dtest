@@ -3,7 +3,6 @@ import time
 
 from dtest import Tester, DEBUG
 
-cql_version = "3.0.0"
 
 QUERY_UPGRADED = os.environ.get('QUERY_UPGRADED', 'true').lower() in ('yes', 'true')
 QUERY_OLD = os.environ.get('QUERY_OLD', 'true').lower() in ('yes', 'true')
@@ -55,7 +54,7 @@ class UpgradeTester(Tester):
         node1 = cluster.nodelist()[0]
         time.sleep(0.2)
 
-        session = self.patient_cql_connection(node1, version=cql_version, protocol_version=protocol_version)
+        session = self.patient_cql_connection(node1, protocol_version=protocol_version)
         if create_keyspace:
             self.create_ks(session, 'ks', rf)
 
@@ -74,19 +73,23 @@ class UpgradeTester(Tester):
         if UPGRADE_MODE not in ('normal', 'all', 'none'):
             raise Exception("UPGRADE_MODE should be one of 'normal', 'all', or 'none'")
 
+        # stop the nodes
         if UPGRADE_MODE != "none":
             node1.drain()
             node1.stop(gently=True)
 
+        if UPGRADE_MODE == "all":
+            node2.drain()
+            node2.stop(gently=True)
+
+        # start them again
+        if UPGRADE_MODE != "none":
             node1.set_install_dir(version=self.original_install_dir)
             node1.set_log_level("DEBUG" if DEBUG else "INFO")
             node1.set_configuration_options(values={'internode_compression': 'none'})
             node1.start(wait_for_binary_proto=True)
 
         if UPGRADE_MODE == "all":
-            node2.drain()
-            node2.stop(gently=True)
-
             node2.set_install_dir(version=self.original_install_dir)
             node2.set_log_level("DEBUG" if DEBUG else "INFO")
             node2.set_configuration_options(values={'internode_compression': 'none'})
