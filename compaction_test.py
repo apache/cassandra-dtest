@@ -138,7 +138,8 @@ class TestCompaction(Tester):
         session = self.patient_cql_connection(node1)
         self.create_ks(session, 'ks', 1)
         # max sstable age is 0.5 minute:
-        session.execute("create table cf (key int PRIMARY KEY, val int) with gc_grace_seconds = 0 and compaction= {'class':'DateTieredCompactionStrategy', 'max_sstable_age_days':0.00035, 'min_threshold':2}")
+        session.execute("""create table cf (key int PRIMARY KEY, val int) with gc_grace_seconds = 0
+            and compaction= {'class':'DateTieredCompactionStrategy', 'max_sstable_age_days':0.00035, 'min_threshold':2}""")
 
         # insert data
         for x in range(0, 300):

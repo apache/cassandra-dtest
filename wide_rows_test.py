@@ -86,7 +86,7 @@ class TestWideRows(Tester):
         for i in range(100000):
             row = 'row0'
             name = 'val' + str(i)
-            session.execute( insert_column_query.format( value=i, row=row, name=name) )
+            session.execute(insert_column_query.format(value=i, row=row, name=name))
 
         #now randomly fetch columns: 1 to 3 at a time
         for i in range(10000):
@@ -97,7 +97,7 @@ class TestWideRows(Tester):
             #necessarily return 3 values.  Hence I am computing the number of unique values in values2fetch
             #and using that in the assert at the end.
             expected_rows = len( set( values2fetch ) )
-            rows = session.execute( select_column_query.format(name1="val" + values2fetch[0],
+            rows = session.execute(select_column_query.format(name1="val" + values2fetch[0],
                                                        name2="val" + values2fetch[1],
                                                        name3="val" + values2fetch[2]))
             assert len(rows) == expected_rows

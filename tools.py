@@ -20,12 +20,15 @@ def rows_to_list(rows):
     new_list = [list(row) for row in rows]
     return new_list
 
+
 def create_c1c2_table(tester, session, read_repair=None):
-    tester.create_cf(session, 'cf', columns={ 'c1' : 'text', 'c2' : 'text' }, read_repair=read_repair)
+    tester.create_cf(session, 'cf', columns={'c1': 'text', 'c2': 'text'}, read_repair=read_repair)
+
 
 def insert_c1c2(session, key, consistency=ConsistencyLevel.QUORUM):
     query = SimpleStatement('UPDATE cf SET c1=\'value1\', c2=\'value2\' WHERE key=\'k%d\'' % key, consistency_level=consistency)
     session.execute(query)
+
 
 def query_c1c2(session, key, consistency=ConsistencyLevel.QUORUM, tolerate_missing=False, must_be_missing=False):
     query = SimpleStatement('SELECT c1, c2 FROM cf WHERE key=\'k%d\'' % key, consistency_level=consistency)
@@ -36,6 +39,7 @@ def query_c1c2(session, key, consistency=ConsistencyLevel.QUORUM, tolerate_missi
         assert len(res) == 2 and res[0] == 'value1' and res[1] == 'value2', res
     if must_be_missing:
         assert len(rows) == 0
+
 
 # work for cluster started by populate
 def new_node(cluster, bootstrap=True, token=None, remote_debug_port='2000', data_center=None):
@@ -52,11 +56,13 @@ def new_node(cluster, bootstrap=True, token=None, remote_debug_port='2000', data
     cluster.add(node, not bootstrap, data_center=data_center)
     return node
 
+
 def insert_columns(tester, session, key, columns_count, consistency=ConsistencyLevel.QUORUM, offset=0):
-    upds = [ "UPDATE cf SET v=\'value%d\' WHERE key=\'k%s\' AND c=\'c%06d\'" % (i, key, i) for i in xrange(offset*columns_count, columns_count*(offset+1))]
+    upds = ["UPDATE cf SET v=\'value%d\' WHERE key=\'k%s\' AND c=\'c%06d\'" % (i, key, i) for i in xrange(offset*columns_count, columns_count*(offset+1))]
     query = 'BEGIN BATCH %s; APPLY BATCH' % '; '.join(upds)
     simple_query = SimpleStatement(query, consistency_level=consistency)
     session.execute(simple_query)
+
 
 def query_columns(tester, session, key, columns_count, consistency=ConsistencyLevel.QUORUM, offset=0):
     query = SimpleStatement('SELECT c, v FROM cf WHERE key=\'k%s\' AND c >= \'c%06d\' AND c <= \'c%06d\'' % (key, offset, columns_count+offset-1), consistency_level=consistency)
@@ -64,6 +70,7 @@ def query_columns(tester, session, key, columns_count, consistency=ConsistencyLe
     assert len(res) == columns_count, "%s != %s (%s-%s)" % (len(res), columns_count, offset, columns_count+offset-1)
     for i in xrange(0, columns_count):
         assert res[i][1] == 'value%d' % (i+offset)
+
 
 def retry_till_success(fun, *args, **kwargs):
     timeout = kwargs.pop('timeout', 60)
@@ -80,6 +87,7 @@ def retry_till_success(fun, *args, **kwargs):
                 # brief pause before next attempt
                 time.sleep(0.25)
 
+
 # Simple puts and get (on one row), testing both reads by names and by slice,
 # with overwrites and flushes between inserts to make sure we hit multiple
 # sstables on reads
@@ -88,37 +96,39 @@ def putget(cluster, session, cl=ConsistencyLevel.QUORUM):
     _put_with_overwrite(cluster, session, 1, cl)
 
     # reads by name
-    ks = [ "\'c%02d\'" % i for i in xrange(0, 100) ]
+    ks = ["\'c%02d\'" % i for i in xrange(0, 100)]
     # We do not support proper IN queries yet
-    #if cluster.version() >= "1.2":
+    # if cluster.version() >= "1.2":
     #    session.execute('SELECT * FROM cf USING CONSISTENCY %s WHERE key=\'k0\' AND c IN (%s)' % (cl, ','.join(ks)))
-    #else:
+    # else:
     #    session.execute('SELECT %s FROM cf USING CONSISTENCY %s WHERE key=\'k0\'' % (','.join(ks), cl))
-    #_validate_row(cluster, session)
+    # _validate_row(cluster, session)
     # slice reads
     query = SimpleStatement('SELECT * FROM cf WHERE key=\'k0\'', consistency_level=cl)
     rows = session.execute(query)
     _validate_row(cluster, rows)
 
+
 def _put_with_overwrite(cluster, session, nb_keys, cl=ConsistencyLevel.QUORUM):
     for k in xrange(0, nb_keys):
-        kvs = [ "UPDATE cf SET v=\'value%d\' WHERE key=\'k%s\' AND c=\'c%02d\'" % (i, k, i) for i in xrange(0, 100) ]
+        kvs = ["UPDATE cf SET v=\'value%d\' WHERE key=\'k%s\' AND c=\'c%02d\'" % (i, k, i) for i in xrange(0, 100)]
         query = SimpleStatement('BEGIN BATCH %s APPLY BATCH' % '; '.join(kvs), consistency_level=cl)
         session.execute(query)
         time.sleep(.01)
     cluster.flush()
     for k in xrange(0, nb_keys):
-        kvs = [ "UPDATE cf SET v=\'value%d\' WHERE key=\'k%s\' AND c=\'c%02d\'" % (i*4, k, i*2) for i in xrange(0, 50) ]
+        kvs = ["UPDATE cf SET v=\'value%d\' WHERE key=\'k%s\' AND c=\'c%02d\'" % (i*4, k, i*2) for i in xrange(0, 50)]
         query = SimpleStatement('BEGIN BATCH %s APPLY BATCH' % '; '.join(kvs), consistency_level=cl)
         session.execute(query)
         time.sleep(.01)
     cluster.flush()
     for k in xrange(0, nb_keys):
-        kvs = [ "UPDATE cf SET v=\'value%d\' WHERE key=\'k%s\' AND c=\'c%02d\'" % (i*20, k, i*5) for i in xrange(0, 20) ]
+        kvs = ["UPDATE cf SET v=\'value%d\' WHERE key=\'k%s\' AND c=\'c%02d\'" % (i*20, k, i*5) for i in xrange(0, 20)]
         query = SimpleStatement('BEGIN BATCH %s APPLY BATCH' % '; '.join(kvs), consistency_level=cl)
         session.execute(query)
         time.sleep(.01)
     cluster.flush()
+
 
 def _validate_row(cluster, res):
     assert len(res) == 100, len(res)
@@ -129,6 +139,7 @@ def _validate_row(cluster, res):
             assert res[i][2] == 'value%d' % (i*2), 'for %d, expecting value%d, got %s' % (i, i*2, res[i][2])
         else:
             assert res[i][2] == 'value%d' % i, 'for %d, expecting value%d, got %s' % (i, i, res[i][2])
+
 
 # Simple puts and range gets, with overwrites and flushes between inserts to
 # make sure we hit multiple sstables on reads
@@ -145,6 +156,7 @@ def range_putget(cluster, session, cl=ConsistencyLevel.QUORUM):
         res = rows[:100]
         del rows[:100]
         _validate_row(cluster, res)
+
 
 def replace_in_file(filepath, search_replacements):
     """In-place file search and replace.
@@ -303,7 +315,7 @@ class InterruptCompaction(Thread):
         self.mark = node.mark_log()
 
     def run(self):
-        self.node.watch_log_for("Compacting(.*)%s"%(self.tablename,), from_mark=self.mark)
+        self.node.watch_log_for("Compacting(.*)%s" % (self.tablename,), from_mark=self.mark)
         self.node.stop(gently=False)
 
 

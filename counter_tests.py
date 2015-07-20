@@ -19,10 +19,9 @@ class TestCounters(Tester):
         self.create_ks(session, 'ks', 3)
         self.create_cf(session, 'cf', validation="CounterColumnType", columns={'c': 'counter'})
 
-
-        sessions = [ self.patient_cql_connection(node, 'ks') for node in nodes ]
-        nb_increment=50
-        nb_counter=10
+        sessions = [self.patient_cql_connection(node, 'ks') for node in nodes]
+        nb_increment = 50
+        nb_counter = 10
 
         for i in xrange(0, nb_increment):
             for c in xrange(0, nb_counter):

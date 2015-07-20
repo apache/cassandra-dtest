@@ -1,4 +1,5 @@
-import math, time
+import math
+import time
 
 from dtest import Tester
 from assertions import assert_invalid, assert_one, assert_none
@@ -54,9 +55,21 @@ class TestUserFunctions(Tester):
         session1.execute("INSERT INTO udf_kv (key, value) VALUES (%d, %d)" % (2, 2))
         session1.execute("INSERT INTO udf_kv (key, value) VALUES (%d, %d)" % (3, 3))
 
-        session1.execute("create or replace function x_sin ( input double ) called on null input returns double language java as 'if (input==null) return null; return Double.valueOf(Math.sin(input.doubleValue()));'")
-        session2.execute("create or replace function x_cos ( input double ) called on null input returns double language java as 'if (input==null) return null; return Double.valueOf(Math.cos(input.doubleValue()));'")
-        session3.execute("create or replace function x_tan ( input double ) called on null input returns double language java as 'if (input==null) return null; return Double.valueOf(Math.tan(input.doubleValue()));'")
+        session1.execute("""
+            create or replace function x_sin ( input double ) called on null input
+            returns double language java as 'if (input==null) return null;
+            return Double.valueOf(Math.sin(input.doubleValue()));'
+            """)
+        session2.execute(""""
+            create or replace function x_cos ( input double ) called on null input
+            returns double language java as 'if (input==null) return null;
+            return Double.valueOf(Math.cos(input.doubleValue()));'
+            """)
+        session3.execute(""""
+            create or replace function x_tan ( input double ) called on null input
+            returns double language java as 'if (input==null) return null;
+            return Double.valueOf(Math.tan(input.doubleValue()));'
+            """)
 
         time.sleep(1)
 
@@ -68,11 +81,12 @@ class TestUserFunctions(Tester):
 
         session4 = self.patient_cql_connection(node1)
 
-        #check that functions are correctly confined to namespaces
+        # check that functions are correctly confined to namespaces
         assert_invalid(session4, "SELECT key, value, sin(value), cos(value), tan(value) FROM ks.udf_kv where key = 4", "Unknown function 'sin'")
 
-        #try giving existing function bad input, should error
-        assert_invalid(session1, "SELECT key, value, x_sin(key), foo_cos(KEYy), foo_tan(key) FROM ks.udf_kv where key = 1", "Type error: key cannot be passed as argument 0 of function ks.x_sin of type double")
+        # try giving existing function bad input, should error
+        assert_invalid(session1,
+                       "SELECT key, value, x_sin(key), foo_cos(KEYy), foo_tan(key) FROM ks.udf_kv where key = 1", "Type error: key cannot be passed as argument 0 of function ks.x_sin of type double")
 
         session2.execute("drop function x_sin")
         session3.execute("drop function x_cos")
@@ -82,51 +96,54 @@ class TestUserFunctions(Tester):
         assert_invalid(session2, "SELECT key, value, sin(value), cos(value), tan(value) FROM udf_kv where key = 1")
         assert_invalid(session3, "SELECT key, value, sin(value), cos(value), tan(value) FROM udf_kv where key = 1")
 
-        #try creating function returning the wrong type, should error
-        assert_invalid(session1, "CREATE FUNCTION bad_sin ( input double ) CALLED ON NULL INPUT RETURNS uuid LANGUAGE java AS 'return Math.sin(input);'", "Could not compile function 'ks.bad_sin' from Java source:")
+        # try creating function returning the wrong type, should error
+        assert_invalid(session1, """
+                      CREATE FUNCTION bad_sin ( input double ) CALLED ON NULL INPUT RETURNS uuid LANGUAGE java AS 'return Math.sin(input);'",
+                      "Could not compile function 'ks.bad_sin' from Java source:
+                      """)
 
     def udf_overload_test(self):
 
         session = self.prepare(nodes=3)
 
-        session.execute("CREATE TABLE tab (k text PRIMARY KEY, v int)");
+        session.execute("CREATE TABLE tab (k text PRIMARY KEY, v int)")
         session.execute("INSERT INTO tab (k, v) VALUES ('foo' , 1);")
 
         # create overloaded udfs
-        session.execute("CREATE FUNCTION overloaded(v varchar) called on null input RETURNS text LANGUAGE java AS 'return \"f1\";'");
-        session.execute("CREATE OR REPLACE FUNCTION overloaded(i int) called on null input RETURNS text LANGUAGE java AS 'return \"f2\";'");
-        session.execute("CREATE OR REPLACE FUNCTION overloaded(v1 text, v2 text) called on null input RETURNS text LANGUAGE java AS 'return \"f3\";'");
-        session.execute("CREATE OR REPLACE FUNCTION overloaded(v ascii) called on null input RETURNS text LANGUAGE java AS 'return \"f1\";'");
+        session.execute("CREATE FUNCTION overloaded(v varchar) called on null input RETURNS text LANGUAGE java AS 'return \"f1\";'")
+        session.execute("CREATE OR REPLACE FUNCTION overloaded(i int) called on null input RETURNS text LANGUAGE java AS 'return \"f2\";'")
+        session.execute("CREATE OR REPLACE FUNCTION overloaded(v1 text, v2 text) called on null input RETURNS text LANGUAGE java AS 'return \"f3\";'")
+        session.execute("CREATE OR REPLACE FUNCTION overloaded(v ascii) called on null input RETURNS text LANGUAGE java AS 'return \"f1\";'")
 
-        #ensure that works with correct specificity
-        assert_invalid(session, "SELECT v FROM tab WHERE k = overloaded('foo')");
-        assert_none(session, "SELECT v FROM tab WHERE k = overloaded((text) 'foo')");
-        assert_none(session, "SELECT v FROM tab WHERE k = overloaded((ascii) 'foo')");
-        assert_none(session, "SELECT v FROM tab WHERE k = overloaded((varchar) 'foo')");
+        # ensure that works with correct specificity
+        assert_invalid(session, "SELECT v FROM tab WHERE k = overloaded('foo')")
+        assert_none(session, "SELECT v FROM tab WHERE k = overloaded((text) 'foo')")
+        assert_none(session, "SELECT v FROM tab WHERE k = overloaded((ascii) 'foo')")
+        assert_none(session, "SELECT v FROM tab WHERE k = overloaded((varchar) 'foo')")
 
-        #try non-existent functions
-        assert_invalid(session, "DROP FUNCTION overloaded(boolean)");
-        assert_invalid(session, "DROP FUNCTION overloaded(bigint)");
+        # try non-existent functions
+        assert_invalid(session, "DROP FUNCTION overloaded(boolean)")
+        assert_invalid(session, "DROP FUNCTION overloaded(bigint)")
 
-        #try dropping overloaded - should fail because ambiguous
-        assert_invalid(session, "DROP FUNCTION overloaded");
-        session.execute("DROP FUNCTION overloaded(varchar)");
-        assert_invalid(session, "SELECT v FROM tab WHERE k = overloaded((text)'foo')");
-        session.execute("DROP FUNCTION overloaded(text, text)");
-        assert_invalid(session, "SELECT v FROM tab WHERE k = overloaded((text)'foo',(text)'bar')");
-        session.execute("DROP FUNCTION overloaded(ascii)");
-        assert_invalid(session, "SELECT v FROM tab WHERE k = overloaded((ascii)'foo')");
-        #should now work - unambiguous
-        session.execute("DROP FUNCTION overloaded");
+        # try dropping overloaded - should fail because ambiguous
+        assert_invalid(session, "DROP FUNCTION overloaded")
+        session.execute("DROP FUNCTION overloaded(varchar)")
+        assert_invalid(session, "SELECT v FROM tab WHERE k = overloaded((text)'foo')")
+        session.execute("DROP FUNCTION overloaded(text, text)")
+        assert_invalid(session, "SELECT v FROM tab WHERE k = overloaded((text)'foo',(text)'bar')")
+        session.execute("DROP FUNCTION overloaded(ascii)")
+        assert_invalid(session, "SELECT v FROM tab WHERE k = overloaded((ascii)'foo')")
+        # should now work - unambiguous
+        session.execute("DROP FUNCTION overloaded")
 
     def udf_scripting_test(self):
         session = self.prepare()
         session.execute("create table nums (key int primary key, val double);")
 
-        for x in range (1,4):
+        for x in range(1, 4):
             session.execute("INSERT INTO nums (key, val) VALUES (%d, %d)" % (x, float(x)))
 
-        session.execute("CREATE FUNCTION x_sin(val double) called on null input returns double language javascript as 'Math.sin(val)'");
+        session.execute("CREATE FUNCTION x_sin(val double) called on null input returns double language javascript as 'Math.sin(val)'")
 
         assert_one(session, "SELECT key, val, x_sin(val) FROM nums where key = %d" % 1, [1, 1.0, math.sin(1.0)])
         assert_one(session, "SELECT key, val, x_sin(val) FROM nums where key = %d" % 2, [2, 2.0, math.sin(2.0)])
@@ -155,7 +172,6 @@ class TestUserFunctions(Tester):
         assert_one(session, "SELECT avg(val) FROM nums", [5.0])
         assert_one(session, "SELECT count(*) FROM nums", [9])
 
-
     def aggregate_udf_test(self):
         session = self.prepare()
         session.execute("create table nums (key int primary key, val int);")
@@ -180,7 +196,7 @@ class TestUserFunctions(Tester):
 
         session.execute("create type test (a text, b int);")
 
-        assert_invalid(session,"create table tab (key int primary key, udt test);")
+        assert_invalid(session, "create table tab (key int primary key, udt test);")
 
         session.execute("create table tab (key int primary key, udt frozen<test>);")
 

@@ -28,7 +28,7 @@ class TestCQL(Tester):
             )
         """)
 
-        query = "BEGIN BATCH INSERT INTO cf (k, c) VALUES (?, ?); APPLY BATCH";
-        pq = session.prepare(query);
+        query = "BEGIN BATCH INSERT INTO cf (k, c) VALUES (?, ?); APPLY BATCH"
+        pq = session.prepare(query)
 
         session.execute(pq, ['foo', 4])

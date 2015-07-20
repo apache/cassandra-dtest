@@ -58,7 +58,7 @@ class TokenGenerator(Tester):
     def prepare(self, randomPart=None, nodes=1):
         cluster = self.cluster
 
-        install_dir = cluster.get_install_dir();
+        install_dir = cluster.get_install_dir()
 
         generated_tokens = self.call_token_generator(install_dir, randomPart, [nodes])
 
@@ -88,7 +88,7 @@ class TokenGenerator(Tester):
         dc_tokens = generated_tokens[0]
 
         tokens = []
-        local_tokens = rows_to_list(session.execute("SELECT tokens FROM system.local"))[0];
+        local_tokens = rows_to_list(session.execute("SELECT tokens FROM system.local"))[0]
         self.assertEqual(local_tokens.__len__(), 1, "too many tokens for peer")
         for tok in local_tokens:
             tokens += tok

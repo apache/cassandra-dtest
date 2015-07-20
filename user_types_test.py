@@ -194,7 +194,7 @@ class TestUserTypes(Tester):
               INSERT INTO simple_table (id, number)
               VALUES ({id}, {{user_number: 'uh oh....this is not a number'}});
            """.format(id=_id)
-        assert_invalid( session, stmt, 'field user_number is not of type int')
+        assert_invalid(session, stmt, 'field user_number is not of type int')
 
         # let's check the rowcount and make sure the data
         # didn't get inserted when the exception asserted above was thrown

@@ -15,7 +15,7 @@ class DeleteInsertTest(Tester):
         self.groups = ['group1', 'group2', 'group3', 'group4']
         self.rows = [(str(uuid.uuid1()),x,random.choice(self.groups)) for x in range(1000)]
 
-    def create_ddl(self, session, rf={'dc1':2, 'dc2':2}):
+    def create_ddl(self, session, rf={'dc1': 2, 'dc2': 2}):
         self.create_ks(session, 'delete_insert_search_test', rf)
         session.execute('CREATE TABLE test (id uuid PRIMARY KEY, val1 text, group text)')
         session.execute('CREATE INDEX group_idx ON test (group)')

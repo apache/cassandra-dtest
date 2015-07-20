@@ -57,7 +57,7 @@ class TestTopology(Tester):
 
         session = self.patient_cql_connection(node1)
         self.create_ks(session, 'ks', 2)
-        self.create_cf(session, 'cf',columns={'c1': 'text', 'c2': 'text'})
+        self.create_cf(session, 'cf', columns={'c1': 'text', 'c2': 'text'})
 
         for n in xrange(0, 10000):
             insert_c1c2(session, n, ConsistencyLevel.QUORUM)

@@ -82,7 +82,7 @@ class TestBootstrapConsistency(Tester):
         node3.start(wait_for_binary_proto=True)
 
         n3session = self.patient_cql_connection(node3)
-        n3session.execute("USE ks");
+        n3session.execute("USE ks")
         debug("Checking that no data was lost")
         for n in xrange(10,20):
             query_c1c2(n3session, n, ConsistencyLevel.ALL)
