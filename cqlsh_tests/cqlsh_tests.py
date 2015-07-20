@@ -731,17 +731,14 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         with open(self.tempfile.name, 'r') as csvfile:
             row_count = 0
             csvreader = csv.reader(csvfile)
-            for cql_row, csv_row in zip(results, csvreader):
-                self.assertEquals(map(str, cql_row), csv_row)
-                row_count += 1
-
-            self.assertEquals(len(results), row_count)
+            result_list = [map(str, cql_row) for cql_row in results]
+            self.assertItemsEqual(result_list, csvreader)
 
         # import the CSV file with COPY FROM
         session.execute("TRUNCATE ks.testcopyto")
         node1.run_cqlsh(cmds="COPY ks.testcopyto FROM '%s'" % (self.tempfile.name,))
         new_results = list(session.execute("SELECT * FROM testcopyto"))
-        self.assertEquals(results, new_results)
+        self.assertItemsEqual(results, new_results)
 
     @since('2.1')
     def test_float_formatting(self):
