@@ -34,7 +34,7 @@ class TestCqlsh(Tester):
         unmonkeypatch_driver(cls._cached_driver_methods)
 
     def tearDown(self):
-        if self.tempfile:
+        if hasattr(self, 'tempfile'):
             os.unlink(self.tempfile.name)
             super(TestCqlsh, self).tearDown()
 
