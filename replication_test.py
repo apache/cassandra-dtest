@@ -163,21 +163,21 @@ class ReplicationTest(Tester):
         node1 = self.cluster.nodelist()[0]
         self.conn = self.patient_exclusive_cql_connection(node1)
 
-        # Install a tracing cursor so we can get info about who the
+        # Install a tracing session so we can get info about who the
         # coordinator is contacting:
-        cursor = self.conn
-        cursor.max_trace_wait = 120
+        session = self.conn
+        session.max_trace_wait = 120
 
         replication_factor = 3
-        self.create_ks(cursor, 'test', replication_factor)
-        cursor.execute('CREATE TABLE test.test (id int PRIMARY KEY, value text)', trace=False)
+        self.create_ks(session, 'test', replication_factor)
+        session.execute('CREATE TABLE test.test (id int PRIMARY KEY, value text)', trace=False)
         # Wait for table creation, otherwise trace times out -
         # CASSANDRA-5658
         time.sleep(5)
 
         for key, token in murmur3_hashes.items():
             query = SimpleStatement("INSERT INTO test (id, value) VALUES (%s, 'asdf')" % key, consistency_level=ConsistencyLevel.ALL)
-            future = cursor.execute_async(query, trace=True)
+            future = session.execute_async(query, trace=True)
             future.result()
             trace = future.get_query_trace(max_wait=120)
             self.pprint_trace(trace)
@@ -201,13 +201,13 @@ class ReplicationTest(Tester):
         ip_nodes = dict((node.address(), node) for node in self.cluster.nodelist())
         self.conn = self.patient_exclusive_cql_connection(node1)
 
-        # Install a tracing cursor so we can get info about who the
+        # Install a tracing session so we can get info about who the
         # coordinator is contacting:
-        cursor = self.conn
+        session = self.conn
 
         replication_factor = {'dc1':2, 'dc2':2}
-        self.create_ks(cursor, 'test', replication_factor)
-        cursor.execute('CREATE TABLE test.test (id int PRIMARY KEY, value text)', trace=False)
+        self.create_ks(session, 'test', replication_factor)
+        session.execute('CREATE TABLE test.test (id int PRIMARY KEY, value text)', trace=False)
         # Wait for table creation, otherwise trace times out -
         # CASSANDRA-5658
         time.sleep(5)
@@ -216,7 +216,7 @@ class ReplicationTest(Tester):
 
         for key, token in murmur3_hashes.items():
             query = SimpleStatement("INSERT INTO test (id, value) VALUES (%s, 'asdf')" % key, consistency_level=ConsistencyLevel.ALL)
-            future = cursor.execute_async(query, trace=True)
+            future = session.execute_async(query, trace=True)
             future.result()
             trace = future.get_query_trace(max_wait=120)
             self.pprint_trace(trace)

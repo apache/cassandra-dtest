@@ -66,7 +66,7 @@ class BaseTester(Tester):
         if DISABLE_VNODES:
             node1.set_configuration_options(values={'initial_token': "a".encode('hex')  })
         cluster.start()
-        cursor = self.patient_cql_connection(node1)
+        session = self.patient_cql_connection(node1)
         self.open_client()
         self.define_schema()
 

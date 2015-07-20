@@ -1,6 +1,7 @@
 from dtest import Tester
 from tools import putget
 
+
 class TestMultiDCPutGet(Tester):
 
     def putget_2dc_rf1_test(self):
@@ -8,19 +9,19 @@ class TestMultiDCPutGet(Tester):
         cluster = self.cluster
         cluster.populate([1, 1]).start()
 
-        cursor = self.patient_cql_connection(cluster.nodelist()[0])
-        self.create_ks(cursor, 'ks', { 'dc1' : 1, 'dc2' : 1})
-        self.create_cf(cursor, 'cf')
+        session = self.patient_cql_connection(cluster.nodelist()[0])
+        self.create_ks(session, 'ks', {'dc1': 1, 'dc2': 1})
+        self.create_cf(session, 'cf')
 
-        putget(cluster, cursor)
+        putget(cluster, session)
 
     def putget_2dc_rf2_test(self):
         """ Simple put-get test for 2 DC with 2 node each (RF=2) -- tests cross-DC efficient writes """
         cluster = self.cluster
         cluster.populate([2, 2]).start()
 
-        cursor = self.patient_cql_connection(cluster.nodelist()[0])
-        self.create_ks(cursor, 'ks', { 'dc1' : 2, 'dc2' : 2})
-        self.create_cf(cursor, 'cf')
+        session = self.patient_cql_connection(cluster.nodelist()[0])
+        self.create_ks(session, 'ks', {'dc1': 2, 'dc2': 2})
+        self.create_cf(session, 'cf')
 
-        putget(cluster, cursor)
+        putget(cluster, session)

@@ -17,13 +17,13 @@ class TestBootstrapConsistency(Tester):
         cluster.start()
 
         debug("Set to talk to node 2")
-        n2cursor = self.patient_cql_connection(node2)
-        self.create_ks(n2cursor, 'ks', 2)
-        create_c1c2_table(self, n2cursor)
+        n2session = self.patient_cql_connection(node2)
+        self.create_ks(n2session, 'ks', 2)
+        create_c1c2_table(self, n2session)
 
         debug("Generating some data for all nodes")
         for n in xrange(10,20):
-            insert_c1c2(n2cursor, n, ConsistencyLevel.ALL)
+            insert_c1c2(n2session, n, ConsistencyLevel.ALL)
 
         node1.flush()
         debug("Taking down node1")
@@ -31,7 +31,7 @@ class TestBootstrapConsistency(Tester):
 
         debug("Writing data to node2")
         for n in xrange(30,1000):
-            insert_c1c2(n2cursor, n, ConsistencyLevel.ONE)
+            insert_c1c2(n2session, n, ConsistencyLevel.ONE)
         node2.flush()
 
         debug("Restart node1")
@@ -42,10 +42,10 @@ class TestBootstrapConsistency(Tester):
 
         debug("Checking that no data was lost")
         for n in xrange(10,20):
-            query_c1c2(n2cursor, n, ConsistencyLevel.ALL)
+            query_c1c2(n2session, n, ConsistencyLevel.ALL)
 
         for n in xrange(30,1000):
-            query_c1c2(n2cursor, n, ConsistencyLevel.ALL)
+            query_c1c2(n2session, n, ConsistencyLevel.ALL)
 
     def consistent_reads_after_bootstrap_test(self):
         debug("Creating a ring")
@@ -57,13 +57,13 @@ class TestBootstrapConsistency(Tester):
         cluster.start(wait_for_binary_proto=True, wait_other_notice=True)
 
         debug("Set to talk to node 2")
-        n2cursor = self.patient_cql_connection(node2)
-        self.create_ks(n2cursor, 'ks', 2)
-        create_c1c2_table(self, n2cursor)
+        n2session = self.patient_cql_connection(node2)
+        self.create_ks(n2session, 'ks', 2)
+        create_c1c2_table(self, n2session)
 
         debug("Generating some data for all nodes")
         for n in xrange(10,20):
-            insert_c1c2(n2cursor, n, ConsistencyLevel.ALL)
+            insert_c1c2(n2session, n, ConsistencyLevel.ALL)
 
         node1.flush()
         debug("Taking down node1")
@@ -71,7 +71,7 @@ class TestBootstrapConsistency(Tester):
 
         debug("Writing data to only node2")
         for n in xrange(30,1000):
-            insert_c1c2(n2cursor, n, ConsistencyLevel.ONE)
+            insert_c1c2(n2session, n, ConsistencyLevel.ONE)
         node2.flush()
 
         debug("Restart node1")
@@ -81,11 +81,11 @@ class TestBootstrapConsistency(Tester):
         node3 = new_node(cluster)
         node3.start(wait_for_binary_proto=True)
 
-        n3cursor = self.patient_cql_connection(node3)
-        n3cursor.execute("USE ks");
+        n3session = self.patient_cql_connection(node3)
+        n3session.execute("USE ks")
         debug("Checking that no data was lost")
         for n in xrange(10,20):
-            query_c1c2(n3cursor, n, ConsistencyLevel.ALL)
+            query_c1c2(n3session, n, ConsistencyLevel.ALL)
 
         for n in xrange(30,1000):
-            query_c1c2(n3cursor, n, ConsistencyLevel.ALL)
+            query_c1c2(n3session, n, ConsistencyLevel.ALL)

@@ -602,14 +602,14 @@ class TestConsistency(Tester):
         cluster.populate(3).start(wait_other_notice=True)
         node1, node2, node3 = cluster.nodelist()
 
-        cursor = self.patient_cql_connection(node1)
-        self.create_ks(cursor, 'ks', 3)
-        self.create_cf(cursor, 'cf', read_repair=0.0)
+        session = self.patient_cql_connection(node1)
+        self.create_ks(session, 'ks', 3)
+        self.create_cf(session, 'cf', read_repair=0.0)
 
         # Repeat this test 10 times to make it more easy to spot a null pointer exception caused by a race, see CASSANDRA-9460
         for k in xrange(10):
             # insert 9 columns in one row
-            insert_columns(self, cursor, 0, 9)
+            insert_columns(self, session, 0, 9)
 
             # Deleting 3 first columns with a different node dead each time
             self.stop_delete_and_restart(1, 0)
@@ -617,9 +617,9 @@ class TestConsistency(Tester):
             self.stop_delete_and_restart(3, 2)
 
             # Query 3 firsts columns
-            cursor = self.patient_cql_connection(node1, 'ks')
+            session = self.patient_cql_connection(node1, 'ks')
             query = SimpleStatement('SELECT c, v FROM cf WHERE key=\'k0\' LIMIT 3', consistency_level=ConsistencyLevel.QUORUM)
-            rows = cursor.execute(query)
+            rows = session.execute(query)
             res = rows
             assert len(res) == 3, 'Expecting 3 values, got %d (%s)' % (len(res), str(res))
             # value 0, 1 and 2 have been deleted
@@ -627,7 +627,7 @@ class TestConsistency(Tester):
                 assert res[i-1][1] == 'value%d' % (i+2), 'Expecting value%d, got %s (%s)' % (i+2, res[i-1][1], str(res))
 
             truncate_statement = SimpleStatement('TRUNCATE cf', consistency_level=ConsistencyLevel.QUORUM)
-            cursor.execute(truncate_statement)
+            session.execute(truncate_statement)
 
     def short_read_delete_test(self):
         """ Test short reads ultimately leaving no columns alive [#4000] """
@@ -640,27 +640,27 @@ class TestConsistency(Tester):
         cluster.populate(2).start(wait_other_notice=True)
         node1, node2 = cluster.nodelist()
 
-        cursor = self.patient_cql_connection(node1)
-        self.create_ks(cursor, 'ks', 3)
-        self.create_cf(cursor, 'cf', read_repair=0.0)
+        session = self.patient_cql_connection(node1)
+        self.create_ks(session, 'ks', 3)
+        self.create_cf(session, 'cf', read_repair=0.0)
         # insert 2 columns in one row
-        insert_columns(self, cursor, 0, 2)
+        insert_columns(self, session, 0, 2)
 
         # Delete the row while first node is dead
         node1.flush()
         node1.stop(wait_other_notice=True)
-        cursor = self.patient_cql_connection(node2, 'ks')
+        session = self.patient_cql_connection(node2, 'ks')
 
         query = SimpleStatement('DELETE FROM cf WHERE key=\'k0\'', consistency_level=ConsistencyLevel.ONE)
-        cursor.execute(query)
+        session.execute(query)
 
         node1.start(wait_other_notice=True)
 
         # Query first column
-        cursor = self.patient_cql_connection(node1, 'ks')
+        session = self.patient_cql_connection(node1, 'ks')
 
         query = SimpleStatement('SELECT c, v FROM cf WHERE key=\'k0\' LIMIT 1', consistency_level=ConsistencyLevel.QUORUM)
-        res = cursor.execute(query)
+        res = session.execute(query)
         assert len(res) == 0, res
 
     def short_read_quorum_delete_test(self):
@@ -712,27 +712,27 @@ class TestConsistency(Tester):
             cluster.populate(2, tokens=tokens).start()
         node1, node2 = cluster.nodelist()
 
-        cursor = self.patient_cql_connection(node1)
-        self.create_ks(cursor, 'ks', 2)
-        create_c1c2_table(self, cursor, read_repair=1.0)
+        session = self.patient_cql_connection(node1)
+        self.create_ks(session, 'ks', 2)
+        create_c1c2_table(self, session, read_repair=1.0)
 
         node2.stop(wait_other_notice=True)
 
         for n in xrange(0, 10000):
-            insert_c1c2(cursor, n, ConsistencyLevel.ONE)
+            insert_c1c2(session, n, ConsistencyLevel.ONE)
 
         node2.start(wait_other_notice=True)
 
        # query everything to cause RR
         for n in xrange(0, 10000):
-            query_c1c2(cursor, n, ConsistencyLevel.QUORUM)
+            query_c1c2(session, n, ConsistencyLevel.QUORUM)
 
         node1.stop(wait_other_notice=True)
 
         # Check node2 for all the keys that should have been repaired
-        cursor = self.patient_cql_connection(node2, keyspace='ks')
+        session = self.patient_cql_connection(node2, keyspace='ks')
         for n in xrange(0, 10000):
-            query_c1c2(cursor, n, ConsistencyLevel.ONE)
+            query_c1c2(session, n, ConsistencyLevel.ONE)
 
     def short_read_reversed_test(self):
         cluster = self.cluster
@@ -744,14 +744,14 @@ class TestConsistency(Tester):
         cluster.populate(3).start(wait_other_notice=True)
         node1, node2, node3 = cluster.nodelist()
 
-        cursor = self.patient_cql_connection(node1)
-        self.create_ks(cursor, 'ks', 3)
-        self.create_cf(cursor, 'cf', read_repair=0.0)
+        session = self.patient_cql_connection(node1)
+        self.create_ks(session, 'ks', 3)
+        self.create_cf(session, 'cf', read_repair=0.0)
 
         # Repeat this test 10 times to make it more easy to spot a null pointer exception caused by a race, see CASSANDRA-9460
         for k in xrange(10):
             # insert 9 columns in one row
-            insert_columns(self, cursor, 0, 9)
+            insert_columns(self, session, 0, 9)
 
             # Deleting 3 last columns with a different node dead each time
             self.stop_delete_and_restart(1, 6)
@@ -759,9 +759,9 @@ class TestConsistency(Tester):
             self.stop_delete_and_restart(3, 8)
 
             # Query 3 firsts columns
-            cursor = self.patient_cql_connection(node1, 'ks')
+            session = self.patient_cql_connection(node1, 'ks')
             query = SimpleStatement('SELECT c, v FROM cf WHERE key=\'k0\' ORDER BY c DESC LIMIT 3', consistency_level=ConsistencyLevel.QUORUM)
-            rows = cursor.execute(query)
+            rows = session.execute(query)
             res = rows
             assert len(res) == 3, 'Expecting 3 values, got %d (%s)' % (len(res), str(res))
             # value 6, 7 and 8 have been deleted
@@ -769,7 +769,7 @@ class TestConsistency(Tester):
                 assert res[i][1] == 'value%d' % (5-i), 'Expecting value%d, got %s (%s)' % (5-i, res[i][1], str(res))
 
             truncate_statement = SimpleStatement('TRUNCATE cf', consistency_level=ConsistencyLevel.QUORUM)
-            cursor.execute(truncate_statement)
+            session.execute(truncate_statement)
 
     def quorum_available_during_failure_test(self):
         CL = ConsistencyLevel.QUORUM
@@ -786,33 +786,33 @@ class TestConsistency(Tester):
         cluster.start()
 
         debug("Set to talk to node 2")
-        cursor = self.patient_cql_connection(node2)
-        self.create_ks(cursor, 'ks', RF)
-        create_c1c2_table(self, cursor)
+        session = self.patient_cql_connection(node2)
+        self.create_ks(session, 'ks', RF)
+        create_c1c2_table(self, session)
 
         debug("Generating some data")
         for n in xrange(100):
-            insert_c1c2(cursor, n, CL)
+            insert_c1c2(session, n, CL)
 
         debug("Taking down node1")
         node1.stop(wait_other_notice=True)
 
         debug("Reading back data.")
         for n in xrange(100):
-            query_c1c2(cursor, n, CL)
+            query_c1c2(session, n, CL)
 
     def stop_delete_and_restart(self, node_number, column):
         to_stop = self.cluster.nodes["node%d" % node_number]
         next_node = self.cluster.nodes["node%d" % (((node_number + 1) % 3) + 1)]
         to_stop.flush()
         to_stop.stop(wait_other_notice=True)
-        cursor = self.patient_cql_connection(next_node, 'ks')
+        session = self.patient_cql_connection(next_node, 'ks')
         query = 'BEGIN BATCH '
         query = query + 'DELETE FROM cf WHERE key=\'k0\' AND c=\'c%06d\'; ' % column
         query = query + 'DELETE FROM cf WHERE key=\'k0\' AND c=\'c2\'; '
         query = query + 'APPLY BATCH;'
         simple_query = SimpleStatement(query, consistency_level=ConsistencyLevel.QUORUM)
-        cursor.execute(simple_query)
+        session.execute(simple_query)
 
         to_stop.start(wait_other_notice=True)
 

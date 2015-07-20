@@ -60,14 +60,14 @@ class TestIncRepair(Tester):
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
 
-        cursor = self.patient_cql_connection(node1)
-        self.create_ks(cursor, 'ks', 3)
-        self.create_cf(cursor, 'cf', read_repair=0.0, columns={'c1': 'text', 'c2': 'text'})
+        session = self.patient_cql_connection(node1)
+        self.create_ks(session, 'ks', 3)
+        self.create_cf(session, 'cf', read_repair=0.0, columns={'c1': 'text', 'c2': 'text'})
 
         debug("insert data")
 
         for x in range(1, 50):
-            insert_c1c2(cursor, x, ConsistencyLevel.ALL)
+            insert_c1c2(session, x, ConsistencyLevel.ALL)
         node1.flush()
 
         debug("bringing down node 3")
@@ -76,7 +76,7 @@ class TestIncRepair(Tester):
 
         debug("inserting additional data into node 1 and 2")
         for y in range(50, 100):
-            insert_c1c2(cursor, y, ConsistencyLevel.TWO)
+            insert_c1c2(session, y, ConsistencyLevel.TWO)
         node1.flush()
         node2.flush()
 
@@ -93,7 +93,7 @@ class TestIncRepair(Tester):
 
         debug("inserting data in nodes 1 and 3")
         for z in range(100, 150):
-            insert_c1c2(cursor, z, ConsistencyLevel.TWO)
+            insert_c1c2(session, z, ConsistencyLevel.TWO)
         node1.flush()
         node3.flush()
 
@@ -111,7 +111,7 @@ class TestIncRepair(Tester):
         cluster.add(node5, False)
         node5.start(replace_address='127.0.0.3', wait_other_notice=True)
 
-        assert_one(cursor, "SELECT COUNT(*) FROM ks.cf LIMIT 200", [149])
+        assert_one(session, "SELECT COUNT(*) FROM ks.cf LIMIT 200", [149])
 
     def sstable_repairedset_test(self):
         cluster = self.cluster
@@ -177,14 +177,14 @@ class TestIncRepair(Tester):
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
 
-        cursor = self.patient_cql_connection(node1)
-        self.create_ks(cursor, 'ks', 3)
-        cursor.execute("create table tab(key int PRIMARY KEY, val int);")
+        session = self.patient_cql_connection(node1)
+        self.create_ks(session, 'ks', 3)
+        session.execute("create table tab(key int PRIMARY KEY, val int);")
 
         node3.stop()
 
         for x in range(0, 100):
-            cursor.execute("insert into tab(key,val) values(" + str(x) + ",0)")
+            session.execute("insert into tab(key,val) values(" + str(x) + ",0)")
         node1.flush()
 
         node3.start(wait_for_binary_proto=True)
@@ -194,7 +194,7 @@ class TestIncRepair(Tester):
         else:
             node3.nodetool("repair -par -inc")
         for x in range(0, 150):
-            cursor.execute("insert into tab(key,val) values(" + str(x) + ",1)")
+            session.execute("insert into tab(key,val) values(" + str(x) + ",1)")
         node1.flush()
         node2.flush()
         node3.flush()
@@ -202,7 +202,7 @@ class TestIncRepair(Tester):
         node3.nodetool('compact')
 
         for x in range(0, 150):
-            assert_one(cursor, "select val from tab where key =" + str(x), [1])
+            assert_one(session, "select val from tab where key =" + str(x), [1])
 
     @since('2.1')
     @attr('long')

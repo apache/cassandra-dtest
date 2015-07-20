@@ -15,40 +15,40 @@ class DeleteInsertTest(Tester):
         self.groups = ['group1', 'group2', 'group3', 'group4']
         self.rows = [(str(uuid.uuid1()),x,random.choice(self.groups)) for x in range(1000)]
 
-    def create_ddl(self, cursor, rf={'dc1':2, 'dc2':2}):
-        self.create_ks(cursor, 'delete_insert_search_test', rf)
-        cursor.execute('CREATE TABLE test (id uuid PRIMARY KEY, val1 text, group text)')
-        cursor.execute('CREATE INDEX group_idx ON test (group)')
+    def create_ddl(self, session, rf={'dc1': 2, 'dc2': 2}):
+        self.create_ks(session, 'delete_insert_search_test', rf)
+        session.execute('CREATE TABLE test (id uuid PRIMARY KEY, val1 text, group text)')
+        session.execute('CREATE INDEX group_idx ON test (group)')
 
-    def delete_group_rows(self, cursor, group):
+    def delete_group_rows(self, session, group):
         """Delete rows from a given group and return them"""
         rows = [r for r in self.rows if r[2]==group]
         ids = [r[0] for r in rows]
-        cursor.execute('DELETE FROM test WHERE id in (%s)' % ', '.join(ids))
+        session.execute('DELETE FROM test WHERE id in (%s)' % ', '.join(ids))
         return rows
 
-    def insert_all_rows(self, cursor):
-        self.insert_some_rows(cursor, self.rows)
+    def insert_all_rows(self, session):
+        self.insert_some_rows(session, self.rows)
 
-    def insert_some_rows(self, cursor, rows):
+    def insert_some_rows(self, session, rows):
         for row in rows:
-            cursor.execute("INSERT INTO test (id, val1, group) VALUES (%s, '%s', '%s')" % row)
+            session.execute("INSERT INTO test (id, val1, group) VALUES (%s, '%s', '%s')" % row)
 
     def delete_insert_search_test(self):
         cluster = self.cluster
         cluster.populate([2,2]).start()
         node1 = cluster.nodelist()[0]
 
-        cursor = self.cql_connection(node1)
-        cursor.consistency_level = 'LOCAL_QUORUM'
+        session = self.cql_connection(node1)
+        session.consistency_level = 'LOCAL_QUORUM'
 
-        self.create_ddl(cursor)
+        self.create_ddl(session)
         # Create 1000 rows:
-        self.insert_all_rows(cursor)
+        self.insert_all_rows(session)
         # Delete all of group2:
-        deleted = self.delete_group_rows(cursor, 'group2')
+        deleted = self.delete_group_rows(session, 'group2')
         # Put that group back:
-        self.insert_some_rows(cursor, rows=deleted)
+        self.insert_some_rows(session, rows=deleted)
 
         # Verify that all of group2 is back, 20 times, in parallel
         # querying across all nodes:
@@ -59,9 +59,9 @@ class DeleteInsertTest(Tester):
                 self.connection = connection
 
             def run(self):
-                cursor = self.connection
+                session = self.connection
                 query = SimpleStatement("SELECT * FROM delete_insert_search_test.test WHERE group = 'group2'", consistency_level=ConsistencyLevel.LOCAL_QUORUM)
-                rows = cursor.execute(query)
+                rows = session.execute(query)
                 assert len(rows) == len(deleted)
 
         threads = []

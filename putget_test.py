@@ -34,11 +34,11 @@ class TestPutGet(Tester):
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
 
-        cursor = self.patient_cql_connection(node1)
-        self.create_ks(cursor, 'ks', 3)
-        self.create_cf(cursor, 'cf', compression=compression)
+        session = self.patient_cql_connection(node1)
+        self.create_ks(session, 'ks', 3)
+        self.create_cf(session, 'cf', compression=compression)
 
-        tools.putget(cluster, cursor)
+        tools.putget(cluster, session)
 
     def non_local_read_test(self):
         """ This test reads from a coordinator we know has no copy of the data """
@@ -47,14 +47,14 @@ class TestPutGet(Tester):
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
 
-        cursor = self.patient_cql_connection(node1)
-        self.create_ks(cursor, 'ks', 2)
-        create_c1c2_table(self, cursor)
+        session = self.patient_cql_connection(node1)
+        self.create_ks(session, 'ks', 2)
+        create_c1c2_table(self, session)
 
         # insert and get at CL.QUORUM (since RF=2, node1 won't have all key locally)
         for n in xrange(0, 1000):
-            tools.insert_c1c2(cursor, n, ConsistencyLevel.QUORUM)
-            tools.query_c1c2(cursor, n, ConsistencyLevel.QUORUM)
+            tools.insert_c1c2(session, n, ConsistencyLevel.QUORUM)
+            tools.query_c1c2(session, n, ConsistencyLevel.QUORUM)
 
     def rangeputget_test(self):
         """ Simple put/get on ranges of rows, hitting multiple sstables """
@@ -64,11 +64,11 @@ class TestPutGet(Tester):
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
 
-        cursor = self.patient_cql_connection(node1)
-        self.create_ks(cursor, 'ks', 2)
-        self.create_cf(cursor, 'cf')
+        session = self.patient_cql_connection(node1)
+        self.create_ks(session, 'ks', 2)
+        self.create_cf(session, 'cf')
 
-        tools.range_putget(cluster, cursor)
+        tools.range_putget(cluster, session)
 
     def wide_row_test(self):
         """ Test wide row slices """
@@ -77,18 +77,18 @@ class TestPutGet(Tester):
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
 
-        cursor = self.patient_cql_connection(node1)
-        self.create_ks(cursor, 'ks', 1)
-        self.create_cf(cursor, 'cf')
+        session = self.patient_cql_connection(node1)
+        self.create_ks(session, 'ks', 1)
+        self.create_cf(session, 'cf')
 
         key = 'wide'
 
         for x in xrange(1, 5001):
-            tools.insert_columns(self, cursor, key, 100, offset=x-1)
+            tools.insert_columns(self, session, key, 100, offset=x-1)
 
         for size in (10, 100, 1000):
             for x in xrange(1, (50001 - size) / size):
-                tools.query_columns(self, cursor, key, size, offset=x*size-1)
+                tools.query_columns(self, session, key, size, offset=x*size-1)
 
     @no_vnodes()
     def wide_slice_test(self):
@@ -125,8 +125,8 @@ class TestPutGet(Tester):
         node1.set_configuration_options(values={'initial_token': "b".encode('hex')  })
         cluster.start()
         time.sleep(.5)
-        cursor = self.patient_cql_connection(node1)
-        self.create_ks(cursor, 'ks', 1)
+        session = self.patient_cql_connection(node1)
+        self.create_ks(session, 'ks', 1)
 
         query = """
             CREATE TABLE test (
@@ -136,17 +136,17 @@ class TestPutGet(Tester):
                 PRIMARY KEY (k, column1)
             ) WITH COMPACT STORAGE;
         """
-        cursor.execute(query)
+        session.execute(query)
         time.sleep(.5)
 
         for i in xrange(10):
             key_num = str(i).zfill(2)
             for j in xrange(10):
                 stmt = "INSERT INTO test (k, column1, value) VALUES ('a%s', 'col%s', '%s')" % (key_num, j, j)
-                cursor.execute(stmt)
+                session.execute(stmt)
                 stmt = "INSERT INTO test (k, column1, value) VALUES ('b%s', 'col%s', '%s')" % (key_num, j, j)
-                cursor.execute(stmt)
-        cursor.shutdown()
+                session.execute(stmt)
+        session.shutdown()
 
         tc = ThriftConnection(node1, ks_name='ks', cf_name='test')
         tc.use_ks()

@@ -17,10 +17,10 @@ class SnapshotTester(Tester):
     def __init__(self, *args, **kwargs):
         Tester.__init__(self, *args, **kwargs)
 
-    def insert_rows(self, cursor, start, end):
-        insert_statement = cursor.prepare("INSERT INTO ks.cf (key, val) VALUES (?, 'asdf')")
+    def insert_rows(self, session, start, end):
+        insert_statement = session.prepare("INSERT INTO ks.cf (key, val) VALUES (?, 'asdf')")
         args = [(r,) for r in range(start, end)]
-        execute_concurrent_with_args(cursor, insert_statement, args, concurrency=20)
+        execute_concurrent_with_args(session, insert_statement, args, concurrency=20)
 
     def make_snapshot(self, node, ks, cf, name):
         debug("Making snapshot....")
@@ -69,30 +69,30 @@ class TestSnapshot(SnapshotTester):
         cluster = self.cluster
         cluster.populate(1).start()
         (node1,) = cluster.nodelist()
-        cursor = self.patient_cql_connection(node1)
-        self.create_ks(cursor, 'ks', 1)
-        cursor.execute('CREATE TABLE ks.cf ( key int PRIMARY KEY, val text);')
+        session = self.patient_cql_connection(node1)
+        self.create_ks(session, 'ks', 1)
+        session.execute('CREATE TABLE ks.cf ( key int PRIMARY KEY, val text);')
 
-        self.insert_rows(cursor, 0, 100)
+        self.insert_rows(session, 0, 100)
         snapshot_dir = self.make_snapshot(node1, 'ks', 'cf', 'basic')
 
         # Write more data after the snapshot, this will get thrown
         # away when we restore:
-        self.insert_rows(cursor, 100, 200)
-        rows = cursor.execute('SELECT count(*) from ks.cf')
+        self.insert_rows(session, 100, 200)
+        rows = session.execute('SELECT count(*) from ks.cf')
         self.assertEqual(rows[0][0], 200)
 
         # Drop the keyspace, make sure we have no data:
-        cursor.execute('DROP KEYSPACE ks')
-        self.create_ks(cursor, 'ks', 1)
-        cursor.execute('CREATE TABLE ks.cf ( key int PRIMARY KEY, val text);')
-        rows = cursor.execute('SELECT count(*) from ks.cf')
+        session.execute('DROP KEYSPACE ks')
+        self.create_ks(session, 'ks', 1)
+        session.execute('CREATE TABLE ks.cf ( key int PRIMARY KEY, val text);')
+        rows = session.execute('SELECT count(*) from ks.cf')
         self.assertEqual(rows[0][0], 0)
 
         # Restore data from snapshot:
         self.restore_snapshot(snapshot_dir, node1, 'ks', 'cf')
         node1.nodetool('refresh ks cf')
-        rows = cursor.execute('SELECT count(*) from ks.cf')
+        rows = session.execute('SELECT count(*) from ks.cf')
 
         # clean up
         debug("removing snapshot_dir: " + snapshot_dir)
@@ -172,11 +172,11 @@ class TestArchiveCommitlog(SnapshotTester):
 
         cluster.start()
 
-        cursor = self.patient_cql_connection(node1)
-        self.create_ks(cursor, 'ks', 1)
-        cursor.execute('CREATE TABLE ks.cf ( key bigint PRIMARY KEY, val text);')
+        session = self.patient_cql_connection(node1)
+        self.create_ks(session, 'ks', 1)
+        session.execute('CREATE TABLE ks.cf ( key bigint PRIMARY KEY, val text);')
         debug("Writing first 30,000 rows...")
-        self.insert_rows(cursor, 0, 30000)
+        self.insert_rows(session, 0, 30000)
         # Record when this first set of inserts finished:
         insert_cutoff_times = [time.gmtime()]
 
@@ -209,18 +209,18 @@ class TestArchiveCommitlog(SnapshotTester):
         try:
             # Write more data:
             debug("Writing second 30,000 rows...")
-            self.insert_rows(cursor, 30000, 60000)
+            self.insert_rows(session, 30000, 60000)
             node1.flush()
             time.sleep(10)
             # Record when this second set of inserts finished:
             insert_cutoff_times.append(time.gmtime())
 
             debug("Writing final 5,000 rows...")
-            self.insert_rows(cursor, 60000, 65000)
+            self.insert_rows(session, 60000, 65000)
             # Record when the third set of inserts finished:
             insert_cutoff_times.append(time.gmtime())
 
-            rows = cursor.execute('SELECT count(*) from ks.cf')
+            rows = session.execute('SELECT count(*) from ks.cf')
             # Make sure we have the same amount of rows as when we snapshotted:
             self.assertEqual(rows[0][0], 65000)
 
@@ -272,10 +272,10 @@ class TestArchiveCommitlog(SnapshotTester):
 
             cluster.start(wait_for_binary_proto=True)
 
-            cursor = self.patient_cql_connection(node1)
+            session = self.patient_cql_connection(node1)
             node1.nodetool('refresh ks cf')
 
-            rows = cursor.execute('SELECT count(*) from ks.cf')
+            rows = session.execute('SELECT count(*) from ks.cf')
             # Make sure we have the same amount of rows as when we snapshotted:
             self.assertEqual(rows[0][0], 30000)
 
@@ -300,8 +300,8 @@ class TestArchiveCommitlog(SnapshotTester):
             node1.nodetool('flush')
             node1.nodetool('compact')
 
-            cursor = self.patient_cql_connection(node1)
-            rows = cursor.execute('SELECT count(*) from ks.cf')
+            session = self.patient_cql_connection(node1)
+            rows = session.execute('SELECT count(*) from ks.cf')
             # Now we should have 30000 rows from the snapshot + 30000 rows
             # from the commitlog backups:
             if not restore_archived_commitlog:
