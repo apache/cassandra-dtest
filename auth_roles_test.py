@@ -1187,10 +1187,10 @@ class TestAuthRoles(Tester):
         conn = self.patient_cql_connection(node, user=user, password=password)
         return conn
 
-    def assert_permissions_listed(self, expected, cursor, query):
-        rows = cursor.execute(query)
+    def assert_permissions_listed(self, expected, session, query):
+        rows = session.execute(query)
         perms = [(str(r.role), str(r.resource), str(r.permission)) for r in rows]
         self.assertEqual(sorted(expected), sorted(perms))
 
-    def assert_no_permissions(self, cursor, query):
-        assert cursor.execute(query) is None
+    def assert_no_permissions(self, session, query):
+        assert session.execute(query) is None

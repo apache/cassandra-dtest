@@ -53,11 +53,11 @@ class TestReplaceAddress(Tester):
         else:
             node1.stress(['write', 'n=10000', '-schema', 'replication(factor=3)'])
 
-        cursor = self.patient_cql_connection(node1)
-        cursor.default_timeout = 45
+        session = self.patient_cql_connection(node1)
+        session.default_timeout = 45
         stress_table = 'keyspace1.standard1' if self.cluster.version() >= '2.1' else '"Keyspace1"."Standard1"'
         query = SimpleStatement('select * from %s LIMIT 1' % stress_table, consistency_level=ConsistencyLevel.THREE)
-        initialData = cursor.execute(query)
+        initialData = session.execute(query)
 
         #stop node, query should not work with consistency 3
         debug("Stopping node 3.")
@@ -67,7 +67,7 @@ class TestReplaceAddress(Tester):
         with self.assertRaises(NodeUnavailable):
             try:
                 query = SimpleStatement('select * from %s LIMIT 1' % stress_table, consistency_level=ConsistencyLevel.THREE)
-                cursor.execute(query)
+                session.execute(query)
             except (Unavailable, ReadTimeout):
                 raise NodeUnavailable("Node could not be queried.")
 
@@ -80,7 +80,7 @@ class TestReplaceAddress(Tester):
         #query should work again
         debug("Verifying querying works again.")
         query = SimpleStatement('select * from %s LIMIT 1' % stress_table, consistency_level=ConsistencyLevel.THREE)
-        finalData = cursor.execute(query)
+        finalData = session.execute(query)
         self.assertListEqual(initialData, finalData)
 
         debug("Verifying tokens migrated sucessfully")
@@ -153,10 +153,10 @@ class TestReplaceAddress(Tester):
         else:
             node1.stress(['write', 'n=10000', '-schema', 'replication(factor=3)'])
 
-        cursor = self.patient_cql_connection(node1)
+        session = self.patient_cql_connection(node1)
         stress_table = 'keyspace1.standard1' if self.cluster.version() >= '2.1' else '"Keyspace1"."Standard1"'
         query = SimpleStatement('select * from %s LIMIT 1' % stress_table, consistency_level=ConsistencyLevel.THREE)
-        initialData = cursor.execute(query)
+        initialData = session.execute(query)
 
         # stop node, query should not work with consistency 3
         debug("Stopping node 3.")
@@ -165,7 +165,7 @@ class TestReplaceAddress(Tester):
         debug("Testing node stoppage (query should fail).")
         with self.assertRaises(NodeUnavailable):
             try:
-                cursor.execute(query, timeout=30)
+                session.execute(query, timeout=30)
             except (Unavailable, ReadTimeout):
                 raise NodeUnavailable("Node could not be queried.")
 
@@ -177,7 +177,7 @@ class TestReplaceAddress(Tester):
 
         # query should work again
         debug("Verifying querying works again.")
-        finalData = cursor.execute(query)
+        finalData = session.execute(query)
         self.assertListEqual(initialData, finalData)
 
         debug("Verifying tokens migrated sucessfully")
@@ -197,7 +197,7 @@ class TestReplaceAddress(Tester):
         node4.start(wait_for_binary_proto=True)
 
         debug("Verifying querying works again.")
-        finalData = cursor.execute(query)
+        finalData = session.execute(query)
         self.assertListEqual(initialData, finalData)
 
         # we redo this check because restarting node should not result in tokens being moved again, ie number should be same
@@ -216,10 +216,10 @@ class TestReplaceAddress(Tester):
 
         node1.stress(['write', 'n=100000', '-schema', 'replication(factor=3)'])
 
-        cursor = self.patient_cql_connection(node1)
+        session = self.patient_cql_connection(node1)
         stress_table = 'keyspace1.standard1' if self.cluster.version() >= '2.1' else '"Keyspace1"."Standard1"'
         query = SimpleStatement('select * from %s LIMIT 1' % stress_table, consistency_level=ConsistencyLevel.THREE)
-        initialData = cursor.execute(query)
+        initialData = session.execute(query)
 
         node3.stop(gently=False)
 
@@ -245,14 +245,14 @@ class TestReplaceAddress(Tester):
         node4.watch_log_for("Listening for thrift clients...")
 
         # check if 2nd bootstrap succeeded
-        cursor = self.exclusive_cql_connection(node4)
-        rows = cursor.execute("SELECT bootstrapped FROM system.local WHERE key='local'")
+        session = self.exclusive_cql_connection(node4)
+        rows = session.execute("SELECT bootstrapped FROM system.local WHERE key='local'")
         assert len(rows) == 1
         assert rows[0][0] == 'COMPLETED', rows[0][0]
 
         #query should work again
         debug("Verifying querying works again.")
-        finalData = cursor.execute(query)
+        finalData = session.execute(query)
         self.assertListEqual(initialData, finalData)
 
     @since('2.2')
@@ -265,10 +265,10 @@ class TestReplaceAddress(Tester):
 
         node1.stress(['write', 'n=100000', '-schema', 'replication(factor=3)'])
 
-        cursor = self.patient_cql_connection(node1)
+        session = self.patient_cql_connection(node1)
         stress_table = 'keyspace1.standard1' if self.cluster.version() >= '2.1' else '"Keyspace1"."Standard1"'
         query = SimpleStatement('select * from %s LIMIT 1' % stress_table, consistency_level=ConsistencyLevel.THREE)
-        initialData = cursor.execute(query)
+        initialData = session.execute(query)
 
         node3.stop(gently=False)
 
@@ -299,12 +299,12 @@ class TestReplaceAddress(Tester):
         node4.watch_log_for("Listening for thrift clients...", from_mark=mark)
 
         # check if 2nd bootstrap succeeded
-        cursor = self.exclusive_cql_connection(node4)
-        rows = cursor.execute("SELECT bootstrapped FROM system.local WHERE key='local'")
+        session = self.exclusive_cql_connection(node4)
+        rows = session.execute("SELECT bootstrapped FROM system.local WHERE key='local'")
         assert len(rows) == 1
         assert rows[0][0] == 'COMPLETED', rows[0][0]
 
         #query should work again
         debug("Verifying querying works again.")
-        finalData = cursor.execute(query)
+        finalData = session.execute(query)
         self.assertListEqual(initialData, finalData)

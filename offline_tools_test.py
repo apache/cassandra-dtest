@@ -48,8 +48,8 @@ class TestOfflineTools(Tester):
 
         #test by writing small amount of data and flushing (all sstables should be level 0)
         cluster.start()
-        cursor = self.patient_cql_connection(node1)
-        cursor.execute("ALTER TABLE keyspace1.standard1 with compaction={'class': 'LeveledCompactionStrategy', 'sstable_size_in_mb':3};")
+        session = self.patient_cql_connection(node1)
+        session.execute("ALTER TABLE keyspace1.standard1 with compaction={'class': 'LeveledCompactionStrategy', 'sstable_size_in_mb':3};")
         if cluster.version() < "2.1":
             node1.stress(['-o', 'insert', '--num-keys=10000', '--replication-factor=3'])
         else:
@@ -129,8 +129,8 @@ class TestOfflineTools(Tester):
 
         #test by flushing (sstable should be level 0)
         cluster.start()
-        cursor = self.patient_cql_connection(node1)
-        cursor.execute("ALTER TABLE keyspace1.standard1 with compaction={'class': 'LeveledCompactionStrategy', 'sstable_size_in_mb':3};")
+        session = self.patient_cql_connection(node1)
+        session.execute("ALTER TABLE keyspace1.standard1 with compaction={'class': 'LeveledCompactionStrategy', 'sstable_size_in_mb':3};")
 
         node1.stress(['write', 'n=1000', '-schema', 'replication(factor=3)'])
 

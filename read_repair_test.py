@@ -27,10 +27,10 @@ class TestRepairDataSystemTable(Tester):
         self.node3 = self.cluster.nodelist()[2]
         self.session = self.patient_cql_connection(self.node1)
 
-        cursor = self.patient_exclusive_cql_connection(self.node1)
+        session = self.patient_exclusive_cql_connection(self.node1)
 
-        cursor.execute("CREATE KEYSPACE ks WITH replication = {'class': 'NetworkTopologyStrategy', 'datacenter1': 2}")
-        cursor.execute("""
+        session.execute("CREATE KEYSPACE ks WITH replication = {'class': 'NetworkTopologyStrategy', 'datacenter1': 2}")
+        session.execute("""
             CREATE TABLE ks.cf (
                 key    int primary key,
                 value  double,
@@ -39,18 +39,18 @@ class TestRepairDataSystemTable(Tester):
         """)
 
     def range_slice_query_with_tombstones_test(self):
-        cursor1 = self.patient_exclusive_cql_connection(self.node1)
+        session1 = self.patient_exclusive_cql_connection(self.node1)
 
         for n in range(1, 2500):
             str = "foo bar %d iuhiu iuhiu ihi" % n
-            cursor1.execute("INSERT INTO ks.cf (key, value, txt) VALUES (%d, %d, '%s')" % (n, n, str))
+            session1.execute("INSERT INTO ks.cf (key, value, txt) VALUES (%d, %d, '%s')" % (n, n, str))
 
         self.cluster.stop()
         self.cluster.start(wait_for_binary_proto=True)
-        cursor1 = self.patient_exclusive_cql_connection(self.node1)
+        session1 = self.patient_exclusive_cql_connection(self.node1)
 
         for n in range(1, 1000):
-            cursor1.execute("DELETE FROM ks.cf WHERE key = %d" % (n))
+            session1.execute("DELETE FROM ks.cf WHERE key = %d" % (n))
 
         time.sleep(1)
 
@@ -59,7 +59,7 @@ class TestRepairDataSystemTable(Tester):
         time.sleep(1)
 
         query = SimpleStatement("SELECT * FROM ks.cf LIMIT 100", consistency_level=ConsistencyLevel.LOCAL_QUORUM)
-        future = cursor1.execute_async(query, trace=True)
+        future = session1.execute_async(query, trace=True)
         future.result()
         trace = future.get_query_trace(max_wait=120)
         self.pprint_trace(trace)

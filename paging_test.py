@@ -181,9 +181,9 @@ class BasePagingTester(Tester):
         cluster = self.cluster
         cluster.populate(3).start()
         node1 = cluster.nodelist()[0]
-        cursor = self.patient_cql_connection(node1)
-        cursor.row_factory = dict_factory
-        return cursor
+        session = self.patient_cql_connection(node1)
+        session.row_factory = dict_factory
+        return session
 
 
 @since('2.0')
@@ -197,12 +197,12 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
         """
         No errors when a page is requested and query has no results.
         """
-        cursor = self.prepare()
-        self.create_ks(cursor, 'test_paging_size', 2)
-        cursor.execute("CREATE TABLE paging_test ( id int PRIMARY KEY, value text )")
+        session = self.prepare()
+        self.create_ks(session, 'test_paging_size', 2)
+        session.execute("CREATE TABLE paging_test ( id int PRIMARY KEY, value text )")
 
         # run a query that has no results and make sure it's exhausted
-        future = cursor.execute_async(
+        future = session.execute_async(
             SimpleStatement("select * from paging_test", fetch_size=100, consistency_level=CL.ALL)
         )
 
@@ -212,9 +212,9 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
         self.assertFalse(pf.has_more_pages)
 
     def test_with_less_results_than_page_size(self):
-        cursor = self.prepare()
-        self.create_ks(cursor, 'test_paging_size', 2)
-        cursor.execute("CREATE TABLE paging_test ( id int PRIMARY KEY, value text )")
+        session = self.prepare()
+        self.create_ks(session, 'test_paging_size', 2)
+        session.execute("CREATE TABLE paging_test ( id int PRIMARY KEY, value text )")
 
         data = """
             |id| value          |
@@ -225,9 +225,9 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
             |4 |and more testing|
             |5 |and more testing|
             """
-        expected_data = create_rows(data, cursor, 'paging_test', cl=CL.ALL, format_funcs={'id': int, 'value': unicode})
+        expected_data = create_rows(data, session, 'paging_test', cl=CL.ALL, format_funcs={'id': int, 'value': unicode})
 
-        future = cursor.execute_async(
+        future = session.execute_async(
             SimpleStatement("select * from paging_test", fetch_size=100, consistency_level=CL.ALL)
         )
         pf = PageFetcher(future)
@@ -237,9 +237,9 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
         self.assertEqual(len(expected_data), len(pf.all_data()))
 
     def test_with_more_results_than_page_size(self):
-        cursor = self.prepare()
-        self.create_ks(cursor, 'test_paging_size', 2)
-        cursor.execute("CREATE TABLE paging_test ( id int PRIMARY KEY, value text )")
+        session = self.prepare()
+        self.create_ks(session, 'test_paging_size', 2)
+        session.execute("CREATE TABLE paging_test ( id int PRIMARY KEY, value text )")
 
         data = """
             |id| value          |
@@ -254,9 +254,9 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
             |8 |and more testing|
             |9 |and more testing|
             """
-        expected_data = create_rows(data, cursor, 'paging_test', cl=CL.ALL, format_funcs={'id': int, 'value': unicode})
+        expected_data = create_rows(data, session, 'paging_test', cl=CL.ALL, format_funcs={'id': int, 'value': unicode})
 
-        future = cursor.execute_async(
+        future = session.execute_async(
             SimpleStatement("select * from paging_test", fetch_size=5, consistency_level=CL.ALL)
         )
 
@@ -270,9 +270,9 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
 
     @require(9775, broken_in='3.0')
     def test_with_equal_results_to_page_size(self):
-        cursor = self.prepare()
-        self.create_ks(cursor, 'test_paging_size', 2)
-        cursor.execute("CREATE TABLE paging_test ( id int PRIMARY KEY, value text )")
+        session = self.prepare()
+        self.create_ks(session, 'test_paging_size', 2)
+        session.execute("CREATE TABLE paging_test ( id int PRIMARY KEY, value text )")
 
         data = """
             |id| value          |
@@ -283,9 +283,9 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
             |4 |and more testing|
             |5 |and more testing|
             """
-        expected_data = create_rows(data, cursor, 'paging_test', cl=CL.ALL, format_funcs={'id': int, 'value': unicode})
+        expected_data = create_rows(data, session, 'paging_test', cl=CL.ALL, format_funcs={'id': int, 'value': unicode})
 
-        future = cursor.execute_async(
+        future = session.execute_async(
             SimpleStatement("select * from paging_test", fetch_size=5, consistency_level=CL.ALL)
         )
 
@@ -302,9 +302,9 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
         """
         If the page size isn't sent then the default fetch size is used.
         """
-        cursor = self.prepare()
-        self.create_ks(cursor, 'test_paging_size', 2)
-        cursor.execute("CREATE TABLE paging_test ( id uuid PRIMARY KEY, value text )")
+        session = self.prepare()
+        self.create_ks(session, 'test_paging_size', 2)
+        session.execute("CREATE TABLE paging_test ( id uuid PRIMARY KEY, value text )")
 
         def random_txt(text):
             return uuid.uuid4()
@@ -314,9 +314,9 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
                +--------+--------+
           *5001| [uuid] |testing |
             """
-        expected_data = create_rows(data, cursor, 'paging_test', cl=CL.ALL, format_funcs={'id': random_txt, 'value': unicode})
+        expected_data = create_rows(data, session, 'paging_test', cl=CL.ALL, format_funcs={'id': random_txt, 'value': unicode})
 
-        future = cursor.execute_async(
+        future = session.execute_async(
             SimpleStatement("select * from paging_test", consistency_level=CL.ALL)
         )
 
@@ -338,9 +338,9 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
         Paging over a single partition with ordering should work.
         (Spanning multiple partitions won't though, by design. See CASSANDRA-6722).
         """
-        cursor = self.prepare()
-        self.create_ks(cursor, 'test_paging', 2)
-        cursor.execute(
+        session = self.prepare()
+        self.create_ks(session, 'test_paging', 2)
+        session.execute(
             """
             CREATE TABLE paging_test (
                 id int,
@@ -364,9 +364,9 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
             |1 |j    |
             """
 
-        expected_data = create_rows(data, cursor, 'paging_test', cl=CL.ALL, format_funcs={'id': int, 'value': unicode})
+        expected_data = create_rows(data, session, 'paging_test', cl=CL.ALL, format_funcs={'id': int, 'value': unicode})
 
-        future = cursor.execute_async(
+        future = session.execute_async(
             SimpleStatement("select * from paging_test where id = 1 order by value asc", fetch_size=5, consistency_level=CL.ALL)
         )
 
@@ -381,15 +381,15 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
         # make sure we don't allow paging over multiple partitions with order because that's weird
         with self.assertRaisesRegexp(InvalidRequest, 'Cannot page queries with both ORDER BY and a IN restriction on the partition key'):
             stmt = SimpleStatement("select * from paging_test where id in (1,2) order by value asc", consistency_level=CL.ALL)
-            cursor.execute(stmt)
+            session.execute(stmt)
 
     def test_with_order_by_reversed(self):
         """"
         Paging over a single partition with ordering and a reversed clustering order.
         """
-        cursor = self.prepare()
-        self.create_ks(cursor, 'test_paging', 2)
-        cursor.execute(
+        session = self.prepare()
+        self.create_ks(session, 'test_paging', 2)
+        session.execute(
             """
             CREATE TABLE paging_test (
                 id int,
@@ -414,9 +414,9 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
             |1 |j    |j     |
             """
 
-        expected_data = create_rows(data, cursor, 'paging_test', cl=CL.ALL, format_funcs={'id': int, 'value': unicode, 'value2': unicode})
+        expected_data = create_rows(data, session, 'paging_test', cl=CL.ALL, format_funcs={'id': int, 'value': unicode, 'value2': unicode})
 
-        future = cursor.execute_async(
+        future = session.execute_async(
             SimpleStatement("select * from paging_test where id = 1 order by value asc", fetch_size=3, consistency_level=CL.ALL)
         )
 
@@ -429,7 +429,7 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
         self.assertEqual(pf.all_data(), expected_data)
 
         # drop the ORDER BY
-        future = cursor.execute_async(
+        future = session.execute_async(
             SimpleStatement("select * from paging_test where id = 1", fetch_size=3, consistency_level=CL.ALL)
         )
 
@@ -442,9 +442,9 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
         self.assertEqual(pf.all_data(), list(reversed(expected_data)))
 
     def test_with_limit(self):
-        cursor = self.prepare()
-        self.create_ks(cursor, 'test_paging_size', 2)
-        cursor.execute("CREATE TABLE paging_test ( id int, value text, PRIMARY KEY (id, value) )")
+        session = self.prepare()
+        self.create_ks(session, 'test_paging_size', 2)
+        session.execute("CREATE TABLE paging_test ( id int, value text, PRIMARY KEY (id, value) )")
 
         def random_txt(text):
             return unicode(uuid.uuid4())
@@ -459,7 +459,7 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
             *20| 5  | [random text] |
             *30| 6  | [random text] |
             """
-        expected_data = create_rows(data, cursor, 'paging_test', cl=CL.ALL, format_funcs={'id': int, 'value': random_txt})
+        expected_data = create_rows(data, session, 'paging_test', cl=CL.ALL, format_funcs={'id': int, 'value': random_txt})
 
         scenarios = [
             # using equals clause w/single partition
@@ -492,21 +492,21 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
         def handle_scenario(scenario):
             # using a limit and a fetch
             if scenario['limit'] and scenario['fetch']:
-                future = cursor.execute_async(
+                future = session.execute_async(
                     SimpleStatement(
                         "select * from paging_test {} limit {}".format(scenario['whereclause'], scenario['limit']),
                         fetch_size=scenario['fetch'], consistency_level=CL.ALL)
                 )
             # using a limit but not specifying a fetch_size
             elif scenario['limit'] and scenario['fetch'] is None:
-                future = cursor.execute_async(
+                future = session.execute_async(
                     SimpleStatement(
                         "select * from paging_test {} limit {}".format(scenario['whereclause'], scenario['limit']),
                         consistency_level=CL.ALL)
                 )
             # no limit but a fetch_size specified
             elif scenario['limit'] is None and scenario['fetch']:
-                future = cursor.execute_async(
+                future = session.execute_async(
                     SimpleStatement(
                         "select * from paging_test {}".format(scenario['whereclause']),
                         fetch_size=scenario['fetch'], consistency_level=CL.ALL)
@@ -525,9 +525,9 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
         run_scenarios(scenarios, handle_scenario, deferred_exceptions=(AssertionError,))
 
     def test_with_allow_filtering(self):
-        cursor = self.prepare()
-        self.create_ks(cursor, 'test_paging_size', 2)
-        cursor.execute("CREATE TABLE paging_test ( id int, value text, PRIMARY KEY (id, value) )")
+        session = self.prepare()
+        self.create_ks(session, 'test_paging_size', 2)
+        session.execute("CREATE TABLE paging_test ( id int, value text, PRIMARY KEY (id, value) )")
 
         data = """
             |id|value           |
@@ -542,9 +542,9 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
             |8 |and more testing|
             |9 |and more testing|
             """
-        create_rows(data, cursor, 'paging_test', cl=CL.ALL, format_funcs={'id': int, 'value': unicode})
+        create_rows(data, session, 'paging_test', cl=CL.ALL, format_funcs={'id': int, 'value': unicode})
 
-        future = cursor.execute_async(
+        future = session.execute_async(
             SimpleStatement("select * from paging_test where value = 'and more testing' ALLOW FILTERING", fetch_size=4, consistency_level=CL.ALL)
         )
 
@@ -575,9 +575,9 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
 @since('2.0')
 class TestPagingData(BasePagingTester, PageAssertionMixin):
     def test_paging_a_single_wide_row(self):
-        cursor = self.prepare()
-        self.create_ks(cursor, 'test_paging_size', 2)
-        cursor.execute("CREATE TABLE paging_test ( id int, value text, PRIMARY KEY (id, value) )")
+        session = self.prepare()
+        self.create_ks(session, 'test_paging_size', 2)
+        session.execute("CREATE TABLE paging_test ( id int, value text, PRIMARY KEY (id, value) )")
 
         def random_txt(text):
             return unicode(uuid.uuid4())
@@ -587,9 +587,9 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
               +----+------------------------+
         *10000| 1  | [replaced with random] |
             """
-        expected_data = create_rows(data, cursor, 'paging_test', cl=CL.ALL, format_funcs={'id': int, 'value': random_txt})
+        expected_data = create_rows(data, session, 'paging_test', cl=CL.ALL, format_funcs={'id': int, 'value': random_txt})
 
-        future = cursor.execute_async(
+        future = session.execute_async(
             SimpleStatement("select * from paging_test where id = 1", fetch_size=3000, consistency_level=CL.ALL)
         )
 
@@ -601,9 +601,9 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         self.assertEqualIgnoreOrder(pf.all_data(), expected_data)
 
     def test_paging_across_multi_wide_rows(self):
-        cursor = self.prepare()
-        self.create_ks(cursor, 'test_paging_size', 2)
-        cursor.execute("CREATE TABLE paging_test ( id int, value text, PRIMARY KEY (id, value) )")
+        session = self.prepare()
+        self.create_ks(session, 'test_paging_size', 2)
+        session.execute("CREATE TABLE paging_test ( id int, value text, PRIMARY KEY (id, value) )")
 
         def random_txt(text):
             return unicode(uuid.uuid4())
@@ -614,9 +614,9 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
          *5000| 1  | [replaced with random] |
          *5000| 2  | [replaced with random] |
             """
-        expected_data = create_rows(data, cursor, 'paging_test', cl=CL.ALL, format_funcs={'id': int, 'value': random_txt})
+        expected_data = create_rows(data, session, 'paging_test', cl=CL.ALL, format_funcs={'id': int, 'value': random_txt})
 
-        future = cursor.execute_async(
+        future = session.execute_async(
             SimpleStatement("select * from paging_test where id in (1,2)", fetch_size=3000, consistency_level=CL.ALL)
         )
 
@@ -628,10 +628,10 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         self.assertEqualIgnoreOrder(pf.all_data(), expected_data)
 
     def test_paging_using_secondary_indexes(self):
-        cursor = self.prepare()
-        self.create_ks(cursor, 'test_paging_size', 2)
-        cursor.execute("CREATE TABLE paging_test ( id int, mybool boolean, sometext text, PRIMARY KEY (id, sometext) )")
-        cursor.execute("CREATE INDEX ON paging_test(mybool)")
+        session = self.prepare()
+        self.create_ks(session, 'test_paging_size', 2)
+        session.execute("CREATE TABLE paging_test ( id int, mybool boolean, sometext text, PRIMARY KEY (id, sometext) )")
+        session.execute("CREATE INDEX ON paging_test(mybool)")
 
         def random_txt(text):
             return unicode(uuid.uuid4())
@@ -648,11 +648,11 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
          *400| 4  | 0     | [random] |
             """
         all_data = create_rows(
-            data, cursor, 'paging_test', cl=CL.ALL,
+            data, session, 'paging_test', cl=CL.ALL,
             format_funcs={'id': int, 'mybool': bool_from_str_int, 'sometext': random_txt}
         )
 
-        future = cursor.execute_async(
+        future = session.execute_async(
             SimpleStatement("select * from paging_test where mybool = true", fetch_size=400, consistency_level=CL.ALL)
         )
 
@@ -673,14 +673,14 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         @jira_ticket CASSANDRA-8502.
         """
 
-        cursor = self.prepare()
-        self.create_ks(cursor, 'test_paging_static_cols', 2)
-        cursor.execute("CREATE TABLE test (a int, b int, c int, s1 int static, s2 int static, PRIMARY KEY (a, b))")
-        cursor.row_factory = named_tuple_factory
+        session = self.prepare()
+        self.create_ks(session, 'test_paging_static_cols', 2)
+        session.execute("CREATE TABLE test (a int, b int, c int, s1 int static, s2 int static, PRIMARY KEY (a, b))")
+        session.row_factory = named_tuple_factory
 
         for i in range(4):
             for j in range(4):
-                cursor.execute("INSERT INTO test (a, b, c, s1, s2) VALUES (%d, %d, %d, %d, %d)" % (i, j, j, 17, 42))
+                session.execute("INSERT INTO test (a, b, c, s1, s2) VALUES (%d, %d, %d, %d, %d)" % (i, j, j, 17, 42))
 
         selectors = (
             "*",
@@ -690,9 +690,9 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
             "a, b, c")
 
         for page_size in (2, 3, 4, 5, 15, 16, 17, 100):
-            cursor.default_fetch_size = page_size
+            session.default_fetch_size = page_size
             for selector in selectors:
-                results = list(cursor.execute("SELECT %s FROM test" % selector))
+                results = list(session.execute("SELECT %s FROM test" % selector))
                 self.assertEqual(16, len(results))
                 self.assertEqual([0] * 4 + [1] * 4 + [2] * 4 + [3] * 4, sorted([r.a for r in results]))
                 self.assertEqual([0, 1, 2, 3] * 4, [r.b for r in results])
@@ -704,9 +704,9 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
         # IN over the partitions
         for page_size in (2, 3, 4, 5, 15, 16, 17, 100):
-            cursor.default_fetch_size = page_size
+            session.default_fetch_size = page_size
             for selector in selectors:
-                results = list(cursor.execute("SELECT %s FROM test WHERE a IN (0, 1, 2, 3)" % selector))
+                results = list(session.execute("SELECT %s FROM test WHERE a IN (0, 1, 2, 3)" % selector))
                 self.assertEqual(16, len(results))
                 self.assertEqual([0] * 4 + [1] * 4 + [2] * 4 + [3] * 4, sorted([r.a for r in results]))
                 self.assertEqual([0, 1, 2, 3] * 4, [r.b for r in results])
@@ -718,12 +718,12 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
         # single partition
         for i in range(16):
-            cursor.execute("INSERT INTO test (a, b, c, s1, s2) VALUES (%d, %d, %d, %d, %d)" % (99, i, i, 17, 42))
+            session.execute("INSERT INTO test (a, b, c, s1, s2) VALUES (%d, %d, %d, %d, %d)" % (99, i, i, 17, 42))
 
         for page_size in (2, 3, 4, 5, 15, 16, 17, 100):
-            cursor.default_fetch_size = page_size
+            session.default_fetch_size = page_size
             for selector in selectors:
-                results = list(cursor.execute("SELECT %s FROM test WHERE a = 99" % selector))
+                results = list(session.execute("SELECT %s FROM test WHERE a = 99" % selector))
                 self.assertEqual(16, len(results))
                 self.assertEqual([99] * 16, [r.a for r in results])
                 self.assertEqual(range(16), [r.b for r in results])
@@ -735,9 +735,9 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
         # reversed
         for page_size in (2, 3, 4, 5, 15, 16, 17, 100):
-            cursor.default_fetch_size = page_size
+            session.default_fetch_size = page_size
             for selector in selectors:
-                results = list(cursor.execute("SELECT %s FROM test WHERE a = 99 ORDER BY b DESC" % selector))
+                results = list(session.execute("SELECT %s FROM test WHERE a = 99 ORDER BY b DESC" % selector))
                 self.assertEqual(16, len(results))
                 self.assertEqual([99] * 16, [r.a for r in results])
                 self.assertEqual(list(reversed(range(16))), [r.b for r in results])
@@ -749,9 +749,9 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
         # IN on clustering column
         for page_size in (2, 3, 4, 5, 15, 16, 17, 100):
-            cursor.default_fetch_size = page_size
+            session.default_fetch_size = page_size
             for selector in selectors:
-                results = list(cursor.execute("SELECT %s FROM test WHERE a = 99 AND b IN (3, 4, 8, 14, 15)" % selector))
+                results = list(session.execute("SELECT %s FROM test WHERE a = 99 AND b IN (3, 4, 8, 14, 15)" % selector))
                 self.assertEqual(5, len(results))
                 self.assertEqual([99] * 5, [r.a for r in results])
                 self.assertEqual([3, 4, 8, 14, 15], [r.b for r in results])
@@ -763,9 +763,9 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
         # reversed IN on clustering column
         for page_size in (2, 3, 4, 5, 15, 16, 17, 100):
-            cursor.default_fetch_size = page_size
+            session.default_fetch_size = page_size
             for selector in selectors:
-                results = list(cursor.execute("SELECT %s FROM test WHERE a = 99 AND b IN (3, 4, 8, 14, 15) ORDER BY b DESC" % selector))
+                results = list(session.execute("SELECT %s FROM test WHERE a = 99 AND b IN (3, 4, 8, 14, 15) ORDER BY b DESC" % selector))
                 self.assertEqual(5, len(results))
                 self.assertEqual([99] * 5, [r.a for r in results])
                 self.assertEqual(list(reversed([3, 4, 8, 14, 15])), [r.b for r in results])
@@ -777,9 +777,9 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
         # slice on clustering column with set start
         for page_size in (2, 3, 4, 5, 15, 16, 17, 100):
-            cursor.default_fetch_size = page_size
+            session.default_fetch_size = page_size
             for selector in selectors:
-                results = list(cursor.execute("SELECT %s FROM test WHERE a = 99 AND b > 3" % selector))
+                results = list(session.execute("SELECT %s FROM test WHERE a = 99 AND b > 3" % selector))
                 self.assertEqual(12, len(results))
                 self.assertEqual([99] * 12, [r.a for r in results])
                 self.assertEqual(range(4, 16), [r.b for r in results])
@@ -791,9 +791,9 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
         # reversed slice on clustering column with set finish
         for page_size in (2, 3, 4, 5, 15, 16, 17, 100):
-            cursor.default_fetch_size = page_size
+            session.default_fetch_size = page_size
             for selector in selectors:
-                results = list(cursor.execute("SELECT %s FROM test WHERE a = 99 AND b > 3 ORDER BY b DESC" % selector))
+                results = list(session.execute("SELECT %s FROM test WHERE a = 99 AND b > 3 ORDER BY b DESC" % selector))
                 self.assertEqual(12, len(results))
                 self.assertEqual([99] * 12, [r.a for r in results])
                 self.assertEqual(list(reversed(range(4, 16))), [r.b for r in results])
@@ -805,9 +805,9 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
         # slice on clustering column with set finish
         for page_size in (2, 3, 4, 5, 15, 16, 17, 100):
-            cursor.default_fetch_size = page_size
+            session.default_fetch_size = page_size
             for selector in selectors:
-                results = list(cursor.execute("SELECT %s FROM test WHERE a = 99 AND b < 14" % selector))
+                results = list(session.execute("SELECT %s FROM test WHERE a = 99 AND b < 14" % selector))
                 self.assertEqual(14, len(results))
                 self.assertEqual([99] * 14, [r.a for r in results])
                 self.assertEqual(range(14), [r.b for r in results])
@@ -819,9 +819,9 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
         # reversed slice on clustering column with set start
         for page_size in (2, 3, 4, 5, 15, 16, 17, 100):
-            cursor.default_fetch_size = page_size
+            session.default_fetch_size = page_size
             for selector in selectors:
-                results = list(cursor.execute("SELECT %s FROM test WHERE a = 99 AND b < 14 ORDER BY b DESC" % selector))
+                results = list(session.execute("SELECT %s FROM test WHERE a = 99 AND b < 14 ORDER BY b DESC" % selector))
                 self.assertEqual(14, len(results))
                 self.assertEqual([99] * 14, [r.a for r in results])
                 self.assertEqual(list(reversed(range(14))), [r.b for r in results])
@@ -833,9 +833,9 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
         # slice on clustering column with start and finish
         for page_size in (2, 3, 4, 5, 15, 16, 17, 100):
-            cursor.default_fetch_size = page_size
+            session.default_fetch_size = page_size
             for selector in selectors:
-                results = list(cursor.execute("SELECT %s FROM test WHERE a = 99 AND b > 3 AND b < 14" % selector))
+                results = list(session.execute("SELECT %s FROM test WHERE a = 99 AND b > 3 AND b < 14" % selector))
                 self.assertEqual(10, len(results))
                 self.assertEqual([99] * 10, [r.a for r in results])
                 self.assertEqual(range(4, 14), [r.b for r in results])
@@ -847,9 +847,9 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
         # reversed slice on clustering column with start and finish
         for page_size in (2, 3, 4, 5, 15, 16, 17, 100):
-            cursor.default_fetch_size = page_size
+            session.default_fetch_size = page_size
             for selector in selectors:
-                results = list(cursor.execute("SELECT %s FROM test WHERE a = 99 AND b > 3 AND b < 14 ORDER BY b DESC" % selector))
+                results = list(session.execute("SELECT %s FROM test WHERE a = 99 AND b > 3 AND b < 14 ORDER BY b DESC" % selector))
                 self.assertEqual(10, len(results))
                 self.assertEqual([99] * 10, [r.a for r in results])
                 self.assertEqual(list(reversed(range(4, 14))), [r.b for r in results])
@@ -861,10 +861,10 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
     @since('2.0.6')
     def test_paging_using_secondary_indexes_with_static_cols(self):
-        cursor = self.prepare()
-        self.create_ks(cursor, 'test_paging_size', 2)
-        cursor.execute("CREATE TABLE paging_test ( id int, s1 int static, s2 int static, mybool boolean, sometext text, PRIMARY KEY (id, sometext) )")
-        cursor.execute("CREATE INDEX ON paging_test(mybool)")
+        session = self.prepare()
+        self.create_ks(session, 'test_paging_size', 2)
+        session.execute("CREATE TABLE paging_test ( id int, s1 int static, s2 int static, mybool boolean, sometext text, PRIMARY KEY (id, sometext) )")
+        session.execute("CREATE INDEX ON paging_test(mybool)")
 
         def random_txt(text):
             return unicode(uuid.uuid4())
@@ -881,11 +881,11 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
          *400| 4  | 4  | 1  | 0     | [random] |
             """
         all_data = create_rows(
-            data, cursor, 'paging_test', cl=CL.ALL,
+            data, session, 'paging_test', cl=CL.ALL,
             format_funcs={'id': int, 'mybool': bool_from_str_int, 'sometext': random_txt, 's1': int, 's2': int}
         )
 
-        future = cursor.execute_async(
+        future = session.execute_async(
             SimpleStatement("select * from paging_test where mybool = true", fetch_size=400, consistency_level=CL.ALL)
         )
 
@@ -905,9 +905,9 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
     Tests concerned with paging when the queried dataset changes while pages are being retrieved.
     """
     def test_data_change_impacting_earlier_page(self):
-        cursor = self.prepare()
-        self.create_ks(cursor, 'test_paging_size', 2)
-        cursor.execute("CREATE TABLE paging_test ( id int, mytext text, PRIMARY KEY (id, mytext) )")
+        session = self.prepare()
+        self.create_ks(session, 'test_paging_size', 2)
+        session.execute("CREATE TABLE paging_test ( id int, mytext text, PRIMARY KEY (id, mytext) )")
 
         def random_txt(text):
             return unicode(uuid.uuid4())
@@ -918,10 +918,10 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
           *500| 1  | [random] |
           *500| 2  | [random] |
             """
-        expected_data = create_rows(data, cursor, 'paging_test', cl=CL.ALL, format_funcs={'id': int, 'mytext': random_txt})
+        expected_data = create_rows(data, session, 'paging_test', cl=CL.ALL, format_funcs={'id': int, 'mytext': random_txt})
 
         # get 501 rows so we have definitely got the 1st row of the second partition
-        future = cursor.execute_async(
+        future = session.execute_async(
             SimpleStatement("select * from paging_test where id in (1,2)", fetch_size=501, consistency_level=CL.ALL)
         )
 
@@ -930,7 +930,7 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
 
         # we got one page and should be done with the first partition (for id=1)
         # let's add another row for that first partition (id=1) and make sure it won't sneak into results
-        cursor.execute(SimpleStatement("insert into paging_test (id, mytext) values (1, 'foo')", consistency_level=CL.ALL))
+        session.execute(SimpleStatement("insert into paging_test (id, mytext) values (1, 'foo')", consistency_level=CL.ALL))
 
         pf.request_all()
         self.assertEqual(pf.pagecount(), 2)
@@ -939,9 +939,9 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
         self.assertEqualIgnoreOrder(pf.all_data(), expected_data)
 
     def test_data_change_impacting_later_page(self):
-        cursor = self.prepare()
-        self.create_ks(cursor, 'test_paging_size', 2)
-        cursor.execute("CREATE TABLE paging_test ( id int, mytext text, PRIMARY KEY (id, mytext) )")
+        session = self.prepare()
+        self.create_ks(session, 'test_paging_size', 2)
+        session.execute("CREATE TABLE paging_test ( id int, mytext text, PRIMARY KEY (id, mytext) )")
 
         def random_txt(text):
             return unicode(uuid.uuid4())
@@ -952,9 +952,9 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
           *500| 1  | [random] |
           *499| 2  | [random] |
             """
-        expected_data = create_rows(data, cursor, 'paging_test', cl=CL.ALL, format_funcs={'id': int, 'mytext': random_txt})
+        expected_data = create_rows(data, session, 'paging_test', cl=CL.ALL, format_funcs={'id': int, 'mytext': random_txt})
 
-        future = cursor.execute_async(
+        future = session.execute_async(
             SimpleStatement("select * from paging_test where id in (1,2)", fetch_size=500, consistency_level=CL.ALL)
         )
 
@@ -963,7 +963,7 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
 
         # we've already paged the first partition, but adding a row for the second (id=2)
         # should still result in the row being seen on the subsequent pages
-        cursor.execute(SimpleStatement("insert into paging_test (id, mytext) values (2, 'foo')", consistency_level=CL.ALL))
+        session.execute(SimpleStatement("insert into paging_test (id, mytext) values (2, 'foo')", consistency_level=CL.ALL))
 
         pf.request_all()
         self.assertEqual(pf.pagecount(), 2)
@@ -974,9 +974,9 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
         self.assertEqualIgnoreOrder(pf.all_data(), expected_data)
 
     def test_row_TTL_expiry_during_paging(self):
-        cursor = self.prepare()
-        self.create_ks(cursor, 'test_paging_size', 2)
-        cursor.execute("CREATE TABLE paging_test ( id int, mytext text, PRIMARY KEY (id, mytext) )")
+        session = self.prepare()
+        self.create_ks(session, 'test_paging_size', 2)
+        session.execute("CREATE TABLE paging_test ( id int, mytext text, PRIMARY KEY (id, mytext) )")
 
         def random_txt(text):
             return unicode(uuid.uuid4())
@@ -989,7 +989,7 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
             *300| 1  | [random] |
             *400| 2  | [random] |
             """,
-            cursor, 'paging_test', cl=CL.ALL, format_funcs={'id': int, 'mytext': random_txt}, postfix='USING TTL 10'
+            session, 'paging_test', cl=CL.ALL, format_funcs={'id': int, 'mytext': random_txt}, postfix='USING TTL 10'
         )
 
         # create rows without TTL
@@ -999,10 +999,10 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
                 +----+----------+
             *500| 3  | [random] |
             """,
-            cursor, 'paging_test', cl=CL.ALL, format_funcs={'id': int, 'mytext': random_txt}
+            session, 'paging_test', cl=CL.ALL, format_funcs={'id': int, 'mytext': random_txt}
         )
 
-        future = cursor.execute_async(
+        future = session.execute_async(
             SimpleStatement("select * from paging_test where id in (1,2,3)", fetch_size=300, consistency_level=CL.ALL)
         )
 
@@ -1018,9 +1018,9 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
         self.assertEqual(pf.num_results_all(), [300, 300, 200])
 
     def test_cell_TTL_expiry_during_paging(self):
-        cursor = self.prepare()
-        self.create_ks(cursor, 'test_paging_size', 2)
-        cursor.execute("""
+        session = self.prepare()
+        self.create_ks(session, 'test_paging_size', 2)
+        session.execute("""
             CREATE TABLE paging_test (
                 id int,
                 mytext text,
@@ -1040,10 +1040,10 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
             *500| 2  | [random] | foo       |  bar         |
             *500| 3  | [random] | foo       |  bar         |
             """,
-            cursor, 'paging_test', cl=CL.ALL, format_funcs={'id': int, 'mytext': random_txt}
+            session, 'paging_test', cl=CL.ALL, format_funcs={'id': int, 'mytext': random_txt}
         )
 
-        future = cursor.execute_async(
+        future = session.execute_async(
             SimpleStatement("select * from paging_test where id in (1,2,3)", fetch_size=500, consistency_level=CL.ALL)
         )
 
@@ -1062,7 +1062,7 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
                 """.format(id=_id, mytext=mytext),
                 consistency_level=CL.ALL
             )
-            cursor.execute(stmt)
+            session.execute(stmt)
 
         # check page two
         pf.request_one()
@@ -1086,9 +1086,9 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
         cluster = self.cluster
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
-        cursor = self.cql_connection(node1)
-        self.create_ks(cursor, 'test_paging_size', 1)
-        cursor.execute("CREATE TABLE paging_test ( id uuid, mytext text, PRIMARY KEY (id, mytext) )")
+        session = self.cql_connection(node1)
+        self.create_ks(session, 'test_paging_size', 1)
+        session.execute("CREATE TABLE paging_test ( id uuid, mytext text, PRIMARY KEY (id, mytext) )")
 
         def make_uuid(text):
             return uuid.uuid4()
@@ -1099,10 +1099,10 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
                   +---------+--------+
             *10000| [uuid]  | foo    |
             """,
-            cursor, 'paging_test', cl=CL.ALL, format_funcs={'id': make_uuid}
+            session, 'paging_test', cl=CL.ALL, format_funcs={'id': make_uuid}
         )
 
-        future = cursor.execute_async(
+        future = session.execute_async(
             SimpleStatement("select * from paging_test where mytext = 'foo' allow filtering", fetch_size=2000, consistency_level=CL.ALL)
         )
 
@@ -1126,9 +1126,9 @@ class TestPagingQueryIsolation(BasePagingTester, PageAssertionMixin):
         """
         Interleave some paged queries and make sure nothing bad happens.
         """
-        cursor = self.prepare()
-        self.create_ks(cursor, 'test_paging_size', 2)
-        cursor.execute("CREATE TABLE paging_test ( id int, mytext text, PRIMARY KEY (id, mytext) )")
+        session = self.prepare()
+        self.create_ks(session, 'test_paging_size', 2)
+        session.execute("CREATE TABLE paging_test ( id int, mytext text, PRIMARY KEY (id, mytext) )")
 
         def random_txt(text):
             return unicode(uuid.uuid4())
@@ -1147,7 +1147,7 @@ class TestPagingQueryIsolation(BasePagingTester, PageAssertionMixin):
           *5000| 9  | [random] |
           *5000| 10 | [random] |
             """
-        expected_data = create_rows(data, cursor, 'paging_test', cl=CL.ALL, format_funcs={'id': int, 'mytext': random_txt})
+        expected_data = create_rows(data, session, 'paging_test', cl=CL.ALL, format_funcs={'id': int, 'mytext': random_txt})
 
         stmts = [
             SimpleStatement("select * from paging_test where id in (1)", fetch_size=500, consistency_level=CL.ALL),
@@ -1166,7 +1166,7 @@ class TestPagingQueryIsolation(BasePagingTester, PageAssertionMixin):
         page_fetchers = []
 
         for stmt in stmts:
-            future = cursor.execute_async(stmt)
+            future = session.execute_async(stmt)
             page_fetchers.append(PageFetcher(future))
             # first page is auto-retrieved, so no need to request it
 
@@ -1212,8 +1212,8 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
 
     def setup_data(self):
 
-        self.create_ks(self.cursor, 'test_paging_size', 2)
-        self.cursor.execute("CREATE TABLE paging_test ( "
+        self.create_ks(self.session, 'test_paging_size', 2)
+        self.session.execute("CREATE TABLE paging_test ( "
                             "id int, mytext text, col1 int, col2 int, col3 int, "
                             "PRIMARY KEY (id, mytext) )")
 
@@ -1230,7 +1230,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
           *40| 5  | [random] | 5    | 5    | 5    |
         """
 
-        create_rows(data, self.cursor, 'paging_test', cl=CL.ALL,
+        create_rows(data, self.session, 'paging_test', cl=CL.ALL,
                     format_funcs={
                         'id': int,
                         'mytext': random_txt,
@@ -1244,7 +1244,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
         return pf.all_data()
 
     def get_page_fetcher(self):
-        future = self.cursor.execute_async(
+        future = self.session.execute_async(
             SimpleStatement("select * from paging_test where id in (1,2,3,4,5)", fetch_size=25,
                             consistency_level=CL.ALL)
         )
@@ -1269,11 +1269,11 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
 
     def test_single_partition_deletions(self):
         """Test single partition deletions """
-        self.cursor = self.prepare()
+        self.session = self.prepare()
         expected_data = self.setup_data()
 
         # Delete the a single partition at the beginning
-        self.cursor.execute(
+        self.session.execute(
             SimpleStatement("delete from paging_test where id = 1",
                             consistency_level=CL.ALL)
         )
@@ -1282,7 +1282,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
                                       [25, 25, 25, 25, 25, 25, 10])
 
         # Delete the a single partition in the middle
-        self.cursor.execute(
+        self.session.execute(
             SimpleStatement("delete from paging_test where id = 3",
                             consistency_level=CL.ALL)
         )
@@ -1290,7 +1290,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
         self.check_all_paging_results(expected_data, 5, [25, 25, 25, 25, 20])
 
         # Delete the a single partition at the end
-        self.cursor.execute(
+        self.session.execute(
             SimpleStatement("delete from paging_test where id = 5",
                             consistency_level=CL.ALL)
         )
@@ -1298,7 +1298,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
         self.check_all_paging_results(expected_data, 4, [25, 25, 25, 5])
 
         # Keep only the partition '2'
-        self.cursor.execute(
+        self.session.execute(
             SimpleStatement("delete from paging_test where id = 4",
                             consistency_level=CL.ALL)
         )
@@ -1307,11 +1307,11 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
 
     def test_multiple_partition_deletions(self):
         """Test multiple partition deletions """
-        self.cursor = self.prepare()
+        self.session = self.prepare()
         expected_data = self.setup_data()
 
         # Keep only the partition '1'
-        self.cursor.execute(
+        self.session.execute(
             SimpleStatement("delete from paging_test where id in (2,3,4,5)",
                             consistency_level=CL.ALL)
         )
@@ -1320,12 +1320,12 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
 
     def test_single_row_deletions(self):
         """Test single row deletions """
-        self.cursor = self.prepare()
+        self.session = self.prepare()
         expected_data = self.setup_data()
 
         # Delete the first row
         row = expected_data.pop(0)
-        self.cursor.execute(SimpleStatement(
+        self.session.execute(SimpleStatement(
             ("delete from paging_test where "
              "id = {} and mytext = '{}'".format(row['id'], row['mytext'])),
             consistency_level=CL.ALL)
@@ -1335,7 +1335,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
 
         # Delete a row in the middle
         row = expected_data.pop(100)
-        self.cursor.execute(SimpleStatement(
+        self.session.execute(SimpleStatement(
             ("delete from paging_test where "
              "id = {} and mytext = '{}'".format(row['id'], row['mytext'])),
             consistency_level=CL.ALL)
@@ -1345,7 +1345,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
 
         # Delete the last row
         row = expected_data.pop()
-        self.cursor.execute(SimpleStatement(
+        self.session.execute(SimpleStatement(
             ("delete from paging_test where "
              "id = {} and mytext = '{}'".format(row['id'], row['mytext'])),
             consistency_level=CL.ALL)
@@ -1356,7 +1356,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
         # Delete all the last page row by row
         rows = expected_data[-22:]
         for row in rows:
-            self.cursor.execute(SimpleStatement(
+            self.session.execute(SimpleStatement(
                 ("delete from paging_test where "
                  "id = {} and mytext = '{}'".format(row['id'], row['mytext'])),
                 consistency_level=CL.ALL)
@@ -1369,7 +1369,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
         """Test multiple row deletions.
            This test should be finished when CASSANDRA-6237 is done.
         """
-        self.cursor = self.prepare()
+        self.session = self.prepare()
         expected_data = self.setup_data()
 
         # Delete a bunch of rows
@@ -1377,7 +1377,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
         expected_data = expected_data[0:100] + expected_data[105:]
         in_condition = ','.join("'{}'".format(r['mytext']) for r in rows)
 
-        self.cursor.execute(SimpleStatement(
+        self.session.execute(SimpleStatement(
             ("delete from paging_test where "
              "id = {} and mytext in ({})".format(3, in_condition)),
             consistency_level=CL.ALL)
@@ -1387,7 +1387,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
 
     def test_single_cell_deletions(self):
         """Test single cell deletions """
-        self.cursor = self.prepare()
+        self.session = self.prepare()
         expected_data = self.setup_data()
 
         # Delete the first cell of some rows of the last partition
@@ -1397,7 +1397,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
                 r['col1'] = None
 
         for pkey in pkeys:
-            self.cursor.execute(SimpleStatement(
+            self.session.execute(SimpleStatement(
                 ("delete col1 from paging_test where id = 5 "
                  "and mytext = '{}'".format(pkey)),
                 consistency_level=CL.ALL))
@@ -1411,7 +1411,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
                 r['col2'] = None
 
         for pkey in pkeys:
-            self.cursor.execute(SimpleStatement(
+            self.session.execute(SimpleStatement(
                 ("delete col2 from paging_test where id = 1 "
                  "and mytext = '{}'".format(pkey)),
                 consistency_level=CL.ALL))
@@ -1425,7 +1425,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
                 r['col3'] = None
 
         for pkey in pkeys:
-            self.cursor.execute(SimpleStatement(
+            self.session.execute(SimpleStatement(
                 ("delete col3 from paging_test where id = 3 "
                  "and mytext = '{}'".format(pkey)),
                 consistency_level=CL.ALL))
@@ -1434,7 +1434,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
 
     def test_multiple_cell_deletions(self):
         """Test multiple cell deletions """
-        self.cursor = self.prepare()
+        self.session = self.prepare()
         expected_data = self.setup_data()
 
         # Delete the multiple cells of some rows of the second partition
@@ -1445,7 +1445,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
                 r['col2'] = None
 
         for pkey in pkeys:
-            self.cursor.execute(SimpleStatement(
+            self.session.execute(SimpleStatement(
                 ("delete col1, col2 from paging_test where id = 2 "
                  "and mytext = '{}'".format(pkey)),
                 consistency_level=CL.ALL))
@@ -1460,7 +1460,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
                 r['col3'] = None
 
         for pkey in pkeys:
-            self.cursor.execute(SimpleStatement(
+            self.session.execute(SimpleStatement(
                 ("delete col2, col3 from paging_test where id = 4 "
                  "and mytext = '{}'".format(pkey)),
                 consistency_level=CL.ALL))
@@ -1470,7 +1470,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
     @require(9831, broken_in='2.2')
     def test_ttl_deletions(self):
         """Test ttl deletions. Paging over a query that has only tombstones """
-        self.cursor = self.prepare()
+        self.session = self.prepare()
         data = self.setup_data()
 
         # Set TTL to all row
@@ -1479,7 +1479,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
                  "values ({}, '{}', {}, {}, {}) using ttl 3;").format(
                      row['id'], row['mytext'], row['col1'],
                      row['col2'], row['col3'])
-            self.cursor.execute(
+            self.session.execute(
                 SimpleStatement(s, consistency_level=CL.ALL)
             )
         time.sleep(5)
@@ -1492,7 +1492,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
         self.cluster.set_configuration_options(
             values={'tombstone_failure_threshold': 500}
         )
-        self.cursor = self.prepare()
+        self.session = self.prepare()
         node1, node2, node3 = self.cluster.nodelist()
 
         self.setup_data()
@@ -1500,14 +1500,14 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
         # Add more data
         values = map(lambda i: uuid.uuid4(), range(3000))
         for value in values:
-            self.cursor.execute(SimpleStatement(
+            self.session.execute(SimpleStatement(
                 "insert into paging_test (id, mytext, col1) values (1, '{}', null) ".format(
                     value
                 ),
                 consistency_level=CL.ALL
             ))
 
-        assert_invalid(self.cursor, SimpleStatement("select * from paging_test", fetch_size=1000, consistency_level=CL.ALL), expected=ReadTimeout)
+        assert_invalid(self.session, SimpleStatement("select * from paging_test", fetch_size=1000, consistency_level=CL.ALL), expected=ReadTimeout)
 
         failure_msg = ("Scanned over.* tombstones in test_paging_size."
                        "paging_test.* query aborted")

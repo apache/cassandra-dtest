@@ -15,19 +15,19 @@ class TestConfiguration(Tester):
 
         cluster.populate(1).start()
         node = cluster.nodelist()[0]
-        cursor = self.patient_cql_connection(node)
-        self.create_ks(cursor, 'ks', 1)
+        session = self.patient_cql_connection(node)
+        self.create_ks(session, 'ks', 1)
 
         create_table_query = "CREATE TABLE test_table (row varchar, name varchar, value int, PRIMARY KEY (row, name));"
         alter_chunk_len_query = "ALTER TABLE test_table WITH compression = {{'sstable_compression' : 'SnappyCompressor', 'chunk_length_kb' : {chunk_length}}};"
 
-        cursor.execute(create_table_query)
+        session.execute(create_table_query)
 
-        cursor.execute(alter_chunk_len_query.format(chunk_length=32))
-        self._check_chunk_length(cursor, 32)
+        session.execute(alter_chunk_len_query.format(chunk_length=32))
+        self._check_chunk_length(session, 32)
 
-        cursor.execute(alter_chunk_len_query.format(chunk_length=64))
-        self._check_chunk_length(cursor, 64)
+        session.execute(alter_chunk_len_query.format(chunk_length=64))
+        self._check_chunk_length(session, 64)
 
     @require(9560)
     def change_durable_writes_test(self):
@@ -92,8 +92,8 @@ class TestConfiguration(Tester):
         self.assertGreater(commitlog_size(node), init_size,
                            msg='ALTER KEYSPACE was not respected')
 
-    def _check_chunk_length(self, cursor, value):
-        result = cursor.cluster.metadata.keyspaces['ks'].tables['test_table'].as_cql_query()
+    def _check_chunk_length(self, session, value):
+        result = session.cluster.metadata.keyspaces['ks'].tables['test_table'].as_cql_query()
         # Now extract the param list
         params = ''
 

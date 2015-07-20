@@ -84,16 +84,16 @@ class TokenGenerator(Tester):
         return generated_tokens, session
 
     def _token_gen_test(self, nodes, randomPart=None):
-        generated_tokens, cursor = self.prepare(randomPart, nodes=nodes)
+        generated_tokens, session = self.prepare(randomPart, nodes=nodes)
         dc_tokens = generated_tokens[0]
 
         tokens = []
-        local_tokens = rows_to_list(cursor.execute("SELECT tokens FROM system.local"))[0];
+        local_tokens = rows_to_list(session.execute("SELECT tokens FROM system.local"))[0];
         self.assertEqual(local_tokens.__len__(), 1, "too many tokens for peer")
         for tok in local_tokens:
             tokens += tok
 
-        rows = rows_to_list(cursor.execute("SELECT tokens FROM system.peers"))
+        rows = rows_to_list(session.execute("SELECT tokens FROM system.peers"))
         self.assertEqual(rows.__len__(), nodes - 1)
         for row in rows:
             peer_tokens = row[0]

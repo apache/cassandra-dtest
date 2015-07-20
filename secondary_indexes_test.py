@@ -18,32 +18,32 @@ class TestSecondaryIndexes(Tester):
         cluster.populate(1).start()
         [node1] = cluster.nodelist()
 
-        cursor = self.patient_cql_connection(node1)
-        self.create_ks(cursor, 'ks', 1)
+        session = self.patient_cql_connection(node1)
+        self.create_ks(session, 'ks', 1)
 
         columns = {"password": "varchar", "gender": "varchar", "session_token": "varchar", "state": "varchar", "birth_year": "bigint"}
-        self.create_cf(cursor, 'users', columns=columns)
+        self.create_cf(session, 'users', columns=columns)
 
         # insert data
-        cursor.execute("INSERT INTO users (KEY, password, gender, state, birth_year) VALUES ('user1', 'ch@ngem3a', 'f', 'TX', 1968);")
-        cursor.execute("INSERT INTO users (KEY, password, gender, state, birth_year) VALUES ('user2', 'ch@ngem3b', 'm', 'CA', 1971);")
+        session.execute("INSERT INTO users (KEY, password, gender, state, birth_year) VALUES ('user1', 'ch@ngem3a', 'f', 'TX', 1968);")
+        session.execute("INSERT INTO users (KEY, password, gender, state, birth_year) VALUES ('user2', 'ch@ngem3b', 'm', 'CA', 1971);")
 
         # create index
-        cursor.execute("CREATE INDEX gender_key ON users (gender);")
-        cursor.execute("CREATE INDEX state_key ON users (state);")
-        cursor.execute("CREATE INDEX birth_year_key ON users (birth_year);")
+        session.execute("CREATE INDEX gender_key ON users (gender);")
+        session.execute("CREATE INDEX state_key ON users (state);")
+        session.execute("CREATE INDEX birth_year_key ON users (birth_year);")
 
         # insert data
-        cursor.execute("INSERT INTO users (KEY, password, gender, state, birth_year) VALUES ('user3', 'ch@ngem3c', 'f', 'FL', 1978);")
-        cursor.execute("INSERT INTO users (KEY, password, gender, state, birth_year) VALUES ('user4', 'ch@ngem3d', 'm', 'TX', 1974);")
+        session.execute("INSERT INTO users (KEY, password, gender, state, birth_year) VALUES ('user3', 'ch@ngem3c', 'f', 'FL', 1978);")
+        session.execute("INSERT INTO users (KEY, password, gender, state, birth_year) VALUES ('user4', 'ch@ngem3d', 'm', 'TX', 1974);")
 
-        result = cursor.execute("SELECT * FROM users;")
+        result = session.execute("SELECT * FROM users;")
         assert len(result) == 4, "Expecting 4 users, got" + str(result)
 
-        result = cursor.execute("SELECT * FROM users WHERE state='TX';")
+        result = session.execute("SELECT * FROM users WHERE state='TX';")
         assert len(result) == 2, "Expecting 2 users, got" + str(result)
 
-        result = cursor.execute("SELECT * FROM users WHERE state='CA';")
+        result = session.execute("SELECT * FROM users WHERE state='CA';")
         assert len(result) == 1, "Expecting 1 users, got" + str(result)
 
     @since('2.1')
@@ -57,16 +57,16 @@ class TestSecondaryIndexes(Tester):
         node1, node2, node3 = cluster.nodelist()
 
         conn = self.patient_cql_connection(node1)
-        cursor = conn
-        cursor.max_trace_wait = 120
-        cursor.execute("CREATE KEYSPACE ks WITH REPLICATION = {'class': 'SimpleStrategy', 'replication_factor': '1'};")
-        cursor.execute("CREATE TABLE ks.cf (a text PRIMARY KEY, b text);")
-        cursor.execute("CREATE INDEX b_index ON ks.cf (b);")
+        session = conn
+        session.max_trace_wait = 120
+        session.execute("CREATE KEYSPACE ks WITH REPLICATION = {'class': 'SimpleStrategy', 'replication_factor': '1'};")
+        session.execute("CREATE TABLE ks.cf (a text PRIMARY KEY, b text);")
+        session.execute("CREATE INDEX b_index ON ks.cf (b);")
         num_rows = 100
         for i in range(num_rows):
             indexed_value = i % (num_rows / 3)
             # use the same indexed value three times
-            cursor.execute("INSERT INTO ks.cf (a, b) VALUES ('%d', '%d');" % (i, indexed_value))
+            session.execute("INSERT INTO ks.cf (a, b) VALUES ('%d', '%d');" % (i, indexed_value))
 
         cluster.flush()
 
@@ -91,22 +91,22 @@ class TestSecondaryIndexes(Tester):
                 self.fail("Didn't find matching trace event")
 
         query = SimpleStatement("SELECT * FROM ks.cf WHERE b='1';")
-        result = cursor.execute(query, trace=True)
+        result = session.execute(query, trace=True)
         self.assertEqual(3, len(result))
         check_trace_events(query.trace)
 
         query = SimpleStatement("SELECT * FROM ks.cf WHERE b='1' LIMIT 100;")
-        result = cursor.execute(query, trace=True)
+        result = session.execute(query, trace=True)
         self.assertEqual(3, len(result))
         check_trace_events(query.trace)
 
         query = SimpleStatement("SELECT * FROM ks.cf WHERE b='1' LIMIT 3;")
-        result = cursor.execute(query, trace=True)
+        result = session.execute(query, trace=True)
         self.assertEqual(3, len(result))
         check_trace_events(query.trace)
 
         for limit in (1, 2):
-            result = cursor.execute("SELECT * FROM ks.cf WHERE b='1' LIMIT %d;" % (limit,))
+            result = session.execute("SELECT * FROM ks.cf WHERE b='1' LIMIT %d;" % (limit,))
             self.assertEqual(limit, len(result))
 
     @since('2.1')
@@ -122,28 +122,28 @@ class TestSecondaryIndexes(Tester):
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
         conn = self.patient_cql_connection(node1)
-        cursor = conn
+        session = conn
 
         #This only occurs when dropping and recreating with
         #the same name, so loop through this test a few times:
         for i in range(10):
             debug("round %s" % i)
             try:
-                cursor.execute("DROP KEYSPACE ks")
+                session.execute("DROP KEYSPACE ks")
             except ConfigurationException:
                 pass
 
-            self.create_ks(cursor, 'ks', 1)
-            cursor.execute("CREATE TABLE ks.cf (key text PRIMARY KEY, col1 text);")
-            cursor.execute("CREATE INDEX on ks.cf (col1);")
+            self.create_ks(session, 'ks', 1)
+            session.execute("CREATE TABLE ks.cf (key text PRIMARY KEY, col1 text);")
+            session.execute("CREATE INDEX on ks.cf (col1);")
 
             for r in range(10):
                 stmt = "INSERT INTO ks.cf (key, col1) VALUES ('%s','asdf');" % r
-                cursor.execute(stmt)
+                session.execute(stmt)
 
-            self.wait_for_schema_agreement(cursor)
+            self.wait_for_schema_agreement(session)
 
-            rows = cursor.execute("select count(*) from ks.cf WHERE col1='asdf'")
+            rows = session.execute("select count(*) from ks.cf WHERE col1='asdf'")
             count = rows[0][0]
             self.assertEqual(count, 10)
 
@@ -159,28 +159,28 @@ class TestSecondaryIndexes(Tester):
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
         conn = self.patient_cql_connection(node1)
-        cursor = conn
-        self.create_ks(cursor, 'ks', 1)
+        session = conn
+        self.create_ks(session, 'ks', 1)
 
         #This only occurs when dropping and recreating with
         #the same name, so loop through this test a few times:
         for i in range(10):
             debug("round %s" % i)
             try:
-                cursor.execute("DROP COLUMNFAMILY ks.cf")
+                session.execute("DROP COLUMNFAMILY ks.cf")
             except InvalidRequest:
                 pass
 
-            cursor.execute("CREATE TABLE ks.cf (key text PRIMARY KEY, col1 text);")
-            cursor.execute("CREATE INDEX on ks.cf (col1);")
+            session.execute("CREATE TABLE ks.cf (key text PRIMARY KEY, col1 text);")
+            session.execute("CREATE INDEX on ks.cf (col1);")
 
             for r in range(10):
                 stmt = "INSERT INTO ks.cf (key, col1) VALUES ('%s','asdf');" % r
-                cursor.execute(stmt)
+                session.execute(stmt)
 
-            self.wait_for_schema_agreement(cursor)
+            self.wait_for_schema_agreement(session)
 
-            rows = cursor.execute("select count(*) from ks.cf WHERE col1='asdf'")
+            rows = session.execute("select count(*) from ks.cf WHERE col1='asdf'")
             count = rows[0][0]
             self.assertEqual(count, 10)
 
@@ -195,49 +195,49 @@ class TestSecondaryIndexes(Tester):
         cluster.populate(1).start()
         node1 = cluster.nodelist()[0]
         conn = self.patient_cql_connection(node1)
-        cursor = conn
-        self.create_ks(cursor, 'ks', 1)
+        session = conn
+        self.create_ks(session, 'ks', 1)
 
         self.insert_row_with_oversize_value("CREATE TABLE %s(a int, b int, c text, PRIMARY KEY (a))",
                                             "CREATE INDEX ON %s(c)",
                                             "INSERT INTO %s (a, b, c) VALUES (0, 0, ?)",
-                                            cursor)
+                                            session)
 
         self.insert_row_with_oversize_value("CREATE TABLE %s(a int, b text, c int, PRIMARY KEY (a, b))",
                                             "CREATE INDEX ON %s(b)",
                                             "INSERT INTO %s (a, b, c) VALUES (0, ?, 0)",
-                                            cursor)
+                                            session)
 
         self.insert_row_with_oversize_value("CREATE TABLE %s(a text, b int, c int, PRIMARY KEY ((a, b)))",
                                             "CREATE INDEX ON %s(a)",
                                             "INSERT INTO %s (a, b, c) VALUES (?, 0, 0)",
-                                            cursor)
+                                            session)
 
         self.insert_row_with_oversize_value("CREATE TABLE %s(a int, b text, PRIMARY KEY (a)) WITH COMPACT STORAGE",
                                             "CREATE INDEX ON %s(b)",
                                             "INSERT INTO %s (a, b) VALUES (0, ?)",
-                                            cursor)
+                                            session)
 
-    def insert_row_with_oversize_value(self, create_table_cql, create_index_cql, insert_cql, cursor):
+    def insert_row_with_oversize_value(self, create_table_cql, create_index_cql, insert_cql, session):
         """ Validate two variations of the supplied insert statement, first
         as it is and then again transformed into a conditional statement
         """
         table_name = "table_" + str(int(round(time.time() * 1000)))
-        cursor.execute(create_table_cql % table_name)
-        cursor.execute(create_index_cql % table_name)
+        session.execute(create_table_cql % table_name)
+        session.execute(create_index_cql % table_name)
         value = "X" * 65536
-        self._assert_invalid_request(cursor, insert_cql % table_name, value)
-        self._assert_invalid_request(cursor, (insert_cql % table_name) + ' IF NOT EXISTS', value)
+        self._assert_invalid_request(session, insert_cql % table_name, value)
+        self._assert_invalid_request(session, (insert_cql % table_name) + ' IF NOT EXISTS', value)
 
-    def _assert_invalid_request(self, cursor, insert_cql, value):
+    def _assert_invalid_request(self, session, insert_cql, value):
         """ Perform two executions of the supplied statement, as a
         single statement and again as part of a batch
         """
-        prepared = cursor.prepare(insert_cql)
-        self._execute_and_fail(lambda: cursor.execute(prepared, [value]), insert_cql)
+        prepared = session.prepare(insert_cql)
+        self._execute_and_fail(lambda: session.execute(prepared, [value]), insert_cql)
         batch = BatchStatement()
         batch.add(prepared, [value])
-        self._execute_and_fail(lambda: cursor.execute(batch), insert_cql)
+        self._execute_and_fail(lambda: session.execute(batch), insert_cql)
 
     def _execute_and_fail(self, operation, cql_string):
         try:
@@ -248,12 +248,12 @@ class TestSecondaryIndexes(Tester):
         except InvalidRequest:
             pass
 
-    def wait_for_schema_agreement(self, cursor):
-        rows = cursor.execute("SELECT schema_version FROM system.local")
+    def wait_for_schema_agreement(self, session):
+        rows = session.execute("SELECT schema_version FROM system.local")
         local_version = rows[0]
 
         all_match = True
-        rows = cursor.execute("SELECT schema_version FROM system.peers")
+        rows = session.execute("SELECT schema_version FROM system.peers")
         for peer_version in rows:
             if peer_version != local_version:
                 all_match = False
@@ -263,7 +263,7 @@ class TestSecondaryIndexes(Tester):
             return
         else:
             time.sleep(0.10)
-            self.wait_for_schema_agreement(cursor)
+            self.wait_for_schema_agreement(session)
 
 
 class TestSecondaryIndexesOnCollections(Tester):
@@ -278,31 +278,31 @@ class TestSecondaryIndexesOnCollections(Tester):
         cluster = self.cluster
         cluster.populate(1).start()
         [node1] = cluster.nodelist()
-        cursor = self.patient_cql_connection(node1)
-        self.create_ks(cursor, 'list_index_search', 1)
+        session = self.patient_cql_connection(node1)
+        self.create_ks(session, 'list_index_search', 1)
 
         stmt = ("CREATE TABLE list_index_search.users ("
                "user_id uuid PRIMARY KEY,"
                "email text,"
                "uuids list<uuid>"
               ");")
-        cursor.execute(stmt)
+        session.execute(stmt)
 
         # no index present yet, make sure there's an error trying to query column
         stmt = ("SELECT * from list_index_search.users where uuids contains {some_uuid}"
             ).format(some_uuid=uuid.uuid4())
 
         if self.cluster.version() < "3":
-            assert_invalid(cursor, stmt, 'No secondary indexes on the restricted columns support the provided operators')
+            assert_invalid(session, stmt, 'No secondary indexes on the restricted columns support the provided operators')
         else:
-            assert_invalid(cursor, stmt, 'No supported secondary index found for the non primary key columns restrictions')
+            assert_invalid(session, stmt, 'No supported secondary index found for the non primary key columns restrictions')
 
         # add index and query again (even though there are no rows in the table yet)
         stmt = "CREATE INDEX user_uuids on list_index_search.users (uuids);"
-        cursor.execute(stmt)
+        session.execute(stmt)
 
         stmt = ("SELECT * from list_index_search.users where uuids contains {some_uuid}").format(some_uuid=uuid.uuid4())
-        row = cursor.execute(stmt)
+        row = session.execute(stmt)
         self.assertEqual(0, len(row))
 
         # add a row which doesn't specify data for the indexed column, and query again
@@ -310,20 +310,20 @@ class TestSecondaryIndexesOnCollections(Tester):
         stmt = ("INSERT INTO list_index_search.users (user_id, email)"
               "values ({user_id}, 'test@example.com')"
             ).format(user_id=user1_uuid)
-        cursor.execute(stmt)
+        session.execute(stmt)
 
         stmt = ("SELECT * from list_index_search.users where uuids contains {some_uuid}").format(some_uuid=uuid.uuid4())
-        row = cursor.execute(stmt)
+        row = session.execute(stmt)
         self.assertEqual(0, len(row))
 
         _id = uuid.uuid4()
         # alter the row to add a single item to the indexed list
         stmt = ("UPDATE list_index_search.users set uuids = [{id}] where user_id = {user_id}"
             ).format(id=_id, user_id=user1_uuid)
-        cursor.execute(stmt)
+        session.execute(stmt)
 
         stmt = ("SELECT * from list_index_search.users where uuids contains {some_uuid}").format(some_uuid=_id)
-        row = cursor.execute(stmt)
+        row = session.execute(stmt)
         self.assertEqual(1, len(row))
 
         # add a bunch of user records and query them back
@@ -339,7 +339,7 @@ class TestSecondaryIndexesOnCollections(Tester):
             stmt = ("INSERT INTO list_index_search.users (user_id, email, uuids)"
                   "values ({user_uuid}, '{prefix}@example.com', [{s_uuid}, {u_uuid}])"
                ).format(user_uuid=user_uuid, prefix=i, s_uuid=shared_uuid, u_uuid=unshared_uuid)
-            cursor.execute(stmt)
+            session.execute(stmt)
 
             log.append(
                 {'user_id': user_uuid,
@@ -349,7 +349,7 @@ class TestSecondaryIndexesOnCollections(Tester):
 
         # confirm there is now 50k rows with the 'shared' uuid above in the secondary index
         stmt = ("SELECT * from list_index_search.users where uuids contains {shared_uuid}").format(shared_uuid=shared_uuid)
-        rows = cursor.execute(stmt)
+        rows = session.execute(stmt)
         result = [row for row in rows]
         self.assertEqual(50000, len(result))
 
@@ -359,7 +359,7 @@ class TestSecondaryIndexesOnCollections(Tester):
         for log_entry in log[:1000]:
             stmt = ("SELECT user_id, email, uuids FROM list_index_search.users where uuids contains {unshared_uuid}"
                 ).format(unshared_uuid=log_entry['unshared_uuid'])
-            rows = cursor.execute(stmt)
+            rows = session.execute(stmt)
 
             self.assertEqual(1, len(rows))
 
@@ -378,47 +378,47 @@ class TestSecondaryIndexesOnCollections(Tester):
         cluster = self.cluster
         cluster.populate(1).start()
         [node1] = cluster.nodelist()
-        cursor = self.patient_cql_connection(node1)
-        self.create_ks(cursor, 'set_index_search', 1)
+        session = self.patient_cql_connection(node1)
+        self.create_ks(session, 'set_index_search', 1)
 
         stmt = ("CREATE TABLE set_index_search.users ("
                "user_id uuid PRIMARY KEY,"
                "email text,"
                "uuids set<uuid>);")
-        cursor.execute(stmt)
+        session.execute(stmt)
 
         # no index present yet, make sure there's an error trying to query column
         stmt = ("SELECT * from set_index_search.users where uuids contains {some_uuid}").format(some_uuid=uuid.uuid4())
         if self.cluster.version() < "3":
-            assert_invalid(cursor, stmt, 'No secondary indexes on the restricted columns support the provided operators')
+            assert_invalid(session, stmt, 'No secondary indexes on the restricted columns support the provided operators')
         else:
-            assert_invalid(cursor, stmt, 'No supported secondary index found for the non primary key columns restrictions')
+            assert_invalid(session, stmt, 'No supported secondary index found for the non primary key columns restrictions')
 
         # add index and query again (even though there are no rows in the table yet)
         stmt = "CREATE INDEX user_uuids on set_index_search.users (uuids);"
-        cursor.execute(stmt)
+        session.execute(stmt)
 
         stmt = ("SELECT * from set_index_search.users where uuids contains {some_uuid}").format(some_uuid=uuid.uuid4())
-        row = cursor.execute(stmt)
+        row = session.execute(stmt)
         self.assertEqual(0, len(row))
 
         # add a row which doesn't specify data for the indexed column, and query again
         user1_uuid = uuid.uuid4()
         stmt = ("INSERT INTO set_index_search.users (user_id, email) values ({user_id}, 'test@example.com')"
             ).format(user_id=user1_uuid)
-        cursor.execute(stmt)
+        session.execute(stmt)
 
         stmt = ("SELECT * from set_index_search.users where uuids contains {some_uuid}").format(some_uuid=uuid.uuid4())
-        row = cursor.execute(stmt)
+        row = session.execute(stmt)
         self.assertEqual(0, len(row))
 
         _id = uuid.uuid4()
         # alter the row to add a single item to the indexed set
         stmt = ("UPDATE set_index_search.users set uuids = {{{id}}} where user_id = {user_id}").format(id=_id, user_id=user1_uuid)
-        cursor.execute(stmt)
+        session.execute(stmt)
 
         stmt = ("SELECT * from set_index_search.users where uuids contains {some_uuid}").format(some_uuid=_id)
-        row = cursor.execute(stmt)
+        row = session.execute(stmt)
         self.assertEqual(1, len(row))
 
         # add a bunch of user records and query them back
@@ -434,7 +434,7 @@ class TestSecondaryIndexesOnCollections(Tester):
             stmt = ("INSERT INTO set_index_search.users (user_id, email, uuids)"
                   "values ({user_uuid}, '{prefix}@example.com', {{{s_uuid}, {u_uuid}}})"
                 ).format(user_uuid=user_uuid, prefix=i, s_uuid=shared_uuid, u_uuid=unshared_uuid)
-            cursor.execute(stmt)
+            session.execute(stmt)
 
             log.append(
                 {'user_id': user_uuid,
@@ -444,7 +444,7 @@ class TestSecondaryIndexesOnCollections(Tester):
 
         # confirm there is now 50k rows with the 'shared' uuid above in the secondary index
         stmt = ("SELECT * from set_index_search.users where uuids contains {shared_uuid}").format(shared_uuid=shared_uuid)
-        rows = cursor.execute(stmt)
+        rows = session.execute(stmt)
         result = [row for row in rows]
         self.assertEqual(50000, len(result))
 
@@ -454,7 +454,7 @@ class TestSecondaryIndexesOnCollections(Tester):
         for log_entry in log[:1000]:
             stmt = ("SELECT user_id, email, uuids FROM set_index_search.users where uuids contains {unshared_uuid}"
                 ).format(unshared_uuid=log_entry['unshared_uuid'])
-            rows = cursor.execute(stmt)
+            rows = session.execute(stmt)
 
             self.assertEqual(1, len(rows))
 
@@ -473,32 +473,32 @@ class TestSecondaryIndexesOnCollections(Tester):
         cluster = self.cluster
         cluster.populate(1).start()
         [node1] = cluster.nodelist()
-        cursor = self.patient_cql_connection(node1)
-        self.create_ks(cursor, 'map_index_search', 1)
+        session = self.patient_cql_connection(node1)
+        self.create_ks(session, 'map_index_search', 1)
 
         stmt = ("CREATE TABLE map_index_search.users ("
                "user_id uuid PRIMARY KEY,"
                "email text,"
                "uuids map<uuid, uuid>);")
-        cursor.execute(stmt)
+        session.execute(stmt)
 
         no_index_error = ('No secondary indexes on the restricted columns support the provided operators'
                           if self.cluster.version() < '3' else
                           'No supported secondary index found for the non primary key columns restrictions')
         # no index present yet, make sure there's an error trying to query column
         stmt = ("SELECT * from map_index_search.users where uuids contains {some_uuid}").format(some_uuid=uuid.uuid4())
-        assert_invalid(cursor, stmt, no_index_error)
+        assert_invalid(session, stmt, no_index_error)
 
         stmt = ("SELECT * from map_index_search.users where uuids contains key {some_uuid}"
             ).format(some_uuid=uuid.uuid4())
-        assert_invalid(cursor, stmt, no_index_error)
+        assert_invalid(session, stmt, no_index_error)
 
         # add index on keys and query again (even though there are no rows in the table yet)
         stmt = "CREATE INDEX user_uuids on map_index_search.users (KEYS(uuids));"
-        cursor.execute(stmt)
+        session.execute(stmt)
 
         stmt = "SELECT * from map_index_search.users where uuids contains key {some_uuid}".format(some_uuid=uuid.uuid4())
-        rows = cursor.execute(stmt)
+        rows = session.execute(stmt)
         self.assertEqual(0, len(rows))
 
         # add a row which doesn't specify data for the indexed column, and query again
@@ -506,10 +506,10 @@ class TestSecondaryIndexesOnCollections(Tester):
         stmt = ("INSERT INTO map_index_search.users (user_id, email)"
               "values ({user_id}, 'test@example.com')"
             ).format(user_id=user1_uuid)
-        cursor.execute(stmt)
+        session.execute(stmt)
 
         stmt = ("SELECT * from map_index_search.users where uuids contains key {some_uuid}").format(some_uuid=uuid.uuid4())
-        rows = cursor.execute(stmt)
+        rows = session.execute(stmt)
         self.assertEqual(0, len(rows))
 
         _id = uuid.uuid4()
@@ -517,10 +517,10 @@ class TestSecondaryIndexesOnCollections(Tester):
         # alter the row to add a single item to the indexed map
         stmt = ("UPDATE map_index_search.users set uuids = {{{id}:{user_id}}} where user_id = {user_id}"
             ).format(id=_id, user_id=user1_uuid)
-        cursor.execute(stmt)
+        session.execute(stmt)
 
         stmt = ("SELECT * from map_index_search.users where uuids contains key {some_uuid}").format(some_uuid=_id)
-        rows = cursor.execute(stmt)
+        rows = session.execute(stmt)
         self.assertEqual(1, len(rows))
 
         # add a bunch of user records and query them back
@@ -537,7 +537,7 @@ class TestSecondaryIndexesOnCollections(Tester):
             stmt = ("INSERT INTO map_index_search.users (user_id, email, uuids)"
                   "values ({user_uuid}, '{prefix}@example.com', {{{u_uuid1}:{u_uuid2}, {s_uuid}:{s_uuid}}})"
                 ).format(user_uuid=user_uuid, prefix=i, s_uuid=shared_uuid, u_uuid1=unshared_uuid1, u_uuid2=unshared_uuid2)
-            cursor.execute(stmt)
+            session.execute(stmt)
 
             log.append(
                 {'user_id': user_uuid,
@@ -549,7 +549,7 @@ class TestSecondaryIndexesOnCollections(Tester):
         # confirm there is now 50k rows with the 'shared' uuid above in the secondary index
         stmt = ("SELECT * from map_index_search.users where uuids contains key {shared_uuid}"
             ).format(shared_uuid=shared_uuid)
-        rows = cursor.execute(stmt)
+        rows = session.execute(stmt)
         result = [row for row in rows]
         self.assertEqual(50000, len(result))
 
@@ -559,7 +559,7 @@ class TestSecondaryIndexesOnCollections(Tester):
         for log_entry in log[:1000]:
             stmt = ("SELECT user_id, email, uuids FROM map_index_search.users where uuids contains key {unshared_uuid1}"
                 ).format(unshared_uuid1=log_entry['unshared_uuid1'])
-            row = cursor.execute(stmt)
+            row = session.execute(stmt)
 
             rows = self.assertEqual(1, len(row))
 
@@ -577,15 +577,15 @@ class TestSecondaryIndexesOnCollections(Tester):
             matching =  "Cannot create index on values\(uuids\): an index on keys\(uuids\) already exists and indexing a map on more than one dimension at the same time is not currently supported"
         else:
             matching =  "Cannot create index on uuids values, an index on uuids keys already exists and indexing a map on both keys and values at the same time is not currently supported"
-        assert_invalid(cursor, stmt, matching)
+        assert_invalid(session, stmt, matching)
 
         # since cannot have index on map keys and values remove current index on keys
         stmt = "DROP INDEX user_uuids;"
-        cursor.execute(stmt)
+        session.execute(stmt)
 
         # add index on values (will index rows added prior)
         stmt = "CREATE INDEX user_uids on map_index_search.users (uuids);"
-        cursor.execute(stmt)
+        session.execute(stmt)
 
         # shuffle the log in-place, and double-check a slice of records by querying the secondary index
         random.shuffle(log)
@@ -597,7 +597,7 @@ class TestSecondaryIndexesOnCollections(Tester):
             stmt = ("SELECT user_id, email, uuids FROM map_index_search.users where uuids contains {unshared_uuid2}"
                 ).format(unshared_uuid2=log_entry['unshared_uuid2'])
 
-            rows = cursor.execute(stmt)
+            rows = session.execute(stmt)
             self.assertEqual(1, len(rows))
 
             db_user_id, db_email, db_uuids = rows[0]
@@ -625,14 +625,14 @@ class TestUpgradeSecondaryIndexes(Tester):
         cluster.populate(1).start()
 
         [node1] = cluster.nodelist()
-        cursor = self.patient_cql_connection(node1)
-        self.create_ks(cursor, 'index_upgrade', 1)
-        cursor.execute("CREATE TABLE index_upgrade.table1 (k int PRIMARY KEY, v int)")
-        cursor.execute("CREATE INDEX ON index_upgrade.table1(v)")
-        cursor.execute("INSERT INTO index_upgrade.table1 (k,v) VALUES (0,0)")
+        session = self.patient_cql_connection(node1)
+        self.create_ks(session, 'index_upgrade', 1)
+        session.execute("CREATE TABLE index_upgrade.table1 (k int PRIMARY KEY, v int)")
+        session.execute("CREATE INDEX ON index_upgrade.table1(v)")
+        session.execute("INSERT INTO index_upgrade.table1 (k,v) VALUES (0,0)")
 
         query = "SELECT * FROM index_upgrade.table1 WHERE v=0"
-        assert_one(cursor, query, [0, 0])
+        assert_one(session, query, [0, 0])
 
         # Upgrade to the 2.1.x version
         node1.drain()
@@ -643,9 +643,9 @@ class TestUpgradeSecondaryIndexes(Tester):
         node1.start(wait_other_notice=True)
 
         [node1] = cluster.nodelist()
-        cursor = self.patient_cql_connection(node1)
+        session = self.patient_cql_connection(node1)
         debug(cluster.cassandra_version())
-        assert_one(cursor, query, [0, 0])
+        assert_one(session, query, [0, 0])
 
     def upgrade_to_version(self, tag, nodes=None):
         debug('Upgrading to ' + tag)

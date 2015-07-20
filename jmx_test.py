@@ -34,10 +34,10 @@ class TestJMX(Tester):
         except Exception, e:
             self.fail("Cfhistograms command failed: " + str(e))
 
-        cursor = self.patient_cql_connection(node1)
+        session = self.patient_cql_connection(node1)
 
-        cursor.execute("CREATE KEYSPACE test WITH REPLICATION = {'class':'SimpleStrategy', 'replication_factor':3}")
-        cursor.execute("CREATE TABLE test.tab(key int primary key, val int);")
+        session.execute("CREATE KEYSPACE test WITH REPLICATION = {'class':'SimpleStrategy', 'replication_factor':3}")
+        session.execute("CREATE TABLE test.tab(key int primary key, val int);")
 
         try:
             finalhistogram = node1.nodetool("cfhistograms test tab", capture_output=True)

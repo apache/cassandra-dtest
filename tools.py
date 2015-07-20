@@ -58,9 +58,9 @@ def insert_columns(tester, session, key, columns_count, consistency=ConsistencyL
     simple_query = SimpleStatement(query, consistency_level=consistency)
     session.execute(simple_query)
 
-def query_columns(tester, cursor, key, columns_count, consistency=ConsistencyLevel.QUORUM, offset=0):
+def query_columns(tester, session, key, columns_count, consistency=ConsistencyLevel.QUORUM, offset=0):
     query = SimpleStatement('SELECT c, v FROM cf WHERE key=\'k%s\' AND c >= \'c%06d\' AND c <= \'c%06d\'' % (key, offset, columns_count+offset-1), consistency_level=consistency)
-    res = cursor.execute(query)
+    res = session.execute(query)
     assert len(res) == columns_count, "%s != %s (%s-%s)" % (len(res), columns_count, offset, columns_count+offset-1)
     for i in xrange(0, columns_count):
         assert res[i][1] == 'value%d' % (i+offset)
@@ -83,40 +83,40 @@ def retry_till_success(fun, *args, **kwargs):
 # Simple puts and get (on one row), testing both reads by names and by slice,
 # with overwrites and flushes between inserts to make sure we hit multiple
 # sstables on reads
-def putget(cluster, cursor, cl=ConsistencyLevel.QUORUM):
+def putget(cluster, session, cl=ConsistencyLevel.QUORUM):
 
-    _put_with_overwrite(cluster, cursor, 1, cl)
+    _put_with_overwrite(cluster, session, 1, cl)
 
     # reads by name
     ks = [ "\'c%02d\'" % i for i in xrange(0, 100) ]
     # We do not support proper IN queries yet
     #if cluster.version() >= "1.2":
-    #    cursor.execute('SELECT * FROM cf USING CONSISTENCY %s WHERE key=\'k0\' AND c IN (%s)' % (cl, ','.join(ks)))
+    #    session.execute('SELECT * FROM cf USING CONSISTENCY %s WHERE key=\'k0\' AND c IN (%s)' % (cl, ','.join(ks)))
     #else:
-    #    cursor.execute('SELECT %s FROM cf USING CONSISTENCY %s WHERE key=\'k0\'' % (','.join(ks), cl))
-    #_validate_row(cluster, cursor)
+    #    session.execute('SELECT %s FROM cf USING CONSISTENCY %s WHERE key=\'k0\'' % (','.join(ks), cl))
+    #_validate_row(cluster, session)
     # slice reads
     query = SimpleStatement('SELECT * FROM cf WHERE key=\'k0\'', consistency_level=cl)
-    rows = cursor.execute(query)
+    rows = session.execute(query)
     _validate_row(cluster, rows)
 
-def _put_with_overwrite(cluster, cursor, nb_keys, cl=ConsistencyLevel.QUORUM):
+def _put_with_overwrite(cluster, session, nb_keys, cl=ConsistencyLevel.QUORUM):
     for k in xrange(0, nb_keys):
         kvs = [ "UPDATE cf SET v=\'value%d\' WHERE key=\'k%s\' AND c=\'c%02d\'" % (i, k, i) for i in xrange(0, 100) ]
         query = SimpleStatement('BEGIN BATCH %s APPLY BATCH' % '; '.join(kvs), consistency_level=cl)
-        cursor.execute(query)
+        session.execute(query)
         time.sleep(.01)
     cluster.flush()
     for k in xrange(0, nb_keys):
         kvs = [ "UPDATE cf SET v=\'value%d\' WHERE key=\'k%s\' AND c=\'c%02d\'" % (i*4, k, i*2) for i in xrange(0, 50) ]
         query = SimpleStatement('BEGIN BATCH %s APPLY BATCH' % '; '.join(kvs), consistency_level=cl)
-        cursor.execute(query)
+        session.execute(query)
         time.sleep(.01)
     cluster.flush()
     for k in xrange(0, nb_keys):
         kvs = [ "UPDATE cf SET v=\'value%d\' WHERE key=\'k%s\' AND c=\'c%02d\'" % (i*20, k, i*5) for i in xrange(0, 20) ]
         query = SimpleStatement('BEGIN BATCH %s APPLY BATCH' % '; '.join(kvs), consistency_level=cl)
-        cursor.execute(query)
+        session.execute(query)
         time.sleep(.01)
     cluster.flush()
 
@@ -132,12 +132,12 @@ def _validate_row(cluster, res):
 
 # Simple puts and range gets, with overwrites and flushes between inserts to
 # make sure we hit multiple sstables on reads
-def range_putget(cluster, cursor, cl=ConsistencyLevel.QUORUM):
+def range_putget(cluster, session, cl=ConsistencyLevel.QUORUM):
     keys = 100
 
-    _put_with_overwrite(cluster, cursor, keys, cl)
+    _put_with_overwrite(cluster, session, keys, cl)
 
-    paged_results = cursor.execute('SELECT * FROM cf LIMIT 10000000')
+    paged_results = session.execute('SELECT * FROM cf LIMIT 10000000')
     rows = [result for result in paged_results]
 
     assert len(rows) == keys * 100, len(rows)
