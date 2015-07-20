@@ -118,6 +118,7 @@ def make_branch_str(_tuple):
 
     return 'cassandra-{}.{}'.format(_tuple[0], _tuple[1])
 
+
 def sanitize_version(version):
     """
         Takes versions of the form cassandra-1.2, 2.0.10, or trunk.
@@ -129,6 +130,7 @@ def sanitize_version(version):
         return LooseVersion(make_ver_str(TRUNK_VER))
     else:
         return LooseVersion(version)
+
 
 def switch_jdks(version):
     version = sanitize_version(version)
@@ -248,7 +250,6 @@ class TestUpgradeThroughVersions(Tester):
                 self._check_counters()
                 self._check_select_count()
 
-
             # run custom post-upgrade callables
             for call in after_upgrade_call:
                 call()
@@ -263,7 +264,7 @@ class TestUpgradeThroughVersions(Tester):
         that are specified by *nodes*, otherwise ignore *nodes* specified
         and upgrade all nodes.
         """
-        debug('Upgrading {nodes} to {tag}'.format(nodes=[n.name for n in nodes] if nodes is not None else 'all nodes',tag=tag))
+        debug('Upgrading {nodes} to {tag}'.format(nodes=[n.name for n in nodes] if nodes is not None else 'all nodes', tag=tag))
         switch_jdks(tag)
         debug(os.environ['JAVA_HOME'])
         if not mixed_version:
@@ -346,7 +347,7 @@ class TestUpgradeThroughVersions(Tester):
             for x in self.row_values:
                 query = SimpleStatement("SELECT k,v FROM cf WHERE k=%d" % x, consistency_level=consistency_level)
                 result = session.execute(query)
-                k,v = result[0]
+                k, v = result[0]
                 self.assertEqual(x, k)
                 self.assertEqual(str(x), v)
 
@@ -388,7 +389,7 @@ class TestUpgradeThroughVersions(Tester):
                 expected_value = self.expected_counts[key1][key2]
 
                 query = SimpleStatement("SELECT c from countertable where k1='{key1}' and k2={key2};".format(key1=key1, key2=key2),
-                    consistency_level=ConsistencyLevel.ONE)
+                                        consistency_level=ConsistencyLevel.ONE)
                 results = session.execute(query)
 
                 if results is not None:
@@ -411,10 +412,9 @@ class TestUpgradeThroughVersions(Tester):
 
         if result is not None:
             actual_num_rows = result[0][0]
-            self.assertEqual(actual_num_rows, expected_num_rows, "SELECT COUNT(*) returned %s when expecting %s" % (actual_num_rows,expected_num_rows))
+            self.assertEqual(actual_num_rows, expected_num_rows, "SELECT COUNT(*) returned %s when expecting %s" % (actual_num_rows, expected_num_rows))
         else:
             self.fail("Count query did not return")
-
 
 
 class TestRandomPartitionerUpgrade(TestUpgradeThroughVersions):

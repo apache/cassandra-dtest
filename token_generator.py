@@ -9,6 +9,7 @@ from dtest import Tester, debug
 from tools import rows_to_list
 from cassandra.util import sortedset
 
+
 class TokenGenerator(Tester):
     """
     Basic tools/bin/token-generator test.
@@ -134,10 +135,10 @@ class TokenGenerator(Tester):
 
     def _multi_dc_tokens(self, random=None):
         t_min = 0
-        t_max = 1<<127
+        t_max = 1 << 127
         if random is None or not random:
-            t_min = -1<<63
-            t_max = 1<<63
+            t_min = -1 << 63
+            t_max = 1 << 63
         for dc_nodes in self.dc_nodes_combinations:
             all_tokens = sortedset()
             node_count = 0

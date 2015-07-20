@@ -1,11 +1,14 @@
 from dtest import Tester, debug
 from tools import since
-import subprocess, tempfile, os
+import os
+import subprocess
+import tempfile
+
 
 @since('2.2')
 class TestValidation(Tester):
 
-    __test__= False
+    __test__ = False
 
     def __init__(self, *args, **kwargs):
         kwargs['cluster_options'] = {'start_rpc': 'true'}
@@ -26,7 +29,7 @@ class TestValidation(Tester):
         Writes data via stress. Should write exact data expected by stress_read()
         """
         node.stress(['write', 'n=1M', '-mode', 'native', 'cql3', '-rate', 'threads=10',
-            '-pop', 'dist=UNIFORM(1..1M)', '-schema', 'compaction(strategy=%s)' % self.strategy])
+                     '-pop', 'dist=UNIFORM(1..1M)', '-schema', 'compaction(strategy=%s)' % self.strategy])
 
     def stress_read(self, node):
         """
@@ -37,7 +40,7 @@ class TestValidation(Tester):
         tmpfile = tempfile.mktemp()
         with open(tmpfile, 'w+') as tmp:
             node.stress(['read', 'n=1M', '-mode', 'native', 'cql3', '-rate', 'threads=10', '-pop', 'dist=UNIFORM(1..1M)'],
-                stdout=tmp, stderr=subprocess.STDOUT)
+                        stdout=tmp, stderr=subprocess.STDOUT)
         return tmpfile
 
     def validate_stress_output(self, outfile, expect_failure=False, expect_errors=False):
@@ -108,7 +111,7 @@ class TestValidation(Tester):
         Deletes sstables from a node and checks for data loss. Assumes RF=1.
         """
         self.ignore_log_patterns = ['CompactionExecutor',
-            'java.lang.RuntimeException: Tried to hard link to file that does not exist']
+                                    'java.lang.RuntimeException: Tried to hard link to file that does not exist']
         cluster = self.prepare()
         node1, node2, node3 = cluster.nodelist()
         self.stress_write(node1)
@@ -117,9 +120,9 @@ class TestValidation(Tester):
         tmpfile = self.stress_read(node2)
         self.validate_stress_output(tmpfile, expect_failure=True, expect_errors=True)
 
-strategies = {'LeveledCompactionStrategy' : 'LCS', 'SizeTieredCompactionStrategy' : 'STCS',
-    'DateTieredCompactionStrategy' : 'DTCS'}
+strategies = {'LeveledCompactionStrategy': 'LCS', 'SizeTieredCompactionStrategy': 'STCS',
+              'DateTieredCompactionStrategy': 'DTCS'}
 
 for strategy in strategies.keys():
     cls_name = ('TestValidation_with_' + strategies[strategy])
-    vars()[cls_name] = type(cls_name, (TestValidation,), {'strategy': strategy, '__test__':True})
+    vars()[cls_name] = type(cls_name, (TestValidation,), {'strategy': strategy, '__test__': True})

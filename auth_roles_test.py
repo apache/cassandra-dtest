@@ -1,4 +1,5 @@
-import time, re
+import re
+import time
 
 from cassandra import AuthenticationFailed, Unauthorized, InvalidRequest
 from cassandra.cluster import NoHostAvailable
@@ -8,8 +9,8 @@ from dtest import Tester
 from assertions import assert_one, assert_all, assert_invalid
 from tools import since
 
-#Second value is superuser status
-#Third value is login status, See #7653 for explanation.
+# Second value is superuser status
+# Third value is login status, See #7653 for explanation.
 mike_role = ['mike', False, True, {}]
 role1_role = ['role1', False, False, {}]
 role2_role = ['role2', False, False, {}]
@@ -199,7 +200,6 @@ class TestAuthRoles(Tester):
         mike.execute("DROP ROLE non_superuser")
         mike.execute("DROP ROLE role1")
 
-
     def drop_role_removes_memberships_test(self):
         self.prepare()
         cassandra = self.get_session(user='cassandra', password='cassandra')
@@ -325,7 +325,6 @@ class TestAuthRoles(Tester):
         assert_all(mike, "LIST ROLES", [mike_role, role1_role, role2_role])
         cassandra.execute("GRANT DESCRIBE ON ALL ROLES TO mike")
         assert_all(mike, "LIST ROLES", [cassandra_role, mike_role, role1_role, role2_role])
-
 
     def grant_revoke_permissions_test(self):
         self.prepare()

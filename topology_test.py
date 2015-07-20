@@ -6,6 +6,7 @@ import time
 from ccmlib.node import TimeoutError
 from cassandra import ConsistencyLevel
 
+
 @no_vnodes()
 class TestTopology(Tester):
 
@@ -30,7 +31,7 @@ class TestTopology(Tester):
         escformat = '\\%s'
         if cluster.version() >= '2.1':
             escformat = '%s'
-        node1.move(escformat % balancing_tokens[0]) # can't assume 0 is balanced with m3p
+        node1.move(escformat % balancing_tokens[0])  # can't assume 0 is balanced with m3p
         node2.move(escformat % balancing_tokens[1])
         node3.move(escformat % balancing_tokens[2])
         time.sleep(1)
@@ -42,7 +43,7 @@ class TestTopology(Tester):
             query_c1c2(session, n, ConsistencyLevel.ONE)
 
         # Now the load should be basically even
-        sizes = [ node.data_size() for node in [node1, node2, node3] ]
+        sizes = [node.data_size() for node in [node1, node2, node3]]
 
         assert_almost_equal(sizes[0], sizes[1])
         assert_almost_equal(sizes[0], sizes[2])
@@ -63,7 +64,7 @@ class TestTopology(Tester):
             insert_c1c2(session, n, ConsistencyLevel.QUORUM)
 
         cluster.flush()
-        sizes = [ node.data_size() for node in cluster.nodelist() if node.is_running()]
+        sizes = [node.data_size() for node in cluster.nodelist() if node.is_running()]
         init_size = sizes[0]
         assert_almost_equal(*sizes)
 
@@ -77,7 +78,7 @@ class TestTopology(Tester):
         for n in xrange(0, 10000):
             query_c1c2(session, n, ConsistencyLevel.QUORUM)
 
-        sizes = [ node.data_size() for node in cluster.nodelist() if node.is_running() ]
+        sizes = [node.data_size() for node in cluster.nodelist() if node.is_running()]
         three_node_sizes = sizes
         assert_almost_equal(sizes[0], sizes[1])
         assert_almost_equal((2.0/3.0) * sizes[0], sizes[2])
@@ -94,7 +95,7 @@ class TestTopology(Tester):
             for n in xrange(0, 10000):
                 query_c1c2(session, n, ConsistencyLevel.QUORUM)
 
-            sizes = [ node.data_size() for node in cluster.nodelist() if node.is_running() ]
+            sizes = [node.data_size() for node in cluster.nodelist() if node.is_running()]
             assert_almost_equal(*sizes)
             assert_almost_equal(sizes[0], 2 * init_size)
 
@@ -109,7 +110,7 @@ class TestTopology(Tester):
             for n in xrange(0, 10000):
                 query_c1c2(session, n, ConsistencyLevel.QUORUM)
 
-            sizes = [ node.data_size() for node in cluster.nodelist() if node.is_running() ]
+            sizes = [node.data_size() for node in cluster.nodelist() if node.is_running()]
             # We should be back to the earlir 3 nodes situation
             for i in xrange(0, len(sizes)):
                 assert_almost_equal(sizes[i], three_node_sizes[i])
