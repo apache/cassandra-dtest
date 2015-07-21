@@ -22,16 +22,16 @@ class TestRepair(Tester):
                 stopped_nodes.append(node)
                 node.stop(wait_other_notice=True)
 
-        cursor = self.patient_cql_connection(node_to_check, 'ks')
-        result = cursor.execute("SELECT * FROM cf LIMIT %d" % (rows * 2))
+        session = self.patient_cql_connection(node_to_check, 'ks')
+        result = session.execute("SELECT * FROM cf LIMIT %d" % (rows * 2))
         self.assertEqual(len(result), rows, len(result))
 
         for k in found:
-            query_c1c2(cursor, k, ConsistencyLevel.ONE)
+            query_c1c2(session, k, ConsistencyLevel.ONE)
 
         for k in missings:
             query = SimpleStatement("SELECT c1, c2 FROM cf WHERE key='k%d'" % k, consistency_level=ConsistencyLevel.ONE)
-            res = cursor.execute(query)
+            res = session.execute(query)
             self.assertEqual(len(filter(lambda x: len(x) != 0, res)), 0, res)
 
         if restart:
@@ -89,20 +89,20 @@ class TestRepair(Tester):
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
 
-        cursor = self.patient_cql_connection(node1)
-        self.create_ks(cursor, 'ks', 3)
-        self.create_cf(cursor, 'cf', read_repair=0.0, columns={'c1': 'text', 'c2': 'text'})
+        session = self.patient_cql_connection(node1)
+        self.create_ks(session, 'ks', 3)
+        self.create_cf(session, 'cf', read_repair=0.0, columns={'c1': 'text', 'c2': 'text'})
 
         # Insert 1000 keys, kill node 3, insert 1 key, restart node 3, insert 1000 more keys
         debug("Inserting data...")
         for i in xrange(0, 1000):
-            insert_c1c2(cursor, i, ConsistencyLevel.ALL)
+            insert_c1c2(session, i, ConsistencyLevel.ALL)
         node3.flush()
         node3.stop()
-        insert_c1c2(cursor, 1000, ConsistencyLevel.TWO)
+        insert_c1c2(session, 1000, ConsistencyLevel.TWO)
         node3.start(wait_other_notice=True)
         for i in xrange(1001, 2001):
-            insert_c1c2(cursor, i, ConsistencyLevel.ALL)
+            insert_c1c2(session, i, ConsistencyLevel.ALL)
 
         cluster.flush()
 
@@ -155,9 +155,9 @@ class TestRepair(Tester):
         cluster.start()
         node1, node2 = cluster.nodelist()
 
-        cursor = self.patient_cql_connection(node1)
+        session = self.patient_cql_connection(node1)
         # create keyspace with RF=2 to be able to be repaired
-        self.create_ks(cursor, 'ks', 2)
+        self.create_ks(session, 'ks', 2)
         # we create two tables, one has low gc grace seconds so that the data
         # can be dropped during test (but we don't actually drop them).
         # the other has default gc.
@@ -172,7 +172,7 @@ class TestRepair(Tester):
             WITH gc_grace_seconds=1
             AND compaction = {'class': 'SizeTieredCompactionStrategy', 'enabled': 'false'};
         """
-        cursor.execute(query)
+        session.execute(query)
         time.sleep(.5)
         query = """
             CREATE TABLE cf2 (
@@ -183,7 +183,7 @@ class TestRepair(Tester):
             )
             WITH compaction = {'class': 'SizeTieredCompactionStrategy', 'enabled': 'false'};
         """
-        cursor.execute(query)
+        session.execute(query)
         time.sleep(.5)
 
         # take down node2, so that only node1 has gc-able data
@@ -193,17 +193,17 @@ class TestRepair(Tester):
             for i in xrange(0, 10):
                 for j in xrange(0, 1000):
                     query = SimpleStatement("INSERT INTO %s (key, c1, c2) VALUES ('k%d', 'v%d', 'value')" % (cf, i, j), consistency_level=ConsistencyLevel.ONE)
-                    cursor.execute(query)
+                    session.execute(query)
             node1.flush()
             # delete those data, half with row tombstone, and the rest with cell range tombstones
             for i in xrange(0, 5):
                 query = SimpleStatement("DELETE FROM %s WHERE key='k%d'" % (cf, i), consistency_level=ConsistencyLevel.ONE)
-                cursor.execute(query)
+                session.execute(query)
             node1.flush()
             for i in xrange(5, 10):
                 for j in xrange(0, 1000):
                     query = SimpleStatement("DELETE FROM %s WHERE key='k%d' AND c1='v%d'" % (cf, i, j), consistency_level=ConsistencyLevel.ONE)
-                    cursor.execute(query)
+                    session.execute(query)
             node1.flush()
 
         # sleep until gc grace seconds pass so that cf1 can be dropped
@@ -217,7 +217,7 @@ class TestRepair(Tester):
         for cf in ['cf1', 'cf2']:
             for i in xrange(0, 10):
                 query = SimpleStatement("SELECT c1, c2 FROM %s WHERE key='k%d'" % (cf, i), consistency_level=ConsistencyLevel.ALL)
-                res = cursor.execute(query)
+                res = session.execute(query)
                 self.assertEqual(len(filter(lambda x: len(x) != 0, res)), 0, res)
 
         # check log for no repair happened for gcable data
@@ -289,22 +289,22 @@ class TestRepair(Tester):
         version = cluster.version()
 
         [node1, node2, node3, node4] = cluster.nodelist()
-        cursor = self.patient_cql_connection(node1)
-        cursor.execute("CREATE KEYSPACE ks WITH replication = {'class': 'NetworkTopologyStrategy', 'dc1': 2, 'dc2': 1, 'dc3':1};")
-        cursor.execute("USE ks")
-        self.create_cf(cursor, 'cf', read_repair=0.0, columns={'c1': 'text', 'c2': 'text'})
+        session = self.patient_cql_connection(node1)
+        session.execute("CREATE KEYSPACE ks WITH replication = {'class': 'NetworkTopologyStrategy', 'dc1': 2, 'dc2': 1, 'dc3':1};")
+        session.execute("USE ks")
+        self.create_cf(session, 'cf', read_repair=0.0, columns={'c1': 'text', 'c2': 'text'})
 
         # Insert 1000 keys, kill node 3, insert 1 key, restart node 3, insert 1000 more keys
         debug("Inserting data...")
         for i in xrange(0, 1000):
-            insert_c1c2(cursor, i, ConsistencyLevel.ALL)
+            insert_c1c2(session, i, ConsistencyLevel.ALL)
         node2.flush()
         node2.stop()
-        insert_c1c2(cursor, 1000, ConsistencyLevel.THREE)
+        insert_c1c2(session, 1000, ConsistencyLevel.THREE)
         node2.start(wait_for_binary_proto=True, wait_other_notice=True)
         node1.watch_log_for_alive(node2)
         for i in xrange(1001, 2001):
-            insert_c1c2(cursor, i, ConsistencyLevel.ALL)
+            insert_c1c2(session, i, ConsistencyLevel.ALL)
 
         cluster.flush()
 

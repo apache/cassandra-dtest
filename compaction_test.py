@@ -26,21 +26,21 @@ class TestCompaction(Tester):
         cluster.populate(1).start(wait_for_binary_proto=True)
         [node1] = cluster.nodelist()
 
-        cursor = self.patient_cql_connection(node1)
-        self.create_ks(cursor, 'ks', 1)
+        session = self.patient_cql_connection(node1)
+        self.create_ks(session, 'ks', 1)
 
-        cursor.execute("create table ks.cf (key int PRIMARY KEY, val int) with compaction = {'class':'" + self.strategy + "'} and gc_grace_seconds = 30;")
+        session.execute("create table ks.cf (key int PRIMARY KEY, val int) with compaction = {'class':'" + self.strategy + "'} and gc_grace_seconds = 30;")
 
         for x in range(0, 100):
-            cursor.execute('insert into cf (key, val) values (' + str(x) + ',1)')
+            session.execute('insert into cf (key, val) values (' + str(x) + ',1)')
 
         node1.flush()
         for x in range(0, 10):
-            cursor.execute('delete from cf where key = ' + str(x))
+            session.execute('delete from cf where key = ' + str(x))
 
         node1.flush()
         for x in range(0, 10):
-            assert_none(cursor, 'select * from cf where key = ' + str(x))
+            assert_none(session, 'select * from cf where key = ' + str(x))
 
         json_path = tempfile.mkstemp(suffix='.json')
         jname = json_path[1]
@@ -99,15 +99,15 @@ class TestCompaction(Tester):
         cluster = self.cluster
         cluster.populate(1).start(wait_for_binary_proto=True)
         [node1] = cluster.nodelist()
-        cursor = self.patient_cql_connection(node1)
-        self.create_ks(cursor, 'ks', 1)
-        cursor.execute("create table cf (key int PRIMARY KEY, val int) with gc_grace_seconds = 0 and compaction= {'class':'" + self.strategy + "'}")
+        session = self.patient_cql_connection(node1)
+        self.create_ks(session, 'ks', 1)
+        session.execute("create table cf (key int PRIMARY KEY, val int) with gc_grace_seconds = 0 and compaction= {'class':'" + self.strategy + "'}")
 
         for x in range(0, 100):
-            cursor.execute('insert into cf (key, val) values (' + str(x) + ',1)')
+            session.execute('insert into cf (key, val) values (' + str(x) + ',1)')
         node1.flush()
         for x in range(0, 100):
-            cursor.execute('delete from cf where key = ' + str(x))
+            session.execute('delete from cf where key = ' + str(x))
 
         block_on_compaction_log(node1, ks='ks', table='cf')
 
@@ -135,14 +135,15 @@ class TestCompaction(Tester):
         cluster = self.cluster
         cluster.populate(1).start(wait_for_binary_proto=True)
         [node1] = cluster.nodelist()
-        cursor = self.patient_cql_connection(node1)
-        self.create_ks(cursor, 'ks', 1)
+        session = self.patient_cql_connection(node1)
+        self.create_ks(session, 'ks', 1)
         # max sstable age is 0.5 minute:
-        cursor.execute("create table cf (key int PRIMARY KEY, val int) with gc_grace_seconds = 0 and compaction= {'class':'DateTieredCompactionStrategy', 'max_sstable_age_days':0.00035, 'min_threshold':2}")
+        session.execute("""create table cf (key int PRIMARY KEY, val int) with gc_grace_seconds = 0
+            and compaction= {'class':'DateTieredCompactionStrategy', 'max_sstable_age_days':0.00035, 'min_threshold':2}""")
 
         # insert data
         for x in range(0, 300):
-            cursor.execute('insert into cf (key, val) values (' + str(x) + ',1) USING TTL 35')
+            session.execute('insert into cf (key, val) values (' + str(x) + ',1) USING TTL 35')
         node1.flush()
         time.sleep(40)
         expired_sstables = node1.get_sstables('ks', 'cf')
@@ -150,7 +151,7 @@ class TestCompaction(Tester):
         expired_sstable = expired_sstables[0]
         # write a new sstable to make DTCS check for expired sstables:
         for x in range(0, 100):
-            cursor.execute('insert into cf (key, val) values (%d, %d)' % (x, x))
+            session.execute('insert into cf (key, val) values (%d, %d)' % (x, x))
         node1.flush()
         time.sleep(5)
         assert expired_sstable not in node1.get_sstables('ks', 'cf')
@@ -201,26 +202,26 @@ class TestCompaction(Tester):
             [node1] = cluster.nodelist()
 
             for strat in strategies:
-                cursor = self.patient_cql_connection(node1)
-                self.create_ks(cursor, 'ks', 1)
+                session = self.patient_cql_connection(node1)
+                self.create_ks(session, 'ks', 1)
 
-                cursor.execute("create table ks.cf (key int PRIMARY KEY, val int) with gc_grace_seconds = 0 and compaction= {'class':'" + self.strategy + "'};")
+                session.execute("create table ks.cf (key int PRIMARY KEY, val int) with gc_grace_seconds = 0 and compaction= {'class':'" + self.strategy + "'};")
 
                 for x in range(0, 100):
-                    cursor.execute('insert into ks.cf (key, val) values (' + str(x) + ',1)')
+                    session.execute('insert into ks.cf (key, val) values (' + str(x) + ',1)')
 
                 node1.flush()
 
                 for x in range(0, 10):
-                    cursor.execute('delete from cf where key = ' + str(x))
+                    session.execute('delete from cf where key = ' + str(x))
 
-                cursor.execute("alter table ks.cf with compaction = {'class':'" + strat + "'};")
+                session.execute("alter table ks.cf with compaction = {'class':'" + strat + "'};")
 
                 for x in range(11, 100):
-                    assert_one(cursor, "select * from ks.cf where key =" + str(x), [x, 1])
+                    assert_one(session, "select * from ks.cf where key =" + str(x), [x, 1])
 
                 for x in range(0, 10):
-                    assert_none(cursor, 'select * from cf where key = ' + str(x))
+                    assert_none(session, 'select * from cf where key = ' + str(x))
 
                 node1.flush()
                 cluster.clear()
@@ -238,13 +239,13 @@ class TestCompaction(Tester):
         cluster.populate(1).start(wait_for_binary_proto=True)
         [node] = cluster.nodelist()
 
-        cursor = self.patient_cql_connection(node)
-        self.create_ks(cursor, 'ks', 1)
+        session = self.patient_cql_connection(node)
+        self.create_ks(session, 'ks', 1)
 
         mark = node.mark_log()
-        cursor.execute("CREATE TABLE large(userid text PRIMARY KEY, properties map<int, text>)")
+        session.execute("CREATE TABLE large(userid text PRIMARY KEY, properties map<int, text>)")
         for i in range(50000):  # ensures partition size larger than compaction_large_partition_warning_threshold_mb
-            cursor.execute("UPDATE ks.large SET properties[%i] = 'x' WHERE userid = 'user'" % i)
+            session.execute("UPDATE ks.large SET properties[%i] = 'x' WHERE userid = 'user'" % i)
 
         node.flush()
 

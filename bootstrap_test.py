@@ -138,8 +138,8 @@ class TestBootstrap(Tester):
         node3.watch_log_for("Starting listening for CQL clients")
         mark = node3.mark_log()
         # check if node3 is still in bootstrap mode
-        cursor = self.exclusive_cql_connection(node3)
-        rows = cursor.execute("SELECT bootstrapped FROM system.local WHERE key='local'")
+        session = self.exclusive_cql_connection(node3)
+        rows = session.execute("SELECT bootstrapped FROM system.local WHERE key='local'")
         assert len(rows) == 1
         assert rows[0][0] == 'IN_PROGRESS', rows[0][0]
         # bring back node1 and invoke nodetool bootstrap to resume bootstrapping
@@ -148,7 +148,7 @@ class TestBootstrap(Tester):
         # check if we skipped already retrieved ranges
         node3.watch_log_for("already available. Skipping streaming.")
         node3.watch_log_for("Resume complete", from_mark=mark)
-        rows = cursor.execute("SELECT bootstrapped FROM system.local WHERE key='local'")
+        rows = session.execute("SELECT bootstrapped FROM system.local WHERE key='local'")
         assert rows[0][0] == 'COMPLETED', rows[0][0]
 
     @since('2.2')
@@ -186,8 +186,8 @@ class TestBootstrap(Tester):
         node3.watch_log_for("Listening for thrift clients...", from_mark=mark)
 
         # check if 2nd bootstrap succeeded
-        cursor = self.exclusive_cql_connection(node3)
-        rows = cursor.execute("SELECT bootstrapped FROM system.local WHERE key='local'")
+        session = self.exclusive_cql_connection(node3)
+        rows = session.execute("SELECT bootstrapped FROM system.local WHERE key='local'")
         assert len(rows) == 1
         assert rows[0][0] == 'COMPLETED', rows[0][0]
 

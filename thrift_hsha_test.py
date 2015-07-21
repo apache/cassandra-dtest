@@ -39,9 +39,9 @@ class ThriftHSHATest(Tester):
         cluster.start(wait_for_binary_proto=True)
         (node1,) = cluster.nodelist()
 
-        cursor = self.patient_cql_connection(node1)
-        self.create_ks(cursor, 'test', 1)
-        cursor.execute("CREATE TABLE \"CF\" (key text PRIMARY KEY, val text) WITH COMPACT STORAGE;")
+        session = self.patient_cql_connection(node1)
+        self.create_ks(session, 'test', 1)
+        session.execute("CREATE TABLE \"CF\" (key text PRIMARY KEY, val text) WITH COMPACT STORAGE;")
         def make_connection():
             pool = pycassa.ConnectionPool('test', timeout=None)
             cf = pycassa.ColumnFamily(pool, 'CF')
@@ -91,10 +91,10 @@ class ThriftHSHATest(Tester):
         [n.start(use_jna=True) for n in nodes]
         debug("Cluster started.")
 
-        cursor = self.patient_cql_connection(node1)
-        self.create_ks(cursor, 'tmp', 2)
+        session = self.patient_cql_connection(node1)
+        self.create_ks(session, 'tmp', 2)
 
-        cursor.execute("""CREATE TABLE "CF" (
+        session.execute("""CREATE TABLE "CF" (
   key blob,
   column1 timeuuid,
   value blob,

@@ -152,10 +152,10 @@ class TestVariousNotifications(Tester):
         )
         self.cluster.populate(3).start()
         node1, node2, node3 = self.cluster.nodelist()
-        cursor = self.patient_cql_connection(node1)
+        session = self.patient_cql_connection(node1)
 
-        self.create_ks(cursor, 'test', 3)
-        cursor.execute(
+        self.create_ks(session, 'test', 3)
+        session.execute(
             "CREATE TABLE test ( "
             "id int, mytext text, col1 int, col2 int, col3 int, "
             "PRIMARY KEY (id, mytext) )"
@@ -164,7 +164,7 @@ class TestVariousNotifications(Tester):
         # Add data with tombstones
         values = map(lambda i: str(i), range(1000))
         for value in values:
-            cursor.execute(SimpleStatement(
+            session.execute(SimpleStatement(
                 "insert into test (id, mytext, col1) values (1, '{}', null) ".format(
                     value
                 ),
@@ -176,7 +176,7 @@ class TestVariousNotifications(Tester):
         @timed(25)
         def read_request_timeout_query():
             assert_invalid(
-                cursor, SimpleStatement("select * from test where id in (1,2,3,4,5)", consistency_level=CL.ALL),
+                session, SimpleStatement("select * from test where id in (1,2,3,4,5)", consistency_level=CL.ALL),
                 expected=ReadTimeout,
             )
 
@@ -195,7 +195,7 @@ class TestVariousNotifications(Tester):
         @timed(35)
         def range_request_timeout_query():
             assert_invalid(
-                cursor, SimpleStatement("select * from test", consistency_level=CL.ALL),
+                session, SimpleStatement("select * from test", consistency_level=CL.ALL),
                 expected=ReadTimeout,
             )
 

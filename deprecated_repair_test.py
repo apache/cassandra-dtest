@@ -25,16 +25,16 @@ class TestDeprecatedRepairAPI(Tester):
                 stopped_nodes.append(node)
                 node.stop(wait_other_notice=True)
 
-        cursor = self.patient_cql_connection(node_to_check, 'ks')
-        result = cursor.execute("SELECT * FROM cf LIMIT %d" % (rows * 2))
+        session = self.patient_cql_connection(node_to_check, 'ks')
+        result = session.execute("SELECT * FROM cf LIMIT %d" % (rows * 2))
         assert len(result) == rows, len(result)
 
         for k in found:
-            query_c1c2(cursor, k, ConsistencyLevel.ONE)
+            query_c1c2(session, k, ConsistencyLevel.ONE)
 
         for k in missings:
             query = SimpleStatement("SELECT c1, c2 FROM cf WHERE key='k%d'" % k, consistency_level=ConsistencyLevel.ONE)
-            res = cursor.execute(query)
+            res = session.execute(query)
             assert len(filter(lambda x: len(x) != 0, res)) == 0, res
 
         if restart:
@@ -156,12 +156,12 @@ class TestDeprecatedRepairAPI(Tester):
         remove_perf_disable_shared_mem(node1)
         cluster.start()
 
-        cursor = self.patient_cql_connection(node1)
-        self.create_ks(cursor, 'ks', 2)
-        self.create_cf(cursor, 'cf', read_repair=0.0, columns={'c1': 'text', 'c2': 'text'})
+        session = self.patient_cql_connection(node1)
+        self.create_ks(session, 'ks', 2)
+        self.create_cf(session, 'cf', read_repair=0.0, columns={'c1': 'text', 'c2': 'text'})
 
         for i in xrange(0, 1000):
-            insert_c1c2(cursor, i, ConsistencyLevel.ALL)
+            insert_c1c2(session, i, ConsistencyLevel.ALL)
 
         # Run repair
         mbean = make_mbean('db', 'StorageService')

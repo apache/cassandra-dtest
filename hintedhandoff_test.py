@@ -43,14 +43,14 @@ class TestHintedHandoffConfig(Tester):
         Test that if we stop one node the other one
         will store hints only when hinted handoff is enabled
         """
-        cursor = self.patient_exclusive_cql_connection(node1)
-        self.create_ks(cursor, 'ks', 2)
-        create_c1c2_table(self, cursor)
+        session = self.patient_exclusive_cql_connection(node1)
+        self.create_ks(session, 'ks', 2)
+        create_c1c2_table(self, session)
 
         node2.stop(wait_other_notice=True)
 
         for n in xrange(0, 100):
-            insert_c1c2(cursor, n, ConsistencyLevel.ONE)
+            insert_c1c2(session, n, ConsistencyLevel.ONE)
 
         log_mark = node1.mark_log()
         node2.start(wait_other_notice=True)
@@ -61,12 +61,12 @@ class TestHintedHandoffConfig(Tester):
         node1.stop(wait_other_notice=True)
 
         # Check node2 for all the keys that should have been delivered via HH if enabled or not if not enabled
-        cursor = self.patient_exclusive_cql_connection(node2, keyspace='ks')
+        session = self.patient_exclusive_cql_connection(node2, keyspace='ks')
         for n in xrange(0, 100):
             if enabled:
-                query_c1c2(cursor, n, ConsistencyLevel.ONE)
+                query_c1c2(session, n, ConsistencyLevel.ONE)
             else:
-                query_c1c2(cursor, n, ConsistencyLevel.ONE, tolerate_missing=True, must_be_missing=True)
+                query_c1c2(session, n, ConsistencyLevel.ONE, tolerate_missing=True, must_be_missing=True)
 
     def nodetool_test(self):
         """

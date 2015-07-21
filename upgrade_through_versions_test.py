@@ -313,17 +313,17 @@ class TestUpgradeThroughVersions(Tester):
                 vers[:curr_index] + ['***' + current_tag + '***'] + vers[curr_index + 1:]))
 
     def _create_schema(self):
-        cursor = self.patient_cql_connection(self.node2, protocol_version=1)
+        session = self.patient_cql_connection(self.node2, protocol_version=1)
 
-        cursor.execute("""CREATE KEYSPACE upgrade WITH replication = {'class':'SimpleStrategy',
+        session.execute("""CREATE KEYSPACE upgrade WITH replication = {'class':'SimpleStrategy',
             'replication_factor':2};
             """)
 
-        cursor.execute('use upgrade')
-        cursor.execute('CREATE TABLE cf ( k int PRIMARY KEY , v text )')
-        cursor.execute('CREATE INDEX vals ON cf (v)')
+        session.execute('use upgrade')
+        session.execute('CREATE TABLE cf ( k int PRIMARY KEY , v text )')
+        session.execute('CREATE INDEX vals ON cf (v)')
 
-        cursor.execute("""
+        session.execute("""
             CREATE TABLE countertable (
                 k1 text,
                 k2 int,
@@ -332,28 +332,28 @@ class TestUpgradeThroughVersions(Tester):
                 );""")
 
     def _write_values(self, num=100):
-        cursor = self.patient_cql_connection(self.node2, protocol_version=1)
-        cursor.execute("use upgrade")
+        session = self.patient_cql_connection(self.node2, protocol_version=1)
+        session.execute("use upgrade")
         for i in xrange(num):
             x = len(self.row_values) + 1
-            cursor.execute("UPDATE cf SET v='%d' WHERE k=%d" % (x, x))
+            session.execute("UPDATE cf SET v='%d' WHERE k=%d" % (x, x))
             self.row_values.add(x)
 
     def _check_values(self, consistency_level=ConsistencyLevel.ALL):
         for node in self.cluster.nodelist():
-            cursor = self.patient_cql_connection(node, protocol_version=1)
-            cursor.execute("use upgrade")
+            session = self.patient_cql_connection(node, protocol_version=1)
+            session.execute("use upgrade")
             for x in self.row_values:
                 query = SimpleStatement("SELECT k,v FROM cf WHERE k=%d" % x, consistency_level=consistency_level)
-                result = cursor.execute(query)
+                result = session.execute(query)
                 k,v = result[0]
                 self.assertEqual(x, k)
                 self.assertEqual(str(x), v)
 
     def _increment_counters(self, opcount=25000):
         debug("performing {opcount} counter increments".format(opcount=opcount))
-        cursor = self.patient_cql_connection(self.node2, protocol_version=1)
-        cursor.execute("use upgrade;")
+        session = self.patient_cql_connection(self.node2, protocol_version=1)
+        session.execute("use upgrade;")
 
         update_counter_query = ("UPDATE countertable SET c = c + 1 WHERE k1='{key1}' and k2={key2}")
 
@@ -368,7 +368,7 @@ class TestUpgradeThroughVersions(Tester):
             key2 = random.randint(1, 10)
             try:
                 query = SimpleStatement(update_counter_query.format(key1=key1, key2=key2), consistency_level=ConsistencyLevel.ALL)
-                cursor.execute(query)
+                session.execute(query)
             except WriteTimeout:
                 fail_count += 1
             else:
@@ -380,8 +380,8 @@ class TestUpgradeThroughVersions(Tester):
 
     def _check_counters(self):
         debug("Checking counter values...")
-        cursor = self.patient_cql_connection(self.node2, protocol_version=1)
-        cursor.execute("use upgrade;")
+        session = self.patient_cql_connection(self.node2, protocol_version=1)
+        session.execute("use upgrade;")
 
         for key1 in self.expected_counts.keys():
             for key2 in self.expected_counts[key1].keys():
@@ -389,7 +389,7 @@ class TestUpgradeThroughVersions(Tester):
 
                 query = SimpleStatement("SELECT c from countertable where k1='{key1}' and k2={key2};".format(key1=key1, key2=key2),
                     consistency_level=ConsistencyLevel.ONE)
-                results = cursor.execute(query)
+                results = session.execute(query)
 
                 if results is not None:
                     actual_value = results[0][0]
@@ -401,13 +401,13 @@ class TestUpgradeThroughVersions(Tester):
 
     def _check_select_count(self, consistency_level=ConsistencyLevel.ALL):
         debug("Checking SELECT COUNT(*)")
-        cursor = self.patient_cql_connection(self.node2, protocol_version=1)
-        cursor.execute("use upgrade;")
+        session = self.patient_cql_connection(self.node2, protocol_version=1)
+        session.execute("use upgrade;")
 
         expected_num_rows = len(self.row_values)
 
         countquery = SimpleStatement("SELECT COUNT(*) FROM cf;", consistency_level=consistency_level)
-        result = cursor.execute(countquery)
+        result = session.execute(countquery)
 
         if result is not None:
             actual_num_rows = result[0][0]
@@ -494,25 +494,25 @@ class PointToPointUpgradeBase(TestUpgradeThroughVersions):
         self.upgrade_scenario(populate=False, create_schema=False, after_upgrade_call=(self._bootstrap_new_node_multidc,))
 
     def _multidc_schema_create(self):
-        cursor = self.patient_cql_connection(self.cluster.nodelist()[0], protocol_version=1)
+        session = self.patient_cql_connection(self.cluster.nodelist()[0], protocol_version=1)
 
         if self.cluster.version() >= '1.2':
             # DDL for C* 1.2+
-            cursor.execute("""CREATE KEYSPACE upgrade WITH replication = {'class':'NetworkTopologyStrategy',
+            session.execute("""CREATE KEYSPACE upgrade WITH replication = {'class':'NetworkTopologyStrategy',
                 'dc1':1, 'dc2':1};
                 """)
         else:
             # DDL for C* 1.1
-            cursor.execute("""CREATE KEYSPACE upgrade WITH strategy_class = 'NetworkTopologyStrategy'
+            session.execute("""CREATE KEYSPACE upgrade WITH strategy_class = 'NetworkTopologyStrategy'
             AND strategy_options:'dc1':1
             AND strategy_options:'dc2':1;
             """)
 
-        cursor.execute('use upgrade')
-        cursor.execute('CREATE TABLE cf ( k int PRIMARY KEY , v text )')
-        cursor.execute('CREATE INDEX vals ON cf (v)')
+        session.execute('use upgrade')
+        session.execute('CREATE TABLE cf ( k int PRIMARY KEY , v text )')
+        session.execute('CREATE INDEX vals ON cf (v)')
 
-        cursor.execute("""
+        session.execute("""
             CREATE TABLE countertable (
                 k1 text,
                 k2 int,

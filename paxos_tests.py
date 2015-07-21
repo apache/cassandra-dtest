@@ -27,10 +27,10 @@ class TestPaxos(Tester):
         node1 = cluster.nodelist()[0]
         time.sleep(0.2)
 
-        cursor = self.patient_cql_connection(node1)
+        session = self.patient_cql_connection(node1)
         if create_keyspace:
-            self.create_ks(cursor, 'ks', rf)
-        return cursor
+            self.create_ks(session, 'ks', rf)
+        return session
 
     def replica_availability_test(self):
         """
@@ -94,17 +94,17 @@ class TestPaxos(Tester):
 
         verbose = False
 
-        cursor = self.prepare(nodes=3)
-        cursor.execute("CREATE TABLE test (k int, v int static, id int, PRIMARY KEY (k, id))")
-        cursor.execute("INSERT INTO test(k, v) VALUES (0, 0)")
+        session = self.prepare(nodes=3)
+        session.execute("CREATE TABLE test (k int, v int static, id int, PRIMARY KEY (k, id))")
+        session.execute("INSERT INTO test(k, v) VALUES (0, 0)")
 
         class Worker(Thread):
-            def __init__(self, wid, cursor, iterations, query):
+            def __init__(self, wid, session, iterations, query):
                 Thread.__init__(self)
                 self.wid = wid
                 self.iterations = iterations
                 self.query = query
-                self.cursor = cursor
+                self.session = session
                 self.errors = 0
                 self.retries = 0
 
@@ -116,7 +116,7 @@ class TestPaxos(Tester):
                     done = False
                     while not done:
                         try:
-                            res = self.cursor.execute(self.query, (prev+1, prev, self.wid))
+                            res = self.session.execute(self.query, (prev+1, prev, self.wid))
                             if verbose:
                                 print "[%3d] CAS %3d -> %3d (res: %s)" % (self.wid, prev, prev+1, str(res))
                             if res[0][0] is True:
@@ -147,7 +147,7 @@ class TestPaxos(Tester):
                     # Clean up for next iteration
                     while True:
                         try:
-                            self.cursor.execute("DELETE FROM test WHERE k = 0 AND id = %d IF EXISTS" % self.wid)
+                            self.session.execute("DELETE FROM test WHERE k = 0 AND id = %d IF EXISTS" % self.wid)
                             break
                         except WriteTimeout as e:
                             pass
@@ -179,7 +179,7 @@ class TestPaxos(Tester):
             print "runtime:", runtime
 
         query = SimpleStatement("SELECT v FROM test WHERE k = 0", consistency_level=ConsistencyLevel.ALL)
-        rows = cursor.execute(query)
+        rows = session.execute(query)
         value = rows[0][0]
 
         errors = 0
