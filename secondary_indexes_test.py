@@ -117,15 +117,15 @@ class TestSecondaryIndexes(Tester):
         keyspace with an indexed column familiy is not included
         in the index.
         """
-                # Reproducing requires at least 3 nodes:
+        # Reproducing requires at least 3 nodes:
         cluster = self.cluster
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
         conn = self.patient_cql_connection(node1)
         session = conn
 
-        #This only occurs when dropping and recreating with
-        #the same name, so loop through this test a few times:
+        # This only occurs when dropping and recreating with
+        # the same name, so loop through this test a few times:
         for i in range(10):
             debug("round %s" % i)
             try:
@@ -162,8 +162,8 @@ class TestSecondaryIndexes(Tester):
         session = conn
         self.create_ks(session, 'ks', 1)
 
-        #This only occurs when dropping and recreating with
-        #the same name, so loop through this test a few times:
+        # This only occurs when dropping and recreating with
+        # the same name, so loop through this test a few times:
         for i in range(10):
             debug("round %s" % i)
             try:
@@ -282,15 +282,15 @@ class TestSecondaryIndexesOnCollections(Tester):
         self.create_ks(session, 'list_index_search', 1)
 
         stmt = ("CREATE TABLE list_index_search.users ("
-               "user_id uuid PRIMARY KEY,"
-               "email text,"
-               "uuids list<uuid>"
-              ");")
+                "user_id uuid PRIMARY KEY,"
+                "email text,"
+                "uuids list<uuid>"
+                ");")
         session.execute(stmt)
 
         # no index present yet, make sure there's an error trying to query column
         stmt = ("SELECT * from list_index_search.users where uuids contains {some_uuid}"
-            ).format(some_uuid=uuid.uuid4())
+                ).format(some_uuid=uuid.uuid4())
 
         if self.cluster.version() < "3":
             assert_invalid(session, stmt, 'No secondary indexes on the restricted columns support the provided operators')
@@ -308,8 +308,8 @@ class TestSecondaryIndexesOnCollections(Tester):
         # add a row which doesn't specify data for the indexed column, and query again
         user1_uuid = uuid.uuid4()
         stmt = ("INSERT INTO list_index_search.users (user_id, email)"
-              "values ({user_id}, 'test@example.com')"
-            ).format(user_id=user1_uuid)
+                "values ({user_id}, 'test@example.com')"
+                ).format(user_id=user1_uuid)
         session.execute(stmt)
 
         stmt = ("SELECT * from list_index_search.users where uuids contains {some_uuid}").format(some_uuid=uuid.uuid4())
@@ -319,7 +319,7 @@ class TestSecondaryIndexesOnCollections(Tester):
         _id = uuid.uuid4()
         # alter the row to add a single item to the indexed list
         stmt = ("UPDATE list_index_search.users set uuids = [{id}] where user_id = {user_id}"
-            ).format(id=_id, user_id=user1_uuid)
+                ).format(id=_id, user_id=user1_uuid)
         session.execute(stmt)
 
         stmt = ("SELECT * from list_index_search.users where uuids contains {some_uuid}").format(some_uuid=_id)
@@ -327,7 +327,7 @@ class TestSecondaryIndexesOnCollections(Tester):
         self.assertEqual(1, len(row))
 
         # add a bunch of user records and query them back
-        shared_uuid = uuid.uuid4() # this uuid will be on all records
+        shared_uuid = uuid.uuid4()  # this uuid will be on all records
 
         log = []
 
@@ -337,14 +337,14 @@ class TestSecondaryIndexesOnCollections(Tester):
 
             # give each record a unique email address using the int index
             stmt = ("INSERT INTO list_index_search.users (user_id, email, uuids)"
-                  "values ({user_uuid}, '{prefix}@example.com', [{s_uuid}, {u_uuid}])"
-               ).format(user_uuid=user_uuid, prefix=i, s_uuid=shared_uuid, u_uuid=unshared_uuid)
+                    "values ({user_uuid}, '{prefix}@example.com', [{s_uuid}, {u_uuid}])"
+                    ).format(user_uuid=user_uuid, prefix=i, s_uuid=shared_uuid, u_uuid=unshared_uuid)
             session.execute(stmt)
 
             log.append(
                 {'user_id': user_uuid,
-                 'email':str(i)+'@example.com',
-                 'unshared_uuid':unshared_uuid}
+                 'email': str(i)+'@example.com',
+                 'unshared_uuid': unshared_uuid}
             )
 
         # confirm there is now 50k rows with the 'shared' uuid above in the secondary index
@@ -358,7 +358,7 @@ class TestSecondaryIndexesOnCollections(Tester):
 
         for log_entry in log[:1000]:
             stmt = ("SELECT user_id, email, uuids FROM list_index_search.users where uuids contains {unshared_uuid}"
-                ).format(unshared_uuid=log_entry['unshared_uuid'])
+                    ).format(unshared_uuid=log_entry['unshared_uuid'])
             rows = session.execute(stmt)
 
             self.assertEqual(1, len(rows))
@@ -382,9 +382,9 @@ class TestSecondaryIndexesOnCollections(Tester):
         self.create_ks(session, 'set_index_search', 1)
 
         stmt = ("CREATE TABLE set_index_search.users ("
-               "user_id uuid PRIMARY KEY,"
-               "email text,"
-               "uuids set<uuid>);")
+                "user_id uuid PRIMARY KEY,"
+                "email text,"
+                "uuids set<uuid>);")
         session.execute(stmt)
 
         # no index present yet, make sure there's an error trying to query column
@@ -405,7 +405,7 @@ class TestSecondaryIndexesOnCollections(Tester):
         # add a row which doesn't specify data for the indexed column, and query again
         user1_uuid = uuid.uuid4()
         stmt = ("INSERT INTO set_index_search.users (user_id, email) values ({user_id}, 'test@example.com')"
-            ).format(user_id=user1_uuid)
+                ).format(user_id=user1_uuid)
         session.execute(stmt)
 
         stmt = ("SELECT * from set_index_search.users where uuids contains {some_uuid}").format(some_uuid=uuid.uuid4())
@@ -422,7 +422,7 @@ class TestSecondaryIndexesOnCollections(Tester):
         self.assertEqual(1, len(row))
 
         # add a bunch of user records and query them back
-        shared_uuid = uuid.uuid4() # this uuid will be on all records
+        shared_uuid = uuid.uuid4()  # this uuid will be on all records
 
         log = []
 
@@ -432,14 +432,14 @@ class TestSecondaryIndexesOnCollections(Tester):
 
             # give each record a unique email address using the int index
             stmt = ("INSERT INTO set_index_search.users (user_id, email, uuids)"
-                  "values ({user_uuid}, '{prefix}@example.com', {{{s_uuid}, {u_uuid}}})"
-                ).format(user_uuid=user_uuid, prefix=i, s_uuid=shared_uuid, u_uuid=unshared_uuid)
+                    "values ({user_uuid}, '{prefix}@example.com', {{{s_uuid}, {u_uuid}}})"
+                    ).format(user_uuid=user_uuid, prefix=i, s_uuid=shared_uuid, u_uuid=unshared_uuid)
             session.execute(stmt)
 
             log.append(
                 {'user_id': user_uuid,
-                 'email':str(i)+'@example.com',
-                 'unshared_uuid':unshared_uuid}
+                 'email': str(i)+'@example.com',
+                 'unshared_uuid': unshared_uuid}
             )
 
         # confirm there is now 50k rows with the 'shared' uuid above in the secondary index
@@ -453,7 +453,7 @@ class TestSecondaryIndexesOnCollections(Tester):
 
         for log_entry in log[:1000]:
             stmt = ("SELECT user_id, email, uuids FROM set_index_search.users where uuids contains {unshared_uuid}"
-                ).format(unshared_uuid=log_entry['unshared_uuid'])
+                    ).format(unshared_uuid=log_entry['unshared_uuid'])
             rows = session.execute(stmt)
 
             self.assertEqual(1, len(rows))
@@ -477,9 +477,9 @@ class TestSecondaryIndexesOnCollections(Tester):
         self.create_ks(session, 'map_index_search', 1)
 
         stmt = ("CREATE TABLE map_index_search.users ("
-               "user_id uuid PRIMARY KEY,"
-               "email text,"
-               "uuids map<uuid, uuid>);")
+                "user_id uuid PRIMARY KEY,"
+                "email text,"
+                "uuids map<uuid, uuid>);")
         session.execute(stmt)
 
         no_index_error = ('No secondary indexes on the restricted columns support the provided operators'
@@ -490,7 +490,7 @@ class TestSecondaryIndexesOnCollections(Tester):
         assert_invalid(session, stmt, no_index_error)
 
         stmt = ("SELECT * from map_index_search.users where uuids contains key {some_uuid}"
-            ).format(some_uuid=uuid.uuid4())
+                ).format(some_uuid=uuid.uuid4())
         assert_invalid(session, stmt, no_index_error)
 
         # add index on keys and query again (even though there are no rows in the table yet)
@@ -504,8 +504,8 @@ class TestSecondaryIndexesOnCollections(Tester):
         # add a row which doesn't specify data for the indexed column, and query again
         user1_uuid = uuid.uuid4()
         stmt = ("INSERT INTO map_index_search.users (user_id, email)"
-              "values ({user_id}, 'test@example.com')"
-            ).format(user_id=user1_uuid)
+                "values ({user_id}, 'test@example.com')"
+                ).format(user_id=user1_uuid)
         session.execute(stmt)
 
         stmt = ("SELECT * from map_index_search.users where uuids contains key {some_uuid}").format(some_uuid=uuid.uuid4())
@@ -516,7 +516,7 @@ class TestSecondaryIndexesOnCollections(Tester):
 
         # alter the row to add a single item to the indexed map
         stmt = ("UPDATE map_index_search.users set uuids = {{{id}:{user_id}}} where user_id = {user_id}"
-            ).format(id=_id, user_id=user1_uuid)
+                ).format(id=_id, user_id=user1_uuid)
         session.execute(stmt)
 
         stmt = ("SELECT * from map_index_search.users where uuids contains key {some_uuid}").format(some_uuid=_id)
@@ -524,7 +524,7 @@ class TestSecondaryIndexesOnCollections(Tester):
         self.assertEqual(1, len(rows))
 
         # add a bunch of user records and query them back
-        shared_uuid = uuid.uuid4() # this uuid will be on all records
+        shared_uuid = uuid.uuid4()  # this uuid will be on all records
 
         log = []
 
@@ -535,20 +535,20 @@ class TestSecondaryIndexesOnCollections(Tester):
 
             # give each record a unique email address using the int index, add unique ids for keys and values
             stmt = ("INSERT INTO map_index_search.users (user_id, email, uuids)"
-                  "values ({user_uuid}, '{prefix}@example.com', {{{u_uuid1}:{u_uuid2}, {s_uuid}:{s_uuid}}})"
-                ).format(user_uuid=user_uuid, prefix=i, s_uuid=shared_uuid, u_uuid1=unshared_uuid1, u_uuid2=unshared_uuid2)
+                    "values ({user_uuid}, '{prefix}@example.com', {{{u_uuid1}:{u_uuid2}, {s_uuid}:{s_uuid}}})"
+                    ).format(user_uuid=user_uuid, prefix=i, s_uuid=shared_uuid, u_uuid1=unshared_uuid1, u_uuid2=unshared_uuid2)
             session.execute(stmt)
 
             log.append(
                 {'user_id': user_uuid,
-                 'email':str(i)+'@example.com',
-                 'unshared_uuid1':unshared_uuid1,
-                 'unshared_uuid2':unshared_uuid2}
+                 'email': str(i)+'@example.com',
+                 'unshared_uuid1': unshared_uuid1,
+                 'unshared_uuid2': unshared_uuid2}
             )
 
         # confirm there is now 50k rows with the 'shared' uuid above in the secondary index
         stmt = ("SELECT * from map_index_search.users where uuids contains key {shared_uuid}"
-            ).format(shared_uuid=shared_uuid)
+                ).format(shared_uuid=shared_uuid)
         rows = session.execute(stmt)
         result = [row for row in rows]
         self.assertEqual(50000, len(result))
@@ -558,7 +558,7 @@ class TestSecondaryIndexesOnCollections(Tester):
 
         for log_entry in log[:1000]:
             stmt = ("SELECT user_id, email, uuids FROM map_index_search.users where uuids contains key {unshared_uuid1}"
-                ).format(unshared_uuid1=log_entry['unshared_uuid1'])
+                    ).format(unshared_uuid1=log_entry['unshared_uuid1'])
             row = session.execute(stmt)
 
             rows = self.assertEqual(1, len(row))
@@ -574,9 +574,9 @@ class TestSecondaryIndexesOnCollections(Tester):
         # attempt to add an index on map values as well (should fail)
         stmt = "CREATE INDEX user_uuids on map_index_search.users (uuids);"
         if self.cluster.version() >= '2.2':
-            matching =  "Cannot create index on values\(uuids\): an index on keys\(uuids\) already exists and indexing a map on more than one dimension at the same time is not currently supported"
+            matching = "Cannot create index on values\(uuids\): an index on keys\(uuids\) already exists and indexing a map on more than one dimension at the same time is not currently supported"
         else:
-            matching =  "Cannot create index on uuids values, an index on uuids keys already exists and indexing a map on both keys and values at the same time is not currently supported"
+            matching = "Cannot create index on uuids values, an index on uuids keys already exists and indexing a map on both keys and values at the same time is not currently supported"
         assert_invalid(session, stmt, matching)
 
         # since cannot have index on map keys and values remove current index on keys
@@ -595,7 +595,7 @@ class TestSecondaryIndexesOnCollections(Tester):
         # since we already inserted unique ids for values as well, check that appropriate recors are found
         for log_entry in log[:1000]:
             stmt = ("SELECT user_id, email, uuids FROM map_index_search.users where uuids contains {unshared_uuid2}"
-                ).format(unshared_uuid2=log_entry['unshared_uuid2'])
+                    ).format(unshared_uuid2=log_entry['unshared_uuid2'])
 
             rows = session.execute(stmt)
             self.assertEqual(1, len(rows))
@@ -671,5 +671,3 @@ class TestUpgradeSecondaryIndexes(Tester):
             node.set_log_level("INFO")
             node.start(wait_other_notice=True)
             # node.nodetool('upgradesstables -a')
-
-

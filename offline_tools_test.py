@@ -26,14 +26,14 @@ class TestOfflineTools(Tester):
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
 
-        #test by trying to run on nonexistent keyspace
+        # test by trying to run on nonexistent keyspace
         cluster.stop(gently=False)
         (output, error, rc) = node1.run_sstablelevelreset("keyspace1", "standard1", output=True)
         self.assertIn("ColumnFamily not found: keyspace1/standard1", error)
         # this should return exit code 1
         self.assertEqual(rc, 1, msg=str(rc))
 
-        #now test by generating keyspace but not flushing sstables
+        # now test by generating keyspace but not flushing sstables
         cluster.start()
         if cluster.version() < "2.1":
             node1.stress(['-o', 'insert', '--num-keys=100', '--replication-factor=3'])
@@ -46,7 +46,7 @@ class TestOfflineTools(Tester):
         self.assertIn("Found no sstables, did you give the correct keyspace", output)
         self.assertEqual(rc, 0, msg=str(rc))
 
-        #test by writing small amount of data and flushing (all sstables should be level 0)
+        # test by writing small amount of data and flushing (all sstables should be level 0)
         cluster.start()
         session = self.patient_cql_connection(node1)
         session.execute("ALTER TABLE keyspace1.standard1 with compaction={'class': 'LeveledCompactionStrategy', 'sstable_size_in_mb':3};")
@@ -61,7 +61,7 @@ class TestOfflineTools(Tester):
         self.assertIn("since it is already on level 0", output)
         self.assertEqual(rc, 0, msg=str(rc))
 
-        #test by loading large amount data so we have multiple levels and checking all levels are 0 at end
+        # test by loading large amount data so we have multiple levels and checking all levels are 0 at end
         cluster.start()
 
         if cluster.version() < "2.1":
@@ -116,9 +116,9 @@ class TestOfflineTools(Tester):
         # self.assertTrue("java.lang.IllegalArgumentException: Unknown keyspace/columnFamily keyspace1.standard1" in error)
         # # this should return exit code 1
         # self.assertEqual(rc, 1, msg=str(rc))
-        #cluster.start()
+        # cluster.start()
 
-        #now test by generating keyspace but not flushing sstables
+        # now test by generating keyspace but not flushing sstables
         node1.stress(['write', 'n=100', '-schema', 'replication(factor=3)'])
         cluster.stop(gently=False)
 
@@ -127,7 +127,7 @@ class TestOfflineTools(Tester):
         self.assertIn("No sstables to relevel for keyspace1.standard1", output)
         self.assertEqual(rc, 1, msg=str(rc))
 
-        #test by flushing (sstable should be level 0)
+        # test by flushing (sstable should be level 0)
         cluster.start()
         session = self.patient_cql_connection(node1)
         session.execute("ALTER TABLE keyspace1.standard1 with compaction={'class': 'LeveledCompactionStrategy', 'sstable_size_in_mb':3};")
@@ -141,7 +141,7 @@ class TestOfflineTools(Tester):
         self.assertIn("L0=1", output)
         self.assertEqual(rc, 0, msg=str(rc))
 
-        #test by loading large amount data so we have multiple sstables
+        # test by loading large amount data so we have multiple sstables
         cluster.start()
         node1.stress(['write', 'n=1M', '-schema', 'replication(factor=3)'])
         node1.flush()
@@ -195,7 +195,7 @@ class TestOfflineTools(Tester):
 
         outlines = out.split("\n")
 
-        #check output is correct for each sstable
+        # check output is correct for each sstable
         sstables = self._get_final_sstables(node1, "keyspace1", "standard1")
 
         for sstable in sstables:
@@ -222,13 +222,13 @@ class TestOfflineTools(Tester):
         self.assertEqual(rc, 0, msg=str(rc))
         self.assertIn("was not released before the reference was garbage collected", out)
 
-        #now try intentionally corrupting an sstable to see if hash computed is different and error recognized
+        # now try intentionally corrupting an sstable to see if hash computed is different and error recognized
         with open(sstables[1], 'r') as f:
             sstabledata = f.read().splitlines(True)
         with open(sstables[1], 'w') as out:
             out.writelines(sstabledata[2:])
 
-        #use verbose to get some coverage on it
+        # use verbose to get some coverage on it
         (out, error, rc) = node1.run_sstableverify("keyspace1", "standard1", options=['-v'], output=True)
 
         self.assertIn("java.lang.Exception: Invalid SSTable", error)
@@ -246,7 +246,7 @@ class TestOfflineTools(Tester):
         # Remove any temporary files
         tool_bin = node.get_tool('sstablelister')
         if os.path.isfile(tool_bin):
-            args = [ tool_bin, '--type', 'tmp', ks, table]
+            args = [tool_bin, '--type', 'tmp', ks, table]
             env = common.make_cassandra_env(node.get_install_cassandra_root(), node.get_node_cassandra_root())
             p = subprocess.Popen(args, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             (stdin, stderr) = p.communicate()

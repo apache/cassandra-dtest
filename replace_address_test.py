@@ -1,8 +1,9 @@
 from dtest import Tester, debug, DISABLE_VNODES
+from tools import since, InterruptBootstrap
+
 from ccmlib.node import Node, NodeError, TimeoutError
 from cassandra import ConsistencyLevel, Unavailable, ReadTimeout
 from cassandra.query import SimpleStatement
-from tools import since, InterruptBootstrap
 
 
 class NodeUnavailable(Exception):
@@ -42,7 +43,7 @@ class TestReplaceAddress(Tester):
         if DISABLE_VNODES:
             numNodes = 1
         else:
-            #a little hacky but grep_log returns the whole line...
+            # a little hacky but grep_log returns the whole line...
             numNodes = int(node3.get_conf_option('num_tokens'))
 
         debug(numNodes)
@@ -59,7 +60,7 @@ class TestReplaceAddress(Tester):
         query = SimpleStatement('select * from %s LIMIT 1' % stress_table, consistency_level=ConsistencyLevel.THREE)
         initialData = session.execute(query)
 
-        #stop node, query should not work with consistency 3
+        # stop node, query should not work with consistency 3
         debug("Stopping node 3.")
         node3.stop(gently=False, wait_other_notice=True)
 
@@ -71,13 +72,13 @@ class TestReplaceAddress(Tester):
             except (Unavailable, ReadTimeout):
                 raise NodeUnavailable("Node could not be queried.")
 
-        #replace node 3 with node 4
+        # replace node 3 with node 4
         debug("Starting node 4 to replace node 3")
         node4 = Node('node4', cluster, True, ('127.0.0.4', 9160), ('127.0.0.4', 7000), '7400', '0', None, ('127.0.0.4', 9042))
         cluster.add(node4, False)
         node4.start(replace_address='127.0.0.3', wait_for_binary_proto=True)
 
-        #query should work again
+        # query should work again
         debug("Verifying querying works again.")
         query = SimpleStatement('select * from %s LIMIT 1' % stress_table, consistency_level=ConsistencyLevel.THREE)
         finalData = session.execute(query)
@@ -88,7 +89,7 @@ class TestReplaceAddress(Tester):
         debug(movedTokensList[0])
         self.assertEqual(len(movedTokensList), numNodes)
 
-        #check that restarting node 3 doesn't work
+        # check that restarting node 3 doesn't work
         debug("Try to restart node 3 (should fail)")
         node3.start()
         checkCollision = node1.grep_log("between /127.0.0.3 and /127.0.0.4; /127.0.0.4 is the new owner")
@@ -102,7 +103,7 @@ class TestReplaceAddress(Tester):
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
 
-        #replace active node 3 with node 4
+        # replace active node 3 with node 4
         debug("Starting node 4 to replace active node 3")
         node4 = Node('node4', cluster, True, ('127.0.0.4', 9160), ('127.0.0.4', 7000), '7400', '0', None, ('127.0.0.4', 9042))
         cluster.add(node4, False)
@@ -126,7 +127,7 @@ class TestReplaceAddress(Tester):
         node4 = Node('node4', cluster, True, ('127.0.0.4', 9160), ('127.0.0.4', 7000), '7400', '0', None, ('127.0.0.4', 9042))
         cluster.add(node4, False)
 
-        #try to replace an unassigned ip address
+        # try to replace an unassigned ip address
         with self.assertRaises(NodeError):
             try:
                 node4.start(replace_address='127.0.0.5', wait_for_binary_proto=True)
@@ -250,7 +251,7 @@ class TestReplaceAddress(Tester):
         assert len(rows) == 1
         assert rows[0][0] == 'COMPLETED', rows[0][0]
 
-        #query should work again
+        # query should work again
         debug("Verifying querying works again.")
         finalData = session.execute(query)
         self.assertListEqual(initialData, finalData)
@@ -292,7 +293,7 @@ class TestReplaceAddress(Tester):
         node4.start(jvm_args=[
                     "-Dcassandra.replace_address_first_boot=127.0.0.3",
                     "-Dcassandra.reset_bootstrap_progress=true"
-                   ])
+                    ])
         # check if we reset bootstrap state
         node4.watch_log_for("Resetting bootstrap progress to start fresh", from_mark=mark)
         # wait for node3 ready to query
@@ -304,7 +305,7 @@ class TestReplaceAddress(Tester):
         assert len(rows) == 1
         assert rows[0][0] == 'COMPLETED', rows[0][0]
 
-        #query should work again
+        # query should work again
         debug("Verifying querying works again.")
         finalData = session.execute(query)
         self.assertListEqual(initialData, finalData)

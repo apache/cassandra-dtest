@@ -1,9 +1,11 @@
-import time, os
 from distutils import dir_util
+import os
 import subprocess
+import time
 
 from dtest import Tester, debug
 from ccmlib import common as ccmcommon
+
 
 class TestSSTableGenerationAndLoading(Tester):
 
@@ -170,7 +172,7 @@ class TestSSTableGenerationAndLoading(Tester):
         # wipe out the node data.
         cluster.clear()
         cluster.start()
-        time.sleep(5) # let gossip figure out what is going on
+        time.sleep(5)  # let gossip figure out what is going on
 
         debug("re-creating the keyspace and column families.")
         session = self.cql_connection(node1)
@@ -191,7 +193,7 @@ class TestSSTableGenerationAndLoading(Tester):
                 p = subprocess.Popen(cmd_args, env=env)
                 exit_status = p.wait()
                 self.assertEqual(0, exit_status,
-                        "sstableloader exited with a non-zero status: %d" % exit_status)
+                                 "sstableloader exited with a non-zero status: %d" % exit_status)
 
         def read_and_validate_data(session):
             for i in range(NUM_KEYS):

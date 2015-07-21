@@ -1,7 +1,10 @@
+from collections import defaultdict
+import re
+import time
+
 from dtest import Tester, debug, PRINT_DEBUG
 from tools import no_vnodes
-import re, time
-from collections import defaultdict
+
 from cassandra.query import SimpleStatement
 from cassandra import ConsistencyLevel
 
@@ -46,11 +49,11 @@ class ReplicationTest(Tester):
     def get_replicas_from_trace(self, trace):
         """Look at trace and return a list of the replicas contacted"""
         coordinator = None
-        nodes_sent_write = set([]) #Nodes sent a write request
-        nodes_responded_write = set([]) #Nodes that acknowledges a write
-        replicas_written = set([]) #Nodes that wrote to their commitlog
-        forwarders = set([]) #Nodes that forwarded a write to another node
-        nodes_contacted = defaultdict(set) #node -> list of nodes that were contacted
+        nodes_sent_write = set([])  # Nodes sent a write request
+        nodes_responded_write = set([])  # Nodes that acknowledges a write
+        replicas_written = set([])  # Nodes that wrote to their commitlog
+        forwarders = set([])  # Nodes that forwarded a write to another node
+        nodes_contacted = defaultdict(set)  # node -> list of nodes that were contacted
 
         for trace_event in trace.events:
             # Step 1, find coordinator node:
@@ -102,7 +105,7 @@ class ReplicationTest(Tester):
                 "nodes_sent_write": nodes_sent_write,
                 "nodes_responded_write": nodes_responded_write,
                 "nodes_contacted": nodes_contacted
-        }
+                }
 
     def get_replicas_for_token(self, token, replication_factor,
                                strategy='SimpleStrategy', nodes=None):
@@ -138,7 +141,7 @@ class ReplicationTest(Tester):
         elif strategy == 'NetworkTopologyStrategy':
             # NetworkTopologyStrategy can be broken down into multiple
             # SimpleStrategies, just once per datacenter:
-            for dc,rf in replication_factor.items():
+            for dc, rf in replication_factor.items():
                 dc_nodes = [n for n in nodes if n.data_center == dc]
                 replicas.extend(self.get_replicas_for_token(
                     token, rf, nodes=dc_nodes))
@@ -187,15 +190,15 @@ class ReplicationTest(Tester):
             debug('\nreplicas should be: %s' % replicas_should_be)
             debug('replicas were: %s' % stats['replicas'])
 
-            #Make sure the correct nodes are replicas:
+            # Make sure the correct nodes are replicas:
             self.assertEqual(stats['replicas'], replicas_should_be)
-            #Make sure that each replica node was contacted and
-            #acknowledged the write:
+            # Make sure that each replica node was contacted and
+            # acknowledged the write:
             self.assertEqual(stats['nodes_sent_write'], stats['nodes_responded_write'])
 
     def network_topology_test(self):
         """Test the NetworkTopologyStrategy on a 2DC 3:3 node cluster"""
-        self.cluster.populate([3,3]).start()
+        self.cluster.populate([3, 3]).start()
         time.sleep(5)
         node1 = self.cluster.nodelist()[0]
         ip_nodes = dict((node.address(), node) for node in self.cluster.nodelist())
@@ -205,7 +208,7 @@ class ReplicationTest(Tester):
         # coordinator is contacting:
         session = self.conn
 
-        replication_factor = {'dc1':2, 'dc2':2}
+        replication_factor = {'dc1': 2, 'dc2': 2}
         self.create_ks(session, 'test', replication_factor)
         session.execute('CREATE TABLE test.test (id int PRIMARY KEY, value text)', trace=False)
         # Wait for table creation, otherwise trace times out -
@@ -227,8 +230,8 @@ class ReplicationTest(Tester):
             debug('\nreplicas should be: %s' % replicas_should_be)
             debug('replicas were: %s' % stats['replicas'])
 
-            #Make sure the coordinator only talked to a single node in
-            #the second datacenter - CASSANDRA-5632:
+            # Make sure the coordinator only talked to a single node in
+            # the second datacenter - CASSANDRA-5632:
             num_in_other_dcs_contacted = 0
             for node_contacted in stats['nodes_contacted'][node1.address()]:
                 if ip_nodes[node_contacted].data_center != node1.data_center:
@@ -239,15 +242,15 @@ class ReplicationTest(Tester):
             forwarders_used = forwarders_used.union(stats['forwarders'])
 
             try:
-                #Make sure the correct nodes are replicas:
+                # Make sure the correct nodes are replicas:
                 self.assertEqual(stats['replicas'], replicas_should_be)
-                #Make sure that each replica node was contacted and
-                #acknowledged the write:
+                # Make sure that each replica node was contacted and
+                # acknowledged the write:
                 self.assertEqual(stats['nodes_sent_write'], stats['nodes_responded_write'])
             except AssertionError as e:
                 debug("Failed on key %s and token %s." % (key, token))
                 raise e
 
-        #Given a diverse enough keyset, each node in the second
-        #datacenter should get a chance to be a forwarder:
+        # Given a diverse enough keyset, each node in the second
+        # datacenter should get a chance to be a forwarder:
         self.assertEqual(len(forwarders_used), 3)
