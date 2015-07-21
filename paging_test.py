@@ -297,7 +297,6 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
         # make sure expected and actual have same data elements (ignoring order)
         self.assertEqualIgnoreOrder(pf.all_data(), expected_data)
 
-    @require(9775, broken_in='3.0')
     def test_undefined_page_size_default(self):
         """
         If the page size isn't sent then the default fetch size is used.
@@ -666,7 +665,6 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         self.assertEqualIgnoreOrder(expected_data, pf.all_data())
 
     @since('2.0.6')
-    @require(9775, broken_in='3.0')
     def static_columns_paging_test(self):
         """
         Exercises paging with static columns to detect bugs
@@ -1485,7 +1483,6 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
         time.sleep(5)
         self.check_all_paging_results([], 0, [])
 
-    @require(9775, broken_in='3.0')
     def test_failure_threshold_deletions(self):
         """Test that paging throws a failure in case of tombstone threshold """
         self.allow_log_errors = True
@@ -1509,8 +1506,11 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
 
         assert_invalid(self.cursor, SimpleStatement("select * from paging_test", fetch_size=1000, consistency_level=CL.ALL), expected=ReadTimeout)
 
-        failure_msg = ("Scanned over.* tombstones in test_paging_size."
-                       "paging_test.* query aborted")
+        if self.cluster.version() < "3.0":
+            failure_msg = ("Scanned over.* tombstones in test_paging_size."
+                           "paging_test.* query aborted")
+        else:
+            failure_msg = ("Scanned over.* tombstones during query.* query aborted")
         failure = (node1.grep_log(failure_msg) or
                    node2.grep_log(failure_msg) or
                    node3.grep_log(failure_msg))
