@@ -260,7 +260,7 @@ class TestArchiveCommitlog(SnapshotTester):
 
             if self.cluster.version() >= '3.0':
                 self.restore_snapshot(system_ut_snapshot_dir, node1, 'system_schema', 'types', 'usertypes')
-            if self.cluster.version() >= '2.1':
+            elif self.cluster.version() >= '2.1':
                 self.restore_snapshot(system_ut_snapshot_dir, node1, 'system', 'schema_usertypes', 'usertypes')
 
             if self.cluster.version() >= '3.0':
