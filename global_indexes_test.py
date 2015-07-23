@@ -23,12 +23,14 @@ class TestGlobalIndexes(Tester):
         return session
 
     def test_create_index(self):
+        self.skipTest("Feature In Development")
         session = self.prepare()
 
         result = session.execute("SELECT * FROM system.schema_globalindexes WHERE keyspace_name='ks' AND columnfamily_name='users'")
         assert len(result) == 1, "Expecting 1 global index, got" + str(result)
 
     def test_index_insert(self):
+        self.skipTest("Feature In Development")
         session = self.prepare()
 
         # insert data
@@ -38,6 +40,7 @@ class TestGlobalIndexes(Tester):
         session.execute("INSERT INTO users (KEY, password, gender, state, birth_year) VALUES ('user4', 'ch@ngem3d', 'm', 'TX', 1974);")
 
     def test_index_query(self):
+        self.skipTest("Feature In Development")
         session = self.prepare()
 
         # insert data
@@ -56,6 +59,7 @@ class TestGlobalIndexes(Tester):
         assert len(result) == 0, "Expecting 0 users, got" + str(result)
 
     def test_index_prepared_statement(self):
+        self.skipTest("Feature In Development")
         session = self.prepare()
 
         insertPrepared = session.prepare("INSERT INTO users (KEY, password, gender, state, birth_year) VALUES (?, ?, ?, ?, ?);")
@@ -77,6 +81,7 @@ class TestGlobalIndexes(Tester):
         assert len(result) == 0, "Expecting 0 users, got" + str(result)
 
     def test_drop_index(self):
+        self.skipTest("Feature In Development")
         session = self.prepare()
 
         result = session.execute("SELECT * FROM system.schema_globalindexes WHERE keyspace_name='ks' AND columnfamily_name='users'")
@@ -88,12 +93,14 @@ class TestGlobalIndexes(Tester):
         assert len(result) == 0, "Expecting 0 global indexes, got" + str(result)
 
     def test_drop_indexed_column(self):
+        self.skipTest("Feature In Development")
         session = self.prepare()
 
         assert_invalid(session, "ALTER TABLE ks.users DROP state")
         assert_invalid(session, "ALTER TABLE ks.users ALTER state TYPE blob")
 
     def test_double_indexing_column(self):
+        self.skipTest("Feature In Development")
         session = self.prepare()
 
         assert_invalid(session, "CREATE INDEX ON ks.users (state)")
@@ -103,6 +110,7 @@ class TestGlobalIndexes(Tester):
         assert_invalid(session, "CREATE GLOBAL INDEX ON ks.users (gender) DENORMALIZED (birth_year)")
 
     def test_drop_indexed_table(self):
+        self.skipTest("Feature In Development")
         session = self.prepare()
 
         result = session.execute("SELECT * FROM system.schema_globalindexes WHERE keyspace_name='ks' AND columnfamily_name='users'")

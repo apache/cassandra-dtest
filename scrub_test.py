@@ -386,7 +386,6 @@ class TestScrub(TestHelper):
         users = self.query_users(session)
         self.assertEqual(initial_users, users)
 
-    @require('9591*')
     def test_standalone_scrub_essential_files_only(self):
         cluster = self.cluster
         cluster.populate(1).start()

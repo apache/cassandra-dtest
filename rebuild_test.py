@@ -5,7 +5,7 @@ from cassandra import ConsistencyLevel
 
 from ccmlib.node import NodetoolError
 from dtest import Tester
-from tools import insert_c1c2, query_c1c2, require
+from tools import insert_c1c2, query_c1c2
 
 
 class TestRebuild(Tester):
@@ -24,7 +24,6 @@ class TestRebuild(Tester):
         ]
         Tester.__init__(self, *args, **kwargs)
 
-    @require(9119)
     def simple_rebuild_test(self):
         """
         @jira_ticket CASSANDRA-9119

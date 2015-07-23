@@ -1,5 +1,5 @@
 from dtest import Tester
-from tools import insert_c1c2, query_c1c2, no_vnodes, new_node, debug, require, since
+from tools import insert_c1c2, query_c1c2, no_vnodes, new_node, debug, since
 from assertions import assert_almost_equal
 
 import time
@@ -142,7 +142,6 @@ class TestTopology(Tester):
         for n in xrange(0, 10000):
             query_c1c2(session, n, ConsistencyLevel.ONE)
 
-    @require(8801)
     @since('3.0')
     def decommissioned_node_cant_rejoin_test(self):
         '''
