@@ -67,9 +67,9 @@ def MBEAN_VALUES_POST(ks, table):
             ('metrics', 'Table', {'name': 'MaxPartitionSize'}, 'Value', 'MBeanEqual'),
             ('metrics', 'Table', {'name': 'MinPartitionSize'}, 'Value', 'MBeanEqual'),
             ('metrics', 'Table', {'name': 'MeanPartitionSize'}, 'Value', 'MBeanDecrement'),
-            ('metrics', 'Table', {'name': 'PartitionCacheHit'}, 'Value', 'MBeanEqual'),
-            ('metrics', 'Table', {'name': 'PartitionCacheHitOutOfRange'}, 'Value', 'MBeanEqual'),
-            ('metrics', 'Table', {'name': 'PartitionCacheMiss'}, 'Value', 'MBeanEqual'),
+            ('metrics', 'Table', {'name': 'RowCacheHit'}, 'Value', 'MBeanEqual'),
+            ('metrics', 'Table', {'name': 'RowCacheHitOutOfRange'}, 'Value', 'MBeanEqual'),
+            ('metrics', 'Table', {'name': 'RowCacheMiss'}, 'Value', 'MBeanEqual'),
             ('metrics', 'Table', {'name': 'EstimatedPartitionSizeHistogram',  'keyspace': ks, 'scope': table}, 'Value', 'MBeanEqual'),
             ('metrics', 'Table', {'name': 'EstimatedPartitionCount', 'keyspace': ks, 'scope': table}, 'Value', 'MBeanEqual')]
 
@@ -158,20 +158,20 @@ class TestJMXMetrics(Tester):
                 b_value = before[attr_counter]
                 if expected == 'MBeanIncrement':
                     if b_value >= a_value:
-                        errors.append(mbeans[attr_counter] + " has a before value of " + str(b_value) + " and after value of " + str(a_value) + " and did not increment" + "\n")
+                        errors.append(mbean + " has a before value of " + str(b_value) + " and after value of " + str(a_value) + " and did not increment" + "\n")
                 elif expected == 'MBeanDecrement':
                     if b_value <= a_value:
-                        errors.append(mbeans[attr_counter] + " has a before value of " + str(b_value) + " and after value of " + str(a_value) + " and did not decrement" + "\n")
+                        errors.append(mbean + " has a before value of " + str(b_value) + " and after value of " + str(a_value) + " and did not decrement" + "\n")
                 elif expected == 'MBeanEqual':
                     if b_value != a_value:
-                        errors.append(mbeans[attr_counter] + " has a before value of " + str(b_value) + " and after value of " + str(a_value) + ", which are not equal" + "\n")
+                        errors.append(mbean + " has a before value of " + str(b_value) + " and after value of " + str(a_value) + ", which are not equal" + "\n")
                 elif expected == 'MBeanZero':
                     if not (b_value == 0 and a_value == 0):
-                        errors.append(mbeans[attr_counter] + " has a before value of " + str(b_value) + " and after value of " + str(a_value) + " and they do not equal zero" + "\n")
+                        errors.append(mbean + " has a before value of " + str(b_value) + " and after value of " + str(a_value) + " and they do not equal zero" + "\n")
                 # If expected is none of the above, then expected should be a number.
                 else:
                     if a_value != expected:
-                        errors.append(mbeans[attr_counter] + " has an after value of " + str(a_value) + " which does not equal " + str(expected) + "\n")
+                        errors.append(mbean + " has an after value of " + str(a_value) + " which does not equal " + str(expected) + "\n")
                 attr_counter += 1
 
             self.assertEqual(len(errors), 0, "\n" + "\n".join(errors))
