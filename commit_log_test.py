@@ -7,11 +7,13 @@ from dtest import Tester
 from ccmlib.node import Node
 import struct
 
+
 class TestCommitLogFailurePolicy(Tester):
 
     def test_bad_crc(self):
         """
-        if the commit log header crc is doesn't the data, and the commit_failure_policy is stop, C* shouldn't startup
+        if the commit log header crc (checksum) doesn't match the actual crc of the header data,
+        and the commit_failure_policy is stop, C* shouldn't startup
         """
         self.cluster.populate(nodes=1)
         node = self.cluster.nodelist()[0]
@@ -29,6 +31,9 @@ class TestCommitLogFailurePolicy(Tester):
         results = cursor.execute("SELECT * FROM ks.tbl")
         self.assertEqual(len(results), 10)
 
+        # with the commitlog_sync_period_in_ms set to 1000,
+        # this sleep guarantees that the commitlog data is
+        # actually flushed to disk before we kill -9 it
         time.sleep(1)
 
         node.stop(gently=False)
@@ -98,6 +103,9 @@ class TestCommitLogFailurePolicy(Tester):
         results = cursor.execute("SELECT * FROM ks1.tbl")
         self.assertEqual(len(results), 10)
 
+        # with the commitlog_sync_period_in_ms set to 1000,
+        # this sleep guarantees that the commitlog data is
+        # actually flushed to disk before we kill -9 it
         time.sleep(1)
 
         node.stop(gently=False)
