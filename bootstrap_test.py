@@ -6,7 +6,7 @@ import subprocess
 import tempfile
 import re
 from dtest import Tester, debug
-from tools import new_node, query_c1c2, since, require, KillOnBootstrap, InterruptBootstrap
+from tools import new_node, query_c1c2, since, KillOnBootstrap, InterruptBootstrap
 from assertions import assert_almost_equal
 from ccmlib.node import NodeError
 from cassandra import ConsistencyLevel
@@ -289,11 +289,9 @@ class TestBootstrap(Tester):
         failure = regex.search(output)
         self.assertIsNone(failure, "Error during stress while bootstrapping")
 
-    @require("9765")
     def shutdown_wiped_node_cannot_join_test(self):
         self._wiped_node_cannot_join_test(gently=True)
 
-    @require("9765")
     def killed_wiped_node_cannot_join_test(self):
         self._wiped_node_cannot_join_test(gently=False)
 
@@ -339,7 +337,6 @@ class TestBootstrap(Tester):
         node2.start(no_wait=True)
         node2.watch_log_for("A node with address /127.0.0.4 already exists, cancelling join", from_mark=mark, timeout=60)
 
-    @require("9765")
     def decommissioned_wiped_node_can_join_test(self):
         """
         @jira_ticket CASSANDRA-9765
@@ -381,7 +378,6 @@ class TestBootstrap(Tester):
         node2.start(wait_other_notice=True)
         node2.watch_log_for("JOINING:", from_mark=mark, timeout=60)
 
-    @require("9765")
     def failed_bootstap_wiped_node_can_join_test(self):
         """
         @jira_ticket CASSANDRA-9765

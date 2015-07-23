@@ -21,6 +21,7 @@ class SSTableListTest(Tester):
         Tester.__init__(self, *args, **kwargs)
 
     def listfiles_oncompaction_test(self):
+        self.skipTest("Feature In Development")
         """
         Check we can list the sstable files after successfull compaction (no temporary sstable files)
         """
@@ -37,6 +38,7 @@ class SSTableListTest(Tester):
         self.assertEqual(0, len(tmpfiles))
 
     def listfiles_onabortedcompaction_test(self):
+        self.skipTest("Feature In Development")
         """
         Check we can list the sstable files after aborted compaction (temporary sstable files)
         """

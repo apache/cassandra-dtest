@@ -674,6 +674,7 @@ class TestUserTypes(Tester):
     @since('3.0')
     @require('7423')
     def udt_subfield_test(self):
+        self.skipTest("Feature In Development")
         cluster = self.cluster
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()

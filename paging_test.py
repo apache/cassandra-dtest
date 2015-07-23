@@ -1367,6 +1367,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
         """Test multiple row deletions.
            This test should be finished when CASSANDRA-6237 is done.
         """
+        self.skipTest("Feature In Development")
         self.session = self.prepare()
         expected_data = self.setup_data()
 
