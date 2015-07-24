@@ -8,6 +8,7 @@ from cassandra import WriteTimeout
 from cassandra.cluster import NoHostAvailable, OperationTimedOut
 
 import ccmlib
+from ccmlib.common import is_win
 from assertions import assert_almost_equal, assert_none, assert_one
 from dtest import Tester, debug
 from tools import require, since
@@ -128,10 +129,10 @@ class TestCommitLog(Tester):
 
         if self.cluster.version() < "2.1":
             with open(os.devnull, 'w') as devnull:
-                self.node1.stress(['--num-keys=500000'], stdout=devnull, stderr=subprocess.STDOUT)
+                self.node1.stress(['--num-keys=1000000'], stdout=devnull, stderr=subprocess.STDOUT)
         else:
             with open(os.devnull, 'w') as devnull:
-                self.node1.stress(['write', 'n=500000', '-rate', 'threads=25'], stdout=devnull, stderr=subprocess.STDOUT)
+                self.node1.stress(['write', 'n=1M', '-rate', 'threads=25'], stdout=devnull, stderr=subprocess.STDOUT)
 
     @since('2.1')
     @require(9717, broken_in='3.0')
@@ -245,12 +246,22 @@ class TestCommitLog(Tester):
         self.assertTrue(failure, "Cannot find the commitlog failure message in logs")
         self.assertTrue(self.node1.is_running(), "Node1 should still be running")
 
-        with self.assertRaises((OperationTimedOut, WriteTimeout)):
-            self.session1.execute("""
-              INSERT INTO test (key, col1) VALUES (2, 2);
-            """)
-        # Should not exists
-        assert_none(self.session1, "SELECT * FROM test where key=2;")
+        # on Windows, we can't delete the segments if they're chmod to 0 so they'll still be available for use by CLSM,
+        # and we can still create new segments since os.chmod is limited to stat.S_IWRITE and stat.S_IREAD to set files
+        # as read-only. New mutations will still be allocated and WriteTimeouts will not be raised. It's sufficient that
+        # we confirm that a) the node isn't dead (stop) and b) the node doesn't terminate the thread (stop_commit)
+        query = "INSERT INTO test (key, col1) VALUES (2, 2);"
+        if is_win():
+            # We expect this to succeed
+            self.session1.execute(query)
+            self.assertFalse(self.node1.grep_log("terminating thread"), "thread was terminated but CL error should have been ignored.")
+            self.assertTrue(self.node1.is_running(), "Node1 should still be running after an ignore error on CL")
+        else:
+            with self.assertRaises((OperationTimedOut, WriteTimeout)):
+                self.session1.execute(query)
+
+            # Should not exist
+            assert_none(self.session1, "SELECT * FROM test where key=2;")
 
         # bring back the node commitlogs
         self._change_commitlog_perms(stat.S_IWRITE | stat.S_IREAD | stat.S_IEXEC)
