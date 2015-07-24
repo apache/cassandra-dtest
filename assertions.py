@@ -44,10 +44,13 @@ def assert_none(session, query, cl=ConsistencyLevel.ONE):
     assert list_res == [], "Expected nothing from %s, but got %s" % (query, list_res)
 
 
-def assert_all(session, query, expected, cl=ConsistencyLevel.ONE):
+def assert_all(session, query, expected, cl=ConsistencyLevel.ONE, ignore_order=False):
     simple_query = SimpleStatement(query, consistency_level=cl)
     res = session.execute(simple_query)
     list_res = rows_to_list(res)
+    if ignore_order:
+        expected = sorted(expected);
+        list_res = sorted(list_res);
     assert list_res == expected, "Expected %s from %s, but got %s" % (expected, query, list_res)
 
 
