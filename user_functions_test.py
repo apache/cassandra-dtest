@@ -1,8 +1,6 @@
 import math
-import os
 import time
 
-from ccmlib.common import get_version_from_build
 from dtest import Tester
 from assertions import assert_invalid, assert_one, assert_none
 from tools import since
@@ -12,12 +10,7 @@ from tools import since
 class TestUserFunctions(Tester):
 
     def __init__(self, *args, **kwargs):
-        CASSANDRA_DIR = os.environ.get('CASSANDRA_DIR')
-        if get_version_from_build(CASSANDRA_DIR) >= '3.0':
-            kwargs['cluster_options'] = {'enable_user_defined_functions': 'true',
-                                         'enable_scripted_user_defined_functions': 'true'}
-        else:
-            kwargs['cluster_options'] = {'enable_user_defined_functions': 'true'}
+        kwargs['cluster_options'] = {'enable_user_defined_functions': 'true'}
         Tester.__init__(self, *args, **kwargs)
 
     def prepare(self, create_keyspace=True, nodes=1, rf=1):
