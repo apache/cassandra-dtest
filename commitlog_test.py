@@ -1,6 +1,5 @@
 import glob
 import os
-import platform
 import stat
 import subprocess
 import time
@@ -9,6 +8,7 @@ from cassandra import WriteTimeout
 from cassandra.cluster import NoHostAvailable, OperationTimedOut
 
 import ccmlib
+from ccmlib.common import is_win
 from assertions import assert_almost_equal, assert_none, assert_one
 from dtest import Tester, debug
 from tools import require, since
@@ -129,10 +129,10 @@ class TestCommitLog(Tester):
 
         if self.cluster.version() < "2.1":
             with open(os.devnull, 'w') as devnull:
-                self.node1.stress(['--num-keys=500000'], stdout=devnull, stderr=subprocess.STDOUT)
+                self.node1.stress(['--num-keys=1000000'], stdout=devnull, stderr=subprocess.STDOUT)
         else:
             with open(os.devnull, 'w') as devnull:
-                self.node1.stress(['write', 'n=500000', '-rate', 'threads=25'], stdout=devnull, stderr=subprocess.STDOUT)
+                self.node1.stress(['write', 'n=1M', '-rate', 'threads=25'], stdout=devnull, stderr=subprocess.STDOUT)
 
     @since('2.1')
     @require(9717, broken_in='3.0')
@@ -251,7 +251,7 @@ class TestCommitLog(Tester):
         # as read-only. New mutations will still be allocated and WriteTimeouts will not be raised. It's sufficient that
         # we confirm that a) the node isn't dead (stop) and b) the node doesn't terminate the thread (stop_commit)
         query = "INSERT INTO test (key, col1) VALUES (2, 2);"
-        if platform.system() == 'Windows':
+        if is_win():
             # We expect this to succeed
             self.session1.execute(query)
             self.assertFalse(self.node1.grep_log("terminating thread"), "thread was terminated but CL error should have been ignored.")
