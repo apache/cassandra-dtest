@@ -60,12 +60,12 @@ class TestUserFunctions(Tester):
             returns double language java as 'if (input==null) return null;
             return Double.valueOf(Math.sin(input.doubleValue()));'
             """)
-        session2.execute(""""
+        session2.execute("""
             create or replace function x_cos ( input double ) called on null input
             returns double language java as 'if (input==null) return null;
             return Double.valueOf(Math.cos(input.doubleValue()));'
             """)
-        session3.execute(""""
+        session3.execute("""
             create or replace function x_tan ( input double ) called on null input
             returns double language java as 'if (input==null) return null;
             return Double.valueOf(Math.tan(input.doubleValue()));'
@@ -98,9 +98,8 @@ class TestUserFunctions(Tester):
 
         # try creating function returning the wrong type, should error
         assert_invalid(session1, """
-                      CREATE FUNCTION bad_sin ( input double ) CALLED ON NULL INPUT RETURNS uuid LANGUAGE java AS 'return Math.sin(input);'",
-                      "Could not compile function 'ks.bad_sin' from Java source:
-                      """)
+                      CREATE FUNCTION bad_sin ( input double ) CALLED ON NULL INPUT RETURNS uuid LANGUAGE java AS 'return Math.sin(input);';
+                      """, "Type mismatch: cannot convert from double to UUID")
 
     def udf_overload_test(self):
 
