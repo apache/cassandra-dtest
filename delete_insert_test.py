@@ -1,7 +1,12 @@
-from dtest import Tester
+import random
+import threading
+import uuid
+
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
-import uuid, threading, random
+
+from dtest import Tester
+
 
 class DeleteInsertTest(Tester):
     """
@@ -13,7 +18,7 @@ class DeleteInsertTest(Tester):
 
         # Generate 1000 rows in memory so we can re-use the same ones over again:
         self.groups = ['group1', 'group2', 'group3', 'group4']
-        self.rows = [(str(uuid.uuid1()),x,random.choice(self.groups)) for x in range(1000)]
+        self.rows = [(str(uuid.uuid1()), x, random.choice(self.groups)) for x in range(1000)]
 
     def create_ddl(self, session, rf={'dc1': 2, 'dc2': 2}):
         self.create_ks(session, 'delete_insert_search_test', rf)
@@ -22,7 +27,7 @@ class DeleteInsertTest(Tester):
 
     def delete_group_rows(self, session, group):
         """Delete rows from a given group and return them"""
-        rows = [r for r in self.rows if r[2]==group]
+        rows = [r for r in self.rows if r[2] == group]
         ids = [r[0] for r in rows]
         session.execute('DELETE FROM test WHERE id in (%s)' % ', '.join(ids))
         return rows
@@ -36,7 +41,7 @@ class DeleteInsertTest(Tester):
 
     def delete_insert_search_test(self):
         cluster = self.cluster
-        cluster.populate([2,2]).start()
+        cluster.populate([2, 2]).start()
         node1 = cluster.nodelist()[0]
 
         session = self.cql_connection(node1)
@@ -72,4 +77,3 @@ class DeleteInsertTest(Tester):
             t.start()
         for t in threads:
             t.join()
-
