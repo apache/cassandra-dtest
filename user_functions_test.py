@@ -73,20 +73,29 @@ class TestUserFunctions(Tester):
 
         time.sleep(1)
 
-        assert_one(session1, "SELECT key, value, x_sin(value), x_cos(value), x_tan(value) FROM ks.udf_kv where key = %d" % 1, [1, 1.0, 0.8414709848078965, 0.5403023058681398, 1.5574077246549023])
+        assert_one(session1,
+                   "SELECT key, value, x_sin(value), x_cos(value), x_tan(value) FROM ks.udf_kv where key = %d" % 1,
+                   [1, 1.0, 0.8414709848078965, 0.5403023058681398, 1.5574077246549023])
 
-        assert_one(session2, "SELECT key, value, x_sin(value), x_cos(value), x_tan(value) FROM ks.udf_kv where key = %d" % 2, [2, 2.0, math.sin(2.0), math.cos(2.0), math.tan(2.0)])
+        assert_one(session2,
+                   "SELECT key, value, x_sin(value), x_cos(value), x_tan(value) FROM ks.udf_kv where key = %d" % 2,
+                   [2, 2.0, math.sin(2.0), math.cos(2.0), math.tan(2.0)])
 
-        assert_one(session3, "SELECT key, value, x_sin(value), x_cos(value), x_tan(value) FROM ks.udf_kv where key = %d" % 3, [3, 3.0, math.sin(3.0), math.cos(3.0), math.tan(3.0)])
+        assert_one(session3,
+                   "SELECT key, value, x_sin(value), x_cos(value), x_tan(value) FROM ks.udf_kv where key = %d" % 3,
+                   [3, 3.0, math.sin(3.0), math.cos(3.0), math.tan(3.0)])
 
         session4 = self.patient_cql_connection(node1)
 
         # check that functions are correctly confined to namespaces
-        assert_invalid(session4, "SELECT key, value, sin(value), cos(value), tan(value) FROM ks.udf_kv where key = 4", "Unknown function 'sin'")
+        assert_invalid(session4,
+                       "SELECT key, value, sin(value), cos(value), tan(value) FROM ks.udf_kv where key = 4",
+                       "Unknown function 'sin'")
 
         # try giving existing function bad input, should error
         assert_invalid(session1,
-                       "SELECT key, value, x_sin(key), foo_cos(KEYy), foo_tan(key) FROM ks.udf_kv where key = 1", "Type error: key cannot be passed as argument 0 of function ks.x_sin of type double")
+                       "SELECT key, value, x_sin(key), foo_cos(KEYy), foo_tan(key) FROM ks.udf_kv where key = 1",
+                       "Type error: key cannot be passed as argument 0 of function ks.x_sin of type double")
 
         session2.execute("drop function x_sin")
         session3.execute("drop function x_cos")
@@ -97,9 +106,9 @@ class TestUserFunctions(Tester):
         assert_invalid(session3, "SELECT key, value, sin(value), cos(value), tan(value) FROM udf_kv where key = 1")
 
         # try creating function returning the wrong type, should error
-        assert_invalid(session1, """
-                      CREATE FUNCTION bad_sin ( input double ) CALLED ON NULL INPUT RETURNS uuid LANGUAGE java AS 'return Math.sin(input);';
-                      """, "Type mismatch: cannot convert from double to UUID")
+        assert_invalid(session1,
+                       "CREATE FUNCTION bad_sin ( input double ) CALLED ON NULL INPUT RETURNS uuid LANGUAGE java AS 'return Math.sin(input);';",
+                       "Type mismatch: cannot convert from double to UUID")
 
     def udf_overload_test(self):
 
