@@ -271,6 +271,106 @@ class TestCompaction(Tester):
         assert len(ret) == 1
         self.assertEqual(200, len(ret[0][0].keys()))
 
+    def disable_autocompaction_nodetool_test(self):
+        """
+        Make sure we can enable/disable compaction using nodetool
+        """
+        cluster = self.cluster
+        cluster.populate(1).start(wait_for_binary_proto=True)
+        [node] = cluster.nodelist()
+        session = self.patient_cql_connection(node)
+        self.create_ks(session, 'ks', 1)
+        session.execute('CREATE TABLE to_disable (id int PRIMARY KEY, d TEXT) WITH compaction = {{\'class\':\'{0}\'}}'.format(self.strategy))
+        node.nodetool('disableautocompaction ks to_disable')
+        for i in range(1000):
+            session.execute('insert into to_disable (id, d) values ({0}, \'{1}\')'.format(i, 'hello'*100))
+            if i % 100 == 0:
+                node.flush()
+        self.assertTrue(len(node.grep_log('Compacting.+to_disable')) == 0, 'Found compaction log items for {0}'.format(self.strategy))
+        node.nodetool('enableautocompaction ks to_disable')
+        # sleep to allow compactions to start
+        time.sleep(2)
+        self.assertTrue(len(node.grep_log('Compacting.+to_disable')) > 0, 'Found no log items for {0}'.format(self.strategy))
+
+    def disable_autocompaction_schema_test(self):
+        """
+        Make sure we can disable compaction via the schema compaction parameter 'enabled' = false
+        """
+        cluster = self.cluster
+        cluster.populate(1).start(wait_for_binary_proto=True)
+        [node] = cluster.nodelist()
+        session = self.patient_cql_connection(node)
+        self.create_ks(session, 'ks', 1)
+        session.execute('CREATE TABLE to_disable (id int PRIMARY KEY, d TEXT) WITH compaction = {{\'class\':\'{0}\', \'enabled\':\'false\'}}'.format(self.strategy))
+        for i in range(1000):
+            session.execute('insert into to_disable (id, d) values ({0}, \'{1}\')'.format(i, 'hello'*100))
+            if i % 100 == 0:
+                node.flush()
+        self.assertTrue(len(node.grep_log('Compacting.+to_disable')) == 0, 'Found compaction log items for {0}'.format(self.strategy))
+        # should still be disabled after restart:
+        node.stop()
+        node.start(wait_for_binary_proto=True)
+        session = self.patient_cql_connection(node)
+        session.execute("use ks")
+        # sleep to make sure we dont start any logs
+        time.sleep(2)
+        self.assertTrue(len(node.grep_log('Compacting.+to_disable')) == 0, 'Found compaction log items for {0}'.format(self.strategy))
+        node.nodetool('enableautocompaction ks to_disable')
+        # sleep to allow compactions to start
+        time.sleep(2)
+        self.assertTrue(len(node.grep_log('Compacting.+to_disable')) > 0, 'Found no log items for {0}'.format(self.strategy))
+
+    def disable_autocompaction_alter_test(self):
+        """
+        Make sure we can enable compaction using an alter-statement
+        """
+        cluster = self.cluster
+        cluster.populate(1).start(wait_for_binary_proto=True)
+        [node] = cluster.nodelist()
+        session = self.patient_cql_connection(node)
+        self.create_ks(session, 'ks', 1)
+        session.execute('CREATE TABLE to_disable (id int PRIMARY KEY, d TEXT) WITH compaction = {{\'class\':\'{0}\'}}'.format(self.strategy))
+        session.execute('ALTER TABLE to_disable WITH compaction = {{\'class\':\'{0}\', \'enabled\':\'false\'}}'.format(self.strategy))
+        for i in range(1000):
+            session.execute('insert into to_disable (id, d) values ({0}, \'{1}\')'.format(i, 'hello'*100))
+            if i % 100 == 0:
+                node.flush()
+        self.assertTrue(len(node.grep_log('Compacting.+to_disable')) == 0, 'Found compaction log items for {0}'.format(self.strategy))
+        session.execute('ALTER TABLE to_disable WITH compaction = {{\'class\':\'{0}\', \'enabled\':\'true\'}}'.format(self.strategy))
+        # we need to flush atleast once when altering to enable:
+        session.execute('insert into to_disable (id, d) values (99, \'hello\')')
+        node.flush()
+        # sleep to allow compactions to start
+        time.sleep(2)
+        self.assertTrue(len(node.grep_log('Compacting.+to_disable')) > 0, 'Found no log items for {0}'.format(self.strategy))
+
+    def disable_autocompaction_alter_and_nodetool_test(self):
+        """
+        Make sure compaction stays disabled after an alter statement where we have disabled using nodetool first
+        """
+        cluster = self.cluster
+        cluster.populate(1).start(wait_for_binary_proto=True)
+        [node] = cluster.nodelist()
+        session = self.patient_cql_connection(node)
+        self.create_ks(session, 'ks', 1)
+        session.execute('CREATE TABLE to_disable (id int PRIMARY KEY, d TEXT) WITH compaction = {{\'class\':\'{0}\'}}'.format(self.strategy))
+        node.nodetool('disableautocompaction ks to_disable')
+        for i in range(1000):
+            session.execute('insert into to_disable (id, d) values ({0}, \'{1}\')'.format(i, 'hello'*100))
+            if i % 100 == 0:
+                node.flush()
+        self.assertTrue(len(node.grep_log('Compacting.+to_disable')) == 0, 'Found compaction log items for {0}'.format(self.strategy))
+        session.execute('ALTER TABLE to_disable WITH compaction = {{\'class\':\'{0}\', \'tombstone_threshold\':0.9}}'.format(self.strategy))
+        session.execute('insert into to_disable (id, d) values (99, \'hello\')')
+        node.flush()
+        time.sleep(2)
+        self.assertTrue(len(node.grep_log('Compacting.+to_disable')) == 0, 'Found log items for {0}'.format(self.strategy))
+        node.nodetool('enableautocompaction ks to_disable')
+        # sleep to allow compactions to start
+        time.sleep(2)
+        self.assertTrue(len(node.grep_log('Compacting.+to_disable')) > 0, 'Found no log items for {0}'.format(self.strategy))
+
+
     def skip_if_no_major_compaction(self):
         if self.cluster.version() < '2.2' and self.strategy == 'LeveledCompactionStrategy':
             self.skipTest('major compaction not implemented for LCS in this version of Cassandra')
