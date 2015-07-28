@@ -11,7 +11,7 @@ import ccmlib
 from ccmlib.common import is_win
 from assertions import assert_almost_equal, assert_none, assert_one
 from dtest import Tester, debug
-from tools import require, since
+from tools import since
 
 
 class TestCommitLog(Tester):
@@ -94,23 +94,39 @@ class TestCommitLog(Tester):
         self.node1.stress(['write', 'n=150000', '-rate', 'threads=25'])
         time.sleep(1)
 
-        if not ccmlib.common.is_win():
-            tolerated_error = 0.15 if compressed else 0.05
-            assert_almost_equal(self._get_commitlog_size(), commitlog_size,
-                                error=tolerated_error)
-
         commitlogs = self._get_commitlog_files()
         assert_almost_equal(len(commitlogs), num_commitlog_files,
                             error=files_error)
-        for f in commitlogs:
+
+        if not ccmlib.common.is_win():
+            tolerated_error = 0.15 if compressed else 0.05
+            assert_almost_equal(sum([int(os.path.getsize(f)/1024/1024) for f in commitlogs]),
+                                commitlog_size,
+                                error=tolerated_error)
+
+        # the most recently-written segment of the commitlog may be smaller
+        # than the expected size, so we allow exactly one segment to be smaller
+        smaller_found = False
+        for i, f in enumerate(commitlogs):
             size = os.path.getsize(f)
             size_in_mb = int(size/1024/1024)
+            debug('segment file {} {}; smaller already found: {}'.format(f, size_in_mb, smaller_found))
             if size_in_mb < 1 or size < (segment_size*0.1):
-                continue   # commitlog not yet used
+                continue  # commitlog not yet used
 
             tolerated_error = 0.15 if compressed else 0.05
 
-            assert_almost_equal(size, segment_size, error=tolerated_error)
+            try:
+                # in general, the size will be close to what we expect
+                assert_almost_equal(size, segment_size, error=tolerated_error)
+            except AssertionError as e:
+                # but segments may be smaller with compression enabled,
+                # or the last segment may be smaller
+                if (not smaller_found) or compressed:
+                    self.assertLessEqual(size, segment_size)
+                    smaller_found = True
+                else:
+                    raise e
 
     def _provoke_commitlog_failure(self):
         """ Provoke the commitlog failure """
@@ -135,22 +151,20 @@ class TestCommitLog(Tester):
                 self.node1.stress(['write', 'n=1M', '-rate', 'threads=25'], stdout=devnull, stderr=subprocess.STDOUT)
 
     @since('2.1')
-    @require(9717, broken_in='3.0')
     def default_segment_size_test(self):
         """ Test default commitlog_segment_size_in_mb (32MB) """
 
         self.prepare(create_test_keyspace=False)
-        self._commitlog_test(32, 60, 2, files_error=0.5)
+        self._commitlog_test(32, 64, 2, files_error=0.5)
 
     @since('2.1')
-    @require(9717, broken_in='3.0')
     def small_segment_size_test(self):
         """ Test a small commitlog_segment_size_in_mb (5MB) """
         segment_size_in_mb = 5
         self.prepare(configuration={
             'commitlog_segment_size_in_mb': segment_size_in_mb
         }, create_test_keyspace=False)
-        self._commitlog_test(segment_size_in_mb, 60, 13, files_error=0.12)
+        self._commitlog_test(segment_size_in_mb, 62.5, 13, files_error=0.12)
 
     @since('2.2')
     def default_compressed_segment_size_test(self):
@@ -169,7 +183,11 @@ class TestCommitLog(Tester):
             'commitlog_segment_size_in_mb': segment_size_in_mb,
             'commitlog_compression': [{'class_name': 'LZ4Compressor'}]
         }, create_test_keyspace=False)
-        self._commitlog_test(segment_size_in_mb, 42, 14, compressed=True, files_error=0.12)
+        (expected_commitlog_files,
+         expected_commitlog_size) = ((12, 33)
+                                     if self.cluster.version() >= '3.0'
+                                     else (14, 42))
+        self._commitlog_test(segment_size_in_mb, expected_commitlog_size, expected_commitlog_files, compressed=True, files_error=0.12)
 
     def stop_failure_policy_test(self):
         """ Test the stop commitlog failure policy (default one) """
