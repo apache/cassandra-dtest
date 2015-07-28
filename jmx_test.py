@@ -1,5 +1,3 @@
-from flaky import flaky
-
 from dtest import Tester, debug
 from jmxutils import JolokiaAgent, make_mbean, remove_perf_disable_shared_mem
 from tools import since
@@ -8,7 +6,6 @@ from tools import since
 class TestJMX(Tester):
 
     @since('2.1')
-    @flaky  # flaps on 2.2
     def cfhistograms_test(self):
         """
         Test cfhistograms on large and small datasets
@@ -20,7 +17,7 @@ class TestJMX(Tester):
         node1, node2, node3 = cluster.nodelist()
 
         # issue large stress write to load data into cluster
-        node1.stress(['write', 'n=15M', '-schema', 'replication(factor=3)'])
+        node1.stress(['write', 'n=15M', '-schema', 'replication(factor=3)', '-rate', 'threads=100'])
         node1.flush()
 
         try:
