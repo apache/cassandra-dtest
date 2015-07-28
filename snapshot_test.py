@@ -9,7 +9,7 @@ import time
 from cassandra.concurrent import execute_concurrent_with_args
 
 from dtest import Tester, debug
-from tools import replace_in_file, require, since
+from tools import replace_in_file, since
 
 
 class SnapshotTester(Tester):
