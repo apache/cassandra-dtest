@@ -1,6 +1,7 @@
 from dtest import Tester, debug
 from tools import generate_ssl_stores, putget
 
+
 class TestInternodeSSL(Tester):
 
     def __init__(self, *args, **kwargs):
@@ -20,4 +21,3 @@ class TestInternodeSSL(Tester):
         self.create_ks(session, 'ks', 3)
         self.create_cf(session, 'cf', compression=None)
         putget(cluster, session)
-

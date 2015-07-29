@@ -174,6 +174,7 @@ def replace_in_file(filepath, search_replacements):
             line = re.sub(regex, replacement, line)
         sys.stdout.write(line)
 
+
 def generate_ssl_stores(base_dir, passphrase='cassandra'):
     """
     Util for generating ssl stores using java keytool -- nondestructive method if stores already exist this method is
@@ -206,6 +207,7 @@ def generate_ssl_stores(base_dir, passphrase='cassandra'):
     subprocess.check_call(['keytool', '-import', '-file', os.path.join(base_dir, 'ccm_node.cer'),
                            '-alias', 'ccm_node', '-keystore', os.path.join(base_dir, 'truststore.jks'),
                            '-storepass', passphrase, '-noprompt'])
+
 
 class since(object):
     def __init__(self, cass_version, max_version=None):

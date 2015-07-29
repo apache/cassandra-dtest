@@ -1,5 +1,6 @@
 from __future__ import with_statement
-import os, tempfile, sys, shutil, subprocess, types, time, threading, traceback, ConfigParser, logging, re, copy, errno
+import os, tempfile, sys, shutil, subprocess, types, time, threading, traceback, ConfigParser, logging, re, copy
+import errno
 
 from ccmlib.cluster import Cluster
 from ccmlib.cluster_factory import ClusterFactory
@@ -191,7 +192,8 @@ class Tester(TestCase):
                 os.remove(os.path.join(self.test_path, 'truststore.jks'))
                 os.remove(os.path.join(self.test_path, 'ccm_node.cer'))
             except OSError as e:
-                if e.errno != errno.ENOENT: # errno.ENOENT = no such file or directory
+                # errno.ENOENT = no such file or directory
+                if e.errno != errno.ENOENT:
                     raise
 
             os.rmdir(self.test_path)
