@@ -1,5 +1,5 @@
 from __future__ import with_statement
-import os, tempfile, sys, shutil, subprocess, types, time, threading, traceback, ConfigParser, logging, re, copy
+import os, tempfile, sys, shutil, subprocess, types, time, threading, traceback, ConfigParser, logging, re, copy, errno
 
 from ccmlib.cluster import Cluster
 from ccmlib.cluster_factory import ClusterFactory
@@ -184,6 +184,16 @@ class Tester(TestCase):
             # Cleanup everything:
             debug("removing ccm cluster " + self.cluster.name + " at: " + self.test_path)
             self.cluster.remove()
+
+            try:
+                debug("clearing ssl stores from [%s] directory" % self.test_path)
+                os.remove(os.path.join(self.test_path, 'keystore.jks'))
+                os.remove(os.path.join(self.test_path, 'truststore.jks'))
+                os.remove(os.path.join(self.test_path, 'ccm_node.cer'))
+            except OSError as e:
+                if e.errno != errno.ENOENT: # errno.ENOENT = no such file or directory
+                    raise
+
             os.rmdir(self.test_path)
         if os.path.exists(LAST_TEST_DIR):
             os.remove(LAST_TEST_DIR)
