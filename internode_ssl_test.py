@@ -8,7 +8,10 @@ class TestInternodeSSL(Tester):
         Tester.__init__(self, *args, **kwargs)
 
     def putget_with_internode_ssl_test(self):
-        """ Simple putget test with internode ssl enabled - https://issues.apache.org/jira/browse/CASSANDRA-9884 """
+        """
+        Simple putget test with internode ssl enabled
+        @jira_ticket CASSANDRA-9884
+        """
         cluster = self.cluster
 
         debug("***using internode ssl***")

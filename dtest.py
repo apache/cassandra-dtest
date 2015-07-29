@@ -187,7 +187,7 @@ class Tester(TestCase):
             self.cluster.remove()
 
             try:
-                debug("clearing ssl stores from [%s] directory" % self.test_path)
+                debug("clearing ssl stores from [{0}] directory".format(self.test_path))
                 os.remove(os.path.join(self.test_path, 'keystore.jks'))
                 os.remove(os.path.join(self.test_path, 'truststore.jks'))
                 os.remove(os.path.join(self.test_path, 'ccm_node.cer'))

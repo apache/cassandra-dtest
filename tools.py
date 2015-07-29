@@ -180,30 +180,26 @@ def generate_ssl_stores(base_dir, passphrase='cassandra'):
     Util for generating ssl stores using java keytool -- nondestructive method if stores already exist this method is
     a no-op.
 
-    Args:
-        base_dir (str):  directory where keystore.jks, truststore.jks and ccm_node.cer will be placed
-
-        passphrase (Optional[str]): currently ccm expects a passphrase of 'cassandra' so it's the default but it can be
+    @param base_dir (str) directory where keystore.jks, truststore.jks and ccm_node.cer will be placed
+    @param passphrase (Optional[str]) currently ccm expects a passphrase of 'cassandra' so it's the default but it can be
             overridden for failure testing
-    Returns:
-        None
-    Raises:
-        CalledProcessError: If the keytool fails during any step
+    @return None
+    @throws CalledProcessError If the keytool fails during any step
     """
 
     if os.path.exists(os.path.join(base_dir, 'keystore.jks')):
         debug("keystores already exists - skipping generation of ssl keystores")
         return
 
-    debug("generating keystore.jks in [%s]" % base_dir)
+    debug("generating keystore.jks in [{0}]".format(base_dir))
     subprocess.check_call(['keytool', '-genkeypair', '-alias', 'ccm_node', '-keyalg', 'RSA', '-validity', '365',
                            '-keystore', os.path.join(base_dir, 'keystore.jks'), '-storepass', passphrase,
                            '-dname', 'cn=Cassandra Node,ou=CCMnode,o=DataStax,c=US', '-keypass', passphrase])
-    debug("exporting cert from keystore.jks in [%s]" % base_dir)
+    debug("exporting cert from keystore.jks in [{0}]".format(base_dir))
     subprocess.check_call(['keytool', '-export', '-rfc', '-alias', 'ccm_node',
                            '-keystore', os.path.join(base_dir, 'keystore.jks'),
                            '-file', os.path.join(base_dir, 'ccm_node.cer'), '-storepass', passphrase])
-    debug("importing cert into truststore.jks in [%s]" % base_dir)
+    debug("importing cert into truststore.jks in [{0}]".format(base_dir))
     subprocess.check_call(['keytool', '-import', '-file', os.path.join(base_dir, 'ccm_node.cer'),
                            '-alias', 'ccm_node', '-keystore', os.path.join(base_dir, 'truststore.jks'),
                            '-storepass', passphrase, '-noprompt'])
