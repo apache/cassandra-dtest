@@ -335,7 +335,7 @@ class TestBootstrap(Tester):
         # Now start it, it should not be allowed to join.
         mark = node2.mark_log()
         node2.start(no_wait=True)
-        node2.watch_log_for("A node with address /127.0.0.4 already exists, cancelling join", from_mark=mark, timeout=60)
+        node2.watch_log_for("A node with address /127.0.0.4 already exists, cancelling join", from_mark=mark)
 
     def decommissioned_wiped_node_can_join_test(self):
         """
@@ -376,7 +376,7 @@ class TestBootstrap(Tester):
         # Now start it, it should be allowed to join
         mark = node2.mark_log()
         node2.start(wait_other_notice=True)
-        node2.watch_log_for("JOINING:", from_mark=mark, timeout=60)
+        node2.watch_log_for("JOINING:", from_mark=mark)
 
     def failed_bootstap_wiped_node_can_join_test(self):
         """
@@ -421,4 +421,4 @@ class TestBootstrap(Tester):
         # Now start it again, it should be allowed to join
         mark = node2.mark_log()
         node2.start(wait_other_notice=True)
-        node2.watch_log_for("JOINING:", from_mark=mark, timeout=60)
+        node2.watch_log_for("JOINING:", from_mark=mark)
