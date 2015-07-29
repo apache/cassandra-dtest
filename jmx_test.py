@@ -17,7 +17,7 @@ class TestJMX(Tester):
         node1, node2, node3 = cluster.nodelist()
 
         # issue large stress write to load data into cluster
-        node1.stress(['write', 'n=15M', '-schema', 'replication(factor=3)', '-rate', 'threads=100'])
+        node1.stress(['write', 'n=15M', '-schema', 'replication(factor=3)', '-rate', 'threads=50'])
         node1.flush()
 
         try:
