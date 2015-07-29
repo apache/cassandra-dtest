@@ -10,7 +10,7 @@ import uuid
 from collections import defaultdict
 from distutils.version import LooseVersion
 from dtest import Tester, debug, DEFAULT_DIR
-from tools import new_node
+from tools import new_node, generate_ssl_stores
 from cassandra import ConsistencyLevel, WriteTimeout
 from cassandra.query import SimpleStatement
 
@@ -190,14 +190,26 @@ class TestUpgradeThroughVersions(Tester):
     def upgrade_test(self):
         self.upgrade_scenario()
 
+    def upgrade_test_with_internode_ssl(self):
+        self.upgrade_scenario(internode_ssl=True)
+
     def upgrade_test_mixed(self):
         """Only upgrade part of the cluster, so we have mixed versions part way through."""
         self.upgrade_scenario(mixed_version=True)
 
-    def upgrade_scenario(self, populate=True, create_schema=True, mixed_version=False, after_upgrade_call=()):
+    def upgrade_test_mixed_with_internode_ssl(self):
+        """Only upgrade part of the cluster, so we have mixed versions part way through."""
+        self.upgrade_scenario(mixed_version=True, internode_ssl=True)
+
+    def upgrade_scenario(self, populate=True, create_schema=True, mixed_version=False, after_upgrade_call=(), internode_ssl=False):
         # Record the rows we write as we go:
         self.row_values = set()
         cluster = self.cluster
+
+        if internode_ssl:
+            debug("***using internode ssl***")
+            generate_ssl_stores(self.test_path)
+            self.cluster.enable_internode_ssl(self.test_path)
 
         if populate:
             # Start with 3 node cluster
