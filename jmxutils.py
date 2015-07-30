@@ -6,6 +6,11 @@ import subprocess
 
 JOLOKIA_JAR = os.path.join('lib', 'jolokia-jvm-1.2.3-agent.jar')
 
+def java_bin():
+    if os.environ.has_key('JAVA_HOME'):
+        return os.path.join(os.environ['JAVA_HOME'],'bin','java')
+    else:
+        return 'java'
 
 def make_mbean(package, type, **kwargs):
     '''
@@ -72,7 +77,7 @@ class JolokiaAgent(object):
         Starts the Jolokia agent.  The process will fork from the parent
         and continue running until stop() is called.
         """
-        args = ('java',
+        args = (java_bin(),
                 '-jar', JOLOKIA_JAR,
                 '--host', self.node.network_interfaces['binary'][0],
                 'start', str(self.node.pid))
@@ -88,7 +93,7 @@ class JolokiaAgent(object):
         """
         Stops the Jolokia agent.
         """
-        args = ('java',
+        args = (java_bin(),
                 '-jar', JOLOKIA_JAR,
                 'stop', str(self.node.pid))
         try:
