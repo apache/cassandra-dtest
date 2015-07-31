@@ -255,14 +255,14 @@ class TestOfflineTools(Tester):
     def _get_final_sstables(self, node, ks, table):
         """
         Return the node final sstable data files, excluding the temporary tables.
-        If sstablelister exists (>= 3.0) then we rely on this tool since the table
+        If sstableutil exists (>= 3.0) then we rely on this tool since the table
         file names no longer contain tmp in their names (CASSANDRA-7066).
         """
         # Get all sstable data files
         allsstables = node.get_sstables(ks, table)
 
         # Remove any temporary files
-        tool_bin = node.get_tool('sstablelister')
+        tool_bin = node.get_tool('sstableutil')
         if os.path.isfile(tool_bin):
             args = [tool_bin, '--type', 'tmp', ks, table]
             env = common.make_cassandra_env(node.get_install_cassandra_root(), node.get_node_cassandra_root())
