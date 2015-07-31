@@ -1,8 +1,7 @@
 import bisect
-import os
 import operator
+import os
 import pprint
-import psutil
 import random
 import re
 import signal
@@ -11,16 +10,15 @@ import time
 import uuid
 from collections import defaultdict
 from distutils.version import LooseVersion
-from dtest import Tester, debug, DEFAULT_DIR
-from tools import new_node, generate_ssl_stores
 from multiprocessing import Process, Queue
 from Queue import Empty, Full
 
+import psutil
+
 from cassandra import ConsistencyLevel, WriteTimeout
 from cassandra.query import SimpleStatement
-
 from dtest import DEFAULT_DIR, Tester, debug
-from tools import new_node
+from tools import generate_ssl_stores, new_node
 
 # Versions are tuples of (major_ver, minor_ver)
 # Used to build upgrade path(s) for tests. Some tests will go from start to finish,
