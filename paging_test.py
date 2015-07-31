@@ -1467,7 +1467,6 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
         self.check_all_paging_results(expected_data, 8,
                                       [25, 25, 25, 25, 25, 25, 25, 25])
 
-    @require(9831, broken_in='2.2')
     def test_ttl_deletions(self):
         """Test ttl deletions. Paging over a query that has only tombstones """
         self.session = self.prepare()
@@ -1482,6 +1481,8 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
             self.session.execute(
                 SimpleStatement(s, consistency_level=CL.ALL)
             )
+        self.check_all_paging_results(data, 8,
+                                      [25, 25, 25, 25, 25, 25, 25, 25])
         time.sleep(5)
         self.check_all_paging_results([], 0, [])
 
