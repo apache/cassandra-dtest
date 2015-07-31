@@ -9,6 +9,7 @@ from tempfile import NamedTemporaryFile
 from uuid import uuid1, uuid4
 
 from cassandra.concurrent import execute_concurrent_with_args
+from ccmlib.common import is_win
 
 from cqlsh_tools import (DummyColorMap, assert_csvs_items_equal, csv_rows,
                          monkeypatch_driver, random_list,
@@ -36,7 +37,7 @@ class CqlshCopyTest(Tester):
         unmonkeypatch_driver(cls._cached_driver_methods)
 
     def tearDown(self):
-        if self.tempfile:
+        if self.tempfile and not is_win():
             os.unlink(self.tempfile.name)
             super(CqlshCopyTest, self).tearDown()
 
