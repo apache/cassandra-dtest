@@ -1482,6 +1482,8 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
             self.session.execute(
                 SimpleStatement(s, consistency_level=CL.ALL)
             )
+        self.check_all_paging_results(data, 8,
+                                      [25, 25, 25, 25, 25, 25, 25, 25])
         time.sleep(5)
         self.check_all_paging_results([], 0, [])
 
