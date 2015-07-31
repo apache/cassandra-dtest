@@ -123,7 +123,7 @@ class TestArchiveCommitlog(SnapshotTester):
     def restore_snapshot(self, snapshot_dir, node, ks, cf, name):
         debug("Restoring snapshot for cf ....")
         data_dir = os.path.join(node.get_path(), 'data')
-        cf_id = [s for s in os.listdir(snapshot_dir) if cf in s][0]
+        cf_id = [s for s in os.listdir(snapshot_dir) if s.startswith(cf + "-")][0]
         snapshot_dir = glob.glob("{snapshot_dir}/{cf_id}/snapshots/{name}".format(**locals()))[0]
         if not os.path.exists(os.path.join(data_dir, ks)):
             os.mkdir(os.path.join(data_dir, ks))
