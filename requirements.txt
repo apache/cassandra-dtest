@@ -8,6 +8,7 @@ flaky
 futures
 nose
 nose-test-select
+psutil
 pycassa
 six
 thrift
