@@ -698,7 +698,8 @@ class TestConsistency(Tester):
         session = self.patient_cql_connection(node1, 'ks')
 
         # we read the first row in the partition (so with a LIMIT 1) and A and B answer first.
-        node3.stop()
+        node3.flush()
+        node3.stop(wait_other_notice=True)
         assert_none(session, "SELECT * FROM t WHERE id = 0 LIMIT 1", cl=ConsistencyLevel.QUORUM)
 
     def readrepair_test(self):
