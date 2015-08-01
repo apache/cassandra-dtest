@@ -23,8 +23,8 @@ class TestOfflineTools(Tester):
         @jira_ticket CASSANDRA-7614
         """
         cluster = self.cluster
-        cluster.populate(3).start()
-        node1, node2, node3 = cluster.nodelist()
+        cluster.populate(1).start()
+        node1 = cluster.nodelist()[0]
 
         # test by trying to run on nonexistent keyspace
         cluster.stop(gently=False)
@@ -35,10 +35,7 @@ class TestOfflineTools(Tester):
 
         # now test by generating keyspace but not flushing sstables
         cluster.start()
-        if cluster.version() < "2.1":
-            node1.stress(['-o', 'insert', '--num-keys=100', '--replication-factor=3'])
-        else:
-            node1.stress(['write', 'n=100', '-schema', 'replication(factor=3)'])
+        node1.stress(['write', 'n=100', '-schema', 'replication(factor=1)'])
         cluster.stop(gently=False)
 
         (output, error, rc) = node1.run_sstablelevelreset("keyspace1", "standard1", output=True)
@@ -49,11 +46,8 @@ class TestOfflineTools(Tester):
         # test by writing small amount of data and flushing (all sstables should be level 0)
         cluster.start()
         session = self.patient_cql_connection(node1)
-        session.execute("ALTER TABLE keyspace1.standard1 with compaction={'class': 'LeveledCompactionStrategy', 'sstable_size_in_mb':3};")
-        if cluster.version() < "2.1":
-            node1.stress(['-o', 'insert', '--num-keys=10000', '--replication-factor=3'])
-        else:
-            node1.stress(['write', 'n=10000', '-schema', 'replication(factor=3)'])
+        session.execute("ALTER TABLE keyspace1.standard1 with compaction={'class': 'LeveledCompactionStrategy', 'sstable_size_in_mb':1};")
+        node1.stress(['write', 'n=1000', '-schema', 'replication(factor=1)'])
         node1.flush()
         cluster.stop(gently=False)
 
@@ -63,11 +57,7 @@ class TestOfflineTools(Tester):
 
         # test by loading large amount data so we have multiple levels and checking all levels are 0 at end
         cluster.start()
-
-        if cluster.version() < "2.1":
-            node1.stress(['-o', 'insert', '--num-keys=1000000', '--replication-factor=3'])
-        else:
-            node1.stress(['write', 'n=1M', '-schema', 'replication(factor=3)'])
+        node1.stress(['write', 'n=50000', '-schema', 'replication(factor=1)'])
         self.wait_for_compactions(node1)
         cluster.stop()
 
@@ -78,8 +68,11 @@ class TestOfflineTools(Tester):
         debug(initial_levels)
         debug(final_levels)
 
-        for x in range(0, len(final_levels)):
-            self.assertEqual(final_levels[x], 0)
+        # let's make sure there was at least L1 beforing resetting levels
+        self.assertTrue(max(initial_levels) > 0)
+
+        # let's check all sstables are on L0 after sstablelevelreset
+        self.assertTrue(max(final_levels) == 0)
 
     def get_levels(self, data):
         levels = []
