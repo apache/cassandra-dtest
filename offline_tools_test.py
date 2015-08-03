@@ -23,8 +23,8 @@ class TestOfflineTools(Tester):
         @jira_ticket CASSANDRA-7614
         """
         cluster = self.cluster
-        cluster.populate(3).start()
-        node1, node2, node3 = cluster.nodelist()
+        cluster.populate(1).start()
+        node1 = cluster.nodelist()[0]
 
         # test by trying to run on nonexistent keyspace
         cluster.stop(gently=False)
@@ -35,10 +35,7 @@ class TestOfflineTools(Tester):
 
         # now test by generating keyspace but not flushing sstables
         cluster.start()
-        if cluster.version() < "2.1":
-            node1.stress(['-o', 'insert', '--num-keys=100', '--replication-factor=3'])
-        else:
-            node1.stress(['write', 'n=100', '-schema', 'replication(factor=3)'])
+        node1.stress(['write', 'n=100', '-schema', 'replication(factor=1)'])
         cluster.stop(gently=False)
 
         (output, error, rc) = node1.run_sstablelevelreset("keyspace1", "standard1", output=True)
@@ -49,11 +46,8 @@ class TestOfflineTools(Tester):
         # test by writing small amount of data and flushing (all sstables should be level 0)
         cluster.start()
         session = self.patient_cql_connection(node1)
-        session.execute("ALTER TABLE keyspace1.standard1 with compaction={'class': 'LeveledCompactionStrategy', 'sstable_size_in_mb':3};")
-        if cluster.version() < "2.1":
-            node1.stress(['-o', 'insert', '--num-keys=10000', '--replication-factor=3'])
-        else:
-            node1.stress(['write', 'n=10000', '-schema', 'replication(factor=3)'])
+        session.execute("ALTER TABLE keyspace1.standard1 with compaction={'class': 'LeveledCompactionStrategy', 'sstable_size_in_mb':1};")
+        node1.stress(['write', 'n=1000', '-schema', 'replication(factor=1)'])
         node1.flush()
         cluster.stop(gently=False)
 
@@ -63,11 +57,7 @@ class TestOfflineTools(Tester):
 
         # test by loading large amount data so we have multiple levels and checking all levels are 0 at end
         cluster.start()
-
-        if cluster.version() < "2.1":
-            node1.stress(['-o', 'insert', '--num-keys=1000000', '--replication-factor=3'])
-        else:
-            node1.stress(['write', 'n=1M', '-schema', 'replication(factor=3)'])
+        node1.stress(['write', 'n=50000', '-schema', 'replication(factor=1)'])
         self.wait_for_compactions(node1)
         cluster.stop()
 
@@ -78,8 +68,11 @@ class TestOfflineTools(Tester):
         debug(initial_levels)
         debug(final_levels)
 
-        for x in range(0, len(final_levels)):
-            self.assertEqual(final_levels[x], 0)
+        # let's make sure there was at least L1 beforing resetting levels
+        self.assertTrue(max(initial_levels) > 0)
+
+        # let's check all sstables are on L0 after sstablelevelreset
+        self.assertTrue(max(final_levels) == 0)
 
     def get_levels(self, data):
         levels = []
@@ -100,14 +93,15 @@ class TestOfflineTools(Tester):
     def sstableofflinerelevel_test(self):
         """
         Generate sstables of varying levels.
+        Reset sstables to L0 with sstablelevelreset
         Run sstableofflinerelevel and ensure tables are promoted correctly
         Also test a variety of bad inputs including nonexistent keyspace and sstables
         @since 2.1.5
         @jira_ticket CASSANRDA-8031
         """
         cluster = self.cluster
-        cluster.populate(3).start()
-        node1, node2, node3 = cluster.nodelist()
+        cluster.populate(1).start()
+        node1 = cluster.nodelist()[0]
 
         # NOTE - As of now this does not return when it encounters Exception and causes test to hang, temporarily commented out
         # test by trying to run on nonexistent keyspace
@@ -119,7 +113,8 @@ class TestOfflineTools(Tester):
         # cluster.start()
 
         # now test by generating keyspace but not flushing sstables
-        node1.stress(['write', 'n=100', '-schema', 'replication(factor=3)'])
+
+        node1.stress(['write', 'n=1', '-schema', 'replication(factor=1)'])
         cluster.stop(gently=False)
 
         (output, error, rc) = node1.run_sstableofflinerelevel("keyspace1", "standard1", output=True)
@@ -130,9 +125,9 @@ class TestOfflineTools(Tester):
         # test by flushing (sstable should be level 0)
         cluster.start()
         session = self.patient_cql_connection(node1)
-        session.execute("ALTER TABLE keyspace1.standard1 with compaction={'class': 'LeveledCompactionStrategy', 'sstable_size_in_mb':3};")
+        session.execute("ALTER TABLE keyspace1.standard1 with compaction={'class': 'LeveledCompactionStrategy', 'sstable_size_in_mb':1};")
 
-        node1.stress(['write', 'n=1000', '-schema', 'replication(factor=3)'])
+        node1.stress(['write', 'n=1000', '-schema', 'replication(factor=1)'])
 
         node1.flush()
         cluster.stop()
@@ -143,22 +138,30 @@ class TestOfflineTools(Tester):
 
         # test by loading large amount data so we have multiple sstables
         cluster.start()
-        node1.stress(['write', 'n=1M', '-schema', 'replication(factor=3)'])
-        node1.flush()
-        node1.stress(['write', 'n=5M', '-schema', 'replication(factor=3)'])
+        node1.stress(['write', 'n=100000', '-schema', 'replication(factor=1)'])
         node1.flush()
         cluster.stop()
 
+        # Let's reset all sstables to L0
         initial_levels = self.get_levels(node1.run_sstablemetadata(keyspace="keyspace1", column_families=["standard1"]))
         (output, error, rc) = node1.run_sstablelevelreset("keyspace1", "standard1", output=True)
+        final_levels = self.get_levels(node1.run_sstablemetadata(keyspace="keyspace1", column_families=["standard1"]))
+
+        # let's make sure there was at least 3 levels (L0, L1 and L2)
+        self.assertTrue(max(initial_levels) > 1)
+        # let's check all sstables are on L0 after sstablelevelreset
+        self.assertTrue(max(final_levels) == 0)
+
+        # time to relevel sstables
+        initial_levels = self.get_levels(node1.run_sstablemetadata(keyspace="keyspace1", column_families=["standard1"]))
+        (output, error, rc) = node1.run_sstableofflinerelevel("keyspace1", "standard1", output=True)
         final_levels = self.get_levels(node1.run_sstablemetadata(keyspace="keyspace1", column_families=["standard1"]))
 
         debug(initial_levels)
         debug(final_levels)
 
-        for x in range(0, len(final_levels)):
-            initial = "intial level: " + str(initial_levels[x])
-            self.assertEqual(final_levels[x], 0, msg=initial)
+        # let's check sstables were promoted after releveling
+        self.assertTrue(max(final_levels) > 1)
 
     @since('2.2')
     @require(9774, broken_in='3.0')
