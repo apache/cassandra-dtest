@@ -440,6 +440,7 @@ class TestRandomPartitionerUpgrade(TestUpgradeThroughVersions):
             # it's trying to send the migration to hasn't started yet,
             # and when it does, it gets replayed and everything is fine.
             r'Can\'t send migration request: node.*is down',
+            r'RejectedExecutionException.*ThreadPoolExecutor has shut down',
         ]
 
         # Force cluster options that are common among versions:
