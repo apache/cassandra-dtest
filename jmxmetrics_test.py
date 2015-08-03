@@ -106,7 +106,7 @@ class TestJMXMetrics(Tester):
                             PRIMARY KEY (key, column1)
                         ) WITH COMPACT STORAGE
                             AND CLUSTERING ORDER BY (column1 ASC)
-                            AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
+                            AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
                             AND comment = ''
                             AND compaction = {'min_threshold': '4', 'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32'}
                             AND compression = {}
