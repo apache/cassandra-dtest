@@ -1,14 +1,19 @@
-from dtest import Tester, debug, DISABLE_VNODES
-from assertions import assert_unavailable, assert_none
-from tools import create_c1c2_table, insert_c1c2, query_c1c2, insert_columns, rows_to_list
-from cassandra import ConsistencyLevel
-from cassandra.query import SimpleStatement
-
+import Queue
+import sys
+import threading
+import time
+import traceback
 from collections import OrderedDict
 from copy import deepcopy
 
-import time, sys
-import threading, Queue, traceback
+from cassandra import ConsistencyLevel
+from cassandra.query import SimpleStatement
+
+from assertions import assert_none, assert_unavailable
+from dtest import DISABLE_VNODES, Tester, debug
+from tools import (create_c1c2_table, insert_c1c2, insert_columns, query_c1c2,
+                   rows_to_list)
+
 
 class TestHelper(Tester):
 
@@ -22,18 +27,18 @@ class TestHelper(Tester):
 
     def _name(self, cl):
         return {
-            None : '-',
-            ConsistencyLevel.ANY : 'ANY',
-            ConsistencyLevel.ONE : 'ONE',
-            ConsistencyLevel.TWO : 'TWO',
-            ConsistencyLevel.THREE : 'THREE',
-            ConsistencyLevel.QUORUM : 'QUORUM',
-            ConsistencyLevel.ALL : 'ALL',
-            ConsistencyLevel.LOCAL_QUORUM : 'LOCAL_QUORUM',
-            ConsistencyLevel.EACH_QUORUM : 'EACH_QUORUM',
-            ConsistencyLevel.SERIAL : 'SERIAL',
-            ConsistencyLevel.LOCAL_SERIAL : 'LOCAL_SERIAL',
-            ConsistencyLevel.LOCAL_ONE : 'LOCAL_ONE',
+            None: '-',
+            ConsistencyLevel.ANY: 'ANY',
+            ConsistencyLevel.ONE: 'ONE',
+            ConsistencyLevel.TWO: 'TWO',
+            ConsistencyLevel.THREE: 'THREE',
+            ConsistencyLevel.QUORUM: 'QUORUM',
+            ConsistencyLevel.ALL: 'ALL',
+            ConsistencyLevel.LOCAL_QUORUM: 'LOCAL_QUORUM',
+            ConsistencyLevel.EACH_QUORUM: 'EACH_QUORUM',
+            ConsistencyLevel.SERIAL: 'SERIAL',
+            ConsistencyLevel.LOCAL_SERIAL: 'LOCAL_SERIAL',
+            ConsistencyLevel.LOCAL_ONE: 'LOCAL_ONE',
         }[cl]
 
     def _is_local(self, cl):
@@ -52,17 +57,17 @@ class TestHelper(Tester):
         given a list of replication factors, one per dc.
         """
         return {
-            ConsistencyLevel.ANY : 1,
-            ConsistencyLevel.ONE : 1,
-            ConsistencyLevel.TWO : 2,
-            ConsistencyLevel.THREE : 3,
-            ConsistencyLevel.QUORUM : sum(rf_factors) / 2 + 1,
-            ConsistencyLevel.ALL : sum(rf_factors),
-            ConsistencyLevel.LOCAL_QUORUM : rf_factors[dc] / 2 + 1,
-            ConsistencyLevel.EACH_QUORUM : rf_factors[dc] / 2 + 1,
-            ConsistencyLevel.SERIAL : sum(rf_factors) / 2 + 1,
-            ConsistencyLevel.LOCAL_SERIAL : rf_factors[dc] / 2 + 1,
-            ConsistencyLevel.LOCAL_ONE : 1,
+            ConsistencyLevel.ANY: 1,
+            ConsistencyLevel.ONE: 1,
+            ConsistencyLevel.TWO: 2,
+            ConsistencyLevel.THREE: 3,
+            ConsistencyLevel.QUORUM: sum(rf_factors) / 2 + 1,
+            ConsistencyLevel.ALL: sum(rf_factors),
+            ConsistencyLevel.LOCAL_QUORUM: rf_factors[dc] / 2 + 1,
+            ConsistencyLevel.EACH_QUORUM: rf_factors[dc] / 2 + 1,
+            ConsistencyLevel.SERIAL: sum(rf_factors) / 2 + 1,
+            ConsistencyLevel.LOCAL_SERIAL: rf_factors[dc] / 2 + 1,
+            ConsistencyLevel.LOCAL_ONE: 1,
         }[cl]
 
     def _should_succeed(self, cl, rf_factors, num_nodes_alive, current):
@@ -86,7 +91,7 @@ class TestHelper(Tester):
         nodes = self.nodes
         rf = self.rf
 
-        cluster.set_configuration_options(values={'hinted_handoff_enabled' : False})
+        cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
         cluster.populate(nodes).start(wait_for_binary_proto=True, wait_other_notice=True)
 
         self.ksname = 'mytestks'
@@ -177,6 +182,7 @@ class TestHelper(Tester):
         res = rows_to_list(session.execute(statement))
         return res[0][0] if res else 0
 
+
 class TestAvailability(TestHelper):
     """
     Test that we can read and write depending on the number of nodes that are alive and the consistency levels.
@@ -190,7 +196,7 @@ class TestAvailability(TestHelper):
         nodes = self.nodes
         rf = self.rf
 
-        num_alive = nodes;
+        num_alive = nodes
         for node in xrange(nodes):
             debug('Testing node %d in single dc with %d nodes alive' % (node, num_alive,))
             session = self.patient_exclusive_cql_connection(cluster.nodelist()[node], self.ksname)
@@ -212,9 +218,9 @@ class TestAvailability(TestHelper):
         nodes_alive = deepcopy(nodes)
         rf_factors = rf.values()
 
-        for i in xrange(0, len(nodes)): # for each dc
-            self.log('Testing dc %d with rf %d and %s nodes alive' %(i, rf_factors[i], nodes_alive))
-            for n in xrange(nodes[i]): # for each node in this dc
+        for i in xrange(0, len(nodes)):  # for each dc
+            self.log('Testing dc %d with rf %d and %s nodes alive' % (i, rf_factors[i], nodes_alive))
+            for n in xrange(nodes[i]):  # for each node in this dc
                 self.log('Testing node %d in dc %d with %s nodes alive' % (n, i, nodes_alive))
                 node = n + sum(nodes[:i])
                 session = self.patient_exclusive_cql_connection(cluster.nodelist()[node], self.ksname)
@@ -430,7 +436,6 @@ class TestAccuracy(TestHelper):
                     outer.update_counter(sessions[s], n, write_cl, serial_cl)
                     check_all_sessions(s, n, c)
 
-
     def _run_test_function_in_parallel(self, valid_fcn, nodes, rf_factors, combinations):
         """
         Run a test function in parallel.
@@ -597,7 +602,7 @@ class TestConsistency(Tester):
 
         # Disable hinted handoff and set batch commit log so this doesn't
         # interfer with the test
-        cluster.set_configuration_options(values={ 'hinted_handoff_enabled' : False}, batch_commitlog=True)
+        cluster.set_configuration_options(values={'hinted_handoff_enabled': False}, batch_commitlog=True)
 
         cluster.populate(3).start(wait_other_notice=True)
         node1, node2, node3 = cluster.nodelist()
@@ -635,7 +640,7 @@ class TestConsistency(Tester):
 
         # Disable hinted handoff and set batch commit log so this doesn't
         # interfer with the test
-        cluster.set_configuration_options(values={ 'hinted_handoff_enabled' : False}, batch_commitlog=True)
+        cluster.set_configuration_options(values={'hinted_handoff_enabled': False}, batch_commitlog=True)
 
         cluster.populate(2).start(wait_other_notice=True)
         node1, node2 = cluster.nodelist()
@@ -666,11 +671,11 @@ class TestConsistency(Tester):
     def short_read_quorum_delete_test(self):
         """Test CASSANDRA-8933"""
         cluster = self.cluster
-        #Consider however 3 nodes A, B, C (RF=3), and following sequence of operations (all done at QUORUM):
+        # Consider however 3 nodes A, B, C (RF=3), and following sequence of operations (all done at QUORUM):
 
         # Disable hinted handoff and set batch commit log so this doesn't
         # interfere with the test
-        cluster.set_configuration_options(values={ 'hinted_handoff_enabled' : False}, batch_commitlog=True)
+        cluster.set_configuration_options(values={'hinted_handoff_enabled': False}, batch_commitlog=True)
 
         cluster.populate(3).start(wait_other_notice=True)
         node1, node2, node3 = cluster.nodelist()
@@ -704,7 +709,7 @@ class TestConsistency(Tester):
 
     def readrepair_test(self):
         cluster = self.cluster
-        cluster.set_configuration_options(values={ 'hinted_handoff_enabled' : False})
+        cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
 
         if DISABLE_VNODES:
             cluster.populate(2).start()
@@ -724,7 +729,7 @@ class TestConsistency(Tester):
 
         node2.start(wait_other_notice=True)
 
-       # query everything to cause RR
+        # query everything to cause RR
         for n in xrange(0, 10000):
             query_c1c2(session, n, ConsistencyLevel.QUORUM)
 
@@ -739,8 +744,8 @@ class TestConsistency(Tester):
         cluster = self.cluster
 
         # Disable hinted handoff and set batch commit log so this doesn't
-        # interfer with the test
-        cluster.set_configuration_options(values={ 'hinted_handoff_enabled' : False}, batch_commitlog=True)
+        # interfere with the test
+        cluster.set_configuration_options(values={'hinted_handoff_enabled': False}, batch_commitlog=True)
 
         cluster.populate(3).start(wait_other_notice=True)
         node1, node2, node3 = cluster.nodelist()
@@ -816,4 +821,3 @@ class TestConsistency(Tester):
         session.execute(simple_query)
 
         to_stop.start(wait_other_notice=True)
-
