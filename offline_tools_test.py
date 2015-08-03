@@ -47,7 +47,7 @@ class TestOfflineTools(Tester):
         cluster.start()
         session = self.patient_cql_connection(node1)
         session.execute("ALTER TABLE keyspace1.standard1 with compaction={'class': 'LeveledCompactionStrategy', 'sstable_size_in_mb':1};")
-        node1.stress(['write', 'n=1000', '-schema', 'replication(factor=1)'])
+        node1.stress(['write', 'n=1K', '-schema', 'replication(factor=1)'])
         node1.flush()
         cluster.stop(gently=False)
 
@@ -57,7 +57,7 @@ class TestOfflineTools(Tester):
 
         # test by loading large amount data so we have multiple levels and checking all levels are 0 at end
         cluster.start()
-        node1.stress(['write', 'n=50000', '-schema', 'replication(factor=1)'])
+        node1.stress(['write', 'n=50K', '-schema', 'replication(factor=1)'])
         self.wait_for_compactions(node1)
         cluster.stop()
 
@@ -127,7 +127,7 @@ class TestOfflineTools(Tester):
         session = self.patient_cql_connection(node1)
         session.execute("ALTER TABLE keyspace1.standard1 with compaction={'class': 'LeveledCompactionStrategy', 'sstable_size_in_mb':1};")
 
-        node1.stress(['write', 'n=1000', '-schema', 'replication(factor=1)'])
+        node1.stress(['write', 'n=1K', '-schema', 'replication(factor=1)'])
 
         node1.flush()
         cluster.stop()
@@ -138,7 +138,7 @@ class TestOfflineTools(Tester):
 
         # test by loading large amount data so we have multiple sstables
         cluster.start()
-        node1.stress(['write', 'n=100000', '-schema', 'replication(factor=1)'])
+        node1.stress(['write', 'n=100K', '-schema', 'replication(factor=1)'])
         node1.flush()
         cluster.stop()
 
