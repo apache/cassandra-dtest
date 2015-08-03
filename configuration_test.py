@@ -87,6 +87,7 @@ class TestConfiguration(Tester):
                         "AND DURABLE_WRITES = false")
         session.execute('CREATE TABLE ks.tab (key int PRIMARY KEY, a int, b int, c int)')
         session.execute('ALTER KEYSPACE ks WITH DURABLE_WRITES=true')
+        write_to_trigger_fsync(session, 'ks', 'tab')
         self.assertGreater(commitlog_size(node), init_size,
                            msg='ALTER KEYSPACE was not respected')
 

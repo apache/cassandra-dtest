@@ -61,6 +61,12 @@ def reset_environment_vars():
     os.environ.clear()
     os.environ.update(initial_environment)
 
+
+def warning(msg):
+    LOG.warning(msg, extra={"current_test": CURRENT_TEST})
+    if PRINT_DEBUG:
+        print "WARN: " + msg
+
 def debug(msg):
     LOG.debug(msg, extra={"current_test":CURRENT_TEST})
     if PRINT_DEBUG:
