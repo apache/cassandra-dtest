@@ -209,13 +209,13 @@ class TestIncRepair(Tester):
     @since('2.1')
     @attr('long')
     @flaky  # see CASSANDRA-9752
+    @unittest.skipIf(is_win(), "This test hangs windows servers up.")
     def multiple_subsequent_repair_test(self):
         """
         Covers CASSANDRA-8366
 
         There is an issue with subsequent inc repairs.
         """
-        unittest.skipIf(is_win(), "This test hangs windows servers up.")
         cluster = self.cluster
         cluster.set_configuration_options(values={
             'compaction_throughput_mb_per_sec': 0
