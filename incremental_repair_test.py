@@ -3,8 +3,10 @@ import time
 from re import findall
 
 from cassandra import ConsistencyLevel
+from ccmlib.common import is_win
 from ccmlib.node import Node
 from nose.plugins.attrib import attr
+import unittest
 
 from assertions import assert_almost_equal, assert_one
 from dtest import Tester, debug
@@ -213,6 +215,7 @@ class TestIncRepair(Tester):
 
         There is an issue with subsequent inc repairs.
         """
+        unittest.skipIf(is_win(), "This test hangs windows servers up.")
         cluster = self.cluster
         cluster.set_configuration_options(values={
             'compaction_throughput_mb_per_sec': 0
