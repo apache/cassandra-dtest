@@ -140,6 +140,7 @@ class TestOfflineTools(Tester):
         cluster.start()
         node1.stress(['write', 'n=100K', '-schema', 'replication(factor=1)'])
         node1.flush()
+        self.wait_for_compactions(node1)
         cluster.stop()
 
         # Let's reset all sstables to L0
