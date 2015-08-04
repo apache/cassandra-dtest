@@ -3,9 +3,10 @@ from __future__ import division
 import subprocess
 import tempfile
 import time
-from math import ceil
+from math import floor
 from os.path import getsize
 
+from distutils.version import LooseVersion
 from dtest import Tester, debug
 from tools import since
 
@@ -31,7 +32,7 @@ class TestSSTableSplit(Tester):
         if version < "2.1":
             node.stress(['-o', 'insert'])
         else:
-            node.stress(['write', 'n=1000000', '-rate', 'threads=50'])
+            node.stress(['write', 'n=1000000', '-rate', 'threads=10'])
 
         self._do_compaction(node)
         self._do_split(node, version)
@@ -59,7 +60,8 @@ class TestSSTableSplit(Tester):
         node.stop()
 
         # default split size is 50MB
-        expected_sstable_size = (50 * 1024 * 1024)
+        splitmaxsize = 10 
+        expected_sstable_size = (10 * 1024 * 1024) 
         keyspace = 'keyspace1' if self.cluster.version() >= '2.1' else 'Keyspace1'
 
         # get the initial sstables and their total size
@@ -68,15 +70,16 @@ class TestSSTableSplit(Tester):
         debug("Original sstable and sizes before split: {}".format([(name, getsize(name)) for name in origsstables]))
 
         # calculate the expected number of sstables post-split
-        expected_num_sstables = ceil(origsstable_size / expected_sstable_size)
+        expected_num_sstables = floor(origsstable_size / expected_sstable_size) 
 
         # split the sstables
-        node.run_sstablesplit(keyspace=keyspace)
+        node.run_sstablesplit(keyspace=keyspace, size=splitmaxsize, no_snapshot=True)
 
         # get the sstables post-split and their total size
         sstables = node.get_sstables(keyspace, '')
-        debug("Number of sstables after split: %s" % len(sstables))
-        self.assertEqual(expected_num_sstables, len(sstables))
+        debug("Number of sstables after split: %s. expected %s" % (len(sstables), expected_num_sstables))
+        self.assertLessEqual(expected_num_sstables, len(sstables) + 1)
+        self.assertLessEqual(1, len(sstables))
 
         # make sure none of the tables are bigger than the max expected size
         sstable_sizes = [getsize(sstable) for sstable in sstables]
@@ -97,7 +100,7 @@ class TestSSTableSplit(Tester):
         node = cluster.nodelist()[0]
 
         debug("Run stress to insert data")
-        node.stress(['write', 'n=2000000', '-rate', 'threads=50',
+        node.stress(['write', 'n=2000000', '-rate', 'threads=10',
                      '-schema', 'compaction(strategy=LeveledCompactionStrategy, sstable_size_in_mb=10)'])
         self._do_compaction(node)
         node.stop()
