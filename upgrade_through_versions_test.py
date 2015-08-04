@@ -188,8 +188,7 @@ def data_writer(tester, to_verify_queue, verification_done_queue, rewrite_probab
                     # we wanted a re-write but the re-writable queue was empty. oh well.
                     pass
 
-            if not key:
-                key = uuid.uuid4()
+            key = key or uuid.uuid4()
 
             val = uuid.uuid4()
 
@@ -289,8 +288,7 @@ def counter_incrementer(tester, to_verify_queue, verification_done_queue, rewrit
                     # we wanted a re-write but the re-writable queue was empty. oh well.
                     pass
 
-            if not key:
-                key = uuid.uuid4()
+            key = key or uuid.uuid4()
 
             session.execute(prepared, (key))
 
