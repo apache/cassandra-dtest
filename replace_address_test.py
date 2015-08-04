@@ -31,7 +31,21 @@ class TestReplaceAddress(Tester):
         self.allow_log_errors = True
 
     def replace_stopped_node_test(self):
-        """Check that the replace address function correctly replaces a node that has failed in a cluster.
+        """
+        Test that we can replace a node that is not shutdown gracefully.
+        """
+        self._replace_node_test(gently=False)
+
+    def replace_shutdown_node_test(self):
+        """
+        @jira_ticket CASSANDRA-9871
+        Test that we can replace a node that is shutdown gracefully.
+        """
+        self._replace_node_test(gently=True)
+
+    def _replace_node_test(self, gently):
+        """
+        Check that the replace address function correctly replaces a node that has failed in a cluster.
         Create a cluster, cause a node to fail, and bring up a new node with the replace_address parameter.
         Check that tokens are migrated and that data is replicated properly.
         """
@@ -62,7 +76,7 @@ class TestReplaceAddress(Tester):
 
         # stop node, query should not work with consistency 3
         debug("Stopping node 3.")
-        node3.stop(gently=False, wait_other_notice=True)
+        node3.stop(gently=gently, wait_other_notice=True)
 
         debug("Testing node stoppage (query should fail).")
         with self.assertRaises(NodeUnavailable):

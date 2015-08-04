@@ -6,7 +6,7 @@ import subprocess
 import tempfile
 import re
 from dtest import Tester, debug
-from tools import new_node, query_c1c2, require, since, KillOnBootstrap, InterruptBootstrap
+from tools import new_node, query_c1c2, since, KillOnBootstrap, InterruptBootstrap
 from assertions import assert_almost_equal
 from ccmlib.node import NodeError
 from cassandra import ConsistencyLevel
@@ -422,42 +422,3 @@ class TestBootstrap(Tester):
         mark = node2.mark_log()
         node2.start(wait_other_notice=True)
         node2.watch_log_for("JOINING:", from_mark=mark)
-
-    @require("9871")
-    def can_replace_down_node_test(self):
-        """
-        @jira_ticket CASSANDRA-9871
-        Test that we can replace a node that is shutdown gracefully (DN) by using
-        -Dcassandra.replace_address
-        """
-        cluster = self.cluster
-        cluster.populate(3)
-        cluster.start(wait_for_binary_proto=True)
-
-        version = cluster.version()
-        stress_table = 'keyspace1.standard1' if self.cluster.version() >= '2.1' else '"Keyspace1"."Standard1"'
-
-        # write some data
-        node1, node2, node3 = cluster.nodelist()
-        if version < "2.1":
-            node1.stress(['-n', '10000'])
-        else:
-            node1.stress(['write', 'n=10000', '-rate', 'threads=8'])
-
-        # Stop node 3
-        node3.stop(gently=True)
-
-        # Sleep a bit to let GOSSIP settle
-        time.sleep(2)
-
-        out, err = node1.nodetool('status')
-        self.assertEquals('', err)
-        debug(out)
-
-        out, err = node1.nodetool('gossipinfo')
-        self.assertEquals('', err)
-        debug(out)
-
-        # Create a new node to replace node3
-        node4 = new_node(cluster, bootstrap=True)
-        node4.start(jvm_args=["-Dcassandra.replace_address=127.0.0.3"], wait_for_binary_proto=True)
