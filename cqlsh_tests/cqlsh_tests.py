@@ -35,9 +35,9 @@ class TestCqlsh(Tester):
         unmonkeypatch_driver(cls._cached_driver_methods)
 
     def tearDown(self):
-        if hasattr(self, 'tempfile'):
+        if hasattr(self, 'tempfile') and not is_win():
             os.unlink(self.tempfile.name)
-            super(TestCqlsh, self).tearDown()
+        super(TestCqlsh, self).tearDown()
 
     def test_simple_insert(self):
 
@@ -632,7 +632,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
                 PRIMARY KEY (id, col)
                 """
 
-        if LooseVersion(self.cluster.version()) >= LooseVersion('3.0'): 
+        if LooseVersion(self.cluster.version()) >= LooseVersion('3.0'):
             ret += """
         ) WITH CLUSTERING ORDER BY (col ASC)
             AND bloom_filter_fp_chance = 0.01
@@ -648,7 +648,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
             AND min_index_interval = 128
             AND read_repair_chance = 0.0
             AND speculative_retry = '99PERCENTILE';
-        """ 
+        """
         else:
             ret += """
         ) WITH CLUSTERING ORDER BY (col ASC)
@@ -665,8 +665,8 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
             AND min_index_interval = 128
             AND read_repair_chance = 0.0
             AND speculative_retry = '99.0PERCENTILE';
-        """ 
-            
+        """
+
 
         ret += self.get_index_output('test_col_idx', 'test', 'test', 'col')
 
@@ -676,7 +676,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
             return ret
 
     def get_users_table_output(self):
-        if LooseVersion(self.cluster.version()) >= LooseVersion('3.0'): 
+        if LooseVersion(self.cluster.version()) >= LooseVersion('3.0'):
             return """
         CREATE TABLE test.users (
             userid text PRIMARY KEY,
