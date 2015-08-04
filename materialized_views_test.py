@@ -764,7 +764,7 @@ class TestMaterializedViews(Tester):
         debug('Starting node2')
         node2.start(wait_other_notice=True, wait_for_binary_proto=True)
 
-        session2 = self.patient_cql_connection(node2)
+        session2 = self.patient_cql_connection(node4)
 
         debug('Verify the data in the MV on node2 with CL=ONE. No rows should be found.')
         for i in xrange(1000):
@@ -871,7 +871,7 @@ class TestMaterializedViews(Tester):
         debug('Starting node2')
         node2.start(wait_other_notice=True, wait_for_binary_proto=True)
 
-        session2 = self.patient_cql_connection(node2)
+        session2 = self.patient_cql_connection(node4)
         session2.execute('USE ks')
 
         debug('Verify the data in the MV on node2 with CL=ONE. No rows should be found.')
