@@ -401,22 +401,20 @@ class TestUpgradeThroughVersions(Tester):
         """
         self.upgrade_scenario()
 
-    def upgrade_test_with_internode_ssl(self):
-        self.upgrade_scenario(internode_ssl=True)
-
-    def upgrade_test_mixed(self):
-        """Only upgrade part of the cluster, so we have mixed versions part way through."""
-        self.upgrade_scenario(mixed_version=True)
-
-    def upgrade_test_rolling_with_internode_ssl(self):
-        """Only upgrade part of the cluster, so we have mixed versions part way through."""
-        self.upgrade_scenario(mixed_version=True, internode_ssl=True)
-
     def upgrade_test_rolling(self):
         """
         Test rolling upgrade of the cluster, so we have mixed versions part way through.
         """
         self.upgrade_scenario(rolling=True)
+
+    def upgrade_test_with_internode_ssl(self):
+        self.upgrade_scenario(internode_ssl=True)
+
+    def upgrade_test_rolling_with_internode_ssl(self):
+        """
+        Rolling upgrade test using internode ssl.
+        """
+        self.upgrade_scenario(rolling=True, internode_ssl=True)
 
     def upgrade_scenario(self, populate=True, create_schema=True, rolling=False, after_upgrade_call=(), internode_ssl=False):
         # Record the rows we write as we go:
