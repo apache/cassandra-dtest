@@ -1094,6 +1094,10 @@ class FromJsonDeleteTests(Tester):
             <BLANKLINE>
             (1 rows)
             <BLANKLINE>
+            Warnings :
+            Aggregation query used without partition key
+            <BLANKLINE>
+            <BLANKLINE>
         """
         run_func_docstring(tester=self, test_func=self.delete_using_pkey_json_test)
 
