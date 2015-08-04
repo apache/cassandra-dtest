@@ -395,22 +395,25 @@ class TestUpgradeThroughVersions(Tester):
         switch_jdks(os.environ['CASSANDRA_VERSION'][-3:])
         super(TestUpgradeThroughVersions, self).setUp()
 
-    def upgrade_test_parallel(self):
+    def parallel_upgrade_test(self):
         """
         Test upgrading cluster all at once (requires cluster downtime).
         """
         self.upgrade_scenario()
 
-    def upgrade_test_rolling(self):
+    def rolling_upgrade_test(self):
         """
         Test rolling upgrade of the cluster, so we have mixed versions part way through.
         """
         self.upgrade_scenario(rolling=True)
 
-    def upgrade_test_with_internode_ssl(self):
+    def parallel_upgrade_with_internode_ssl_test(self):
+        """
+        Test upgrading cluster all at once (requires cluster downtime), with internode ssl.
+        """
         self.upgrade_scenario(internode_ssl=True)
 
-    def upgrade_test_rolling_with_internode_ssl(self):
+    def rolling_upgrade_with_internode_ssl_test(self):
         """
         Rolling upgrade test using internode ssl.
         """
