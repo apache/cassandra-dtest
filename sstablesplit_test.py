@@ -6,7 +6,6 @@ import time
 from math import floor
 from os.path import getsize
 
-from distutils.version import LooseVersion
 from dtest import Tester, debug
 from tools import since
 
