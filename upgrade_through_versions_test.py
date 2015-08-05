@@ -1,26 +1,31 @@
 import bisect
+import operator
 import os
 import pprint
 import random
 import re
+import signal
 import subprocess
 import time
 import uuid
-
 from collections import defaultdict
 from distutils.version import LooseVersion
-from dtest import Tester, debug, DEFAULT_DIR
-from tools import new_node, generate_ssl_stores
+from multiprocessing import Process, Queue
+from Queue import Empty, Full
+
+import psutil
+
 from cassandra import ConsistencyLevel, WriteTimeout
 from cassandra.query import SimpleStatement
-
+from dtest import DEFAULT_DIR, Tester, debug
+from tools import generate_ssl_stores, new_node
 
 # Versions are tuples of (major_ver, minor_ver)
 # Used to build upgrade path(s) for tests. Some tests will go from start to finish,
 # other tests will focus on single upgrades from UPGRADE_PATH[n] to UPGRADE_PATH[n+1]
 
-TRUNK_VER = (3, 0)
-DEFAULT_PATH = [(1, 2), (2, 0), (2, 1), (2, 2), TRUNK_VER]
+TRUNK_VER = (3, 1)
+DEFAULT_PATH = [(1, 2), (2, 0), (2, 1), (2, 2), (3, 0), TRUNK_VER]
 
 CUSTOM_PATH = os.environ.get('UPGRADE_PATH', None)
 if CUSTOM_PATH:
@@ -105,12 +110,17 @@ def latest_tag_matching(ver_tuple):
 
 
 def make_ver_str(_tuple):
-    """Takes a tuple like (1,2) and returns a string like '1.2' """
+    """
+    Takes a tuple like (1,2) and returns a string like '1.2'
+    """
     return '{}.{}'.format(_tuple[0], _tuple[1])
 
 
 def make_branch_str(_tuple):
-    """Takes a tuple like (1,2) and formats that version specifier as something like 'cassandra-1.2' to match the branch naming convention"""
+    """
+    Takes a tuple like (1,2) and formats that version specifier as something
+    like 'cassandra-1.2' to match the branch naming convention
+    """
 
     # special case trunk version to just return 'trunk'
     if _tuple == TRUNK_VER:
@@ -121,8 +131,8 @@ def make_branch_str(_tuple):
 
 def sanitize_version(version):
     """
-        Takes versions of the form cassandra-1.2, 2.0.10, or trunk.
-        Returns just the version string 'X.Y.Z'
+    Takes versions of the form cassandra-1.2, 2.0.10, or trunk.
+    Returns just the version string 'X.Y.Z'
     """
     if version.find('-') >= 0:
         return LooseVersion(version.split('-')[1])
@@ -139,8 +149,205 @@ def switch_jdks(version):
             os.environ['JAVA_HOME'] = os.environ['JAVA7_HOME']
         else:
             os.environ['JAVA_HOME'] = os.environ['JAVA8_HOME']
-    except KeyError as e:
+    except KeyError:
         raise RuntimeError("You need to set JAVA7_HOME and JAVA8_HOME to run these tests!")
+
+
+def data_writer(tester, to_verify_queue, verification_done_queue, rewrite_probability=0):
+    """
+    Process for writing/rewriting data continuously.
+
+    Pushes to a queue to be consumed by data_checker.
+
+    Pulls from a queue of already-verified rows written by data_checker that it can overwrite.
+
+    Intended to be run using multiprocessing.
+    """
+    # 'tester' is a cloned object so we shouldn't be inappropriately sharing anything with another process
+    session = tester.patient_cql_connection(tester.node1, keyspace="upgrade", protocol_version=1)
+
+    prepared = session.prepare("UPDATE cf SET v=? WHERE k=?")
+    prepared.consistency_level = ConsistencyLevel.QUORUM
+
+    def handle_sigterm(signum, frame):
+        # need to close queue gracefully if possible, or the data_checker process
+        # can't seem to empty the queue and test failures result.
+        to_verify_queue.close()
+        exit(0)
+
+    signal.signal(signal.SIGTERM, handle_sigterm)
+
+    while True:
+        try:
+            key = None
+
+            if (rewrite_probability > 0) and (random.randint(0, 100) <= rewrite_probability):
+                try:
+                    key = verification_done_queue.get_nowait()
+                except Empty:
+                    # we wanted a re-write but the re-writable queue was empty. oh well.
+                    pass
+
+            key = key or uuid.uuid4()
+
+            val = uuid.uuid4()
+
+            session.execute(prepared, (val, key))
+
+            to_verify_queue.put_nowait((key, val,))
+        except Exception:
+            debug("Error in data writer process!")
+            to_verify_queue.close()
+            raise
+
+
+def data_checker(tester, to_verify_queue, verification_done_queue):
+    """
+    Process for checking data continuously.
+
+    Pulls from a queue written to by data_writer to know what to verify.
+
+    Pushes to a queue to tell data_writer what's been verified and could be a candidate for re-writing.
+
+    Intended to be run using multiprocessing.
+    """
+    # 'tester' is a cloned object so we shouldn't be inappropriately sharing anything with another process
+    session = tester.patient_cql_connection(tester.node1, keyspace="upgrade", protocol_version=1)
+
+    prepared = session.prepare("SELECT v FROM cf WHERE k=?")
+    prepared.consistency_level = ConsistencyLevel.QUORUM
+
+    def handle_sigterm(signum, frame):
+        # need to close queue gracefully if possible, or the data_checker process
+        # can't seem to empty the queue and test failures result.
+        verification_done_queue.close()
+        exit(0)
+
+    signal.signal(signal.SIGTERM, handle_sigterm)
+
+    while True:
+        try:
+            # here we could block, but if the writer process terminates early with an empty queue
+            # we would end up blocking indefinitely
+            (key, expected_val) = to_verify_queue.get_nowait()
+
+            actual_val = session.execute(prepared, (key,))[0][0]
+        except Empty:
+            time.sleep(0.1)  # let's not eat CPU if the queue is empty
+            continue
+        except Exception:
+            debug("Error in data verifier process!")
+            verification_done_queue.close()
+            raise
+        else:
+            try:
+                verification_done_queue.put_nowait(key)
+            except Full:
+                # the rewritable queue is full, not a big deal. drop this one.
+                # we keep the rewritable queue held to a modest max size
+                # and allow dropping some rewritables because we don't want to
+                # rewrite rows in the same sequence as originally written
+                pass
+
+        tester.assertEqual(expected_val, actual_val, "Data did not match expected value!")
+
+
+def counter_incrementer(tester, to_verify_queue, verification_done_queue, rewrite_probability=0):
+    """
+    Process for incrementing counters continuously.
+
+    Pushes to a queue to be consumed by counter_checker.
+
+    Pulls from a queue of already-verified rows written by data_checker that it can increment again.
+
+    Intended to be run using multiprocessing.
+    """
+    # 'tester' is a cloned object so we shouldn't be inappropriately sharing anything with another process
+    session = tester.patient_cql_connection(tester.node1, keyspace="upgrade", protocol_version=1)
+
+    prepared = session.prepare("UPDATE countertable SET c = c + 1 WHERE k1=?")
+    prepared.consistency_level = ConsistencyLevel.QUORUM
+
+    def handle_sigterm(signum, frame):
+        # need to close queue gracefully if possible, or the data_checker process
+        # can't seem to empty the queue and test failures result.
+        to_verify_queue.close()
+        exit(0)
+
+    signal.signal(signal.SIGTERM, handle_sigterm)
+
+    while True:
+        try:
+            key = None
+            count = 0  # this will get set to actual last known count if we do a re-write
+
+            if (rewrite_probability > 0) and (random.randint(0, 100) <= rewrite_probability):
+                try:
+                    key, count = verification_done_queue.get_nowait()
+                except Empty:
+                    # we wanted a re-write but the re-writable queue was empty. oh well.
+                    pass
+
+            key = key or uuid.uuid4()
+
+            session.execute(prepared, (key))
+
+            to_verify_queue.put_nowait((key, count + 1,))
+        except Exception:
+            debug("Error in data writer process!")
+            to_verify_queue.close()
+            raise
+
+
+def counter_checker(tester, to_verify_queue, verification_done_queue):
+    """
+    Process for checking counters continuously.
+
+    Pulls from a queue written to by counter_incrementer to know what to verify.
+
+    Pushes to a queue to tell counter_incrementer what's been verified and could be a candidate for incrementing again.
+
+    Intended to be run using multiprocessing.
+    """
+    # 'tester' is a cloned object so we shouldn't be inappropriately sharing anything with another process
+    session = tester.patient_cql_connection(tester.node1, keyspace="upgrade", protocol_version=1)
+
+    prepared = session.prepare("SELECT c FROM countertable WHERE k1=?")
+    prepared.consistency_level = ConsistencyLevel.QUORUM
+
+    def handle_sigterm(signum, frame):
+        # need to close queue gracefully if possible, or the data_checker process
+        # can't seem to empty the queue and test failures result.
+        verification_done_queue.close()
+        exit(0)
+
+    signal.signal(signal.SIGTERM, handle_sigterm)
+
+    while True:
+        try:
+            # here we could block, but if the writer process terminates early with an empty queue
+            # we would end up blocking indefinitely
+            (key, expected_count) = to_verify_queue.get_nowait()
+
+            actual_count = session.execute(prepared, (key,))[0][0]
+        except Empty:
+            time.sleep(0.1)  # let's not eat CPU if the queue is empty
+            continue
+        except Exception:
+            debug("Error in data verifier process!")
+            verification_done_queue.close()
+            raise
+        else:
+            tester.assertEqual(expected_count, actual_count, "Data did not match expected value!")
+
+            try:
+                verification_done_queue.put_nowait((key, actual_count))
+            except Full:
+                # the rewritable queue is full, not a big deal. drop this one.
+                # we keep the rewritable queue held to a modest max size
+                # and allow dropping some rewritables because we don't want to
+                # rewrite rows in the same sequence as originally written
+                pass
 
 
 class TestUpgradeThroughVersions(Tester):
@@ -148,6 +355,7 @@ class TestUpgradeThroughVersions(Tester):
     Upgrades a 3-node Murmur3Partitioner cluster through versions specified in test_versions.
     """
     test_versions = None  # set on init to know which versions to use
+    subprocs = None  # holds any subprocesses, for status checking and cleanup
 
     def __init__(self, *args, **kwargs):
         # Ignore these log patterns:
@@ -157,7 +365,7 @@ class TestUpgradeThroughVersions(Tester):
             # and when it does, it gets replayed and everything is fine.
             r'Can\'t send migration request: node.*is down',
         ]
-
+        self.subprocs = []
         # Force cluster options that are common among versions:
         kwargs['cluster_options'] = {'partitioner': 'org.apache.cassandra.dht.Murmur3Partitioner'}
         Tester.__init__(self, *args, **kwargs)
@@ -187,21 +395,31 @@ class TestUpgradeThroughVersions(Tester):
         switch_jdks(os.environ['CASSANDRA_VERSION'][-3:])
         super(TestUpgradeThroughVersions, self).setUp()
 
-    def upgrade_test(self):
+    def parallel_upgrade_test(self):
+        """
+        Test upgrading cluster all at once (requires cluster downtime).
+        """
         self.upgrade_scenario()
 
-    def upgrade_test_with_internode_ssl(self):
+    def rolling_upgrade_test(self):
+        """
+        Test rolling upgrade of the cluster, so we have mixed versions part way through.
+        """
+        self.upgrade_scenario(rolling=True)
+
+    def parallel_upgrade_with_internode_ssl_test(self):
+        """
+        Test upgrading cluster all at once (requires cluster downtime), with internode ssl.
+        """
         self.upgrade_scenario(internode_ssl=True)
 
-    def upgrade_test_mixed(self):
-        """Only upgrade part of the cluster, so we have mixed versions part way through."""
-        self.upgrade_scenario(mixed_version=True)
+    def rolling_upgrade_with_internode_ssl_test(self):
+        """
+        Rolling upgrade test using internode ssl.
+        """
+        self.upgrade_scenario(rolling=True, internode_ssl=True)
 
-    def upgrade_test_mixed_with_internode_ssl(self):
-        """Only upgrade part of the cluster, so we have mixed versions part way through."""
-        self.upgrade_scenario(mixed_version=True, internode_ssl=True)
-
-    def upgrade_scenario(self, populate=True, create_schema=True, mixed_version=False, after_upgrade_call=(), internode_ssl=False):
+    def upgrade_scenario(self, populate=True, create_schema=True, rolling=False, after_upgrade_call=(), internode_ssl=False):
         # Record the rows we write as we go:
         self.row_values = set()
         cluster = self.cluster
@@ -225,33 +443,51 @@ class TestUpgradeThroughVersions(Tester):
             setattr(self, node_name, node)
 
         if create_schema:
-            self._create_schema()
+            if rolling:
+                self._create_schema_for_rolling()
+            else:
+                self._create_schema()
         else:
             debug("Skipping schema creation (should already be built)")
         time.sleep(5)  # sigh...
 
         self._log_current_ver(self.test_versions[0])
 
-        # upgrade through versions
-        for tag in self.test_versions[1:]:
-            if mixed_version:
+        if rolling:
+            # start up processes to write and verify data
+            write_proc, verify_proc, verification_queue = self._start_continuous_write_and_verify(wait_for_rowcount=5000)
+            increment_proc, incr_verify_proc, incr_verify_queue = self._start_continuous_counter_increment_and_verify(wait_for_rowcount=5000)
+
+            # upgrade through versions
+            for tag in self.test_versions[1:]:
                 for num, node in enumerate(self.cluster.nodelist()):
-                    # do a write and check for each new node as upgraded
+                    # sleep (sigh) because driver needs extra time to keep up with topo and make quorum possible
+                    # this is ok, because a real world upgrade would proceed much slower than this programmatic one
+                    # additionally this should provide more time for timeouts and other issues to crop up as well, which we could
+                    # possibly "speed past" in an overly fast upgrade test
+                    time.sleep(60)
 
-                    self._write_values()
-                    self._increment_counters()
+                    self.upgrade_to_version(tag, partial=True, nodes=(node,))
 
-                    self.upgrade_to_version(tag, mixed_version=True, nodes=(node,))
-
-                    self._check_values()
-                    self._check_counters()
-                    self._check_select_count()
-
+                    self._check_on_subprocs(self.subprocs)
                     debug('Successfully upgraded %d of %d nodes to %s' %
                           (num + 1, len(self.cluster.nodelist()), tag))
 
                 self.cluster.set_install_dir(version='git:' + tag)
-            else:
+
+            # Stop write processes
+            write_proc.terminate()
+            increment_proc.terminate()
+            # wait for the verification queue's to empty (and check all rows) before continuing
+            self._wait_until_queue_condition('writes pending verification', verification_queue, operator.le, 0, max_wait_s=600)
+            self._wait_until_queue_condition('counters pending verification', incr_verify_queue, operator.le, 0, max_wait_s=600)
+            self._check_on_subprocs([verify_proc, incr_verify_proc])  # make sure the verification processes are running still
+
+            self._terminate_subprocs()
+        # not a rolling upgrade, do everything in parallel:
+        else:
+            # upgrade through versions
+            for tag in self.test_versions[1:]:
                 self._write_values()
                 self._increment_counters()
 
@@ -263,23 +499,54 @@ class TestUpgradeThroughVersions(Tester):
                 self._check_select_count()
 
             # run custom post-upgrade callables
-            for call in after_upgrade_call:
-                call()
+        for call in after_upgrade_call:
+            call()
 
             debug('All nodes successfully upgraded to %s' % tag)
             self._log_current_ver(tag)
 
         cluster.stop()
 
-    def upgrade_to_version(self, tag, mixed_version=False, nodes=None):
-        """Upgrade Nodes - if *mixed_version* is True, only upgrade those nodes
+    def tearDown(self):
+        # just to be super sure we get cleaned up
+        self._terminate_subprocs()
+
+        super(TestUpgradeThroughVersions, self).tearDown()
+
+    def _check_on_subprocs(self, subprocs):
+        """
+        Check on given subprocesses.
+
+        If any are not alive, we'll go ahead and terminate any remaining alive subprocesses since this test is going to fail.
+        """
+        subproc_statuses = [s.is_alive() for s in subprocs]
+        if not all(subproc_statuses):
+            message = "A subprocess has terminated early. Subprocess statuses: "
+            for s in subprocs:
+                message += "{name} (is_alive: {aliveness}), ".format(name=s.name, aliveness=s.is_alive())
+            message += "attempting to terminate remaining subprocesses now."
+            self._terminate_subprocs()
+            raise RuntimeError(message)
+
+    def _terminate_subprocs(self):
+        for s in self.subprocs:
+            if s.is_alive():
+                try:
+                    psutil.Process(s.pid).kill()  # with fire damnit
+                except Exception:
+                    debug("Error terminating subprocess. There could be a lingering process.")
+                    pass
+
+    def upgrade_to_version(self, tag, partial=False, nodes=None):
+        """
+        Upgrade Nodes - if *partial* is True, only upgrade those nodes
         that are specified by *nodes*, otherwise ignore *nodes* specified
         and upgrade all nodes.
         """
         debug('Upgrading {nodes} to {tag}'.format(nodes=[n.name for n in nodes] if nodes is not None else 'all nodes', tag=tag))
         switch_jdks(tag)
         debug(os.environ['JAVA_HOME'])
-        if not mixed_version:
+        if not partial:
             nodes = self.cluster.nodelist()
 
         for node in nodes:
@@ -325,15 +592,32 @@ class TestUpgradeThroughVersions(Tester):
             "Current upgrade path: {}".format(
                 vers[:curr_index] + ['***' + current_tag + '***'] + vers[curr_index + 1:]))
 
+    def _create_schema_for_rolling(self):
+        """
+        Slightly different schema variant for testing rolling upgrades with quorum reads/writes.
+        """
+        session = self.patient_cql_connection(self.node2, protocol_version=1)
+
+        session.execute("CREATE KEYSPACE upgrade WITH replication = {'class':'SimpleStrategy', 'replication_factor':3};")
+
+        session.execute('use upgrade')
+        session.execute('CREATE TABLE cf ( k uuid PRIMARY KEY, v uuid )')
+        session.execute('CREATE INDEX vals ON cf (v)')
+
+        session.execute("""
+            CREATE TABLE countertable (
+                k1 uuid,
+                c counter,
+                PRIMARY KEY (k1)
+                );""")
+
     def _create_schema(self):
         session = self.patient_cql_connection(self.node2, protocol_version=1)
 
-        session.execute("""CREATE KEYSPACE upgrade WITH replication = {'class':'SimpleStrategy',
-            'replication_factor':2};
-            """)
+        session.execute("CREATE KEYSPACE upgrade WITH replication = {'class':'SimpleStrategy', 'replication_factor':2};")
 
         session.execute('use upgrade')
-        session.execute('CREATE TABLE cf ( k int PRIMARY KEY , v text )')
+        session.execute('CREATE TABLE cf ( k int PRIMARY KEY, v text )')
         session.execute('CREATE INDEX vals ON cf (v)')
 
         session.execute("""
@@ -362,6 +646,96 @@ class TestUpgradeThroughVersions(Tester):
                 k, v = result[0]
                 self.assertEqual(x, k)
                 self.assertEqual(str(x), v)
+
+    def _wait_until_queue_condition(self, label, queue, opfunc, required_len, max_wait_s=300):
+        """
+        Waits up to max_wait_s for queue size to return True when evaluated against a condition function from the operator module.
+
+        Label is just a string identifier for easier debugging.
+
+        On Mac OS X may not be able to check queue size, in which case it will not block.
+
+        If time runs out, raises RuntimeError.
+        """
+        wait_end_time = time.time() + max_wait_s
+
+        while time.time() < wait_end_time:
+                try:
+                    qsize = queue.qsize()
+                except NotImplementedError:
+                    debug("Queue size may not be checkable on Mac OS X. Test will continue without waiting.")
+                    break
+                if opfunc(qsize, required_len):
+                    debug("{} queue size ({}) is '{}' to {}. Continuing.".format(label, qsize, opfunc.__name__, required_len))
+                    break
+
+                if divmod(round(time.time()), 30)[1] == 0:
+                    debug("{} queue size is at {}, target is to reach '{}' {}".format(label, qsize, opfunc.__name__, required_len))
+
+                time.sleep(0.1)
+                continue
+        else:
+            raise RuntimeError("Ran out of time waiting for queue size ({}) to be '{}' to {}. Aborting.".format(qsize, opfunc.__name__, required_len))
+
+    def _start_continuous_write_and_verify(self, wait_for_rowcount=0, max_wait_s=300):
+        """
+        Starts a writer process, a verifier process, a queue to track writes,
+        and a queue to track successful verifications (which are rewrite candidates).
+
+        wait_for_rowcount provides a number of rows to write before unblocking and continuing.
+
+        Returns the writer process, verifier process, and the to_verify_queue.
+        """
+        # queue of writes to be verified
+        to_verify_queue = Queue()
+        # queue of verified writes, which are update candidates
+        verification_done_queue = Queue(maxsize=500)
+
+        writer = Process(target=data_writer, args=(self, to_verify_queue, verification_done_queue, 25))
+        # daemon subprocesses are killed automagically when the parent process exits
+        writer.daemon = True
+        self.subprocs.append(writer)
+        writer.start()
+
+        if wait_for_rowcount > 0:
+            self._wait_until_queue_condition('rows written (but not verified)', to_verify_queue, operator.ge, wait_for_rowcount, max_wait_s=max_wait_s)
+
+        verifier = Process(target=data_checker, args=(self, to_verify_queue, verification_done_queue))
+        # daemon subprocesses are killed automagically when the parent process exits
+        verifier.daemon = True
+        self.subprocs.append(verifier)
+        verifier.start()
+
+        return writer, verifier, to_verify_queue
+
+    def _start_continuous_counter_increment_and_verify(self, wait_for_rowcount=0, max_wait_s=300):
+        """
+        Starts a counter incrementer process, a verifier process, a queue to track writes,
+        and a queue to track successful verifications (which are re-increment candidates).
+
+        Returns the writer process, verifier process, and the to_verify_queue.
+        """
+        # queue of writes to be verified
+        to_verify_queue = Queue()
+        # queue of verified writes, which are update candidates
+        verification_done_queue = Queue(maxsize=500)
+
+        incrementer = Process(target=data_writer, args=(self, to_verify_queue, verification_done_queue, 25))
+        # daemon subprocesses are killed automagically when the parent process exits
+        incrementer.daemon = True
+        self.subprocs.append(incrementer)
+        incrementer.start()
+
+        if wait_for_rowcount > 0:
+            self._wait_until_queue_condition('counters incremented (but not verified)', to_verify_queue, operator.ge, wait_for_rowcount, max_wait_s=max_wait_s)
+
+        count_verifier = Process(target=data_checker, args=(self, to_verify_queue, verification_done_queue))
+        # daemon subprocesses are killed automagically when the parent process exits
+        count_verifier.daemon = True
+        self.subprocs.append(count_verifier)
+        count_verifier.start()
+
+        return incrementer, count_verifier, to_verify_queue
 
     def _increment_counters(self, opcount=25000):
         debug("performing {opcount} counter increments".format(opcount=opcount))
@@ -442,7 +816,7 @@ class TestRandomPartitionerUpgrade(TestUpgradeThroughVersions):
             r'Can\'t send migration request: node.*is down',
             r'RejectedExecutionException.*ThreadPoolExecutor has shut down',
         ]
-
+        self.subprocs = []
         # Force cluster options that are common among versions:
         kwargs['cluster_options'] = {'partitioner': 'org.apache.cassandra.dht.RandomPartitioner'}
         Tester.__init__(self, *args, **kwargs)
@@ -511,14 +885,12 @@ class PointToPointUpgradeBase(TestUpgradeThroughVersions):
 
         if self.cluster.version() >= '1.2':
             # DDL for C* 1.2+
-            session.execute("""CREATE KEYSPACE upgrade WITH replication = {'class':'NetworkTopologyStrategy',
-                'dc1':1, 'dc2':1};
-                """)
+            session.execute("CREATE KEYSPACE upgrade WITH replication = {'class':'NetworkTopologyStrategy', 'dc1':1, 'dc2':2};")
         else:
             # DDL for C* 1.1
             session.execute("""CREATE KEYSPACE upgrade WITH strategy_class = 'NetworkTopologyStrategy'
             AND strategy_options:'dc1':1
-            AND strategy_options:'dc2':1;
+            AND strategy_options:'dc2':2;
             """)
 
         session.execute('use upgrade')
