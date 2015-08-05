@@ -1,8 +1,10 @@
+import re
+
+from nose.tools import assert_equal, assert_in
+
 from cassandra import cqltypes
 from dtest import Tester
-from nose.tools import assert_equal, assert_in
-from tools import since
-import re
+from tools import since, require
 
 
 def establish_indexes_table(version, session, table_name_prefix=""):
@@ -191,6 +193,11 @@ def verify_nondefault_table_settings(created_on_version, current_version, keyspa
         assert_equal('55PERCENTILE', meta.options['speculative_retry'])
         assert_equal(2121, meta.options['memtable_flush_period_in_ms'])
 
+    if current_version >= '3.0':
+        assert_equal('org.apache.cassandra.io.compress.DeflateCompressor', meta.options['compression']['class'])
+        assert_equal('128', meta.options['compression']['chunk_length_in_kb'])
+        assert_equal('org.apache.cassandra.db.compaction.LeveledCompactionStrategy', meta.options['compaction']['class'])
+
     if '2.1' <= current_version < '3.0':
         assert_equal('{"keys":"NONE", "rows_per_partition":"ALL"}', meta.options['caching'])
         assert_in('"chunk_length_kb":"128"', meta.options['compression_parameters'])
@@ -210,6 +217,103 @@ def verify_nondefault_table_settings(created_on_version, current_version, keyspa
 
     assert_equal(1, len(meta.clustering_key))
     assert_equal(meta.clustering_key[0].name, 'c')
+
+
+@require(6717)
+# this method has been renamed to _* so it's removed from upgrade tests as it will fail on 2.2 -> 3.0
+def _establish_uda(version, session, table_name_prefix=""):
+    if version < '2.2':
+        return
+    function_name = _table_name_builder(table_name_prefix, "test_uda_function")
+    aggregate_name = _table_name_builder(table_name_prefix, "test_uda_aggregate")
+
+    session.execute('''
+            CREATE FUNCTION {0}(current int, candidate int)
+            CALLED ON NULL INPUT
+            RETURNS int LANGUAGE java AS
+            'if (current == null) return candidate; else return Math.max(current, candidate);';
+        '''.format(function_name))
+
+    session.execute('''
+            CREATE AGGREGATE {0}(int)
+            SFUNC {1}
+            STYPE int
+            INITCOND null;
+        '''.format(aggregate_name, function_name))
+
+
+@require(6717)
+# this method has been renamed to _* so it's removed from upgrade tests as it will fail on 2.2 -> 3.0
+def _verify_uda(created_on_version, current_version, keyspace, session, table_name_prefix=""):
+    if created_on_version < '2.2':
+        return
+    function_name = _table_name_builder(table_name_prefix, "test_uda_function")
+    aggregate_name = _table_name_builder(table_name_prefix, "test_uda_aggregate")
+
+    assert_in(function_name+"(int,int)", session.cluster.metadata.keyspaces[keyspace].functions.keys())
+    assert_in(aggregate_name+"(int)", session.cluster.metadata.keyspaces[keyspace].aggregates.keys())
+
+    aggr_meta = session.cluster.metadata.keyspaces[keyspace].aggregates[aggregate_name+"(int)"]
+    assert_equal(function_name, aggr_meta.state_func)
+    assert_equal(cqltypes.Int32Type, aggr_meta.state_type)
+    assert_equal(cqltypes.Int32Type, aggr_meta.return_type)
+
+
+@require(6717)
+# this method has been renamed to _* so it's removed from upgrade tests as it will fail on 2.2 -> 3.0
+def _establish_udf(version, session, table_name_prefix=""):
+    if version < '2.2':
+        return
+    function_name = _table_name_builder(table_name_prefix, "test_udf")
+    session.execute('''
+        CREATE OR REPLACE FUNCTION {0} (input double) CALLED ON NULL INPUT RETURNS double LANGUAGE java AS 'return Double.valueOf(Math.log(input.doubleValue()));';
+        '''.format(function_name))
+
+
+@require(6717)
+# this method has been renamed to _* so it's removed from upgrade tests as it will fail on 2.2 -> 3.0
+def _verify_udf(created_on_version, current_version, keyspace, session, table_name_prefix=""):
+    if created_on_version < '2.2':
+        return
+    function_name = _table_name_builder(table_name_prefix, "test_udf")
+    assert_in(function_name+"(double)", session.cluster.metadata.keyspaces[keyspace].functions.keys())
+    meta = session.cluster.metadata.keyspaces[keyspace].functions[function_name+"(double)"]
+    assert_equal('java', meta.language)
+    assert_equal(cqltypes.DoubleType, meta.return_type)
+    assert_equal(['double'], meta.type_signature)
+    assert_equal(['input'], meta.argument_names)
+    assert_equal('return Double.valueOf(Math.log(input.doubleValue()));', meta.body)
+
+
+@require(6717)
+# this method has been renamed to _* so it's removed from upgrade tests as it will fail on 2.2 -> 3.0
+def _establish_udt_table(version, session, table_name_prefix=""):
+    if version < '2.1':
+        return
+    table_name = _table_name_builder(table_name_prefix, "test_udt")
+    session.execute('''
+          CREATE TYPE {0} (
+              street text,
+              city text,
+              zip int
+          )'''.format(table_name))
+
+
+@require(6717)
+# this method has been renamed to _* so it's removed from upgrade tests as it will fail on 2.2 -> 3.0
+def _verify_udt_table(created_on_version, current_version, keyspace, session, table_name_prefix=""):
+    if created_on_version < '2.1':
+        return
+    table_name = _table_name_builder(table_name_prefix, "test_udt")
+    meta = session.cluster.metadata.keyspaces[keyspace].user_types[table_name]
+
+    assert_equal(meta.field_names, ['street', 'city', 'zip'])
+    assert_equal('street', meta.field_names[0])
+    assert_equal(cqltypes.UTF8Type, meta.field_types[0])
+    assert_equal('city', meta.field_names[1])
+    assert_equal(cqltypes.UTF8Type, meta.field_types[1])
+    assert_equal('zip', meta.field_names[2])
+    assert_equal(cqltypes.Int32Type, meta.field_types[2])
 
 
 def establish_static_column_table(version, session, table_name_prefix=""):
@@ -377,75 +481,202 @@ def _table_name_builder(prefix, table_name):
 
 
 class TestSchemaMetadata(Tester):
-    def basic_table_datatype_test(self):
+    def setUp(self):
+        Tester.setUp(self)
         cluster = self.cluster
+        cluster.schema_event_refresh_window = 0
+
+        if cluster.version() >= '3.0':
+            cluster.set_configuration_options({'enable_user_defined_functions': 'true',
+                                               'enable_scripted_user_defined_functions': 'true'})
+        elif cluster.version() >= '2.2':
+            cluster.set_configuration_options({'enable_user_defined_functions': 'true'})
         cluster.populate(1).start()
 
-        session = self.patient_cql_connection(cluster.nodelist()[0])
-        self.create_ks(session, 'ks', 1)
-        establish_basic_datatype_table(self.cluster.version(), session)
-        verify_basic_datatype_table(self.cluster.version(), self.cluster.version(), 'ks', session)
+        self.session = self.patient_cql_connection(cluster.nodelist()[0])
+        self.create_ks(self.session, 'ks', 1)
+
+    def _keyspace_meta(self, keyspace_name="ks"):
+        self.session.cluster.refresh_schema_metadata()
+        return self.session.cluster.metadata.keyspaces[keyspace_name]
+
+    def creating_and_dropping_keyspace_test(self):
+        starting_keyspace_count = len(self.session.cluster.metadata.keyspaces)
+        self.assertEqual(True, self._keyspace_meta().durable_writes)
+        self.session.execute("""
+                CREATE KEYSPACE so_long
+                    WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}
+                    AND durable_writes = false
+            """)
+        self.assertEqual(False, self._keyspace_meta('so_long').durable_writes)
+        self.session.execute("DROP KEYSPACE so_long")
+        self.assertEqual(starting_keyspace_count, len(self.session.cluster.metadata.keyspaces))
+
+    def creating_and_dropping_table_test(self):
+        self.session.execute("create table born_to_die (id uuid primary key, name varchar)")
+        meta = self._keyspace_meta().tables['born_to_die']
+        self.assertEqual('ks', meta.keyspace.name)
+        self.assertEqual('born_to_die', meta.name)
+        self.assertEqual(1, len(meta.partition_key))
+        self.assertEqual('id', meta.partition_key[0].name)
+        self.assertEqual(2, len(meta.columns))
+        self.assertIsNotNone(meta.columns.get('id'))
+        self.assertEqual(cqltypes.UUIDType, meta.columns['id'].data_type)
+        self.assertIsNotNone(meta.columns.get('name'))
+        self.assertEqual(cqltypes.UTF8Type, meta.columns['name'].data_type)
+        self.assertEqual(0, len(meta.clustering_key))
+        self.assertEqual(0, len(meta.triggers))
+        self.assertEqual(0, len(meta.indexes))
+        self.session.execute("drop table born_to_die")
+        self.assertIsNone(self._keyspace_meta().tables.get('born_to_die'))
+
+    def creating_and_dropping_table_with_2ary_indexes_test(self):
+        self.assertEqual(0, len(self._keyspace_meta().indexes))
+        self.session.execute("create table born_to_die (id uuid primary key, name varchar)")
+        self.session.execute("create index ix_born_to_die_name on born_to_die(name)")
+
+        self.assertEqual(1, len(self._keyspace_meta().indexes))
+        ix_meta = self._keyspace_meta().indexes['ix_born_to_die_name']
+        self.assertEqual('COMPOSITES', ix_meta.index_type)
+        self.assertEqual('name', ix_meta.column.name)
+        self.assertEqual('ix_born_to_die_name', ix_meta.name)
+        if self.cluster.version() < '2.0':
+            self.assertEqual({'prefix_size': '0'}, ix_meta.index_options)
+        else:
+            self.assertEqual({}, ix_meta.index_options)
+
+        self.session.execute("drop table born_to_die")
+        self.assertIsNone(self._keyspace_meta().tables.get('born_to_die'))
+        self.assertIsNone(self._keyspace_meta().indexes.get('ix_born_to_die_name'))
+        self.assertEqual(0, len(self._keyspace_meta().indexes))
+
+    @since('2.1')
+    def creating_and_dropping_user_types_test(self):
+        self.assertEqual(0, len(self._keyspace_meta().user_types))
+        self.session.execute("CREATE TYPE soon_to_die (foo text, bar int)")
+        self.assertEqual(1, len(self._keyspace_meta().user_types))
+
+        ut_meta = self._keyspace_meta().user_types['soon_to_die']
+        self.assertEqual('ks', ut_meta.keyspace)
+        self.assertEqual('soon_to_die', ut_meta.name)
+        self.assertEqual(['foo', 'bar'], ut_meta.field_names)
+        self.assertEqual([cqltypes.UTF8Type, cqltypes.Int32Type], ut_meta.field_types)
+
+        self.session.execute("DROP TYPE soon_to_die")
+        self.assertEqual(0, len(self._keyspace_meta().user_types))
+
+    @since('2.2')
+    def creating_and_dropping_udf_test(self):
+        self.assertEqual(0, len(self._keyspace_meta().functions), "expected to start with no indexes")
+        self.session.execute("""
+                CREATE OR REPLACE FUNCTION ks.wasteful_function (input double)
+                    CALLED ON NULL INPUT
+                    RETURNS double
+                    LANGUAGE java AS 'return Double.valueOf(Math.log(input.doubleValue()));';
+            """)
+        self.assertEqual(1, len(self._keyspace_meta().functions), "udf count should be 1")
+        udf_meta = self._keyspace_meta().functions['wasteful_function(double)']
+        self.assertEqual('ks', udf_meta.keyspace)
+        self.assertEqual('wasteful_function', udf_meta.name)
+        self.assertEqual(['double'], udf_meta.type_signature)
+        self.assertEqual(['input'], udf_meta.argument_names)
+        self.assertEqual(cqltypes.DoubleType, udf_meta.return_type)
+        self.assertEqual('java', udf_meta.language)
+        self.assertEqual('return Double.valueOf(Math.log(input.doubleValue()));', udf_meta.body)
+        self.assertTrue(udf_meta.called_on_null_input)
+        self.session.execute("DROP FUNCTION ks.wasteful_function")
+        self.assertEqual(0, len(self._keyspace_meta().functions), "expected udf list to be back to zero")
+
+    @since('2.2')
+    def creating_and_dropping_uda_test(self):
+        self.assertEqual(0, len(self._keyspace_meta().functions), "expected to start with no indexes")
+        self.assertEqual(0, len(self._keyspace_meta().aggregates), "expected to start with no aggregates")
+        self.session.execute('''
+                CREATE FUNCTION ks.max_val(current int, candidate int)
+                CALLED ON NULL INPUT
+                RETURNS int LANGUAGE java AS
+                'if (current == null) return candidate; else return Math.max(current, candidate);'
+            ''')
+        self.session.execute('''
+                CREATE AGGREGATE ks.kind_of_max_agg(int)
+                SFUNC max_val
+                STYPE int
+                INITCOND -1
+            ''')
+        self.assertEqual(1, len(self._keyspace_meta().functions), "udf count should be 1")
+        self.assertEqual(1, len(self._keyspace_meta().aggregates), "uda count should be 1")
+        udf_meta = self._keyspace_meta().functions['max_val(int,int)']
+        uda_meta = self._keyspace_meta().aggregates['kind_of_max_agg(int)']
+
+        self.assertEqual('ks', udf_meta.keyspace)
+        self.assertEqual('max_val', udf_meta.name)
+        self.assertEqual(['int', 'int'], udf_meta.type_signature)
+        self.assertEqual(['current', 'candidate'], udf_meta.argument_names)
+        self.assertEqual(cqltypes.Int32Type, udf_meta.return_type)
+        self.assertEqual('java', udf_meta.language)
+        self.assertEqual('if (current == null) return candidate; else return Math.max(current, candidate);', udf_meta.body)
+        self.assertTrue(udf_meta.called_on_null_input)
+
+        self.assertEqual('ks', uda_meta.keyspace)
+        self.assertEqual('kind_of_max_agg', uda_meta.name)
+        self.assertEqual(['int'], uda_meta.type_signature)
+        self.assertEqual('max_val', uda_meta.state_func)
+        self.assertEqual(cqltypes.Int32Type, uda_meta.state_type)
+        self.assertEqual(None, uda_meta.final_func)
+        self.assertEqual(-1, uda_meta.initial_condition)
+        self.assertEqual(cqltypes.Int32Type, uda_meta.return_type)
+
+        self.session.execute("DROP AGGREGATE ks.kind_of_max_agg")
+        self.assertEqual(0, len(self._keyspace_meta().aggregates), "expected uda list to be back to zero")
+        self.session.execute("DROP FUNCTION ks.max_val")
+        self.assertEqual(0, len(self._keyspace_meta().functions), "expected udf list to be back to zero")
+
+    def basic_table_datatype_test(self):
+        establish_basic_datatype_table(self.cluster.version(), self.session)
+        verify_basic_datatype_table(self.cluster.version(), self.cluster.version(), 'ks', self.session)
+
+    def collection_table_datatype_test(self):
+        establish_collection_datatype_table(self.cluster.version(), self.session)
+        verify_collection_datatype_table(self.cluster.version(), self.cluster.version(), 'ks', self.session)
+
+    def clustering_order_test(self):
+        establish_clustering_order_table(self.cluster.version(), self.session)
+        verify_clustering_order_table(self.cluster.version(), self.cluster.version(), 'ks', self.session)
+
+    def compact_storage_test(self):
+        establish_compact_storage_table(self.cluster.version(), self.session)
+        verify_compact_storage_table(self.cluster.version(), self.cluster.version(), 'ks', self.session)
+
+    def compact_storage_composite_test(self):
+        establish_compact_storage_composite_table(self.cluster.version(), self.session)
+        verify_compact_storage_composite_table(self.cluster.version(), self.cluster.version(), 'ks', self.session)
+
+    def nondefault_table_settings_test(self):
+        establish_nondefault_table_settings(self.cluster.version(), self.session)
+        verify_nondefault_table_settings(self.cluster.version(), self.cluster.version(), 'ks', self.session)
+
+    def indexes_test(self):
+        establish_indexes_table(self.cluster.version(), self.session)
+        verify_indexes_table(self.cluster.version(), self.cluster.version(), 'ks', self.session)
 
     @since('2.0')
     def static_column_test(self):
-        cluster = self.cluster
-        cluster.populate(1).start()
+        establish_static_column_table(self.cluster.version(), self.session)
+        verify_static_column_table(self.cluster.version(), self.cluster.version(), 'ks', self.session)
 
-        session = self.patient_cql_connection(cluster.nodelist()[0])
-        self.create_ks(session, 'ks', 1)
-        establish_static_column_table(self.cluster.version(), session)
-        verify_static_column_table(self.cluster.version(), self.cluster.version(), 'ks', session)
+    @since('2.1')
+    def udt_table_test(self):
+        _establish_udt_table(self.cluster.version(), self.session)
+        _verify_udt_table(self.cluster.version(), self.cluster.version(), 'ks', self.session)
 
-    def collection_table_datatype_test(self):
-        cluster = self.cluster
-        cluster.populate(1).start()
+    @since('2.2')
+    def udf_test(self):
+        _establish_udf(self.cluster.version(), self.session)
+        self.session.cluster.refresh_schema_metadata()
+        _verify_udf(self.cluster.version(), self.cluster.version(), 'ks', self.session)
 
-        session = self.patient_cql_connection(cluster.nodelist()[0])
-        self.create_ks(session, 'ks', 1)
-        establish_collection_datatype_table(self.cluster.version(), session)
-        verify_collection_datatype_table(self.cluster.version(), self.cluster.version(), 'ks', session)
-
-    def clustering_order_test(self):
-        cluster = self.cluster
-        cluster.populate(1).start()
-
-        session = self.patient_cql_connection(cluster.nodelist()[0])
-        self.create_ks(session, 'ks', 1)
-        establish_clustering_order_table(self.cluster.version(), session)
-        verify_clustering_order_table(self.cluster.version(), self.cluster.version(), 'ks', session)
-
-    def compact_storage_test(self):
-        cluster = self.cluster
-        cluster.populate(1).start()
-
-        session = self.patient_cql_connection(cluster.nodelist()[0])
-        self.create_ks(session, 'ks', 1)
-        establish_compact_storage_table(self.cluster.version(), session)
-        verify_compact_storage_table(self.cluster.version(), self.cluster.version(), 'ks', session)
-
-    def compact_storage_composite_test(self):
-        cluster = self.cluster
-        cluster.populate(1).start()
-
-        session = self.patient_cql_connection(cluster.nodelist()[0])
-        self.create_ks(session, 'ks', 1)
-        establish_compact_storage_composite_table(self.cluster.version(), session)
-        verify_compact_storage_composite_table(self.cluster.version(), self.cluster.version(), 'ks', session)
-
-    def nondefault_table_settings_test(self):
-        cluster = self.cluster
-        cluster.populate(1).start()
-
-        session = self.patient_cql_connection(cluster.nodelist()[0])
-        self.create_ks(session, 'ks', 1)
-        establish_nondefault_table_settings(self.cluster.version(), session)
-        verify_nondefault_table_settings(self.cluster.version(), self.cluster.version(), 'ks', session)
-
-    def indexes_test(self):
-        cluster = self.cluster
-        cluster.populate(1).start()
-
-        session = self.patient_cql_connection(cluster.nodelist()[0])
-        self.create_ks(session, 'ks', 1)
-        establish_indexes_table(self.cluster.version(), session)
-        verify_indexes_table(self.cluster.version(), self.cluster.version(), 'ks', session)
+    @since('2.2')
+    def uda_test(self):
+        _establish_uda(self.cluster.version(), self.session)
+        self.session.cluster.refresh_schema_metadata()
+        _verify_uda(self.cluster.version(), self.cluster.version(), 'ks', self.session)
