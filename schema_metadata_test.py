@@ -1,8 +1,9 @@
 from cassandra import cqltypes
 from dtest import Tester
-from nose.tools import assert_equal
+from nose.tools import assert_equal, assert_in
 from tools import since
 import re
+import time
 
 
 def establish_indexes_table(version, session, table_name_prefix=""):
@@ -24,10 +25,111 @@ def establish_indexes_table(version, session, table_name_prefix=""):
 
 def verify_indexes_table(created_on_version, current_version, keyspace, session, table_name_prefix=""):
     table_name = _table_name_builder(table_name_prefix, "test_indexes")
-    meta = session.cluster.metadata.keyspaces[keyspace].indexes[
-        _table_name_builder("idx_" + table_name_prefix, table_name)]
+    index_name = _table_name_builder("idx_" + table_name_prefix, table_name)
+    meta = session.cluster.metadata.keyspaces[keyspace].indexes[index_name]
     assert_equal('d', meta.column.name)
     assert_equal(table_name, meta.column.table.name)
+
+    meta = session.cluster.metadata.keyspaces[keyspace].tables[table_name]
+    assert_equal(1, len(meta.clustering_key))
+    assert_equal('c', meta.clustering_key[0].name)
+
+    assert_equal(1, len(meta.indexes))
+    assert_equal('d', meta.indexes[index_name].column.name)
+    assert_equal(3, len(meta.primary_key))
+    assert_equal('a', meta.primary_key[0].name)
+    assert_equal('b', meta.primary_key[1].name)
+    assert_equal('c', meta.primary_key[2].name)
+
+
+def establish_clustering_order_table(version, session, table_name_prefix=""):
+    table_name = _table_name_builder(table_name_prefix, "test_clustering_order")
+    cql = """
+                CREATE TABLE {0} (
+                  event_type text,
+                  insertion_time timestamp,
+                  event blob,
+                  PRIMARY KEY (event_type, insertion_time)
+                )
+                WITH CLUSTERING ORDER BY (insertion_time DESC);
+              """
+
+    session.execute(cql.format(table_name))
+
+
+def verify_clustering_order_table(created_on_version, current_version, keyspace, session, table_name_prefix=""):
+    table_name = _table_name_builder(table_name_prefix, "test_clustering_order")
+    meta = session.cluster.metadata.keyspaces[keyspace].tables[table_name]
+    assert_equal(0, len(meta.indexes))
+    assert_equal(2, len(meta.primary_key))
+    assert_equal('event_type', meta.primary_key[0].name)
+    assert_equal('insertion_time', meta.primary_key[1].name)
+    assert_equal(1, len(meta.clustering_key))
+    assert_equal('insertion_time', meta.clustering_key[0].name)
+    assert_in('insertion_time DESC', meta.as_cql_query())
+
+
+def establish_compact_storage_table(version, session, table_name_prefix=""):
+    table_name = _table_name_builder(table_name_prefix, "test_compact_storage")
+    cql = """
+                CREATE TABLE {0} (
+                  block_id uuid,
+                  sub_block_id int,
+                  stuff blob,
+                  PRIMARY KEY (block_id, sub_block_id)
+                )
+                WITH COMPACT STORAGE;
+              """
+
+    session.execute(cql.format(table_name))
+
+
+def verify_compact_storage_table(created_on_version, current_version, keyspace, session, table_name_prefix=""):
+    table_name = _table_name_builder(table_name_prefix, "test_compact_storage")
+    meta = session.cluster.metadata.keyspaces[keyspace].tables[table_name]
+    assert_equal(3, len(meta.columns))
+    assert_equal(2, len(meta.primary_key))
+    assert_equal(1, len(meta.clustering_key))
+    assert_equal('sub_block_id', meta.clustering_key[0].name)
+    assert_equal('block_id', meta.primary_key[0].name)
+    assert_equal(cqltypes.UUIDType, meta.primary_key[0].data_type)
+    assert_equal('sub_block_id', meta.primary_key[1].name)
+    assert_equal(cqltypes.Int32Type, meta.primary_key[1].data_type)
+    assert_equal(1, len(meta.clustering_key))
+    assert_equal('sub_block_id', meta.clustering_key[0].name)
+
+
+def establish_compact_storage_composite_table(version, session, table_name_prefix=""):
+    table_name = _table_name_builder(table_name_prefix, "test_compact_storage_composite")
+    cql = """
+                CREATE TABLE {0} (
+                    key text,
+                    column1 int,
+                    column2 int,
+                    value text,
+                    PRIMARY KEY(key, column1, column2)
+                ) WITH COMPACT STORAGE;
+              """
+
+    session.execute(cql.format(table_name))
+
+
+def verify_compact_storage_composite_table(created_on_version, current_version, keyspace, session, table_name_prefix=""):
+    table_name = _table_name_builder(table_name_prefix, "test_compact_storage_composite")
+    meta = session.cluster.metadata.keyspaces[keyspace].tables[table_name]
+    assert_equal(4, len(meta.columns))
+    assert_equal(3, len(meta.primary_key))
+    assert_equal('key', meta.primary_key[0].name)
+    assert_equal(cqltypes.UTF8Type, meta.primary_key[0].data_type)
+    assert_equal('column1', meta.primary_key[1].name)
+    assert_equal(cqltypes.Int32Type, meta.primary_key[1].data_type)
+    assert_equal('column2', meta.primary_key[2].name)
+    assert_equal(cqltypes.Int32Type, meta.primary_key[2].data_type)
+    assert_equal(2, len(meta.clustering_key))
+    assert_equal('column1', meta.clustering_key[0].name)
+    assert_equal(cqltypes.Int32Type, meta.clustering_key[0].data_type)
+    assert_equal('column2', meta.clustering_key[1].name)
+    assert_equal(cqltypes.Int32Type, meta.clustering_key[1].data_type)
 
 
 def establish_nondefault_table_settings(version, session, table_name_prefix=""):
@@ -99,6 +201,60 @@ def verify_nondefault_table_settings(created_on_version, current_version, keyspa
     assert_equal(meta.clustering_key[0].name, 'c')
 
 
+def establish_uda(version, session, table_name_prefix=""):
+    if version < '2.2':
+        return
+    function_name = _table_name_builder(table_name_prefix, "test_uda_function")
+    aggregate_name = _table_name_builder(table_name_prefix, "test_uda_aggregate")
+
+    session.execute('''
+            CREATE FUNCTION {0}(current int, candidate int)
+            CALLED ON NULL INPUT
+            RETURNS int LANGUAGE java AS
+            'if (current == null) return candidate; else return Math.max(current, candidate);';
+        '''.format(function_name))
+
+    session.execute('''
+            CREATE AGGREGATE {0}(int)
+            SFUNC {1}
+            STYPE int
+            INITCOND null;
+        '''.format(aggregate_name, function_name))
+
+
+def verify_uda(created_on_version, current_version, keyspace, session, table_name_prefix=""):
+    if created_on_version < '2.2':
+        return
+    function_name = _table_name_builder(table_name_prefix, "test_uda_function")
+    aggregate_name = _table_name_builder(table_name_prefix, "test_uda_aggregate")
+
+    aggr_meta = session.cluster.metadata.keyspaces[keyspace].aggregates[aggregate_name+"(int)"]
+    assert_equal(function_name, aggr_meta.state_func)
+    assert_equal(cqltypes.Int32Type, aggr_meta.state_type)
+    assert_equal(cqltypes.Int32Type, aggr_meta.return_type)
+
+
+def establish_udf(version, session, table_name_prefix=""):
+    if version < '2.2':
+        return
+    function_name = _table_name_builder(table_name_prefix, "test_udf")
+    session.execute('''
+        CREATE OR REPLACE FUNCTION {0} (input double) CALLED ON NULL INPUT RETURNS double LANGUAGE java AS 'return Double.valueOf(Math.log(input.doubleValue()));';
+        '''.format(function_name))
+
+
+def verify_udf(created_on_version, current_version, keyspace, session, table_name_prefix=""):
+    if created_on_version < '2.2':
+        return
+    function_name = _table_name_builder(table_name_prefix, "test_udf")
+    meta = session.cluster.metadata.keyspaces[keyspace].functions[function_name+"(double)"]
+    assert_equal('java', meta.language)
+    assert_equal(cqltypes.DoubleType, meta.return_type)
+    assert_equal(['double'], meta.type_signature)
+    assert_equal(['input'], meta.argument_names)
+    assert_equal('return Double.valueOf(Math.log(input.doubleValue()));', meta.body)
+
+
 def establish_udt_table(version, session, table_name_prefix=""):
     if version < '2.1':
         return
@@ -123,6 +279,36 @@ def verify_udt_table(created_on_version, current_version, keyspace, session, tab
     assert_equal(cqltypes.UTF8Type, meta.field_types[1])
     assert_equal('zip', meta.field_names[2])
     assert_equal(cqltypes.Int32Type, meta.field_types[2])
+
+
+def establish_static_column_table(version, session, table_name_prefix=""):
+    if version < '2.0':
+        return
+    table_name = _table_name_builder(table_name_prefix, "test_static_column")
+    session.execute('''
+          CREATE TABLE {0} (
+             user text,
+             balance int static,
+             expense_id int,
+             amount int,
+             PRIMARY KEY (user, expense_id)
+          )'''.format(table_name))
+
+
+def verify_static_column_table(created_on_version, current_version, keyspace, session, table_name_prefix=""):
+    if created_on_version < '2.0':
+        return
+    table_name = _table_name_builder(table_name_prefix, "test_static_column")
+    meta = session.cluster.metadata.keyspaces[keyspace].tables[table_name]
+    assert_equal(4, len(meta.columns))
+    assert_equal(cqltypes.UTF8Type, meta.columns['user'].data_type)
+    assert_equal(False, meta.columns['user'].is_static)
+    assert_equal(cqltypes.Int32Type, meta.columns['balance'].data_type)
+    assert_equal(True, meta.columns['balance'].is_static)
+    assert_equal(cqltypes.Int32Type, meta.columns['expense_id'].data_type)
+    assert_equal(False, meta.columns['expense_id'].is_static)
+    assert_equal(cqltypes.Int32Type, meta.columns['amount'].data_type)
+    assert_equal(False, meta.columns['amount'].is_static)
 
 
 def establish_collection_datatype_table(version, session, table_name_prefix=""):
@@ -269,6 +455,16 @@ class TestSchemaMetadata(Tester):
         establish_basic_datatype_table(self.cluster.version(), session)
         verify_basic_datatype_table(self.cluster.version(), self.cluster.version(), 'ks', session)
 
+    @since('2.0')
+    def static_column_test(self):
+        cluster = self.cluster
+        cluster.populate(1).start()
+
+        session = self.patient_cql_connection(cluster.nodelist()[0])
+        self.create_ks(session, 'ks', 1)
+        establish_static_column_table(self.cluster.version(), session)
+        verify_static_column_table(self.cluster.version(), self.cluster.version(), 'ks', session)
+
     def collection_table_datatype_test(self):
         cluster = self.cluster
         cluster.populate(1).start()
@@ -287,6 +483,67 @@ class TestSchemaMetadata(Tester):
         self.create_ks(session, 'ks', 1)
         establish_udt_table(self.cluster.version(), session)
         verify_udt_table(self.cluster.version(), self.cluster.version(), 'ks', session)
+
+    @since('2.2')
+    def udf_test(self):
+        cluster = self.cluster
+        if cluster.version >= '3.0':
+            cluster.set_configuration_options({'enable_user_defined_functions': 'true',
+                                               'enable_scripted_user_defined_functions': 'true'})
+        else:
+            cluster.set_configuration_options({'enable_user_defined_functions': 'true'})
+
+        cluster.populate(1).start()
+        session = self.patient_cql_connection(cluster.nodelist()[0])
+        self.create_ks(session, 'ks', 1)
+        establish_udf(self.cluster.version(), session)
+        time.sleep(1)
+        session = self.patient_cql_connection(cluster.nodelist()[0])
+        verify_udf(self.cluster.version(), self.cluster.version(), 'ks', session)
+
+    @since('2.2')
+    def uda_test(self):
+        cluster = self.cluster
+        if cluster.version >= '3.0':
+            cluster.set_configuration_options({'enable_user_defined_functions': 'true',
+                                               'enable_scripted_user_defined_functions': 'true'})
+        else:
+            cluster.set_configuration_options({'enable_user_defined_functions': 'true'})
+
+        cluster.populate(1).start()
+        session = self.patient_cql_connection(cluster.nodelist()[0])
+        self.create_ks(session, 'ks', 1)
+        establish_uda(self.cluster.version(), session)
+        time.sleep(1)
+        session = self.patient_cql_connection(cluster.nodelist()[0])
+        verify_uda(self.cluster.version(), self.cluster.version(), 'ks', session)
+
+    def clustering_order_test(self):
+        cluster = self.cluster
+        cluster.populate(1).start()
+
+        session = self.patient_cql_connection(cluster.nodelist()[0])
+        self.create_ks(session, 'ks', 1)
+        establish_clustering_order_table(self.cluster.version(), session)
+        verify_clustering_order_table(self.cluster.version(), self.cluster.version(), 'ks', session)
+
+    def compact_storage_test(self):
+        cluster = self.cluster
+        cluster.populate(1).start()
+
+        session = self.patient_cql_connection(cluster.nodelist()[0])
+        self.create_ks(session, 'ks', 1)
+        establish_compact_storage_table(self.cluster.version(), session)
+        verify_compact_storage_table(self.cluster.version(), self.cluster.version(), 'ks', session)
+
+    def compact_storage_composite_test(self):
+        cluster = self.cluster
+        cluster.populate(1).start()
+
+        session = self.patient_cql_connection(cluster.nodelist()[0])
+        self.create_ks(session, 'ks', 1)
+        establish_compact_storage_composite_table(self.cluster.version(), session)
+        verify_compact_storage_composite_table(self.cluster.version(), self.cluster.version(), 'ks', session)
 
     def nondefault_table_settings_test(self):
         cluster = self.cluster
