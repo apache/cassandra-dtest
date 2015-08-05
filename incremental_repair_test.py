@@ -3,10 +3,8 @@ import time
 from re import findall
 
 from cassandra import ConsistencyLevel
-from ccmlib.common import is_win
 from ccmlib.node import Node
 from nose.plugins.attrib import attr
-import unittest
 
 from assertions import assert_almost_equal, assert_one
 from dtest import Tester, debug
@@ -209,7 +207,6 @@ class TestIncRepair(Tester):
     @since('2.1')
     @attr('long')
     @flaky  # see CASSANDRA-9752
-    @unittest.skipIf(is_win(), "This test hangs windows servers up.")
     def multiple_subsequent_repair_test(self):
         """
         Covers CASSANDRA-8366
@@ -217,20 +214,17 @@ class TestIncRepair(Tester):
         There is an issue with subsequent inc repairs.
         """
         cluster = self.cluster
-        cluster.set_configuration_options(values={
-            'compaction_throughput_mb_per_sec': 0
-        })
         cluster.populate(3).start()
         [node1, node2, node3] = cluster.nodelist()
 
         debug("Inserting data with stress")
-        expected_load_size = 4.5  # In GB
-        node1.stress(['write', 'n=5M', '-rate', 'threads=50', '-schema', 'replication(factor=3)'])
+        node1.stress(['write', 'n=5M', '-rate', 'threads=10', '-schema', 'replication(factor=3)'])
 
         debug("Flushing nodes")
-        node1.flush()
-        node2.flush()
-        node3.flush()
+        cluster.flush()
+
+        debug("Waiting compactions to finish")
+        cluster.wait_for_compactions()
 
         if self.cluster.version() >= '2.2':
             debug("Repairing node1")
@@ -267,4 +261,5 @@ class TestIncRepair(Tester):
         debug("Total Load size: {}GB".format(load_size))
 
         # There is still some overhead, but it's lot better. We tolerate 25%.
+        expected_load_size = 4.5  # In GB
         assert_almost_equal(load_size, expected_load_size, error=0.25)
