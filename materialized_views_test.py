@@ -25,9 +25,12 @@ class TestMaterializedViews(Tester):
     @since 3.0
     """
 
-    def prepare(self, user_table=False, rf=1):
+    def prepare(self, user_table=False, rf=1, options={}):
         cluster = self.cluster
-        cluster.populate([3, 0]).start()
+        cluster.populate([3, 0])
+        if options:
+            cluster.set_configuration_options(values=options)
+        cluster.start()
         node1 = cluster.nodelist()[0]
 
         session = self.patient_cql_connection(node1)
@@ -764,7 +767,7 @@ class TestMaterializedViews(Tester):
         debug('Starting node2')
         node2.start(wait_other_notice=True, wait_for_binary_proto=True)
 
-        session2 = self.patient_cql_connection(node2)
+        session2 = self.patient_cql_connection(node4)
 
         debug('Verify the data in the MV on node2 with CL=ONE. No rows should be found.')
         for i in xrange(1000):
@@ -829,7 +832,7 @@ class TestMaterializedViews(Tester):
         Test that a materialized view are consistent after a more complex repair.
         """
 
-        session = self.prepare(rf=3)
+        session = self.prepare(rf=3, options={'hinted_handoff_enabled': False})
         node1, node2, node3 = self.cluster.nodelist()
 
         # batchlog requires 2 nodes, so we need to create another dc and set replica 0
@@ -871,7 +874,7 @@ class TestMaterializedViews(Tester):
         debug('Starting node2')
         node2.start(wait_other_notice=True, wait_for_binary_proto=True)
 
-        session2 = self.patient_cql_connection(node2)
+        session2 = self.patient_cql_connection(node4)
         session2.execute('USE ks')
 
         debug('Verify the data in the MV on node2 with CL=ONE. No rows should be found.')

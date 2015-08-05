@@ -112,6 +112,13 @@ def build_doc_context(tester, test_name, prepare=True, connection=None, nodes=No
         """
         output, err = _cqlsh(cmds)
 
+        # python coerces LF to OS-specific line-endings on print or write calls
+        # unless the stream is opened in binary mode. It's cleaner just to
+        # patch that up here so subsequent doctest comparisons to <BLANKLINE>
+        # pass, as they'll fail on Windows w/whitespace + ^M (CRLF)
+        if is_win():
+            err = re.sub(os.linesep, '\n', err)
+
         if not err:
             raise RuntimeError("Expected cqlsh error but none occurred!")
 
@@ -1093,6 +1100,10 @@ class FromJsonDeleteTests(Tester):
                  0
             <BLANKLINE>
             (1 rows)
+            <BLANKLINE>
+            Warnings :
+            Aggregation query used without partition key
+            <BLANKLINE>
             <BLANKLINE>
         """
         run_func_docstring(tester=self, test_func=self.delete_using_pkey_json_test)

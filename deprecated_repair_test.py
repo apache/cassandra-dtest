@@ -1,5 +1,6 @@
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
+from ccmlib.common import is_win
 
 from dtest import Tester, debug
 from tools import since, insert_c1c2, query_c1c2
@@ -50,7 +51,7 @@ class TestDeprecatedRepairAPI(Tester):
         """
         opt = self._deprecated_repair_jmx("forceRepairAsync(java.lang.String,boolean,java.util.Collection,java.util.Collection,boolean,boolean,[Ljava.lang.String;)",
                                           ['ks', True, [], [], False, False, ["cf"]])
-        self.assertEqual(opt["parallelism"], "sequential", opt)
+        self.assertEqual(opt["parallelism"], "parallel" if is_win() else "sequential", opt)
         self.assertEqual(opt["primary_range"], "false", opt)
         self.assertEqual(opt["incremental"], "true", opt)
         self.assertEqual(opt["job_threads"], "1", opt)
@@ -101,7 +102,7 @@ class TestDeprecatedRepairAPI(Tester):
         """
         opt = self._deprecated_repair_jmx("forceRepairRangeAsync(java.lang.String,java.lang.String,java.lang.String,boolean,java.util.Collection,java.util.Collection,boolean,[Ljava.lang.String;)",
                                           ["0", "1000", "ks", True, ["dc1"], [], False, ["cf"]])
-        self.assertEqual(opt["parallelism"], "sequential", opt)
+        self.assertEqual(opt["parallelism"], "parallel" if is_win() else "sequential", opt)
         self.assertEqual(opt["primary_range"], "false", opt)
         self.assertEqual(opt["incremental"], "true", opt)
         self.assertEqual(opt["job_threads"], "1", opt)
@@ -120,7 +121,7 @@ class TestDeprecatedRepairAPI(Tester):
         """
         opt = self._deprecated_repair_jmx("forceRepairRangeAsync(java.lang.String,java.lang.String,java.lang.String,int,java.util.Collection,java.util.Collection,boolean,[Ljava.lang.String;)",
                                           ["0", "1000", "ks", 2, [], [], True, ["cf"]])
-        self.assertEqual(opt["parallelism"], "dc_parallel", opt)
+        self.assertEqual(opt["parallelism"], "parallel" if is_win() else "dc_parallel", opt)
         self.assertEqual(opt["primary_range"], "false", opt)
         self.assertEqual(opt["incremental"], "false", opt)
         self.assertEqual(opt["job_threads"], "1", opt)
@@ -138,7 +139,7 @@ class TestDeprecatedRepairAPI(Tester):
         """
         opt = self._deprecated_repair_jmx("forceRepairRangeAsync(java.lang.String,java.lang.String,java.lang.String,boolean,boolean,boolean,[Ljava.lang.String;)",
                                           ["0", "1000", "ks", True, True, True, ["cf"]])
-        self.assertEqual(opt["parallelism"], "sequential", opt)
+        self.assertEqual(opt["parallelism"], "parallel" if is_win() else "sequential", opt)
         self.assertEqual(opt["primary_range"], "false", opt)
         self.assertEqual(opt["incremental"], "false", opt)
         self.assertEqual(opt["job_threads"], "1", opt)

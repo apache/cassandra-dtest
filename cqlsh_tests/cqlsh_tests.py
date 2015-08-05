@@ -24,6 +24,7 @@ class TestCqlsh(Tester):
 
     def __init__(self, *args, **kwargs):
         Tester.__init__(self, *args, **kwargs)
+        self.maxDiff = None
 
     @classmethod
     def setUpClass(cls):
@@ -34,9 +35,9 @@ class TestCqlsh(Tester):
         unmonkeypatch_driver(cls._cached_driver_methods)
 
     def tearDown(self):
-        if hasattr(self, 'tempfile'):
+        if hasattr(self, 'tempfile') and not common.is_win():
             os.unlink(self.tempfile.name)
-            super(TestCqlsh, self).tearDown()
+        super(TestCqlsh, self).tearDown()
 
     def test_simple_insert(self):
 
@@ -631,7 +632,25 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
                 PRIMARY KEY (id, col)
                 """
 
-        ret += """
+        if LooseVersion(self.cluster.version()) >= LooseVersion('3.0'):
+            ret += """
+        ) WITH CLUSTERING ORDER BY (col ASC)
+            AND bloom_filter_fp_chance = 0.01
+            AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
+            AND comment = ''
+            AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32', 'min_threshold': '4'}
+            AND compression = {'chunk_length_in_kb': '64', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+            AND dclocal_read_repair_chance = 0.1
+            AND default_time_to_live = 0
+            AND gc_grace_seconds = 864000
+            AND max_index_interval = 2048
+            AND memtable_flush_period_in_ms = 0
+            AND min_index_interval = 128
+            AND read_repair_chance = 0.0
+            AND speculative_retry = '99PERCENTILE';
+        """
+        else:
+            ret += """
         ) WITH CLUSTERING ORDER BY (col ASC)
             AND bloom_filter_fp_chance = 0.01
             AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
@@ -646,7 +665,10 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
             AND min_index_interval = 128
             AND read_repair_chance = 0.0
             AND speculative_retry = '99.0PERCENTILE';
-        """ + self.get_index_output('test_col_idx', 'test', 'test', 'col')
+        """
+
+
+        ret += self.get_index_output('test_col_idx', 'test', 'test', 'col')
 
         if has_val_idx:
             return ret + "\n" + self.get_index_output('test_val_idx', 'test', 'test', 'val')
@@ -654,7 +676,29 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
             return ret
 
     def get_users_table_output(self):
-        return """
+        if LooseVersion(self.cluster.version()) >= LooseVersion('3.0'):
+            return """
+        CREATE TABLE test.users (
+            userid text PRIMARY KEY,
+            age int,
+            firstname text,
+            lastname text
+        ) WITH bloom_filter_fp_chance = 0.01
+            AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
+            AND comment = ''
+            AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32', 'min_threshold': '4'}
+            AND compression = {'chunk_length_in_kb': '64', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+            AND dclocal_read_repair_chance = 0.1
+            AND default_time_to_live = 0
+            AND gc_grace_seconds = 864000
+            AND max_index_interval = 2048
+            AND memtable_flush_period_in_ms = 0
+            AND min_index_interval = 128
+            AND read_repair_chance = 0.0
+            AND speculative_retry = '99PERCENTILE';
+        """ + self.get_index_output('myindex', 'test', 'users', 'age')
+        else:
+            return """
         CREATE TABLE test.users (
             userid text PRIMARY KEY,
             age int,
