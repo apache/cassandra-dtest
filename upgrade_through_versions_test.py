@@ -24,8 +24,8 @@ from tools import generate_ssl_stores, new_node
 # Used to build upgrade path(s) for tests. Some tests will go from start to finish,
 # other tests will focus on single upgrades from UPGRADE_PATH[n] to UPGRADE_PATH[n+1]
 
-TRUNK_VER = (3, 0)
-DEFAULT_PATH = [(1, 2), (2, 0), (2, 1), (2, 2), TRUNK_VER]
+TRUNK_VER = (3, 1)
+DEFAULT_PATH = [(1, 2), (2, 0), (2, 1), (2, 2), (3, 0), TRUNK_VER]
 
 CUSTOM_PATH = os.environ.get('UPGRADE_PATH', None)
 if CUSTOM_PATH:
