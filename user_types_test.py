@@ -560,6 +560,8 @@ class TestUserTypes(Tester):
         user1_session.execute(SimpleStatement("DROP TYPE ks1.simple_type;", ConsistencyLevel.ALL))
         user2_session.execute(SimpleStatement("DROP TYPE ks2.simple_type;", ConsistencyLevel.ALL))
 
+        time.sleep(5)
+
         # verify user type metadata is gone from the system schema
         self.assertNoTypes(superuser_session)
 
