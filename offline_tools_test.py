@@ -23,7 +23,7 @@ class TestOfflineTools(Tester):
         @jira_ticket CASSANDRA-7614
         """
         cluster = self.cluster
-        cluster.populate(1).start()
+        cluster.populate(1).start(wait_for_binary_proto=True)
         node1 = cluster.nodelist()[0]
 
         # test by trying to run on nonexistent keyspace
@@ -34,7 +34,7 @@ class TestOfflineTools(Tester):
         self.assertEqual(rc, 1, msg=str(rc))
 
         # now test by generating keyspace but not flushing sstables
-        cluster.start()
+        cluster.start(wait_for_binary_proto=True)
         node1.stress(['write', 'n=100', '-schema', 'replication(factor=1)'])
         cluster.stop(gently=False)
 
@@ -44,7 +44,7 @@ class TestOfflineTools(Tester):
         self.assertEqual(rc, 0, msg=str(rc))
 
         # test by writing small amount of data and flushing (all sstables should be level 0)
-        cluster.start()
+        cluster.start(wait_for_binary_proto=True)
         session = self.patient_cql_connection(node1)
         session.execute("ALTER TABLE keyspace1.standard1 with compaction={'class': 'LeveledCompactionStrategy', 'sstable_size_in_mb':1};")
         node1.stress(['write', 'n=1K', '-schema', 'replication(factor=1)'])
@@ -56,7 +56,7 @@ class TestOfflineTools(Tester):
         self.assertEqual(rc, 0, msg=str(rc))
 
         # test by loading large amount data so we have multiple levels and checking all levels are 0 at end
-        cluster.start()
+        cluster.start(wait_for_binary_proto=True)
         node1.stress(['write', 'n=50K', '-schema', 'replication(factor=1)'])
         self.wait_for_compactions(node1)
         cluster.stop()
@@ -100,7 +100,7 @@ class TestOfflineTools(Tester):
         @jira_ticket CASSANRDA-8031
         """
         cluster = self.cluster
-        cluster.populate(1).start()
+        cluster.populate(1).start(wait_for_binary_proto=True)
         node1 = cluster.nodelist()[0]
 
         # NOTE - As of now this does not return when it encounters Exception and causes test to hang, temporarily commented out
@@ -123,7 +123,7 @@ class TestOfflineTools(Tester):
         self.assertEqual(rc, 1, msg=str(rc))
 
         # test by flushing (sstable should be level 0)
-        cluster.start()
+        cluster.start(wait_for_binary_proto=True)
         session = self.patient_cql_connection(node1)
         session.execute("ALTER TABLE keyspace1.standard1 with compaction={'class': 'LeveledCompactionStrategy', 'sstable_size_in_mb':1};")
 
@@ -137,7 +137,7 @@ class TestOfflineTools(Tester):
         self.assertEqual(rc, 0, msg=str(rc))
 
         # test by loading large amount data so we have multiple sstables
-        cluster.start()
+        cluster.start(wait_for_binary_proto=True)
         node1.stress(['write', 'n=100K', '-schema', 'replication(factor=1)'])
         node1.flush()
         self.wait_for_compactions(node1)
@@ -174,7 +174,7 @@ class TestOfflineTools(Tester):
         """
 
         cluster = self.cluster
-        cluster.populate(3).start()
+        cluster.populate(3).start(wait_for_binary_proto=True)
         node1, node2, node3 = cluster.nodelist()
 
         # test on nonexistent keyspace
