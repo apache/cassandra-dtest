@@ -62,6 +62,29 @@ class TestCqlsh(Tester):
         self.assertEqual({1: 'one', 2: 'two', 3: 'three', 4: 'four', 5: 'five'},
                          {k: v for k, v in rows})
 
+    @since('2.2')
+    def test_past_and_future_dates(self):
+        self.cluster.populate(1)
+        self.cluster.start(wait_for_binary_proto=True)
+
+        node1, = self.cluster.nodelist()
+
+        node1.run_cqlsh(cmds="""
+            CREATE KEYSPACE simple WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
+            use simple;
+            create TABLE simpledate (id int PRIMARY KEY , value timestamp ) ;
+            insert into simpledate (id, value) VALUES (1, '2143-04-19 11:21:01+0000');
+            insert into simpledate (id, value) VALUES (2, '1943-04-19 11:21:01+0000')""")
+
+        session = self.patient_cql_connection(node1)
+        rows = session.execute("select id, value from simple.simpledate")
+
+        output, err = self.run_cqlsh(node1, 'use simple; SELECT * FROM simpledate')
+
+        self.assertIn("2143-04-19 11:21:01+0000", output)
+        self.assertIn("1943-04-19 11:21:01+0000", output)
+
+
     def test_eat_glass(self):
 
         self.cluster.populate(1)
