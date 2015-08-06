@@ -21,6 +21,7 @@ from tools import rows_to_list, since
 DEFAULT_FLOAT_PRECISION = 5  # magic number copied from cqlsh script
 DEFAULT_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'  # based on cqlsh script; timezone stripped
 
+
 @canReuseCluster
 @since('2.1')  # version differences break formatting code on 2.0.x
 class CqlshCopyTest(Tester):
@@ -128,9 +129,9 @@ class CqlshCopyTest(Tester):
                 date_time_format = DateTimeFormat()
             except ImportError:
                 date_time_format = None
-            # try:
+            #  try:
             #     from cqlshlib.formatting
-        encoding_name = 'utf-8' #codecs.lookup(locale.getpreferredencoding()).name
+        encoding_name = 'utf-8'  # codecs.lookup(locale.getpreferredencoding()).name
 
         # different versions use time_format or date_time_format
         # but all versions reject spurious values, so we just use both
@@ -327,7 +328,7 @@ class CqlshCopyTest(Tester):
             csv_values = list(csv.reader(csvfile))
 
         self.assertItemsEqual(csv_values,
-                                 [['a', 'b'], ['1', '10'], ['2', '20'], ['3', '30']])
+                              [['a', 'b'], ['1', '10'], ['2', '20'], ['3', '30']])
 
     def test_reading_use_header(self):
         """

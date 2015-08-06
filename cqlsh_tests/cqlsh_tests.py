@@ -667,7 +667,6 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
             AND speculative_retry = '99.0PERCENTILE';
         """
 
-
         ret += self.get_index_output('test_col_idx', 'test', 'test', 'col')
 
         if has_val_idx:
