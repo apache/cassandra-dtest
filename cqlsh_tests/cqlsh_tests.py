@@ -653,7 +653,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
             ret += """
         ) WITH CLUSTERING ORDER BY (col ASC)
             AND bloom_filter_fp_chance = 0.01
-            AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
+            AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
             AND comment = ''
             AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy'}
             AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
@@ -704,7 +704,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
             firstname text,
             lastname text
         ) WITH bloom_filter_fp_chance = 0.01
-            AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
+            AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
             AND comment = ''
             AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy'}
             AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
