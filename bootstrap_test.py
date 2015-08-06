@@ -329,8 +329,10 @@ class TestBootstrap(Tester):
         # Stop the new node and wipe its data
         node2.stop(gently=gently)
         data_dir = os.path.join(node2.get_path(), 'data')
+        commitlog_dir = os.path.join(node2.get_path(), 'commitlogs')
         debug("Deleting {}".format(data_dir))
         shutil.rmtree(data_dir)
+        shutil.rmtree(commitlog_dir)
 
         # Now start it, it should not be allowed to join.
         mark = node2.mark_log()
