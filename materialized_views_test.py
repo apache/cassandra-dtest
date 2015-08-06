@@ -723,7 +723,7 @@ class TestMaterializedViews(Tester):
         Test that a materialized view are consistent after a more complex repair.
         """
 
-        session = self.prepare(rf=3)
+        session = self.prepare(rf=3, options={'hinted_handoff_enabled': False})
         node1, node2, node3 = self.cluster.nodelist()
 
         # batchlog requires 2 nodes, so we need to create another dc and set replica 0
