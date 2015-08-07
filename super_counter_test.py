@@ -49,6 +49,7 @@ class TestSuperCounterClusterRestart(Tester):
                 thrift_conn.add('row_0', column_parent, counter_column,
                                 ConsistencyLevel.QUORUM)
         time.sleep(1)
+        cluster.flush()
 
         debug("Stopping cluster")
         cluster.stop()
