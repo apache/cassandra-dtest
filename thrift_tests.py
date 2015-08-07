@@ -816,6 +816,7 @@ class TestMutations(ThriftTester):
         _assert_no_columnpath('key', ColumnPath('Super1', super_column='sc4', column=_i64(6)))
         _assert_columnpath_exists('key', ColumnPath('Super1', super_column='sc5', column=_i64(7)))
 
+    @since('1.0','2.2')
     def test_batch_mutate_remove_slice_part_of_supercolumns(self):
         _set_keyspace('Keyspace1')
 
