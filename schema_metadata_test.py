@@ -3,7 +3,6 @@ from dtest import Tester
 from nose.tools import assert_equal, assert_in
 from tools import since
 import re
-import time
 
 
 def establish_indexes_table(version, session, table_name_prefix=""):
@@ -159,9 +158,12 @@ def establish_nondefault_table_settings(version, session, table_name_prefix=""):
                    AND min_index_interval = 1
                    AND default_time_to_live = 86400
                    AND caching = {{'keys': 'NONE', 'rows_per_partition': 'ALL'}}"""
-    else:
-        cql += """ AND index_interval = 1
-                   AND caching = 'ROWS_ONLY'"""
+
+    if version >= '2.0':
+        cql += " AND index_interval = 1"
+
+    if version < '2.1':
+        cql += " AND caching = 'ROWS_ONLY'"
 
     session.execute(cql.format(table_name))
 
@@ -178,12 +180,8 @@ def verify_nondefault_table_settings(created_on_version, current_version, keyspa
 
     if created_on_version >= '2.1':
         assert_equal(86400, meta.options['default_time_to_live'])
-
-    if current_version > '2.0':
         assert_equal(1, meta.options['min_index_interval'])
         assert_equal(20, meta.options['max_index_interval'])
-    else:
-        assert_equal(1, meta.options['index_interval'])
 
     if created_on_version >= '3.0':
         assert_equal('55PERCENTILE', meta.options['speculative_retry'])
@@ -208,86 +206,6 @@ def verify_nondefault_table_settings(created_on_version, current_version, keyspa
 
     assert_equal(1, len(meta.clustering_key))
     assert_equal(meta.clustering_key[0].name, 'c')
-
-
-def establish_uda(version, session, table_name_prefix=""):
-    if version < '2.2':
-        return
-    function_name = _table_name_builder(table_name_prefix, "test_uda_function")
-    aggregate_name = _table_name_builder(table_name_prefix, "test_uda_aggregate")
-
-    session.execute('''
-            CREATE FUNCTION {0}(current int, candidate int)
-            CALLED ON NULL INPUT
-            RETURNS int LANGUAGE java AS
-            'if (current == null) return candidate; else return Math.max(current, candidate);';
-        '''.format(function_name))
-
-    session.execute('''
-            CREATE AGGREGATE {0}(int)
-            SFUNC {1}
-            STYPE int
-            INITCOND null;
-        '''.format(aggregate_name, function_name))
-
-
-def verify_uda(created_on_version, current_version, keyspace, session, table_name_prefix=""):
-    if created_on_version < '2.2':
-        return
-    function_name = _table_name_builder(table_name_prefix, "test_uda_function")
-    aggregate_name = _table_name_builder(table_name_prefix, "test_uda_aggregate")
-
-    aggr_meta = session.cluster.metadata.keyspaces[keyspace].aggregates[aggregate_name+"(int)"]
-    assert_equal(function_name, aggr_meta.state_func)
-    assert_equal(cqltypes.Int32Type, aggr_meta.state_type)
-    assert_equal(cqltypes.Int32Type, aggr_meta.return_type)
-
-
-def establish_udf(version, session, table_name_prefix=""):
-    if version < '2.2':
-        return
-    function_name = _table_name_builder(table_name_prefix, "test_udf")
-    session.execute('''
-        CREATE OR REPLACE FUNCTION {0} (input double) CALLED ON NULL INPUT RETURNS double LANGUAGE java AS 'return Double.valueOf(Math.log(input.doubleValue()));';
-        '''.format(function_name))
-
-
-def verify_udf(created_on_version, current_version, keyspace, session, table_name_prefix=""):
-    if created_on_version < '2.2':
-        return
-    function_name = _table_name_builder(table_name_prefix, "test_udf")
-    meta = session.cluster.metadata.keyspaces[keyspace].functions[function_name+"(double)"]
-    assert_equal('java', meta.language)
-    assert_equal(cqltypes.DoubleType, meta.return_type)
-    assert_equal(['double'], meta.type_signature)
-    assert_equal(['input'], meta.argument_names)
-    assert_equal('return Double.valueOf(Math.log(input.doubleValue()));', meta.body)
-
-
-def establish_udt_table(version, session, table_name_prefix=""):
-    if version < '2.1':
-        return
-    table_name = _table_name_builder(table_name_prefix, "test_udt")
-    session.execute('''
-          CREATE TYPE {0} (
-              street text,
-              city text,
-              zip int
-          )'''.format(table_name))
-
-
-def verify_udt_table(created_on_version, current_version, keyspace, session, table_name_prefix=""):
-    if created_on_version < '2.1':
-        return
-    table_name = _table_name_builder(table_name_prefix, "test_udt")
-    meta = session.cluster.metadata.keyspaces[keyspace].user_types[table_name]
-    assert_equal(3, len(meta.field_names))
-    assert_equal('street', meta.field_names[0])
-    assert_equal(cqltypes.UTF8Type, meta.field_types[0])
-    assert_equal('city', meta.field_names[1])
-    assert_equal(cqltypes.UTF8Type, meta.field_types[1])
-    assert_equal('zip', meta.field_names[2])
-    assert_equal(cqltypes.Int32Type, meta.field_types[2])
 
 
 def establish_static_column_table(version, session, table_name_prefix=""):
@@ -482,50 +400,6 @@ class TestSchemaMetadata(Tester):
         self.create_ks(session, 'ks', 1)
         establish_collection_datatype_table(self.cluster.version(), session)
         verify_collection_datatype_table(self.cluster.version(), self.cluster.version(), 'ks', session)
-
-    @since('2.1')
-    def udt_table_test(self):
-        cluster = self.cluster
-        cluster.populate(1).start()
-
-        session = self.patient_cql_connection(cluster.nodelist()[0])
-        self.create_ks(session, 'ks', 1)
-        establish_udt_table(self.cluster.version(), session)
-        verify_udt_table(self.cluster.version(), self.cluster.version(), 'ks', session)
-
-    @since('2.2')
-    def udf_test(self):
-        cluster = self.cluster
-        if cluster.version >= '3.0':
-            cluster.set_configuration_options({'enable_user_defined_functions': 'true',
-                                               'enable_scripted_user_defined_functions': 'true'})
-        else:
-            cluster.set_configuration_options({'enable_user_defined_functions': 'true'})
-
-        cluster.populate(1).start()
-        session = self.patient_cql_connection(cluster.nodelist()[0])
-        self.create_ks(session, 'ks', 1)
-        establish_udf(self.cluster.version(), session)
-        time.sleep(1)
-        session = self.patient_cql_connection(cluster.nodelist()[0])
-        verify_udf(self.cluster.version(), self.cluster.version(), 'ks', session)
-
-    @since('2.2')
-    def uda_test(self):
-        cluster = self.cluster
-        if cluster.version >= '3.0':
-            cluster.set_configuration_options({'enable_user_defined_functions': 'true',
-                                               'enable_scripted_user_defined_functions': 'true'})
-        else:
-            cluster.set_configuration_options({'enable_user_defined_functions': 'true'})
-
-        cluster.populate(1).start()
-        session = self.patient_cql_connection(cluster.nodelist()[0])
-        self.create_ks(session, 'ks', 1)
-        establish_uda(self.cluster.version(), session)
-        time.sleep(1)
-        session = self.patient_cql_connection(cluster.nodelist()[0])
-        verify_uda(self.cluster.version(), self.cluster.version(), 'ks', session)
 
     def clustering_order_test(self):
         cluster = self.cluster
