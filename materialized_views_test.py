@@ -762,12 +762,13 @@ class TestMaterializedViews(Tester):
                 [i, i, 'a', 3.0]
             )
 
-        debug('Shutdown node1')
+        debug('Shutdown node1 and node4')
         node1.stop(wait_other_notice=True)
+        node4.stop(wait_other_notice=True)
         debug('Starting node2')
         node2.start(wait_other_notice=True, wait_for_binary_proto=True)
 
-        session2 = self.patient_cql_connection(node4)
+        session2 = self.patient_cql_connection(node2)
 
         debug('Verify the data in the MV on node2 with CL=ONE. No rows should be found.')
         for i in xrange(1000):
@@ -775,6 +776,9 @@ class TestMaterializedViews(Tester):
                 session2,
                 "SELECT * FROM ks2.t_by_v WHERE v = {}".format(i)
             )
+
+        debug('Starting node4')
+        node4.start(wait_other_notice=True, wait_for_binary_proto=True)
 
         debug('Write new data in node2 that overlap those in node1')
         for i in xrange(1000):
