@@ -424,6 +424,11 @@ class TestUpgradeThroughVersions(Tester):
         # Record the rows we write as we go:
         self.row_values = set()
         cluster = self.cluster
+        if cluster.version >= '3.0':
+            cluster.set_configuration_options({'enable_user_defined_functions': 'true',
+                                               'enable_scripted_user_defined_functions': 'true'})
+        elif cluster.version >= '2.2':
+            cluster.set_configuration_options({'enable_user_defined_functions': 'true'})
 
         if internode_ssl:
             debug("***using internode ssl***")

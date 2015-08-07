@@ -151,16 +151,17 @@ def establish_nondefault_table_settings(version, session, table_name_prefix=""):
           """
 
     if version >= '3.0':
-        cql += """ AND max_index_interval = 20
-                   AND min_index_interval = 1
-                   AND default_time_to_live = 86400
-                   AND memtable_flush_period_in_ms = 2121
+        cql += """ AND memtable_flush_period_in_ms = 2121
                    AND speculative_retry = '55PERCENTILE'"""
 
     if version >= '2.1':
-        cql += " AND caching = {{'keys': 'NONE', 'rows_per_partition': 'ALL'}}"
+        cql += """ AND max_index_interval = 20
+                   AND min_index_interval = 1
+                   AND default_time_to_live = 86400
+                   AND caching = {{'keys': 'NONE', 'rows_per_partition': 'ALL'}}"""
     else:
-        cql += " AND caching = 'ROWS_ONLY'"
+        cql += """ AND index_interval = 1
+                   AND caching = 'ROWS_ONLY'"""
 
     session.execute(cql.format(table_name))
 
@@ -175,12 +176,20 @@ def verify_nondefault_table_settings(created_on_version, current_version, keyspa
     assert_equal(0.99, meta.options['read_repair_chance'])
     assert_equal(0.5, meta.options['bloom_filter_fp_chance'])
 
-    if current_version >= '3.0':
+    if created_on_version >= '2.1':
+        assert_equal(86400, meta.options['default_time_to_live'])
+
+    if current_version > '2.0':
         assert_equal(1, meta.options['min_index_interval'])
         assert_equal(20, meta.options['max_index_interval'])
-        assert_equal(86400, meta.options['default_time_to_live'])
+    else:
+        assert_equal(1, meta.options['index_interval'])
+
+    if created_on_version >= '3.0':
         assert_equal('55PERCENTILE', meta.options['speculative_retry'])
         assert_equal(2121, meta.options['memtable_flush_period_in_ms'])
+
+    if current_version >= '3.0':
         assert_equal('org.apache.cassandra.io.compress.DeflateCompressor', meta.options['compression']['class'])
         assert_equal('64', meta.options['compression']['chunk_length_in_kb'])
         assert_equal('org.apache.cassandra.db.compaction.LeveledCompactionStrategy', meta.options['compaction']['class'])
