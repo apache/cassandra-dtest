@@ -369,8 +369,8 @@ class TestBootstrap(Tester):
         self.assertEquals(original_rows, list(session.execute("SELECT * FROM {}".format(stress_table,))))
 
         # Decommision the new node and wipe its data
-        node2.nodetool('decommission')
-        node2.stop(gently=True)
+        node2.decommission()
+        node2.stop(gently=False)
         data_dir = os.path.join(node2.get_path(), 'data')
         debug("Deleting {}".format(data_dir))
         shutil.rmtree(data_dir)
