@@ -1,8 +1,19 @@
-from dtest import Tester
+from scrub_test import TestHelper
 from tools import since
+import os
 
 
-class TestCompression(Tester):
+class TestCompression(TestHelper):
+
+    def _get_compression_type(self, file):
+        types = {
+            '00 10': 'NONE',
+            '78 9c': 'DEFLATE'
+        }
+
+        with open(file, 'rb') as fh:
+            file_start = fh.read(4)
+            return types.get(''.join(["%02x " % ord(x) for x in file_start[:2]]).strip(), 'UNKNOWN')
 
     @since("3.0")
     def disable_compression_cql_test(self):
@@ -20,6 +31,14 @@ class TestCompression(Tester):
         meta = session.cluster.metadata.keyspaces['ks'].tables['disabled_compression_table']
         self.assertEqual('false', meta.options['compression']['enabled'])
 
+        for n in range(0, 100):
+            session.execute("insert into disabled_compression_table (id) values (uuid());")
+
+        sstables = self.flush('disabled_compression_table')
+        sstable_path = self.get_table_path('disabled_compression_table')
+
+        self.assertEqual('NONE', self._get_compression_type(os.path.join(sstable_path, sstables['disabled_compression_table'][1])))
+
     @since("3.0")
     def compression_cql_options_test(self):
         """
@@ -36,15 +55,22 @@ class TestCompression(Tester):
             create table compression_opts_table
                 (id uuid PRIMARY KEY )
                 WITH compression = {
-                    'class': 'SnappyCompressor',
+                    'class': 'DeflateCompressor',
                     'chunk_length_in_kb': 256,
                     'crc_check_chance': 0.25
                 };
             """)
         meta = session.cluster.metadata.keyspaces['ks'].tables['compression_opts_table']
-        self.assertEqual('org.apache.cassandra.io.compress.SnappyCompressor', meta.options['compression']['class'])
+        self.assertEqual('org.apache.cassandra.io.compress.DeflateCompressor', meta.options['compression']['class'])
         self.assertEqual('256', meta.options['compression']['chunk_length_in_kb'])
         self.assertEqual('0.25', meta.options['compression']['crc_check_chance'])
+
+        for n in range(0, 100):
+            session.execute("insert into compression_opts_table (id) values (uuid());")
+
+        sstables = self.flush('compression_opts_table')
+        sstable_path = self.get_table_path('compression_opts_table')
+        self.assertEqual('DEFLATE', self._get_compression_type(os.path.join(sstable_path, sstables['compression_opts_table'][1])))
 
     @since("3.0")
     def compression_cql_disabled_with_alter_test(self):
