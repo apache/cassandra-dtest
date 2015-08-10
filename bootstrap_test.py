@@ -373,8 +373,10 @@ class TestBootstrap(Tester):
         node2.decommission()
         node2.stop(gently=False)
         data_dir = os.path.join(node2.get_path(), 'data')
+        commitlog_dir = os.path.join(node2.get_path(), 'commitlogs')
         debug("Deleting {}".format(data_dir))
         shutil.rmtree(data_dir)
+        shutil.rmtree(commitlog_dir)
 
         # Now start it, it should be allowed to join
         mark = node2.mark_log()
@@ -418,8 +420,10 @@ class TestBootstrap(Tester):
 
         # wipe any data for node2
         data_dir = os.path.join(node2.get_path(), 'data')
+        commitlog_dir = os.path.join(node2.get_path(), 'commitlogs')
         debug("Deleting {}".format(data_dir))
         shutil.rmtree(data_dir)
+        shutil.rmtree(commitlog_dir)
 
         # Now start it again, it should be allowed to join
         mark = node2.mark_log()
