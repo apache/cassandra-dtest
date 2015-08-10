@@ -367,6 +367,7 @@ class TestBootstrap(Tester):
 
         session = self.patient_cql_connection(node2)
         self.assertEquals(original_rows, list(session.execute("SELECT * FROM {}".format(stress_table,))))
+        session.shutdown()  # Ensure all sockets to node2 are released
 
         # Decommision the new node and wipe its data
         node2.decommission()

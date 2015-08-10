@@ -221,13 +221,14 @@ class TestConcurrentSchemaChanges(Tester):
         # create and add a new node, I must not be a seed, otherwise
         # we get schema disagreement issues for awhile after decommissioning it.
         node2 = Node('node2',
-                    cluster,
-                    True,
-                    ('127.0.0.2', 9160),
-                    ('127.0.0.2', 7000),
-                    '7200',
+                     cluster,
+                     True,
+                     ('127.0.0.2', 9160),
+                     ('127.0.0.2', 7000),
+                     '7200',
                      '0',
-                    None)
+                     None,
+                     binary_interface=('127.0.0.2', 9042))
         cluster.add(node2, False)
 
         node1, node2 = cluster.nodelist()
@@ -246,13 +247,14 @@ class TestConcurrentSchemaChanges(Tester):
 
         # create and add a new node
         node3 = Node('node3',
-                    cluster,
-                    True,
-                    ('127.0.0.3', 9160),
-                    ('127.0.0.3', 7000),
-                    '7300',
+                     cluster,
+                     True,
+                     ('127.0.0.3', 9160),
+                     ('127.0.0.3', 7000),
+                     '7300',
                      '0',
-                    None)
+                     None,
+                     binary_interface=('127.0.0.3', 9042))
 
         cluster.add(node3, True)
         node3.start(wait_for_binary_proto=True)
