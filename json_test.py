@@ -100,7 +100,7 @@ def build_doc_context(tester, test_name, prepare=True, connection=None, nodes=No
         # unless the stream is opened in binary mode. It's cleaner just to
         # patch that up here so subsequent doctest comparisons to <BLANKLINE>
         # pass, as they'll fail on Windows w/whitespace + ^M (CRLF)
-        if is_win():
+        if is_win() and output:
             output = re.sub(os.linesep, '\n', output)
 
         if output:
@@ -116,7 +116,7 @@ def build_doc_context(tester, test_name, prepare=True, connection=None, nodes=No
         # unless the stream is opened in binary mode. It's cleaner just to
         # patch that up here so subsequent doctest comparisons to <BLANKLINE>
         # pass, as they'll fail on Windows w/whitespace + ^M (CRLF)
-        if is_win():
+        if is_win() and output:
             err = re.sub(os.linesep, '\n', err)
 
         if not err:
