@@ -45,6 +45,7 @@ class TestRepairDataSystemTable(Tester):
             str = "foo bar %d iuhiu iuhiu ihi" % n
             session1.execute("INSERT INTO ks.cf (key, value, txt) VALUES (%d, %d, '%s')" % (n, n, str))
 
+        self.cluster.flush()
         self.cluster.stop()
         self.cluster.start(wait_for_binary_proto=True)
         session1 = self.patient_exclusive_cql_connection(self.node1)
