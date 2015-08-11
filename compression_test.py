@@ -7,13 +7,13 @@ class TestCompression(TestHelper):
 
     def _get_compression_type(self, file):
         types = {
-            '00 10': 'NONE',
-            '78 9c': 'DEFLATE'
+            '0010': 'NONE',
+            '789c': 'DEFLATE'
         }
 
         with open(file, 'rb') as fh:
-            file_start = fh.read(4)
-            return types.get(''.join(["%02x " % ord(x) for x in file_start[:2]]).strip(), 'UNKNOWN')
+            file_start = fh.read(2)
+            return types.get(file_start.encode('hex'), 'UNKNOWN')
 
     @since("3.0")
     def disable_compression_cql_test(self):
