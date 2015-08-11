@@ -3,13 +3,12 @@ import glob
 import os
 import shutil
 import subprocess
-import tempfile
 import time
 
 from cassandra.concurrent import execute_concurrent_with_args
 
 from dtest import Tester, debug
-from tools import replace_in_file, since
+from tools import safe_mkdtemp, replace_in_file, since
 
 
 class SnapshotTester(Tester):
@@ -28,7 +27,7 @@ class SnapshotTester(Tester):
         snapshot_cmd = 'snapshot {ks} -cf {cf} -t {name}'.format(**locals())
         debug("Running snapshot cmd: {snapshot_cmd}".format(snapshot_cmd=snapshot_cmd))
         node.nodetool(snapshot_cmd)
-        tmpdir = tempfile.mkdtemp()
+        tmpdir = safe_mkdtemp()
         os.mkdir(os.path.join(tmpdir, ks))
         os.mkdir(os.path.join(tmpdir, ks, cf))
         node_dir = node.get_path()
@@ -112,7 +111,7 @@ class TestArchiveCommitlog(SnapshotTester):
         snapshot_cmd = 'snapshot {ks} -cf {cf} -t {name}'.format(**locals())
         debug("Running snapshot cmd: {snapshot_cmd}".format(snapshot_cmd=snapshot_cmd))
         node.nodetool(snapshot_cmd)
-        tmpdir = tempfile.mkdtemp()
+        tmpdir = safe_mkdtemp()
         node_dir = node.get_path()
 
         # Copy files from the snapshot dir to existing temp dir
@@ -160,7 +159,7 @@ class TestArchiveCommitlog(SnapshotTester):
         (node1,) = cluster.nodelist()
 
         # Create a temp directory for storing commitlog archives:
-        tmp_commitlog = tempfile.mkdtemp()
+        tmp_commitlog = safe_mkdtemp()
         debug("tmp_commitlog: " + tmp_commitlog)
 
         # Edit commitlog_archiving.properties and set an archive
