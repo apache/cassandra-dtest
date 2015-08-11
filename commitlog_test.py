@@ -99,7 +99,7 @@ class TestCommitLog(Tester):
                             error=files_error)
 
         if not ccmlib.common.is_win():
-            tolerated_error = 0.15 if compressed else 0.05
+            tolerated_error = 0.25 if compressed else 0.15
             assert_almost_equal(sum([int(os.path.getsize(f)/1024/1024) for f in commitlogs]),
                                 commitlog_size,
                                 error=tolerated_error)
@@ -145,10 +145,12 @@ class TestCommitLog(Tester):
 
         if self.cluster.version() < "2.1":
             with open(os.devnull, 'w') as devnull:
-                self.node1.stress(['--num-keys=1000000'], stdout=devnull, stderr=subprocess.STDOUT)
+                self.node1.stress(['--num-keys=1000000', '-S', '1000'],
+                                  stdout=devnull, stderr=subprocess.STDOUT)
         else:
             with open(os.devnull, 'w') as devnull:
-                self.node1.stress(['write', 'n=1M', '-rate', 'threads=25'], stdout=devnull, stderr=subprocess.STDOUT)
+                self.node1.stress(['write', 'n=1M', '-col', 'size=FIXED(1000)', '-rate', 'threads=25'],
+                                  stdout=devnull, stderr=subprocess.STDOUT)
 
     @since('2.1')
     def default_segment_size_test(self):
@@ -164,7 +166,7 @@ class TestCommitLog(Tester):
         self.prepare(configuration={
             'commitlog_segment_size_in_mb': segment_size_in_mb
         }, create_test_keyspace=False)
-        self._commitlog_test(segment_size_in_mb, 62.5, 13, files_error=0.12)
+        self._commitlog_test(segment_size_in_mb, 62.5, 13, files_error=0.2)
 
     @since('2.2')
     def default_compressed_segment_size_test(self):
