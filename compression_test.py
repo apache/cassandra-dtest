@@ -1,6 +1,7 @@
+import os
+
 from scrub_test import TestHelper
 from tools import since
-import os
 
 
 class TestCompression(TestHelper):
@@ -28,6 +29,7 @@ class TestCompression(TestHelper):
         session = self.patient_cql_connection(node)
         self.create_ks(session, 'ks', 1)
         session.execute("create table disabled_compression_table (id uuid PRIMARY KEY ) WITH compression = {'enabled': false};")
+        session.cluster.refresh_schema_metadata()
         meta = session.cluster.metadata.keyspaces['ks'].tables['disabled_compression_table']
         self.assertEqual('false', meta.options['compression']['enabled'])
 
@@ -60,6 +62,7 @@ class TestCompression(TestHelper):
                     'crc_check_chance': 0.25
                 };
             """)
+        session.cluster.refresh_schema_metadata()
         meta = session.cluster.metadata.keyspaces['ks'].tables['compression_opts_table']
         self.assertEqual('org.apache.cassandra.io.compress.DeflateCompressor', meta.options['compression']['class'])
         self.assertEqual('256', meta.options['compression']['chunk_length_in_kb'])
@@ -98,6 +101,8 @@ class TestCompression(TestHelper):
         self.assertEqual('256', meta.options['compression']['chunk_length_in_kb'])
         self.assertEqual('0.25', meta.options['compression']['crc_check_chance'])
         session.execute("alter table start_enabled_compression_table with compression = {'enabled': false};")
+
+        session.cluster.refresh_schema_metadata()
         meta = session.cluster.metadata.keyspaces['ks'].tables['start_enabled_compression_table']
         self.assertEqual('false', meta.options['compression']['enabled'])
 
@@ -122,6 +127,8 @@ class TestCompression(TestHelper):
                                         'chunk_length_in_kb': 256,
                                         'crc_check_chance': 0.25
                                     };""")
+
+        session.cluster.refresh_schema_metadata()
         meta = session.cluster.metadata.keyspaces['ks'].tables['start_disabled_compression_table']
         self.assertEqual('org.apache.cassandra.io.compress.SnappyCompressor', meta.options['compression']['class'])
         self.assertEqual('256', meta.options['compression']['chunk_length_in_kb'])
