@@ -126,7 +126,7 @@ class TestReplaceAddress(Tester):
         mark = node4.mark_log()
         node4.start(replace_address='127.0.0.3')
         node4.watch_log_for("java.lang.UnsupportedOperationException: Cannot replace a live node...", from_mark=mark)
-        self.assertFalse(node4.is_running())
+        self.check_not_running(node4)
 
     def replace_nonexistent_node_test(self):
         debug("Starting cluster with 3 nodes.")
@@ -142,7 +142,15 @@ class TestReplaceAddress(Tester):
         mark = node4.mark_log()
         node4.start(replace_address='127.0.0.5')
         node4.watch_log_for("java.lang.RuntimeException: Cannot replace_address /127.0.0.5 because it doesn't exist in gossip", from_mark=mark)
-        self.assertFalse(node4.is_running())
+        self.check_not_running(node4)
+
+    def check_not_running(self, node):
+        attempts = 0
+        while node.is_running() and attempts < 10:
+            sleep(1)
+            attempts = attempts + 1
+
+        self.assertFalse(node.is_running())
 
     def replace_first_boot_test(self):
         debug("Starting cluster with 3 nodes.")
