@@ -1,9 +1,11 @@
 import os
 import time
+from unittest import skipIf
 from re import findall
 
 from cassandra import ConsistencyLevel
 from ccmlib.node import Node
+from ccmlib.common import is_win
 from nose.plugins.attrib import attr
 
 from assertions import assert_almost_equal, assert_one
@@ -206,6 +208,7 @@ class TestIncRepair(Tester):
 
     @since('2.1')
     @attr('long')
+    @skipIf(is_win(), 'Times out on Windows during write')
     @flaky  # see CASSANDRA-9752
     def multiple_subsequent_repair_test(self):
         """
