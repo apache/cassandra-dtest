@@ -4,6 +4,7 @@ import re
 import subprocess
 import os
 import sys
+import tempfile
 import time
 import unittest
 from distutils.version import LooseVersion
@@ -326,6 +327,12 @@ def cassandra_git_branch():
         raise RuntimeError('Git printed error: {err}'.format(err=err))
     [current_branch_line] = [line for line in out.splitlines() if line.startswith('*')]
     return current_branch_line[1:].strip()
+
+
+def safe_mkdtemp():
+    tmpdir = tempfile.mkdtemp()
+    # \ on Windows is interpreted as an escape character and doesn't do anyone any favors
+    return tmpdir.replace('\\', '/')
 
 
 class InterruptBootstrap(Thread):

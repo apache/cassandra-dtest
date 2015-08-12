@@ -16,6 +16,13 @@ These are instructions for setting up dtests on a fresh install of Ubuntu Linux 
 
         sudo apt-get install git
 
+* windows
+
+        python: https://www.python.org/downloads/
+        git:https://msysgit.github.io/
+        gnuwin32: http://gnuwin32.sourceforge.net/
+        apache ant: https://ant.apache.org/bindownload.cgi
+
 ## Install Oracle Java 7:
 * java and misc tools:
 
@@ -23,6 +30,8 @@ These are instructions for setting up dtests on a fresh install of Ubuntu Linux 
         sudo add-apt-repository ppa:webupd8team/java
         sudo apt-get update
         sudo apt-get install oracle-java7-installer
+
+        Windows: http://www.oracle.com/technetwork/java/javase/downloads/index.html
 
 * Ensure that java is a HotSpot 1.7.x version:
 
