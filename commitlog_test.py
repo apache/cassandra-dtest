@@ -209,7 +209,6 @@ class TestCommitLog(Tester):
         self.assertItemsEqual(rows_to_list(res),
                               [[u'gandalf', 1955, u'male', u'p@$$', u'WA']])
 
-
     @since('2.1')
     def default_segment_size_test(self):
         """ Test default commitlog_segment_size_in_mb (32MB) """
