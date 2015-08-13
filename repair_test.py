@@ -1,5 +1,6 @@
 import time
 from collections import namedtuple
+from unittest import skip
 
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
@@ -372,6 +373,7 @@ class TestRepairDataSystemTable(Tester):
         return RepairTableContents(parent_repair_history=parent_repair_history,
                                    repair_history=repair_history)
 
+    @skip('hangs CI')
     def initial_empty_repair_tables_test(self):
         debug('repair tables:')
         debug(self.repair_table_contents(node=self.node1, include_system_keyspaces=False))
