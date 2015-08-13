@@ -11,7 +11,7 @@ import ccmlib
 from ccmlib.common import is_win
 from assertions import assert_almost_equal, assert_none, assert_one
 from dtest import Tester, debug
-from tools import since
+from tools import since, rows_to_list
 
 
 class TestCommitLog(Tester):
@@ -151,6 +151,63 @@ class TestCommitLog(Tester):
             with open(os.devnull, 'w') as devnull:
                 self.node1.stress(['write', 'n=1M', '-col', 'size=FIXED(1000)', '-rate', 'threads=25'],
                                   stdout=devnull, stderr=subprocess.STDOUT)
+
+    def test_commitlog_replay_on_startup(self):
+        """ Test commit log replay """
+        node1 = self.node1
+        node1.set_configuration_options(batch_commitlog=True)
+        node1.start()
+
+        debug("Insert data")
+        session = self.patient_cql_connection(node1)
+        self.create_ks(session, 'Test', 1)
+        session.execute("""
+            CREATE TABLE users (
+                user_name varchar PRIMARY KEY,
+                password varchar,
+                gender varchar,
+                state varchar,
+                birth_year bigint
+            );
+        """)
+        session.execute("INSERT INTO Test. users (user_name, password, gender, state, birth_year) "
+                        "VALUES('gandalf', 'p@$$', 'male', 'WA', 1955);")
+
+        debug("Verify data is present")
+        session = self.patient_cql_connection(node1)
+        res = session.execute("SELECT * FROM Test. users")
+        self.assertItemsEqual(rows_to_list(res),
+                              [[u'gandalf', 1955, u'male', u'p@$$', u'WA']])
+
+        debug("Stop node abruptly")
+        node1.stop(gently=False)
+
+        debug("Verify commitlog was written before abrupt stop")
+        commitlog_dir = os.path.join(node1.get_path(), 'commitlogs')
+        commitlog_files = os.listdir(commitlog_dir)
+        self.assertTrue(len(commitlog_files) > 0)
+
+        debug("Verify no SSTables were flushed before abrupt stop")
+        data_dir = os.path.join(node1.get_path(), 'data')
+        cf_id = [s for s in os.listdir(os.path.join(data_dir, "test")) if s.startswith("users")][0]
+        cf_data_dir = glob.glob("{data_dir}/test/{cf_id}".format(**locals()))[0]
+        cf_data_dir_files = os.listdir(cf_data_dir)
+        if "backups" in cf_data_dir_files:
+            cf_data_dir_files.remove("backups")
+        self.assertEqual(0, len(cf_data_dir_files))
+
+        debug("Verify commit log was replayed on startup")
+        node1.start()
+        node1.watch_log_for("Log replay complete", timeout=5)
+        # Here we verify there was more than 0 replayed mutations
+        zero_replays = node1.grep_log("0 replayed mutations")
+        self.assertEqual(0, len(zero_replays))
+
+        debug("Make query and ensure data is present")
+        session = self.patient_cql_connection(node1)
+        res = session.execute("SELECT * FROM Test. users")
+        self.assertItemsEqual(rows_to_list(res),
+                              [[u'gandalf', 1955, u'male', u'p@$$', u'WA']])
 
     @since('2.1')
     def default_segment_size_test(self):
