@@ -338,7 +338,9 @@ class Tester(TestCase):
         node_ip = self.get_ip_from_node(node)
 
         if protocol_version is None:
-            if self.cluster.version() >= '2.1':
+            if self.cluster.version() >= '2.2':
+                protocol_version = 4
+            elif self.cluster.version() >= '2.1':
                 protocol_version = 3
             elif self.cluster.version() >= '2.0':
                 protocol_version = 2
