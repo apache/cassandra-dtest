@@ -1,16 +1,16 @@
 import os
 import time
-from unittest import skipIf
 from re import findall
+from unittest import skipIf
 
 from cassandra import ConsistencyLevel
-from ccmlib.node import Node
-from ccmlib.common import is_win
+from flaky import flaky
 from nose.plugins.attrib import attr
 
 from assertions import assert_almost_equal, assert_one
+from ccmlib.common import is_win
+from ccmlib.node import Node
 from dtest import Tester, debug
-from flaky import flaky
 from tools import insert_c1c2, since
 
 
