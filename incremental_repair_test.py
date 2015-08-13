@@ -1,16 +1,14 @@
 import os
 import time
-from unittest import skipIf
 from re import findall
+from unittest import skip
 
 from cassandra import ConsistencyLevel
-from ccmlib.node import Node
-from ccmlib.common import is_win
 from nose.plugins.attrib import attr
 
 from assertions import assert_almost_equal, assert_one
+from ccmlib.node import Node
 from dtest import Tester, debug
-from flaky import flaky
 from tools import insert_c1c2, since
 
 
@@ -208,8 +206,7 @@ class TestIncRepair(Tester):
 
     @since('2.1')
     @attr('long')
-    @skipIf(is_win(), 'Times out on Windows during write')
-    @flaky  # see CASSANDRA-9752
+    @skip('hangs CI')
     def multiple_subsequent_repair_test(self):
         """
         Covers CASSANDRA-8366
