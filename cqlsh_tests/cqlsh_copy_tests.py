@@ -5,6 +5,7 @@ import os
 import sys
 from contextlib import contextmanager
 from decimal import Decimal
+from dtest import warning
 from tempfile import NamedTemporaryFile
 from uuid import uuid1, uuid4
 
@@ -121,8 +122,19 @@ class CqlshCopyTest(Tester):
                          for row in csv_file]
 
         self.maxDiff = None
-        self.assertItemsEqual(processed_csv,
-                              processed_results)
+        try:
+            self.assertItemsEqual(processed_csv, processed_results)
+        except Exception as e:
+            if len(processed_csv) != len(processed_results):
+                warning("Different # of entries. CSV: " + str(len(processed_csv)) +
+                        " vs results: " + str(len(processed_results)))
+            elif(processed_csv[0] != None):
+                for x in range(0, len(processed_csv[0])):
+                    if processed_csv[0][x] != processed_results[0][x]:
+                        warning("Mismatch at index: " + str(x))
+                        warning("Value in csv: " + str(processed_csv[0][x]))
+                        warning("Value in result: " + str(processed_results[0][x]))
+            raise e
 
     def format_for_csv(self, val):
         with self._cqlshlib() as cqlshlib:
