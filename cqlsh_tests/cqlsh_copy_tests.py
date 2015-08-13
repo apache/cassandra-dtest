@@ -38,9 +38,12 @@ class CqlshCopyTest(Tester):
         unmonkeypatch_driver(cls._cached_driver_methods)
 
     def tearDown(self):
-        if self.tempfile and not is_win():
+        if self.tempfile:
+            if is_win():
+                self.tempfile.close()
             os.unlink(self.tempfile.name)
-            super(CqlshCopyTest, self).tearDown()
+
+        super(CqlshCopyTest, self).tearDown()
 
     def prepare(self):
         if not self.cluster.nodelist():
@@ -784,25 +787,28 @@ class CqlshCopyTest(Tester):
 
         results = list(self.session.execute("SELECT * FROM testcopyto"))
 
-        self.tempfile = NamedTemporaryFile()
+        self.tempfile = NamedTemporaryFile(delete=False)
         debug('Exporting to csv file: {name}'.format(name=self.tempfile.name))
 
-        commandfile = NamedTemporaryFile()
-        with open(commandfile.name, 'w') as commands:
-            commands.write('USE ks;\n')
-            commands.write("COPY ks.testcopyto TO '{name}' WITH HEADER=false;".format(name=self.tempfile.name))
+        commandfile = NamedTemporaryFile(delete=False)
+        commandfile.file.write('USE ks;\n')
+        commandfile.file.write("COPY ks.testcopyto TO '{name}' WITH HEADER=false;".format(name=self.tempfile.name))
+        commandfile.close()
 
         self.node1.run_cqlsh(cmds="SOURCE '{name}'".format(name=commandfile.name))
+        os.unlink(commandfile.name)
 
         # import the CSV file with COPY FROM
         self.session.execute("TRUNCATE ks.testcopyto")
         debug('Importing from csv file: {name}'.format(name=self.tempfile.name))
 
-        commandfile = NamedTemporaryFile()
-        with open(commandfile.name, 'w') as commands:
-            commands.write('USE ks;\n')
-            commands.write("COPY ks.testcopyto FROM '{name}' WITH HEADER=false;".format(name=self.tempfile.name))
+        commandfile = NamedTemporaryFile(delete=False)
+        commandfile.file.write('USE ks;\n')
+        commandfile.file.write("COPY ks.testcopyto FROM '{name}' WITH HEADER=false;".format(name=self.tempfile.name))
+        commandfile.close()
 
         self.node1.run_cqlsh(cmds="SOURCE '{name}'".format(name=commandfile.name))
         new_results = list(self.session.execute("SELECT * FROM testcopyto"))
         self.assertEqual(results, new_results)
+
+        os.unlink(commandfile.name)
