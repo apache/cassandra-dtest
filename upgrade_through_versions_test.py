@@ -335,7 +335,7 @@ def counter_checker(tester, to_verify_queue, verification_done_queue):
             time.sleep(0.1)  # let's not eat CPU if the queue is empty
             continue
         except Exception:
-            debug("Error in data verifier process!")
+            debug("Error in counter verifier process!")
             verification_done_queue.close()
             raise
         else:
