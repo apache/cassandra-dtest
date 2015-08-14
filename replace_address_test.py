@@ -1,9 +1,9 @@
-from dtest import Tester, debug, DISABLE_VNODES
-from tools import since, InterruptBootstrap
+from cassandra import ConsistencyLevel, ReadTimeout, Unavailable
+from cassandra.query import SimpleStatement
 
 from ccmlib.node import Node, NodeError
-from cassandra import ConsistencyLevel, Unavailable, ReadTimeout
-from cassandra.query import SimpleStatement
+from dtest import DISABLE_VNODES, Tester, debug
+from tools import InterruptBootstrap, since
 
 
 class NodeUnavailable(Exception):
