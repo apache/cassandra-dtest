@@ -73,6 +73,36 @@ class TestMaterializedViews(Tester):
                                   "WHERE keyspace_name='ks' AND table_name='users'"))
         self.assertEqual(len(result), 1, "Expecting 1 materialized view, got" + str(result))
 
+    def test_gcgs_validation(self):
+        """Verify that it's not possible to create or set a too low gc_grace_seconds on MVs"""
+        session = self.prepare(user_table=True)
+
+        # First on base table
+        assert_invalid(session,
+                       "ALTER TABLE users WITH gc_grace_seconds = 0",
+                       "Cannot alter gc_grace_seconds of the base table of a "
+                       "materialized view to a value lower than 10800 seconds.")
+        # Now on MV
+        assert_invalid(session,
+                       "ALTER MATERIALIZED VIEW users_by_state WITH gc_grace_seconds = 0",
+                       "Cannot alter gc_grace_seconds of a materialized view to a value "
+                       "lower than 10800 seconds.")
+
+        # Now let's drop MV
+        session.execute("DROP MATERIALIZED VIEW ks.users_by_state;")
+
+        # Now we should be able to set the gc_grace_seconds of the base table to 0
+        session.execute("ALTER TABLE users WITH gc_grace_seconds = 0")
+
+        # Now we shouldn't be able to create a new MV on this table
+        assert_invalid(session,
+                       "CREATE MATERIALIZED VIEW users_by_state AS "
+                       "SELECT * FROM users WHERE STATE IS NOT NULL AND username IS NOT NULL "
+                       "PRIMARY KEY (state, username)",
+                       "Base table 'users' must have gcGraceSeconds attribute of at least "
+                       "10800 seconds")
+
+
     def insert_test(self):
         """Test basic insertions"""
 
