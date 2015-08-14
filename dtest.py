@@ -19,7 +19,7 @@ from unittest import TestCase
 from cassandra.auth import PlainTextAuthProvider
 from cassandra.cluster import Cluster as PyCluster
 from cassandra.cluster import NoHostAvailable
-from cassandra.policies import WhiteListRoundRobinPolicy
+from cassandra.policies import WhiteListRoundRobinPolicy, RetryPolicy
 from nose.exc import SkipTest
 
 from ccmlib.cluster import Cluster
@@ -104,6 +104,33 @@ def retry_till_success(fun, *args, **kwargs):
             else:
                 # brief pause before next attempt
                 time.sleep(0.25)
+
+
+class FlakyRetryPolicy(RetryPolicy):
+    """
+    A retry policy that retries 5 times
+    """
+
+    def on_read_timeout(self, *args, **kwargs):
+        if kwargs['retry_num'] < 5:
+            debug("Retrying read after timeout. Attempt #"+str(kwargs['retry_num']))
+            return (self.RETRY, None)
+        else:
+            return (self.RETHROW, None)
+
+    def on_write_timeout(self, *args, **kwargs):
+        if kwargs['retry_num'] < 5:
+            debug("Retrying write after timeout. Attempt #"+str(kwargs['retry_num']))
+            return (self.RETRY, None)
+        else:
+            return (self.RETHROW, None)
+
+    def on_unavailable(self, *args, **kwargs):
+        if kwargs['retry_num'] < 5:
+            debug("Retrying request after UE. Attempt #"+str(kwargs['retry_num']))
+            return (self.RETRY, None)
+        else:
+            return (self.RETHROW, None)
 
 
 class Runner(threading.Thread):
@@ -353,7 +380,7 @@ class Tester(TestCase):
             auth_provider = None
 
         cluster = PyCluster([node_ip], auth_provider=auth_provider, compression=compression,
-                            protocol_version=protocol_version, load_balancing_policy=load_balancing_policy)
+                            protocol_version=protocol_version, load_balancing_policy=load_balancing_policy, default_retry_policy=FlakyRetryPolicy())
         session = cluster.connect()
 
         # temporarily increase client-side timeout to 1m to determine
