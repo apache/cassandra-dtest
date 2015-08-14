@@ -1,3 +1,5 @@
+from time import sleep
+
 from cassandra import ConsistencyLevel, ReadTimeout, Unavailable
 from cassandra.query import SimpleStatement
 
