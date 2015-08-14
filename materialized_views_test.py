@@ -74,6 +74,45 @@ class TestMaterializedViews(Tester):
                                   "WHERE keyspace_name='ks' AND table_name='users'"))
         self.assertEqual(len(result), 1, "Expecting 1 materialized view, got" + str(result))
 
+    def test_gcgs_validation(self):
+        """Verify that it's not possible to create or set a too low gc_grace_seconds on MVs"""
+        session = self.prepare(user_table=True)
+
+        # Shouldn't be able to alter the gc_grace_seconds of the base table to 0
+        assert_invalid(session,
+                       "ALTER TABLE users WITH gc_grace_seconds = 0",
+                       "Cannot alter gc_grace_seconds of the base table of a materialized view "
+                       "to 0, since this value is used to TTL undelivered updates. Setting "
+                       "gc_grace_seconds too low might cause undelivered updates to expire "
+                       "before being replayed.")
+
+        # But can alter the gc_grace_seconds of the bease table to a value != 0
+        session.execute("ALTER TABLE users WITH gc_grace_seconds = 10")
+
+        # Shouldn't be able to alter the gc_grace_seconds of the MV to 0
+        assert_invalid(session,
+                       "ALTER MATERIALIZED VIEW users_by_state WITH gc_grace_seconds = 0",
+                       "Cannot alter gc_grace_seconds of a materialized view to 0, since "
+                       "this value is used to TTL undelivered updates. Setting gc_grace_seconds "
+                       "too low might cause undelivered updates to expire before being replayed.")
+
+        # Now let's drop MV
+        session.execute("DROP MATERIALIZED VIEW ks.users_by_state;")
+
+        # Now we should be able to set the gc_grace_seconds of the base table to 0
+        session.execute("ALTER TABLE users WITH gc_grace_seconds = 0")
+
+        # Now we shouldn't be able to create a new MV on this table
+        assert_invalid(session,
+                       "CREATE MATERIALIZED VIEW users_by_state AS "
+                       "SELECT * FROM users WHERE STATE IS NOT NULL AND username IS NOT NULL "
+                       "PRIMARY KEY (state, username)",
+                       "Cannot create materialized view 'users_by_state' for base table 'users' "
+                       "with gc_grace_seconds of 0, since this value is used to TTL undelivered "
+                       "updates. Setting gc_grace_seconds too low might cause undelivered updates"
+                       " to expire before being replayed.")
+
+
     def insert_test(self):
         """Test basic insertions"""
 
