@@ -148,7 +148,7 @@ def build_doc_context(tester, test_name, prepare=True, connection=None, nodes=No
     }
 
 
-def run_func_docstring(tester, test_func, globs=None, verbose=False, compileflags=None, optionflags=doctest.ELLIPSIS):
+def run_func_docstring(tester, test_func, globs=None, verbose=False, compileflags=None, optionflags=doctest.ELLIPSIS | doctest.NORMALIZE_WHITESPACE):
     """
     Similar to doctest.run_docstring_examples, but takes a single function/bound method,
     extracts it's singular docstring (no looking for subobjects with tests),
