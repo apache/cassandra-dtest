@@ -295,7 +295,7 @@ def counter_incrementer(tester, to_verify_queue, verification_done_queue, rewrit
 
             to_verify_queue.put_nowait((key, count + 1,))
         except Exception:
-            debug("Error in data writer process!")
+            debug("Error in counter incrementer process!")
             to_verify_queue.close()
             raise
 
