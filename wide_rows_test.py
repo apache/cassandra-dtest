@@ -20,6 +20,7 @@ clients = (
     "Emacs"
     )
 
+
 class TestWideRows(Tester):
 
     def __init__(self, *args, **kwargs):
@@ -50,11 +51,11 @@ class TestWideRows(Tester):
                 client = random.choice(clients)
                 msg = random.choice(status_messages)
                 query = "UPDATE user_events SET value = '{msg:%s, client:%s}' WHERE userid='%s' and event='%s';" \
-                               % (msg, client, user, date_str)
-                #debug(query)
+                        % (msg, client, user, date_str)
+                # debug(query)
                 session.execute(query)
 
-        #debug('Duration of test: %s' % (datetime.datetime.now() - start_time))
+        # debug('Duration of test: %s' % (datetime.datetime.now() - start_time))
 
         # Pick out an update for a specific date:
         query = "SELECT value FROM user_events WHERE userid='ryan' and event='%s'" % \
@@ -74,30 +75,30 @@ class TestWideRows(Tester):
         cluster = self.cluster
         cluster.populate(1).start()
         (node1,) = cluster.nodelist()
-        cluster.set_configuration_options(values={ 'column_index_size_in_kb' : 1 }) #reduce this value to force column index creation
+        cluster.set_configuration_options(values={'column_index_size_in_kb': 1})  # reduce this value to force column index creation
         session = self.patient_cql_connection(node1)
         self.create_ks(session, 'wide_rows', 1)
 
         create_table_query = 'CREATE TABLE test_table (row varchar, name varchar, value int, PRIMARY KEY (row, name));'
         session.execute(create_table_query)
 
-        #Now insert 100,000 columns to row 'row0'
+        # Now insert 100,000 columns to row 'row0'
         insert_column_query = "UPDATE test_table SET value = {value} WHERE row = '{row}' AND name = '{name}';"
         for i in range(100000):
             row = 'row0'
             name = 'val' + str(i)
             session.execute(insert_column_query.format(value=i, row=row, name=name))
 
-        #now randomly fetch columns: 1 to 3 at a time
+        # now randomly fetch columns: 1 to 3 at a time
         for i in range(10000):
             select_column_query = "SELECT value FROM test_table WHERE row='row0' AND name in ('{name1}', '{name2}', '{name3}');"
             values2fetch = [str(random.randint(0, 99999)) for i in range(3)]
-            #values2fetch is a list of random values.  Because they are random, they will not be unique necessarily.
-            #To simplify the template logic in the select_column_query I will not expect the query to
-            #necessarily return 3 values.  Hence I am computing the number of unique values in values2fetch
-            #and using that in the assert at the end.
-            expected_rows = len( set( values2fetch ) )
+            # values2fetch is a list of random values.  Because they are random, they will not be unique necessarily.
+            # To simplify the template logic in the select_column_query I will not expect the query to
+            # necessarily return 3 values.  Hence I am computing the number of unique values in values2fetch
+            # and using that in the assert at the end.
+            expected_rows = len(set(values2fetch))
             rows = session.execute(select_column_query.format(name1="val" + values2fetch[0],
-                                                       name2="val" + values2fetch[1],
-                                                       name3="val" + values2fetch[2]))
+                                                              name2="val" + values2fetch[1],
+                                                              name3="val" + values2fetch[2]))
             assert len(rows) == expected_rows

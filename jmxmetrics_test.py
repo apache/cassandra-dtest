@@ -1,36 +1,78 @@
 from dtest import Tester
+from tools import debug
 from jmxutils import JolokiaAgent, make_mbean, remove_perf_disable_shared_mem
 
-# Currently only have attributes that are incrementing. 
-# MBEAN_VALUES are expressed in tuple with the first value being the class, 
-# the package (may be tuple), the attribute, and then the value. 
-MBEAN_VALUES_PRE = [('metrics', ('ColumnFamily', 'AllMemtablesLiveDataSize'), 'Value', 'MBeanIncrement'),
-                        ('metrics', ('ColumnFamily', 'AllMemtablesHeapSize'), 'Value', 'MBeanIncrement'),
-                        ('metrics', ('ColumnFamily', 'AllMemtablesOffHeapSize'), 'Value', 'MBeanEqual'),
-                        ('metrics', ('ColumnFamily', 'BloomFilterDiskSpaceUsed'), 'Value', 'MBeanIncrement'),
-                        ('metrics', ('ColumnFamily', 'BloomFilterFalsePositives'), 'Value', 'MBeanEqual'),
-                        ('metrics', ('ColumnFamily', 'IndexSummaryOffHeapMemoryUsed'), 'Value', 'MBeanIncrement'),
-                        ('metrics', ('ColumnFamily', 'LiveDiskSpaceUsed'), 'Value', 'MBeanIncrement'),
-                        ('metrics', ('ColumnFamily', 'LiveSSTableCount'), 'Value', 'MBeanIncrement'), 
-                        ('metrics', ('ColumnFamily', 'MemtableColumnsCount'), 'Value', 'MBeanIncrement'),
-                        ('metrics', ('ColumnFamily', 'MemtableLiveDataSize'), 'Value', 'MBeanIncrement'),
-                        ('metrics', ('ColumnFamily', 'MemtableOnHeapSize'), 'Value', 'MBeanIncrement'),
-                        ('metrics', ('ColumnFamily', 'MemtableSwitchCount'), 'Value', 'MBeanIncrement'),
-                        ('db', 'IndexSummaries', 'MemoryPoolSizeInMB', 'MBeanIncrement'),
-                        ('db', 'IndexSummaries', 'IndexIntervals', 'MBeanIncrement'),
-                        ('db', 'Caches', 'CounterCacheKeysToSave', 2147483647),
-                        ('db', 'Caches', 'CounterCacheSavePeriodInSeconds', 7200),
-                        ('metrics', ('ColumnFamily', 'MaxRowSize'), 'Value', 'MBeanEqual'),
-                        ('metrics', ('ColumnFamily', 'MemtableOffHeapSize'), 'Value', 'MBeanEqual'),
-                        ('metrics', ('ColumnFamily', 'MinRowSize'), 'Value', 'MBeanEqual'),
-                        ('metrics', ('ColumnFamily', 'PendingCompactions'), 'Value', 'MBeanEqual'),
-                        ('metrics', ('ColumnFamily', 'RowCacheHit'), 'Value', 'MBeanEqual'),
-                        ('metrics', ('ColumnFamily', 'CompressionRatio'), 'Value', 'MBeanDecrement'),
-                        ('metrics', ('ColumnFamily', 'MeanRowSize'), 'Value', 'MBeanDecrement'),
-                        ('db', 'BatchlogManager', 'TotalBatchesReplayed', 0),
-                        ('db', 'Caches', 'RowCacheSavePeriodInSeconds', 0)]
 
-# MBEAN_VALUES_POST_3.0 = 
+# We currently only have attributes that are incrementing.
+# MBEAN_VALUES are expressed in tuple with the first value being the class, then the type,
+# a dictionary of arguments for make_mbean(), the attribute, and then the value.
+# MBEAN_VALUES_PRE are values for up to release 2.2, MBEAN_VALUES_POST are for 3.0 and later.
+# In 3.0 "ColumnFamily" has been renamed to "Table" and "Row" to "Partition".
+# However, the old names are also supported for backward compatibility and we test them via
+# the mbean aliases, see begin_test().
+def MBEAN_VALUES_PRE(ks, table):
+    return [('db', 'Caches', {}, 'CounterCacheKeysToSave', 2147483647),
+            ('db', 'Caches', {}, 'CounterCacheSavePeriodInSeconds', 7200),
+            ('db', 'BatchlogManager', {}, 'TotalBatchesReplayed', 0),
+            ('db', 'Caches', {}, 'RowCacheSavePeriodInSeconds', 0),
+            ('db', 'IndexSummaries', {}, 'MemoryPoolSizeInMB', 'MBeanIncrement'),
+            ('db', 'IndexSummaries', {}, 'IndexIntervals', 'MBeanIncrement'),
+            ('metrics', 'ColumnFamily', {'name': 'AllMemtablesLiveDataSize'}, 'Value', 'MBeanIncrement'),
+            ('metrics', 'ColumnFamily', {'name': 'AllMemtablesHeapSize'}, 'Value', 'MBeanIncrement'),
+            ('metrics', 'ColumnFamily', {'name': 'AllMemtablesOffHeapSize'}, 'Value', 'MBeanEqual'),
+            ('metrics', 'ColumnFamily', {'name': 'BloomFilterDiskSpaceUsed'}, 'Value', 'MBeanIncrement'),
+            ('metrics', 'ColumnFamily', {'name': 'BloomFilterFalsePositives'}, 'Value', 'MBeanEqual'),
+            ('metrics', 'ColumnFamily', {'name': 'IndexSummaryOffHeapMemoryUsed'}, 'Value', 'MBeanIncrement'),
+            ('metrics', 'ColumnFamily', {'name': 'LiveDiskSpaceUsed'}, 'Value', 'MBeanIncrement'),
+            ('metrics', 'ColumnFamily', {'name': 'LiveSSTableCount'}, 'Value', 'MBeanIncrement'),
+            ('metrics', 'ColumnFamily', {'name': 'MemtableColumnsCount'}, 'Value', 'MBeanIncrement'),
+            ('metrics', 'ColumnFamily', {'name': 'MemtableLiveDataSize'}, 'Value', 'MBeanIncrement'),
+            ('metrics', 'ColumnFamily', {'name': 'MemtableOnHeapSize'}, 'Value', 'MBeanIncrement'),
+            ('metrics', 'ColumnFamily', {'name': 'MemtableSwitchCount'}, 'Value', 'MBeanIncrement'),
+            ('metrics', 'ColumnFamily', {'name': 'MemtableOffHeapSize'}, 'Value', 'MBeanEqual'),
+            ('metrics', 'ColumnFamily', {'name': 'PendingCompactions'}, 'Value', 'MBeanEqual'),
+            ('metrics', 'ColumnFamily', {'name': 'CompressionRatio'}, 'Value', 'MBeanDecrement'),
+            ('metrics', 'ColumnFamily', {'name': 'MaxRowSize'}, 'Value', 'MBeanEqual'),
+            ('metrics', 'ColumnFamily', {'name': 'MinRowSize'}, 'Value', 'MBeanEqual'),
+            ('metrics', 'ColumnFamily', {'name': 'MeanRowSize'}, 'Value', 'MBeanDecrement'),
+            ('metrics', 'ColumnFamily', {'name': 'RowCacheHit'}, 'Value', 'MBeanEqual'),
+            ('metrics', 'ColumnFamily', {'name': 'RowCacheHitOutOfRange'}, 'Value', 'MBeanEqual'),
+            ('metrics', 'ColumnFamily', {'name': 'RowCacheMiss'}, 'Value', 'MBeanEqual'),
+            ('metrics', 'ColumnFamily', {'name': 'EstimatedRowSizeHistogram', 'keyspace': ks, 'scope': table}, 'Value', 'MBeanEqual'),
+            ('metrics', 'ColumnFamily', {'name': 'EstimatedRowCount', 'keyspace': ks, 'scope': table}, 'Value', 'MBeanEqual')]
+
+
+def MBEAN_VALUES_POST(ks, table):
+    return [('db', 'Caches', {}, 'CounterCacheKeysToSave', 2147483647),
+            ('db', 'Caches', {}, 'CounterCacheSavePeriodInSeconds', 7200),
+            ('db', 'BatchlogManager', {}, 'TotalBatchesReplayed', 0),
+            ('db', 'Caches', {}, 'RowCacheSavePeriodInSeconds', 0),
+            ('db', 'IndexSummaries', {}, 'MemoryPoolSizeInMB', 'MBeanIncrement'),
+            ('db', 'IndexSummaries', {}, 'IndexIntervals', 'MBeanIncrement'),
+            ('metrics', 'Table', {'name': 'AllMemtablesLiveDataSize'}, 'Value', 'MBeanIncrement'),
+            ('metrics', 'Table', {'name': 'AllMemtablesHeapSize'}, 'Value', 'MBeanIncrement'),
+            ('metrics', 'Table', {'name': 'AllMemtablesOffHeapSize'}, 'Value', 'MBeanEqual'),
+            ('metrics', 'Table', {'name': 'BloomFilterDiskSpaceUsed'}, 'Value', 'MBeanIncrement'),
+            ('metrics', 'Table', {'name': 'BloomFilterFalsePositives'}, 'Value', 'MBeanEqual'),
+            ('metrics', 'Table', {'name': 'IndexSummaryOffHeapMemoryUsed'}, 'Value', 'MBeanIncrement'),
+            ('metrics', 'Table', {'name': 'LiveDiskSpaceUsed'}, 'Value', 'MBeanIncrement'),
+            ('metrics', 'Table', {'name': 'LiveSSTableCount'}, 'Value', 'MBeanIncrement'),
+            ('metrics', 'Table', {'name': 'MemtableColumnsCount'}, 'Value', 'MBeanIncrement'),
+            ('metrics', 'Table', {'name': 'MemtableLiveDataSize'}, 'Value', 'MBeanIncrement'),
+            ('metrics', 'Table', {'name': 'MemtableOnHeapSize'}, 'Value', 'MBeanIncrement'),
+            ('metrics', 'Table', {'name': 'MemtableSwitchCount'}, 'Value', 'MBeanIncrement'),
+            ('metrics', 'Table', {'name': 'MemtableOffHeapSize'}, 'Value', 'MBeanEqual'),
+            ('metrics', 'Table', {'name': 'PendingCompactions'}, 'Value', 'MBeanEqual'),
+            ('metrics', 'Table', {'name': 'CompressionRatio'}, 'Value', 'MBeanDecrement'),
+            ('metrics', 'Table', {'name': 'MaxPartitionSize'}, 'Value', 'MBeanEqual'),
+            ('metrics', 'Table', {'name': 'MinPartitionSize'}, 'Value', 'MBeanEqual'),
+            ('metrics', 'Table', {'name': 'MeanPartitionSize'}, 'Value', 'MBeanDecrement'),
+            ('metrics', 'Table', {'name': 'RowCacheHit'}, 'Value', 'MBeanEqual'),
+            ('metrics', 'Table', {'name': 'RowCacheHitOutOfRange'}, 'Value', 'MBeanEqual'),
+            ('metrics', 'Table', {'name': 'RowCacheMiss'}, 'Value', 'MBeanEqual'),
+            ('metrics', 'Table', {'name': 'EstimatedPartitionSizeHistogram',  'keyspace': ks, 'scope': table}, 'Value', 'MBeanEqual'),
+            ('metrics', 'Table', {'name': 'EstimatedPartitionCount', 'keyspace': ks, 'scope': table}, 'Value', 'MBeanEqual')]
+
 
 class TestJMXMetrics(Tester):
 
@@ -40,10 +82,14 @@ class TestJMXMetrics(Tester):
     def begin_test(self):
         """
         @jira_ticket CASSANDRA-7436
-        This test measures the values of MBeans before and after running a load. We expect 
-        the values to change a certain way, and thus deem them as 'MBeanEqual','MBeanDecrement', 
+        This test measures the values of MBeans before and after running a load. We expect
+        the values to change a certain way, and thus deem them as 'MBeanEqual','MBeanDecrement',
         'MBeanIncrement', or a constant to experss this expected change. If the value does not reflect
-        this expected change, then it raises an AssertionError. 
+        this expected change, then it raises an AssertionError.
+
+        @jira_ticket CASSANDRA-9448
+        This test also makes sure to cover all metrics that were renamed by CASSANDRA-9448, in post 3.0
+        we also check that the old alias names are the same as the new names.
         """
         cluster = self.cluster
         cluster.populate(1)
@@ -60,7 +106,7 @@ class TestJMXMetrics(Tester):
                             PRIMARY KEY (key, column1)
                         ) WITH COMPACT STORAGE
                             AND CLUSTERING ORDER BY (column1 ASC)
-                            AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
+                            AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
                             AND comment = ''
                             AND compaction = {'min_threshold': '4', 'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32'}
                             AND compression = {}
@@ -75,46 +121,64 @@ class TestJMXMetrics(Tester):
                         """)
 
         with JolokiaAgent(node) as jmx:
+            debug("Cluster version {}".format(cluster.version()))
+            if cluster.version() <= '2.2.X':
+                mbean_values = MBEAN_VALUES_PRE('keyspace1', 'counter1')
+                mbean_aliases = None
+            else:
+                mbean_values = MBEAN_VALUES_POST('keyspace1', 'counter1')
+                mbean_aliases = MBEAN_VALUES_PRE('keyspace1', 'counter1')
+
             before = []
-            mbeans = []
-            errors = []
-            for package, bean, attribute, expected in MBEAN_VALUES_PRE:
-                # In the case that the file name is longer, then we put it in the form of tuple in bean.
-                if type(bean) == tuple:
-                    mbean = make_mbean(package, type = bean[0], name = bean[1])
-                else:
-                    mbean = make_mbean(package, bean)
-                mbeans.append(mbean)
+            for package, bean, bean_args, attribute, expected in mbean_values:
+                mbean = make_mbean(package, type=bean, **bean_args)
+                debug(mbean)
                 before.append(jmx.read_attribute(mbean, attribute))
+
+            if mbean_aliases:
+                alias_counter = 0
+                for package, bean, bean_args, attribute, expected in mbean_aliases:
+                    mbean = make_mbean(package, type=bean, **bean_args)
+                    debug(mbean)
+                    self.assertEqual(before[alias_counter], jmx.read_attribute(mbean, attribute))
+                    alias_counter += 1
 
             if cluster.version() < "2.1":
                 node.stress(['-o', 'insert', '-n', '100000', '-p', '7100'])
-            else: 
+            else:
                 node.stress(['write', 'n=100K', '-port jmx=7100'])
 
+            errors = []
+            after = []
             attr_counter = 0
-            for package, bean, attribute, expected in MBEAN_VALUES_PRE:
-                a_value = jmx.read_attribute(mbeans[attr_counter], attribute)
+            for package, bean, bean_args, attribute, expected in mbean_values:
+                mbean = make_mbean(package, type=bean, **bean_args)
+                a_value = jmx.read_attribute(mbean, attribute)
+                after.append(a_value)
                 b_value = before[attr_counter]
                 if expected == 'MBeanIncrement':
                     if b_value >= a_value:
-                        errors.append(mbeans[attr_counter] + " has a before value of " + str(b_value) + " and after value of " + str(a_value) + " and did not increment" + "\n")
+                        errors.append(mbean + " has a before value of " + str(b_value) + " and after value of " + str(a_value) + " and did not increment" + "\n")
                 elif expected == 'MBeanDecrement':
                     if b_value <= a_value:
-                        errors.append(mbeans[attr_counter] + " has a before value of " + str(b_value) + " and after value of " + str(a_value) + " and did not decrement" + "\n")
+                        errors.append(mbean + " has a before value of " + str(b_value) + " and after value of " + str(a_value) + " and did not decrement" + "\n")
                 elif expected == 'MBeanEqual':
                     if b_value != a_value:
-                        errors.append(mbeans[attr_counter] + " has a before value of " + str(b_value) + " and after value of " + str(a_value) + ", which are not equal" + "\n")
+                        errors.append(mbean + " has a before value of " + str(b_value) + " and after value of " + str(a_value) + ", which are not equal" + "\n")
                 elif expected == 'MBeanZero':
                     if not (b_value == 0 and a_value == 0):
-                        errors.append(mbeans[attr_counter] + " has a before value of " + str(b_value) + " and after value of " + str(a_value) + " and they do not equal zero" + "\n")
+                        errors.append(mbean + " has a before value of " + str(b_value) + " and after value of " + str(a_value) + " and they do not equal zero" + "\n")
                 # If expected is none of the above, then expected should be a number.
                 else:
                     if a_value != expected:
-                        errors.append(mbeans[attr_counter] + " has an after value of " + str(a_value) + " which does not equal " + str(expected) + "\n")
+                        errors.append(mbean + " has an after value of " + str(a_value) + " which does not equal " + str(expected) + "\n")
                 attr_counter += 1
 
             self.assertEqual(len(errors), 0, "\n" + "\n".join(errors))
 
-
-
+            if mbean_aliases:
+                alias_counter = 0
+                for package, bean, bean_args, attribute, expected in mbean_aliases:
+                    mbean = make_mbean(package, type=bean, **bean_args)
+                    self.assertEqual(after[alias_counter], jmx.read_attribute(mbean, attribute))
+                    alias_counter += 1

@@ -1,5 +1,13 @@
+import glob
+import os
+import pycassa
+import shlex
+import subprocess
+import sys
+import time
+import unittest
+
 from dtest import Tester, debug, DEFAULT_DIR
-import unittest, time, os, subprocess, shlex, pycassa, glob, sys
 
 JNA_PATH = '/usr/share/java/jna.jar'
 ATTACK_JAR = 'lib/cassandra-attack.jar'
@@ -16,6 +24,7 @@ except KeyError:
         JNA_IN_LIB = glob.glob('%s/lib/jna-*.jar' % DEFAULT_DIR)
         JNA_PATH = JNA_IN_LIB[0]
 
+
 class ThriftHSHATest(Tester):
 
     def __init__(self, *args, **kwargs):
@@ -31,8 +40,8 @@ class ThriftHSHATest(Tester):
         cluster = self.cluster
         cluster.set_configuration_options(values={
             'start_rpc': 'true',
-            'rpc_server_type' : 'hsha',
-            'rpc_max_threads' : 20
+            'rpc_server_type': 'hsha',
+            'rpc_max_threads': 20
         })
 
         cluster.populate(1)
@@ -42,6 +51,7 @@ class ThriftHSHATest(Tester):
         session = self.patient_cql_connection(node1)
         self.create_ks(session, 'test', 1)
         session.execute("CREATE TABLE \"CF\" (key text PRIMARY KEY, val text) WITH COMPACT STORAGE;")
+
         def make_connection():
             pool = pycassa.ConnectionPool('test', timeout=None)
             cf = pycassa.ColumnFamily(pool, 'CF')
@@ -77,12 +87,12 @@ class ThriftHSHATest(Tester):
         cluster = self.cluster
         cluster.set_configuration_options(values={
             'start_rpc': 'true',
-            'rpc_server_type' : 'hsha',
-            'rpc_max_threads' : 20
+            'rpc_server_type': 'hsha',
+            'rpc_max_threads': 20
         })
 
         # Enable JNA:
-        with open(os.path.join(self.test_path, 'test', 'cassandra.in.sh'),'w') as f:
+        with open(os.path.join(self.test_path, 'test', 'cassandra.in.sh'), 'w') as f:
             f.write('CLASSPATH={jna_path}:$CLASSPATH\n'.format(
                 jna_path=JNA_PATH))
 
@@ -102,7 +112,6 @@ class ThriftHSHATest(Tester):
 ) WITH COMPACT STORAGE;
 """)
 
-
         debug("running attack jar...")
         p = subprocess.Popen(shlex.split("java -jar {attack_jar}".format(attack_jar=ATTACK_JAR)))
         p.communicate()
@@ -113,4 +122,3 @@ class ThriftHSHATest(Tester):
         cluster.start(no_wait=True)
         debug("Waiting 10 seconds before we're done..")
         time.sleep(10)
-

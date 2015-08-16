@@ -6,7 +6,7 @@ import subprocess
 import tempfile
 import re
 from dtest import Tester, debug
-from tools import new_node, query_c1c2, since, require, KillOnBootstrap, InterruptBootstrap
+from tools import new_node, query_c1c2, since, KillOnBootstrap, InterruptBootstrap
 from assertions import assert_almost_equal
 from ccmlib.node import NodeError
 from cassandra import ConsistencyLevel
@@ -289,11 +289,9 @@ class TestBootstrap(Tester):
         failure = regex.search(output)
         self.assertIsNone(failure, "Error during stress while bootstrapping")
 
-    @require("9765")
     def shutdown_wiped_node_cannot_join_test(self):
         self._wiped_node_cannot_join_test(gently=True)
 
-    @require("9765")
     def killed_wiped_node_cannot_join_test(self):
         self._wiped_node_cannot_join_test(gently=False)
 
@@ -331,15 +329,16 @@ class TestBootstrap(Tester):
         # Stop the new node and wipe its data
         node2.stop(gently=gently)
         data_dir = os.path.join(node2.get_path(), 'data')
+        commitlog_dir = os.path.join(node2.get_path(), 'commitlogs')
         debug("Deleting {}".format(data_dir))
         shutil.rmtree(data_dir)
+        shutil.rmtree(commitlog_dir)
 
         # Now start it, it should not be allowed to join.
         mark = node2.mark_log()
         node2.start(no_wait=True)
-        node2.watch_log_for("A node with address /127.0.0.4 already exists, cancelling join", from_mark=mark, timeout=60)
+        node2.watch_log_for("A node with address /127.0.0.4 already exists, cancelling join", from_mark=mark)
 
-    @require("9765")
     def decommissioned_wiped_node_can_join_test(self):
         """
         @jira_ticket CASSANDRA-9765
@@ -368,20 +367,22 @@ class TestBootstrap(Tester):
 
         session = self.patient_cql_connection(node2)
         self.assertEquals(original_rows, list(session.execute("SELECT * FROM {}".format(stress_table,))))
+        session.shutdown()  # Ensure all sockets to node2 are released
 
         # Decommision the new node and wipe its data
-        node2.nodetool('decommission')
-        node2.stop(gently=True)
+        node2.decommission()
+        node2.stop(gently=False)
         data_dir = os.path.join(node2.get_path(), 'data')
+        commitlog_dir = os.path.join(node2.get_path(), 'commitlogs')
         debug("Deleting {}".format(data_dir))
         shutil.rmtree(data_dir)
+        shutil.rmtree(commitlog_dir)
 
         # Now start it, it should be allowed to join
         mark = node2.mark_log()
         node2.start(wait_other_notice=True)
-        node2.watch_log_for("JOINING:", from_mark=mark, timeout=60)
+        node2.watch_log_for("JOINING:", from_mark=mark)
 
-    @require("9765")
     def failed_bootstap_wiped_node_can_join_test(self):
         """
         @jira_ticket CASSANDRA-9765
@@ -419,10 +420,12 @@ class TestBootstrap(Tester):
 
         # wipe any data for node2
         data_dir = os.path.join(node2.get_path(), 'data')
+        commitlog_dir = os.path.join(node2.get_path(), 'commitlogs')
         debug("Deleting {}".format(data_dir))
         shutil.rmtree(data_dir)
+        shutil.rmtree(commitlog_dir)
 
         # Now start it again, it should be allowed to join
         mark = node2.mark_log()
         node2.start(wait_other_notice=True)
-        node2.watch_log_for("JOINING:", from_mark=mark, timeout=60)
+        node2.watch_log_for("JOINING:", from_mark=mark)

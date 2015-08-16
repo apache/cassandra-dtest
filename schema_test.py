@@ -1,8 +1,9 @@
+import time
 
 from dtest import Tester
 from tools import since, rows_to_list
 from assertions import assert_invalid
-import time
+
 
 @since('2.0')
 class TestSchema(Tester):
@@ -64,7 +65,7 @@ class TestSchema(Tester):
         self.assertEqual([[None], [None], [None], [4]], sorted(rows_to_list(rows)))
 
         rows = session.execute("SELECT * FROM cf")
-        self.assertEqual([[0,None,2], [1,None,3], [2,None,4], [3,4,5]], sorted(rows_to_list(rows)))
+        self.assertEqual([[0, None, 2], [1, None, 3], [2, None, 4], [3, 4, 5]], sorted(rows_to_list(rows)))
 
         rows = session.execute("SELECT c1 FROM cf WHERE key = 0")
         self.assertEqual([[None]], rows_to_list(rows))
@@ -73,10 +74,10 @@ class TestSchema(Tester):
         self.assertEqual([[4]], rows_to_list(rows))
 
         rows = session.execute("SELECT * FROM cf WHERE c2 = 2")
-        self.assertEqual([[0,None,2]], rows_to_list(rows))
+        self.assertEqual([[0, None, 2]], rows_to_list(rows))
 
         rows = session.execute("SELECT * FROM cf WHERE c2 = 5")
-        self.assertEqual([[3,4,5]], rows_to_list(rows))
+        self.assertEqual([[3, 4, 5]], rows_to_list(rows))
 
     def prepare(self):
         cluster = self.cluster

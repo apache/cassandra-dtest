@@ -81,7 +81,8 @@ class TestHelper(Tester):
         """
         node1 = self.cluster.nodelist()[0]
         response = node1.nodetool(cmd, capture_output=True)[0]
-        assert len(response) == 0  # nodetool does not print anything unless there is an error
+        if not common.is_win():  # nodetool always prints out on windows
+            assert len(response) == 0, response  # nodetool does not print anything unless there is an error
 
     def launch_standalone_scrub(self, ks, cf):
         """
@@ -386,7 +387,6 @@ class TestScrub(TestHelper):
         users = self.query_users(session)
         self.assertEqual(initial_users, users)
 
-    @require('9591*')
     def test_standalone_scrub_essential_files_only(self):
         cluster = self.cluster
         cluster.populate(1).start()

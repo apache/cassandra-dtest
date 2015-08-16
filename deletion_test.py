@@ -61,16 +61,18 @@ class TestDeletion(Tester):
 def memtable_size(node, keyspace, table):
     version = node.get_cassandra_version()
     name = 'MemtableOnHeapSize' if version >= '2.1' else 'MemtableDataSize'
-    return columnfamily_metric(node, keyspace, table, name)
+    return table_metric(node, keyspace, table, name)
 
 
 def memtable_count(node, keyspace, table):
-    return columnfamily_metric(node, keyspace, table, 'MemtableColumnsCount')
+    return table_metric(node, keyspace, table, 'MemtableColumnsCount')
 
 
-def columnfamily_metric(node, keyspace, table, name):
+def table_metric(node, keyspace, table, name):
+    version = node.get_cassandra_version()
+    typeName = "ColumnFamily" if version <= '2.2.X' else 'Table'
     with JolokiaAgent(node) as jmx:
-        mbean = make_mbean('metrics', type='ColumnFamily',
+        mbean = make_mbean('metrics', type=typeName,
                            name=name, keyspace=keyspace, scope=table)
         value = jmx.read_attribute(mbean, 'Value')
 

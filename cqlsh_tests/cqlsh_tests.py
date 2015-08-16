@@ -24,6 +24,7 @@ class TestCqlsh(Tester):
 
     def __init__(self, *args, **kwargs):
         Tester.__init__(self, *args, **kwargs)
+        self.maxDiff = None
 
     @classmethod
     def setUpClass(cls):
@@ -34,9 +35,9 @@ class TestCqlsh(Tester):
         unmonkeypatch_driver(cls._cached_driver_methods)
 
     def tearDown(self):
-        if hasattr(self, 'tempfile'):
+        if hasattr(self, 'tempfile') and not common.is_win():
             os.unlink(self.tempfile.name)
-            super(TestCqlsh, self).tearDown()
+        super(TestCqlsh, self).tearDown()
 
     def test_simple_insert(self):
 
@@ -60,6 +61,29 @@ class TestCqlsh(Tester):
 
         self.assertEqual({1: 'one', 2: 'two', 3: 'three', 4: 'four', 5: 'five'},
                          {k: v for k, v in rows})
+
+    @since('2.2')
+    def test_past_and_future_dates(self):
+        self.cluster.populate(1)
+        self.cluster.start(wait_for_binary_proto=True)
+
+        node1, = self.cluster.nodelist()
+
+        node1.run_cqlsh(cmds="""
+            CREATE KEYSPACE simple WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
+            use simple;
+            create TABLE simpledate (id int PRIMARY KEY , value timestamp ) ;
+            insert into simpledate (id, value) VALUES (1, '2143-04-19 11:21:01+0000');
+            insert into simpledate (id, value) VALUES (2, '1943-04-19 11:21:01+0000')""")
+
+        session = self.patient_cql_connection(node1)
+        rows = session.execute("select id, value from simple.simpledate")
+
+        output, err = self.run_cqlsh(node1, 'use simple; SELECT * FROM simpledate')
+
+        self.assertIn("2143-04-19 11:21:01+0000", output)
+        self.assertIn("1943-04-19 11:21:01+0000", output)
+
 
     def test_eat_glass(self):
 
@@ -631,7 +655,25 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
                 PRIMARY KEY (id, col)
                 """
 
-        ret += """
+        if LooseVersion(self.cluster.version()) >= LooseVersion('3.0'):
+            ret += """
+        ) WITH CLUSTERING ORDER BY (col ASC)
+            AND bloom_filter_fp_chance = 0.01
+            AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
+            AND comment = ''
+            AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32', 'min_threshold': '4'}
+            AND compression = {'chunk_length_in_kb': '64', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+            AND dclocal_read_repair_chance = 0.1
+            AND default_time_to_live = 0
+            AND gc_grace_seconds = 864000
+            AND max_index_interval = 2048
+            AND memtable_flush_period_in_ms = 0
+            AND min_index_interval = 128
+            AND read_repair_chance = 0.0
+            AND speculative_retry = '99PERCENTILE';
+        """
+        else:
+            ret += """
         ) WITH CLUSTERING ORDER BY (col ASC)
             AND bloom_filter_fp_chance = 0.01
             AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
@@ -646,7 +688,9 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
             AND min_index_interval = 128
             AND read_repair_chance = 0.0
             AND speculative_retry = '99.0PERCENTILE';
-        """ + self.get_index_output('test_col_idx', 'test', 'test', 'col')
+        """
+
+        ret += self.get_index_output('test_col_idx', 'test', 'test', 'col')
 
         if has_val_idx:
             return ret + "\n" + self.get_index_output('test_val_idx', 'test', 'test', 'val')
@@ -654,7 +698,29 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
             return ret
 
     def get_users_table_output(self):
-        return """
+        if LooseVersion(self.cluster.version()) >= LooseVersion('3.0'):
+            return """
+        CREATE TABLE test.users (
+            userid text PRIMARY KEY,
+            age int,
+            firstname text,
+            lastname text
+        ) WITH bloom_filter_fp_chance = 0.01
+            AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
+            AND comment = ''
+            AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32', 'min_threshold': '4'}
+            AND compression = {'chunk_length_in_kb': '64', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+            AND dclocal_read_repair_chance = 0.1
+            AND default_time_to_live = 0
+            AND gc_grace_seconds = 864000
+            AND max_index_interval = 2048
+            AND memtable_flush_period_in_ms = 0
+            AND min_index_interval = 128
+            AND read_repair_chance = 0.0
+            AND speculative_retry = '99PERCENTILE';
+        """ + self.get_index_output('myindex', 'test', 'users', 'age')
+        else:
+            return """
         CREATE TABLE test.users (
             userid text PRIMARY KEY,
             age int,

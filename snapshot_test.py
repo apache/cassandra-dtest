@@ -3,13 +3,12 @@ import glob
 import os
 import shutil
 import subprocess
-import tempfile
 import time
 
 from cassandra.concurrent import execute_concurrent_with_args
 
 from dtest import Tester, debug
-from tools import replace_in_file, require, since
+from tools import safe_mkdtemp, replace_in_file, since
 
 
 class SnapshotTester(Tester):
@@ -28,7 +27,7 @@ class SnapshotTester(Tester):
         snapshot_cmd = 'snapshot {ks} -cf {cf} -t {name}'.format(**locals())
         debug("Running snapshot cmd: {snapshot_cmd}".format(snapshot_cmd=snapshot_cmd))
         node.nodetool(snapshot_cmd)
-        tmpdir = tempfile.mkdtemp()
+        tmpdir = safe_mkdtemp()
         os.mkdir(os.path.join(tmpdir, ks))
         os.mkdir(os.path.join(tmpdir, ks, cf))
         node_dir = node.get_path()
@@ -101,7 +100,6 @@ class TestSnapshot(SnapshotTester):
         self.assertEqual(rows[0][0], 100)
 
 
-@require('dtest issue #393', broken_in='3.0')
 class TestArchiveCommitlog(SnapshotTester):
     def __init__(self, *args, **kwargs):
         kwargs['cluster_options'] = {'commitlog_segment_size_in_mb': 1}
@@ -113,7 +111,7 @@ class TestArchiveCommitlog(SnapshotTester):
         snapshot_cmd = 'snapshot {ks} -cf {cf} -t {name}'.format(**locals())
         debug("Running snapshot cmd: {snapshot_cmd}".format(snapshot_cmd=snapshot_cmd))
         node.nodetool(snapshot_cmd)
-        tmpdir = tempfile.mkdtemp()
+        tmpdir = safe_mkdtemp()
         node_dir = node.get_path()
 
         # Copy files from the snapshot dir to existing temp dir
@@ -124,7 +122,7 @@ class TestArchiveCommitlog(SnapshotTester):
     def restore_snapshot(self, snapshot_dir, node, ks, cf, name):
         debug("Restoring snapshot for cf ....")
         data_dir = os.path.join(node.get_path(), 'data')
-        cf_id = [s for s in os.listdir(snapshot_dir) if cf in s][0]
+        cf_id = [s for s in os.listdir(snapshot_dir) if s.startswith(cf + "-")][0]
         snapshot_dir = glob.glob("{snapshot_dir}/{cf_id}/snapshots/{name}".format(**locals()))[0]
         if not os.path.exists(os.path.join(data_dir, ks)):
             os.mkdir(os.path.join(data_dir, ks))
@@ -161,7 +159,7 @@ class TestArchiveCommitlog(SnapshotTester):
         (node1,) = cluster.nodelist()
 
         # Create a temp directory for storing commitlog archives:
-        tmp_commitlog = tempfile.mkdtemp()
+        tmp_commitlog = safe_mkdtemp()
         debug("tmp_commitlog: " + tmp_commitlog)
 
         # Edit commitlog_archiving.properties and set an archive
@@ -260,7 +258,7 @@ class TestArchiveCommitlog(SnapshotTester):
 
             if self.cluster.version() >= '3.0':
                 self.restore_snapshot(system_ut_snapshot_dir, node1, 'system_schema', 'types', 'usertypes')
-            if self.cluster.version() >= '2.1':
+            elif self.cluster.version() >= '2.1':
                 self.restore_snapshot(system_ut_snapshot_dir, node1, 'system', 'schema_usertypes', 'usertypes')
 
             if self.cluster.version() >= '3.0':

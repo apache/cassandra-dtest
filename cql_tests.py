@@ -407,6 +407,7 @@ class AbortedQueriesTester(CQLTester):
         """
         Check that a query running on the local coordinator node times out
         """
+        self.skipTest("Feature In Development")
         cluster = self.cluster
         cluster.set_configuration_options(values={'read_request_timeout_in_ms': 1000})
 
@@ -437,6 +438,7 @@ class AbortedQueriesTester(CQLTester):
         """
         Check that a query running on a node other than the coordinator times out
         """
+        self.skipTest("Feature In Development")
         cluster = self.cluster
         cluster.set_configuration_options(values={'read_request_timeout_in_ms': 1000})
 
@@ -467,6 +469,7 @@ class AbortedQueriesTester(CQLTester):
         """
         Check that a secondary index query times out
         """
+        self.skipTest("Feature In Development")
         cluster = self.cluster
         cluster.set_configuration_options(values={'read_request_timeout_in_ms': 1000})
 
@@ -497,4 +500,5 @@ class AbortedQueriesTester(CQLTester):
         """
         Check that a materialized view query times out
         """
+        self.skipTest("Feature In Development")
         self.fail("Not yet implemented")

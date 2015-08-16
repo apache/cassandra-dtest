@@ -2,11 +2,11 @@ import os
 import re
 import tempfile
 import time
+import random
 
 from assertions import assert_almost_equal, assert_none, assert_one
 from dtest import Tester, debug
 from tools import require, since
-
 
 class TestCompaction(Tester):
 
@@ -243,19 +243,34 @@ class TestCompaction(Tester):
         self.create_ks(session, 'ks', 1)
 
         mark = node.mark_log()
-        session.execute("CREATE TABLE large(userid text PRIMARY KEY, properties map<int, text>)")
-        for i in range(50000):  # ensures partition size larger than compaction_large_partition_warning_threshold_mb
-            session.execute("UPDATE ks.large SET properties[%i] = 'x' WHERE userid = 'user'" % i)
+        strlen = (1024 * 1024)/100
+        session.execute("CREATE TABLE large(userid text PRIMARY KEY, properties map<int, text>) with compression = {}")
+        for i in range(200):  # ensures partition size larger than compaction_large_partition_warning_threshold_mb
+            session.execute("UPDATE ks.large SET properties[%i] = '%s' WHERE userid = 'user'" % (i, get_random_word(strlen)))
+
+        ret = session.execute("SELECT properties from ks.large where userid = 'user'")
+        assert len(ret) == 1
+        self.assertEqual(200, len(ret[0][0].keys()))
 
         node.flush()
 
         node.nodetool('compact ks large')
         node.watch_log_for('Compacting large partition ks/large:user \(\d+ bytes\)', from_mark=mark, timeout=180)
 
+        ret = session.execute("SELECT properties from ks.large where userid = 'user'")
+
+        assert len(ret) == 1
+        self.assertEqual(200, len(ret[0][0].keys()))
+
     def skip_if_no_major_compaction(self):
         if self.cluster.version() < '2.2' and self.strategy == 'LeveledCompactionStrategy':
             self.skipTest('major compaction not implemented for LCS in this version of Cassandra')
 
+def get_random_word(wordLen):
+    word = ''
+    for i in range(wordLen):
+        word += random.choice('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789')
+    return word
 
 def block_on_compaction_log(node, ks=None, table=None):
     """

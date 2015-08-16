@@ -1,6 +1,8 @@
 import math
+import os
 import time
 
+from ccmlib.common import get_version_from_build
 from dtest import Tester
 from assertions import assert_invalid, assert_one, assert_none
 from tools import since
@@ -10,7 +12,12 @@ from tools import since
 class TestUserFunctions(Tester):
 
     def __init__(self, *args, **kwargs):
-        kwargs['cluster_options'] = {'enable_user_defined_functions': 'true'}
+        CASSANDRA_DIR = os.environ.get('CASSANDRA_DIR')
+        if get_version_from_build(CASSANDRA_DIR) >= '3.0':
+            kwargs['cluster_options'] = {'enable_user_defined_functions': 'true',
+                                         'enable_scripted_user_defined_functions': 'true'}
+        else:
+            kwargs['cluster_options'] = {'enable_user_defined_functions': 'true'}
         Tester.__init__(self, *args, **kwargs)
 
     def prepare(self, create_keyspace=True, nodes=1, rf=1):
@@ -60,12 +67,12 @@ class TestUserFunctions(Tester):
             returns double language java as 'if (input==null) return null;
             return Double.valueOf(Math.sin(input.doubleValue()));'
             """)
-        session2.execute(""""
+        session2.execute("""
             create or replace function x_cos ( input double ) called on null input
             returns double language java as 'if (input==null) return null;
             return Double.valueOf(Math.cos(input.doubleValue()));'
             """)
-        session3.execute(""""
+        session3.execute("""
             create or replace function x_tan ( input double ) called on null input
             returns double language java as 'if (input==null) return null;
             return Double.valueOf(Math.tan(input.doubleValue()));'
@@ -73,20 +80,29 @@ class TestUserFunctions(Tester):
 
         time.sleep(1)
 
-        assert_one(session1, "SELECT key, value, x_sin(value), x_cos(value), x_tan(value) FROM ks.udf_kv where key = %d" % 1, [1, 1.0, 0.8414709848078965, 0.5403023058681398, 1.5574077246549023])
+        assert_one(session1,
+                   "SELECT key, value, x_sin(value), x_cos(value), x_tan(value) FROM ks.udf_kv where key = %d" % 1,
+                   [1, 1.0, 0.8414709848078965, 0.5403023058681398, 1.5574077246549023])
 
-        assert_one(session2, "SELECT key, value, x_sin(value), x_cos(value), x_tan(value) FROM ks.udf_kv where key = %d" % 2, [2, 2.0, math.sin(2.0), math.cos(2.0), math.tan(2.0)])
+        assert_one(session2,
+                   "SELECT key, value, x_sin(value), x_cos(value), x_tan(value) FROM ks.udf_kv where key = %d" % 2,
+                   [2, 2.0, math.sin(2.0), math.cos(2.0), math.tan(2.0)])
 
-        assert_one(session3, "SELECT key, value, x_sin(value), x_cos(value), x_tan(value) FROM ks.udf_kv where key = %d" % 3, [3, 3.0, math.sin(3.0), math.cos(3.0), math.tan(3.0)])
+        assert_one(session3,
+                   "SELECT key, value, x_sin(value), x_cos(value), x_tan(value) FROM ks.udf_kv where key = %d" % 3,
+                   [3, 3.0, math.sin(3.0), math.cos(3.0), math.tan(3.0)])
 
         session4 = self.patient_cql_connection(node1)
 
         # check that functions are correctly confined to namespaces
-        assert_invalid(session4, "SELECT key, value, sin(value), cos(value), tan(value) FROM ks.udf_kv where key = 4", "Unknown function 'sin'")
+        assert_invalid(session4,
+                       "SELECT key, value, sin(value), cos(value), tan(value) FROM ks.udf_kv where key = 4",
+                       "Unknown function 'sin'")
 
         # try giving existing function bad input, should error
         assert_invalid(session1,
-                       "SELECT key, value, x_sin(key), foo_cos(KEYy), foo_tan(key) FROM ks.udf_kv where key = 1", "Type error: key cannot be passed as argument 0 of function ks.x_sin of type double")
+                       "SELECT key, value, x_sin(key), foo_cos(KEYy), foo_tan(key) FROM ks.udf_kv where key = 1",
+                       "Type error: key cannot be passed as argument 0 of function ks.x_sin of type double")
 
         session2.execute("drop function x_sin")
         session3.execute("drop function x_cos")
@@ -97,10 +113,9 @@ class TestUserFunctions(Tester):
         assert_invalid(session3, "SELECT key, value, sin(value), cos(value), tan(value) FROM udf_kv where key = 1")
 
         # try creating function returning the wrong type, should error
-        assert_invalid(session1, """
-                      CREATE FUNCTION bad_sin ( input double ) CALLED ON NULL INPUT RETURNS uuid LANGUAGE java AS 'return Math.sin(input);'",
-                      "Could not compile function 'ks.bad_sin' from Java source:
-                      """)
+        assert_invalid(session1,
+                       "CREATE FUNCTION bad_sin ( input double ) CALLED ON NULL INPUT RETURNS uuid LANGUAGE java AS 'return Math.sin(input);';",
+                       "Type mismatch: cannot convert from double to UUID")
 
     def udf_overload_test(self):
 

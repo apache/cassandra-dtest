@@ -270,6 +270,7 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
 
     @require(9775, broken_in='3.0')
     def test_with_equal_results_to_page_size(self):
+        self.skipTest("Hangs the build")
         session = self.prepare()
         self.create_ks(session, 'test_paging_size', 2)
         session.execute("CREATE TABLE paging_test ( id int PRIMARY KEY, value text )")
@@ -1367,6 +1368,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
         """Test multiple row deletions.
            This test should be finished when CASSANDRA-6237 is done.
         """
+        self.skipTest("Feature In Development")
         self.session = self.prepare()
         expected_data = self.setup_data()
 
@@ -1465,7 +1467,6 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
         self.check_all_paging_results(expected_data, 8,
                                       [25, 25, 25, 25, 25, 25, 25, 25])
 
-    @require(9831, broken_in='2.2')
     def test_ttl_deletions(self):
         """Test ttl deletions. Paging over a query that has only tombstones """
         self.session = self.prepare()
@@ -1480,6 +1481,8 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
             self.session.execute(
                 SimpleStatement(s, consistency_level=CL.ALL)
             )
+        self.check_all_paging_results(data, 8,
+                                      [25, 25, 25, 25, 25, 25, 25, 25])
         time.sleep(5)
         self.check_all_paging_results([], 0, [])
 

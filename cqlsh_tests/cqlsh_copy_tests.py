@@ -5,10 +5,12 @@ import os
 import sys
 from contextlib import contextmanager
 from decimal import Decimal
+from dtest import warning
 from tempfile import NamedTemporaryFile
 from uuid import uuid1, uuid4
 
 from cassandra.concurrent import execute_concurrent_with_args
+from ccmlib.common import is_win
 
 from cqlsh_tools import (DummyColorMap, assert_csvs_items_equal, csv_rows,
                          monkeypatch_driver, random_list,
@@ -19,6 +21,7 @@ from tools import rows_to_list, since
 
 DEFAULT_FLOAT_PRECISION = 5  # magic number copied from cqlsh script
 DEFAULT_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'  # based on cqlsh script; timezone stripped
+
 
 @canReuseCluster
 @since('2.1')  # version differences break formatting code on 2.0.x
@@ -37,8 +40,11 @@ class CqlshCopyTest(Tester):
 
     def tearDown(self):
         if self.tempfile:
+            if is_win():
+                self.tempfile.close()
             os.unlink(self.tempfile.name)
-            super(CqlshCopyTest, self).tearDown()
+
+        super(CqlshCopyTest, self).tearDown()
 
     def prepare(self):
         if not self.cluster.nodelist():
@@ -116,8 +122,19 @@ class CqlshCopyTest(Tester):
                          for row in csv_file]
 
         self.maxDiff = None
-        self.assertItemsEqual(processed_csv,
-                              processed_results)
+        try:
+            self.assertItemsEqual(processed_csv, processed_results)
+        except Exception as e:
+            if len(processed_csv) != len(processed_results):
+                warning("Different # of entries. CSV: " + str(len(processed_csv)) +
+                        " vs results: " + str(len(processed_results)))
+            elif(processed_csv[0] != None):
+                for x in range(0, len(processed_csv[0])):
+                    if processed_csv[0][x] != processed_results[0][x]:
+                        warning("Mismatch at index: " + str(x))
+                        warning("Value in csv: " + str(processed_csv[0][x]))
+                        warning("Value in result: " + str(processed_results[0][x]))
+            raise e
 
     def format_for_csv(self, val):
         with self._cqlshlib() as cqlshlib:
@@ -127,9 +144,9 @@ class CqlshCopyTest(Tester):
                 date_time_format = DateTimeFormat()
             except ImportError:
                 date_time_format = None
-            # try:
+            #  try:
             #     from cqlshlib.formatting
-        encoding_name = 'utf-8' #codecs.lookup(locale.getpreferredencoding()).name
+        encoding_name = 'utf-8'  # codecs.lookup(locale.getpreferredencoding()).name
 
         # different versions use time_format or date_time_format
         # but all versions reject spurious values, so we just use both
@@ -326,7 +343,7 @@ class CqlshCopyTest(Tester):
             csv_values = list(csv.reader(csvfile))
 
         self.assertItemsEqual(csv_values,
-                                 [['a', 'b'], ['1', '10'], ['2', '20'], ['3', '30']])
+                              [['a', 'b'], ['1', '10'], ['2', '20'], ['3', '30']])
 
     def test_reading_use_header(self):
         """
@@ -782,25 +799,28 @@ class CqlshCopyTest(Tester):
 
         results = list(self.session.execute("SELECT * FROM testcopyto"))
 
-        self.tempfile = NamedTemporaryFile()
+        self.tempfile = NamedTemporaryFile(delete=False)
         debug('Exporting to csv file: {name}'.format(name=self.tempfile.name))
 
-        commandfile = NamedTemporaryFile()
-        with open(commandfile.name, 'w') as commands:
-            commands.write('USE ks;\n')
-            commands.write("COPY ks.testcopyto TO '{name}' WITH HEADER=false;".format(name=self.tempfile.name))
+        commandfile = NamedTemporaryFile(delete=False)
+        commandfile.file.write('USE ks;\n')
+        commandfile.file.write("COPY ks.testcopyto TO '{name}' WITH HEADER=false;".format(name=self.tempfile.name))
+        commandfile.close()
 
         self.node1.run_cqlsh(cmds="SOURCE '{name}'".format(name=commandfile.name))
+        os.unlink(commandfile.name)
 
         # import the CSV file with COPY FROM
         self.session.execute("TRUNCATE ks.testcopyto")
         debug('Importing from csv file: {name}'.format(name=self.tempfile.name))
 
-        commandfile = NamedTemporaryFile()
-        with open(commandfile.name, 'w') as commands:
-            commands.write('USE ks;\n')
-            commands.write("COPY ks.testcopyto FROM '{name}' WITH HEADER=false;".format(name=self.tempfile.name))
+        commandfile = NamedTemporaryFile(delete=False)
+        commandfile.file.write('USE ks;\n')
+        commandfile.file.write("COPY ks.testcopyto FROM '{name}' WITH HEADER=false;".format(name=self.tempfile.name))
+        commandfile.close()
 
         self.node1.run_cqlsh(cmds="SOURCE '{name}'".format(name=commandfile.name))
         new_results = list(self.session.execute("SELECT * FROM testcopyto"))
         self.assertEqual(results, new_results)
+
+        os.unlink(commandfile.name)

@@ -12,6 +12,7 @@ class TestJson(Tester):
 
         debug("Starting cluster...")
         cluster = self.cluster
+        cluster.set_configuration_options(batch_commitlog=True)
         cluster.populate(1).start()
 
         debug("Version: " + cluster.version())
@@ -39,8 +40,8 @@ class TestJson(Tester):
         res = session.execute("SELECT * FROM Test. users")
 
         self.assertItemsEqual(rows_to_list(res),
-           [ [ u'frodo', 1985, u'male', u'pass@', u'CA' ],
-              [u'sam', 1980, u'male', u'@pass', u'NY' ] ] )
+                              [[u'frodo', 1985, u'male', u'pass@', u'CA'],
+                               [u'sam', 1980, u'male', u'@pass', u'NY']])
 
         debug("Flushing and stopping cluster...")
         node1.flush()
@@ -95,6 +96,6 @@ class TestJson(Tester):
         debug("data: " + str(res))
 
         self.assertItemsEqual(rows_to_list(res),
-           [ [ u'frodo', 1985, u'male', u'pass@', u'CA' ],
-                [u'sam', 1980, u'male', u'@pass', u'NY' ],
-                [u'gandalf', 1955, u'male', u'p@$$', u'WA'] ] )
+                              [[u'frodo', 1985, u'male', u'pass@', u'CA'],
+                               [u'sam', 1980, u'male', u'@pass', u'NY'],
+                               [u'gandalf', 1955, u'male', u'p@$$', u'WA']])

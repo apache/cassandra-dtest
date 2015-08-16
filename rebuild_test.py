@@ -5,7 +5,7 @@ from cassandra import ConsistencyLevel
 
 from ccmlib.node import NodetoolError
 from dtest import Tester
-from tools import insert_c1c2, query_c1c2, require
+from tools import insert_c1c2, query_c1c2
 
 
 class TestRebuild(Tester):
@@ -24,7 +24,6 @@ class TestRebuild(Tester):
         ]
         Tester.__init__(self, *args, **kwargs)
 
-    @require(9119)
     def simple_rebuild_test(self):
         """
         @jira_ticket CASSANDRA-9119
@@ -74,9 +73,16 @@ class TestRebuild(Tester):
         session.execute("ALTER KEYSPACE ks WITH REPLICATION = {'class':'NetworkTopologyStrategy', 'dc1':1, 'dc2':1};")
         session.execute('USE ks')
 
+        self.rebuild_errors = 0
+
         # rebuild dc2 from dc1
         def rebuild():
-            node2.nodetool('rebuild dc1')
+            try:
+                node2.nodetool('rebuild dc1')
+            except NodetoolError as e:
+                if 'Node is still rebuilding' in e.message:
+                    self.rebuild_errors += 1
+
         cmd1 = Thread(target=rebuild)
         cmd1.start()
 
@@ -85,11 +91,17 @@ class TestRebuild(Tester):
         time.sleep(.1)
         try:
             node2.nodetool('rebuild dc1')
-            self.fail("concurrent rebuild should not be allowed")
         except NodetoolError:
-            pass
+            self.rebuild_errors += 1
 
         cmd1.join()
+
+        # exactly 1 of the two nodetool calls should fail
+        # usually it will be the one in the main thread,
+        # but occasionally it wins the race with the one in the secondary thread,
+        # so we check that one succeeded and the other failed
+        self.assertEqual(self.rebuild_errors, 1,
+                         msg='concurrent rebuild should not be allowed, but one rebuild command should have succeeded.')
 
         # check data
         for i in xrange(0, keys):

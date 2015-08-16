@@ -1,5 +1,8 @@
-import time, re
+import os
+import re
+import time
 
+from ccmlib.common import get_version_from_build
 from cassandra import AuthenticationFailed, Unauthorized, InvalidRequest
 from cassandra.cluster import NoHostAvailable
 from cassandra.protocol import SyntaxException
@@ -8,8 +11,8 @@ from dtest import Tester
 from assertions import assert_one, assert_all, assert_invalid
 from tools import since
 
-#Second value is superuser status
-#Third value is login status, See #7653 for explanation.
+# Second value is superuser status
+# Third value is login status, See #7653 for explanation.
 mike_role = ['mike', False, True, {}]
 role1_role = ['role1', False, False, {}]
 role2_role = ['role2', False, False, {}]
@@ -20,7 +23,12 @@ cassandra_role = ['cassandra', True, True, {}]
 class TestAuthRoles(Tester):
 
     def __init__(self, *args, **kwargs):
-        kwargs['cluster_options'] = {'enable_user_defined_functions': 'true'}
+        CASSANDRA_DIR = os.environ.get('CASSANDRA_DIR')
+        if get_version_from_build(CASSANDRA_DIR) >= '3.0':
+            kwargs['cluster_options'] = {'enable_user_defined_functions': 'true',
+                                         'enable_scripted_user_defined_functions': 'true'}
+        else:
+            kwargs['cluster_options'] = {'enable_user_defined_functions': 'true'}
         Tester.__init__(self, *args, **kwargs)
 
     def create_drop_role_test(self):
@@ -199,7 +207,6 @@ class TestAuthRoles(Tester):
         mike.execute("DROP ROLE non_superuser")
         mike.execute("DROP ROLE role1")
 
-
     def drop_role_removes_memberships_test(self):
         self.prepare()
         cassandra = self.get_session(user='cassandra', password='cassandra')
@@ -325,7 +332,6 @@ class TestAuthRoles(Tester):
         assert_all(mike, "LIST ROLES", [mike_role, role1_role, role2_role])
         cassandra.execute("GRANT DESCRIBE ON ALL ROLES TO mike")
         assert_all(mike, "LIST ROLES", [cassandra_role, mike_role, role1_role, role2_role])
-
 
     def grant_revoke_permissions_test(self):
         self.prepare()

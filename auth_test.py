@@ -274,6 +274,44 @@ class TestAuth(Tester):
         cassandra.execute("GRANT ALTER ON ks.cf TO cathy")
         cathy.execute("DROP INDEX cf_val_idx")
 
+    @since('3.0')
+    def materialized_views_auth_test(self):
+        self.prepare()
+
+        cassandra = self.get_session(user='cassandra', password='cassandra')
+        cassandra.execute("CREATE USER cathy WITH PASSWORD '12345'")
+        cassandra.execute("CREATE KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor':1}")
+        cassandra.execute("CREATE TABLE ks.cf (id int primary key, value text)")
+
+        # Try CREATE MV without ALTER permission on base table
+        create_mv = "CREATE MATERIALIZED VIEW ks.mv1 AS SELECT * FROM ks.cf WHERE id IS NOT NULL " \
+                    "AND value IS NOT NULL PRIMARY KEY (value, id)"
+        cathy = self.get_session(user='cathy', password='12345')
+        self.assertUnauthorized("User cathy has no ALTER permission on <table ks.cf> or any of its parents",
+                                cathy, create_mv)
+
+        # Grant ALTER permission and CREATE MV
+        cassandra.execute("GRANT ALTER ON ks.cf TO cathy")
+        cathy.execute(create_mv)
+
+        # TRY SELECT MV without SELECT permission on base table
+        self.assertUnauthorized("User cathy has no SELECT permission on <table ks.cf> or any of its parents",
+                                cathy, "SELECT * FROM ks.mv1")
+
+        # Grant SELECT permission and CREATE MV
+        cassandra.execute("GRANT SELECT ON ks.cf TO cathy")
+        cathy.execute("SELECT * FROM ks.mv1")
+
+        # Revoke ALTER permission and try DROP MV
+        cassandra.execute("REVOKE ALTER ON ks.cf FROM cathy")
+        cathy.execute("USE ks")
+        self.assertUnauthorized("User cathy has no ALTER permission on <table ks.cf> or any of its parents",
+                                cathy, "DROP MATERIALIZED VIEW mv1")
+
+        # GRANT ALTER permission and DROP MV
+        cassandra.execute("GRANT ALTER ON ks.cf TO cathy")
+        cathy.execute("DROP MATERIALIZED VIEW mv1")
+
     def drop_ks_auth_test(self):
         self.prepare()
 

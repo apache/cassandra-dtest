@@ -2,9 +2,8 @@ import re
 
 from cassandra.concurrent import execute_concurrent_with_args
 
-from dtest import Tester
+from dtest import Tester, debug
 from jmxutils import JolokiaAgent, make_mbean, remove_perf_disable_shared_mem
-from tools import debug, require
 
 
 class TestConfiguration(Tester):
@@ -29,7 +28,6 @@ class TestConfiguration(Tester):
         session.execute(alter_chunk_len_query.format(chunk_length=64))
         self._check_chunk_length(session, 64)
 
-    @require(9560)
     def change_durable_writes_test(self):
         """
         @jira_ticket CASSANDRA-9560
@@ -89,6 +87,7 @@ class TestConfiguration(Tester):
                         "AND DURABLE_WRITES = false")
         session.execute('CREATE TABLE ks.tab (key int PRIMARY KEY, a int, b int, c int)')
         session.execute('ALTER KEYSPACE ks WITH DURABLE_WRITES=true')
+        write_to_trigger_fsync(session, 'ks', 'tab')
         self.assertGreater(commitlog_size(node), init_size,
                            msg='ALTER KEYSPACE was not respected')
 

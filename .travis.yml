@@ -8,8 +8,10 @@ script:
   # we use flake8 because it allows us to ignore other warnings
   # exclude the thrift directories - they contain auto-generated code
   - flake8 --ignore=E,W,F811,F812,F821,F822,F823,F831,F841,N8,C9 --exclude=thrift_bindings,cassandra-thrift .
+  - git remote add riptano git://github.com/riptano/cassandra-dtest.git
+  - git fetch riptano # fetch master for the next diff
   # feed changed lines with no context around them to pep8
   # I know we don't enforce line length but if you introduce
   # 200-char lines you are doing something terribly wrong
-  - git diff master -U0 | pep8 --diff --max-line-length=200
+  - git diff riptano/master -U0 | pep8 --diff --max-line-length=200
 sudo: false

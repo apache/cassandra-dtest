@@ -11,6 +11,7 @@ import os
 KeyspaceName = 'keyspace1'
 TableName = 'standard1'
 
+
 @require('7066')
 @since('3.0')
 class SSTableListTest(Tester):
@@ -20,6 +21,7 @@ class SSTableListTest(Tester):
         Tester.__init__(self, *args, **kwargs)
 
     def listfiles_oncompaction_test(self):
+        self.skipTest("Feature In Development")
         """
         Check we can list the sstable files after successfull compaction (no temporary sstable files)
         """
@@ -31,11 +33,12 @@ class SSTableListTest(Tester):
         finalfiles, tmpfiles = self._check_files(node, KeyspaceName, TableName)
         self.assertEqual(0, len(tmpfiles))
 
-        node.compact();
+        node.compact()
         finalfiles, tmpfiles = self._check_files(node, KeyspaceName, TableName)
         self.assertEqual(0, len(tmpfiles))
 
     def listfiles_onabortedcompaction_test(self):
+        self.skipTest("Feature In Development")
         """
         Check we can list the sstable files after aborted compaction (temporary sstable files)
         """
@@ -56,7 +59,7 @@ class SSTableListTest(Tester):
             node.compact()
             assert False, "Compaction should have failed"
         except NodetoolError:
-            pass #expected to fail
+            pass  # expected to fail
 
         t.join()
 
@@ -67,7 +70,7 @@ class SSTableListTest(Tester):
 
         # restart and make sure tmp files are gone and the data can be read
         node.start(wait_for_binary_proto=True)
-        node.watch_log_for("Compacted(.*)%s"%(TableName,))
+        node.watch_log_for("Compacted(.*)%s" % (TableName, ))
 
         finalfiles, tmpfiles = self._check_files(node, KeyspaceName, TableName)
         self.assertEqual(0, len(tmpfiles))
@@ -77,14 +80,14 @@ class SSTableListTest(Tester):
 
     def _create_data(self, node, ks, table, numrecords):
         # This is just to create the schema so we can disable compaction
-        node.stress( ['write', 'n=1', '-rate', 'threads=1'] )
+        node.stress(['write', 'n=1', '-rate', 'threads=1'])
         node.nodetool('disableautocompaction %s %s' % (ks, table))
 
-        node.stress( ['write', 'n=%d' % (numrecords), '-rate', 'threads=50'] )
+        node.stress(['write', 'n=%d' % (numrecords), '-rate', 'threads=50'])
         node.flush()
 
     def _read_data(self, node, numrecords):
-        node.stress( ['read', 'n=%d' % (numrecords,), '-rate', 'threads=25'] )
+        node.stress(['read', 'n=%d' % (numrecords,), '-rate', 'threads=25'])
 
     def _check_files(self, node, ks, table, expected_finalfiles=[], expected_tmpfiles=[]):
         sstablefiles = self._get_sstable_files(node, ks, table)
@@ -122,9 +125,9 @@ class SSTableListTest(Tester):
         tool_bin = node1.get_tool('sstablelister')
 
         if oplogs:
-            args = [ tool_bin, '--type', type, '--oplog', ks, table]
+            args = [tool_bin, '--type', type, '--oplog', ks, table]
         else:
-            args = [ tool_bin, '--type', type, ks, table]
+            args = [tool_bin, '--type', type, ks, table]
 
         p = subprocess.Popen(args, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 

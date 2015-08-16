@@ -3,9 +3,27 @@ from urllib2 import urlopen
 import json
 import os
 import subprocess
+from dtest import warning
 
 JOLOKIA_JAR = os.path.join('lib', 'jolokia-jvm-1.2.3-agent.jar')
+CLASSPATH_SEP = ';' if common.is_win() else ':'
 
+
+def jolokia_classpath():
+    if 'JAVA_HOME' in os.environ:
+        tools_jar = os.path.join(os.environ['JAVA_HOME'], 'lib', 'tools.jar')
+        return CLASSPATH_SEP.join((tools_jar, JOLOKIA_JAR))
+    else:
+        warning("Environment variable $JAVA_HOME not present: jmx-based " +
+                "tests may fail because of missing $JAVA_HOME/lib/tools.jar.")
+        return JOLOKIA_JAR
+
+
+def java_bin():
+    if 'JAVA_HOME' in os.environ:
+        return os.path.join(os.environ['JAVA_HOME'], 'bin', 'java')
+    else:
+        return 'java'
 
 def make_mbean(package, type, **kwargs):
     '''
@@ -72,10 +90,12 @@ class JolokiaAgent(object):
         Starts the Jolokia agent.  The process will fork from the parent
         and continue running until stop() is called.
         """
-        args = ('java',
-                '-jar', JOLOKIA_JAR,
+        args = (java_bin(),
+                '-cp', jolokia_classpath(),
+                'org.jolokia.jvmagent.client.AgentLauncher',
                 '--host', self.node.network_interfaces['binary'][0],
                 'start', str(self.node.pid))
+
         try:
             subprocess.check_output(args, stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError, exc:
@@ -88,8 +108,9 @@ class JolokiaAgent(object):
         """
         Stops the Jolokia agent.
         """
-        args = ('java',
-                '-jar', JOLOKIA_JAR,
+        args = (java_bin(),
+                '-cp', jolokia_classpath(),
+                'org.jolokia.jvmagent.client.AgentLauncher',
                 'stop', str(self.node.pid))
         try:
             subprocess.check_output(args, stderr=subprocess.STDOUT)

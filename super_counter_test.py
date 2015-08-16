@@ -1,11 +1,10 @@
 import time
 
 from dtest import Tester, debug
-
 from thrift_tests import get_thrift_client
 
 from cql.cassandra.ttypes import CfDef, ColumnParent, CounterColumn, \
-        ConsistencyLevel, ColumnPath
+                                 ConsistencyLevel, ColumnPath
 
 
 class TestSuperCounterClusterRestart(Tester):
@@ -36,7 +35,7 @@ class TestSuperCounterClusterRestart(Tester):
         thrift_conn.transport.open()
         thrift_conn.set_keyspace('ks')
         cf_def = CfDef(keyspace='ks', name='cf', column_type='Super',
-                default_validation_class='CounterColumnType')
+                       default_validation_class='CounterColumnType')
         thrift_conn.system_add_column_family(cf_def)
 
         # let the sediment settle to to the bottom before drinking...
@@ -45,11 +44,12 @@ class TestSuperCounterClusterRestart(Tester):
         for subcol in xrange(NUM_SUBCOLS):
             for add in xrange(NUM_ADDS):
                 column_parent = ColumnParent(column_family='cf',
-                        super_column='subcol_%d' % subcol)
+                                             super_column='subcol_%d' % subcol)
                 counter_column = CounterColumn('col_0', 1)
                 thrift_conn.add('row_0', column_parent, counter_column,
-                        ConsistencyLevel.QUORUM)
+                                ConsistencyLevel.QUORUM)
         time.sleep(1)
+        cluster.flush()
 
         debug("Stopping cluster")
         cluster.stop()
@@ -66,9 +66,9 @@ class TestSuperCounterClusterRestart(Tester):
 
         for i in xrange(NUM_SUBCOLS):
             column_path = ColumnPath(column_family='cf', column='col_0',
-                    super_column='subcol_%d' % i)
+                                     super_column='subcol_%d' % i)
             column_or_super_column = thrift_conn.get('row_0', column_path,
-                    ConsistencyLevel.QUORUM)
+                                                     ConsistencyLevel.QUORUM)
             val = column_or_super_column.counter_column.value
             debug(str(val)),
             from_db.append(val)

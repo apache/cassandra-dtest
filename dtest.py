@@ -1,17 +1,32 @@
 from __future__ import with_statement
-import os, tempfile, sys, shutil, subprocess, types, time, threading, traceback, ConfigParser, logging, re, copy
+
+import ConfigParser
+import copy
+import errno
+import logging
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import threading
+import time
+import traceback
+import types
+from unittest import TestCase
+
+from cassandra.auth import PlainTextAuthProvider
+from cassandra.cluster import Cluster as PyCluster
+from cassandra.cluster import NoHostAvailable
+from cassandra.policies import WhiteListRoundRobinPolicy, RetryPolicy
+from nose.exc import SkipTest
 
 from ccmlib.cluster import Cluster
 from ccmlib.cluster_factory import ClusterFactory
 from ccmlib.common import is_win
-from nose.exc import SkipTest
-from unittest import TestCase
-from cassandra.cluster import NoHostAvailable
-from cassandra.cluster import Cluster as PyCluster
-from cassandra.auth import PlainTextAuthProvider
-from cassandra.policies import WhiteListRoundRobinPolicy
 
-LOG_SAVED_DIR="logs"
+LOG_SAVED_DIR = "logs"
 try:
     os.mkdir(LOG_SAVED_DIR)
 except OSError:
@@ -19,13 +34,13 @@ except OSError:
 
 LAST_LOG = os.path.join(LOG_SAVED_DIR, "last")
 
-LAST_TEST_DIR='last_test_dir'
+LAST_TEST_DIR = 'last_test_dir'
 
-DEFAULT_DIR='./'
+DEFAULT_DIR = './'
 config = ConfigParser.RawConfigParser()
 if len(config.read(os.path.expanduser('~/.cassandra-dtest'))) > 0:
     if config.has_option('main', 'default_dir'):
-        DEFAULT_DIR=os.path.expanduser(config.get('main', 'default_dir'))
+        DEFAULT_DIR = os.path.expanduser(config.get('main', 'default_dir'))
 CASSANDRA_DIR = os.environ.get('CASSANDRA_DIR', DEFAULT_DIR)
 
 NO_SKIP = os.environ.get('SKIP', '').lower() in ('no', 'false')
@@ -44,7 +59,7 @@ IGNORE_REQUIRE = os.environ.get('IGNORE_REQUIRE', '').lower() in ('yes', 'true')
 
 CURRENT_TEST = ""
 
-logging.basicConfig(filename=os.path.join(LOG_SAVED_DIR,"dtest.log"),
+logging.basicConfig(filename=os.path.join(LOG_SAVED_DIR, "dtest.log"),
                     filemode='w',
                     format='%(asctime)s,%(msecs)d %(name)s %(current_test)s %(levelname)s %(message)s',
                     datefmt='%H:%M:%S',
@@ -56,14 +71,24 @@ logging.getLogger('cassandra').setLevel(logging.WARNING)
 
 # copy the initial environment variables so we can reset them later:
 initial_environment = copy.deepcopy(os.environ)
+
+
 def reset_environment_vars():
     os.environ.clear()
     os.environ.update(initial_environment)
 
+
+def warning(msg):
+    LOG.warning(msg, extra={"current_test": CURRENT_TEST})
+    if PRINT_DEBUG:
+        print "WARN: " + msg
+
+
 def debug(msg):
-    LOG.debug(msg, extra={"current_test":CURRENT_TEST})
+    LOG.debug(msg, extra={"current_test": CURRENT_TEST})
     if PRINT_DEBUG:
         print msg
+
 
 def retry_till_success(fun, *args, **kwargs):
     timeout = kwargs.pop('timeout', 60)
@@ -79,6 +104,34 @@ def retry_till_success(fun, *args, **kwargs):
             else:
                 # brief pause before next attempt
                 time.sleep(0.25)
+
+
+class FlakyRetryPolicy(RetryPolicy):
+    """
+    A retry policy that retries 5 times
+    """
+
+    def on_read_timeout(self, *args, **kwargs):
+        if kwargs['retry_num'] < 5:
+            debug("Retrying read after timeout. Attempt #"+str(kwargs['retry_num']))
+            return (self.RETRY, None)
+        else:
+            return (self.RETHROW, None)
+
+    def on_write_timeout(self, *args, **kwargs):
+        if kwargs['retry_num'] < 5:
+            debug("Retrying write after timeout. Attempt #"+str(kwargs['retry_num']))
+            return (self.RETRY, None)
+        else:
+            return (self.RETHROW, None)
+
+    def on_unavailable(self, *args, **kwargs):
+        if kwargs['retry_num'] < 5:
+            debug("Retrying request after UE. Attempt #"+str(kwargs['retry_num']))
+            return (self.RETRY, None)
+        else:
+            return (self.RETHROW, None)
+
 
 class Runner(threading.Thread):
     def __init__(self, func):
@@ -128,7 +181,7 @@ class Tester(TestCase):
         # ccm on cygwin needs absolute path to directory - it crosses from cygwin space into
         # regular Windows space on wmic calls which will otherwise break pathing
         if sys.platform == "cygwin":
-            self.test_path = subprocess.Popen(["cygpath", "-m", self.test_path], stdout = subprocess.PIPE, stderr = subprocess.STDOUT).communicate()[0].rstrip()
+            self.test_path = subprocess.Popen(["cygpath", "-m", self.test_path], stdout=subprocess.PIPE, stderr=subprocess.STDOUT).communicate()[0].rstrip()
         debug("cluster ccm directory: "+self.test_path)
         version = os.environ.get('CASSANDRA_VERSION')
         cdir = CASSANDRA_DIR
@@ -184,6 +237,17 @@ class Tester(TestCase):
             # Cleanup everything:
             debug("removing ccm cluster " + self.cluster.name + " at: " + self.test_path)
             self.cluster.remove()
+
+            try:
+                debug("clearing ssl stores from [{0}] directory".format(self.test_path))
+                os.remove(os.path.join(self.test_path, 'keystore.jks'))
+                os.remove(os.path.join(self.test_path, 'truststore.jks'))
+                os.remove(os.path.join(self.test_path, 'ccm_node.cer'))
+            except OSError as e:
+                # errno.ENOENT = no such file or directory
+                if e.errno != errno.ENOENT:
+                    raise
+
             os.rmdir(self.test_path)
         if os.path.exists(LAST_TEST_DIR):
             os.remove(LAST_TEST_DIR)
@@ -245,11 +309,11 @@ class Tester(TestCase):
             self.cluster.set_configuration_options(values=self.cluster_options)
         else:
             self.cluster.set_configuration_options(values={
-                'read_request_timeout_in_ms' : timeout,
-                'range_request_timeout_in_ms' : timeout,
-                'write_request_timeout_in_ms' : timeout,
-                'truncate_request_timeout_in_ms' : timeout,
-                'request_timeout_in_ms' : timeout
+                'read_request_timeout_in_ms': timeout,
+                'range_request_timeout_in_ms': timeout,
+                'write_request_timeout_in_ms': timeout,
+                'truncate_request_timeout_in_ms': timeout,
+                'request_timeout_in_ms': timeout
             })
 
         with open(LAST_TEST_DIR, 'w') as f:
@@ -270,7 +334,7 @@ class Tester(TestCase):
             name = os.path.join(directory, name)
         if not os.path.exists(directory):
             os.mkdir(directory)
-        logs = [ (node.name, node.logfilename()) for node in self.cluster.nodes.values() ]
+        logs = [(node.name, node.logfilename()) for node in self.cluster.nodes.values()]
         if len(logs) is not 0:
             basedir = str(int(time.time() * 1000)) + '_' + self.id()
             logdir = os.path.join(directory, basedir)
@@ -301,7 +365,9 @@ class Tester(TestCase):
         node_ip = self.get_ip_from_node(node)
 
         if protocol_version is None:
-            if self.cluster.version() >= '2.1':
+            if self.cluster.version() >= '2.2':
+                protocol_version = 4
+            elif self.cluster.version() >= '2.1':
                 protocol_version = 3
             elif self.cluster.version() >= '2.0':
                 protocol_version = 2
@@ -314,7 +380,7 @@ class Tester(TestCase):
             auth_provider = None
 
         cluster = PyCluster([node_ip], auth_provider=auth_provider, compression=compression,
-                            protocol_version=protocol_version, load_balancing_policy=load_balancing_policy)
+                            protocol_version=protocol_version, load_balancing_policy=load_balancing_policy, default_retry_policy=FlakyRetryPolicy())
         session = cluster.connect()
 
         # temporarily increase client-side timeout to 1m to determine
@@ -381,7 +447,7 @@ class Tester(TestCase):
         else:
             assert len(rf) != 0, "At least one datacenter/rf pair is needed"
             # we assume networkTopolyStrategy
-            options = (', ').join([ '\'%s\':%d' % (d, r) for d, r in rf.iteritems() ])
+            options = (', ').join(['\'%s\':%d' % (d, r) for d, r in rf.iteritems()])
             session.execute(query % (name, "'class':'NetworkTopologyStrategy', %s" % options))
         session.execute('USE %s' % name)
 
@@ -418,7 +484,6 @@ class Tester(TestCase):
 
         session.execute(query)
         time.sleep(0.2)
-
 
     @classmethod
     def tearDownClass(cls):
@@ -500,7 +565,7 @@ class Tester(TestCase):
         if os.path.isfile(agent_location):
             debug("Jacoco agent found at {}".format(agent_location))
             with open(os.path.join(
-                    self.test_path, cluster_name, 'cassandra.in.sh'),'w') as f:
+                    self.test_path, cluster_name, 'cassandra.in.sh'), 'w') as f:
 
                 f.write('JVM_OPTS="$JVM_OPTS -javaagent:{jar_path}=destfile={exec_file}"'\
                     .format(jar_path=agent_location, exec_file=jacoco_execfile))
@@ -538,12 +603,13 @@ class Tester(TestCase):
 
     def make_auth(self, user, password):
         def private_auth(node_ip):
-            return {'username': user, 'password' : password}
+            return {'username': user, 'password': password}
         return private_auth
 
     # Disable docstrings printing in nosetest output
     def shortDescription(self):
         return None
+
 
 def canReuseCluster(Tester):
     orig_init = Tester.__init__
@@ -551,9 +617,9 @@ def canReuseCluster(Tester):
 
     def __init__(self, *args, **kwargs):
         self._preserve_cluster = REUSE_CLUSTER
-        orig_init(self, *args, **kwargs) # call the original __init__
+        orig_init(self, *args, **kwargs)  # call the original __init__
 
-    Tester.__init__ = __init__ # set the class' __init__ to the new one
+    Tester.__init__ = __init__  # set the class' __init__ to the new one
     return Tester
 
 

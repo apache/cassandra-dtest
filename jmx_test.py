@@ -1,5 +1,3 @@
-from flaky import flaky
-
 from dtest import Tester, debug
 from jmxutils import JolokiaAgent, make_mbean, remove_perf_disable_shared_mem
 from tools import since
@@ -8,7 +6,6 @@ from tools import since
 class TestJMX(Tester):
 
     @since('2.1')
-    @flaky  # flaps on 2.2
     def cfhistograms_test(self):
         """
         Test cfhistograms on large and small datasets
@@ -20,7 +17,7 @@ class TestJMX(Tester):
         node1, node2, node3 = cluster.nodelist()
 
         # issue large stress write to load data into cluster
-        node1.stress(['write', 'n=15M', '-schema', 'replication(factor=3)'])
+        node1.stress(['write', 'n=15M', '-schema', 'replication(factor=3)', '-rate', 'threads=50'])
         node1.flush()
 
         try:
@@ -95,15 +92,19 @@ class TestJMX(Tester):
         remove_perf_disable_shared_mem(node1)
         cluster.start(wait_for_binary_proto=True)
 
-        if cluster.version() < "2.1":
+        version = cluster.version()
+        if version < "2.1":
             node1.stress(['-o', 'insert', '--num-keys=10000', '--replication-factor=3'])
         else:
             node1.stress(['write', 'n=10000', '-schema', 'replication(factor=3)'])
 
+        typeName = "ColumnFamily" if version <= '2.2.X' else 'Table'
+        debug('Version {} typeName {}'.format(version, typeName))
+
         # TODO the keyspace and table name are capitalized in 2.0
-        memtable_size = make_mbean('metrics', type='ColumnFamily', keyspace='keyspace1', scope='standard1', name='AllMemtablesHeapSize')
-        disk_size = make_mbean('metrics', type='ColumnFamily', keyspace='keyspace1', scope='standard1', name='LiveDiskSpaceUsed')
-        sstable_count = make_mbean('metrics', type='ColumnFamily', keyspace='keyspace1', scope='standard1', name='LiveSSTableCount')
+        memtable_size = make_mbean('metrics', type=typeName, keyspace='keyspace1', scope='standard1', name='AllMemtablesHeapSize')
+        disk_size = make_mbean('metrics', type=typeName, keyspace='keyspace1', scope='standard1', name='LiveDiskSpaceUsed')
+        sstable_count = make_mbean('metrics', type=typeName, keyspace='keyspace1', scope='standard1', name='LiveSSTableCount')
 
         with JolokiaAgent(node1) as jmx:
             mem_size = jmx.read_attribute(memtable_size, "Value")

@@ -1,6 +1,7 @@
 import time
 
 from cassandra import Unauthorized
+from ccmlib.common import is_win
 
 from assertions import assert_all, assert_invalid
 from dtest import Tester, debug
@@ -25,6 +26,11 @@ class TestAuthUpgrade(Tester):
         Tester.__init__(self, *args, **kwargs)
 
     def upgrade_to_22_test(self):
+        if is_win():
+            # These three occur on older versions of C* on Windows
+            self.ignore_log_patterns.append(r'Failed deleting temp components for')
+            self.ignore_log_patterns.append(r'Missing component')
+            self.ignore_log_patterns.append(r'Exception in thread Thread\[CompactionExecutor')
         self.do_upgrade_with_internal_auth("git:cassandra-2.2")
 
     # todo: when we branch for 3.0 switch this from trunk to cassandra-3.0
