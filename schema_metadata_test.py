@@ -163,7 +163,7 @@ def establish_nondefault_table_settings(version, session, table_name_prefix=""):
                    AND default_time_to_live = 86400
                    AND caching = {{'keys': 'NONE', 'rows_per_partition': 'ALL'}}"""
 
-    if version >= '2.0':
+    if version >= '2.0' and version <= '3.0':
         cql += " AND index_interval = 1"
 
     if version < '2.1':
