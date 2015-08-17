@@ -1,3 +1,6 @@
+import sys
+import unittest
+
 from dtest import Tester, debug
 from jmxutils import JolokiaAgent, make_mbean, remove_perf_disable_shared_mem
 from tools import since
@@ -6,6 +9,7 @@ from tools import since
 class TestJMX(Tester):
 
     @since('2.1')
+    @unittest.skipIf(sys.platform == "win32", 'Skip long tests on Windows')
     def cfhistograms_test(self):
         """
         Test cfhistograms on large and small datasets
