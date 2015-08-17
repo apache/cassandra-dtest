@@ -665,6 +665,14 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         self.assertEqual(pf.num_results_all(), [400, 200])
         self.assertEqualIgnoreOrder(expected_data, pf.all_data())
 
+    def test_paging_with_in_orderby_and_two_partition_keys(self):
+        session = self.prepare()
+        self.create_ks(session, 'test_paging_size', 2)
+        session.execute("CREATE TABLE paging_test (col_1 int, col_2 int, col_3 int, PRIMARY KEY ((col_1, col_2), col_3))")
+
+        assert_invalid(session, "select * from paging_test where col_1=1 and col_2 IN (1, 2) order by col_3 desc;", expected=InvalidRequest)
+        assert_invalid(session, "select * from paging_test where col_2 IN (1, 2) and col_1=1 order by col_3 desc;", expected=InvalidRequest)
+
     @since('2.0.6')
     def static_columns_paging_test(self):
         """
