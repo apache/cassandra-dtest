@@ -769,6 +769,7 @@ class TestMutations(ThriftTester):
             for key in keys:
                 _assert_no_columnpath(key, ColumnPath('Super1', super_column=sc.name))
 
+    # known failure: see CASSANDRA-10046
     def test_batch_mutate_remove_slice_standard(self):
         _set_keyspace('Keyspace1')
 
@@ -790,6 +791,7 @@ class TestMutations(ThriftTester):
         _assert_no_columnpath('key', ColumnPath('Standard1', column='c4'))
         _assert_columnpath_exists('key', ColumnPath('Standard1', column='c5'))
 
+    # known failure: see CASSANDRA-10046
     def test_batch_mutate_remove_slice_of_entire_supercolumns(self):
         _set_keyspace('Keyspace1')
 
@@ -2056,6 +2058,7 @@ class TestMutations(ThriftTester):
         time.sleep(5)
         _assert_no_columnpath('key2', ColumnPath(column_family='Counter1', column='c1'))
 
+    # known failure: see CASSANDRA-10046
     @since('2.0')
     def test_range_deletion(self):
         """ Tests CASSANDRA-7990 """
