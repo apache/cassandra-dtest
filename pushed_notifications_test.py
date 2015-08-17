@@ -1,6 +1,6 @@
 import time
 from nose.tools import timed
-from cassandra import ReadTimeout
+from cassandra import ReadTimeout, ReadFailure
 from cassandra import ConsistencyLevel as CL
 from cassandra.query import SimpleStatement
 from dtest import Tester, debug
@@ -174,32 +174,32 @@ class TestVariousNotifications(Tester):
         failure_msg = ("Scanned over.* tombstones.* query aborted")
 
         @timed(25)
-        def read_request_timeout_query():
+        def read_failure_query():
             assert_invalid(
                 session, SimpleStatement("select * from test where id in (1,2,3,4,5)", consistency_level=CL.ALL),
-                expected=ReadTimeout,
+                expected=ReadTimeout if self.cluster.version() < '3' else ReadFailure,
             )
 
-        read_request_timeout_query()
+        read_failure_query()
 
         failure = (node1.grep_log(failure_msg) or
                    node2.grep_log(failure_msg) or
                    node3.grep_log(failure_msg))
 
         self.assertTrue(failure, ("Cannot find tombstone failure threshold error in log "
-                                  "after read_request_timeout_query"))
+                                  "after failed query"))
         mark1 = node1.mark_log()
         mark2 = node2.mark_log()
         mark3 = node3.mark_log()
 
         @timed(35)
-        def range_request_timeout_query():
+        def range_request_failure_query():
             assert_invalid(
                 session, SimpleStatement("select * from test", consistency_level=CL.ALL),
-                expected=ReadTimeout,
+                expected=ReadTimeout if self.cluster.version() < '3' else ReadFailure,
             )
 
-        range_request_timeout_query()
+        range_request_failure_query()
 
         failure = (node1.watch_log_for(failure_msg, from_mark=mark1, timeout=5) or
                    node2.watch_log_for(failure_msg, from_mark=mark2, timeout=5) or
