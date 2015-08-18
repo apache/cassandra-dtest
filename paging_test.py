@@ -1507,7 +1507,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
                 consistency_level=CL.ALL
             ))
 
-        assert_invalid(self.session, SimpleStatement("select * from paging_test", fetch_size=1000, consistency_level=CL.ALL), expected=ReadTimeout if self.cluster.version() < '3' else ReadFailure)
+        assert_invalid(self.session, SimpleStatement("select * from paging_test", fetch_size=1000, consistency_level=CL.ALL), expected=ReadTimeout if self.cluster.version() < '2.2' else ReadFailure)
 
         if self.cluster.version() < "3.0":
             failure_msg = ("Scanned over.* tombstones in test_paging_size."
