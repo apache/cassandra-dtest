@@ -1,4 +1,5 @@
 from time import sleep
+from unittest import skip
 
 from cassandra import ConsistencyLevel, ReadTimeout, Unavailable
 from cassandra.query import SimpleStatement
@@ -228,6 +229,7 @@ class TestReplaceAddress(Tester):
         self.assertEqual(len(movedTokensList), numNodes)
 
     @since('2.2')
+    @skip('test hangs: see CASSANDRA-9831')
     def resumable_replace_test(self):
         """Test resumable bootstrap while replacing node"""
 

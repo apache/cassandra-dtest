@@ -320,7 +320,7 @@ UPDATE varcharmaptable SET varcharvarintmap['Vitrum edere possum, mihi non nocet
             'I can eat glass and it does not hurt me': 1400
         })
 
-        output, err = self.run_cqlsh(node1, 'use testks; SELECT * FROM varcharmaptable')
+        output, err = self.run_cqlsh(node1, 'use testks; SELECT * FROM varcharmaptable', ['--encoding=utf-8'])
 
         self.assertEquals(output.count('Можам да јадам стакло, а не ме штета.'), 16)
         self.assertEquals(output.count(' ⠊⠀⠉⠁⠝⠀⠑⠁⠞⠀⠛⠇⠁⠎⠎⠀⠁⠝⠙⠀⠊⠞⠀⠙⠕⠑⠎⠝⠞⠀⠓⠥⠗⠞⠀⠍⠑'), 16)
