@@ -477,7 +477,7 @@ def verify_basic_datatype_table(created_on_version, current_version, keyspace, s
 def _table_name_builder(prefix, table_name):
     if prefix == "":
         return table_name
-    return "{0}_{1}".format(re.sub(r"[^A-Za-z0-9]", "_", prefix), table_name)
+    return "{0}_{1}".format(re.sub(r"[^A-Za-z0-9]", "_", prefix), table_name)[-47:]
 
 
 class TestSchemaMetadata(Tester):
