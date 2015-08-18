@@ -1,9 +1,10 @@
 import time
 
 from assertions import assert_invalid, assert_unavailable
-from dtest import Tester
+from dtest import Tester, debug
 from cassandra import ConsistencyLevel, Timeout
 from cassandra.query import SimpleStatement
+from tools import since
 
 class TestBatch(Tester):
 
@@ -49,6 +50,40 @@ class TestBatch(Tester):
         rows = session.execute("SELECT * FROM users")
         res = sorted(rows)
         assert [list(res[0]), list(res[1])] == [[0, u'Jack', u'Sparrow'], [1, u'Will', u'Turner']], res
+
+    @since('3.0')
+    def logged_batch_gcgs_below_threshold_should_print_warning_test(self):
+        """ Test that logged batch accepts regular mutations """
+        session = self.prepare()
+        session.execute("ALTER TABLE users WITH gc_grace_seconds = 0")
+        session.execute("""
+            BEGIN BATCH
+            INSERT INTO users (id, firstname, lastname) VALUES (0, 'Jack', 'Sparrow')
+            INSERT INTO users (id, firstname, lastname) VALUES (1, 'Will', 'Turner')
+            APPLY BATCH
+        """)
+        node1 = self.cluster.nodelist()[0]
+        warning = node1.grep_log("Table 'ks.users' has a configured gc_grace_seconds of 0, "
+                                 "below the recommended minimum of 10800 for use in atomic batches. "
+                                 "This might lead to partially applied batches in the case of failures.")
+        debug(warning)
+        self.assertEquals(1, len(warning), "Cannot find the gc_grace_seconds warning message.")
+
+    @since('3.0')
+    def unlogged_batch_gcgs_below_threshold_should_not_print_warning_test(self):
+        """ Test that logged batch accepts regular mutations """
+        session = self.prepare()
+        session.execute("ALTER TABLE users WITH gc_grace_seconds = 0")
+        session.execute("""
+            BEGIN UNLOGGED BATCH
+            INSERT INTO users (id, firstname, lastname) VALUES (0, 'Jack', 'Sparrow')
+            INSERT INTO users (id, firstname, lastname) VALUES (1, 'Will', 'Turner')
+            APPLY BATCH
+        """)
+        node1 = self.cluster.nodelist()[0]
+        warning = node1.grep_log("This might lead to partially applied batches in the case of failures.")
+        debug(warning)
+        self.assertEquals(0, len(warning), "Cannot find the gc_grace_seconds warning message.")
 
     def logged_batch_rejects_counter_mutations_test(self):
         """ Test that logged batch rejects counter mutations """
