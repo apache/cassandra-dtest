@@ -154,6 +154,15 @@ class TestCompaction(Tester):
             session.execute('insert into cf (key, val) values (%d, %d)' % (x, x))
         node1.flush()
         time.sleep(5)
+        # we only check every 10 minutes - sstable should still be there:
+        assert expired_sstable in node1.get_sstables('ks', 'cf')
+
+        session.execute("alter table cf with compaction =  {'class':'DateTieredCompactionStrategy', 'max_sstable_age_days':0.00035, 'min_threshold':2, 'expired_sstable_check_frequency_seconds':0}")
+        time.sleep(1)
+        for x in range(0, 100):
+            session.execute('insert into cf (key, val) values (%d, %d)' % (x, x))
+        node1.flush()
+        time.sleep(5)
         assert expired_sstable not in node1.get_sstables('ks', 'cf')
 
     @require('dtest PR #373', broken_in='3.0')
