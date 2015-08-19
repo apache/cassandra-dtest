@@ -238,6 +238,23 @@ class TestOfflineTools(Tester):
         self.assertIn("java.lang.Exception: Invalid SSTable", error)
         self.assertEqual(rc, 1, msg=str(rc))
 
+    def sstableexpiredblockers_test(self):
+        cluster = self.cluster
+        cluster.populate(1).start(wait_for_binary_proto=True)
+        [node1] = cluster.nodelist()
+        session = self.patient_cql_connection(node1)
+        self.create_ks(session, 'ks', 1)
+        session.execute("create table ks.cf (key int PRIMARY KEY, val int) with gc_grace_seconds=0")
+        # create a blocker:
+        session.execute("insert into ks.cf (key, val) values (1,1)")
+        node1.flush()
+        session.execute("delete from ks.cf where key = 2")
+        node1.flush()
+        session.execute("delete from ks.cf where key = 3")
+        node1.flush()
+        [(out, error, rc)] = node1.run_sstableexpiredblockers(keyspace="ks", column_family="cf")
+        self.assertIn("blocks 2 expired sstables from getting dropped", out)
+
     def _get_final_sstables(self, node, ks, table):
         """
         Return the node final sstable data files, excluding the temporary tables.
