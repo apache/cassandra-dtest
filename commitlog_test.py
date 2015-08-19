@@ -223,7 +223,7 @@ class TestCommitLog(Tester):
         self.prepare(configuration={
             'commitlog_segment_size_in_mb': segment_size_in_mb
         }, create_test_keyspace=False)
-        self._commitlog_test(segment_size_in_mb, 62.5, 13, files_error=0.2)
+        self._commitlog_test(segment_size_in_mb, 62.5, 13, files_error=0.25)
 
     @since('2.2')
     def default_compressed_segment_size_test(self):
