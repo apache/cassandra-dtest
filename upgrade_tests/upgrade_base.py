@@ -83,13 +83,13 @@ class UpgradeTester(Tester):
 
         # start them again
         if UPGRADE_MODE != "none":
-            node1.set_install_dir(version=self.original_install_dir)
+            node1.set_install_dir(install_dir=self.original_install_dir)
             node1.set_log_level("DEBUG" if DEBUG else "INFO")
             node1.set_configuration_options(values={'internode_compression': 'none'})
             node1.start(wait_for_binary_proto=True)
 
         if UPGRADE_MODE == "all":
-            node2.set_install_dir(version=self.original_install_dir)
+            node2.set_install_dir(install_dir=self.original_install_dir)
             node2.set_log_level("DEBUG" if DEBUG else "INFO")
             node2.set_configuration_options(values={'internode_compression': 'none'})
             node2.start(wait_for_binary_proto=True)
