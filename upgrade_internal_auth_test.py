@@ -31,6 +31,7 @@ class TestAuthUpgrade(Tester):
             self.ignore_log_patterns.append(r'Failed deleting temp components for')
             self.ignore_log_patterns.append(r'Missing component')
             self.ignore_log_patterns.append(r'Exception in thread Thread\[CompactionExecutor')
+            self.ignore_log_patterns.append(r'Unable to delete')
         self.do_upgrade_with_internal_auth("git:cassandra-2.2")
 
     # todo: when we branch for 3.0 switch this from trunk to cassandra-3.0
