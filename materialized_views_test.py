@@ -7,6 +7,7 @@ from functools import partial
 # TODO add in requirements.txt
 from enum import Enum  # Remove when switching to py3
 from multiprocessing import Process, Queue
+from unittest import skipIf
 
 from cassandra import ConsistencyLevel
 from cassandra.cluster import Cluster
@@ -1031,6 +1032,7 @@ def thread_session(ip, queue, start, end, rows):
 
 
 @since('3.0')
+@skipIf(sys.platform == 'win32', 'Bug in python on Windows: https://bugs.python.org/issue10128')
 class TestMaterializedViewsConsistency(Tester):
 
     def prepare(self, user_table=False):
