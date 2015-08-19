@@ -1,3 +1,6 @@
+import os
+from itertools import chain
+from shutil import rmtree
 from time import sleep
 
 from cassandra import ConsistencyLevel, ReadTimeout, Unavailable
@@ -225,6 +228,51 @@ class TestReplaceAddress(Tester):
         debug(movedTokensList[0])
         self.assertEqual(len(movedTokensList), numNodes)
 
+    def fail_without_replace_test(self):
+        """
+        When starting a node from a clean slate with the same address as
+        an existing down node, the node should error out even when
+        auto_bootstrap = false (or the node is a seed) and tell the user
+        to use replace_address.
+
+        @jira_ticket CASSANDRA-10134
+        """
+        debug("Starting cluster with 3 nodes.")
+        cluster = self.cluster
+        cluster.populate(3)
+        node1, node2, node3 = cluster.nodelist()
+        cluster.seeds.remove(node3)
+        NUM_TOKENS = os.environ.get('NUM_TOKENS', '256')
+        if DISABLE_VNODES:
+            cluster.set_configuration_options(values={'initial_token': None, 'num_tokens': 1})
+        else:
+            cluster.set_configuration_options(values={'initial_token': None, 'num_tokens': NUM_TOKENS})
+        cluster.start()
+
+        debug("Inserting Data...")
+        if cluster.version() < "2.1":
+            node1.stress(['-o', 'insert', '--num-keys=10000', '--replication-factor=3'])
+        else:
+            node1.stress(['write', 'n=10000', '-schema', 'replication(factor=3)'])
+
+        mark = None
+        for auto_bootstrap in (True, False):
+            debug("Stopping node 3.")
+            node3.stop(gently=False)
+
+            # completely delete the data, commitlog, and saved caches
+            for d in chain([os.path.join(node3.get_path(), "commitlogs")],
+                           [os.path.join(node3.get_path(), "saved_caches")],
+                           node3.data_directories()):
+                if os.path.exists(d):
+                    rmtree(d)
+
+            node3.set_configuration_options(values={'auto_bootstrap': auto_bootstrap})
+            debug("Starting node 3 with auto_boostrap = {val}".format(val=auto_bootstrap))
+            node3.start(wait_other_notice=False)
+            node3.watch_log_for('Use cassandra.replace_address if you want to replace this node', from_mark=mark, timeout=20)
+            mark = node3.mark_log()
+
     @since('2.2')
     def resumable_replace_test(self):
         """
@@ -336,3 +384,4 @@ class TestReplaceAddress(Tester):
         debug("Verifying querying works again.")
         finalData = list(session.execute(query))
         self.assertListEqual(initialData, finalData)
+
