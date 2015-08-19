@@ -242,7 +242,7 @@ class TestCommitLog(Tester):
                                      if self.cluster.version() >= '3.0'
                                      else (10, 42))
         self._commitlog_test(5, expected_commitlog_size, expected_commitlog_files,
-                             compressed=True, files_error=0.12)
+                             compressed=True, files_error=0.3)
 
     def stop_failure_policy_test(self):
         """ Test the stop commitlog failure policy (default one) """
