@@ -1,8 +1,7 @@
 import os
 import time
 
-from dtest import Tester, DEBUG
-
+from dtest import DEBUG, Tester
 
 QUERY_UPGRADED = os.environ.get('QUERY_UPGRADED', 'true').lower() in ('yes', 'true')
 QUERY_OLD = os.environ.get('QUERY_OLD', 'true').lower() in ('yes', 'true')
