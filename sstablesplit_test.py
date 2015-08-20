@@ -72,7 +72,13 @@ class TestSSTableSplit(Tester):
         expected_num_sstables = floor(origsstable_size / expected_sstable_size) 
 
         # split the sstables
-        node.run_sstablesplit(keyspace=keyspace, size=splitmaxsize, no_snapshot=True)
+        result = node.run_sstablesplit(keyspace=keyspace, size=splitmaxsize,
+                                       no_snapshot=True, debug=True)
+
+        for (out, error, rc) in result:
+            debug("stdout: {}".format(out))
+            debug("stderr: {}".format(error))
+            debug("rc: {}".format(rc))
 
         # get the sstables post-split and their total size
         sstables = node.get_sstables(keyspace, '')
