@@ -1,8 +1,15 @@
-import time, os, pprint, glob, re
+import glob
+import os
+import pprint
+import random
+import re
+import time
 from threading import Thread
 
-from dtest import debug, Tester
+from cassandra.concurrent import execute_concurrent
 from ccmlib.node import Node
+from dtest import Tester, debug
+
 
 def wait(delay=2):
     """
@@ -117,6 +124,108 @@ class TestConcurrentSchemaChanges(Tester):
         num_schemas = len(re.findall('\[.*?\]', schemas))
         assert num_schemas == 1, "There were multiple schema versions: " + pprint.pformat(schemas)
 
+    def create_lots_of_tables_concurrently_test(self):
+        """
+        create tables across multiple threads concurrently
+        """
+        cluster = self.cluster
+        cluster.populate(3).start()
+
+        node1, node2, node3 = cluster.nodelist()
+        session = self.cql_connection(node1)
+        session.execute("create keyspace lots_o_tables WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};")
+        session.execute("use lots_o_tables")
+        wait(5)
+
+        cmds = []
+        for n in range(0, 250):
+            cmds.append(("create table t_{0} (id uuid primary key, c1 text, c2 text, c3 text, c4 text)".format(n), ()))
+
+        results = execute_concurrent(session, cmds, raise_on_first_error=True, concurrency=200)
+
+        for (success, result) in results:
+            self.assertTrue(success, "didn't get success on table create: {}".format(result))
+
+        wait(3)
+
+        session.cluster.refresh_schema_metadata()
+        table_meta = session.cluster.metadata.keyspaces["lots_o_tables"].tables
+        self.assertEqual(250, len(table_meta))
+        self.validate_schema_consistent(node1)
+        self.validate_schema_consistent(node2)
+        self.validate_schema_consistent(node3)
+
+    def create_lots_of_alters_concurrently_test(self):
+        """
+        create alters across multiple threads concurrently
+        """
+        cluster = self.cluster
+        cluster.populate(3).start()
+
+        node1, node2, node3 = cluster.nodelist()
+        session = self.cql_connection(node1)
+        session.execute("create keyspace lots_o_alters WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};")
+        session.execute("use lots_o_alters")
+        for n in range(0, 10):
+            session.execute("create table base_{0} (id uuid primary key)".format(n))
+        wait(5)
+
+        cmds = []
+        for n in range(0, 500):
+            cmds.append(("alter table base_{0} add c_{1} int".format(random.choice(range(0, 10)), n), ()))
+
+        results = execute_concurrent(session, cmds, raise_on_first_error=True, concurrency=150)
+
+        for (success, result) in results:
+            self.assertTrue(success, "didn't get success on table create: {}".format(result))
+
+        wait(30)
+
+        session.cluster.refresh_schema_metadata()
+        table_meta = session.cluster.metadata.keyspaces["lots_o_alters"].tables
+        column_ct = 0
+        for table in table_meta.values():
+            column_ct += len(table.columns)
+        self.assertEqual(510, column_ct) # primary key + alters
+        self.validate_schema_consistent(node1)
+        self.validate_schema_consistent(node2)
+        self.validate_schema_consistent(node3)
+
+    def create_lots_of_indexes_concurrently_test(self):
+        """
+        create indexes across multiple threads concurrently
+        """
+        cluster = self.cluster
+        cluster.populate(3).start()
+
+        node1, node2, node3 = cluster.nodelist()
+        session = self.cql_connection(node1)
+        session.execute("create keyspace lots_o_indexes WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};")
+        session.execute("use lots_o_indexes")
+        for n in range(0, 15):
+            session.execute("create table base_{0} (id uuid primary key, c1 int, c2 int, c3 int, c4 int, c5 int)".format(n))
+            for ins in range(0, 5000):
+                session.execute("insert into base_{0} (id, c1, c2, c3, c4, c5) values (uuid(), {1}, {2}, {3}, {4}, {5})".format(
+                    n, random.choice(range(0, 100)), random.choice(range(0, 500)), random.choice(range(0, 1000)), random.choice(range(0, 5000)), random.choice(range(0, 10000))))
+        wait(5)
+
+        cmds = []
+        for n in range(0, 15):
+            cmds.append(("create index ix_base_{0} on base_{0} (c{1})".format(n, random.choice(range(1, 5))), ()))
+
+        results = execute_concurrent(session, cmds, raise_on_first_error=True)
+
+        for (success, result) in results:
+            self.assertTrue(success, "didn't get success on table create: {}".format(result))
+
+        wait(30)
+
+        session.cluster.refresh_schema_metadata()
+        index_meta = session.cluster.metadata.keyspaces["lots_o_indexes"].indexes
+        self.validate_schema_consistent(node1)
+        self.validate_schema_consistent(node2)
+        self.validate_schema_consistent(node3)
+        self.assertEqual(15, len(index_meta))
 
     def basic_test(self):
         """
@@ -365,5 +474,3 @@ class TestConcurrentSchemaChanges(Tester):
             session.execute('CREATE COLUMNFAMILY Standard1 (KEY text PRIMARY KEY)')
 
         tcompact.join()
-
-
