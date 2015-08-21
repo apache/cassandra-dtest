@@ -1,3 +1,5 @@
+import os
+
 from cassandra import ConsistencyLevel
 
 from dtest import DISABLE_VNODES, Tester
@@ -88,7 +90,7 @@ class TestHintedHandoffConfig(Tester):
 
             self._launch_nodetool_cmd(node, 'disablehintsfordc dc1')
             res = self._launch_nodetool_cmd(node, 'statushandoff')
-            self.assertEqual('Hinted handoff is running\nData center dc1 is disabled', res.rstrip())
+            self.assertEqual('Hinted handoff is running{}Data center dc1 is disabled'.format(os.linesep), res.rstrip())
 
             self._launch_nodetool_cmd(node, 'enablehintsfordc dc1')
             res = self._launch_nodetool_cmd(node, 'statushandoff')
@@ -127,7 +129,7 @@ class TestHintedHandoffConfig(Tester):
 
         for node in node1, node2:
             res = self._launch_nodetool_cmd(node, 'statushandoff')
-            self.assertEqual('Hinted handoff is running\nData center dc1 is disabled', res.rstrip())
+            self.assertEqual('Hinted handoff is running{}Data center dc1 is disabled'.format(os.linesep), res.rstrip())
 
         self._do_hinted_handoff(node1, node2, False)
 
@@ -140,7 +142,7 @@ class TestHintedHandoffConfig(Tester):
 
         for node in node1, node2:
             res = self._launch_nodetool_cmd(node, 'statushandoff')
-            self.assertEqual('Hinted handoff is running\nData center dc1 is disabled', res.rstrip())
+            self.assertEqual('Hinted handoff is running{}Data center dc1 is disabled'.format(os.linesep), res.rstrip())
 
         for node in node1, node2:
             self._launch_nodetool_cmd(node, 'enablehintsfordc dc1')
