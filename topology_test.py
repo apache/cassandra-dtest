@@ -21,8 +21,7 @@ class TestTopology(Tester):
         self.create_ks(session, 'ks', 1)
         self.create_cf(session, 'cf', columns={'c1': 'text', 'c2': 'text'})
 
-        for n in xrange(0, 10000):
-            insert_c1c2(session, n, ConsistencyLevel.ONE)
+        insert_c1c2(session, n=10000, consistency=ConsistencyLevel.ONE)
 
         cluster.flush()
 
@@ -60,8 +59,7 @@ class TestTopology(Tester):
         self.create_ks(session, 'ks', 2)
         self.create_cf(session, 'cf', columns={'c1': 'text', 'c2': 'text'})
 
-        for n in xrange(0, 10000):
-            insert_c1c2(session, n, ConsistencyLevel.QUORUM)
+        insert_c1c2(session, n=10000, consistency=ConsistencyLevel.QUORUM)
 
         cluster.flush()
         sizes = [node.data_size() for node in cluster.nodelist() if node.is_running()]
@@ -128,8 +126,7 @@ class TestTopology(Tester):
         self.create_ks(session, 'ks', 1)
         self.create_cf(session, 'cf', columns={'c1': 'text', 'c2': 'text'})
 
-        for n in xrange(0, 10000):
-            insert_c1c2(session, n, ConsistencyLevel.ONE)
+        insert_c1c2(session, n=10000, consistency=ConsistencyLevel.ONE)
 
         cluster.flush()
 

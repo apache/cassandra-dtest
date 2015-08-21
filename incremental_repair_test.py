@@ -66,8 +66,7 @@ class TestIncRepair(Tester):
 
         debug("insert data")
 
-        for x in range(1, 50):
-            insert_c1c2(session, x, ConsistencyLevel.ALL)
+        insert_c1c2(session, keys=range(1, 50), consistency=ConsistencyLevel.ALL)
         node1.flush()
 
         debug("bringing down node 3")
@@ -75,8 +74,7 @@ class TestIncRepair(Tester):
         node3.stop(gently=False)
 
         debug("inserting additional data into node 1 and 2")
-        for y in range(50, 100):
-            insert_c1c2(session, y, ConsistencyLevel.TWO)
+        insert_c1c2(session, keys=range(50, 100), consistency=ConsistencyLevel.TWO)
         node1.flush()
         node2.flush()
 
@@ -92,8 +90,7 @@ class TestIncRepair(Tester):
         node2.stop(gently=False)
 
         debug("inserting data in nodes 1 and 3")
-        for z in range(100, 150):
-            insert_c1c2(session, z, ConsistencyLevel.TWO)
+        insert_c1c2(session, keys=range(100, 150), consistency=ConsistencyLevel.TWO)
         node1.flush()
         node3.flush()
 

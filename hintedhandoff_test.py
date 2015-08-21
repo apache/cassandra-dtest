@@ -51,8 +51,7 @@ class TestHintedHandoffConfig(Tester):
 
         node2.stop(wait_other_notice=True)
 
-        for n in xrange(0, 100):
-            insert_c1c2(session, n, ConsistencyLevel.ONE)
+        insert_c1c2(session, n=100, consistency=ConsistencyLevel.ONE)
 
         log_mark = node1.mark_log()
         node2.start(wait_other_notice=True)

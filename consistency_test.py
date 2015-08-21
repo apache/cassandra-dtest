@@ -724,8 +724,7 @@ class TestConsistency(Tester):
 
         node2.stop(wait_other_notice=True)
 
-        for n in xrange(0, 10000):
-            insert_c1c2(session, n, ConsistencyLevel.ONE)
+        insert_c1c2(session, n=10000, consistency=ConsistencyLevel.ONE)
 
         node2.start(wait_other_notice=True)
 
@@ -797,8 +796,7 @@ class TestConsistency(Tester):
         create_c1c2_table(self, session)
 
         debug("Generating some data")
-        for n in xrange(100):
-            insert_c1c2(session, n, CL)
+        insert_c1c2(session, n=100, consistency=CL)
 
         debug("Taking down node1")
         node1.stop(wait_other_notice=True)

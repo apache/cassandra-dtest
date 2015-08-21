@@ -24,16 +24,14 @@ class TestBootstrapConsistency(Tester):
         create_c1c2_table(self, n2session)
 
         debug("Generating some data for all nodes")
-        for n in xrange(10, 20):
-            insert_c1c2(n2session, n, ConsistencyLevel.ALL)
+        insert_c1c2(n2session, keys=range(10, 20), consistency=ConsistencyLevel.ALL)
 
         node1.flush()
         debug("Taking down node1")
         node1.stop(wait_other_notice=True)
 
         debug("Writing data to node2")
-        for n in xrange(30, 1000):
-            insert_c1c2(n2session, n, ConsistencyLevel.ONE)
+        insert_c1c2(n2session, keys=range(30, 1000), consistency=ConsistencyLevel.ONE)
         node2.flush()
 
         debug("Restart node1")
@@ -65,16 +63,14 @@ class TestBootstrapConsistency(Tester):
         create_c1c2_table(self, n2session)
 
         debug("Generating some data for all nodes")
-        for n in xrange(10, 20):
-            insert_c1c2(n2session, n, ConsistencyLevel.ALL)
+        insert_c1c2(n2session, keys=range(10, 20), consistency=ConsistencyLevel.ALL)
 
         node1.flush()
         debug("Taking down node1")
         node1.stop(wait_other_notice=True)
 
         debug("Writing data to only node2")
-        for n in xrange(30, 1000):
-            insert_c1c2(n2session, n, ConsistencyLevel.ONE)
+        insert_c1c2(n2session, keys=range(30, 1000), consistency=ConsistencyLevel.ONE)
         node2.flush()
 
         debug("Restart node1")
