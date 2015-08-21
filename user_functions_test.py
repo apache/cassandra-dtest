@@ -6,6 +6,7 @@ from ccmlib.common import get_version_from_build
 from dtest import Tester
 from assertions import assert_invalid, assert_one, assert_none
 from tools import since
+from cassandra import FunctionFailure
 
 
 @since('2.2')
@@ -166,7 +167,7 @@ class TestUserFunctions(Tester):
 
         session.execute("create function y_sin(val double) called on null input returns double language javascript as 'Math.sin(val).toString()'")
 
-        assert_invalid(session, "select y_sin(val) from nums where key = 1")
+        assert_invalid(session, "select y_sin(val) from nums where key = 1", expected=FunctionFailure)
 
         assert_invalid(session, "create function compilefail(key int) called on null input returns double language javascript as 'foo bar';")
 
