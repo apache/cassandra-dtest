@@ -1,8 +1,8 @@
 import fileinput
 import functools
+import os
 import re
 import subprocess
-import os
 import sys
 import tempfile
 import time
@@ -11,6 +11,7 @@ from distutils.version import LooseVersion
 from threading import Thread
 
 from cassandra import ConsistencyLevel
+from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.query import SimpleStatement
 from nose.plugins.attrib import attr
 
@@ -27,9 +28,17 @@ def create_c1c2_table(tester, session, read_repair=None):
     tester.create_cf(session, 'cf', columns={'c1': 'text', 'c2': 'text'}, read_repair=read_repair)
 
 
-def insert_c1c2(session, key, consistency=ConsistencyLevel.QUORUM):
-    query = SimpleStatement('UPDATE cf SET c1=\'value1\', c2=\'value2\' WHERE key=\'k%d\'' % key, consistency_level=consistency)
-    session.execute(query)
+def insert_c1c2(session, keys=None, n=None, consistency=ConsistencyLevel.QUORUM):
+    if (keys is None and n is None) or (keys is not None and n is not None):
+        raise ValueError("Expected exactly one of 'keys' or 'n' arguments to not be None; "
+                         "got keys={keys}, n={n}".format(keys=keys, n=n))
+    if n:
+        keys = list(range(n))
+
+    statement = session.prepare("INSERT INTO cf (key, c1, c2) VALUES (?, 'value1', 'value2')")
+    statement.consistency_level = consistency
+
+    execute_concurrent_with_args(session, statement, [['k{}'.format(k)] for k in keys])
 
 
 def query_c1c2(session, key, consistency=ConsistencyLevel.QUORUM, tolerate_missing=False, must_be_missing=False):

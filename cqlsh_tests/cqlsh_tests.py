@@ -418,8 +418,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         self.create_ks(session, 'ks', 1)
         create_c1c2_table(self, session)
 
-        for n in xrange(100):
-            insert_c1c2(session, n)
+        insert_c1c2(session, n=100)
 
         out, err = self.run_cqlsh(node1, 'TRACING ON; SELECT * FROM ks.cf')
         self.assertIn('Tracing session: ', out)

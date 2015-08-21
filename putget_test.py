@@ -52,8 +52,8 @@ class TestPutGet(Tester):
         create_c1c2_table(self, session)
 
         # insert and get at CL.QUORUM (since RF=2, node1 won't have all key locally)
+        tools.insert_c1c2(session, n=1000, consistency=ConsistencyLevel.QUORUM)
         for n in xrange(0, 1000):
-            tools.insert_c1c2(session, n, ConsistencyLevel.QUORUM)
             tools.query_c1c2(session, n, ConsistencyLevel.QUORUM)
 
     def rangeputget_test(self):

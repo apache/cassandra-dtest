@@ -49,8 +49,7 @@ class TestRebuild(Tester):
         session = self.patient_exclusive_cql_connection(node1)
         self.create_ks(session, 'ks', {'dc1': 1})
         self.create_cf(session, 'cf', columns={'c1': 'text', 'c2': 'text'})
-        for i in xrange(0, keys):
-            insert_c1c2(session, i, ConsistencyLevel.ALL)
+        insert_c1c2(session, n=keys, consistency=ConsistencyLevel.ALL)
 
         # check data
         for i in xrange(0, keys):
