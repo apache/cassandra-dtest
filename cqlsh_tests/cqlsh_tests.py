@@ -3,6 +3,7 @@ import binascii
 import csv
 import datetime
 import os
+import re
 import subprocess
 import sys
 from decimal import Decimal
@@ -1175,6 +1176,48 @@ Unlogged batch covering 2 partitions detected against table [client_warnings.tes
 
         # the table created before and after should be the same
         self.assertEqual(reloaded_describe_out, describe_out)
+
+    @since('3.0')
+    def test_clear(self):
+        """
+        Test the CLEAR command
+        @jira_ticket CASSANDRA-10086
+        """
+        self._test_clear_screen('CLEAR')
+
+    @since('3.0')
+    def test_cls(self):
+        """
+        Test the CLS command
+        @jira_ticket CASSANDRA-10086
+        """
+        self._test_clear_screen('CLS')
+
+    def _test_clear_screen(self, cmd):
+        """
+            We use ANSI escape sequences to check the output:
+            http://ascii-table.com/ansi-escape-sequences-vt-100.php
+
+            Possible clear screen sequences:
+            Esc[J or Esc[0J or Esc[1J or Esc[2J
+
+            In addition we can move the cursor upper left:
+            Esc[H or Esc[;H
+
+            The escape character code is 27.
+
+            We don't check for moving the cursor though, we only check that
+            there is no error and that at least one of the possible clear
+            screen sequences is contained in the output, via a regular
+            expression that allows any optional digit between '['' and 'H'.
+        """
+        self.cluster.populate(1)
+        self.cluster.start(wait_for_binary_proto=True)
+        node1, = self.cluster.nodelist()
+
+        out, err = self.run_cqlsh(node1, cmd)
+        self.assertEqual("", err)
+        self.assertTrue(re.search(chr(27) + "\[\d?J", out))
 
     def run_cqlsh(self, node, cmds, cqlsh_options=[]):
         cdir = node.get_install_dir()
