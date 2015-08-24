@@ -1385,6 +1385,31 @@ class TestMutations(ThriftTester):
         assert len(result) == 1
         assert result[0].column.name == _i64(4)
 
+    def test_multiget_slice_with_compact_table(self):
+        """Insert multiple keys in a compact table and retrieve them using the multiget_slice interface"""
+
+        _set_keyspace('Keyspace1')
+
+        # create
+        cd = ColumnDef('v', 'AsciiType', None, None)
+        newcf = CfDef('Keyspace1', 'CompactColumnFamily', default_validation_class='AsciiType', column_metadata=[cd])
+        client.system_add_column_family(newcf)
+
+        CL = ConsistencyLevel.ONE
+        for i in range(0, 5):
+            client.insert('key'+str(i), ColumnParent('CompactColumnFamily'), Column('v', 'value'+str(i), 0), CL)
+        time.sleep(0.1)
+
+        p = SlicePredicate(column_names=['v'])
+        rows = client.multiget_slice(['key'+str(i) for i in range(0, 5)], ColumnParent('CompactColumnFamily'), p, ConsistencyLevel.ONE)
+
+        for i in range(0, 5):
+            key = 'key'+str(i)
+            assert key in rows
+            assert len(rows[key]) == 1
+            assert rows[key][0].column.name == 'v'
+            assert rows[key][0].column.value == 'value'+str(i)
+
     def test_multiget_slice(self):
         """Insert multiple keys and retrieve them using the multiget_slice interface"""
 
@@ -2252,7 +2277,6 @@ class TestMutations(ThriftTester):
         L = [result.column
              for result in _big_multi_slice('abc')]
         assert L == _MULTI_SLICE_COLUMNS, L
-
 
 class TestTruncate(ThriftTester):
     def test_truncate(self):
