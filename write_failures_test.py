@@ -83,7 +83,7 @@ class TestWriteFailures(Tester):
             with self.assertRaises(self.expected_expt) as cm:
                 session.execute(statement)
 
-    @since('2.2')
+    @since('2.2', '2.2.X')
     def test_mutation_v2(self):
         """
             A failed mutation at v2 receives a WriteTimeout
