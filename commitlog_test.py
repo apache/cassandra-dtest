@@ -33,8 +33,7 @@ class TestCommitLog(Tester):
 
     def prepare(self, configuration={}, create_test_keyspace=True, **kwargs):
         conf = {'commitlog_sync_period_in_ms': 1000}
-        if self.cluster.version() >= "2.1":
-            conf['memtable_heap_space_in_mb'] = 512
+
         conf.update(configuration)
         self.cluster.set_configuration_options(values=conf, **kwargs)
         self.cluster.start()
@@ -87,6 +86,13 @@ class TestCommitLog(Tester):
                         num_commitlog_files, compressed=False,
                         files_error=0):
         """ Execute a basic commitlog test and validate the commitlog files """
+
+        conf = {'commitlog_segment_size_in_mb': segment_size_in_mb}
+        if compressed:
+            conf['commitlog_compression'] = [{'class_name': 'LZ4Compressor'}]
+        if self.cluster.version() >= "2.1":
+            conf['memtable_heap_space_in_mb'] = 512
+        self.prepare(configuration=conf, create_test_keyspace=False)
 
         if compressed:
             segment_size_in_mb *= 0.7
@@ -213,40 +219,30 @@ class TestCommitLog(Tester):
     def default_segment_size_test(self):
         """ Test default commitlog_segment_size_in_mb (32MB) """
 
-        self.prepare(create_test_keyspace=False)
         self._commitlog_test(32, 64, 2, files_error=0.5)
 
     @since('2.1')
     def small_segment_size_test(self):
         """ Test a small commitlog_segment_size_in_mb (5MB) """
-        segment_size_in_mb = 5
-        self.prepare(configuration={
-            'commitlog_segment_size_in_mb': segment_size_in_mb
-        }, create_test_keyspace=False)
-        self._commitlog_test(segment_size_in_mb, 62.5, 13, files_error=0.25)
+
+        self._commitlog_test(5, 62.5, 13, files_error=0.25)
 
     @since('2.2')
     def default_compressed_segment_size_test(self):
         """ Test default compressed commitlog_segment_size_in_mb (32MB) """
 
-        self.prepare(configuration={
-            'commitlog_compression': [{'class_name': 'LZ4Compressor'}]
-        }, create_test_keyspace=False)
         self._commitlog_test(32, 42, 2, compressed=True, files_error=0.5)
 
     @since('2.2')
     def small_compressed_segment_size_test(self):
         """ Test a small compressed commitlog_segment_size_in_mb (5MB) """
-        segment_size_in_mb = 5
-        self.prepare(configuration={
-            'commitlog_segment_size_in_mb': segment_size_in_mb,
-            'commitlog_compression': [{'class_name': 'LZ4Compressor'}]
-        }, create_test_keyspace=False)
+
         (expected_commitlog_files,
          expected_commitlog_size) = ((12, 33)
                                      if self.cluster.version() >= '3.0'
                                      else (10, 42))
-        self._commitlog_test(segment_size_in_mb, expected_commitlog_size, expected_commitlog_files, compressed=True, files_error=0.12)
+        self._commitlog_test(5, expected_commitlog_size, expected_commitlog_files,
+                             compressed=True, files_error=0.3)
 
     def stop_failure_policy_test(self):
         """ Test the stop commitlog failure policy (default one) """
