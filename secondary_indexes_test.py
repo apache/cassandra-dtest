@@ -571,21 +571,25 @@ class TestSecondaryIndexesOnCollections(Tester):
             self.assertTrue(shared_uuid in db_uuids)
             self.assertTrue(log_entry['unshared_uuid1'] in db_uuids)
 
-        # attempt to add an index on map values as well (should fail)
-        stmt = "CREATE INDEX user_uuids on map_index_search.users (uuids);"
-        if self.cluster.version() >= '2.2':
-            matching = "Cannot create index on values\(uuids\): an index on keys\(uuids\) already exists and indexing a map on more than one dimension at the same time is not currently supported"
+        # attempt to add an index on map values as well (should fail pre 3.0)
+        stmt = "CREATE INDEX user_uuids_values on map_index_search.users (uuids);"
+        if self.cluster.version() < '3.0':
+            if self.cluster.version() >= '2.2':
+                matching = "Cannot create index on values\(uuids\): an index on keys\(uuids\) already exists and indexing a map on more than one dimension at the same time is not currently supported"
+            else:
+                matching = "Cannot create index on uuids values, an index on uuids keys already exists and indexing a map on both keys and values at the same time is not currently supported"
+            assert_invalid(session, stmt, matching)
         else:
-            matching = "Cannot create index on uuids values, an index on uuids keys already exists and indexing a map on both keys and values at the same time is not currently supported"
-        assert_invalid(session, stmt, matching)
+            session.execute(stmt)
 
-        # since cannot have index on map keys and values remove current index on keys
-        stmt = "DROP INDEX user_uuids;"
-        session.execute(stmt)
+        if self.cluster.version() < '3.0':
+            # since cannot have index on map keys and values remove current index on keys
+            stmt = "DROP INDEX user_uuids;"
+            session.execute(stmt)
 
-        # add index on values (will index rows added prior)
-        stmt = "CREATE INDEX user_uids on map_index_search.users (uuids);"
-        session.execute(stmt)
+            # add index on values (will index rows added prior)
+            stmt = "CREATE INDEX user_uuids_values on map_index_search.users (uuids);"
+            session.execute(stmt)
 
         # shuffle the log in-place, and double-check a slice of records by querying the secondary index
         random.shuffle(log)
