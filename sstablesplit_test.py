@@ -1,7 +1,5 @@
 from __future__ import division
 
-import subprocess
-import tempfile
 import time
 from math import floor
 from os.path import getsize
@@ -109,12 +107,9 @@ class TestSSTableSplit(Tester):
                      '-schema', 'compaction(strategy=LeveledCompactionStrategy, sstable_size_in_mb=10)'])
         self._do_compaction(node)
         node.stop()
-        with tempfile.TemporaryFile(mode='w+') as tmpfile:
-            node.run_sstablesplit(keyspace='keyspace1', size=2, no_snapshot=True,
-                                  stdout=tmpfile, stderr=subprocess.STDOUT)
-            tmpfile.seek(0)
-            output = tmpfile.read()
+        result = node.run_sstablesplit(keyspace='keyspace1', size=2, no_snapshot=True)
 
-        debug(output)
-        failure = output.find("java.lang.AssertionError: Data component is missing")
-        self.assertEqual(failure, -1, "Error during sstablesplit")
+        for (stdout, stderr, rc) in result:
+            debug(stderr)
+            failure = stderr.find("java.lang.AssertionError: Data component is missing")
+            self.assertEqual(failure, -1, "Error during sstablesplit")
