@@ -1,14 +1,16 @@
 import glob
 import os
 import pprint
-import random
 import re
 import time
+from random import randrange
 from threading import Thread
 
-from cassandra.concurrent import execute_concurrent
 from ccmlib.node import Node
+
+from cassandra.concurrent import execute_concurrent
 from dtest import Tester, debug
+from tools import require, since
 
 
 def wait(delay=2):
@@ -146,7 +148,7 @@ class TestConcurrentSchemaChanges(Tester):
         for (success, result) in results:
             self.assertTrue(success, "didn't get success on table create: {}".format(result))
 
-        wait(3)
+        wait(10)
 
         session.cluster.refresh_schema_metadata()
         table_meta = session.cluster.metadata.keyspaces["lots_o_tables"].tables
@@ -172,7 +174,7 @@ class TestConcurrentSchemaChanges(Tester):
 
         cmds = []
         for n in range(0, 500):
-            cmds.append(("alter table base_{0} add c_{1} int".format(random.choice(range(0, 10)), n), ()))
+            cmds.append(("alter table base_{0} add c_{1} int".format(randrange(0, 10), n), ()))
 
         results = execute_concurrent(session, cmds, raise_on_first_error=True, concurrency=150)
 
@@ -186,7 +188,9 @@ class TestConcurrentSchemaChanges(Tester):
         column_ct = 0
         for table in table_meta.values():
             column_ct += len(table.columns)
-        self.assertEqual(510, column_ct) # primary key + alters
+
+        # primary key + alters
+        self.assertEqual(510, column_ct)
         self.validate_schema_consistent(node1)
         self.validate_schema_consistent(node2)
         self.validate_schema_consistent(node3)
@@ -196,36 +200,84 @@ class TestConcurrentSchemaChanges(Tester):
         create indexes across multiple threads concurrently
         """
         cluster = self.cluster
-        cluster.populate(3).start()
+        cluster.populate(2).start()
 
-        node1, node2, node3 = cluster.nodelist()
+        node1, node2 = cluster.nodelist()
         session = self.cql_connection(node1)
         session.execute("create keyspace lots_o_indexes WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};")
         session.execute("use lots_o_indexes")
-        for n in range(0, 15):
-            session.execute("create table base_{0} (id uuid primary key, c1 int, c2 int, c3 int, c4 int, c5 int)".format(n))
-            for ins in range(0, 5000):
-                session.execute("insert into base_{0} (id, c1, c2, c3, c4, c5) values (uuid(), {1}, {2}, {3}, {4}, {5})".format(
-                    n, random.choice(range(0, 100)), random.choice(range(0, 500)), random.choice(range(0, 1000)), random.choice(range(0, 5000)), random.choice(range(0, 10000))))
+        for n in range(0, 5):
+            session.execute("create table base_{0} (id uuid primary key, c1 int, c2 int)".format(n))
+            for ins in range(0, 1000):
+                session.execute("insert into base_{0} (id, c1, c2) values (uuid(), {1}, {2})".format(n, ins, ins))
         wait(5)
 
+        debug("creating indexes")
         cmds = []
-        for n in range(0, 15):
-            cmds.append(("create index ix_base_{0} on base_{0} (c{1})".format(n, random.choice(range(1, 5))), ()))
+        for n in range(0, 5):
+            cmds.append(("create index ix_base_{0}_c1 on base_{0} (c1)".format(n), ()))
+            cmds.append(("create index ix_base_{0}_c2 on base_{0} (c2)".format(n), ()))
 
         results = execute_concurrent(session, cmds, raise_on_first_error=True)
 
         for (success, result) in results:
             self.assertTrue(success, "didn't get success on table create: {}".format(result))
 
-        wait(30)
+        wait(5)
 
+        debug("validating schema and index list")
         session.cluster.refresh_schema_metadata()
         index_meta = session.cluster.metadata.keyspaces["lots_o_indexes"].indexes
         self.validate_schema_consistent(node1)
         self.validate_schema_consistent(node2)
-        self.validate_schema_consistent(node3)
-        self.assertEqual(15, len(index_meta))
+        self.assertEqual(10, len(index_meta))
+        for n in range(0, 5):
+            self.assertIn("ix_base_{0}_c1".format(n), index_meta)
+            self.assertIn("ix_base_{0}_c2".format(n), index_meta)
+
+        debug("waiting for indexes to fill in")
+        wait(45)
+        debug("querying all values by secondary index")
+        for n in range(0, 5):
+            debug("checking table: base_{0}".format(n))
+            for ins in range(0, 1000):
+                self.assertEqual(1, len(session.execute("select * from base_{0} where c1 = {1}".format(n, ins))))
+                self.assertEqual(1, len(session.execute("select * from base_{0} where c2 = {1}".format(n, ins))))
+
+    @since('3.0')
+    @require(10156)
+    def create_lots_of_mv_concurrently_test(self):
+        """
+        create materialized views across multiple threads concurrently
+        """
+        cluster = self.cluster
+        cluster.populate(3).start()
+        node1, node2, node3 = cluster.nodelist()
+        session = self.cql_connection(node1)
+        session.execute("create keyspace lots_o_views WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};")
+        session.execute("use lots_o_views")
+        wait(10)
+        session.execute("create table source_data (id uuid primary key, c1 int, c2 int, c3 int, c4 int, c5 int, c6 int, c7 int, c8 int, c9 int, c10 int);")
+        insert_stmt = session.prepare("insert into source_data (id, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10) values (uuid(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);")
+        wait(10)
+        for n in range(0, 4000):
+            session.execute(insert_stmt, [n] * 10)
+
+        wait(10)
+        for n in range(1, 11):
+            session.execute(("CREATE MATERIALIZED VIEW src_by_c{0} AS SELECT * FROM source_data "
+                             "WHERE c{0} IS NOT NULL AND id IS NOT NULL PRIMARY KEY (c{0}, id)".format(n)))
+            session.cluster.control_connection.wait_for_schema_agreement()
+
+        wait(300)
+        result = session.execute(("SELECT * FROM system_schema.materialized_views "
+                                  "WHERE keyspace_name='lots_o_views' AND table_name='source_data'"))
+        self.assertEqual(10, len(result), "missing some mv from source_data table")
+
+        for n in range(1, 11):
+            result = session.execute("select * from src_by_c{0}".format(n))
+            debug("checking src_by_c{0}: {1}".format(n, len(result)))
+            self.assertEqual(4000, len(result))
 
     def basic_test(self):
         """
