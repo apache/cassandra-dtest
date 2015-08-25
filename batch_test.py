@@ -191,7 +191,7 @@ class TestBatch(Tester):
                         received_responses, e.received_responses,)
                 assert e.received_responses == received_responses, msg
         except Unavailable as e:
-            if not received_responses is None:
+            if received_responses is not None:
                 msg = "Expecting alive_replicas to be %s, got: %s" % (
                         received_responses, e.alive_replicas,)
                 assert received_responses == e.alive_replicas, msg
