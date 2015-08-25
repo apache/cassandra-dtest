@@ -1,9 +1,11 @@
 import time
 
-from assertions import assert_invalid, assert_unavailable
-from dtest import Tester
 from cassandra import ConsistencyLevel, Timeout, Unavailable
 from cassandra.query import SimpleStatement
+
+from assertions import assert_invalid, assert_unavailable
+from dtest import Tester
+
 
 class TestBatch(Tester):
 
@@ -98,7 +100,7 @@ class TestBatch(Tester):
     def logged_batch_throws_uae_test(self):
         """ Test that logged batch throws UAE if there aren't enough live nodes """
         session = self.prepare(nodes=3)
-        [ node.stop(wait_other_notice=True) for node in self.cluster.nodelist()[1:] ]
+        [node.stop(wait_other_notice=True) for node in self.cluster.nodelist()[1:]]
         session.consistency_level = 'ONE'
         assert_unavailable(session.execute, """
             BEGIN BATCH
@@ -124,7 +126,7 @@ class TestBatch(Tester):
         """ Test that acknowledged_by_batchlog is False if batchlog can't be written """
         session = self.prepare(nodes=3, compression=False)
         # kill 2 of the 3 nodes (all the batchlog write candidates).
-        [ node.stop(gently=False) for node in self.cluster.nodelist()[1:] ]
+        [node.stop(gently=False) for node in self.cluster.nodelist()[1:]]
         self.assert_timedout(session, """
             BEGIN BATCH
             INSERT INTO users (id, firstname, lastname) VALUES (0, 'Jack', 'Sparrow')
@@ -186,15 +188,15 @@ class TestBatch(Tester):
             statement = SimpleStatement(query, consistency_level=cl)
             session.execute(statement, timeout=None)
         except Timeout as e:
-            if not received_responses is None:
-                msg = "Expecting received_responses to be %s, got: %s" % (
+            if received_responses is not None:
+                msg = "Expecting received_responses to be {}, got: {}".format(
                         received_responses, e.received_responses,)
-                assert e.received_responses == received_responses, msg
+                self.assertEqual(e.received_responses, received_responses, msg)
         except Unavailable as e:
             if received_responses is not None:
-                msg = "Expecting alive_replicas to be %s, got: %s" % (
+                msg = "Expecting alive_replicas to be {}, got: {}".format(
                         received_responses, e.alive_replicas,)
-                assert received_responses == e.alive_replicas, msg
+                self.assertEqual(e.alive_replicas, received_responses, msg)
         except Exception as e:
             assert False, "Expecting TimedOutException, got:" + str(e)
         else:
