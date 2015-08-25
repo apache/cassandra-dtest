@@ -26,7 +26,16 @@ from tools import generate_ssl_stores, new_node
 # other tests will focus on single upgrades from UPGRADE_PATH[n] to UPGRADE_PATH[n+1]
 
 TRUNK_VER = (3, 1)
-DEFAULT_PATH = [(1, 2), (2, 0), (2, 1), (2, 2), (3, 0), TRUNK_VER]
+
+# maps protocol version to c* version(s)
+PROTOCOL_PATHS = {
+    1: [(1, 2), (2, 0), (2, 1)],  # omitting 2.2; it supports v1, but deprecated
+    2: [(2, 0), (2, 1)],          # omitting 2.2; it supports v2, but deprecated
+    3: [(2, 1), (2, 2), (3, 0), TRUNK_VER],
+    4: [(2, 2), (3, 0), TRUNK_VER]
+}
+
+PROTOCOL_VERSION = int(os.environ.get('PROTOCOL_VERSION', 3))
 
 CUSTOM_PATH = os.environ.get('UPGRADE_PATH', None)
 if CUSTOM_PATH:
@@ -36,7 +45,7 @@ if CUSTOM_PATH:
         _major, _minor = _vertup.split('_')
         UPGRADE_PATH.append((int(_major), int(_minor)))
 else:
-    UPGRADE_PATH = DEFAULT_PATH
+    UPGRADE_PATH = PROTOCOL_PATHS[PROTOCOL_VERSION]
 
 LOCAL_MODE = os.environ.get('LOCAL_MODE', '').lower() in ('yes', 'true')
 if LOCAL_MODE:
