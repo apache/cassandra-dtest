@@ -26,7 +26,16 @@ from tools import generate_ssl_stores, new_node
 # other tests will focus on single upgrades from UPGRADE_PATH[n] to UPGRADE_PATH[n+1]
 
 TRUNK_VER = (3, 1)
-DEFAULT_PATH = [(1, 2), (2, 0), (2, 1), (2, 2), (3, 0), TRUNK_VER]
+
+# maps protocol version to c* version(s)
+PROTOCOL_PATHS = {
+    1: [(1, 2), (2, 0), (2, 1)],  # omitting 2.2; it supports v1, but deprecated
+    2: [(2, 0), (2, 1)],          # omitting 2.2; it supports v2, but deprecated
+    3: [(2, 1), (2, 2), (3, 0), TRUNK_VER],
+    4: [(2, 2), (3, 0), TRUNK_VER]
+}
+
+PROTOCOL_VERSION = int(os.environ.get('PROTOCOL_VERSION', 3))
 
 CUSTOM_PATH = os.environ.get('UPGRADE_PATH', None)
 if CUSTOM_PATH:
@@ -36,7 +45,7 @@ if CUSTOM_PATH:
         _major, _minor = _vertup.split('_')
         UPGRADE_PATH.append((int(_major), int(_minor)))
 else:
-    UPGRADE_PATH = DEFAULT_PATH
+    UPGRADE_PATH = PROTOCOL_PATHS[PROTOCOL_VERSION]
 
 LOCAL_MODE = os.environ.get('LOCAL_MODE', '').lower() in ('yes', 'true')
 if LOCAL_MODE:
@@ -165,7 +174,7 @@ def data_writer(tester, to_verify_queue, verification_done_queue, rewrite_probab
     Intended to be run using multiprocessing.
     """
     # 'tester' is a cloned object so we shouldn't be inappropriately sharing anything with another process
-    session = tester.patient_cql_connection(tester.node1, keyspace="upgrade", protocol_version=1)
+    session = tester.patient_cql_connection(tester.node1, keyspace="upgrade", protocol_version=PROTOCOL_VERSION)
 
     prepared = session.prepare("UPDATE cf SET v=? WHERE k=?")
     prepared.consistency_level = ConsistencyLevel.QUORUM
@@ -213,7 +222,7 @@ def data_checker(tester, to_verify_queue, verification_done_queue):
     Intended to be run using multiprocessing.
     """
     # 'tester' is a cloned object so we shouldn't be inappropriately sharing anything with another process
-    session = tester.patient_cql_connection(tester.node1, keyspace="upgrade", protocol_version=1)
+    session = tester.patient_cql_connection(tester.node1, keyspace="upgrade", protocol_version=PROTOCOL_VERSION)
 
     prepared = session.prepare("SELECT v FROM cf WHERE k=?")
     prepared.consistency_level = ConsistencyLevel.QUORUM
@@ -264,7 +273,7 @@ def counter_incrementer(tester, to_verify_queue, verification_done_queue, rewrit
     Intended to be run using multiprocessing.
     """
     # 'tester' is a cloned object so we shouldn't be inappropriately sharing anything with another process
-    session = tester.patient_cql_connection(tester.node1, keyspace="upgrade", protocol_version=1)
+    session = tester.patient_cql_connection(tester.node1, keyspace="upgrade", protocol_version=PROTOCOL_VERSION)
 
     prepared = session.prepare("UPDATE countertable SET c = c + 1 WHERE k1=?")
     prepared.consistency_level = ConsistencyLevel.QUORUM
@@ -311,7 +320,7 @@ def counter_checker(tester, to_verify_queue, verification_done_queue):
     Intended to be run using multiprocessing.
     """
     # 'tester' is a cloned object so we shouldn't be inappropriately sharing anything with another process
-    session = tester.patient_cql_connection(tester.node1, keyspace="upgrade", protocol_version=1)
+    session = tester.patient_cql_connection(tester.node1, keyspace="upgrade", protocol_version=PROTOCOL_VERSION)
 
     prepared = session.prepare("SELECT c FROM countertable WHERE k1=?")
     prepared.consistency_level = ConsistencyLevel.QUORUM
@@ -628,7 +637,7 @@ class TestUpgradeThroughVersions(Tester):
         """
         Slightly different schema variant for testing rolling upgrades with quorum reads/writes.
         """
-        session = self.patient_cql_connection(self.node2, protocol_version=1)
+        session = self.patient_cql_connection(self.node2, protocol_version=PROTOCOL_VERSION)
 
         session.execute("CREATE KEYSPACE upgrade WITH replication = {'class':'SimpleStrategy', 'replication_factor':3};")
 
@@ -644,7 +653,7 @@ class TestUpgradeThroughVersions(Tester):
                 );""")
 
     def _create_schema(self):
-        session = self.patient_cql_connection(self.node2, protocol_version=1)
+        session = self.patient_cql_connection(self.node2, protocol_version=PROTOCOL_VERSION)
 
         session.execute("CREATE KEYSPACE upgrade WITH replication = {'class':'SimpleStrategy', 'replication_factor':2};")
 
@@ -661,7 +670,7 @@ class TestUpgradeThroughVersions(Tester):
                 );""")
 
     def _write_values(self, num=100):
-        session = self.patient_cql_connection(self.node2, protocol_version=1)
+        session = self.patient_cql_connection(self.node2, protocol_version=PROTOCOL_VERSION)
         session.execute("use upgrade")
         for i in xrange(num):
             x = len(self.row_values) + 1
@@ -670,7 +679,7 @@ class TestUpgradeThroughVersions(Tester):
 
     def _check_values(self, consistency_level=ConsistencyLevel.ALL):
         for node in self.cluster.nodelist():
-            session = self.patient_cql_connection(node, protocol_version=1)
+            session = self.patient_cql_connection(node, protocol_version=PROTOCOL_VERSION)
             session.execute("use upgrade")
             for x in self.row_values:
                 query = SimpleStatement("SELECT k,v FROM cf WHERE k=%d" % x, consistency_level=consistency_level)
@@ -771,7 +780,7 @@ class TestUpgradeThroughVersions(Tester):
 
     def _increment_counters(self, opcount=25000):
         debug("performing {opcount} counter increments".format(opcount=opcount))
-        session = self.patient_cql_connection(self.node2, protocol_version=1)
+        session = self.patient_cql_connection(self.node2, protocol_version=PROTOCOL_VERSION)
         session.execute("use upgrade;")
 
         update_counter_query = ("UPDATE countertable SET c = c + 1 WHERE k1='{key1}' and k2={key2}")
@@ -799,7 +808,7 @@ class TestUpgradeThroughVersions(Tester):
 
     def _check_counters(self):
         debug("Checking counter values...")
-        session = self.patient_cql_connection(self.node2, protocol_version=1)
+        session = self.patient_cql_connection(self.node2, protocol_version=PROTOCOL_VERSION)
         session.execute("use upgrade;")
 
         for key1 in self.expected_counts.keys():
@@ -820,7 +829,7 @@ class TestUpgradeThroughVersions(Tester):
 
     def _check_select_count(self, consistency_level=ConsistencyLevel.ALL):
         debug("Checking SELECT COUNT(*)")
-        session = self.patient_cql_connection(self.node2, protocol_version=1)
+        session = self.patient_cql_connection(self.node2, protocol_version=PROTOCOL_VERSION)
         session.execute("use upgrade;")
 
         expected_num_rows = len(self.row_values)
@@ -913,7 +922,7 @@ class PointToPointUpgradeBase(TestUpgradeThroughVersions):
         self.upgrade_scenario(populate=False, create_schema=False, after_upgrade_call=(self._bootstrap_new_node_multidc,))
 
     def _multidc_schema_create(self):
-        session = self.patient_cql_connection(self.cluster.nodelist()[0], protocol_version=1)
+        session = self.patient_cql_connection(self.cluster.nodelist()[0], protocol_version=PROTOCOL_VERSION)
 
         if self.cluster.version() >= '1.2':
             # DDL for C* 1.2+
