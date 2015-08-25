@@ -84,6 +84,128 @@ class TestCqlsh(Tester):
         self.assertIn("2143-04-19 11:21:01+0000", output)
         self.assertIn("1943-04-19 11:21:01+0000", output)
 
+    def verify_glass(self, node):
+        session = self.patient_cql_connection(node)
+
+        def verify_varcharmap(map_name, expected, encode_value=False):
+            rows = session.execute((u"SELECT %s FROM testks.varcharmaptable WHERE varcharkey= '᚛᚛ᚉᚑᚅᚔᚉᚉᚔᚋ ᚔᚈᚔ ᚍᚂᚐᚅᚑ ᚅᚔᚋᚌᚓᚅᚐ᚜';" % map_name).encode("utf-8"))
+            if encode_value:
+                got = {k.encode("utf-8"): v.encode("utf-8") for k, v in rows[0][0].iteritems()}
+            else:
+                got = {k.encode("utf-8"): v for k, v in rows[0][0].iteritems()}
+            self.assertEqual(got, expected)
+
+        verify_varcharmap('varcharasciimap', {
+            'Vitrum edere possum, mihi non nocet.': 'Hello',
+            ' ⠊⠀⠉⠁⠝⠀⠑⠁⠞⠀⠛⠇⠁⠎⠎⠀⠁⠝⠙⠀⠊⠞⠀⠙⠕⠑⠎⠝⠞⠀⠓⠥⠗⠞⠀⠍⠑': 'My',
+            'Можам да јадам стакло, а не ме штета.': 'Name',
+            'I can eat glass and it does not hurt me': 'Is'
+        })
+
+        verify_varcharmap('varcharbigintmap', {
+            'Vitrum edere possum, mihi non nocet.': 5100003,
+            ' ⠊⠀⠉⠁⠝⠀⠑⠁⠞⠀⠛⠇⠁⠎⠎⠀⠁⠝⠙⠀⠊⠞⠀⠙⠕⠑⠎⠝⠞⠀⠓⠥⠗⠞⠀⠍⠑': -45,
+            'Можам да јадам стакло, а не ме штета.': 12300,
+            'I can eat glass and it does not hurt me': 0
+        })
+
+        verify_varcharmap('varcharblobmap', {
+            'Vitrum edere possum, mihi non nocet.': binascii.a2b_hex("FEED103A"),
+            ' ⠊⠀⠉⠁⠝⠀⠑⠁⠞⠀⠛⠇⠁⠎⠎⠀⠁⠝⠙⠀⠊⠞⠀⠙⠕⠑⠎⠝⠞⠀⠓⠥⠗⠞⠀⠍⠑': binascii.a2b_hex("DEADBEEF"),
+            'Можам да јадам стакло, а не ме штета.': binascii.a2b_hex("BEEFBEEF"),
+            'I can eat glass and it does not hurt me': binascii.a2b_hex("FEEB")
+        })
+
+        verify_varcharmap('varcharbooleanmap', {
+            'Vitrum edere possum, mihi non nocet.': True,
+            ' ⠊⠀⠉⠁⠝⠀⠑⠁⠞⠀⠛⠇⠁⠎⠎⠀⠁⠝⠙⠀⠊⠞⠀⠙⠕⠑⠎⠝⠞⠀⠓⠥⠗⠞⠀⠍⠑': False,
+            'Можам да јадам стакло, а не ме штета.': False,
+            'I can eat glass and it does not hurt me': False
+        })
+
+        verify_varcharmap('varchardecimalmap', {
+            'Vitrum edere possum, mihi non nocet.': Decimal('50'),
+            ' ⠊⠀⠉⠁⠝⠀⠑⠁⠞⠀⠛⠇⠁⠎⠎⠀⠁⠝⠙⠀⠊⠞⠀⠙⠕⠑⠎⠝⠞⠀⠓⠥⠗⠞⠀⠍⠑': Decimal('-20.4'),
+            'Можам да јадам стакло, а не ме штета.': Decimal('11234234.3'),
+            'I can eat glass and it does not hurt me': Decimal('10.0')
+        })
+
+        verify_varcharmap('varchardoublemap', {
+            'Vitrum edere possum, mihi non nocet.': 4234243,
+            ' ⠊⠀⠉⠁⠝⠀⠑⠁⠞⠀⠛⠇⠁⠎⠎⠀⠁⠝⠙⠀⠊⠞⠀⠙⠕⠑⠎⠝⠞⠀⠓⠥⠗⠞⠀⠍⠑': -432.311,
+            'Можам да јадам стакло, а не ме штета.': 3.1415,
+            'I can eat glass and it does not hurt me': 20000.0
+        })
+
+        verify_varcharmap('varcharfloatmap', {
+            'Vitrum edere possum, mihi non nocet.': 10.0,
+            ' ⠊⠀⠉⠁⠝⠀⠑⠁⠞⠀⠛⠇⠁⠎⠎⠀⠁⠝⠙⠀⠊⠞⠀⠙⠕⠑⠎⠝⠞⠀⠓⠥⠗⠞⠀⠍⠑': -234.3000030517578,
+            'Можам да јадам стакло, а не ме штета.': -234234,
+            'I can eat glass and it does not hurt me': 1000.5
+        })
+
+        verify_varcharmap('varcharintmap', {
+            'Vitrum edere possum, mihi non nocet.': 1,
+            ' ⠊⠀⠉⠁⠝⠀⠑⠁⠞⠀⠛⠇⠁⠎⠎⠀⠁⠝⠙⠀⠊⠞⠀⠙⠕⠑⠎⠝⠞⠀⠓⠥⠗⠞⠀⠍⠑': 2,
+            'Можам да јадам стакло, а не ме штета.': -3,
+            'I can eat glass and it does not hurt me': -500
+        })
+
+        verify_varcharmap('varcharinetmap', {
+            'Vitrum edere possum, mihi non nocet.': '192.168.0.1',
+            ' ⠊⠀⠉⠁⠝⠀⠑⠁⠞⠀⠛⠇⠁⠎⠎⠀⠁⠝⠙⠀⠊⠞⠀⠙⠕⠑⠎⠝⠞⠀⠓⠥⠗⠞⠀⠍⠑': '127.0.0.1',
+            'Можам да јадам стакло, а не ме штета.': '8.8.8.8',
+            'I can eat glass and it does not hurt me': '8.8.4.4'
+        })
+
+        verify_varcharmap('varchartextmap', {
+            'Vitrum edere possum, mihi non nocet.': 'Once I went',
+            ' ⠊⠀⠉⠁⠝⠀⠑⠁⠞⠀⠛⠇⠁⠎⠎⠀⠁⠝⠙⠀⠊⠞⠀⠙⠕⠑⠎⠝⠞⠀⠓⠥⠗⠞⠀⠍⠑': 'On a trip',
+            'Можам да јадам стакло, а не ме штета.': 'Across',
+            'I can eat glass and it does not hurt me': 'The '
+        })
+
+        verify_varcharmap('varchartimestampmap', {
+            'Vitrum edere possum, mihi non nocet.': datetime.datetime(2013, 6, 19, 3, 21, 1),
+            ' ⠊⠀⠉⠁⠝⠀⠑⠁⠞⠀⠛⠇⠁⠎⠎⠀⠁⠝⠙⠀⠊⠞⠀⠙⠕⠑⠎⠝⠞⠀⠓⠥⠗⠞⠀⠍⠑': datetime.datetime(1985, 8, 3, 4, 21, 1),
+            'Можам да јадам стакло, а не ме штета.': datetime.datetime(2000, 1, 1, 0, 20, 1),
+            'I can eat glass and it does not hurt me': datetime.datetime(1942, 3, 11, 5, 21, 1)
+        })
+
+        verify_varcharmap('varcharuuidmap', {
+            'Vitrum edere possum, mihi non nocet.': UUID('7787064c-ce54-4324-abdd-05775b89ead7'),
+            ' ⠊⠀⠉⠁⠝⠀⠑⠁⠞⠀⠛⠇⠁⠎⠎⠀⠁⠝⠙⠀⠊⠞⠀⠙⠕⠑⠎⠝⠞⠀⠓⠥⠗⠞⠀⠍⠑': UUID('1df0b6ac-f3d3-456c-8b78-2bc70e585107'),
+            'Можам да јадам стакло, а не ме штета.': UUID('e2ed2164-31dc-42cb-8ee9-47376e071210'),
+            'I can eat glass and it does not hurt me': UUID('a487fe45-8af5-4454-ac66-2614286d7e89')
+        })
+
+        verify_varcharmap('varchartimeuuidmap', {
+            'Vitrum edere possum, mihi non nocet.': UUID('4a36c100-d8ec-11e2-a28f-0800200c9a66'),
+            ' ⠊⠀⠉⠁⠝⠀⠑⠁⠞⠀⠛⠇⠁⠎⠎⠀⠁⠝⠙⠀⠊⠞⠀⠙⠕⠑⠎⠝⠞⠀⠓⠥⠗⠞⠀⠍⠑': UUID('670c7f90-d8ec-11e2-a28f-0800200c9a66'),
+            'Можам да јадам стакло, а не ме штета.': UUID('750c2d70-d8ec-11e2-a28f-0800200c9a66'),
+            'I can eat glass and it does not hurt me': UUID('80d74810-d8ec-11e2-a28f-0800200c9a66')
+        })
+
+        verify_varcharmap('varcharvarcharmap', {
+            'Vitrum edere possum, mihi non nocet.': '᚛᚛ᚉᚑᚅᚔᚉᚉᚔᚋ ᚔᚈᚔ ᚍᚂᚐᚅᚑ ᚅᚔᚋᚌᚓᚅᚐ᚜',
+            ' ⠊⠀⠉⠁⠝⠀⠑⠁⠞⠀⠛⠇⠁⠎⠎⠀⠁⠝⠙⠀⠊⠞⠀⠙⠕⠑⠎⠝⠞⠀⠓⠥⠗⠞⠀⠍⠑': ' ⠊⠀⠉⠁⠝⠀⠑⠁⠞⠀⠛⠇⠁⠎⠎⠀⠁⠝⠙⠀⠊⠞⠀⠙⠕⠑⠎⠝⠞⠀⠓⠥⠗⠞⠀⠍⠑',
+            'Можам да јадам стакло, а не ме штета.': 'Можам да јадам стакло, а не ме штета.',
+            'I can eat glass and it does not hurt me': 'I can eat glass and it does not hurt me'
+        }, encode_value=True)
+
+        verify_varcharmap('varcharvarintmap', {
+            'Vitrum edere possum, mihi non nocet.': 1010010101020400204143243,
+            ' ⠊⠀⠉⠁⠝⠀⠑⠁⠞⠀⠛⠇⠁⠎⠎⠀⠁⠝⠙⠀⠊⠞⠀⠙⠕⠑⠎⠝⠞⠀⠓⠥⠗⠞⠀⠍⠑': -40,
+            'Можам да јадам стакло, а не ме штета.': 110230,
+            'I can eat glass and it does not hurt me': 1400
+        })
+
+        output, err = self.run_cqlsh(node, 'use testks; SELECT * FROM varcharmaptable', ['--encoding=utf-8'])
+
+        self.assertEquals(output.count('Можам да јадам стакло, а не ме штета.'), 16)
+        self.assertEquals(output.count(' ⠊⠀⠉⠁⠝⠀⠑⠁⠞⠀⠛⠇⠁⠎⠎⠀⠁⠝⠙⠀⠊⠞⠀⠙⠕⠑⠎⠝⠞⠀⠓⠥⠗⠞⠀⠍⠑'), 16)
+        self.assertEquals(output.count('᚛᚛ᚉᚑᚅᚔᚉᚉᚔᚋ ᚔᚈᚔ ᚍᚂᚐᚅᚑ ᚅᚔᚋᚌᚓᚅᚐ᚜'), 2)
+
     def test_eat_glass(self):
 
         self.cluster.populate(1)
@@ -204,126 +326,19 @@ UPDATE varcharmaptable SET varcharvarintmap = varcharvarintmap + {'Vitrum edere 
 UPDATE varcharmaptable SET varcharvarintmap['Vitrum edere possum, mihi non nocet.'] = 1010010101020400204143243 WHERE varcharkey= '᚛᚛ᚉᚑᚅᚔᚉᚉᚔᚋ ᚔᚈᚔ ᚍᚂᚐᚅᚑ ᚅᚔᚋᚌᚓᚅᚐ᚜'
         """.encode("utf-8"))
 
-        session = self.patient_cql_connection(node1)
+        self.verify_glass(node1)
 
-        def verify_varcharmap(map_name, expected, encode_value=False):
-            rows = session.execute((u"SELECT %s FROM testks.varcharmaptable WHERE varcharkey= '᚛᚛ᚉᚑᚅᚔᚉᚉᚔᚋ ᚔᚈᚔ ᚍᚂᚐᚅᚑ ᚅᚔᚋᚌᚓᚅᚐ᚜';" % map_name).encode("utf-8"))
-            if encode_value:
-                got = {k.encode("utf-8"): v.encode("utf-8") for k, v in rows[0][0].iteritems()}
-            else:
-                got = {k.encode("utf-8"): v for k, v in rows[0][0].iteritems()}
-            self.assertEqual(got, expected)
+    @since('2.1')
+    def test_source_glass(self):
 
-        verify_varcharmap('varcharasciimap', {
-            'Vitrum edere possum, mihi non nocet.': 'Hello',
-            ' ⠊⠀⠉⠁⠝⠀⠑⠁⠞⠀⠛⠇⠁⠎⠎⠀⠁⠝⠙⠀⠊⠞⠀⠙⠕⠑⠎⠝⠞⠀⠓⠥⠗⠞⠀⠍⠑': 'My',
-            'Можам да јадам стакло, а не ме штета.': 'Name',
-            'I can eat glass and it does not hurt me': 'Is'
-        })
+        self.cluster.populate(1)
+        self.cluster.start(wait_for_binary_proto=True)
 
-        verify_varcharmap('varcharbigintmap', {
-            'Vitrum edere possum, mihi non nocet.': 5100003,
-            ' ⠊⠀⠉⠁⠝⠀⠑⠁⠞⠀⠛⠇⠁⠎⠎⠀⠁⠝⠙⠀⠊⠞⠀⠙⠕⠑⠎⠝⠞⠀⠓⠥⠗⠞⠀⠍⠑': -45,
-            'Можам да јадам стакло, а не ме штета.': 12300,
-            'I can eat glass and it does not hurt me': 0
-        })
+        node1, = self.cluster.nodelist()
 
-        verify_varcharmap('varcharblobmap', {
-            'Vitrum edere possum, mihi non nocet.': binascii.a2b_hex("FEED103A"),
-            ' ⠊⠀⠉⠁⠝⠀⠑⠁⠞⠀⠛⠇⠁⠎⠎⠀⠁⠝⠙⠀⠊⠞⠀⠙⠕⠑⠎⠝⠞⠀⠓⠥⠗⠞⠀⠍⠑': binascii.a2b_hex("DEADBEEF"),
-            'Можам да јадам стакло, а не ме штета.': binascii.a2b_hex("BEEFBEEF"),
-            'I can eat glass and it does not hurt me': binascii.a2b_hex("FEEB")
-        })
+        node1.run_cqlsh(cmds="SOURCE 'cqlsh_tests/glass.cql'")
 
-        verify_varcharmap('varcharbooleanmap', {
-            'Vitrum edere possum, mihi non nocet.': True,
-            ' ⠊⠀⠉⠁⠝⠀⠑⠁⠞⠀⠛⠇⠁⠎⠎⠀⠁⠝⠙⠀⠊⠞⠀⠙⠕⠑⠎⠝⠞⠀⠓⠥⠗⠞⠀⠍⠑': False,
-            'Можам да јадам стакло, а не ме штета.': False,
-            'I can eat glass and it does not hurt me': False
-        })
-
-        verify_varcharmap('varchardecimalmap', {
-            'Vitrum edere possum, mihi non nocet.': Decimal('50'),
-            ' ⠊⠀⠉⠁⠝⠀⠑⠁⠞⠀⠛⠇⠁⠎⠎⠀⠁⠝⠙⠀⠊⠞⠀⠙⠕⠑⠎⠝⠞⠀⠓⠥⠗⠞⠀⠍⠑': Decimal('-20.4'),
-            'Можам да јадам стакло, а не ме штета.': Decimal('11234234.3'),
-            'I can eat glass and it does not hurt me': Decimal('10.0')
-        })
-
-        verify_varcharmap('varchardoublemap', {
-            'Vitrum edere possum, mihi non nocet.': 4234243,
-            ' ⠊⠀⠉⠁⠝⠀⠑⠁⠞⠀⠛⠇⠁⠎⠎⠀⠁⠝⠙⠀⠊⠞⠀⠙⠕⠑⠎⠝⠞⠀⠓⠥⠗⠞⠀⠍⠑': -432.311,
-            'Можам да јадам стакло, а не ме штета.': 3.1415,
-            'I can eat glass and it does not hurt me': 20000.0
-        })
-
-        verify_varcharmap('varcharfloatmap', {
-            'Vitrum edere possum, mihi non nocet.': 10.0,
-            ' ⠊⠀⠉⠁⠝⠀⠑⠁⠞⠀⠛⠇⠁⠎⠎⠀⠁⠝⠙⠀⠊⠞⠀⠙⠕⠑⠎⠝⠞⠀⠓⠥⠗⠞⠀⠍⠑': -234.3000030517578,
-            'Можам да јадам стакло, а не ме штета.': -234234,
-            'I can eat glass and it does not hurt me': 1000.5
-        })
-
-        verify_varcharmap('varcharintmap', {
-            'Vitrum edere possum, mihi non nocet.': 1,
-            ' ⠊⠀⠉⠁⠝⠀⠑⠁⠞⠀⠛⠇⠁⠎⠎⠀⠁⠝⠙⠀⠊⠞⠀⠙⠕⠑⠎⠝⠞⠀⠓⠥⠗⠞⠀⠍⠑': 2,
-            'Можам да јадам стакло, а не ме штета.': -3,
-            'I can eat glass and it does not hurt me': -500
-        })
-
-        verify_varcharmap('varcharinetmap', {
-            'Vitrum edere possum, mihi non nocet.': '192.168.0.1',
-            ' ⠊⠀⠉⠁⠝⠀⠑⠁⠞⠀⠛⠇⠁⠎⠎⠀⠁⠝⠙⠀⠊⠞⠀⠙⠕⠑⠎⠝⠞⠀⠓⠥⠗⠞⠀⠍⠑': '127.0.0.1',
-            'Можам да јадам стакло, а не ме штета.': '8.8.8.8',
-            'I can eat glass and it does not hurt me': '8.8.4.4'
-        })
-
-        verify_varcharmap('varchartextmap', {
-            'Vitrum edere possum, mihi non nocet.': 'Once I went',
-            ' ⠊⠀⠉⠁⠝⠀⠑⠁⠞⠀⠛⠇⠁⠎⠎⠀⠁⠝⠙⠀⠊⠞⠀⠙⠕⠑⠎⠝⠞⠀⠓⠥⠗⠞⠀⠍⠑': 'On a trip',
-            'Можам да јадам стакло, а не ме штета.': 'Across',
-            'I can eat glass and it does not hurt me': 'The '
-        })
-
-        verify_varcharmap('varchartimestampmap', {
-            'Vitrum edere possum, mihi non nocet.': datetime.datetime(2013, 6, 19, 3, 21, 1),
-            ' ⠊⠀⠉⠁⠝⠀⠑⠁⠞⠀⠛⠇⠁⠎⠎⠀⠁⠝⠙⠀⠊⠞⠀⠙⠕⠑⠎⠝⠞⠀⠓⠥⠗⠞⠀⠍⠑': datetime.datetime(1985, 8, 3, 4, 21, 1),
-            'Можам да јадам стакло, а не ме штета.': datetime.datetime(2000, 1, 1, 0, 20, 1),
-            'I can eat glass and it does not hurt me': datetime.datetime(1942, 3, 11, 5, 21, 1)
-        })
-
-        verify_varcharmap('varcharuuidmap', {
-            'Vitrum edere possum, mihi non nocet.': UUID('7787064c-ce54-4324-abdd-05775b89ead7'),
-            ' ⠊⠀⠉⠁⠝⠀⠑⠁⠞⠀⠛⠇⠁⠎⠎⠀⠁⠝⠙⠀⠊⠞⠀⠙⠕⠑⠎⠝⠞⠀⠓⠥⠗⠞⠀⠍⠑': UUID('1df0b6ac-f3d3-456c-8b78-2bc70e585107'),
-            'Можам да јадам стакло, а не ме штета.': UUID('e2ed2164-31dc-42cb-8ee9-47376e071210'),
-            'I can eat glass and it does not hurt me': UUID('a487fe45-8af5-4454-ac66-2614286d7e89')
-        })
-
-        verify_varcharmap('varchartimeuuidmap', {
-            'Vitrum edere possum, mihi non nocet.': UUID('4a36c100-d8ec-11e2-a28f-0800200c9a66'),
-            ' ⠊⠀⠉⠁⠝⠀⠑⠁⠞⠀⠛⠇⠁⠎⠎⠀⠁⠝⠙⠀⠊⠞⠀⠙⠕⠑⠎⠝⠞⠀⠓⠥⠗⠞⠀⠍⠑': UUID('670c7f90-d8ec-11e2-a28f-0800200c9a66'),
-            'Можам да јадам стакло, а не ме штета.': UUID('750c2d70-d8ec-11e2-a28f-0800200c9a66'),
-            'I can eat glass and it does not hurt me': UUID('80d74810-d8ec-11e2-a28f-0800200c9a66')
-        })
-
-        verify_varcharmap('varcharvarcharmap', {
-            'Vitrum edere possum, mihi non nocet.': '᚛᚛ᚉᚑᚅᚔᚉᚉᚔᚋ ᚔᚈᚔ ᚍᚂᚐᚅᚑ ᚅᚔᚋᚌᚓᚅᚐ᚜',
-            ' ⠊⠀⠉⠁⠝⠀⠑⠁⠞⠀⠛⠇⠁⠎⠎⠀⠁⠝⠙⠀⠊⠞⠀⠙⠕⠑⠎⠝⠞⠀⠓⠥⠗⠞⠀⠍⠑': ' ⠊⠀⠉⠁⠝⠀⠑⠁⠞⠀⠛⠇⠁⠎⠎⠀⠁⠝⠙⠀⠊⠞⠀⠙⠕⠑⠎⠝⠞⠀⠓⠥⠗⠞⠀⠍⠑',
-            'Можам да јадам стакло, а не ме штета.': 'Можам да јадам стакло, а не ме штета.',
-            'I can eat glass and it does not hurt me': 'I can eat glass and it does not hurt me'
-        }, encode_value=True)
-
-        verify_varcharmap('varcharvarintmap', {
-            'Vitrum edere possum, mihi non nocet.': 1010010101020400204143243,
-            ' ⠊⠀⠉⠁⠝⠀⠑⠁⠞⠀⠛⠇⠁⠎⠎⠀⠁⠝⠙⠀⠊⠞⠀⠙⠕⠑⠎⠝⠞⠀⠓⠥⠗⠞⠀⠍⠑': -40,
-            'Можам да јадам стакло, а не ме штета.': 110230,
-            'I can eat glass and it does not hurt me': 1400
-        })
-
-        output, err = self.run_cqlsh(node1, 'use testks; SELECT * FROM varcharmaptable', ['--encoding=utf-8'])
-
-        self.assertEquals(output.count('Можам да јадам стакло, а не ме штета.'), 16)
-        self.assertEquals(output.count(' ⠊⠀⠉⠁⠝⠀⠑⠁⠞⠀⠛⠇⠁⠎⠎⠀⠁⠝⠙⠀⠊⠞⠀⠙⠕⠑⠎⠝⠞⠀⠓⠥⠗⠞⠀⠍⠑'), 16)
-        self.assertEquals(output.count('᚛᚛ᚉᚑᚅᚔᚉᚉᚔᚋ ᚔᚈᚔ ᚍᚂᚐᚅᚑ ᚅᚔᚋᚌᚓᚅᚐ᚜'), 2)
+        self.verify_glass(node1)
 
     def test_with_empty_values(self):
         """
