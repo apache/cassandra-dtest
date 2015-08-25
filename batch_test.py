@@ -2,7 +2,7 @@ import time
 
 from assertions import assert_invalid, assert_unavailable
 from dtest import Tester
-from cassandra import ConsistencyLevel, Timeout
+from cassandra import ConsistencyLevel, Timeout, Unavailable
 from cassandra.query import SimpleStatement
 
 class TestBatch(Tester):
@@ -190,6 +190,11 @@ class TestBatch(Tester):
                 msg = "Expecting received_responses to be %s, got: %s" % (
                         received_responses, e.received_responses,)
                 assert e.received_responses == received_responses, msg
+        except Unavailable as e:
+            if not received_responses is None:
+                msg = "Expecting alive_replicas to be %s, got: %s" % (
+                        received_responses, e.alive_replicas,)
+                assert received_responses == e.alive_replicas, msg
         except Exception as e:
             assert False, "Expecting TimedOutException, got:" + str(e)
         else:
