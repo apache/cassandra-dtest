@@ -17,7 +17,7 @@ from assertions import assert_all, assert_none
 from ccmlib import common
 from cqlsh_tools import monkeypatch_driver, unmonkeypatch_driver
 from dtest import Tester, debug
-from tools import create_c1c2_table, insert_c1c2, rows_to_list, since
+from tools import create_c1c2_table, insert_c1c2, require, rows_to_list, since
 
 
 class TestCqlsh(Tester):
@@ -631,6 +631,24 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         stdout, _ = self.run_cqlsh(node, describe_cmd)
         self.assertIn("'min_threshold': '10'", stdout)
         self.assertIn("'max_threshold': '100'", stdout)
+
+    @since('2.1')
+    @require("9232")
+    def test_describe_on_non_reserved_keywords(self):
+        """
+        @jira_ticket CASSANDRA-9232
+        Test that we can describe tables whose name is a non-reserved CQL keyword
+        """
+        self.cluster.populate(1)
+        self.cluster.start(wait_for_binary_proto=True)
+        node, = self.cluster.nodelist()
+        session = self.patient_cql_connection(node)
+        self.create_ks(session, 'ks', 1)
+        session.execute("CREATE TABLE map (key int PRIMARY KEY, val text)")
+        describe_cmd = 'USE ks; DESCRIBE map'
+        out, err = self.run_cqlsh(node, describe_cmd)
+        self.assertEqual("", err)
+        self.assertIn("CREATE TABLE ks.map (", out)
 
     def get_keyspace_output(self):
         return ("CREATE KEYSPACE test WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}  AND durable_writes = true;" +
