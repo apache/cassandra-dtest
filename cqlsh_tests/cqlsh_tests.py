@@ -17,7 +17,7 @@ from assertions import assert_all, assert_none
 from ccmlib import common
 from cqlsh_tools import monkeypatch_driver, unmonkeypatch_driver
 from dtest import Tester, debug
-from tools import create_c1c2_table, insert_c1c2, require, rows_to_list, since
+from tools import create_c1c2_table, insert_c1c2, rows_to_list, since
 
 
 class TestCqlsh(Tester):
@@ -83,7 +83,6 @@ class TestCqlsh(Tester):
 
         self.assertIn("2143-04-19 11:21:01+0000", output)
         self.assertIn("1943-04-19 11:21:01+0000", output)
-
 
     def test_eat_glass(self):
 
@@ -633,7 +632,6 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         self.assertIn("'max_threshold': '100'", stdout)
 
     @since('2.1')
-    @require("9232")
     def test_describe_on_non_reserved_keywords(self):
         """
         @jira_ticket CASSANDRA-9232
