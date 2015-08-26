@@ -546,7 +546,7 @@ class TestMaterializedViews(Tester):
     def interrupt_build_process_test(self):
         """Test that an interupted MV build process is resumed as it should"""
 
-        session = self.prepare()
+        session = self.prepare(options={'hinted_handoff_enabled': False})
         node1, node2, node3 = self.cluster.nodelist()
 
         session.execute("CREATE TABLE t (id int PRIMARY KEY, v int, v2 text, v3 decimal)")
@@ -604,7 +604,7 @@ class TestMaterializedViews(Tester):
         Test that a materialized view are consistent after a simple repair.
         """
 
-        session = self.prepare(rf=3)
+        session = self.prepare(rf=3, options={'hinted_handoff_enabled': False})
         node1, node2, node3 = self.cluster.nodelist()
 
         session.execute("CREATE TABLE t (id int PRIMARY KEY, v int, v2 text, v3 decimal)")
