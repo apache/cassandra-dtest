@@ -26,9 +26,9 @@ class TestMaterializedViews(Tester):
     @since 3.0
     """
 
-    def prepare(self, user_table=False, rf=1, options={}):
+    def prepare(self, user_table=False, rf=1, options={}, nodes=3):
         cluster = self.cluster
-        cluster.populate([3, 0])
+        cluster.populate([nodes, 0])
         if options:
             cluster.set_configuration_options(values=options)
         cluster.start()
@@ -724,50 +724,41 @@ class TestMaterializedViews(Tester):
         Test that a materialized view are consistent after a more complex repair.
         """
 
-        session = self.prepare(rf=3, options={'hinted_handoff_enabled': False})
-        node1, node2, node3 = self.cluster.nodelist()
+        session = self.prepare(rf=5, options={'hinted_handoff_enabled': False}, nodes=5)
+        node1, node2, node3, node4, node5 = self.cluster.nodelist()
 
-        # batchlog requires 2 nodes, so we need to create another dc and set replica 0
-        debug("Bootstrapping new node in another dc")
-        node4 = new_node(self.cluster, data_center='dc2')
-        node4.start(wait_other_notice=True, wait_for_binary_proto=True)
-
-        debug("Creating a new keyspace with NTS")
-        session.execute(
-            ("CREATE KEYSPACE IF NOT EXISTS ks2 WITH replication = "
-             "{'class': 'NetworkTopologyStrategy', 'dc1': 3, 'dc2': 0}")
-        )
-        session.execute("CREATE TABLE ks2.t (id int PRIMARY KEY, v int, v2 text, v3 decimal)")
-        session.execute(("CREATE MATERIALIZED VIEW ks2.t_by_v AS SELECT * FROM t "
+        # we create the base table with gc_grace_seconds=1 so batchlog will expire after 1 second
+        session.execute("CREATE TABLE ks.t (id int PRIMARY KEY, v int, v2 text, v3 decimal)"
+                        "WITH gc_grace_seconds = 1")
+        session.execute(("CREATE MATERIALIZED VIEW ks.t_by_v AS SELECT * FROM t "
                          "WHERE v IS NOT NULL AND id IS NOT NULL PRIMARY KEY (v, id)"))
 
         session.cluster.control_connection.wait_for_schema_agreement()
 
-        debug('Shutdown node2')
-        node2.stop(wait_other_notice=True)
-        debug('Shutdown node3')
+        debug('Shutdown node2 and node3')
+        node2.stop()
         node3.stop(wait_other_notice=True)
 
-        debug('Write initial data')
+        debug('Write initial data to node1 (will be replicated to node4 and node5)')
         for i in xrange(1000):
-            session.execute("INSERT INTO ks2.t (id, v, v2, v3) VALUES ({v}, {v}, 'a', 3.0)".format(v=i))
-
-        debug('Replay all batchlogs')
-        self._replay_batchlogs()
+            session.execute("INSERT INTO ks.t (id, v, v2, v3) VALUES ({v}, {v}, 'a', 3.0)".format(v=i))
 
         debug('Verify the data in the MV on node1 with CL=ONE')
         for i in xrange(1000):
             assert_one(
                 session,
-                "SELECT * FROM ks2.t_by_v WHERE v = {}".format(i),
+                "SELECT * FROM ks.t_by_v WHERE v = {}".format(i),
                 [i, i, 'a', 3.0]
             )
 
-        debug('Shutdown node1 and node4')
-        node1.stop(wait_other_notice=True)
-        node4.stop(wait_other_notice=True)
-        debug('Starting node2')
-        node2.start(wait_other_notice=True, wait_for_binary_proto=True)
+        debug('Shutdown node1, node4 and node5')
+        node1.stop()
+        node4.stop()
+        node5.stop()
+
+        debug('Start nodes 2 and 3')
+        node2.start()
+        node3.start(wait_other_notice=True, wait_for_binary_proto=True)
 
         session2 = self.patient_cql_connection(node2)
 
@@ -775,61 +766,53 @@ class TestMaterializedViews(Tester):
         for i in xrange(1000):
             assert_none(
                 session2,
-                "SELECT * FROM ks2.t_by_v WHERE v = {}".format(i)
+                "SELECT * FROM ks.t_by_v WHERE v = {}".format(i)
             )
 
-        debug('Starting node4')
-        node4.start(wait_other_notice=True, wait_for_binary_proto=True)
-
-        debug('Write new data in node2 that overlap those in node1')
+        debug('Write new data in node2 and node3 that overlap those in node1, node4 and node5')
         for i in xrange(1000):
             # we write i*2 as value, instead of i
-            session2.execute("INSERT INTO ks2.t (id, v, v2, v3) VALUES ({v}, {v}, 'a', 3.0)".format(v=i*2))
-
-        debug('Replay all batchlogs')
-        self._replay_batchlogs()
+            session2.execute("INSERT INTO ks.t (id, v, v2, v3) VALUES ({v}, {v}, 'a', 3.0)".format(v=i*2))
 
         debug('Verify the new data in the MV on node2 with CL=ONE')
         for i in xrange(1000):
             v = i*2
             assert_one(
                 session2,
-                "SELECT * FROM ks2.t_by_v WHERE v = {}".format(v),
+                "SELECT * FROM ks.t_by_v WHERE v = {}".format(v),
                 [v, v, 'a', 3.0]
             )
 
-        debug('Shutdown node2')
-        node2.stop(wait_other_notice=True)
-        debug('Starting node1 and node3')
+        debug('Wait for batchlogs to expire from node2 and node3')
+        time.sleep(1)
+
+        debug('Start remaining nodes')
         node1.start(wait_other_notice=True, wait_for_binary_proto=True)
+        node4.start(wait_other_notice=True, wait_for_binary_proto=True)
+        node5.start(wait_other_notice=True, wait_for_binary_proto=True)
 
         session = self.patient_cql_connection(node1)
 
-        debug('Verify that node1 still have the old data')
+        debug('Read data from MV at QUORUM (old data should be returned)')
         for i in xrange(1000):
             assert_one(
                 session,
-                "SELECT * FROM ks2.t_by_v WHERE v = {}".format(i),
-                [i, i, 'a', 3.0]
+                "SELECT * FROM ks.t_by_v WHERE v = {}".format(i),
+                [i, i, 'a', 3.0],
+                cl=ConsistencyLevel.QUORUM
             )
 
-        debug('Starting node2 and node3')
-        node2.start(wait_other_notice=True, wait_for_binary_proto=True)
-        node3.start(wait_other_notice=True, wait_for_binary_proto=True)
-
-        debug('Repair all nodes')
+        debug('Run global repair on node1')
         node1.repair()
-        node2.repair()
-        node3.repair()
 
-        debug('Verify that all data are repaired properly.')
+        debug('Read data from MV at quorum (new data should be returned after repair)')
         for i in xrange(1000):
             v = i*2
             assert_one(
                 session,
-                "SELECT * FROM ks2.t_by_v WHERE v = {}".format(v),
+                "SELECT * FROM ks.t_by_v WHERE v = {}".format(v),
                 [v, v, 'a', 3.0],
-                cl=ConsistencyLevel.ALL
+                cl=ConsistencyLevel.QUORUM
             )
 
     def really_complex_repair_test(self):
@@ -837,86 +820,85 @@ class TestMaterializedViews(Tester):
         Test that a materialized view are consistent after a more complex repair.
         """
 
-        session = self.prepare(rf=3, options={'hinted_handoff_enabled': False})
-        node1, node2, node3 = self.cluster.nodelist()
+        session = self.prepare(rf=5, options={'hinted_handoff_enabled': False}, nodes=5)
+        node1, node2, node3, node4, node5 = self.cluster.nodelist()
 
-        # batchlog requires 2 nodes, so we need to create another dc and set replica 0
-        debug("Bootstrapping new node in another dc")
-        node4 = new_node(self.cluster, data_center='dc2')
-        node4.start(wait_other_notice=True, wait_for_binary_proto=True)
-        debug("Creating a new keyspace with NTS")
-        session.execute(
-            ("CREATE KEYSPACE IF NOT EXISTS ks2 WITH replication = "
-             "{'class': 'NetworkTopologyStrategy', 'dc1': 3, 'dc2': 0}")
-        )
-
-        session.execute("CREATE TABLE ks2.t (id int, v int, v2 text, v3 decimal, PRIMARY KEY(id, v, v2))")
-        session.execute(("CREATE MATERIALIZED VIEW ks2.t_by_v AS SELECT * FROM t "
+        # we create the base table with gc_grace_seconds=1 so batchlog will expire after 1 second
+        session.execute("CREATE TABLE ks.t (id int, v int, v2 text, v3 decimal, PRIMARY KEY(id, v, v2))"
+                        "WITH gc_grace_seconds = 1")
+        session.execute(("CREATE MATERIALIZED VIEW ks.t_by_v AS SELECT * FROM t "
                          "WHERE v IS NOT NULL AND id IS NOT NULL AND v IS NOT NULL AND "
                          "v2 IS NOT NULL PRIMARY KEY (v2, v, id)"))
 
         session.cluster.control_connection.wait_for_schema_agreement()
 
-        debug('Shutdown node2')
+        debug('Shutdown node2 and node3')
         node2.stop(wait_other_notice=True)
-        debug('Shutdown node3')
         node3.stop(wait_other_notice=True)
 
-        session.execute("INSERT INTO ks2.t (id, v, v2, v3) VALUES (1, 1, 'a', 3.0)")
-        session.execute("INSERT INTO ks2.t (id, v, v2, v3) VALUES (2, 2, 'a', 3.0)")
+        session.execute("INSERT INTO ks.t (id, v, v2, v3) VALUES (1, 1, 'a', 3.0)")
+        session.execute("INSERT INTO ks.t (id, v, v2, v3) VALUES (2, 2, 'a', 3.0)")
         debug('Verify the data in the MV on node1 with CL=ONE')
-        assert_all(session, "SELECT * FROM ks2.t_by_v WHERE v2 = 'a'", [['a', 1, 1, 3.0], ['a', 2, 2, 3.0]])
+        assert_all(session, "SELECT * FROM ks.t_by_v WHERE v2 = 'a'", [['a', 1, 1, 3.0], ['a', 2, 2, 3.0]])
 
-        session.execute("INSERT INTO ks2.t (id, v, v2, v3) VALUES (1, 1, 'b', 3.0)")
-        session.execute("INSERT INTO ks2.t (id, v, v2, v3) VALUES (2, 2, 'b', 3.0)")
+        session.execute("INSERT INTO ks.t (id, v, v2, v3) VALUES (1, 1, 'b', 3.0)")
+        session.execute("INSERT INTO ks.t (id, v, v2, v3) VALUES (2, 2, 'b', 3.0)")
         debug('Verify the data in the MV on node1 with CL=ONE')
-        assert_all(session, "SELECT * FROM ks2.t_by_v WHERE v2 = 'b'", [['b', 1, 1, 3.0], ['b', 2, 2, 3.0]])
+        assert_all(session, "SELECT * FROM ks.t_by_v WHERE v2 = 'b'", [['b', 1, 1, 3.0], ['b', 2, 2, 3.0]])
 
         session.shutdown()
 
-        debug('Shutdown node1')
-        node1.stop(wait_other_notice=True)
-        debug('Starting node2')
-        node2.start(wait_other_notice=True, wait_for_binary_proto=True)
+        debug('Shutdown node1, node4 and node5')
+        node1.stop()
+        node4.stop()
+        node5.stop()
 
-        session2 = self.patient_cql_connection(node4)
+        debug('Start nodes 2 and 3')
+        node2.start()
+        node3.start(wait_other_notice=True, wait_for_binary_proto=True)
+
+        session2 = self.patient_cql_connection(node2)
         session2.execute('USE ks')
 
         debug('Verify the data in the MV on node2 with CL=ONE. No rows should be found.')
-        assert_none(session2, "SELECT * FROM ks2.t_by_v WHERE v2 = 'a'")
+        assert_none(session2, "SELECT * FROM ks.t_by_v WHERE v2 = 'a'")
 
         debug('Write new data in node2 that overlap those in node1')
-        session2.execute("INSERT INTO ks2.t (id, v, v2, v3) VALUES (1, 1, 'c', 3.0)")
-        session2.execute("INSERT INTO ks2.t (id, v, v2, v3) VALUES (2, 2, 'c', 3.0)")
-        assert_all(session2, "SELECT * FROM ks2.t_by_v WHERE v2 = 'c'", [['c', 1, 1, 3.0], ['c', 2, 2, 3.0]])
+        session2.execute("INSERT INTO ks.t (id, v, v2, v3) VALUES (1, 1, 'c', 3.0)")
+        session2.execute("INSERT INTO ks.t (id, v, v2, v3) VALUES (2, 2, 'c', 3.0)")
+        assert_all(session2, "SELECT * FROM ks.t_by_v WHERE v2 = 'c'", [['c', 1, 1, 3.0], ['c', 2, 2, 3.0]])
 
-        session2.execute("INSERT INTO ks2.t (id, v, v2, v3) VALUES (1, 1, 'd', 3.0)")
-        session2.execute("INSERT INTO ks2.t (id, v, v2, v3) VALUES (2, 2, 'd', 3.0)")
-        assert_all(session2, "SELECT * FROM ks2.t_by_v WHERE v2 = 'd'", [['d', 1, 1, 3.0], ['d', 2, 2, 3.0]])
+        session2.execute("INSERT INTO ks.t (id, v, v2, v3) VALUES (1, 1, 'd', 3.0)")
+        session2.execute("INSERT INTO ks.t (id, v, v2, v3) VALUES (2, 2, 'd', 3.0)")
+        assert_all(session2, "SELECT * FROM ks.t_by_v WHERE v2 = 'd'", [['d', 1, 1, 3.0], ['d', 2, 2, 3.0]])
 
         debug("Composite delete of everything")
-        session2.execute("DELETE FROM ks2.t WHERE id = 1 and v = 1")
-        session2.execute("DELETE FROM ks2.t WHERE id = 2 and v = 2")
+        session2.execute("DELETE FROM ks.t WHERE id = 1 and v = 1")
+        session2.execute("DELETE FROM ks.t WHERE id = 2 and v = 2")
 
-        assert_none(session2, "SELECT * FROM ks2.t_by_v WHERE v2 = 'c'")
-        assert_none(session2, "SELECT * FROM ks2.t_by_v WHERE v2 = 'd'")
+        assert_none(session2, "SELECT * FROM ks.t_by_v WHERE v2 = 'c'")
+        assert_none(session2, "SELECT * FROM ks.t_by_v WHERE v2 = 'd'")
 
-        debug('Starting node1 & node3')
+        debug('Wait for batchlogs to expire from node2 and node3')
+        time.sleep(1)
+
+        debug('Start remaining nodes')
         node1.start(wait_other_notice=True, wait_for_binary_proto=True)
-        node3.start(wait_other_notice=True, wait_for_binary_proto=True)
+        node4.start(wait_other_notice=True, wait_for_binary_proto=True)
+        node5.start(wait_other_notice=True, wait_for_binary_proto=True)
 
         # at this point the data isn't repaired so we have an inconsistency.
-        # this value should return 0
+        # this value should return None
         assert_all(
             session2,
-            "SELECT * FROM ks2.t_by_v WHERE v2 = 'a'", [['a', 1, 1, 3.0], ['a', 2, 2, 3.0]],
-            cl=ConsistencyLevel.ALL
+            "SELECT * FROM ks.t_by_v WHERE v2 = 'a'", [['a', 1, 1, 3.0], ['a', 2, 2, 3.0]],
+            cl=ConsistencyLevel.QUORUM
         )
 
-        debug("Repair nodes")
+        debug('Run global repair on node1')
         node1.repair()
 
-        assert_none(session2, "SELECT * FROM ks2.t_by_v WHERE v2 = 'a'", cl=ConsistencyLevel.ALL)
+        assert_none(session2, "SELECT * FROM ks.t_by_v WHERE v2 = 'a'", cl=ConsistencyLevel.QUORUM)
 
 
 # For read verification
