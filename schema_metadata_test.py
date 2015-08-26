@@ -28,15 +28,18 @@ def verify_indexes_table(created_on_version, current_version, keyspace, session,
     table_name = _table_name_builder(table_name_prefix, "test_indexes")
     index_name = _table_name_builder("idx_" + table_name_prefix, table_name)
     meta = session.cluster.metadata.keyspaces[keyspace].indexes[index_name]
-    assert_equal('d', meta.column.name)
-    assert_equal(table_name, meta.column.table.name)
+    assert_equal(1, len(meta.columns))
+    column = next(iter(meta.columns))
+    assert_equal('d', column.name)
+    assert_equal(table_name, column.table.name)
 
     meta = session.cluster.metadata.keyspaces[keyspace].tables[table_name]
     assert_equal(1, len(meta.clustering_key))
     assert_equal('c', meta.clustering_key[0].name)
 
     assert_equal(1, len(meta.indexes))
-    assert_equal('d', meta.indexes[index_name].column.name)
+    assert_equal(1, len(meta.indexes[index_name].columns))
+    assert_equal('d', next(iter(meta.indexes[index_name].columns)).name)
     assert_equal(3, len(meta.primary_key))
     assert_equal('a', meta.primary_key[0].name)
     assert_equal('b', meta.primary_key[1].name)
@@ -530,7 +533,8 @@ class TestSchemaMetadata(Tester):
         self.assertEqual(1, len(self._keyspace_meta().indexes))
         ix_meta = self._keyspace_meta().indexes['ix_born_to_die_name']
         self.assertEqual('COMPOSITES', ix_meta.index_type)
-        self.assertEqual('name', ix_meta.column.name)
+        self.assertEqual(1, len(ix_meta.columns))
+        self.assertEqual('name', next(iter(ix_meta.columns)).name)
         self.assertEqual('ix_born_to_die_name', ix_meta.name)
         if self.cluster.version() < '2.0':
             self.assertEqual({'prefix_size': '0'}, ix_meta.index_options)
