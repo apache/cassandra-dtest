@@ -3,7 +3,7 @@ import os
 import pprint
 import re
 import time
-from random import randrange
+from random import randrange, shuffle
 from threading import Thread
 
 from ccmlib.node import Node
@@ -239,7 +239,6 @@ class TestConcurrentSchemaChanges(Tester):
         wait(45)
         debug("querying all values by secondary index")
         for n in range(0, 5):
-            debug("checking table: base_{0}".format(n))
             for ins in range(0, 1000):
                 self.assertEqual(1, len(session.execute("select * from base_{0} where c1 = {1}".format(n, ins))))
                 self.assertEqual(1, len(session.execute("select * from base_{0} where c2 = {1}".format(n, ins))))
@@ -276,8 +275,77 @@ class TestConcurrentSchemaChanges(Tester):
 
         for n in range(1, 11):
             result = session.execute("select * from src_by_c{0}".format(n))
-            debug("checking src_by_c{0}: {1}".format(n, len(result)))
             self.assertEqual(4000, len(result))
+
+    def _do_lots_of_actions(self, session):
+        for n in range(0, 20):
+            session.execute("create table alter_me_{0} (id uuid primary key, s1 int, s2 int, s3 int, s4 int, s5 int, s6 int, s7 int);".format(n))
+            session.execute("create table index_me_{0} (id uuid primary key, c1 int, c2 int, c3 int, c4 int, c5 int, c6 int, c7 int);".format(n))
+            for ins in range(0, 1000):
+                session.execute_async("insert into base_{0} (id, c1, c2, c3, c4, c5, c6, c7) values (uuid(), {1}, {1}, {1}, {1}, {1}, {1}, {1})".format(n, ins))
+
+        wait(10)
+        cmds = []
+        for n in range(0, 20):
+            cmds.append(("create table new_table_{0} (id uuid primary key, c1 int, c2 int, c3 int, c4 int);".format(n), ()))
+            for a in range(1, 8):
+                cmds.append(("alter table alter_me_{0} drop s{1};".format(n, a), ()))
+                cmds.append(("alter table alter_me_{0} add c{1} int;".format(n, a), ()))
+                cmds.append(("create index ix_index_me_{0}_c{1} on index_me_{0} (c{1});".format(n, a), ()))
+
+        shuffle(cmds)
+        results = execute_concurrent(session, cmds, raise_on_first_error=True)
+        for (success, result) in results:
+            self.assertTrue(success, "didn't get success: {}".format(result))
+
+    def _verify_lots_of_actions(self, session):
+        session.cluster.refresh_schema_metadata()
+        table_meta = session.cluster.metadata.keyspaces["lots_o_churn"].tables
+        for n in range(0, 20):
+            altered = table_meta["alter_me_{0}".format(n)]
+            self.assertEqual(8, len(altered.columns))
+            for col in altered.columns:
+                self.assertTrue(col.startswith("c") or col == "id", "column[{0}] does not start with c and should have been dropped".format(col))
+            self.assertTrue("new_table_{0}".format(n) in table_meta)
+            self.assertEqual(7, len(table_meta["index_me_{0}".format(n)].indexes))
+
+        node1, node2, node3 = self.cluster.nodelist()
+        self.validate_schema_consistent(node1)
+        self.validate_schema_consistent(node2)
+        self.validate_schema_consistent(node3)
+
+    def create_lots_of_everything_test(self):
+        """
+        create tables, indexes, alters across multiple threads concurrently
+        """
+        cluster = self.cluster
+        cluster.populate(3).start()
+        node1, node2, node3 = cluster.nodelist()
+        session = self.cql_connection(node1)
+        session.execute("create keyspace lots_o_churn WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};")
+        session.execute("use lots_o_churn")
+
+        self._do_lots_of_actions(session)
+        wait(40)
+        self._verify_lots_of_actions(session)
+
+    def create_lots_of_everything_with_node_down_test(self):
+        """
+        create tables, indexes, alters across multiple threads concurrently with a node down
+        """
+        cluster = self.cluster
+        cluster.populate(3).start()
+        node1, node2, node3 = cluster.nodelist()
+        session = self.cql_connection(node1)
+        session.execute("create keyspace lots_o_churn WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};")
+        session.execute("use lots_o_churn")
+
+        node2.stop()
+        self._do_lots_of_actions(session)
+        wait(40)
+        node2.start(wait_other_notice=True)
+        wait(20)
+        self._verify_lots_of_actions(session)
 
     def basic_test(self):
         """
