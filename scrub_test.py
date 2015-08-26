@@ -6,7 +6,7 @@ import uuid
 
 from ccmlib import common
 from dtest import Tester, debug
-from tools import since, require
+from tools import since
 import time
 
 KEYSPACE = 'ks'
@@ -255,7 +255,6 @@ class TestScrubIndexes(TestHelper):
         users = self.query_users(session)
         self.assertEqual(initial_users, users)
 
-    @require('9814', broken_in='3.0')
     def test_scrub_collections_table(self):
         cluster = self.cluster
         cluster.populate(1).start()
