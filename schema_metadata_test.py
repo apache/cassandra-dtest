@@ -259,9 +259,7 @@ def _verify_uda(created_on_version, current_version, keyspace, session, table_na
     assert_equal(cqltypes.Int32Type, aggr_meta.return_type)
 
 
-@require(6717)
-# this method has been renamed to _* so it's removed from upgrade tests as it will fail on 2.2 -> 3.0
-def _establish_udf(version, session, table_name_prefix=""):
+def establish_udf(version, session, table_name_prefix=""):
     if version < '2.2':
         return
     function_name = _table_name_builder(table_name_prefix, "test_udf")
@@ -270,9 +268,7 @@ def _establish_udf(version, session, table_name_prefix=""):
         '''.format(function_name))
 
 
-@require(6717)
-# this method has been renamed to _* so it's removed from upgrade tests as it will fail on 2.2 -> 3.0
-def _verify_udf(created_on_version, current_version, keyspace, session, table_name_prefix=""):
+def verify_udf(created_on_version, current_version, keyspace, session, table_name_prefix=""):
     if created_on_version < '2.2':
         return
     function_name = _table_name_builder(table_name_prefix, "test_udf")
@@ -285,9 +281,7 @@ def _verify_udf(created_on_version, current_version, keyspace, session, table_na
     assert_equal('return Double.valueOf(Math.log(input.doubleValue()));', meta.body)
 
 
-@require(6717)
-# this method has been renamed to _* so it's removed from upgrade tests as it will fail on 2.2 -> 3.0
-def _establish_udt_table(version, session, table_name_prefix=""):
+def establish_udt_table(version, session, table_name_prefix=""):
     if version < '2.1':
         return
     table_name = _table_name_builder(table_name_prefix, "test_udt")
@@ -299,9 +293,7 @@ def _establish_udt_table(version, session, table_name_prefix=""):
           )'''.format(table_name))
 
 
-@require(6717)
-# this method has been renamed to _* so it's removed from upgrade tests as it will fail on 2.2 -> 3.0
-def _verify_udt_table(created_on_version, current_version, keyspace, session, table_name_prefix=""):
+def verify_udt_table(created_on_version, current_version, keyspace, session, table_name_prefix=""):
     if created_on_version < '2.1':
         return
     table_name = _table_name_builder(table_name_prefix, "test_udt")
@@ -666,14 +658,14 @@ class TestSchemaMetadata(Tester):
 
     @since('2.1')
     def udt_table_test(self):
-        _establish_udt_table(self.cluster.version(), self.session)
-        _verify_udt_table(self.cluster.version(), self.cluster.version(), 'ks', self.session)
+        establish_udt_table(self.cluster.version(), self.session)
+        verify_udt_table(self.cluster.version(), self.cluster.version(), 'ks', self.session)
 
     @since('2.2')
     def udf_test(self):
-        _establish_udf(self.cluster.version(), self.session)
+        establish_udf(self.cluster.version(), self.session)
         self.session.cluster.refresh_schema_metadata()
-        _verify_udf(self.cluster.version(), self.cluster.version(), 'ks', self.session)
+        verify_udf(self.cluster.version(), self.cluster.version(), 'ks', self.session)
 
     @since('2.2')
     def uda_test(self):
