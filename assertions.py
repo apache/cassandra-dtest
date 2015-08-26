@@ -49,8 +49,8 @@ def assert_all(session, query, expected, cl=ConsistencyLevel.ONE, ignore_order=F
     res = session.execute(simple_query)
     list_res = rows_to_list(res)
     if ignore_order:
-        expected = sorted(expected);
-        list_res = sorted(list_res);
+        expected = sorted(expected)
+        list_res = sorted(list_res)
     assert list_res == expected, "Expected %s from %s, but got %s" % (expected, query, list_res)
 
 
