@@ -204,7 +204,7 @@ class TestCommitLog(Tester):
 
         debug("Verify commit log was replayed on startup")
         node1.start()
-        node1.watch_log_for("Log replay complete", timeout=5)
+        node1.watch_log_for("Log replay complete")
         # Here we verify there was more than 0 replayed mutations
         zero_replays = node1.grep_log(" 0 replayed mutations")
         self.assertEqual(0, len(zero_replays))
