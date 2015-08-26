@@ -57,8 +57,8 @@ class TestSSTableSplit(Tester):
         node.stop()
 
         # default split size is 50MB
-        splitmaxsize = 10 
-        expected_sstable_size = (10 * 1024 * 1024) 
+        splitmaxsize = 10
+        expected_sstable_size = (10 * 1024 * 1024)
         keyspace = 'keyspace1' if self.cluster.version() >= '2.1' else 'Keyspace1'
 
         # get the initial sstables and their total size
@@ -67,7 +67,7 @@ class TestSSTableSplit(Tester):
         debug("Original sstable and sizes before split: {}".format([(name, getsize(name)) for name in origsstables]))
 
         # calculate the expected number of sstables post-split
-        expected_num_sstables = floor(origsstable_size / expected_sstable_size) 
+        expected_num_sstables = floor(origsstable_size / expected_sstable_size)
 
         # split the sstables
         result = node.run_sstablesplit(keyspace=keyspace, size=splitmaxsize,

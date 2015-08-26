@@ -152,6 +152,7 @@ class TestHelper(Tester):
 
         debug('sstables after increment %s' % (str(sstables)))
 
+
 @since('2.2')
 class TestScrubIndexes(TestHelper):
     """
@@ -293,6 +294,7 @@ class TestScrubIndexes(TestHelper):
         users = session.execute(("SELECT * from users where uuids contains {some_uuid}").format(some_uuid=_id))
 
         self.assertListEqual(initial_users, users)
+
 
 class TestScrub(TestHelper):
     """
