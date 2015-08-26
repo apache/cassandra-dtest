@@ -6,7 +6,8 @@ import random
 
 from assertions import assert_almost_equal, assert_none, assert_one
 from dtest import Tester, debug
-from tools import require, since
+from tools import since
+
 
 class TestCompaction(Tester):
 
@@ -165,7 +166,6 @@ class TestCompaction(Tester):
         time.sleep(5)
         assert expired_sstable not in node1.get_sstables('ks', 'cf')
 
-    @require('dtest PR #373', broken_in='3.0')
     def compaction_throughput_test(self):
         """
         Test setting compaction throughput.
@@ -371,16 +371,17 @@ class TestCompaction(Tester):
         time.sleep(2)
         self.assertTrue(len(node.grep_log('Compacting.+to_disable')) > 0, 'Found no log items for {0}'.format(self.strategy))
 
-
     def skip_if_no_major_compaction(self):
         if self.cluster.version() < '2.2' and self.strategy == 'LeveledCompactionStrategy':
             self.skipTest('major compaction not implemented for LCS in this version of Cassandra')
+
 
 def get_random_word(wordLen):
     word = ''
     for i in range(wordLen):
         word += random.choice('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789')
     return word
+
 
 def block_on_compaction_log(node, ks=None, table=None):
     """
