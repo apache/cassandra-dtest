@@ -1209,7 +1209,7 @@ Unlogged batch covering 2 partitions detected against table [client_warnings.tes
             We don't check for moving the cursor though, we only check that
             there is no error and that at least one of the possible clear
             screen sequences is contained in the output, via a regular
-            expression that allows any optional digit between '['' and 'H'.
+            expression.
         """
         self.cluster.populate(1)
         self.cluster.start(wait_for_binary_proto=True)
@@ -1217,7 +1217,7 @@ Unlogged batch covering 2 partitions detected against table [client_warnings.tes
 
         out, err = self.run_cqlsh(node1, cmd)
         self.assertEqual("", err)
-        self.assertTrue(re.search(chr(27) + "\[\d?J", out))
+        self.assertTrue(re.search(chr(27) + "\[[0,1,2]?J", out))
 
     def run_cqlsh(self, node, cmds, cqlsh_options=[]):
         cdir = node.get_install_dir()
