@@ -57,7 +57,8 @@ class TestOfflineTools(Tester):
 
         # test by loading large amount data so we have multiple levels and checking all levels are 0 at end
         cluster.start(wait_for_binary_proto=True)
-        node1.stress(['write', 'n=50K', '-schema', 'replication(factor=1)'])
+        node1.stress(['write', 'n=50K', '-rate', 'threads=20', '-schema', 'replication(factor=1)'])
+        cluster.flush()
         self.wait_for_compactions(node1)
         cluster.stop()
 
