@@ -7,6 +7,7 @@ from dtest import Tester, debug
 from tools import since
 from assertions import assert_invalid, assert_one
 from cassandra import InvalidRequest
+from cassandra.concurrent import execute_concurrent
 from cassandra.query import BatchStatement, SimpleStatement
 from cassandra.protocol import ConfigurationException
 
@@ -269,6 +270,85 @@ class TestSecondaryIndexes(Tester):
 class TestSecondaryIndexesOnCollections(Tester):
     def __init__(self, *args, **kwargs):
         Tester.__init__(self, *args, **kwargs)
+
+    @since('2.1')
+    def test_tuple_indexes(self):
+        """
+        Checks that secondary indexes on tuples work for querying
+        """
+        cluster = self.cluster
+        cluster.populate(1).start()
+        [node1] = cluster.nodelist()
+        session = self.patient_cql_connection(node1)
+        self.create_ks(session, 'tuple_index_test', 1)
+        session.execute("use tuple_index_test")
+        session.execute("""
+            CREATE TABLE simple_with_tuple (
+                id uuid primary key,
+                normal_col int,
+                single_tuple tuple<int>,
+                double_tuple tuple<int, int>,
+                triple_tuple tuple<int, int, int>
+            )""")
+        cmds = [("""insert into simple_with_tuple
+                        (id, normal_col, single_tuple, double_tuple, triple_tuple)
+                    values
+                        (uuid(), {0}, ({0}), ({0},{0}), ({0},{0},{0}))""".format(n), ())
+                for n in range(50)]
+
+        results = execute_concurrent(session, cmds*5, raise_on_first_error=True, concurrency=200)
+
+        for (success, result) in results:
+            self.assertTrue(success, "didn't get success on insert: {0}".format(result))
+
+        # no index present yet, make sure there's an error trying to query column
+        stmt = ("SELECT * from simple_with_tuple where single_tuple = (1)")
+
+        if self.cluster.version() < "3":
+            assert_invalid(session, stmt, 'No secondary indexes on the restricted columns support the provided operators')
+        else:
+            assert_invalid(session, stmt, 'No supported secondary index found for the non primary key columns restrictions')
+
+        session.execute("CREATE INDEX idx_single_tuple ON simple_with_tuple(single_tuple);")
+        session.execute("CREATE INDEX idx_double_tuple ON simple_with_tuple(double_tuple);")
+        session.execute("CREATE INDEX idx_triple_tuple ON simple_with_tuple(triple_tuple);")
+        time.sleep(10)
+
+        # check if indexes work on existing data
+        for n in range(50):
+            self.assertEqual(5, len(session.execute("select * from simple_with_tuple where single_tuple = ({0});".format(n))))
+            self.assertEqual(5, len(session.execute("select * from simple_with_tuple where double_tuple = ({0},{0});".format(n))))
+            self.assertEqual(0, len(session.execute("select * from simple_with_tuple where double_tuple = ({0},-1);".format(n))))
+            self.assertEqual(5, len(session.execute("select * from simple_with_tuple where triple_tuple = ({0},{0},{0});".format(n))))
+            self.assertEqual(0, len(session.execute("select * from simple_with_tuple where triple_tuple = ({0},{0},-1);".format(n))))
+
+        # check if indexes work on new data inserted after index creation
+        results = execute_concurrent(session, cmds*3, raise_on_first_error=True, concurrency=200)
+        for (success, result) in results:
+            self.assertTrue(success, "didn't get success on insert: {0}".format(result))
+        time.sleep(5)
+        for n in range(50):
+            self.assertEqual(8, len(session.execute("select * from simple_with_tuple where single_tuple = ({0});".format(n))))
+            self.assertEqual(8, len(session.execute("select * from simple_with_tuple where double_tuple = ({0},{0});".format(n))))
+            self.assertEqual(8, len(session.execute("select * from simple_with_tuple where triple_tuple = ({0},{0},{0});".format(n))))
+
+        # check if indexes work on mutated data
+        for n in range(5):
+            rows = session.execute("select * from simple_with_tuple where single_tuple = ({0});".format(n))
+            [session.execute("update simple_with_tuple set single_tuple = (-999) where id = {0}".format(row.id)) for row in rows]
+            rows = session.execute("select * from simple_with_tuple where double_tuple = ({0},{0});".format(n))
+            [session.execute("update simple_with_tuple set double_tuple = (-999,-999) where id = {0}".format(row.id)) for row in rows]
+            rows = session.execute("select * from simple_with_tuple where triple_tuple = ({0},{0},{0});".format(n))
+            [session.execute("update simple_with_tuple set triple_tuple = (-999,-999,-999) where id = {0}".format(row.id)) for row in rows]
+
+        for n in range(5):
+            self.assertEqual(0, len(session.execute("select * from simple_with_tuple where single_tuple = ({0});".format(n))))
+            self.assertEqual(0, len(session.execute("select * from simple_with_tuple where double_tuple = ({0},{0});".format(n))))
+            self.assertEqual(0, len(session.execute("select * from simple_with_tuple where triple_tuple = ({0},{0},{0});".format(n))))
+
+        self.assertEqual(40, len(session.execute("select * from simple_with_tuple where single_tuple = (-999);".format(n))))
+        self.assertEqual(40, len(session.execute("select * from simple_with_tuple where double_tuple = (-999,-999);".format(n))))
+        self.assertEqual(40, len(session.execute("select * from simple_with_tuple where triple_tuple = (-999,-999,-999);".format(n))))
 
     @since('2.1')
     def test_list_indexes(self):
