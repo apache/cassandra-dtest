@@ -6,7 +6,7 @@
 flake8 --ignore=E,W,F811,F812,F821,F822,F823,F831,F841,N8,C9 --exclude=thrift_bindings,cassandra-thrift .
 flake8_result=$?
 
-git diff master -U0 | pep8 --diff --max-line-length=200
+git diff master...HEAD -U0 | pep8 --diff --max-line-length=200
 pep8_result=$?
 
 echo -e "\nflake8 exited with ${flake8_result}."
