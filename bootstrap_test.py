@@ -346,6 +346,7 @@ class TestBootstrap(Tester):
         """
         cluster = self.cluster
         cluster.populate(3)
+        cluster.set_log_level('TRACE')
         cluster.start(wait_for_binary_proto=True)
 
         version = cluster.version()
