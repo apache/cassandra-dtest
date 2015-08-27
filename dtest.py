@@ -346,6 +346,21 @@ class Tester(TestCase):
             if not is_win():
                 os.symlink(basedir, name)
 
+    def get_eager_protocol_version(self, cassandra_version):
+        """
+        Returns the highest protocol version accepted
+        by the given C* version
+        """
+        if cassandra_version >= '2.2':
+            protocol_version = 4
+        elif cassandra_version >= '2.1':
+            protocol_version = 3
+        elif cassandra_version >= '2.0':
+            protocol_version = 2
+        else:
+            protocol_version = 1
+        return protocol_version
+
     def cql_connection(self, node, keyspace=None, user=None,
                        password=None, compression=True, protocol_version=None):
 
@@ -365,14 +380,7 @@ class Tester(TestCase):
         node_ip = self.get_ip_from_node(node)
 
         if protocol_version is None:
-            if self.cluster.version() >= '2.2':
-                protocol_version = 4
-            elif self.cluster.version() >= '2.1':
-                protocol_version = 3
-            elif self.cluster.version() >= '2.0':
-                protocol_version = 2
-            else:
-                protocol_version = 1
+            protocol_version = self.get_eager_protocol_version(self.cluster.version())
 
         if user is not None:
             auth_provider = self.get_auth_provider(user=user, password=password)
