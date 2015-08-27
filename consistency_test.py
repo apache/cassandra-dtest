@@ -147,7 +147,7 @@ class TestHelper(Tester):
         expected = [[userid, age]] if age else []
         ret = rows_to_list(res) == expected
         if check_ret:
-            assert ret, "Got %s from %s, expected %s at %s" % (res, session.cluster.contact_points, expected, self._name(consistency))
+            assert ret, "Got %s from %s, expected %s at %s" % (rows_to_list(res), session.cluster.contact_points, expected, self._name(consistency))
         return ret
 
     def create_counters_table(self, session):
