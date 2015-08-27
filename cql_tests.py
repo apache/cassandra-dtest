@@ -14,7 +14,7 @@ from thrift_bindings.v22.ttypes import \
 from thrift_bindings.v22.ttypes import (CfDef, Column, ColumnOrSuperColumn,
                                         Mutation)
 from thrift_tests import get_thrift_client
-from tools import rows_to_list, since, require, debug
+from tools import debug, require, rows_to_list, since
 
 
 class CQLTester(Tester):
@@ -33,9 +33,9 @@ class CQLTester(Tester):
             cluster.set_configuration_options(values={'start_rpc': True})
 
         if user:
-            config = {'authenticator' : 'org.apache.cassandra.auth.PasswordAuthenticator',
-                      'authorizer' : 'org.apache.cassandra.auth.CassandraAuthorizer',
-                      'permissions_validity_in_ms' : 0}
+            config = {'authenticator': 'org.apache.cassandra.auth.PasswordAuthenticator',
+                      'authorizer': 'org.apache.cassandra.auth.CassandraAuthorizer',
+                      'permissions_validity_in_ms': 0}
             cluster.set_configuration_options(values=config)
 
         if not cluster.nodelist():
@@ -48,6 +48,7 @@ class CQLTester(Tester):
                 session.execute("DROP KEYSPACE IF EXISTS ks")
             self.create_ks(session, 'ks', rf)
         return session
+
 
 @since('2.1')
 @canReuseCluster
@@ -221,6 +222,7 @@ class StorageProxyCQLTester(CQLTester):
             APPLY BATCH;
         """, consistency_level=ConsistencyLevel.QUORUM)
         session.execute(query)
+
 
 @since('2.1')
 @canReuseCluster
