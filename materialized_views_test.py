@@ -766,9 +766,9 @@ class TestMaterializedViews(Tester):
         session = self.prepare(rf=5, options={'hinted_handoff_enabled': False}, nodes=5)
         node1, node2, node3, node4, node5 = self.cluster.nodelist()
 
-        # we create the base table with gc_grace_seconds=1 so batchlog will expire after 1 second
+        # we create the base table with gc_grace_seconds=5 so batchlog will expire after 5 seconds
         session.execute("CREATE TABLE ks.t (id int PRIMARY KEY, v int, v2 text, v3 decimal)"
-                        "WITH gc_grace_seconds = 1")
+                        "WITH gc_grace_seconds = 5")
         session.execute(("CREATE MATERIALIZED VIEW ks.t_by_v AS SELECT * FROM t "
                          "WHERE v IS NOT NULL AND id IS NOT NULL PRIMARY KEY (v, id)"))
 
@@ -823,7 +823,7 @@ class TestMaterializedViews(Tester):
             )
 
         debug('Wait for batchlogs to expire from node2 and node3')
-        time.sleep(1)
+        time.sleep(5)
 
         debug('Start remaining nodes')
         node1.start(wait_other_notice=True, wait_for_binary_proto=True)
@@ -862,7 +862,7 @@ class TestMaterializedViews(Tester):
         session = self.prepare(rf=5, options={'hinted_handoff_enabled': False}, nodes=5)
         node1, node2, node3, node4, node5 = self.cluster.nodelist()
 
-        # we create the base table with gc_grace_seconds=1 so batchlog will expire after 1 second
+        # we create the base table with gc_grace_seconds=5 so batchlog will expire after 5 seconds
         session.execute("CREATE TABLE ks.t (id int, v int, v2 text, v3 decimal, PRIMARY KEY(id, v, v2))"
                         "WITH gc_grace_seconds = 1")
         session.execute(("CREATE MATERIALIZED VIEW ks.t_by_v AS SELECT * FROM t "
@@ -919,7 +919,7 @@ class TestMaterializedViews(Tester):
         assert_none(session2, "SELECT * FROM ks.t_by_v WHERE v2 = 'd'")
 
         debug('Wait for batchlogs to expire from node2 and node3')
-        time.sleep(1)
+        time.sleep(5)
 
         debug('Start remaining nodes')
         node1.start(wait_other_notice=True, wait_for_binary_proto=True)
