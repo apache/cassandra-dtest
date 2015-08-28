@@ -56,8 +56,7 @@ class TestSecondaryIndexes(Tester):
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
 
-        conn = self.patient_cql_connection(node1)
-        session = conn
+        session = self.patient_cql_connection(node1)
         session.max_trace_wait = 120
         session.execute("CREATE KEYSPACE ks WITH REPLICATION = {'class': 'SimpleStrategy', 'replication_factor': '1'};")
         session.execute("CREATE TABLE ks.cf (a text PRIMARY KEY, b text);")
@@ -264,6 +263,70 @@ class TestSecondaryIndexes(Tester):
         else:
             time.sleep(0.10)
             self.wait_for_schema_agreement(session)
+
+    @since('3.0')
+    def test_only_coordinator_chooses_index_for_query(self):
+        """
+        Checks that the index to use is selected (once) on the coordinator and
+        included in the serialized command sent to the replicas.
+        @jira_ticket CASSANDRA-10215
+        """
+        cluster = self.cluster
+        cluster.populate(3).start()
+        node1, node2, node3 = cluster.nodelist()
+        session = self.patient_cql_connection(node1)
+        session.max_trace_wait = 120
+        session.execute("CREATE KEYSPACE ks WITH REPLICATION = {'class': 'SimpleStrategy', 'replication_factor': '1'};")
+        session.execute("CREATE TABLE ks.cf (a text PRIMARY KEY, b text);")
+        session.execute("CREATE INDEX b_index ON ks.cf (b);")
+        num_rows = 100
+        for i in range(num_rows):
+            indexed_value = i % (num_rows / 3)
+            # use the same indexed value three times
+            session.execute("INSERT INTO ks.cf (a, b) VALUES ('{a}', '{b}');"
+                            .format(a=i, b=indexed_value))
+
+        cluster.flush()
+
+        def check_trace_events(trace, regex, expected_matches):
+            """
+            Check for the presence of certain trace events. exact_matches should be a list of
+            tuple(source, min_count, max_count) indicating that of all the trace events for the
+            the source, the supplied regex should match at least min_count trace messages & at
+            most max_count messages. E.g. [(127.0.0.1, 1, 10), (127.0.0.2, 0, 0)]
+            indicates that the regex should match at least 1, but no more than 10 events emitted
+            by node1, and that no messages emitted by node2 should match.
+            """
+            match_counts = {}
+            for event_source, min_matches, max_matches in expected_matches:
+                match_counts[event_source] = 0
+
+            for event in trace.events:
+                desc = event.description
+                match = re.match(regex, desc)
+                if match:
+                    if event.source in match_counts:
+                        match_counts[event.source] += 1
+
+            for event_source, min_matches, max_matches in expected_matches:
+                if match_counts[event_source] < min_matches or match_counts[event_source] > max_matches:
+                    self.fail("Expected to find between {min} and {max} trace events matching {pattern} from {source}, "
+                              "but actually found {actual}. (Full counts: {all})"
+                              .format(min=min_matches, max=max_matches, pattern=regex, source=event_source,
+                                      actual=match_counts[event_source], all=match_counts))
+
+        query = SimpleStatement("SELECT * FROM ks.cf WHERE b='1';")
+        result = session.execute(query, trace=True)
+        self.assertEqual(3, len(result))
+        # node2 is the coordinator for the query
+        check_trace_events(query.trace,
+                           "Index mean cardinalities are b_index:[0-9]*. Scanning with b_index.",
+                           [("127.0.0.1", 0, 0), ("127.0.0.2", 1, 1), ("127.0.0.3", 0, 0)])
+        # check that the index is used on each node, really we only care that the matching
+        # message appears on every node, so the max count is not important
+        check_trace_events(query.trace,
+                           "Executing read on ks.cf using index b_index",
+                           [("127.0.0.1", 1, 200), ("127.0.0.2", 1, 200), ("127.0.0.3", 1, 200)])
 
 
 class TestSecondaryIndexesOnCollections(Tester):
