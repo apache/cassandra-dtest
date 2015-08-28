@@ -345,8 +345,8 @@ class TestBootstrap(Tester):
         Test that if we decommission a node and then wipe its data, it can join the cluster.
         """
         cluster = self.cluster
-        cluster.populate(3)
         cluster.set_log_level('TRACE')
+        cluster.populate(3)
         cluster.start(wait_for_binary_proto=True)
 
         version = cluster.version()
