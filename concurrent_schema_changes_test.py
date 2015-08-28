@@ -10,7 +10,7 @@ from ccmlib.node import Node
 
 from cassandra.concurrent import execute_concurrent
 from dtest import Tester, debug
-from tools import require, since
+from tools import since
 
 
 def wait(delay=2):
@@ -239,7 +239,6 @@ class TestConcurrentSchemaChanges(Tester):
                 self.assertEqual(1, len(session.execute("select * from base_{0} where c2 = {1}".format(n, ins))))
 
     @since('3.0')
-    @require(10156)
     def create_lots_of_mv_concurrently_test(self):
         """
         create materialized views across multiple threads concurrently
