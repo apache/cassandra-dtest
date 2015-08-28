@@ -116,7 +116,6 @@ class TestConcurrentSchemaChanges(Tester):
         # remove an index
         session.execute("DROP INDEX index_%s" % namespace)
 
-
     def validate_schema_consistent(self, node):
         """ Makes sure that there is only one schema """
         debug("validate_schema_consistent() " + node.name)
@@ -221,6 +220,7 @@ class TestConcurrentSchemaChanges(Tester):
         wait(5)
 
         debug("validating schema and index list")
+        session.cluster.control_connection.wait_for_schema_agreement()
         session.cluster.refresh_schema_metadata()
         index_meta = session.cluster.metadata.keyspaces["lots_o_indexes"].indexes
         self.validate_schema_consistent(node1)
@@ -272,12 +272,10 @@ class TestConcurrentSchemaChanges(Tester):
             result = session.execute("select * from src_by_c{0}".format(n))
             self.assertEqual(4000, len(result))
 
-    def _do_lots_of_actions(self, session):
+    def _do_lots_of_schema_actions(self, session):
         for n in range(20):
             session.execute("create table alter_me_{0} (id uuid primary key, s1 int, s2 int, s3 int, s4 int, s5 int, s6 int, s7 int);".format(n))
             session.execute("create table index_me_{0} (id uuid primary key, c1 int, c2 int, c3 int, c4 int, c5 int, c6 int, c7 int);".format(n))
-            for ins in range(1000):
-                session.execute_async("insert into base_{0} (id, c1, c2, c3, c4, c5, c6, c7) values (uuid(), {1}, {1}, {1}, {1}, {1}, {1}, {1})".format(n, ins))
 
         wait(10)
         cmds = []
@@ -292,23 +290,27 @@ class TestConcurrentSchemaChanges(Tester):
         for (success, result) in results:
             self.assertTrue(success, "didn't get success: {}".format(result))
 
-    def _verify_lots_of_actions(self, session):
-        session.cluster.refresh_schema_metadata()
-        table_meta = session.cluster.metadata.keyspaces["lots_o_churn"].tables
-        for n in range(20):
-            altered = table_meta["alter_me_{0}".format(n)]
-            self.assertEqual(8, len(altered.columns))
-            for col in altered.columns:
-                self.assertTrue(col.startswith("c") or col == "id", "column[{0}] does not start with c and should have been dropped".format(col))
-            self.assertTrue("new_table_{0}".format(n) in table_meta)
-            self.assertEqual(7, len(table_meta["index_me_{0}".format(n)].indexes))
+    def _verify_lots_of_schema_actions(self, session):
+        session.cluster.control_connection.wait_for_schema_agreement()
 
+        # the above should guarentee this -- but to be sure
         node1, node2, node3 = self.cluster.nodelist()
         self.validate_schema_consistent(node1)
         self.validate_schema_consistent(node2)
         self.validate_schema_consistent(node3)
 
-    def create_lots_of_everything_test(self):
+        session.cluster.refresh_schema_metadata()
+        table_meta = session.cluster.metadata.keyspaces["lots_o_churn"].tables
+        for n in range(20):
+            self.assertTrue("new_table_{0}".format(n) in table_meta)
+            self.assertEqual(7, len(table_meta["index_me_{0}".format(n)].indexes),
+                             "expected indexes ix_index_me_c0->7, got: {0}".format(sorted(list(table_meta["index_me_{0}".format(n)].indexes))))
+            altered = table_meta["alter_me_{0}".format(n)]
+            for col in altered.columns:
+                self.assertTrue(col.startswith("c") or col == "id", "column[{0}] does not start with c and should have been dropped".format(col))
+            self.assertEqual(8, len(altered.columns), "expected c1 -> c7, id, got: {0}".format(sorted(list(altered.columns))))
+
+    def create_lots_of_schema_churn_test(self):
         """
         create tables, indexes, alters across multiple threads concurrently
         """
@@ -319,10 +321,10 @@ class TestConcurrentSchemaChanges(Tester):
         session.execute("create keyspace lots_o_churn WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};")
         session.execute("use lots_o_churn")
 
-        self._do_lots_of_actions(session)
-        debug("waiting for actions to finish")
-        wait(40)
-        self._verify_lots_of_actions(session)
+        self._do_lots_of_schema_actions(session)
+        debug("waiting for things to settle and sync")
+        wait(60)
+        self._verify_lots_of_schema_actions(session)
 
     def create_lots_of_everything_with_node_down_test(self):
         """
@@ -336,13 +338,12 @@ class TestConcurrentSchemaChanges(Tester):
         session.execute("use lots_o_churn")
 
         node2.stop()
-        self._do_lots_of_actions(session)
-        debug("waiting for actions to finish")
-        wait(40)
+        self._do_lots_of_schema_actions(session)
+        wait(15)
         node2.start(wait_other_notice=True)
-        debug("waiting for schema agreement -- hopefully....")
-        wait(20)
-        self._verify_lots_of_actions(session)
+        debug("waiting for things to settle and sync")
+        wait(120)
+        self._verify_lots_of_schema_actions(session)
 
     def basic_test(self):
         """
@@ -359,7 +360,6 @@ class TestConcurrentSchemaChanges(Tester):
         self.prepare_for_changes(session, namespace='ns1')
 
         self.make_schema_changes(session, namespace='ns1')
-
 
     def changes_to_different_nodes_test(self):
         debug("changes_to_different_nodes_test()")
@@ -383,7 +383,6 @@ class TestConcurrentSchemaChanges(Tester):
         self.validate_schema_consistent(node1)
         # check both, just because we can
         self.validate_schema_consistent(node2)
-
 
     def changes_while_node_down_test(self):
         """
@@ -409,7 +408,6 @@ class TestConcurrentSchemaChanges(Tester):
         node2.start()
         wait(20)
         self.validate_schema_consistent(node1)
-
 
     def changes_while_node_toggle_test(self):
         """
@@ -437,7 +435,6 @@ class TestConcurrentSchemaChanges(Tester):
         node2.start()
         wait(20)
         self.validate_schema_consistent(node1)
-
 
     def decommission_node_test(self):
         debug("decommission_node_test()")
@@ -488,7 +485,6 @@ class TestConcurrentSchemaChanges(Tester):
         wait(30)
         self.validate_schema_consistent(node1)
 
-
     def snapshot_test(self):
         debug("snapshot_test()")
         cluster = self.cluster
@@ -533,8 +529,6 @@ class TestConcurrentSchemaChanges(Tester):
 
         wait(2)
         self.validate_schema_consistent(node1)
-
-
 
     def load_test(self):
         """
