@@ -304,11 +304,12 @@ class TestConcurrentSchemaChanges(Tester):
         for n in range(20):
             self.assertTrue("new_table_{0}".format(n) in table_meta)
             self.assertEqual(7, len(table_meta["index_me_{0}".format(n)].indexes),
-                             "expected indexes ix_index_me_c0->7, got: {0}".format(sorted(list(table_meta["index_me_{0}".format(n)].indexes))))
+                             "index_me_{0} expected indexes ix_index_me_c0->7, got: {1}".format(n, sorted(list(table_meta["index_me_{0}".format(n)].indexes))))
             altered = table_meta["alter_me_{0}".format(n)]
             for col in altered.columns:
-                self.assertTrue(col.startswith("c") or col == "id", "column[{0}] does not start with c and should have been dropped".format(col))
-            self.assertEqual(8, len(altered.columns), "expected c1 -> c7, id, got: {0}".format(sorted(list(altered.columns))))
+                self.assertTrue(col.startswith("c") or col == "id",
+                    "alter_me_{0} column[{1}] does not start with c and should have been dropped: {2}".format(n, col, sorted(list(altered.columns))))
+            self.assertEqual(8, len(altered.columns), "alter_me_{0} expected c1 -> c7, id, got: {1}".format(n, sorted(list(altered.columns))))
 
     def create_lots_of_schema_churn_test(self):
         """
