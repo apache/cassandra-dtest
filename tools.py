@@ -303,11 +303,7 @@ def require(require_pattern, broken_in=None):
         return tagging_decorator
     require_pattern = str(require_pattern)
     git_branch = ''
-    try:
-        git_branch = cassandra_git_branch().lower()
-    except OSError as e:
-        debug('git branch check failed with error {e}'.format(e=e))
-        return unittest.skip('failed git branch name check in {f}()'.format(f=require.__name__))
+    git_branch = cassandra_git_branch().lower()
 
     if git_branch:
         run_on_branch_patterns = (require_pattern, 'cassandra-{b}'.format(b=require_pattern))
