@@ -3,8 +3,8 @@ import os
 from cassandra import ConsistencyLevel
 
 from dtest import DISABLE_VNODES, Tester
-from tools import create_c1c2_table, insert_c1c2, query_c1c2, since
-
+from tools import create_c1c2_table, insert_c1c2, query_c1c2, since, no_vnodes
+import time
 
 @since('3.0')
 class TestHintedHandoffConfig(Tester):
@@ -149,3 +149,22 @@ class TestHintedHandoffConfig(Tester):
             self.assertEqual('Hinted handoff is running', res.rstrip())
 
         self._do_hinted_handoff(node1, node2, True)
+
+
+class TestHintedHandoff(Tester):
+    @no_vnodes()
+    def hintedhandoff_decom_test(self):
+        self.cluster.populate(4).start(wait_for_binary_proto=True)
+        [node1, node2, node3, node4] = self.cluster.nodelist()
+        session = self.patient_cql_connection(node1)
+        self.create_ks(session, 'ks', 2)
+        create_c1c2_table(self, session)
+        node4.stop(wait_other_notice=True)
+        insert_c1c2(session, n=100, consistency=ConsistencyLevel.ONE)
+        node1.decommission()
+        node4.start(wait_for_binary_proto=True)
+        node2.decommission()
+        node3.decommission()
+        time.sleep(5)
+        for x in xrange(0, 100):
+            query_c1c2(session, x, ConsistencyLevel.ONE)
