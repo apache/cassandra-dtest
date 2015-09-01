@@ -286,7 +286,7 @@ class TestConcurrentSchemaChanges(Tester):
                 cmds.append(("alter table alter_me_{0} add c{1} int;".format(n, a), ()))
                 cmds.append(("create index ix_index_me_{0}_c{1} on index_me_{0} (c{1});".format(n, a), ()))
 
-        results = execute_concurrent(session, cmds, raise_on_first_error=True)
+        results = execute_concurrent(session, cmds, concurrency=100, raise_on_first_error=True)
         for (success, result) in results:
             self.assertTrue(success, "didn't get success: {}".format(result))
 
@@ -301,15 +301,20 @@ class TestConcurrentSchemaChanges(Tester):
 
         session.cluster.refresh_schema_metadata()
         table_meta = session.cluster.metadata.keyspaces["lots_o_churn"].tables
+        errors = []
         for n in range(20):
             self.assertTrue("new_table_{0}".format(n) in table_meta)
-            self.assertEqual(7, len(table_meta["index_me_{0}".format(n)].indexes),
-                             "index_me_{0} expected indexes ix_index_me_c0->7, got: {1}".format(n, sorted(list(table_meta["index_me_{0}".format(n)].indexes))))
+
+            if(7 != len(table_meta["index_me_{0}".format(n)].indexes)):
+                errors.append("index_me_{0} expected indexes ix_index_me_c0->7, got: {1}".format(n, sorted(list(table_meta["index_me_{0}".format(n)].indexes))))
             altered = table_meta["alter_me_{0}".format(n)]
             for col in altered.columns:
-                self.assertTrue(col.startswith("c") or col == "id",
-                    "alter_me_{0} column[{1}] does not start with c and should have been dropped: {2}".format(n, col, sorted(list(altered.columns))))
-            self.assertEqual(8, len(altered.columns), "alter_me_{0} expected c1 -> c7, id, got: {1}".format(n, sorted(list(altered.columns))))
+                if(not col.startswith("c") and col != "id"):
+                    errors.append("alter_me_{0} column[{1}] does not start with c and should have been dropped: {2}".format(n, col, sorted(list(altered.columns))))
+            if(8 != len(altered.columns)):
+                errors.append("alter_me_{0} expected c1 -> c7, id, got: {1}".format(n, sorted(list(altered.columns))))
+
+        self.assertTrue(0 == len(errors), "\n".join(errors))
 
     def create_lots_of_schema_churn_test(self):
         """
@@ -327,7 +332,7 @@ class TestConcurrentSchemaChanges(Tester):
         wait(60)
         self._verify_lots_of_schema_actions(session)
 
-    def create_lots_of_everything_with_node_down_test(self):
+    def create_lots_of_schema_churn_with_node_down_test(self):
         """
         create tables, indexes, alters across multiple threads concurrently with a node down
         """
