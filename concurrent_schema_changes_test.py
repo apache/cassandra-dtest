@@ -305,13 +305,13 @@ class TestConcurrentSchemaChanges(Tester):
         for n in range(20):
             self.assertTrue("new_table_{0}".format(n) in table_meta)
 
-            if(7 != len(table_meta["index_me_{0}".format(n)].indexes)):
+            if 7 != len(table_meta["index_me_{0}".format(n)].indexes):
                 errors.append("index_me_{0} expected indexes ix_index_me_c0->7, got: {1}".format(n, sorted(list(table_meta["index_me_{0}".format(n)].indexes))))
             altered = table_meta["alter_me_{0}".format(n)]
             for col in altered.columns:
-                if(not col.startswith("c") and col != "id"):
+                if not col.startswith("c") and col != "id":
                     errors.append("alter_me_{0} column[{1}] does not start with c and should have been dropped: {2}".format(n, col, sorted(list(altered.columns))))
-            if(8 != len(altered.columns)):
+            if 8 != len(altered.columns):
                 errors.append("alter_me_{0} expected c1 -> c7, id, got: {1}".format(n, sorted(list(altered.columns))))
 
         self.assertTrue(0 == len(errors), "\n".join(errors))
