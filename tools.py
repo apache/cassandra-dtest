@@ -328,8 +328,8 @@ def cassandra_git_branch():
     p = subprocess.Popen(['git', 'branch'], cwd=CASSANDRA_DIR,
                          stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out, err = p.communicate()
-    # fail if err was printed and isn't empty OR if git failed
-    if err.split() or (p.returncode != 0):
+    # fail if git failed
+    if p.returncode != 0:
         raise RuntimeError('Git printed error: {err}'.format(err=err))
     [current_branch_line] = [line for line in out.splitlines() if line.startswith('*')]
     return current_branch_line[1:].strip()
