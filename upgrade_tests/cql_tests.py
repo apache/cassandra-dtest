@@ -103,7 +103,9 @@ class TestCQL(UpgradeTester):
 
             # Query for the data and throw exception
             cursor.execute("SELECT properties FROM maps WHERE userid = 'user'")
-            node1.watch_log_for("Detected collection for table ks.maps with 70000 elements, more than the 65535 limit. Only the first 65535 elements will be returned to the client. Please see http://cassandra.apache.org/doc/cql3/CQL.html#collections for more details.")
+            node1.watch_log_for("Detected collection for table ks.maps with 70000 elements, more than the 65535 limit. "
+                                "Only the first 65535 elements will be returned to the client. "
+                                "Please see http://cassandra.apache.org/doc/cql3/CQL.html#collections for more details.")
 
     def noncomposite_static_cf_test(self):
         """ Test non-composite static CF syntax """
@@ -1064,8 +1066,8 @@ class TestCQL(UpgradeTester):
             res = cursor.execute("SELECT k FROM test WHERE token(k) >= %d" % min_token)
             assert len(res) == c, "%s [all: %s]" % (str(res), str(inOrder))
 
-            #assert_invalid(cursor, "SELECT k FROM test WHERE token(k) >= 0")
-            #cursor.execute("SELECT k FROM test WHERE token(k) >= 0")
+            # assert_invalid(cursor, "SELECT k FROM test WHERE token(k) >= 0")
+            # cursor.execute("SELECT k FROM test WHERE token(k) >= 0")
 
             res = cursor.execute("SELECT k FROM test WHERE token(k) >= token(%d) AND token(k) < token(%d)" % (inOrder[32], inOrder[65]))
             assert rows_to_list(res) == [[inOrder[x]] for x in range(32, 65)], "%s [all: %s]" % (str(res), str(inOrder))
@@ -1093,7 +1095,7 @@ class TestCQL(UpgradeTester):
             for r in res:
                 assert isinstance(r[2], (int, long))
                 if r[0] == 1:
-                    assert r[3] == None, res
+                    assert r[3] is None, res
                 else:
                     assert isinstance(r[3], (int, long)), res
 
@@ -1103,7 +1105,7 @@ class TestCQL(UpgradeTester):
             for r in res:
                 assert isinstance(r[2], (int, long))
                 if r[0] == 1:
-                    assert r[3] == None, res
+                    assert r[3] is None, res
                 else:
                     assert isinstance(r[3], (int, long)), res
 
@@ -1112,7 +1114,7 @@ class TestCQL(UpgradeTester):
             for r in res:
                 assert isinstance(r[2], (int, long))
                 if r[0] == 1:
-                    assert r[3] == None, res
+                    assert r[3] is None, res
                 else:
                     assert isinstance(r[3], (int, long)), res
 
@@ -3470,7 +3472,7 @@ class TestCQL(UpgradeTester):
                   SELECT addresses FROM users WHERE id = {id}
             """.format(id=userID_1)
             res = cursor.execute(stmt)
-            ## TODO: deserialize the value here and check it's right.
+            # TODO: deserialize the value here and check it's right.
 
     @since('2.1')
     def more_user_types_test(self):
@@ -3794,94 +3796,93 @@ class TestCQL(UpgradeTester):
 
             # Testing batches
             assert_one(cursor,
-            """
-              BEGIN BATCH
-                UPDATE test SET v='foobar' WHERE id=0 AND k='k1';
-                UPDATE test SET v='barfoo' WHERE id=0 AND k='k2';
-                UPDATE test SET version=3 WHERE id=0 IF version=1;
-              APPLY BATCH
-            """, [False, 0, None, 2])
+                       """
+                         BEGIN BATCH
+                           UPDATE test SET v='foobar' WHERE id=0 AND k='k1';
+                           UPDATE test SET v='barfoo' WHERE id=0 AND k='k2';
+                           UPDATE test SET version=3 WHERE id=0 IF version=1;
+                         APPLY BATCH
+                       """, [False, 0, None, 2])
 
             assert_one(cursor,
-            """
-              BEGIN BATCH
-                UPDATE test SET v='foobar' WHERE id=0 AND k='k1';
-                UPDATE test SET v='barfoo' WHERE id=0 AND k='k2';
-                UPDATE test SET version=3 WHERE id=0 IF version=2;
-              APPLY BATCH
-            """, [True])
+                       """
+                         BEGIN BATCH
+                           UPDATE test SET v='foobar' WHERE id=0 AND k='k1';
+                           UPDATE test SET v='barfoo' WHERE id=0 AND k='k2';
+                           UPDATE test SET version=3 WHERE id=0 IF version=2;
+                         APPLY BATCH
+                       """, [True])
             assert_all(cursor, "SELECT * FROM test", [[0, 'k1', 3, 'foobar'], [0, 'k2', 3, 'barfoo']])
 
             assert_all(cursor,
-            """
-              BEGIN BATCH
-                UPDATE test SET version=4 WHERE id=0 IF version=3;
-                UPDATE test SET v='row1' WHERE id=0 AND k='k1' IF v='foo';
-                UPDATE test SET v='row2' WHERE id=0 AND k='k2' IF v='bar';
-              APPLY BATCH
-            """, [[False, 0, 'k1', 3, 'foobar'], [False, 0, 'k2', 3, 'barfoo']])
+                       """
+                         BEGIN BATCH
+                           UPDATE test SET version=4 WHERE id=0 IF version=3;
+                           UPDATE test SET v='row1' WHERE id=0 AND k='k1' IF v='foo';
+                           UPDATE test SET v='row2' WHERE id=0 AND k='k2' IF v='bar';
+                         APPLY BATCH
+                       """, [[False, 0, 'k1', 3, 'foobar'], [False, 0, 'k2', 3, 'barfoo']])
 
             assert_one(cursor,
-            """
-              BEGIN BATCH
-                UPDATE test SET version=4 WHERE id=0 IF version=3;
-                UPDATE test SET v='row1' WHERE id=0 AND k='k1' IF v='foobar';
-                UPDATE test SET v='row2' WHERE id=0 AND k='k2' IF v='barfoo';
-              APPLY BATCH
-            """, [True])
-            assert_all(cursor, "SELECT * FROM test", [[0, 'k1', 4, 'row1'], [0, 'k2', 4, 'row2']])
+                       """
+                         BEGIN BATCH
+                           UPDATE test SET version=4 WHERE id=0 IF version=3;
+                           UPDATE test SET v='row1' WHERE id=0 AND k='k1' IF v='foobar';
+                           UPDATE test SET v='row2' WHERE id=0 AND k='k2' IF v='barfoo';
+                         APPLY BATCH
+                       """, [True])
 
             assert_invalid(cursor,
-            """
-              BEGIN BATCH
-                UPDATE test SET version=5 WHERE id=0 IF version=4;
-                UPDATE test SET v='row1' WHERE id=0 AND k='k1';
-                UPDATE test SET v='row2' WHERE id=1 AND k='k2';
-              APPLY BATCH
-            """)
+                           """
+                             BEGIN BATCH
+                               UPDATE test SET version=5 WHERE id=0 IF version=4;
+                               UPDATE test SET v='row1' WHERE id=0 AND k='k1';
+                               UPDATE test SET v='row2' WHERE id=1 AND k='k2';
+                             APPLY BATCH
+                           """)
 
             assert_one(cursor,
-            """
-              BEGIN BATCH
-                INSERT INTO TEST (id, k, v) VALUES(1, 'k1', 'val1') IF NOT EXISTS;
-                INSERT INTO TEST (id, k, v) VALUES(1, 'k2', 'val2') IF NOT EXISTS;
-              APPLY BATCH
-            """, [True])
+                       """
+                         BEGIN BATCH
+                           INSERT INTO TEST (id, k, v) VALUES(1, 'k1', 'val1') IF NOT EXISTS;
+                           INSERT INTO TEST (id, k, v) VALUES(1, 'k2', 'val2') IF NOT EXISTS;
+                         APPLY BATCH
+                       """, [True])
             assert_all(cursor, "SELECT * FROM test WHERE id=1", [[1, 'k1', None, 'val1'], [1, 'k2', None, 'val2']])
 
             assert_one(cursor,
-            """
-              BEGIN BATCH
-                INSERT INTO TEST (id, k, v) VALUES(1, 'k2', 'val2') IF NOT EXISTS;
-                INSERT INTO TEST (id, k, v) VALUES(1, 'k3', 'val3') IF NOT EXISTS;
-              APPLY BATCH
-            """, [False, 1, 'k2', None, 'val2'])
+                       """
+                         BEGIN BATCH
+                           INSERT INTO TEST (id, k, v) VALUES(1, 'k2', 'val2') IF NOT EXISTS;
+                           INSERT INTO TEST (id, k, v) VALUES(1, 'k3', 'val3') IF NOT EXISTS;
+                         APPLY BATCH
+                       """, [False, 1, 'k2', None, 'val2'])
 
             assert_one(cursor,
-            """
-              BEGIN BATCH
-                UPDATE test SET v='newVal' WHERE id=1 AND k='k2' IF v='val0';
-                INSERT INTO TEST (id, k, v) VALUES(1, 'k3', 'val3') IF NOT EXISTS;
-              APPLY BATCH
-            """, [False, 1, 'k2', None, 'val2'])
+                       """
+                         BEGIN BATCH
+                           UPDATE test SET v='newVal' WHERE id=1 AND k='k2' IF v='val0';
+                           INSERT INTO TEST (id, k, v) VALUES(1, 'k3', 'val3') IF NOT EXISTS;
+                         APPLY BATCH
+                       """, [False, 1, 'k2', None, 'val2'])
             assert_all(cursor, "SELECT * FROM test WHERE id=1", [[1, 'k1', None, 'val1'], [1, 'k2', None, 'val2']])
 
             assert_one(cursor,
-            """
-              BEGIN BATCH
-                UPDATE test SET v='newVal' WHERE id=1 AND k='k2' IF v='val2';
-                INSERT INTO TEST (id, k, v, version) VALUES(1, 'k3', 'val3', 1) IF NOT EXISTS;
-              APPLY BATCH
-            """, [True])
+                       """
+                         BEGIN BATCH
+                           UPDATE test SET v='newVal' WHERE id=1 AND k='k2' IF v='val2';
+                           INSERT INTO TEST (id, k, v, version) VALUES(1, 'k3', 'val3', 1) IF NOT EXISTS;
+                         APPLY BATCH
+                       """, [True])
             assert_all(cursor, "SELECT * FROM test WHERE id=1", [[1, 'k1', 1, 'val1'], [1, 'k2', 1, 'newVal'], [1, 'k3', 1, 'val3']])
 
             assert_one(cursor,
-            """
-              BEGIN BATCH
-                UPDATE test SET v='newVal1' WHERE id=1 AND k='k2' IF v='val2';
-                UPDATE test SET v='newVal2' WHERE id=1 AND k='k2' IF v='val3';
-              APPLY BATCH
-            """, [False, 1, 'k2', 'newVal'])
+                       """
+                         BEGIN BATCH
+                           UPDATE test SET v='newVal1' WHERE id=1 AND k='k2' IF v='val2';
+                           UPDATE test SET v='newVal2' WHERE id=1 AND k='k2' IF v='val3';
+                         APPLY BATCH
+                       """, [False, 1, 'k2', 'newVal'])
 
     @since('2.0')
     def static_columns_with_2i_test(self):
@@ -4745,7 +4746,7 @@ class TestCQL(UpgradeTester):
             assert_all(cursor, "SELECT * FROM test WHERE k IN (0, 1, 2) AND v > 0 AND v <= 4 LIMIT 6", [[0, 1], [0, 2], [0, 3], [1, 1], [1, 2], [1, 3]])
 
             # This doesn't work -- see #7059
-            #assert_all(cursor, "SELECT * FROM test WHERE v > 1 AND v <= 3 LIMIT 6 ALLOW FILTERING", [[1, 2], [1, 3], [0, 2], [0, 3], [2, 2], [2, 3]])
+            # assert_all(cursor, "SELECT * FROM test WHERE v > 1 AND v <= 3 LIMIT 6 ALLOW FILTERING", [[1, 2], [1, 3], [0, 2], [0, 3], [2, 2], [2, 3]])
 
     def key_index_with_reverse_clustering(self):
         """ Test for #6950 bug """
@@ -4870,7 +4871,7 @@ class TestCQL(UpgradeTester):
             );
         """)
 
-        #cursor.execute("create index sessionIndex ON session_data (session_id)")
+        # cursor.execute("create index sessionIndex ON session_data (session_id)")
         cursor.execute("create index sessionAppName ON session_data (app_name)")
         cursor.execute("create index lastAccessIndex ON session_data (last_access)")
 

@@ -1398,7 +1398,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
         """Check all paging results: pagecount, num_results per page, data."""
 
         page_size = 25
-        expected_pages_data = [expected_data[x:x + page_size] for x in \
+        expected_pages_data = [expected_data[x:x + page_size] for x in
                                range(0, len(expected_data), page_size)]
 
         pf = self.get_page_fetcher(cursor)
