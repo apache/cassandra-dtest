@@ -465,6 +465,57 @@ class TestSecondaryIndexesOnCollections(Tester):
             self.assertTrue(shared_uuid in db_uuids)
             self.assertTrue(log_entry['unshared_uuid'] in db_uuids)
 
+    @since('3.0')
+    def test_key_and_value_indexes(self):
+        """
+        Checks if secondary index on both key and value of a single column works
+        """
+        cluster = self.cluster
+        cluster.populate(1).start()
+        [node1] = cluster.nodelist()
+        session = self.patient_cql_connection(node1)
+        self.create_ks(session, 'map_double_index', 1)
+        session.execute("""
+                CREATE TABLE map_tbl (
+                    id uuid primary key,
+                    amap map<text, int>
+                )
+            """)
+        session.execute("CREATE INDEX map_keys ON map_tbl(keys(amap))")
+        session.execute("CREATE INDEX map_values ON map_tbl(amap)")
+        session.execute("CREATE INDEX map_entries ON map_tbl(entries(amap))")
+
+        # multiple indexes on a single column are allowed but identical duplicate indexes are not
+        assert_invalid(session,
+                       "CREATE INDEX map_values_2 ON map_tbl(amap)",
+                       'Index map_values_2 is a duplicate of existing index map_values')
+
+        session.execute("INSERT INTO map_tbl (id, amap) values (uuid(), {'foo': 1, 'bar': 2});")
+        session.execute("INSERT INTO map_tbl (id, amap) values (uuid(), {'faz': 1, 'baz': 2});")
+
+        value_search = session.execute("SELECT * FROM map_tbl WHERE amap CONTAINS 1")
+        self.assertEqual(2, len(value_search), "incorrect number of rows when querying on map values")
+
+        key_search = session.execute("SELECT * FROM map_tbl WHERE amap CONTAINS KEY 'foo'")
+        self.assertEqual(1, len(key_search), "incorrect number of rows when querying on map keys")
+
+        entries_search = session.execute("SELECT * FROM map_tbl WHERE amap['foo'] = 1")
+        self.assertEqual(1, len(entries_search), "incorrect number of rows when querying on map entries")
+
+        session.cluster.refresh_schema_metadata()
+        table_meta = session.cluster.metadata.keyspaces["map_double_index"].tables["map_tbl"]
+        self.assertEqual(3, len(table_meta.indexes))
+        self.assertItemsEqual(['map_keys', 'map_values', 'map_entries'], table_meta.indexes)
+        self.assertEqual(3, len(session.cluster.metadata.keyspaces["map_double_index"].indexes))
+
+        self.assertTrue('map_keys' in table_meta.export_as_string())
+        self.assertTrue('map_values' in table_meta.export_as_string())
+        self.assertTrue('map_entries' in table_meta.export_as_string())
+
+        session.execute("DROP TABLE map_tbl")
+        session.cluster.refresh_schema_metadata()
+        self.assertEqual(0, len(session.cluster.metadata.keyspaces["map_double_index"].indexes))
+
     @since('2.1')
     def test_map_indexes(self):
         """
