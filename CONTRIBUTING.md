@@ -57,3 +57,7 @@ To run doxygen to generate HTML from these test plans, you will need to do the f
         doxygen doxygen/Doxyfile_python
 
 Feel free to submit test plans without the implemented tests. If you are submitting a new test, we would appreciate if it were annotated in this manner. If that is not possible, we will add the markup to your pull request.
+
+## Modules
+
+In some cases, we organize our test files by putting them in directories. If you do so, please export a module from that direcory py placing an `__init__.py file in the directory with the test files. This makes the modules visible to our test infrastructure scripts that divide tests into buckets for CI.
