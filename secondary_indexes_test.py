@@ -466,9 +466,11 @@ class TestSecondaryIndexesOnCollections(Tester):
             self.assertTrue(log_entry['unshared_uuid'] in db_uuids)
 
     @since('3.0')
-    def test_key_and_value_indexes(self):
+    def test_multiple_indexes_on_single_map_column(self):
         """
-        Checks if secondary index on both key and value of a single column works
+        verifying functionality of multiple unique secondary indexes on a single column
+        @jira_ticket CASSANDRA-7771
+        @since 3.0
         """
         cluster = self.cluster
         cluster.populate(1).start()
