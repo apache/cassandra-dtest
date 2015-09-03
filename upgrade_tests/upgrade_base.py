@@ -1,8 +1,8 @@
 import os
 import time
 
-from dtest import Tester, DEBUG
-
+from ccmlib.common import is_win
+from dtest import DEBUG, Tester
 
 QUERY_UPGRADED = os.environ.get('QUERY_UPGRADED', 'true').lower() in ('yes', 'true')
 QUERY_OLD = os.environ.get('QUERY_OLD', 'true').lower() in ('yes', 'true')
@@ -73,12 +73,18 @@ class UpgradeTester(Tester):
         if UPGRADE_MODE not in ('normal', 'all', 'none'):
             raise Exception("UPGRADE_MODE should be one of 'normal', 'all', or 'none'")
 
+        # Ignore errors before upgrade on Windows
+        if is_win():
+            node1.mark_log_for_errors()
+
         # stop the nodes
         if UPGRADE_MODE != "none":
             node1.drain()
             node1.stop(gently=True)
 
         if UPGRADE_MODE == "all":
+            if is_win():
+                node2.mark_log_for_errors()
             node2.drain()
             node2.stop(gently=True)
 
