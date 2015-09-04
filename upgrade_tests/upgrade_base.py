@@ -73,20 +73,20 @@ class UpgradeTester(Tester):
         if UPGRADE_MODE not in ('normal', 'all', 'none'):
             raise Exception("UPGRADE_MODE should be one of 'normal', 'all', or 'none'")
 
-        # Ignore errors before upgrade on Windows
-        if is_win():
-            node1.mark_log_for_errors()
-
         # stop the nodes
         if UPGRADE_MODE != "none":
             node1.drain()
             node1.stop(gently=True)
 
+        # Ignore errors before upgrade on Windows
+        if is_win():
+            node1.mark_log_for_errors()
+
         if UPGRADE_MODE == "all":
-            if is_win():
-                node2.mark_log_for_errors()
             node2.drain()
             node2.stop(gently=True)
+            if is_win():
+                node2.mark_log_for_errors()
 
         # start them again
         if UPGRADE_MODE != "none":
