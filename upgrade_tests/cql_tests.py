@@ -23,6 +23,7 @@ from cassandra.util import sortedset
 from upgrade_base import UpgradeTester
 
 
+@since('2.2')
 class TestCQL(UpgradeTester):
 
     def static_cf_test(self):
