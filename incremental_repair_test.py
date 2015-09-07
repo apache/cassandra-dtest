@@ -51,7 +51,7 @@ class TestIncRepair(Tester):
         with open("sstables.txt", 'r') as r:
             output = r.read().replace('\n', '')
 
-        self.assertNotIn('repairedAt: 0', output)
+        self.assertNotIn('Repaired at: 0', output)
 
         os.remove('sstables.txt')
 
