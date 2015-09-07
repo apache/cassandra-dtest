@@ -187,11 +187,11 @@ class TestMaterializedViews(Tester):
         session = self.prepare(user_table=True)
 
         # cannot insert
-        assert_invalid(session, "INSERT INTO users_by_state (username) VALUES ('user1');",
+        assert_invalid(session, "INSERT INTO users_by_state (state, username) VALUES ('TX', 'user1');",
                        "Cannot directly modify a materialized view")
 
         # cannot update
-        assert_invalid(session, "UPDATE users_by_state SET session_token='XYZ' where username='user1';",
+        assert_invalid(session, "UPDATE users_by_state SET session_token='XYZ' WHERE username='user1' AND state = 'TX';",
                        "Cannot directly modify a materialized view")
 
         # cannot delete a row
