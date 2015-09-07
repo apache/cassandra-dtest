@@ -4,6 +4,7 @@ import struct
 import time
 
 from cassandra import ConsistencyLevel, InvalidRequest
+from cassandra.policies import FallthroughRetryPolicy
 from cassandra.protocol import ProtocolException
 from cassandra.query import SimpleStatement
 
@@ -409,7 +410,6 @@ class AbortedQueriesTester(CQLTester):
         """
         Check that a query running on the local coordinator node times out
         """
-        self.skipTest("Feature In Development")
         cluster = self.cluster
         cluster.set_configuration_options(values={'read_request_timeout_in_ms': 1000})
 
@@ -433,14 +433,14 @@ class AbortedQueriesTester(CQLTester):
             session.execute("INSERT INTO test1 (id, val) VALUES ({}, 'foo')".format(i))
 
         mark = node.mark_log()
-        assert_unavailable(lambda c: debug(c.execute("SELECT * from test1")), session)
-        node.watch_log_for("<SELECT \* FROM ks.test1 (.*)> timed out", from_mark=mark, timeout=30)
+        statement = SimpleStatement("SELECT * from test1", consistency_level=ConsistencyLevel.ONE, retry_policy=FallthroughRetryPolicy())
+        assert_unavailable(lambda c: debug(c.execute(statement)), session)
+        node.watch_log_for("'SELECT \* FROM ks.test1 (.*)' timed out 1 time", from_mark=mark, timeout=60)
 
     def remote_query_test(self):
         """
         Check that a query running on a node other than the coordinator times out
         """
-        self.skipTest("Feature In Development")
         cluster = self.cluster
         cluster.set_configuration_options(values={'read_request_timeout_in_ms': 1000})
 
@@ -448,7 +448,7 @@ class AbortedQueriesTester(CQLTester):
         node1, node2 = cluster.nodelist()
 
         node1.start(wait_for_binary_proto=True, jvm_args=["-Djoin_ring=false"])  # ensure other node executes queries
-        node2.start(wait_for_binary_proto=True, jvm_args=["-Dcassandra.test.read_iteration_delay_ms=100"])  # see above for explanation
+        node2.start(wait_for_binary_proto=True, jvm_args=["-Dcassandra.test.read_iteration_delay_ms=1500"])  # see above for explanation
 
         session = self.patient_exclusive_cql_connection(node1)
 
@@ -464,14 +464,16 @@ class AbortedQueriesTester(CQLTester):
             session.execute("INSERT INTO test2 (id, val) VALUES ({}, 'foo')".format(i))
 
         mark = node2.mark_log()
-        assert_unavailable(lambda c: debug(c.execute("SELECT * from test2")), session)
-        node2.watch_log_for("<SELECT \* FROM ks.test2 (.*)> timed out", from_mark=mark, timeout=30)
+
+        statement = SimpleStatement("SELECT * from test2", consistency_level=ConsistencyLevel.ONE, retry_policy=FallthroughRetryPolicy())
+        assert_unavailable(lambda c: debug(c.execute(statement)), session)
+        node2.watch_log_for("'SELECT \* FROM ks.test2 (.*)' timed out 1 time", from_mark=mark, timeout=60)
+
 
     def index_query_test(self):
         """
         Check that a secondary index query times out
         """
-        self.skipTest("Feature In Development")
         cluster = self.cluster
         cluster.set_configuration_options(values={'read_request_timeout_in_ms': 1000})
 
@@ -494,13 +496,42 @@ class AbortedQueriesTester(CQLTester):
             session.execute("INSERT INTO test3 (id, col, val) VALUES ({}, {}, 'foo')".format(i, i // 10))
 
         mark = node.mark_log()
-        assert_unavailable(lambda c: debug(c.execute("SELECT * from test3 WHERE col < 50 ALLOW FILTERING")), session)
-        node.watch_log_for("<SELECT \* FROM ks.test3 WHERE col < 50 (.*)> timed out", from_mark=mark, timeout=30)
+        statement = SimpleStatement("SELECT * from test3 WHERE col < 50 ALLOW FILTERING", consistency_level=ConsistencyLevel.ONE, retry_policy=FallthroughRetryPolicy())
+        assert_unavailable(lambda c: debug(c.execute(statement)), session)
+        node.watch_log_for("'SELECT \* FROM ks.test3 WHERE col < 50 (.*)' timed out 1 time", from_mark=mark, timeout=60)
 
-    @require("6477")
     def materialized_view_test(self):
         """
         Check that a materialized view query times out
         """
-        self.skipTest("Feature In Development")
-        self.fail("Not yet implemented")
+        cluster = self.cluster
+        cluster.set_configuration_options(values={'read_request_timeout_in_ms': 1000})
+
+        cluster.populate(2)
+        node1, node2 = cluster.nodelist()
+
+        node1.start(wait_for_binary_proto=True, jvm_args=["-Djoin_ring=false"])  # ensure other node executes queries
+        node2.start(wait_for_binary_proto=True, jvm_args=["-Dcassandra.test.read_iteration_delay_ms=1500"])  # see above for explanation
+
+        session = self.patient_exclusive_cql_connection(node1)
+
+        self.create_ks(session, 'ks', 1)
+        session.execute("""
+            CREATE TABLE test4 (
+                id int PRIMARY KEY,
+                col int,
+                val text
+            );
+        """)
+
+        session.execute(("CREATE MATERIALIZED VIEW mv AS SELECT * FROM test4 "
+                         "WHERE col IS NOT NULL AND id IS NOT NULL PRIMARY KEY (col, id)"))
+
+        for i in xrange(25):
+            session.execute("INSERT INTO test4 (id, col, val) VALUES ({}, {}, 'foo')".format(i, i // 10))
+
+        mark = node2.mark_log()
+        statement = SimpleStatement("SELECT * FROM mv WHERE col = 50", consistency_level=ConsistencyLevel.ONE, retry_policy=FallthroughRetryPolicy())
+        assert_unavailable(lambda c: debug(c.execute(statement)), session)
+
+        node2.watch_log_for("'SELECT \* FROM ks.mv WHERE col = 50 (.*)' timed out 1 time", from_mark=mark, timeout=60)

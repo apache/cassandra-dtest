@@ -1,5 +1,5 @@
 import re
-from cassandra import InvalidRequest, Unavailable, ConsistencyLevel, WriteTimeout, ReadTimeout
+from cassandra import InvalidRequest, Unavailable, ConsistencyLevel, WriteFailure, WriteTimeout, ReadFailure, ReadTimeout
 from cassandra.query import SimpleStatement
 from tools import rows_to_list
 
@@ -10,7 +10,7 @@ def assert_unavailable(fun, *args):
             fun(None)
         else:
             fun(*args)
-    except (Unavailable, WriteTimeout, ReadTimeout) as e:
+    except (Unavailable, WriteTimeout, WriteFailure, ReadTimeout, ReadFailure) as e:
         pass
     except Exception as e:
         assert False, "Expecting unavailable exception, got: " + str(e)
