@@ -362,13 +362,13 @@ class Tester(TestCase):
         return protocol_version
 
     def cql_connection(self, node, keyspace=None, user=None,
-                       password=None, compression=True, protocol_version=None, port=None, ssl_opts=None):
+                       password=None, compression=True, protocol_version=None, port=9042, ssl_opts=None):
 
         return self._create_session(node, keyspace, user, password, compression,
                                     protocol_version, port=port, ssl_opts=ssl_opts)
 
     def exclusive_cql_connection(self, node, keyspace=None, user=None,
-                                 password=None, compression=True, protocol_version=None, port=None, ssl_opts=None):
+                                 password=None, compression=True, protocol_version=None, port=9042, ssl_opts=None):
 
         node_ip = self.get_ip_from_node(node)
         wlrr = WhiteListRoundRobinPolicy([node_ip])
@@ -377,7 +377,7 @@ class Tester(TestCase):
                                     protocol_version, wlrr, port=port, ssl_opts=ssl_opts)
 
     def _create_session(self, node, keyspace, user, password, compression, protocol_version, load_balancing_policy=None,
-                        port=None, ssl_opts=None):
+                        port=9042, ssl_opts=None):
         node_ip = self.get_ip_from_node(node)
 
         if protocol_version is None:
