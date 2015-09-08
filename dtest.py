@@ -362,21 +362,22 @@ class Tester(TestCase):
         return protocol_version
 
     def cql_connection(self, node, keyspace=None, user=None,
-                       password=None, compression=True, protocol_version=None):
+                       password=None, compression=True, protocol_version=None, port=None, ssl_opts=None):
 
         return self._create_session(node, keyspace, user, password, compression,
-                                    protocol_version)
+                                    protocol_version, port=port, ssl_opts=ssl_opts)
 
     def exclusive_cql_connection(self, node, keyspace=None, user=None,
-                                 password=None, compression=True, protocol_version=None):
+                                 password=None, compression=True, protocol_version=None, port=None, ssl_opts=None):
 
         node_ip = self.get_ip_from_node(node)
         wlrr = WhiteListRoundRobinPolicy([node_ip])
 
         return self._create_session(node, keyspace, user, password, compression,
-                                    protocol_version, wlrr)
+                                    protocol_version, wlrr, port=port, ssl_opts=ssl_opts)
 
-    def _create_session(self, node, keyspace, user, password, compression, protocol_version, load_balancing_policy=None):
+    def _create_session(self, node, keyspace, user, password, compression, protocol_version, load_balancing_policy=None,
+                        port=None, ssl_opts=None):
         node_ip = self.get_ip_from_node(node)
 
         if protocol_version is None:
@@ -388,7 +389,8 @@ class Tester(TestCase):
             auth_provider = None
 
         cluster = PyCluster([node_ip], auth_provider=auth_provider, compression=compression,
-                            protocol_version=protocol_version, load_balancing_policy=load_balancing_policy, default_retry_policy=FlakyRetryPolicy())
+                            protocol_version=protocol_version, load_balancing_policy=load_balancing_policy, default_retry_policy=FlakyRetryPolicy(),
+                            port=port, ssl_options=ssl_opts)
         session = cluster.connect()
 
         # temporarily increase client-side timeout to 1m to determine
@@ -402,8 +404,8 @@ class Tester(TestCase):
         return session
 
     def patient_cql_connection(self, node, keyspace=None,
-        user=None, password=None, timeout=10, compression=True,
-        protocol_version=None):
+                               user=None, password=None, timeout=10, compression=True,
+                               protocol_version=None, port=9042, ssl_opts=None):
         """
         Returns a connection after it stops throwing NoHostAvailables due to not being ready.
 
@@ -421,12 +423,14 @@ class Tester(TestCase):
             timeout=timeout,
             compression=compression,
             protocol_version=protocol_version,
+            port=port,
+            ssl_opts=ssl_opts,
             bypassed_exception=NoHostAvailable
         )
 
     def patient_exclusive_cql_connection(self, node, keyspace=None,
-        user=None, password=None, timeout=10, compression=True,
-        protocol_version=None):
+                                         user=None, password=None, timeout=10, compression=True,
+                                         protocol_version=None, port=9042, ssl_opts=None):
         """
         Returns a connection after it stops throwing NoHostAvailables due to not being ready.
 
@@ -444,6 +448,8 @@ class Tester(TestCase):
             timeout=timeout,
             compression=compression,
             protocol_version=protocol_version,
+            port=port,
+            ssl_opts=ssl_opts,
             bypassed_exception=NoHostAvailable
         )
 
