@@ -79,13 +79,18 @@ class UpgradeTester(Tester):
             node1.stop(gently=True)
 
         # Ignore errors before upgrade on Windows
-        if is_win():
+        # We ignore errors from 2.1, because windows 2.1
+        # support is only beta. There are frequent log errors,
+        # related to filesystem interactions that are a direct result
+        # of the lack of full functionality on 2.1 Windows, and we dont
+        # want these to pollute our results.
+        if is_win() and self.cluster.version() <= '2.2':
             node1.mark_log_for_errors()
 
         if UPGRADE_MODE == "all":
             node2.drain()
             node2.stop(gently=True)
-            if is_win():
+            if is_win() and self.cluster.version() <= '2.2':
                 node2.mark_log_for_errors()
 
         # start them again
@@ -117,3 +122,14 @@ class UpgradeTester(Tester):
     def get_version(self):
         node1 = self.cluster.nodelist()[0]
         return node1.version()
+
+    def tearDown(self):
+        # Ignore errors before upgrade on Windows
+        # We ignore errors from 2.1, because windows 2.1
+        # support is only beta. There are frequent log errors,
+        # related to filesystem interactions that are a direct result
+        # of the lack of full functionality on 2.1 Windows, and we dont
+        # want these to pollute our results.
+        if is_win() and UPGRADE_MODE != "all" and self.cluster.version() <= '2.2':
+            self.cluster.nodelist()[1].mark_log_for_errors()
+        super(UpgradeTester, self).tearDown()
