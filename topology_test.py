@@ -2,14 +2,16 @@ from dtest import Tester
 from tools import insert_c1c2, query_c1c2, no_vnodes, new_node, debug, since
 from assertions import assert_almost_equal
 
+import re
 import time
 from ccmlib.node import TimeoutError
 from cassandra import ConsistencyLevel
+from threading import Thread
 
 
-@no_vnodes()
 class TestTopology(Tester):
 
+    @no_vnodes()
     def movement_test(self):
         cluster = self.cluster
 
@@ -48,7 +50,8 @@ class TestTopology(Tester):
         assert_almost_equal(sizes[0], sizes[2])
         assert_almost_equal(sizes[1], sizes[2])
 
-    def decomission_test(self):
+    @no_vnodes()
+    def decommission_test(self):
         cluster = self.cluster
 
         tokens = cluster.balanced_tokens(4)
@@ -113,6 +116,7 @@ class TestTopology(Tester):
             for i in xrange(0, len(sizes)):
                 assert_almost_equal(sizes[i], three_node_sizes[i])
 
+    @no_vnodes()
     def move_single_node_test(self):
         """ Test moving a node in a single-node cluster (#4200) """
         cluster = self.cluster
@@ -140,15 +144,16 @@ class TestTopology(Tester):
             query_c1c2(session, n, ConsistencyLevel.ONE)
 
     @since('3.0')
+    @no_vnodes()
     def decommissioned_node_cant_rejoin_test(self):
         '''
         @jira_ticket CASSANDRA-8801
 
-        Test that a decomissioned node can't rejoin the cluster by:
+        Test that a decommissioned node can't rejoin the cluster by:
 
         - creating a cluster,
-        - decomissioning a node, and
-        - asserting that the "decomissioned node won't rejoin" error is in the
+        - decommissioning a node, and
+        - asserting that the "decommissioned node won't rejoin" error is in the
         logs for that node and
         - asserting that the node is not running.
         '''
@@ -180,3 +185,63 @@ class TestTopology(Tester):
                       '\n'.join(['\n'.join(err_list)
                                  for err_list in node3.grep_log_for_errors()]))
         self.assertFalse(node3.is_running())
+
+    @since('3.0')
+    def crash_during_decommission_test(self):
+        """
+        If a node crashes whilst another node is being decommissioned,
+        upon restarting the crashed node should not have invalid entries
+        for the decommissioned node
+        @jira_ticket CASSANDRA-10231
+        """
+        cluster = self.cluster
+        cluster.populate(3).start(wait_other_notice=True)
+
+        node1, node2 = cluster.nodelist()[0:2]
+
+        t = DecommissionInParallel(node1)
+        t.start()
+
+        p = re.compile(".N(?:\s*)127\.0\.0\.1(?:.*)null(?:\s*)rack1")
+        while t.is_alive():
+            out = self.show_status(node2)
+            if p.search(out):
+                debug("Matched null status entry")
+                break
+            debug("Restarting node2")
+            node2.stop(gently=False)
+            node2.start(wait_for_binary_proto=True)
+
+        debug("Waiting for decommission to complete")
+        t.join()
+        self.show_status(node2)
+
+        debug("Sleeping for 30 seconds to allow gossip updates")
+        time.sleep(30)
+        out = self.show_status(node2)
+        self.assertFalse(p.search(out))
+
+    def show_status(self, node):
+        out, err = node.nodetool('status')
+        debug("Status as reported by node {}".format(node.address()))
+        debug(out)
+        return out
+
+
+class DecommissionInParallel(Thread):
+
+    def __init__(self, node):
+        Thread.__init__(self)
+        self.node = node
+
+    def run(self):
+        node = self.node
+        mark = node.mark_log()
+        try:
+            out, err = node.nodetool("decommission")
+            node.watch_log_for("DECOMMISSIONED", from_mark=mark)
+            debug(out)
+            debug(err)
+        except NodetoolError as e:
+            debug("Decommission failed with exception: " + str(e))
+            pass
