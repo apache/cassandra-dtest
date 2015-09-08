@@ -1,8 +1,9 @@
 import os
 import time
 
-from ccmlib.common import is_win
-from dtest import DEBUG, Tester
+from ccmlib.common import get_version_from_build, is_win
+from dtest import DEBUG, Tester, debug
+from tools import cassandra_git_branch, since
 
 QUERY_UPGRADED = os.environ.get('QUERY_UPGRADED', 'true').lower() in ('yes', 'true')
 QUERY_OLD = os.environ.get('QUERY_OLD', 'true').lower() in ('yes', 'true')
@@ -22,6 +23,13 @@ UPGRADE_MODE = os.environ.get('UPGRADE_MODE', 'normal').lower()
 
 
 class UpgradeTester(Tester):
+    """
+    When run in 'normal' upgrade mode without specifying any version to run,
+    this will test different upgrade paths depending on what version of C* you
+    are testing. When run on 2.1 or 2.2, this will test the upgrade to 3.0.
+    When run on 3.0, this will test the upgrade path to trunk. When run on
+    versions above 3.0, this will test the upgrade path from 3.0 to HEAD.
+    """
 
     def prepare(self, ordered=False, create_keyspace=True, use_cache=False, nodes=2, rf=1, protocol_version=None, **kwargs):
         assert nodes >= 2, "backwards compatibility tests require at least two nodes"
@@ -44,12 +52,18 @@ class UpgradeTester(Tester):
         cluster.set_configuration_options(values={'internode_compression': 'none'})
         if not cluster.nodelist():
             cluster.populate(nodes)
-            self.original_install_dir = cluster.nodelist()[0].get_install_dir()
+            node1 = cluster.nodelist()[0]
+            self.original_install_dir = node1.get_install_dir()
+            self.original_git_branch = cassandra_git_branch()
+            self.original_version = get_version_from_build(node_path=node1.get_path())
             if OLD_CASSANDRA_DIR:
                 cluster.set_install_dir(install_dir=OLD_CASSANDRA_DIR)
             else:
-                cluster.set_install_dir(version='git:cassandra-2.1')
-            cluster.start()
+                # upgrade from 3.0 to current install dir if we're running from trunk
+                if self.original_git_branch == 'trunk':
+                    cluster.set_install_dir(version='git:cassandra-3.0')
+            cluster.start(wait_for_binary_proto=True)
+            debug('starting from {}'.format(get_version_from_build(node1.get_install_dir())))
 
         node1 = cluster.nodelist()[0]
         time.sleep(0.2)
@@ -93,15 +107,23 @@ class UpgradeTester(Tester):
             if is_win() and self.cluster.version() <= '2.2':
                 node2.mark_log_for_errors()
 
+        # choose version to upgrade to
+        if self.original_git_branch == 'trunk' or self.original_version >= '3.0':
+            new_branch = 'git:trunk'
+        else:
+            new_branch = 'git:cassandra-3.0'
+
+        debug('upgrading to {}'.format(new_branch))
+
         # start them again
         if UPGRADE_MODE != "none":
-            node1.set_install_dir(install_dir=self.original_install_dir)
+            node1.set_install_dir(version=new_branch)
             node1.set_log_level("DEBUG" if DEBUG else "INFO")
             node1.set_configuration_options(values={'internode_compression': 'none'})
             node1.start(wait_for_binary_proto=True)
 
         if UPGRADE_MODE == "all":
-            node2.set_install_dir(install_dir=self.original_install_dir)
+            node2.set_install_dir(version=new_branch)
             node2.set_log_level("DEBUG" if DEBUG else "INFO")
             node2.set_configuration_options(values={'internode_compression': 'none'})
             node2.start(wait_for_binary_proto=True)
