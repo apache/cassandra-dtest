@@ -21,6 +21,9 @@ OLD_CASSANDRA_DIR = os.environ.get('OLD_CASSANDRA_DIR', None)
 # a 3.0 cluster will use.
 UPGRADE_MODE = os.environ.get('UPGRADE_MODE', 'normal').lower()
 
+# Specify a branch to upgrade to
+UPGRADE_TO = os.environ.get('UPGRADE_TO', None)
+
 
 @since('2.1')
 class UpgradeTester(Tester):
@@ -109,7 +112,9 @@ class UpgradeTester(Tester):
                 node2.mark_log_for_errors()
 
         # choose version to upgrade to
-        if self.original_git_branch == 'trunk' or self.original_version >= '3.0':
+        if UPGRADE_TO:
+            new_branch = UPGRADE_TO
+        elif self.original_git_branch == 'trunk' or self.original_version >= '3.0':
             new_branch = 'git:trunk'
         else:
             new_branch = 'git:cassandra-3.0'
