@@ -1168,7 +1168,7 @@ class TestAuthRoles(Tester):
             self.cql_connection(node, user=user, password=password)
         host, error = response.exception.errors.popitem()
         pattern = 'Failed to authenticate to %s: code=0100 \[Bad credentials\] message="%s"' % (host, message)
-        assert type(error) == AuthenticationFailed, "Expected AuthenticationFailed, got %s" % type(error)
+        assert type(error) == AuthenticationFailed, "Expected AuthenticationFailed, got %s" % error
         assert re.search(pattern, error.message), "Expected: %s" % pattern
 
     def prepare(self, nodes=1, roles_expiry=0):
