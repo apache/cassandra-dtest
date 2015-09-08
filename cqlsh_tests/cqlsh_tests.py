@@ -1172,6 +1172,37 @@ Unlogged batch covering 2 partitions detected against table [client_warnings.tes
         stdout, stderr = self.run_cqlsh(node1, cmds='USE system', cqlsh_options=['--debug', '--connect-timeout=10'])
         self.assertTrue("Using connect timeout: 10 seconds" in stderr)
 
+    @since('2.1')
+    def test_refresh_schema_on_timeout_error(self):
+        """
+        @jira_ticket CASSANDRA-9689
+        """
+        self.cluster.populate(3)
+        self.cluster.start(wait_for_binary_proto=True)
+
+        node1, node2, node3 = self.cluster.nodelist()
+        node2.stop(wait_other_notice=True)
+
+        stdout, stderr = self.run_cqlsh(node1, cmds="""
+              CREATE KEYSPACE training WITH replication={'class':'SimpleStrategy','replication_factor':1};
+              DESCRIBE KEYSPACES""")
+        self.assertIn("training", stdout)
+        self.assertIn("Warning: schema version mismatch detected, which might be caused by DOWN nodes; "
+                      "if this is not the case, check the schema versions of your nodes in system.local "
+                      "and system.peers.",
+                      stderr)
+        self.assertIn("OperationTimedOut: errors={}, last_host=127.0.0.1", stderr)
+
+        stdout, stderr = self.run_cqlsh(node1, """USE training;
+                                                  CREATE TABLE mytable (id int, val text, PRIMARY KEY (id));
+                                                  describe tables""")
+        self.assertIn("mytable", stdout)
+        self.assertIn("Warning: schema version mismatch detected, which might be caused by DOWN nodes; "
+                      "if this is not the case, check the schema versions of your nodes in system.local "
+                      "and system.peers.",
+                      stderr)
+        self.assertIn("OperationTimedOut: errors={}, last_host=127.0.0.1", stderr)
+
     def test_describe_round_trip(self):
         """
         @jira_ticket CASSANDRA-9064
