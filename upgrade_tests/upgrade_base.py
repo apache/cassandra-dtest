@@ -22,6 +22,7 @@ OLD_CASSANDRA_DIR = os.environ.get('OLD_CASSANDRA_DIR', None)
 UPGRADE_MODE = os.environ.get('UPGRADE_MODE', 'normal').lower()
 
 
+@since('2.1')
 class UpgradeTester(Tester):
     """
     When run in 'normal' upgrade mode without specifying any version to run,
