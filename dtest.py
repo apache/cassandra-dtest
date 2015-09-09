@@ -612,11 +612,15 @@ class Tester(TestCase):
         return node_ip
 
     def get_port_from_node(self, node):
-        if node.network_interfaces['binary']:
-            port = node.network_interfaces['binary'][1]
-        else:
-            port = node.network_interfaces['thrift'][1]
-        return port
+        """
+        Return the port that this node is listening on.
+        We only use this to connect the native driver,
+        so we only care about the binary port.
+        """
+        try:
+            return node.network_interfaces['binary'][1]
+        except Exception as e:
+            raise RuntimeError("No network interface defined on this node object. {}".format(node.network_interfaces))
 
     def get_auth_provider(self, user, password):
         if self.cluster.version() >= '2.0':
