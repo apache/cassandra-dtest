@@ -1,4 +1,5 @@
 from collections import defaultdict
+import os
 import re
 import time
 
@@ -254,3 +255,86 @@ class ReplicationTest(Tester):
         # Given a diverse enough keyset, each node in the second
         # datacenter should get a chance to be a forwarder:
         self.assertEqual(len(forwarders_used), 3)
+
+
+class Cassandra10238Test(Tester):
+    """
+    Test to repro CASSANDRA-10238, wherein consolidating racks without a restart could violate RF contract.
+    """
+    def check_endpoint_count(self, ks, table, nodes, expected_count):
+        """
+        Check a dummy key (of a stress generated table) expecting it to have expected_count endpoints on each node.
+        """
+        for node in nodes:
+            cmd = "getendpoints {} {} 11".format(ks, table)
+            out, err = node.nodetool(cmd)
+
+            if len(err.strip()) > 0:
+                debug(err)
+                raise RuntimeError("Error running 'nodetool {}'".format(cmd))
+
+            out = out.rstrip()  # remove extra \n from output
+
+            self.assertEqual(len(out.split('\n')), expected_count, "wrong number of endpoints found ({}), should be: {}".format(len(out.split('\n')), expected_count))
+
+    def wait_for_all_nodes_on_rack(self, nodes, rack_name):
+        """
+        Waits for nodes to collapse to rack_name.
+        """
+        for i, node in enumerate(nodes):
+            wait_expire = time.time() + 120
+            while time.time() < wait_expire:
+                    out, err = node.nodetool("status")
+
+                    if len(err.strip()) > 0:
+                        raise RuntimeError("Error trying to run nodetool status")
+
+                    if len(re.findall(rack_name, out)) == len(nodes):
+                        # great, the topology change is propogated
+                        debug("Topology change detected on node {}".format(i))
+                        break
+                    else:
+                        debug("Waiting for topology change on node {}".format(i))
+                        time.sleep(5)
+            else:
+                raise RuntimeError("Ran out of time waiting for topology to change on node {}".format(i))
+
+    def test_rf_collapse(self):
+        """
+        CASSANDRA-10238
+
+        Confirm that when racks are collapsed the RF is not impacted.
+        """
+        cluster = self.cluster
+        cluster.populate(3)
+        node1, node2, node3 = cluster.nodelist()
+
+        cluster.set_configuration_options(values={'endpoint_snitch': 'org.apache.cassandra.locator.GossipingPropertyFileSnitch'})
+
+        # start with separate racks
+        for i, node in enumerate(cluster.nodelist()):
+            with open(os.path.join(node.get_conf_dir(), 'cassandra-rackdc.properties'), 'w') as topo_file:
+                topo_file.write("dc=DC1\n")
+                topo_file.write("rack=RAC{}".format(i))
+
+        cluster.start()
+
+        conn = self.patient_cql_connection(node1)
+
+        # small stress write to build ks/table for us
+        node1.stress(['write', 'n=20', '-rate', 'threads=50', '-schema', 'keyspace=testing', '-pop', 'seq=1..20'])
+        conn.execute("""ALTER KEYSPACE testing WITH replication = {'class':'NetworkTopologyStrategy', 'DC1':3}""")
+
+        # make sure endpoint count is correct before continuing with the rest of the test
+        self.check_endpoint_count('testing', 'standard1', cluster.nodelist(), 3)
+
+        # consolidate node1/node3 racks to "RAC1"
+        for node in [node1, node3]:
+            with open(os.path.join(node.get_conf_dir(), 'cassandra-rackdc.properties'), 'w') as topo_file:
+                topo_file.write("dc=DC1\n")
+                topo_file.write("rack=RAC1")
+
+        self.wait_for_all_nodes_on_rack(cluster.nodelist(), "RAC1")
+
+        # nodes have joined racks, check endpoint counts again
+        self.check_endpoint_count('testing', 'standard1', cluster.nodelist(), 3)
