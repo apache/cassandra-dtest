@@ -1631,7 +1631,6 @@ class TestCQL(UpgradeTester):
             res = cursor.execute("SELECT * FROM test")
             assert rows_to_list(res) == [[2, 2, None, None]], res
 
-    @require("CASSANDRA-6717")
     @freshCluster()
     def only_pk_test(self):
         """ Check table with only a PK (#4361) """
@@ -1644,9 +1643,6 @@ class TestCQL(UpgradeTester):
                 PRIMARY KEY (k, c)
             )
         """)
-
-        # The migration for this table is not quite correct right now.
-        # Until CASSANDRA-6717 fixes this, this test will fail.
 
         # Check for dense tables too
         cursor.execute("""
