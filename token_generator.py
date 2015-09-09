@@ -150,7 +150,7 @@ class TokenGenerator(Tester):
                 tokens = generated_tokens[n]
                 self.assertEqual(nodes, tokens.__len__())
                 for tok in tokens:
-                    self.assertTrue(t_min <= tok < t_max, "Generated token %r out of Murmur3Partitioner range %r..%r" % (tok, t_min, t_max-1))
+                    self.assertTrue(t_min <= tok < t_max, "Generated token %r out of Murmur3Partitioner range %r..%r" % (tok, t_min, t_max - 1))
                     self.assertTrue(not all_tokens.__contains__(tok), "Duplicate token %r for nodes-counts %r" % (tok, dc_nodes))
                     all_tokens.add(tok)
             self.assertEqual(all_tokens.__len__(), node_count, "Number of tokens %r and number of nodes %r does not match for %r" % (all_tokens.__len__(), node_count, dc_nodes))

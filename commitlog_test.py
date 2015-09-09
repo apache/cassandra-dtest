@@ -52,7 +52,7 @@ class TestCommitLog(Tester):
     def _change_commitlog_perms(self, mod):
         path = self._get_commitlog_path()
         os.chmod(path, mod)
-        commitlogs = glob.glob(path+'/*')
+        commitlogs = glob.glob(path + '/*')
         for commitlog in commitlogs:
             os.chmod(commitlog, mod)
 
@@ -103,16 +103,16 @@ class TestCommitLog(Tester):
         smaller_found = False
         for i, f in enumerate(commitlogs):
             size = os.path.getsize(f)
-            size_in_mb = int(size/1024/1024)
+            size_in_mb = int(size / 1024 / 1024)
             debug('segment file {} {}; smaller already found: {}'.format(f, size_in_mb, smaller_found))
-            if size_in_mb < 1 or size < (segment_size*0.1):
+            if size_in_mb < 1 or size < (segment_size * 0.1):
                 continue  # commitlog not yet used
 
             try:
                 if compressed:
                     # if compression is used, we assume there will be at most a 50% compression ratio
                     self.assertLess(size, segment_size)
-                    self.assertGreater(size, segment_size/2)
+                    self.assertGreater(size, segment_size / 2)
                 else:
                     # if no compression is used, the size will be close to what we expect
                     assert_almost_equal(size, segment_size, error=0.05)

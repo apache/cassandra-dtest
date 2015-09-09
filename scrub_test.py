@@ -299,6 +299,7 @@ class TestScrub(TestHelper):
     """
     Generic tests for scrubbing
     """
+
     def create_users(self, session):
         columns = {"password": "varchar", "gender": "varchar", "session_token": "varchar", "state": "varchar", "birth_year": "bigint"}
         self.create_cf(session, 'users', columns=columns)

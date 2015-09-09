@@ -98,6 +98,7 @@ class TestPaxos(Tester):
         session.execute("INSERT INTO test(k, v) VALUES (0, 0)")
 
         class Worker(Thread):
+
             def __init__(self, wid, session, iterations, query):
                 Thread.__init__(self)
                 self.wid = wid
@@ -115,9 +116,9 @@ class TestPaxos(Tester):
                     done = False
                     while not done:
                         try:
-                            res = self.session.execute(self.query, (prev+1, prev, self.wid))
+                            res = self.session.execute(self.query, (prev + 1, prev, self.wid))
                             if verbose:
-                                print "[%3d] CAS %3d -> %3d (res: %s)" % (self.wid, prev, prev+1, str(res))
+                                print "[%3d] CAS %3d -> %3d (res: %s)" % (self.wid, prev, prev + 1, str(res))
                             if res[0][0] is True:
                                 done = True
                                 prev = prev + 1

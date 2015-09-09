@@ -7,6 +7,7 @@ from assertions import assert_invalid, assert_unavailable
 from dtest import Tester, debug
 from tools import since
 
+
 class TestBatch(Tester):
 
     def counter_batch_accepts_counter_mutations_test(self):
@@ -255,12 +256,12 @@ class TestBatch(Tester):
         except Timeout as e:
             if received_responses is not None:
                 msg = "Expecting received_responses to be {}, got: {}".format(
-                        received_responses, e.received_responses,)
+                    received_responses, e.received_responses,)
                 self.assertEqual(e.received_responses, received_responses, msg)
         except Unavailable as e:
             if received_responses is not None:
                 msg = "Expecting alive_replicas to be {}, got: {}".format(
-                        received_responses, e.alive_replicas,)
+                    received_responses, e.alive_replicas,)
                 self.assertEqual(e.alive_replicas, received_responses, msg)
         except Exception as e:
             assert False, "Expecting TimedOutException, got:" + str(e)

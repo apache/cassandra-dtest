@@ -73,7 +73,7 @@ class TestCompaction(Tester):
         if output.find(table_name) != -1:
             output = output[output.find(table_name):]
             output = output[output.find("Space used (live)"):]
-            initialValue = int(output[output.find(":")+1:output.find("\n")].strip())
+            initialValue = int(output[output.find(":") + 1:output.find("\n")].strip())
         else:
             debug("datasize not found")
             debug(output)
@@ -84,7 +84,7 @@ class TestCompaction(Tester):
         if output.find(table_name) != -1:
             output = output[output.find(table_name):]
             output = output[output.find("Space used (live)"):]
-            finalValue = int(output[output.find(":")+1:output.find("\n")].strip())
+            finalValue = int(output[output.find(":") + 1:output.find("\n")].strip())
         else:
             debug("datasize not found")
 
@@ -253,7 +253,7 @@ class TestCompaction(Tester):
         self.create_ks(session, 'ks', 1)
 
         mark = node.mark_log()
-        strlen = (1024 * 1024)/100
+        strlen = (1024 * 1024) / 100
         session.execute("CREATE TABLE large(userid text PRIMARY KEY, properties map<int, text>) with compression = {}")
         for i in range(200):  # ensures partition size larger than compaction_large_partition_warning_threshold_mb
             session.execute("UPDATE ks.large SET properties[%i] = '%s' WHERE userid = 'user'" % (i, get_random_word(strlen)))
@@ -284,7 +284,7 @@ class TestCompaction(Tester):
         session.execute('CREATE TABLE to_disable (id int PRIMARY KEY, d TEXT) WITH compaction = {{\'class\':\'{0}\'}}'.format(self.strategy))
         node.nodetool('disableautocompaction ks to_disable')
         for i in range(1000):
-            session.execute('insert into to_disable (id, d) values ({0}, \'{1}\')'.format(i, 'hello'*100))
+            session.execute('insert into to_disable (id, d) values ({0}, \'{1}\')'.format(i, 'hello' * 100))
             if i % 100 == 0:
                 node.flush()
         self.assertTrue(len(node.grep_log('Compacting.+to_disable')) == 0, 'Found compaction log items for {0}'.format(self.strategy))
@@ -304,7 +304,7 @@ class TestCompaction(Tester):
         self.create_ks(session, 'ks', 1)
         session.execute('CREATE TABLE to_disable (id int PRIMARY KEY, d TEXT) WITH compaction = {{\'class\':\'{0}\', \'enabled\':\'false\'}}'.format(self.strategy))
         for i in range(1000):
-            session.execute('insert into to_disable (id, d) values ({0}, \'{1}\')'.format(i, 'hello'*100))
+            session.execute('insert into to_disable (id, d) values ({0}, \'{1}\')'.format(i, 'hello' * 100))
             if i % 100 == 0:
                 node.flush()
         self.assertTrue(len(node.grep_log('Compacting.+to_disable')) == 0, 'Found compaction log items for {0}'.format(self.strategy))
@@ -333,7 +333,7 @@ class TestCompaction(Tester):
         session.execute('CREATE TABLE to_disable (id int PRIMARY KEY, d TEXT) WITH compaction = {{\'class\':\'{0}\'}}'.format(self.strategy))
         session.execute('ALTER TABLE to_disable WITH compaction = {{\'class\':\'{0}\', \'enabled\':\'false\'}}'.format(self.strategy))
         for i in range(1000):
-            session.execute('insert into to_disable (id, d) values ({0}, \'{1}\')'.format(i, 'hello'*100))
+            session.execute('insert into to_disable (id, d) values ({0}, \'{1}\')'.format(i, 'hello' * 100))
             if i % 100 == 0:
                 node.flush()
         self.assertTrue(len(node.grep_log('Compacting.+to_disable')) == 0, 'Found compaction log items for {0}'.format(self.strategy))
@@ -357,7 +357,7 @@ class TestCompaction(Tester):
         session.execute('CREATE TABLE to_disable (id int PRIMARY KEY, d TEXT) WITH compaction = {{\'class\':\'{0}\'}}'.format(self.strategy))
         node.nodetool('disableautocompaction ks to_disable')
         for i in range(1000):
-            session.execute('insert into to_disable (id, d) values ({0}, \'{1}\')'.format(i, 'hello'*100))
+            session.execute('insert into to_disable (id, d) values ({0}, \'{1}\')'.format(i, 'hello' * 100))
             if i % 100 == 0:
                 node.flush()
         self.assertTrue(len(node.grep_log('Compacting.+to_disable')) == 0, 'Found compaction log items for {0}'.format(self.strategy))

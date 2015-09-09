@@ -4,7 +4,7 @@ from dtest import Tester, debug
 from thrift_tests import get_thrift_client
 
 from cql.cassandra.ttypes import CfDef, ColumnParent, CounterColumn, \
-                                 ConsistencyLevel, ColumnPath
+    ConsistencyLevel, ColumnPath
 
 
 class TestSuperCounterClusterRestart(Tester):
@@ -12,6 +12,7 @@ class TestSuperCounterClusterRestart(Tester):
     This test is part of this issue:
     https://issues.apache.org/jira/browse/CASSANDRA-3821
     """
+
     def __init__(self, *args, **kwargs):
         kwargs['cluster_options'] = {'start_rpc': 'true'}
         Tester.__init__(self, *args, **kwargs)

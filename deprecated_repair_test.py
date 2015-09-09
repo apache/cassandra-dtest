@@ -6,6 +6,7 @@ from dtest import Tester, debug
 from tools import since, insert_c1c2, query_c1c2
 from jmxutils import JolokiaAgent, make_mbean, remove_perf_disable_shared_mem
 
+
 @since("2.2")
 class TestDeprecatedRepairAPI(Tester):
     """
@@ -152,7 +153,7 @@ class TestDeprecatedRepairAPI(Tester):
         cluster = self.cluster
 
         debug("Starting cluster..")
-        cluster.populate([1,1])
+        cluster.populate([1, 1])
         node1, node2 = cluster.nodelist()
         remove_perf_disable_shared_mem(node1)
         cluster.start()
@@ -182,4 +183,3 @@ class TestDeprecatedRepairAPI(Tester):
                 "data_centers": m.group("dc"),
                 "hosts": m.group("hosts"),
                 "ranges": m.group("ranges")}
-

@@ -187,6 +187,7 @@ class TestAvailability(TestHelper):
     """
     Test that we can read and write depending on the number of nodes that are alive and the consistency levels.
     """
+
     def _test_simple_strategy(self, combinations):
         """
         Helper test function for a single data center: invoke _test_insert_query_from_node() for each node
@@ -237,7 +238,7 @@ class TestAvailability(TestHelper):
         cluster = self.cluster
 
         self.log("Connected to %s for %s/%s/%s" %
-            (session.cluster.contact_points, self._name(write_cl), self._name(read_cl), self._name(serial_cl)))
+                 (session.cluster.contact_points, self._name(write_cl), self._name(read_cl), self._name(serial_cl)))
 
         start = 0
         end = 100
@@ -324,6 +325,7 @@ class TestAccuracy(TestHelper):
     """
 
     class Validation:
+
         def __init__(self, outer, sessions, nodes, rf_factors, start, end, write_cl, read_cl, serial_cl=None):
             self.outer = outer
             self.sessions = sessions
@@ -336,7 +338,7 @@ class TestAccuracy(TestHelper):
             self.serial_cl = serial_cl
 
             outer.log('Testing accuracy for %s/%s/%s (keys : %d to %d)'
-            % (outer._name(write_cl), outer._name(read_cl), outer._name(serial_cl), start, end))
+                      % (outer._name(write_cl), outer._name(read_cl), outer._name(serial_cl), start, end))
 
         def get_num_nodes(self, idx):
             """
@@ -387,8 +389,8 @@ class TestAccuracy(TestHelper):
                     if outer.query_user(s, n, val, read_cl, check_ret=strong_consistency):
                         num = num + 1
                 assert num >= write_nodes, \
-                "Failed to read value from sufficient number of nodes, required %d but  got %d - [%d, %s]" \
-                % (write_nodes, num, n, val)
+                    "Failed to read value from sufficient number of nodes, required %d but  got %d - [%d, %s]" \
+                    % (write_nodes, num, n, val)
 
             for n in xrange(start, end):
                 age = 30
@@ -426,8 +428,8 @@ class TestAccuracy(TestHelper):
                     if outer.query_counter(s, n, val, read_cl, check_ret=strong_consistency):
                         num = num + 1
                 assert num >= write_nodes, \
-                "Failed to read value from sufficient number of nodes, required %d but got %d - [%d, %s]" \
-                % (write_nodes, num, n, val)
+                    "Failed to read value from sufficient number of nodes, required %d but got %d - [%d, %s]" \
+                    % (write_nodes, num, n, val)
 
             for n in xrange(start, end):
                 c = outer.read_counter(sessions[0], n, ConsistencyLevel.ALL)
@@ -629,7 +631,7 @@ class TestConsistency(Tester):
             assert len(res) == 3, 'Expecting 3 values, got %d (%s)' % (len(res), str(res))
             # value 0, 1 and 2 have been deleted
             for i in xrange(1, 4):
-                assert res[i-1][1] == 'value%d' % (i+2), 'Expecting value%d, got %s (%s)' % (i+2, res[i-1][1], str(res))
+                assert res[i - 1][1] == 'value%d' % (i + 2), 'Expecting value%d, got %s (%s)' % (i + 2, res[i - 1][1], str(res))
 
             truncate_statement = SimpleStatement('TRUNCATE cf', consistency_level=ConsistencyLevel.QUORUM)
             session.execute(truncate_statement)
@@ -771,7 +773,7 @@ class TestConsistency(Tester):
             assert len(res) == 3, 'Expecting 3 values, got %d (%s)' % (len(res), str(res))
             # value 6, 7 and 8 have been deleted
             for i in xrange(0, 3):
-                assert res[i][1] == 'value%d' % (5-i), 'Expecting value%d, got %s (%s)' % (5-i, res[i][1], str(res))
+                assert res[i][1] == 'value%d' % (5 - i), 'Expecting value%d, got %s (%s)' % (5 - i, res[i][1], str(res))
 
             truncate_statement = SimpleStatement('TRUNCATE cf', consistency_level=ConsistencyLevel.QUORUM)
             session.execute(truncate_statement)

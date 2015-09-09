@@ -112,7 +112,6 @@ class TestMaterializedViews(Tester):
                        "updates. Setting gc_grace_seconds too low might cause undelivered updates"
                        " to expire before being replayed.")
 
-
     def insert_test(self):
         """Test basic insertions"""
 
@@ -217,13 +216,13 @@ class TestMaterializedViews(Tester):
                          "username IS NOT NULL PRIMARY KEY (birth_year, username)"))
 
         result = session.execute(("SELECT * FROM system_schema.materialized_views "
-                                 "WHERE keyspace_name='ks' AND table_name='users'"))
+                                  "WHERE keyspace_name='ks' AND table_name='users'"))
         self.assertEqual(len(result), 2, "Expecting {} materialized view, got {}".format(2, len(result)))
 
         session.execute("DROP MATERIALIZED VIEW ks.users_by_state;")
 
         result = session.execute(("SELECT * FROM system_schema.materialized_views "
-                                 "WHERE keyspace_name='ks' AND table_name='users'"))
+                                  "WHERE keyspace_name='ks' AND table_name='users'"))
         self.assertEqual(len(result), 1, "Expecting {} materialized view, got {}".format(1, len(result)))
 
     def drop_column_test(self):
@@ -232,7 +231,7 @@ class TestMaterializedViews(Tester):
         session = self.prepare(user_table=True)
 
         result = session.execute(("SELECT * FROM system_schema.materialized_views "
-                                 "WHERE keyspace_name='ks' AND table_name='users'"))
+                                  "WHERE keyspace_name='ks' AND table_name='users'"))
         self.assertEqual(len(result), 1, "Expecting {} materialized view, got {}".format(1, len(result)))
 
         assert_invalid(
@@ -247,7 +246,7 @@ class TestMaterializedViews(Tester):
         session = self.prepare(user_table=True)
 
         result = session.execute(("SELECT * FROM system_schema.materialized_views "
-                                 "WHERE keyspace_name='ks' AND table_name='users'"))
+                                  "WHERE keyspace_name='ks' AND table_name='users'"))
         self.assertEqual(
             len(result), 1,
             "Expecting {} materialized view, got {}".format(1, len(result))
@@ -531,7 +530,7 @@ class TestMaterializedViews(Tester):
 
         debug("Tyring to UpInsert data with a different value using IF NOT EXISTS")
         for i in xrange(1000):
-            v = i*2
+            v = i * 2
             session.execute(
                 "INSERT INTO t (id, v, v2, v3) VALUES ({id}, {v}, 'a', 3.0) IF NOT EXISTS".format(id=i, v=v)
             )
@@ -547,7 +546,7 @@ class TestMaterializedViews(Tester):
 
         debug("Update the 10 first rows with a different value")
         for i in xrange(1000):
-            v = i+2000
+            v = i + 2000
             session.execute(
                 "UPDATE t SET v={v} WHERE id = {id} IF v < 10".format(id=i, v=v)
             )
@@ -557,7 +556,7 @@ class TestMaterializedViews(Tester):
         results = session.execute("SELECT * FROM t_by_v;")
         self.assertEqual(len(results), 1000)
         for i in xrange(1000):
-            v = i+2000 if i < 10 else i
+            v = i + 2000 if i < 10 else i
             assert_one(
                 session,
                 "SELECT * FROM t_by_v WHERE v = {}".format(v),
@@ -566,7 +565,7 @@ class TestMaterializedViews(Tester):
 
         debug("Deleting the first 10 rows")
         for i in xrange(1000):
-            v = i+2000
+            v = i + 2000
             session.execute(
                 "DELETE FROM t WHERE id = {id} IF v = {v} ".format(id=i, v=v)
             )
@@ -621,7 +620,7 @@ class TestMaterializedViews(Tester):
                 debug("MV build process is finished")
                 break
 
-            elapsed = (time.time()-start)/60
+            elapsed = (time.time() - start) / 60
             if elapsed > 2:
                 break
 
@@ -812,11 +811,11 @@ class TestMaterializedViews(Tester):
         debug('Write new data in node2 and node3 that overlap those in node1, node4 and node5')
         for i in xrange(1000):
             # we write i*2 as value, instead of i
-            session2.execute("INSERT INTO ks.t (id, v, v2, v3) VALUES ({v}, {v}, 'a', 3.0)".format(v=i*2))
+            session2.execute("INSERT INTO ks.t (id, v, v2, v3) VALUES ({v}, {v}, 'a', 3.0)".format(v=i * 2))
 
         debug('Verify the new data in the MV on node2 with CL=ONE')
         for i in xrange(1000):
-            v = i*2
+            v = i * 2
             assert_one(
                 session2,
                 "SELECT * FROM ks.t_by_v WHERE v = {}".format(v),
@@ -847,7 +846,7 @@ class TestMaterializedViews(Tester):
 
         debug('Read data from MV at quorum (new data should be returned after repair)')
         for i in xrange(1000):
-            v = i*2
+            v = i * 2
             assert_one(
                 session,
                 "SELECT * FROM ks.t_by_v WHERE v = {}".format(v),
@@ -958,6 +957,7 @@ class MM(object):
 
 
 class Match(MM):
+
     def __init__(self):
         self.mp = MutationPresence.match
 
@@ -994,6 +994,7 @@ class Missing(MM):
 
 
 class Excluded(MM):
+
     def __init__(self):
         self.mp = MutationPresence.excluded
 
@@ -1002,6 +1003,7 @@ class Excluded(MM):
 
 
 class Unknown(MM):
+
     def __init__(self):
         self.mp = MutationPresence.unknown
 
@@ -1015,7 +1017,7 @@ SimpleRow = collections.namedtuple('SimpleRow', 'a b c d')
 
 
 def row_generate(i):
-    return SimpleRow(a=i % 20, b=(i % 400)/20, c=i, d=i)
+    return SimpleRow(a=i % 20, b=(i % 400) / 20, c=i, d=i)
 
 
 # Create a threaded session and execute queries from a Queue
@@ -1048,7 +1050,7 @@ def thread_session(ip, queue, start, end, rows):
         for i in range(start, end):
             ret = execute_query(session, select_gi, i)
             queue.put_nowait(ret)
-    except Exception, e:
+    except Exception as e:
         print str(e)
         queue.close()
 

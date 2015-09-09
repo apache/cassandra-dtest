@@ -189,6 +189,7 @@ class ToJsonSelectTests(Tester):
     """
     Tests using toJson with a SELECT statement
     """
+
     def basic_data_types_test(self):
         """
         Create our schema:
@@ -448,6 +449,7 @@ class FromJsonUpdateTests(Tester):
     """
     Tests using fromJson within UPDATE statements.
     """
+
     def basic_data_types_test(self):
         """
         Create a table with the primitive types:
@@ -748,6 +750,7 @@ class FromJsonSelectTests(Tester):
     """
     Tests using fromJson in conjunction with a SELECT statement
     """
+
     def selecting_pkey_as_json_test(self):
         """
         Schema setup:
@@ -829,6 +832,7 @@ class FromJsonInsertTests(Tester):
     """
     Tests using fromJson within INSERT statements.
     """
+
     def basic_data_types_test(self):
         """
         Create a table with the primitive types:
@@ -1051,6 +1055,7 @@ class FromJsonDeleteTests(Tester):
     """
     Tests using fromJson within DELETE statements.
     """
+
     def delete_using_pkey_json_test(self):
         """
         Schema setup:
@@ -1114,6 +1119,7 @@ class JsonFullRowInsertSelect(Tester):
     """
     Tests for creating full rows from json documents, selecting full rows back as json documents, and related functionality.
     """
+
     def simple_schema_test(self):
         """
         Create schema:

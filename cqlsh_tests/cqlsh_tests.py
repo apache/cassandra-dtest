@@ -480,14 +480,14 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         # If this assertion fails check CASSANDRA-7891
 
     def verify_output(self, query, node, expected):
-            output, err = self.run_cqlsh(node, query, ['-u', 'cassandra', '-p', 'cassandra'])
-            if common.is_win():
-                output = output.replace('\r', '')
-            if len(err) > 0:
-                debug(err)
-                assert False, "Failed to execute cqlsh"
-            debug(output)
-            self.assertTrue(expected in output, "Output \n {%s} \n doesn't contain expected\n {%s}" % (output, expected))
+        output, err = self.run_cqlsh(node, query, ['-u', 'cassandra', '-p', 'cassandra'])
+        if common.is_win():
+            output = output.replace('\r', '')
+        if len(err) > 0:
+            debug(err)
+            assert False, "Failed to execute cqlsh"
+        debug(output)
+        self.assertTrue(expected in output, "Output \n {%s} \n doesn't contain expected\n {%s}" % (output, expected))
 
     def test_list_queries(self):
         config = {'authenticator': 'org.apache.cassandra.auth.PasswordAuthenticator',
@@ -1308,6 +1308,7 @@ class CqlshSmokeTest(Tester):
     """
     Tests simple use cases for clqsh.
     """
+
     def setUp(self):
         super(CqlshSmokeTest, self).setUp()
         self.cluster.populate(1).start(wait_for_binary_proto=True)
@@ -1588,6 +1589,7 @@ class CqlLoginTest(Tester):
     """
     Tests login which requires password authenticator
     """
+
     def setUp(self):
         super(CqlLoginTest, self).setUp()
         config = {'authenticator': 'org.apache.cassandra.auth.PasswordAuthenticator'}

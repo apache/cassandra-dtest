@@ -2,9 +2,12 @@ from dtest import Tester
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
 
-import random, time, uuid
+import random
+import time
+import uuid
 from assertions import assert_invalid, assert_one
 from tools import rows_to_list, since
+
 
 class TestCounters(Tester):
 
@@ -56,7 +59,7 @@ class TestCounters(Tester):
                 c counter
             )
         """
-        query = query +  "WITH compression = { 'sstable_compression' : 'SnappyCompressor' }"
+        query = query + "WITH compression = { 'sstable_compression' : 'SnappyCompressor' }"
 
         session.execute(query)
         time.sleep(2)
@@ -69,7 +72,7 @@ class TestCounters(Tester):
             upd = "UPDATE counterTable SET c = c + 1 WHERE k = %d;"
             batch = " ".join(["BEGIN COUNTER BATCH"] + [upd % x for x in keys] + ["APPLY BATCH;"])
 
-            kmap = { "k%d" % i : i for i in keys }
+            kmap = {"k%d" % i: i for i in keys}
             for i in range(0, updates):
                 query = SimpleStatement(batch, consistency_level=ConsistencyLevel.QUORUM)
                 session.execute(query)
@@ -130,7 +133,7 @@ class TestCounters(Tester):
         for i in xrange(25):
             _id = str(uuid.uuid4())
             counters.append(
-                {_id: {'counter_one':1, 'counter_two':1}}
+                {_id: {'counter_one': 1, 'counter_two': 1}}
             )
 
             query = SimpleStatement("""
@@ -141,7 +144,7 @@ class TestCounters(Tester):
 
         # increment a bunch of counters with CL.ONE
         for i in xrange(10000):
-            counter = counters[random.randint(0, len(counters)-1)]
+            counter = counters[random.randint(0, len(counters) - 1)]
             counter_id = counter.keys()[0]
 
             query = SimpleStatement("""
@@ -208,7 +211,7 @@ class TestCounters(Tester):
         expected_counts = {}
 
         # set up expectations
-        for i in range(1,6):
+        for i in range(1, 6):
             _id = uuid.uuid4()
 
             expected_counts[_id] = i

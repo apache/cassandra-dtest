@@ -69,18 +69,18 @@ def new_node(cluster, bootstrap=True, token=None, remote_debug_port='2000', data
 
 
 def insert_columns(tester, session, key, columns_count, consistency=ConsistencyLevel.QUORUM, offset=0):
-    upds = ["UPDATE cf SET v=\'value%d\' WHERE key=\'k%s\' AND c=\'c%06d\'" % (i, key, i) for i in xrange(offset*columns_count, columns_count*(offset+1))]
+    upds = ["UPDATE cf SET v=\'value%d\' WHERE key=\'k%s\' AND c=\'c%06d\'" % (i, key, i) for i in xrange(offset * columns_count, columns_count * (offset + 1))]
     query = 'BEGIN BATCH %s; APPLY BATCH' % '; '.join(upds)
     simple_query = SimpleStatement(query, consistency_level=consistency)
     session.execute(simple_query)
 
 
 def query_columns(tester, session, key, columns_count, consistency=ConsistencyLevel.QUORUM, offset=0):
-    query = SimpleStatement('SELECT c, v FROM cf WHERE key=\'k%s\' AND c >= \'c%06d\' AND c <= \'c%06d\'' % (key, offset, columns_count+offset-1), consistency_level=consistency)
+    query = SimpleStatement('SELECT c, v FROM cf WHERE key=\'k%s\' AND c >= \'c%06d\' AND c <= \'c%06d\'' % (key, offset, columns_count + offset - 1), consistency_level=consistency)
     res = session.execute(query)
-    assert len(res) == columns_count, "%s != %s (%s-%s)" % (len(res), columns_count, offset, columns_count+offset-1)
+    assert len(res) == columns_count, "%s != %s (%s-%s)" % (len(res), columns_count, offset, columns_count + offset - 1)
     for i in xrange(0, columns_count):
-        assert res[i][1] == 'value%d' % (i+offset)
+        assert res[i][1] == 'value%d' % (i + offset)
 
 
 def retry_till_success(fun, *args, **kwargs):
@@ -128,13 +128,13 @@ def _put_with_overwrite(cluster, session, nb_keys, cl=ConsistencyLevel.QUORUM):
         time.sleep(.01)
     cluster.flush()
     for k in xrange(0, nb_keys):
-        kvs = ["UPDATE cf SET v=\'value%d\' WHERE key=\'k%s\' AND c=\'c%02d\'" % (i*4, k, i*2) for i in xrange(0, 50)]
+        kvs = ["UPDATE cf SET v=\'value%d\' WHERE key=\'k%s\' AND c=\'c%02d\'" % (i * 4, k, i * 2) for i in xrange(0, 50)]
         query = SimpleStatement('BEGIN BATCH %s APPLY BATCH' % '; '.join(kvs), consistency_level=cl)
         session.execute(query)
         time.sleep(.01)
     cluster.flush()
     for k in xrange(0, nb_keys):
-        kvs = ["UPDATE cf SET v=\'value%d\' WHERE key=\'k%s\' AND c=\'c%02d\'" % (i*20, k, i*5) for i in xrange(0, 20)]
+        kvs = ["UPDATE cf SET v=\'value%d\' WHERE key=\'k%s\' AND c=\'c%02d\'" % (i * 20, k, i * 5) for i in xrange(0, 20)]
         query = SimpleStatement('BEGIN BATCH %s APPLY BATCH' % '; '.join(kvs), consistency_level=cl)
         session.execute(query)
         time.sleep(.01)
@@ -145,9 +145,9 @@ def _validate_row(cluster, res):
     assert len(res) == 100, len(res)
     for i in xrange(0, 100):
         if i % 5 == 0:
-            assert res[i][2] == 'value%d' % (i*4), 'for %d, expecting value%d, got %s' % (i, i*4, res[i][2])
+            assert res[i][2] == 'value%d' % (i * 4), 'for %d, expecting value%d, got %s' % (i, i * 4, res[i][2])
         elif i % 2 == 0:
-            assert res[i][2] == 'value%d' % (i*2), 'for %d, expecting value%d, got %s' % (i, i*2, res[i][2])
+            assert res[i][2] == 'value%d' % (i * 2), 'for %d, expecting value%d, got %s' % (i, i * 2, res[i][2])
         else:
             assert res[i][2] == 'value%d' % i, 'for %d, expecting value%d, got %s' % (i, i, res[i][2])
 
@@ -216,6 +216,7 @@ def generate_ssl_stores(base_dir, passphrase='cassandra'):
 
 
 class since(object):
+
     def __init__(self, cass_version, max_version=None):
         self.cass_version = LooseVersion(cass_version)
         self.max_version = max_version
@@ -342,6 +343,7 @@ def safe_mkdtemp():
 
 
 class InterruptBootstrap(Thread):
+
     def __init__(self, node):
         Thread.__init__(self)
         self.node = node
@@ -352,6 +354,7 @@ class InterruptBootstrap(Thread):
 
 
 class InterruptCompaction(Thread):
+
     def __init__(self, node, tablename):
         Thread.__init__(self)
         self.node = node
@@ -364,6 +367,7 @@ class InterruptCompaction(Thread):
 
 
 class KillOnBootstrap(Thread):
+
     def __init__(self, node):
         Thread.__init__(self)
         self.node = node

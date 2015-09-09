@@ -113,27 +113,28 @@ class FlakyRetryPolicy(RetryPolicy):
 
     def on_read_timeout(self, *args, **kwargs):
         if kwargs['retry_num'] < 5:
-            debug("Retrying read after timeout. Attempt #"+str(kwargs['retry_num']))
+            debug("Retrying read after timeout. Attempt #" + str(kwargs['retry_num']))
             return (self.RETRY, None)
         else:
             return (self.RETHROW, None)
 
     def on_write_timeout(self, *args, **kwargs):
         if kwargs['retry_num'] < 5:
-            debug("Retrying write after timeout. Attempt #"+str(kwargs['retry_num']))
+            debug("Retrying write after timeout. Attempt #" + str(kwargs['retry_num']))
             return (self.RETRY, None)
         else:
             return (self.RETHROW, None)
 
     def on_unavailable(self, *args, **kwargs):
         if kwargs['retry_num'] < 5:
-            debug("Retrying request after UE. Attempt #"+str(kwargs['retry_num']))
+            debug("Retrying request after UE. Attempt #" + str(kwargs['retry_num']))
             return (self.RETRY, None)
         else:
             return (self.RETHROW, None)
 
 
 class Runner(threading.Thread):
+
     def __init__(self, func):
         threading.Thread.__init__(self)
         self.__func = func
@@ -182,7 +183,7 @@ class Tester(TestCase):
         # regular Windows space on wmic calls which will otherwise break pathing
         if sys.platform == "cygwin":
             self.test_path = subprocess.Popen(["cygpath", "-m", self.test_path], stdout=subprocess.PIPE, stderr=subprocess.STDOUT).communicate()[0].rstrip()
-        debug("cluster ccm directory: "+self.test_path)
+        debug("cluster ccm directory: " + self.test_path)
         version = os.environ.get('CASSANDRA_VERSION')
         cdir = CASSANDRA_DIR
 
@@ -552,7 +553,7 @@ class Tester(TestCase):
                     # means the test failed. Save the logs for inspection.
                     self.copy_logs()
             except Exception as e:
-                    print "Error saving log:", str(e)
+                print "Error saving log:", str(e)
             finally:
                 if not self._preserve_cluster:
                     self._cleanup_cluster()
@@ -583,8 +584,8 @@ class Tester(TestCase):
             with open(os.path.join(
                     self.test_path, cluster_name, 'cassandra.in.sh'), 'w') as f:
 
-                f.write('JVM_OPTS="$JVM_OPTS -javaagent:{jar_path}=destfile={exec_file}"'\
-                    .format(jar_path=agent_location, exec_file=jacoco_execfile))
+                f.write('JVM_OPTS="$JVM_OPTS -javaagent:{jar_path}=destfile={exec_file}"'
+                        .format(jar_path=agent_location, exec_file=jacoco_execfile))
 
                 if os.path.isfile(jacoco_execfile):
                     debug("Jacoco execfile found at {}, execution data will be appended".format(jacoco_execfile))
@@ -666,6 +667,7 @@ class MultiError(Exception):
     """
     Extends Exception to provide reporting multiple exceptions at once.
     """
+
     def __init__(self, exceptions, tracebacks):
         # an exception and the corresponding traceback should be found at the same
         # position in their respective lists, otherwise __str__ will be incorrect

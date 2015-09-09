@@ -19,6 +19,7 @@ class TestRepairDataSystemTable(Tester):
 
     It's possible to check the behavior with tracing - pattern matching in system_traces.events.activity
     """
+
     def setUp(self):
         Tester.setUp(self)
         self.cluster.populate(3).start(wait_for_binary_proto=True)

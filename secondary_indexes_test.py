@@ -330,6 +330,7 @@ class TestSecondaryIndexes(Tester):
 
 
 class TestSecondaryIndexesOnCollections(Tester):
+
     def __init__(self, *args, **kwargs):
         Tester.__init__(self, *args, **kwargs)
 
@@ -406,7 +407,7 @@ class TestSecondaryIndexesOnCollections(Tester):
 
             log.append(
                 {'user_id': user_uuid,
-                 'email': str(i)+'@example.com',
+                 'email': str(i) + '@example.com',
                  'unshared_uuid': unshared_uuid}
             )
 
@@ -501,7 +502,7 @@ class TestSecondaryIndexesOnCollections(Tester):
 
             log.append(
                 {'user_id': user_uuid,
-                 'email': str(i)+'@example.com',
+                 'email': str(i) + '@example.com',
                  'unshared_uuid': unshared_uuid}
             )
 
@@ -657,7 +658,7 @@ class TestSecondaryIndexesOnCollections(Tester):
 
             log.append(
                 {'user_id': user_uuid,
-                 'email': str(i)+'@example.com',
+                 'email': str(i) + '@example.com',
                  'unshared_uuid1': unshared_uuid1,
                  'unshared_uuid2': unshared_uuid2}
             )

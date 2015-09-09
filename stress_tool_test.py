@@ -11,6 +11,7 @@ class TestStressSparsenessRatio(Tester):
 
     Tests for the `row-population-ratio` parameter to `cassandra-stress`.
     """
+
     def uniform_ratio_test(self):
         """
         Tests that the ratio-specifying string 'uniform(5..15)/50' results in
@@ -26,7 +27,7 @@ class TestStressSparsenessRatio(Tester):
         written being non-null.
         """
         self.distribution_template(ratio_spec='fixed(1)/3',
-                                   expected_ratio=1 - 1/3,
+                                   expected_ratio=1 - 1 / 3,
                                    delta=.01)
 
     def distribution_template(self, ratio_spec, expected_ratio, delta):

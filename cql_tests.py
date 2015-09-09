@@ -406,6 +406,7 @@ class AbortedQueriesTester(CQLTester):
     @jira_ticket CASSANDRA-7392
     Test that read-queries that take longer than read_request_timeout_in_ms time out
     """
+
     def local_query_test(self):
         """
         Check that a query running on the local coordinator node times out
@@ -468,7 +469,6 @@ class AbortedQueriesTester(CQLTester):
         statement = SimpleStatement("SELECT * from test2", consistency_level=ConsistencyLevel.ONE, retry_policy=FallthroughRetryPolicy())
         assert_unavailable(lambda c: debug(c.execute(statement)), session)
         node2.watch_log_for("'SELECT \* FROM ks.test2 (.*)' timed out 1 time", from_mark=mark, timeout=60)
-
 
     def index_query_test(self):
         """

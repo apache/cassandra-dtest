@@ -120,7 +120,7 @@ def write_to_trigger_fsync(session, ks, table):
     """
     execute_concurrent_with_args(session,
                                  session.prepare('INSERT INTO "{ks}"."{table}" (key, a, b, c) VALUES (?, ?, ?, ?)'.format(ks=ks, table=table)),
-                                 ((x, x+1, x+2, x+3) for x in range(50000)))
+                                 ((x, x + 1, x + 2, x + 3) for x in range(50000)))
 
 
 def commitlog_size(node):
