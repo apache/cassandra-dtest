@@ -18,7 +18,7 @@ clients = (
     "Chromium",
     "Mozilla",
     "Emacs"
-    )
+)
 
 
 class TestWideRows(Tester):

@@ -19,6 +19,7 @@ def wait(delay=2):
     """
     time.sleep(delay)
 
+
 class TestConcurrentSchemaChanges(Tester):
 
     def __init__(self, *argv, **kwargs):
@@ -46,10 +47,10 @@ class TestConcurrentSchemaChanges(Tester):
         session.execute(query)
         wait(1)
         session.execute("INSERT INTO cf_%s (col1, col2, col3) VALUES ('a', 'b', 'c');"
-                % namespace)
+                        % namespace)
 
         # create an index
-        session.execute("CREATE INDEX index_%s ON cf_%s(col2)"%(namespace, namespace))
+        session.execute("CREATE INDEX index_%s ON cf_%s(col2)" % (namespace, namespace))
 
         # create a column family that can be deleted later.
         query = """
@@ -111,7 +112,7 @@ class TestConcurrentSchemaChanges(Tester):
         session.execute(query)
 
         # add index
-        session.execute("CREATE INDEX index2_%s ON cf_%s(col3)"%(namespace, namespace))
+        session.execute("CREATE INDEX index2_%s ON cf_%s(col3)" % (namespace, namespace))
 
         # remove an index
         session.execute("DROP INDEX index_%s" % namespace)
@@ -516,10 +517,10 @@ class TestConcurrentSchemaChanges(Tester):
 
         ### restore the snapshots ##
         # clear the commitlogs and data
-        dirs = (    '%s/commitlogs' % node1.get_path(),
-                    '%s/commitlogs' % node2.get_path(),
-                    '%s/data/ks_ns2/cf_*/*' % node1.get_path(),
-                    '%s/data/ks_ns2/cf_*/*' % node2.get_path(),
+        dirs = ('%s/commitlogs' % node1.get_path(),
+                '%s/commitlogs' % node2.get_path(),
+                '%s/data/ks_ns2/cf_*/*' % node1.get_path(),
+                '%s/data/ks_ns2/cf_*/*' % node2.get_path(),
                 )
         for dirr in dirs:
             for f in glob.glob(os.path.join(dirr)):

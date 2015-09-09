@@ -3,6 +3,7 @@ from tools import since
 
 import time
 
+
 @since("1.2")
 class TestCQL(Tester):
 

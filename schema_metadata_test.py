@@ -253,10 +253,10 @@ def _verify_uda(created_on_version, current_version, keyspace, session, table_na
     function_name = _table_name_builder(table_name_prefix, "test_uda_function")
     aggregate_name = _table_name_builder(table_name_prefix, "test_uda_aggregate")
 
-    assert_in(function_name+"(int,int)", session.cluster.metadata.keyspaces[keyspace].functions.keys())
-    assert_in(aggregate_name+"(int)", session.cluster.metadata.keyspaces[keyspace].aggregates.keys())
+    assert_in(function_name + "(int,int)", session.cluster.metadata.keyspaces[keyspace].functions.keys())
+    assert_in(aggregate_name + "(int)", session.cluster.metadata.keyspaces[keyspace].aggregates.keys())
 
-    aggr_meta = session.cluster.metadata.keyspaces[keyspace].aggregates[aggregate_name+"(int)"]
+    aggr_meta = session.cluster.metadata.keyspaces[keyspace].aggregates[aggregate_name + "(int)"]
     assert_equal(function_name, aggr_meta.state_func)
     assert_equal(cqltypes.Int32Type, aggr_meta.state_type)
     assert_equal(cqltypes.Int32Type, aggr_meta.return_type)
@@ -275,8 +275,8 @@ def verify_udf(created_on_version, current_version, keyspace, session, table_nam
     if created_on_version < '2.2':
         return
     function_name = _table_name_builder(table_name_prefix, "test_udf")
-    assert_in(function_name+"(double)", session.cluster.metadata.keyspaces[keyspace].functions.keys())
-    meta = session.cluster.metadata.keyspaces[keyspace].functions[function_name+"(double)"]
+    assert_in(function_name + "(double)", session.cluster.metadata.keyspaces[keyspace].functions.keys())
+    meta = session.cluster.metadata.keyspaces[keyspace].functions[function_name + "(double)"]
     assert_equal('java', meta.language)
     assert_equal(cqltypes.DoubleType, meta.return_type)
     assert_equal(['double'], meta.type_signature)
@@ -476,6 +476,7 @@ def _table_name_builder(prefix, table_name):
 
 
 class TestSchemaMetadata(Tester):
+
     def setUp(self):
         Tester.setUp(self)
         cluster = self.cluster

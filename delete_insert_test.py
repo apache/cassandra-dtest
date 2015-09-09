@@ -59,6 +59,7 @@ class DeleteInsertTest(Tester):
         # querying across all nodes:
 
         class ThreadedQuery(threading.Thread):
+
             def __init__(self, connection):
                 threading.Thread.__init__(self)
                 self.connection = connection

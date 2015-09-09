@@ -101,6 +101,7 @@ class TestSnapshot(SnapshotTester):
 
 
 class TestArchiveCommitlog(SnapshotTester):
+
     def __init__(self, *args, **kwargs):
         kwargs['cluster_options'] = {'commitlog_segment_size_in_mb': 1}
         SnapshotTester.__init__(self, *args, **kwargs)
@@ -179,7 +180,7 @@ class TestArchiveCommitlog(SnapshotTester):
         insert_cutoff_times = [time.gmtime()]
 
         # Delete all commitlog backups so far:
-        for f in glob.glob(tmp_commitlog+"/*"):
+        for f in glob.glob(tmp_commitlog + "/*"):
             os.remove(f)
 
         snapshot_dir = self.make_snapshot(node1, 'ks', 'cf', 'basic')
@@ -239,7 +240,7 @@ class TestArchiveCommitlog(SnapshotTester):
 
             # Destroy the cluster
             cluster.stop()
-            self.copy_logs(name=self.id().split(".")[0]+"_pre-restore")
+            self.copy_logs(name=self.id().split(".")[0] + "_pre-restore")
             self._cleanup_cluster()
             cluster = self.cluster = self._get_cluster()
             cluster.populate(1)

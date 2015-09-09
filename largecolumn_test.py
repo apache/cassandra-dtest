@@ -8,6 +8,7 @@ class TestLargeColumn(Tester):
     Check that inserting and reading large columns to the database doesn't cause off heap memory usage
     that is proportional to the size of the memory read/written.
     """
+
     def stress_with_col_size(self, cluster, node, size):
         size = str(size)
         node.stress(['write', 'n=5', "no-warmup", "cl=ALL", "-pop", "seq=1...5", "-schema", "replication(factor=2)", "-col", "n=fixed(1)", "size=fixed(" + size + ")", "-rate", "threads=1"])

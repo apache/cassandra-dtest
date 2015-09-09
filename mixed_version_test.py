@@ -66,7 +66,7 @@ class TestSchemaChanges(Tester):
         try:
             for i in range(20):
                 session.execute(SimpleStatement("SELECT * FROM test_upgrades.foo WHERE a = %d" % (i,),
-                                consistency_level=ConsistencyLevel.ALL, fetch_size=None))
+                                                consistency_level=ConsistencyLevel.ALL, fetch_size=None))
             self.fail("expected failure")
         except (ReadTimeout, OperationTimedOut):
             debug("Checking node2 for warning in log")

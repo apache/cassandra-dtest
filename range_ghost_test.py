@@ -2,6 +2,7 @@ from dtest import Tester
 
 import time
 
+
 class TestRangeGhosts(Tester):
 
     def ghosts_test(self):
@@ -25,16 +26,16 @@ class TestRangeGhosts(Tester):
 
         node1.flush()
 
-        for i in xrange(0, rows/2):
+        for i in xrange(0, rows / 2):
             session.execute("DELETE FROM cf WHERE key = 'k%i'" % i)
 
         res = session.execute("SELECT * FROM cf LIMIT 10000")
         # no ghosts in 1.2+
-        assert len(res) == rows/2, len(res)
+        assert len(res) == rows / 2, len(res)
 
         node1.flush()
-        time.sleep(1) # make sure tombstones are collected
+        time.sleep(1)  # make sure tombstones are collected
         node1.compact()
 
         res = session.execute("SELECT * FROM cf LIMIT 10000")
-        assert len(res) == rows/2, len(res)
+        assert len(res) == rows / 2, len(res)

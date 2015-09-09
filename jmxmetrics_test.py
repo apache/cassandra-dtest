@@ -70,7 +70,7 @@ def MBEAN_VALUES_POST(ks, table):
             ('metrics', 'Table', {'name': 'RowCacheHit'}, 'Value', 'MBeanEqual'),
             ('metrics', 'Table', {'name': 'RowCacheHitOutOfRange'}, 'Value', 'MBeanEqual'),
             ('metrics', 'Table', {'name': 'RowCacheMiss'}, 'Value', 'MBeanEqual'),
-            ('metrics', 'Table', {'name': 'EstimatedPartitionSizeHistogram',  'keyspace': ks, 'scope': table}, 'Value', 'MBeanEqual'),
+            ('metrics', 'Table', {'name': 'EstimatedPartitionSizeHistogram', 'keyspace': ks, 'scope': table}, 'Value', 'MBeanEqual'),
             ('metrics', 'Table', {'name': 'EstimatedPartitionCount', 'keyspace': ks, 'scope': table}, 'Value', 'MBeanEqual')]
 
 

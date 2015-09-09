@@ -261,7 +261,7 @@ class TestRepair(Tester):
 
         # Verify that only nodes in dc1 and dc2 are involved in repair
         out_of_sync_logs = node1.grep_log("/([0-9.]+) and /([0-9.]+) have ([0-9]+) range\(s\) out of sync")
-        self.assertEqual(len(out_of_sync_logs),  2, "Lines matching: " + str([elt[0] for elt in out_of_sync_logs]))
+        self.assertEqual(len(out_of_sync_logs), 2, "Lines matching: " + str([elt[0] for elt in out_of_sync_logs]))
         valid = [(node1.address(), node2.address()), (node2.address(), node1.address()),
                  (node2.address(), node3.address()), (node3.address(), node2.address())]
         for line, m in out_of_sync_logs:
@@ -326,6 +326,7 @@ class TestRepairDataSystemTable(Tester):
     to a cluster, then ensuring these tables are in valid states before and
     after running repair.
     """
+
     def setUp(self):
         """
         Prepares a cluster for tests of the repair history tables by starting

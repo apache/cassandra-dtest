@@ -701,20 +701,20 @@ class TestUpgradeThroughVersions(Tester):
         wait_end_time = time.time() + max_wait_s
 
         while time.time() < wait_end_time:
-                try:
-                    qsize = queue.qsize()
-                except NotImplementedError:
-                    debug("Queue size may not be checkable on Mac OS X. Test will continue without waiting.")
-                    break
-                if opfunc(qsize, required_len):
-                    debug("{} queue size ({}) is '{}' to {}. Continuing.".format(label, qsize, opfunc.__name__, required_len))
-                    break
+            try:
+                qsize = queue.qsize()
+            except NotImplementedError:
+                debug("Queue size may not be checkable on Mac OS X. Test will continue without waiting.")
+                break
+            if opfunc(qsize, required_len):
+                debug("{} queue size ({}) is '{}' to {}. Continuing.".format(label, qsize, opfunc.__name__, required_len))
+                break
 
-                if divmod(round(time.time()), 30)[1] == 0:
-                    debug("{} queue size is at {}, target is to reach '{}' {}".format(label, qsize, opfunc.__name__, required_len))
+            if divmod(round(time.time()), 30)[1] == 0:
+                debug("{} queue size is at {}, target is to reach '{}' {}".format(label, qsize, opfunc.__name__, required_len))
 
-                time.sleep(0.1)
-                continue
+            time.sleep(0.1)
+            continue
         else:
             raise RuntimeError("Ran out of time waiting for queue size ({}) to be '{}' to {}. Aborting.".format(qsize, opfunc.__name__, required_len))
 
@@ -848,6 +848,7 @@ class TestRandomPartitionerUpgrade(TestUpgradeThroughVersions):
     """
     Upgrades a 3-node RandomPartitioner cluster through versions specified in test_versions.
     """
+
     def __init__(self, *args, **kwargs):
         # Ignore these log patterns:
         self.ignore_log_patterns = [

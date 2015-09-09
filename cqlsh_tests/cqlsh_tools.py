@@ -8,6 +8,7 @@ from nose.tools import assert_items_equal
 
 
 class DummyColorMap(object):
+
     def __getitem__(self, *args):
         return ''
 

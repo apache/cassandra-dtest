@@ -25,6 +25,7 @@ def java_bin():
     else:
         return 'java'
 
+
 def make_mbean(package, type, **kwargs):
     '''
     Builds the name for an mbean.
@@ -98,7 +99,7 @@ class JolokiaAgent(object):
 
         try:
             subprocess.check_output(args, stderr=subprocess.STDOUT)
-        except subprocess.CalledProcessError, exc:
+        except subprocess.CalledProcessError as exc:
             print "Failed to start jolokia agent (command was: %s): %s" % (' '.join(args), exc)
             print "Exit status was: %d" % (exc.returncode,)
             print "Output was: %s" % (exc.output,)
@@ -114,7 +115,7 @@ class JolokiaAgent(object):
                 'stop', str(self.node.pid))
         try:
             subprocess.check_output(args, stderr=subprocess.STDOUT)
-        except subprocess.CalledProcessError, exc:
+        except subprocess.CalledProcessError as exc:
             print "Failed to stop jolokia agent (command was: %s): %s" % (' '.join(args), exc)
             print "Exit status was: %d" % (exc.returncode,)
             print "Output was: %s" % (exc.output,)

@@ -7,6 +7,7 @@ from assertions import assert_invalid
 
 @since('2.0')
 class TestSchema(Tester):
+
     def drop_column_compact_test(self):
         session = self.prepare()
 

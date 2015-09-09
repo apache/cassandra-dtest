@@ -32,7 +32,7 @@ class TestJMX(Tester):
             self.assertFalse(error_msg in histogram)
             self.assertTrue("NaN" not in histogram)
 
-        except Exception, e:
+        except Exception as e:
             self.fail("Cfhistograms command failed: " + str(e))
 
         session = self.patient_cql_connection(node1)
@@ -48,7 +48,7 @@ class TestJMX(Tester):
             self.assertFalse(error_msg in finalhistogram)
             correct_error_msg = "No SSTables exists, unable to calculate 'Partition Size' and 'Cell Count' percentiles"
             self.assertTrue(correct_error_msg in finalhistogram[1])
-        except Exception, e:
+        except Exception as e:
             debug(finalhistogram)
             self.fail("Cfhistograms command failed: " + str(e))
 
@@ -68,7 +68,7 @@ class TestJMX(Tester):
         node1.stop(gently=False)
         try:
             node1.nodetool("netstats")
-        except Exception, e:
+        except Exception as e:
             if "ConcurrentModificationException" in str(e):
                 self.fail("Netstats failed due to CASSANDRA-6577")
             else:
@@ -78,7 +78,7 @@ class TestJMX(Tester):
 
         try:
             node1.nodetool("netstats")
-        except Exception, e:
+        except Exception as e:
             if 'java.lang.reflect.UndeclaredThrowableException' in str(e):
                 debug(str(e))
                 self.fail("Netstats failed with UndeclaredThrowableException (CASSANDRA-8122)")

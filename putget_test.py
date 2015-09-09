@@ -8,6 +8,7 @@ import time
 from thrift.transport import TTransport, TSocket
 from thrift.protocol import TBinaryProtocol
 
+
 class TestPutGet(Tester):
 
     def __init__(self, *args, **kwargs):
@@ -84,11 +85,11 @@ class TestPutGet(Tester):
         key = 'wide'
 
         for x in xrange(1, 5001):
-            tools.insert_columns(self, session, key, 100, offset=x-1)
+            tools.insert_columns(self, session, key, 100, offset=x - 1)
 
         for size in (10, 100, 1000):
             for x in xrange(1, (50001 - size) / size):
-                tools.query_columns(self, session, key, size, offset=x*size-1)
+                tools.query_columns(self, session, key, size, offset=x * size - 1)
 
     @no_vnodes()
     def wide_slice_test(self):
@@ -121,8 +122,8 @@ class TestPutGet(Tester):
         cluster.set_configuration_options(values={'partitioner': 'org.apache.cassandra.dht.ByteOrderedPartitioner'})
         cluster.populate(2)
         node1, node2 = cluster.nodelist()
-        node1.set_configuration_options(values={'initial_token': "a".encode('hex')  })
-        node1.set_configuration_options(values={'initial_token': "b".encode('hex')  })
+        node1.set_configuration_options(values={'initial_token': "a".encode('hex')})
+        node1.set_configuration_options(values={'initial_token': "b".encode('hex')})
         cluster.start()
         time.sleep(.5)
         session = self.patient_cql_connection(node1)
@@ -168,10 +169,11 @@ class TestPutGet(Tester):
         for row in rows:
             cols = [col.column.name for col in row.columns]
             columns.extend(cols)
-            #print row.key
-            #print cols
+            # print row.key
+            # print cols
 
         assert len(columns) == 95, "Regression in cassandra-4919. Expected 95 columns, got %d." % len(columns)
+
 
 class ThriftConnection(object):
     """
@@ -179,7 +181,7 @@ class ThriftConnection(object):
     """
 
     def __init__(self, node=None, host=None, port=None, ks_name='ks', cf_name='cf',
-            cassandra_interface='11'):
+                 cassandra_interface='11'):
         """
         initializes the connection.
          - node: a ccm node. If supplied, the host and port, and cassandra_interface
@@ -217,14 +219,14 @@ class ThriftConnection(object):
     def create_ks(self, replication_factor=1):
         if self.cassandra_interface == '07':
             ks_def = self.Cassandra.KsDef(name=self.ks_name,
-                    strategy_class='org.apache.cassandra.locator.SimpleStrategy',
-                    replication_factor=int(replication_factor),
-                    cf_defs=[])
+                                          strategy_class='org.apache.cassandra.locator.SimpleStrategy',
+                                          replication_factor=int(replication_factor),
+                                          cf_defs=[])
         else:
             ks_def = self.Cassandra.KsDef(name=self.ks_name,
-                    strategy_class='org.apache.cassandra.locator.SimpleStrategy',
-                    strategy_options={'replication_factor': str(replication_factor)},
-                    cf_defs=[])
+                                          strategy_class='org.apache.cassandra.locator.SimpleStrategy',
+                                          strategy_options={'replication_factor': str(replication_factor)},
+                                          cf_defs=[])
         retry_till_success(self.client.system_add_keyspace, ks_def, timeout=30)
         time.sleep(0.5)
         retry_till_success(self.wait_for_agreement, timeout=10)
@@ -235,7 +237,6 @@ class ThriftConnection(object):
     def use_ks(self):
         retry_till_success(self.client.set_keyspace, self.ks_name, timeout=30)
         return self
-
 
     def create_cf(self):
         cf_def = self.Cassandra.CfDef(name=self.cf_name, keyspace=self.ks_name)
@@ -253,29 +254,27 @@ class ThriftConnection(object):
     def _translate_cl(self, cl):
         return self.Cassandra.ConsistencyLevel._NAMES_TO_VALUES[cl]
 
-
     def insert_columns(self, num_rows=10, consistency_level='QUORUM'):
         """ Insert some basic values """
         cf_parent = self.Cassandra.ColumnParent(column_family=self.cf_name)
 
-        for row_key in ('row_%d'%i for i in xrange(num_rows)):
+        for row_key in ('row_%d' % i for i in xrange(num_rows)):
             col = self.Cassandra.Column(name='col_0', value='val_0',
-                    timestamp=int(time.time()*1000))
+                                        timestamp=int(time.time() * 1000))
             retry_till_success(self.client.insert,
-                    key=row_key, column_parent=cf_parent, column=col,
-                    consistency_level=self._translate_cl(consistency_level),
-                    timeout=30)
+                               key=row_key, column_parent=cf_parent, column=col,
+                               consistency_level=self._translate_cl(consistency_level),
+                               timeout=30)
         return self
-
 
     def query_columns(self, num_rows=10, consistency_level='QUORUM'):
         """ Check that the values inserted in insert_columns() are present """
-        for row_key in ('row_%d'%i for i in xrange(num_rows)):
+        for row_key in ('row_%d' % i for i in xrange(num_rows)):
             cpath = self.Cassandra.ColumnPath(column_family=self.cf_name,
-                    column='col_0')
+                                              column='col_0')
             cosc = retry_till_success(self.client.get, key=row_key, column_path=cpath,
-                    consistency_level=self._translate_cl(consistency_level),
-                    timeout=30)
+                                      consistency_level=self._translate_cl(consistency_level),
+                                      timeout=30)
             col = cosc.column
             value = col.value
             assert value == 'val_0', "column did not have the same value that was inserted!"

@@ -3969,13 +3969,13 @@ class TestCQL(Tester):
                     session.execute("INSERT INTO test(k, v1, v2, v3) VALUES (0, %d, %d, %d)" % (i, j, k))
 
         assert_all(session, "SELECT v1, v2, v3 FROM test WHERE k = 0", [[0, 0, 0],
-                                                                       [0, 0, 1],
-                                                                       [0, 1, 0],
-                                                                       [0, 1, 1],
-                                                                       [1, 0, 0],
-                                                                       [1, 0, 1],
-                                                                       [1, 1, 0],
-                                                                       [1, 1, 1]])
+                                                                        [0, 0, 1],
+                                                                        [0, 1, 0],
+                                                                        [0, 1, 1],
+                                                                        [1, 0, 0],
+                                                                        [1, 0, 1],
+                                                                        [1, 1, 0],
+                                                                        [1, 1, 1]])
 
         assert_all(session, "SELECT v1, v2, v3 FROM test WHERE k = 0 AND (v1, v2, v3) >= (1, 0, 1)", [[1, 0, 1], [1, 1, 0], [1, 1, 1]])
         assert_all(session, "SELECT v1, v2, v3 FROM test WHERE k = 0 AND (v1, v2) >= (1, 1)", [[1, 1, 0], [1, 1, 1]])

@@ -169,6 +169,7 @@ class PageFetcher(object):
 
 class PageAssertionMixin(object):
     """Can be added to subclasses of unittest.Tester"""
+
     def assertEqualIgnoreOrder(self, actual, expected):
         return self.assertItemsEqual(actual, expected)
 
@@ -177,6 +178,7 @@ class PageAssertionMixin(object):
 
 
 class BasePagingTester(Tester):
+
     def prepare(self):
         cluster = self.cluster
         cluster.populate(3).start()
@@ -333,6 +335,7 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
     """
     Tests concerned with paging when CQL modifiers (such as order, limit, allow filtering) are used.
     """
+
     def test_with_order_by(self):
         """"
         Paging over a single partition with ordering should work.
@@ -574,6 +577,7 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
 
 @since('2.0')
 class TestPagingData(BasePagingTester, PageAssertionMixin):
+
     def test_paging_a_single_wide_row(self):
         session = self.prepare()
         self.create_ks(session, 'test_paging_size', 2)
@@ -911,6 +915,7 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
     """
     Tests concerned with paging when the queried dataset changes while pages are being retrieved.
     """
+
     def test_data_change_impacting_earlier_page(self):
         session = self.prepare()
         self.create_ks(session, 'test_paging_size', 2)
@@ -1129,6 +1134,7 @@ class TestPagingQueryIsolation(BasePagingTester, PageAssertionMixin):
     """
     Tests concerned with isolation of paged queries (queries can't affect each other).
     """
+
     def test_query_isolation(self):
         """
         Interleave some paged queries and make sure nothing bad happens.
@@ -1221,8 +1227,8 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
 
         self.create_ks(self.session, 'test_paging_size', 2)
         self.session.execute("CREATE TABLE paging_test ( "
-                            "id int, mytext text, col1 int, col2 int, col3 int, "
-                            "PRIMARY KEY (id, mytext) )")
+                             "id int, mytext text, col1 int, col2 int, col3 int, "
+                             "PRIMARY KEY (id, mytext) )")
 
         def random_txt(text):
             return unicode(uuid.uuid4())
