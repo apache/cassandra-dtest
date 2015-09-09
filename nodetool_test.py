@@ -1,11 +1,9 @@
 from ccmlib.node import NodetoolError
 from dtest import Tester
-from tools import require
 
 
 class TestNodetool(Tester):
 
-    @require("8741")
     def test_decommission_after_drain_is_invalid(self):
         """
         @jira_ticket CASSANDRA-8741
