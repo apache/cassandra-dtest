@@ -1277,15 +1277,18 @@ Unlogged batch covering 2 partitions detected against table [client_warnings.tes
         self.cluster.start(wait_for_binary_proto=True)
         node1, = self.cluster.nodelist()
 
-        out, err = self.run_cqlsh(node1, cmd)
+        out, err = self.run_cqlsh(node1, cmd, env_vars={'TERM': 'xterm'})
         self.assertEqual("", err)
         self.assertTrue(re.search(chr(27) + "\[[0,1,2]?J", out))
 
-    def run_cqlsh(self, node, cmds, cqlsh_options=[]):
+    def run_cqlsh(self, node, cmds, cqlsh_options=[], env_vars=None):
+        if env_vars is None:
+            env_vars = {}
         cdir = node.get_install_dir()
         cli = os.path.join(cdir, 'bin', common.platform_binary('cqlsh'))
         env = common.make_cassandra_env(cdir, node.get_path())
         env['LANG'] = 'en_US.UTF-8'
+        env.update(env_vars)
         if LooseVersion(self.cluster.version()) >= LooseVersion('2.1'):
             host = node.network_interfaces['binary'][0]
             port = node.network_interfaces['binary'][1]
