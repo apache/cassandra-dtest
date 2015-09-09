@@ -147,6 +147,7 @@ class TestPushedNotifications(Tester):
             notifications = waiter.wait_for_notifications(30.0)
             self.assertEquals(1 if waiter.node is node1 else 0, len(notifications))
 
+    @require("10052")
     def restart_node_test(self):
         """
         @jira_ticket CASSANDRA-7816
