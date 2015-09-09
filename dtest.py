@@ -612,7 +612,7 @@ class Tester(TestCase):
         return node_ip
 
     def get_port_from_node(self, node):
-        if node.get_base_cassandra_version() >= 2.1:
+        if node.network_interfaces['binary']:
             port = node.network_interfaces['binary'][1]
         else:
             port = node.network_interfaces['thrift'][1]
