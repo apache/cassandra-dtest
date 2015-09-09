@@ -181,7 +181,6 @@ class BasePagingTester(UpgradeTester):
         return cursor
 
 
-@since('2.2')
 class TestPagingSize(BasePagingTester, PageAssertionMixin):
     """
     Basic tests relating to page size (relative to results set)
@@ -337,7 +336,6 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
             self.assertEqualIgnoreOrder(pf.all_data(), expected_data)
 
 
-@since('2.2')
 class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
     """
     Tests concerned with paging when CQL modifiers (such as order, limit, allow filtering) are used.
@@ -594,7 +592,6 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
             )
 
 
-@since('2.2')
 class TestPagingData(BasePagingTester, PageAssertionMixin):
 
     def basic_paging_test(self):
@@ -1063,7 +1060,6 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
             self.assertEqualIgnoreOrder(expected_data, pf.all_data())
 
 
-@since('2.2')
 class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
     """
     Tests concerned with paging when the queried dataset changes while pages are being retrieved.
@@ -1258,7 +1254,6 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
             self.assertEqualIgnoreOrder(page3, page3expected)
 
 
-@since('2.2')
 class TestPagingQueryIsolation(BasePagingTester, PageAssertionMixin):
     """
     Tests concerned with isolation of paged queries (queries can't affect each other).
@@ -1348,7 +1343,6 @@ class TestPagingQueryIsolation(BasePagingTester, PageAssertionMixin):
             self.assertEqualIgnoreOrder(flatten_into_set(page_fetchers[10].all_data()), flatten_into_set(expected_data[:50000]))
 
 
-@since('2.2')
 class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
     """
     Tests concerned with paging when deletions occur.
