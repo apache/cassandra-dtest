@@ -362,13 +362,13 @@ class Tester(TestCase):
         return protocol_version
 
     def cql_connection(self, node, keyspace=None, user=None,
-                       password=None, compression=True, protocol_version=None, port=9042, ssl_opts=None):
+                       password=None, compression=True, protocol_version=None, port=None, ssl_opts=None):
 
         return self._create_session(node, keyspace, user, password, compression,
                                     protocol_version, port=port, ssl_opts=ssl_opts)
 
     def exclusive_cql_connection(self, node, keyspace=None, user=None,
-                                 password=None, compression=True, protocol_version=None, port=9042, ssl_opts=None):
+                                 password=None, compression=True, protocol_version=None, port=None, ssl_opts=None):
 
         node_ip = self.get_ip_from_node(node)
         wlrr = WhiteListRoundRobinPolicy([node_ip])
@@ -377,8 +377,10 @@ class Tester(TestCase):
                                     protocol_version, wlrr, port=port, ssl_opts=ssl_opts)
 
     def _create_session(self, node, keyspace, user, password, compression, protocol_version, load_balancing_policy=None,
-                        port=9042, ssl_opts=None):
+                        port=None, ssl_opts=None):
         node_ip = self.get_ip_from_node(node)
+        if not port:
+            port = self.get_port_from_node(node)
 
         if protocol_version is None:
             protocol_version = self.get_eager_protocol_version(self.cluster.version())
@@ -405,7 +407,7 @@ class Tester(TestCase):
 
     def patient_cql_connection(self, node, keyspace=None,
                                user=None, password=None, timeout=10, compression=True,
-                               protocol_version=None, port=9042, ssl_opts=None):
+                               protocol_version=None, port=None, ssl_opts=None):
         """
         Returns a connection after it stops throwing NoHostAvailables due to not being ready.
 
@@ -430,7 +432,7 @@ class Tester(TestCase):
 
     def patient_exclusive_cql_connection(self, node, keyspace=None,
                                          user=None, password=None, timeout=10, compression=True,
-                                         protocol_version=None, port=9042, ssl_opts=None):
+                                         protocol_version=None, port=None, ssl_opts=None):
         """
         Returns a connection after it stops throwing NoHostAvailables due to not being ready.
 
@@ -608,6 +610,13 @@ class Tester(TestCase):
         else:
             node_ip = node.network_interfaces['thrift'][0]
         return node_ip
+
+    def get_port_from_node(self, node):
+        if node.network_interfaces['binary']:
+            port = node.network_interfaces['binary'][1]
+        else:
+            port = node.network_interfaces['thrift'][1]
+        return port
 
     def get_auth_provider(self, user, password):
         if self.cluster.version() >= '2.0':
