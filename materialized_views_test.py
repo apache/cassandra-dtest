@@ -748,7 +748,8 @@ class TestMaterializedViews(Tester):
         node2.start(wait_other_notice=True, wait_for_binary_proto=True)
         node3.start(wait_other_notice=True, wait_for_binary_proto=True)
 
-        node1.repair()
+        # Just repair the base replica
+        node1.nodetool("repair ks t")
 
         debug('Verify data with cl=ALL')
         for i in xrange(1000):
