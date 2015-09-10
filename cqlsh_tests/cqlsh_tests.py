@@ -653,7 +653,8 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         self.execute(cql='CREATE INDEX myindex ON test.users (age)')
         self.execute(cql='DESCRIBE INDEX test.myindex', expected_output=self.get_index_output('myindex', 'test', 'users', 'age'))
 
-        # Alter table (rename of column with idx is currently not allowed)
+        # Alter table (rename of column with idx is currently not allowed, so we drop it first)
+        self.execute(cql='DROP INDEX test.test_val_idx')
         self.execute(cql='ALTER TABLE test.test DROP val')
         self.execute(cql="DESCRIBE test.test", expected_output=self.get_test_table_output(has_val=False, has_val_idx=False))
         self.execute(cql='DESCRIBE test.test_val_idx', expected_err="'test_val_idx' not found in keyspace 'test'")
@@ -749,12 +750,16 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
             AND speculative_retry = '99.0PERCENTILE';
         """
 
-        ret += self.get_index_output('test_col_idx', 'test', 'test', 'col')
+        col_idx_def = self.get_index_output('test_col_idx', 'test', 'test', 'col')
 
         if has_val_idx:
-            return ret + "\n" + self.get_index_output('test_val_idx', 'test', 'test', 'val')
+            val_idx_def = self.get_index_output('test_val_idx', 'test', 'test', 'val')
+            if LooseVersion(self.cluster.version()) >= LooseVersion('3.0'):
+                return ret + "\n" + val_idx_def + "\n" + col_idx_def
+            else:
+                return ret + "\n" + col_idx_def + "\n" + val_idx_def
         else:
-            return ret
+            return ret + "\n" + col_idx_def
 
     def get_users_table_output(self):
         if LooseVersion(self.cluster.version()) >= LooseVersion('3.0'):
