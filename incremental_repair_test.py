@@ -1,6 +1,7 @@
 import os
 import time
 from re import findall
+from re import search
 from unittest import skip
 
 from cassandra import ConsistencyLevel
@@ -262,3 +263,51 @@ class TestIncRepair(Tester):
         # There is still some overhead, but it's lot better. We tolerate 25%.
         expected_load_size = 4.5  # In GB
         assert_almost_equal(load_size, expected_load_size, error=0.25)
+
+    def sstable_marking_test_not_intersecting_all_ranges(self):
+        """
+        For CASSANDRA-10299
+        """
+        cluster = self.cluster
+        cluster.populate(4, use_vnodes=True).start()
+        [node1, node2, node3, node4] = cluster.nodelist()
+
+        debug("Inserting data with stress")
+        node1.stress(['write', 'n=3', '-rate', 'threads=1', '-schema', 'replication(factor=3)'])
+
+        debug("Flushing nodes")
+        cluster.flush()
+
+        if self.cluster.version() >= '2.2':
+            debug("Repairing node 1")
+            node1.nodetool("repair")
+            debug("Repairing node 2")
+            node2.nodetool("repair")
+            debug("Repairing node 3")
+            node3.nodetool("repair")
+            debug("Repairing node 4")
+            node4.nodetool("repair")
+
+        else:
+            debug("Repairing node 1")
+            node1.nodetool("repair -inc -par")
+            debug("Repairing node 2")
+            node2.nodetool("repair -inc -par")
+            debug("Repairing node 3")
+            node3.nodetool("repair -inc -par")
+            debug("Repairing node 4")
+            node4.nodetool("repair -inc -par")
+
+
+        with open("final.txt", "w") as h:
+            node1.run_sstablemetadata(output_file=h,keyspace='keyspace1')
+            node2.run_sstablemetadata(output_file=h,keyspace='keyspace1')
+            node3.run_sstablemetadata(output_file=h,keyspace='keyspace1')
+            node4.run_sstablemetadata(output_file=h,keyspace='keyspace1')
+
+        with open("final.txt", "r") as r:
+            output = r.read()
+
+        self.assertNotIn('Repaired at: 0', output)
+
+        os.remove('final.txt')
