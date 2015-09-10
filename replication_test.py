@@ -4,7 +4,7 @@ import re
 import time
 
 from dtest import Tester, debug, PRINT_DEBUG
-from tools import no_vnodes
+from tools import no_vnodes, require
 
 from cassandra.query import SimpleStatement
 from cassandra import ConsistencyLevel
@@ -299,9 +299,10 @@ class Cassandra10238Test(Tester):
             else:
                 raise RuntimeError("Ran out of time waiting for topology to change on node {}".format(i))
 
+    require('10238')
     def test_rf_collapse(self):
         """
-        CASSANDRA-10238
+        @jira_ticket CASSANDRA-10238
 
         Confirm that when racks are collapsed the RF is not impacted.
         """
