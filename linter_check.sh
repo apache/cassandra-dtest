@@ -15,6 +15,7 @@ echo "pep8 exited with ${pep8_result}."
 if [ $flake8_result -ne 0 -o $pep8_result -ne 0 ];
 then
     echo "Your changes contain linter errors."
+    echo "You can fix these manually or with autopep8, which can be installed with pip."
     exit 1
 fi
 
