@@ -299,7 +299,7 @@ class Cassandra10238Test(Tester):
             else:
                 raise RuntimeError("Ran out of time waiting for topology to change on node {}".format(i))
 
-    require('10238')
+    @require('10238')
     def test_rf_collapse(self):
         """
         @jira_ticket CASSANDRA-10238
