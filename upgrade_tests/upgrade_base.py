@@ -25,7 +25,7 @@ UPGRADE_MODE = os.environ.get('UPGRADE_MODE', 'normal').lower()
 UPGRADE_TO = os.environ.get('UPGRADE_TO', None)
 
 
-@since('2.1')
+@since('2.2')
 class UpgradeTester(Tester):
     """
     When run in 'normal' upgrade mode without specifying any version to run,
