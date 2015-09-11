@@ -42,7 +42,7 @@ class TestCommitLogFailurePolicy(Tester):
         path = node.get_path()
         ks_dir = path + '/data/ks'
         db_dir = os.listdir(ks_dir)[0]
-        sstables = len([f for f in os.listdir(ks_dir + '/' + db_dir) if f.endswith('.db')])
+        sstables = len([f for f in os.listdir(os.path.join(ks_dir, db_dir)) if f.endswith('.db')])
         self.assertEqual(sstables, 0)
 
         # modify the commit log crc values
@@ -50,7 +50,7 @@ class TestCommitLogFailurePolicy(Tester):
         self.assertTrue(len(os.listdir(cl_dir)) > 0)
         for cl in os.listdir(cl_dir):
             # locate the CRC location
-            with open(cl_dir + '/' + cl, 'r') as f:
+            with open(os.path.join(cl_dir, cl), 'r') as f:
                 f.seek(0)
                 version = struct.unpack('>i', f.read(4))[0]
                 crc_pos = 12
@@ -60,12 +60,12 @@ class TestCommitLogFailurePolicy(Tester):
                     crc_pos += 2 + psize
 
             # rewrite it with crap
-            with open(cl_dir + '/' + cl, 'w') as f:
+            with open(os.path.join(cl_dir, cl), 'w') as f:
                 f.seek(crc_pos)
                 f.write(struct.pack('>i', 123456))
 
             # verify said crap
-            with open(cl_dir + '/' + cl, 'r') as f:
+            with open(os.path.join(cl_dir, cl), 'r') as f:
                 f.seek(crc_pos)
                 crc = struct.unpack('>i', f.read(4))[0]
                 self.assertEqual(crc, 123456)
@@ -114,7 +114,7 @@ class TestCommitLogFailurePolicy(Tester):
         path = node.get_path()
         ks_dir = path + '/data/ks1'
         db_dir = os.listdir(ks_dir)[0]
-        sstables = len([f for f in os.listdir(ks_dir + '/' + db_dir) if f.endswith('.db')])
+        sstables = len([f for f in os.listdir(os.path.join(ks_dir, db_dir)) if f.endswith('.db')])
         self.assertEqual(sstables, 0)
 
         def get_header_crc(header):
@@ -138,7 +138,7 @@ class TestCommitLogFailurePolicy(Tester):
         self.assertTrue(len(os.listdir(cl_dir)) > 0)
         for cl in os.listdir(cl_dir):
             # read the header and find the crc location
-            with open(cl_dir + '/' + cl, 'r') as f:
+            with open(os.path.join(cl_dir, cl), 'r') as f:
                 f.seek(0)
                 version = struct.unpack('>i', f.read(4))[0]
                 crc_pos = 12
@@ -163,14 +163,14 @@ class TestCommitLogFailurePolicy(Tester):
             header_bytes = header_bytes.replace('LZ4Compressor', 'LZ5Compressor')
             self.assertNotIn('LZ4Compressor', header_bytes)
             self.assertIn('LZ5Compressor', header_bytes)
-            with open(cl_dir + '/' + cl, 'w') as f:
+            with open(os.path.join(cl_dir, cl), 'w') as f:
                 f.seek(0)
                 f.write(header_bytes)
                 f.seek(crc_pos)
                 f.write(struct.pack('>i', get_header_crc(header_bytes)))
 
             # verify we wrote everything correctly
-            with open(cl_dir + '/' + cl, 'r') as f:
+            with open(os.path.join(cl_dir, cl), 'r') as f:
                 f.seek(0)
                 self.assertEqual(f.read(header_length), header_bytes)
                 f.seek(crc_pos)
