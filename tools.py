@@ -53,7 +53,7 @@ def query_c1c2(session, key, consistency=ConsistencyLevel.QUORUM, tolerate_missi
 
 
 # work for cluster started by populate
-def new_node(cluster, bootstrap=True, token=None, remote_debug_port='2000', data_center=None):
+def new_node(cluster, bootstrap=True, token=None, remote_debug_port='0', data_center=None):
     i = len(cluster.nodes) + 1
     node = Node('node%s' % i,
                 cluster,

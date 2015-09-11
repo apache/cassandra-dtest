@@ -4,8 +4,8 @@ from cassandra import ConsistencyLevel, Timeout, Unavailable
 from cassandra.query import SimpleStatement
 
 from assertions import assert_invalid, assert_unavailable
-from dtest import Tester, debug
-from tools import since
+from dtest import CASSANDRA_DIR, Tester, debug
+from tools import debug, since
 
 
 class TestBatch(Tester):
@@ -248,6 +248,64 @@ class TestBatch(Tester):
         res = sorted(rows)
         assert [list(res[0]), list(res[1])] == [[0, 1111111111111111, 1111111111111111], [1, 1111111111111112, 1111111111111112]], res
 
+    @since('3.0', max_version='3.0.x')
+    def logged_batch_compatibility_1_test(self):
+        """
+        @jira_ticket CASSANDRA-9673, test that logged batches still work with a mixed version cluster.
+
+        Here we have one 3.0 node and two 2.2 nodes and we send the batch request to the 3.0 node.
+        """
+        self._logged_batch_compatibility_test(0, 1, 'git:cassandra-2.2', 2)
+
+    @since('3.0', max_version='3.0.x')
+    def logged_batch_compatibility_2_test(self):
+        """
+        @jira_ticket CASSANDRA-9673, test that logged batches still work with a mixed version cluster.
+
+        Here we have one 3.0 node and two 2.1 nodes and we send the batch request to the 3.0 node.
+        """
+        self._logged_batch_compatibility_test(0, 1, 'git:cassandra-2.1', 2)
+
+    @since('3.0', max_version='3.0.x')
+    def logged_batch_compatibility_3_test(self):
+        """
+        @jira_ticket CASSANDRA-9673, test that logged batches still work with a mixed version cluster.
+
+        Here we have two 3.0 nodes and one 2.1 node and we send the batch request to the 3.0 node.
+        """
+        self._logged_batch_compatibility_test(0, 2, 'git:cassandra-2.1', 1)
+
+    @since('3.0', max_version='3.0.x')
+    def logged_batch_compatibility_4_test(self):
+        """
+        @jira_ticket CASSANDRA-9673, test that logged batches still work with a mixed version cluster.
+
+        Here we have two 3.0 nodes and one 2.2 node and we send the batch request to the 2.2 node.
+        """
+        self._logged_batch_compatibility_test(2, 2, 'git:cassandra-2.2', 1)
+
+    @since('3.0', max_version='3.0.x')
+    def logged_batch_compatibility_5_test(self):
+        """
+        @jira_ticket CASSANDRA-9673, test that logged batches still work with a mixed version cluster.
+
+        Here we have two 3.0 nodes and one 2.1 node and we send the batch request to the 2.1 node.
+        """
+        self._logged_batch_compatibility_test(2, 2, 'git:cassandra-2.1', 1)
+
+    def _logged_batch_compatibility_test(self, coordinator_idx, current_nodes, previous_version, previous_nodes):
+        session = self.prepare_mixed(coordinator_idx, current_nodes, previous_version, previous_nodes)
+        query = SimpleStatement("""
+            BEGIN BATCH
+            INSERT INTO users (id, firstname, lastname) VALUES (0, 'Jack', 'Sparrow')
+            INSERT INTO users (id, firstname, lastname) VALUES (1, 'Will', 'Turner')
+            APPLY BATCH
+        """, consistency_level=ConsistencyLevel.ALL)
+        session.execute(query)
+        rows = session.execute("SELECT id, firstname, lastname FROM users")
+        res = sorted(rows)
+        self.assertEquals([[0, 'Jack', 'Sparrow'], [1, 'Will', 'Turner']], [list(res[0]), list(res[1])])
+
     def assert_timedout(self, session, query, cl, acknowledged_by=None,
                         received_responses=None):
         try:
@@ -268,13 +326,25 @@ class TestBatch(Tester):
         else:
             assert False, "Expecting TimedOutException but no exception was raised"
 
-    def prepare(self, nodes=1, compression=True):
+    def prepare(self, nodes=1, compression=True, version=None):
         if not self.cluster.nodelist():
-            self.cluster.populate(nodes).start(wait_other_notice=True)
+            self.cluster.populate(nodes)
+            if version:
+                for node in self.cluster.nodelist():
+                    node.set_install_dir(version=version)
+                    debug("Set cassandra dir for {} to {}".format(node.name, node.get_install_dir()))
+
+            self.cluster.start(wait_other_notice=True)
 
         node1 = self.cluster.nodelist()[0]
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'ks', nodes)
+        self.create_schema(session, nodes)
+        return session
+
+    def create_schema(self, session, rf):
+        debug('Creating schema...')
+        self.create_ks(session, 'ks', rf)
+
         session.execute("""
             CREATE TABLE clicks (
                 userid int,
@@ -283,6 +353,7 @@ class TestBatch(Tester):
                 PRIMARY KEY (userid, url)
              );
          """)
+
         session.execute("""
             CREATE TABLE users (
                 id int,
@@ -291,5 +362,42 @@ class TestBatch(Tester):
                 PRIMARY KEY (id)
              );
          """)
+
         time.sleep(.5)
+
+    def prepare_mixed(self, coordinator_idx, current_nodes, previous_version, previous_nodes, compression=True):
+
+        debug("Testing with {} node(s) at version '{}', {} node(s) at current version"
+              .format(previous_nodes, previous_version, current_nodes))
+
+        # start a cluster using the previous version
+        self.prepare(previous_nodes + current_nodes, compression, previous_version)
+
+        # then upgrade the current nodes to the current version but not hte previous nodes
+        for i in xrange(current_nodes):
+            node = self.cluster.nodelist()[i]
+            self.upgrade_node(node)
+
+        session = self.patient_exclusive_cql_connection(self.cluster.nodelist()[coordinator_idx])
+        session.execute('USE ks')
         return session
+
+    def upgrade_node(self, node):
+        """
+        Upgrade a node to the current version
+        """
+        debug('Upgrading {}'.format(node.name))
+
+        debug('Shutting down node: ' + node.name)
+        node.drain()
+        node.watch_log_for("DRAINED")
+        node.stop(wait_other_notice=False)
+
+        node.set_install_dir(install_dir=CASSANDRA_DIR)
+        debug("Set new cassandra dir for {}: {}".format(node.name, node.get_install_dir()))
+
+        # Restart nodes on new version
+        debug('Starting {} on new version ({})'.format(node.name, node.get_cassandra_version()))
+        node.start(wait_other_notice=True, wait_for_binary_proto=True)
+        debug('Upgrading sstables')
+        node.nodetool('upgradesstables -a')
