@@ -39,13 +39,13 @@ class TestCommitLogFailurePolicy(Tester):
 
         # check that ks.tbl hasn't been flushed
         path = node.get_path()
-        ks_dir = path + '/data/ks'
+        ks_dir = os.path.join(path, 'data', 'ks')
         db_dir = os.listdir(ks_dir)[0]
         sstables = len([f for f in os.listdir(os.path.join(ks_dir, db_dir)) if f.endswith('.db')])
         self.assertEqual(sstables, 0)
 
         # modify the commit log crc values
-        cl_dir = path + '/commitlogs'
+        cl_dir = os.path.join(path, 'commitlogs')
         self.assertTrue(len(os.listdir(cl_dir)) > 0)
         for cl in os.listdir(cl_dir):
             # locate the CRC location
@@ -116,7 +116,7 @@ class TestCommitLogFailurePolicy(Tester):
 
         # check that ks1.tbl hasn't been flushed
         path = node.get_path()
-        ks_dir = path + '/data/ks1'
+        ks_dir = os.path.join(path, 'data', 'ks1')
         db_dir = os.listdir(ks_dir)[0]
         sstables = len([f for f in os.listdir(os.path.join(ks_dir, db_dir)) if f.endswith('.db')])
         self.assertEqual(sstables, 0)
@@ -138,7 +138,7 @@ class TestCommitLogFailurePolicy(Tester):
         # modify the compression parameters to look for a compressor that isn't there
         # while this scenario is pretty unlikely, if a jar or lib got moved or something,
         # you'd have a similar situation, which would be fixable by the user
-        cl_dir = path + '/commitlogs'
+        cl_dir = os.path.join(path, 'commitlogs')
         self.assertTrue(len(os.listdir(cl_dir)) > 0)
         for cl in os.listdir(cl_dir):
             # read the header and find the crc location
