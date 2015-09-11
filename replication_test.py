@@ -263,10 +263,10 @@ class Cassandra10238Test(Tester):
     """
     def check_endpoint_count(self, ks, table, nodes, expected_count):
         """
-        Check a dummy key (of a stress generated table) expecting it to have expected_count endpoints on each node.
+        Check a dummy key expecting it to have expected_count endpoints on each node.
         """
         for node in nodes:
-            cmd = "getendpoints {} {} 11".format(ks, table)
+            cmd = "getendpoints {} {} dummy".format(ks, table)
             out, err = node.nodetool(cmd)
 
             if len(err.strip()) > 0:
@@ -322,12 +322,11 @@ class Cassandra10238Test(Tester):
 
         session = self.patient_cql_connection(node1)
 
-        # small stress write to build ks/table for us
-        node1.stress(['write', 'n=20', '-rate', 'threads=50', '-schema', 'keyspace=testing', '-pop', 'seq=1..20'])
-        session.execute("ALTER KEYSPACE testing WITH replication = {'class':'NetworkTopologyStrategy', 'DC1':3}")
+        session.execute("CREATE KEYSPACE testing WITH replication = {'class':'NetworkTopologyStrategy', 'DC1':3}")
+        session.execute("CREATE TABLE testing.rf_test (key text PRIMARY KEY, value text)")
 
         # make sure endpoint count is correct before continuing with the rest of the test
-        self.check_endpoint_count('testing', 'standard1', cluster.nodelist(), 3)
+        self.check_endpoint_count('testing', 'rf_test', cluster.nodelist(), 3)
 
         # consolidate node1/node3 racks to "RAC1"
         for node in [node1, node3]:
@@ -338,4 +337,4 @@ class Cassandra10238Test(Tester):
         self.wait_for_all_nodes_on_rack(cluster.nodelist(), "RAC1")
 
         # nodes have joined racks, check endpoint counts again
-        self.check_endpoint_count('testing', 'standard1', cluster.nodelist(), 3)
+        self.check_endpoint_count('testing', 'rf_test', cluster.nodelist(), 3)
