@@ -273,9 +273,9 @@ class Cassandra10238Test(Tester):
                 debug(err)
                 raise RuntimeError("Error running 'nodetool {}'".format(cmd))
 
-            out = out.rstrip()  # remove extra \n from output
+            ips_found = re.findall('(\d+\.\d+\.\d+\.\d+)', out)
 
-            self.assertEqual(len(out.split('\n')), expected_count, "wrong number of endpoints found ({}), should be: {}".format(len(out.split('\n')), expected_count))
+            self.assertEqual(len(ips_found), expected_count, "wrong number of endpoints found ({}), should be: {}".format(len(ips_found), expected_count))
 
     def wait_for_all_nodes_on_rack(self, nodes, rack_name):
         """
