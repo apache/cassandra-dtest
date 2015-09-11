@@ -1,7 +1,6 @@
 import os
 import time
 from re import findall
-from re import search
 from unittest import skip
 
 from cassandra import ConsistencyLevel
