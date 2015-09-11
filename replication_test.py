@@ -320,11 +320,11 @@ class Cassandra10238Test(Tester):
 
         cluster.start()
 
-        conn = self.patient_cql_connection(node1)
+        session = self.patient_cql_connection(node1)
 
         # small stress write to build ks/table for us
         node1.stress(['write', 'n=20', '-rate', 'threads=50', '-schema', 'keyspace=testing', '-pop', 'seq=1..20'])
-        conn.execute("""ALTER KEYSPACE testing WITH replication = {'class':'NetworkTopologyStrategy', 'DC1':3}""")
+        session.execute("ALTER KEYSPACE testing WITH replication = {'class':'NetworkTopologyStrategy', 'DC1':3}")
 
         # make sure endpoint count is correct before continuing with the rest of the test
         self.check_endpoint_count('testing', 'standard1', cluster.nodelist(), 3)
