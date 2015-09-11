@@ -1,11 +1,10 @@
+import binascii
 import os
+import struct
 import time
 
-import binascii
-
+from ccmlib.node import Node, TimeoutError
 from dtest import Tester
-from ccmlib.node import Node
-import struct
 
 
 class TestCommitLogFailurePolicy(Tester):
@@ -85,6 +84,11 @@ class TestCommitLogFailurePolicy(Tester):
         """
         if the commit log header refers to an unknown compression class, and the commit_failure_policy is stop, C* shouldn't startup
         """
+        if not hasattr(self, 'ignore_log_patterns'):
+            self.ignore_log_patterns = []
+
+        expected_error = 'Could not create Compression for type org.apache.cassandra.io.compress.LZ5Compressor'
+        self.ignore_log_patterns.append(expected_error)
         self.cluster.populate(nodes=1)
         node = self.cluster.nodelist()[0]
         assert isinstance(node, Node)
@@ -177,13 +181,8 @@ class TestCommitLogFailurePolicy(Tester):
                 crc = struct.unpack('>i', f.read(4))[0]
                 self.assertEqual(crc, get_header_crc(header_bytes))
 
-        # try starting normally
-        try:
-            node.start(wait_for_binary_proto=True)
-        except:
-            # ok
-            return
-        # if not, our data should still be there (demonstrates CASSANDRA-9749)
-        cursor = self.patient_cql_connection(self.cluster.nodelist()[0])
-        results = cursor.execute("SELECT * FROM ks1.tbl")
-        self.assertEqual(len(results), 10)
+        mark = node.mark_log()
+        node.start()
+        node.watch_log_for(expected_error, from_mark=mark)
+        with self.assertRaises(TimeoutError):
+            node.wait_for_binary_interface(from_mark=mark, timeout=20)
