@@ -436,7 +436,7 @@ class AbortedQueriesTester(CQLTester):
         mark = node.mark_log()
         statement = SimpleStatement("SELECT * from test1", consistency_level=ConsistencyLevel.ONE, retry_policy=FallthroughRetryPolicy())
         assert_unavailable(lambda c: debug(c.execute(statement)), session)
-        node.watch_log_for("'SELECT \* FROM ks.test1 (.*)' timed out 1 time", from_mark=mark, timeout=60)
+        node.watch_log_for("SELECT \* FROM ks.test1 (.*) timeout", from_mark=mark, timeout=60)
 
     def remote_query_test(self):
         """
@@ -468,7 +468,7 @@ class AbortedQueriesTester(CQLTester):
 
         statement = SimpleStatement("SELECT * from test2", consistency_level=ConsistencyLevel.ONE, retry_policy=FallthroughRetryPolicy())
         assert_unavailable(lambda c: debug(c.execute(statement)), session)
-        node2.watch_log_for("'SELECT \* FROM ks.test2 (.*)' timed out 1 time", from_mark=mark, timeout=60)
+        node2.watch_log_for("SELECT \* FROM ks.test2 (.*) timeout", from_mark=mark, timeout=60)
 
     def index_query_test(self):
         """
@@ -496,9 +496,11 @@ class AbortedQueriesTester(CQLTester):
             session.execute("INSERT INTO test3 (id, col, val) VALUES ({}, {}, 'foo')".format(i, i // 10))
 
         mark = node.mark_log()
-        statement = SimpleStatement("SELECT * from test3 WHERE col < 50 ALLOW FILTERING", consistency_level=ConsistencyLevel.ONE, retry_policy=FallthroughRetryPolicy())
-        assert_unavailable(lambda c: debug(c.execute(statement)), session)
-        node.watch_log_for("'SELECT \* FROM ks.test3 WHERE col < 50 (.*)' timed out 1 time", from_mark=mark, timeout=60)
+        statement = session.prepare("SELECT * from test3 WHERE col < ? ALLOW FILTERING")
+        statement.consistency_level = ConsistencyLevel.ONE
+        statement.retry_policy = FallthroughRetryPolicy()
+        assert_unavailable(lambda c: debug(c.execute(statement, [50])), session)
+        node.watch_log_for("SELECT \* FROM ks.test3 WHERE col < 50 (.*) timeout", from_mark=mark, timeout=60)
 
     def materialized_view_test(self):
         """
@@ -534,4 +536,4 @@ class AbortedQueriesTester(CQLTester):
         statement = SimpleStatement("SELECT * FROM mv WHERE col = 50", consistency_level=ConsistencyLevel.ONE, retry_policy=FallthroughRetryPolicy())
         assert_unavailable(lambda c: debug(c.execute(statement)), session)
 
-        node2.watch_log_for("'SELECT \* FROM ks.mv WHERE col = 50 (.*)' timed out 1 time", from_mark=mark, timeout=60)
+        node2.watch_log_for("SELECT \* FROM ks.mv WHERE col = 50 (.*) timeout", from_mark=mark, timeout=60)
