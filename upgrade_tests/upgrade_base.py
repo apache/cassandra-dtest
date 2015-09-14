@@ -55,7 +55,8 @@ def get_default_upgrade_path(job_version):
         # but 3.0->3.X is.
         start_version = 'git:cassandra-3.0'
 
-    assert [start_version, upgrade_version].count(None) >= 1
+    err = 'Expected one or two upgrade path endpoints to be None; found {}'.format((start_version, upgrade_version))
+    assert [start_version, upgrade_version].count(None) >= 1, err
     return UpgradePath(start_version, upgrade_version)
 
 
