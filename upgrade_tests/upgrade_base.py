@@ -1,5 +1,6 @@
 import os
 import time
+from collections import namedtuple
 
 from ccmlib.common import get_version_from_build, is_win
 from dtest import DEBUG, Tester, debug
@@ -23,6 +24,39 @@ UPGRADE_MODE = os.environ.get('UPGRADE_MODE', 'normal').lower()
 
 # Specify a branch to upgrade to
 UPGRADE_TO = os.environ.get('UPGRADE_TO', None)
+
+
+UpgradePath = namedtuple('UpgradePath', ('starting_version', 'upgrade_version'))
+
+
+def get_default_upgrade_path(job_version):
+    """
+    Given a version (which should be specified as a LooseVersion,
+    StrictVersion, or NormalizedVersion object), return a tuple (start, target)
+    whose members indicate the git branch that should be downloaded for the
+    starting or target versions for an upgrade test. One or both of these
+    will be None, so this specifies at most one end of the upgrade path.
+
+    We assume that the version being passed in is the version of C* being
+    tested on a CassCI job, which means if the version is less than 3.0, we
+    will be running on JDK 1.7. This means we can't run 3.0+ on this version.
+    """
+    start_version, upgrade_version = None, None
+
+    if '2.1' <= job_version < '2.2':
+        # If this is 2.1.X, we can upgrade to 2.2.
+        # Skip 2.2.X->3.X because of JDK compatibility.
+        upgrade_version = 'git:cassandra-2.2'
+    elif '3.0' <= job_version < '3.1':
+        # We can choose 2.2 because it will run on JDK 1.8
+        start_version = 'git:cassandra-2.2'
+    elif '3.1' <= job_version:
+        # 2.2->3.X, where X > 0, isn't a supported upgrade path,
+        # but 3.0->3.X is.
+        start_version = 'git:cassandra-3.0'
+
+    assert [start_version, upgrade_version].count(None) >= 1
+    return UpgradePath(start_version, upgrade_version)
 
 
 @since('3.0')
@@ -60,12 +94,12 @@ class UpgradeTester(Tester):
             self.original_install_dir = node1.get_install_dir()
             self.original_git_branch = cassandra_git_branch()
             self.original_version = get_version_from_build(node_path=node1.get_path())
+            self.upgrade_path = get_default_upgrade_path(self.original_version)
             if OLD_CASSANDRA_DIR:
                 cluster.set_install_dir(install_dir=OLD_CASSANDRA_DIR)
-            else:
-                # upgrade from 3.0 to current install dir if we're running from trunk
-                if self.original_git_branch == 'trunk':
-                    cluster.set_install_dir(version='git:cassandra-3.0')
+            elif UPGRADE_TO is not None and self.upgrade_path.starting_version:
+                cluster.set_install_dir(version=self.upgrade_path.starting_version)
+            # in other cases, just use the existing install directory
             cluster.start(wait_for_binary_proto=True)
             debug('starting from {}'.format(get_version_from_build(node1.get_install_dir())))
 
@@ -113,23 +147,24 @@ class UpgradeTester(Tester):
 
         # choose version to upgrade to
         if UPGRADE_TO:
-            new_branch = UPGRADE_TO
-        elif self.original_git_branch == 'trunk' or self.original_version >= '3.0':
-            new_branch = 'git:trunk'
+            install_kwargs = {'version': UPGRADE_TO}
         else:
-            new_branch = 'git:cassandra-3.0'
+            if self.upgrade_path.upgrade_version:
+                install_kwargs = {'version': self.upgrade_path.upgrade_version}
+            else:
+                install_kwargs = {'install_dir': self.original_install_dir}
 
-        debug('upgrading to {}'.format(new_branch))
+        debug('upgrading to {}'.format(install_kwargs))
 
         # start them again
         if UPGRADE_MODE != "none":
-            node1.set_install_dir(version=new_branch)
+            node1.set_install_dir(**install_kwargs)
             node1.set_log_level("DEBUG" if DEBUG else "INFO")
             node1.set_configuration_options(values={'internode_compression': 'none'})
             node1.start(wait_for_binary_proto=True)
 
         if UPGRADE_MODE == "all":
-            node2.set_install_dir(version=new_branch)
+            node2.set_install_dir(**install_kwargs)
             node2.set_log_level("DEBUG" if DEBUG else "INFO")
             node2.set_configuration_options(values={'internode_compression': 'none'})
             node2.start(wait_for_binary_proto=True)
