@@ -4076,9 +4076,11 @@ class TestCQL(UpgradeTester):
 
             assert_invalid(cursor, "SELECT v1, v2, v3 FROM test WHERE k = 0 AND (v1, v3) > (1, 0)")
 
-    @since('2.1.1')
+    @since('2.1.1', max_version='2.2.X')
     def test_v2_protocol_IN_with_tuples(self):
-        """ Test for CASSANDRA-8062 """
+        """
+        @jira_ticket CASSANDRA-8062
+        """
         cursor = self.prepare(protocol_version=2)
         cursor.execute("CREATE TABLE test (k int, c1 int, c2 text, PRIMARY KEY (k, c1, c2))")
 

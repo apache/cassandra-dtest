@@ -1,6 +1,8 @@
 import os
+import sys
 import time
 from collections import namedtuple
+from unittest import skipIf
 
 from ccmlib.common import get_version_from_build, is_win
 from dtest import DEBUG, Tester, debug
@@ -61,6 +63,7 @@ def get_default_upgrade_path(job_version):
 
 
 @since('3.0')
+@skipIf(sys.platform == 'win32', 'Skip upgrade tests on Windows')
 class UpgradeTester(Tester):
     """
     When run in 'normal' upgrade mode without specifying any version to run,
@@ -160,12 +163,22 @@ class UpgradeTester(Tester):
         # start them again
         if UPGRADE_MODE != "none":
             node1.set_install_dir(**install_kwargs)
+            # this is a bandaid; after refactoring, upgrades should account for protocol version
+            new_version_from_build = get_version_from_build(node1.get_install_dir())
+            if (new_version_from_build >= '3' and self.protocol_version < 3):
+                self.skip('Protocol version {} incompatible '
+                          'with Cassandra version {}'.format(self.protocol_version, new_version_from_build))
             node1.set_log_level("DEBUG" if DEBUG else "INFO")
             node1.set_configuration_options(values={'internode_compression': 'none'})
             node1.start(wait_for_binary_proto=True)
 
         if UPGRADE_MODE == "all":
             node2.set_install_dir(**install_kwargs)
+            # this is a bandaid; after refactoring, upgrades should account for protocol version
+            new_version_from_build = get_version_from_build(node1.get_install_dir())
+            if (new_version_from_build >= '3' and self.protocol_version < 3):
+                self.skip('Protocol version {} incompatible '
+                          'with Cassandra version {}'.format(self.protocol_version, new_version_from_build))
             node2.set_log_level("DEBUG" if DEBUG else "INFO")
             node2.set_configuration_options(values={'internode_compression': 'none'})
             node2.start(wait_for_binary_proto=True)
