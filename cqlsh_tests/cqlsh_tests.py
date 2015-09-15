@@ -1281,6 +1281,23 @@ Unlogged batch covering 2 partitions detected against table [client_warnings.tes
         self.assertEqual("", err)
         self.assertTrue(re.search(chr(27) + "\[[0,1,2]?J", out))
 
+    def test_batch(self):
+        """
+        Test the BATCH command
+        @jira_ticket CASSANDRA-10272
+        """
+        self.cluster.populate(1)
+        self.cluster.start(wait_for_binary_proto=True)
+        node1, = self.cluster.nodelist()
+
+        stdout, stderr = self.run_cqlsh(node1, cmds="""
+            CREATE KEYSPACE Excelsior  WITH REPLICATION={'class':'SimpleStrategy','replication_factor':1};
+            CREATE TABLE excelsior.data (id int primary key);
+            BEGIN BATCH INSERT INTO excelsior.data (id) VALUES (0); APPLY BATCH""")
+
+        self.assertEqual(0, len(stderr), stderr)
+        self.assertEqual(0, len(stdout), stdout)
+
     def run_cqlsh(self, node, cmds, cqlsh_options=[], env_vars=None):
         if env_vars is None:
             env_vars = {}
