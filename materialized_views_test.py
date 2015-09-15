@@ -877,11 +877,13 @@ class TestMaterializedViews(Tester):
 
         session.execute("INSERT INTO ks.t (id, v, v2, v3) VALUES (1, 1, 'a', 3.0)")
         session.execute("INSERT INTO ks.t (id, v, v2, v3) VALUES (2, 2, 'a', 3.0)")
+        self._replay_batchlogs()
         debug('Verify the data in the MV on node1 with CL=ONE')
         assert_all(session, "SELECT * FROM ks.t_by_v WHERE v2 = 'a'", [['a', 1, 1, 3.0], ['a', 2, 2, 3.0]])
 
         session.execute("INSERT INTO ks.t (id, v, v2, v3) VALUES (1, 1, 'b', 3.0)")
         session.execute("INSERT INTO ks.t (id, v, v2, v3) VALUES (2, 2, 'b', 3.0)")
+        self._replay_batchlogs()
         debug('Verify the data in the MV on node1 with CL=ONE')
         assert_all(session, "SELECT * FROM ks.t_by_v WHERE v2 = 'b'", [['b', 1, 1, 3.0], ['b', 2, 2, 3.0]])
 
@@ -905,16 +907,18 @@ class TestMaterializedViews(Tester):
         debug('Write new data in node2 that overlap those in node1')
         session2.execute("INSERT INTO ks.t (id, v, v2, v3) VALUES (1, 1, 'c', 3.0)")
         session2.execute("INSERT INTO ks.t (id, v, v2, v3) VALUES (2, 2, 'c', 3.0)")
+        self._replay_batchlogs()
         assert_all(session2, "SELECT * FROM ks.t_by_v WHERE v2 = 'c'", [['c', 1, 1, 3.0], ['c', 2, 2, 3.0]])
 
         session2.execute("INSERT INTO ks.t (id, v, v2, v3) VALUES (1, 1, 'd', 3.0)")
         session2.execute("INSERT INTO ks.t (id, v, v2, v3) VALUES (2, 2, 'd', 3.0)")
+        self._replay_batchlogs()
         assert_all(session2, "SELECT * FROM ks.t_by_v WHERE v2 = 'd'", [['d', 1, 1, 3.0], ['d', 2, 2, 3.0]])
 
         debug("Composite delete of everything")
         session2.execute("DELETE FROM ks.t WHERE id = 1 and v = 1")
         session2.execute("DELETE FROM ks.t WHERE id = 2 and v = 2")
-
+        self._replay_batchlogs()
         assert_none(session2, "SELECT * FROM ks.t_by_v WHERE v2 = 'c'")
         assert_none(session2, "SELECT * FROM ks.t_by_v WHERE v2 = 'd'")
 
