@@ -25,6 +25,8 @@ class TestIncRepair(Tester):
 
     def sstable_marking_test(self):
         cluster = self.cluster
+        # hinted handoff can create SSTable that we don't need after node3 restarted
+        cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
 
