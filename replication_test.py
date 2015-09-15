@@ -256,6 +256,7 @@ class ReplicationTest(Tester):
         # datacenter should get a chance to be a forwarder:
         self.assertEqual(len(forwarders_used), 3)
 
+
 @require('10238')
 class SnitchConfigurationUpdateTest(Tester):
     """
@@ -280,7 +281,7 @@ class SnitchConfigurationUpdateTest(Tester):
 
             self.assertEqual(len(ips_found), expected_count, "wrong number of endpoints found ({}), should be: {}".format(len(ips_found), expected_count))
 
-    def wait_for_all_nodes_on_rack(self, nodes, expected_racks):
+    def wait_for_nodes_on_racks(self, nodes, expected_racks):
         """
         Waits for nodes to match the expected racks.
         """
@@ -317,10 +318,10 @@ class SnitchConfigurationUpdateTest(Tester):
         Confirm that when racks are collapsed using a gossiping property file snitch the RF is not impacted.
         """
         self._test_rf_on_snitch_update(nodes=[3], rf={'class': '\'NetworkTopologyStrategy\'', 'dc1': 3},
-                                       snitch_class_name = 'GossipingPropertyFileSnitch',
-                                       snitch_config_file = 'cassandra-rackdc.properties',
-                                       snitch_lines_before = lambda i, node: ["dc=dc1", "rack=rack{}".format(i)],
-                                       snitch_lines_after = lambda i, node: ["dc=dc1", "rack=rack1"],
+                                       snitch_class_name='GossipingPropertyFileSnitch',
+                                       snitch_config_file='cassandra-rackdc.properties',
+                                       snitch_lines_before=lambda i, node: ["dc=dc1", "rack=rack{}".format(i)],
+                                       snitch_lines_after=lambda i, node: ["dc=dc1", "rack=rack1"],
                                        final_racks=["rack1", "rack1", "rack1"])
 
     def test_rf_expand_gossiping_property_file_snitch(self):
@@ -330,10 +331,10 @@ class SnitchConfigurationUpdateTest(Tester):
         Confirm that when racks are expanded using a gossiping property file snitch the RF is not impacted.
         """
         self._test_rf_on_snitch_update(nodes=[3], rf={'class': '\'NetworkTopologyStrategy\'', 'dc1': 3},
-                                       snitch_class_name = 'GossipingPropertyFileSnitch',
-                                       snitch_config_file = 'cassandra-rackdc.properties',
-                                       snitch_lines_before = lambda i, node: ["dc=dc1", "rack=rack1"],
-                                       snitch_lines_after = lambda i, node: ["dc=dc1", "rack=rack{}".format(i)],
+                                       snitch_class_name='GossipingPropertyFileSnitch',
+                                       snitch_config_file='cassandra-rackdc.properties',
+                                       snitch_lines_before=lambda i, node: ["dc=dc1", "rack=rack1"],
+                                       snitch_lines_after=lambda i, node: ["dc=dc1", "rack=rack{}".format(i)],
                                        final_racks=["rack0", "rack1", "rack2"])
 
     def test_rf_collapse_gossiping_property_file_snitch_multi_dc(self):
@@ -343,10 +344,10 @@ class SnitchConfigurationUpdateTest(Tester):
         Confirm that when racks are collapsed using a gossiping property file snitch the RF is not impacted, in a multi-dc environment.
         """
         self._test_rf_on_snitch_update(nodes=[3, 3], rf={'class': '\'NetworkTopologyStrategy\'', 'dc1': 3, 'dc2': 3},
-                                       snitch_class_name = 'GossipingPropertyFileSnitch',
-                                       snitch_config_file = 'cassandra-rackdc.properties',
-                                       snitch_lines_before = lambda i, node: ["dc={}".format(node.data_center), "rack=rack{}".format(i % 3)],
-                                       snitch_lines_after = lambda i, node: ["dc={}".format(node.data_center), "rack=rack1"],
+                                       snitch_class_name='GossipingPropertyFileSnitch',
+                                       snitch_config_file='cassandra-rackdc.properties',
+                                       snitch_lines_before=lambda i, node: ["dc={}".format(node.data_center), "rack=rack{}".format(i % 3)],
+                                       snitch_lines_after=lambda i, node: ["dc={}".format(node.data_center), "rack=rack1"],
                                        final_racks=["rack1", "rack1", "rack1", "rack1", "rack1", "rack1"])
 
     def test_rf_expand_gossiping_property_file_snitch_multi_dc(self):
@@ -356,10 +357,10 @@ class SnitchConfigurationUpdateTest(Tester):
         Confirm that when racks are expanded using a gossiping property file snitch the RF is not impacted, in a multi-dc environment.
         """
         self._test_rf_on_snitch_update(nodes=[3, 3], rf={'class': '\'NetworkTopologyStrategy\'', 'dc1': 3, 'dc2': 3},
-                                       snitch_class_name = 'GossipingPropertyFileSnitch',
-                                       snitch_config_file = 'cassandra-rackdc.properties',
-                                       snitch_lines_before = lambda i, node: ["dc={}".format(node.data_center), "rack=rack1"],
-                                       snitch_lines_after = lambda i, node: ["dc={}".format(node.data_center), "rack=rack{}".format(i % 3)],
+                                       snitch_class_name='GossipingPropertyFileSnitch',
+                                       snitch_config_file='cassandra-rackdc.properties',
+                                       snitch_lines_before=lambda i, node: ["dc={}".format(node.data_center), "rack=rack1"],
+                                       snitch_lines_after=lambda i, node: ["dc={}".format(node.data_center), "rack=rack{}".format(i % 3)],
                                        final_racks=["rack0", "rack1", "rack2", "rack0", "rack1", "rack2"])
 
     def test_rf_collapse_property_file_snitch(self):
@@ -369,10 +370,10 @@ class SnitchConfigurationUpdateTest(Tester):
         Confirm that when racks are collapsed using a property file snitch the RF is not impacted.
         """
         self._test_rf_on_snitch_update(nodes=[3], rf={'class': '\'NetworkTopologyStrategy\'', 'dc1': 3},
-                                       snitch_class_name = 'PropertyFileSnitch',
-                                       snitch_config_file = 'cassandra-topology.properties',
-                                       snitch_lines_before = lambda i, node: ["127.0.0.1=dc1:rack0", "127.0.0.2=dc1:rack1", "127.0.0.3=dc1:rack2"],
-                                       snitch_lines_after = lambda i, node: ["default=dc1:rack0"],
+                                       snitch_class_name='PropertyFileSnitch',
+                                       snitch_config_file='cassandra-topology.properties',
+                                       snitch_lines_before=lambda i, node: ["127.0.0.1=dc1:rack0", "127.0.0.2=dc1:rack1", "127.0.0.3=dc1:rack2"],
+                                       snitch_lines_after=lambda i, node: ["default=dc1:rack0"],
                                        final_racks=["rack0", "rack0", "rack0"])
 
     def test_rf_expand_property_file_snitch(self):
@@ -382,10 +383,10 @@ class SnitchConfigurationUpdateTest(Tester):
         Confirm that when racks are expanded using a property file snitch the RF is not impacted.
         """
         self._test_rf_on_snitch_update(nodes=[3], rf={'class': '\'NetworkTopologyStrategy\'', 'dc1': 3},
-                                       snitch_class_name = 'PropertyFileSnitch',
-                                       snitch_config_file = 'cassandra-topology.properties',
-                                       snitch_lines_before = lambda i, node: ["default=dc1:rack0"],
-                                       snitch_lines_after = lambda i, node: ["127.0.0.1=dc1:rack0", "127.0.0.2=dc1:rack1", "127.0.0.3=dc1:rack2"],
+                                       snitch_class_name='PropertyFileSnitch',
+                                       snitch_config_file='cassandra-topology.properties',
+                                       snitch_lines_before=lambda i, node: ["default=dc1:rack0"],
+                                       snitch_lines_after=lambda i, node: ["127.0.0.1=dc1:rack0", "127.0.0.2=dc1:rack1", "127.0.0.3=dc1:rack2"],
                                        final_racks=["rack0", "rack1", "rack2"])
 
     def test_rf_collapse_yaml_file_snitch(self):
@@ -395,28 +396,28 @@ class SnitchConfigurationUpdateTest(Tester):
         Confirm that when racks are collapsed using a yaml file snitch the RF is not impacted.
         """
         self._test_rf_on_snitch_update(nodes=[3], rf={'class': '\'NetworkTopologyStrategy\'', 'dc1': 3},
-                                       snitch_class_name = 'YamlFileNetworkTopologySnitch',
-                                       snitch_config_file = 'cassandra-topology.yaml',
-                                       snitch_lines_before = lambda i, node: ["topology:",
-                                                                              "  - dc_name: dc1",
-                                                                              "    racks:",
-                                                                              "    - rack_name: rack0",
-                                                                              "      nodes:",
-                                                                              "      - broadcast_address: 127.0.0.1",
-                                                                              "    - rack_name: rack1",
-                                                                              "      nodes:",
-                                                                              "      - broadcast_address: 127.0.0.2",
-                                                                              "    - rack_name: rack2",
-                                                                              "      nodes:",
-                                                                              "      - broadcast_address: 127.0.0.3"],
-                                       snitch_lines_after = lambda i, node: ["topology:",
-                                                                             "  - dc_name: dc1",
-                                                                             "    racks:",
-                                                                             "    - rack_name: rack0",
-                                                                             "      nodes:",
-                                                                             "      - broadcast_address: 127.0.0.1",
-                                                                             "      - broadcast_address: 127.0.0.2",
-                                                                             "      - broadcast_address: 127.0.0.3"],
+                                       snitch_class_name='YamlFileNetworkTopologySnitch',
+                                       snitch_config_file='cassandra-topology.yaml',
+                                       snitch_lines_before=lambda i, node: ["topology:",
+                                                                            "  - dc_name: dc1",
+                                                                            "    racks:",
+                                                                            "    - rack_name: rack0",
+                                                                            "      nodes:",
+                                                                            "      - broadcast_address: 127.0.0.1",
+                                                                            "    - rack_name: rack1",
+                                                                            "      nodes:",
+                                                                            "      - broadcast_address: 127.0.0.2",
+                                                                            "    - rack_name: rack2",
+                                                                            "      nodes:",
+                                                                            "      - broadcast_address: 127.0.0.3"],
+                                       snitch_lines_after=lambda i, node: ["topology:",
+                                                                           "  - dc_name: dc1",
+                                                                           "    racks:",
+                                                                           "    - rack_name: rack0",
+                                                                           "      nodes:",
+                                                                           "      - broadcast_address: 127.0.0.1",
+                                                                           "      - broadcast_address: 127.0.0.2",
+                                                                           "      - broadcast_address: 127.0.0.3"],
                                        final_racks=["rack0", "rack0", "rack0"])
 
     def test_rf_expand_yaml_file_snitch(self):
@@ -426,30 +427,29 @@ class SnitchConfigurationUpdateTest(Tester):
         Confirm that when racks are expanded using a yaml file snitch the RF is not impacted.
         """
         self._test_rf_on_snitch_update(nodes=[3], rf={'class': '\'NetworkTopologyStrategy\'', 'dc1': 3},
-                                       snitch_class_name = 'YamlFileNetworkTopologySnitch',
-                                       snitch_config_file = 'cassandra-topology.yaml',
-                                       snitch_lines_before = lambda i, node: ["topology:",
-                                                                             "  - dc_name: dc1",
-                                                                             "    racks:",
-                                                                             "    - rack_name: rack0",
-                                                                             "      nodes:",
-                                                                             "      - broadcast_address: 127.0.0.1",
-                                                                             "      - broadcast_address: 127.0.0.2",
-                                                                             "      - broadcast_address: 127.0.0.3"],
-                                       snitch_lines_after = lambda i, node: ["topology:",
-                                                                              "  - dc_name: dc1",
-                                                                              "    racks:",
-                                                                              "    - rack_name: rack0",
-                                                                              "      nodes:",
-                                                                              "      - broadcast_address: 127.0.0.1",
-                                                                              "    - rack_name: rack1",
-                                                                              "      nodes:",
-                                                                              "      - broadcast_address: 127.0.0.2",
-                                                                              "    - rack_name: rack2",
-                                                                              "      nodes:",
-                                                                              "      - broadcast_address: 127.0.0.3"],
+                                       snitch_class_name='YamlFileNetworkTopologySnitch',
+                                       snitch_config_file='cassandra-topology.yaml',
+                                       snitch_lines_before=lambda i, node: ["topology:",
+                                                                            "  - dc_name: dc1",
+                                                                            "    racks:",
+                                                                            "    - rack_name: rack0",
+                                                                            "      nodes:",
+                                                                            "      - broadcast_address: 127.0.0.1",
+                                                                            "      - broadcast_address: 127.0.0.2",
+                                                                            "      - broadcast_address: 127.0.0.3"],
+                                       snitch_lines_after=lambda i, node: ["topology:",
+                                                                           "  - dc_name: dc1",
+                                                                           "    racks:",
+                                                                           "    - rack_name: rack0",
+                                                                           "      nodes:",
+                                                                           "      - broadcast_address: 127.0.0.1",
+                                                                           "    - rack_name: rack1",
+                                                                           "      nodes:",
+                                                                           "      - broadcast_address: 127.0.0.2",
+                                                                           "    - rack_name: rack2",
+                                                                           "      nodes:",
+                                                                           "      - broadcast_address: 127.0.0.3"],
                                        final_racks=["rack0", "rack1", "rack2"])
-
 
     def _test_rf_on_snitch_update(self, nodes, rf, snitch_class_name, snitch_config_file, snitch_lines_before, snitch_lines_after, final_racks):
         cluster = self.cluster
@@ -476,10 +476,10 @@ class SnitchConfigurationUpdateTest(Tester):
         # update snitch file on all nodes
         for i, node in enumerate(cluster.nodelist()):
             with open(os.path.join(node.get_conf_dir(), snitch_config_file), 'w') as topo_file:
-               for line in snitch_lines_after(i, node):
+                for line in snitch_lines_after(i, node):
                     topo_file.write(line + "\n")
 
-        self.wait_for_all_nodes_on_rack(cluster.nodelist(), final_racks)
+        self.wait_for_nodes_on_racks(cluster.nodelist(), final_racks)
 
         # nodes have joined racks, check endpoint counts again
         self.check_endpoint_count('testing', 'rf_test', cluster.nodelist(), rf)
