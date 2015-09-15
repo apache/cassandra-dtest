@@ -40,6 +40,34 @@ class TestCqlsh(Tester):
             os.unlink(self.tempfile.name)
         super(TestCqlsh, self).tearDown()
 
+    @since('2.1.9')
+    def test_pep8_compliance(self):
+        """
+        @jira_ticket CASSANDRA-10066
+        Checks that cqlsh is compliant with pep8 with the following command:
+        pep8 --ignore E501,E402,E731 pylib/cqlshlib/*.py bin/cqlsh.py
+        """
+        cluster = self.cluster
+
+        if cluster.version() < '2.2':
+            cqlsh_path = os.path.join(cluster.get_install_dir(), 'bin', 'cqlsh')
+        else:
+            cqlsh_path = os.path.join(cluster.get_install_dir(), 'bin', 'cqlsh.py')
+
+        cqlshlib_path = os.path.join(cluster.get_install_dir(), 'pylib', 'cqlshlib')
+        cqlshlib_paths = os.listdir(cqlshlib_path)
+        cqlshlib_paths = [os.path.join(cqlshlib_path, x) for x in cqlshlib_paths if '.py' in x and '.pyc' not in x]
+
+        cmds = ['pep8', '--ignore', 'E501,E402,E731', cqlsh_path] + cqlshlib_paths
+
+        debug(cmds)
+
+        p = subprocess.Popen(cmds, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        stdout, stderr = p.communicate()
+
+        self.assertEqual(len(stdout), 0, stdout)
+        self.assertEqual(len(stderr), 0, stderr)
+
     def test_simple_insert(self):
 
         self.cluster.populate(1)
