@@ -48,10 +48,10 @@ def get_default_upgrade_path(job_version):
     if '2.1' <= job_version < '2.2':
         # If this is 2.1.X, we can upgrade to 2.2.
         # Skip 2.2.X->3.X because of JDK compatibility.
-        upgrade_version = 'git:cassandra-2.2'
+        upgrade_version = 'binary:2.2.0'
     elif '3.0' <= job_version < '3.1':
         # We can choose 2.2 because it will run on JDK 1.8
-        start_version = 'git:cassandra-2.2'
+        start_version = 'binary:2.2.0'
     elif '3.1' <= job_version:
         # 2.2->3.X, where X > 0, isn't a supported upgrade path,
         # but 3.0->3.X is.
