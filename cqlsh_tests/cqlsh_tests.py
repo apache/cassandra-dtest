@@ -653,7 +653,8 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         self.execute(cql='CREATE INDEX myindex ON test.users (age)')
         self.execute(cql='DESCRIBE INDEX test.myindex', expected_output=self.get_index_output('myindex', 'test', 'users', 'age'))
 
-        # Alter table (rename of column with idx is currently not allowed, so we drop it first)
+        # Alter table. Renaming indexed columns is not allowed, and since 3.0 neither is dropping them
+        # Prior to 3.0 the index would have been automatically dropped, but now we need to explicitly do that.
         self.execute(cql='DROP INDEX test.test_val_idx')
         self.execute(cql='ALTER TABLE test.test DROP val')
         self.execute(cql="DESCRIBE test.test", expected_output=self.get_test_table_output(has_val=False, has_val_idx=False))
