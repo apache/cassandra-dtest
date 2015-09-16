@@ -1,3 +1,4 @@
+import itertools
 import time
 import uuid
 
@@ -1663,11 +1664,11 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
         """Test that paging throws a failure in case of tombstone threshold """
         self.allow_log_errors = True
         self.cluster.set_configuration_options(
-            values={'tombstone_failure_threshold': 500}
+            values={'tombstone_failure_threshold': 500,
+                    'read_request_timeout_in_ms': 1000}
         )
         cursor = self.prepare()
-        node1, node2 = self.cluster.nodelist()
-
+        nodes = self.cluster.nodelist()
         self.setup_schema(cursor)
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
@@ -1686,11 +1687,12 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
                     consistency_level=CL.ALL
                 ))
 
-            assert_invalid(cursor, SimpleStatement("select * from paging_test", fetch_size=1000, consistency_level=CL.ALL), expected=ReadTimeout)
+            stmt = SimpleStatement("select * from paging_test", fetch_size=1000, consistency_level=CL.ALL)
+            assert_invalid(cursor, stmt, expected=ReadTimeout)
 
-            failure_msg = ("Scanned over.* tombstones in ks."
-                           "paging_test.* query aborted")
-            failure = (node1.grep_log(failure_msg) or
-                       node2.grep_log(failure_msg))
+            patterns = [r"Scanned over.* tombstones during query 'SELECT \* FROM ks.paging_test.* query aborted",  # new pattern
+                        "Scanned over.* tombstones in ks.paging_test.* query aborted"]  # old pattern
 
-            self.assertTrue(failure, "Cannot find tombstone failure threshold error in log")
+            failed = any([n.grep_log(m) for n, m in itertools.product(nodes, patterns)])
+
+            self.assertTrue(failed, "Cannot find tombstone failure threshold error in log for {} node".format(("upgraded" if is_upgraded else "old")))
