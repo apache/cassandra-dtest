@@ -1518,33 +1518,6 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
             self.check_all_paging_results(cursor, expected_data, 7,
                                           [25, 25, 25, 25, 25, 25, 25])
 
-    @require('6237')
-    def test_multiple_row_deletions(self):
-        """Test multiple row deletions.
-           This test should be finished when CASSANDRA-6237 is done.
-        """
-        cursor = self.prepare()
-        self.setup_schema(cursor)
-
-        for is_upgraded, cursor in self.do_upgrade(cursor):
-            cursor.row_factory = dict_factory
-            debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
-            cursor.execute("TRUNCATE paging_test")
-            expected_data = self.setup_data(cursor)
-
-            # Delete a bunch of rows
-            rows = expected_data[100:105]
-            expected_data = expected_data[0:100] + expected_data[105:]
-            in_condition = ','.join("'{}'".format(r['mytext']) for r in rows)
-
-            cursor.execute(SimpleStatement(
-                ("delete from paging_test where "
-                 "id = {} and mytext in ({})".format(3, in_condition)),
-                consistency_level=CL.ALL)
-            )
-            self.check_all_paging_results(cursor, expected_data, 8,
-                                          [25, 25, 25, 25, 25, 25, 25, 20])
-
     def test_single_cell_deletions(self):
         """Test single cell deletions """
         cursor = self.prepare()
