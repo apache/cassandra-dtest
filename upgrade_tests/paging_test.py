@@ -2,11 +2,11 @@ import itertools
 import time
 import uuid
 
-from cassandra import ConsistencyLevel as CL, OperationTimedOut
+from cassandra import ConsistencyLevel as CL
 from cassandra import InvalidRequest, ReadTimeout
 from cassandra.query import SimpleStatement, dict_factory, named_tuple_factory
 from dtest import run_scenarios, debug
-from tools import since, require, rows_to_list, no_vnodes
+from tools import since, require, rows_to_list
 
 from datahelp import create_rows, parse_data_into_dicts, flatten_into_set
 from assertions import assert_invalid
@@ -1693,7 +1693,6 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
             patterns = [r"Scanned over.* tombstones during query 'SELECT \* FROM ks.paging_test.* query aborted",  # new pattern
                         "Scanned over.* tombstones in ks.paging_test.* query aborted"]  # old pattern
 
-            grep = lambda n, m: bool(n.grep_log(m))
-            failed = any([grep(*a) for a in itertools.product(nodes, patterns)])
+            failed = any([n.grep_log(m) for n, m in itertools.product(nodes, patterns)])
 
             self.assertTrue(failed, "Cannot find tombstone failure threshold error in log for {} node".format(("upgraded" if is_upgraded else "old")))
