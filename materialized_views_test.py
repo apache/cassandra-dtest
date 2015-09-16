@@ -943,6 +943,131 @@ class TestMaterializedViews(Tester):
 
         assert_none(session2, "SELECT * FROM ks.t_by_v WHERE v2 = 'a'", cl=ConsistencyLevel.QUORUM)
 
+    def complex_mv_select_statements_test(self):
+        """
+        Test complex MV select statements
+        @jira_ticket CASSANDRA-9664
+        """
+
+        cluster = self.cluster
+        cluster.populate(3).start()
+        node1 = cluster.nodelist()[0]
+        session = self.patient_cql_connection(node1)
+
+        debug("Creating keyspace")
+        session.execute("CREATE KEYSPACE mvtest WITH replication = "
+                        "{'class': 'SimpleStrategy', 'replication_factor': '3'}")
+        session.execute('USE mvtest')
+
+        mv_primary_keys = ["((a, b), c)",
+                           "((b, a), c)",
+                           "(a, b, c)",
+                           "(c, b, a)",
+                           "((c, a), b)"]
+
+        for mv_primary_key in mv_primary_keys:
+
+            session.execute("CREATE TABLE test (a int, b int, c int, d int, PRIMARY KEY (a, b, c))")
+
+            insert_stmt = session.prepare("INSERT INTO test (a, b, c, d) VALUES (?, ?, ?, ?)")
+            update_stmt = session.prepare("UPDATE test SET d = ? WHERE a = ? AND b = ? AND c = ?")
+            delete_stmt1 = session.prepare("DELETE FROM test WHERE a = ? AND b = ? AND c = ?")
+            delete_stmt2 = session.prepare("DELETE FROM test WHERE a = ?")
+
+            session.cluster.control_connection.wait_for_schema_agreement()
+
+            rows = [(0, 0, 0, 0),
+                    (0, 0, 1, 0),
+                    (0, 1, 0, 0),
+                    (0, 1, 1, 0),
+                    (1, 0, 0, 0),
+                    (1, 0, 1, 0),
+                    (1, 1, -1, 0),
+                    (1, 1, 0, 0),
+                    (1, 1, 1, 0)]
+
+            for row in rows:
+                session.execute(insert_stmt, row)
+
+            debug("Testing MV primary key: {}".format(mv_primary_key))
+
+            session.execute("CREATE MATERIALIZED VIEW mv AS SELECT * FROM test WHERE "
+                            "a = 1 AND b IS NOT NULL AND c = 1 PRIMARY KEY {}".format(mv_primary_key))
+            time.sleep(3)
+
+            assert_all(
+                session, "SELECT a, b, c, d FROM mv",
+                [[1, 0, 1, 0], [1, 1, 1, 0]],
+                ignore_order=True,
+                cl=ConsistencyLevel.QUORUM
+            )
+
+            # insert new rows that does not match the filter
+            session.execute(insert_stmt, (0, 0, 1, 0))
+            session.execute(insert_stmt, (1, 1, 0, 0))
+            assert_all(
+                session, "SELECT a, b, c, d FROM mv",
+                [[1, 0, 1, 0], [1, 1, 1, 0]],
+                ignore_order=True,
+                cl=ConsistencyLevel.QUORUM
+            )
+
+            # insert new row that does match the filter
+            session.execute(insert_stmt, (1, 2, 1, 0))
+            assert_all(
+                session, "SELECT a, b, c, d FROM mv",
+                [[1, 0, 1, 0], [1, 1, 1, 0], [1, 2, 1, 0]],
+                ignore_order=True,
+                cl=ConsistencyLevel.QUORUM
+            )
+
+            # update rows that does not match the filter
+            session.execute(update_stmt, (1, 1, -1, 0))
+            session.execute(update_stmt, (0, 1, 1, 0))
+            assert_all(
+                session, "SELECT a, b, c, d FROM mv",
+                [[1, 0, 1, 0], [1, 1, 1, 0], [1, 2, 1, 0]],
+                ignore_order=True,
+                cl=ConsistencyLevel.QUORUM
+            )
+
+            # update a row that does match the filter
+            session.execute(update_stmt, (2, 1, 1, 1))
+            assert_all(
+                session, "SELECT a, b, c, d FROM mv",
+                [[1, 0, 1, 0], [1, 1, 1, 2], [1, 2, 1, 0]],
+                ignore_order=True,
+                cl=ConsistencyLevel.QUORUM
+            )
+
+            # delete rows that does not match the filter
+            session.execute(delete_stmt1, (1, 1, -1))
+            session.execute(delete_stmt1, (2, 0, 1))
+            session.execute(delete_stmt2, (0,))
+            assert_all(
+                session, "SELECT a, b, c, d FROM mv",
+                [[1, 0, 1, 0], [1, 1, 1, 2], [1, 2, 1, 0]],
+                ignore_order=True,
+                cl=ConsistencyLevel.QUORUM
+            )
+
+            # delete a row that does match the filter
+            session.execute(delete_stmt1, (1, 1, 1))
+            assert_all(
+                session, "SELECT a, b, c, d FROM mv",
+                [[1, 0, 1, 0], [1, 2, 1, 0]],
+                ignore_order=True,
+                cl=ConsistencyLevel.QUORUM
+            )
+
+            # delete a partition that matches the filter
+            session.execute(delete_stmt1, (1,))
+            assert_all(session, "SELECT a, b, c, d FROM mv", [], cl=ConsistencyLevel.QUORUM)
+
+            # Cleanup
+            session.execute("DROP MATERIALIZED VIEW mv")
+            session.execute("DROP TABLE test")
+
 
 # For read verification
 class MutationPresence(Enum):
