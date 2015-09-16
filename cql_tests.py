@@ -418,7 +418,8 @@ class AbortedQueriesTester(CQLTester):
         # introduced by CASSANDRA-7392 to pause by the specified amount of milliseconds during each
         # iteration of non system queries, so that these queries take much longer to complete,
         # see ReadCommand.withStateTracking()
-        cluster.populate(1).start(wait_for_binary_proto=True, jvm_args=["-Dcassandra.test.read_iteration_delay_ms=100"])
+        cluster.populate(1).start(wait_for_binary_proto=True, jvm_args=["-Dcassandra.monitoring_check_interval_ms=50",
+                                                                        "-Dcassandra.test.read_iteration_delay_ms=1500"])
         node = cluster.nodelist()[0]
         session = self.patient_cql_connection(node)
 
@@ -436,7 +437,7 @@ class AbortedQueriesTester(CQLTester):
         mark = node.mark_log()
         statement = SimpleStatement("SELECT * from test1", consistency_level=ConsistencyLevel.ONE, retry_policy=FallthroughRetryPolicy())
         assert_unavailable(lambda c: debug(c.execute(statement)), session)
-        node.watch_log_for("SELECT \* FROM ks.test1 (.*) timeout", from_mark=mark, timeout=60)
+        node.watch_log_for("Some operations timed out", from_mark=mark, timeout=60)
 
     def remote_query_test(self):
         """
@@ -448,27 +449,41 @@ class AbortedQueriesTester(CQLTester):
         cluster.populate(2)
         node1, node2 = cluster.nodelist()
 
-        node1.start(wait_for_binary_proto=True, jvm_args=["-Djoin_ring=false"])  # ensure other node executes queries
-        node2.start(wait_for_binary_proto=True, jvm_args=["-Dcassandra.test.read_iteration_delay_ms=1500"])  # see above for explanation
+        node1.start(wait_for_binary_proto=True, join_ring=False)  # ensure other node executes queries
+        node2.start(wait_for_binary_proto=True, jvm_args=["-Dcassandra.monitoring_check_interval_ms=50",
+                                                          "-Dcassandra.test.read_iteration_delay_ms=1500"])  # see above for explanation
 
         session = self.patient_exclusive_cql_connection(node1)
 
         self.create_ks(session, 'ks', 1)
         session.execute("""
             CREATE TABLE test2 (
-                id int PRIMARY KEY,
-                val text
+                id int,
+                col int,
+                val text,
+                PRIMARY KEY(id, col)
             );
         """)
 
         for i in xrange(500):
-            session.execute("INSERT INTO test2 (id, val) VALUES ({}, 'foo')".format(i))
+            for j in xrange(10):
+                session.execute("INSERT INTO test2 (id, col, val) VALUES ({}, {}, 'foo')".format(i, j))
 
         mark = node2.mark_log()
 
         statement = SimpleStatement("SELECT * from test2", consistency_level=ConsistencyLevel.ONE, retry_policy=FallthroughRetryPolicy())
         assert_unavailable(lambda c: debug(c.execute(statement)), session)
-        node2.watch_log_for("SELECT \* FROM ks.test2 (.*) timeout", from_mark=mark, timeout=60)
+
+        statement = SimpleStatement("SELECT * from test2 where id = 1", consistency_level=ConsistencyLevel.ONE, retry_policy=FallthroughRetryPolicy())
+        assert_unavailable(lambda c: debug(c.execute(statement)), session)
+
+        statement = SimpleStatement("SELECT * from test2 where id IN (1, 10,  20) AND col < 10", consistency_level=ConsistencyLevel.ONE, retry_policy=FallthroughRetryPolicy())
+        assert_unavailable(lambda c: debug(c.execute(statement)), session)
+
+        statement = SimpleStatement("SELECT * from test2 where col > 5 ALLOW FILTERING", consistency_level=ConsistencyLevel.ONE, retry_policy=FallthroughRetryPolicy())
+        assert_unavailable(lambda c: debug(c.execute(statement)), session)
+
+        node2.watch_log_for("Some operations timed out", from_mark=mark, timeout=60)
 
     def index_query_test(self):
         """
@@ -477,7 +492,8 @@ class AbortedQueriesTester(CQLTester):
         cluster = self.cluster
         cluster.set_configuration_options(values={'read_request_timeout_in_ms': 1000})
 
-        cluster.populate(1).start(wait_for_binary_proto=True, jvm_args=["-Dcassandra.test.read_iteration_delay_ms=100"])  # see above for explanation
+        cluster.populate(1).start(wait_for_binary_proto=True, jvm_args=["-Dcassandra.monitoring_check_interval_ms=50",
+                                                                        "-Dcassandra.test.read_iteration_delay_ms=1500"])  # see above for explanation
         node = cluster.nodelist()[0]
         session = self.patient_cql_connection(node)
 
@@ -500,7 +516,7 @@ class AbortedQueriesTester(CQLTester):
         statement.consistency_level = ConsistencyLevel.ONE
         statement.retry_policy = FallthroughRetryPolicy()
         assert_unavailable(lambda c: debug(c.execute(statement, [50])), session)
-        node.watch_log_for("SELECT \* FROM ks.test3 WHERE col < 50 (.*) timeout", from_mark=mark, timeout=60)
+        node.watch_log_for("Some operations timed out", from_mark=mark, timeout=60)
 
     def materialized_view_test(self):
         """
@@ -512,8 +528,9 @@ class AbortedQueriesTester(CQLTester):
         cluster.populate(2)
         node1, node2 = cluster.nodelist()
 
-        node1.start(wait_for_binary_proto=True, jvm_args=["-Djoin_ring=false"])  # ensure other node executes queries
-        node2.start(wait_for_binary_proto=True, jvm_args=["-Dcassandra.test.read_iteration_delay_ms=1500"])  # see above for explanation
+        node1.start(wait_for_binary_proto=True, join_ring=False)  # ensure other node executes queries
+        node2.start(wait_for_binary_proto=True, jvm_args=["-Dcassandra.monitoring_check_interval_ms=50",
+                                                          "-Dcassandra.test.read_iteration_delay_ms=1500"])  # see above for explanation
 
         session = self.patient_exclusive_cql_connection(node1)
 
@@ -529,11 +546,10 @@ class AbortedQueriesTester(CQLTester):
         session.execute(("CREATE MATERIALIZED VIEW mv AS SELECT * FROM test4 "
                          "WHERE col IS NOT NULL AND id IS NOT NULL PRIMARY KEY (col, id)"))
 
-        for i in xrange(25):
+        for i in xrange(50):
             session.execute("INSERT INTO test4 (id, col, val) VALUES ({}, {}, 'foo')".format(i, i // 10))
 
         mark = node2.mark_log()
         statement = SimpleStatement("SELECT * FROM mv WHERE col = 50", consistency_level=ConsistencyLevel.ONE, retry_policy=FallthroughRetryPolicy())
         assert_unavailable(lambda c: debug(c.execute(statement)), session)
-
-        node2.watch_log_for("SELECT \* FROM ks.mv WHERE col = 50 (.*) timeout", from_mark=mark, timeout=60)
+        node2.watch_log_for("Some operations timed out", from_mark=mark, timeout=60)
