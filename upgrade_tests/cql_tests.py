@@ -2901,6 +2901,8 @@ class TestCQL(UpgradeTester):
         client.set_keyspace('ks')
         client.system_add_column_family(cfdef)
 
+        time.sleep(1)
+
         cursor.execute("INSERT INTO ks.test (key, column1, column2, column3, value) VALUES ('foo', 4, 3, 2, 'bar')")
 
         time.sleep(1)
