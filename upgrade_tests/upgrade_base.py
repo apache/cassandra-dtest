@@ -165,7 +165,7 @@ class UpgradeTester(Tester):
             node1.set_install_dir(**install_kwargs)
             # this is a bandaid; after refactoring, upgrades should account for protocol version
             new_version_from_build = get_version_from_build(node1.get_install_dir())
-            if (new_version_from_build >= '3' and self.protocol_version < 3):
+            if (new_version_from_build >= '3' and self.protocol_version is not None and self.protocol_version < 3):
                 self.skip('Protocol version {} incompatible '
                           'with Cassandra version {}'.format(self.protocol_version, new_version_from_build))
             node1.set_log_level("DEBUG" if DEBUG else "INFO")
@@ -176,7 +176,7 @@ class UpgradeTester(Tester):
             node2.set_install_dir(**install_kwargs)
             # this is a bandaid; after refactoring, upgrades should account for protocol version
             new_version_from_build = get_version_from_build(node1.get_install_dir())
-            if (new_version_from_build >= '3' and self.protocol_version < 3):
+            if (new_version_from_build >= '3' and self.protocol_version is not None and self.protocol_version < 3):
                 self.skip('Protocol version {} incompatible '
                           'with Cassandra version {}'.format(self.protocol_version, new_version_from_build))
             node2.set_log_level("DEBUG" if DEBUG else "INFO")
