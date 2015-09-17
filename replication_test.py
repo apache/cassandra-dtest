@@ -4,7 +4,7 @@ import re
 import time
 
 from dtest import Tester, debug, PRINT_DEBUG
-from tools import no_vnodes, require, since
+from tools import no_vnodes, since
 
 from cassandra.query import SimpleStatement
 from cassandra import ConsistencyLevel
@@ -257,7 +257,6 @@ class ReplicationTest(Tester):
         self.assertEqual(len(forwarders_used), 3)
 
 
-@require('10238')
 class SnitchConfigurationUpdateTest(Tester):
     """
     Test to repro CASSANDRA-10238, wherein changing snitch properties to change racks without a restart could violate RF contract.
