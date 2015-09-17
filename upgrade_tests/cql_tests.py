@@ -1,25 +1,23 @@
 # coding: utf-8
 
+import math
 import random
 import struct
 import time
-import math
 from collections import OrderedDict
-from uuid import uuid4, UUID
+from uuid import UUID, uuid4
 
-from thrift_bindings.v22.ttypes import CfDef, Mutation, ColumnOrSuperColumn, Column
-from thrift_bindings.v22.ttypes import ConsistencyLevel as ThriftConsistencyLevel
-
-from dtest import freshCluster, debug
-from assertions import assert_invalid, assert_one, assert_none, assert_all
-from thrift_tests import get_thrift_client
-from tools import since, require, rows_to_list
+from assertions import assert_all, assert_invalid, assert_none, assert_one
 from cassandra import ConsistencyLevel, InvalidRequest
 from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.protocol import ProtocolException, SyntaxException
 from cassandra.query import SimpleStatement
 from cassandra.util import sortedset
-
+from dtest import debug, freshCluster
+from thrift_bindings.v22.ttypes import ConsistencyLevel as ThriftConsistencyLevel
+from thrift_bindings.v22.ttypes import (CfDef, Column, ColumnOrSuperColumn, Mutation)
+from thrift_tests import get_thrift_client
+from tools import require, rows_to_list, since
 from upgrade_base import UpgradeTester
 
 
@@ -366,7 +364,7 @@ class TestCQL(UpgradeTester):
             # order of keys (even though 48 is after 2)
             res = cursor.execute("SELECT * FROM clicks WHERE userid IN (48, 2) LIMIT 1")
 
-            if is_upgraded:
+            if self.get_node_version(is_upgraded):
                 # the coordinator is the upgraded 2.2+ node
                 assert rows_to_list(res) == [[2, 'http://foo.com', 42]], res
             else:
@@ -608,7 +606,7 @@ class TestCQL(UpgradeTester):
                 cursor.execute("INSERT INTO test2 (k, c1, c2, v) VALUES (0, 0, %i, %i)" % (x, x))
 
             # Check first we don't allow IN everywhere
-            if is_upgraded:
+            if self.get_node_version(is_upgraded) >= '2.2':
                 # the coordinator is the upgraded 2.2+ node
                 assert_none(cursor, "SELECT v FROM test2 WHERE k = 0 AND c1 IN (5, 2, 8) AND c2 = 3")
             else:
@@ -1546,7 +1544,7 @@ class TestCQL(UpgradeTester):
 
             assert_invalid(cursor, "SELECT * FROM test WHERE k2 = 3")
 
-            if not is_upgraded:
+            if self.get_node_version(is_upgraded) < '2.2':
                 # the coordinator is the upgraded 2.2+ node
                 assert_invalid(cursor, "SELECT * FROM test WHERE k1 IN (0, 1) and k2 = 3")
 
@@ -1779,7 +1777,7 @@ class TestCQL(UpgradeTester):
 
             # as discussed in CASSANDRA-8148, some queries that should have required ALLOW FILTERING
             # in 2.0 have been fixed for 2.2
-            if not is_upgraded:
+            if self.get_node_version(is_upgraded) < '2.2':
                 # the coordinator is the non-upgraded 2.1 node
                 cursor.execute("SELECT blog_id, content FROM blogs WHERE time1 > 0 AND author='foo'")
                 cursor.execute("SELECT blog_id, content FROM blogs WHERE time1 = 1 AND author='foo'")
@@ -2339,13 +2337,22 @@ class TestCQL(UpgradeTester):
     def truncate_clean_cache_test(self):
         cursor = self.prepare(ordered=True, use_cache=True)
 
-        cursor.execute("""
-            CREATE TABLE test (
-                k int PRIMARY KEY,
-                v1 int,
-                v2 int,
-            ) WITH CACHING = ALL;
-        """)
+        if self.node_version_above('2.1'):
+            cursor.execute("""
+                CREATE TABLE test (
+                    k int PRIMARY KEY,
+                    v1 int,
+                    v2 int,
+                ) WITH caching = {'keys': 'NONE', 'rows_per_partition': 'ALL'};
+            """)
+        else:
+            cursor.execute("""
+                CREATE TABLE test (
+                    k int PRIMARY KEY,
+                    v1 int,
+                    v2 int,
+                ) WITH CACHING = ALL;
+            """)
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
             debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
@@ -4024,7 +4031,7 @@ class TestCQL(UpgradeTester):
             cursor.execute("insert into test(field1, field2, field3) values ('hola', now(), false);")
 
             # the result depends on which node we're connected to, see CASSANDRA-8216
-            if is_upgraded:
+            if self.get_node_version(is_upgraded) >= '2.2':
                 # the coordinator is the upgraded 2.2+ node
                 assert_one(cursor, "select count(*) from test where field3 = false limit 1;", [2])
             else:
@@ -4144,7 +4151,7 @@ class TestCQL(UpgradeTester):
             assert_all(cursor, "SELECT v FROM test WHERE k=0 AND c1 = 0 AND c2 IN (2, 0)", [[0], [2]])
             assert_all(cursor, "SELECT v FROM test WHERE k=0 AND c1 = 0 AND c2 IN (2, 0) ORDER BY c1 ASC", [[0], [2]])
             assert_all(cursor, "SELECT v FROM test WHERE k=0 AND c1 = 0 AND c2 IN (2, 0) ORDER BY c1 DESC", [[2], [0]])
-            if is_upgraded:
+            if self.get_node_version(is_upgraded) >= '2.2':
                 # the coordinator is the upgraded 2.2+ node
                 assert_all(cursor, "SELECT v FROM test WHERE k IN (1, 0)", [[0], [1], [2], [3], [4], [5]])
             else:
@@ -5132,7 +5139,10 @@ class TestCQL(UpgradeTester):
             )
         """)
 
-        cursor.execute("ALTER TABLE test WITH CACHING='ALL'")
+        if self.node_version_above('2.1'):
+            cursor.execute("ALTER TABLE test WITH caching = {'keys': 'ALL', 'rows_per_partition': 'ALL'}")
+        else:
+            cursor.execute("ALTER TABLE test WITH CACHING='ALL'")
         cursor.execute("INSERT INTO test (k,v) VALUES (0,0)")
         cursor.execute("INSERT INTO test (k,v) VALUES (1,1)")
         cursor.execute("CREATE INDEX testindex on test(v)")
@@ -5140,12 +5150,18 @@ class TestCQL(UpgradeTester):
         # wait for the index to be fully built
         start = time.time()
         while True:
-            results = cursor.execute("""SELECT * FROM system."IndexInfo" WHERE table_name = 'ks' AND index_name = 'test.testindex'""")
+            if self.node_version_above('3.0'):
+                results = cursor.execute("""SELECT * FROM system_schema.indexes WHERE keyspace_name = 'ks' AND table_name = 'test' AND index_name = 'testindex'""")
+            else:
+                results = cursor.execute("""SELECT * FROM system."IndexInfo" WHERE table_name = 'ks' AND index_name = 'test.testindex'""")
             if results:
                 break
 
             if time.time() - start > 10.0:
-                results = list(cursor.execute('SELECT * FROM system."IndexInfo"'))
+                if self.node_version_above('3.0'):
+                    results = list(cursor.execute('SELECT * FROM system_schema.indexes'))
+                else:
+                    results = list(cursor.execute('SELECT * FROM system."IndexInfo"'))
                 raise Exception("Failed to build secondary index within ten seconds: %s" % (results,))
             time.sleep(0.1)
 
