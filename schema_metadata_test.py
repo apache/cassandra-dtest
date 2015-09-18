@@ -380,7 +380,10 @@ def _validate_collection_column(collection_type, param_type, column, frozen=Fals
     if frozen:
         meta_type = cqltypes.FrozenType.apply_parameters([meta_type])
 
-    assert_equal(str(meta_type), str(column.data_type), "column {0} invalid".format(column.name))
+    # Only checking the class name since the package doesn't matter
+    expected = str(meta_type).split('.')[-1]
+    actual = str(column.data_type).split('.')[-1]
+    assert_equal(expected, actual, "column {0} invalid; exp: {1}, got: {2}".format(column.name, expected, actual))
 
 
 def verify_collection_datatype_table(created_on_version, current_version, keyspace, session, table_name_prefix=""):
