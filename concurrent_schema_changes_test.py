@@ -265,8 +265,8 @@ class TestConcurrentSchemaChanges(Tester):
 
         debug("waiting for indexes to fill in")
         wait(60)
-        result = session.execute(("SELECT * FROM system_schema.materialized_views "
-                                  "WHERE keyspace_name='lots_o_views' AND table_name='source_data'"))
+        result = session.execute(("SELECT * FROM system_schema.views "
+                                  "WHERE keyspace_name='lots_o_views' AND base_table_name='source_data' ALLOW FILTERING"))
         self.assertEqual(10, len(result), "missing some mv from source_data table")
 
         for n in range(1, 11):
