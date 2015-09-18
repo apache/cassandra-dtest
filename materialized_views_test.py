@@ -406,24 +406,15 @@ class TestMaterializedViews(Tester):
             )
 
     def secondary_index_test(self):
-        """Test that we can use secondary indexes with a materialized view"""
+        """Test that secondary indexes cannot be created on a materialized view"""
 
         session = self.prepare()
 
         session.execute("CREATE TABLE t (id int PRIMARY KEY, v int, v2 text, v3 decimal)")
         session.execute(("CREATE MATERIALIZED VIEW t_by_v AS SELECT * FROM t "
                          "WHERE v IS NOT NULL AND id IS NOT NULL PRIMARY KEY (v, id)"))
-        session.execute("CREATE INDEX ON t_by_v (v2)")
-
-        for i in xrange(1000):
-            session.execute("INSERT INTO t (id, v, v2, v3) VALUES ({v}, {v}, 'a', 3.0)".format(v=i))
-
-        for i in xrange(1000):
-            assert_one(
-                session,
-                "SELECT * FROM t_by_v WHERE v = {} AND v2 = 'a'".format(i),
-                [i, i, 'a', 3.0]
-            )
+        assert_invalid(session, "CREATE INDEX ON t_by_v (v2)",
+                       "Secondary indexes are not supported on materialized views")
 
     def ttl_test(self):
         """
