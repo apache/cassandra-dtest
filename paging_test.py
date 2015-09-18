@@ -272,7 +272,6 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
 
     @require(9775, broken_in='3.0')
     def test_with_equal_results_to_page_size(self):
-        self.skipTest("Hangs the build")
         session = self.prepare()
         self.create_ks(session, 'test_paging_size', 2)
         session.execute("CREATE TABLE paging_test ( id int PRIMARY KEY, value text )")
