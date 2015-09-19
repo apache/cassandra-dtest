@@ -15,7 +15,7 @@ from cassandra.query import SimpleStatement
 
 from dtest import Tester, debug
 from tools import since, new_node
-from assertions import assert_all, assert_one, assert_invalid, assert_unavailable, assert_none
+from assertions import assert_all, assert_one, assert_invalid, assert_unavailable, assert_none, assert_crc_check_chance_equal
 
 
 @since('3.0')
@@ -149,6 +149,21 @@ class TestMaterializedViews(Tester):
 
         for i in xrange(1000):
             assert_one(session, "SELECT * FROM t_by_v WHERE v = {}".format(i), [i, i])
+
+    def crc_check_chance_test(self):
+        """Test that crc_check_chance parameter is properly populated after mv creation and update"""
+
+        session = self.prepare()
+
+        session.execute("CREATE TABLE t (id int PRIMARY KEY, v int)")
+        session.execute(("CREATE MATERIALIZED VIEW t_by_v AS SELECT * FROM t WHERE v IS NOT NULL "
+                         "AND id IS NOT NULL PRIMARY KEY (v, id) WITH crc_check_chance = 0.5"))
+
+        assert_crc_check_chance_equal(session, "t_by_v", 0.5, view=True)
+
+        session.execute("ALTER MATERIALIZED VIEW t_by_v WITH crc_check_chance = 0.3")
+
+        assert_crc_check_chance_equal(session, "t_by_v", 0.3, view=True)
 
     def prepared_statement_test(self):
         """Test basic insertions with prepared statement"""

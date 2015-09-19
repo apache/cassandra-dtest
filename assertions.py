@@ -74,3 +74,20 @@ def assert_row_count(session, table_name, expected):
     assert count == expected, "Expected a row count of {} in table '{}', but got {}".format(
         expected, table_name, count
     )
+
+
+def assert_crc_check_chance_equal(session, table, expected, ks="ks", view=False):
+    """
+    driver still doesn't support top-level crc_check_chance property,
+    so let's fetch directly from system_schema
+    """
+    if view:
+        assert_one(session,
+                   "SELECT crc_check_chance from system_schema.views WHERE keyspace_name = 'ks' AND "
+                   "view_name = '{table}';".format(**locals()),
+                   [expected])
+    else:
+        assert_one(session,
+                   "SELECT crc_check_chance from system_schema.tables WHERE keyspace_name = 'ks' AND "
+                   "table_name = '{table}';".format(**locals()),
+                   [expected])
