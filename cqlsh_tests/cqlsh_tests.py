@@ -694,6 +694,37 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         self.assertEqual("", err)
         self.assertIn("CREATE TABLE ks.map (", out)
 
+    @since('3.0')
+    def test_describe_mv(self):
+        """
+        @jira_ticket CASSANDRA-9961
+        """
+        self.cluster.populate(1)
+        self.cluster.start(wait_for_binary_proto=True)
+        node1, = self.cluster.nodelist()
+
+        self.execute(
+            cql="""
+                CREATE KEYSPACE test WITH REPLICATION = {'class' : 'SimpleStrategy', 'replication_factor' : 1};
+                CREATE TABLE test.users (username varchar, password varchar, gender varchar,
+                session_token varchar, state varchar, birth_year bigint, PRIMARY KEY (username));
+                CREATE MATERIALIZED VIEW test.users_by_state AS
+                SELECT * FROM users WHERE STATE IS NOT NULL AND username IS NOT NULL PRIMARY KEY (state, username)
+                """)
+
+        output = self.execute(cql="DESCRIBE KEYSPACE test")
+        self.assertIn("users_by_state", output)
+
+        self.execute(cql='DESCRIBE MATERIALIZED VIEW test.users_by_state', expected_output=self.get_users_by_state_mv_output())
+        self.execute(cql='DESCRIBE test.users_by_state', expected_output=self.get_users_by_state_mv_output())
+        self.execute(cql='USE test; DESCRIBE MATERIALIZED VIEW test.users_by_state', expected_output=self.get_users_by_state_mv_output())
+        self.execute(cql='USE test; DESCRIBE MATERIALIZED VIEW users_by_state', expected_output=self.get_users_by_state_mv_output())
+        self.execute(cql='USE test; DESCRIBE users_by_state', expected_output=self.get_users_by_state_mv_output())
+
+        # test quotes
+        self.execute(cql='USE test; DESCRIBE MATERIALIZED VIEW "users_by_state"', expected_output=self.get_users_by_state_mv_output())
+        self.execute(cql='USE test; DESCRIBE "users_by_state"', expected_output=self.get_users_by_state_mv_output())
+
     def get_keyspace_output(self):
         return ("CREATE KEYSPACE test WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}  AND durable_writes = true;" +
                 self.get_test_table_output() +
@@ -811,10 +842,33 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
     def get_index_output(self, index, ks, table, col):
         return "CREATE INDEX {} ON {}.{} ({});".format(index, ks, table, col)
 
-    def execute(self, cql, expected_output=None, expected_err=None):
+    def get_users_by_state_mv_output(self):
+        return """
+                CREATE MATERIALIZED VIEW test.users_by_state AS
+                SELECT *
+                FROM test.users
+                WHERE state IS NOT NULL AND username IS NOT NULL
+                PRIMARY KEY (state, username)
+                WITH CLUSTERING ORDER BY (username ASC)
+                AND bloom_filter_fp_chance = 0.01
+                AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
+                AND comment = ''
+                AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32', 'min_threshold': '4'}
+                AND compression = {'chunk_length_in_kb': '64', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+                AND dclocal_read_repair_chance = 0.1
+                AND default_time_to_live = 0
+                AND gc_grace_seconds = 864000
+                AND max_index_interval = 2048
+                AND memtable_flush_period_in_ms = 0
+                AND min_index_interval = 128
+                AND read_repair_chance = 0.0
+                AND speculative_retry = '99PERCENTILE';
+               """
+
+    def execute(self, cql, expected_output=None, expected_err=None, env_vars=None):
         debug(cql)
         node1, = self.cluster.nodelist()
-        output, err = self.run_cqlsh(node1, cql)
+        output, err = self.run_cqlsh(node1, cql, env_vars=env_vars)
 
         if err:
             if expected_err:
@@ -822,8 +876,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
                 self.check_response(err, expected_err)
                 return
             else:
-                debug('{} returned error {}'.format(cql, err))
-                self.assertTrue(False)
+                self.assertTrue(False, err)
 
         if expected_output:
             self.check_response(output, expected_output)
@@ -1274,6 +1327,58 @@ Unlogged batch covering 2 partitions detected against table [client_warnings.tes
 
         # the table created before and after should be the same
         self.assertEqual(reloaded_describe_out, describe_out)
+
+    @since('3.0')
+    def test_materialized_view(self):
+        """
+        Test operations on a materialized view: create, describe, select from, drop, create using describe output.
+        @jira_ticket CASSANDRA-9961 and CASSANDRA-10348
+        """
+        self.cluster.populate(1)
+        self.cluster.start(wait_for_binary_proto=True)
+        node1, = self.cluster.nodelist()
+        session = self.patient_cql_connection(node1)
+
+        self.create_ks(session, 'test', 1)
+
+        session.execute("""CREATE TABLE test.users (username varchar, password varchar, gender varchar,
+                session_token varchar, state varchar, birth_year bigint, PRIMARY KEY (username))""")
+
+        session.execute("""CREATE MATERIALIZED VIEW test.users_by_state AS
+                SELECT * FROM users WHERE STATE IS NOT NULL AND username IS NOT NULL PRIMARY KEY (state, username)""")
+
+        insert_stmt = "INSERT INTO users (username, password, gender, state, birth_year) VALUES "
+        session.execute(insert_stmt + "('user1', 'ch@ngem3a', 'f', 'TX', 1968);")
+        session.execute(insert_stmt + "('user2', 'ch@ngem3b', 'm', 'CA', 1971);")
+        session.execute(insert_stmt + "('user3', 'ch@ngem3c', 'f', 'FL', 1978);")
+        session.execute(insert_stmt + "('user4', 'ch@ngem3d', 'm', 'TX', 1974);")
+
+        describe_out, err = self.run_cqlsh(node1, 'DESCRIBE MATERIALIZED VIEW test.users_by_state')
+        self.assertEqual(0, len(err), err)
+
+        select_out, err = self.run_cqlsh(node1, "SELECT * FROM test.users_by_state")
+        self.assertEqual(0, len(err), err)
+        debug(select_out)
+
+        out, err = self.run_cqlsh(node1, "DROP MATERIALIZED VIEW test.users_by_state; DESCRIBE KEYSPACE test; DESCRIBE table test.users")
+        self.assertEqual(0, len(err), err)
+        self.assertNotIn("CREATE MATERIALIZED VIEW users_by_state", out)
+
+        out, err = self.run_cqlsh(node1, 'DESCRIBE MATERIALIZED VIEW test.users_by_state')
+        self.assertEqual(0, len(out.strip()), out)
+        self.assertIn("Materialized view 'users_by_state' not found", err)
+
+        create_statement = 'USE test; ' + ' '.join(describe_out.splitlines()).strip()[:-1]
+        out, err = self.run_cqlsh(node1, create_statement)
+        self.assertEqual(0, len(err), err)
+
+        reloaded_describe_out, err = self.run_cqlsh(node1, 'DESCRIBE MATERIALIZED VIEW test.users_by_state')
+        self.assertEqual(0, len(err), err)
+        self.assertEqual(describe_out, reloaded_describe_out)
+
+        reloaded_select_out, err = self.run_cqlsh(node1, "SELECT * FROM test.users_by_state")
+        self.assertEqual(0, len(err), err)
+        self.assertEqual(select_out, reloaded_select_out)
 
     @since('3.0')
     def test_clear(self):

@@ -15,7 +15,7 @@ class NotificationWaiter(object):
     Cassandra over the native protocol.
     """
 
-    def __init__(self, tester, node, notification_types):
+    def __init__(self, tester, node, notification_types, keyspace=None):
         """
         `address` should be a ccmlib.node.Node instance
         `notification_types` should be a list of
@@ -24,6 +24,7 @@ class NotificationWaiter(object):
         self.node = node
         self.address = node.network_interfaces['binary'][0]
         self.notification_types = notification_types
+        self.keyspace = keyspace
 
         # get a single, new connection
         session = tester.patient_cql_connection(node)
@@ -43,8 +44,10 @@ class NotificationWaiter(object):
         """
         Called when a notification is pushed from Cassandra.
         """
+        debug("Source {} sent {}".format(self.address, notification))
 
-        debug("Source {} sent {} for {}".format(self.address, notification["change_type"], notification["address"][0],))
+        if self.keyspace and notification['keyspace'] and self.keyspace != notification['keyspace']:
+            return  # we are not interested in this schema change
 
         self.notifications.append(notification)
         self.event.set()
@@ -209,6 +212,50 @@ class TestPushedNotifications(Tester):
         debug("Waiting for notifications from {}".format(waiter.address,))
         notifications = waiter.wait_for_notifications(timeout=30.0, num_notifications=3)
         self.assertEquals(0, len(notifications))
+
+    @since("3.0")
+    @require("9961")
+    def schema_changes_test(self):
+        """
+        @jira_ticket CASSANDRA-10328
+        Creating, updating and dropping a keyspace, a table and a materialized view
+        will generate the correct schema change notifications.
+        """
+
+        self.cluster.populate(2).start(wait_for_binary_proto=True)
+        node1, node2 = self.cluster.nodelist()
+
+        session = self.patient_cql_connection(node1)
+        waiter = NotificationWaiter(self, node2, ["SCHEMA_CHANGE"], keyspace='ks')
+
+        self.create_ks(session, 'ks', 3)
+        session.execute("create TABLE t (k int PRIMARY KEY , v int)")
+        session.execute("alter TABLE t add v1 int;")
+
+        session.execute("create MATERIALIZED VIEW mv as select * from t WHERE v IS NOT NULL AND t IS NOT NULL PRIMARY KEY (v, k)")
+        session.execute(" alter materialized view mv with min_index_interval = 100")
+
+        session.execute("drop MATERIALIZED VIEW mv")
+        session.execute("drop TABLE t")
+        session.execute("drop KEYSPACE ks")
+
+        debug("Waiting for notifications from {}".format(waiter.address,))
+        notifications = waiter.wait_for_notifications(timeout=60.0, num_notifications=14)
+        self.assertEquals(14, len(notifications))
+        self.assertDictContainsSubset({'change_type': u'CREATED', 'target_type': u'KEYSPACE'}, notifications[0])
+        self.assertDictContainsSubset({'change_type': u'UPDATED', 'target_type': u'KEYSPACE'}, notifications[1])
+        self.assertDictContainsSubset({'change_type': u'CREATED', 'target_type': u'TABLE', u'table': u't'}, notifications[2])
+        self.assertDictContainsSubset({'change_type': u'UPDATED', 'target_type': u'KEYSPACE'}, notifications[3])
+        self.assertDictContainsSubset({'change_type': u'UPDATED', 'target_type': u'TABLE', u'table': u't'}, notifications[4])
+        self.assertDictContainsSubset({'change_type': u'UPDATED', 'target_type': u'KEYSPACE'}, notifications[5])
+        self.assertDictContainsSubset({'change_type': u'CREATED', 'target_type': u'TABLE', u'table': u'mv'}, notifications[6])
+        self.assertDictContainsSubset({'change_type': u'UPDATED', 'target_type': u'KEYSPACE'}, notifications[7])
+        self.assertDictContainsSubset({'change_type': u'UPDATED', 'target_type': u'TABLE', u'table': u'mv'}, notifications[8])
+        self.assertDictContainsSubset({'change_type': u'UPDATED', 'target_type': u'KEYSPACE'}, notifications[9])
+        self.assertDictContainsSubset({'change_type': u'DROPPED', 'target_type': u'TABLE', u'table': u'mv'}, notifications[10])
+        self.assertDictContainsSubset({'change_type': u'UPDATED', 'target_type': u'KEYSPACE'}, notifications[11])
+        self.assertDictContainsSubset({'change_type': u'DROPPED', 'target_type': u'TABLE', u'table': u't'}, notifications[12])
+        self.assertDictContainsSubset({'change_type': u'DROPPED', 'target_type': u'KEYSPACE'}, notifications[13])
 
 
 class TestVariousNotifications(Tester):
