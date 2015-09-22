@@ -265,7 +265,7 @@ class TestCompaction(Tester):
         node.flush()
 
         node.nodetool('compact ks large')
-        node.watch_log_for('Compacting large partition ks/large:user \(\d+ bytes\)', from_mark=mark, timeout=180)
+        node.watch_log_for('Writing large partition ks/large:user \(\d+ bytes\)', from_mark=mark, timeout=180)
 
         ret = session.execute("SELECT properties from ks.large where userid = 'user'")
 
