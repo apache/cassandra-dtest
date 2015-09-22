@@ -6,7 +6,7 @@ from cassandra import ConsistencyLevel as CL
 from cassandra import InvalidRequest, ReadTimeout
 from cassandra.query import SimpleStatement, dict_factory, named_tuple_factory
 from dtest import run_scenarios, debug
-from tools import since, require, rows_to_list
+from tools import since, rows_to_list
 
 from datahelp import create_rows, parse_data_into_dicts, flatten_into_set
 from assertions import assert_invalid
@@ -795,7 +795,6 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
             self.assertEqualIgnoreOrder(expected_data, pf.all_data())
 
     @since('2.0.6')
-    @require(9775, broken_in='3.0')
     def static_columns_paging_test(self):
         """
         Exercises paging with static columns to detect bugs
