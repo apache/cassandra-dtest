@@ -264,9 +264,10 @@ class TestIncRepair(Tester):
         expected_load_size = 4.5  # In GB
         assert_almost_equal(load_size, expected_load_size, error=0.25)
 
+    @since('2.1')
     def sstable_marking_test_not_intersecting_all_ranges(self):
         """
-        For CASSANDRA-10299
+        @jira_ticket CASSANDRA-10299
         """
         cluster = self.cluster
         cluster.populate(4, use_vnodes=True).start()
@@ -298,12 +299,11 @@ class TestIncRepair(Tester):
             debug("Repairing node 4")
             node4.nodetool("repair -inc -par")
 
-
         with open("final.txt", "w") as h:
-            node1.run_sstablemetadata(output_file=h,keyspace='keyspace1')
-            node2.run_sstablemetadata(output_file=h,keyspace='keyspace1')
-            node3.run_sstablemetadata(output_file=h,keyspace='keyspace1')
-            node4.run_sstablemetadata(output_file=h,keyspace='keyspace1')
+            node1.run_sstablemetadata(output_file=h, keyspace='keyspace1')
+            node2.run_sstablemetadata(output_file=h, keyspace='keyspace1')
+            node3.run_sstablemetadata(output_file=h, keyspace='keyspace1')
+            node4.run_sstablemetadata(output_file=h, keyspace='keyspace1')
 
         with open("final.txt", "r") as r:
             output = r.read()
