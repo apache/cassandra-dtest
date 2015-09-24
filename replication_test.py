@@ -295,7 +295,7 @@ class SnitchConfigurationUpdateTest(Tester):
                         raise RuntimeError("Error trying to run nodetool status")
 
                     racks = []
-                    for line in out.split('\n'):
+                    for line in out.split(os.linesep):
                         m = regex.match(line)
                         if m:
                             racks.append(m.group(1))
@@ -465,9 +465,9 @@ class SnitchConfigurationUpdateTest(Tester):
         for i, node in enumerate(cluster.nodelist()):
             with open(os.path.join(node.get_conf_dir(), snitch_config_file), 'w') as topo_file:
                 for line in snitch_lines_before(i, node):
-                    topo_file.write(line + "\n")
+                    topo_file.write(line + os.linesep)
 
-        cluster.start()
+        cluster.start(wait_for_binary_proto=True)
 
         session = self.patient_cql_connection(cluster.nodelist()[0])
 
@@ -482,7 +482,7 @@ class SnitchConfigurationUpdateTest(Tester):
         for i, node in enumerate(cluster.nodelist()):
             with open(os.path.join(node.get_conf_dir(), snitch_config_file), 'w') as topo_file:
                 for line in snitch_lines_after(i, node):
-                    topo_file.write(line + "\n")
+                    topo_file.write(line + os.linesep)
 
         self.wait_for_nodes_on_racks(cluster.nodelist(), final_racks)
 
