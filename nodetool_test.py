@@ -46,7 +46,7 @@ class TestNodetool(Tester):
         for i, node in enumerate(cluster.nodelist()):
             with open(os.path.join(node.get_conf_dir(), 'cassandra-rackdc.properties'), 'w') as snitch_file:
                 for line in ["dc={}".format(node.data_center), "rack=rack{}".format(i % 2)]:
-                    snitch_file.write(line + "\n")
+                    snitch_file.write(line + os.linesep)
 
         cluster.start(wait_for_binary_proto='True')
 
