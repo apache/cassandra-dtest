@@ -33,6 +33,8 @@ class CqlshCopyTest(Tester):
     @classmethod
     def setUpClass(cls):
         cls._cached_driver_methods = monkeypatch_driver()
+        reload(sys)
+        sys.setdefaultencoding('utf-8')
 
     @classmethod
     def tearDownClass(cls):
@@ -78,7 +80,7 @@ class CqlshCopyTest(Tester):
 
         self.data = ('ascii',  # a ascii
                      2 ** 40,  # b bigint
-                     '0xbeef',  # c blob
+                     bytearray.fromhex('beef'),  # c blob
                      True,  # d boolean
                      Decimal(3.14),  # e decimal
                      2.444,  # f double
@@ -148,10 +150,18 @@ class CqlshCopyTest(Tester):
             #     from cqlshlib.formatting
         encoding_name = 'utf-8'  # codecs.lookup(locale.getpreferredencoding()).name
 
+        # this seems gross but if the blob isn't set to type:bytearray is won't compare correctly
+        if isinstance(val, str) and self.data[2] == val:
+            var_type = bytearray
+            val = bytearray(val)
+        else:
+            var_type = type(val)
+
         # different versions use time_format or date_time_format
         # but all versions reject spurious values, so we just use both
         # here
-        return format_value(type(val), val,
+        return format_value(var_type,
+                            val,
                             encoding=encoding_name,
                             date_time_format=date_time_format,
                             time_format=DEFAULT_TIME_FORMAT,
@@ -663,8 +673,11 @@ class CqlshCopyTest(Tester):
 
         with open(self.tempfile.name, 'w') as csvfile:
             writer = csv.writer(csvfile)
-            writer.writerow(self.data)
-            csvfile.close
+            # serializing blob bytearray in friendly format
+            data_set = list(self.data)
+            data_set[2] = '0x' + ''.join('%02x' % c for c in self.data[2])
+            writer.writerow(data_set)
+            csvfile.close()
 
         debug('Importing from csv file: {name}'.format(name=self.tempfile.name))
         self.node1.run_cqlsh(cmds="COPY ks.testdatatype FROM '{name}'".format(name=self.tempfile.name))
