@@ -33,8 +33,6 @@ class CqlshCopyTest(Tester):
     @classmethod
     def setUpClass(cls):
         cls._cached_driver_methods = monkeypatch_driver()
-        reload(sys)
-        sys.setdefaultencoding('utf-8')
 
     @classmethod
     def tearDownClass(cls):
@@ -675,7 +673,7 @@ class CqlshCopyTest(Tester):
             writer = csv.writer(csvfile)
             # serializing blob bytearray in friendly format
             data_set = list(self.data)
-            data_set[2] = '0x' + ''.join('%02x' % c for c in self.data[2])
+            data_set[2] = '0x{}'.format(''.join('%02x' % c for c in self.data[2]))
             writer.writerow(data_set)
             csvfile.close()
 
