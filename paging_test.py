@@ -270,7 +270,6 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
         # make sure expected and actual have same data elements (ignoring order)
         self.assertEqualIgnoreOrder(pf.all_data(), expected_data)
 
-    @require(9775, broken_in='3.0')
     def test_with_equal_results_to_page_size(self):
         session = self.prepare()
         self.create_ks(session, 'test_paging_size', 2)
