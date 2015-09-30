@@ -166,7 +166,6 @@ class TestOfflineTools(Tester):
         self.assertTrue(max(final_levels) > 1)
 
     @since('2.2')
-    @require(9774, broken_in='3.0')
     def sstableverify_test(self):
         """
         Generate sstables and test offline verification works correctly
@@ -220,23 +219,20 @@ class TestOfflineTools(Tester):
             debug(sstable)
             self.assertTrue(verified and hashcomputed)
 
-        # try removing an sstable and running verify with extended option to ensure missing table is found
-        os.remove(sstables[0])
-        (out, error, rc) = node1.run_sstableverify("keyspace1", "standard1", options=['-e'], output=True)
-
-        self.assertEqual(rc, 0, msg=str(rc))
-        self.assertIn("was not released before the reference was garbage collected", out)
-
         # now try intentionally corrupting an sstable to see if hash computed is different and error recognized
-        with open(sstables[1], 'r') as f:
+        sstable1 = sstables[1]
+        with open(sstable1, 'r') as f:
             sstabledata = f.read().splitlines(True)
-        with open(sstables[1], 'w') as out:
+        with open(sstable1, 'w') as out:
             out.writelines(sstabledata[2:])
 
         # use verbose to get some coverage on it
         (out, error, rc) = node1.run_sstableverify("keyspace1", "standard1", options=['-v'], output=True)
 
-        self.assertIn("java.lang.Exception: Invalid SSTable", error)
+        if self.cluster.version() < '3.0':
+            self.assertIn("java.lang.Exception: Invalid SSTable", error)
+        else:
+            self.assertIn("Corrupted: " + sstable1, error)
         self.assertEqual(rc, 1, msg=str(rc))
 
     def sstableexpiredblockers_test(self):
