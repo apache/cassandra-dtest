@@ -21,6 +21,7 @@ from thrift_bindings.v22.Cassandra import (CfDef, Column, ColumnDef,
                                            SlicePredicate, SliceRange,
                                            SuperColumn)
 from tools import since
+from assertions import assert_one, assert_none
 
 
 def get_thrift_client(host='127.0.0.1', port=9160):
@@ -2295,3 +2296,29 @@ class TestTruncate(ThriftTester):
         client.truncate('Super1')
         assert _big_slice('key1', ColumnParent('Super1')) == []
         assert _big_slice('key1', ColumnParent('Super1', 'sc1')) == []
+
+
+class TestCQLAccesses(ThriftTester):
+
+    def test_range_tombstone_and_static(self):
+        node1, = self.cluster.nodelist()
+        session = self.patient_cql_connection(node1)
+
+        # Create a CQL table with a static column and insert a row
+        session.execute("USE \"Keyspace1\"");
+        session.execute("CREATE TABLE t (k text, s text static, t text, v text, PRIMARY KEY (k, t))");
+
+        session.execute("INSERT INTO t (k, s, t, v) VALUES ('k', 's', 't', 'v') USING TIMESTAMP 0");
+        assert_one(session, "SELECT * FROM t", [u'k', 't', 's', 'v']);
+
+        # Now submit a range deletion that should include both the row and the static value
+
+        _set_keyspace('Keyspace1')
+
+        mutations = [Mutation(deletion=Deletion(1, predicate=SlicePredicate(slice_range=SliceRange('', '', False, 1000))))]
+        mutation_map = dict((table, mutations) for table in ['t'])
+        keyed_mutations = dict((key, mutation_map) for key in ['k'])
+        client.batch_mutate(keyed_mutations, ConsistencyLevel.ONE)
+
+        # And check everything is gone
+        assert_none(session, "SELECT * FROM t");
