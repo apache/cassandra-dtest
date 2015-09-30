@@ -341,13 +341,20 @@ class TestSecondaryIndexesOnCollections(Tester):
         # check if indexes work on mutated data
         for n in range(5):
             rows = session.execute("select * from simple_with_tuple where single_tuple = ({0});".format(n))
-            [session.execute("update simple_with_tuple set single_tuple = (-999) where id = {0}".format(row.id)) for row in rows]
+            for row in rows:
+                session.execute("update simple_with_tuple set single_tuple = (-999) where id = {0}".format(row.id))
+
             rows = session.execute("select * from simple_with_tuple where double_tuple = ({0},{0});".format(n))
-            [session.execute("update simple_with_tuple set double_tuple = (-999,-999) where id = {0}".format(row.id)) for row in rows]
+            for row in rows:
+                session.execute("update simple_with_tuple set double_tuple = (-999,-999) where id = {0}".format(row.id))
+
             rows = session.execute("select * from simple_with_tuple where triple_tuple = ({0},{0},{0});".format(n))
-            [session.execute("update simple_with_tuple set triple_tuple = (-999,-999,-999) where id = {0}".format(row.id)) for row in rows]
+            for row in rows:
+                session.execute("update simple_with_tuple set triple_tuple = (-999,-999,-999) where id = {0}".format(row.id))
+
             rows = session.execute("select * from simple_with_tuple where nested_one = ({0},({0},{0}));".format(n))
-            [session.execute("update simple_with_tuple set nested_one = (-999,(-999,-999)) where id = {0}".format(row.id)) for row in rows]
+            for row in rows:
+                session.execute("update simple_with_tuple set nested_one = (-999,(-999,-999)) where id = {0}".format(row.id))
 
         for n in range(5):
             self.assertEqual(0, len(session.execute("select * from simple_with_tuple where single_tuple = ({0});".format(n))))
@@ -355,10 +362,10 @@ class TestSecondaryIndexesOnCollections(Tester):
             self.assertEqual(0, len(session.execute("select * from simple_with_tuple where triple_tuple = ({0},{0},{0});".format(n))))
             self.assertEqual(0, len(session.execute("select * from simple_with_tuple where nested_one = ({0},({0},{0}));".format(n))))
 
-        self.assertEqual(40, len(session.execute("select * from simple_with_tuple where single_tuple = (-999);".format(n))))
-        self.assertEqual(40, len(session.execute("select * from simple_with_tuple where double_tuple = (-999,-999);".format(n))))
-        self.assertEqual(40, len(session.execute("select * from simple_with_tuple where triple_tuple = (-999,-999,-999);".format(n))))
-        self.assertEqual(40, len(session.execute("select * from simple_with_tuple where nested_one = (-999,(-999,-999));".format(n))))
+        self.assertEqual(40, len(session.execute("select * from simple_with_tuple where single_tuple = (-999);")))
+        self.assertEqual(40, len(session.execute("select * from simple_with_tuple where double_tuple = (-999,-999);")))
+        self.assertEqual(40, len(session.execute("select * from simple_with_tuple where triple_tuple = (-999,-999,-999);")))
+        self.assertEqual(40, len(session.execute("select * from simple_with_tuple where nested_one = (-999,(-999,-999));")))
 
     @since('2.1')
     def test_list_indexes(self):
