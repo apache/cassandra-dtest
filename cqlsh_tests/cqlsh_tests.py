@@ -1421,7 +1421,10 @@ Unlogged batch covering 2 partitions detected against table [client_warnings.tes
 
         out, err = self.run_cqlsh(node1, cmd, env_vars={'TERM': 'xterm'})
         self.assertEqual("", err)
-        self.assertTrue(re.search(chr(27) + "\[[0,1,2]?J", out))
+
+        # Can't check escape sequence on cmd prompt. Assume no errors is good enough metric.
+        if not common.is_win():
+            self.assertTrue(re.search(chr(27) + "\[[0,1,2]?J", out))
 
     def test_batch(self):
         """
