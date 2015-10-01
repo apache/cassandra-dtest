@@ -76,6 +76,16 @@ class CqlshCopyTest(Tester):
                 o varint
             )''')
 
+        class UTC(datetime.tzinfo):
+            def utcoffset(self, dt):
+                return datetime.timedelta(0)
+
+            def tzname(self, dt):
+                return "UTC"
+
+            def dst(self, dt):
+                return datetime.timedelta(0)
+
         self.data = ('ascii',  # a ascii
                      2 ** 40,  # b bigint
                      bytearray.fromhex('beef'),  # c blob
@@ -86,7 +96,7 @@ class CqlshCopyTest(Tester):
                      '127.0.0.1',  # h inet
                      25,  # i int
                      'ヽ(´ー｀)ノ',  # j text
-                     datetime.datetime(2005, 7, 14, 12, 30),  # k timestamp
+                     datetime.datetime(2005, 7, 14, 12, 30, 0, 0, UTC()),  # k timestamp
                      uuid1(),  # l timeuuid
                      uuid4(),  # m uuid
                      'asdf',  # n varchar
@@ -286,6 +296,7 @@ class CqlshCopyTest(Tester):
         A parametrized test that tests COPY with a given null indicator.
         """
         self.prepare()
+        self.all_datatypes_prepare()
         self.session.execute("""
             CREATE TABLE testnullindicator (
                 a int primary key,
