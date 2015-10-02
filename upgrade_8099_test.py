@@ -17,7 +17,7 @@ class TestUpgrade8099(Tester):
         cluster = self.cluster
 
         # Forcing cluster version on purpose
-        cluster.set_install_dir(version="2.1.5")
+        cluster.set_install_dir(version="2.1.9")
         cluster.populate(1).start()
 
         [node1] = cluster.nodelist()
@@ -267,3 +267,33 @@ class TestUpgrade8099(Tester):
 
         print("Querying...")
         assert_all(cursor, "SELECT * FROM t WHERE v1 = 0", [[p, r, 0, r *2] for p in xrange(0, PARTITIONS) for r in xrange(0, ROWS) if r%2 == 0], ignore_order=True)
+
+    def upgrade_with_range_tombstones(self):
+        ROWS = 100
+
+        cursor = self._setup_cluster()
+
+        print("Creating schema...")
+        cursor.execute("CREATE KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor': 1};")
+        cursor.execute('USE ks')
+        cursor.execute('CREATE TABLE t (k int, t1 int, t2 int, PRIMARY KEY (k, t1, t2))')
+
+        print("Inserting...")
+        for n in xrange(0, ROWS):
+            cursor.execute("INSERT INTO t(k, t1, t2) VALUES (0, 0, %d)" % n)
+
+        cursor.execute("DELETE FROM t WHERE k=0 AND t1=0")
+
+        for n in xrange(0, ROWS, 2):
+            cursor.execute("INSERT INTO t(k, t1, t2) VALUES (0, 0, %d)" % n)
+
+        print("Upgrading node...")
+        cursor = self._do_upgrade()
+
+        cursor.execute('USE ks')
+
+        print("Querying...")
+        assert_all(cursor, "SELECT * FROM t WHERE k = 0", [ [0, 0, n] for n in xrange (0, ROWS, 2)])
+
+        self.cluster.compact()
+
