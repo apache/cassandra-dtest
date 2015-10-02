@@ -4,7 +4,7 @@ import subprocess
 
 from ccmlib import common
 from dtest import Tester, debug
-from tools import require, since
+from tools import since
 
 
 class TestOfflineTools(Tester):
