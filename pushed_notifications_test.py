@@ -150,7 +150,6 @@ class TestPushedNotifications(Tester):
             notifications = waiter.wait_for_notifications(30.0)
             self.assertEquals(1 if waiter.node is node1 else 0, len(notifications))
 
-    @require("10052")
     def restart_node_test(self):
         """
         @jira_ticket CASSANDRA-7816
@@ -177,7 +176,6 @@ class TestPushedNotifications(Tester):
             waiter.clear_notifications()
 
     @since("2.1")
-    @require("10052")
     def restart_node_localhost_test(self):
         """
         Test that we don't get client notifications when rpc_address is set to localhost.
