@@ -22,11 +22,12 @@ from tools import rows_to_list, since
 DEFAULT_FLOAT_PRECISION = 5  # magic number copied from cqlsh script
 DEFAULT_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'  # based on cqlsh script; timezone stripped
 
-PARTITIONERS = dict()
-PARTITIONERS["murmur3"] = "org.apache.cassandra.dht.Murmur3Partitioner"
-PARTITIONERS["random"] = "org.apache.cassandra.dht.RandomPartitioner"
-PARTITIONERS["byte"] = "org.apache.cassandra.dht.ByteOrderedPartitioner"
-PARTITIONERS["order"] = "org.apache.cassandra.dht.OrderPreservingPartitioner"
+PARTITIONERS = {
+    "murmur3": "org.apache.cassandra.dht.Murmur3Partitioner",
+    "random": "org.apache.cassandra.dht.RandomPartitioner",
+    "byte": "org.apache.cassandra.dht.ByteOrderedPartitioner",
+    "order": "org.apache.cassandra.dht.OrderPreservingPartitioner"
+}
 
 
 @canReuseCluster
@@ -39,7 +40,6 @@ class CqlshCopyTest(Tester):
 
     def __init__(self, *args, **kwargs):
         Tester.__init__(self, *args, **kwargs)
-        self.tempfile = None
 
     @classmethod
     def setUpClass(cls):
@@ -50,16 +50,19 @@ class CqlshCopyTest(Tester):
         unmonkeypatch_driver(cls._cached_driver_methods)
 
     def tearDown(self):
-        if self.tempfile:
-            if is_win():
-                self.tempfile.close()
-            os.unlink(self.tempfile.name)
+        try:
+            if self.tempfile:
+                if is_win():
+                    self.tempfile.close()
+                os.unlink(self.tempfile.name)
+        except AttributeError:
+            pass
 
         super(CqlshCopyTest, self).tearDown()
 
     def prepare(self, nodes=1, partitioner="murmur3"):
         if not self.cluster.nodelist():
-            p = PARTITIONERS.get(partitioner)
+            p = PARTITIONERS[partitioner]
             self.cluster.set_partitioner(p)
             self.cluster.populate(nodes).start(wait_for_binary_proto=True)
         else:
