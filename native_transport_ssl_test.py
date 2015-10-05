@@ -10,9 +10,6 @@ class NativeTransportSSL(Tester):
     Native transport integration tests, specifically for ssl and port configurations.
     """
 
-    def __init__(self, *args, **kwargs):
-        Tester.__init__(self, *args, **kwargs)
-
     def connect_to_ssl_test(self):
         """
         Connecting to SSL enabled native transport port should only be possible using SSL enabled client
