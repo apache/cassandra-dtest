@@ -907,6 +907,28 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         self.assertEqual(pf.num_results_all(), [400, 200])
         self.assertEqualIgnoreOrder(expected_data, pf.all_data())
 
+    def static_columns_with_empty_non_static_columns_paging_test(self):
+        """
+        @jira_ticket CASSANDRA-10381.
+        """
+
+        session = self.prepare()
+        self.create_ks(session, 'test_paging_static_cols', 2)
+        session.execute("CREATE TABLE test (a int, b int, c int, s int static, PRIMARY KEY (a, b))")
+        session.row_factory = named_tuple_factory
+
+        for i in range(10):
+            session.execute("UPDATE test SET s = %d WHERE a = %d" % (i, i))
+
+        session.default_fetch_size = 2
+        results = list(session.execute("SELECT * FROM test"))
+        self.assertEqual(10, len(results))
+        self.assertEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9] * 1, sorted([r.s for r in results]))
+
+        results = list(session.execute("SELECT * FROM test WHERE a IN (0, 1, 2, 3, 4)"))
+        self.assertEqual(5, len(results))
+        self.assertEqual([0, 1, 2, 3, 4] * 1, sorted([r.s for r in results]))
+
 
 @since('2.0')
 class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
