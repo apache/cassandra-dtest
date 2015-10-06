@@ -179,7 +179,7 @@ class CqlshCopyTest(Tester):
         encoding_name = 'utf-8'  # codecs.lookup(locale.getpreferredencoding()).name
 
         # this seems gross but if the blob isn't set to type:bytearray is won't compare correctly
-        if isinstance(val, str) and self.data[2] == val:
+        if isinstance(val, str) and hasattr(self, 'data') and self.data[2] == val:
             var_type = bytearray
             val = bytearray(val)
         else:
