@@ -301,6 +301,7 @@ class TestAvailability(TestHelper):
             (ConsistencyLevel.QUORUM, ConsistencyLevel.QUORUM),
             (ConsistencyLevel.LOCAL_QUORUM, ConsistencyLevel.LOCAL_QUORUM),
             (ConsistencyLevel.EACH_QUORUM, ConsistencyLevel.LOCAL_QUORUM),
+            (ConsistencyLevel.LOCAL_QUORUM, ConsistencyLevel.EACH_QUORUM),
             (ConsistencyLevel.ONE, ConsistencyLevel.ONE, None, False),
             (ConsistencyLevel.ONE, ConsistencyLevel.ALL),
             (ConsistencyLevel.ALL, ConsistencyLevel.ONE),
