@@ -31,7 +31,7 @@ UPGRADE_TO = os.environ.get('UPGRADE_TO', None)
 UpgradePath = namedtuple('UpgradePath', ('starting_version', 'upgrade_version'))
 
 
-def get_default_upgrade_path(job_version):
+def get_default_upgrade_path(job_version, cdir=None):
     """
     Given a version (which should be specified as a LooseVersion,
     StrictVersion, or NormalizedVersion object), return a tuple (start, target)
@@ -52,7 +52,10 @@ def get_default_upgrade_path(job_version):
         upgrade_version = 'binary:2.2.0'
     elif '3.0' <= job_version < '3.1':
         # We can choose 2.2 because it will run on JDK 1.8
-        start_version = 'binary:2.2.0'
+        if cassandra_git_branch(cdir=cdir) == 'trunk':
+            start_version = 'binary:3.0.0-rc1'
+        else:
+            start_version = 'binary:2.2.0'
     elif '3.1' <= job_version:
         # 2.2->3.X, where X > 0, isn't a supported upgrade path,
         # but 3.0->3.X is.
@@ -99,9 +102,8 @@ class UpgradeTester(Tester):
             cluster.populate(nodes)
             node1 = cluster.nodelist()[0]
             self.original_install_dir = node1.get_install_dir()
-            self.original_git_branch = cassandra_git_branch()
             self.original_version = get_version_from_build(node_path=node1.get_path())
-            self.upgrade_path = get_default_upgrade_path(self.original_version)
+            self.upgrade_path = get_default_upgrade_path(self.original_version, cdir=self.original_install_dir)
             if OLD_CASSANDRA_DIR:
                 cluster.set_install_dir(install_dir=OLD_CASSANDRA_DIR)
             elif self.upgrade_path.starting_version:
