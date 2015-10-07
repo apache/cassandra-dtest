@@ -2,7 +2,7 @@ from dtest import Tester, debug
 from tools import since
 
 
-@since('3.0')
+@since('2.2')
 class TestLargeColumn(Tester):
     """
     Check that inserting and reading large columns to the database doesn't cause off heap memory usage
