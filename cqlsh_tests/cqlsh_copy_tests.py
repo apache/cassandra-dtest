@@ -16,11 +16,18 @@ from cqlsh_tools import (DummyColorMap, assert_csvs_items_equal, csv_rows,
                          monkeypatch_driver, random_list,
                          strip_timezone_if_time_string, unmonkeypatch_driver,
                          write_rows_to_csv)
-from dtest import Tester, canReuseCluster, debug
+from dtest import Tester, canReuseCluster, freshCluster, debug
 from tools import rows_to_list, since
 
 DEFAULT_FLOAT_PRECISION = 5  # magic number copied from cqlsh script
 DEFAULT_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'  # based on cqlsh script; timezone stripped
+
+PARTITIONERS = {
+    "murmur3": "org.apache.cassandra.dht.Murmur3Partitioner",
+    "random": "org.apache.cassandra.dht.RandomPartitioner",
+    "byte": "org.apache.cassandra.dht.ByteOrderedPartitioner",
+    "order": "org.apache.cassandra.dht.OrderPreservingPartitioner"
+}
 
 
 @canReuseCluster
@@ -30,6 +37,10 @@ class CqlshCopyTest(Tester):
     Tests the COPY TO and COPY FROM features in cqlsh.
     @jira_ticket CASSANDRA-3906
     """
+
+    def __init__(self, *args, **kwargs):
+        Tester.__init__(self, *args, **kwargs)
+
     @classmethod
     def setUpClass(cls):
         cls._cached_driver_methods = monkeypatch_driver()
@@ -39,17 +50,26 @@ class CqlshCopyTest(Tester):
         unmonkeypatch_driver(cls._cached_driver_methods)
 
     def tearDown(self):
-        if self.tempfile:
-            if is_win():
-                self.tempfile.close()
-            os.unlink(self.tempfile.name)
+        try:
+            if self.tempfile:
+                if is_win():
+                    self.tempfile.close()
+                os.unlink(self.tempfile.name)
+        except AttributeError:
+            pass
 
         super(CqlshCopyTest, self).tearDown()
 
-    def prepare(self):
+    def prepare(self, nodes=1, partitioner="murmur3"):
         if not self.cluster.nodelist():
-            self.cluster.populate(1).start(wait_for_binary_proto=True)
-        self.node1, = self.cluster.nodelist()
+            p = PARTITIONERS[partitioner]
+            self.cluster.set_partitioner(p)
+            self.cluster.populate(nodes).start(wait_for_binary_proto=True)
+        else:
+            self.assertEqual(self.cluster.partitioner, partitioner, "Cannot reuse cluster: different partitioner")
+            self.assertEqual(len(self.cluster.nodelist()), nodes, "Cannot reuse cluster: different number of nodes")
+
+        self.node1 = self.cluster.nodelist()[0]
         self.session = self.patient_cql_connection(self.node1)
 
         self.session.execute('DROP KEYSPACE IF EXISTS ks')
@@ -76,6 +96,16 @@ class CqlshCopyTest(Tester):
                 o varint
             )''')
 
+        class UTC(datetime.tzinfo):
+            def utcoffset(self, dt):
+                return datetime.timedelta(0)
+
+            def tzname(self, dt):
+                return "UTC"
+
+            def dst(self, dt):
+                return datetime.timedelta(0)
+
         self.data = ('ascii',  # a ascii
                      2 ** 40,  # b bigint
                      bytearray.fromhex('beef'),  # c blob
@@ -86,7 +116,7 @@ class CqlshCopyTest(Tester):
                      '127.0.0.1',  # h inet
                      25,  # i int
                      'ヽ(´ー｀)ノ',  # j text
-                     datetime.datetime(2005, 7, 14, 12, 30),  # k timestamp
+                     datetime.datetime(2005, 7, 14, 12, 30, 0, 0, UTC()),  # k timestamp
                      uuid1(),  # l timeuuid
                      uuid4(),  # m uuid
                      'asdf',  # n varchar
@@ -149,7 +179,7 @@ class CqlshCopyTest(Tester):
         encoding_name = 'utf-8'  # codecs.lookup(locale.getpreferredencoding()).name
 
         # this seems gross but if the blob isn't set to type:bytearray is won't compare correctly
-        if isinstance(val, str) and self.data[2] == val:
+        if isinstance(val, str) and hasattr(self, 'data') and self.data[2] == val:
             var_type = bytearray
             val = bytearray(val)
         else:
@@ -248,7 +278,7 @@ class CqlshCopyTest(Tester):
                 a int primary key
             )""")
         insert_statement = self.session.prepare("INSERT INTO testdelimiter (a) VALUES (?)")
-        args = [(i,) for i in range(1000)]
+        args = [(i,) for i in range(10000)]
         execute_concurrent_with_args(self.session, insert_statement, args)
 
         results = list(self.session.execute("SELECT * FROM testdelimiter"))
@@ -285,7 +315,7 @@ class CqlshCopyTest(Tester):
 
         A parametrized test that tests COPY with a given null indicator.
         """
-        self.prepare()
+        self.all_datatypes_prepare()
         self.session.execute("""
             CREATE TABLE testnullindicator (
                 a int primary key,
@@ -748,7 +778,7 @@ class CqlshCopyTest(Tester):
         self.assertFalse(self.session.execute("SELECT * FROM testcolumns"))
         self.assertIn('Aborting import', err)
 
-    def test_round_trip(self):
+    def _test_round_trip(self, nodes, partitioner, num_records=10000):
         """
         Test a simple round trip of a small CQL table to and from a CSV file via
         COPY.
@@ -761,33 +791,55 @@ class CqlshCopyTest(Tester):
         - asserting that the previously-SELECTed contents of the table match the
         current contents of the table.
         """
-        self.prepare()
+        self.prepare(nodes=nodes, partitioner=partitioner)
         self.session.execute("""
             CREATE TABLE testcopyto (
-                a int,
-                b text,
+                a text PRIMARY KEY,
+                b int,
                 c float,
-                d uuid,
-                PRIMARY KEY (a, b)
+                d uuid
             )""")
 
         insert_statement = self.session.prepare("INSERT INTO testcopyto (a, b, c, d) VALUES (?, ?, ?, ?)")
-        args = [(i, str(i), float(i) + 0.5, uuid4()) for i in range(1000)]
+        args = [(str(i), i, float(i) + 0.5, uuid4()) for i in range(num_records)]
         execute_concurrent_with_args(self.session, insert_statement, args)
 
         results = list(self.session.execute("SELECT * FROM testcopyto"))
 
         self.tempfile = NamedTemporaryFile(delete=False)
-        debug('Exporting to csv file: {name}'.format(name=self.tempfile.name))
-        self.node1.run_cqlsh(cmds="COPY ks.testcopyto TO '{name}'".format(name=self.tempfile.name))
+        debug('Exporting to csv file: {}'.format(self.tempfile.name))
+        out = self.node1.run_cqlsh(cmds="COPY ks.testcopyto TO '{}'".format(self.tempfile.name), return_output=True)
+        debug(out)
+
+        # check all records were exported
+        self.assertEqual(num_records, sum(1 for line in open(self.tempfile.name)))
 
         # import the CSV file with COPY FROM
         self.session.execute("TRUNCATE ks.testcopyto")
-        debug('Importing from csv file: {name}'.format(name=self.tempfile.name))
-        self.node1.run_cqlsh(cmds="COPY ks.testcopyto FROM '{name}'".format(name=self.tempfile.name))
+        debug('Importing from csv file: {}'.format(self.tempfile.name))
+        out = self.node1.run_cqlsh(cmds="COPY ks.testcopyto FROM '{}'".format(self.tempfile.name), return_output=True)
+        debug(out)
+
         new_results = list(self.session.execute("SELECT * FROM testcopyto"))
         self.assertEqual(results, new_results)
 
+    @freshCluster()
+    def test_round_trip_murmur3(self):
+        self._test_round_trip(nodes=3, partitioner="murmur3")
+
+    @freshCluster()
+    def test_round_trip_random(self):
+        self._test_round_trip(nodes=3, partitioner="random")
+
+    @freshCluster()
+    def test_round_trip_order_preserving(self):
+        self._test_round_trip(nodes=3, partitioner="order")
+
+    @freshCluster()
+    def test_round_trip_byte_ordered(self):
+        self._test_round_trip(nodes=3, partitioner="byte")
+
+    @freshCluster()
     def test_source_copy_round_trip(self):
         """
         Like test_round_trip, but uses the SOURCE command to execute the
@@ -835,3 +887,36 @@ class CqlshCopyTest(Tester):
         self.assertEqual(results, new_results)
 
         os.unlink(commandfile.name)
+
+    def _test_bulk_round_trip(self, nodes, partitioner, num_records):
+        """
+        Test exporting a large number of rows into a csv file.
+        """
+        self.prepare(nodes=nodes, partitioner=partitioner)
+        self.node1.stress(['write', 'n={}'.format(num_records), '-rate', 'threads=50'])
+
+        stress_table = 'keyspace1.standard1'
+        self.assertEqual([[num_records]], rows_to_list(self.session.execute("SELECT COUNT(*) FROM {}".format(stress_table))))
+
+        self.tempfile = NamedTemporaryFile(delete=False)
+
+        debug('Exporting to csv file: {}'.format(self.tempfile.name))
+        start = datetime.datetime.now()
+        self.node1.run_cqlsh(cmds="COPY {} TO '{}'".format(stress_table, self.tempfile.name))
+        debug("COPY TO took {} to export {} records".format(datetime.datetime.now() - start, num_records))
+
+        # check all records were exported
+        self.assertEqual(num_records, sum(1 for line in open(self.tempfile.name)))
+
+        self.session.execute("TRUNCATE {}".format(stress_table))
+
+        debug('Importing from csv file: {}'.format(self.tempfile.name))
+        start = datetime.datetime.now()
+        self.node1.run_cqlsh(cmds="COPY {} FROM '{}'".format(stress_table, self.tempfile.name))
+        debug("COPY FROM took {} to import {} records".format(datetime.datetime.now() - start, num_records))
+
+        self.assertEqual([[num_records]], rows_to_list(self.session.execute("SELECT COUNT(*) FROM {}".format(stress_table))))
+
+    @freshCluster()
+    def test_bulk_round_trip(self):
+        self._test_bulk_round_trip(nodes=3, partitioner="murmur3", num_records=100000)

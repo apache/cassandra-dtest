@@ -905,7 +905,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
             )""")
 
         insert_statement = session.prepare("INSERT INTO testcopyto (a, b, c, d) VALUES (?, ?, ?, ?)")
-        args = [(i, str(i), float(i) + 0.5, uuid4()) for i in range(1000)]
+        args = [(i, str(i), float(i) + 0.5, uuid4()) for i in range(10000)]
         execute_concurrent_with_args(session, insert_statement, args)
 
         results = list(session.execute("SELECT * FROM testcopyto"))
@@ -1421,7 +1421,10 @@ Unlogged batch covering 2 partitions detected against table [client_warnings.tes
 
         out, err = self.run_cqlsh(node1, cmd, env_vars={'TERM': 'xterm'})
         self.assertEqual("", err)
-        self.assertTrue(re.search(chr(27) + "\[[0,1,2]?J", out))
+
+        # Can't check escape sequence on cmd prompt. Assume no errors is good enough metric.
+        if not common.is_win():
+            self.assertTrue(re.search(chr(27) + "\[[0,1,2]?J", out))
 
     def test_batch(self):
         """
