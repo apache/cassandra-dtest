@@ -189,10 +189,10 @@ class TestOfflineTools(Tester):
 
         # Generate multiple sstables and test works properly in the simple case
         node1.stress(['write', 'n=1M', '-schema', 'replication(factor=3)'])
-        node1.flush()
+        cluster.flush()
         node1.stress(['write', 'n=1M', '-schema', 'replication(factor=3)'])
-        node1.flush()
-        cluster.stop(gently=False)
+        cluster.flush()
+        cluster.stop()
         (out, error, rc) = node1.run_sstableverify("keyspace1", "standard1", output=True)
 
         self.assertEqual(rc, 0, msg=str(rc))
