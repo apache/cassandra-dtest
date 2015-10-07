@@ -41,10 +41,12 @@ class TestLargeColumn(Tester):
         debug("Running stress")
         # Run the full stack to see how much memory is utilized for "small" columns
         self.stress_with_col_size(cluster, node1, 1)
-        debug("Ran stress once {0}".format(self.directbytes(node1)))
+        beforeStress = self.directbytes(node1)
+        debug("Ran stress once {0}".format(beforeStress))
 
         # Now run the full stack to see how much memory is utilized for "large" columns
-        self.stress_with_col_size(cluster, node1, 1024 * 1024 * 63)
+        LARGE_COLUMN_SIZE = 1024 * 1024 * 63
+        self.stress_with_col_size(cluster, node1, LARGE_COLUMN_SIZE)
 
         output = node1.nodetool("gcstats", capture_output=True)
         afterStress = self.directbytes(node1)
@@ -52,4 +54,5 @@ class TestLargeColumn(Tester):
 
         # Any growth in memory usage should not be proportional column size. Really almost no memory should be used
         # since Netty was instructed to use a heap allocator
-        assert int(afterStress) < 1024 * 1024 * 2, int(afterStress)
+        diff = int(afterStress) - int(beforeStress)
+        assert diff < LARGE_COLUMN_SIZE, diff
