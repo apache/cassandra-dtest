@@ -44,6 +44,7 @@ def get_default_upgrade_path(job_version):
     will be running on JDK 1.7. This means we can't run 3.0+ on this version.
     """
     start_version, upgrade_version = None, None
+    debug('getting default job version for {}'.format(job_version))
 
     if '2.1' <= job_version < '2.2':
         # If this is 2.1.X, we can upgrade to 2.2.
@@ -59,7 +60,9 @@ def get_default_upgrade_path(job_version):
 
     err = 'Expected one or two upgrade path endpoints to be None; found {}'.format((start_version, upgrade_version))
     assert [start_version, upgrade_version].count(None) >= 1, err
-    return UpgradePath(start_version, upgrade_version)
+    upgrade_path = UpgradePath(start_version, upgrade_version)
+    debug(upgrade_path)
+    return upgrade_path
 
 
 @since('3.0')
@@ -101,7 +104,7 @@ class UpgradeTester(Tester):
             self.upgrade_path = get_default_upgrade_path(self.original_version)
             if OLD_CASSANDRA_DIR:
                 cluster.set_install_dir(install_dir=OLD_CASSANDRA_DIR)
-            elif UPGRADE_TO is not None and self.upgrade_path.starting_version:
+            elif self.upgrade_path.starting_version:
                 cluster.set_install_dir(version=self.upgrade_path.starting_version)
             # in other cases, just use the existing install directory
             cluster.start(wait_for_binary_proto=True)
