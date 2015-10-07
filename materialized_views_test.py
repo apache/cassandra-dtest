@@ -1067,7 +1067,7 @@ class TestMaterializedViews(Tester):
             )
 
             # delete a partition that matches the filter
-            session.execute(delete_stmt1, (1,))
+            session.execute(delete_stmt2, (1,))
             assert_all(session, "SELECT a, b, c, d FROM mv", [], cl=ConsistencyLevel.QUORUM)
 
             # Cleanup
