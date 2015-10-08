@@ -17,6 +17,12 @@ class TestCompaction(Tester):
         kwargs['cluster_options'] = {'start_rpc': 'true'}
         Tester.__init__(self, *args, **kwargs)
 
+    def setUp(self):
+        Tester.setUp(self)
+        # compaction test for version 2.2.2 and above relies on DEBUG log in debug.log
+        if self.cluster.version() > '2.1':
+            self.cluster.set_log_level("DEBUG")
+
     @since('0', '2.2.X')
     def compaction_delete_test(self):
         """
@@ -287,11 +293,15 @@ class TestCompaction(Tester):
             session.execute('insert into to_disable (id, d) values ({0}, \'{1}\')'.format(i, 'hello' * 100))
             if i % 100 == 0:
                 node.flush()
-        self.assertTrue(len(node.grep_log('Compacting.+to_disable')) == 0, 'Found compaction log items for {0}'.format(self.strategy))
+        if node.get_cassandra_version() < '2.2':
+            log_file = 'system.log'
+        else:
+            log_file = 'debug.log'
+        self.assertTrue(len(node.grep_log('Compacting.+to_disable', filename=log_file)) == 0, 'Found compaction log items for {0}'.format(self.strategy))
         node.nodetool('enableautocompaction ks to_disable')
         # sleep to allow compactions to start
         time.sleep(2)
-        self.assertTrue(len(node.grep_log('Compacting.+to_disable')) > 0, 'Found no log items for {0}'.format(self.strategy))
+        self.assertTrue(len(node.grep_log('Compacting.+to_disable', filename=log_file)) > 0, 'Found no log items for {0}'.format(self.strategy))
 
     def disable_autocompaction_schema_test(self):
         """
@@ -315,11 +325,15 @@ class TestCompaction(Tester):
         session.execute("use ks")
         # sleep to make sure we dont start any logs
         time.sleep(2)
-        self.assertTrue(len(node.grep_log('Compacting.+to_disable')) == 0, 'Found compaction log items for {0}'.format(self.strategy))
+        if node.get_cassandra_version() < '2.2':
+            log_file = 'system.log'
+        else:
+            log_file = 'debug.log'
+        self.assertTrue(len(node.grep_log('Compacting.+to_disable', filename=log_file)) == 0, 'Found compaction log items for {0}'.format(self.strategy))
         node.nodetool('enableautocompaction ks to_disable')
         # sleep to allow compactions to start
         time.sleep(2)
-        self.assertTrue(len(node.grep_log('Compacting.+to_disable')) > 0, 'Found no log items for {0}'.format(self.strategy))
+        self.assertTrue(len(node.grep_log('Compacting.+to_disable', filename=log_file)) > 0, 'Found no log items for {0}'.format(self.strategy))
 
     def disable_autocompaction_alter_test(self):
         """
@@ -336,14 +350,18 @@ class TestCompaction(Tester):
             session.execute('insert into to_disable (id, d) values ({0}, \'{1}\')'.format(i, 'hello' * 100))
             if i % 100 == 0:
                 node.flush()
-        self.assertTrue(len(node.grep_log('Compacting.+to_disable')) == 0, 'Found compaction log items for {0}'.format(self.strategy))
+        if node.get_cassandra_version() < '2.2':
+            log_file = 'system.log'
+        else:
+            log_file = 'debug.log'
+        self.assertTrue(len(node.grep_log('Compacting.+to_disable', filename=log_file)) == 0, 'Found compaction log items for {0}'.format(self.strategy))
         session.execute('ALTER TABLE to_disable WITH compaction = {{\'class\':\'{0}\', \'enabled\':\'true\'}}'.format(self.strategy))
         # we need to flush atleast once when altering to enable:
         session.execute('insert into to_disable (id, d) values (99, \'hello\')')
         node.flush()
         # sleep to allow compactions to start
         time.sleep(2)
-        self.assertTrue(len(node.grep_log('Compacting.+to_disable')) > 0, 'Found no log items for {0}'.format(self.strategy))
+        self.assertTrue(len(node.grep_log('Compacting.+to_disable', filename=log_file)) > 0, 'Found no log items for {0}'.format(self.strategy))
 
     def disable_autocompaction_alter_and_nodetool_test(self):
         """
@@ -360,16 +378,20 @@ class TestCompaction(Tester):
             session.execute('insert into to_disable (id, d) values ({0}, \'{1}\')'.format(i, 'hello' * 100))
             if i % 100 == 0:
                 node.flush()
-        self.assertTrue(len(node.grep_log('Compacting.+to_disable')) == 0, 'Found compaction log items for {0}'.format(self.strategy))
+        if node.get_cassandra_version() < '2.2':
+            log_file = 'system.log'
+        else:
+            log_file = 'debug.log'
+        self.assertTrue(len(node.grep_log('Compacting.+to_disable', filename=log_file)) == 0, 'Found compaction log items for {0}'.format(self.strategy))
         session.execute('ALTER TABLE to_disable WITH compaction = {{\'class\':\'{0}\', \'tombstone_threshold\':0.9}}'.format(self.strategy))
         session.execute('insert into to_disable (id, d) values (99, \'hello\')')
         node.flush()
         time.sleep(2)
-        self.assertTrue(len(node.grep_log('Compacting.+to_disable')) == 0, 'Found log items for {0}'.format(self.strategy))
+        self.assertTrue(len(node.grep_log('Compacting.+to_disable', filename=log_file)) == 0, 'Found log items for {0}'.format(self.strategy))
         node.nodetool('enableautocompaction ks to_disable')
         # sleep to allow compactions to start
         time.sleep(2)
-        self.assertTrue(len(node.grep_log('Compacting.+to_disable')) > 0, 'Found no log items for {0}'.format(self.strategy))
+        self.assertTrue(len(node.grep_log('Compacting.+to_disable', filename=log_file)) > 0, 'Found no log items for {0}'.format(self.strategy))
 
     def skip_if_no_major_compaction(self):
         if self.cluster.version() < '2.2' and self.strategy == 'LeveledCompactionStrategy':
@@ -404,7 +426,11 @@ def block_on_compaction_log(node, ks=None, table=None):
     compaction completes before the method starts, it may not occur again
     during this method.
     """
-    mark = node.mark_log()
+    if node.get_cassandra_version() < '2.2':
+        log_file = 'system.log'
+    else:
+        log_file = 'debug.log'
+    mark = node.mark_log(filename=log_file)
     node.flush()
 
     # on newer C* versions, default stress names are titlecased
@@ -417,7 +443,7 @@ def block_on_compaction_log(node, ks=None, table=None):
 
     node.nodetool('compact {ks} {table}'.format(ks=ks, table=table))
 
-    return node.watch_log_for('Compacted', from_mark=mark)
+    return node.watch_log_for('Compacted', from_mark=mark, filename=log_file)
 
 
 def stress_write(node, keycount=100000):
