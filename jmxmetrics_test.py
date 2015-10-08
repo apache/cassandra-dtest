@@ -146,7 +146,7 @@ class TestJMXMetrics(Tester):
             if cluster.version() < "2.1":
                 node.stress(['-o', 'insert', '-n', '100000', '-p', '7100'])
             else:
-                node.stress(['write', 'n=100K', '-port jmx=7100'])
+                node.stress(['write', 'n=100K'])
 
             errors = []
             after = []
