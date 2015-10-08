@@ -311,12 +311,7 @@ class TestBootstrap(Tester):
 
         # Stop the new node and wipe its data
         node2.stop(gently=gently)
-        data_dir = os.path.join(node2.get_path(), 'data')
-        commitlog_dir = os.path.join(node2.get_path(), 'commitlogs')
-        debug("Deleting {}".format(data_dir))
-        shutil.rmtree(data_dir)
-        shutil.rmtree(commitlog_dir)
-
+        self._cleanup(node2)
         # Now start it, it should not be allowed to join.
         mark = node2.mark_log()
         node2.start(no_wait=True)
@@ -350,12 +345,7 @@ class TestBootstrap(Tester):
         # Decommision the new node and wipe its data
         node2.decommission()
         node2.stop(wait_other_notice=True)
-        data_dir = os.path.join(node2.get_path(), 'data')
-        commitlog_dir = os.path.join(node2.get_path(), 'commitlogs')
-        debug("Deleting {}".format(data_dir))
-        shutil.rmtree(data_dir)
-        shutil.rmtree(commitlog_dir)
-
+        self._cleanup(node2)
         # Now start it, it should be allowed to join
         mark = node2.mark_log()
         node2.start(wait_other_notice=True)
@@ -395,12 +385,7 @@ class TestBootstrap(Tester):
         self.assertFalse(node2.is_running())
 
         # wipe any data for node2
-        data_dir = os.path.join(node2.get_path(), 'data')
-        commitlog_dir = os.path.join(node2.get_path(), 'commitlogs')
-        debug("Deleting {}".format(data_dir))
-        shutil.rmtree(data_dir)
-        shutil.rmtree(commitlog_dir)
-
+        self._cleanup(node2)
         # Now start it again, it should be allowed to join
         mark = node2.mark_log()
         node2.start(wait_other_notice=True)
@@ -452,3 +437,12 @@ class TestBootstrap(Tester):
         # data loads.
         for _ in xrange(5):
             assert_one(session, "SELECT count(*) from keyspace1.standard1", [500000], cl=ConsistencyLevel.ONE)
+
+    def _cleanup(self, node):
+        data_dirs = [os.path.join(node.get_path(), 'data{0}'.format(x)) for x in xrange(0, self.cluster.data_dir_count)]
+        commitlog_dir = os.path.join(node.get_path(), 'commitlogs')
+        for data_dir in data_dirs:
+            debug("Deleting {}".format(data_dir))
+            shutil.rmtree(data_dir)
+        shutil.rmtree(commitlog_dir)
+

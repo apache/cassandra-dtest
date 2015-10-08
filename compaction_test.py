@@ -123,10 +123,11 @@ class TestCompaction(Tester):
         block_on_compaction_log(node1, ks='ks', table='cf')
 
         try:
-            cfs = os.listdir(node1.get_path() + "/data/ks")
-            ssdir = os.listdir(node1.get_path() + "/data/ks/" + cfs[0])
-            for afile in ssdir:
-                self.assertFalse("Data" in afile)
+            for x in xrange(0, cluster.data_dir_count):
+                cfs = os.listdir(node1.get_path() + "/data{0}/ks".format(x))
+                ssdir = os.listdir(node1.get_path() + "/data{0}/ks/{1}".format(format(x), cfs[0]))
+                for afile in ssdir:
+                    self.assertFalse("Data" in afile)
 
         except OSError:
             self.fail("Path to sstables not valid.")
@@ -158,15 +159,15 @@ class TestCompaction(Tester):
         node1.flush()
         time.sleep(40)
         expired_sstables = node1.get_sstables('ks', 'cf')
-        self.assertEqual(len(expired_sstables), 1)
-        expired_sstable = expired_sstables[0]
+        self.assertEqual(len(expired_sstables), cluster.data_dir_count)
         # write a new sstable to make DTCS check for expired sstables:
         for x in range(0, 100):
             session.execute('insert into cf (key, val) values (%d, %d)' % (x, x))
         node1.flush()
         time.sleep(5)
         # we only check every 10 minutes - sstable should still be there:
-        assert expired_sstable in node1.get_sstables('ks', 'cf')
+        for expired_sstable in expired_sstables:
+            assert expired_sstable in node1.get_sstables('ks', 'cf')
 
         session.execute("alter table cf with compaction =  {'class':'DateTieredCompactionStrategy', 'max_sstable_age_days':0.00035, 'min_threshold':2, 'expired_sstable_check_frequency_seconds':0}")
         time.sleep(1)
@@ -174,7 +175,8 @@ class TestCompaction(Tester):
             session.execute('insert into cf (key, val) values (%d, %d)' % (x, x))
         node1.flush()
         time.sleep(5)
-        assert expired_sstable not in node1.get_sstables('ks', 'cf')
+        for expired_sstable in expired_sstables:
+            assert expired_sstable not in node1.get_sstables('ks', 'cf')
 
     @known_failure(failure_source='cassandra',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10842')
@@ -192,7 +194,7 @@ class TestCompaction(Tester):
         stress_write(node1, keycount=1)
         node1.nodetool('disableautocompaction')
 
-        stress_write(node1, keycount=200000)
+        stress_write(node1, keycount=200000*cluster.data_dir_count)
 
         threshold = "5"
         node1.nodetool('setcompactionthroughput -- ' + threshold)
@@ -322,7 +324,12 @@ class TestCompaction(Tester):
             session.execute('insert into to_disable (id, d) values ({0}, \'{1}\')'.format(i, 'hello' * 100))
             if i % 100 == 0:
                 node.flush()
-        self.assertTrue(len(node.grep_log('Compacting.+to_disable')) == 0, 'Found compaction log items for {0}'.format(self.strategy))
+        if node.get_cassandra_version() < '2.2':
+            log_file = 'system.log'
+        else:
+            log_file = 'debug.log'
+
+        self.assertTrue(len(node.grep_log('Compacting.+to_disable', filename=log_file)) == 0, 'Found compaction log items for {0}'.format(self.strategy))
         # should still be disabled after restart:
         node.stop()
         node.start(wait_for_binary_proto=True)
@@ -330,10 +337,6 @@ class TestCompaction(Tester):
         session.execute("use ks")
         # sleep to make sure we dont start any logs
         time.sleep(2)
-        if node.get_cassandra_version() < '2.2':
-            log_file = 'system.log'
-        else:
-            log_file = 'debug.log'
         self.assertTrue(len(node.grep_log('Compacting.+to_disable', filename=log_file)) == 0, 'Found compaction log items for {0}'.format(self.strategy))
         node.nodetool('enableautocompaction ks to_disable')
         # sleep to allow compactions to start

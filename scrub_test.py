@@ -13,38 +13,43 @@ KEYSPACE = 'ks'
 
 
 class TestHelper(Tester):
-    def get_table_path(self, table):
+    def get_table_paths(self, table):
         """
         Return the path where the table sstables are located
         """
         node1 = self.cluster.nodelist()[0]
-        path = ""
-        basepath = os.path.join(node1.get_path(), 'data', KEYSPACE)
-        for x in os.listdir(basepath):
-            if x.startswith(table):
-                path = os.path.join(basepath, x)
-                break
-        return path
+        paths = []
+        for x in xrange(0, self.cluster.data_dir_count):
+            basepath = os.path.join(node1.get_path(), "data{0}".format(x), KEYSPACE)
+            for x in os.listdir(basepath):
+                if x.startswith(table):
+                    paths.append(os.path.join(basepath, x))
+                    break
+        return paths
 
-    def get_index_path(self, table, index):
+    def get_index_paths(self, table, index):
         """
-        Return the path where the index sstables are located
+        Return the paths where the index sstables are located
         """
-        path = self.get_table_path(table)
-        return os.path.join(path, '.' + index)
+        paths = self.get_table_paths(table)
+        index_paths = []
+        for path in paths:
+            index_paths.append(os.path.join(path, '.' + index))
+        return paths
 
-    def get_sstable_files(self, path):
+    def get_sstable_files(self, paths):
         """
         Return the sstable files at a specific location
         """
         ret = []
-        debug('Checking sstables in %s' % (path))
+        debug('Checking sstables in %s' % (paths))
 
         for ext in ('*.db', '*.txt', '*.adler32', '*.sha1'):
-            for fname in glob.glob(os.path.join(path, ext)):
-                bname = os.path.basename(fname)
-                debug('Found sstable file %s' % (bname))
-                ret.append(bname)
+            for path in paths:
+                for fname in glob.glob(os.path.join(path, ext)):
+                    bname = os.path.basename(fname)
+                    debug('Found sstable file %s' % (bname))
+                    ret.append(bname)
         return ret
 
     def delete_non_essential_sstable_files(self, table):
@@ -52,23 +57,26 @@ class TestHelper(Tester):
         Delete all sstable files except for the -Data.db file and the
         -Statistics.db file (only available in >= 3.0)
         """
-        for fname in self.get_sstable_files(self.get_table_path(table)):
+        for fname in self.get_sstable_files(self.get_table_paths(table)):
             if not fname.endswith("-Data.db") and not fname.endswith("-Statistics.db"):
-                fullname = os.path.join(self.get_table_path(table), fname)
-                debug('Deleting {}'.format(fullname))
-                os.remove(fullname)
+                paths = self.get_table_paths(table)
+                for path in paths:
+                    fullname = os.path.join(path, fname)
+                    if (os.path.exists(fullname)):
+                        debug('Deleting {}'.format(fullname))
+                        os.remove(fullname)
 
     def get_sstables(self, table, indexes):
         """
         Return the sstables for a table and the specified indexes of this table
         """
         sstables = {}
-        table_sstables = self.get_sstable_files(self.get_table_path(table))
+        table_sstables = self.get_sstable_files(self.get_table_paths(table))
         assert len(table_sstables) > 0
         sstables[table] = sorted(table_sstables)
 
         for index in indexes:
-            index_sstables = self.get_sstable_files(self.get_index_path(table, index))
+            index_sstables = self.get_sstable_files(self.get_index_paths(table, index))
             assert len(index_sstables) > 0
             sstables[index] = sorted('%s/%s' % (index, sstable) for sstable in index_sstables)
 
