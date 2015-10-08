@@ -230,9 +230,7 @@ def verify_nondefault_table_settings(created_on_version, current_version, keyspa
     assert_equal(meta.clustering_key[0].name, 'c')
 
 
-@require(6717)
-# this method has been renamed to _* so it's removed from upgrade tests as it will fail on 2.2 -> 3.0
-def _establish_uda(version, session, table_name_prefix=""):
+def establish_uda(version, session, table_name_prefix=""):
     if version < '2.2':
         return
     function_name = _table_name_builder(table_name_prefix, "test_uda_function")
@@ -253,9 +251,7 @@ def _establish_uda(version, session, table_name_prefix=""):
         '''.format(aggregate_name, function_name))
 
 
-@require(6717)
-# this method has been renamed to _* so it's removed from upgrade tests as it will fail on 2.2 -> 3.0
-def _verify_uda(created_on_version, current_version, keyspace, session, table_name_prefix=""):
+def verify_uda(created_on_version, current_version, keyspace, session, table_name_prefix=""):
     if created_on_version < '2.2':
         return
     function_name = _table_name_builder(table_name_prefix, "test_uda_function")
@@ -690,6 +686,6 @@ class TestSchemaMetadata(Tester):
 
     @since('2.2')
     def uda_test(self):
-        _establish_uda(self.cluster.version(), self.session)
+        establish_uda(self.cluster.version(), self.session)
         self.session.cluster.refresh_schema_metadata()
-        _verify_uda(self.cluster.version(), self.cluster.version(), 'ks', self.session)
+        verify_uda(self.cluster.version(), self.cluster.version(), 'ks', self.session)
