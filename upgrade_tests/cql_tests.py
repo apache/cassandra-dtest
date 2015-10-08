@@ -7,18 +7,20 @@ import time
 from collections import OrderedDict
 from uuid import UUID, uuid4
 
-from assertions import assert_all, assert_invalid, assert_none, assert_one
 from cassandra import ConsistencyLevel, InvalidRequest
 from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.protocol import ProtocolException, SyntaxException
 from cassandra.query import SimpleStatement
 from cassandra.util import sortedset
+from nose.exc import SkipTest
+
+from assertions import assert_all, assert_invalid, assert_none, assert_one
 from dtest import debug, freshCluster
 from thrift_bindings.v22.ttypes import ConsistencyLevel as ThriftConsistencyLevel
 from thrift_bindings.v22.ttypes import (CfDef, Column, ColumnOrSuperColumn, Mutation)
 from thrift_tests import get_thrift_client
 from tools import require, rows_to_list, since
-from upgrade_base import UpgradeTester
+from upgrade_base import UpgradeTester, UPGRADE_TO
 
 
 class TestCQL(UpgradeTester):
@@ -4085,7 +4087,7 @@ class TestCQL(UpgradeTester):
 
             assert_invalid(cursor, "SELECT v1, v2, v3 FROM test WHERE k = 0 AND (v1, v3) > (1, 0)")
 
-    @since('2.1.1', max_version='2.2.X')
+    @since('2.0', max_version='2.2.X')
     def test_v2_protocol_IN_with_tuples(self):
         """
         @jira_ticket CASSANDRA-8062
@@ -4093,8 +4095,13 @@ class TestCQL(UpgradeTester):
         cursor = self.prepare(protocol_version=2)
         cursor.execute("CREATE TABLE test (k int, c1 int, c2 text, PRIMARY KEY (k, c1, c2))")
 
+        for version in (UPGRADE_TO, self.upgrade_path.upgrade_version):
+            if version >= '3.0':
+                raise SkipTest('version {} not compatible with protocol version 2'.format(version))
+
         for is_upgraded, cursor in self.do_upgrade(cursor):
             debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
+
             cursor.execute("TRUNCATE test")
 
             cursor.execute("INSERT INTO test (k, c1, c2) VALUES (0, 0, 'a')")
