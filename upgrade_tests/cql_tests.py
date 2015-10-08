@@ -366,7 +366,7 @@ class TestCQL(UpgradeTester):
             # order of keys (even though 48 is after 2)
             res = cursor.execute("SELECT * FROM clicks WHERE userid IN (48, 2) LIMIT 1")
 
-            if self.get_node_version(is_upgraded):
+            if self.get_node_version(is_upgraded) >= '2.2':
                 # the coordinator is the upgraded 2.2+ node
                 assert rows_to_list(res) == [[2, 'http://foo.com', 42]], res
             else:
