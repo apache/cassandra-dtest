@@ -4,7 +4,7 @@ from nose.tools import assert_equal, assert_in
 
 from cassandra import cqltypes
 from dtest import Tester
-from tools import since, require
+from tools import since
 
 
 def establish_indexes_table(version, session, table_name_prefix=""):
