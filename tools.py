@@ -323,10 +323,11 @@ def require(require_pattern, broken_in=None):
             return tag_and_skip
 
 
-def cassandra_git_branch():
+def cassandra_git_branch(cdir=None):
     '''Get the name of the git branch at CASSANDRA_DIR.
     '''
-    p = subprocess.Popen(['git', 'branch'], cwd=CASSANDRA_DIR,
+    cdir = CASSANDRA_DIR if cdir is None else cdir
+    p = subprocess.Popen(['git', 'branch'], cwd=cdir,
                          stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out, err = p.communicate()
     # fail if git failed
