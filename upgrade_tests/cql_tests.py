@@ -4087,7 +4087,7 @@ class TestCQL(UpgradeTester):
 
             assert_invalid(cursor, "SELECT v1, v2, v3 FROM test WHERE k = 0 AND (v1, v3) > (1, 0)")
 
-    @since('2.1.1', max_version='2.2.X')
+    @since('2.0', max_version='2.2.X')
     def test_v2_protocol_IN_with_tuples(self):
         """
         @jira_ticket CASSANDRA-8062
@@ -4096,7 +4096,7 @@ class TestCQL(UpgradeTester):
         cursor.execute("CREATE TABLE test (k int, c1 int, c2 text, PRIMARY KEY (k, c1, c2))")
 
         for version in (UPGRADE_TO, self.upgrade_path.upgrade_version):
-            if not '2.1.1' <= version <= '2.2.X':
+            if version >= '3.0':
                 raise SkipTest('version {} not compatible with protocol version 2'.format(version))
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
