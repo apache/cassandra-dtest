@@ -1,5 +1,5 @@
 from dtest import Tester, debug
-from tools import since, require, InterruptCompaction
+from tools import since, InterruptCompaction
 from ccmlib import common
 from ccmlib.node import NodetoolError
 
@@ -12,17 +12,16 @@ KeyspaceName = 'keyspace1'
 TableName = 'standard1'
 
 
-@require('7066')
 @since('3.0')
-class SSTableListTest(Tester):
+class SSTableUtilTest(Tester):
 
     def __init__(self, *args, **kwargs):
         kwargs['cluster_options'] = {'start_rpc': 'true'}
         Tester.__init__(self, *args, **kwargs)
 
-    def listfiles_oncompaction_test(self):
-        self.skipTest("Feature In Development")
+    def compaction_test(self):
         """
+        @jira_ticket CASSANDRA-7066
         Check we can list the sstable files after successfull compaction (no temporary sstable files)
         """
         cluster = self.cluster
@@ -37,10 +36,11 @@ class SSTableListTest(Tester):
         finalfiles, tmpfiles = self._check_files(node, KeyspaceName, TableName)
         self.assertEqual(0, len(tmpfiles))
 
-    def listfiles_onabortedcompaction_test(self):
-        self.skipTest("Feature In Development")
+    def abortedcompaction_test(self):
         """
+        @jira_ticket CASSANDRA-7066
         Check we can list the sstable files after aborted compaction (temporary sstable files)
+        Then perform a cleanup and verify the temporary files are gone
         """
         cluster = self.cluster
         cluster.populate(1).start(wait_for_binary_proto=True)
@@ -66,9 +66,14 @@ class SSTableListTest(Tester):
         # should compaction finish before the node is killed, this test would fail,
         # in which case try increasing numrecords
         finalfiles, tmpfiles = self._check_files(node, KeyspaceName, TableName, finalfiles)
-        assert len(tmpfiles) > 0
+        self.assertTrue(len(tmpfiles) > 0)
 
-        # restart and make sure tmp files are gone and the data can be read
+        self._invoke_sstableutil(KeyspaceName, TableName, cleanup=True)
+
+        self.assertEqual([], self._invoke_sstableutil(KeyspaceName, TableName, type='tmp'))
+        self.assertEqual(finalfiles, self._invoke_sstableutil(KeyspaceName, TableName, type='final'))
+
+        # restart to make sure not data is lost
         node.start(wait_for_binary_proto=True)
         node.watch_log_for("Compacted(.*)%s" % (TableName, ))
 
@@ -79,7 +84,9 @@ class SSTableListTest(Tester):
         self._read_data(node, numrecords)
 
     def _create_data(self, node, ks, table, numrecords):
-        # This is just to create the schema so we can disable compaction
+        """
+         This is just to create the schema so we can disable compaction
+        """
         node.stress(['write', 'n=1', '-rate', 'threads=1'])
         node.nodetool('disableautocompaction %s %s' % (ks, table))
 
@@ -93,41 +100,47 @@ class SSTableListTest(Tester):
         sstablefiles = self._get_sstable_files(node, ks, table)
 
         debug("Comparing all files...")
-        allfiles = self._list_sstable_files(ks, table, type='all')
+        allfiles = self._invoke_sstableutil(ks, table, type='all')
         self.assertEqual(sstablefiles, allfiles)
 
         if len(expected_finalfiles) == 0:
             expected_finalfiles = allfiles
 
         debug("Comparing final files...")
-        finalfiles = self._list_sstable_files(ks, table, type='final')
+        finalfiles = self._invoke_sstableutil(ks, table, type='final')
         self.assertEqual(expected_finalfiles, finalfiles)
 
         if len(expected_tmpfiles) == 0:
             expected_tmpfiles = sorted(list(set(allfiles) - set(finalfiles)))
 
         debug("Comparing tmp files...")
-        tmpfiles = self._list_sstable_files(ks, table, type='tmp')
+        tmpfiles = self._invoke_sstableutil(ks, table, type='tmp')
         self.assertEqual(expected_tmpfiles, tmpfiles)
 
         debug("Comparing op logs...")
         expectedoplogs = sorted(self._get_sstable_transaction_logs(node, ks, table))
-        oplogs = sorted(list(set(self._list_sstable_files(ks, table, type='tmp', oplogs=True)) - set(tmpfiles)))
+        oplogs = sorted(list(set(self._invoke_sstableutil(ks, table, type='tmp', oplogs=True)) - set(tmpfiles)))
         self.assertEqual(expectedoplogs, oplogs)
 
         return finalfiles, tmpfiles
 
-    # Use sstablelister to list sstable files
-    def _list_sstable_files(self, ks, table, type='all', oplogs=False):
-        debug("About to invoke sstablelister...")
+    def _invoke_sstableutil(self, ks, table, type='all', oplogs=False, cleanup=False):
+        """
+        Invoke sstableutil and return the list of files, if any
+        """
+        debug("About to invoke sstableutil...")
         node1 = self.cluster.nodelist()[0]
         env = common.make_cassandra_env(node1.get_install_cassandra_root(), node1.get_node_cassandra_root())
-        tool_bin = node1.get_tool('sstablelister')
+        tool_bin = node1.get_tool('sstableutil')
+
+        args = [tool_bin, '--type', type]
 
         if oplogs:
-            args = [tool_bin, '--type', type, '--oplog', ks, table]
-        else:
-            args = [tool_bin, '--type', type, ks, table]
+            args.extend(['--oplog'])
+        if cleanup:
+            args.extend(['--cleanup'])
+
+        args.extend([ks, table])
 
         p = subprocess.Popen(args, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
@@ -135,24 +148,27 @@ class SSTableListTest(Tester):
 
         if len(stderr) > 0:
             debug(stderr)
-            assert False, "Error invoking sstablelister"
+            assert False, "Error invoking sstableutil"
 
         ret = stdin.split('\n')
+        ret.pop(0)  # The first line is either "Listing files..." or "Cleaning up..."
         debug("Got %d files" % (len(ret),))
         return sorted(filter(None, ret))
 
-    # Read sstable files directly from disk
     def _get_sstable_files(self, node, ks, table):
+        """
+        Read sstable files directly from disk
+        """
         keyspace_dir = os.path.join(node.get_path(), 'data', ks)
 
         ret = []
-        for ext in ('*.db', '*.txt', '*.adler32'):
+        for ext in ('*.db', '*.txt', '*.adler32', '*.crc32'):
             ret.extend(glob.glob(os.path.join(keyspace_dir, table + '-*', ext)))
 
         return sorted(ret)
 
     def _get_sstable_transaction_logs(self, node, ks, table):
         keyspace_dir = os.path.join(node.get_path(), 'data', ks)
-        ret = glob.glob(os.path.join(keyspace_dir, table + '-*', "transactions", "*.log"))
+        ret = glob.glob(os.path.join(keyspace_dir, table + '-*', "*.log"))
 
         return sorted(ret)
