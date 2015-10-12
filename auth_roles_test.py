@@ -652,6 +652,40 @@ class TestAuthRoles(Tester):
         cassandra.execute("CREATE USER super_user WITH PASSWORD '12345' SUPERUSER")
         assert_one(cassandra, "LIST ROLES OF super_user", ["super_user", True, True, {}])
 
+    def role_name_test(self):
+        """ Simple test to verify the behaviour of quoting when creating roles & users
+        @jira_ticket CASSANDRA-10394
+        """
+        self.prepare()
+        cassandra = self.get_session(user='cassandra', password='cassandra')
+        # unquoted identifiers and unreserved keyword do not preserve case
+        # count
+        cassandra.execute("CREATE ROLE ROLE1 WITH PASSWORD = '12345' AND LOGIN = true")
+        self.assert_unauthenticated("Username and/or password are incorrect", 'ROLE1', '12345')
+        self.get_session(user='role1', password='12345')
+
+        cassandra.execute("CREATE ROLE COUNT WITH PASSWORD = '12345' AND LOGIN = true")
+        self.assert_unauthenticated("Username and/or password are incorrect", 'COUNT', '12345')
+        self.get_session(user='count', password='12345')
+
+        # string literals and quoted names do preserve case
+        cassandra.execute("CREATE ROLE 'ROLE2' WITH PASSWORD = '12345' AND LOGIN = true")
+        self.get_session(user='ROLE2', password='12345')
+        self.assert_unauthenticated("Username and/or password are incorrect", 'Role2', '12345')
+
+        cassandra.execute("""CREATE ROLE "ROLE3" WITH PASSWORD = '12345' AND LOGIN = true""")
+        self.get_session(user='ROLE3', password='12345')
+        self.assert_unauthenticated("Username and/or password are incorrect", 'Role3', '12345')
+
+        # when using legacy USER syntax, both unquoted identifiers and string literals preserve case
+        cassandra.execute("CREATE USER USER1 WITH PASSWORD '12345'")
+        self.get_session(user='USER1', password='12345')
+        self.assert_unauthenticated("Username and/or password are incorrect", 'User1', '12345')
+
+        cassandra.execute("CREATE USER 'USER2' WITH PASSWORD '12345'")
+        self.get_session(user='USER2', password='12345')
+        self.assert_unauthenticated("Username and/or password are incorrect", 'User2', '12345')
+
     def role_requires_login_privilege_to_authenticate_test(self):
         self.prepare()
         cassandra = self.get_session(user='cassandra', password='cassandra')
