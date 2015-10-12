@@ -1,3 +1,4 @@
+import os
 import random
 import re
 import time
@@ -265,6 +266,39 @@ class TestSecondaryIndexes(Tester):
             time.sleep(0.10)
             self.wait_for_schema_agreement(session)
 
+    @since('3.0')
+    def test_manual_rebuild_index(self):
+        """
+        asserts that new sstables are written when rebuild_index is called from nodetool
+        """
+        cluster = self.cluster
+        cluster.populate(1).start()
+        node1, = cluster.nodelist()
+        session = self.patient_cql_connection(node1)
+
+        node1.stress(['write', 'n=50K'])
+        session.execute("use keyspace1;")
+        lookup_value = session.execute('select "C0" from standard1 limit 1')[0].C0
+        session.execute('CREATE INDEX ix_c0 ON standard1("C0");')
+        debug("waiting for index to build")
+        time.sleep(10)
+
+        stmt = session.prepare('select * from standard1 where "C0" = ?')
+        self.assertEqual(1, len(session.execute(stmt, [lookup_value])))
+        base_tbl_dir = os.path.dirname(node1.get_sstablespath(keyspace="keyspace1", tables=["standard1"])[0])
+        index_sstables_dir = os.path.join(base_tbl_dir, '.ix_c0')
+
+        before_files = os.listdir(index_sstables_dir)
+
+        node1.nodetool("rebuild_index keyspace1 standard1 ix_c0")
+
+        debug("waiting for index to rebuild")
+        time.sleep(10)
+
+        after_files = os.listdir(index_sstables_dir)
+        self.assertNotEqual(before_files, after_files)
+        self.assertEqual(1, len(session.execute(stmt, [lookup_value])))
+
     def test_multi_index_filtering_query(self):
         """
         asserts that having multiple indexes that cover all predicates still requires ALLOW FILTERING to also be present
@@ -283,7 +317,6 @@ class TestSecondaryIndexes(Tester):
         session.execute("INSERT INTO tbl (id, c0, c1, c2) values (uuid(), 'q', 'b', 'c');")
         session.execute("INSERT INTO tbl (id, c0, c1, c2) values (uuid(), 'a', 'e', 'f');")
         session.execute("INSERT INTO tbl (id, c0, c1, c2) values (uuid(), 'a', 'e', 'f');")
-        time.sleep(4)
 
         rows = session.execute("SELECT * FROM tbl WHERE c0 = 'a';")
         self.assertEqual(4, len(rows))
