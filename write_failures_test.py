@@ -13,6 +13,9 @@ from tools import since
 KEYSPACE = "foo"
 
 
+# These tests use the cassandra.test.fail_writes_ks option, which was only
+# implemented in 2.2, so we skip it before then.
+@since('2.2')
 class TestWriteFailures(Tester):
     """
     Tests for write failures in the replicas,
@@ -83,7 +86,6 @@ class TestWriteFailures(Tester):
             with self.assertRaises(self.expected_expt) as cm:
                 session.execute(statement)
 
-    @since('2.2', '2.2.X')
     def test_mutation_v2(self):
         """
             A failed mutation at v2 receives a WriteTimeout
@@ -92,7 +94,6 @@ class TestWriteFailures(Tester):
         self.protocol_version = 2
         self._perform_cql_statement("INSERT INTO mytable (key, value) VALUES ('key1', 'Value 1')")
 
-    @since('2.2')
     def test_mutation_v3(self):
         """
             A failed mutation at v3 receives a WriteTimeout
@@ -101,7 +102,6 @@ class TestWriteFailures(Tester):
         self.protocol_version = 3
         self._perform_cql_statement("INSERT INTO mytable (key, value) VALUES ('key1', 'Value 1')")
 
-    @since('2.2')
     def test_mutation_v4(self):
         """
             A failed mutation at v4 receives a WriteFailure
@@ -110,7 +110,6 @@ class TestWriteFailures(Tester):
         self.protocol_version = 4
         self._perform_cql_statement("INSERT INTO mytable (key, value) VALUES ('key1', 'Value 1')")
 
-    @since('2.2')
     def test_mutation_any(self):
         """
             A WriteFailure is not received at consistency level ANY
@@ -121,7 +120,6 @@ class TestWriteFailures(Tester):
         self.failing_nodes = [0, 1, 2]
         self._perform_cql_statement("INSERT INTO mytable (key, value) VALUES ('key1', 'Value 1')")
 
-    @since('2.2')
     def test_mutation_one(self):
         """
             A WriteFailure is received at consistency level ONE
@@ -131,7 +129,6 @@ class TestWriteFailures(Tester):
         self.failing_nodes = [0, 1, 2]
         self._perform_cql_statement("INSERT INTO mytable (key, value) VALUES ('key1', 'Value 1')")
 
-    @since('2.2')
     def test_mutation_quorum(self):
         """
             A WriteFailure is not received at consistency level
@@ -142,7 +139,6 @@ class TestWriteFailures(Tester):
         self.failing_nodes = [2]
         self._perform_cql_statement("INSERT INTO mytable (key, value) VALUES ('key1', 'Value 1')")
 
-    @since('2.2')
     def test_batch(self):
         """
             A failed batch receives a WriteFailure
@@ -154,7 +150,6 @@ class TestWriteFailures(Tester):
             APPLY BATCH
         """)
 
-    @since('2.2')
     def test_counter(self):
         """
             A failed counter mutation receives a WriteFailure
@@ -166,14 +161,12 @@ class TestWriteFailures(Tester):
                 where key = {uuid}
         """.format(uuid=_id))
 
-    @since('2.2')
     def test_paxos(self):
         """
             A light transaction receives a WriteFailure
         """
         self._perform_cql_statement("INSERT INTO mytable (key, value) VALUES ('key1', 'Value 1') IF NOT EXISTS")
 
-    @since('2.2')
     def test_paxos_any(self):
         """
             A light transaction at consistency level ANY does not receive a WriteFailure
@@ -182,7 +175,6 @@ class TestWriteFailures(Tester):
         self.expected_expt = None
         self._perform_cql_statement("INSERT INTO mytable (key, value) VALUES ('key1', 'Value 1') IF NOT EXISTS")
 
-    @since('2.2')
     def test_thrift(self):
         """
             A thrift client receives a TimedOutException
