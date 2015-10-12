@@ -63,7 +63,10 @@ will often need to modify them in some fashion at some later point:
 * python-driver
 
         cd ~/git/cstar
+        Cassandra 2.x:
         sudo pip install cassandra-driver
+        Cassandra 3.x (requires latest python-driver):
+        sudo pip install --pre cassandra-driver
         For more instructions on how to install the python-driver,
         see http://datastax.github.io/python-driver/installation.html
 
