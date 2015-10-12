@@ -265,6 +265,37 @@ class TestSecondaryIndexes(Tester):
             time.sleep(0.10)
             self.wait_for_schema_agreement(session)
 
+    def test_multi_index_filtering_query(self):
+        """
+        asserts that having multiple indexes that cover all predicates still requires ALLOW FILTERING to also be present
+        """
+        cluster = self.cluster
+        cluster.populate(1).start()
+        node1, = cluster.nodelist()
+        session = self.patient_cql_connection(node1)
+        session.execute("CREATE KEYSPACE ks WITH REPLICATION = {'class': 'SimpleStrategy', 'replication_factor': '1'};")
+        session.execute("USE ks;")
+        session.execute("CREATE TABLE tbl (id uuid primary key, c0 text, c1 text, c2 text);")
+        session.execute("CREATE INDEX ix_tbl_c0 ON tbl(c0);")
+        session.execute("CREATE INDEX ix_tbl_c1 ON tbl(c1);")
+        session.execute("INSERT INTO tbl (id, c0, c1, c2) values (uuid(), 'a', 'b', 'c');")
+        session.execute("INSERT INTO tbl (id, c0, c1, c2) values (uuid(), 'a', 'b', 'c');")
+        session.execute("INSERT INTO tbl (id, c0, c1, c2) values (uuid(), 'q', 'b', 'c');")
+        session.execute("INSERT INTO tbl (id, c0, c1, c2) values (uuid(), 'a', 'e', 'f');")
+        session.execute("INSERT INTO tbl (id, c0, c1, c2) values (uuid(), 'a', 'e', 'f');")
+        time.sleep(4)
+
+        rows = session.execute("SELECT * FROM tbl WHERE c0 = 'a';")
+        self.assertEqual(4, len(rows))
+
+        stmt = "SELECT * FROM tbl WHERE c0 = 'a' AND c1 = 'b';"
+        assert_invalid(session, stmt, "Cannot execute this query as it might involve data filtering and thus may have "
+                                      "unpredictable performance. If you want to execute this query despite the "
+                                      "performance unpredictability, use ALLOW FILTERING")
+
+        rows = session.execute("SELECT * FROM tbl WHERE c0 = 'a' AND c1 = 'b' ALLOW FILTERING;")
+        self.assertEqual(2, len(rows))
+
     @since('3.0')
     def test_only_coordinator_chooses_index_for_query(self):
         """
