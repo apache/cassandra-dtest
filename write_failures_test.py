@@ -88,7 +88,7 @@ class TestWriteFailures(Tester):
 
     def test_mutation_v2(self):
         """
-            A failed mutation at v2 receives a WriteTimeout
+        A failed mutation at v2 receives a WriteTimeout
         """
         self.expected_expt = WriteTimeout
         self.protocol_version = 2
@@ -96,7 +96,7 @@ class TestWriteFailures(Tester):
 
     def test_mutation_v3(self):
         """
-            A failed mutation at v3 receives a WriteTimeout
+        A failed mutation at v3 receives a WriteTimeout
         """
         self.expected_expt = WriteTimeout
         self.protocol_version = 3
@@ -104,7 +104,7 @@ class TestWriteFailures(Tester):
 
     def test_mutation_v4(self):
         """
-            A failed mutation at v4 receives a WriteFailure
+        A failed mutation at v4 receives a WriteFailure
         """
         self.expected_expt = WriteFailure
         self.protocol_version = 4
@@ -112,8 +112,8 @@ class TestWriteFailures(Tester):
 
     def test_mutation_any(self):
         """
-            A WriteFailure is not received at consistency level ANY
-            even if all nodes fail because of hinting
+        A WriteFailure is not received at consistency level ANY
+        even if all nodes fail because of hinting
         """
         self.consistency_level = ConsistencyLevel.ANY
         self.expected_expt = None
@@ -131,8 +131,8 @@ class TestWriteFailures(Tester):
 
     def test_mutation_quorum(self):
         """
-            A WriteFailure is not received at consistency level
-            QUORUM if quorum succeeds
+        A WriteFailure is not received at consistency level
+        QUORUM if quorum succeeds
         """
         self.consistency_level = ConsistencyLevel.QUORUM
         self.expected_expt = None
@@ -141,7 +141,7 @@ class TestWriteFailures(Tester):
 
     def test_batch(self):
         """
-            A failed batch receives a WriteFailure
+        A failed batch receives a WriteFailure
         """
         self._perform_cql_statement("""
             BEGIN BATCH
@@ -152,7 +152,7 @@ class TestWriteFailures(Tester):
 
     def test_counter(self):
         """
-            A failed counter mutation receives a WriteFailure
+        A failed counter mutation receives a WriteFailure
         """
         _id = str(uuid.uuid4())
         self._perform_cql_statement("""
@@ -163,13 +163,13 @@ class TestWriteFailures(Tester):
 
     def test_paxos(self):
         """
-            A light transaction receives a WriteFailure
+        A light transaction receives a WriteFailure
         """
         self._perform_cql_statement("INSERT INTO mytable (key, value) VALUES ('key1', 'Value 1') IF NOT EXISTS")
 
     def test_paxos_any(self):
         """
-            A light transaction at consistency level ANY does not receive a WriteFailure
+        A light transaction at consistency level ANY does not receive a WriteFailure
         """
         self.consistency_level = ConsistencyLevel.ANY
         self.expected_expt = None
@@ -177,7 +177,7 @@ class TestWriteFailures(Tester):
 
     def test_thrift(self):
         """
-            A thrift client receives a TimedOutException
+        A thrift client receives a TimedOutException
         """
         self.expected_expt = thrift_types.TimedOutException
 
