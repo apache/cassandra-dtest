@@ -83,7 +83,7 @@ class TestWriteFailures(Tester):
         if self.expected_expt is None:
             session.execute(statement)
         else:
-            with self.assertRaises(self.expected_expt) as cm:
+            with self.assertRaises(self.expected_expt):
                 session.execute(statement)
 
     def test_mutation_v2(self):
@@ -179,14 +179,14 @@ class TestWriteFailures(Tester):
         """
         A thrift client receives a TimedOutException
         """
+        self._prepare_cluster(start_rpc=True)
         self.expected_expt = thrift_types.TimedOutException
 
-        session = self._prepare_cluster(start_rpc=True)
         client = get_thrift_client()
         client.transport.open()
         client.set_keyspace(KEYSPACE)
 
-        with self.assertRaises(self.expected_expt) as cm:
+        with self.assertRaises(self.expected_expt):
             client.insert('key1',
                           thrift_types.ColumnParent('mytable'),
                           thrift_types.Column('value', 'Value 1', 0),
