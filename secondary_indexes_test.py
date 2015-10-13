@@ -296,7 +296,7 @@ class TestSecondaryIndexes(Tester):
         time.sleep(10)
 
         after_files = os.listdir(index_sstables_dir)
-        self.assertNotEqual(before_files, after_files)
+        self.assertNotEqual(set(before_files), set(after_files))
         self.assertEqual(1, len(session.execute(stmt, [lookup_value])))
 
     def test_multi_index_filtering_query(self):
