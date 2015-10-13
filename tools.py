@@ -330,7 +330,8 @@ def cassandra_git_branch(cdir=None):
     try:
         p = subprocess.Popen(['git', 'branch'], cwd=cdir,
                              stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    except OSError:  # e.g. if git isn't available, just give up and return None
+    except OSError as e:  # e.g. if git isn't available, just give up and return None
+        debug('shelling out to git failed: {}'.format(e))
         return
 
     out, err = p.communicate()
