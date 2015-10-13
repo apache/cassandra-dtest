@@ -202,10 +202,10 @@ class TestTopology(Tester):
         t = DecommissionInParallel(node1)
         t.start()
 
-        p = re.compile(".N(?:\s*)127\.0\.0\.1(?:.*)null(?:\s*)rack1")
+        null_status_pattern = re.compile(".N(?:\s*)127\.0\.0\.1(?:.*)null(?:\s*)rack1")
         while t.is_alive():
             out = self.show_status(node2)
-            if p.search(out):
+            if null_status_pattern.search(out):
                 debug("Matched null status entry")
                 break
             debug("Restarting node2")
@@ -219,7 +219,7 @@ class TestTopology(Tester):
         debug("Sleeping for 30 seconds to allow gossip updates")
         time.sleep(30)
         out = self.show_status(node2)
-        self.assertFalse(p.search(out))
+        self.assertFalse(null_status_pattern.search(out))
 
     def show_status(self, node):
         out, err = node.nodetool('status')
