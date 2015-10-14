@@ -128,6 +128,8 @@ class TestBootstrap(Tester):
         # start bootstrapping node3 and wait for streaming
         node3 = new_node(cluster)
         node3.set_configuration_options(values={'stream_throughput_outbound_megabits_per_sec': 1})
+        # keep timeout low so that test won't hang
+        node3.set_configuration_options(values={'streaming_socket_timeout_in_ms': 1000})
         try:
             node3.start()
         except NodeError:
