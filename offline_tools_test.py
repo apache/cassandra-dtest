@@ -39,7 +39,7 @@ class TestOfflineTools(Tester):
         cluster.stop(gently=False)
 
         (output, error, rc) = node1.run_sstablelevelreset("keyspace1", "standard1", output=True)
-        debug(error)
+        self.assertEqual(len(error), 0, error)
         self.assertIn("Found no sstables, did you give the correct keyspace", output)
         self.assertEqual(rc, 0, msg=str(rc))
 
@@ -52,6 +52,7 @@ class TestOfflineTools(Tester):
         cluster.stop(gently=False)
 
         (output, error, rc) = node1.run_sstablelevelreset("keyspace1", "standard1", output=True)
+        self.assertEqual(len(error), 0, error)
         self.assertIn("since it is already on level 0", output)
         self.assertEqual(rc, 0, msg=str(rc))
 
@@ -65,6 +66,9 @@ class TestOfflineTools(Tester):
         initial_levels = self.get_levels(node1.run_sstablemetadata(keyspace="keyspace1", column_families=["standard1"]))
         (output, error, rc) = node1.run_sstablelevelreset("keyspace1", "standard1", output=True)
         final_levels = self.get_levels(node1.run_sstablemetadata(keyspace="keyspace1", column_families=["standard1"]))
+
+        self.assertEqual(len(error), 0, error)
+        self.assertEqual(rc, 0, msg=str(rc))
 
         debug(initial_levels)
         debug(final_levels)
@@ -268,7 +272,7 @@ class TestOfflineTools(Tester):
             env = common.make_cassandra_env(node.get_install_cassandra_root(), node.get_node_cassandra_root())
             p = subprocess.Popen(args, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             (stdin, stderr) = p.communicate()
-            tmpsstables = stdin.split('\n')
+            tmpsstables = stdin.splitlines()
             ret = list(set(allsstables) - set(tmpsstables))
         else:
             ret = [sstable for sstable in allsstables if "tmp" not in sstable[50:]]
