@@ -2,7 +2,7 @@ import os
 from dtest import Tester
 from cassandra import ConsistencyLevel
 from cassandra.cluster import NoHostAvailable
-from tools import generate_ssl_stores, putget
+from tools import generate_ssl_stores, putget, since
 
 
 class NativeTransportSSL(Tester):
@@ -53,6 +53,7 @@ class NativeTransportSSL(Tester):
         session = self.patient_cql_connection(node1, port=9567)
         self._putget(cluster, session)
 
+    @since('3.0')
     def use_custom_ssl_port_test(self):
         """
         Connect to additional ssl enabled native transport port
