@@ -1,5 +1,7 @@
+import re
 import sys
 import unittest
+import time
 
 from dtest import Tester, debug
 from jmxutils import JolokiaAgent, make_mbean, remove_perf_disable_shared_mem
@@ -124,3 +126,67 @@ class TestJMX(Tester):
 
             sstables = jmx.read_attribute(sstable_count, "Value")
             self.assertGreaterEqual(int(sstables), 1)
+
+    def test_compactionstats(self):
+        """
+        @jira_ticket CASSANDAR-10504
+        @jira_ticket CASSANDRA-10427
+
+        Test that jmx MBean used by nodetool compactionstats
+        properly updates the progress of a compaction
+        """
+
+        cluster = self.cluster
+        cluster.populate(1)
+        node = cluster.nodelist()[0]
+        cluster.set_configuration_options({'concurrent_compactors': 1, 'memtable_cleanup_threshold': 0.01})
+        remove_perf_disable_shared_mem(node)
+        cluster.start(wait_for_binary_proto=True)
+
+        # Run a quick stress command to create the keyspace and table
+        node.stress(['write', 'n=1'])
+        # Disable compaction on the table
+        node.nodetool('disableautocompaction keyspace1 standard1')
+
+        node.stress(['write', 'n=750K'])
+        # Run a major compaction. This will be the compaction whose
+        # progress we track.
+        node.nodetool('compact', capture_output=False, wait=False)
+        # We need to sleep here to give compaction time to start
+        # Why not do something smarter? Because if the bug regresses,
+        # we can't rely on jmx to tell us that compaction started.
+        time.sleep(5)
+
+        compaction_manager = make_mbean('db', type='CompactionManager')
+
+        with JolokiaAgent(node) as jmx:
+            progress_string = jmx.read_attribute(compaction_manager, 'CompactionSummary')[0]
+
+            # Pause in between reads
+            # to allow compaction to move forward
+            time.sleep(2)
+
+            updated_progress_string = jmx.read_attribute(compaction_manager, 'CompactionSummary')[0]
+
+            progress = int(re.search('standard1, (\d+)\/', progress_string).groups()[0])
+            updated_progress = int(re.search('standard1, (\d+)\/', updated_progress_string).groups()[0])
+
+            debug(progress_string)
+            debug(updated_progress_string)
+
+            # We want to make sure that the progress is increasing,
+            # and that values other than zero are displayed.
+            self.assertGreater(updated_progress, progress)
+            self.assertGreater(progress, 0)
+            self.assertGreater(updated_progress, 0)
+
+            # Block until the major compaction is complete
+            # Otherwise nodetool will throw an exception
+            # Give a timeout, in case compaction is broken
+            # and never ends.
+            start = time.time()
+            max_query_timeout = 600
+            debug("Waiting for compaction to finish:")
+            while (len(jmx.read_attribute(compaction_manager, 'CompactionSummary')) > 0) and (time.time() - start < max_query_timeout):
+                debug(jmx.read_attribute(compaction_manager, 'CompactionSummary'))
+                time.sleep(2)
