@@ -151,6 +151,7 @@ class SSTableUtilTest(Tester):
             assert False, "Error invoking sstableutil"
 
         ret = stdin.splitlines()
+        debug(ret)
         del ret[0]  # The first line is either "Listing files..." or "Cleaning up..."
         debug("Got %d files" % (len(ret),))
         return sorted(filter(None, ret))
