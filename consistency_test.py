@@ -600,6 +600,9 @@ class TestAccuracy(TestHelper):
 class TestConsistency(Tester):
 
     def short_read_test(self):
+        """
+        @jira_ticket CASSANDRA-9460
+        """
         cluster = self.cluster
 
         # Disable hinted handoff and set batch commit log so this doesn't
@@ -671,7 +674,9 @@ class TestConsistency(Tester):
         assert len(res) == 0, res
 
     def short_read_quorum_delete_test(self):
-        """Test CASSANDRA-8933"""
+        """
+        @jira_ticket CASSANDRA-8933
+        """
         cluster = self.cluster
         # Consider however 3 nodes A, B, C (RF=3), and following sequence of operations (all done at QUORUM):
 
@@ -742,6 +747,9 @@ class TestConsistency(Tester):
             query_c1c2(session, n, ConsistencyLevel.ONE)
 
     def short_read_reversed_test(self):
+        """
+        @jira_ticket CASSANDRA-9460
+        """
         cluster = self.cluster
 
         # Disable hinted handoff and set batch commit log so this doesn't
