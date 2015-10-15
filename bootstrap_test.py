@@ -1,17 +1,18 @@
 import os
 import random
-import time
+import re
 import shutil
 import subprocess
 import tempfile
-import re
-from dtest import Tester, debug
-from tools import new_node, query_c1c2, since, KillOnBootstrap, InterruptBootstrap
-from assertions import assert_almost_equal
+import time
+
 from assertions import assert_almost_equal, assert_one
-from ccmlib.node import NodeError
 from cassandra import ConsistencyLevel
 from cassandra.concurrent import execute_concurrent_with_args
+from ccmlib.node import NodeError
+from dtest import Tester, debug
+from tools import (InterruptBootstrap, KillOnBootstrap, new_node, query_c1c2,
+                   since)
 
 
 class TestBootstrap(Tester):
@@ -455,7 +456,7 @@ class TestBootstrap(Tester):
         node1, = cluster.nodelist()
 
         node1.stress(['write', 'n=500K', '-schema', 'replication(factor=1)',
-                          '-rate', 'threads=10'])
+                      '-rate', 'threads=10'])
 
         node2 = new_node(cluster)
         node2.start(wait_other_notice=True)
