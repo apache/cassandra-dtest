@@ -335,13 +335,14 @@ class Tester(TestCase):
             name = os.path.join(directory, name)
         if not os.path.exists(directory):
             os.mkdir(directory)
-        logs = [(node.name, node.logfilename()) for node in self.cluster.nodes.values()]
+        logs = [(node.name, node.logfilename(), node.debuglogfilename()) for node in self.cluster.nodes.values()]
         if len(logs) is not 0:
             basedir = str(int(time.time() * 1000)) + '_' + self.id()
             logdir = os.path.join(directory, basedir)
             os.mkdir(logdir)
-            for n, log in logs:
+            for n, log, debuglog in logs:
                 shutil.copyfile(log, os.path.join(logdir, n + ".log"))
+                shutil.copyfile(debuglog, os.path.join(logdir, n + "_debug.log"))
             if os.path.exists(name):
                 os.unlink(name)
             if not is_win():
