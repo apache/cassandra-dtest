@@ -82,8 +82,12 @@ class UpgradeTester(Tester):
     When run on 3.0, this will test the upgrade path to trunk. When run on
     versions above 3.0, this will test the upgrade path from 3.0 to HEAD.
     """
+    NODES, RF, __test__ = 2, 1, False
 
-    def prepare(self, ordered=False, create_keyspace=True, use_cache=False, nodes=2, rf=1, protocol_version=None, **kwargs):
+    def prepare(self, ordered=False, create_keyspace=True, use_cache=False, nodes=None, rf=None, protocol_version=None, **kwargs):
+        nodes = self.NODES if nodes is None else nodes
+        rf = self.RF if rf is None else rf
+
         assert nodes >= 2, "backwards compatibility tests require at least two nodes"
         assert not self._preserve_cluster, "preserve_cluster cannot be True for upgrade tests"
 
