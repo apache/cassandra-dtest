@@ -46,7 +46,7 @@ def get_default_upgrade_path(job_version, cdir=None):
     start_version, upgrade_version = None, None
     debug('getting default job version for {}'.format(job_version))
 
-    start_2_2_X_release = 'binary:2.2.1'
+    start_2_2_X_release = 'binary:2.2.2'
 
     if '2.1' <= job_version < '2.2':
         # If this is 2.1.X, we can upgrade to 2.2.
