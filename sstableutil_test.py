@@ -144,17 +144,17 @@ class SSTableUtilTest(Tester):
 
         p = subprocess.Popen(args, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-        (stdin, stderr) = p.communicate()
+        (stdout, stderr) = p.communicate()
 
         if len(stderr) > 0:
             debug(stderr)
             assert False, "Error invoking sstableutil"
 
-        ret = stdin.splitlines()
-        debug(ret)
-        del ret[0]  # The first line is either "Listing files..." or "Cleaning up..."
+        debug(stdout)
+        match = ks + os.sep + table + '-'
+        ret = sorted(filter(lambda s: match in s, stdout.splitlines()))
         debug("Got %d files" % (len(ret),))
-        return sorted(filter(None, ret))
+        return ret
 
     def _get_sstable_files(self, node, ks, table):
         """
