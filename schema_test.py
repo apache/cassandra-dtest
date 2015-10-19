@@ -1,12 +1,52 @@
 import time
 
-from dtest import Tester
-from tools import since, rows_to_list
 from assertions import assert_invalid
+from cassandra.util import unix_time_from_uuid1
+from dtest import Tester
+from tools import rows_to_list, since
 
 
 @since('2.0')
 class TestSchema(Tester):
+
+    @since('2.1')
+    def table_alteration_test(self):
+        """
+        Tests that table alters return as expected with many sstables at different schema points
+        """
+        cluster = self.cluster
+        cluster.populate(1).start()
+        node1, = cluster.nodelist()
+        session = self.patient_cql_connection(node1)
+        self.create_ks(session, 'ks', 1)
+        session.execute("use ks;")
+        session.execute("create table tbl_o_churn (id timeuuid primary key, c0 text, c1 text) "
+                        "WITH compaction = {'class': 'SizeTieredCompactionStrategy', 'min_threshold': 1024, 'max_threshold': 1024 };")
+
+        stmt1 = session.prepare("insert into tbl_o_churn (id, c0, c1) values (now(), ?, ?)")
+        for n in range(1000):
+            session.execute(stmt1, ['aaa', 'bbb'])
+            if n % 100 == 0:
+                node1.flush()
+
+        first_run_timestamp = time.time()
+
+        session.execute("alter table tbl_o_churn add c2 text")
+        session.execute("alter table tbl_o_churn drop c0")
+        stmt2 = session.prepare("insert into tbl_o_churn (id, c1, c2) values (now(), ?, ?);")
+
+        for n in range(1000):
+            session.execute(stmt2, ['ccc', 'ddd'])
+            if n % 100 == 0:
+                node1.flush()
+
+        for row in session.execute("select * from tbl_o_churn"):
+            if unix_time_from_uuid1(row.id) > first_run_timestamp:
+                self.assertEqual(row.c1, 'ccc')
+                self.assertEqual(row.c2, 'ddd')
+            else:
+                self.assertEqual(row.c1, 'bbb')
+                self.assertIsNone(row.c2)
 
     def drop_column_compact_test(self):
         session = self.prepare()
