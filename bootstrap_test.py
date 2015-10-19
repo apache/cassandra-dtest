@@ -360,7 +360,7 @@ class TestBootstrap(Tester):
         if version < "2.1":
             node1.stress(['-n', '10000'])
         else:
-            node1.stress(['write', 'n=10000', '-rate', 'threads=8'])
+            node1.stress(['write', 'n=10K', '-rate', 'threads=8'])
 
         session = self.patient_cql_connection(node1)
         original_rows = list(session.execute("SELECT * FROM {}".format(stress_table,)))
