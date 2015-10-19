@@ -304,9 +304,10 @@ def require(require_pattern, broken_in=None):
         return tagging_decorator
     require_pattern = str(require_pattern)
     git_branch = ''
-    git_branch = cassandra_git_branch().lower()
+    git_branch = cassandra_git_branch()
 
     if git_branch:
+        git_branch = git_branch.lower()
         run_on_branch_patterns = (require_pattern, 'cassandra-{b}'.format(b=require_pattern))
         # always run the test if the git branch name matches
         if any(re.match(p, git_branch, re.IGNORECASE) for p in run_on_branch_patterns):
@@ -321,6 +322,8 @@ def require(require_pattern, broken_in=None):
             def tag_and_skip(decorated):
                 return unittest.skip('require ' + str(require_pattern))(tagging_decorator(decorated))
             return tag_and_skip
+    else:
+        return tagging_decorator
 
 
 def cassandra_git_branch(cdir=None):
