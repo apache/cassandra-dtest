@@ -7,6 +7,38 @@ from dtest import Tester
 from tools import since
 
 
+def establish_durable_writes_keyspace(version, session, table_name_prefix=""):
+    session.execute("""
+        CREATE KEYSPACE {}
+            WITH replication = {{'class': 'SimpleStrategy', 'replication_factor': 1}};
+    """.format(_table_name_builder(table_name_prefix, "durable_writes_default")))
+
+    session.execute("""
+        CREATE KEYSPACE {}
+            WITH replication = {{'class': 'SimpleStrategy', 'replication_factor': 1}}
+            AND durable_writes = 'false';
+    """.format(_table_name_builder(table_name_prefix, "durable_writes_false")))
+
+    session.execute("""
+        CREATE KEYSPACE {}
+            WITH replication = {{'class': 'SimpleStrategy', 'replication_factor': 1}}
+            AND durable_writes = 'true';
+    """.format(_table_name_builder(table_name_prefix, "durable_writes_true")))
+
+
+def verify_durable_writes_keyspace(created_on_version, current_version, keyspace, session, table_name_prefix=""):
+    expected = {
+        "durable_writes_default": True,
+        "durable_writes_true": True,
+        "durable_writes_false": False
+    }
+    for keyspace, is_durable in expected.iteritems():
+        keyspace_name = _table_name_builder(table_name_prefix, keyspace)
+        meta = session.cluster.metadata.keyspaces[keyspace_name]
+        assert_equal(is_durable, meta.durable_writes,
+                     "keyspace [{}] had durable_writes of [{}] should be [{}]".format(keyspace_name, meta.durable_writes, is_durable))
+
+
 def establish_indexes_table(version, session, table_name_prefix=""):
     table_name = _table_name_builder(table_name_prefix, "test_indexes")
     cql = """
@@ -667,6 +699,10 @@ class TestSchemaMetadata(Tester):
     def indexes_test(self):
         establish_indexes_table(self.cluster.version(), self.session)
         verify_indexes_table(self.cluster.version(), self.cluster.version(), 'ks', self.session)
+
+    def durable_writes_test(self):
+        establish_durable_writes_keyspace(self.cluster.version(), self.session)
+        verify_durable_writes_keyspace(self.cluster.version(), self.cluster.version(), 'ks', self.session)
 
     @since('2.0')
     def static_column_test(self):
