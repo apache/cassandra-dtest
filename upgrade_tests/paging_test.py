@@ -9,9 +9,9 @@ from dtest import run_scenarios, debug
 from tools import since, rows_to_list
 
 from datahelp import create_rows, parse_data_into_dicts, flatten_into_set
-from assertions import assert_invalid
 
 from upgrade_base import UpgradeTester
+
 
 def assert_read_timeout_or_failure(session, query):
     try:
@@ -23,6 +23,7 @@ def assert_read_timeout_or_failure(session, query):
         pass
     except ReadFailure as e:
         pass
+
 
 class Page(object):
     data = None
