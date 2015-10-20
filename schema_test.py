@@ -1,7 +1,6 @@
 import time
 
 from assertions import assert_invalid
-from cassandra.util import unix_time_from_uuid1
 from dtest import Tester
 from tools import rows_to_list, since
 
@@ -20,33 +19,34 @@ class TestSchema(Tester):
         session = self.patient_cql_connection(node1)
         self.create_ks(session, 'ks', 1)
         session.execute("use ks;")
-        session.execute("create table tbl_o_churn (id timeuuid primary key, c0 text, c1 text) "
+        session.execute("create table tbl_o_churn (id int primary key, c0 text, c1 text) "
                         "WITH compaction = {'class': 'SizeTieredCompactionStrategy', 'min_threshold': 1024, 'max_threshold': 1024 };")
 
-        stmt1 = session.prepare("insert into tbl_o_churn (id, c0, c1) values (now(), ?, ?)")
+        stmt1 = session.prepare("insert into tbl_o_churn (id, c0, c1) values (?, ?, ?)")
         for n in range(1000):
-            session.execute(stmt1, ['aaa', 'bbb'])
+            session.execute(stmt1, [n, 'aaa', 'bbb'])
             if n % 100 == 0:
                 node1.flush()
-
-        first_run_timestamp = time.time()
 
         session.execute("alter table tbl_o_churn add c2 text")
         session.execute("alter table tbl_o_churn drop c0")
-        stmt2 = session.prepare("insert into tbl_o_churn (id, c1, c2) values (now(), ?, ?);")
+        stmt2 = session.prepare("insert into tbl_o_churn (id, c1, c2) values (?, ?, ?);")
 
         for n in range(1000):
-            session.execute(stmt2, ['ccc', 'ddd'])
+            session.execute(stmt2, [n + 1000, 'ccc', 'ddd'])
             if n % 100 == 0:
                 node1.flush()
 
-        for row in session.execute("select * from tbl_o_churn"):
-            if unix_time_from_uuid1(row.id) > first_run_timestamp:
-                self.assertEqual(row.c1, 'ccc')
-                self.assertEqual(row.c2, 'ddd')
-            else:
-                self.assertEqual(row.c1, 'bbb')
-                self.assertIsNone(row.c2)
+        for n in range(1000):
+            rows = session.execute("select * from tbl_o_churn where id = %s", (n, ))
+            self.assertEqual(rows[0].c1, 'bbb')
+            self.assertIsNone(rows[0].c2)
+            self.assertFalse(hasattr(rows[0], 'c0'))
+
+            rows = session.execute("select * from tbl_o_churn where id = %s", (n + 1000, ))
+            self.assertEqual(rows[0].c1, 'ccc')
+            self.assertEqual(rows[0].c2, 'ddd')
+            self.assertFalse(hasattr(rows[0], 'c0'))
 
     def drop_column_compact_test(self):
         session = self.prepare()
