@@ -111,7 +111,17 @@ class UpgradeTester(Tester):
             if OLD_CASSANDRA_DIR:
                 cluster.set_install_dir(install_dir=OLD_CASSANDRA_DIR)
             elif self.upgrade_path.starting_version:
-                cluster.set_install_dir(version=self.upgrade_path.starting_version)
+                try:
+                    cluster.set_install_dir(version=self.upgrade_path.starting_version)
+                except:
+                    if self.upgrade_path.starting_version.startswith('binary'):
+                        debug('Exception while downloading {}; falling back to source'.format(
+                            self.upgrade_path.starting_version))
+                        version_number = self.upgrade_path.starting_version.split(':')[-1]
+                        source_ccm_id = 'git:cassandra-' + version_number
+                        debug('Source identifier: {}'.format(source_ccm_id))
+                        cluster.set_install_dir(version=source_ccm_id)
+
             # in other cases, just use the existing install directory
             cluster.start(wait_for_binary_proto=True)
             debug('starting from {}'.format(get_version_from_build(node1.get_install_dir())))
