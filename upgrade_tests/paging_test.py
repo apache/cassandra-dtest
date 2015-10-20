@@ -349,7 +349,7 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
 
 
 class TestPagingSizeNodes3RF3(TestPagingSize):
-    NODES, RF, __test__ = 3, 3, True
+    NODES, RF, __test__, CL = 3, 3, True, CL.ALL
 
 
 class TestPagingSizeNodes2RF1(TestPagingSize):
@@ -613,7 +613,7 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
 
 
 class TestPagingWithModifiersNodes3RF3(TestPagingWithModifiers):
-    NODES, RF, __test__ = 3, 3, True
+    NODES, RF, __test__, CL = 3, 3, True, CL.ALL
 
 
 class TestPagingWithModifiersNodes2RF1(TestPagingWithModifiers):
@@ -1088,7 +1088,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
 
 class TestPagingDataNodes3RF3(TestPagingData):
-    NODES, RF, __test__ = 3, 3, True
+    NODES, RF, __test__, CL = 3, 3, True, CL.ALL
 
 
 class TestPagingDataNodes2RF1(TestPagingData):
@@ -1290,7 +1290,7 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
 
 
 class TestPagingDatasetChangesNodes3RF3(TestPagingDatasetChanges):
-    NODES, RF, __test__ = 3, 3, True
+    NODES, RF, __test__, CL = 3, 3, True, CL.ALL
 
 
 class TestPagingDatasetChangesNodes2RF1(TestPagingDatasetChanges):
@@ -1387,7 +1387,7 @@ class TestPagingQueryIsolation(BasePagingTester, PageAssertionMixin):
 
 
 class TestPagingQueryIsolationNodes3RF3(TestPagingQueryIsolation):
-    NODES, RF, __test__ = 3, 3, True
+    NODES, RF, __test__, CL = 3, 3, True, CL.ALL
 
 
 class TestPagingQueryIsolationNodes2RF1(TestPagingQueryIsolation):
@@ -1722,7 +1722,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
 
 
 class TestPagingWithDeletionsNodes3RF3(TestPagingWithDeletions):
-    NODES, RF, __test__ = 3, 3, True
+    NODES, RF, __test__, CL = 3, 3, True, CL.ALL
 
 
 class TestPagingWithDeletionsNodes2RF1(TestPagingWithDeletions):

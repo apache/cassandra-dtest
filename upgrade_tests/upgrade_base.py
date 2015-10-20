@@ -82,11 +82,15 @@ class UpgradeTester(Tester):
     When run on 3.0, this will test the upgrade path to trunk. When run on
     versions above 3.0, this will test the upgrade path from 3.0 to HEAD.
     """
-    NODES, RF, __test__ = 2, 1, False
+    NODES, RF, __test__, CL = 2, 1, False, None
 
-    def prepare(self, ordered=False, create_keyspace=True, use_cache=False, nodes=None, rf=None, protocol_version=None, **kwargs):
+    def prepare(self, ordered=False, create_keyspace=True, use_cache=False,
+                nodes=None, rf=None, protocol_version=None, cl=None, **kwargs):
         nodes = self.NODES if nodes is None else nodes
         rf = self.RF if rf is None else rf
+
+        cl = self.CL if cl is None else cl
+        self.CL = cl  # store for later use in do_upgrade
 
         assert nodes >= 2, "backwards compatibility tests require at least two nodes"
         assert not self._preserve_cluster, "preserve_cluster cannot be True for upgrade tests"
@@ -136,6 +140,9 @@ class UpgradeTester(Tester):
         session = self.patient_cql_connection(node1, protocol_version=protocol_version)
         if create_keyspace:
             self.create_ks(session, 'ks', rf)
+
+        if cl:
+            session.default_consistency_level = cl
 
         return session
 
@@ -216,6 +223,10 @@ class UpgradeTester(Tester):
             session = self.patient_exclusive_cql_connection(node2, protocol_version=self.protocol_version)
             session.set_keyspace('ks')
             sessions.append((False, session))
+
+        if self.CL:
+            for is_upgraded, session in sessions:
+                session.default_consistency_level = self.CL
 
         return sessions
 

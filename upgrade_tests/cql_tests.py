@@ -5187,7 +5187,7 @@ class TestCQL(UpgradeTester):
 
 
 class TestCQLNodes3RF3(TestCQL):
-    NODES, RF, __test__ = 3, 3, True
+    NODES, RF, __test__, CL = 3, 3, True, ConsistencyLevel.ALL
 
 
 class TestCQLNodes2RF1(TestCQL):
