@@ -3,7 +3,7 @@ import time
 import uuid
 
 from cassandra import ConsistencyLevel as CL
-from cassandra import InvalidRequest, ReadTimeout
+from cassandra import InvalidRequest, ReadTimeout, ReadFailure
 from cassandra.query import SimpleStatement, dict_factory, named_tuple_factory
 from dtest import run_scenarios, debug
 from tools import since, rows_to_list
@@ -13,6 +13,16 @@ from assertions import assert_invalid
 
 from upgrade_base import UpgradeTester
 
+def assert_read_timeout_or_failure(session, query):
+    try:
+        res = session.execute(query)
+        assert False, "Expecting query to be invalid: got %s" % res
+    except AssertionError as e:
+        raise e
+    except ReadTimeout as e:
+        pass
+    except ReadFailure as e:
+        pass
 
 class Page(object):
     data = None
@@ -1660,7 +1670,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
                 ))
 
             stmt = SimpleStatement("select * from paging_test", fetch_size=1000, consistency_level=CL.ALL)
-            assert_invalid(cursor, stmt, expected=ReadTimeout)
+            assert_read_timeout_or_failure(cursor, stmt)
 
             patterns = [r"Scanned over.* tombstones during query 'SELECT \* FROM ks.paging_test.* query aborted",  # new pattern
                         "Scanned over.* tombstones in ks.paging_test.* query aborted"]  # old pattern
