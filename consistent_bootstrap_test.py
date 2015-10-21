@@ -76,7 +76,7 @@ class TestBootstrapConsistency(Tester):
         debug("Restart node1")
         node1.start(wait_other_notice=True)
 
-        debug("Boostraping node3")
+        debug("Bootstraping node3")
         node3 = new_node(cluster)
         node3.start(wait_for_binary_proto=True)
 

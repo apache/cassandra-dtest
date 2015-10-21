@@ -63,11 +63,11 @@ class TestBootstrap(Tester):
         initial_size = node1.data_size()
         debug("node1 size before bootstrapping node2: %s" % float(initial_size))
 
-        # Reads inserted data all during the boostrap process. We shouldn't
+        # Reads inserted data all during the bootstrap process. We shouldn't
         # get any error
         reader = self.go(lambda _: query_c1c2(session, random.randint(0, keys - 1), ConsistencyLevel.ONE))
 
-        # Boostraping a new node
+        # Bootstraping a new node
         node2 = new_node(cluster)
         node2.set_configuration_options(values={'initial_token': tokens[1]})
         node2.start(wait_for_binary_proto=True)
