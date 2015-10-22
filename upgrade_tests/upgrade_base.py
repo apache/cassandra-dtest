@@ -245,7 +245,7 @@ class UpgradeTester(Tester):
         Used in places where is_upgraded was used to determine if the node version was >=2.2.
         """
         node_versions = self.get_node_versions()
-        self.assertLessEqual(len(node_versions), 2)
+        self.assertLessEqual(len(set(node_versions)), 2)
         return max(node_versions) if is_upgraded else min(node_versions)
 
     def tearDown(self):
