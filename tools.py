@@ -363,15 +363,23 @@ class InterruptBootstrap(Thread):
 
 
 class InterruptCompaction(Thread):
-
-    def __init__(self, node, tablename):
+    """
+    Interrupt compaction by killing a node as soon as
+    the "Compacting" string is found in the log file
+    for the table specified. This requires debug level
+    logging in 2.1+ and expects debug information to be
+    available in a file called "debug.log" unless a
+    different name is passed in as a paramter.
+    """
+    def __init__(self, node, tablename, filename='debug.log'):
         Thread.__init__(self)
         self.node = node
         self.tablename = tablename
-        self.mark = node.mark_log()
+        self.filename = filename
+        self.mark = node.mark_log(filename=self.filename)
 
     def run(self):
-        self.node.watch_log_for("Compacting(.*)%s" % (self.tablename,), from_mark=self.mark)
+        self.node.watch_log_for("Compacting(.*)%s" % (self.tablename,), from_mark=self.mark, filename=self.filename)
         self.node.stop(gently=False)
 
 
