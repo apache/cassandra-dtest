@@ -42,6 +42,7 @@ class SSTableUtilTest(Tester):
         Check we can list the sstable files after aborted compaction (temporary sstable files)
         Then perform a cleanup and verify the temporary files are gone
         """
+        log_file_name = 'debug.log'
         cluster = self.cluster
         cluster.populate(1).start(wait_for_binary_proto=True)
         node = cluster.nodelist()[0]
@@ -52,7 +53,7 @@ class SSTableUtilTest(Tester):
         finalfiles, tmpfiles = self._check_files(node, KeyspaceName, TableName)
         self.assertEqual(0, len(tmpfiles))
 
-        t = InterruptCompaction(node, TableName)
+        t = InterruptCompaction(node, TableName, filename=log_file_name)
         t.start()
 
         try:
@@ -75,7 +76,7 @@ class SSTableUtilTest(Tester):
 
         # restart to make sure not data is lost
         node.start(wait_for_binary_proto=True)
-        node.watch_log_for("Compacted(.*)%s" % (TableName, ))
+        node.watch_log_for("Compacted(.*)%s" % (TableName, ), filename=log_file_name)
 
         finalfiles, tmpfiles = self._check_files(node, KeyspaceName, TableName)
         self.assertEqual(0, len(tmpfiles))
