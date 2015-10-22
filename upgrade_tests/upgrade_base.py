@@ -11,6 +11,7 @@ from tools import cassandra_git_branch, since
 QUERY_UPGRADED = os.environ.get('QUERY_UPGRADED', 'true').lower() in ('yes', 'true')
 QUERY_OLD = os.environ.get('QUERY_OLD', 'true').lower() in ('yes', 'true')
 OLD_CASSANDRA_DIR = os.environ.get('OLD_CASSANDRA_DIR', None)
+OLD_CASSANDRA_VERSION = os.environ.get('OLD_CASSANDRA_VERSION', None)
 
 # This controls how many of the nodes are upgraded.  Accepted values are
 # "normal", "none", and "all".
@@ -120,6 +121,9 @@ class UpgradeTester(Tester):
             if OLD_CASSANDRA_DIR:
                 cluster.set_install_dir(install_dir=OLD_CASSANDRA_DIR)
                 debug('running C* from {}'.format(OLD_CASSANDRA_DIR))
+            elif OLD_CASSANDRA_VERSION:
+                cluster.set_install_dir(version=OLD_CASSANDRA_VERSION)
+                debug('installed C* {}'.format(OLD_CASSANDRA_VERSION))
             elif self.upgrade_path.starting_version:
                 try:
                     cluster.set_install_dir(version=self.upgrade_path.starting_version)
