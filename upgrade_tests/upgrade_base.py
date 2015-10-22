@@ -26,6 +26,7 @@ UPGRADE_MODE = os.environ.get('UPGRADE_MODE', 'normal').lower()
 
 # Specify a branch to upgrade to
 UPGRADE_TO = os.environ.get('UPGRADE_TO', None)
+UPGRADE_TO_DIR = os.environ.get('UPGRADE_TO_DIR', None)
 
 
 UpgradePath = namedtuple('UpgradePath', ('starting_version', 'upgrade_version'))
@@ -118,6 +119,7 @@ class UpgradeTester(Tester):
             self.upgrade_path = get_default_upgrade_path(self.original_version, cdir=self.original_install_dir)
             if OLD_CASSANDRA_DIR:
                 cluster.set_install_dir(install_dir=OLD_CASSANDRA_DIR)
+                debug('running C* from {}'.format(OLD_CASSANDRA_DIR))
             elif self.upgrade_path.starting_version:
                 try:
                     cluster.set_install_dir(version=self.upgrade_path.starting_version)
@@ -180,13 +182,14 @@ class UpgradeTester(Tester):
                 node2.mark_log_for_errors()
 
         # choose version to upgrade to
-        if UPGRADE_TO:
+        if UPGRADE_TO_DIR:
+            install_kwargs = {'install_dir': UPGRADE_TO_DIR}
+        elif UPGRADE_TO:
             install_kwargs = {'version': UPGRADE_TO}
+        elif self.upgrade_path.upgrade_version:
+            install_kwargs = {'version': self.upgrade_path.upgrade_version}
         else:
-            if self.upgrade_path.upgrade_version:
-                install_kwargs = {'version': self.upgrade_path.upgrade_version}
-            else:
-                install_kwargs = {'install_dir': self.original_install_dir}
+            install_kwargs = {'install_dir': self.original_install_dir}
 
         debug('upgrading to {}'.format(install_kwargs))
 
