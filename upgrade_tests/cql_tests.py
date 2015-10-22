@@ -5184,3 +5184,11 @@ class TestCQL(UpgradeTester):
         for is_upgraded, cursor in self.do_upgrade(cursor):
             debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
             assert_all(cursor, "SELECT k FROM ks.test WHERE v = 0", [[0]])
+
+
+class TestCQLNodes3RF3(TestCQL):
+    NODES, RF, __test__, CL = 3, 3, True, ConsistencyLevel.ALL
+
+
+class TestCQLNodes2RF1(TestCQL):
+    NODES, RF, __test__ = 2, 1, True
