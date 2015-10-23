@@ -11,6 +11,7 @@ from tools import cassandra_git_branch, since
 QUERY_UPGRADED = os.environ.get('QUERY_UPGRADED', 'true').lower() in ('yes', 'true')
 QUERY_OLD = os.environ.get('QUERY_OLD', 'true').lower() in ('yes', 'true')
 OLD_CASSANDRA_DIR = os.environ.get('OLD_CASSANDRA_DIR', None)
+OLD_CASSANDRA_VERSION = os.environ.get('OLD_CASSANDRA_VERSION', None)
 
 # This controls how many of the nodes are upgraded.  Accepted values are
 # "normal", "none", and "all".
@@ -26,6 +27,7 @@ UPGRADE_MODE = os.environ.get('UPGRADE_MODE', 'normal').lower()
 
 # Specify a branch to upgrade to
 UPGRADE_TO = os.environ.get('UPGRADE_TO', None)
+UPGRADE_TO_DIR = os.environ.get('UPGRADE_TO_DIR', None)
 
 
 UpgradePath = namedtuple('UpgradePath', ('starting_version', 'upgrade_version'))
@@ -118,6 +120,10 @@ class UpgradeTester(Tester):
             self.upgrade_path = get_default_upgrade_path(self.original_version, cdir=self.original_install_dir)
             if OLD_CASSANDRA_DIR:
                 cluster.set_install_dir(install_dir=OLD_CASSANDRA_DIR)
+                debug('running C* from {}'.format(OLD_CASSANDRA_DIR))
+            elif OLD_CASSANDRA_VERSION:
+                cluster.set_install_dir(version=OLD_CASSANDRA_VERSION)
+                debug('installed C* {}'.format(OLD_CASSANDRA_VERSION))
             elif self.upgrade_path.starting_version:
                 try:
                     cluster.set_install_dir(version=self.upgrade_path.starting_version)
@@ -180,13 +186,14 @@ class UpgradeTester(Tester):
                 node2.mark_log_for_errors()
 
         # choose version to upgrade to
-        if UPGRADE_TO:
+        if UPGRADE_TO_DIR:
+            install_kwargs = {'install_dir': UPGRADE_TO_DIR}
+        elif UPGRADE_TO:
             install_kwargs = {'version': UPGRADE_TO}
+        elif self.upgrade_path.upgrade_version:
+            install_kwargs = {'version': self.upgrade_path.upgrade_version}
         else:
-            if self.upgrade_path.upgrade_version:
-                install_kwargs = {'version': self.upgrade_path.upgrade_version}
-            else:
-                install_kwargs = {'install_dir': self.original_install_dir}
+            install_kwargs = {'install_dir': self.original_install_dir}
 
         debug('upgrading to {}'.format(install_kwargs))
 

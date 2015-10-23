@@ -20,7 +20,7 @@ from thrift_bindings.v22.ttypes import ConsistencyLevel as ThriftConsistencyLeve
 from thrift_bindings.v22.ttypes import (CfDef, Column, ColumnOrSuperColumn, Mutation)
 from thrift_tests import get_thrift_client
 from tools import require, rows_to_list, since
-from upgrade_base import UpgradeTester, UPGRADE_TO
+from upgrade_base import UpgradeTester
 
 
 class TestCQL(UpgradeTester):
@@ -4095,7 +4095,7 @@ class TestCQL(UpgradeTester):
         cursor = self.prepare(protocol_version=2)
         cursor.execute("CREATE TABLE test (k int, c1 int, c2 text, PRIMARY KEY (k, c1, c2))")
 
-        for version in (UPGRADE_TO, self.upgrade_path.upgrade_version):
+        for version in self.get_node_versions():
             if version >= '3.0':
                 raise SkipTest('version {} not compatible with protocol version 2'.format(version))
 
