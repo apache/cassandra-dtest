@@ -467,6 +467,7 @@ class TestBootstrap(Tester):
         process = node3.start()
         stdout, stderr = process.communicate()
         self.assertIn(bootstrap_error, stderr, msg=stderr)
+        time.sleep(.5)
         self.assertFalse(node3.is_running(), msg="Two nodes bootstrapped simultaneously")
 
         node2.watch_log_for("Starting listening for CQL clients")
