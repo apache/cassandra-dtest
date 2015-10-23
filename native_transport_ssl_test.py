@@ -39,6 +39,7 @@ class NativeTransportSSL(Tester):
     def connect_to_ssl_optional_test(self):
         """
         Connecting to SSL optional native transport port must be possible with SSL and non-SSL native clients
+        @jira_ticket CASSANDRA-10559
         """
         cluster = self._populateCluster(enableSSL=True, sslOptional=True)
         node1 = cluster.nodelist()[0]
