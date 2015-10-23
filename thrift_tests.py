@@ -7,7 +7,7 @@ from thrift.protocol import TBinaryProtocol
 from thrift.Thrift import TApplicationException
 from thrift.transport import TSocket, TTransport
 
-from dtest import DISABLE_VNODES, NUM_TOKENS, Tester
+from dtest import DISABLE_VNODES, NUM_TOKENS, Tester, debug
 from thrift_bindings.v22 import Cassandra
 from thrift_bindings.v22.Cassandra import (CfDef, Column, ColumnDef,
                                            ColumnOrSuperColumn, ColumnParent,
@@ -89,6 +89,8 @@ class ThriftTester(BaseTester):
                                     cf_defs=[
             Cassandra.CfDef('Keyspace1', 'Standard1'),
             Cassandra.CfDef('Keyspace1', 'Standard2'),
+            Cassandra.CfDef('Keyspace1', 'Standard3', column_metadata=[Cassandra.ColumnDef('c1', 'AsciiType'), Cassandra.ColumnDef('c2', 'AsciiType')]),
+            Cassandra.CfDef('Keyspace1', 'Standard4', column_metadata=[Cassandra.ColumnDef('c1', 'AsciiType')]),
             Cassandra.CfDef('Keyspace1', 'StandardLong1', comparator_type='LongType'),
             Cassandra.CfDef('Keyspace1', 'StandardLong2', comparator_type='LongType'),
             Cassandra.CfDef('Keyspace1', 'StandardInteger1', comparator_type='IntegerType'),
@@ -386,25 +388,48 @@ class TestMutations(ThriftTester):
     def test_cas(self):
         _set_keyspace('Keyspace1')
 
-        def cas(expected, updates):
-            return client.cas('key1', 'Standard1', expected, updates, ConsistencyLevel.SERIAL, ConsistencyLevel.QUORUM)
+        def cas(expected, updates, column_family):
+            return client.cas('key1', column_family, expected, updates, ConsistencyLevel.SERIAL, ConsistencyLevel.QUORUM)
 
-        cas_result = cas(_SIMPLE_COLUMNS, _SIMPLE_COLUMNS)
-        assert not cas_result.success
-        assert len(cas_result.current_values) == 0, cas_result
+        def test_cas_operations(first_columns, second_columns, column_family):
+            # partition should be empty, so cas expecting any existing values should fail
+            cas_result = cas(first_columns, first_columns, column_family)
+            assert not cas_result.success
+            assert len(cas_result.current_values) == 0, cas_result
 
-        assert cas([], _SIMPLE_COLUMNS).success
+            # cas of empty columns -> first_columns should succeed
+            # and the reading back from the table should match first_columns
+            assert cas([], first_columns, column_family).success
+            result = [cosc.column for cosc in _big_slice('key1', ColumnParent(column_family))]
+            # CAS will use its own timestamp, so we can't just compare result == _SIMPLE_COLUMNS
+            assert dict((c.name, c.value) for c in result) == dict((ex.name, ex.value) for ex in first_columns)
 
-        result = [cosc.column for cosc in _big_slice('key1', ColumnParent('Standard1'))]
-        # CAS will use its own timestamp, so we can't just compare result == _SIMPLE_COLUMNS
+            # now that the partition has been updated, repeating the
+            # operation which expects it to be empty should not succeed
+            cas_result = cas([], first_columns, column_family)
+            assert not cas_result.success
+            # When we CAS for non-existence, current_values is the first live column of the row
+            assert dict((c.name, c.value) for c in cas_result.current_values) == {first_columns[0].name: first_columns[0].value}, cas_result
 
-        cas_result = cas([], _SIMPLE_COLUMNS)
-        assert not cas_result.success
-        # When we CAS for non-existence, current_values is the first live column of the row
-        assert dict((c.name, c.value) for c in cas_result.current_values) == {_SIMPLE_COLUMNS[0].name: _SIMPLE_COLUMNS[0].value}, cas_result
+            # CL.SERIAL for reads
+            assert client.get('key1', ColumnPath(column_family, column=first_columns[0].name), ConsistencyLevel.SERIAL).column.value == first_columns[0].value
 
-        # CL.SERIAL for reads
-        assert client.get('key1', ColumnPath('Standard1', column='c1'), ConsistencyLevel.SERIAL).column.value == 'value1'
+            # cas first_columns -> second_columns should succeed
+            assert cas(first_columns, second_columns, column_family).success
+
+            # as before, an operation with an incorrect expectation should fail
+            cas_result = cas(first_columns, second_columns, column_family)
+            assert not cas_result.success
+
+        updated_columns = [Column('c1', 'value101', 1),
+                           Column('c2', 'value102', 1)]
+
+        debug("Testing CAS operations on dynamic cf")
+        test_cas_operations(_SIMPLE_COLUMNS, updated_columns, 'Standard1')
+        debug("Testing CAS operations on static cf")
+        test_cas_operations(_SIMPLE_COLUMNS, updated_columns, 'Standard3')
+        debug("Testing CAS on mixed static/dynamic cf")
+        test_cas_operations(_SIMPLE_COLUMNS, updated_columns, 'Standard4')
 
     def test_missing_super(self):
         _set_keyspace('Keyspace1')
