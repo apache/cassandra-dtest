@@ -121,6 +121,10 @@ def _i64(n):
     return struct.pack('>q', n)  # big endian = network order
 
 
+def _i32(n):
+    return struct.pack('>i', n)  # big endian = network order
+
+
 def _i16(n):
     return struct.pack('>h', n)  # big endian = network order
 
@@ -2322,3 +2326,20 @@ class TestCQLAccesses(ThriftTester):
 
         # And check everything is gone
         assert_none(session, "SELECT * FROM t");
+
+
+class TestCompactStorageThriftAccesses(ThriftTester):
+
+    def test_get(self):
+        node1, = self.cluster.nodelist()
+        session = self.patient_cql_connection(node1)
+
+        # Create a CQL table with a static column and insert a row
+        session.execute("USE \"Keyspace1\"")
+        session.execute("CREATE TABLE IF NOT EXISTS cs1 (k int PRIMARY KEY,v int) WITH COMPACT STORAGE")
+
+        _set_keyspace('Keyspace1')
+        CL = ConsistencyLevel.ONE
+        i = 1
+        client.insert(_i32(i), ColumnParent('cs1'), Column('v', _i32(i), 0), CL)
+        _assert_column('cs1', _i32(i), 'v', _i32(i), 0)
