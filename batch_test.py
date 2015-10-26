@@ -3,7 +3,7 @@ import time
 from cassandra import ConsistencyLevel, Timeout, Unavailable
 from cassandra.query import SimpleStatement
 
-from assertions import assert_invalid, assert_unavailable
+from assertions import assert_invalid, assert_unavailable, assert_one
 from dtest import CASSANDRA_DIR, Tester, debug
 from tools import debug, since
 
@@ -247,6 +247,40 @@ class TestBatch(Tester):
         rows = session.execute("SELECT id, writetime(firstname), writetime(lastname) FROM users")
         res = sorted(rows)
         assert [list(res[0]), list(res[1])] == [[0, 1111111111111111, 1111111111111111], [1, 1111111111111112, 1111111111111112]], res
+
+    def multi_table_batch_for_10554_test(self):
+        """ Test a batch on 2 tables having different columns, restarting the node afterwards, to reproduce CASSANDRA-10554 """
+
+        session = self.prepare()
+
+        # prepare() adds users and clicks but clicks is a counter table, so adding a random other table for this test.
+        session.execute("""
+            CREATE TABLE dogs (
+                dogid int PRIMARY KEY,
+                dogname text,
+             );
+         """)
+
+        session.execute("""
+            BEGIN BATCH
+            INSERT INTO users (id, firstname, lastname) VALUES (0, 'Jack', 'Sparrow')
+            INSERT INTO dogs (dogid, dogname) VALUES (0, 'Pluto')
+            APPLY BATCH
+        """)
+
+        assert_one(session, "SELECT * FROM users", [0, 'Jack', 'Sparrow'])
+        assert_one(session, "SELECT * FROM dogs", [0, 'Pluto'])
+
+        # Flush and restart the node as it's how 10554 reproduces
+        node1 = self.cluster.nodelist()[0]
+        node1.flush()
+        node1.stop()
+        node1.start(wait_for_binary_proto=True)
+
+        session = self.patient_cql_connection(node1, keyspace='ks')
+
+        assert_one(session, "SELECT * FROM users", [0, 'Jack', 'Sparrow'])
+        assert_one(session, "SELECT * FROM dogs", [0, 'Pluto'])
 
     @since('3.0', max_version='3.0.x')
     def logged_batch_compatibility_1_test(self):
