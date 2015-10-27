@@ -1612,12 +1612,28 @@ class TestMutations(ThriftTester):
         assert modks.strategy_class == modified_keyspace.strategy_class
         assert modks.strategy_options == modified_keyspace.strategy_options
 
+        # check strategy options are validated on modify
+        def modify_invalid_ks():
+            client.system_update_keyspace(KsDef('CreateKeyspace',
+                                                'org.apache.cassandra.locator.SimpleStrategy',
+                                                {},
+                                                cf_defs=[]))
+        _expect_exception(modify_invalid_ks, InvalidRequestException)
+
         # drop
         client.system_drop_keyspace('CreateKeyspace')
 
         def get_second_ks():
             client.describe_keyspace('CreateKeyspace')
         _expect_exception(get_second_ks, NotFoundException)
+
+        # check strategy options are validated on creation
+        def create_invalid_ks():
+            client.system_add_keyspace(KsDef('InvalidKeyspace',
+                                             'org.apache.cassandra.locator.SimpleStrategy',
+                                             {},
+                                             cf_defs=[]))
+        _expect_exception(create_invalid_ks, InvalidRequestException)
 
     def test_create_then_drop_ks(self):
         keyspace = KsDef('AddThenDrop',
