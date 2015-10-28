@@ -35,7 +35,6 @@ class NativeTransportSSL(Tester):
         session = self.patient_cql_connection(node1, ssl_opts={'ca_certs': os.path.join(self.test_path, 'ccm_node.cer')})
         self._putget(cluster, session)
 
-    @since('3.0')
     def connect_to_ssl_optional_test(self):
         """
         Connecting to SSL optional native transport port must be possible with SSL and non-SSL native clients
