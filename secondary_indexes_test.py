@@ -280,8 +280,15 @@ class TestSecondaryIndexes(Tester):
         session.execute("use keyspace1;")
         lookup_value = session.execute('select "C0" from standard1 limit 1')[0].C0
         session.execute('CREATE INDEX ix_c0 ON standard1("C0");')
-        debug("waiting for index to build")
-        time.sleep(10)
+
+        def index_is_built():
+            return len(session.execute(
+                """SELECT * FROM system."IndexInfo"
+                   WHERE table_name ='keyspace1' AND index_name='ix_c0'""")) == 1
+
+        while not index_is_built():
+            debug("waiting for index to build")
+            time.sleep(1)
 
         stmt = session.prepare('select * from standard1 where "C0" = ?')
         self.assertEqual(1, len(session.execute(stmt, [lookup_value])))
@@ -291,13 +298,16 @@ class TestSecondaryIndexes(Tester):
         before_files = os.listdir(index_sstables_dir)
 
         node1.nodetool("rebuild_index keyspace1 standard1 ix_c0")
-
-        debug("waiting for index to rebuild")
-        time.sleep(10)
+        while not index_is_built():
+            debug("waiting for index to rebuild")
+            time.sleep(1)
 
         after_files = os.listdir(index_sstables_dir)
         self.assertNotEqual(set(before_files), set(after_files))
         self.assertEqual(1, len(session.execute(stmt, [lookup_value])))
+
+        # verify that only the expected row is present in the build indexes table
+        self.assertEqual(1, len(session.execute("""SELECT * FROM system."IndexInfo";""")))
 
     def test_multi_index_filtering_query(self):
         """
