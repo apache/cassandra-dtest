@@ -3,7 +3,7 @@ import re
 from nose.tools import assert_equal, assert_in, assert_is_not_none
 
 from cassandra import cqltypes
-from dtest import Tester
+from dtest import Tester, debug
 from tools import since
 
 
@@ -59,6 +59,7 @@ def establish_indexes_table(version, session, table_name_prefix=""):
 def verify_indexes_table(created_on_version, current_version, keyspace, session, table_name_prefix=""):
     table_name = _table_name_builder(table_name_prefix, "test_indexes")
     index_name = _table_name_builder("idx_" + table_name_prefix, table_name)
+    debug("table name: [{}], index name: [{}], prefix: [{}]".format(table_name, index_name, table_name_prefix))
     meta = session.cluster.metadata.keyspaces[keyspace].indexes[index_name]
 
     if current_version >= '3.0':
