@@ -1,6 +1,6 @@
 import re
 
-from nose.tools import assert_equal, assert_in
+from nose.tools import assert_equal, assert_in, assert_is_not_none
 
 from cassandra import cqltypes
 from dtest import Tester
@@ -64,8 +64,8 @@ def verify_indexes_table(created_on_version, current_version, keyspace, session,
     if current_version >= '3.0':
         assert_equal('d', meta.index_options['target'])
     else:
-        assert_equal(1, len(meta.columns))
-        column = next(iter(meta.columns))
+        assert_is_not_none(meta.column)
+        column = meta.column
         assert_equal('d', column.name)
         assert_equal(table_name, column.table.name)
 
@@ -78,8 +78,8 @@ def verify_indexes_table(created_on_version, current_version, keyspace, session,
     if current_version >= '3.0':
         assert_equal({'target': 'd'}, meta.indexes[index_name].index_options)
     else:
-        assert_equal(1, len(meta.indexes[index_name].columns))
-        assert_equal('d', next(iter(meta.indexes[index_name].columns)).name)
+        assert_is_not_none(meta.indexes[index_name].column)
+        assert_equal('d', meta.indexes[index_name].column.name)
     assert_equal(3, len(meta.primary_key))
     assert_equal('a', meta.primary_key[0].name)
     assert_equal('b', meta.primary_key[1].name)
