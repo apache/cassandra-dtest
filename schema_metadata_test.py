@@ -53,6 +53,7 @@ def establish_indexes_table(version, session, table_name_prefix=""):
 
     session.execute(cql.format(table_name))
     index_name = _table_name_builder("idx_" + table_name_prefix, table_name)
+    debug("table name: [{}], index name: [{}], prefix: [{}]".format(table_name, index_name, table_name_prefix))
     session.execute("CREATE INDEX {0} ON {1}( d )".format(index_name, table_name))
 
 
