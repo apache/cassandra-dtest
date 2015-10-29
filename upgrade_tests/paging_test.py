@@ -1356,13 +1356,13 @@ class TestPagingQueryIsolation(BasePagingTester, PageAssertionMixin):
                 # first page is auto-retrieved, so no need to request it
 
             for pf in page_fetchers:
-                pf.request_one()
+                pf.request_one(timeout=10)
 
             for pf in page_fetchers:
-                pf.request_one()
+                pf.request_one(timeout=10)
 
             for pf in page_fetchers:
-                pf.request_all()
+                pf.request_all(timeout=10)
 
             self.assertEqual(page_fetchers[0].pagecount(), 10)
             self.assertEqual(page_fetchers[1].pagecount(), 9)
@@ -1477,7 +1477,8 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
             )
             expected_data = [row for row in expected_data if row['id'] != 1]
             self.check_all_paging_results(cursor, expected_data, 7,
-                                          [25, 25, 25, 25, 25, 25, 10])
+                                          [25, 25, 25, 25, 25, 25, 10],
+                                          timeout=10)
 
             # Delete the a single partition in the middle
             cursor.execute(
@@ -1485,21 +1486,24 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
                                 consistency_level=CL.ALL)
             )
             expected_data = [row for row in expected_data if row['id'] != 3]
-            self.check_all_paging_results(cursor, expected_data, 5, [25, 25, 25, 25, 20])
+            self.check_all_paging_results(cursor, expected_data, 5, [25, 25, 25, 25, 20],
+                                          timeout=10)
 
             # Delete the a single partition at the end
             cursor.execute(
                 SimpleStatement("delete from paging_test where id = 5",
                                 consistency_level=CL.ALL))
             expected_data = [row for row in expected_data if row['id'] != 5]
-            self.check_all_paging_results(cursor, expected_data, 4, [25, 25, 25, 5])
+            self.check_all_paging_results(cursor, expected_data, 4, [25, 25, 25, 5],
+                                          timeout=10)
 
             # Keep only the partition '2'
             cursor.execute(
                 SimpleStatement("delete from paging_test where id = 4",
                                 consistency_level=CL.ALL))
             expected_data = [row for row in expected_data if row['id'] != 4]
-            self.check_all_paging_results(cursor, expected_data, 2, [25, 15])
+            self.check_all_paging_results(cursor, expected_data, 2, [25, 15],
+                                          timeout=10)
 
     def test_multiple_partition_deletions(self):
         """Test multiple partition deletions """
@@ -1518,7 +1522,8 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
                                 consistency_level=CL.ALL)
             )
             expected_data = [row for row in expected_data if row['id'] == 1]
-            self.check_all_paging_results(cursor, expected_data, 2, [25, 15])
+            self.check_all_paging_results(cursor, expected_data, 2, [25, 15],
+                                          timeout=10)
 
     def test_single_row_deletions(self):
         """Test single row deletions """
