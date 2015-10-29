@@ -514,10 +514,7 @@ def _table_name_builder(prefix, table_name):
     if prefix == "":
         return table_name
 
-    built_name = "{0}_{1}".format(re.sub(r"[^A-Za-z0-9]", "_", prefix), table_name)[-47:]
-
-    # leading _ isn't legal, but possible when name is chopped
-    return re.sub("^_+", "", built_name)
+    return "{0}_{1}".format(re.sub(r"[^A-Za-z0-9]", "_", prefix), table_name)[-47:].lstrip('_')
 
 
 class TestSchemaMetadata(Tester):
