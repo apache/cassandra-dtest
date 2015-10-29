@@ -11,6 +11,43 @@ from threading import Thread
 
 class TestTopology(Tester):
 
+    @since('2.1')
+    def do_not_join_ring_test(self):
+        """
+        @jira_ticket CASSANDRA-9034
+        Check that AssertionError is not thrown on SizeEstimatesRecorder before node joins ring
+        """
+        cluster = self.cluster.populate(1)
+        node1, = cluster.nodelist()
+
+        node1.start(wait_for_binary_proto=True, join_ring=False,
+                    jvm_args=["-Dcassandra.size_recorder_interval=1"])
+
+        # initial delay is 30s
+        time.sleep(40)
+
+        node1.stop(gently=False)
+
+    @since('2.1')
+    def simple_decommission_test(self):
+        """
+        @jira_ticket CASSANDRA-9912
+        Check that AssertionError is not thrown on SizeEstimatesRecorder after node is decommissioned
+        """
+        cluster = self.cluster
+        cluster.populate(3)
+        cluster.start(wait_for_binary_proto=True, jvm_args=["-Dcassandra.size_recorder_interval=1"])
+        [node1, node2, node3] = cluster.nodelist()
+
+        # write some data
+        node1.stress(['write', 'n=10K', '-rate', 'threads=8'])
+
+        # Decommision node and wipe its data
+        node2.decommission()
+        node2.stop(wait_other_notice=True)
+
+        time.sleep(10)
+
     @no_vnodes()
     def movement_test(self):
         cluster = self.cluster
