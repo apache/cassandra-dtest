@@ -544,7 +544,7 @@ class Tester(TestCase):
             for node in self.cluster.nodelist():
                 if self.allow_log_errors == False:
                     errors = list(self.__filter_errors(
-                        [' '.join(msg) for msg in node.grep_log_for_errors()]))
+                        ['\n'.join(msg) for msg in node.grep_log_for_errors()]))
                     if len(errors) is not 0:
                         failed = True
                         raise AssertionError('Unexpected error in %s node log: %s' % (node.name, errors))
