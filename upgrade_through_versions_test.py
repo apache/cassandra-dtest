@@ -917,7 +917,15 @@ class PointToPointUpgradeBase(TestUpgradeThroughVersions):
     def bootstrap_multidc_test(self):
         # try and add a new node
         # multi dc, 2 nodes in each dc
-        self.cluster.populate([2, 2])
+        cluster = self.cluster
+
+        if cluster.version() >= '3.0':
+            cluster.set_configuration_options({'enable_user_defined_functions': 'true',
+                                               'enable_scripted_user_defined_functions': 'true'})
+        elif cluster.version() >= '2.2':
+            cluster.set_configuration_options({'enable_user_defined_functions': 'true'})
+
+        cluster.populate([2, 2])
         [node.start(use_jna=True, wait_for_binary_proto=True) for node in self.cluster.nodelist()]
         self._multidc_schema_create()
         self.upgrade_scenario(populate=False, create_schema=False, after_upgrade_call=(self._bootstrap_new_node_multidc,))
