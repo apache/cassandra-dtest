@@ -161,6 +161,7 @@ def switch_jdks(version):
             os.environ['JAVA_HOME'] = os.environ['JAVA8_HOME']
     except KeyError:
         raise RuntimeError("You need to set JAVA7_HOME and JAVA8_HOME to run these tests!")
+    debug("Set JAVA_HOME: [{}] for cassandra version: [{}]".format(os.environ['JAVA_HOME'], version))
 
 
 def data_writer(tester, to_verify_queue, verification_done_queue, rewrite_probability=0):
@@ -887,6 +888,7 @@ class PointToPointUpgradeBase(TestUpgradeThroughVersions):
             os.environ['CASSANDRA_VERSION'] = 'git:' + self.test_versions[0]
 
         debug("Versions to test (%s): %s" % (type(self), str([v for v in self.test_versions])))
+        switch_jdks(os.environ['CASSANDRA_VERSION'])
         super(TestUpgradeThroughVersions, self).setUp()
 
     def _bootstrap_new_node(self):
