@@ -542,7 +542,7 @@ class Tester(TestCase):
         failed = sys.exc_info() != (None, None, None)
         try:
             for node in self.cluster.nodelist():
-                if self.allow_log_errors == False:
+                if not self.allow_log_errors:
                     errors = list(self.__filter_errors(
                         ['\n'.join(msg) for msg in node.grep_log_for_errors()]))
                     if len(errors) is not 0:
@@ -621,7 +621,7 @@ class Tester(TestCase):
         """
         try:
             return node.network_interfaces['binary'][1]
-        except Exception as e:
+        except Exception:
             raise RuntimeError("No network interface defined on this node object. {}".format(node.network_interfaces))
 
     def get_auth_provider(self, user, password):
