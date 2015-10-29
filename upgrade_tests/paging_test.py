@@ -89,33 +89,35 @@ class PageFetcher(object):
         self.error = exc
         raise exc
 
-    def request_one(self):
+    def request_one(self, timeout=None):
         """
         Requests the next page if there is one.
 
         If the future is exhausted, this is a no-op.
+        @param timeout Time, in seconds, to wait for all pages.
         """
         if self.future.has_more_pages:
             self.future.start_fetching_next_page()
             self.requested_pages += 1
-            self.wait()
+            self.wait(seconds=timeout)
 
         return self
 
-    def request_all(self):
+    def request_all(self, timeout=None):
         """
         Requests any remaining pages.
 
         If the future is exhausted, this is a no-op.
+        @param timeout Time, in seconds, to wait for all pages.
         """
         while self.future.has_more_pages:
             self.future.start_fetching_next_page()
             self.requested_pages += 1
-            self.wait()
+            self.wait(seconds=timeout)
 
         return self
 
-    def wait(self, seconds=5):
+    def wait(self, seconds=None):
         """
         Blocks until all *requested* pages have been returned.
 
@@ -123,6 +125,7 @@ class PageFetcher(object):
 
         Raises RuntimeError if seconds is exceeded.
         """
+        seconds = 5 if seconds is None else seconds
         expiry = time.time() + seconds
 
         while time.time() < expiry:
@@ -1439,7 +1442,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
 
         return PageFetcher(future)
 
-    def check_all_paging_results(self, cursor, expected_data, pagecount, num_page_results):
+    def check_all_paging_results(self, cursor, expected_data, pagecount, num_page_results, timeout=None):
         """Check all paging results: pagecount, num_results per page, data."""
 
         page_size = 25
@@ -1447,7 +1450,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
                                range(0, len(expected_data), page_size)]
 
         pf = self.get_page_fetcher(cursor)
-        pf.request_all()
+        pf.request_all(timeout=timeout)
         self.assertEqual(pf.pagecount(), pagecount)
         self.assertEqual(pf.num_results_all(), num_page_results)
 
