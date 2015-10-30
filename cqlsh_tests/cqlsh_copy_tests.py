@@ -10,6 +10,7 @@ from tempfile import NamedTemporaryFile
 from uuid import uuid1, uuid4
 
 from cassandra.concurrent import execute_concurrent_with_args
+from cassandra.util import SortedSet
 from ccmlib.common import is_win
 
 from cqlsh_tools import (DummyColorMap, assert_csvs_items_equal, csv_rows,
@@ -17,10 +18,10 @@ from cqlsh_tools import (DummyColorMap, assert_csvs_items_equal, csv_rows,
                          strip_timezone_if_time_string, unmonkeypatch_driver,
                          write_rows_to_csv)
 from dtest import Tester, canReuseCluster, freshCluster, debug
-from tools import rows_to_list, since
+from tools import rows_to_list, since, require
 
 DEFAULT_FLOAT_PRECISION = 5  # magic number copied from cqlsh script
-DEFAULT_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'  # based on cqlsh script; timezone stripped
+DEFAULT_TIME_FORMAT = '%Y-%m-%d %H:%M:%S%z'  # based on cqlsh script
 
 PARTITIONERS = {
     "murmur3": "org.apache.cassandra.dht.Murmur3Partitioner",
@@ -74,14 +75,17 @@ class CqlshCopyTest(Tester):
 
         super(CqlshCopyTest, self).tearDown()
 
-    def prepare(self, nodes=1, partitioner="murmur3"):
+    def prepare(self, nodes=1, partitioner="murmur3", configuration_options=None):
         if not self.cluster.nodelist():
             p = PARTITIONERS[partitioner]
             self.cluster.set_partitioner(p)
+            if configuration_options:
+                self.cluster.set_configuration_options(values=configuration_options)
             self.cluster.populate(nodes).start(wait_for_binary_proto=True)
         else:
             self.assertEqual(self.cluster.partitioner, partitioner, "Cannot reuse cluster: different partitioner")
             self.assertEqual(len(self.cluster.nodelist()), nodes, "Cannot reuse cluster: different number of nodes")
+            self.assertIsNone(configuration_options)
 
         self.node1 = self.cluster.nodelist()[0]
         self.session = self.patient_cql_connection(self.node1)
@@ -91,6 +95,12 @@ class CqlshCopyTest(Tester):
 
     def all_datatypes_prepare(self):
         self.prepare()
+
+        self.session.execute('CREATE TYPE name_type (firstname text, lastname text)')
+        self.session.execute('''
+            CREATE TYPE address_type (name frozen<name_type>, number int, street text, phones set<text>)
+            ''')
+
         self.session.execute('''
             CREATE TABLE testdatatype (
                 a ascii PRIMARY KEY,
@@ -107,8 +117,76 @@ class CqlshCopyTest(Tester):
                 l timeuuid,
                 m uuid,
                 n varchar,
-                o varint
+                o varint,
+                p list<int>,
+                q set<text>,
+                r map<timestamp, text>,
+                s tuple<int, text, boolean>,
+                t frozen<address_type>,
+                u frozen<list<list<address_type>>>,
+                v frozen<map<map<int,int>,set<text>>>,
+                w frozen<set<set<inet>>>,
             )''')
+
+        class Datetime(datetime.datetime):
+            def __str__(self):
+                return self.strftime(DEFAULT_TIME_FORMAT)
+
+            def __repr__(self):
+                return self.strftime(DEFAULT_TIME_FORMAT)
+
+        def str_q(s):
+            return "'{}'".format(s) if isinstance(s, (str, unicode, Datetime)) else str(s)
+
+        class ImmutableDict(frozenset):
+            iteritems = frozenset.__iter__
+
+            def __repr__(self):
+                return '{{{}}}'.format(', '.join(['{}: {}'.format(str_q(t[0]), str_q(t[1])) for t in sorted(self)]))
+
+        class ImmutableSet(SortedSet):
+            def __repr__(self):
+                return '{{{}}}'.format(', '.join([str_q(t) for t in sorted(self._items)]))
+
+        class CommonEqualityMixin(object):
+            def __eq__(self, other):
+                return type(other) is type(self) and self.__dict__ == other.__dict__
+
+            def __ne__(self, other):
+                return not self.__eq__(other)
+
+        class Name(CommonEqualityMixin):
+            def __init__(self, firstname, lastname):
+                self.firstname = firstname
+                self.lastname = lastname
+
+            def __repr__(self):
+                return "{{firstname: '{}', lastname: '{}'}}".format(self.firstname, self.lastname)
+
+        class Address(CommonEqualityMixin):
+            def __init__(self, name, number, street, phones):
+                self.name = name
+                self.number = number
+                self.street = street
+                self.phones = phones
+
+            def __repr__(self):
+                phones_str = "{{{}}}".format(', '.join(str_q(p) for p in sorted(self.phones)))
+                return "{{name: {}, number: {}, street: '{}', phones: {}}}".format(self.name,
+                                                                                   self.number,
+                                                                                   self.street,
+                                                                                   phones_str)
+
+        self.session.cluster.register_user_type('ks', 'name_type', Name)
+        self.session.cluster.register_user_type('ks', 'address_type', Address)
+
+        date1 = Datetime(2005, 7, 14, 12, 30, 0, 0, UTC())
+        date2 = Datetime(2005, 7, 14, 13, 30, 0, 0, UTC())
+
+        addr1 = Address(Name('name1', 'last1'), 1, 'street 1', ImmutableSet(['1111 2222', '3333 4444']))
+        addr2 = Address(Name('name2', 'last2'), 2, 'street 2', ImmutableSet(['5555 6666', '7777 8888']))
+        addr3 = Address(Name('name3', 'last3'), 3, 'street 3', ImmutableSet(['1111 2222', '3333 4444']))
+        addr4 = Address(Name('name4', 'last4'), 4, 'street 4', ImmutableSet(['5555 6666', '7777 8888']))
 
         self.data = ('ascii',  # a ascii
                      2 ** 40,  # b bigint
@@ -120,11 +198,21 @@ class CqlshCopyTest(Tester):
                      '127.0.0.1',  # h inet
                      25,  # i int
                      'ヽ(´ー｀)ノ',  # j text
-                     datetime.datetime(2005, 7, 14, 12, 30, 0, 0, UTC()),  # k timestamp
+                     date1,  # k timestamp
                      uuid1(),  # l timeuuid
                      uuid4(),  # m uuid
                      'asdf',  # n varchar
-                     2 ** 65  # o varint
+                     2 ** 65,  # o varint
+                     [1, 2, 3],  # p list<int>,
+                     ImmutableSet(['3', '2', '1']),  # q set<text>,
+                     ImmutableDict([(date1, '1'), (date2, '2')]),  # r map<timestamp, text>,
+                     (1, '1', True),  # s tuple<int, text, boolean>,
+                     addr1,  # t frozen<address_type>,
+                     [[addr1, addr2], [addr3, addr4]],  # u frozen<list<list<address_type>>>,
+                     # v frozen<map<map<int,int>,set<text>>>
+                     ImmutableDict([(ImmutableDict([(1, 1), (2, 2)]), ImmutableSet(['1', '2', '3']))]),
+                     # w frozen<set<set<inet>>>
+                     ImmutableSet([ImmutableSet(['127.0.0.1', '127.0.0.2']), ImmutableSet(['127.0.0.3', '127.0.0.4'])])
                      )
 
     @contextmanager
@@ -178,6 +266,7 @@ class CqlshCopyTest(Tester):
                 date_time_format = DateTimeFormat()
             except ImportError:
                 date_time_format = None
+
             #  try:
             #     from cqlshlib.formatting
         encoding_name = 'utf-8'  # codecs.lookup(locale.getpreferredencoding()).name
@@ -642,10 +731,9 @@ class CqlshCopyTest(Tester):
         - writing a CSV file containing the value passed in as load_as_int, then
         - COPYing that csv file into the table, loading load_as_int as an int.
 
-        If expect_invalid, this test will succeed when the COPY command fails
-        with a "Bad request" error message. If not expect_invalid, this test
-        will succeed when the COPY command prints no errors and the table
-        matches the loaded CSV file.
+        If expect_invalid, this test will succeed when the COPY command fails.
+        If not expect_invalid, this test will succeed when the COPY command prints
+        no errors and the table matches the loaded CSV file.
         """
         self.prepare()
         self.session.execute("""
@@ -664,7 +752,6 @@ class CqlshCopyTest(Tester):
         results = list(self.session.execute("SELECT * FROM testvalidate"))
 
         if expect_invalid:
-            self.assertRegexpMatches('Bad [Rr]equest', err)
             self.assertFalse(results)
         else:
             self.assertFalse(err)
@@ -712,8 +799,8 @@ class CqlshCopyTest(Tester):
         self.all_datatypes_prepare()
 
         insert_statement = self.session.prepare(
-            """INSERT INTO testdatatype (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""")
+            """INSERT INTO testdatatype (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""")
         self.session.execute(insert_statement, self.data)
 
         self.tempfile = NamedTemporaryFile(delete=False)
@@ -769,8 +856,8 @@ class CqlshCopyTest(Tester):
         self.all_datatypes_prepare()
 
         insert_statement = self.session.prepare(
-            """INSERT INTO testdatatype (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""")
+            """INSERT INTO testdatatype (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""")
         self.session.execute(insert_statement, self.data)
 
         self.tempfile = NamedTemporaryFile(delete=False)
@@ -815,7 +902,7 @@ class CqlshCopyTest(Tester):
                                         return_output=True)
 
         self.assertFalse(self.session.execute("SELECT * FROM testcolumns"))
-        self.assertIn('Aborting import', err)
+        self.assertTrue(len(err) > 0, 'Expected an error message')
 
     def _test_round_trip(self, nodes, partitioner, num_records=10000):
         """
@@ -927,21 +1014,33 @@ class CqlshCopyTest(Tester):
 
         os.unlink(commandfile.name)
 
-    def _test_bulk_round_trip(self, nodes, partitioner, num_records):
+    def _test_bulk_round_trip(self, nodes, partitioner,
+                              num_operations, profile=None, stress_table='keyspace1.standard1',
+                              page_size=1000, page_timeout=10, configuration_options=None):
         """
         Test exporting a large number of rows into a csv file.
         """
-        self.prepare(nodes=nodes, partitioner=partitioner)
-        self.node1.stress(['write', 'n={}'.format(num_records), '-rate', 'threads=50'])
+        self.prepare(nodes=nodes, partitioner=partitioner, configuration_options=configuration_options)
 
-        stress_table = 'keyspace1.standard1'
-        self.assertEqual([[num_records]], rows_to_list(self.session.execute("SELECT COUNT(*) FROM {}".format(stress_table))))
+        if not profile:
+            debug('Running stress without any user profile')
+            self.node1.stress(['write', 'n={}'.format(num_operations), '-rate', 'threads=50'])
+        else:
+            debug('Running stress with user profile {}'.format(profile))
+            self.node1.stress(['user', 'profile={}'.format(profile), 'ops(insert=1)',
+                               'n={}'.format(num_operations), '-rate', 'threads=50'])
+
+        num_records = rows_to_list(self.session.execute("SELECT COUNT(*) FROM {}".format(stress_table)))[0][0]
+        debug('Generated {} records'.format(num_records))
+
+        self.assertTrue(num_records >= num_operations, 'cassandra-stress did not import enough records')
 
         self.tempfile = NamedTemporaryFile(delete=False)
 
         debug('Exporting to csv file: {}'.format(self.tempfile.name))
         start = datetime.datetime.now()
-        self.node1.run_cqlsh(cmds="COPY {} TO '{}'".format(stress_table, self.tempfile.name))
+        self.node1.run_cqlsh(cmds="COPY {} TO '{}' WITH PAGETIMEOUT='{}' AND PAGESIZE='{}'"
+                             .format(stress_table, self.tempfile.name, page_timeout, page_size))
         debug("COPY TO took {} to export {} records".format(datetime.datetime.now() - start, num_records))
 
         # check all records were exported
@@ -954,8 +1053,34 @@ class CqlshCopyTest(Tester):
         self.node1.run_cqlsh(cmds="COPY {} FROM '{}'".format(stress_table, self.tempfile.name))
         debug("COPY FROM took {} to import {} records".format(datetime.datetime.now() - start, num_records))
 
-        self.assertEqual([[num_records]], rows_to_list(self.session.execute("SELECT COUNT(*) FROM {}".format(stress_table))))
+        self.assertEqual([[num_records]], rows_to_list(self.session.execute("SELECT COUNT(*) FROM {}"
+                                                                            .format(stress_table))))
 
+    @require('9302')
     @freshCluster()
-    def test_bulk_round_trip(self):
-        self._test_bulk_round_trip(nodes=3, partitioner="murmur3", num_records=100000)
+    def test_bulk_round_trip_default(self):
+        """
+        Test bulk import with default stress import (one row per operation)
+        """
+        self._test_bulk_round_trip(nodes=3, partitioner="murmur3", num_operations=100000)
+
+    @require('9302')
+    @freshCluster()
+    def test_bulk_round_trip_blogposts(self):
+        """
+        Test bulk import with a user profile that inserts 10 rows per operation
+        """
+        self._test_bulk_round_trip(nodes=3, partitioner="murmur3", num_operations=10000,
+                                   profile=os.path.join(os.path.dirname(os.path.realpath(__file__)), 'blogposts.yaml'),
+                                   stress_table='stresscql.blogposts', page_timeout=60)
+
+    @require('9302')
+    @freshCluster()
+    def test_bulk_round_trip_with_timeouts(self):
+        """
+        Test bulk import with very short read and write timeout values, this should exercise the
+        retry and back-off policies
+        """
+        self._test_bulk_round_trip(nodes=1, partitioner="murmur3", num_operations=100000,
+                                   configuration_options={'range_request_timeout_in_ms': '300',
+                                                          'write_request_timeout_in_ms': '200'})
