@@ -5,7 +5,7 @@ from ccmlib.common import is_win
 
 from assertions import assert_all, assert_invalid
 from dtest import Tester, debug
-from tools import require, since
+from tools import since
 
 
 @since('2.2')
@@ -29,7 +29,6 @@ class TestAuthUpgrade(Tester):
         self.do_upgrade_with_internal_auth("git:cassandra-2.2")
 
     @since('3.0')
-    @require(9704)
     def upgrade_to_30_test(self):
         self.do_upgrade_with_internal_auth("git:cassandra-3.0")
 
@@ -95,7 +94,7 @@ class TestAuthUpgrade(Tester):
 
     def check_permissions(self, node, upgraded):
         # use an exclusive connection to ensure we only talk to the specified node
-        klaus = self.patient_exclusive_cql_connection(node, user='klaus', password='12345')
+        klaus = self.patient_exclusive_cql_connection(node, user='klaus', password='12345', timeout=20)
         # klaus is a superuser, so should be able to list all permissions
         # the output of LIST PERMISSIONS changes slightly with #7653 adding
         # a new role column to results, so we need to tailor our check
