@@ -324,15 +324,15 @@ class TestMaterializedViews(Tester):
 
         debug("Writing 1k to base")
         for i in xrange(1000):
-            session.execute("INSERT INTO t (id, v) VALUES ({v}, {v})".format(v=i))
+            session.execute("INSERT INTO t (id, v) VALUES ({id}, {v})".format(id=i, v=-i))
 
         debug("Reading 1k from view")
         for i in xrange(1000):
-            assert_one(session, "SELECT * FROM t_by_v WHERE v = {}".format(i), [i, i])
+            assert_one(session, "SELECT * FROM t_by_v WHERE v = {}".format(-i), [-i, i])
 
         debug("Reading 1k from base")
         for i in xrange(1000):
-            assert_one(session, "SELECT * FROM t WHERE id = {}".format(i), [i, i])
+            assert_one(session, "SELECT * FROM t WHERE id = {}".format(i), [i, -i])
 
         debug("Bootstrapping new node in another dc")
         node4 = new_node(self.cluster, data_center='dc2')
@@ -346,15 +346,15 @@ class TestMaterializedViews(Tester):
 
         debug("Verifying data from new node in view")
         for i in xrange(1000):
-            assert_one(session2, "SELECT * FROM ks.t_by_v WHERE v = {}".format(i), [i, i])
+            assert_one(session2, "SELECT * FROM ks.t_by_v WHERE v = {}".format(-i), [-i, i])
 
         debug("Inserting 100 into base")
         for i in xrange(1000, 1100):
-            session.execute("INSERT INTO t (id, v) VALUES ({v}, {v})".format(v=i))
+            session.execute("INSERT INTO t (id, v) VALUES ({id}, {v})".format(id=i, v=-i))
 
         debug("Verify 100 in view")
         for i in xrange(1000, 1100):
-            assert_one(session, "SELECT * FROM t_by_v WHERE v = {}".format(i), [i, i])
+            assert_one(session, "SELECT * FROM t_by_v WHERE v = {}".format(-i), [-i, i])
 
     def add_node_after_mv_test(self):
         """Test that materialized views work as expected when adding a node."""
@@ -366,10 +366,10 @@ class TestMaterializedViews(Tester):
                          "WHERE v IS NOT NULL AND id IS NOT NULL PRIMARY KEY (v, id)"))
 
         for i in xrange(1000):
-            session.execute("INSERT INTO t (id, v) VALUES ({v}, {v})".format(v=i))
+            session.execute("INSERT INTO t (id, v) VALUES ({id}, {v})".format(id=i, v=-i))
 
         for i in xrange(1000):
-            assert_one(session, "SELECT * FROM t_by_v WHERE v = {}".format(i), [i, i])
+            assert_one(session, "SELECT * FROM t_by_v WHERE v = {}".format(-i), [-i, i])
 
         node4 = new_node(self.cluster)
         node4.start(wait_for_binary_proto=True)
@@ -377,13 +377,37 @@ class TestMaterializedViews(Tester):
         session2 = self.patient_exclusive_cql_connection(node4)
 
         for i in xrange(1000):
-            assert_one(session2, "SELECT * FROM ks.t_by_v WHERE v = {}".format(i), [i, i])
+            assert_one(session2, "SELECT * FROM ks.t_by_v WHERE v = {}".format(-i), [-i, i])
 
         for i in xrange(1000, 1100):
-            session.execute("INSERT INTO t (id, v) VALUES ({v}, {v})".format(v=i))
+            session.execute("INSERT INTO t (id, v) VALUES ({id}, {v})".format(id=i, v=-i))
 
         for i in xrange(1000, 1100):
-            assert_one(session, "SELECT * FROM t_by_v WHERE v = {}".format(i), [i, i])
+            assert_one(session, "SELECT * FROM t_by_v WHERE v = {}".format(-i), [-i, i])
+
+    def add_survey_node_after_mv_test(self):
+        """Test that materialized views work as expected when adding a node."""
+
+        session = self.prepare()
+
+        session.execute("CREATE TABLE t (id int PRIMARY KEY, v int)")
+        session.execute(("CREATE MATERIALIZED VIEW t_by_v AS SELECT * FROM t "
+                         "WHERE v IS NOT NULL AND id IS NOT NULL PRIMARY KEY (v, id)"))
+
+        for i in xrange(1000):
+            session.execute("INSERT INTO t (id, v) VALUES ({id}, {v})".format(id=i, v=-i))
+
+        for i in xrange(1000):
+            assert_one(session, "SELECT * FROM t_by_v WHERE v = {}".format(-i), [-i, i])
+
+        node4 = new_node(self.cluster)
+        node4.start(wait_for_binary_proto=True, jvm_args=["-Dcassandra.write_survey=true"])
+
+        for i in xrange(1000, 1100):
+            session.execute("INSERT INTO t (id, v) VALUES ({id}, {v})".format(id=i, v=-i))
+
+        for i in xrange(1100):
+            assert_one(session, "SELECT * FROM t_by_v WHERE v = {}".format(-i), [-i, i])
 
     def allow_filtering_test(self):
         """Test that allow filtering works as usual for a materialized view"""
