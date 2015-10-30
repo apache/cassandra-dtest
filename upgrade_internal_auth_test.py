@@ -5,7 +5,7 @@ from ccmlib.common import is_win
 
 from assertions import assert_all, assert_invalid
 from dtest import Tester, debug
-from tools import require, since
+from tools import since
 
 
 @since('2.2')
