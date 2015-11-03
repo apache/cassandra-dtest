@@ -445,4 +445,3 @@ class TestBootstrap(Tester):
             debug("Deleting {}".format(data_dir))
             shutil.rmtree(data_dir)
         shutil.rmtree(commitlog_dir)
-
