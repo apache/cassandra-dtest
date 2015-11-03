@@ -6,7 +6,6 @@ from cassandra.cluster import NoHostAvailable
 
 from assertions import assert_invalid
 from dtest import Tester, debug
-from flaky import flaky
 from tools import since
 
 
@@ -21,7 +20,6 @@ class TestAuth(Tester):
         ]
         Tester.__init__(self, *args, **kwargs)
 
-    @flaky
     def system_auth_ks_is_alterable_test(self):
         self.prepare(nodes=3)
         debug("nodes started")
@@ -35,6 +33,11 @@ class TestAuth(Tester):
         """)
 
         self.assertEquals(3, session.cluster.metadata.keyspaces['system_auth'].replication_strategy.replication_factor)
+
+        debug("Repairing system_auth keyspace")
+        for node in self.cluster.nodelist():
+            node.repair(['-pr', 'system_auth'])
+
 
         # make sure schema change is persistent
         debug("Stopping cluster..")
@@ -607,14 +610,21 @@ class TestAuth(Tester):
                   'authorizer': 'org.apache.cassandra.auth.CassandraAuthorizer',
                   'permissions_validity_in_ms': permissions_validity}
         self.cluster.set_configuration_options(values=config)
-        self.cluster.populate(nodes).start(no_wait=True)
+        self.cluster.populate(nodes).start()
+
         # default user setup is delayed by 10 seconds to reduce log spam
-        if nodes == 1:
-            self.cluster.nodelist()[0].watch_log_for('Created default superuser')
-        else:
-            # can' just watch for log - the line will appear in just one of the nodes' logs
-            # only one test uses more than 1 node, though, so some sleep is fine.
-            time.sleep(15)
+        time.sleep(10)
+        attempts = 0
+        while not self.find_in_any_log(self.cluster.nodelist(), 'Created default superuser') and attempts < 10:
+            attempts += 1
+            time.sleep(1)
+
+    def find_in_any_log(self, nodes, pattern):
+        for node in nodes:
+            found = node.grep_log(pattern)
+            if found:
+                return found
+        return None
 
     def get_session(self, node_idx=0, user=None, password=None):
         node = self.cluster.nodelist()[node_idx]
