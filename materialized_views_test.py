@@ -312,10 +312,10 @@ class TestMaterializedViews(Tester):
         result = list(session.execute("SELECT * FROM ks.users_by_state_birth_year WHERE state='TX' AND birth_year=1968"))
         self.assertEqual(len(result), 1, "Expecting {} users, got {}".format(1, len(result)))
 
-    def add_dc_after_mv_test(self):
+    def __add_dc_after_mv_test(self, rf):
         """Test that materialized views work as expected when adding a datacenter."""
 
-        session = self.prepare()
+        session = self.prepare(rf=rf)
 
         debug("Creating schema")
         session.execute("CREATE TABLE t (id int PRIMARY KEY, v int)")
@@ -355,6 +355,13 @@ class TestMaterializedViews(Tester):
         debug("Verify 100 in view")
         for i in xrange(1000, 1100):
             assert_one(session, "SELECT * FROM t_by_v WHERE v = {}".format(-i), [-i, i])
+
+    def add_dc_after_mv_simple_replication_test(self):
+        self.__add_dc_after_mv_test(1)
+
+    def add_dc_after_mv_network_replication_test(self):
+        self.__add_dc_after_mv_test({'dc1': 1, 'dc2': 1})
+
 
     def add_node_after_mv_test(self):
         """Test that materialized views work as expected when adding a node."""
