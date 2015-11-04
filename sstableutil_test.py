@@ -12,6 +12,19 @@ KeyspaceName = 'keyspace1'
 TableName = 'standard1'
 
 
+def _strip_common_prefix(strings):
+    strings = list(map(os.path.normcase, strings))
+    common_prefix = os.path.commonprefix(strings)
+    rvs = []
+    for s in strings:
+        stripped = s.lstrip(common_prefix)
+        if s:
+            assert stripped
+        rvs.append(stripped)
+
+    return rvs
+
+
 @since('3.0')
 class SSTableUtilTest(Tester):
 
@@ -98,10 +111,23 @@ class SSTableUtilTest(Tester):
         node.stress(['read', 'n=%d' % (numrecords,), '-rate', 'threads=25'])
 
     def _check_files(self, node, ks, table, expected_finalfiles=[], expected_tmpfiles=[]):
+        if common.is_win():
+            if expected_finalfiles:
+                expected_finalfiles = _strip_common_prefix(expected_finalfiles)
+            if expected_tmpfiles:
+                expected_tmpfiles = _strip_common_prefix(expected_tmpfiles)
+
         sstablefiles = self._get_sstable_files(node, ks, table)
+
+        if common.is_win():
+            sstablefiles = _strip_common_prefix(sstablefiles)
 
         debug("Comparing all files...")
         allfiles = self._invoke_sstableutil(ks, table, type='all')
+
+        if common.is_win():
+            allfiles = _strip_common_prefix(allfiles)
+
         self.assertEqual(sstablefiles, allfiles)
 
         if len(expected_finalfiles) == 0:
@@ -109,6 +135,10 @@ class SSTableUtilTest(Tester):
 
         debug("Comparing final files...")
         finalfiles = self._invoke_sstableutil(ks, table, type='final')
+
+        if common.is_win():
+            finalfiles = _strip_common_prefix(finalfiles)
+
         self.assertEqual(expected_finalfiles, finalfiles)
 
         if len(expected_tmpfiles) == 0:
