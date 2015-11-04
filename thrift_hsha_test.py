@@ -68,8 +68,12 @@ class ThriftHSHATest(Tester):
             debug("Closing connections from the client side..")
             for pool in pools:
                 pool.dispose()
-            stdout = subprocess.Popen(["lsof -a -p %s -iTCP -sTCP:CLOSE_WAIT" % node1.pid], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True).communicate()[0]
-            lines = stdout.splitlines()
+            for i in range(0, 3):
+                stdout = subprocess.Popen(["lsof -a -p %s -iTCP -sTCP:CLOSE_WAIT" % node1.pid], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True).communicate()[0]
+                lines = stdout.splitlines()
+                if len(lines) == 0:
+                    break
+                time.sleep(1)
             self.assertEqual(len(lines), 0, "There are non-closed connections: %s" % stdout)
 
     @unittest.skipIf(not os.path.exists(ATTACK_JAR), "No attack jar found")
