@@ -177,9 +177,9 @@ class SSTableUtilTest(Tester):
 
         (stdout, stderr) = p.communicate()
 
-        if len(stderr) > 0:
+        if p.returncode != 0:
             debug(stderr)
-            assert False, "Error invoking sstableutil"
+            assert False, "Error invoking sstableutil; returned {code}".format(code=p.returncode)
 
         debug(stdout)
         match = ks + os.sep + table + '-'
