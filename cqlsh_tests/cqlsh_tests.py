@@ -787,7 +787,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
 
         if has_val_idx:
             val_idx_def = self.get_index_output('test_val_idx', 'test', 'test', 'val')
-            if LooseVersion(self.cluster.version()) >= LooseVersion('3.0'):
+            if LooseVersion(self.cluster.version()) >= LooseVersion('2.2'):
                 return ret + "\n" + val_idx_def + "\n" + col_idx_def
             else:
                 return ret + "\n" + col_idx_def + "\n" + val_idx_def
