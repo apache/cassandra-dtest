@@ -70,8 +70,8 @@ class TestMaterializedViews(Tester):
 
         session = self.prepare(user_table=True)
 
-        result = session.execute(("SELECT * FROM system_schema.views "
-                                  "WHERE keyspace_name='ks' AND base_table_name='users' ALLOW FILTERING"))
+        result = list(session.execute(("SELECT * FROM system_schema.views "
+                                       "WHERE keyspace_name='ks' AND base_table_name='users' ALLOW FILTERING")))
         self.assertEqual(len(result), 1, "Expecting 1 materialized view, got" + str(result))
 
     def test_gcgs_validation(self):
@@ -119,16 +119,16 @@ class TestMaterializedViews(Tester):
 
         self._insert_data(session)
 
-        result = session.execute("SELECT * FROM users;")
+        result = list(session.execute("SELECT * FROM users;"))
         self.assertEqual(len(result), 4, "Expecting {} users, got {}".format(4, len(result)))
 
-        result = session.execute("SELECT * FROM users_by_state WHERE state='TX';")
+        result = list(session.execute("SELECT * FROM users_by_state WHERE state='TX';"))
         self.assertEqual(len(result), 2, "Expecting {} users, got {}".format(2, len(result)))
 
-        result = session.execute("SELECT * FROM users_by_state WHERE state='CA';")
+        result = list(session.execute("SELECT * FROM users_by_state WHERE state='CA';"))
         self.assertEqual(len(result), 1, "Expecting {} users, got {}".format(1, len(result)))
 
-        result = session.execute("SELECT * FROM users_by_state WHERE state='MA';")
+        result = list(session.execute("SELECT * FROM users_by_state WHERE state='MA';"))
         self.assertEqual(len(result), 0, "Expecting {} users, got {}".format(0, len(result)))
 
     def populate_mv_after_insert_test(self):
@@ -183,16 +183,16 @@ class TestMaterializedViews(Tester):
         session.execute(insertPrepared.bind(('user3', 'ch@ngem3c', 'f', 'FL', 1978)))
         session.execute(insertPrepared.bind(('user4', 'ch@ngem3d', 'm', 'TX', 1974)))
 
-        result = session.execute("SELECT * FROM users;")
+        result = list(session.execute("SELECT * FROM users;"))
         self.assertEqual(len(result), 4, "Expecting {} users, got {}".format(4, len(result)))
 
-        result = session.execute(selectPrepared.bind(['TX']))
+        result = list(session.execute(selectPrepared.bind(['TX'])))
         self.assertEqual(len(result), 2, "Expecting {} users, got {}".format(2, len(result)))
 
-        result = session.execute(selectPrepared.bind(['CA']))
+        result = list(session.execute(selectPrepared.bind(['CA'])))
         self.assertEqual(len(result), 1, "Expecting {} users, got {}".format(1, len(result)))
 
-        result = session.execute(selectPrepared.bind(['MA']))
+        result = list(session.execute(selectPrepared.bind(['MA'])))
         self.assertEqual(len(result), 0, "Expecting {} users, got {}".format(0, len(result)))
 
     def immutable_test(self):
@@ -230,14 +230,14 @@ class TestMaterializedViews(Tester):
                          "SELECT * FROM users WHERE birth_year IS NOT NULL AND "
                          "username IS NOT NULL PRIMARY KEY (birth_year, username)"))
 
-        result = session.execute(("SELECT * FROM system_schema.views "
-                                  "WHERE keyspace_name='ks' AND base_table_name='users' ALLOW FILTERING"))
+        result = list(session.execute(("SELECT * FROM system_schema.views "
+                                       "WHERE keyspace_name='ks' AND base_table_name='users' ALLOW FILTERING")))
         self.assertEqual(len(result), 2, "Expecting {} materialized view, got {}".format(2, len(result)))
 
         session.execute("DROP MATERIALIZED VIEW ks.users_by_state;")
 
-        result = session.execute(("SELECT * FROM system_schema.views "
-                                  "WHERE keyspace_name='ks' AND base_table_name='users' ALLOW FILTERING"))
+        result = list(session.execute(("SELECT * FROM system_schema.views "
+                                       "WHERE keyspace_name='ks' AND base_table_name='users' ALLOW FILTERING")))
         self.assertEqual(len(result), 1, "Expecting {} materialized view, got {}".format(1, len(result)))
 
     def drop_column_test(self):
@@ -245,8 +245,8 @@ class TestMaterializedViews(Tester):
 
         session = self.prepare(user_table=True)
 
-        result = session.execute(("SELECT * FROM system_schema.views "
-                                  "WHERE keyspace_name='ks' AND base_table_name='users' ALLOW FILTERING"))
+        result = list(session.execute(("SELECT * FROM system_schema.views "
+                                       "WHERE keyspace_name='ks' AND base_table_name='users' ALLOW FILTERING")))
         self.assertEqual(len(result), 1, "Expecting {} materialized view, got {}".format(1, len(result)))
 
         assert_invalid(
@@ -306,7 +306,7 @@ class TestMaterializedViews(Tester):
 
         self._insert_data(session)
 
-        result = session.execute("SELECT * FROM ks.users_by_state_birth_year WHERE state='TX'")
+        result = list(session.execute("SELECT * FROM ks.users_by_state_birth_year WHERE state='TX'"))
         self.assertEqual(len(result), 2, "Expecting {} users, got {}".format(2, len(result)))
 
         result = session.execute("SELECT * FROM ks.users_by_state_birth_year WHERE state='TX' AND birth_year=1968")
@@ -501,7 +501,7 @@ class TestMaterializedViews(Tester):
 
         session.execute("ALTER TABLE users ADD first_name varchar;")
 
-        results = session.execute("SELECT * FROM users_by_state2 WHERE state = 'TX' AND username = 'user1'")
+        results = list(session.execute("SELECT * FROM users_by_state2 WHERE state = 'TX' AND username = 'user1'"))
         self.assertEqual(len(results), 1)
         self.assertFalse(hasattr(results[0], 'first_name'), 'Column "first_name" found in view')
         assert_one(
@@ -578,7 +578,7 @@ class TestMaterializedViews(Tester):
         self._replay_batchlogs()
 
         debug("Verify that only the 10 first rows have been deleted.")
-        results = session.execute("SELECT * FROM t_by_v;")
+        results = list(session.execute("SELECT * FROM t_by_v;"))
         self.assertEqual(len(results), 990)
         for i in xrange(10, 1000):
             assert_one(
@@ -620,7 +620,7 @@ class TestMaterializedViews(Tester):
         start = time.time()
         while True:
             try:
-                result = session.execute("SELECT count(*) FROM t_by_v;")
+                result = list(session.execute("SELECT count(*) FROM t_by_v;"))
                 self.assertNotEqual(result[0].count, 10000)
             except AssertionError:
                 debug("MV build process is finished")
@@ -633,7 +633,7 @@ class TestMaterializedViews(Tester):
             time.sleep(5)
 
         debug("Verify all data")
-        result = session.execute("SELECT count(*) FROM t_by_v;")
+        result = list(session.execute("SELECT count(*) FROM t_by_v;"))
         self.assertEqual(result[0].count, 10000)
         for i in xrange(10000):
             assert_one(

@@ -273,7 +273,7 @@ class TestScrubIndexes(TestHelper):
             session.execute(("INSERT INTO users (user_id, email) values ({user_id}, 'test@example.com')").format(user_id=user_uuid))
             session.execute(("UPDATE users set uuids = [{id}] where user_id = {user_id}").format(id=_id, user_id=user_uuid))
 
-        initial_users = session.execute(("SELECT * from users where uuids contains {some_uuid}").format(some_uuid=_id))
+        initial_users = list(session.execute(("SELECT * from users where uuids contains {some_uuid}").format(some_uuid=_id)))
         self.assertEqual(num_users, len(initial_users))
 
         initial_sstables = self.flush('users', 'user_uuids_idx')
@@ -319,7 +319,7 @@ class TestScrub(TestHelper):
         session.execute("DELETE FROM users where KEY = 'user7'")
 
     def query_users(self, session):
-        ret = session.execute("SELECT * FROM users")
+        ret = list(session.execute("SELECT * FROM users"))
         assert len(ret) == 5
         return ret
 

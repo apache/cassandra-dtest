@@ -43,7 +43,7 @@ class TestSSTableGenerationAndLoading(Tester):
 
         node1.flush()
         time.sleep(2)
-        rows = session.execute("SELECT * FROM cf WHERE KEY = '0' AND c < '8'")
+        rows = list(session.execute("SELECT * FROM cf WHERE KEY = '0' AND c < '8'"))
         assert len(rows) > 0
 
     def remove_index_file_test(self):
@@ -195,9 +195,9 @@ class TestSSTableGenerationAndLoading(Tester):
 
         def read_and_validate_data(session):
             for i in range(NUM_KEYS):
-                rows = session.execute("SELECT * FROM standard1 WHERE KEY='%d'" % i)
+                rows = list(session.execute("SELECT * FROM standard1 WHERE KEY='%d'" % i))
                 self.assertEquals([str(i), 'col', str(i)], list(rows[0]))
-                rows = session.execute("SELECT * FROM counter1 WHERE KEY='%d'" % i)
+                rows = list(session.execute("SELECT * FROM counter1 WHERE KEY='%d'" % i))
                 self.assertEquals([str(i), 1], list(rows[0]))
 
         debug("Reading data back")

@@ -39,13 +39,13 @@ class TestSecondaryIndexes(Tester):
         session.execute("INSERT INTO users (KEY, password, gender, state, birth_year) VALUES ('user3', 'ch@ngem3c', 'f', 'FL', 1978);")
         session.execute("INSERT INTO users (KEY, password, gender, state, birth_year) VALUES ('user4', 'ch@ngem3d', 'm', 'TX', 1974);")
 
-        result = session.execute("SELECT * FROM users;")
+        result = list(session.execute("SELECT * FROM users;"))
         assert len(result) == 4, "Expecting 4 users, got" + str(result)
 
-        result = session.execute("SELECT * FROM users WHERE state='TX';")
+        result = list(session.execute("SELECT * FROM users WHERE state='TX';"))
         assert len(result) == 2, "Expecting 2 users, got" + str(result)
 
-        result = session.execute("SELECT * FROM users WHERE state='CA';")
+        result = list(session.execute("SELECT * FROM users WHERE state='CA';"))
         assert len(result) == 1, "Expecting 1 users, got" + str(result)
 
     @since('2.1')
@@ -107,7 +107,7 @@ class TestSecondaryIndexes(Tester):
         check_trace_events(query.trace)
 
         for limit in (1, 2):
-            result = session.execute("SELECT * FROM ks.cf WHERE b='1' LIMIT %d;" % (limit,))
+            result = list(session.execute("SELECT * FROM ks.cf WHERE b='1' LIMIT %d;" % (limit,)))
             self.assertEqual(limit, len(result))
 
     @since('2.1')
@@ -282,9 +282,9 @@ class TestSecondaryIndexes(Tester):
         session.execute('CREATE INDEX ix_c0 ON standard1("C0");')
 
         def index_is_built():
-            return len(session.execute(
+            return len(list(session.execute(
                 """SELECT * FROM system."IndexInfo"
-                   WHERE table_name ='keyspace1' AND index_name='ix_c0'""")) == 1
+                   WHERE table_name ='keyspace1' AND index_name='ix_c0'"""))) == 1
 
         while not index_is_built():
             debug("waiting for index to build")
@@ -304,10 +304,10 @@ class TestSecondaryIndexes(Tester):
 
         after_files = os.listdir(index_sstables_dir)
         self.assertNotEqual(set(before_files), set(after_files))
-        self.assertEqual(1, len(session.execute(stmt, [lookup_value])))
+        self.assertEqual(1, len(list(session.execute(stmt, [lookup_value]))))
 
         # verify that only the expected row is present in the build indexes table
-        self.assertEqual(1, len(session.execute("""SELECT * FROM system."IndexInfo";""")))
+        self.assertEqual(1, len(list(session.execute("""SELECT * FROM system."IndexInfo";"""))))
 
     def test_multi_index_filtering_query(self):
         """
@@ -328,7 +328,7 @@ class TestSecondaryIndexes(Tester):
         session.execute("INSERT INTO tbl (id, c0, c1, c2) values (uuid(), 'a', 'e', 'f');")
         session.execute("INSERT INTO tbl (id, c0, c1, c2) values (uuid(), 'a', 'e', 'f');")
 
-        rows = session.execute("SELECT * FROM tbl WHERE c0 = 'a';")
+        rows = list(session.execute("SELECT * FROM tbl WHERE c0 = 'a';"))
         self.assertEqual(4, len(rows))
 
         stmt = "SELECT * FROM tbl WHERE c0 = 'a' AND c1 = 'b';"
@@ -336,7 +336,7 @@ class TestSecondaryIndexes(Tester):
                                       "unpredictable performance. If you want to execute this query despite the "
                                       "performance unpredictability, use ALLOW FILTERING")
 
-        rows = session.execute("SELECT * FROM tbl WHERE c0 = 'a' AND c1 = 'b' ALLOW FILTERING;")
+        rows = list(session.execute("SELECT * FROM tbl WHERE c0 = 'a' AND c1 = 'b' ALLOW FILTERING;"))
         self.assertEqual(2, len(rows))
 
     @since('3.0')
@@ -391,7 +391,7 @@ class TestSecondaryIndexes(Tester):
                                       actual=match_counts[event_source], all=match_counts))
 
         query = SimpleStatement("SELECT * FROM ks.cf WHERE b='1';")
-        result = session.execute(query, trace=True)
+        result = list(session.execute(query, trace=True))
         self.assertEqual(3, len(result))
         # node2 is the coordinator for the query
         check_trace_events(query.trace,
@@ -537,7 +537,7 @@ class TestSecondaryIndexesOnCollections(Tester):
         session.execute(stmt)
 
         stmt = ("SELECT * from list_index_search.users where uuids contains {some_uuid}").format(some_uuid=uuid.uuid4())
-        row = session.execute(stmt)
+        row = list(session.execute(stmt))
         self.assertEqual(0, len(row))
 
         # add a row which doesn't specify data for the indexed column, and query again
@@ -548,7 +548,7 @@ class TestSecondaryIndexesOnCollections(Tester):
         session.execute(stmt)
 
         stmt = ("SELECT * from list_index_search.users where uuids contains {some_uuid}").format(some_uuid=uuid.uuid4())
-        row = session.execute(stmt)
+        row = list(session.execute(stmt))
         self.assertEqual(0, len(row))
 
         _id = uuid.uuid4()
@@ -558,7 +558,7 @@ class TestSecondaryIndexesOnCollections(Tester):
         session.execute(stmt)
 
         stmt = ("SELECT * from list_index_search.users where uuids contains {some_uuid}").format(some_uuid=_id)
-        row = session.execute(stmt)
+        row = list(session.execute(stmt))
         self.assertEqual(1, len(row))
 
         # add a bunch of user records and query them back
@@ -584,7 +584,7 @@ class TestSecondaryIndexesOnCollections(Tester):
 
         # confirm there is now 50k rows with the 'shared' uuid above in the secondary index
         stmt = ("SELECT * from list_index_search.users where uuids contains {shared_uuid}").format(shared_uuid=shared_uuid)
-        rows = session.execute(stmt)
+        rows = list(session.execute(stmt))
         result = [row for row in rows]
         self.assertEqual(50000, len(result))
 
@@ -594,7 +594,7 @@ class TestSecondaryIndexesOnCollections(Tester):
         for log_entry in log[:1000]:
             stmt = ("SELECT user_id, email, uuids FROM list_index_search.users where uuids contains {unshared_uuid}"
                     ).format(unshared_uuid=log_entry['unshared_uuid'])
-            rows = session.execute(stmt)
+            rows = list(session.execute(stmt))
 
             self.assertEqual(1, len(rows))
 
@@ -634,7 +634,7 @@ class TestSecondaryIndexesOnCollections(Tester):
         session.execute(stmt)
 
         stmt = ("SELECT * from set_index_search.users where uuids contains {some_uuid}").format(some_uuid=uuid.uuid4())
-        row = session.execute(stmt)
+        row = list(session.execute(stmt))
         self.assertEqual(0, len(row))
 
         # add a row which doesn't specify data for the indexed column, and query again
@@ -644,7 +644,7 @@ class TestSecondaryIndexesOnCollections(Tester):
         session.execute(stmt)
 
         stmt = ("SELECT * from set_index_search.users where uuids contains {some_uuid}").format(some_uuid=uuid.uuid4())
-        row = session.execute(stmt)
+        row = list(session.execute(stmt))
         self.assertEqual(0, len(row))
 
         _id = uuid.uuid4()
@@ -653,7 +653,7 @@ class TestSecondaryIndexesOnCollections(Tester):
         session.execute(stmt)
 
         stmt = ("SELECT * from set_index_search.users where uuids contains {some_uuid}").format(some_uuid=_id)
-        row = session.execute(stmt)
+        row = list(session.execute(stmt))
         self.assertEqual(1, len(row))
 
         # add a bunch of user records and query them back
@@ -689,7 +689,7 @@ class TestSecondaryIndexesOnCollections(Tester):
         for log_entry in log[:1000]:
             stmt = ("SELECT user_id, email, uuids FROM set_index_search.users where uuids contains {unshared_uuid}"
                     ).format(unshared_uuid=log_entry['unshared_uuid'])
-            rows = session.execute(stmt)
+            rows = list(session.execute(stmt))
 
             self.assertEqual(1, len(rows))
 
@@ -730,13 +730,13 @@ class TestSecondaryIndexesOnCollections(Tester):
         session.execute("INSERT INTO map_tbl (id, amap) values (uuid(), {'foo': 1, 'bar': 2});")
         session.execute("INSERT INTO map_tbl (id, amap) values (uuid(), {'faz': 1, 'baz': 2});")
 
-        value_search = session.execute("SELECT * FROM map_tbl WHERE amap CONTAINS 1")
+        value_search = list(session.execute("SELECT * FROM map_tbl WHERE amap CONTAINS 1"))
         self.assertEqual(2, len(value_search), "incorrect number of rows when querying on map values")
 
-        key_search = session.execute("SELECT * FROM map_tbl WHERE amap CONTAINS KEY 'foo'")
+        key_search = list(session.execute("SELECT * FROM map_tbl WHERE amap CONTAINS KEY 'foo'"))
         self.assertEqual(1, len(key_search), "incorrect number of rows when querying on map keys")
 
-        entries_search = session.execute("SELECT * FROM map_tbl WHERE amap['foo'] = 1")
+        entries_search = list(session.execute("SELECT * FROM map_tbl WHERE amap['foo'] = 1"))
         self.assertEqual(1, len(entries_search), "incorrect number of rows when querying on map entries")
 
         session.cluster.refresh_schema_metadata()
@@ -786,7 +786,7 @@ class TestSecondaryIndexesOnCollections(Tester):
         session.execute(stmt)
 
         stmt = "SELECT * from map_index_search.users where uuids contains key {some_uuid}".format(some_uuid=uuid.uuid4())
-        rows = session.execute(stmt)
+        rows = list(session.execute(stmt))
         self.assertEqual(0, len(rows))
 
         # add a row which doesn't specify data for the indexed column, and query again
@@ -797,7 +797,7 @@ class TestSecondaryIndexesOnCollections(Tester):
         session.execute(stmt)
 
         stmt = ("SELECT * from map_index_search.users where uuids contains key {some_uuid}").format(some_uuid=uuid.uuid4())
-        rows = session.execute(stmt)
+        rows = list(session.execute(stmt))
         self.assertEqual(0, len(rows))
 
         _id = uuid.uuid4()
@@ -808,7 +808,7 @@ class TestSecondaryIndexesOnCollections(Tester):
         session.execute(stmt)
 
         stmt = ("SELECT * from map_index_search.users where uuids contains key {some_uuid}").format(some_uuid=_id)
-        rows = session.execute(stmt)
+        rows = list(session.execute(stmt))
         self.assertEqual(1, len(rows))
 
         # add a bunch of user records and query them back
@@ -889,7 +889,7 @@ class TestSecondaryIndexesOnCollections(Tester):
             stmt = ("SELECT user_id, email, uuids FROM map_index_search.users where uuids contains {unshared_uuid2}"
                     ).format(unshared_uuid2=log_entry['unshared_uuid2'])
 
-            rows = session.execute(stmt)
+            rows = list(session.execute(stmt))
             self.assertEqual(1, len(rows))
 
             db_user_id, db_email, db_uuids = rows[0]

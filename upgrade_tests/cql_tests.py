@@ -254,15 +254,15 @@ class TestCQL(UpgradeTester):
 
             # Deletion
             cursor.execute("DELETE time FROM connections WHERE userid = 550e8400-e29b-41d4-a716-446655440000 AND ip = '192.168.0.2' AND port = 80")
-            res = cursor.execute("SELECT * FROM connections WHERE userid = 550e8400-e29b-41d4-a716-446655440000")
+            res = list(cursor.execute("SELECT * FROM connections WHERE userid = 550e8400-e29b-41d4-a716-446655440000"))
             assert len(res) == 2, res
 
             cursor.execute("DELETE FROM connections WHERE userid = 550e8400-e29b-41d4-a716-446655440000")
-            res = cursor.execute("SELECT * FROM connections WHERE userid = 550e8400-e29b-41d4-a716-446655440000")
+            res = list(cursor.execute("SELECT * FROM connections WHERE userid = 550e8400-e29b-41d4-a716-446655440000"))
             assert len(res) == 0, res
 
             cursor.execute("DELETE FROM connections WHERE userid = f47ac10b-58cc-4372-a567-0e02b2c3d479 AND ip = '192.168.0.3'")
-            res = cursor.execute("SELECT * FROM connections WHERE userid = f47ac10b-58cc-4372-a567-0e02b2c3d479 AND ip = '192.168.0.3'")
+            res = list(cursor.execute("SELECT * FROM connections WHERE userid = f47ac10b-58cc-4372-a567-0e02b2c3d479 AND ip = '192.168.0.3'"))
             self.assertEqual([], res)
 
     def sparse_cf_test(self):
@@ -420,7 +420,7 @@ class TestCQL(UpgradeTester):
 
             # Queries
             # Check we do get as many rows as requested
-            res = cursor.execute("SELECT * FROM clicks LIMIT 4")
+            res = list(cursor.execute("SELECT * FROM clicks LIMIT 4"))
             assert len(res) == 4, res
 
     def counters_test(self):
@@ -516,10 +516,10 @@ class TestCQL(UpgradeTester):
             """)
 
             # Select
-            res = cursor.execute("""
+            res = list(cursor.execute("""
                     SELECT firstname, lastname FROM users
                     WHERE userid IN (550e8400-e29b-41d4-a716-446655440000, f47ac10b-58cc-4372-a567-0e02b2c3d479)
-            """)
+            """))
 
             assert len(res) == 2, res
 
@@ -1727,7 +1727,7 @@ class TestCQL(UpgradeTester):
             cursor.execute("INSERT INTO test (k, v) VALUES ('foo', 0)")
             cursor.execute("INSERT INTO test (k, v) VALUES ('bar', 1)")
 
-            res = cursor.execute("SELECT * FROM test")
+            res = list(cursor.execute("SELECT * FROM test"))
             assert len(res) == 2, res
 
     @freshCluster()
@@ -2426,7 +2426,7 @@ class TestCQL(UpgradeTester):
             cursor.execute("INSERT INTO foo (a, b , c ) VALUES (  1 , 'ert', 693f5800-8acb-11e3-82e0-3f484de45426)")
             cursor.execute("INSERT INTO foo (a, b , c ) VALUES (  1 , 'opl', d4815800-2d8d-11e0-82e0-3f484de45426)")
 
-            res = cursor.execute("SELECT * FROM foo")
+            res = list(cursor.execute("SELECT * FROM foo"))
             assert len(res) == 3, res
 
             assert_invalid(cursor, "SELECT * FROM foo WHERE a=1")
@@ -2602,20 +2602,20 @@ class TestCQL(UpgradeTester):
                 cursor.execute("INSERT INTO test (k, t) VALUES (0, now())")
                 time.sleep(1)
 
-            res = cursor.execute("SELECT * FROM test")
+            res = list(cursor.execute("SELECT * FROM test"))
             assert len(res) == 4, res
             dates = [d[1] for d in res]
 
-            res = cursor.execute("SELECT * FROM test WHERE k = 0 AND t >= %s" % dates[0])
+            res = list(cursor.execute("SELECT * FROM test WHERE k = 0 AND t >= %s" % dates[0]))
             assert len(res) == 4, res
 
-            res = cursor.execute("SELECT * FROM test WHERE k = 0 AND t < %s" % dates[0])
+            res = list(cursor.execute("SELECT * FROM test WHERE k = 0 AND t < %s" % dates[0]))
             assert len(res) == 0, res
 
-            res = cursor.execute("SELECT * FROM test WHERE k = 0 AND t > %s AND t <= %s" % (dates[0], dates[2]))
+            res = list(cursor.execute("SELECT * FROM test WHERE k = 0 AND t > %s AND t <= %s" % (dates[0], dates[2])))
             assert len(res) == 2, res
 
-            res = cursor.execute("SELECT * FROM test WHERE k = 0 AND t = %s" % dates[0])
+            res = list(cursor.execute("SELECT * FROM test WHERE k = 0 AND t = %s" % dates[0]))
             assert len(res) == 1, res
 
             assert_invalid(cursor, "SELECT dateOf(k) FROM test WHERE k = 0 AND t = %s" % dates[0])
