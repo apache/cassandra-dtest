@@ -92,19 +92,19 @@ class TestSecondaryIndexes(Tester):
                 self.fail("Didn't find matching trace event")
 
         query = SimpleStatement("SELECT * FROM ks.cf WHERE b='1';")
-        result = list(session.execute(query, trace=True))
-        self.assertEqual(3, len(result))
-        check_trace_events(query.trace)
+        result = session.execute(query, trace=True)
+        self.assertEqual(3, len(list(result)))
+        check_trace_events(result.get_query_trace())
 
         query = SimpleStatement("SELECT * FROM ks.cf WHERE b='1' LIMIT 100;")
-        result = list(session.execute(query, trace=True))
-        self.assertEqual(3, len(result))
-        check_trace_events(query.trace)
+        result = session.execute(query, trace=True)
+        self.assertEqual(3, len(list(result)))
+        check_trace_events(result.get_query_trace())
 
         query = SimpleStatement("SELECT * FROM ks.cf WHERE b='1' LIMIT 3;")
-        result = list(session.execute(query, trace=True))
-        self.assertEqual(3, len(result))
-        check_trace_events(query.trace)
+        result = session.execute(query, trace=True)
+        self.assertEqual(3, len(list(result)))
+        check_trace_events(result.get_query_trace())
 
         for limit in (1, 2):
             result = list(session.execute("SELECT * FROM ks.cf WHERE b='1' LIMIT %d;" % (limit,)))
@@ -391,15 +391,18 @@ class TestSecondaryIndexes(Tester):
                                       actual=match_counts[event_source], all=match_counts))
 
         query = SimpleStatement("SELECT * FROM ks.cf WHERE b='1';")
-        result = list(session.execute(query, trace=True))
-        self.assertEqual(3, len(result))
+        result = session.execute(query, trace=True)
+        self.assertEqual(3, len(list(result)))
+
+        trace = result.get_query_trace()
+
         # node2 is the coordinator for the query
-        check_trace_events(query.trace,
+        check_trace_events(trace,
                            "Index mean cardinalities are b_index:[0-9]*. Scanning with b_index.",
                            [("127.0.0.1", 0, 0), ("127.0.0.2", 1, 1), ("127.0.0.3", 0, 0)])
         # check that the index is used on each node, really we only care that the matching
         # message appears on every node, so the max count is not important
-        check_trace_events(query.trace,
+        check_trace_events(trace,
                            "Executing read on ks.cf using index b_index",
                            [("127.0.0.1", 1, 200), ("127.0.0.2", 1, 200), ("127.0.0.3", 1, 200)])
 
@@ -456,14 +459,14 @@ class TestSecondaryIndexesOnCollections(Tester):
 
         # check if indexes work on existing data
         for n in range(50):
-            self.assertEqual(5, len(session.execute("select * from simple_with_tuple where single_tuple = ({0});".format(n))))
-            self.assertEqual(0, len(session.execute("select * from simple_with_tuple where single_tuple = (-1);".format(n))))
-            self.assertEqual(5, len(session.execute("select * from simple_with_tuple where double_tuple = ({0},{0});".format(n))))
-            self.assertEqual(0, len(session.execute("select * from simple_with_tuple where double_tuple = ({0},-1);".format(n))))
-            self.assertEqual(5, len(session.execute("select * from simple_with_tuple where triple_tuple = ({0},{0},{0});".format(n))))
-            self.assertEqual(0, len(session.execute("select * from simple_with_tuple where triple_tuple = ({0},{0},-1);".format(n))))
-            self.assertEqual(5, len(session.execute("select * from simple_with_tuple where nested_one = ({0},({0},{0}));".format(n))))
-            self.assertEqual(0, len(session.execute("select * from simple_with_tuple where nested_one = ({0},({0},-1));".format(n))))
+            self.assertEqual(5, len(list(session.execute("select * from simple_with_tuple where single_tuple = ({0});".format(n)))))
+            self.assertEqual(0, len(list(session.execute("select * from simple_with_tuple where single_tuple = (-1);".format(n)))))
+            self.assertEqual(5, len(list(session.execute("select * from simple_with_tuple where double_tuple = ({0},{0});".format(n)))))
+            self.assertEqual(0, len(list(session.execute("select * from simple_with_tuple where double_tuple = ({0},-1);".format(n)))))
+            self.assertEqual(5, len(list(session.execute("select * from simple_with_tuple where triple_tuple = ({0},{0},{0});".format(n)))))
+            self.assertEqual(0, len(list(session.execute("select * from simple_with_tuple where triple_tuple = ({0},{0},-1);".format(n)))))
+            self.assertEqual(5, len(list(session.execute("select * from simple_with_tuple where nested_one = ({0},({0},{0}));".format(n)))))
+            self.assertEqual(0, len(list(session.execute("select * from simple_with_tuple where nested_one = ({0},({0},-1));".format(n)))))
 
         # check if indexes work on new data inserted after index creation
         results = execute_concurrent(session, cmds*3, raise_on_first_error=True, concurrency=200)
@@ -471,10 +474,10 @@ class TestSecondaryIndexesOnCollections(Tester):
             self.assertTrue(success, "didn't get success on insert: {0}".format(result))
         time.sleep(5)
         for n in range(50):
-            self.assertEqual(8, len(session.execute("select * from simple_with_tuple where single_tuple = ({0});".format(n))))
-            self.assertEqual(8, len(session.execute("select * from simple_with_tuple where double_tuple = ({0},{0});".format(n))))
-            self.assertEqual(8, len(session.execute("select * from simple_with_tuple where triple_tuple = ({0},{0},{0});".format(n))))
-            self.assertEqual(8, len(session.execute("select * from simple_with_tuple where nested_one = ({0},({0},{0}));".format(n))))
+            self.assertEqual(8, len(list(session.execute("select * from simple_with_tuple where single_tuple = ({0});".format(n)))))
+            self.assertEqual(8, len(list(session.execute("select * from simple_with_tuple where double_tuple = ({0},{0});".format(n)))))
+            self.assertEqual(8, len(list(session.execute("select * from simple_with_tuple where triple_tuple = ({0},{0},{0});".format(n)))))
+            self.assertEqual(8, len(list(session.execute("select * from simple_with_tuple where nested_one = ({0},({0},{0}));".format(n)))))
 
         # check if indexes work on mutated data
         for n in range(5):
@@ -495,15 +498,15 @@ class TestSecondaryIndexesOnCollections(Tester):
                 session.execute("update simple_with_tuple set nested_one = (-999,(-999,-999)) where id = {0}".format(row.id))
 
         for n in range(5):
-            self.assertEqual(0, len(session.execute("select * from simple_with_tuple where single_tuple = ({0});".format(n))))
-            self.assertEqual(0, len(session.execute("select * from simple_with_tuple where double_tuple = ({0},{0});".format(n))))
-            self.assertEqual(0, len(session.execute("select * from simple_with_tuple where triple_tuple = ({0},{0},{0});".format(n))))
-            self.assertEqual(0, len(session.execute("select * from simple_with_tuple where nested_one = ({0},({0},{0}));".format(n))))
+            self.assertEqual(0, len(list(session.execute("select * from simple_with_tuple where single_tuple = ({0});".format(n)))))
+            self.assertEqual(0, len(list(session.execute("select * from simple_with_tuple where double_tuple = ({0},{0});".format(n)))))
+            self.assertEqual(0, len(list(session.execute("select * from simple_with_tuple where triple_tuple = ({0},{0},{0});".format(n)))))
+            self.assertEqual(0, len(list(session.execute("select * from simple_with_tuple where nested_one = ({0},({0},{0}));".format(n)))))
 
-        self.assertEqual(40, len(session.execute("select * from simple_with_tuple where single_tuple = (-999);")))
-        self.assertEqual(40, len(session.execute("select * from simple_with_tuple where double_tuple = (-999,-999);")))
-        self.assertEqual(40, len(session.execute("select * from simple_with_tuple where triple_tuple = (-999,-999,-999);")))
-        self.assertEqual(40, len(session.execute("select * from simple_with_tuple where nested_one = (-999,(-999,-999));")))
+        self.assertEqual(40, len(list(session.execute("select * from simple_with_tuple where single_tuple = (-999);"))))
+        self.assertEqual(40, len(list(session.execute("select * from simple_with_tuple where double_tuple = (-999,-999);"))))
+        self.assertEqual(40, len(list(session.execute("select * from simple_with_tuple where triple_tuple = (-999,-999,-999);"))))
+        self.assertEqual(40, len(list(session.execute("select * from simple_with_tuple where nested_one = (-999,(-999,-999));"))))
 
     @since('2.1')
     def test_list_indexes(self):
@@ -849,9 +852,10 @@ class TestSecondaryIndexesOnCollections(Tester):
                     ).format(unshared_uuid1=log_entry['unshared_uuid1'])
             row = session.execute(stmt)
 
-            rows = self.assertEqual(1, len(row))
+            result = list(row)
+            rows = self.assertEqual(1, len(result))
 
-            db_user_id, db_email, db_uuids = row[0]
+            db_user_id, db_email, db_uuids = result[0]
 
             self.assertEqual(db_user_id, log_entry['user_id'])
             self.assertEqual(db_email, log_entry['email'])
