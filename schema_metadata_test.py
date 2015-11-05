@@ -316,7 +316,7 @@ def verify_udf(created_on_version, current_version, keyspace, session, table_nam
     meta = session.cluster.metadata.keyspaces[keyspace].functions[function_name + "(double)"]
     assert_equal('java', meta.language)
     assert_equal('double', meta.return_type)
-    assert_equal(['double'], meta.type_signature)
+    assert_equal(['double'], meta.argument_types)
     assert_equal(['input'], meta.argument_names)
     assert_equal('return Double.valueOf(Math.log(input.doubleValue()));', meta.body)
 
@@ -603,7 +603,7 @@ class TestSchemaMetadata(Tester):
         udf_meta = self._keyspace_meta().functions['wasteful_function(double)']
         self.assertEqual('ks', udf_meta.keyspace)
         self.assertEqual('wasteful_function', udf_meta.name)
-        self.assertEqual(['double'], udf_meta.type_signature)
+        self.assertEqual(['double'], udf_meta.argument_types)
         self.assertEqual(['input'], udf_meta.argument_names)
         self.assertEqual('double', udf_meta.return_type)
         self.assertEqual('java', udf_meta.language)
@@ -635,7 +635,7 @@ class TestSchemaMetadata(Tester):
 
         self.assertEqual('ks', udf_meta.keyspace)
         self.assertEqual('max_val', udf_meta.name)
-        self.assertEqual(['int', 'int'], udf_meta.type_signature)
+        self.assertEqual(['int', 'int'], udf_meta.argument_types)
         self.assertEqual(['current', 'candidate'], udf_meta.argument_names)
         self.assertEqual('int', udf_meta.return_type)
         self.assertEqual('java', udf_meta.language)
@@ -644,7 +644,7 @@ class TestSchemaMetadata(Tester):
 
         self.assertEqual('ks', uda_meta.keyspace)
         self.assertEqual('kind_of_max_agg', uda_meta.name)
-        self.assertEqual(['int'], uda_meta.type_signature)
+        self.assertEqual(['int'], uda_meta.argument_types)
         self.assertEqual('max_val', uda_meta.state_func)
         self.assertEqual('int', uda_meta.state_type)
         self.assertEqual(None, uda_meta.final_func)
