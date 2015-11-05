@@ -98,7 +98,7 @@ class TestWideRows(Tester):
             # necessarily return 3 values.  Hence I am computing the number of unique values in values2fetch
             # and using that in the assert at the end.
             expected_rows = len(set(values2fetch))
-            rows = session.execute(select_column_query.format(name1="val" + values2fetch[0],
-                                                              name2="val" + values2fetch[1],
-                                                              name3="val" + values2fetch[2]))
+            rows = list(session.execute(select_column_query.format(name1="val" + values2fetch[0],
+                                                                   name2="val" + values2fetch[1],
+                                                                   name3="val" + values2fetch[2])))
             assert len(rows) == expected_rows

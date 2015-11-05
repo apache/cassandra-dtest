@@ -236,8 +236,8 @@ class TestConcurrentSchemaChanges(Tester):
         debug("querying all values by secondary index")
         for n in range(5):
             for ins in range(1000):
-                self.assertEqual(1, len(session.execute("select * from base_{0} where c1 = {1}".format(n, ins))))
-                self.assertEqual(1, len(session.execute("select * from base_{0} where c2 = {1}".format(n, ins))))
+                self.assertEqual(1, len(list(session.execute("select * from base_{0} where c1 = {1}".format(n, ins)))))
+                self.assertEqual(1, len(list(session.execute("select * from base_{0} where c2 = {1}".format(n, ins)))))
 
     @since('3.0')
     def create_lots_of_mv_concurrently_test(self):
@@ -265,12 +265,12 @@ class TestConcurrentSchemaChanges(Tester):
 
         debug("waiting for indexes to fill in")
         wait(60)
-        result = session.execute(("SELECT * FROM system_schema.views "
-                                  "WHERE keyspace_name='lots_o_views' AND base_table_name='source_data' ALLOW FILTERING"))
+        result = list(session.execute(("SELECT * FROM system_schema.views "
+                                       "WHERE keyspace_name='lots_o_views' AND base_table_name='source_data' ALLOW FILTERING")))
         self.assertEqual(10, len(result), "missing some mv from source_data table")
 
         for n in range(1, 11):
-            result = session.execute("select * from src_by_c{0}".format(n))
+            result = list(session.execute("select * from src_by_c{0}".format(n)))
             self.assertEqual(4000, len(result))
 
     def _do_lots_of_schema_actions(self, session):

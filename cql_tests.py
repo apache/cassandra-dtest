@@ -395,7 +395,7 @@ class MiscellaneousCQLTester(CQLTester):
         session.execute("INSERT INTO test (k, v) VALUES ('foo', 0)")
         session.execute("INSERT INTO test (k, v) VALUES ('bar', 1)")
 
-        res = session.execute("SELECT * FROM test")
+        res = list(session.execute("SELECT * FROM test"))
         assert len(res) == 2, res
 
 

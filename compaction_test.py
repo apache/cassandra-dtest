@@ -264,7 +264,7 @@ class TestCompaction(Tester):
         for i in range(200):  # ensures partition size larger than compaction_large_partition_warning_threshold_mb
             session.execute("UPDATE ks.large SET properties[%i] = '%s' WHERE userid = 'user'" % (i, get_random_word(strlen)))
 
-        ret = session.execute("SELECT properties from ks.large where userid = 'user'")
+        ret = list(session.execute("SELECT properties from ks.large where userid = 'user'"))
         assert len(ret) == 1
         self.assertEqual(200, len(ret[0][0].keys()))
 
@@ -273,7 +273,7 @@ class TestCompaction(Tester):
         node.nodetool('compact ks large')
         node.watch_log_for('Writing large partition ks/large:user \(\d+ bytes\)', from_mark=mark, timeout=180)
 
-        ret = session.execute("SELECT properties from ks.large where userid = 'user'")
+        ret = list(session.execute("SELECT properties from ks.large where userid = 'user'"))
 
         assert len(ret) == 1
         self.assertEqual(200, len(ret[0][0].keys()))

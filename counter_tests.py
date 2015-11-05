@@ -35,7 +35,7 @@ class TestCounters(Tester):
             session = sessions[i % len(nodes)]
             keys = ",".join(["'counter%i'" % c for c in xrange(0, nb_counter)])
             query = SimpleStatement("SELECT key, c FROM cf WHERE key IN (%s)" % keys, consistency_level=ConsistencyLevel.QUORUM)
-            res = session.execute(query)
+            res = list(session.execute(query))
 
             assert len(res) == nb_counter
             for c in xrange(0, nb_counter):
@@ -183,7 +183,7 @@ class TestCounters(Tester):
                 SELECT counter_one, counter_two
                 FROM counter_table WHERE id = {uuid}
                 """.format(uuid=counter_id), consistency_level=ConsistencyLevel.ALL)
-            rows = session.execute(query)
+            rows = list(session.execute(query))
 
             counter_one_actual, counter_two_actual = rows[0]
 
@@ -223,10 +223,10 @@ class TestCounters(Tester):
                 """.format(k=k, v=v))
 
         for k, v in expected_counts.items():
-            count = session.execute("""
+            count = list(session.execute("""
                 SELECT counter_one FROM counter_table
                 WHERE id = 'foo' and myuuid = {k}
-                """.format(k=k))
+                """.format(k=k)))
 
             self.assertEqual(v, count[0][0])
 
@@ -266,7 +266,7 @@ class TestCounters(Tester):
         session.execute("CREATE TABLE counter_bug (t int, c counter, primary key(t))")
 
         session.execute("UPDATE counter_bug SET c = c + 1 where t = 1")
-        row = session.execute("SELECT * from counter_bug")
+        row = list(session.execute("SELECT * from counter_bug"))
 
         self.assertEqual(rows_to_list(row)[0], [1, 1])
         self.assertEqual(len(row), 1)
