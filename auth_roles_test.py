@@ -245,7 +245,7 @@ class TestAuthRoles(Tester):
 
         cassandra.execute("DROP ROLE role1")
         cassandra.execute("DROP ROLE role2")
-        assert cassandra.execute("LIST ALL PERMISSIONS OF mike") is None
+        assert len(list(cassandra.execute("LIST ALL PERMISSIONS OF mike"))) == 0
 
     def grant_revoke_roles_test(self):
         self.prepare()
@@ -528,7 +528,7 @@ class TestAuthRoles(Tester):
                                        "LIST ALTER PERMISSION ON ROLE role1 OF role2")
         # make sure ALTER on role2 is excluded properly when OF is for another role
         cassandra.execute("CREATE ROLE role3 WITH SUPERUSER = false AND LOGIN = false")
-        assert cassandra.execute("LIST ALTER PERMISSION ON ROLE role1 OF role3") is None
+        assert len(list(cassandra.execute("LIST ALTER PERMISSION ON ROLE role1 OF role3"))) == 0
 
         # now check users can list their own permissions
         mike = self.get_session(user='mike', password='12345')
@@ -1233,4 +1233,4 @@ class TestAuthRoles(Tester):
         self.assertEqual(sorted(expected), sorted(perms))
 
     def assert_no_permissions(self, session, query):
-        assert session.execute(query) is None
+        assert len(list(session.execute(query))) == 0

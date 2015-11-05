@@ -96,7 +96,7 @@ class TestAuth(Tester):
         session.execute("CREATE USER cathy WITH PASSWORD '12345' NOSUPERUSER")
         session.execute("CREATE USER dave WITH PASSWORD '12345' SUPERUSER")
 
-        rows = session.execute("LIST USERS")
+        rows = list(session.execute("LIST USERS"))
         self.assertEqual(5, len(rows))
         # {username: isSuperuser} dict.
         users = dict([(r[0], r[1]) for r in rows])
@@ -122,18 +122,18 @@ class TestAuth(Tester):
         cassandra = self.get_session(user='cassandra', password='cassandra')
         cassandra.execute("CREATE USER cathy WITH PASSWORD '12345' NOSUPERUSER")
         cassandra.execute("CREATE USER dave WITH PASSWORD '12345' NOSUPERUSER")
-        rows = cassandra.execute("LIST USERS")
+        rows = list(cassandra.execute("LIST USERS"))
         self.assertEqual(3, len(rows))
 
         cathy = self.get_session(user='cathy', password='12345')
         self.assertUnauthorized('Only superusers are allowed to perform DROP (\[ROLE\|USER\]|USER) queries',
                                 cathy, 'DROP USER dave')
 
-        rows = cassandra.execute("LIST USERS")
+        rows = list(cassandra.execute("LIST USERS"))
         self.assertEqual(3, len(rows))
 
         cassandra.execute('DROP USER dave')
-        rows = cassandra.execute("LIST USERS")
+        rows = list(cassandra.execute("LIST USERS"))
         self.assertEqual(2, len(rows))
 
     def dropping_nonexistent_user_throws_exception_test(self):
@@ -185,19 +185,19 @@ class TestAuth(Tester):
         self.prepare()
         session = self.get_session(user='cassandra', password='cassandra')
 
-        users = session.execute("LIST USERS")
+        users = list(session.execute("LIST USERS"))
         self.assertEqual(1, len(users))  # cassandra
 
         session.execute("CREATE USER IF NOT EXISTS aleksey WITH PASSWORD 'sup'")
         session.execute("CREATE USER IF NOT EXISTS aleksey WITH PASSWORD 'ignored'")
 
-        users = session.execute("LIST USERS")
+        users = list(session.execute("LIST USERS"))
         self.assertEqual(2, len(users))  # cassandra + aleksey
 
         session.execute("DROP USER IF EXISTS aleksey")
         session.execute("DROP USER IF EXISTS aleksey")
 
-        users = session.execute("LIST USERS")
+        users = list(session.execute("LIST USERS"))
         self.assertEqual(1, len(users))  # cassandra
 
     def create_ks_auth_test(self):
@@ -354,7 +354,7 @@ class TestAuth(Tester):
                                 cathy, "SELECT * FROM ks.cf")
 
         cassandra.execute("GRANT SELECT ON ks.cf TO cathy")
-        rows = cathy.execute("SELECT * FROM ks.cf")
+        rows = list(cathy.execute("SELECT * FROM ks.cf"))
         self.assertEquals(0, len(rows))
 
         self.assertUnauthorized("User cathy has no MODIFY permission on <table ks.cf> or any of its parents",
@@ -372,15 +372,15 @@ class TestAuth(Tester):
         cassandra.execute("GRANT MODIFY ON ks.cf TO cathy")
         cathy.execute("INSERT INTO ks.cf (id, val) VALUES (0, 0)")
         cathy.execute("UPDATE ks.cf SET val = 1 WHERE id = 1")
-        rows = cathy.execute("SELECT * FROM ks.cf")
+        rows = list(cathy.execute("SELECT * FROM ks.cf"))
         self.assertEquals(2, len(rows))
 
         cathy.execute("DELETE FROM ks.cf WHERE id = 1")
-        rows = cathy.execute("SELECT * FROM ks.cf")
+        rows = list(cathy.execute("SELECT * FROM ks.cf"))
         self.assertEquals(1, len(rows))
 
-        rows = cathy.execute("TRUNCATE ks.cf")
-        assert rows is None
+        rows = list(cathy.execute("TRUNCATE ks.cf"))
+        assert len(rows) == 0
 
     def grant_revoke_auth_test(self):
         self.prepare()
@@ -502,7 +502,7 @@ class TestAuth(Tester):
         while not success and cnt < 10:
             try:
                 for c in cathys:
-                    rows = c.execute("SELECT * FROM ks.cf")
+                    rows = list(c.execute("SELECT * FROM ks.cf"))
                     self.assertEqual(0, len(rows))
                 success = True
             except Unauthorized:
