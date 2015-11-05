@@ -24,7 +24,7 @@ class TestRepair(Tester):
                 node.stop(wait_other_notice=True)
 
         session = self.patient_cql_connection(node_to_check, 'ks')
-        result = session.execute("SELECT * FROM cf LIMIT %d" % (rows * 2))
+        result = list(session.execute("SELECT * FROM cf LIMIT %d" % (rows * 2)))
         self.assertEqual(len(result), rows, len(result))
 
         for k in found:
@@ -32,7 +32,7 @@ class TestRepair(Tester):
 
         for k in missings:
             query = SimpleStatement("SELECT c1, c2 FROM cf WHERE key='k%d'" % k, consistency_level=ConsistencyLevel.ONE)
-            res = session.execute(query)
+            res = list(session.execute(query))
             self.assertEqual(len(filter(lambda x: len(x) != 0, res)), 0, res)
 
         if restart:
@@ -216,7 +216,7 @@ class TestRepair(Tester):
         for cf in ['cf1', 'cf2']:
             for i in xrange(0, 10):
                 query = SimpleStatement("SELECT c1, c2 FROM %s WHERE key='k%d'" % (cf, i), consistency_level=ConsistencyLevel.ALL)
-                res = session.execute(query)
+                res = list(ession.execute(query))
                 self.assertEqual(len(filter(lambda x: len(x) != 0, res)), 0, res)
 
         # check log for no repair happened for gcable data
