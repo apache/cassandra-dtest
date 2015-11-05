@@ -312,9 +312,7 @@ class TestMaterializedViews(Tester):
         result = list(session.execute("SELECT * FROM ks.users_by_state_birth_year WHERE state='TX' AND birth_year=1968"))
         self.assertEqual(len(result), 1, "Expecting {} users, got {}".format(1, len(result)))
 
-    def __add_dc_after_mv_test(self, rf):
-        """Test that materialized views work as expected when adding a datacenter."""
-
+    def _add_dc_after_mv_test(self, rf):
         session = self.prepare(rf=rf)
 
         debug("Creating schema")
@@ -357,10 +355,22 @@ class TestMaterializedViews(Tester):
             assert_one(session, "SELECT * FROM t_by_v WHERE v = {}".format(-i), [-i, i])
 
     def add_dc_after_mv_simple_replication_test(self):
-        self.__add_dc_after_mv_test(1)
+        """
+        @jira_ticket CASSANDRA-10634
+
+        Test that materialized views work as expected when adding a datacenter with SimpleStrategy.
+        """
+
+        self._add_dc_after_mv_test(1)
 
     def add_dc_after_mv_network_replication_test(self):
-        self.__add_dc_after_mv_test({'dc1': 1, 'dc2': 1})
+        """
+        @jira_ticket CASSANDRA-10634
+
+        Test that materialized views work as expected when adding a datacenter with NetworkTopologyStrategy.
+        """
+
+        self._add_dc_after_mv_test({'dc1': 1, 'dc2': 1})
 
 
     def add_node_after_mv_test(self):
@@ -392,8 +402,12 @@ class TestMaterializedViews(Tester):
         for i in xrange(1000, 1100):
             assert_one(session, "SELECT * FROM t_by_v WHERE v = {}".format(-i), [-i, i])
 
-    def add_survey_node_after_mv_test(self):
-        """Test that materialized views work as expected when adding a node."""
+    def add_write_survey_node_after_mv_test(self):
+        """
+        @jira_ticket CASSANDRA-10621
+
+        Test that materialized views work as expected when adding a node in write survey mode.
+        """
 
         session = self.prepare()
 
