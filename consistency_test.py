@@ -270,6 +270,7 @@ class TestAvailability(TestHelper):
             (ConsistencyLevel.QUORUM, ConsistencyLevel.QUORUM),
             (ConsistencyLevel.LOCAL_QUORUM, ConsistencyLevel.LOCAL_QUORUM),
             (ConsistencyLevel.EACH_QUORUM, ConsistencyLevel.LOCAL_QUORUM),
+            (ConsistencyLevel.LOCAL_QUORUM, ConsistencyLevel.EACH_QUORUM),
             (ConsistencyLevel.ONE, ConsistencyLevel.ONE, None, False),
             (ConsistencyLevel.ONE, ConsistencyLevel.ALL),
             (ConsistencyLevel.ALL, ConsistencyLevel.ONE),
@@ -502,6 +503,10 @@ class TestAccuracy(TestHelper):
             (ConsistencyLevel.ONE, ConsistencyLevel.ONE),
             (ConsistencyLevel.ONE, ConsistencyLevel.TWO),
             (ConsistencyLevel.TWO, ConsistencyLevel.ONE),
+            # These are multi-DC consitency levels that should default to quorum calls
+            (ConsistencyLevel.EACH_QUORUM, ConsistencyLevel.LOCAL_QUORUM),
+            (ConsistencyLevel.LOCAL_QUORUM, ConsistencyLevel.EACH_QUORUM),
+            (ConsistencyLevel.LOCAL_QUORUM, ConsistencyLevel.LOCAL_QUORUM),
             (ConsistencyLevel.QUORUM, ConsistencyLevel.SERIAL, ConsistencyLevel.SERIAL),
             (ConsistencyLevel.QUORUM, ConsistencyLevel.LOCAL_SERIAL, ConsistencyLevel.SERIAL),
         ]
@@ -519,6 +524,8 @@ class TestAccuracy(TestHelper):
         combinations = [
             (ConsistencyLevel.ALL, ConsistencyLevel.ALL),
             (ConsistencyLevel.QUORUM, ConsistencyLevel.QUORUM),
+            (ConsistencyLevel.EACH_QUORUM, ConsistencyLevel.LOCAL_QUORUM),
+            (ConsistencyLevel.LOCAL_QUORUM, ConsistencyLevel.EACH_QUORUM),
             (ConsistencyLevel.LOCAL_QUORUM, ConsistencyLevel.LOCAL_QUORUM),
             (ConsistencyLevel.ALL, ConsistencyLevel.ONE),
             (ConsistencyLevel.ONE, ConsistencyLevel.ALL),
@@ -563,6 +570,10 @@ class TestAccuracy(TestHelper):
             (ConsistencyLevel.ONE, ConsistencyLevel.ONE),
             (ConsistencyLevel.ONE, ConsistencyLevel.TWO),
             (ConsistencyLevel.TWO, ConsistencyLevel.ONE),
+            # These are multi-DC consitency levels that should default to quorum calls
+            (ConsistencyLevel.EACH_QUORUM, ConsistencyLevel.LOCAL_QUORUM),
+            (ConsistencyLevel.LOCAL_QUORUM, ConsistencyLevel.EACH_QUORUM),
+            (ConsistencyLevel.LOCAL_QUORUM, ConsistencyLevel.LOCAL_QUORUM),
         ]
 
         self.log("Testing single dc, counters")
@@ -578,6 +589,8 @@ class TestAccuracy(TestHelper):
         combinations = [
             (ConsistencyLevel.ALL, ConsistencyLevel.ALL),
             (ConsistencyLevel.QUORUM, ConsistencyLevel.QUORUM),
+            (ConsistencyLevel.EACH_QUORUM, ConsistencyLevel.LOCAL_QUORUM),
+            (ConsistencyLevel.LOCAL_QUORUM, ConsistencyLevel.EACH_QUORUM),
             (ConsistencyLevel.LOCAL_QUORUM, ConsistencyLevel.LOCAL_QUORUM),
             (ConsistencyLevel.ALL, ConsistencyLevel.ONE),
             (ConsistencyLevel.ONE, ConsistencyLevel.ALL),
