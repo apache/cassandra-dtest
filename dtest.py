@@ -20,6 +20,7 @@ from cassandra.auth import PlainTextAuthProvider
 from cassandra.cluster import Cluster as PyCluster
 from cassandra.cluster import NoHostAvailable
 from cassandra.policies import WhiteListRoundRobinPolicy, RetryPolicy
+from cassandra import ConsistencyLevel
 from nose.exc import SkipTest
 
 from ccmlib.cluster import Cluster
@@ -406,6 +407,9 @@ class Tester(TestCase):
 
         if keyspace is not None:
             session.set_keyspace(keyspace)
+
+        # override driver default consistency level of LOCAL_QUORUM
+        session.default_consistency_level = ConsistencyLevel.ONE
 
         self.connections.append(session)
         return session
