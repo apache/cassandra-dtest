@@ -5185,6 +5185,23 @@ class TestCQL(UpgradeTester):
             debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
             assert_all(cursor, "SELECT k FROM ks.test WHERE v = 0", [[0]])
 
+    def bug_10652_test(self):
+        cursor = self.prepare()
+
+        cursor.execute("CREATE KEYSPACE foo WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}")
+        cursor.execute("CREATE TABLE foo.bar (k int PRIMARY KEY, v int)")
+
+        for is_upgraded, cursor in self.do_upgrade(cursor):
+            debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
+
+            future = cursor.execute_async("INSERT INTO foo.bar(k, v) VALUES (0, 0)", trace=True)
+            future.result()
+            trace = future.get_query_trace(max_wait=120)
+
+            self.cluster.flush()
+
+            assert_one(cursor, "SELECT * FROM foo.bar", [0, 0])
+
 
 class TestCQLNodes3RF3(TestCQL):
     NODES, RF, __test__, CL = 3, 3, True, ConsistencyLevel.ALL

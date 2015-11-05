@@ -341,8 +341,10 @@ class Tester(TestCase):
             logdir = os.path.join(directory, basedir)
             os.mkdir(logdir)
             for n, log, debuglog in logs:
-                shutil.copyfile(log, os.path.join(logdir, n + ".log"))
-                shutil.copyfile(debuglog, os.path.join(logdir, n + "_debug.log"))
+                if os.path.exists(log):
+                    shutil.copyfile(log, os.path.join(logdir, n + ".log"))
+                if os.path.exists(debuglog):
+                    shutil.copyfile(debuglog, os.path.join(logdir, n + "_debug.log"))
             if os.path.exists(name):
                 os.unlink(name)
             if not is_win():
