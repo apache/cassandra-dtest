@@ -86,7 +86,7 @@ class TestCqlsh(Tester):
             insert into simple (id, value) VALUES (5, 'five')""")
 
         session = self.patient_cql_connection(node1)
-        rows = session.execute("select id, value from simple.simple")
+        rows = list(session.execute("select id, value from simple.simple"))
 
         self.assertEqual({1: 'one', 2: 'two', 3: 'three', 4: 'four', 5: 'five'},
                          {k: v for k, v in rows})
@@ -106,7 +106,7 @@ class TestCqlsh(Tester):
             insert into simpledate (id, value) VALUES (2, '1943-04-19 11:21:01+0000')""")
 
         session = self.patient_cql_connection(node1)
-        rows = session.execute("select id, value from simple.simpledate")
+        rows = list(session.execute("select id, value from simple.simpledate"))
 
         output, err = self.run_cqlsh(node1, 'use simple; SELECT * FROM simpledate')
 
@@ -117,7 +117,7 @@ class TestCqlsh(Tester):
         session = self.patient_cql_connection(node)
 
         def verify_varcharmap(map_name, expected, encode_value=False):
-            rows = session.execute((u"SELECT %s FROM testks.varcharmaptable WHERE varcharkey= '᚛᚛ᚉᚑᚅᚔᚉᚉᚔᚋ ᚔᚈᚔ ᚍᚂᚐᚅᚑ ᚅᚔᚋᚌᚓᚅᚐ᚜';" % map_name).encode("utf-8"))
+            rows = list(session.execute((u"SELECT %s FROM testks.varcharmaptable WHERE varcharkey= '᚛᚛ᚉᚑᚅᚔᚉᚉᚔᚋ ᚔᚈᚔ ᚍᚂᚐᚅᚑ ᚅᚔᚋᚌᚓᚅᚐ᚜';" % map_name).encode("utf-8")))
             if encode_value:
                 got = {k.encode("utf-8"): v.encode("utf-8") for k, v in rows[0][0].iteritems()}
             else:
@@ -1488,7 +1488,7 @@ class CqlshSmokeTest(Tester):
                                         return_output=True)
         self.assertEqual(err, "")
 
-        result = self.session.execute("SELECT key FROM ks.test")
+        result = list(self.session.execute("SELECT key FROM ks.test"))
         self.assertEqual(len(result), 1)
         self.assertEqual(len(result[0]), 1)
         self.assertIsInstance(result[0][0], UUID)
@@ -1497,7 +1497,7 @@ class CqlshSmokeTest(Tester):
                                         return_output=True)
         self.assertEqual(err, "")
 
-        result = self.session.execute("SELECT key FROM ks.test")
+        result = list(self.session.execute("SELECT key FROM ks.test"))
         self.assertEqual(len(result), 2)
         self.assertEqual(len(result[0]), 1)
         self.assertEqual(len(result[1]), 1)
@@ -1652,10 +1652,10 @@ class CqlshSmokeTest(Tester):
         def get_ks_columns():
             table = self.session.cluster.metadata.keyspaces['ks'].tables['test']
 
-            return [[table.name, column.name, column.data_type.cassname] for column in table.columns.values()]
+            return [[table.name, column.name, column.cql_type] for column in table.columns.values()]
 
         old_column_spec = [u'test', u'i',
-                           u'AsciiType']
+                           u'ascii']
         self.assertIn(old_column_spec, get_ks_columns())
 
         self.node1.run_cqlsh('ALTER TABLE ks.test ALTER i TYPE text;')
@@ -1664,7 +1664,7 @@ class CqlshSmokeTest(Tester):
         new_columns = get_ks_columns()
         self.assertNotIn(old_column_spec, new_columns)
         self.assertIn([u'test', u'i',
-                       u'UTF8Type'],
+                       u'text'],
                       new_columns)
 
     def test_use_keyspace(self):
