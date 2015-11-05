@@ -34,10 +34,9 @@ class TestAuth(Tester):
 
         self.assertEquals(3, session.cluster.metadata.keyspaces['system_auth'].replication_strategy.replication_factor)
 
-        debug("Repairing system_auth keyspace")
-        for node in self.cluster.nodelist():
-            node.repair(['-pr', 'system_auth'])
-
+        # Run repair to workaround read repair issues caused by CASSANDRA-10655
+        debug("Repairing before altering RF")
+        self.cluster.repair()
 
         # make sure schema change is persistent
         debug("Stopping cluster..")
@@ -614,17 +613,8 @@ class TestAuth(Tester):
 
         # default user setup is delayed by 10 seconds to reduce log spam
         time.sleep(10)
-        attempts = 0
-        while not self.find_in_any_log(self.cluster.nodelist(), 'Created default superuser') and attempts < 10:
-            attempts += 1
-            time.sleep(1)
-
-    def find_in_any_log(self, nodes, pattern):
-        for node in nodes:
-            found = node.grep_log(pattern)
-            if found:
-                return found
-        return None
+        n = self.wait_for_any_log(self.cluster.nodelist(), 'Created default superuser', 10)
+        debug("Default role created by " + n.name)
 
     def get_session(self, node_idx=0, user=None, password=None):
         node = self.cluster.nodelist()[node_idx]
