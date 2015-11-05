@@ -178,7 +178,7 @@ class TestReplaceAddress(Tester):
         session = self.patient_cql_connection(node1)
         stress_table = 'keyspace1.standard1' if self.cluster.version() >= '2.1' else '"Keyspace1"."Standard1"'
         query = SimpleStatement('select * from %s LIMIT 1' % stress_table, consistency_level=ConsistencyLevel.THREE)
-        initialData = session.execute(query)
+        initialData = list(session.execute(query))
 
         # stop node, query should not work with consistency 3
         debug("Stopping node 3.")
@@ -199,7 +199,7 @@ class TestReplaceAddress(Tester):
 
         # query should work again
         debug("Verifying querying works again.")
-        finalData = session.execute(query)
+        finalData = list(session.execute(query))
         self.assertListEqual(initialData, finalData)
 
         debug("Verifying tokens migrated sucessfully")
@@ -219,7 +219,7 @@ class TestReplaceAddress(Tester):
         node4.start(wait_for_binary_proto=True)
 
         debug("Verifying querying works again.")
-        finalData = session.execute(query)
+        finalData = list(session.execute(query))
         self.assertListEqual(initialData, finalData)
 
         # we redo this check because restarting node should not result in tokens being moved again, ie number should be same
@@ -242,7 +242,7 @@ class TestReplaceAddress(Tester):
         session = self.patient_cql_connection(node1)
         stress_table = 'keyspace1.standard1' if self.cluster.version() >= '2.1' else '"Keyspace1"."Standard1"'
         query = SimpleStatement('select * from %s LIMIT 1' % stress_table, consistency_level=ConsistencyLevel.THREE)
-        initialData = session.execute(query)
+        initialData = list(session.execute(query))
 
         node3.stop(gently=False)
 
@@ -269,13 +269,13 @@ class TestReplaceAddress(Tester):
 
         # check if 2nd bootstrap succeeded
         session = self.exclusive_cql_connection(node4)
-        rows = session.execute("SELECT bootstrapped FROM system.local WHERE key='local'")
+        rows = list(session.execute("SELECT bootstrapped FROM system.local WHERE key='local'"))
         assert len(rows) == 1
         assert rows[0][0] == 'COMPLETED', rows[0][0]
 
         # query should work again
         debug("Verifying querying works again.")
-        finalData = session.execute(query)
+        finalData = list(session.execute(query))
         self.assertListEqual(initialData, finalData)
 
     @since('2.2')
@@ -291,7 +291,7 @@ class TestReplaceAddress(Tester):
         session = self.patient_cql_connection(node1)
         stress_table = 'keyspace1.standard1' if self.cluster.version() >= '2.1' else '"Keyspace1"."Standard1"'
         query = SimpleStatement('select * from %s LIMIT 1' % stress_table, consistency_level=ConsistencyLevel.THREE)
-        initialData = session.execute(query)
+        initialData = list(session.execute(query))
 
         node3.stop(gently=False)
 
@@ -323,11 +323,11 @@ class TestReplaceAddress(Tester):
 
         # check if 2nd bootstrap succeeded
         session = self.exclusive_cql_connection(node4)
-        rows = session.execute("SELECT bootstrapped FROM system.local WHERE key='local'")
+        rows = list(session.execute("SELECT bootstrapped FROM system.local WHERE key='local'"))
         assert len(rows) == 1
         assert rows[0][0] == 'COMPLETED', rows[0][0]
 
         # query should work again
         debug("Verifying querying works again.")
-        finalData = session.execute(query)
+        finalData = list(session.execute(query))
         self.assertListEqual(initialData, finalData)

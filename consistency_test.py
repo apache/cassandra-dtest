@@ -629,7 +629,7 @@ class TestConsistency(Tester):
             # Query 3 firsts columns
             session = self.patient_cql_connection(node1, 'ks')
             query = SimpleStatement('SELECT c, v FROM cf WHERE key=\'k0\' LIMIT 3', consistency_level=ConsistencyLevel.QUORUM)
-            rows = session.execute(query)
+            rows = list(session.execute(query))
             res = rows
             assert len(res) == 3, 'Expecting 3 values, got %d (%s)' % (len(res), str(res))
             # value 0, 1 and 2 have been deleted
@@ -776,7 +776,7 @@ class TestConsistency(Tester):
             # Query 3 firsts columns
             session = self.patient_cql_connection(node1, 'ks')
             query = SimpleStatement('SELECT c, v FROM cf WHERE key=\'k0\' ORDER BY c DESC LIMIT 3', consistency_level=ConsistencyLevel.QUORUM)
-            rows = session.execute(query)
+            rows = list(session.execute(query))
             res = rows
             assert len(res) == 3, 'Expecting 3 values, got %d (%s)' % (len(res), str(res))
             # value 6, 7 and 8 have been deleted

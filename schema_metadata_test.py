@@ -534,7 +534,7 @@ class TestSchemaMetadata(Tester):
     def creating_and_dropping_table_test(self):
         self.session.execute("create table born_to_die (id uuid primary key, name varchar)")
         meta = self._keyspace_meta().tables['born_to_die']
-        self.assertEqual('ks', meta.keyspace.name)
+        self.assertEqual('ks', meta.keyspace_name)
         self.assertEqual('born_to_die', meta.name)
         self.assertEqual(1, len(meta.partition_key))
         self.assertEqual('id', meta.partition_key[0].name)
