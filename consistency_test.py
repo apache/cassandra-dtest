@@ -12,7 +12,7 @@ from cassandra.query import SimpleStatement
 from assertions import assert_none, assert_unavailable
 from dtest import DISABLE_VNODES, Tester, debug
 from tools import (create_c1c2_table, insert_c1c2, insert_columns, query_c1c2,
-                   rows_to_list)
+                   rows_to_list, since)
 
 
 class TestHelper(Tester):
@@ -287,6 +287,25 @@ class TestAvailability(TestHelper):
 
         self._test_simple_strategy(combinations)
 
+    @since("3.0")
+    def test_simple_strategy_each_quorum(self):
+        """
+        @jira_ticket CASSANDRA-10584
+        Test for a single datacenter, using simple replication strategy, only
+        the each quorum reads.
+        """
+        self.nodes = 3
+        self.rf = 3
+
+        self._start_cluster()
+
+        combinations = [
+            (ConsistencyLevel.LOCAL_QUORUM, ConsistencyLevel.EACH_QUORUM),
+            (ConsistencyLevel.EACH_QUORUM, ConsistencyLevel.EACH_QUORUM),
+        ]
+
+        self._test_simple_strategy(combinations)
+
     def test_network_topology_strategy(self):
         """
         Test for multiple datacenters, using network topology replication strategy.
@@ -314,6 +333,25 @@ class TestAvailability(TestHelper):
             (ConsistencyLevel.LOCAL_QUORUM, ConsistencyLevel.LOCAL_SERIAL, ConsistencyLevel.LOCAL_SERIAL),
             (ConsistencyLevel.QUORUM, ConsistencyLevel.LOCAL_SERIAL, ConsistencyLevel.SERIAL),
             (ConsistencyLevel.LOCAL_QUORUM, ConsistencyLevel.SERIAL, ConsistencyLevel.LOCAL_SERIAL),
+        ]
+
+        self._test_network_topology_strategy(combinations)
+
+    @since("3.0")
+    def test_network_topology_strategy_each_quorum(self):
+        """
+        @jira_ticket CASSANDRA-10584
+        Test for a single datacenter, using network topology strategy, only
+        the each quorum reads.
+        """
+        self.nodes = [3, 3, 3]
+        self.rf = OrderedDict([('dc1', 3), ('dc2', 3), ('dc3', 3)])
+
+        self._start_cluster()
+
+        combinations = [
+            (ConsistencyLevel.LOCAL_QUORUM, ConsistencyLevel.EACH_QUORUM),
+            (ConsistencyLevel.EACH_QUORUM, ConsistencyLevel.EACH_QUORUM),
         ]
 
         self._test_network_topology_strategy(combinations)
@@ -482,7 +520,7 @@ class TestAccuracy(TestHelper):
 
     def test_simple_strategy_users(self):
         """
-        Test for a single datacenter, users table.
+        Test for a single datacenter, users table, only the each quorum reads.
         """
         self.nodes = 5
         self.rf = 3
@@ -501,11 +539,31 @@ class TestAccuracy(TestHelper):
             (ConsistencyLevel.ONE, ConsistencyLevel.ONE),
             (ConsistencyLevel.ONE, ConsistencyLevel.TWO),
             (ConsistencyLevel.TWO, ConsistencyLevel.ONE),
+            # These are multi-DC consitency levels that should default to quorum calls
+            (ConsistencyLevel.EACH_QUORUM, ConsistencyLevel.LOCAL_QUORUM),
+            (ConsistencyLevel.LOCAL_QUORUM, ConsistencyLevel.LOCAL_QUORUM),
             (ConsistencyLevel.QUORUM, ConsistencyLevel.SERIAL, ConsistencyLevel.SERIAL),
             (ConsistencyLevel.QUORUM, ConsistencyLevel.LOCAL_SERIAL, ConsistencyLevel.SERIAL),
         ]
 
         self.log("Testing single dc, users")
+        self._run_test_function_in_parallel(TestAccuracy.Validation.validate_users, [self.nodes], [self.rf], combinations)
+
+    @since("3.0")
+    def test_simple_strategy_each_quorum_users(self):
+        """
+        @jira_ticket CASSANDRA-10584
+        Test for a single datacenter, users table, only the each quorum reads.
+        """
+        self.nodes = 5
+        self.rf = 3
+
+        combinations = [
+            (ConsistencyLevel.LOCAL_QUORUM, ConsistencyLevel.EACH_QUORUM),
+            (ConsistencyLevel.EACH_QUORUM, ConsistencyLevel.EACH_QUORUM),
+        ]
+
+        self.log("Testing single dc, users, each quorum reads")
         self._run_test_function_in_parallel(TestAccuracy.Validation.validate_users, [self.nodes], [self.rf], combinations)
 
     def test_network_topology_strategy_users(self):
@@ -518,6 +576,7 @@ class TestAccuracy(TestHelper):
         combinations = [
             (ConsistencyLevel.ALL, ConsistencyLevel.ALL),
             (ConsistencyLevel.QUORUM, ConsistencyLevel.QUORUM),
+            (ConsistencyLevel.EACH_QUORUM, ConsistencyLevel.LOCAL_QUORUM),
             (ConsistencyLevel.LOCAL_QUORUM, ConsistencyLevel.LOCAL_QUORUM),
             (ConsistencyLevel.ALL, ConsistencyLevel.ONE),
             (ConsistencyLevel.ONE, ConsistencyLevel.ALL),
@@ -542,6 +601,24 @@ class TestAccuracy(TestHelper):
         self.log("Testing multiple dcs, users")
         self._run_test_function_in_parallel(TestAccuracy.Validation.validate_users, self.nodes, self.rf.values(), combinations),
 
+    @since("3.0")
+    def test_network_topology_strategy_each_quorum_users(self):
+        """
+        @jira_ticket CASSANDRA-10584
+        Test for a multiple datacenters, users table, only the each quorum
+        reads.
+        """
+        self.nodes = [3, 3]
+        self.rf = OrderedDict([('dc1', 3), ('dc2', 3)])
+
+        combinations = [
+            (ConsistencyLevel.LOCAL_QUORUM, ConsistencyLevel.EACH_QUORUM),
+            (ConsistencyLevel.EACH_QUORUM, ConsistencyLevel.EACH_QUORUM),
+        ]
+
+        self.log("Testing multiple dcs, users, each quorum reads")
+        self._run_test_function_in_parallel(TestAccuracy.Validation.validate_users, self.nodes, self.rf.values(), combinations)
+
     def test_simple_strategy_counters(self):
         """
         Test for a single datacenter, counters table.
@@ -562,9 +639,30 @@ class TestAccuracy(TestHelper):
             (ConsistencyLevel.ONE, ConsistencyLevel.ONE),
             (ConsistencyLevel.ONE, ConsistencyLevel.TWO),
             (ConsistencyLevel.TWO, ConsistencyLevel.ONE),
+            # These are multi-DC consitency levels that should default to quorum calls
+            (ConsistencyLevel.EACH_QUORUM, ConsistencyLevel.LOCAL_QUORUM),
+            (ConsistencyLevel.LOCAL_QUORUM, ConsistencyLevel.LOCAL_QUORUM),
         ]
 
         self.log("Testing single dc, counters")
+        self._run_test_function_in_parallel(TestAccuracy.Validation.validate_counters, [self.nodes], [self.rf], combinations)
+
+    @since("3.0")
+    def test_simple_strategy_each_quorum_counters(self):
+        """
+        @jira_ticket CASSANDRA-10584
+        Test for a single datacenter, counters table, only the each quorum
+        reads.
+        """
+        self.nodes = 3
+        self.rf = 3
+
+        combinations = [
+            (ConsistencyLevel.LOCAL_QUORUM, ConsistencyLevel.EACH_QUORUM),
+            (ConsistencyLevel.EACH_QUORUM, ConsistencyLevel.EACH_QUORUM),
+        ]
+
+        self.log("Testing single dc, counters, each quorum reads")
         self._run_test_function_in_parallel(TestAccuracy.Validation.validate_counters, [self.nodes], [self.rf], combinations)
 
     def test_network_topology_strategy_counters(self):
@@ -577,6 +675,7 @@ class TestAccuracy(TestHelper):
         combinations = [
             (ConsistencyLevel.ALL, ConsistencyLevel.ALL),
             (ConsistencyLevel.QUORUM, ConsistencyLevel.QUORUM),
+            (ConsistencyLevel.EACH_QUORUM, ConsistencyLevel.LOCAL_QUORUM),
             (ConsistencyLevel.LOCAL_QUORUM, ConsistencyLevel.LOCAL_QUORUM),
             (ConsistencyLevel.ALL, ConsistencyLevel.ONE),
             (ConsistencyLevel.ONE, ConsistencyLevel.ALL),
@@ -594,6 +693,24 @@ class TestAccuracy(TestHelper):
         ]
 
         self.log("Testing multiple dcs, counters")
+        self._run_test_function_in_parallel(TestAccuracy.Validation.validate_counters, self.nodes, self.rf.values(), combinations),
+
+    @since("3.0")
+    def test_network_topology_strategy_each_quorum_counters(self):
+        """
+        @jira_ticket CASSANDRA-10584
+        Test for multiple datacenters, counters table, only the each quorum
+        reads.
+        """
+        self.nodes = [3, 3]
+        self.rf = OrderedDict([('dc1', 3), ('dc2', 3)])
+
+        combinations = [
+            (ConsistencyLevel.LOCAL_QUORUM, ConsistencyLevel.EACH_QUORUM),
+            (ConsistencyLevel.EACH_QUORUM, ConsistencyLevel.EACH_QUORUM),
+        ]
+
+        self.log("Testing multiple dcs, counters, each quorum reads")
         self._run_test_function_in_parallel(TestAccuracy.Validation.validate_counters, self.nodes, self.rf.values(), combinations),
 
 
