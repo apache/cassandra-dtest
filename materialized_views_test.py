@@ -309,7 +309,7 @@ class TestMaterializedViews(Tester):
         result = list(session.execute("SELECT * FROM ks.users_by_state_birth_year WHERE state='TX'"))
         self.assertEqual(len(result), 2, "Expecting {} users, got {}".format(2, len(result)))
 
-        result = session.execute("SELECT * FROM ks.users_by_state_birth_year WHERE state='TX' AND birth_year=1968")
+        result = list(session.execute("SELECT * FROM ks.users_by_state_birth_year WHERE state='TX' AND birth_year=1968"))
         self.assertEqual(len(result), 1, "Expecting {} users, got {}".format(1, len(result)))
 
     def add_dc_after_mv_test(self):
@@ -402,7 +402,7 @@ class TestMaterializedViews(Tester):
         for i in xrange(1000):
             assert_one(session, "SELECT * FROM t_by_v WHERE v = {v}".format(v=i), [i, i, 'a', 3.0])
 
-        rows = session.execute("SELECT * FROM t_by_v2 WHERE v2 = 'a'")
+        rows = list(session.execute("SELECT * FROM t_by_v2 WHERE v2 = 'a'"))
         self.assertEqual(len(rows), 1000, "Expected 1000 rows but got {}".format(len(rows)))
 
         assert_invalid(session, "SELECT * FROM t_by_v WHERE v = 1 AND v2 = 'a'")
@@ -450,7 +450,7 @@ class TestMaterializedViews(Tester):
 
         time.sleep(20)
 
-        rows = session.execute("SELECT * FROM t_by_v2")
+        rows = list(session.execute("SELECT * FROM t_by_v2"))
         self.assertEqual(len(rows), 0, "Expected 0 rows but got {}".format(len(rows)))
 
     def query_all_new_column_test(self):
@@ -471,7 +471,7 @@ class TestMaterializedViews(Tester):
 
         session.execute("ALTER TABLE users ADD first_name varchar;")
 
-        results = session.execute("SELECT * FROM users_by_state WHERE state = 'TX' AND username = 'user1'")
+        results = list(session.execute("SELECT * FROM users_by_state WHERE state = 'TX' AND username = 'user1'"))
         self.assertEqual(len(results), 1)
         self.assertTrue(hasattr(results[0], 'first_name'), 'Column "first_name" not found')
         assert_one(
@@ -559,7 +559,7 @@ class TestMaterializedViews(Tester):
         self._replay_batchlogs()
 
         debug("Verify that only the 10 first rows changed.")
-        results = session.execute("SELECT * FROM t_by_v;")
+        results = list(session.execute("SELECT * FROM t_by_v;"))
         self.assertEqual(len(results), 1000)
         for i in xrange(1000):
             v = i + 2000 if i < 10 else i

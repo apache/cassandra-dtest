@@ -182,10 +182,10 @@ class TestScrubIndexes(TestHelper):
         session.execute("DELETE FROM users where KEY = 'user7'")
 
     def query_users(self, session):
-        ret = session.execute("SELECT * FROM users")
-        ret.extend(session.execute("SELECT * FROM users WHERE state='TX'"))
-        ret.extend(session.execute("SELECT * FROM users WHERE gender='f'"))
-        ret.extend(session.execute("SELECT * FROM users WHERE birth_year=1978"))
+        ret = list(session.execute("SELECT * FROM users"))
+        ret.extend(list(session.execute("SELECT * FROM users WHERE state='TX'")))
+        ret.extend(list(session.execute("SELECT * FROM users WHERE gender='f'")))
+        ret.extend(list(session.execute("SELECT * FROM users WHERE birth_year=1978")))
         assert len(ret) == 8
         return ret
 
@@ -282,7 +282,7 @@ class TestScrubIndexes(TestHelper):
         self.increase_sstable_generations(initial_sstables)
         self.assertEqual(initial_sstables, scrubbed_sstables)
 
-        users = session.execute(("SELECT * from users where uuids contains {some_uuid}").format(some_uuid=_id))
+        users = list(session.execute(("SELECT * from users where uuids contains {some_uuid}").format(some_uuid=_id)))
         self.assertEqual(initial_users, users)
 
         scrubbed_sstables = self.scrub('users', 'user_uuids_idx')
@@ -290,7 +290,7 @@ class TestScrubIndexes(TestHelper):
         self.increase_sstable_generations(initial_sstables)
         self.assertEqual(initial_sstables, scrubbed_sstables)
 
-        users = session.execute(("SELECT * from users where uuids contains {some_uuid}").format(some_uuid=_id))
+        users = list(session.execute(("SELECT * from users where uuids contains {some_uuid}").format(some_uuid=_id)))
 
         self.assertListEqual(initial_users, users)
 

@@ -470,7 +470,7 @@ def verify_basic_datatype_table(created_on_version, current_version, keyspace, s
     assert_equal('b', meta.primary_key[0].name)
 
     assert_equal('ascii', meta.columns['a'].cql_type)
-    assert_equal('long', meta.columns['b'].cql_type)
+    assert_equal('bigint', meta.columns['b'].cql_type)
     assert_equal('blob', meta.columns['c'].cql_type)
     assert_equal('boolean', meta.columns['d'].cql_type)
     assert_equal('decimal', meta.columns['e'].cql_type)

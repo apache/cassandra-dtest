@@ -291,7 +291,7 @@ class TestSecondaryIndexes(Tester):
             time.sleep(1)
 
         stmt = session.prepare('select * from standard1 where "C0" = ?')
-        self.assertEqual(1, len(session.execute(stmt, [lookup_value])))
+        self.assertEqual(1, len(list(session.execute(stmt, [lookup_value]))))
         base_tbl_dir = os.path.dirname(node1.get_sstablespath(keyspace="keyspace1", tables=["standard1"])[0])
         index_sstables_dir = os.path.join(base_tbl_dir, '.ix_c0')
 
