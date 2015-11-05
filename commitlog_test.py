@@ -366,7 +366,7 @@ class TestCommitLog(Tester):
         for i in range(10):
             cursor.execute("INSERT INTO ks.tbl (k, v) VALUES ({0}, {0})".format(i))
 
-        results = cursor.execute("SELECT * FROM ks.tbl")
+        results = list(cursor.execute("SELECT * FROM ks.tbl"))
         self.assertEqual(len(results), 10)
 
         # with the commitlog_sync_period_in_ms set to 1000,

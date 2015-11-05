@@ -2,7 +2,6 @@ import re
 
 from nose.tools import assert_equal, assert_in, assert_is_not_none
 
-from cassandra import cqltypes
 from dtest import Tester, debug
 from tools import since
 
@@ -296,8 +295,8 @@ def verify_uda(created_on_version, current_version, keyspace, session, table_nam
 
     aggr_meta = session.cluster.metadata.keyspaces[keyspace].aggregates[aggregate_name + "(int)"]
     assert_equal(function_name, aggr_meta.state_func)
-    assert_equal(cqltypes.Int32Type, aggr_meta.state_type)
-    assert_equal(cqltypes.Int32Type, aggr_meta.return_type)
+    assert_equal('int', aggr_meta.state_type)
+    assert_equal('int', aggr_meta.return_type)
 
 
 def establish_udf(version, session, table_name_prefix=""):
@@ -316,7 +315,7 @@ def verify_udf(created_on_version, current_version, keyspace, session, table_nam
     assert_in(function_name + "(double)", session.cluster.metadata.keyspaces[keyspace].functions.keys())
     meta = session.cluster.metadata.keyspaces[keyspace].functions[function_name + "(double)"]
     assert_equal('java', meta.language)
-    assert_equal(cqltypes.DoubleType, meta.return_type)
+    assert_equal('double', meta.return_type)
     assert_equal(['double'], meta.type_signature)
     assert_equal(['input'], meta.argument_names)
     assert_equal('return Double.valueOf(Math.log(input.doubleValue()));', meta.body)
@@ -342,11 +341,11 @@ def verify_udt_table(created_on_version, current_version, keyspace, session, tab
 
     assert_equal(meta.field_names, ['street', 'city', 'zip'])
     assert_equal('street', meta.field_names[0])
-    assert_equal(cqltypes.UTF8Type, meta.field_types[0])
+    assert_equal('text', meta.field_types[0])
     assert_equal('city', meta.field_names[1])
-    assert_equal(cqltypes.UTF8Type, meta.field_types[1])
+    assert_equal('text', meta.field_types[1])
     assert_equal('zip', meta.field_names[2])
-    assert_equal(cqltypes.Int32Type, meta.field_types[2])
+    assert_equal('int', meta.field_types[2])
 
 
 def establish_static_column_table(version, session, table_name_prefix=""):
@@ -369,13 +368,13 @@ def verify_static_column_table(created_on_version, current_version, keyspace, se
     table_name = _table_name_builder(table_name_prefix, "test_static_column")
     meta = session.cluster.metadata.keyspaces[keyspace].tables[table_name]
     assert_equal(4, len(meta.columns))
-    assert_equal(cqltypes.UTF8Type, meta.columns['user'].data_type)
+    assert_equal('text', meta.columns['user'].data_type)
     assert_equal(False, meta.columns['user'].is_static)
-    assert_equal(cqltypes.Int32Type, meta.columns['balance'].data_type)
+    assert_equal('int', meta.columns['balance'].data_type)
     assert_equal(True, meta.columns['balance'].is_static)
-    assert_equal(cqltypes.Int32Type, meta.columns['expense_id'].data_type)
+    assert_equal('int', meta.columns['expense_id'].data_type)
     assert_equal(False, meta.columns['expense_id'].is_static)
-    assert_equal(cqltypes.Int32Type, meta.columns['amount'].data_type)
+    assert_equal('int', meta.columns['amount'].data_type)
     assert_equal(False, meta.columns['amount'].is_static)
 
 
@@ -405,17 +404,6 @@ def establish_collection_datatype_table(version, session, table_name_prefix=""):
     session.execute(cql.format(table_name))
 
 
-def _validate_collection_column(collection_type, param_type, column, frozen=False):
-    meta_type = collection_type.apply_parameters(param_type)
-    if frozen:
-        meta_type = cqltypes.FrozenType.apply_parameters([meta_type])
-
-    # Only checking the class name since the package doesn't matter
-    expected = str(meta_type).split('.')[-1]
-    actual = str(column.data_type).split('.')[-1]
-    assert_equal(expected, actual, "column {0} invalid; exp: {1}, got: {2}".format(column.name, expected, actual))
-
-
 def verify_collection_datatype_table(created_on_version, current_version, keyspace, session, table_name_prefix=""):
     table_name = _table_name_builder(table_name_prefix, "test_collection_datatypes")
     meta = session.cluster.metadata.keyspaces[keyspace].tables[table_name]
@@ -424,24 +412,20 @@ def verify_collection_datatype_table(created_on_version, current_version, keyspa
     else:
         assert_equal(7, len(meta.columns))
 
-    validations = [
-        (cqltypes.ListType, [cqltypes.Int32Type], meta.columns['a']),
-        (cqltypes.ListType, [cqltypes.UTF8Type], meta.columns['b']),
-        (cqltypes.SetType, [cqltypes.Int32Type], meta.columns['c']),
-        (cqltypes.SetType, [cqltypes.UTF8Type], meta.columns['d']),
-        (cqltypes.MapType, [cqltypes.UTF8Type, cqltypes.UTF8Type], meta.columns['e']),
-        (cqltypes.MapType, [cqltypes.UTF8Type, cqltypes.Int32Type], meta.columns['f'])
-    ]
-    if created_on_version > '2.1':
-        validations.append((cqltypes.ListType, [cqltypes.Int32Type], meta.columns['g'], True))
-        validations.append((cqltypes.ListType, [cqltypes.UTF8Type], meta.columns['h'], True))
-        validations.append((cqltypes.SetType, [cqltypes.Int32Type], meta.columns['i'], True))
-        validations.append((cqltypes.SetType, [cqltypes.UTF8Type], meta.columns['j'], True))
-        validations.append((cqltypes.MapType, [cqltypes.UTF8Type, cqltypes.UTF8Type], meta.columns['k'], True))
-        validations.append((cqltypes.MapType, [cqltypes.UTF8Type, cqltypes.Int32Type], meta.columns['l'], True))
+    assert_equal('list<int>', meta.columns['a'].data_type)
+    assert_equal('list<text>', meta.columns['b'].data_type)
+    assert_equal('set<int>', meta.columns['c'].data_type)
+    assert_equal('set<text>', meta.columns['d'].data_type)
+    assert_equal('map<text, text>', meta.columns['e'].data_type)
+    assert_equal('map<text, int>', meta.columns['f'].data_type)
 
-    for validation in validations:
-        _validate_collection_column(*validation)
+    if created_on_version > '2.1':
+        assert_equal('frozen<list<int>>', meta.columns['g'].data_type)
+        assert_equal('frozen<list<text>>', meta.columns['h'].data_type)
+        assert_equal('frozen<set<int>>', meta.columns['i'].data_type)
+        assert_equal('frozen<set<text>>', meta.columns['j'].data_type)
+        assert_equal('frozen<map<text, text>>', meta.columns['k'].data_type)
+        assert_equal('frozen<map<text, int>>', meta.columns['l'].data_type)
 
 
 def establish_basic_datatype_table(version, session, table_name_prefix=""):
@@ -485,29 +469,26 @@ def verify_basic_datatype_table(created_on_version, current_version, keyspace, s
     assert_equal(1, len(meta.primary_key))
     assert_equal('b', meta.primary_key[0].name)
 
-    assert_equal(cqltypes.AsciiType, meta.columns['a'].data_type)
-    assert_equal(cqltypes.LongType, meta.columns['b'].data_type)
-    assert_equal(cqltypes.BytesType, meta.columns['c'].data_type)
-    assert_equal(cqltypes.BooleanType, meta.columns['d'].data_type)
-    assert_equal(cqltypes.DecimalType, meta.columns['e'].data_type)
-    assert_equal(cqltypes.DoubleType, meta.columns['f'].data_type)
-    assert_equal(cqltypes.FloatType, meta.columns['g'].data_type)
-    assert_equal(cqltypes.InetAddressType, meta.columns['h'].data_type)
-    assert_equal(cqltypes.Int32Type, meta.columns['i'].data_type)
-    assert_equal(cqltypes.UTF8Type, meta.columns['j'].data_type)
-    if created_on_version < '2.0':
-        assert_equal(cqltypes.DateType, meta.columns['k'].data_type)
-    else:
-        assert_equal(cqltypes.TimestampType, meta.columns['k'].data_type)
-    assert_equal(cqltypes.TimeUUIDType, meta.columns['l'].data_type)
-    assert_equal(cqltypes.UUIDType, meta.columns['m'].data_type)
-    assert_equal(cqltypes.UTF8Type, meta.columns['n'].data_type)
-    assert_equal(cqltypes.IntegerType, meta.columns['o'].data_type)
+    assert_equal('ascii', meta.columns['a'].data_type)
+    assert_equal('long', meta.columns['b'].data_type)
+    assert_equal('blob', meta.columns['c'].data_type)
+    assert_equal('boolean', meta.columns['d'].data_type)
+    assert_equal('decimal', meta.columns['e'].data_type)
+    assert_equal('double', meta.columns['f'].data_type)
+    assert_equal('float', meta.columns['g'].data_type)
+    assert_equal('inet', meta.columns['h'].data_type)
+    assert_equal('int', meta.columns['i'].data_type)
+    assert_equal('text', meta.columns['j'].data_type)
+    assert_equal('timestamp', meta.columns['k'].data_type)
+    assert_equal('timeuuid', meta.columns['l'].data_type)
+    assert_equal('uuid', meta.columns['m'].data_type)
+    assert_equal('text', meta.columns['n'].data_type)
+    assert_equal('varint', meta.columns['o'].data_type)
     if created_on_version > '2.2':
-        assert_equal(cqltypes.SimpleDateType, meta.columns['p'].data_type)
-        assert_equal(cqltypes.ShortType, meta.columns['q'].data_type)
-        assert_equal(cqltypes.TimeType, meta.columns['r'].data_type)
-        assert_equal(cqltypes.ByteType, meta.columns['s'].data_type)
+        assert_equal('date', meta.columns['p'].data_type)
+        assert_equal('smallint', meta.columns['q'].data_type)
+        assert_equal('time', meta.columns['r'].data_type)
+        assert_equal('tinyint', meta.columns['s'].data_type)
 
 
 def _table_name_builder(prefix, table_name):
@@ -559,9 +540,9 @@ class TestSchemaMetadata(Tester):
         self.assertEqual('id', meta.partition_key[0].name)
         self.assertEqual(2, len(meta.columns))
         self.assertIsNotNone(meta.columns.get('id'))
-        self.assertEqual(cqltypes.UUIDType, meta.columns['id'].data_type)
+        self.assertEqual('uuid', meta.columns['id'].data_type)
         self.assertIsNotNone(meta.columns.get('name'))
-        self.assertEqual(cqltypes.UTF8Type, meta.columns['name'].data_type)
+        self.assertEqual('text', meta.columns['name'].data_type)
         self.assertEqual(0, len(meta.clustering_key))
         self.assertEqual(0, len(meta.triggers))
         self.assertEqual(0, len(meta.indexes))
@@ -624,7 +605,7 @@ class TestSchemaMetadata(Tester):
         self.assertEqual('wasteful_function', udf_meta.name)
         self.assertEqual(['double'], udf_meta.type_signature)
         self.assertEqual(['input'], udf_meta.argument_names)
-        self.assertEqual(cqltypes.DoubleType, udf_meta.return_type)
+        self.assertEqual('double', udf_meta.return_type)
         self.assertEqual('java', udf_meta.language)
         self.assertEqual('return Double.valueOf(Math.log(input.doubleValue()));', udf_meta.body)
         self.assertTrue(udf_meta.called_on_null_input)

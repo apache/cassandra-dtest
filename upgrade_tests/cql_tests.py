@@ -1063,7 +1063,7 @@ class TestCQL(UpgradeTester):
             assert len(inOrder) == c, 'Expecting %d elements, got %d' % (c, len(inOrder))
 
             min_token = -2 ** 63
-            res = cursor.execute("SELECT k FROM test WHERE token(k) >= %d" % min_token)
+            res = list(cursor.execute("SELECT k FROM test WHERE token(k) >= %d" % min_token))
             assert len(res) == c, "%s [all: %s]" % (str(res), str(inOrder))
 
             # assert_invalid(cursor, "SELECT k FROM test WHERE token(k) >= 0")
@@ -1311,7 +1311,7 @@ class TestCQL(UpgradeTester):
             cursor.execute(q % (0, 1, 0, 3, 3))
 
             cursor.execute("DELETE FROM test WHERE k = 0 AND c1 = 0 AND c2 = 0")
-            res = cursor.execute("SELECT * FROM test")
+            res = list(cursor.execute("SELECT * FROM test"))
             assert len(res) == 3, res
 
     def range_query_2ndary_test(self):
@@ -2394,7 +2394,7 @@ class TestCQL(UpgradeTester):
             for i in random.sample(xrange(nb_keys), nb_deletes):
                 cursor.execute("DELETE FROM test WHERE k = %d" % i)
 
-            res = cursor.execute("SELECT * FROM test LIMIT %d" % (nb_keys / 2))
+            res = list(cursor.execute("SELECT * FROM test LIMIT %d" % (nb_keys / 2)))
             assert len(res) == nb_keys / 2, "Expected %d but got %d" % (nb_keys / 2, len(res))
 
     def collection_function_test(self):
@@ -2484,39 +2484,39 @@ class TestCQL(UpgradeTester):
             for d in data:
                 cursor.execute("INSERT INTO zipcodes (group, zipcode, state, fips_regions, city) VALUES ('%s', '%s', '%s', %i, '%s')" % d)
 
-            res = cursor.execute("select zipcode from zipcodes")
+            res = list(cursor.execute("select zipcode from zipcodes"))
             assert len(res) == 16, res
 
-            res = cursor.execute("select zipcode from zipcodes where group='test'")
+            res = list(cursor.execute("select zipcode from zipcodes where group='test'"))
             assert len(res) == 8, res
 
             assert_invalid(cursor, "select zipcode from zipcodes where zipcode='06902'")
 
-            res = cursor.execute("select zipcode from zipcodes where zipcode='06902' ALLOW FILTERING")
+            res = list(cursor.execute("select zipcode from zipcodes where zipcode='06902' ALLOW FILTERING"))
             assert len(res) == 2, res
 
-            res = cursor.execute("select zipcode from zipcodes where group='test' and zipcode='06902'")
+            res = list(cursor.execute("select zipcode from zipcodes where group='test' and zipcode='06902'"))
             assert len(res) == 1, res
 
             if is_upgraded:
                 # the coordinator is the upgraded 2.2+ node
 
-                res = cursor.execute("select zipcode from zipcodes where group='test' and zipcode IN ('06902','73301','94102')")
+                res = list(cursor.execute("select zipcode from zipcodes where group='test' and zipcode IN ('06902','73301','94102')"))
                 assert len(res) == 3, res
 
-                res = cursor.execute("select zipcode from zipcodes where group='test' AND zipcode IN ('06902','73301','94102') and state IN ('CT','CA')")
+                res = list(cursor.execute("select zipcode from zipcodes where group='test' AND zipcode IN ('06902','73301','94102') and state IN ('CT','CA')"))
                 assert len(res) == 2, res
 
-                res = cursor.execute("select zipcode from zipcodes where group='test' AND zipcode IN ('06902','73301','94102') and state IN ('CT','CA') and fips_regions = 9")
+                res = list(cursor.execute("select zipcode from zipcodes where group='test' AND zipcode IN ('06902','73301','94102') and state IN ('CT','CA') and fips_regions = 9"))
                 assert len(res) == 1, res
 
-                res = cursor.execute("select zipcode from zipcodes where group='test' AND zipcode IN ('06902','73301','94102') and state IN ('CT','CA') ORDER BY zipcode DESC")
+                res = list(cursor.execute("select zipcode from zipcodes where group='test' AND zipcode IN ('06902','73301','94102') and state IN ('CT','CA') ORDER BY zipcode DESC"))
                 assert len(res) == 2, res
 
-                res = cursor.execute("select zipcode from zipcodes where group='test' AND zipcode IN ('06902','73301','94102') and state IN ('CT','CA') and fips_regions > 0")
+                res = list(cursor.execute("select zipcode from zipcodes where group='test' AND zipcode IN ('06902','73301','94102') and state IN ('CT','CA') and fips_regions > 0"))
                 assert len(res) == 2, res
 
-                res = cursor.execute("select zipcode from zipcodes where group='test' AND zipcode IN ('06902','73301','94102') and state IN ('CT','CA') and fips_regions < 0")
+                res = list(cursor.execute("select zipcode from zipcodes where group='test' AND zipcode IN ('06902','73301','94102') and state IN ('CT','CA') and fips_regions < 0"))
                 assert len(res) == 0, res
 
     @since('2.2')

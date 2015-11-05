@@ -260,8 +260,8 @@ class TestMaterializedViews(Tester):
 
         session = self.prepare(user_table=True)
 
-        result = session.execute(("SELECT * FROM system_schema.views "
-                                  "WHERE keyspace_name='ks' AND base_table_name='users' ALLOW FILTERING"))
+        result = list(session.execute(("SELECT * FROM system_schema.views "
+                                       "WHERE keyspace_name='ks' AND base_table_name='users' ALLOW FILTERING")))
         self.assertEqual(
             len(result), 1,
             "Expecting {} materialized view, got {}".format(1, len(result))
@@ -273,8 +273,8 @@ class TestMaterializedViews(Tester):
             "Cannot drop table when materialized views still depend on it"
         )
 
-        result = session.execute(("SELECT * FROM system_schema.views "
-                                  "WHERE keyspace_name='ks' AND base_table_name='users' ALLOW FILTERING"))
+        result = list(session.execute(("SELECT * FROM system_schema.views "
+                                       "WHERE keyspace_name='ks' AND base_table_name='users' ALLOW FILTERING")))
         self.assertEqual(
             len(result), 1,
             "Expecting {} materialized view, got {}".format(1, len(result))
@@ -283,8 +283,8 @@ class TestMaterializedViews(Tester):
         session.execute("DROP MATERIALIZED VIEW ks.users_by_state;")
         session.execute("DROP TABLE ks.users;")
 
-        result = session.execute(("SELECT * FROM system_schema.views "
-                                  "WHERE keyspace_name='ks' AND base_table_name='users' ALLOW FILTERING"))
+        result = list(session.execute(("SELECT * FROM system_schema.views "
+                                       "WHERE keyspace_name='ks' AND base_table_name='users' ALLOW FILTERING")))
         self.assertEqual(
             len(result), 0,
             "Expecting {} materialized view, got {}".format(1, len(result))

@@ -431,7 +431,7 @@ class TestAuth(Tester):
 
         cathy = self.get_session(user='cathy', password='12345')
         cathy.execute("INSERT INTO ks.cf (id, val) VALUES (0, 0)")
-        rows = cathy.execute("SELECT * FROM ks.cf")
+        rows = list(cathy.execute("SELECT * FROM ks.cf"))
         self.assertEquals(1, len(rows))
 
         # drop and recreate the user, make sure permissions are gone
@@ -447,7 +447,7 @@ class TestAuth(Tester):
         # grant all the permissions back
         cassandra.execute("GRANT ALL ON ks.cf TO cathy")
         cathy.execute("INSERT INTO ks.cf (id, val) VALUES (0, 0)")
-        rows = cathy.execute("SELECT * FROM ks.cf")
+        rows = list(cathy.execute("SELECT * FROM ks.cf"))
         self.assertEqual(1, len(rows))
 
         # drop and recreate the keyspace, make sure permissions are gone
