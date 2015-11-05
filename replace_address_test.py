@@ -75,7 +75,7 @@ class TestReplaceAddress(Tester):
         session.default_timeout = 45
         stress_table = 'keyspace1.standard1' if self.cluster.version() >= '2.1' else '"Keyspace1"."Standard1"'
         query = SimpleStatement('select * from %s LIMIT 1' % stress_table, consistency_level=ConsistencyLevel.THREE)
-        initialData = session.execute(query)
+        initialData = list(session.execute(query))
 
         # stop node, query should not work with consistency 3
         debug("Stopping node 3.")
@@ -99,7 +99,7 @@ class TestReplaceAddress(Tester):
         # query should work again
         debug("Verifying querying works again.")
         query = SimpleStatement('select * from %s LIMIT 1' % stress_table, consistency_level=ConsistencyLevel.THREE)
-        finalData = session.execute(query)
+        finalData = list(session.execute(query))
         self.assertListEqual(initialData, finalData)
 
         debug("Verifying tokens migrated sucessfully")

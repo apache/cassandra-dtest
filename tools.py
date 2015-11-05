@@ -43,7 +43,7 @@ def insert_c1c2(session, keys=None, n=None, consistency=ConsistencyLevel.QUORUM)
 
 def query_c1c2(session, key, consistency=ConsistencyLevel.QUORUM, tolerate_missing=False, must_be_missing=False):
     query = SimpleStatement('SELECT c1, c2 FROM cf WHERE key=\'k%d\'' % key, consistency_level=consistency)
-    rows = session.execute(query)
+    rows = list(session.execute(query))
     if not tolerate_missing:
         assert len(rows) == 1
         res = rows[0]
@@ -77,7 +77,7 @@ def insert_columns(tester, session, key, columns_count, consistency=ConsistencyL
 
 def query_columns(tester, session, key, columns_count, consistency=ConsistencyLevel.QUORUM, offset=0):
     query = SimpleStatement('SELECT c, v FROM cf WHERE key=\'k%s\' AND c >= \'c%06d\' AND c <= \'c%06d\'' % (key, offset, columns_count + offset - 1), consistency_level=consistency)
-    res = session.execute(query)
+    res = list(session.execute(query))
     assert len(res) == columns_count, "%s != %s (%s-%s)" % (len(res), columns_count, offset, columns_count + offset - 1)
     for i in xrange(0, columns_count):
         assert res[i][1] == 'value%d' % (i + offset)
@@ -116,7 +116,7 @@ def putget(cluster, session, cl=ConsistencyLevel.QUORUM):
     # _validate_row(cluster, session)
     # slice reads
     query = SimpleStatement('SELECT * FROM cf WHERE key=\'k0\'', consistency_level=cl)
-    rows = session.execute(query)
+    rows = list(session.execute(query))
     _validate_row(cluster, rows)
 
 

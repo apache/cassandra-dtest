@@ -1090,7 +1090,7 @@ class TestCQL(UpgradeTester):
             cursor.execute("INSERT INTO test (k, c) VALUES (1, 'test')")
             cursor.execute("INSERT INTO test (k, c) VALUES (2, 'test') USING TTL 400")
 
-            res = cursor.execute("SELECT k, c, writetime(c), ttl(c) FROM test")
+            res = list(cursor.execute("SELECT k, c, writetime(c), ttl(c) FROM test"))
             assert len(res) == 2, res
             for r in res:
                 assert isinstance(r[2], (int, long))
@@ -1100,7 +1100,7 @@ class TestCQL(UpgradeTester):
                     assert isinstance(r[3], (int, long)), res
 
             # wrap writetime(), ttl() in other functions (test for CASSANDRA-8451)
-            res = cursor.execute("SELECT k, c, blobAsBigint(bigintAsBlob(writetime(c))), ttl(c) FROM test")
+            res = list(cursor.execute("SELECT k, c, blobAsBigint(bigintAsBlob(writetime(c))), ttl(c) FROM test"))
             assert len(res) == 2, res
             for r in res:
                 assert isinstance(r[2], (int, long))
@@ -1109,7 +1109,7 @@ class TestCQL(UpgradeTester):
                 else:
                     assert isinstance(r[3], (int, long)), res
 
-            res = cursor.execute("SELECT k, c, writetime(c), blobAsInt(intAsBlob(ttl(c))) FROM test")
+            res = list(cursor.execute("SELECT k, c, writetime(c), blobAsInt(intAsBlob(ttl(c))) FROM test"))
             assert len(res) == 2, res
             for r in res:
                 assert isinstance(r[2], (int, long))
@@ -2567,7 +2567,7 @@ class TestCQL(UpgradeTester):
             in_values = list(range(10000))
 
             # try to fetch one existing row and 9999 non-existing rows
-            rows = cursor.execute(select_statement, [0, in_values])
+            rows = list(cursor.execute(select_statement, [0, in_values]))
             self.assertEqual(1, len(rows))
             self.assertEqual((0, 0, 0), rows[0])
 
@@ -2577,7 +2577,7 @@ class TestCQL(UpgradeTester):
             args = [(0, i, i) for i in clustering_values]
             execute_concurrent_with_args(cursor, insert_statement, args)
 
-            rows = cursor.execute(select_statement, [0, in_values])
+            rows = list(cursor.execute(select_statement, [0, in_values]))
             self.assertEqual(len(clustering_values), len(rows))
 
     @since('1.2.1')
@@ -4171,7 +4171,7 @@ class TestCQL(UpgradeTester):
             # we should also be able to use functions in the select clause (additional test for CASSANDRA-8286)
             results = cursor.execute("SELECT writetime(v) FROM test WHERE k IN (1, 0) ORDER BY c1 ASC")
             # since we don't know the write times, just assert that the order matches the order we expect
-            self.assertEqual(results, list(sorted(results)))
+            self.assertEqual(results, list(sorted(list(results))))
 
     @since('2.0')
     def cas_and_compact_test(self):

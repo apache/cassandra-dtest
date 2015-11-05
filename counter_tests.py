@@ -80,7 +80,7 @@ class TestCounters(Tester):
         def check(i):
             session = self.patient_cql_connection(nodes[0], keyspace='ks')
             query = SimpleStatement("SELECT * FROM counterTable", consistency_level=ConsistencyLevel.QUORUM)
-            rows = session.execute(query)
+            rows = list(session.execute(query))
 
             assert len(rows) == len(keys), "Expected %d rows, got %d: %s" % (len(keys), len(rows), str(rows))
             for row in rows:

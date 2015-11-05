@@ -92,17 +92,17 @@ class TestSecondaryIndexes(Tester):
                 self.fail("Didn't find matching trace event")
 
         query = SimpleStatement("SELECT * FROM ks.cf WHERE b='1';")
-        result = session.execute(query, trace=True)
+        result = list(session.execute(query, trace=True))
         self.assertEqual(3, len(result))
         check_trace_events(query.trace)
 
         query = SimpleStatement("SELECT * FROM ks.cf WHERE b='1' LIMIT 100;")
-        result = session.execute(query, trace=True)
+        result = list(session.execute(query, trace=True))
         self.assertEqual(3, len(result))
         check_trace_events(query.trace)
 
         query = SimpleStatement("SELECT * FROM ks.cf WHERE b='1' LIMIT 3;")
-        result = session.execute(query, trace=True)
+        result = list(session.execute(query, trace=True))
         self.assertEqual(3, len(result))
         check_trace_events(query.trace)
 
@@ -250,11 +250,11 @@ class TestSecondaryIndexes(Tester):
             pass
 
     def wait_for_schema_agreement(self, session):
-        rows = session.execute("SELECT schema_version FROM system.local")
+        rows = list(session.execute("SELECT schema_version FROM system.local"))
         local_version = rows[0]
 
         all_match = True
-        rows = session.execute("SELECT schema_version FROM system.peers")
+        rows = list(session.execute("SELECT schema_version FROM system.peers"))
         for peer_version in rows:
             if peer_version != local_version:
                 all_match = False

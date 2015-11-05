@@ -670,7 +670,7 @@ class TestConsistency(Tester):
         session = self.patient_cql_connection(node1, 'ks')
 
         query = SimpleStatement('SELECT c, v FROM cf WHERE key=\'k0\' LIMIT 1', consistency_level=ConsistencyLevel.QUORUM)
-        res = session.execute(query)
+        res = list(session.execute(query))
         assert len(res) == 0, res
 
     def short_read_quorum_delete_test(self):
