@@ -203,7 +203,9 @@ class TestOfflineTools(Tester):
 
         self.assertEqual(rc, 0, msg=str(rc))
 
-        # Process sstableverify output to normalize paths in string to Python casing
+        # STDOUT of the sstableverify command consists of multiple lines which may contain
+        # Java-normalized paths. To later compare these with Python-normalized paths, we
+        # map over each line of out and replace Java-normalized paths with Python equivalents.
         outlines = map(lambda line: re.sub("(?<=path=').*(?=')",
                                            lambda match: os.path.normcase(match.group(0)),
                                            line),
@@ -241,7 +243,7 @@ class TestOfflineTools(Tester):
         # use verbose to get some coverage on it
         (out, error, rc) = node1.run_sstableverify("keyspace1", "standard1", options=['-v'], output=True)
 
-        # Process sstableverify output to normalize paths in string to Python casing
+        # Process sstableverify output to normalize paths in string to Python casing as above
         error = re.sub("(?<=Corrupted: ).*", lambda match: os.path.normcase(match.group(0)), error)
 
         if self.cluster.version() < '3.0':
