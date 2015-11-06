@@ -30,6 +30,20 @@ PARTITIONERS = {
 }
 
 
+class UTC(datetime.tzinfo):
+    """
+    A utility class to specify a UTC timezone.
+    """
+    def utcoffset(self, dt):
+        return datetime.timedelta(0)
+
+    def tzname(self, dt):
+        return "UTC"
+
+    def dst(self, dt):
+        return datetime.timedelta(0)
+
+
 @canReuseCluster
 @since('2.1')  # version differences break formatting code on 2.0.x
 class CqlshCopyTest(Tester):
@@ -95,16 +109,6 @@ class CqlshCopyTest(Tester):
                 n varchar,
                 o varint
             )''')
-
-        class UTC(datetime.tzinfo):
-            def utcoffset(self, dt):
-                return datetime.timedelta(0)
-
-            def tzname(self, dt):
-                return "UTC"
-
-            def dst(self, dt):
-                return datetime.timedelta(0)
 
         self.data = ('ascii',  # a ascii
                      2 ** 40,  # b bigint
@@ -417,6 +421,40 @@ class CqlshCopyTest(Tester):
         result = self.session.execute("SELECT * FROM testheader")
         self.assertItemsEqual([tuple(d) for d in data],
                               [tuple(r) for r in rows_to_list(result)])
+
+    def test_writing_with_timeformat(self):
+        """
+        Test COPY TO with the time format specified in the WITH option by:
+
+        - creating and populating a table,
+        - exporting the contents of the table to a CSV file using COPY TO WITH TIMEFORMAT
+        - checking the time format written to csv
+        """
+        self.prepare()
+        self.session.execute("""
+            CREATE TABLE testtimeformat (
+                a int primary key,
+                b timestamp
+            )""")
+        insert_statement = self.session.prepare("INSERT INTO testtimeformat (a, b) VALUES (?, ?)")
+        args = [(1, datetime.datetime(2015, 1, 1, 07, 00, 0, 0, UTC())),
+                (2, datetime.datetime(2015, 6, 10, 12, 30, 30, 500, UTC())),
+                (3, datetime.datetime(2015, 12, 31, 23, 59, 59, 999, UTC()))]
+        execute_concurrent_with_args(self.session, insert_statement, args)
+
+        self.tempfile = NamedTemporaryFile(delete=False)
+        debug('Exporting to csv file: {name}'.format(name=self.tempfile.name))
+        cmds = "COPY ks.testtimeformat TO '{name}'".format(name=self.tempfile.name)
+        cmds += " WITH TIMEFORMAT = '%Y/%m/%d %H:%M'"
+        self.node1.run_cqlsh(cmds=cmds)
+
+        with open(self.tempfile.name, 'r') as csvfile:
+            csv_values = list(csv.reader(csvfile))
+
+        self.assertItemsEqual(csv_values,
+                              [['1', '2015/01/01 07:00'],
+                               ['2', '2015/06/10 12:30'],
+                               ['3', '2015/12/31 23:59']])
 
     def test_explicit_column_order_writing(self):
         """
