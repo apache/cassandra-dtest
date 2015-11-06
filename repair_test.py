@@ -216,7 +216,7 @@ class TestRepair(Tester):
         for cf in ['cf1', 'cf2']:
             for i in xrange(0, 10):
                 query = SimpleStatement("SELECT c1, c2 FROM %s WHERE key='k%d'" % (cf, i), consistency_level=ConsistencyLevel.ALL)
-                res = list(ession.execute(query))
+                res = list(session.execute(query))
                 self.assertEqual(len(filter(lambda x: len(x) != 0, res)), 0, res)
 
         # check log for no repair happened for gcable data

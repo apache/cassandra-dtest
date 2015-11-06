@@ -21,7 +21,7 @@ class TestRangeGhosts(Tester):
         for i in xrange(0, rows):
             session.execute("UPDATE cf SET c = 'value' WHERE key = 'k%i'" % i)
 
-        res = session.execute("SELECT * FROM cf LIMIT 10000")
+        res = list(session.execute("SELECT * FROM cf LIMIT 10000"))
         assert len(res) == rows, res
 
         node1.flush()
@@ -29,7 +29,7 @@ class TestRangeGhosts(Tester):
         for i in xrange(0, rows / 2):
             session.execute("DELETE FROM cf WHERE key = 'k%i'" % i)
 
-        res = session.execute("SELECT * FROM cf LIMIT 10000")
+        res = list(session.execute("SELECT * FROM cf LIMIT 10000"))
         # no ghosts in 1.2+
         assert len(res) == rows / 2, len(res)
 
@@ -37,5 +37,5 @@ class TestRangeGhosts(Tester):
         time.sleep(1)  # make sure tombstones are collected
         node1.compact()
 
-        res = session.execute("SELECT * FROM cf LIMIT 10000")
+        res = list(session.execute("SELECT * FROM cf LIMIT 10000"))
         assert len(res) == rows / 2, len(res)

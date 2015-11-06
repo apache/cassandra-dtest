@@ -3300,7 +3300,7 @@ class TestCQL(UpgradeTester):
             for i in range(10):
                 cursor.execute('INSERT INTO t1 (k, c, v) VALUES (%d, %d, %d)' % (i, i, i))
 
-            rows = cursor.execute('SELECT DISTINCT k FROM t1')
+            rows = list(cursor.execute('SELECT DISTINCT k FROM t1'))
             self.assertEqual(10, len(rows))
             key_to_delete = rows[3].k
 
@@ -4169,9 +4169,9 @@ class TestCQL(UpgradeTester):
             assert_all(cursor, "SELECT v FROM test WHERE k IN (1, 0) ORDER BY c1 ASC", [[0], [1], [2], [3], [4], [5]])
 
             # we should also be able to use functions in the select clause (additional test for CASSANDRA-8286)
-            results = cursor.execute("SELECT writetime(v) FROM test WHERE k IN (1, 0) ORDER BY c1 ASC")
+            results = list(cursor.execute("SELECT writetime(v) FROM test WHERE k IN (1, 0) ORDER BY c1 ASC"))
             # since we don't know the write times, just assert that the order matches the order we expect
-            self.assertEqual(results, list(sorted(list(results))))
+            self.assertEqual(results, list(sorted(results)))
 
     @since('2.0')
     def cas_and_compact_test(self):

@@ -22,7 +22,7 @@ class TestDeletion(Tester):
         session.execute('insert into cf (key, c1) values (2,1)')
         node1.flush()
 
-        result = session.execute('select * from cf;')
+        result = list(session.execute('select * from cf;'))
         assert len(result) == 2 and len(result[0]) == 2 and len(result[1]) == 2, result
 
         session.execute('delete from cf where key=1')
