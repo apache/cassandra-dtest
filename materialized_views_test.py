@@ -1209,7 +1209,7 @@ def thread_session(ip, queue, start, end, rows):
             base = rows[(row.a, row.b)]
         else:
             base = -1
-        gi = session.execute(select_gi, [row.c, row.a])
+        gi = list(session.execute(select_gi, [row.c, row.a]))
         if base == i and len(gi) == 1:
             return Match()
         elif base != i and len(gi) == 1:
