@@ -648,7 +648,7 @@ class TestSchemaMetadata(Tester):
         self.assertEqual('max_val', uda_meta.state_func)
         self.assertEqual('int', uda_meta.state_type)
         self.assertEqual(None, uda_meta.final_func)
-        self.assertEqual(-1, uda_meta.initial_condition)
+        self.assertEqual('-1', uda_meta.initial_condition)
         self.assertEqual('int', uda_meta.return_type)
 
         self.session.execute("DROP AGGREGATE ks.kind_of_max_agg")
