@@ -424,6 +424,7 @@ class CqlshCopyTest(Tester):
 
     def test_writing_with_timeformat(self):
         """
+        @jira_ticket CASSANDRA-10633
         Test COPY TO with the time format specified in the WITH option by:
 
         - creating and populating a table,
