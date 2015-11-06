@@ -2,8 +2,10 @@ import time
 
 from cassandra import ConsistencyLevel, Timeout, Unavailable
 from cassandra.query import SimpleStatement
+import sys
 
 from assertions import assert_invalid, assert_unavailable, assert_one
+from unittest import skipIf
 from dtest import CASSANDRA_DIR, Tester, debug
 from tools import debug, since
 
@@ -292,6 +294,7 @@ class TestBatch(Tester):
         self._logged_batch_compatibility_test(0, 1, 'git:cassandra-2.2', 2)
 
     @since('3.0', max_version='3.0.x')
+    @skipIf(sys.platform == 'win32', 'Windows production support only on 2.2+')
     def logged_batch_compatibility_2_test(self):
         """
         @jira_ticket CASSANDRA-9673, test that logged batches still work with a mixed version cluster.
@@ -301,6 +304,7 @@ class TestBatch(Tester):
         self._logged_batch_compatibility_test(0, 1, 'git:cassandra-2.1', 2)
 
     @since('3.0', max_version='3.0.x')
+    @skipIf(sys.platform == 'win32', 'Windows production support only on 2.2+')
     def logged_batch_compatibility_3_test(self):
         """
         @jira_ticket CASSANDRA-9673, test that logged batches still work with a mixed version cluster.
@@ -319,6 +323,7 @@ class TestBatch(Tester):
         self._logged_batch_compatibility_test(2, 2, 'git:cassandra-2.2', 1)
 
     @since('3.0', max_version='3.0.x')
+    @skipIf(sys.platform == 'win32', 'Windows production support only on 2.2+')
     def logged_batch_compatibility_5_test(self):
         """
         @jira_ticket CASSANDRA-9673, test that logged batches still work with a mixed version cluster.
