@@ -3,13 +3,12 @@ import time
 import uuid
 
 from cassandra import ConsistencyLevel as CL
-from cassandra import InvalidRequest, ReadTimeout, ReadFailure
+from cassandra import InvalidRequest, ReadFailure, ReadTimeout
 from cassandra.query import SimpleStatement, dict_factory, named_tuple_factory
-from dtest import run_scenarios, debug
-from tools import since, rows_to_list
 
-from datahelp import create_rows, parse_data_into_dicts, flatten_into_set
-
+from datahelp import create_rows, flatten_into_set, parse_data_into_dicts
+from dtest import debug, run_scenarios
+from tools import rows_to_list, since
 from upgrade_base import UpgradeTester
 
 
