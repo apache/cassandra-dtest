@@ -1696,7 +1696,9 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
         self.allow_log_errors = True
         self.cluster.set_configuration_options(
             values={'tombstone_failure_threshold': 500,
-                    'read_request_timeout_in_ms': 1000}
+                    'read_request_timeout_in_ms': 1000,
+                    'request_timeout_in_ms': 1000,
+                    'range_request_timeout_in_ms': 1000}
         )
         cursor = self.prepare()
         nodes = self.cluster.nodelist()
