@@ -26,7 +26,7 @@ class TestDeletion(Tester):
         assert len(result) == 2 and len(result[0]) == 2 and len(result[1]) == 2, result
 
         session.execute('delete from cf where key=1')
-        result = session.execute('select * from cf;')
+        result = list(session.execute('select * from cf;'))
         if cluster.version() < '1.2':  # > 1.2 doesn't show tombstones
             assert len(result) == 2 and len(result[0]) == 1 and len(result[1]) == 1, result
 
@@ -35,7 +35,7 @@ class TestDeletion(Tester):
         node1.compact()
         time.sleep(.5)
 
-        result = session.execute('select * from cf;')
+        result = list(session.execute('select * from cf;'))
         assert len(result) == 1 and len(result[0]) == 2, result
 
     def tombstone_size_test(self):
