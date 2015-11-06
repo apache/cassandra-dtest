@@ -4,7 +4,7 @@ import tempfile
 import time
 import random
 
-from assertions import assert_almost_equal, assert_none, assert_one
+from assertions import assert_none, assert_one
 from dtest import Tester, debug
 from tools import since
 
@@ -203,7 +203,6 @@ class TestCompaction(Tester):
         debug(avgthroughput)
 
         self.assertGreaterEqual(float(threshold), float(avgthroughput))
-        assert_almost_equal(float(threshold), float(avgthroughput), error=0.2)
 
     def compaction_strategy_switching_test(self):
         """Ensure that switching strategies does not result in problems.
