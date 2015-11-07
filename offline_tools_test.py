@@ -1,4 +1,5 @@
 import os
+import random
 import re
 import subprocess
 
@@ -192,16 +193,23 @@ class TestOfflineTools(Tester):
         self.assertEqual(rc, 0, msg=str(rc))
 
         # Generate multiple sstables and test works properly in the simple case
-        node1.stress(['write', 'n=1M', '-schema', 'replication(factor=3)'])
-        cluster.flush()
-        node1.stress(['write', 'n=1M', '-schema', 'replication(factor=3)'])
-        cluster.flush()
+        node1.stress(['write', 'n=100K', '-schema', 'replication(factor=3)'])
+        node1.flush()
+        node1.stress(['write', 'n=100K', '-schema', 'replication(factor=3)'])
+        node1.flush()
         cluster.stop()
+
         (out, error, rc) = node1.run_sstableverify("keyspace1", "standard1", output=True)
 
         self.assertEqual(rc, 0, msg=str(rc))
 
-        outlines = out.split("\n")
+        # STDOUT of the sstableverify command consists of multiple lines which may contain
+        # Java-normalized paths. To later compare these with Python-normalized paths, we
+        # map over each line of out and replace Java-normalized paths with Python equivalents.
+        outlines = map(lambda line: re.sub("(?<=path=').*(?=')",
+                                           lambda match: os.path.normcase(match.group(0)),
+                                           line),
+                       out.splitlines())
 
         # check output is correct for each sstable
         sstables = self._get_final_sstables(node1, "keyspace1", "standard1")
@@ -226,12 +234,17 @@ class TestOfflineTools(Tester):
         # now try intentionally corrupting an sstable to see if hash computed is different and error recognized
         sstable1 = sstables[1]
         with open(sstable1, 'r') as f:
-            sstabledata = f.read().splitlines(True)
+            sstabledata = bytearray(f.read())
         with open(sstable1, 'w') as out:
-            out.writelines(sstabledata[2:])
+            position = random.randrange(0, len(sstabledata))
+            sstabledata[position] = (sstabledata[position] + 1) % 256
+            out.write(sstabledata)
 
         # use verbose to get some coverage on it
         (out, error, rc) = node1.run_sstableverify("keyspace1", "standard1", options=['-v'], output=True)
+
+        # Process sstableverify output to normalize paths in string to Python casing as above
+        error = re.sub("(?<=Corrupted: ).*", lambda match: os.path.normcase(match.group(0)), error)
 
         if self.cluster.version() < '3.0':
             self.assertIn("java.lang.Exception: Invalid SSTable", error)
@@ -263,7 +276,7 @@ class TestOfflineTools(Tester):
         file names no longer contain tmp in their names (CASSANDRA-7066).
         """
         # Get all sstable data files
-        allsstables = node.get_sstables(ks, table)
+        allsstables = map(os.path.normcase, node.get_sstables(ks, table))
 
         # Remove any temporary files
         tool_bin = node.get_tool('sstableutil')
@@ -271,8 +284,9 @@ class TestOfflineTools(Tester):
             args = [tool_bin, '--type', 'tmp', ks, table]
             env = common.make_cassandra_env(node.get_install_cassandra_root(), node.get_node_cassandra_root())
             p = subprocess.Popen(args, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            (stdin, stderr) = p.communicate()
-            tmpsstables = stdin.splitlines()
+            (stdout, stderr) = p.communicate()
+            tmpsstables = map(os.path.normcase, stdout.splitlines())
+
             ret = list(set(allsstables) - set(tmpsstables))
         else:
             ret = [sstable for sstable in allsstables if "tmp" not in sstable[50:]]
