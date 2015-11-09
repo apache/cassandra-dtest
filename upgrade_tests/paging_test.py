@@ -1,15 +1,15 @@
 import itertools
 import time
 import uuid
+from unittest import SkipTest
 
 from cassandra import ConsistencyLevel as CL
-from cassandra import InvalidRequest, ReadTimeout, ReadFailure
+from cassandra import InvalidRequest, ReadFailure, ReadTimeout
 from cassandra.query import SimpleStatement, dict_factory, named_tuple_factory
-from dtest import run_scenarios, debug
-from tools import since, rows_to_list
 
-from datahelp import create_rows, parse_data_into_dicts, flatten_into_set
-
+from datahelp import create_rows, flatten_into_set, parse_data_into_dicts
+from dtest import debug, run_scenarios
+from tools import rows_to_list, since
 from upgrade_base import UpgradeTester
 
 
@@ -835,6 +835,12 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         cursor.execute("CREATE TABLE test (a int, b int, c int, s1 int static, s2 int static, PRIMARY KEY (a, b))")
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
+            min_version = min(self.get_node_versions())
+            latest_version_with_bug = '2.2.3'
+            if min_version <= latest_version_with_bug:
+                raise SkipTest('known bug released in {latest_ver} and earlier (current min version {min_ver}); '
+                               'skipping'.format(latest_ver=latest_version_with_bug, min_ver=min_version))
+
             cursor.row_factory = dict_factory
             debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE test")
