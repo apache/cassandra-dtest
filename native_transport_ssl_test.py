@@ -1,7 +1,9 @@
 import os
-from dtest import Tester
+
 from cassandra import ConsistencyLevel
 from cassandra.cluster import NoHostAvailable
+
+from dtest import Tester
 from tools import generate_ssl_stores, putget, since
 
 
