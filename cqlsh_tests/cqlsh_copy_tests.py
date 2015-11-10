@@ -3,6 +3,7 @@ import csv
 import datetime
 import os
 import sys
+from collections import namedtuple
 from contextlib import contextmanager
 from decimal import Decimal
 from dtest import warning
@@ -135,43 +136,35 @@ class CqlshCopyTest(Tester):
             def __repr__(self):
                 return self.strftime(DEFAULT_TIME_FORMAT)
 
-        def str_q(s):
+        def maybe_quote(s):
+            """
+            Return a quoted string representation for strings, unicode and date time parameters,
+            otherwise return a string representation of the parameter.
+            """
             return "'{}'".format(s) if isinstance(s, (str, unicode, Datetime)) else str(s)
 
         class ImmutableDict(frozenset):
             iteritems = frozenset.__iter__
 
             def __repr__(self):
-                return '{{{}}}'.format(', '.join(['{}: {}'.format(str_q(t[0]), str_q(t[1])) for t in sorted(self)]))
+                return '{{{}}}'.format(', '.join(['{}: {}'.format(maybe_quote(t[0]), maybe_quote(t[1]))
+                                                  for t in sorted(self)]))
 
         class ImmutableSet(SortedSet):
             def __repr__(self):
-                return '{{{}}}'.format(', '.join([str_q(t) for t in sorted(self._items)]))
+                return '{{{}}}'.format(', '.join([maybe_quote(t) for t in sorted(self._items)]))
 
-        class CommonEqualityMixin(object):
-            def __eq__(self, other):
-                return type(other) is type(self) and self.__dict__ == other.__dict__
-
-            def __ne__(self, other):
-                return not self.__eq__(other)
-
-        class Name(CommonEqualityMixin):
-            def __init__(self, firstname, lastname):
-                self.firstname = firstname
-                self.lastname = lastname
+        class Name(namedtuple('Name', ('firstname', 'lastname'))):
+            __slots__ = ()
 
             def __repr__(self):
                 return "{{firstname: '{}', lastname: '{}'}}".format(self.firstname, self.lastname)
 
-        class Address(CommonEqualityMixin):
-            def __init__(self, name, number, street, phones):
-                self.name = name
-                self.number = number
-                self.street = street
-                self.phones = phones
+        class Address(namedtuple('Address', ('name', 'number', 'street', 'phones'))):
+            __slots__ = ()
 
             def __repr__(self):
-                phones_str = "{{{}}}".format(', '.join(str_q(p) for p in sorted(self.phones)))
+                phones_str = "{{{}}}".format(', '.join(maybe_quote(p) for p in sorted(self.phones)))
                 return "{{name: {}, number: {}, street: '{}', phones: {}}}".format(self.name,
                                                                                    self.number,
                                                                                    self.street,
@@ -734,6 +727,8 @@ class CqlshCopyTest(Tester):
         If expect_invalid, this test will succeed when the COPY command fails.
         If not expect_invalid, this test will succeed when the COPY command prints
         no errors and the table matches the loaded CSV file.
+
+        @jira_ticket CASSANDRA-9302
         """
         self.prepare()
         self.session.execute("""
@@ -795,6 +790,8 @@ class CqlshCopyTest(Tester):
         - creating and populating a table containing all datatypes,
         - COPYing the contents of that table to a CSV file, and
         - asserting that the CSV file contains the same data as the table.
+
+        @jira_ticket CASSANDRA-9302
         """
         self.all_datatypes_prepare()
 
@@ -820,6 +817,8 @@ class CqlshCopyTest(Tester):
         - writing a corresponding CSV file containing each datatype,
         - COPYing the CSV file into the table, and
         - asserting that the CSV file contains the same data as the table.
+
+        @jira_ticket CASSANDRA-9302
         """
         self.all_datatypes_prepare()
 
@@ -852,6 +851,8 @@ class CqlshCopyTest(Tester):
         - COPYing the written CSV file back into the table, and
         - asserting that the previously-SELECTed contents of the table match the
         current contents of the table.
+
+        @jira_ticket CASSANDRA-9302
         """
         self.all_datatypes_prepare()
 
@@ -885,6 +886,8 @@ class CqlshCopyTest(Tester):
         - writing a CSV file with two columns,
         - attempting to COPY the CSV file into the table, and
         - asserting that the COPY operation failed.
+
+        @jira_ticket CASSANDRA-9302
         """
         self.prepare()
         self.session.execute("""
@@ -1061,6 +1064,8 @@ class CqlshCopyTest(Tester):
     def test_bulk_round_trip_default(self):
         """
         Test bulk import with default stress import (one row per operation)
+
+        @jira_ticket CASSANDRA-9302
         """
         self._test_bulk_round_trip(nodes=3, partitioner="murmur3", num_operations=100000)
 
@@ -1069,6 +1074,8 @@ class CqlshCopyTest(Tester):
     def test_bulk_round_trip_blogposts(self):
         """
         Test bulk import with a user profile that inserts 10 rows per operation
+
+        @jira_ticket CASSANDRA-9302
         """
         self._test_bulk_round_trip(nodes=3, partitioner="murmur3", num_operations=10000,
                                    profile=os.path.join(os.path.dirname(os.path.realpath(__file__)), 'blogposts.yaml'),
@@ -1080,6 +1087,8 @@ class CqlshCopyTest(Tester):
         """
         Test bulk import with very short read and write timeout values, this should exercise the
         retry and back-off policies
+
+        @jira_ticket CASSANDRA-9302
         """
         self._test_bulk_round_trip(nodes=1, partitioner="murmur3", num_operations=100000,
                                    configuration_options={'range_request_timeout_in_ms': '300',
