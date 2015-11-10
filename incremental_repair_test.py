@@ -8,6 +8,7 @@ from nose.plugins.attrib import attr
 
 from assertions import assert_almost_equal, assert_one
 from ccmlib.node import Node
+from ccmlib.common import is_win
 from dtest import Tester, debug
 from tools import insert_c1c2, since
 
@@ -87,6 +88,11 @@ class TestIncRepair(Tester):
             node3.repair()
         else:
             node3.nodetool("repair -par -inc")
+
+        # wait stream handlers to be closed on windows
+        # after session is finished (See CASSANDRA-10644)
+        if is_win:
+            time.sleep(2)
 
         debug("stopping node 2")
         node2.stop(gently=False)
