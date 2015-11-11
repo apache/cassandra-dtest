@@ -747,6 +747,7 @@ class CqlshCopyTest(Tester):
         results = list(self.session.execute("SELECT * FROM testvalidate"))
 
         if expect_invalid:
+            self.assertIn('Failed to import', err)
             self.assertFalse(results)
         else:
             self.assertFalse(err)
@@ -761,6 +762,7 @@ class CqlshCopyTest(Tester):
         # make sure the template works properly
         self.data_validation_on_read_template(2, expect_invalid=False)
 
+    @require('9302')
     def test_read_invalid_float(self):
         """
         Use data_validation_on_read_template to test COPYing a float value from a
@@ -768,6 +770,7 @@ class CqlshCopyTest(Tester):
         """
         self.data_validation_on_read_template(2.14, expect_invalid=True)
 
+    @require('9302')
     def test_read_invalid_uuid(self):
         """
         Use data_validation_on_read_template to test COPYing a uuid value from a
@@ -775,6 +778,7 @@ class CqlshCopyTest(Tester):
         """
         self.data_validation_on_read_template(uuid4(), expect_invalid=True)
 
+    @require('9302')
     def test_read_invalid_text(self):
         """
         Use data_validation_on_read_template to test COPYing a text value from a
@@ -877,6 +881,7 @@ class CqlshCopyTest(Tester):
 
         self.assertEqual(exported_results, imported_results)
 
+    @require('9302')
     def test_wrong_number_of_columns(self):
         """
         Test that a COPY statement will fail when trying to import from a CSV
@@ -905,7 +910,7 @@ class CqlshCopyTest(Tester):
                                         return_output=True)
 
         self.assertFalse(self.session.execute("SELECT * FROM testcolumns"))
-        self.assertTrue(len(err) > 0, 'Expected an error message')
+        self.assertIn('Failed to import', err)
 
     def _test_round_trip(self, nodes, partitioner, num_records=10000):
         """
