@@ -4,7 +4,7 @@ import re
 import time
 
 from dtest import Tester, debug, PRINT_DEBUG
-from tools import no_vnodes, since
+from tools import no_vnodes, require, since
 
 from cassandra.query import SimpleStatement
 from cassandra import ConsistencyLevel
@@ -259,8 +259,19 @@ class ReplicationTest(Tester):
 
 class SnitchConfigurationUpdateTest(Tester):
     """
-    Test to repro CASSANDRA-10238, wherein changing snitch properties to change racks without a restart could violate RF contract.
+    Test to reproduce CASSANDRA-10238, wherein changing snitch properties to change racks without a restart
+    could violate RF contract.
+
+    Since CASSANDRA-10243 it is no longer possible to change rack or dc for live nodes so we must specify
+    which nodes should be shutdown in order to have the rack changed. Since CASSANDRA-10242 it is no longer
+    possible to start a node with a different rack unless we specify -Dcassandra.ignore_rack=true.
     """
+
+    def __init__(self, *args, **kwargs):
+        Tester.__init__(self, *args, **kwargs)
+        self.ignore_log_patterns = ['Fatal exception during initialization',
+                                    'Cannot update data center or rack']
+
     def check_endpoint_count(self, ks, table, nodes, rf):
         """
         Check a dummy key expecting it to have replication factor as the sum of rf on all dcs.
@@ -278,7 +289,9 @@ class SnitchConfigurationUpdateTest(Tester):
             debug(out)
             ips_found = re.findall('(\d+\.\d+\.\d+\.\d+)', out)
 
-            self.assertEqual(len(ips_found), expected_count, "wrong number of endpoints found ({}), should be: {}".format(len(ips_found), expected_count))
+            self.assertEqual(len(ips_found), expected_count,
+                             "wrong number of endpoints found ({}), should be: {}"
+                             .format(len(ips_found), expected_count))
 
     def wait_for_nodes_on_racks(self, nodes, expected_racks):
         """
@@ -313,6 +326,8 @@ class SnitchConfigurationUpdateTest(Tester):
     def test_rf_collapse_gossiping_property_file_snitch(self):
         """
         @jira_ticket CASSANDRA-10238
+        @jira_ticket CASSANDRA-10242
+        @jira_ticket CASSANDRA-10243
 
         Confirm that when racks are collapsed using a gossiping property file snitch the RF is not impacted.
         """
@@ -321,11 +336,14 @@ class SnitchConfigurationUpdateTest(Tester):
                                        snitch_config_file='cassandra-rackdc.properties',
                                        snitch_lines_before=lambda i, node: ["dc=dc1", "rack=rack{}".format(i)],
                                        snitch_lines_after=lambda i, node: ["dc=dc1", "rack=rack1"],
-                                       final_racks=["rack1", "rack1", "rack1"])
+                                       final_racks=["rack1", "rack1", "rack1"],
+                                       nodes_to_shutdown=[0, 2])
 
     def test_rf_expand_gossiping_property_file_snitch(self):
         """
         @jira_ticket CASSANDRA-10238
+        @jira_ticket CASSANDRA-10242
+        @jira_ticket CASSANDRA-10243
 
         Confirm that when racks are expanded using a gossiping property file snitch the RF is not impacted.
         """
@@ -334,11 +352,14 @@ class SnitchConfigurationUpdateTest(Tester):
                                        snitch_config_file='cassandra-rackdc.properties',
                                        snitch_lines_before=lambda i, node: ["dc=dc1", "rack=rack1"],
                                        snitch_lines_after=lambda i, node: ["dc=dc1", "rack=rack{}".format(i)],
-                                       final_racks=["rack0", "rack1", "rack2"])
+                                       final_racks=["rack0", "rack1", "rack2"],
+                                       nodes_to_shutdown=[0, 2])
 
     def test_rf_collapse_gossiping_property_file_snitch_multi_dc(self):
         """
         @jira_ticket CASSANDRA-10238
+        @jira_ticket CASSANDRA-10242
+        @jira_ticket CASSANDRA-10243
 
         Confirm that when racks are collapsed using a gossiping property file snitch the RF is not impacted, in a multi-dc environment.
         """
@@ -347,11 +368,14 @@ class SnitchConfigurationUpdateTest(Tester):
                                        snitch_config_file='cassandra-rackdc.properties',
                                        snitch_lines_before=lambda i, node: ["dc={}".format(node.data_center), "rack=rack{}".format(i % 3)],
                                        snitch_lines_after=lambda i, node: ["dc={}".format(node.data_center), "rack=rack1"],
-                                       final_racks=["rack1", "rack1", "rack1", "rack1", "rack1", "rack1"])
+                                       final_racks=["rack1", "rack1", "rack1", "rack1", "rack1", "rack1"],
+                                       nodes_to_shutdown=[0, 2, 3, 5])
 
     def test_rf_expand_gossiping_property_file_snitch_multi_dc(self):
         """
         @jira_ticket CASSANDRA-10238
+        @jira_ticket CASSANDRA-10242
+        @jira_ticket CASSANDRA-10243
 
         Confirm that when racks are expanded using a gossiping property file snitch the RF is not impacted, in a multi-dc environment.
         """
@@ -360,11 +384,14 @@ class SnitchConfigurationUpdateTest(Tester):
                                        snitch_config_file='cassandra-rackdc.properties',
                                        snitch_lines_before=lambda i, node: ["dc={}".format(node.data_center), "rack=rack1"],
                                        snitch_lines_after=lambda i, node: ["dc={}".format(node.data_center), "rack=rack{}".format(i % 3)],
-                                       final_racks=["rack0", "rack1", "rack2", "rack0", "rack1", "rack2"])
+                                       final_racks=["rack0", "rack1", "rack2", "rack0", "rack1", "rack2"],
+                                       nodes_to_shutdown=[0, 2, 3, 5])
 
     def test_rf_collapse_property_file_snitch(self):
         """
         @jira_ticket CASSANDRA-10238
+        @jira_ticket CASSANDRA-10242
+        @jira_ticket CASSANDRA-10243
 
         Confirm that when racks are collapsed using a property file snitch the RF is not impacted.
         """
@@ -373,11 +400,14 @@ class SnitchConfigurationUpdateTest(Tester):
                                        snitch_config_file='cassandra-topology.properties',
                                        snitch_lines_before=lambda i, node: ["127.0.0.1=dc1:rack0", "127.0.0.2=dc1:rack1", "127.0.0.3=dc1:rack2"],
                                        snitch_lines_after=lambda i, node: ["default=dc1:rack0"],
-                                       final_racks=["rack0", "rack0", "rack0"])
+                                       final_racks=["rack0", "rack0", "rack0"],
+                                       nodes_to_shutdown=[1, 2])
 
     def test_rf_expand_property_file_snitch(self):
         """
         @jira_ticket CASSANDRA-10238
+        @jira_ticket CASSANDRA-10242
+        @jira_ticket CASSANDRA-10243
 
         Confirm that when racks are expanded using a property file snitch the RF is not impacted.
         """
@@ -386,12 +416,15 @@ class SnitchConfigurationUpdateTest(Tester):
                                        snitch_config_file='cassandra-topology.properties',
                                        snitch_lines_before=lambda i, node: ["default=dc1:rack0"],
                                        snitch_lines_after=lambda i, node: ["127.0.0.1=dc1:rack0", "127.0.0.2=dc1:rack1", "127.0.0.3=dc1:rack2"],
-                                       final_racks=["rack0", "rack1", "rack2"])
+                                       final_racks=["rack0", "rack1", "rack2"],
+                                       nodes_to_shutdown=[1, 2])
 
     @since('2.0', max_version='2.1.x')
     def test_rf_collapse_yaml_file_snitch(self):
         """
         @jira_ticket CASSANDRA-10238
+        @jira_ticket CASSANDRA-10242
+        @jira_ticket CASSANDRA-10243
 
         Confirm that when racks are collapsed using a yaml file snitch the RF is not impacted.
         """
@@ -418,12 +451,15 @@ class SnitchConfigurationUpdateTest(Tester):
                                                                            "      - broadcast_address: 127.0.0.1",
                                                                            "      - broadcast_address: 127.0.0.2",
                                                                            "      - broadcast_address: 127.0.0.3"],
-                                       final_racks=["rack0", "rack0", "rack0"])
+                                       final_racks=["rack0", "rack0", "rack0"],
+                                       nodes_to_shutdown=[1, 2])
 
     @since('2.0', max_version='2.1.x')
     def test_rf_expand_yaml_file_snitch(self):
         """
         @jira_ticket CASSANDRA-10238
+        @jira_ticket CASSANDRA-10242
+        @jira_ticket CASSANDRA-10243
 
         Confirm that when racks are expanded using a yaml file snitch the RF is not impacted.
         """
@@ -450,9 +486,11 @@ class SnitchConfigurationUpdateTest(Tester):
                                                                            "    - rack_name: rack2",
                                                                            "      nodes:",
                                                                            "      - broadcast_address: 127.0.0.3"],
-                                       final_racks=["rack0", "rack1", "rack2"])
+                                       final_racks=["rack0", "rack1", "rack2"],
+                                       nodes_to_shutdown=[1, 2])
 
-    def _test_rf_on_snitch_update(self, nodes, rf, snitch_class_name, snitch_config_file, snitch_lines_before, snitch_lines_after, final_racks):
+    def _test_rf_on_snitch_update(self, nodes, rf, snitch_class_name, snitch_config_file,
+                                  snitch_lines_before, snitch_lines_after, final_racks, nodes_to_shutdown):
         cluster = self.cluster
         cluster.populate(nodes)
         cluster.set_configuration_options(values={'endpoint_snitch': 'org.apache.cassandra.locator.{}'.format(snitch_class_name)})
@@ -474,13 +512,160 @@ class SnitchConfigurationUpdateTest(Tester):
         # make sure endpoint count is correct before continuing with the rest of the test
         self.check_endpoint_count('testing', 'rf_test', cluster.nodelist(), rf)
 
-        # update snitch file on all nodes
+        for i in nodes_to_shutdown:
+            node = cluster.nodelist()[i]
+            debug("Shutting down node {}".format(node.address()))
+            node.stop(wait_other_notice=True)
+
+        debug("Updating snitch file")
         for i, node in enumerate(cluster.nodelist()):
             with open(os.path.join(node.get_conf_dir(), snitch_config_file), 'w') as topo_file:
                 for line in snitch_lines_after(i, node):
                     topo_file.write(line + os.linesep)
 
+        # wait until the config is reloaded before we restart the nodes, the default check period is
+        # 5 seconds so we wait for 10 seconds to be sure
+        debug("Waiting 10 seconds to make sure snitch file is reloaded...")
+        time.sleep(10)
+
+        for i in nodes_to_shutdown:
+            node = cluster.nodelist()[i]
+            debug("Restarting node {}".format(node.address()))
+            node.start(jvm_args=['-Dcassandra.ignore_rack=true'], wait_for_binary_proto=True)
+
         self.wait_for_nodes_on_racks(cluster.nodelist(), final_racks)
 
         # nodes have joined racks, check endpoint counts again
         self.check_endpoint_count('testing', 'rf_test', cluster.nodelist(), rf)
+
+    def test_cannot_restart_with_different_rack(self):
+        """
+        @jira_ticket CASSANDRA-10242
+
+        Test that we cannot restart with a different rack if '-Dcassandra.ignore_rack=true' is not specified.
+        """
+        cluster = self.cluster
+        cluster.populate(1)
+        cluster.set_configuration_options(values={'endpoint_snitch': 'org.apache.cassandra.locator.{}'
+                                          .format('GossipingPropertyFileSnitch')})
+
+        node = cluster.nodelist()[0]
+
+        with open(os.path.join(node.get_conf_dir(), 'cassandra-rackdc.properties'), 'w') as topo_file:
+            for line in ["dc={}".format(node.data_center), "rack=rack1"]:
+                topo_file.write(line + os.linesep)
+
+        debug("Starting node {} with rack1".format(node.address()))
+        node.start(wait_for_binary_proto=True)
+
+        debug("Shutting down node {}".format(node.address()))
+        node.stop(wait_other_notice=True)
+
+        debug("Updating snitch file with rack2")
+        for i, node in enumerate(cluster.nodelist()):
+            with open(os.path.join(node.get_conf_dir(), 'cassandra-rackdc.properties'), 'w') as topo_file:
+                for line in ["dc={}".format(node.data_center), "rack=rack2"]:
+                    topo_file.write(line + os.linesep)
+
+        debug("Restarting node {} with rack2".format(node.address()))
+        mark = node.mark_log()
+        node.start()
+
+        # check node not running
+        debug("Waiting for error message in log file")
+        node.watch_log_for("Fatal exception during initialization", from_mark=mark)
+
+    @require('10243')
+    def test_failed_snitch_update_gossiping_property_file_snitch(self):
+        """
+        @jira_ticket CASSANDRA-10243
+
+        Test that we cannot change the rack of a live node with GossipingPropertyFileSnitch.
+        """
+        self._test_failed_snitch_update(nodes=[3],
+                                        snitch_class_name='GossipingPropertyFileSnitch',
+                                        snitch_config_file='cassandra-rackdc.properties',
+                                        snitch_lines_before=["dc=dc1", "rack=rack1"],
+                                        snitch_lines_after=["dc=dc1", "rack=rack2"],
+                                        racks=["rack1", "rack1", "rack1"])
+
+    @require('10243')
+    def test_failed_snitch_update_property_file_snitch(self):
+        """
+        @jira_ticket CASSANDRA-10243
+
+        Test that we cannot change the rack of a live node with PropertyFileSnitch.
+        """
+        self._test_failed_snitch_update(nodes=[3],
+                                        snitch_class_name='PropertyFileSnitch',
+                                        snitch_config_file='cassandra-topology.properties',
+                                        snitch_lines_before=["default=dc1:rack1"],
+                                        snitch_lines_after=["default=dc1:rack2"],
+                                        racks=["rack1", "rack1", "rack1"])
+
+    @require('10243')
+    @since('2.0', max_version='2.1.x')
+    def test_failed_snitch_update_yaml_file_snitch(self):
+        """
+        @jira_ticket CASSANDRA-10243
+
+        Test that we cannot change the rack of a live node with YamlFileNetworkTopologySnitch.
+        """
+        self._test_failed_snitch_update(nodes=[3],
+                                        snitch_class_name='YamlFileNetworkTopologySnitch',
+                                        snitch_config_file='cassandra-topology.yaml',
+                                        snitch_lines_before=["topology:",
+                                                             "  - dc_name: dc1",
+                                                             "    racks:",
+                                                             "    - rack_name: rack1",
+                                                             "      nodes:",
+                                                             "      - broadcast_address: 127.0.0.1",
+                                                             "      - broadcast_address: 127.0.0.2",
+                                                             "      - broadcast_address: 127.0.0.3"],
+                                        snitch_lines_after=["topology:",
+                                                            "  - dc_name: dc1",
+                                                            "    racks:",
+                                                            "    - rack_name: rack2",
+                                                            "      nodes:",
+                                                            "      - broadcast_address: 127.0.0.1",
+                                                            "      - broadcast_address: 127.0.0.2",
+                                                            "      - broadcast_address: 127.0.0.3"],
+                                        racks=["rack1", "rack1", "rack1"])
+
+    def _test_failed_snitch_update(self, nodes, snitch_class_name, snitch_config_file,
+                                   snitch_lines_before, snitch_lines_after, racks):
+        cluster = self.cluster
+        cluster.populate(nodes)
+        cluster.set_configuration_options(values={'endpoint_snitch': 'org.apache.cassandra.locator.{}'
+                                          .format(snitch_class_name)})
+
+        # start with initial snitch lines
+        for i, node in enumerate(cluster.nodelist()):
+            with open(os.path.join(node.get_conf_dir(), snitch_config_file), 'w') as topo_file:
+                for line in snitch_lines_before:
+                    topo_file.write(line + os.linesep)
+
+        cluster.start(wait_for_binary_proto=True)
+
+        # check racks are as specified
+        self.wait_for_nodes_on_racks(cluster.nodelist(), racks)
+
+        marks = [node.mark_log() for node in cluster.nodelist()]
+
+        debug("Updating snitch file")
+        for i, node in enumerate(cluster.nodelist()):
+            with open(os.path.join(node.get_conf_dir(), snitch_config_file), 'w') as topo_file:
+                for line in snitch_lines_after:
+                    topo_file.write(line + os.linesep)
+
+        # wait until the config is reloaded, the default check period is
+        # 5 seconds so we wait for 10 seconds to be sure
+        debug("Waiting 10 seconds to make sure snitch file is reloaded...")
+        time.sleep(10)
+
+        # check racks have not changed
+        self.wait_for_nodes_on_racks(cluster.nodelist(), racks)
+
+        # check error in log files
+        for node, mark in zip(cluster.nodelist(), marks):
+            node.watch_log_for("Cannot update data center or rack", from_mark=mark)
