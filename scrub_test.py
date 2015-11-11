@@ -13,7 +13,6 @@ KEYSPACE = 'ks'
 
 
 class TestHelper(Tester):
-
     def get_table_path(self, table):
         """
         Return the path where the table sstables are located
@@ -97,7 +96,8 @@ class TestHelper(Tester):
         p = subprocess.Popen(args, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out, err = p.communicate()
         debug(out)
-        if err:
+        # if we have less than 64G free space, we get this warning - ignore it
+        if err and "Consider adding more capacity" not in err:
             debug(err)
             assert False, 'sstablescrub failed'
 
