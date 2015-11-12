@@ -310,7 +310,6 @@ class SnitchConfigurationUpdateTest(Tester):
             else:
                 raise RuntimeError("Ran out of time waiting for topology to change on node {}".format(i))
 
-    @since('2.1')
     def test_rf_collapse_gossiping_property_file_snitch(self):
         """
         @jira_ticket CASSANDRA-10238
@@ -324,7 +323,6 @@ class SnitchConfigurationUpdateTest(Tester):
                                        snitch_lines_after=lambda i, node: ["dc=dc1", "rack=rack1"],
                                        final_racks=["rack1", "rack1", "rack1"])
 
-    @since('2.1')
     def test_rf_expand_gossiping_property_file_snitch(self):
         """
         @jira_ticket CASSANDRA-10238
@@ -338,7 +336,6 @@ class SnitchConfigurationUpdateTest(Tester):
                                        snitch_lines_after=lambda i, node: ["dc=dc1", "rack=rack{}".format(i)],
                                        final_racks=["rack0", "rack1", "rack2"])
 
-    @since('2.1')
     def test_rf_collapse_gossiping_property_file_snitch_multi_dc(self):
         """
         @jira_ticket CASSANDRA-10238
@@ -352,7 +349,6 @@ class SnitchConfigurationUpdateTest(Tester):
                                        snitch_lines_after=lambda i, node: ["dc={}".format(node.data_center), "rack=rack1"],
                                        final_racks=["rack1", "rack1", "rack1", "rack1", "rack1", "rack1"])
 
-    @since('2.1')
     def test_rf_expand_gossiping_property_file_snitch_multi_dc(self):
         """
         @jira_ticket CASSANDRA-10238

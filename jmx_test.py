@@ -8,12 +8,10 @@ from ccmlib.node import NodetoolError
 
 from dtest import Tester, debug
 from jmxutils import JolokiaAgent, make_mbean, remove_perf_disable_shared_mem
-from tools import since
 
 
 class TestJMX(Tester):
 
-    @since('2.1')
     @unittest.skipIf(sys.platform == "win32", 'Skip long tests on Windows')
     def cfhistograms_test(self):
         """
@@ -57,7 +55,6 @@ class TestJMX(Tester):
             debug(finalhistogram)
             self.fail("Cfhistograms command failed: " + str(e))
 
-    @since('2.1')
     def netstats_test(self):
         """
         Check functioning of nodetool netstats, especially with restarts.
@@ -96,7 +93,6 @@ class TestJMX(Tester):
 
         self.assertTrue(running, msg='node1 never started')
 
-    @since('2.1')
     def table_metric_mbeans_test(self):
         """
         Test some basic table metric mbeans with simple writes.
@@ -108,10 +104,7 @@ class TestJMX(Tester):
         cluster.start(wait_for_binary_proto=True)
 
         version = cluster.version()
-        if version < "2.1":
-            node1.stress(['-o', 'insert', '--num-keys=10000', '--replication-factor=3'])
-        else:
-            node1.stress(['write', 'n=10000', '-schema', 'replication(factor=3)'])
+        node1.stress(['write', 'n=10000', '-schema', 'replication(factor=3)'])
 
         typeName = "ColumnFamily" if version <= '2.2.X' else 'Table'
         debug('Version {} typeName {}'.format(version, typeName))

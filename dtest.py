@@ -199,9 +199,8 @@ class Tester(TestCase):
         else:
             cluster.set_configuration_options(values={'initial_token': None, 'num_tokens': NUM_TOKENS})
 
-        if cluster.version() >= "2.1":
-            if OFFHEAP_MEMTABLES:
-                cluster.set_configuration_options(values={'memtable_allocation_type': 'offheap_objects'})
+        if OFFHEAP_MEMTABLES:
+            cluster.set_configuration_options(values={'memtable_allocation_type': 'offheap_objects'})
 
         return cluster
 
@@ -500,9 +499,8 @@ class Tester(TestCase):
             query = '%s AND read_repair_chance=%f' % (query, read_repair)
         if gc_grace is not None:
             query = '%s AND gc_grace_seconds=%d' % (query, gc_grace)
-        if self.cluster.version() >= "2.0":
-            if speculative_retry is not None:
-                query = '%s AND speculative_retry=\'%s\'' % (query, speculative_retry)
+        if speculative_retry is not None:
+            query = '%s AND speculative_retry=\'%s\'' % (query, speculative_retry)
 
         if compact_storage:
             query += ' AND COMPACT STORAGE'
@@ -632,10 +630,7 @@ class Tester(TestCase):
             raise RuntimeError("No network interface defined on this node object. {}".format(node.network_interfaces))
 
     def get_auth_provider(self, user, password):
-        if self.cluster.version() >= '2.0':
-            return PlainTextAuthProvider(username=user, password=password)
-        else:
-            return self.make_auth(user, password)
+        return PlainTextAuthProvider(username=user, password=password)
 
     def make_auth(self, user, password):
         def private_auth(node_ip):

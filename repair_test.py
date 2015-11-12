@@ -285,7 +285,6 @@ class TestRepair(Tester):
         debug("Starting cluster..")
         # populate 2 nodes in dc1, and one node each in dc2 and dc3
         cluster.populate([2, 1, 1]).start()
-        version = cluster.version()
 
         [node1, node2, node3, node4] = cluster.nodelist()
         session = self.patient_cql_connection(node1)

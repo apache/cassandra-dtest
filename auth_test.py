@@ -182,7 +182,6 @@ class TestAuth(Tester):
         session = self.get_session(user='cassandra', password='cassandra')
         assert_invalid(session, "ALTER USER nonexistent WITH PASSWORD 'doesn''tmatter'", "nonexistent doesn't exist")
 
-    @since('2.0')
     def conditional_create_drop_user_test(self):
         self.prepare()
         session = self.get_session(user='cassandra', password='cassandra')
@@ -581,7 +580,6 @@ class TestAuth(Tester):
         self.assertUnauthorized("You are not authorized to view cathy's permissions",
                                 bob, "LIST ALL PERMISSIONS OF cathy")
 
-    @since('2.1')
     def type_auth_test(self):
         self.prepare()
 

@@ -14,7 +14,6 @@ class TestOfflineTools(Tester):
     # in the classpath
     ignore_log_patterns = ["Unable to initialize MemoryMeter"]
 
-    @since('2.1')
     def sstablelevelreset_test(self):
         """
         Insert data and call sstablelevelreset on a series of
@@ -95,7 +94,6 @@ class TestOfflineTools(Tester):
             if pattern.search(output):
                 break
 
-    @since('2.1')
     def sstableofflinerelevel_test(self):
         """
         Generate sstables of varying levels.

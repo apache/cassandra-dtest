@@ -52,12 +52,11 @@ class TestJson(Tester):
         with open(json_path, 'w') as f:
             node1.run_sstable2json(f)
 
-        if self.cluster.version() >= '2.1':
-            with open(json_path, 'r') as fin:
-                data = fin.read().splitlines(True)
-            if data[0][0] == 'W':
-                with open(json_path, 'w') as fout:
-                    fout.writelines(data[1:])
+        with open(json_path, 'r') as fin:
+            data = fin.read().splitlines(True)
+        if data[0][0] == 'W':
+            with open(json_path, 'w') as fout:
+                fout.writelines(data[1:])
 
         debug("Deleting cluster and creating new...")
         cluster.clear()

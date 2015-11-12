@@ -20,8 +20,7 @@ class TestCompaction(Tester):
     def setUp(self):
         Tester.setUp(self)
         # compaction test for version 2.2.2 and above relies on DEBUG log in debug.log
-        if self.cluster.version() > '2.1':
-            self.cluster.set_log_level("DEBUG")
+        self.cluster.set_log_level("DEBUG")
 
     @since('0', '2.2.X')
     def compaction_delete_test(self):
@@ -74,7 +73,7 @@ class TestCompaction(Tester):
 
         node1.flush()
 
-        table_name = 'Standard1' if node1.get_cassandra_version() < '2.1' else 'standard1'
+        table_name = 'standard1'
         output = node1.nodetool('cfstats', True)[0]
         if output.find(table_name) != -1:
             output = output[output.find(table_name):]
@@ -243,7 +242,6 @@ class TestCompaction(Tester):
                 time.sleep(5)
                 cluster.start(wait_for_binary_proto=True)
 
-    @since("2.1")
     def large_compaction_warning_test(self):
         """
         @jira_ticket CASSANDRA-9643
@@ -433,9 +431,7 @@ def block_on_compaction_log(node, ks=None, table=None):
     node.flush()
 
     # on newer C* versions, default stress names are titlecased
-    stress_name_upper = node.get_cassandra_version() < '2.1'
-    stress_keyspace, stress_table = (('Keyspace1', 'Standard1') if stress_name_upper else
-                                     ('keyspace1', 'standard1'))
+    stress_keyspace, stress_table = ('keyspace1', 'standard1')
 
     ks = ks or stress_keyspace
     table = table or stress_table
@@ -446,10 +442,7 @@ def block_on_compaction_log(node, ks=None, table=None):
 
 
 def stress_write(node, keycount=100000):
-    if node.get_cassandra_version() < '2.1':
-        node.stress(['--num-keys={keycount}'.format(keycount=keycount)])
-    else:
-        node.stress(['write', 'n={keycount}'.format(keycount=keycount)])
+    node.stress(['write', 'n={keycount}'.format(keycount=keycount)])
 
 
 strategies = ['LeveledCompactionStrategy', 'SizeTieredCompactionStrategy', 'DateTieredCompactionStrategy']

@@ -19,7 +19,7 @@ from cqlsh_tools import (DummyColorMap, assert_csvs_items_equal, csv_rows,
                          strip_timezone_if_time_string, unmonkeypatch_driver,
                          write_rows_to_csv)
 from dtest import Tester, canReuseCluster, freshCluster, debug
-from tools import rows_to_list, since, require
+from tools import rows_to_list, require
 
 DEFAULT_FLOAT_PRECISION = 5  # magic number copied from cqlsh script
 DEFAULT_TIME_FORMAT = '%Y-%m-%d %H:%M:%S%z'  # based on cqlsh script
@@ -47,7 +47,6 @@ class UTC(datetime.tzinfo):
 
 
 @canReuseCluster
-@since('2.1')  # version differences break formatting code on 2.0.x
 class CqlshCopyTest(Tester):
     """
     Tests the COPY TO and COPY FROM features in cqlsh.

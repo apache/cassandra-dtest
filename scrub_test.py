@@ -418,7 +418,6 @@ class TestScrub(TestHelper):
         users = self.query_users(session)
         self.assertEqual(initial_users, users)
 
-    @since('2.1')
     def test_scrub_with_UDT(self):
         """
         @jira_ticket CASSANDRA-7665

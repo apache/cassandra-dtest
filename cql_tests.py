@@ -51,7 +51,6 @@ class CQLTester(Tester):
         return session
 
 
-@since('2.1')
 @canReuseCluster
 class StorageProxyCQLTester(CQLTester):
     """
@@ -225,7 +224,6 @@ class StorageProxyCQLTester(CQLTester):
         session.execute(query)
 
 
-@since('2.1')
 @canReuseCluster
 class MiscellaneousCQLTester(CQLTester):
     """

@@ -2130,7 +2130,6 @@ class TestMutations(ThriftTester):
         _assert_no_columnpath('key2', ColumnPath(column_family='Counter1', column='c1'))
 
     # known failure: see CASSANDRA-10046
-    @since('2.0')
     def test_range_deletion(self):
         """ Tests CASSANDRA-7990 """
         _set_keyspace('Keyspace1')
@@ -2316,7 +2315,6 @@ class TestMutations(ThriftTester):
         assert len(result[0].columns) == 1, result[0].columns
         assert result[0].columns[0].super_column.name == 'sc1'
 
-    @since('2.1')
     def test_multi_slice(self):
         _set_keyspace('Keyspace1')
         _insert_six_columns('abc')

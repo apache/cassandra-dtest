@@ -143,10 +143,7 @@ class TestJMXMetrics(Tester):
                     self.assertEqual(before[alias_counter], jmx.read_attribute(mbean, attribute))
                     alias_counter += 1
 
-            if cluster.version() < "2.1":
-                node.stress(['-o', 'insert', '-n', '100000', '-p', '7100'])
-            else:
-                node.stress(['write', 'n=100K'])
+            node.stress(['write', 'n=100K'])
 
             errors = []
             after = []

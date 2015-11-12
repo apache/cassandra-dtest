@@ -1,6 +1,5 @@
 from dtest import Tester
 from cassandra import InvalidRequest
-from tools import since
 
 KEYSPACE = "foo"
 
@@ -10,7 +9,6 @@ class TestPreparedStatements(Tester):
     Tests for pushed native protocol notification from Cassandra.
     """
 
-    @since('2.1')
     def dropped_index_test(self):
         """
         Prepared statements using dropped indexes should be handled correctly

@@ -28,10 +28,7 @@ class TestBatch(Tester):
     def counter_batch_rejects_regular_mutations_test(self):
         """ Test that counter batch rejects non-counter mutations """
         session = self.prepare()
-        if self.cluster.version() < '2.1':
-            err = "Only counter mutations are allowed in COUNTER batches"
-        else:
-            err = "Cannot include non-counter statement in a counter batch"
+        err = "Cannot include non-counter statement in a counter batch"
 
         assert_invalid(session, """
             BEGIN COUNTER BATCH
@@ -123,10 +120,7 @@ class TestBatch(Tester):
     def logged_batch_rejects_counter_mutations_test(self):
         """ Test that logged batch rejects counter mutations """
         session = self.prepare()
-        if self.cluster.version() < '2.1':
-            err = "Counter mutations are only allowed in COUNTER batches"
-        else:
-            err = "Cannot include a counter statement in a logged batch"
+        err = "Cannot include a counter statement in a logged batch"
 
         assert_invalid(session, """
             BEGIN BATCH
@@ -152,10 +146,7 @@ class TestBatch(Tester):
     def unlogged_batch_rejects_counter_mutations_test(self):
         """ Test that unlogged batch rejects counter mutations """
         session = self.prepare()
-        if self.cluster.version() < '2.1':
-            err = "Counter mutations are only allowed in COUNTER batches"
-        else:
-            err = "Counter and non-counter mutations cannot exist in the same batch"
+        err = "Counter and non-counter mutations cannot exist in the same batch"
 
         assert_invalid(session, """
             BEGIN UNLOGGED BATCH

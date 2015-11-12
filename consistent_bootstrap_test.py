@@ -1,10 +1,9 @@
 from dtest import Tester, debug
 from tools import (create_c1c2_table, insert_c1c2, query_c1c2,
-                   new_node, no_vnodes, since)
+                   new_node, no_vnodes)
 from cassandra import ConsistencyLevel
 
 
-@since('2.1')
 class TestBootstrapConsistency(Tester):
 
     @no_vnodes()

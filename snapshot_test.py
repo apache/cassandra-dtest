@@ -8,7 +8,7 @@ import time
 from cassandra.concurrent import execute_concurrent_with_args
 
 from dtest import Tester, debug
-from tools import safe_mkdtemp, replace_in_file, since
+from tools import safe_mkdtemp, replace_in_file
 
 
 class SnapshotTester(Tester):
@@ -132,7 +132,6 @@ class TestArchiveCommitlog(SnapshotTester):
         debug("snapshot_dir is : " + snapshot_dir)
         distutils.dir_util.copy_tree(snapshot_dir, os.path.join(data_dir, ks, cf_id))
 
-    @since('2.1')
     def test_archive_commitlog(self):
         self.run_archive_commitlog(restore_point_in_time=False)
 
@@ -197,7 +196,7 @@ class TestArchiveCommitlog(SnapshotTester):
 
         if self.cluster.version() >= '3.0':
             system_ut_snapshot_dir = self.make_snapshot(node1, 'system_schema', 'types', 'usertypes')
-        elif self.cluster.version() >= '2.1':
+        else:
             system_ut_snapshot_dir = self.make_snapshot(node1, 'system', 'schema_usertypes', 'usertypes')
 
         if self.cluster.version() >= '3.0':
@@ -259,7 +258,7 @@ class TestArchiveCommitlog(SnapshotTester):
 
             if self.cluster.version() >= '3.0':
                 self.restore_snapshot(system_ut_snapshot_dir, node1, 'system_schema', 'types', 'usertypes')
-            elif self.cluster.version() >= '2.1':
+            else:
                 self.restore_snapshot(system_ut_snapshot_dir, node1, 'system', 'schema_usertypes', 'usertypes')
 
             if self.cluster.version() >= '3.0':
@@ -318,9 +317,8 @@ class TestArchiveCommitlog(SnapshotTester):
             shutil.rmtree(system_ks_snapshot_dir)
             debug("removing snapshot_dir: " + system_cfs_snapshot_dir)
             shutil.rmtree(system_cfs_snapshot_dir)
-            if self.cluster.version() >= '2.1':
-                debug("removing snapshot_dir: " + system_ut_snapshot_dir)
-                shutil.rmtree(system_ut_snapshot_dir)
+            debug("removing snapshot_dir: " + system_ut_snapshot_dir)
+            shutil.rmtree(system_ut_snapshot_dir)
             debug("removing snapshot_dir: " + system_col_snapshot_dir)
             shutil.rmtree(system_col_snapshot_dir)
             debug("removing tmp_commitlog: " + tmp_commitlog)

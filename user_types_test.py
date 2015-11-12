@@ -29,7 +29,6 @@ def listify(item):
     return decoded
 
 
-@since('2.1')
 class TestUserTypes(Tester):
 
     def __init__(self, *args, **kwargs):
