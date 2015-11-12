@@ -4,6 +4,7 @@ from assertions import assert_almost_equal
 
 import re
 import time
+from ccmlib.node import NodetoolError
 from ccmlib.node import TimeoutError
 from cassandra import ConsistencyLevel
 from threading import Thread

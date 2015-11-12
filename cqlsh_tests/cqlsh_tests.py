@@ -1819,8 +1819,9 @@ class CqlLoginTest(Tester):
             if expected_error in err_line:
                 break
         else:
-            self.fail("Did not find expected error '%s' in cqlsh stderr output: %s" %
-                      expected_error, '\n'.join(err_lines))
+            self.fail("Did not find expected error '{}' in "
+                      "cqlsh stderr output: {}".format(expected_error,
+                                                       '\n'.join(err_lines)))
 
     def test_login_allows_bad_pass_and_continued_use(self):
         self.create_ks(self.session, 'ks1', 1)
