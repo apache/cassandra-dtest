@@ -69,21 +69,21 @@ class TestJMX(Tester):
         node1.flush()
         node1.stop(gently=False)
         try:
-            node1.nodetool("netstats")
+            node1.nodetool('netstats')
         except Exception as e:
-            if "ConcurrentModificationException" in str(e):
-                self.fail("Netstats failed due to CASSANDRA-6577")
+            if 'ConcurrentModificationException' in str(e):
+                self.fail('Netstats failed due to CASSANDRA-6577')
             else:
                 debug(str(e))
 
         node1.start(wait_for_binary_proto=True)
 
         try:
-            node1.nodetool("netstats")
+            node1.nodetool('netstats')
         except Exception as e:
             if 'java.lang.reflect.UndeclaredThrowableException' in str(e):
                 debug(str(e))
-                self.fail("Netstats failed with UndeclaredThrowableException (CASSANDRA-8122)")
+                self.fail('Netstats failed with UndeclaredThrowableException (CASSANDRA-8122)')
             else:
                 self.fail(str(e))
 
