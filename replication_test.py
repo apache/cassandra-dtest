@@ -288,25 +288,25 @@ class SnitchConfigurationUpdateTest(Tester):
         for i, node in enumerate(nodes):
             wait_expire = time.time() + 120
             while time.time() < wait_expire:
-                    out, err = node.nodetool("status")
+                out, err = node.nodetool("status")
 
-                    debug(out)
-                    if len(err.strip()) > 0:
-                        raise RuntimeError("Error trying to run nodetool status")
+                debug(out)
+                if len(err.strip()) > 0:
+                    raise RuntimeError("Error trying to run nodetool status")
 
-                    racks = []
-                    for line in out.split(os.linesep):
-                        m = regex.match(line)
-                        if m:
-                            racks.append(m.group(1))
+                racks = []
+                for line in out.split(os.linesep):
+                    m = regex.match(line)
+                    if m:
+                        racks.append(m.group(1))
 
-                    if racks == expected_racks:
-                        # great, the topology change is propogated
-                        debug("Topology change detected on node {}".format(i))
-                        break
-                    else:
-                        debug("Waiting for topology change on node {}".format(i))
-                        time.sleep(5)
+                if racks == expected_racks:
+                    # great, the topology change is propogated
+                    debug("Topology change detected on node {}".format(i))
+                    break
+                else:
+                    debug("Waiting for topology change on node {}".format(i))
+                    time.sleep(5)
             else:
                 raise RuntimeError("Ran out of time waiting for topology to change on node {}".format(i))
 
