@@ -3,6 +3,9 @@ import sys
 import unittest
 import time
 
+import ccmlib.common
+from ccmlib.node import NodetoolError
+
 from dtest import Tester, debug
 from jmxutils import JolokiaAgent, make_mbean, remove_perf_disable_shared_mem
 from tools import since
@@ -68,24 +71,30 @@ class TestJMX(Tester):
         node1.stress(['write', 'n=5M', '-schema', 'replication(factor=3)'])
         node1.flush()
         node1.stop(gently=False)
-        try:
-            node1.nodetool('netstats')
-        except Exception as e:
-            if 'ConcurrentModificationException' in str(e):
-                self.fail('Netstats failed due to CASSANDRA-6577')
-            else:
-                debug(str(e))
 
-        node1.start(wait_for_binary_proto=True)
-
-        try:
+        with self.assertRaisesRegexp(NodetoolError, "ConnectException: 'Connection refused'."):
             node1.nodetool('netstats')
-        except Exception as e:
-            if 'java.lang.reflect.UndeclaredThrowableException' in str(e):
-                debug(str(e))
-                self.fail('Netstats failed with UndeclaredThrowableException (CASSANDRA-8122)')
-            else:
-                self.fail(str(e))
+
+        # don't wait; we're testing for when nodetool is called on a node mid-startup
+        node1.start(wait_for_binary_proto=False)
+
+        # until the binary interface is available, try `nodetool netstats`
+        binary_interface = node1.network_interfaces['binary']
+        time_out_at = time.time() + 30
+        running = False
+        while (not running and time.time() <= time_out_at):
+            running = ccmlib.common.check_socket_listening(binary_interface, timeout=0.5)
+            try:
+                node1.nodetool('netstats')
+            except Exception as e:
+                self.assertNotIn('java.lang.reflect.UndeclaredThrowableException', str(e),
+                                 'Netstats failed with UndeclaredThrowableException (CASSANDRA-8122)')
+                if not isinstance(e, NodetoolError):
+                    raise
+                else:
+                    self.assertIn("ConnectException: 'Connection refused'.", str(e))
+
+        self.assertTrue(running, msg='node1 never started')
 
     @since('2.1')
     def table_metric_mbeans_test(self):
