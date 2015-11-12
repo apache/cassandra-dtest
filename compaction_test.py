@@ -125,7 +125,7 @@ class TestCompaction(Tester):
         try:
             for x in xrange(0, cluster.data_dir_count):
                 cfs = os.listdir(node1.get_path() + "/data{0}/ks".format(x))
-                ssdir = os.listdir(node1.get_path() + "/data{0}/ks/{1}".format(format(x), cfs[0]))
+                ssdir = os.listdir(node1.get_path() + "/data{0}/ks/{1}".format(x, cfs[0]))
                 for afile in ssdir:
                     self.assertFalse("Data" in afile)
 
