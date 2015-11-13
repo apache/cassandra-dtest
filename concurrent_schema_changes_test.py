@@ -6,9 +6,9 @@ import time
 from random import randrange
 from threading import Thread
 
+from cassandra.concurrent import execute_concurrent
 from ccmlib.node import Node
 
-from cassandra.concurrent import execute_concurrent
 from dtest import Tester, debug
 from tools import since
 
@@ -20,6 +20,7 @@ def wait(delay=2):
     time.sleep(delay)
 
 
+@require(10699)
 class TestConcurrentSchemaChanges(Tester):
 
     def __init__(self, *argv, **kwargs):
