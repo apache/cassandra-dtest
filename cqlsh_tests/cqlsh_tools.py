@@ -31,7 +31,7 @@ def strip_timezone_if_time_string(s):
         time_struct = time.strptime(time_string_no_tz, '%Y-%m-%d %H:%M:%S')
         dt_no_timezone = datetime.datetime(*time_struct[:6])
         return dt_no_timezone.strftime('%Y-%m-%d %H:%M:%S')
-    except:
+    except (TypeError, ValueError):
         return s
 
 
