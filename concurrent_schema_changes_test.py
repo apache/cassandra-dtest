@@ -7,10 +7,10 @@ from random import randrange
 from threading import Thread
 
 from cassandra.concurrent import execute_concurrent
-from ccmlib.node import Node
 
+from ccmlib.node import Node
 from dtest import Tester, debug
-from tools import since
+from tools import require, since
 
 
 def wait(delay=2):
