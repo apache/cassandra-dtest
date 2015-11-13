@@ -5,7 +5,6 @@ from math import floor
 from os.path import getsize
 
 from dtest import Tester, debug
-from tools import since
 
 
 class TestSSTableSplit(Tester):
@@ -26,10 +25,7 @@ class TestSSTableSplit(Tester):
         version = cluster.version()
 
         debug("Run stress to insert data")
-        if version < "2.1":
-            node.stress(['-o', 'insert'])
-        else:
-            node.stress(['write', 'n=1000000', '-rate', 'threads=10'])
+        node.stress(['write', 'n=1000000', '-rate', 'threads=10'])
 
         self._do_compaction(node)
         self._do_split(node, version)
@@ -37,17 +33,14 @@ class TestSSTableSplit(Tester):
         self._do_split(node, version)
 
         debug("Run stress to ensure data is readable")
-        if version < "2.1":
-            node.stress(['-o', 'read'])
-        else:
-            node.stress(['read', 'n=1000000', '-rate', 'threads=25'])
+        node.stress(['read', 'n=1000000', '-rate', 'threads=25'])
 
     def _do_compaction(self, node):
         debug("Compact sstables.")
         node.flush()
         node.compact()
         node.flush()
-        keyspace = 'keyspace1' if self.cluster.version() >= '2.1' else 'Keyspace1'
+        keyspace = 'keyspace1'
         sstables = node.get_sstables(keyspace, '')
         debug("Number of sstables after compaction: %s" % len(sstables))
 
@@ -59,7 +52,7 @@ class TestSSTableSplit(Tester):
         # default split size is 50MB
         splitmaxsize = 10
         expected_sstable_size = (10 * 1024 * 1024)
-        keyspace = 'keyspace1' if self.cluster.version() >= '2.1' else 'Keyspace1'
+        keyspace = 'keyspace1'
 
         # get the initial sstables and their total size
         origsstables = node.get_sstables(keyspace, '')
@@ -91,7 +84,6 @@ class TestSSTableSplit(Tester):
         # make sure node can start with changed sstables
         node.start(wait_for_binary_proto=True)
 
-    @since("2.1")
     def single_file_split_test(self):
         """
         Covers CASSANDRA-8623

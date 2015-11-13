@@ -357,7 +357,6 @@ UPDATE varcharmaptable SET varcharvarintmap['Vitrum edere possum, mihi non nocet
 
         self.verify_glass(node1)
 
-    @since('2.1')
     def test_source_glass(self):
 
         self.cluster.populate(1)
@@ -450,7 +449,6 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
 
         self.assertTrue(expected in output, "Output \n {%s} \n doesn't contain expected\n {%s}" % (output, expected))
 
-    @since('2.0')
     def tracing_from_system_traces_test(self):
         self.cluster.populate(1).start(wait_for_binary_proto=True)
 
@@ -472,7 +470,6 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         out, err = self.run_cqlsh(node1, 'TRACING ON; SELECT * FROM system_traces.sessions')
         self.assertNotIn('Tracing session: ', out)
 
-    @since('2.1')
     def select_element_inside_udt_test(self):
         self.cluster.populate(1).start()
 
@@ -578,7 +575,6 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
 (6 rows)
 """)
 
-    @since('2.1')
     def test_describe(self):
         """
         @jira_ticket CASSANDRA-7814
@@ -672,12 +668,11 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         session.execute("CREATE TABLE tab (key int PRIMARY KEY ) "
                         "WITH compaction = {'class': 'SizeTieredCompactionStrategy',"
                         "'min_threshold': 10, 'max_threshold': 100 }")
-        describe_cmd = 'DESCRIBE ks.tab' if self.cluster.version > '2.0' else 'DESCRIBE TABLE ks.tab'
+        describe_cmd = 'DESCRIBE ks.tab'
         stdout, _ = self.run_cqlsh(node, describe_cmd)
         self.assertIn("'min_threshold': '10'", stdout)
         self.assertIn("'max_threshold': '100'", stdout)
 
-    @since('2.1')
     def test_describe_on_non_reserved_keywords(self):
         """
         @jira_ticket CASSANDRA-9232
@@ -927,7 +922,6 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         new_results = list(session.execute("SELECT * FROM testcopyto"))
         self.assertItemsEqual(results, new_results)
 
-    @since('2.1')
     def test_float_formatting(self):
         """ Tests for CASSANDRA-9224, check format of float and double values"""
         self.cluster.populate(1)
@@ -1249,7 +1243,6 @@ Tracing session:""")
 Warnings :
 Unlogged batch covering 2 partitions detected against table [client_warnings.test]. You should use a logged batch for atomicity, or asynchronous writes for performance.""")
 
-    @since('2.1')
     def test_connect_timeout(self):
         """
         @jira_ticket CASSANDRA-9601
@@ -1262,7 +1255,6 @@ Unlogged batch covering 2 partitions detected against table [client_warnings.tes
         stdout, stderr = self.run_cqlsh(node1, cmds='USE system', cqlsh_options=['--debug', '--connect-timeout=10'])
         self.assertTrue("Using connect timeout: 10 seconds" in stderr)
 
-    @since('2.1')
     def test_refresh_schema_on_timeout_error(self):
         """
         @jira_ticket CASSANDRA-9689
@@ -1693,7 +1685,6 @@ class CqlshSmokeTest(Tester):
         self.assertEqual(ks2_stderr, '')
 
     # DROP INDEX statement fails in 2.0 (see CASSANDRA-9247)
-    @since('2.1')
     def test_drop_index(self):
         self.create_ks(self.session, 'ks', 1)
         self.create_cf(self.session, 'test', columns={'i': 'int'})
@@ -1716,7 +1707,6 @@ class CqlshSmokeTest(Tester):
         self.assertRaises(InvalidRequest, execute_requires_index)
 
     # DROP INDEX statement fails in 2.0 (see CASSANDRA-9247)
-    @since('2.1')
     def test_create_index(self):
         self.create_ks(self.session, 'ks', 1)
         self.create_cf(self.session, 'test', columns={'i': 'int'})

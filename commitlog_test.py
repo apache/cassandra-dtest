@@ -90,8 +90,7 @@ class TestCommitLog(Tester):
         conf = {'commitlog_segment_size_in_mb': segment_size_in_mb}
         if compressed:
             conf['commitlog_compression'] = [{'class_name': 'LZ4Compressor'}]
-        if self.cluster.version() >= "2.1":
-            conf['memtable_heap_space_in_mb'] = 512
+        conf['memtable_heap_space_in_mb'] = 512
         self.prepare(configuration=conf, create_test_keyspace=False)
 
         segment_size = segment_size_in_mb * 1024 * 1024
@@ -142,14 +141,8 @@ class TestCommitLog(Tester):
 
         self._change_commitlog_perms(0)
 
-        if self.cluster.version() < "2.1":
-            with open(os.devnull, 'w') as devnull:
-                self.node1.stress(['--num-keys=1000000', '-S', '1000'],
-                                  stdout=devnull, stderr=subprocess.STDOUT)
-        else:
-            with open(os.devnull, 'w') as devnull:
-                self.node1.stress(['write', 'n=1M', '-col', 'size=FIXED(1000)', '-rate', 'threads=25'],
-                                  stdout=devnull, stderr=subprocess.STDOUT)
+        with open(os.devnull, 'w') as devnull:
+            self.node1.stress(['write', 'n=1M', '-col', 'size=FIXED(1000)', '-rate', 'threads=25'], stdout=devnull, stderr=subprocess.STDOUT)
 
     def test_commitlog_replay_on_startup(self):
         """ Test commit log replay """
@@ -208,13 +201,11 @@ class TestCommitLog(Tester):
         self.assertItemsEqual(rows_to_list(res),
                               [[u'gandalf', 1955, u'male', u'p@$$', u'WA']])
 
-    @since('2.1')
     def default_segment_size_test(self):
         """ Test default commitlog_segment_size_in_mb (32MB) """
 
         self._segment_size_test(32)
 
-    @since('2.1')
     def small_segment_size_test(self):
         """ Test a small commitlog_segment_size_in_mb (5MB) """
 
@@ -283,7 +274,6 @@ class TestCommitLog(Tester):
             [2, 2]
         )
 
-    @since('2.1')
     def die_failure_policy_test(self):
         """ Test the die commitlog failure policy """
         self.prepare(configuration={
@@ -478,11 +468,7 @@ class TestCommitLog(Tester):
             # read the header and find the crc location
             with open(os.path.join(cl_dir, cl), 'r') as f:
                 f.seek(0)
-                version = struct.unpack('>i', f.read(4))[0]
                 crc_pos = 12
-                # if version < 5:
-                #     # not applicable
-                #     return
                 f.seek(crc_pos)
                 psize = struct.unpack('>h', f.read(2))[0] & 0xFFFF
                 crc_pos += 2 + psize

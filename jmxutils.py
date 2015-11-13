@@ -56,7 +56,7 @@ def remove_perf_disable_shared_mem(node):
     option (see https://github.com/rhuss/jolokia/issues/198 for details).  This
     edits cassandra-env.sh (or the Windows equivalent) to remove that option.
     """
-    if common.is_win() and node.get_base_cassandra_version() >= 2.1:
+    if common.is_win():
         conf_file = os.path.join(node.get_conf_dir(), common.CASSANDRA_WIN_ENV)
     else:
         conf_file = os.path.join(node.get_conf_dir(), common.CASSANDRA_ENV)

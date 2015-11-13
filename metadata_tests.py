@@ -14,28 +14,19 @@ class TestMetadata(Tester):
     def force_compact(self):
         cluster = self.cluster
         (node1, node2) = cluster.nodelist()
-        if cluster.version() < "2.1":
-            node1.nodetool("compact Keyspace1 Standard1")
-        else:
-            node1.nodetool("compact keyspace1 standard1")
+        node1.nodetool("compact keyspace1 standard1")
 
     def force_repair(self):
         cluster = self.cluster
         (node1, node2) = cluster.nodelist()
-        if cluster.version() < "2.1":
-            node1.nodetool('repair Keyspace1 Standard1')
-        else:
-            node1.nodetool('repair keyspace1 standard1')
+        node1.nodetool('repair keyspace1 standard1')
 
     def do_read(self):
         cluster = self.cluster
         (node1, node2) = cluster.nodelist()
 
-        if cluster.version() < "2.1":
-            node1.stress(['-o', 'read', '-n', '30000', '-l', '2', '-t', '1', '-I', 'LZ4Compressor'])
-        else:
-            node1.stress(['read', 'no-warmup', 'n=30000', '-schema', 'replication(factor=2)', 'compression=LZ4Compressor',
-                          '-rate', 'threads=1'])
+        node1.stress(['read', 'no-warmup', 'n=30000', '-schema', 'replication(factor=2)', 'compression=LZ4Compressor',
+                      '-rate', 'threads=1'])
 
     @require(9831, broken_in='2.0')
     def metadata_reset_while_compact_test(self):
@@ -57,11 +48,7 @@ class TestMetadata(Tester):
         node1.nodetool("setcompactionthroughput 1")
 
         for i in range(3):
-            if cluster.version() < "2.1":
-                node1.stress(['-o', 'insert', '-n', '30000', '-l', '2', '-t', '5', '-I', 'LZ4Compressor'])
-            else:
-                node1.stress(['write', 'no-warmup', 'n=30000', '-schema', 'replication(factor=2)', 'compression=LZ4Compressor',
-                              '-rate', 'threads=5', '-pop', 'seq=1..30000'])
+            node1.stress(['write', 'no-warmup', 'n=30000', '-schema', 'replication(factor=2)', 'compression=LZ4Compressor', '-rate', 'threads=5', '-pop', 'seq=1..30000'])
             node1.flush()
 
         thread = threading.Thread(target=self.force_compact)

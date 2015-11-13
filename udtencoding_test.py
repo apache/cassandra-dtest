@@ -1,11 +1,9 @@
 from dtest import Tester
 from assertions import assert_invalid
-from tools import since
 
 import time
 
 
-@since('2.1')
 class TestUDTEncoding(Tester):
 
     def udt_test(self):

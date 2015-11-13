@@ -547,7 +547,6 @@ class TestConcurrentSchemaChanges(Tester):
         cluster = self.cluster
         cluster.populate(1).start()
         node1 = cluster.nodelist()[0]
-        version = cluster.version()
         wait(2)
         session = self.cql_connection(node1)
 
@@ -562,10 +561,7 @@ class TestConcurrentSchemaChanges(Tester):
             debug("Done Compacting.")
 
         # put some data into the cluster
-        if version < "2.1":
-            stress(['--num-keys=30000'])
-        else:
-            stress(['write', 'n=30000', '-rate', 'threads=8'])
+        stress(['write', 'n=30000', '-rate', 'threads=8'])
 
         # now start stressing and compacting at the same time
         tcompact = Thread(target=compact)
@@ -573,23 +569,10 @@ class TestConcurrentSchemaChanges(Tester):
         wait(1)
 
         # now the cluster is under a lot of load. Make some schema changes.
-        if version >= "2.1":
-            session.execute('USE keyspace1')
-            wait(1)
-            session.execute('DROP TABLE standard1')
-            wait(3)
-            session.execute('CREATE TABLE standard1 (KEY text PRIMARY KEY)')
-        elif version >= "1.2":
-            session.execute('USE "Keyspace1"')
-            wait(1)
-            session.execute('DROP COLUMNFAMILY "Standard1"')
-            wait(3)
-            session.execute('CREATE COLUMNFAMILY "Standard1" (KEY text PRIMARY KEY)')
-        else:
-            session.execute('USE Keyspace1')
-            wait(1)
-            session.execute('DROP COLUMNFAMILY Standard1')
-            wait(3)
-            session.execute('CREATE COLUMNFAMILY Standard1 (KEY text PRIMARY KEY)')
+        session.execute('USE keyspace1')
+        wait(1)
+        session.execute('DROP TABLE standard1')
+        wait(3)
+        session.execute('CREATE TABLE standard1 (KEY text PRIMARY KEY)')
 
         tcompact.join()

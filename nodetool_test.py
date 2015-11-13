@@ -16,7 +16,6 @@ class TestNodetool(Tester):
         """
         cluster = self.cluster
         cluster.populate([3]).start()
-        version = cluster.version()
 
         node = cluster.nodelist()[0]
         node.drain(block_on_log=True)
@@ -25,12 +24,8 @@ class TestNodetool(Tester):
             node.decommission()
             self.assertFalse("Expected nodetool error")
         except NodetoolError as e:
-            if version >= "2.1":
-                self.assertEqual('', e.stderr)
-                self.assertTrue('Unsupported operation' in e.stdout)
-            else:
-                self.assertEqual('', e.stdout)
-                self.assertTrue('Unsupported operation' in e.stderr)
+            self.assertEqual('', e.stderr)
+            self.assertTrue('Unsupported operation' in e.stdout)
 
     def test_correct_dc_rack_in_nodetool_info(self):
         """

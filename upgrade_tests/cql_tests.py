@@ -2580,7 +2580,6 @@ class TestCQL(UpgradeTester):
             rows = list(cursor.execute(select_statement, [0, in_values]))
             self.assertEqual(len(clustering_values), len(rows))
 
-    @since('1.2.1')
     def timeuuid_test(self):
         cursor = self.prepare()
 
@@ -2662,7 +2661,6 @@ class TestCQL(UpgradeTester):
             res = cursor.execute("SELECT * FROM bar")
             assert rows_to_list(res) == [[1, 2]], res
 
-    @since('2.0')
     def clustering_indexing_test(self):
         cursor = self.prepare()
 
@@ -2709,7 +2707,6 @@ class TestCQL(UpgradeTester):
             res = cursor.execute("SELECT v1 FROM posts WHERE time = 1")
             assert rows_to_list(res) == [['B'], ['E']], res
 
-    @since('2.0')
     def edge_2i_on_complex_pk_test(self):
         cursor = self.prepare()
 
@@ -2883,7 +2880,6 @@ class TestCQL(UpgradeTester):
             res = cursor.execute("SELECT * FROM test")
             assert rows_to_list(res) == [[0, '']], res
 
-    @since('2.0')
     def rename_test(self):
         cursor = self.prepare(start_rpc=True)
 
@@ -2935,7 +2931,6 @@ class TestCQL(UpgradeTester):
 
             cursor.execute("SELECT dateOf(t) FROM test")
 
-    @since('2.0')
     def conditional_update_test(self):
         cursor = self.prepare()
 
@@ -3039,7 +3034,6 @@ class TestCQL(UpgradeTester):
             assert_one(cursor, "UPDATE test SET v2 = 'bar' WHERE k = 0 IF v1 IN (142, 276)", [False, 2])
             assert_one(cursor, "UPDATE test SET v2 = 'bar' WHERE k = 0 IF v1 IN ()", [False, 2])
 
-    @since('2.0.7')
     def conditional_delete_test(self):
         cursor = self.prepare()
 
@@ -3120,7 +3114,6 @@ class TestCQL(UpgradeTester):
             assert_all(cursor, "SELECT * FROM test", [[0], [1], [-1]])
             assert_invalid(cursor, "SELECT * FROM test WHERE k >= -1 AND k < 1;")
 
-    @since('2.0')
     def select_with_alias_test(self):
         cursor = self.prepare()
         cursor.execute('CREATE TABLE users (id int PRIMARY KEY, name text)')
@@ -3239,7 +3232,6 @@ class TestCQL(UpgradeTester):
 
             assert_one(cursor, "SELECT * FROM test", [1, set([2])])
 
-    @since('2.0.1')
     def select_distinct_test(self):
         cursor = self.prepare(ordered=True)
 
@@ -3366,7 +3358,6 @@ class TestCQL(UpgradeTester):
             debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
             assert_invalid(cursor, "SELECT * FROM test WHERE a = 3 AND b IN (1, 3)")
 
-    @since('2.0')
     def bug_6069_test(self):
         cursor = self.prepare()
 
@@ -3420,7 +3411,6 @@ class TestCQL(UpgradeTester):
             # Insert a non-version 1 uuid
             assert_invalid(cursor, "INSERT INTO test(k, c, v) VALUES (0, 0, 550e8400-e29b-41d4-a716-446655440000)")
 
-    @since('2.1')
     def user_types_test(self):
         cursor = self.prepare()
 
@@ -3481,7 +3471,6 @@ class TestCQL(UpgradeTester):
             res = cursor.execute(stmt)
             # TODO: deserialize the value here and check it's right.
 
-    @since('2.1')
     def more_user_types_test(self):
         """ user type test that does a little more nesting"""
 
@@ -3514,7 +3503,6 @@ class TestCQL(UpgradeTester):
             # TODO: check result once we have an easy way to do it. For now we just check it doesn't crash
             cursor.execute("SELECT * FROM test")
 
-    @since('1.2')
     def bug_6327_test(self):
         cursor = self.prepare()
 
@@ -3557,7 +3545,6 @@ class TestCQL(UpgradeTester):
             assert_none(cursor, "SELECT v FROM test2 WHERE k=0 AND v IN (1, 0)")
             assert_none(cursor, "SELECT v FROM test2 WHERE v IN (1, 0) ALLOW FILTERING")
 
-    @since('1.2')
     def large_count_test(self):
         cursor = self.prepare()
 
@@ -3590,7 +3577,6 @@ class TestCQL(UpgradeTester):
             execute_concurrent_with_args(cursor, insert_statement, [(i,) for i in range(10002, 15001)])
             assert_one(cursor, "SELECT COUNT(*) FROM test", [15000])
 
-    @since('2.1')
     def collection_indexing_test(self):
         cursor = self.prepare()
 
@@ -3639,7 +3625,6 @@ class TestCQL(UpgradeTester):
             assert_all(cursor, "SELECT k, v FROM test WHERE m CONTAINS 2", [[0, 1]])
             assert_none(cursor, "SELECT k, v FROM test  WHERE m CONTAINS 4")
 
-    @since('2.1')
     def map_keys_indexing(self):
         cursor = self.prepare()
 
@@ -3697,7 +3682,6 @@ class TestCQL(UpgradeTester):
             assert selected[1] == [float("inf")]
             assert selected[2] == [float("-inf")]
 
-    @since('2.0')
     def static_columns_test(self):
         cursor = self.prepare()
 
@@ -3764,7 +3748,6 @@ class TestCQL(UpgradeTester):
             cursor.execute("DELETE s FROM test WHERE k=0")
             assert_all(cursor, "SELECT * FROM test", [[0, 1, None, 1]])
 
-    @since('2.0')
     def static_columns_cas_test(self):
         cursor = self.prepare()
 
@@ -3891,7 +3874,6 @@ class TestCQL(UpgradeTester):
                          APPLY BATCH
                        """, [False, 1, 'k2', 'newVal'])
 
-    @since('2.0')
     def static_columns_with_2i_test(self):
         cursor = self.prepare()
 
@@ -3921,7 +3903,6 @@ class TestCQL(UpgradeTester):
             # We don't support that
             assert_invalid(cursor, "SELECT s FROM test WHERE v = 1")
 
-    @since('2.0')
     def static_columns_with_distinct_test(self):
         cursor = self.prepare()
 
@@ -4042,7 +4023,6 @@ class TestCQL(UpgradeTester):
                 # the coordinator is the not-upgraded 2.1 node
                 assert_one(cursor, "select count(*) from test where field3 = false limit 1;", [1])
 
-    @since('2.0')
     def cas_and_ttl_test(self):
         cursor = self.prepare()
         cursor.execute("CREATE TABLE test (k int PRIMARY KEY, v int, lock boolean)")
@@ -4056,7 +4036,6 @@ class TestCQL(UpgradeTester):
             time.sleep(2)
             assert_one(cursor, "UPDATE test SET v = 1 WHERE k = 0 IF lock = null", [True])
 
-    @since('2.0')
     def tuple_notation_test(self):
         """ Test the syntax introduced by #4851 """
         cursor = self.prepare()
@@ -4134,7 +4113,6 @@ class TestCQL(UpgradeTester):
             assert_all(cursor, "SELECT * FROM test WHERE k=0 AND c1 = 0 AND c2 IN (0, 2) ORDER BY c1 ASC", [[0, 0, 0], [0, 0, 2]])
             assert_all(cursor, "SELECT * FROM test WHERE k=0 AND c1 = 0 AND c2 IN (0, 2) ORDER BY c1 DESC", [[0, 0, 2], [0, 0, 0]])
 
-    @since('2.1')
     def in_order_by_without_selecting_test(self):
         """ Test that columns don't need to be selected for ORDER BY when there is a IN (#4911) """
 
@@ -4173,7 +4151,6 @@ class TestCQL(UpgradeTester):
             # since we don't know the write times, just assert that the order matches the order we expect
             self.assertEqual(results, list(sorted(results)))
 
-    @since('2.0')
     def cas_and_compact_test(self):
         """ Test for CAS with compact storage table, and #6813 in particular """
         cursor = self.prepare()
@@ -4276,7 +4253,6 @@ class TestCQL(UpgradeTester):
                 # not supported yet
                 check_invalid("m CONTAINS 'bar'", expected=SyntaxException)
 
-    @since('2.1')
     def list_item_conditional_test(self):
         # Lists
         cursor = self.prepare()
@@ -4543,7 +4519,6 @@ class TestCQL(UpgradeTester):
                 check_invalid("m CONTAINS null", expected=SyntaxException)
                 check_invalid("m CONTAINS KEY null", expected=SyntaxException)
 
-    @since('2.0')
     def map_item_conditional_test(self):
         cursor = self.prepare()
 
@@ -4792,7 +4767,6 @@ class TestCQL(UpgradeTester):
 
             assert_all(cursor, "SELECT * FROM test WHERE k2 = 0 AND v >= 2 ALLOW FILTERING", [[2, 0, 7], [0, 0, 3], [1, 0, 4]])
 
-    @since('2.1')
     def invalid_custom_timestamp_test(self):
         cursor = self.prepare()
 
@@ -4821,7 +4795,6 @@ class TestCQL(UpgradeTester):
             assert_invalid(cursor, "BEGIN COUNTER BATCH UPDATE counters USING TIMESTAMP 3 SET c = c + 1 WHERE k = 0; UPDATE counters SET c = c + 1 WHERE k = 0; APPLY BATCH")
             assert_invalid(cursor, "BEGIN COUNTER BATCH USING TIMESTAMP 3 UPDATE counters SET c = c + 1 WHERE k = 0; UPDATE counters SET c = c + 1 WHERE k = 0; APPLY BATCH")
 
-    @since('1.2')
     def clustering_order_in_test(self):
         """Test for #7105 bug"""
         cursor = self.prepare()
@@ -4845,7 +4818,6 @@ class TestCQL(UpgradeTester):
             assert_one(cursor, "SELECT * FROM test WHERE a=1 AND b=2 AND c IN (3)", [1, 2, 3])
             assert_one(cursor, "SELECT * FROM test WHERE a=1 AND b=2 AND c IN (3, 4)", [1, 2, 3])
 
-    @since('1.2')
     def bug7105_test(self):
         """Test for #7105 bug"""
         cursor = self.prepare()
@@ -4869,7 +4841,6 @@ class TestCQL(UpgradeTester):
 
             assert_one(cursor, "SELECT * FROM test WHERE a=1 AND b=2 ORDER BY b DESC", [1, 2, 3, 3])
 
-    @since('2.0')
     def bug_6612_test(self):
         cursor = self.prepare()
 
@@ -4899,7 +4870,6 @@ class TestCQL(UpgradeTester):
 
             assert_one(cursor, "select count(*) from session_data where app_name='foo' and account='bar' and last_access > 4 allow filtering", [1])
 
-    @since('2.0')
     def blobAs_functions_test(self):
         cursor = self.prepare()
 

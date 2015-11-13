@@ -57,23 +57,16 @@ class TestSSTableGenerationAndLoading(Tester):
 
         # Makinge sure the cluster is ready to accept the subsequent
         # stress connection. This was an issue on Windows.
-        version = cluster.version()
-        if version < "2.1":
-            node1.stress(['--num-keys=10000'])
-        else:
-            node1.stress(['write', 'n=10000', '-rate', 'threads=8'])
+        node1.stress(['write', 'n=10000', '-rate', 'threads=8'])
         node1.flush()
         node1.compact()
         node1.stop()
         time.sleep(1)
         path = ""
-        if version < "2.1":
-            path = os.path.join(node1.get_path(), 'data', 'Keyspace1', 'Standard1')
-        else:
-            basepath = os.path.join(node1.get_path(), 'data', 'keyspace1')
-            for x in os.listdir(basepath):
-                if x.startswith("standard1"):
-                    path = os.path.join(basepath, x)
+        basepath = os.path.join(node1.get_path(), 'data', 'keyspace1')
+        for x in os.listdir(basepath):
+            if x.startswith("standard1"):
+                path = os.path.join(basepath, x)
 
         os.system('rm %s/*Index.db' % path)
         os.system('rm %s/*Filter.db' % path)

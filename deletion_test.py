@@ -27,8 +27,6 @@ class TestDeletion(Tester):
 
         session.execute('delete from cf where key=1')
         result = list(session.execute('select * from cf;'))
-        if cluster.version() < '1.2':  # > 1.2 doesn't show tombstones
-            assert len(result) == 2 and len(result[0]) == 1 and len(result[1]) == 1, result
 
         node1.flush()
         time.sleep(.5)
@@ -59,9 +57,7 @@ class TestDeletion(Tester):
 
 
 def memtable_size(node, keyspace, table):
-    version = node.get_cassandra_version()
-    name = 'MemtableOnHeapSize' if version >= '2.1' else 'MemtableDataSize'
-    return table_metric(node, keyspace, table, name)
+    return table_metric(node, keyspace, table, 'MemtableOnHeapSize')
 
 
 def memtable_count(node, keyspace, table):

@@ -10,10 +10,9 @@ from assertions import assert_almost_equal, assert_one
 from ccmlib.node import Node
 from ccmlib.common import is_win
 from dtest import Tester, debug
-from tools import insert_c1c2, since
+from tools import insert_c1c2
 
 
-@since('2.1')
 class TestIncRepair(Tester):
 
     def __init__(self, *args, **kwargs):
@@ -176,7 +175,6 @@ class TestIncRepair(Tester):
         os.remove('initial.txt')
         os.remove('final.txt')
 
-    @since('2.1')
     def compaction_test(self):
         cluster = self.cluster
         cluster.populate(3).start()
@@ -209,7 +207,6 @@ class TestIncRepair(Tester):
         for x in range(0, 150):
             assert_one(session, "select val from tab where key =" + str(x), [1])
 
-    @since('2.1')
     @attr('long')
     @skip('hangs CI')
     def multiple_subsequent_repair_test(self):
@@ -269,7 +266,6 @@ class TestIncRepair(Tester):
         expected_load_size = 4.5  # In GB
         assert_almost_equal(load_size, expected_load_size, error=0.25)
 
-    @since('2.1')
     def sstable_marking_test_not_intersecting_all_ranges(self):
         """
         @jira_ticket CASSANDRA-10299

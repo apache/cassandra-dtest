@@ -1,9 +1,7 @@
 from dtest import Tester
-from tools import since
 import os
 
 
-@since('2.1')
 class TestCFID(Tester):
 
     def cfid_test(self):

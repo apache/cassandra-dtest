@@ -108,7 +108,6 @@ class TestPushedNotifications(Tester):
             self.assertEquals(self.get_ip_from_node(node1), address)
 
     @no_vnodes()
-    @since("2.1")
     @require("10052")
     def move_single_node_localhost_test(self):
         """
@@ -175,7 +174,6 @@ class TestPushedNotifications(Tester):
             self.assertEquals("NEW_NODE", notifications[2]["change_type"])
             waiter.clear_notifications()
 
-    @since("2.1")
     def restart_node_localhost_test(self):
         """
         Test that we don't get client notifications when rpc_address is set to localhost.

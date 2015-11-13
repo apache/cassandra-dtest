@@ -92,17 +92,13 @@ class TestBootstrap(Tester):
         """Test bootstrapped node sees existing data, eg. CASSANDRA-6648"""
         cluster = self.cluster
         cluster.populate(3)
-        version = cluster.version()
         cluster.start()
 
         node1 = cluster.nodes['node1']
-        if version < "2.1":
-            node1.stress(['-n', '10000'])
-        else:
-            node1.stress(['write', 'n=10000', '-rate', 'threads=8'])
+        node1.stress(['write', 'n=10000', '-rate', 'threads=8'])
 
         session = self.patient_cql_connection(node1)
-        stress_table = 'keyspace1.standard1' if self.cluster.version() >= '2.1' else '"Keyspace1"."Standard1"'
+        stress_table = 'keyspace1.standard1'
         original_rows = list(session.execute("SELECT * FROM %s" % (stress_table,)))
 
         node4 = new_node(cluster)
@@ -204,17 +200,11 @@ class TestBootstrap(Tester):
         cluster.populate(2).start(wait_other_notice=True)
         (node1, node2) = cluster.nodelist()
 
-        if cluster.version() < "2.1":
-            node1.stress(['-o', 'insert', '-n', '1000', '-l', '2', '-t', '1'])
-        else:
-            node1.stress(['write', 'n=1000', '-schema', 'replication(factor=2)',
+        node1.stress(['write', 'n=1000', '-schema', 'replication(factor=2)',
                           '-rate', 'threads=1', '-pop', 'dist=UNIFORM(1..1000)'])
 
         session = self.patient_exclusive_cql_connection(node2)
-        if cluster.version() < "2.1":
-            stress_table = '"Keyspace1"."Standard1"'
-        else:
-            stress_table = 'keyspace1.standard1'
+        stress_table = 'keyspace1.standard1'
 
         original_rows = list(session.execute("SELECT * FROM %s" % stress_table))
 
@@ -232,58 +222,48 @@ class TestBootstrap(Tester):
 
         cluster = self.cluster
         cluster.populate([1, 1])
-        version = cluster.version()
         cluster.start()
 
         node1 = cluster.nodes['node1']
-        if version < "2.1":
-            node1.stress(['-n', '2000000', '-t', '50', '-S', '100',
-                          '--replication-strategy', 'NetworkTopologyStrategy',
-                          '--strategy-properties', 'dc1:1,dc2:1'])
-        else:
-            yaml_config = """
-            # Create the keyspace and table
-            keyspace: keyspace1
-            keyspace_definition: |
-              CREATE KEYSPACE keyspace1 WITH replication = {'class': 'NetworkTopologyStrategy', 'dc1': 1, 'dc2': 1};
-            table: users
-            table_definition:
-              CREATE TABLE users (
-                username text,
-                first_name text,
-                last_name text,
-                email text,
-                PRIMARY KEY(username)
-              ) WITH compaction = {'class':'SizeTieredCompactionStrategy'};
-            insert:
-              partitions: fixed(1)
-              batchtype: UNLOGGED
-            queries:
-              read:
-                cql: select * from users where username = ?
-                fields: samerow
-            """
-            stress_config = tempfile.NamedTemporaryFile(mode='w+', delete=False)
-            stress_config.write(yaml_config)
-            stress_config.close()
-            node1.stress(['user', 'profile=' + stress_config.name, 'n=2000000',
-                          'ops(insert=1)', '-rate', 'threads=50'])
+        yaml_config = """
+        # Create the keyspace and table
+        keyspace: keyspace1
+        keyspace_definition: |
+          CREATE KEYSPACE keyspace1 WITH replication = {'class': 'NetworkTopologyStrategy', 'dc1': 1, 'dc2': 1};
+        table: users
+        table_definition:
+          CREATE TABLE users (
+            username text,
+            first_name text,
+            last_name text,
+            email text,
+            PRIMARY KEY(username)
+          ) WITH compaction = {'class':'SizeTieredCompactionStrategy'};
+        insert:
+          partitions: fixed(1)
+          batchtype: UNLOGGED
+        queries:
+          read:
+            cql: select * from users where username = ?
+            fields: samerow
+        """
+        stress_config = tempfile.NamedTemporaryFile(mode='w+', delete=False)
+        stress_config.write(yaml_config)
+        stress_config.close()
+        node1.stress(['user', 'profile=' + stress_config.name, 'n=2000000',
+                      'ops(insert=1)', '-rate', 'threads=50'])
 
         node3 = new_node(cluster, data_center='dc2')
         node3.start(no_wait=True)
         time.sleep(3)
 
         with tempfile.TemporaryFile(mode='w+') as tmpfile:
-            if version < "2.1":
-                node1.stress(['-o', 'insert', '-n', '500000', '-t', '5', '-e', 'LOCAL_QUORUM', '-K', '2'],
-                             stdout=tmpfile, stderr=subprocess.STDOUT)
-            else:
-                node1.stress(['user', 'profile=' + stress_config.name, 'ops(insert=1)',
-                              'n=500000', 'cl=LOCAL_QUORUM',
-                              '-rate', 'threads=5',
-                              '-errors', 'retries=2'],
-                             stdout=tmpfile, stderr=subprocess.STDOUT)
-                os.unlink(stress_config.name)
+            node1.stress(['user', 'profile=' + stress_config.name, 'ops(insert=1)',
+                          'n=500000', 'cl=LOCAL_QUORUM',
+                          '-rate', 'threads=5',
+                          '-errors', 'retries=2'],
+                         stdout=tmpfile, stderr=subprocess.STDOUT)
+            os.unlink(stress_config.name)
 
             tmpfile.seek(0)
             output = tmpfile.read()
@@ -310,15 +290,11 @@ class TestBootstrap(Tester):
         cluster.populate(3)
         cluster.start(wait_for_binary_proto=True)
 
-        version = cluster.version()
-        stress_table = 'keyspace1.standard1' if self.cluster.version() >= '2.1' else '"Keyspace1"."Standard1"'
+        stress_table = 'keyspace1.standard1'
 
         # write some data
         node1 = cluster.nodelist()[0]
-        if version < "2.1":
-            node1.stress(['-n', '10000'])
-        else:
-            node1.stress(['write', 'n=10000', '-rate', 'threads=8'])
+        node1.stress(['write', 'n=10000', '-rate', 'threads=8'])
 
         session = self.patient_cql_connection(node1)
         original_rows = list(session.execute("SELECT * FROM {}".format(stress_table,)))
@@ -352,15 +328,11 @@ class TestBootstrap(Tester):
         cluster.populate(3)
         cluster.start(wait_for_binary_proto=True)
 
-        version = cluster.version()
-        stress_table = 'keyspace1.standard1' if self.cluster.version() >= '2.1' else '"Keyspace1"."Standard1"'
+        stress_table = 'keyspace1.standard1'
 
         # write some data
         node1 = cluster.nodelist()[0]
-        if version < "2.1":
-            node1.stress(['-n', '10000'])
-        else:
-            node1.stress(['write', 'n=10K', '-rate', 'threads=8'])
+        node1.stress(['write', 'n=10K', '-rate', 'threads=8'])
 
         session = self.patient_cql_connection(node1)
         original_rows = list(session.execute("SELECT * FROM {}".format(stress_table,)))
@@ -395,15 +367,11 @@ class TestBootstrap(Tester):
         cluster.populate(1)
         cluster.start(wait_for_binary_proto=True)
 
-        version = cluster.version()
-        stress_table = 'keyspace1.standard1' if self.cluster.version() >= '2.1' else '"Keyspace1"."Standard1"'
+        stress_table = 'keyspace1.standard1'
 
         # write some data, enough for the bootstrap to fail later on
         node1 = cluster.nodelist()[0]
-        if version < "2.1":
-            node1.stress(['-n', '100000'])
-        else:
-            node1.stress(['write', 'n=100000', '-rate', 'threads=8'])
+        node1.stress(['write', 'n=100000', '-rate', 'threads=8'])
         node1.flush()
 
         session = self.patient_cql_connection(node1)
