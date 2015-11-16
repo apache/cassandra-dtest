@@ -7,10 +7,23 @@ import sys
 from assertions import assert_invalid, assert_unavailable, assert_one
 from unittest import skipIf
 from dtest import CASSANDRA_DIR, Tester, debug
-from tools import debug, since
+from tools import debug, since, require
 
 
 class TestBatch(Tester):
+
+    @require(10711)
+    def empty_batch_throws_no_error_test(self):
+        """
+        @jira_ticket CASSANDRA-10711
+        """
+        session = self.prepare()
+        session.execute("""
+            BEGIN BATCH
+            APPLY BATCH;
+        """)
+        for node in self.cluster.nodelist():
+            self.assertEquals(0, len(node.grep_log_for_errors()))
 
     def counter_batch_accepts_counter_mutations_test(self):
         """ Test that counter batch accepts counter mutations """
