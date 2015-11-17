@@ -445,9 +445,11 @@ class TestCommitLog(Tester):
 
         # check that ks1.tbl hasn't been flushed
         path = node.get_path()
-        ks_dir = os.path.join(path, 'data', 'ks1')
-        db_dir = os.listdir(ks_dir)[0]
-        sstables = len([f for f in os.listdir(os.path.join(ks_dir, db_dir)) if f.endswith('.db')])
+        sstables = 0
+        for x in xrange(0, self.cluster.data_dir_count):
+            ks_dir = os.path.join(path, 'data{0}'.format(x), 'ks1')
+            db_dir = os.listdir(ks_dir)[0]
+            sstables = sstables + len([f for f in os.listdir(os.path.join(ks_dir, db_dir)) if f.endswith('.db')])
         self.assertEqual(sstables, 0)
 
         def get_header_crc(header):
