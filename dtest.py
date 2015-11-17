@@ -397,7 +397,7 @@ class Tester(TestCase):
 
         cluster = PyCluster([node_ip], auth_provider=auth_provider, compression=compression,
                             protocol_version=protocol_version, load_balancing_policy=load_balancing_policy, default_retry_policy=FlakyRetryPolicy(),
-                            port=port, ssl_options=ssl_opts)
+                            port=port, ssl_options=ssl_opts, connect_timeout=10)
         session = cluster.connect()
 
         # temporarily increase client-side timeout to 1m to determine
@@ -414,7 +414,7 @@ class Tester(TestCase):
         return session
 
     def patient_cql_connection(self, node, keyspace=None,
-                               user=None, password=None, timeout=10, compression=True,
+                               user=None, password=None, timeout=30, compression=True,
                                protocol_version=None, port=None, ssl_opts=None):
         """
         Returns a connection after it stops throwing NoHostAvailables due to not being ready.
@@ -422,7 +422,7 @@ class Tester(TestCase):
         If the timeout is exceeded, the exception is raised.
         """
         if is_win():
-            timeout = timeout * 5
+            timeout *= 2
 
         return retry_till_success(
             self.cql_connection,
@@ -439,7 +439,7 @@ class Tester(TestCase):
         )
 
     def patient_exclusive_cql_connection(self, node, keyspace=None,
-                                         user=None, password=None, timeout=10, compression=True,
+                                         user=None, password=None, timeout=30, compression=True,
                                          protocol_version=None, port=None, ssl_opts=None):
         """
         Returns a connection after it stops throwing NoHostAvailables due to not being ready.
@@ -447,7 +447,7 @@ class Tester(TestCase):
         If the timeout is exceeded, the exception is raised.
         """
         if is_win():
-            timeout = timeout * 5
+            timeout *= 2
 
         return retry_till_success(
             self.exclusive_cql_connection,
