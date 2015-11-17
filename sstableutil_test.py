@@ -145,6 +145,8 @@ class SSTableUtilTest(Tester):
 
         if len(expected_tmpfiles) == 0:
             expected_tmpfiles = sorted(list(set(allfiles) - set(finalfiles)))
+        if common.is_win():
+            expected_tmpfiles = _strip_common_prefix(expected_tmpfiles)
 
         debug("Comparing tmp files...")
         tmpfiles = self._invoke_sstableutil(ks, table, type='tmp')
