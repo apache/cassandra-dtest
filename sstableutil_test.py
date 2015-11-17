@@ -12,18 +12,19 @@ KeyspaceName = 'keyspace1'
 TableName = 'standard1'
 
 
+def _remove_prefix(string, prefix):
+    assert string.startswith(prefix), '{p} not a prefix of {s}'.format(p=prefix, s=string)
+    suffix = string[len(prefix):]
+    assert string.endswith(suffix), '{u} not a prefix of {t}'.format(u=suffix, t=string)
+    assert len(suffix) + len(prefix) == len(string)
+    return suffix
+
+
 def _strip_common_prefix(strings):
     strings = list(map(os.path.normcase, strings))
     common_prefix = os.path.commonprefix(strings)
 
-    rvs = []
-    for s in strings:
-        stripped = s[len(common_prefix):]
-        assert len(stripped) + len(common_prefix) == len(s)
-        assert s.endswith(stripped)
-        rvs.append(stripped)
-
-    return rvs
+    return [_remove_prefix(string, common_prefix) for string in strings]
 
 
 @since('3.0')
