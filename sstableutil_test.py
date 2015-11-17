@@ -143,14 +143,13 @@ class SSTableUtilTest(Tester):
 
         self.assertEqual(expected_finalfiles, finalfiles)
 
-        if len(expected_tmpfiles) == 0:
-            expected_tmpfiles = sorted(list(set(allfiles) - set(finalfiles)))
-        if common.is_win():
-            expected_tmpfiles = _strip_common_prefix(expected_tmpfiles)
-
         debug("Comparing tmp files...")
         tmpfiles = self._invoke_sstableutil(ks, table, type='tmp')
-        self.assertEqual(expected_tmpfiles, tmpfiles)
+
+        common_prefix = os.path.commonprefix(list(tmpfiles) + list(expected_tmpfiles))
+
+        self.assertEqual([_remove_prefix(s, common_prefix) for s in tmpfiles],
+                         [_remove_prefix(s, common_prefix) for s in expected_tmpfiles])
 
         debug("Comparing op logs...")
         expectedoplogs = sorted(self._get_sstable_transaction_logs(node, ks, table))
