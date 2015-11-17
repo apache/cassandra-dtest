@@ -92,6 +92,12 @@ class GitSemVer(object):
             self.semver = LooseVersion(make_ver_str(TRUNK_VER))
 
     def __cmp__(self, other):
+        # if we find a tag of x.y.z we need to special case that to compare higher than x.y.z-foo
+        # to accomplish this, compare on length and then invert so shorter version wins
+        if (len(self.semver.version) == 3) or (len(other.semver.version) == 3):
+            if self.semver.version[0:3] == other.semver.version[0:3]:
+                return cmp(len(self.semver.version), len(other.semver.version)) * -1
+
         return cmp(self.semver, other.semver)
 
 
