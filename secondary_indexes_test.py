@@ -433,7 +433,7 @@ class TestSecondaryIndexesOnCollections(Tester):
                         (uuid(), {0}, ({0}), ({0},{0}), ({0},{0},{0}), ({0},({0},{0})))""".format(n), ())
                 for n in range(50)]
 
-        results = execute_concurrent(session, cmds*5, raise_on_first_error=True, concurrency=200)
+        results = execute_concurrent(session, cmds * 5, raise_on_first_error=True, concurrency=200)
 
         for (success, result) in results:
             self.assertTrue(success, "didn't get success on insert: {0}".format(result))
@@ -464,7 +464,7 @@ class TestSecondaryIndexesOnCollections(Tester):
             self.assertEqual(0, len(list(session.execute("select * from simple_with_tuple where nested_one = ({0},({0},-1));".format(n)))))
 
         # check if indexes work on new data inserted after index creation
-        results = execute_concurrent(session, cmds*3, raise_on_first_error=True, concurrency=200)
+        results = execute_concurrent(session, cmds * 3, raise_on_first_error=True, concurrency=200)
         for (success, result) in results:
             self.assertTrue(success, "didn't get success on insert: {0}".format(result))
         time.sleep(5)
