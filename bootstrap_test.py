@@ -201,7 +201,7 @@ class TestBootstrap(Tester):
         (node1, node2) = cluster.nodelist()
 
         node1.stress(['write', 'n=1000', '-schema', 'replication(factor=2)',
-                          '-rate', 'threads=1', '-pop', 'dist=UNIFORM(1..1000)'])
+                      '-rate', 'threads=1', '-pop', 'dist=UNIFORM(1..1000)'])
 
         session = self.patient_exclusive_cql_connection(node2)
         stress_table = 'keyspace1.standard1'

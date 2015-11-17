@@ -372,7 +372,6 @@ class TestMaterializedViews(Tester):
 
         self._add_dc_after_mv_test({'dc1': 1, 'dc2': 1})
 
-
     def add_node_after_mv_test(self):
         """Test that materialized views work as expected when adding a node."""
 

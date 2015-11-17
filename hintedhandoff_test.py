@@ -6,6 +6,7 @@ from dtest import DISABLE_VNODES, Tester
 from tools import create_c1c2_table, insert_c1c2, query_c1c2, since, no_vnodes
 import time
 
+
 @since('3.0')
 class TestHintedHandoffConfig(Tester):
     """
@@ -152,6 +153,7 @@ class TestHintedHandoffConfig(Tester):
 
 
 class TestHintedHandoff(Tester):
+
     @no_vnodes()
     def hintedhandoff_decom_test(self):
         self.cluster.populate(4).start(wait_for_binary_proto=True)

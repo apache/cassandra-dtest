@@ -2348,11 +2348,11 @@ class TestCQLAccesses(ThriftTester):
         session = self.patient_cql_connection(node1)
 
         # Create a CQL table with a static column and insert a row
-        session.execute("USE \"Keyspace1\"");
-        session.execute("CREATE TABLE t (k text, s text static, t text, v text, PRIMARY KEY (k, t))");
+        session.execute('USE "Keyspace1"')
+        session.execute("CREATE TABLE t (k text, s text static, t text, v text, PRIMARY KEY (k, t))")
 
-        session.execute("INSERT INTO t (k, s, t, v) VALUES ('k', 's', 't', 'v') USING TIMESTAMP 0");
-        assert_one(session, "SELECT * FROM t", [u'k', 't', 's', 'v']);
+        session.execute("INSERT INTO t (k, s, t, v) VALUES ('k', 's', 't', 'v') USING TIMESTAMP 0")
+        assert_one(session, "SELECT * FROM t", [u'k', 't', 's', 'v'])
 
         # Now submit a range deletion that should include both the row and the static value
 
@@ -2364,7 +2364,7 @@ class TestCQLAccesses(ThriftTester):
         client.batch_mutate(keyed_mutations, ConsistencyLevel.ONE)
 
         # And check everything is gone
-        assert_none(session, "SELECT * FROM t");
+        assert_none(session, "SELECT * FROM t")
 
 
 class TestCompactStorageThriftAccesses(ThriftTester):
