@@ -15,11 +15,12 @@ TableName = 'standard1'
 def _strip_common_prefix(strings):
     strings = list(map(os.path.normcase, strings))
     common_prefix = os.path.commonprefix(strings)
+
     rvs = []
     for s in strings:
-        stripped = s.lstrip(common_prefix)
-        if s:
-            assert stripped
+        stripped = s[len(common_prefix):]
+        assert len(stripped) + len(common_prefix) == len(s)
+        assert s.endswith(stripped)
         rvs.append(stripped)
 
     return rvs
