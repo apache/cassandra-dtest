@@ -11,22 +11,6 @@ import os
 KeyspaceName = 'keyspace1'
 TableName = 'standard1'
 
-
-def _remove_prefix(string, prefix):
-    assert string.startswith(prefix), '{p} not a prefix of {s}'.format(p=prefix, s=string)
-    suffix = string[len(prefix):]
-    assert string.endswith(suffix), '{u} not a prefix of {t}'.format(u=suffix, t=string)
-    assert len(suffix) + len(prefix) == len(string)
-    return suffix
-
-
-def _strip_common_prefix(strings):
-    strings = list(map(os.path.normcase, strings))
-    common_prefix = os.path.commonprefix(strings)
-
-    return [_remove_prefix(string, common_prefix) for string in strings]
-
-
 @since('3.0')
 class SSTableUtilTest(Tester):
 
@@ -86,8 +70,7 @@ class SSTableUtilTest(Tester):
 
         self._invoke_sstableutil(KeyspaceName, TableName, cleanup=True)
 
-        self.assertEqual([], self._invoke_sstableutil(KeyspaceName, TableName, type='tmp'))
-        self.assertEqual(finalfiles, self._invoke_sstableutil(KeyspaceName, TableName, type='final'))
+        self._check_files(node, KeyspaceName, TableName, finalfiles, [])
 
         # restart to make sure not data is lost
         node.start(wait_for_binary_proto=True)
@@ -112,49 +95,36 @@ class SSTableUtilTest(Tester):
     def _read_data(self, node, numrecords):
         node.stress(['read', 'n=%d' % (numrecords,), '-rate', 'threads=25'])
 
-    def _check_files(self, node, ks, table, expected_finalfiles=[], expected_tmpfiles=[]):
-        if common.is_win():
-            if expected_finalfiles:
-                expected_finalfiles = _strip_common_prefix(expected_finalfiles)
-            if expected_tmpfiles:
-                expected_tmpfiles = _strip_common_prefix(expected_tmpfiles)
-
-        sstablefiles = self._get_sstable_files(node, ks, table)
-
-        if common.is_win():
-            sstablefiles = _strip_common_prefix(sstablefiles)
+    def _check_files(self, node, ks, table, expected_finalfiles=None, expected_tmpfiles=None):
+        sstablefiles = map(os.path.normcase, self._get_sstable_files(node, ks, table))
+        allfiles = map(os.path.normcase, self._invoke_sstableutil(ks, table, type='all'))
+        finalfiles = map(os.path.normcase, self._invoke_sstableutil(ks, table, type='final'))
+        tmpfiles = map(os.path.normcase, self._invoke_sstableutil(ks, table, type='tmp'))
+        expected_oplogs = map(os.path.normcase, self._get_sstable_transaction_logs(node, ks, table))
+        tmpfiles_with_oplogs = map(os.path.normcase, self._invoke_sstableutil(ks, table, type='tmp', oplogs=True))
+        oplogs = list(set(tmpfiles_with_oplogs) - set(tmpfiles))
+        
+        if expected_finalfiles is None:
+            expected_finalfiles = allfiles
+        else:
+            map(os.path.normcase, expected_finalfiles)
+            
+        if expected_tmpfiles is None:
+            expected_tmpfiles = sorted(list(set(allfiles) - set(finalfiles)))
+        else:
+            map(os.path.normcase, expected_tmpfiles)
 
         debug("Comparing all files...")
-        allfiles = self._invoke_sstableutil(ks, table, type='all')
-
-        if common.is_win():
-            allfiles = _strip_common_prefix(allfiles)
-
         self.assertEqual(sstablefiles, allfiles)
 
-        if len(expected_finalfiles) == 0:
-            expected_finalfiles = allfiles
-
         debug("Comparing final files...")
-        finalfiles = self._invoke_sstableutil(ks, table, type='final')
-
-        if common.is_win():
-            finalfiles = _strip_common_prefix(finalfiles)
-
         self.assertEqual(expected_finalfiles, finalfiles)
-
+            
         debug("Comparing tmp files...")
-        tmpfiles = self._invoke_sstableutil(ks, table, type='tmp')
-
-        common_prefix = os.path.commonprefix(list(tmpfiles) + list(expected_tmpfiles))
-
-        self.assertEqual([_remove_prefix(s, common_prefix) for s in tmpfiles],
-                         [_remove_prefix(s, common_prefix) for s in expected_tmpfiles])
+        self.assertEqual(expected_tmpfiles, tmpfiles)
 
         debug("Comparing op logs...")
-        expectedoplogs = sorted(self._get_sstable_transaction_logs(node, ks, table))
-        oplogs = sorted(list(set(self._invoke_sstableutil(ks, table, type='tmp', oplogs=True)) - set(tmpfiles)))
-        self.assertEqual(expectedoplogs, oplogs)
+        self.assertEqual(expected_oplogs, oplogs)
 
         return finalfiles, tmpfiles
 
