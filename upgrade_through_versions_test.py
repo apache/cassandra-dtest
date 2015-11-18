@@ -25,12 +25,12 @@ from tools import generate_ssl_stores, new_node
 # Used to build upgrade path(s) for tests. Some tests will go from start to finish,
 # other tests will focus on single upgrades from UPGRADE_PATH[n] to UPGRADE_PATH[n+1]
 
-TRUNK_VER = (3, 1)
+TRUNK_VER = (3, 2)
 
 # maps protocol version to c* version(s)
 PROTOCOL_PATHS = {
-    1: [(1, 2), (2, 0), (2, 1)],  # omitting 2.2; it supports v1, but deprecated
-    2: [(2, 0), (2, 1)],          # omitting 2.2; it supports v2, but deprecated
+    1: [(2, 0), (2, 1), (2, 2)],
+    2: [(2, 0), (2, 1), (2, 2)],
     3: [(2, 1), (2, 2), (3, 0), TRUNK_VER],
     4: [(2, 2), (3, 0), TRUNK_VER]
 }
