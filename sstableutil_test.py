@@ -11,6 +11,15 @@ import os
 KeyspaceName = 'keyspace1'
 TableName = 'standard1'
 
+
+def _normcase_all(xs):
+    """
+    Return a list of the elements in xs, each with its casing normalized for
+    use as a filename.
+    """
+    return [os.path.normcase(x) for x in xs]
+
+
 @since('3.0')
 class SSTableUtilTest(Tester):
 
@@ -96,30 +105,30 @@ class SSTableUtilTest(Tester):
         node.stress(['read', 'n=%d' % (numrecords,), '-rate', 'threads=25'])
 
     def _check_files(self, node, ks, table, expected_finalfiles=None, expected_tmpfiles=None):
-        sstablefiles = map(os.path.normcase, self._get_sstable_files(node, ks, table))
-        allfiles = map(os.path.normcase, self._invoke_sstableutil(ks, table, type='all'))
-        finalfiles = map(os.path.normcase, self._invoke_sstableutil(ks, table, type='final'))
-        tmpfiles = map(os.path.normcase, self._invoke_sstableutil(ks, table, type='tmp'))
-        expected_oplogs = map(os.path.normcase, self._get_sstable_transaction_logs(node, ks, table))
-        tmpfiles_with_oplogs = map(os.path.normcase, self._invoke_sstableutil(ks, table, type='tmp', oplogs=True))
+        sstablefiles = _normcase_all(self._get_sstable_files(node, ks, table))
+        allfiles = _normcase_all(self._invoke_sstableutil(ks, table, type='all'))
+        finalfiles = _normcase_all(self._invoke_sstableutil(ks, table, type='final'))
+        tmpfiles = _normcase_all(self._invoke_sstableutil(ks, table, type='tmp'))
+        expected_oplogs = _normcase_all(self._get_sstable_transaction_logs(node, ks, table))
+        tmpfiles_with_oplogs = _normcase_all(self._invoke_sstableutil(ks, table, type='tmp', oplogs=True))
         oplogs = list(set(tmpfiles_with_oplogs) - set(tmpfiles))
-        
+
         if expected_finalfiles is None:
             expected_finalfiles = allfiles
         else:
-            map(os.path.normcase, expected_finalfiles)
-            
+            expected_finalfiles = _normcase_all(expected_finalfiles)
+
         if expected_tmpfiles is None:
-            expected_tmpfiles = sorted(list(set(allfiles) - set(finalfiles)))
+            expected_tmpfiles = sorted(set(allfiles) - set(finalfiles))
         else:
-            map(os.path.normcase, expected_tmpfiles)
+            expected_tmpfiles = _normcase_all(expected_tmpfiles)
 
         debug("Comparing all files...")
         self.assertEqual(sstablefiles, allfiles)
 
         debug("Comparing final files...")
         self.assertEqual(expected_finalfiles, finalfiles)
-            
+
         debug("Comparing tmp files...")
         self.assertEqual(expected_tmpfiles, tmpfiles)
 
