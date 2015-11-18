@@ -92,6 +92,19 @@ class GitSemVer(object):
             self.semver = LooseVersion(make_ver_str(TRUNK_VER))
 
     def __cmp__(self, other):
+        # when comparing x.y.z and x.y.z-foo, we need to value x.y.z higher than the "nicknamed" tag x.y.z-foo
+        # likewise for shorter versions of the form X.Y and X.Y-foo
+        # to accomplish this, check if "x.y.z-" (note the dash there) is contained within "x.y.z-foo", and if so declare x.y.z the higher version
+        # e.g. when comparing 3.0.0 and 3.0.0-rc1, consider 3.0.0 higher
+        # e.g. when comparing 3.3 and 3.3-beta1, consider 3.3 higher
+        if (len(self.semver.version) <= 3) or (len(other.semver.version) <= 3):
+            if self.semver.vstring + "-" in other.semver.vstring:
+                return 1
+            elif other.semver.vstring + "-" in self.semver.vstring:
+                return -1
+            elif other.semver.vstring == self.semver.vstring:
+                return 0
+
         return cmp(self.semver, other.semver)
 
 
