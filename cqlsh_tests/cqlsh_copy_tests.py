@@ -468,6 +468,41 @@ class CqlshCopyTest(Tester):
         self.assertItemsEqual(csv_values,
                               [['a', 'b'], ['1', '10'], ['2', '20'], ['3', '30']])
 
+    def test_reading_counter(self):
+        """
+        Test that COPY can read a CSV of COUNTER by:
+
+        - creating a table,
+        - writing a CSV with COUNTER data with header,
+        - importing the contents of the CSV file using COPY with header,
+        - checking that the contents of the table are the written values.
+        @jira_ticket CASSANDRA-9043
+        """
+        self.prepare()
+        self.session.execute("""
+            CREATE TABLE testcounter (
+                a int primary key,
+                b counter
+            )""")
+
+        self.tempfile = NamedTemporaryFile(delete=False)
+
+        data = [[1, 20], [2, 40], [3, 60], [4, 80]]
+
+        with open(self.tempfile.name, 'w') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=['a', 'b'])
+            writer.writeheader()
+            for a, b in data:
+                writer.writerow({'a': a, 'b': b})
+            csvfile.close
+
+        cmds = "COPY ks.testcounter FROM '{name}'".format(name=self.tempfile.name)
+        cmds += " WITH HEADER = true"
+        self.node1.run_cqlsh(cmds=cmds)
+
+        result = self.session.execute("SELECT * FROM testcounter")
+        self.assertItemsEqual(data, rows_to_list(result))
+
     def test_reading_use_header(self):
         """
         Test that COPY can read a CSV with a header by:
