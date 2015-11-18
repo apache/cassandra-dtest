@@ -12,17 +12,12 @@ KeyspaceName = 'keyspace1'
 TableName = 'standard1'
 
 
-def _strip_common_prefix(strings):
-    strings = list(map(os.path.normcase, strings))
-    common_prefix = os.path.commonprefix(strings)
-    rvs = []
-    for s in strings:
-        stripped = s.lstrip(common_prefix)
-        if s:
-            assert stripped
-        rvs.append(stripped)
-
-    return rvs
+def _normcase_all(xs):
+    """
+    Return a list of the elements in xs, each with its casing normalized for
+    use as a filename.
+    """
+    return [os.path.normcase(x) for x in xs]
 
 
 @since('3.0')
@@ -84,8 +79,7 @@ class SSTableUtilTest(Tester):
 
         self._invoke_sstableutil(KeyspaceName, TableName, cleanup=True)
 
-        self.assertEqual([], self._invoke_sstableutil(KeyspaceName, TableName, type='tmp'))
-        self.assertEqual(finalfiles, self._invoke_sstableutil(KeyspaceName, TableName, type='final'))
+        self._check_files(node, KeyspaceName, TableName, finalfiles, [])
 
         # restart to make sure not data is lost
         node.start(wait_for_binary_proto=True)
@@ -110,48 +104,36 @@ class SSTableUtilTest(Tester):
     def _read_data(self, node, numrecords):
         node.stress(['read', 'n=%d' % (numrecords,), '-rate', 'threads=25'])
 
-    def _check_files(self, node, ks, table, expected_finalfiles=[], expected_tmpfiles=[]):
-        if common.is_win():
-            if expected_finalfiles:
-                expected_finalfiles = _strip_common_prefix(expected_finalfiles)
-            if expected_tmpfiles:
-                expected_tmpfiles = _strip_common_prefix(expected_tmpfiles)
+    def _check_files(self, node, ks, table, expected_finalfiles=None, expected_tmpfiles=None):
+        sstablefiles = _normcase_all(self._get_sstable_files(node, ks, table))
+        allfiles = _normcase_all(self._invoke_sstableutil(ks, table, type='all'))
+        finalfiles = _normcase_all(self._invoke_sstableutil(ks, table, type='final'))
+        tmpfiles = _normcase_all(self._invoke_sstableutil(ks, table, type='tmp'))
+        expected_oplogs = _normcase_all(self._get_sstable_transaction_logs(node, ks, table))
+        tmpfiles_with_oplogs = _normcase_all(self._invoke_sstableutil(ks, table, type='tmp', oplogs=True))
+        oplogs = list(set(tmpfiles_with_oplogs) - set(tmpfiles))
 
-        sstablefiles = self._get_sstable_files(node, ks, table)
+        if expected_finalfiles is None:
+            expected_finalfiles = allfiles
+        else:
+            expected_finalfiles = _normcase_all(expected_finalfiles)
 
-        if common.is_win():
-            sstablefiles = _strip_common_prefix(sstablefiles)
+        if expected_tmpfiles is None:
+            expected_tmpfiles = sorted(set(allfiles) - set(finalfiles))
+        else:
+            expected_tmpfiles = _normcase_all(expected_tmpfiles)
 
         debug("Comparing all files...")
-        allfiles = self._invoke_sstableutil(ks, table, type='all')
-
-        if common.is_win():
-            allfiles = _strip_common_prefix(allfiles)
-
         self.assertEqual(sstablefiles, allfiles)
 
-        if len(expected_finalfiles) == 0:
-            expected_finalfiles = allfiles
-
         debug("Comparing final files...")
-        finalfiles = self._invoke_sstableutil(ks, table, type='final')
-
-        if common.is_win():
-            finalfiles = _strip_common_prefix(finalfiles)
-
         self.assertEqual(expected_finalfiles, finalfiles)
 
-        if len(expected_tmpfiles) == 0:
-            expected_tmpfiles = sorted(list(set(allfiles) - set(finalfiles)))
-
         debug("Comparing tmp files...")
-        tmpfiles = self._invoke_sstableutil(ks, table, type='tmp')
         self.assertEqual(expected_tmpfiles, tmpfiles)
 
         debug("Comparing op logs...")
-        expectedoplogs = sorted(self._get_sstable_transaction_logs(node, ks, table))
-        oplogs = sorted(list(set(self._invoke_sstableutil(ks, table, type='tmp', oplogs=True)) - set(tmpfiles)))
-        self.assertEqual(expectedoplogs, oplogs)
+        self.assertEqual(expected_oplogs, oplogs)
 
         return finalfiles, tmpfiles
 
