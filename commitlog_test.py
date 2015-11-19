@@ -180,13 +180,14 @@ class TestCommitLog(Tester):
         self.assertTrue(len(commitlog_files) > 0)
 
         debug("Verify no SSTables were flushed before abrupt stop")
-        data_dir = os.path.join(node1.get_path(), 'data')
-        cf_id = [s for s in os.listdir(os.path.join(data_dir, "test")) if s.startswith("users")][0]
-        cf_data_dir = glob.glob("{data_dir}/test/{cf_id}".format(**locals()))[0]
-        cf_data_dir_files = os.listdir(cf_data_dir)
-        if "backups" in cf_data_dir_files:
-            cf_data_dir_files.remove("backups")
-        self.assertEqual(0, len(cf_data_dir_files))
+        for x in xrange(0, self.cluster.data_dir_count):
+            data_dir = os.path.join(node1.get_path(), 'data{0}'.format(x))
+            cf_id = [s for s in os.listdir(os.path.join(data_dir, "test")) if s.startswith("users")][0]
+            cf_data_dir = glob.glob("{data_dir}/test/{cf_id}".format(**locals()))[0]
+            cf_data_dir_files = os.listdir(cf_data_dir)
+            if "backups" in cf_data_dir_files:
+                cf_data_dir_files.remove("backups")
+            self.assertEqual(0, len(cf_data_dir_files))
 
         debug("Verify commit log was replayed on startup")
         node1.start()
@@ -371,10 +372,11 @@ class TestCommitLog(Tester):
 
         # check that ks.tbl hasn't been flushed
         path = node.get_path()
-        ks_dir = os.path.join(path, 'data', 'ks')
-        db_dir = os.listdir(ks_dir)[0]
-        sstables = len([f for f in os.listdir(os.path.join(ks_dir, db_dir)) if f.endswith('.db')])
-        self.assertEqual(sstables, 0)
+        for x in xrange(0, self.cluster.data_dir_count):
+            ks_dir = os.path.join(path, 'data{0}'.format(x), 'ks')
+            db_dir = os.listdir(ks_dir)[0]
+            sstables = len([f for f in os.listdir(os.path.join(ks_dir, db_dir)) if f.endswith('.db')])
+            self.assertEqual(sstables, 0)
 
         # modify the commit log crc values
         cl_dir = os.path.join(path, 'commitlogs')
