@@ -240,15 +240,15 @@ class Tester(TestCase):
             debug("removing ccm cluster " + self.cluster.name + " at: " + self.test_path)
             self.cluster.remove()
 
-            try:
-                debug("clearing ssl stores from [{0}] directory".format(self.test_path))
-                os.remove(os.path.join(self.test_path, 'keystore.jks'))
-                os.remove(os.path.join(self.test_path, 'truststore.jks'))
-                os.remove(os.path.join(self.test_path, 'ccm_node.cer'))
-            except OSError as e:
-                # errno.ENOENT = no such file or directory
-                if e.errno != errno.ENOENT:
-                    raise
+            debug("clearing ssl stores from [{0}] directory".format(self.test_path))
+            for filename in ('keystore.jks', 'truststore.jks', 'ccm_node.cer'):
+                try:
+                    os.remove(os.path.join(self.test_path, filename))
+                except OSError as e:
+                    # once we port to py3, which has better reporting for exceptions raised while
+                    # handling other excpetions, we should just assert e.errno == errno.ENOENT
+                    if e.errno != errno.ENOENT:  # ENOENT = no such file or directory
+                        raise
 
             os.rmdir(self.test_path)
         if os.path.exists(LAST_TEST_DIR):
