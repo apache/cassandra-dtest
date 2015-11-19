@@ -244,10 +244,7 @@ class TestOfflineTools(Tester):
         # Process sstableverify output to normalize paths in string to Python casing as above
         error = re.sub("(?<=Corrupted: ).*", lambda match: os.path.normcase(match.group(0)), error)
 
-        if self.cluster.version() < '3.0':
-            self.assertIn("java.lang.Exception: Invalid SSTable", error)
-        else:
-            self.assertIn("Corrupted: " + sstable1, error)
+        self.assertIn("Corrupted: " + sstable1, error)
         self.assertEqual(rc, 1, msg=str(rc))
 
     def sstableexpiredblockers_test(self):
