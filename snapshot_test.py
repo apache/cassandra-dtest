@@ -258,29 +258,6 @@ class TestArchiveCommitlog(SnapshotTester):
             node1, = cluster.nodelist()
 
             # Restore schema from snapshots:
-<<<<<<< HEAD
-            if self.cluster.version() >= '3.0':
-                self.restore_snapshot(system_ks_snapshot_dir, node1, 'system_schema', 'keyspaces', 'keyspaces')
-            else:
-                self.restore_snapshot(system_ks_snapshot_dir, node1, 'system', 'schema_keyspaces', 'keyspaces')
-
-            if self.cluster.version() >= '3.0':
-                self.restore_snapshot(system_col_snapshot_dir, node1, 'system_schema', 'columns', 'columns')
-            else:
-                self.restore_snapshot(system_col_snapshot_dir, node1, 'system', 'schema_columns', 'columns')
-
-            if self.cluster.version() >= '3.0':
-                self.restore_snapshot(system_ut_snapshot_dir, node1, 'system_schema', 'types', 'usertypes')
-            else:
-                self.restore_snapshot(system_ut_snapshot_dir, node1, 'system', 'schema_usertypes', 'usertypes')
-
-            if self.cluster.version() >= '3.0':
-                self.restore_snapshot(system_cfs_snapshot_dir, node1, 'system_schema', 'tables', 'cfs')
-            else:
-                self.restore_snapshot(system_cfs_snapshot_dir, node1, 'system', 'schema_columnfamilies', 'cfs')
-
-            self.restore_snapshot(snapshot_dir, node1, 'ks', 'cf', 'basic')
-=======
             for system_ks_snapshot_dir in system_ks_snapshot_dirs:
                 if self.cluster.version() >= '3.0':
                     self.restore_snapshot(system_ks_snapshot_dir, node1, 'system_schema', 'keyspaces', 'keyspaces')
@@ -294,7 +271,7 @@ class TestArchiveCommitlog(SnapshotTester):
             for system_ut_snapshot_dir in system_ut_snapshot_dirs:
                 if self.cluster.version() >= '3.0':
                     self.restore_snapshot(system_ut_snapshot_dir, node1, 'system_schema', 'types', 'usertypes')
-                elif self.cluster.version() >= '2.1':
+                else:
                     self.restore_snapshot(system_ut_snapshot_dir, node1, 'system', 'schema_usertypes', 'usertypes')
 
             for system_cfs_snapshot_dir in system_cfs_snapshot_dirs:
@@ -304,7 +281,6 @@ class TestArchiveCommitlog(SnapshotTester):
                     self.restore_snapshot(system_cfs_snapshot_dir, node1, 'system', 'schema_columnfamilies', 'cfs')
             for snapshot_dir in snapshot_dirs:
                 self.restore_snapshot(snapshot_dir, node1, 'ks', 'cf', 'basic')
->>>>>>> beba8a5... more multi datair fixes
 
             cluster.start(wait_for_binary_proto=True)
 
@@ -349,18 +325,6 @@ class TestArchiveCommitlog(SnapshotTester):
 
         finally:
             # clean up
-<<<<<<< HEAD
-            debug("removing snapshot_dir: " + snapshot_dir)
-            shutil.rmtree(snapshot_dir)
-            debug("removing snapshot_dir: " + system_ks_snapshot_dir)
-            shutil.rmtree(system_ks_snapshot_dir)
-            debug("removing snapshot_dir: " + system_cfs_snapshot_dir)
-            shutil.rmtree(system_cfs_snapshot_dir)
-            debug("removing snapshot_dir: " + system_ut_snapshot_dir)
-            shutil.rmtree(system_ut_snapshot_dir)
-            debug("removing snapshot_dir: " + system_col_snapshot_dir)
-            shutil.rmtree(system_col_snapshot_dir)
-=======
             debug("removing snapshot_dir: " + ",".join(snapshot_dirs))
             for snapshot_dir in snapshot_dirs:
                 shutil.rmtree(snapshot_dir)
@@ -370,14 +334,13 @@ class TestArchiveCommitlog(SnapshotTester):
             debug("removing snapshot_dir: " + ",".join(system_cfs_snapshot_dirs))
             for system_cfs_snapshot_dir in system_cfs_snapshot_dirs:
                 shutil.rmtree(system_cfs_snapshot_dir)
-            if self.cluster.version() >= '2.1':
-                debug("removing snapshot_dir: " + ",".join(system_ut_snapshot_dirs))
-                for system_ut_snapshot_dir in system_ut_snapshot_dirs:
-                    shutil.rmtree(system_ut_snapshot_dir)
+            debug("removing snapshot_dir: " + ",".join(system_ut_snapshot_dirs))
+            for system_ut_snapshot_dir in system_ut_snapshot_dirs:
+                shutil.rmtree(system_ut_snapshot_dir)
             debug("removing snapshot_dir: " + ",".join(system_col_snapshot_dirs))
             for system_col_snapshot_dir in system_col_snapshot_dirs:
                 shutil.rmtree(system_col_snapshot_dir)
->>>>>>> beba8a5... more multi datair fixes
+
             debug("removing tmp_commitlog: " + tmp_commitlog)
             shutil.rmtree(tmp_commitlog)
 
