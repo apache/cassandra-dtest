@@ -1153,7 +1153,7 @@ class CqlshCopyTest(Tester):
         @jira_ticket CASSANDRA-9304
         """
         num_records = 100000
-        self.prepare(nodes=1, partitioner="murmur3")
+        self.prepare(nodes=1)
 
         debug('Running stress')
         stress_table = 'keyspace1.standard1'
@@ -1172,7 +1172,7 @@ class CqlshCopyTest(Tester):
         debug(err)
 
         self.assertIn('some records might be missing', err)
-        self.assertTrue(sum(1 for _ in open(self.tempfile.name)) < num_records)
+        self.assertTrue(len(open(self.tempfile.name).readlines()) < num_records)
 
     @freshCluster()
     def test_copy_to_with_fewer_failures_than_max_attempts(self):
@@ -1185,7 +1185,7 @@ class CqlshCopyTest(Tester):
         @jira_ticket CASSANDRA-9304
         """
         num_records = 100000
-        self.prepare(nodes=1, partitioner="murmur3")
+        self.prepare(nodes=1)
 
         debug('Running stress')
         stress_table = 'keyspace1.standard1'
@@ -1203,7 +1203,7 @@ class CqlshCopyTest(Tester):
         debug(err)
 
         self.assertNotIn('some records might be missing', err)
-        self.assertEqual(num_records, sum(1 for _ in open(self.tempfile.name)))
+        self.assertEqual(num_records, len(open(self.tempfile.name).readlines()))
 
     @freshCluster()
     def test_copy_to_with_child_process_crashing(self):
@@ -1216,7 +1216,7 @@ class CqlshCopyTest(Tester):
         @jira_ticket CASSANDRA-9304
         """
         num_records = 100000
-        self.prepare(nodes=1, partitioner="murmur3")
+        self.prepare(nodes=1)
 
         debug('Running stress')
         stress_table = 'keyspace1.standard1'
@@ -1235,4 +1235,4 @@ class CqlshCopyTest(Tester):
         debug(err)
 
         self.assertIn('some records might be missing', err)
-        self.assertTrue(sum(1 for _ in open(self.tempfile.name)) < num_records)
+        self.assertTrue(len(open(self.tempfile.name).readlines()) < num_records)
