@@ -3,6 +3,7 @@ import csv
 import datetime
 import os
 import sys
+import time
 from collections import namedtuple
 from contextlib import contextmanager
 from decimal import Decimal
@@ -509,8 +510,8 @@ class CqlshCopyTest(Tester):
         Test COPY TO with the time format specified in the WITH option by:
 
         - creating and populating a table,
-        - exporting the contents of the table to a CSV file using COPY TO WITH TIMEFORMAT
-        - checking the time format written to csv
+        - exporting the contents of the table to a CSV file using COPY TO WITH TIMEFORMAT,
+        - checking the time format written to csv.
         """
         self.prepare()
         self.session.execute("""
@@ -537,6 +538,45 @@ class CqlshCopyTest(Tester):
                               [['1', '2015/01/01 07:00'],
                                ['2', '2015/06/10 12:30'],
                                ['3', '2015/12/31 23:59']])
+
+    @require('9494')
+    def test_reading_with_ttl(self):
+        """
+        @jira_ticket CASSANDRA-9494
+        Test COPY FROM with TTL specified in the WITH option by:
+
+        - creating a table,
+        - writing a csv,
+        - importing the contents of the CSV file using COPY TO WITH TTL,
+        - checking the data has been imported,
+        - checking again after TTL * 2 seconds that the data has expired.
+        """
+        self.prepare()
+        self.session.execute("""
+            CREATE TABLE testttl (
+                a int primary key,
+                b int
+            )""")
+
+        self.tempfile = NamedTemporaryFile(delete=False)
+
+        data = [[1, 20], [2, 40], [3, 60], [4, 80]]
+
+        with open(self.tempfile.name, 'w') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=['a', 'b'])
+            for a, b in data:
+                writer.writerow({'a': a, 'b': b})
+            csvfile.close
+
+        self.node1.run_cqlsh(cmds="COPY ks.testttl FROM '{name}' WITH TTL = '5'".format(name=self.tempfile.name))
+
+        result = rows_to_list(self.session.execute("SELECT * FROM testttl"))
+        self.assertItemsEqual(data, result)
+
+        time.sleep(10)
+
+        result = rows_to_list(self.session.execute("SELECT * FROM testttl"))
+        self.assertItemsEqual([], result)
 
     def test_explicit_column_order_writing(self):
         """
