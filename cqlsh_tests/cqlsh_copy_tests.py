@@ -1,6 +1,7 @@
 # coding: utf-8
 import csv
 import datetime
+import json
 import os
 import sys
 import time
@@ -204,8 +205,11 @@ class CqlshCopyTest(Tester):
                      [[addr1, addr2], [addr3, addr4]],  # u frozen<list<list<address_type>>>,
                      # v frozen<map<map<int,int>,set<text>>>
                      ImmutableDict([(ImmutableDict([(1, 1), (2, 2)]), ImmutableSet(['1', '2', '3']))]),
-                     # w frozen<set<set<inet>>>
-                     ImmutableSet([ImmutableSet(['127.0.0.1', '127.0.0.2']), ImmutableSet(['127.0.0.3', '127.0.0.4'])])
+                     # w frozen<set<set<inet>>>, because of the SortedSet.__lt__() implementation, make sure the
+                     # first set is contained in the second set or else they will not sort consistently
+                     # and this will cause comparison problems when comparing with csv strings therefore failing
+                     # some tests
+                     ImmutableSet([ImmutableSet(['127.0.0.1']), ImmutableSet(['127.0.0.1', '127.0.0.2'])])
                      )
 
     @contextmanager
@@ -1137,3 +1141,98 @@ class CqlshCopyTest(Tester):
         self._test_bulk_round_trip(nodes=1, partitioner="murmur3", num_operations=100000,
                                    configuration_options={'range_request_timeout_in_ms': '300',
                                                           'write_request_timeout_in_ms': '200'})
+
+    @freshCluster()
+    def test_copy_to_with_more_failures_than_max_attempts(self):
+        """
+        Test exporting rows with failure injection by setting the environment variable CQLSH_COPY_TEST_FAILURES,
+        which is used by ExportProcess in pylib/copy.py to deviate its behavior from performing normal queries.
+        Here we set a token range that will fail more times than the maximum number of attempts, therefore
+        we expect this COPY TO job to fail.
+
+        @jira_ticket CASSANDRA-9304
+        """
+        num_records = 100000
+        self.prepare(nodes=1)
+
+        debug('Running stress')
+        stress_table = 'keyspace1.standard1'
+        self.node1.stress(['write', 'n={}'.format(num_records), '-rate', 'threads=50'])
+
+        self.tempfile = NamedTemporaryFile(delete=False)
+        failures = {'failing_range': {'start': 0, 'end': 1000000000000000000, 'num_failures': 5}}
+        os.environ['CQLSH_COPY_TEST_FAILURES'] = json.dumps(failures)
+
+        debug('Exporting to csv file: {} with {} and 3 max attempts'
+              .format(self.tempfile.name, os.environ['CQLSH_COPY_TEST_FAILURES']))
+        out, err = self.node1.run_cqlsh(cmds="COPY {} TO '{}' WITH MAXATTEMPTS='3'"
+                                        .format(stress_table, self.tempfile.name),
+                                        return_output=True)
+        debug(out)
+        debug(err)
+
+        self.assertIn('some records might be missing', err)
+        self.assertTrue(len(open(self.tempfile.name).readlines()) < num_records)
+
+    @freshCluster()
+    def test_copy_to_with_fewer_failures_than_max_attempts(self):
+        """
+        Test exporting rows with failure injection by setting the environment variable CQLSH_COPY_TEST_FAILURES,
+        which is used by ExportProcess in pylib/copy.py to deviate its behavior from performing normal queries.
+        Here we set a token range that will fail fewer times than the maximum number of attempts, therefore
+        we expect this COPY TO job to succeed.
+
+        @jira_ticket CASSANDRA-9304
+        """
+        num_records = 100000
+        self.prepare(nodes=1)
+
+        debug('Running stress')
+        stress_table = 'keyspace1.standard1'
+        self.node1.stress(['write', 'n={}'.format(num_records), '-rate', 'threads=50'])
+
+        self.tempfile = NamedTemporaryFile(delete=False)
+        failures = {'failing_range': {'start': 0, 'end': 1000000000000000000, 'num_failures': 3}}
+        os.environ['CQLSH_COPY_TEST_FAILURES'] = json.dumps(failures)
+        debug('Exporting to csv file: {} with {} and 5 max attemps'
+              .format(self.tempfile.name, os.environ['CQLSH_COPY_TEST_FAILURES']))
+        out, err = self.node1.run_cqlsh(cmds="COPY {} TO '{}' WITH MAXATTEMPTS='5'"
+                                        .format(stress_table, self.tempfile.name),
+                                        return_output=True)
+        debug(out)
+        debug(err)
+
+        self.assertNotIn('some records might be missing', err)
+        self.assertEqual(num_records, len(open(self.tempfile.name).readlines()))
+
+    @freshCluster()
+    def test_copy_to_with_child_process_crashing(self):
+        """
+        Test exporting rows with failure injection by setting the environment variable CQLSH_COPY_TEST_FAILURES,
+        which is used by ExportProcess in pylib/copy.py to deviate its behavior from performing normal queries.
+        Here we set a token range that will cause a child process processing this range to exit, therefore
+        we expect this COPY TO job to fail.
+
+        @jira_ticket CASSANDRA-9304
+        """
+        num_records = 100000
+        self.prepare(nodes=1)
+
+        debug('Running stress')
+        stress_table = 'keyspace1.standard1'
+        self.node1.stress(['write', 'n={}'.format(num_records), '-rate', 'threads=50'])
+
+        self.tempfile = NamedTemporaryFile(delete=False)
+        failures = {'exit_range': {'start': 0, 'end': 1000000000000000000}}
+        os.environ['CQLSH_COPY_TEST_FAILURES'] = json.dumps(failures)
+
+        debug('Exporting to csv file: {} with {}'
+              .format(self.tempfile.name, os.environ['CQLSH_COPY_TEST_FAILURES']))
+        out, err = self.node1.run_cqlsh(cmds="COPY {} TO '{}'"
+                                        .format(stress_table, self.tempfile.name),
+                                        return_output=True)
+        debug(out)
+        debug(err)
+
+        self.assertIn('some records might be missing', err)
+        self.assertTrue(len(open(self.tempfile.name).readlines()) < num_records)
