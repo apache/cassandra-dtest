@@ -1,6 +1,6 @@
 import re
 
-from nose.tools import assert_equal, assert_in, assert_is_not_none
+from nose.tools import assert_equal, assert_in
 
 from dtest import Tester, debug
 from tools import since
@@ -62,13 +62,7 @@ def verify_indexes_table(created_on_version, current_version, keyspace, session,
     debug("table name: [{}], index name: [{}], prefix: [{}]".format(table_name, index_name, table_name_prefix))
     meta = session.cluster.metadata.keyspaces[keyspace].indexes[index_name]
 
-    if current_version >= '3.0':
-        assert_equal('d', meta.index_options['target'])
-    else:
-        assert_is_not_none(meta.column)
-        column = meta.column
-        assert_equal('d', column.name)
-        assert_equal(table_name, column.table.name)
+    assert_equal('d', meta.index_options['target'])
 
     meta = session.cluster.metadata.keyspaces[keyspace].tables[table_name]
     assert_equal(1, len(meta.clustering_key))
@@ -76,11 +70,7 @@ def verify_indexes_table(created_on_version, current_version, keyspace, session,
 
     assert_equal(1, len(meta.indexes))
 
-    if current_version >= '3.0':
-        assert_equal({'target': 'd'}, meta.indexes[index_name].index_options)
-    else:
-        assert_is_not_none(meta.indexes[index_name].column)
-        assert_equal('d', meta.indexes[index_name].column.name)
+    assert_equal({'target': 'd'}, meta.indexes[index_name].index_options)
     assert_equal(3, len(meta.primary_key))
     assert_equal('a', meta.primary_key[0].name)
     assert_equal('b', meta.primary_key[1].name)
@@ -558,17 +548,8 @@ class TestSchemaMetadata(Tester):
         ix_meta = self._keyspace_meta().indexes['ix_born_to_die_name']
         self.assertEqual('ix_born_to_die_name', ix_meta.name)
 
-        if self.cluster.version() >= '3.0':
-            self.assertEqual({'target': 'name'}, ix_meta.index_options)
-            self.assertEqual('COMPOSITES', ix_meta.kind)
-        else:
-            self.assertEqual(1, len(ix_meta.columns))
-            self.assertEqual('name', next(iter(ix_meta.columns)).name)
-            self.assertEqual('COMPOSITES', ix_meta.index_type)
-            if self.cluster.version() < '2.0':
-                self.assertEqual({'prefix_size': '0'}, ix_meta.index_options)
-            else:
-                self.assertEqual({}, ix_meta.index_options)
+        self.assertEqual({'target': 'name'}, ix_meta.index_options)
+        self.assertEqual('COMPOSITES', ix_meta.kind)
 
         self.session.execute("drop table born_to_die")
         self.assertIsNone(self._keyspace_meta().tables.get('born_to_die'))
