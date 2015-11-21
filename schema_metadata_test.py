@@ -1,6 +1,6 @@
 import re
 
-from nose.tools import assert_equal, assert_in, assert_is_not_none
+from nose.tools import assert_equal, assert_in
 
 from dtest import Tester, debug
 from tools import since
