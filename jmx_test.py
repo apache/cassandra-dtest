@@ -65,7 +65,7 @@ class TestJMX(Tester):
         cluster.populate(3).start(wait_for_binary_proto=True)
         node1, node2, node3 = cluster.nodelist()
 
-        node1.stress(['write', 'n=5M', '-schema', 'replication(factor=3)'])
+        node1.stress(['write', 'n=500K', '-schema', 'replication(factor=3)'])
         node1.flush()
         node1.stop(gently=False)
 
@@ -104,7 +104,7 @@ class TestJMX(Tester):
         cluster.start(wait_for_binary_proto=True)
 
         version = cluster.version()
-        node1.stress(['write', 'n=10000', '-schema', 'replication(factor=3)'])
+        node1.stress(['write', 'n=10K', '-schema', 'replication(factor=3)'])
 
         typeName = "ColumnFamily" if version <= '2.2.X' else 'Table'
         debug('Version {} typeName {}'.format(version, typeName))
