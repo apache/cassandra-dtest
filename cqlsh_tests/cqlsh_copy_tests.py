@@ -1195,7 +1195,7 @@ class CqlshCopyTest(Tester):
         self.node1.stress(['write', 'n={}'.format(num_records), '-rate', 'threads=50'])
 
         self.tempfile = NamedTemporaryFile(delete=False)
-        failures = {'failing_range': {'start': 0, 'end': 1000000000000000000, 'num_failures': 5}}
+        failures = {'failing_range': {'start': 0, 'end': 5000000000000000000, 'num_failures': 5}}
         os.environ['CQLSH_COPY_TEST_FAILURES'] = json.dumps(failures)
 
         debug('Exporting to csv file: {} with {} and 3 max attempts'
@@ -1227,7 +1227,7 @@ class CqlshCopyTest(Tester):
         self.node1.stress(['write', 'n={}'.format(num_records), '-rate', 'threads=50'])
 
         self.tempfile = NamedTemporaryFile(delete=False)
-        failures = {'failing_range': {'start': 0, 'end': 1000000000000000000, 'num_failures': 3}}
+        failures = {'failing_range': {'start': 0, 'end': 5000000000000000000, 'num_failures': 3}}
         os.environ['CQLSH_COPY_TEST_FAILURES'] = json.dumps(failures)
         debug('Exporting to csv file: {} with {} and 5 max attemps'
               .format(self.tempfile.name, os.environ['CQLSH_COPY_TEST_FAILURES']))
@@ -1258,7 +1258,7 @@ class CqlshCopyTest(Tester):
         self.node1.stress(['write', 'n={}'.format(num_records), '-rate', 'threads=50'])
 
         self.tempfile = NamedTemporaryFile(delete=False)
-        failures = {'exit_range': {'start': 0, 'end': 1000000000000000000}}
+        failures = {'exit_range': {'start': 0, 'end': 5000000000000000000}}
         os.environ['CQLSH_COPY_TEST_FAILURES'] = json.dumps(failures)
 
         debug('Exporting to csv file: {} with {}'
