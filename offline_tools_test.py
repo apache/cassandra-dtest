@@ -39,7 +39,7 @@ class TestOfflineTools(Tester):
         cluster.stop(gently=False)
 
         (output, error, rc) = node1.run_sstablelevelreset("keyspace1", "standard1", output=True)
-        self.assertEqual(len(error), 0, error)
+        self.assertTrue(len(error) == 0 or "Max sstable size of" in error)
         self.assertIn("Found no sstables, did you give the correct keyspace", output)
         self.assertEqual(rc, 0, msg=str(rc))
 
@@ -52,7 +52,7 @@ class TestOfflineTools(Tester):
         cluster.stop(gently=False)
 
         (output, error, rc) = node1.run_sstablelevelreset("keyspace1", "standard1", output=True)
-        self.assertEqual(len(error), 0, error)
+        self.assertTrue(len(error) == 0 or "Max sstable size of" in error)
         self.assertIn("since it is already on level 0", output)
         self.assertEqual(rc, 0, msg=str(rc))
 
@@ -67,7 +67,7 @@ class TestOfflineTools(Tester):
         (output, error, rc) = node1.run_sstablelevelreset("keyspace1", "standard1", output=True)
         final_levels = self.get_levels(node1.run_sstablemetadata(keyspace="keyspace1", column_families=["standard1"]))
 
-        self.assertEqual(len(error), 0, error)
+        self.assertTrue(len(error) == 0 or "Max sstable size of" in error)
         self.assertEqual(rc, 0, msg=str(rc))
 
         debug(initial_levels)
