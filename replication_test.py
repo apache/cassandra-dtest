@@ -257,20 +257,26 @@ class ReplicationTest(Tester):
         self.assertEqual(len(forwarders_used), 3)
 
 
+@require('10243')
+@require('9474')
 class SnitchConfigurationUpdateTest(Tester):
     """
     Test to reproduce CASSANDRA-10238, wherein changing snitch properties to change racks without a restart
     could violate RF contract.
 
     Since CASSANDRA-10243 it is no longer possible to change rack or dc for live nodes so we must specify
-    which nodes should be shutdown in order to have the rack changed. Since CASSANDRA-10242 it is no longer
-    possible to start a node with a different rack unless we specify -Dcassandra.ignore_rack=true.
+    which nodes should be shutdown in order to have the rack changed. Since CASSANDRA-10242 and CASSANDRA-9474
+    it is no longer possible to start a node with a different rack unless we specify -Dcassandra.ignore_rack
+    (CASSANDRA-10242 only in 2.1) or -Dcassandra.override_rackdc (CASSANDRA-9474, 2.1+). These tests already use
+    the latest property name (override_rackdc) and therefore require CASSANDRA-9474 as well.
     """
 
     def __init__(self, *args, **kwargs):
         Tester.__init__(self, *args, **kwargs)
-        self.ignore_log_patterns = ['Fatal exception during initialization',
-                                    'Cannot update data center or rack']
+        self.ignore_log_patterns = ["Fatal exception during initialization",
+                                    "Cannot start node if snitch's rack differs from previous rack",
+                                    "Cannot update data center or rack",
+                                    "Configuration update of GossipingPropertyFileSnitch is no longer supported"]
 
     def check_endpoint_count(self, ks, table, nodes, rf):
         """
@@ -531,7 +537,7 @@ class SnitchConfigurationUpdateTest(Tester):
         for i in nodes_to_shutdown:
             node = cluster.nodelist()[i]
             debug("Restarting node {}".format(node.address()))
-            node.start(jvm_args=['-Dcassandra.ignore_rack=true'], wait_for_binary_proto=True)
+            node.start(jvm_args=['-Dcassandra.override_rackdc=true'], wait_for_binary_proto=True)
 
         self.wait_for_nodes_on_racks(cluster.nodelist(), final_racks)
 
@@ -542,7 +548,8 @@ class SnitchConfigurationUpdateTest(Tester):
         """
         @jira_ticket CASSANDRA-10242
 
-        Test that we cannot restart with a different rack if '-Dcassandra.ignore_rack=true' is not specified.
+        Test that we cannot restart with a different rack if '-Dcassandra.ignore_rack=true' or
+        '-Dcassandra.override_rackdc=true' are not specified.
         """
         cluster = self.cluster
         cluster.populate(1)
@@ -573,9 +580,12 @@ class SnitchConfigurationUpdateTest(Tester):
 
         # check node not running
         debug("Waiting for error message in log file")
-        node.watch_log_for("Fatal exception during initialization", from_mark=mark)
 
-    @require('10243')
+        if cluster.version() >= '2.2':
+            node.watch_log_for("Cannot start node if snitch's rack differs from previous rack", from_mark=mark)
+        else:
+            node.watch_log_for("Fatal exception during initialization", from_mark=mark)
+
     def test_failed_snitch_update_gossiping_property_file_snitch(self):
         """
         @jira_ticket CASSANDRA-10243
@@ -587,9 +597,10 @@ class SnitchConfigurationUpdateTest(Tester):
                                         snitch_config_file='cassandra-rackdc.properties',
                                         snitch_lines_before=["dc=dc1", "rack=rack1"],
                                         snitch_lines_after=["dc=dc1", "rack=rack2"],
-                                        racks=["rack1", "rack1", "rack1"])
+                                        racks=["rack1", "rack1", "rack1"],
+                                        error='Configuration update of GossipingPropertyFileSnitch '
+                                              'is no longer supported')
 
-    @require('10243')
     def test_failed_snitch_update_property_file_snitch(self):
         """
         @jira_ticket CASSANDRA-10243
@@ -601,9 +612,9 @@ class SnitchConfigurationUpdateTest(Tester):
                                         snitch_config_file='cassandra-topology.properties',
                                         snitch_lines_before=["default=dc1:rack1"],
                                         snitch_lines_after=["default=dc1:rack2"],
-                                        racks=["rack1", "rack1", "rack1"])
+                                        racks=["rack1", "rack1", "rack1"],
+                                        error='Cannot update data center or rack')
 
-    @require('10243')
     @since('2.0', max_version='2.1.x')
     def test_failed_snitch_update_yaml_file_snitch(self):
         """
@@ -630,10 +641,11 @@ class SnitchConfigurationUpdateTest(Tester):
                                                             "      - broadcast_address: 127.0.0.1",
                                                             "      - broadcast_address: 127.0.0.2",
                                                             "      - broadcast_address: 127.0.0.3"],
-                                        racks=["rack1", "rack1", "rack1"])
+                                        racks=["rack1", "rack1", "rack1"],
+                                        error='Cannot update data center or rack')
 
     def _test_failed_snitch_update(self, nodes, snitch_class_name, snitch_config_file,
-                                   snitch_lines_before, snitch_lines_after, racks):
+                                   snitch_lines_before, snitch_lines_after, racks, error):
         cluster = self.cluster
         cluster.populate(nodes)
         cluster.set_configuration_options(values={'endpoint_snitch': 'org.apache.cassandra.locator.{}'
@@ -668,4 +680,4 @@ class SnitchConfigurationUpdateTest(Tester):
 
         # check error in log files
         for node, mark in zip(cluster.nodelist(), marks):
-            node.watch_log_for("Cannot update data center or rack", from_mark=mark)
+            node.watch_log_for(error, from_mark=mark)
