@@ -258,25 +258,20 @@ class ReplicationTest(Tester):
 
 
 @require('10243')
-@require('9474')
 class SnitchConfigurationUpdateTest(Tester):
     """
     Test to reproduce CASSANDRA-10238, wherein changing snitch properties to change racks without a restart
     could violate RF contract.
 
     Since CASSANDRA-10243 it is no longer possible to change rack or dc for live nodes so we must specify
-    which nodes should be shutdown in order to have the rack changed. Since CASSANDRA-10242 and CASSANDRA-9474
-    it is no longer possible to start a node with a different rack unless we specify -Dcassandra.ignore_rack
-    (CASSANDRA-10242 only in 2.1) or -Dcassandra.override_rackdc (CASSANDRA-9474, 2.1+). These tests already use
-    the latest property name (override_rackdc) and therefore require CASSANDRA-9474 as well.
+    which nodes should be shutdown in order to have the rack changed.
     """
 
     def __init__(self, *args, **kwargs):
         Tester.__init__(self, *args, **kwargs)
         self.ignore_log_patterns = ["Fatal exception during initialization",
                                     "Cannot start node if snitch's rack differs from previous rack",
-                                    "Cannot update data center or rack",
-                                    "Configuration update of GossipingPropertyFileSnitch is no longer supported"]
+                                    "Cannot update data center or rack"]
 
     def check_endpoint_count(self, ks, table, nodes, rf):
         """
@@ -537,7 +532,12 @@ class SnitchConfigurationUpdateTest(Tester):
         for i in nodes_to_shutdown:
             node = cluster.nodelist()[i]
             debug("Restarting node {}".format(node.address()))
-            node.start(jvm_args=['-Dcassandra.override_rackdc=true'], wait_for_binary_proto=True)
+            # Since CASSANDRA-10242 it is no longer
+            # possible to start a node with a different rack unless we specify -Dcassandra.ignore_rack and since
+            # CASSANDRA-9474 it is no longer possible to start a node with a different dc unless we specify
+            # -Dcassandra.ignore_dc.
+            node.start(jvm_args=['-Dcassandra.ignore_rack=true', '-Dcassandra.ignore_dc=true'],
+                       wait_for_binary_proto=True)
 
         self.wait_for_nodes_on_racks(cluster.nodelist(), final_racks)
 
@@ -548,8 +548,7 @@ class SnitchConfigurationUpdateTest(Tester):
         """
         @jira_ticket CASSANDRA-10242
 
-        Test that we cannot restart with a different rack if '-Dcassandra.ignore_rack=true' or
-        '-Dcassandra.override_rackdc=true' are not specified.
+        Test that we cannot restart with a different rack if '-Dcassandra.ignore_rack=true' is not specified.
         """
         cluster = self.cluster
         cluster.populate(1)
@@ -598,8 +597,7 @@ class SnitchConfigurationUpdateTest(Tester):
                                         snitch_lines_before=["dc=dc1", "rack=rack1"],
                                         snitch_lines_after=["dc=dc1", "rack=rack2"],
                                         racks=["rack1", "rack1", "rack1"],
-                                        error='Configuration update of GossipingPropertyFileSnitch '
-                                              'is no longer supported')
+                                        error='')
 
     def test_failed_snitch_update_property_file_snitch(self):
         """
@@ -678,6 +676,7 @@ class SnitchConfigurationUpdateTest(Tester):
         # check racks have not changed
         self.wait_for_nodes_on_racks(cluster.nodelist(), racks)
 
-        # check error in log files
-        for node, mark in zip(cluster.nodelist(), marks):
-            node.watch_log_for(error, from_mark=mark)
+        # check error in log files if applicable
+        if error:
+            for node, mark in zip(cluster.nodelist(), marks):
+                node.watch_log_for(error, from_mark=mark)
