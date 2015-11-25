@@ -810,7 +810,6 @@ class TestSecondaryIndexesOnCollections(Tester):
         shared_uuid = uuid.uuid4()  # this uuid will be on all records
 
         log = []
-
         for i in range(50000):
             user_uuid = uuid.uuid4()
             unshared_uuid1 = uuid.uuid4()
@@ -875,12 +874,23 @@ class TestSecondaryIndexesOnCollections(Tester):
             stmt = "CREATE INDEX user_uuids_values on map_index_search.users (uuids);"
             session.execute(stmt)
 
+        def index_is_built():
+            index_name = 'user_uuids_values'
+            if self.cluster.version() < '3.0':
+                index_name = 'users.' + index_name
+            return len(list(session.execute("""SELECT * FROM system."IndexInfo"
+                   WHERE table_name ='map_index_search' AND index_name='{0}'""".format(index_name)))) == 1
+
+        while not index_is_built():
+            debug("waiting for index to build")
+            time.sleep(1)
+
         # shuffle the log in-place, and double-check a slice of records by querying the secondary index
         random.shuffle(log)
 
         time.sleep(10)
 
-        # since we already inserted unique ids for values as well, check that appropriate recors are found
+        # since we already inserted unique ids for values as well, check that appropriate records are found
         for log_entry in log[:1000]:
             stmt = ("SELECT user_id, email, uuids FROM map_index_search.users where uuids contains {unshared_uuid2}"
                     ).format(unshared_uuid2=log_entry['unshared_uuid2'])
