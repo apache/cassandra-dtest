@@ -4,7 +4,7 @@ import re
 import time
 
 from dtest import Tester, debug, PRINT_DEBUG
-from tools import no_vnodes, require, since
+from tools import no_vnodes, since
 
 from cassandra.query import SimpleStatement
 from cassandra import ConsistencyLevel
@@ -257,7 +257,6 @@ class ReplicationTest(Tester):
         self.assertEqual(len(forwarders_used), 3)
 
 
-@require('10243')
 class SnitchConfigurationUpdateTest(Tester):
     """
     Test to reproduce CASSANDRA-10238, wherein changing snitch properties to change racks without a restart
@@ -270,7 +269,7 @@ class SnitchConfigurationUpdateTest(Tester):
     def __init__(self, *args, **kwargs):
         Tester.__init__(self, *args, **kwargs)
         self.ignore_log_patterns = ["Fatal exception during initialization",
-                                    "Cannot start node if snitch's rack differs from previous rack",
+                                    "Cannot start node if snitch's rack (.*) differs from previous rack (.*)",
                                     "Cannot update data center or rack"]
 
     def check_endpoint_count(self, ks, table, nodes, rf):
@@ -581,7 +580,8 @@ class SnitchConfigurationUpdateTest(Tester):
         debug("Waiting for error message in log file")
 
         if cluster.version() >= '2.2':
-            node.watch_log_for("Cannot start node if snitch's rack differs from previous rack", from_mark=mark)
+            node.watch_log_for("Cannot start node if snitch's rack (.*) differs from previous rack (.*)",
+                               from_mark=mark)
         else:
             node.watch_log_for("Fatal exception during initialization", from_mark=mark)
 
