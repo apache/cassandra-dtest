@@ -1,6 +1,7 @@
 import time
 
 from assertions import assert_invalid
+from cassandra.concurrent import execute_concurrent_with_args
 from dtest import Tester
 from tools import rows_to_list
 
@@ -21,30 +22,32 @@ class TestSchema(Tester):
                         "WITH compaction = {'class': 'SizeTieredCompactionStrategy', 'min_threshold': 1024, 'max_threshold': 1024 };")
 
         stmt1 = session.prepare("insert into tbl_o_churn (id, c0, c1) values (?, ?, ?)")
-        for n in range(1000):
-            session.execute(stmt1, [n, 'aaa', 'bbb'])
-            if n % 100 == 0:
-                node1.flush()
+        rows_to_insert = 50
+
+        for n in range(5):
+            parameters = [(x, 'aaa', 'bbb') for x in range(n * rows_to_insert, (n * rows_to_insert) + rows_to_insert)]
+            execute_concurrent_with_args(session, stmt1, parameters, concurrency=rows_to_insert)
+            node1.flush()
 
         session.execute("alter table tbl_o_churn add c2 text")
         session.execute("alter table tbl_o_churn drop c0")
         stmt2 = session.prepare("insert into tbl_o_churn (id, c1, c2) values (?, ?, ?);")
 
-        for n in range(1000):
-            session.execute(stmt2, [n + 1000, 'ccc', 'ddd'])
-            if n % 100 == 0:
-                node1.flush()
+        for n in range(5, 10):
+            parameters = [(x, 'ccc', 'ddd') for x in range(n * rows_to_insert, (n * rows_to_insert) + rows_to_insert)]
+            execute_concurrent_with_args(session, stmt2, parameters, concurrency=rows_to_insert)
+            node1.flush()
 
-        for n in range(1000):
-            rows = session.execute("select * from tbl_o_churn where id = %s", (n, ))
-            self.assertEqual(rows[0].c1, 'bbb')
-            self.assertIsNone(rows[0].c2)
-            self.assertFalse(hasattr(rows[0], 'c0'))
-
-            rows = session.execute("select * from tbl_o_churn where id = %s", (n + 1000, ))
-            self.assertEqual(rows[0].c1, 'ccc')
-            self.assertEqual(rows[0].c2, 'ddd')
-            self.assertFalse(hasattr(rows[0], 'c0'))
+        rows = session.execute("select * from tbl_o_churn")
+        for row in rows:
+            if row.id < rows_to_insert * 5:
+                self.assertEqual(row.c1, 'bbb')
+                self.assertIsNone(row.c2)
+                self.assertFalse(hasattr(row, 'c0'))
+            else:
+                self.assertEqual(row.c1, 'ccc')
+                self.assertEqual(row.c2, 'ddd')
+                self.assertFalse(hasattr(row, 'c0'))
 
     def drop_column_compact_test(self):
         session = self.prepare()
