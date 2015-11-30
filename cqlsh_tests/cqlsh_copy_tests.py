@@ -1271,3 +1271,116 @@ class CqlshCopyTest(Tester):
 
         self.assertIn('some records might be missing', err)
         self.assertTrue(len(open(self.tempfile.name).readlines()) < num_records)
+
+    @require('9302')
+    @freshCluster()
+    def test_copy_from_with_more_failures_than_max_attempts(self):
+        """
+        Test importing rows with failure injection by setting the environment variable CQLSH_COPY_TEST_FAILURES,
+        which is used by ImportProcess in pylib/copy.py to deviate its behavior from performing normal queries.
+        To ensure unique batch ids we must also set the chunk size to one.
+
+        We set a batch id that will cause a batch to fail more times than the maximum number of attempts,
+        therefore we expect this COPY TO job to fail.
+
+        @jira_ticket CASSANDRA-9302
+        """
+        num_records = 1000
+        self.prepare(nodes=1)
+
+        debug('Running stress')
+        stress_table = 'keyspace1.standard1'
+        self.node1.stress(['write', 'n={}'.format(num_records), '-rate', 'threads=50'])
+
+        self.tempfile = NamedTemporaryFile(delete=False)
+        debug('Exporting to csv file {} to generate a file'.format(self.tempfile.name))
+        self.node1.run_cqlsh(cmds="COPY {} TO '{}'".format(stress_table, self.tempfile.name))
+
+        self.session.execute("TRUNCATE {}".format(stress_table))
+
+        failures = {'failing_batch': {'id': 30, 'failures': 5}}
+        os.environ['CQLSH_COPY_TEST_FAILURES'] = json.dumps(failures)
+        debug('Importing from csv file {} with {}'.format(self.tempfile.name, os.environ['CQLSH_COPY_TEST_FAILURES']))
+        out, err = self.node1.run_cqlsh(cmds="COPY {} FROM '{}' WITH CHUNKSIZE='1' AND MAXATTEMPTS='3'"
+                                        .format(stress_table, self.tempfile.name), return_output=True)
+        debug(out)
+        debug(err)
+
+        self.assertIn('Failed to process', err)
+        num_records_imported = rows_to_list(self.session.execute("SELECT COUNT(*) FROM {}".format(stress_table)))[0][0]
+        self.assertTrue(num_records_imported < num_records)
+
+    @require('9302')
+    @freshCluster()
+    def test_copy_from_with_fewer_failures_than_max_attempts(self):
+        """
+        Test importing rows with failure injection by setting the environment variable CQLSH_COPY_TEST_FAILURES,
+        which is used by ImportProcess in pylib/copy.py to deviate its behavior from performing normal queries.
+        To ensure unique batch ids we must also set the chunk size to one.
+
+        We set a batch id that will cause a batch to fail fewer times than the maximum number of attempts,
+        therefore we expect this COPY TO job to succeed.
+
+        @jira_ticket CASSANDRA-9302
+        """
+        num_records = 1000
+        self.prepare(nodes=1)
+
+        debug('Running stress')
+        stress_table = 'keyspace1.standard1'
+        self.node1.stress(['write', 'n={}'.format(num_records), '-rate', 'threads=50'])
+
+        self.tempfile = NamedTemporaryFile(delete=False)
+        debug('Exporting to csv file {} to generate a file'.format(self.tempfile.name))
+        self.node1.run_cqlsh(cmds="COPY {} TO '{}'".format(stress_table, self.tempfile.name))
+
+        self.session.execute("TRUNCATE {}".format(stress_table))
+
+        failures = {'failing_batch': {'id': 30, 'failures': 3}}
+        os.environ['CQLSH_COPY_TEST_FAILURES'] = json.dumps(failures)
+        debug('Importing from csv file {} with {}'.format(self.tempfile.name, os.environ['CQLSH_COPY_TEST_FAILURES']))
+        out, err = self.node1.run_cqlsh(cmds="COPY {} FROM '{}' WITH CHUNKSIZE='1' AND MAXATTEMPTS='5'"
+                                        .format(stress_table, self.tempfile.name), return_output=True)
+        debug(out)
+        debug(err)
+
+        self.assertNotIn('Failed to process', err)
+        num_records_imported = rows_to_list(self.session.execute("SELECT COUNT(*) FROM {}".format(stress_table)))[0][0]
+        self.assertEquals(num_records, num_records_imported)
+
+    @require('9302')
+    @freshCluster()
+    def test_copy_from_with_child_process_crashing(self):
+        """
+        Test importing rows with failure injection by setting the environment variable CQLSH_COPY_TEST_FAILURES,
+        which is used by ImportProcess in pylib/copy.py to deviate its behavior from performing normal queries.
+        To ensure unique batch ids we must also set the chunk size to one.
+
+        We set a batch id that will cause a child process to exit, therefore we expect this COPY TO job to fail.
+
+        @jira_ticket CASSANDRA-9302
+        """
+        num_records = 1000
+        self.prepare(nodes=1)
+
+        debug('Running stress')
+        stress_table = 'keyspace1.standard1'
+        self.node1.stress(['write', 'n={}'.format(num_records), '-rate', 'threads=50'])
+
+        self.tempfile = NamedTemporaryFile(delete=False)
+        debug('Exporting to csv file {} to generate a file'.format(self.tempfile.name))
+        self.node1.run_cqlsh(cmds="COPY {} TO '{}'".format(stress_table, self.tempfile.name))
+
+        self.session.execute("TRUNCATE {}".format(stress_table))
+
+        failures = {'exit_batch': {'id': 30}}
+        os.environ['CQLSH_COPY_TEST_FAILURES'] = json.dumps(failures)
+        debug('Importing from csv file {} with {}'.format(self.tempfile.name, os.environ['CQLSH_COPY_TEST_FAILURES']))
+        out, err = self.node1.run_cqlsh(cmds="COPY {} FROM '{}' WITH CHUNKSIZE='1'"
+                                        .format(stress_table, self.tempfile.name), return_output=True)
+        debug(out)
+        debug(err)
+
+        self.assertIn('Failed to process', err)
+        num_records_imported = rows_to_list(self.session.execute("SELECT COUNT(*) FROM {}".format(stress_table)))[0][0]
+        self.assertTrue(num_records_imported < num_records)
