@@ -945,12 +945,12 @@ class TestMutations(ThriftTester):
         _expect_exception(bad_cf, InvalidRequestException)
 
         # test_batch_mutate_does_not_accept_deletion_on_undefined_cf
-        def bad_cf():
+        def bad_cf_2():
             _set_keyspace('Keyspace1')
             d = Deletion(2, predicate=SlicePredicate(column_names=['baz']))
             client.batch_mutate({'key_37': {'Undefined': [Mutation(deletion=d)]}},
                                 ConsistencyLevel.ONE)
-        _expect_exception(bad_cf, InvalidRequestException)
+        _expect_exception(bad_cf_2, InvalidRequestException)
 
         # a column value that does not match the declared validator
         def send_string_instead_of_long():
