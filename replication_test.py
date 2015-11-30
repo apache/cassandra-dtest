@@ -282,8 +282,7 @@ class SnitchConfigurationUpdateTest(Tester):
             out, err = node.nodetool(cmd)
 
             if len(err.strip()) > 0:
-                debug(err)
-                raise RuntimeError("Error running 'nodetool {}'".format(cmd))
+                debug("Error running 'nodetool {}': {}".format(cmd, err))
 
             debug("Endpoints for node {}, expected count is {}".format(node.address(), expected_count))
             debug(out)
@@ -303,7 +302,7 @@ class SnitchConfigurationUpdateTest(Tester):
 
                 debug(out)
                 if len(err.strip()) > 0:
-                    raise RuntimeError("Error trying to run nodetool status")
+                    debug("Error trying to run nodetool status: {}".format(err))
 
                 racks = []
                 for line in out.split(os.linesep):
