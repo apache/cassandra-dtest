@@ -306,7 +306,7 @@ class SnitchConfigurationUpdateTest(Tester):
                         racks.append(m.group(1))
 
                 if racks == expected_racks:
-                    # great, the topology change is propogated
+                    # great, the topology change is propagated
                     debug("Topology change detected on node {}".format(i))
                     break
                 else:
