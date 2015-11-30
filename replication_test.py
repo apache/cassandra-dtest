@@ -452,6 +452,37 @@ class SnitchConfigurationUpdateTest(Tester):
                                                                            "      - broadcast_address: 127.0.0.3"],
                                        final_racks=["rack0", "rack1", "rack2"])
 
+    @since('2.1')
+    def test_switch_rack_startup_fails(self):
+        """
+        @jira_ticket CASSANDRA-10242
+
+        Confirm that switching racks fails to bring up the node
+        """
+        expected_error = r'Cannot start node if snitch\'s rack (.*) differs from previous rack (.*)\. Please fix the snitch or wipe and rebootstrap this node\.'
+        self.ignore_log_patterns = [expected_error]
+
+        cluster = self.cluster
+        cluster.populate(1)
+        cluster.set_configuration_options(values={'endpoint_snitch': 'org.apache.cassandra.locator.GossipingPropertyFileSnitch'})
+
+        node = cluster.nodelist()[0]
+        with open(os.path.join(node.get_conf_dir(), 'cassandra-rackdc.properties'), 'w') as topo_file:
+            topo_file.write("dc=dc1" + os.linesep)
+            topo_file.write("rack=rack9" + os.linesep)
+
+        cluster.start(wait_for_binary_proto=True)
+
+        node.stop()
+
+        with open(os.path.join(node.get_conf_dir(), 'cassandra-rackdc.properties'), 'w') as topo_file:
+            topo_file.write("dc=dc1" + os.linesep)
+            topo_file.write("rack=rack0" + os.linesep)
+
+        mark = node.mark_log()
+        node.start()
+        node.watch_log_for(expected_error, from_mark=mark, timeout=10)
+
     def _test_rf_on_snitch_update(self, nodes, rf, snitch_class_name, snitch_config_file, snitch_lines_before, snitch_lines_after, final_racks):
         cluster = self.cluster
         cluster.populate(nodes)
