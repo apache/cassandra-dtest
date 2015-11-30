@@ -484,3 +484,34 @@ class SnitchConfigurationUpdateTest(Tester):
 
         # nodes have joined racks, check endpoint counts again
         self.check_endpoint_count('testing', 'rf_test', cluster.nodelist(), rf)
+
+    def test_switch_data_center_startup_fails(self):
+        """
+        @jira_ticket CASSANDRA-9474
+
+        Confirm that switching data centers fails to bring up the node.
+        """
+        expected_error = r"Cannot start node if snitch's data center (.*) differs from previous data center (.*)\." \
+                         " Please fix the snitch configuration, decommission and rebootstrap this node or use the flag -Dcassandra.ignore_dc=true."
+        self.ignore_log_patterns = [expected_error]
+
+        cluster = self.cluster
+        cluster.populate(1)
+        cluster.set_configuration_options(values={'endpoint_snitch': 'org.apache.cassandra.locator.GossipingPropertyFileSnitch'})
+
+        node = cluster.nodelist()[0]
+        with open(os.path.join(node.get_conf_dir(), 'cassandra-rackdc.properties'), 'w') as topo_file:
+            topo_file.write("dc=dc9" + os.linesep)
+            topo_file.write("rack=rack1" + os.linesep)
+
+        cluster.start(wait_for_binary_proto=True)
+
+        node.stop()
+
+        with open(os.path.join(node.get_conf_dir(), 'cassandra-rackdc.properties'), 'w') as topo_file:
+            topo_file.write("dc=dc0" + os.linesep)
+            topo_file.write("rack=rack1" + os.linesep)
+
+        mark = node.mark_log()
+        node.start()
+        node.watch_log_for(expected_error, from_mark=mark, timeout=10)
