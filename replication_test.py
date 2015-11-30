@@ -544,7 +544,7 @@ class SnitchConfigurationUpdateTest(Tester):
         cluster = self.cluster
         cluster.populate(1)
         cluster.set_configuration_options(values={'endpoint_snitch': 'org.apache.cassandra.locator.{}'
-                                          .format('GossipingPropertyFileSnitch')})
+                                                  .format('GossipingPropertyFileSnitch')})
 
         node1 = cluster.nodelist()[0]
 
@@ -573,7 +573,7 @@ class SnitchConfigurationUpdateTest(Tester):
 
         if cluster.version() >= '2.2':
             node1.watch_log_for("Cannot start node if snitch's rack(.*) differs from previous rack(.*)",
-                               from_mark=mark)
+                                from_mark=mark)
         else:
             node1.watch_log_for("Fatal exception during initialization", from_mark=mark)
 
@@ -639,7 +639,7 @@ class SnitchConfigurationUpdateTest(Tester):
         cluster = self.cluster
         cluster.populate(nodes)
         cluster.set_configuration_options(values={'endpoint_snitch': 'org.apache.cassandra.locator.{}'
-                                          .format(snitch_class_name)})
+                                                  .format(snitch_class_name)})
 
         # start with initial snitch lines
         for node in cluster.nodelist():
