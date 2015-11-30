@@ -68,11 +68,8 @@ class ReplicationTest(Tester):
                 continue
 
         for trace_event in trace.events:
-            session = trace._session
             activity = trace_event.description
             source = trace_event.source
-            source_elapsed = trace_event.source_elapsed
-            thread = trace_event.thread_name
 
             # Step 2, find all the nodes that each node talked to:
             send_match = TRACE_SEND_MESSAGE.search(activity)
