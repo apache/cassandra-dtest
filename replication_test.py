@@ -559,7 +559,7 @@ class SnitchConfigurationUpdateTest(Tester):
         node1.stop(wait_other_notice=True)
 
         debug("Updating snitch file with rack2")
-        for i, node in enumerate(cluster.nodelist()):
+        for node in cluster.nodelist():
             with open(os.path.join(node.get_conf_dir(), 'cassandra-rackdc.properties'), 'w') as topo_file:
                 for line in ["dc={}".format(node.data_center), "rack=rack2"]:
                     topo_file.write(line + os.linesep)
@@ -642,7 +642,7 @@ class SnitchConfigurationUpdateTest(Tester):
                                           .format(snitch_class_name)})
 
         # start with initial snitch lines
-        for i, node in enumerate(cluster.nodelist()):
+        for node in cluster.nodelist():
             with open(os.path.join(node.get_conf_dir(), snitch_config_file), 'w') as topo_file:
                 for line in snitch_lines_before:
                     topo_file.write(line + os.linesep)
@@ -655,7 +655,7 @@ class SnitchConfigurationUpdateTest(Tester):
         marks = [node.mark_log() for node in cluster.nodelist()]
 
         debug("Updating snitch file")
-        for i, node in enumerate(cluster.nodelist()):
+        for node in cluster.nodelist():
             with open(os.path.join(node.get_conf_dir(), snitch_config_file), 'w') as topo_file:
                 for line in snitch_lines_after:
                     topo_file.write(line + os.linesep)
