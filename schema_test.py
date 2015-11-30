@@ -2,13 +2,11 @@ import time
 
 from assertions import assert_invalid
 from dtest import Tester
-from tools import rows_to_list, since
+from tools import rows_to_list
 
 
-@since('2.0')
 class TestSchema(Tester):
 
-    @since('2.1')
     def table_alteration_test(self):
         """
         Tests that table alters return as expected with many sstables at different schema points
