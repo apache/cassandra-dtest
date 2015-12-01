@@ -742,13 +742,13 @@ class TestMaterializedViews(Tester):
                                 consistency_level=ConsistencyLevel.ALL)
 
         result = session.execute(query, trace=True)
-        self.check_trace_events(query.trace, True)
+        self.check_trace_events(result.get_query_trace(), True)
 
         # We should not get a digest mismatch the second time
         query = SimpleStatement("SELECT * FROM t_by_v WHERE v = 1", consistency_level=ConsistencyLevel.ALL)
 
         result = session.execute(query, trace=True)
-        self.check_trace_events(query.trace, False)
+        self.check_trace_events(result.get_query_trace(), False)
 
         # Verify values one last time
         assert_one(
