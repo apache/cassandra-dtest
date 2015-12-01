@@ -179,7 +179,7 @@ class TestJMX(Tester):
             # We want to make sure that the progress is increasing,
             # and that values other than zero are displayed.
             self.assertGreater(updated_progress, progress)
-            self.assertGreater(progress, 0)
+            self.assertGreaterEqual(progress, 0)
             self.assertGreater(updated_progress, 0)
 
             # Block until the major compaction is complete
