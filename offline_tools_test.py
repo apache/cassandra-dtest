@@ -39,7 +39,7 @@ class TestOfflineTools(Tester):
         cluster.stop(gently=False)
 
         (output, error, rc) = node1.run_sstablelevelreset("keyspace1", "standard1", output=True)
-        self.assertTrue(len(error) == 0 or "Max sstable size of" in error, error)
+        self._check_stderr_error(error)
         self.assertIn("Found no sstables, did you give the correct keyspace", output)
         self.assertEqual(rc, 0, msg=str(rc))
 
@@ -52,7 +52,7 @@ class TestOfflineTools(Tester):
         cluster.stop(gently=False)
 
         (output, error, rc) = node1.run_sstablelevelreset("keyspace1", "standard1", output=True)
-        self.assertTrue(len(error) == 0 or "Max sstable size of" in error, error)
+        self._check_stderr_error(error)
         self.assertIn("since it is already on level 0", output)
         self.assertEqual(rc, 0, msg=str(rc))
 
@@ -66,8 +66,7 @@ class TestOfflineTools(Tester):
         initial_levels = self.get_levels(node1.run_sstablemetadata(keyspace="keyspace1", column_families=["standard1"]))
         (output, error, rc) = node1.run_sstablelevelreset("keyspace1", "standard1", output=True)
         final_levels = self.get_levels(node1.run_sstablemetadata(keyspace="keyspace1", column_families=["standard1"]))
-
-        self.assertTrue(len(error) == 0 or "Max sstable size of" in error, error)
+        self._check_stderr_error(error)
         self.assertEqual(rc, 0, msg=str(rc))
 
         debug(initial_levels)
@@ -263,6 +262,12 @@ class TestOfflineTools(Tester):
         node1.flush()
         [(out, error, rc)] = node1.run_sstableexpiredblockers(keyspace="ks", column_family="cf")
         self.assertIn("blocks 2 expired sstables from getting dropped", out)
+
+    def _check_stderr_error(self, error):
+        if len(error) > 0:
+            for line in error.splitlines():
+                self.assertTrue("Max sstable size of" in line or "Consider adding more capacity" in line,
+                                'Found line \n\n"{line}"\n\n in error\n\n{error}'.format(line=line, error=error))
 
     def _get_final_sstables(self, node, ks, table):
         """
