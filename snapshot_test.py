@@ -151,7 +151,11 @@ class TestArchiveCommitlog(SnapshotTester):
         """Test archive commit log with restore_point_in_time setting"""
         self.run_archive_commitlog(restore_point_in_time=True, archive_active_commitlogs=True)
 
-    def run_archive_commitlog(self, restore_point_in_time=False, restore_archived_commitlog=True, archive_active_commitlogs=False):
+    def test_archive_commitlog_point_in_time_with_active_commitlog_ln(self):
+        """Test archive commit log with restore_point_in_time setting"""
+        self.run_archive_commitlog(restore_point_in_time=True, archive_active_commitlogs=True, archive_command='ln')
+
+    def run_archive_commitlog(self, restore_point_in_time=False, restore_archived_commitlog=True, archive_active_commitlogs=False, archive_command='cp'):
         """Run archive commit log restoration test"""
 
         cluster = self.cluster
@@ -165,8 +169,8 @@ class TestArchiveCommitlog(SnapshotTester):
         # Edit commitlog_archiving.properties and set an archive
         # command:
         replace_in_file(os.path.join(node1.get_path(), 'conf', 'commitlog_archiving.properties'),
-                        [(r'^archive_command=.*$', 'archive_command=cp %path {tmp_commitlog}/%name'.format(
-                            tmp_commitlog=tmp_commitlog))])
+                        [(r'^archive_command=.*$', 'archive_command={archive_command} %path {tmp_commitlog}/%name'.format(
+                            tmp_commitlog=tmp_commitlog, archive_command=archive_command))])
 
         cluster.start()
 
@@ -321,5 +325,65 @@ class TestArchiveCommitlog(SnapshotTester):
             shutil.rmtree(system_ut_snapshot_dir)
             debug("removing snapshot_dir: " + system_col_snapshot_dir)
             shutil.rmtree(system_col_snapshot_dir)
+            debug("removing tmp_commitlog: " + tmp_commitlog)
+            shutil.rmtree(tmp_commitlog)
+
+    def test_archive_and_restore_commitlog_repeatedly(self):
+        """Run archive commit log restoration test repeatedly to make sure it is idempoten
+           and doesn't fail if done repeatedly"""
+
+        cluster = self.cluster
+        cluster.populate(1)
+        (node1,) = cluster.nodelist()
+
+        # Create a temp directory for storing commitlog archives:
+        tmp_commitlog = safe_mkdtemp()
+        debug("tmp_commitlog: " + tmp_commitlog)
+
+        # Edit commitlog_archiving.properties and set an archive
+        # command:
+        replace_in_file(os.path.join(node1.get_path(), 'conf', 'commitlog_archiving.properties'),
+                        [(r'^archive_command=.*$', 'archive_command=ln %path {tmp_commitlog}/%name'.format(
+                            tmp_commitlog=tmp_commitlog)),
+                         (r'^restore_command=.*$', 'restore_command=cp -f %from %to'),
+                         (r'^restore_directories=.*$', 'restore_directories={tmp_commitlog}'.format(
+                            tmp_commitlog=tmp_commitlog))])
+
+        cluster.start(wait_for_binary_proto=True)
+
+        debug("Creating initial connection")
+        session = self.patient_cql_connection(node1)
+        self.create_ks(session, 'ks', 1)
+        session.execute('CREATE TABLE ks.cf ( key bigint PRIMARY KEY, val text);')
+        debug("Writing 30,000 rows...")
+        self.insert_rows(session, 0, 60000)
+
+        try:
+            # Check that there are at least one commit log backed up that
+            # is not one of the active commit logs:
+            commitlog_dir = os.path.join(node1.get_path(), 'commitlogs')
+            debug("node1 commitlog dir: " + commitlog_dir)
+
+            cluster.flush()
+
+            self.assertTrue(len(set(os.listdir(tmp_commitlog)) - set(os.listdir(commitlog_dir))) > 0)
+
+            debug("Flushing and doing first restart")
+            cluster.compact()
+            node1.drain()
+            # restart the node which causes the active commitlogs to be archived
+            node1.stop()
+            node1.start(wait_for_binary_proto=True)
+
+            debug("Stopping and second restart")
+            node1.stop()
+            node1.start(wait_for_binary_proto=True)
+
+            # Shouldn't be any additional data since it's replaying the same stuff repeatedly
+            session = self.patient_cql_connection(node1)
+
+            rows = session.execute('SELECT count(*) from ks.cf')
+            self.assertEqual(rows[0][0], 60000)
+        finally:
             debug("removing tmp_commitlog: " + tmp_commitlog)
             shutil.rmtree(tmp_commitlog)
