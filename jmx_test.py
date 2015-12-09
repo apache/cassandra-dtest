@@ -141,7 +141,6 @@ class TestJMX(Tester):
         cluster = self.cluster
         cluster.populate(1)
         node = cluster.nodelist()[0]
-        cluster.set_configuration_options({'concurrent_compactors': 1, 'memtable_cleanup_threshold': 0.01})
         remove_perf_disable_shared_mem(node)
         cluster.start(wait_for_binary_proto=True)
 
@@ -149,8 +148,9 @@ class TestJMX(Tester):
         node.stress(['write', 'n=1'])
         # Disable compaction on the table
         node.nodetool('disableautocompaction keyspace1 standard1')
-
-        node.stress(['write', 'n=750K'])
+        node.nodetool('setcompactionthroughput 1')
+        node.stress(['write', 'n=150K'])
+        node.flush()
         # Run a major compaction. This will be the compaction whose
         # progress we track.
         node.nodetool('compact', capture_output=False, wait=False)
