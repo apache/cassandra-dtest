@@ -356,7 +356,8 @@ def known_failure(failure_source, jira_url, flaky=False):
     assert isinstance(flaky, bool)
 
     def wrapper(f):
-        tagged_func = attr(known_failure=failure_source)(f)
+        tagged_func = attr(known_failure=failure_source,
+                           jira_url=jira_url)(f)
         if flaky:
             tagged_func = attr('known_flaky')(tagged_func)
         return tagged_func
