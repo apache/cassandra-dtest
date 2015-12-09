@@ -131,7 +131,7 @@ class TestJMX(Tester):
 
     def test_compactionstats(self):
         """
-        @jira_ticket CASSANDAR-10504
+        @jira_ticket CASSANDRA-10504
         @jira_ticket CASSANDRA-10427
 
         Test that jmx MBean used by nodetool compactionstats
