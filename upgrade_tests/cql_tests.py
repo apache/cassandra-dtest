@@ -19,7 +19,7 @@ from dtest import debug, freshCluster
 from thrift_bindings.v22.ttypes import ConsistencyLevel as ThriftConsistencyLevel
 from thrift_bindings.v22.ttypes import (CfDef, Column, ColumnOrSuperColumn, Mutation)
 from thrift_tests import get_thrift_client
-from tools import require, rows_to_list, since
+from tools import known_failure, require, rows_to_list, since
 from upgrade_base import UpgradeTester
 
 
@@ -922,6 +922,9 @@ class TestCQL(UpgradeTester):
             res = cursor.execute("SELECT id FROM users WHERE birth_year = 42")
             assert rows_to_list(res) == [['Tom'], ['Bob']]
 
+    @known_failure(failure_source='systemic',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10730',
+                   flaky=True)
     def deletion_test(self):
         """ Test simple deletion and in particular check for #4193 bug """
 
