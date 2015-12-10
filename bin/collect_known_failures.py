@@ -1,4 +1,15 @@
-from __future__ import division
+"""
+A script that runs the tests with --collect-only, but instead of just printing
+the tests' names, prints the information added by the tools.known_failure
+decorator.
+
+This is basically a wrapper around the `nosetests` command, so it takes the
+same arguments, though it appends some arguments to sys.argv. In particular,
+if you want to look at particular kinds of known failures, use the `-a`
+parameter on this script as you would for any of the known_failures attributes.
+In addition, you should call it from the same directory from which you'd call
+`nosetests`.
+"""
 
 from functools import partial
 import json
