@@ -352,10 +352,11 @@ def known_failure(failure_source, jira_url, flaky=False):
     will have the value applied by the outermost instance of the decorator.
     """
     valid_failure_sources = ('cassandra', 'test', 'systemic')
-    assert failure_source in valid_failure_sources
-    assert isinstance(flaky, bool)
 
     def wrapper(f):
+        assert failure_source in valid_failure_sources
+        assert isinstance(flaky, bool)
+
         tagged_func = attr(known_failure=failure_source,
                            jira_url=jira_url)(f)
         if flaky:
