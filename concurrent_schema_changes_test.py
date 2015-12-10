@@ -10,7 +10,7 @@ from cassandra.concurrent import execute_concurrent
 
 from ccmlib.node import Node
 from dtest import Tester, debug
-from tools import require, since
+from tools import known_failure, require, since
 
 
 def wait(delay=2):
@@ -21,6 +21,9 @@ def wait(delay=2):
 
 
 @require(10699)
+@known_failure(failure_source='cassandra',
+               jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10699',
+               flaky=True)
 class TestConcurrentSchemaChanges(Tester):
 
     def __init__(self, *argv, **kwargs):

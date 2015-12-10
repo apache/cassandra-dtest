@@ -326,6 +326,45 @@ def require(require_pattern, broken_in=None):
         return tagging_decorator
 
 
+def known_failure(failure_source, jira_url, flaky=False):
+    """
+    Tag a test as a known failure. Associate it with the URL for a JIRA
+    ticket and tag it as flaky or not.
+
+    Valid values for failure_source include: 'cassandra', 'test', and
+    'systemic'.
+
+    To run all known failures, use the functionality provided by the nosetests
+    attrib plugin, using the known_failure and known_flaky attributes:
+
+        # only run tests that are known to fail
+        $ nosetests -a known_failure
+        # only run tests that are not known to fail
+        $ nosetests -a !known_failure
+        # only run tests that fail because of cassandra bugs
+        $ nosetests -a known_failure=cassandra
+        # only run tests that fail because of cassandra bugs, but are not flaky
+        $ nosetests -a known_failure=cassandra -a !known_flaky
+
+    Known limitations: a given test may only be tagged once and still work as
+    expected with the attrib plugin machinery; if you decorate a test with
+    known_failure multiple times, the known_failure attribute of that test
+    will have the value applied by the outermost instance of the decorator.
+    """
+    valid_failure_sources = ('cassandra', 'test', 'systemic')
+
+    def wrapper(f):
+        assert failure_source in valid_failure_sources
+        assert isinstance(flaky, bool)
+
+        tagged_func = attr(known_failure=failure_source,
+                           jira_url=jira_url)(f)
+        if flaky:
+            tagged_func = attr('known_flaky')(tagged_func)
+        return tagged_func
+    return wrapper
+
+
 def cassandra_git_branch(cdir=None):
     '''Get the name of the git branch at CASSANDRA_DIR.
     '''
