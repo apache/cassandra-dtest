@@ -1,12 +1,53 @@
 import time
 
-from dtest import Tester
-from tools import since, rows_to_list
 from assertions import assert_invalid
+from cassandra.concurrent import execute_concurrent_with_args
+from dtest import Tester
+from tools import rows_to_list
 
 
-@since('2.0')
 class TestSchema(Tester):
+
+    def table_alteration_test(self):
+        """
+        Tests that table alters return as expected with many sstables at different schema points
+        """
+        cluster = self.cluster
+        cluster.populate(1).start()
+        node1, = cluster.nodelist()
+        session = self.patient_cql_connection(node1)
+        self.create_ks(session, 'ks', 1)
+        session.execute("use ks;")
+        session.execute("create table tbl_o_churn (id int primary key, c0 text, c1 text) "
+                        "WITH compaction = {'class': 'SizeTieredCompactionStrategy', 'min_threshold': 1024, 'max_threshold': 1024 };")
+
+        stmt1 = session.prepare("insert into tbl_o_churn (id, c0, c1) values (?, ?, ?)")
+        rows_to_insert = 50
+
+        for n in range(5):
+            parameters = [(x, 'aaa', 'bbb') for x in range(n * rows_to_insert, (n * rows_to_insert) + rows_to_insert)]
+            execute_concurrent_with_args(session, stmt1, parameters, concurrency=rows_to_insert)
+            node1.flush()
+
+        session.execute("alter table tbl_o_churn add c2 text")
+        session.execute("alter table tbl_o_churn drop c0")
+        stmt2 = session.prepare("insert into tbl_o_churn (id, c1, c2) values (?, ?, ?);")
+
+        for n in range(5, 10):
+            parameters = [(x, 'ccc', 'ddd') for x in range(n * rows_to_insert, (n * rows_to_insert) + rows_to_insert)]
+            execute_concurrent_with_args(session, stmt2, parameters, concurrency=rows_to_insert)
+            node1.flush()
+
+        rows = session.execute("select * from tbl_o_churn")
+        for row in rows:
+            if row.id < rows_to_insert * 5:
+                self.assertEqual(row.c1, 'bbb')
+                self.assertIsNone(row.c2)
+                self.assertFalse(hasattr(row, 'c0'))
+            else:
+                self.assertEqual(row.c1, 'ccc')
+                self.assertEqual(row.c2, 'ddd')
+                self.assertFalse(hasattr(row, 'c0'))
 
     def drop_column_compact_test(self):
         session = self.prepare()
