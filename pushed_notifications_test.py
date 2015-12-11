@@ -5,7 +5,7 @@ from nose.tools import timed
 
 from assertions import assert_invalid
 from cassandra import ConsistencyLevel as CL
-from cassandra import ReadFailure, ReadTimeout
+from cassandra import ReadFailure
 from cassandra.query import SimpleStatement
 from dtest import Tester, debug
 from tools import no_vnodes, require, since
