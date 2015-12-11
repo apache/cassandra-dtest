@@ -1,12 +1,14 @@
 import time
+from threading import Event
+
 from nose.tools import timed
-from cassandra import ReadTimeout, ReadFailure
+
+from assertions import assert_invalid
 from cassandra import ConsistencyLevel as CL
+from cassandra import ReadFailure, ReadTimeout
 from cassandra.query import SimpleStatement
 from dtest import Tester, debug
 from tools import no_vnodes, require, since
-from threading import Event
-from assertions import assert_invalid
 
 
 class NotificationWaiter(object):
@@ -303,7 +305,7 @@ class TestVariousNotifications(Tester):
         def read_failure_query():
             assert_invalid(
                 session, SimpleStatement("select * from test where id in (1,2,3,4,5)", consistency_level=CL.ALL),
-                expected=ReadTimeout if self.cluster.version() < '3' else ReadFailure,
+                expected=ReadFailure
             )
 
         read_failure_query()
@@ -322,7 +324,7 @@ class TestVariousNotifications(Tester):
         def range_request_failure_query():
             assert_invalid(
                 session, SimpleStatement("select * from test", consistency_level=CL.ALL),
-                expected=ReadTimeout if self.cluster.version() < '3' else ReadFailure,
+                expected=ReadFailure
             )
 
         range_request_failure_query()
