@@ -358,7 +358,7 @@ class TestBootstrap(Tester):
         node2.start(wait_other_notice=True)
         node2.watch_log_for("JOINING:", from_mark=mark)
 
-    def failed_bootstap_wiped_node_can_join_test(self):
+    def failed_bootstrap_wiped_node_can_join_test(self):
         """
         @jira_ticket CASSANDRA-9765
         Test that if a node fails to bootstrap, it can join the cluster even if the data is wiped.
