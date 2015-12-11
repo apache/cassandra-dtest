@@ -152,9 +152,9 @@ class TestOfflineTools(Tester):
         final_levels = self.get_levels(node1.run_sstablemetadata(keyspace="keyspace1", column_families=["standard1"]))
 
         # let's make sure there was at least 3 levels (L0, L1 and L2)
-        self.assertTrue(max(initial_levels) > 1)
+        self.assertGreater(max(initial_levels), 1)
         # let's check all sstables are on L0 after sstablelevelreset
-        self.assertTrue(max(final_levels) == 0)
+        self.assertEqual(max(final_levels), 0)
 
         # time to relevel sstables
         initial_levels = self.get_levels(node1.run_sstablemetadata(keyspace="keyspace1", column_families=["standard1"]))
@@ -165,7 +165,7 @@ class TestOfflineTools(Tester):
         debug(final_levels)
 
         # let's check sstables were promoted after releveling
-        self.assertTrue(max(final_levels) > 1)
+        self.assertGreater(max(final_levels), 1)
 
     @since('2.2')
     def sstableverify_test(self):
