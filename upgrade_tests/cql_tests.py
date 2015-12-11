@@ -76,7 +76,7 @@ class TestCQL(UpgradeTester):
                 [UUID('550e8400-e29b-41d4-a716-446655440000'), 36, None, None],
             ], res
 
-    def large_collection_errors(self):
+    def large_collection_errors_test(self):
         """ For large collections, make sure that we are printing warnings """
 
         # We only warn with protocol 2
@@ -2826,7 +2826,7 @@ class TestCQL(UpgradeTester):
             res = cursor.execute("SELECT i, blobAsText(b) FROM test WHERE k = 0")
             assert rows_to_list(res) == [[3, 'foobar']], res
 
-    def bug_5376(self):
+    def bug_5376_test(self):
         cursor = self.prepare()
 
         cursor.execute("""
@@ -2860,7 +2860,7 @@ class TestCQL(UpgradeTester):
             debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
             cursor.execute("INSERT INTO test (k, c, v) VALUES (0, now(), 0);")
 
-    def bug_5404(self):
+    def bug_5404_test(self):
         cursor = self.prepare()
 
         cursor.execute("CREATE TABLE test (key text PRIMARY KEY)")
@@ -3628,7 +3628,7 @@ class TestCQL(UpgradeTester):
             assert_all(cursor, "SELECT k, v FROM test WHERE m CONTAINS 2", [[0, 1]])
             assert_none(cursor, "SELECT k, v FROM test  WHERE m CONTAINS 4")
 
-    def map_keys_indexing(self):
+    def map_keys_indexing_test(self):
         cursor = self.prepare()
 
         cursor.execute("""
@@ -4710,7 +4710,7 @@ class TestCQL(UpgradeTester):
             assert_one(cursor, "SELECT * FROM test", ['partition1', '', 'static value', 'value'])
 
     @since("1.2")
-    def limit_compact_table(self):
+    def limit_compact_table_test(self):
         """ Check for #7052 bug """
         cursor = self.prepare()
 
@@ -4740,7 +4740,7 @@ class TestCQL(UpgradeTester):
             # This doesn't work -- see #7059
             # assert_all(cursor, "SELECT * FROM test WHERE v > 1 AND v <= 3 LIMIT 6 ALLOW FILTERING", [[1, 2], [1, 3], [0, 2], [0, 3], [2, 2], [2, 3]])
 
-    def key_index_with_reverse_clustering(self):
+    def key_index_with_reverse_clustering_test(self):
         """ Test for #6950 bug """
         cursor = self.prepare()
 
