@@ -1,12 +1,12 @@
 import os
+import random
 import re
 import tempfile
 import time
-import random
 
 from assertions import assert_none, assert_one
 from dtest import Tester, debug
-from tools import since
+from tools import known_failure, since
 
 
 class TestCompaction(Tester):
@@ -60,6 +60,8 @@ class TestCompaction(Tester):
 
         self.assertEqual(numfound, 10)
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10843')
     def data_size_test(self):
         """
         Ensure that data size does not have unwarranted increases after compaction.
@@ -171,6 +173,8 @@ class TestCompaction(Tester):
         time.sleep(5)
         assert expired_sstable not in node1.get_sstables('ks', 'cf')
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10842')
     def compaction_throughput_test(self):
         """
         Test setting compaction throughput.

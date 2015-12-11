@@ -11,8 +11,8 @@ from cassandra import ConsistencyLevel
 from cassandra.concurrent import execute_concurrent_with_args
 from ccmlib.node import NodeError
 from dtest import Tester, debug
-from tools import (InterruptBootstrap, KillOnBootstrap, new_node, query_c1c2,
-                   since)
+from tools import (InterruptBootstrap, KillOnBootstrap, known_failure,
+                   new_node, query_c1c2, since)
 
 
 class TestBootstrap(Tester):
@@ -358,6 +358,8 @@ class TestBootstrap(Tester):
         node2.start(wait_other_notice=True)
         node2.watch_log_for("JOINING:", from_mark=mark)
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10844')
     def failed_bootstrap_wiped_node_can_join_test(self):
         """
         @jira_ticket CASSANDRA-9765
