@@ -326,7 +326,7 @@ def require(require_pattern, broken_in=None):
         return tagging_decorator
 
 
-def known_failure(failure_source, jira_url, flaky=False):
+def known_failure(failure_source, jira_url, flaky=False, notes=None):
     """
     Tag a test as a known failure. Associate it with the URL for a JIRA
     ticket and tag it as flaky or not.
@@ -361,6 +361,8 @@ def known_failure(failure_source, jira_url, flaky=False):
                            jira_url=jira_url)(f)
         if flaky:
             tagged_func = attr('known_flaky')(tagged_func)
+        if notes:
+            tagged_func = attr('failure_notes')(tagged_func)
         return tagged_func
     return wrapper
 
