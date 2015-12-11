@@ -9,7 +9,7 @@ from cassandra.query import SimpleStatement, dict_factory, named_tuple_factory
 
 from datahelp import create_rows, flatten_into_set, parse_data_into_dicts
 from dtest import debug, run_scenarios
-from tools import rows_to_list, since
+from tools import known_failure, rows_to_list, since
 from upgrade_base import UpgradeTester
 
 
@@ -1464,6 +1464,9 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
             page_data = pf.page_data(i + 1)
             self.assertEquals(page_data, expected_pages_data[i])
 
+    @known_failure(failure_source='systemic',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10848',
+                   flaky=True)
     def test_single_partition_deletions(self):
         """Test single partition deletions """
         cursor = self.prepare()
@@ -1511,6 +1514,9 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
             self.check_all_paging_results(cursor, expected_data, 2, [25, 15],
                                           timeout=10)
 
+    @known_failure(failure_source='systemic',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10848',
+                   flaky=True)
     def test_multiple_partition_deletions(self):
         """Test multiple partition deletions """
         cursor = self.prepare()
@@ -1531,6 +1537,9 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
             self.check_all_paging_results(cursor, expected_data, 2, [25, 15],
                                           timeout=10)
 
+    @known_failure(failure_source='systemic',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10848',
+                   flaky=True)
     def test_single_row_deletions(self):
         """Test single row deletions """
         cursor = self.prepare()
@@ -1582,6 +1591,9 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
             self.check_all_paging_results(cursor, expected_data, 7,
                                           [25, 25, 25, 25, 25, 25, 25])
 
+    @known_failure(failure_source='systemic',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10848',
+                   flaky=True)
     def test_single_cell_deletions(self):
         """Test single cell deletions """
         cursor = self.prepare()
@@ -1697,6 +1709,9 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
             time.sleep(5)
             self.check_all_paging_results(cursor, [], 0, [])
 
+    @known_failure(failure_source='systemic',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10476',
+                   flaky=True)
     def test_failure_threshold_deletions(self):
         """Test that paging throws a failure in case of tombstone threshold """
         self.allow_log_errors = True

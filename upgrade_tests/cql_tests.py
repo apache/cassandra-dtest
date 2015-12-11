@@ -2934,6 +2934,9 @@ class TestCQL(UpgradeTester):
 
             cursor.execute("SELECT dateOf(t) FROM test")
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10836',
+                   flaky=True)
     def conditional_update_test(self):
         cursor = self.prepare()
 
@@ -3037,6 +3040,9 @@ class TestCQL(UpgradeTester):
             assert_one(cursor, "UPDATE test SET v2 = 'bar' WHERE k = 0 IF v1 IN (142, 276)", [False, 2])
             assert_one(cursor, "UPDATE test SET v2 = 'bar' WHERE k = 0 IF v1 IN ()", [False, 2])
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10836',
+                   flaky=True)
     def conditional_delete_test(self):
         cursor = self.prepare()
 
@@ -3284,6 +3290,9 @@ class TestCQL(UpgradeTester):
             assert_invalid(cursor, 'SELECT DISTINCT pk0 FROM regular', matching="queries must request all the partition key columns")
             assert_invalid(cursor, 'SELECT DISTINCT pk0, pk1, ck0 FROM regular', matching="queries must only request partition key columns")
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10762',
+                   flaky=False)
     def select_distinct_with_deletions_test(self):
         cursor = self.prepare()
         cursor.execute('CREATE TABLE t1 (k int PRIMARY KEY, c int, v int)')
@@ -3751,6 +3760,9 @@ class TestCQL(UpgradeTester):
             cursor.execute("DELETE s FROM test WHERE k=0")
             assert_all(cursor, "SELECT * FROM test", [[0, 1, None, 1]])
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10836',
+                   flaky=True)
     def static_columns_cas_test(self):
         cursor = self.prepare()
 
@@ -4256,6 +4268,9 @@ class TestCQL(UpgradeTester):
                 # not supported yet
                 check_invalid("m CONTAINS 'bar'", expected=SyntaxException)
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10836',
+                   flaky=True)
     def list_item_conditional_test(self):
         # Lists
         cursor = self.prepare()
@@ -4371,6 +4386,9 @@ class TestCQL(UpgradeTester):
                 check_invalid("l[null] = null")
 
     @since('2.1.1')
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10836',
+                   flaky=True)
     def whole_set_conditional_test(self):
         cursor = self.prepare()
 
@@ -4522,6 +4540,9 @@ class TestCQL(UpgradeTester):
                 check_invalid("m CONTAINS null", expected=SyntaxException)
                 check_invalid("m CONTAINS KEY null", expected=SyntaxException)
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10836',
+                   flaky=True)
     def map_item_conditional_test(self):
         cursor = self.prepare()
 
