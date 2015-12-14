@@ -8,7 +8,7 @@ from cassandra.query import SimpleStatement, dict_factory, named_tuple_factory
 from assertions import assert_invalid
 from datahelp import create_rows, flatten_into_set, parse_data_into_dicts
 from dtest import Tester, run_scenarios
-from tools import require, since
+from tools import known_failure, require, since
 
 
 class Page(object):
@@ -1518,6 +1518,9 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
         time.sleep(5)
         self.check_all_paging_results([], 0, [])
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10869',
+                   notes='Fails on 2.1')
     def test_failure_threshold_deletions(self):
         """Test that paging throws a failure in case of tombstone threshold """
         self.allow_log_errors = True
