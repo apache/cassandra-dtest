@@ -11,9 +11,12 @@ from thrift_bindings.v22.ttypes import ConsistencyLevel as ThriftConsistencyLeve
 from thrift_tests import get_thrift_client
 
 from dtest import Tester, debug
-from tools import since
+from tools import known_failure, since
 
 
+@known_failure(failure_source='test',
+               jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10868',
+               notes='Fails when run on JDK8')
 @since('2.0', max_version='2.1.x')
 class TestSCUpgrade(Tester):
     """
