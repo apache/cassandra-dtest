@@ -10,8 +10,8 @@ from cassandra.query import SimpleStatement
 from cassandra import ConsistencyLevel
 
 TRACE_DETERMINE_REPLICAS = re.compile('Determining replicas for mutation')
-TRACE_SEND_MESSAGE = re.compile('Sending message to /([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)')
-TRACE_RESPOND_MESSAGE = re.compile('Message received from /([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)')
+TRACE_SEND_MESSAGE = re.compile('Sending (?:MUTATION|REQUEST_RESPONSE) message to /([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)')
+TRACE_RESPOND_MESSAGE = re.compile('(?:MUTATION|REQUEST_RESPONSE) message received from /([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)')
 TRACE_COMMIT_LOG = re.compile('Appending to commitlog')
 TRACE_FORWARD_WRITE = re.compile('Enqueuing forwarded write to /([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)')
 
