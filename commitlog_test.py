@@ -13,7 +13,7 @@ from ccmlib.common import is_win
 from ccmlib.node import Node, TimeoutError
 from assertions import assert_almost_equal, assert_none, assert_one
 from dtest import Tester, debug
-from tools import since, rows_to_list
+from tools import known_failure, since, rows_to_list
 
 
 class TestCommitLog(Tester):
@@ -333,6 +333,9 @@ class TestCommitLog(Tester):
             [2, 2]
         )
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10865',
+                   notes='Fails on C* 2.1')
     def test_bad_crc(self):
         """
         if the commit log header crc (checksum) doesn't match the actual crc of the header data,
