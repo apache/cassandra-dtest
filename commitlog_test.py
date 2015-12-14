@@ -405,8 +405,10 @@ class TestCommitLog(Tester):
             node.wait_for_binary_interface(from_mark=mark, timeout=20)
         self.assertFalse(node.is_running())
 
+    @since('2.2')
     def test_compression_error(self):
         """
+        @jira_ticket CASSANDRA-7886
         if the commit log header refers to an unknown compression class, and the commit_failure_policy is stop, C* shouldn't startup
         """
         if not hasattr(self, 'ignore_log_patterns'):
