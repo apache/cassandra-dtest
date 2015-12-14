@@ -3,6 +3,7 @@ import uuid
 
 from cassandra import ConsistencyLevel as CL
 from cassandra import InvalidRequest, ReadTimeout, ReadFailure
+from cassandra.policies import FallthroughRetryPolicy
 from cassandra.query import SimpleStatement, dict_factory, named_tuple_factory
 
 from assertions import assert_invalid
@@ -1539,7 +1540,9 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
                 consistency_level=CL.ALL
             ))
 
-        assert_invalid(self.session, SimpleStatement("select * from paging_test", fetch_size=1000, consistency_level=CL.ALL), expected=ReadTimeout if self.cluster.version() < '2.2' else ReadFailure)
+        assert_invalid(self.session,
+                       SimpleStatement("select * from paging_test", fetch_size=1000, consistency_level=CL.ALL, retry_policy=FallthroughRetryPolicy()),
+                       expected=ReadTimeout if self.cluster.version() < '2.2' else ReadFailure)
 
         if self.cluster.version() < "3.0":
             failure_msg = ("Scanned over.* tombstones in test_paging_size."
