@@ -8,7 +8,7 @@ from cassandra import ConsistencyLevel as CL
 from cassandra import ReadFailure
 from cassandra.query import SimpleStatement
 from dtest import Tester, debug
-from tools import no_vnodes, require, since
+from tools import known_failure, no_vnodes, require, since
 
 
 class NotificationWaiter(object):
@@ -151,6 +151,10 @@ class TestPushedNotifications(Tester):
             notifications = waiter.wait_for_notifications(30.0)
             self.assertEquals(1 if waiter.node is node1 else 0, len(notifications))
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10870',
+                   flaky=True,
+                   notes='Flakes under C* 2.1')
     def restart_node_test(self):
         """
         @jira_ticket CASSANDRA-7816
