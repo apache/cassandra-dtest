@@ -8,6 +8,7 @@ import time
 import unittest
 
 from dtest import Tester, debug, DEFAULT_DIR
+from tools import known_failure
 
 JNA_PATH = '/usr/share/java/jna.jar'
 ATTACK_JAR = 'lib/cassandra-attack.jar'
@@ -31,6 +32,9 @@ class ThriftHSHATest(Tester):
         Tester.__init__(self, *args, **kwargs)
 
     @unittest.skipIf(sys.platform == "win32", 'Could not be executed on Windows')
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10863',
+                   flaky=True)
     def test_closing_connections(self):
         """
         @jira_ticket CASSANDRA-6546
