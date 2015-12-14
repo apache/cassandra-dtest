@@ -1243,6 +1243,8 @@ class CqlshCopyTest(Tester):
         self.assertEqual(num_records, len(open(self.tempfile.name).readlines()))
 
     @freshCluster()
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10858')
     def test_copy_to_with_child_process_crashing(self):
         """
         Test exporting rows with failure injection by setting the environment variable CQLSH_COPY_TEST_FAILURES,
