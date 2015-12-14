@@ -4091,7 +4091,7 @@ class TestCQL(UpgradeTester):
             cursor.execute("INSERT INTO test (k, c1, c2) VALUES (0, 0, 'c')")
 
             p = cursor.prepare("SELECT * FROM test WHERE k=? AND (c1, c2) IN ?")
-            rows = cursor.execute(p, (0, [(0, 'b'), (0, 'c')]))
+            rows = list(cursor.execute(p, (0, [(0, 'b'), (0, 'c')])))
             self.assertEqual(2, len(rows))
             self.assertEqual((0, 0, 'b'), rows[0])
             self.assertEqual((0, 0, 'c'), rows[1])
