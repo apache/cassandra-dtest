@@ -50,7 +50,7 @@ class TestRepair(Tester):
         debug("Starting cluster..")
         cluster.populate([2, 2]).start(wait_for_binary_proto=True)
         node1_1, node2_1, node1_2, node2_2 = cluster.nodelist()
-        node1_1.stress(stress_options=['write', 'n=50K', 'cl=ONE', '-schema', 'replication(factor=2)'])
+        node1_1.stress(stress_options=['write', 'n=50K', 'cl=ONE', '-schema', 'replication(factor=4)'])
         node1_1.nodetool("repair -local keyspace1 standard1")
         self.assertTrue(node1_1.grep_log("Not a global repair"))
         self.assertTrue(node2_1.grep_log("Not a global repair"))
@@ -72,7 +72,7 @@ class TestRepair(Tester):
         debug("Starting cluster..")
         cluster.populate([2, 2]).start(wait_for_binary_proto=True)
         node1_1, node2_1, node1_2, node2_2 = cluster.nodelist()
-        node1_1.stress(stress_options=['write', 'n=500K', 'cl=ONE', '-schema', 'replication(factor=2)'])
+        node1_1.stress(stress_options=['write', 'n=100K', 'cl=ONE', '-schema', 'replication(factor=4)'])
         node1_1.nodetool("repair -hosts 127.0.0.1,127.0.0.2,127.0.0.3,127.0.0.4 keyspace1 standard1")
         for node in cluster.nodelist():
             self.assertTrue(node.grep_log("Not a global repair"))
@@ -104,7 +104,7 @@ class TestRepair(Tester):
         debug("Starting cluster..")
         cluster.populate([2, 2]).start(wait_for_binary_proto=True)
         node1_1, node2_1, node1_2, node2_2 = cluster.nodelist()
-        node1_1.stress(stress_options=['write', 'n=50K', 'cl=ONE', '-schema', 'replication(factor=2)'])
+        node1_1.stress(stress_options=['write', 'n=50K', 'cl=ONE', '-schema', 'replication(factor=4)'])
         node1_1.nodetool("repair keyspace1 standard1")
         for node in cluster.nodelist():
             self.assertTrue("Starting anticompaction")
