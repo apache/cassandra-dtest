@@ -5,6 +5,7 @@ import time
 
 from dtest import Tester, debug
 from ccmlib import common as ccmcommon
+from tools import require
 
 
 class TestSSTableGenerationAndLoading(Tester):
@@ -110,7 +111,15 @@ class TestSSTableGenerationAndLoading(Tester):
     def sstableloader_compression_deflate_to_deflate_test(self):
         self.load_sstable_with_configuration('Deflate', 'Deflate')
 
-    def load_sstable_with_configuration(self, pre_compression=None, post_compression=None):
+    @require("10806")
+    def sstableloader_uppercase_keyspace_name_test(self):
+        """
+        Make sure sstableloader works with upper case keyspace
+        @jira_ticket CASSANDRA-10806
+        """
+        self.load_sstable_with_configuration(ks='"Keyspace1"')
+
+    def load_sstable_with_configuration(self, pre_compression=None, post_compression=None, ks="ks"):
         """
         tests that the sstableloader works by using it to load data.
         Compression of the columnfamilies being loaded, and loaded into
@@ -132,7 +141,7 @@ class TestSSTableGenerationAndLoading(Tester):
         time.sleep(.5)
 
         def create_schema(session, compression):
-            self.create_ks(session, "ks", rf=2)
+            self.create_ks(session, ks, rf=2)
             self.create_cf(session, "standard1", compression=compression)
             self.create_cf(session, "counter1", compression=compression, columns={'v': 'counter'})
 
@@ -176,7 +185,11 @@ class TestSSTableGenerationAndLoading(Tester):
         sstableloader = os.path.join(cdir, 'bin', ccmcommon.platform_binary('sstableloader'))
         env = ccmcommon.make_cassandra_env(cdir, node1.get_path())
         host = node1.address()
-        sstablecopy_dir = copy_root + '/ks'
+        if ks.startswith('"') and ks.endswith('"'):
+            ks_dir = ks[1:-1]
+        else:
+            ks_dir = ks
+        sstablecopy_dir = copy_root + '/' + ks_dir
         for cf_dir in os.listdir(sstablecopy_dir):
             full_cf_dir = os.path.join(sstablecopy_dir, cf_dir)
             if os.path.isdir(full_cf_dir):
