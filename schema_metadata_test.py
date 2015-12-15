@@ -3,7 +3,7 @@ import re
 from nose.tools import assert_equal, assert_in
 
 from dtest import Tester, debug
-from tools import since
+from tools import known_failure, since
 
 
 def establish_durable_writes_keyspace(version, session, table_name_prefix=""):
@@ -488,6 +488,9 @@ def _table_name_builder(prefix, table_name):
     return "{0}_{1}".format(re.sub(r"[^A-Za-z0-9]", "_", prefix), table_name)[-47:].lstrip('_')
 
 
+@known_failure(failure_source='systemic',
+               jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10730',
+               flaky=True)
 class TestSchemaMetadata(Tester):
 
     def setUp(self):
