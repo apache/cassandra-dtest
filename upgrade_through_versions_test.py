@@ -31,8 +31,8 @@ TRUNK_VER = (3, 2)
 PROTOCOL_PATHS = {
     1: [(2, 0), (2, 1), (2, 2)],
     2: [(2, 0), (2, 1), (2, 2)],
-    3: [(2, 1), (2, 2), (3, 0), TRUNK_VER],
-    4: [(2, 2), (3, 0), TRUNK_VER]
+    3: [(2, 1), (2, 2), (3, 0), (3, 1), TRUNK_VER],
+    4: [(2, 2), (3, 0), (3, 1), TRUNK_VER]
 }
 
 PROTOCOL_VERSION = int(os.environ.get('PROTOCOL_VERSION', 3))
