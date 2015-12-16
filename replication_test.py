@@ -4,7 +4,7 @@ import re
 import time
 
 from dtest import Tester, debug, PRINT_DEBUG
-from tools import no_vnodes, since
+from tools import known_failure, no_vnodes, since
 
 from cassandra.query import SimpleStatement
 from cassandra import ConsistencyLevel
@@ -194,6 +194,8 @@ class ReplicationTest(Tester):
             # acknowledged the write:
             self.assertEqual(stats['nodes_sent_write'], stats['nodes_responded_write'])
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10882')
     def network_topology_test(self):
         """Test the NetworkTopologyStrategy on a 2DC 3:3 node cluster"""
         self.cluster.populate([3, 3]).start()
