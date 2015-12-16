@@ -854,6 +854,9 @@ class CqlshCopyTest(Tester):
         """
         self.data_validation_on_read_template(uuid4(), expect_invalid=True)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10886',
+                   notes='fails on Windows')
     def test_read_invalid_text(self):
         """
         Use data_validation_on_read_template to test COPYing a text value from a
