@@ -1177,9 +1177,9 @@ class CqlshCopyTest(Tester):
                                    configuration_options={'range_request_timeout_in_ms': '300',
                                                           'write_request_timeout_in_ms': '200'})
 
-    @freshCluster()
     @known_failure(failure_source='cassandra',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10858')
+    @freshCluster()
     def test_copy_to_with_more_failures_than_max_attempts(self):
         """
         Test exporting rows with failure injection by setting the environment variable CQLSH_COPY_TEST_FAILURES,
@@ -1242,9 +1242,9 @@ class CqlshCopyTest(Tester):
         self.assertNotIn('some records might be missing', err)
         self.assertEqual(num_records, len(open(self.tempfile.name).readlines()))
 
-    @freshCluster()
     @known_failure(failure_source='cassandra',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10858')
+    @freshCluster()
     def test_copy_to_with_child_process_crashing(self):
         """
         Test exporting rows with failure injection by setting the environment variable CQLSH_COPY_TEST_FAILURES,
