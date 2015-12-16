@@ -840,7 +840,6 @@ class CqlshCopyTest(Tester):
         # make sure the template works properly
         self.data_validation_on_read_template(2, expect_invalid=False)
 
-    @require('9302')
     def test_read_invalid_float(self):
         """
         Use data_validation_on_read_template to test COPYing a float value from a
@@ -848,7 +847,6 @@ class CqlshCopyTest(Tester):
         """
         self.data_validation_on_read_template(2.14, expect_invalid=True)
 
-    @require('9302')
     def test_read_invalid_uuid(self):
         """
         Use data_validation_on_read_template to test COPYing a uuid value from a
@@ -856,7 +854,6 @@ class CqlshCopyTest(Tester):
         """
         self.data_validation_on_read_template(uuid4(), expect_invalid=True)
 
-    @require('9302')
     def test_read_invalid_text(self):
         """
         Use data_validation_on_read_template to test COPYing a text value from a
@@ -959,7 +956,6 @@ class CqlshCopyTest(Tester):
 
         self.assertEqual(exported_results, imported_results)
 
-    @require('9302')
     def test_wrong_number_of_columns(self):
         """
         Test that a COPY statement will fail when trying to import from a CSV
@@ -1142,7 +1138,6 @@ class CqlshCopyTest(Tester):
         self.assertEqual([[num_records]], rows_to_list(self.session.execute("SELECT COUNT(*) FROM {}"
                                                                             .format(stress_table))))
 
-    @require('9302')
     @freshCluster()
     def test_bulk_round_trip_default(self):
         """
@@ -1152,7 +1147,6 @@ class CqlshCopyTest(Tester):
         """
         self._test_bulk_round_trip(nodes=3, partitioner="murmur3", num_operations=100000)
 
-    @require('9302')
     @freshCluster()
     def test_bulk_round_trip_blogposts(self):
         """
@@ -1164,7 +1158,6 @@ class CqlshCopyTest(Tester):
                                    profile=os.path.join(os.path.dirname(os.path.realpath(__file__)), 'blogposts.yaml'),
                                    stress_table='stresscql.blogposts', page_timeout=60)
 
-    @require('9302')
     @freshCluster()
     def test_bulk_round_trip_with_timeouts(self):
         """
@@ -1276,7 +1269,6 @@ class CqlshCopyTest(Tester):
         self.assertIn('some records might be missing', err)
         self.assertTrue(len(open(self.tempfile.name).readlines()) < num_records)
 
-    @require('9302')
     @freshCluster()
     def test_copy_from_with_more_failures_than_max_attempts(self):
         """
@@ -1314,7 +1306,6 @@ class CqlshCopyTest(Tester):
         num_records_imported = rows_to_list(self.session.execute("SELECT COUNT(*) FROM {}".format(stress_table)))[0][0]
         self.assertTrue(num_records_imported < num_records)
 
-    @require('9302')
     @freshCluster()
     def test_copy_from_with_fewer_failures_than_max_attempts(self):
         """
@@ -1352,7 +1343,6 @@ class CqlshCopyTest(Tester):
         num_records_imported = rows_to_list(self.session.execute("SELECT COUNT(*) FROM {}".format(stress_table)))[0][0]
         self.assertEquals(num_records, num_records_imported)
 
-    @require('9302')
     @freshCluster()
     def test_copy_from_with_child_process_crashing(self):
         """
