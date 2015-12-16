@@ -183,7 +183,7 @@ class TestSSTableGenerationAndLoading(Tester):
         sstableloader = os.path.join(cdir, 'bin', ccmcommon.platform_binary('sstableloader'))
         env = ccmcommon.make_cassandra_env(cdir, node1.get_path())
         host = node1.address()
-        sstablecopy_dir = os.path.join(copy_root,ks.strip('"'))
+        sstablecopy_dir = os.path.join(copy_root, ks.strip('"'))
         for cf_dir in os.listdir(sstablecopy_dir):
             full_cf_dir = os.path.join(sstablecopy_dir, cf_dir)
             if os.path.isdir(full_cf_dir):
