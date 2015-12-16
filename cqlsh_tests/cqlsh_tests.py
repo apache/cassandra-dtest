@@ -18,7 +18,7 @@ from assertions import assert_all, assert_none
 from ccmlib import common
 from cqlsh_tools import monkeypatch_driver, unmonkeypatch_driver
 from dtest import Tester, debug
-from tools import create_c1c2_table, insert_c1c2, rows_to_list, since
+from tools import create_c1c2_table, insert_c1c2, known_failure, rows_to_list, since
 
 
 class TestCqlsh(Tester):
@@ -1255,6 +1255,9 @@ Unlogged batch covering 2 partitions detected against table [client_warnings.tes
         stdout, stderr = self.run_cqlsh(node1, cmds='USE system', cqlsh_options=['--debug', '--connect-timeout=10'])
         self.assertTrue("Using connect timeout: 10 seconds" in stderr)
 
+    @known_failure(failure_source='systemic',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10884',
+                   flaky=True)
     def test_refresh_schema_on_timeout_error(self):
         """
         @jira_ticket CASSANDRA-9689
