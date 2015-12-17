@@ -362,7 +362,7 @@ def known_failure(failure_source, jira_url, flaky=False, notes=None):
         if flaky:
             tagged_func = attr('known_flaky')(tagged_func)
         if notes:
-            tagged_func = attr('failure_notes')(tagged_func)
+            tagged_func = attr(failure_notes=notes)(tagged_func)
         return tagged_func
     return wrapper
 

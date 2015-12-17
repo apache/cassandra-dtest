@@ -39,13 +39,15 @@ class PrintJiraURLPlugin(nose.plugins.Plugin):
         jira_url = get_attr_for_current_method(attr_name='jira_url')
         flaky = get_attr_for_current_method(attr_name='known_flaky')
         failure_source = get_attr_for_current_method(attr_name='known_failure')
+        notes = get_attr_for_current_method(attr_name='failure_notes')
 
         return json.dumps({
             'module': test_module,
             'name': test_name,
             'jira_url': jira_url,
             'known_flaky': flaky,
-            'failure_source': failure_source
+            'failure_source': failure_source,
+            'notes': notes
         })
 
 
