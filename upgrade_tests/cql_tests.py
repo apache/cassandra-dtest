@@ -4081,6 +4081,9 @@ class TestCQL(UpgradeTester):
 
             assert_invalid(cursor, "SELECT v1, v2, v3 FROM test WHERE k = 0 AND (v1, v3) > (1, 0)")
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10896',
+                   notes='should be possible for skip logic in loop below to work in CI environment')
     @since('2.0', max_version='2.2.X')
     def test_v2_protocol_IN_with_tuples(self):
         """
