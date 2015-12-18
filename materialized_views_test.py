@@ -27,7 +27,7 @@ class TestMaterializedViews(Tester):
     @since 3.0
     """
 
-    def prepare(self, user_table=False, rf=1, options={}, nodes=3):
+    def prepare(self, user_table=False, rf=1, options=None, nodes=3):
         cluster = self.cluster
         cluster.populate([nodes, 0])
         if options:
