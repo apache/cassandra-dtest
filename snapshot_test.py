@@ -32,31 +32,33 @@ class SnapshotTester(Tester):
         os.mkdir(os.path.join(tmpdir, ks, cf))
         node_dir = node.get_path()
 
-        # Find the snapshot dir, it's different in various C* versions:
-        snapshot_dir = "{node_dir}/data/{ks}/{cf}/snapshots/{name}".format(**locals())
-        if not os.path.isdir(snapshot_dir):
-            snapshot_dir = glob.glob("{node_dir}/data/{ks}/{cf}-*/snapshots/{name}".format(**locals()))[0]
-        debug("snapshot_dir is : " + snapshot_dir)
-        debug("snapshot copy is : " + tmpdir)
+        # Find the snapshot dir, it's different in various C*
+        for x in xrange(0, self.cluster.data_dir_count):
+            snapshot_dir = "{node_dir}/data{x}/{ks}/{cf}/snapshots/{name}".format(**locals())
+            if not os.path.isdir(snapshot_dir):
+                snapshot_dir = glob.glob("{node_dir}/data{x}/{ks}/{cf}-*/snapshots/{name}".format(**locals()))[0]
+            debug("snapshot_dir is : " + snapshot_dir)
+            debug("snapshot copy is : " + tmpdir)
 
-        # Copy files from the snapshot dir to existing temp dir
-        distutils.dir_util.copy_tree(str(snapshot_dir), os.path.join(tmpdir, ks, cf))
+            # Copy files from the snapshot dir to existing temp dir
+            distutils.dir_util.copy_tree(str(snapshot_dir), os.path.join(tmpdir, str(x), ks, cf))
 
         return tmpdir
 
     def restore_snapshot(self, snapshot_dir, node, ks, cf):
         debug("Restoring snapshot....")
-        snapshot_dir = os.path.join(snapshot_dir, ks, cf)
-        ip = node.address()
+        for x in xrange(0, self.cluster.data_dir_count):
+            snap_dir = os.path.join(snapshot_dir, str(x), ks, cf)
+            ip = node.address()
 
-        args = [node.get_tool('sstableloader'), '-d', ip, snapshot_dir]
-        p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        stdout, stderr = p.communicate()
-        exit_status = p.wait()
+            args = [node.get_tool('sstableloader'), '-d', ip, snap_dir]
+            p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            stdout, stderr = p.communicate()
+            exit_status = p.wait()
 
-        if exit_status != 0:
-            raise Exception("sstableloader command '%s' failed; exit status: %d'; stdout: %s; stderr: %s" %
-                            (" ".join(args), exit_status, stdout, stderr))
+            if exit_status != 0:
+                raise Exception("sstableloader command '%s' failed; exit status: %d'; stdout: %s; stderr: %s" %
+                                (" ".join(args), exit_status, stdout, stderr))
 
 
 class TestSnapshot(SnapshotTester):
