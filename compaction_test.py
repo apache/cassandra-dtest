@@ -121,13 +121,13 @@ class TestCompaction(Tester):
             session.execute('delete from cf where key = ' + str(x))
 
         block_on_compaction_log(node1, ks='ks', table='cf')
-
+        time.sleep(1)
         try:
             for x in xrange(0, cluster.data_dir_count):
                 cfs = os.listdir(node1.get_path() + "/data{0}/ks".format(x))
                 ssdir = os.listdir(node1.get_path() + "/data{0}/ks/{1}".format(x, cfs[0]))
                 for afile in ssdir:
-                    self.assertFalse("Data" in afile)
+                    self.assertFalse("Data" in afile, afile)
 
         except OSError:
             self.fail("Path to sstables not valid.")
