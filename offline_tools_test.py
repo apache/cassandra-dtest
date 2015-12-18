@@ -143,7 +143,7 @@ class TestOfflineTools(Tester):
 
         # test by loading large amount data so we have multiple sstables
         cluster.start(wait_for_binary_proto=True)
-        node1.stress(['write', 'n=100K', '-schema', 'replication(factor=1)'])
+        node1.stress(['write', 'n=200K', '-schema', 'replication(factor=1)'])
         node1.flush()
         self.wait_for_compactions(node1)
         cluster.stop()
@@ -162,6 +162,9 @@ class TestOfflineTools(Tester):
         initial_levels = self.get_levels(node1.run_sstablemetadata(keyspace="keyspace1", column_families=["standard1"]))
         (output, error, rc) = node1.run_sstableofflinerelevel("keyspace1", "standard1", output=True)
         final_levels = self.get_levels(node1.run_sstablemetadata(keyspace="keyspace1", column_families=["standard1"]))
+
+        debug(output)
+        debug(error)
 
         debug(initial_levels)
         debug(final_levels)

@@ -10,7 +10,7 @@ from jmxutils import JolokiaAgent, make_mbean, remove_perf_disable_shared_mem
 # In 3.0 "ColumnFamily" has been renamed to "Table" and "Row" to "Partition".
 # However, the old names are also supported for backward compatibility and we test them via
 # the mbean aliases, see begin_test().
-def MBEAN_VALUES_PRE(ks, table):
+def MBEAN_VALUES_PRE(ks, table, node):
     return [('db', 'Caches', {}, 'CounterCacheKeysToSave', 2147483647),
             ('db', 'Caches', {}, 'CounterCacheSavePeriodInSeconds', 7200),
             ('db', 'BatchlogManager', {}, 'TotalBatchesReplayed', 0),
@@ -19,7 +19,7 @@ def MBEAN_VALUES_PRE(ks, table):
             ('db', 'IndexSummaries', {}, 'IndexIntervals', 'MBeanIncrement'),
             ('metrics', 'ColumnFamily', {'name': 'AllMemtablesLiveDataSize'}, 'Value', 'MBeanIncrement'),
             ('metrics', 'ColumnFamily', {'name': 'AllMemtablesHeapSize'}, 'Value', 'MBeanIncrement'),
-            ('metrics', 'ColumnFamily', {'name': 'AllMemtablesOffHeapSize'}, 'Value', 'MBeanEqual'),
+            ('metrics', 'ColumnFamily', {'name': 'AllMemtablesOffHeapSize'}, 'Value', offheap_memtable_val(node)),
             ('metrics', 'ColumnFamily', {'name': 'BloomFilterDiskSpaceUsed'}, 'Value', 'MBeanIncrement'),
             ('metrics', 'ColumnFamily', {'name': 'BloomFilterFalsePositives'}, 'Value', 'MBeanEqual'),
             ('metrics', 'ColumnFamily', {'name': 'IndexSummaryOffHeapMemoryUsed'}, 'Value', 'MBeanIncrement'),
@@ -29,7 +29,7 @@ def MBEAN_VALUES_PRE(ks, table):
             ('metrics', 'ColumnFamily', {'name': 'MemtableLiveDataSize'}, 'Value', 'MBeanIncrement'),
             ('metrics', 'ColumnFamily', {'name': 'MemtableOnHeapSize'}, 'Value', 'MBeanIncrement'),
             ('metrics', 'ColumnFamily', {'name': 'MemtableSwitchCount'}, 'Value', 'MBeanIncrement'),
-            ('metrics', 'ColumnFamily', {'name': 'MemtableOffHeapSize'}, 'Value', 'MBeanEqual'),
+            ('metrics', 'ColumnFamily', {'name': 'MemtableOffHeapSize'}, 'Value', offheap_memtable_val(node)),
             ('metrics', 'ColumnFamily', {'name': 'PendingCompactions'}, 'Value', 'MBeanEqual'),
             ('metrics', 'ColumnFamily', {'name': 'MaxRowSize'}, 'Value', 'MBeanEqual'),
             ('metrics', 'ColumnFamily', {'name': 'MinRowSize'}, 'Value', 'MBeanEqual'),
@@ -41,7 +41,7 @@ def MBEAN_VALUES_PRE(ks, table):
             ('metrics', 'ColumnFamily', {'name': 'EstimatedRowCount', 'keyspace': ks, 'scope': table}, 'Value', 'MBeanEqual')]
 
 
-def MBEAN_VALUES_POST(ks, table):
+def MBEAN_VALUES_POST(ks, table, node):
     return [('db', 'Caches', {}, 'CounterCacheKeysToSave', 2147483647),
             ('db', 'Caches', {}, 'CounterCacheSavePeriodInSeconds', 7200),
             ('db', 'BatchlogManager', {}, 'TotalBatchesReplayed', 0),
@@ -50,7 +50,7 @@ def MBEAN_VALUES_POST(ks, table):
             ('db', 'IndexSummaries', {}, 'IndexIntervals', 'MBeanIncrement'),
             ('metrics', 'Table', {'name': 'AllMemtablesLiveDataSize'}, 'Value', 'MBeanIncrement'),
             ('metrics', 'Table', {'name': 'AllMemtablesHeapSize'}, 'Value', 'MBeanIncrement'),
-            ('metrics', 'Table', {'name': 'AllMemtablesOffHeapSize'}, 'Value', 'MBeanEqual'),
+            ('metrics', 'Table', {'name': 'AllMemtablesOffHeapSize'}, 'Value', offheap_memtable_val(node)),
             ('metrics', 'Table', {'name': 'BloomFilterDiskSpaceUsed'}, 'Value', 'MBeanIncrement'),
             ('metrics', 'Table', {'name': 'BloomFilterFalsePositives'}, 'Value', 'MBeanEqual'),
             ('metrics', 'Table', {'name': 'IndexSummaryOffHeapMemoryUsed'}, 'Value', 'MBeanIncrement'),
@@ -60,7 +60,7 @@ def MBEAN_VALUES_POST(ks, table):
             ('metrics', 'Table', {'name': 'MemtableLiveDataSize'}, 'Value', 'MBeanIncrement'),
             ('metrics', 'Table', {'name': 'MemtableOnHeapSize'}, 'Value', 'MBeanIncrement'),
             ('metrics', 'Table', {'name': 'MemtableSwitchCount'}, 'Value', 'MBeanIncrement'),
-            ('metrics', 'Table', {'name': 'MemtableOffHeapSize'}, 'Value', 'MBeanEqual'),
+            ('metrics', 'Table', {'name': 'MemtableOffHeapSize'}, 'Value', offheap_memtable_val(node)),
             ('metrics', 'Table', {'name': 'PendingCompactions'}, 'Value', 'MBeanEqual'),
             ('metrics', 'Table', {'name': 'MaxPartitionSize'}, 'Value', 'MBeanEqual'),
             ('metrics', 'Table', {'name': 'MinPartitionSize'}, 'Value', 'MBeanEqual'),
@@ -71,6 +71,11 @@ def MBEAN_VALUES_POST(ks, table):
             ('metrics', 'Table', {'name': 'EstimatedPartitionSizeHistogram', 'keyspace': ks, 'scope': table}, 'Value', 'MBeanEqual'),
             ('metrics', 'Table', {'name': 'EstimatedPartitionCount', 'keyspace': ks, 'scope': table}, 'Value', 'MBeanEqual')]
 
+
+def offheap_memtable_val(node):
+    memtable_allocation_type = node.get_conf_option('memtable_allocation_type')
+    offheap_memtable = memtable_allocation_type is not None and memtable_allocation_type.startswith('offheap')
+    return 'MBeanIncrement' if offheap_memtable else 'MBeanEqual'
 
 class TestJMXMetrics(Tester):
 
@@ -84,7 +89,7 @@ class TestJMXMetrics(Tester):
         @jira_ticket CASSANDRA-7436
         This test measures the values of MBeans before and after running a load. We expect
         the values to change a certain way, and thus deem them as 'MBeanEqual','MBeanDecrement',
-        'MBeanIncrement', or a constant to experss this expected change. If the value does not reflect
+        'MBeanIncrement', or a constant to express this expected change. If the value does not reflect
         this expected change, then it raises an AssertionError.
 
         @jira_ticket CASSANDRA-9448
@@ -123,11 +128,11 @@ class TestJMXMetrics(Tester):
         with JolokiaAgent(node) as jmx:
             debug("Cluster version {}".format(cluster.version()))
             if cluster.version() <= '2.2.X':
-                mbean_values = MBEAN_VALUES_PRE('keyspace1', 'counter1')
+                mbean_values = MBEAN_VALUES_PRE('keyspace1', 'counter1', node)
                 mbean_aliases = None
             else:
-                mbean_values = MBEAN_VALUES_POST('keyspace1', 'counter1')
-                mbean_aliases = MBEAN_VALUES_PRE('keyspace1', 'counter1')
+                mbean_values = MBEAN_VALUES_POST('keyspace1', 'counter1', node)
+                mbean_aliases = MBEAN_VALUES_PRE('keyspace1', 'counter1', node)
 
             before = []
             for package, bean, bean_args, attribute, expected in mbean_values:
