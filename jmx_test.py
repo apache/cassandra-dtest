@@ -58,6 +58,9 @@ class TestJMX(Tester):
             debug(finalhistogram)
             self.fail("Cfhistograms command failed: " + str(e))
 
+    @known_failure(failure_source='systemic',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10913',
+                   flaky=True)
     def netstats_test(self):
         """
         Check functioning of nodetool netstats, especially with restarts.
