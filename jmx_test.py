@@ -61,6 +61,9 @@ class TestJMX(Tester):
     @known_failure(failure_source='systemic',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10913',
                    flaky=True)
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10915',
+                   flaky=False)
     def netstats_test(self):
         """
         Check functioning of nodetool netstats, especially with restarts.

@@ -97,6 +97,9 @@ class TestCompaction(Tester):
 
         self.assertLess(finalValue, initialValue)
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10914',
+                   flaky=True)
     def sstable_deletion_test(self):
         """
         Test that sstables are deleted properly when able after compaction.
