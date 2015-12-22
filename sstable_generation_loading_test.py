@@ -19,6 +19,8 @@ class TestSSTableGenerationAndLoading(Tester):
         tests for the bug that caused #3370:
         https://issues.apache.org/jira/browse/CASSANDRA-3370
 
+        @jira_ticket CASSANDRA-3370
+
         inserts random data into a compressed table. The compressed SSTable was
         compared to the uncompressed and was found to indeed be larger then
         uncompressed.
@@ -44,12 +46,14 @@ class TestSSTableGenerationAndLoading(Tester):
         node1.flush()
         time.sleep(2)
         rows = list(session.execute("SELECT * FROM cf WHERE KEY = '0' AND c < '8'"))
-        assert len(rows) > 0
+        self.assertGreater(len(rows), 0)
 
     def remove_index_file_test(self):
         """
         tests for situations similar to that found in #343:
         https://issues.apache.org/jira/browse/CASSANDRA-343
+
+        @jira_ticket CASSANDRA-343
         """
         cluster = self.cluster
         cluster.populate(1).start(wait_for_binary_proto=True)
@@ -57,7 +61,7 @@ class TestSSTableGenerationAndLoading(Tester):
 
         # Makinge sure the cluster is ready to accept the subsequent
         # stress connection. This was an issue on Windows.
-        node1.stress(['write', 'n=10000', '-rate', 'threads=8'])
+        node1.stress(['write', 'n=10K', '-rate', 'threads=8'])
         node1.flush()
         node1.compact()
         node1.stop()
@@ -81,7 +85,7 @@ class TestSSTableGenerationAndLoading(Tester):
         for fname in os.listdir(path):
             if fname.endswith('Data.db'):
                 data_found += 1
-        assert data_found > 0, "After removing index, filter, stats, and digest files, the data file was deleted!"
+        self.assertGreater(data_found, 0, "After removing index, filter, stats, and digest files, the data file was deleted!")
 
     def sstableloader_compression_none_to_none_test(self):
         self.load_sstable_with_configuration(None, None)
