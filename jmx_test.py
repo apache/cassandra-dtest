@@ -203,7 +203,6 @@ class TestJMX(Tester):
                 time.sleep(2)
 
     @since('2.2')
-    @require(9526)
     def phi_test(self):
         """
         Check functioning of nodetool failuredetector.
@@ -228,5 +227,8 @@ class TestJMX(Tester):
         endpoint2Phi = float(endpoint2Values[1])
 
         max_phi = 2.0
-        self.assertTrue(endpoint1Phi > 0.0 and endpoint1Phi < 2.0)
-        self.assertTrue(endpoint2Phi > 0.0 and endpoint2Phi < 2.0)
+        self.assertGreater(endpoint1Phi, 0.0)
+        self.assertLess(endpoint1Phi, max_phi)
+
+        self.assertGreater(endpoint2Phi, 0.0)
+        self.assertLess(endpoint2Phi, max_phi)
