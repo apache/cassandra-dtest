@@ -110,7 +110,6 @@ class TestPushedNotifications(Tester):
             self.assertEquals(self.get_ip_from_node(node1), address)
 
     @no_vnodes()
-    @require("10052")
     def move_single_node_localhost_test(self):
         """
         @jira_ticket  CASSANDRA-10052
