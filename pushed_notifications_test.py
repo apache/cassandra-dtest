@@ -8,7 +8,7 @@ from cassandra import ConsistencyLevel as CL
 from cassandra import ReadFailure
 from cassandra.query import SimpleStatement
 from dtest import Tester, debug
-from tools import known_failure, no_vnodes, require, since
+from tools import known_failure, no_vnodes, since
 
 
 class NotificationWaiter(object):
@@ -215,7 +215,6 @@ class TestPushedNotifications(Tester):
         self.assertEquals(0, len(notifications))
 
     @since("3.0")
-    @require("9961")
     def schema_changes_test(self):
         """
         @jira_ticket CASSANDRA-10328
