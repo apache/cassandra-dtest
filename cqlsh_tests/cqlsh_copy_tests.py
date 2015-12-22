@@ -578,7 +578,6 @@ class CqlshCopyTest(Tester):
                                ['2', '2015/06/10 12:30'],
                                ['3', '2015/12/31 23:59']])
 
-    @require('9494')
     def test_reading_with_ttl(self):
         """
         @jira_ticket CASSANDRA-9494
