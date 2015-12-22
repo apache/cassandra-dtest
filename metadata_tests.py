@@ -34,7 +34,6 @@ class TestMetadata(Tester):
         Resets the schema while a compact, read and repair happens.
         All kinds of glorious things can fail.
         """
-        self.skipTest("Hangs the build")
 
         # while the schema is being reset, there will inevitably be some
         # queries that will error with this message
