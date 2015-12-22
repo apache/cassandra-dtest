@@ -233,7 +233,7 @@ class MiscellaneousCQLTester(CQLTester):
     required.
     """
 
-    def large_collection_errors(self):
+    def large_collection_errors_test(self):
         """
         For large collections, make sure that we are printing warnings.
         """
