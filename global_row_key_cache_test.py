@@ -1,12 +1,17 @@
 import time
 
 from dtest import Tester, debug
+from tools import known_failure
 
 from cassandra.concurrent import execute_concurrent_with_args
 
 
 class TestGlobalRowKeyCache(Tester):
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10916',
+                   flaky=False,
+                   notes='Fails on windows')
     def functional_test(self):
         cluster = self.cluster
         cluster.populate(3)
