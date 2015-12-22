@@ -8,7 +8,7 @@ from ccmlib.node import NodetoolError
 
 from dtest import Tester, debug
 from jmxutils import JolokiaAgent, make_mbean, remove_perf_disable_shared_mem
-from tools import known_failure
+from tools import known_failure, since
 
 
 class TestJMX(Tester):
@@ -201,3 +201,33 @@ class TestJMX(Tester):
             while (len(jmx.read_attribute(compaction_manager, 'CompactionSummary')) > 0) and (time.time() - start < max_query_timeout):
                 debug(jmx.read_attribute(compaction_manager, 'CompactionSummary'))
                 time.sleep(2)
+
+    @since('2.2')
+    def phi_test(self):
+        """
+        Check functioning of nodetool failuredetector.
+        @jira_ticket CASSANDRA-9526
+        """
+
+        cluster = self.cluster
+        cluster.populate(3).start(wait_for_binary_proto=True)
+        node1, node2, node3 = cluster.nodelist()
+
+        phivalues = node1.nodetool("failuredetector")[0].splitlines()
+        endpoint1Values = phivalues[1].split()
+        endpoint2Values = phivalues[2].split()
+
+        endpoint1 = endpoint1Values[0][1:-1]
+        endpoint2 = endpoint2Values[0][1:-1]
+
+        self.assertItemsEqual([endpoint1, endpoint2], ['127.0.0.2', '127.0.0.3'])
+
+        endpoint1Phi = float(endpoint1Values[1])
+        endpoint2Phi = float(endpoint2Values[1])
+
+        max_phi = 2.0
+        self.assertGreater(endpoint1Phi, 0.0)
+        self.assertLess(endpoint1Phi, max_phi)
+
+        self.assertGreater(endpoint2Phi, 0.0)
+        self.assertLess(endpoint2Phi, max_phi)
