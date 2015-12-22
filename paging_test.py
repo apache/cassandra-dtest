@@ -9,7 +9,7 @@ from cassandra.query import SimpleStatement, dict_factory, named_tuple_factory
 from assertions import assert_invalid
 from datahelp import create_rows, flatten_into_set, parse_data_into_dicts
 from dtest import Tester, run_scenarios
-from tools import known_failure, require, since
+from tools import known_failure, since
 
 
 class Page(object):
@@ -1396,7 +1396,6 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
         self.check_all_paging_results(expected_data, 7,
                                       [25, 25, 25, 25, 25, 25, 25])
 
-    @require('6237')
     def test_multiple_row_deletions(self):
         """Test multiple row deletions.
            This test should be finished when CASSANDRA-6237 is done.
