@@ -258,7 +258,9 @@ class MiscellaneousCQLTester(CQLTester):
 
         # Query for the data and throw exception
         session.execute("SELECT properties FROM maps WHERE userid = 'user'")
-        node1.watch_log_for("Detected collection for table ks.maps with 70000 elements, more than the 65535 limit. Only the first 65535 elements will be returned to the client. Please see http://cassandra.apache.org/doc/cql3/CQL.html#collections for more details.")
+        node1.watch_log_for("Detected collection for table ks.maps with 70000 elements, more than the 65535 limit. "
+                            "Only the first 65535 elements will be returned to the client. Please see "
+                            "http://cassandra.apache.org/doc/cql3/CQL.html#collections for more details.")
 
     def cql3_insert_thrift_test(self):
         """ Check that we can insert from thrift into a CQL3 table (#4377) """
