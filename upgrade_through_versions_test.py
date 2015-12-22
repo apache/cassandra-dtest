@@ -19,7 +19,7 @@ import psutil
 from cassandra import ConsistencyLevel, WriteTimeout
 from cassandra.query import SimpleStatement
 from dtest import DEFAULT_DIR, Tester, debug
-from tools import generate_ssl_stores, new_node
+from tools import generate_ssl_stores, known_failure, new_node
 
 # Versions are tuples of (major_ver, minor_ver)
 # Used to build upgrade path(s) for tests. Some tests will go from start to finish,
@@ -929,6 +929,9 @@ class PointToPointUpgradeBase(TestUpgradeThroughVersions):
         # try and add a new node
         self.upgrade_scenario(after_upgrade_call=(self._bootstrap_new_node,))
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10610',
+                   flaky=False)
     def bootstrap_multidc_test(self):
         # try and add a new node
         # multi dc, 2 nodes in each dc
