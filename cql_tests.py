@@ -15,7 +15,7 @@ from thrift_bindings.v22.ttypes import \
 from thrift_bindings.v22.ttypes import (CfDef, Column, ColumnOrSuperColumn,
                                         Mutation)
 from thrift_tests import get_thrift_client
-from tools import debug, require, rows_to_list, since
+from tools import debug, rows_to_list, since
 
 
 class CQLTester(Tester):
@@ -398,7 +398,6 @@ class MiscellaneousCQLTester(CQLTester):
 
 
 @since('3.0')
-@require("7392")
 class AbortedQueriesTester(CQLTester):
     """
     @jira_ticket CASSANDRA-7392
