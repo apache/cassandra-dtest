@@ -18,7 +18,7 @@ from assertions import assert_all, assert_none
 from ccmlib import common
 from cqlsh_tools import monkeypatch_driver, unmonkeypatch_driver
 from dtest import Tester, debug
-from tools import create_c1c2_table, insert_c1c2, known_failure, rows_to_list, since
+from tools import create_c1c2_table, insert_c1c2, rows_to_list, since
 
 
 class TestCqlsh(Tester):
@@ -1255,9 +1255,6 @@ Unlogged batch covering 2 partitions detected against table [client_warnings.tes
         stdout, stderr = self.run_cqlsh(node1, cmds='USE system', cqlsh_options=['--debug', '--connect-timeout=10'])
         self.assertTrue("Using connect timeout: 10 seconds" in stderr)
 
-    @known_failure(failure_source='systemic',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10884',
-                   flaky=True)
     def test_refresh_schema_on_timeout_error(self):
         """
         @jira_ticket CASSANDRA-9689
@@ -1268,9 +1265,10 @@ Unlogged batch covering 2 partitions detected against table [client_warnings.tes
         node1, node2, node3 = self.cluster.nodelist()
         node2.stop(wait_other_notice=True)
 
+        # set request timeout explicitly to force error on schema disagreement before PYTHON-458 is ready (CASSANDRA-10686)
         stdout, stderr = self.run_cqlsh(node1, cmds="""
               CREATE KEYSPACE training WITH replication={'class':'SimpleStrategy','replication_factor':1};
-              DESCRIBE KEYSPACES""")
+              DESCRIBE KEYSPACES""", cqlsh_options=['--request-timeout=6'])
         self.assertIn("training", stdout)
         self.assertIn("Warning: schema version mismatch detected, which might be caused by DOWN nodes; "
                       "if this is not the case, check the schema versions of your nodes in system.local "
@@ -1278,9 +1276,10 @@ Unlogged batch covering 2 partitions detected against table [client_warnings.tes
                       stderr)
         self.assertIn("OperationTimedOut: errors={}, last_host=127.0.0.1", stderr)
 
+        # set request timeout explicitly to force error on schema disagreement before PYTHON-458 is ready (CASSANDRA-10686)
         stdout, stderr = self.run_cqlsh(node1, """USE training;
                                                   CREATE TABLE mytable (id int, val text, PRIMARY KEY (id));
-                                                  describe tables""")
+                                                  describe tables""", cqlsh_options=['--request-timeout=6'])
         self.assertIn("mytable", stdout)
         self.assertIn("Warning: schema version mismatch detected, which might be caused by DOWN nodes; "
                       "if this is not the case, check the schema versions of your nodes in system.local "
