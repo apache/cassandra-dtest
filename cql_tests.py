@@ -233,6 +233,7 @@ class MiscellaneousCQLTester(CQLTester):
     required.
     """
 
+    @since('2.1', max_version='3.0')
     def large_collection_errors_test(self):
         """
         For large collections, make sure that we are printing warnings.
