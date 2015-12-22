@@ -329,16 +329,19 @@ class TestArchiveCommitlog(SnapshotTester):
             shutil.rmtree(tmp_commitlog)
 
     def test_archive_and_restore_commitlog_repeatedly(self):
-        """Run archive commit log restoration test repeatedly to make sure it is idempoten
-           and doesn't fail if done repeatedly"""
+        """
+        @jira_ticket CASSANDRA-10593
+        Run archive commit log restoration test repeatedly to make sure it is idempotent
+        and doesn't fail if done repeatedly
+        """
 
         cluster = self.cluster
         cluster.populate(1)
-        (node1,) = cluster.nodelist()
+        node1 = cluster.nodelist()[0]
 
         # Create a temp directory for storing commitlog archives:
         tmp_commitlog = safe_mkdtemp()
-        debug("tmp_commitlog: " + tmp_commitlog)
+        debug("tmp_commitlog: {}".format(tmp_commitlog))
 
         # Edit commitlog_archiving.properties and set an archive
         # command:
@@ -366,7 +369,7 @@ class TestArchiveCommitlog(SnapshotTester):
 
             cluster.flush()
 
-            self.assertTrue(len(set(os.listdir(tmp_commitlog)) - set(os.listdir(commitlog_dir))) > 0)
+            self.assertGreater(len(set(os.listdir(tmp_commitlog)) - set(os.listdir(commitlog_dir))), 0)
 
             debug("Flushing and doing first restart")
             cluster.compact()
