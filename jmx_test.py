@@ -220,8 +220,7 @@ class TestJMX(Tester):
         endpoint1 = endpoint1Values[0][1:-1]
         endpoint2 = endpoint2Values[0][1:-1]
 
-        self.assertTrue(endpoint1.startswith("127.0.0"))
-        self.assertTrue(endpoint2.startswith("127.0.0"))
+        self.assertItemsEqual([endpoint1, endpoint2], ['127.0.0.2', '127.0.0.3'])
 
         endpoint1Phi = float(endpoint1Values[1])
         endpoint2Phi = float(endpoint2Values[1])
