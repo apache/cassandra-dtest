@@ -21,7 +21,7 @@ from cqlsh_tools import (DummyColorMap, assert_csvs_items_equal, csv_rows,
                          strip_timezone_if_time_string, unmonkeypatch_driver,
                          write_rows_to_csv)
 from dtest import Tester, canReuseCluster, freshCluster, debug
-from tools import known_failure, rows_to_list, require
+from tools import known_failure, rows_to_list, since
 
 DEFAULT_FLOAT_PRECISION = 5  # magic number copied from cqlsh script
 DEFAULT_TIME_FORMAT = '%Y-%m-%d %H:%M:%S%z'  # based on cqlsh script
@@ -578,6 +578,7 @@ class CqlshCopyTest(Tester):
                                ['2', '2015/06/10 12:30'],
                                ['3', '2015/12/31 23:59']])
 
+    @since('3.2')
     def test_reading_with_ttl(self):
         """
         @jira_ticket CASSANDRA-9494
