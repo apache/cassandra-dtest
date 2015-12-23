@@ -291,8 +291,7 @@ class UpgradeTester(Tester):
         self.establish_default_config()
 
         if self.extra_config is not None:
-            debug("Setting extra configuration options:")
-            debug(pprint.pformat(dict(self.extra_config), indent=4))
+            debug("Setting extra configuration options:\n" + pprint.pformat(dict(self.extra_config), indent=4))
             self.cluster.set_configuration_options(values=dict(self.extra_config))
 
     def parallel_upgrade_test(self):

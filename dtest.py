@@ -282,8 +282,7 @@ class Tester(TestCase):
                 'request_timeout_in_ms': timeout
             })
 
-        debug("Done setting configuration options:")
-        debug(pprint.pformat(self.cluster._config_options, indent=4))
+        debug("Done setting configuration options:\n" + pprint.pformat(self.cluster._config_options, indent=4))
 
     def setUp(self):
         global CURRENT_TEST
