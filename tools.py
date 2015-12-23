@@ -331,7 +331,7 @@ def known_failure(failure_source, jira_url, flaky=False, notes=None):
     Tag a test as a known failure. Associate it with the URL for a JIRA
     ticket and tag it as flaky or not.
 
-    Valid values for failure_source include: 'cassandra', 'test', and
+    Valid values for failure_source include: 'cassandra', 'test', 'driver', and
     'systemic'.
 
     To run all known failures, use the functionality provided by the nosetests
@@ -351,7 +351,7 @@ def known_failure(failure_source, jira_url, flaky=False, notes=None):
     known_failure multiple times, the known_failure attribute of that test
     will have the value applied by the outermost instance of the decorator.
     """
-    valid_failure_sources = ('cassandra', 'test', 'systemic')
+    valid_failure_sources = ('cassandra', 'test', 'systemic', 'driver')
 
     def wrapper(f):
         assert failure_source in valid_failure_sources
