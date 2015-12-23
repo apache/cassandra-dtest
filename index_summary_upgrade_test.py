@@ -14,6 +14,7 @@ class TestUpgradeIndexSummary(Tester):
         original_install_dir = node.get_install_dir()
 
         # start out with a 2.0 version
+        cluster.set_install_dir(version='2.0.12')
         node.set_install_dir(version='2.0.12')
         node.set_log_level("INFO")
         node.stop()
@@ -40,7 +41,8 @@ class TestUpgradeIndexSummary(Tester):
         node.drain()
         node.watch_log_for("DRAINED")
         node.stop()
-        node.set_install_dir(version='2.1.3')  # 2.1.3 is affected by CASSANDRA-8993
+        cluster.set_install_dir(version='2.1.3')  # 2.1.3 is affected by CASSANDRA-8993
+        node.set_install_dir(version='2.1.3')
         debug("Set new cassandra dir for %s: %s" % (node.name, node.get_install_dir()))
 
         # setup log4j / logback again (necessary moving from 2.0 -> 2.1)
@@ -71,6 +73,7 @@ class TestUpgradeIndexSummary(Tester):
         node.drain()
         node.watch_log_for("DRAINED")
         node.stop()
+        cluster.set_install_dir(original_install_dir)
         node.set_install_dir(original_install_dir)
         debug("Set new cassandra dir for %s: %s" % (node.name, node.get_install_dir()))
 
