@@ -5,6 +5,7 @@ import time
 
 from dtest import Tester, debug
 from ccmlib import common as ccmcommon
+from tools import known_failure
 
 
 class TestSSTableGenerationAndLoading(Tester):
@@ -114,6 +115,8 @@ class TestSSTableGenerationAndLoading(Tester):
     def sstableloader_compression_deflate_to_deflate_test(self):
         self.load_sstable_with_configuration('Deflate', 'Deflate')
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10935')
     def sstableloader_uppercase_keyspace_name_test(self):
         """
         Make sure sstableloader works with upper case keyspace
