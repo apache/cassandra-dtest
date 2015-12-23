@@ -443,6 +443,8 @@ class AbortedQueriesTester(CQLTester):
         assert_unavailable(lambda c: debug(c.execute(statement)), session)
         node.watch_log_for("Some operations timed out", from_mark=mark, timeout=60)
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10929')
     def remote_query_test(self):
         """
         Check that a query running on a node other than the coordinator times out
@@ -489,6 +491,8 @@ class AbortedQueriesTester(CQLTester):
 
         node2.watch_log_for("Some operations timed out", from_mark=mark, timeout=60)
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10929')
     def index_query_test(self):
         """
         Check that a secondary index query times out
@@ -522,6 +526,8 @@ class AbortedQueriesTester(CQLTester):
         assert_unavailable(lambda c: debug(c.execute(statement, [50])), session)
         node.watch_log_for("Some operations timed out", from_mark=mark, timeout=60)
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10929')
     def materialized_view_test(self):
         """
         Check that a materialized view query times out
