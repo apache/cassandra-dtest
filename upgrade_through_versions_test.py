@@ -494,23 +494,27 @@ class UpgradeTester(Tester):
                 vers[:curr_index] + ['***' + current_tag + '***'] + vers[curr_index + 1:]))
 
     def _create_metadata_schemas(self, tag):
+        safe_name = "t" + tag  # add a letter so we don't break C* naming rules in the case of bare versions
+
         self.created_metadata_versions.append((self.cluster.version(), tag))
         session = self.patient_cql_connection(self.node2)
         session.execute('use upgrade')
-        debug("schema metadata establish tables tag: {0}".format(tag))
+        debug("schema metadata establish tables tag: {0}".format(safe_name))
 
         for m in filter(lambda mtd: mtd.startswith('establish_'), dir(schema_metadata_test)):
             debug("schema establish calling: [{0}]".format(m))
-            getattr(schema_metadata_test, m)(self.cluster.version(), session, tag)
+            getattr(schema_metadata_test, m)(self.cluster.version(), session, safe_name)
 
     def _check_metadata_schemas(self, version, tag):
+        safe_name = "t" + tag  # mirrors the name safety convention in _create_metadata_schemas
+
         session = self.patient_cql_connection(self.node2)
         session.execute('use upgrade')
-        debug("schema metadata verify version: {0}, tag: {1}".format(version, tag))
+        debug("schema metadata verify version: {0}, tag: {1}".format(version, safe_name))
 
         for m in filter(lambda mtd: mtd.startswith('verify_'), dir(schema_metadata_test)):
             debug("schema verify calling: [{0}]".format(m))
-            getattr(schema_metadata_test, m)(version, self.cluster.version(), 'upgrade', session, tag)
+            getattr(schema_metadata_test, m)(version, self.cluster.version(), 'upgrade', session, safe_name)
 
     def _create_schema_for_rolling(self):
         """
