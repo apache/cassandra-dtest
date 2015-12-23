@@ -214,6 +214,8 @@ class TestPushedNotifications(Tester):
         notifications = waiter.wait_for_notifications(timeout=30.0, num_notifications=3)
         self.assertEquals(0, len(notifications))
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10932')
     @since("3.0")
     def schema_changes_test(self):
         """
