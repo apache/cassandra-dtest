@@ -20,7 +20,7 @@ from cqlsh_tools import (DummyColorMap, assert_csvs_items_equal, csv_rows,
                          monkeypatch_driver, random_list,
                          strip_timezone_if_time_string, unmonkeypatch_driver,
                          write_rows_to_csv)
-from dtest import Tester, canReuseCluster, freshCluster, debug
+from dtest import Tester, canReuseCluster, freshCluster, debug, DISABLE_VNODES
 from tools import known_failure, rows_to_list, since
 
 DEFAULT_FLOAT_PRECISION = 5  # magic number copied from cqlsh script
@@ -77,13 +77,13 @@ class CqlshCopyTest(Tester):
 
         super(CqlshCopyTest, self).tearDown()
 
-    def prepare(self, nodes=1, partitioner="murmur3", configuration_options=None):
+    def prepare(self, nodes=1, partitioner="murmur3", configuration_options=None, tokens=None):
         if not self.cluster.nodelist():
             p = PARTITIONERS[partitioner]
             self.cluster.set_partitioner(p)
             if configuration_options:
                 self.cluster.set_configuration_options(values=configuration_options)
-            self.cluster.populate(nodes).start(wait_for_binary_proto=True)
+            self.cluster.populate(nodes, tokens=tokens).start(wait_for_binary_proto=True)
         else:
             self.assertEqual(self.cluster.partitioner, partitioner, "Cannot reuse cluster: different partitioner")
             self.assertEqual(len(self.cluster.nodelist()), nodes, "Cannot reuse cluster: different number of nodes")
@@ -1173,8 +1173,28 @@ class CqlshCopyTest(Tester):
                                    configuration_options={'range_request_timeout_in_ms': '300',
                                                           'write_request_timeout_in_ms': '200'})
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10858')
+    def prepare_copy_to_with_failures(self):
+        """
+        Create a cluster for testing COPY TO with failure injection, we need at least 3 token ranges
+        so if VNODES are disabled we need to manually fix them and specify the correct start and end
+        tokens for injecting failures. If VNODES are enabled instead, we will have several ranges
+        so we pick an arbitrary range.
+
+        @jira_ticket CASSANDRA-10858
+        """
+        if DISABLE_VNODES:
+            tokens = sorted(self.cluster.balanced_tokens(3))
+            debug('Using tokens {}'.format(tokens))
+            self.prepare(nodes=3, tokens=tokens)
+            start = tokens[1]
+            end = tokens[2]
+        else:
+            start = 0
+            end = 5000000000000000000
+            self.prepare(nodes=1)
+
+        return start, end
+
     @freshCluster()
     def test_copy_to_with_more_failures_than_max_attempts(self):
         """
@@ -1186,14 +1206,15 @@ class CqlshCopyTest(Tester):
         @jira_ticket CASSANDRA-9304
         """
         num_records = 100000
-        self.prepare(nodes=1)
+        start, end = self.prepare_copy_to_with_failures()
 
         debug('Running stress')
         stress_table = 'keyspace1.standard1'
         self.node1.stress(['write', 'n={}'.format(num_records), '-rate', 'threads=50'])
 
         self.tempfile = NamedTemporaryFile(delete=False)
-        failures = {'failing_range': {'start': 0, 'end': 5000000000000000000, 'num_failures': 5}}
+        failures = {'failing_range': {'start': start, 'end': end, 'num_failures': 5}}
+
         os.environ['CQLSH_COPY_TEST_FAILURES'] = json.dumps(failures)
 
         debug('Exporting to csv file: {} with {} and 3 max attempts'
@@ -1218,14 +1239,14 @@ class CqlshCopyTest(Tester):
         @jira_ticket CASSANDRA-9304
         """
         num_records = 100000
-        self.prepare(nodes=1)
+        start, end = self.prepare_copy_to_with_failures()
 
         debug('Running stress')
         stress_table = 'keyspace1.standard1'
         self.node1.stress(['write', 'n={}'.format(num_records), '-rate', 'threads=50'])
 
         self.tempfile = NamedTemporaryFile(delete=False)
-        failures = {'failing_range': {'start': 0, 'end': 5000000000000000000, 'num_failures': 3}}
+        failures = {'failing_range': {'start': start, 'end': end, 'num_failures': 3}}
         os.environ['CQLSH_COPY_TEST_FAILURES'] = json.dumps(failures)
         debug('Exporting to csv file: {} with {} and 5 max attemps'
               .format(self.tempfile.name, os.environ['CQLSH_COPY_TEST_FAILURES']))
@@ -1251,14 +1272,14 @@ class CqlshCopyTest(Tester):
         @jira_ticket CASSANDRA-9304
         """
         num_records = 100000
-        self.prepare(nodes=1)
+        start, end = self.prepare_copy_to_with_failures()
 
         debug('Running stress')
         stress_table = 'keyspace1.standard1'
         self.node1.stress(['write', 'n={}'.format(num_records), '-rate', 'threads=50'])
 
         self.tempfile = NamedTemporaryFile(delete=False)
-        failures = {'exit_range': {'start': 0, 'end': 5000000000000000000}}
+        failures = {'exit_range': {'start': start, 'end': end}}
         os.environ['CQLSH_COPY_TEST_FAILURES'] = json.dumps(failures)
 
         debug('Exporting to csv file: {} with {}'
