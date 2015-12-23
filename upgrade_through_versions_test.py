@@ -1,5 +1,6 @@
 import operator
 import os
+import pprint
 import random
 import re
 import signal
@@ -265,6 +266,7 @@ class UpgradeTester(Tester):
     """
     test_versions = None  # set on init to know which versions to use
     subprocs = None  # holds any subprocesses, for status checking and cleanup
+    extra_config = None  # holds a non-mutable structure that can be cast as dict()
     protocol_version = DEFAULT_PROTOCOL_VERSION
 
     def __init__(self, *args, **kwargs):
@@ -274,10 +276,9 @@ class UpgradeTester(Tester):
             # it's trying to send the migration to hasn't started yet,
             # and when it does, it gets replayed and everything is fine.
             r'Can\'t send migration request: node.*is down',
+            r'RejectedExecutionException.*ThreadPoolExecutor has shut down',
         ]
         self.subprocs = []
-        # Force cluster options that are common among versions:
-        kwargs['cluster_options'] = {'partitioner': 'org.apache.cassandra.dht.Murmur3Partitioner'}
         Tester.__init__(self, *args, **kwargs)
 
     def setUp(self):
@@ -285,6 +286,14 @@ class UpgradeTester(Tester):
         debug("Versions to test (%s): %s" % (type(self), str([v for v in self.test_versions])))
         switch_jdks(self.test_versions[0])
         self.cluster.set_install_dir(version=self.test_versions[0])
+
+    def establish_config(self):
+        self.establish_default_config()
+
+        if self.extra_config is not None:
+            debug("Setting extra configuration options:")
+            debug(pprint.pformat(dict(self.extra_config), indent=4))
+            self.cluster.set_configuration_options(values=dict(self.extra_config))
 
     def parallel_upgrade_test(self):
         """
@@ -715,25 +724,6 @@ class UpgradeTester(Tester):
             self.fail("Count query did not return")
 
 
-class TestRandomPartitionerUpgrade(UpgradeTester):
-    """
-    Upgrades a 3-node RandomPartitioner cluster through versions specified in test_versions.
-    """
-    def __init__(self, *args, **kwargs):
-        # Ignore these log patterns:
-        self.ignore_log_patterns = [
-            # This one occurs if we do a non-rolling upgrade, the node
-            # it's trying to send the migration to hasn't started yet,
-            # and when it does, it gets replayed and everything is fine.
-            r'Can\'t send migration request: node.*is down',
-            r'RejectedExecutionException.*ThreadPoolExecutor has shut down',
-        ]
-        self.subprocs = []
-        # Force cluster options that are common among versions:
-        kwargs['cluster_options'] = {'partitioner': 'org.apache.cassandra.dht.RandomPartitioner'}
-        Tester.__init__(self, *args, **kwargs)
-
-
 class BootstrapMixin(object):
     """
     Can be mixed into UpgradeTester or a subclass thereof to add bootstrap tests.
@@ -811,12 +801,17 @@ class BootstrapMixin(object):
                 );""")
 
 
-def create_upgrade_class(clsname, version_list, protocol_version=DEFAULT_PROTOCOL_VERSION, bootstrap_test=False):
+def create_upgrade_class(clsname, version_list, protocol_version=DEFAULT_PROTOCOL_VERSION,
+                         bootstrap_test=False, extra_config=(('partitioner', 'org.apache.cassandra.dht.Murmur3Partitioner'),)):
     """
     Dynamically creates a test subclass for testing the given versions.
 
-    'version_list' should be a list of versions ccm will recognize.
-    'bootstrap_test' is a boolean, if True bootstrap testing will be included.
+    'clsname' is the name of the new class.
+    'protocol_version' is an int.
+    'bootstrap_test' is a boolean, if True bootstrap testing will be included. Default False.
+    'version_list' is a list of versions ccm will recognize, to be upgraded in order.
+    'extra_config' is tuple of config options that can (eventually) be cast as a dict,
+    e.g. (('partitioner', org.apache.cassandra.dht.Murmur3Partitioner''))
     """
     if bootstrap_test:
         parent_classes = (UpgradeTester, BootstrapMixin)
@@ -834,7 +829,7 @@ def create_upgrade_class(clsname, version_list, protocol_version=DEFAULT_PROTOCO
     newcls = type(
         clsname,
         parent_classes,
-        {'test_versions': version_list, '__test__': True, 'protocol_version': protocol_version}
+        {'test_versions': version_list, '__test__': True, 'protocol_version': protocol_version, 'extra_config': extra_config}
     )
 
     if globals().get(clsname):
@@ -862,7 +857,14 @@ create_upgrade_class(
     [latest_2dot0, latest_2dot1, 'git:cassandra-2.2'],
     protocol_version=1
 )
-
+create_upgrade_class(
+    'ProtoV1Upgrade_AllVersions_RandomPartitioner',
+    [latest_2dot0, latest_2dot1, 'git:cassandra-2.2'],
+    protocol_version=1,
+    extra_config=(
+        ('partitioner', 'org.apache.cassandra.dht.RandomPartitioner'),
+    )
+)
 
 # Proto v2 upgrade classes (v2 is supported on 2.0, 2.1, 2.2)
 create_upgrade_class(
@@ -881,6 +883,14 @@ create_upgrade_class(
     'ProtoV2Upgrade_AllVersions',
     [latest_2dot0, latest_2dot1, 'git:cassandra-2.2'],
     protocol_version=2
+)
+create_upgrade_class(
+    'ProtoV2Upgrade_AllVersions_RandomPartitioner',
+    [latest_2dot0, latest_2dot1, 'git:cassandra-2.2'],
+    protocol_version=2,
+    extra_config=(
+        ('partitioner', 'org.apache.cassandra.dht.RandomPartitioner'),
+    )
 )
 
 
@@ -924,6 +934,22 @@ create_upgrade_class(  # special case upgrade skipping 2.2
     [latest_2dot1, latest_3dot0, latest_3dot1, trunk_ccm_string],
     protocol_version=3
 )
+create_upgrade_class(
+    'ProtoV3Upgrade_AllVersions_RandomPartitioner',
+    [latest_2dot1, latest_2dot2, latest_3dot0, latest_3dot1, trunk_ccm_string],
+    protocol_version=3,
+    extra_config=(
+        ('partitioner', 'org.apache.cassandra.dht.RandomPartitioner'),
+    )
+)
+create_upgrade_class(
+    'ProtoV3Upgrade_AllVersions_RandomPartitioner_Skip_2_2',
+    [latest_2dot1, latest_3dot0, latest_3dot1, trunk_ccm_string],
+    protocol_version=3,
+    extra_config=(
+        ('partitioner', 'org.apache.cassandra.dht.RandomPartitioner'),
+    )
+)
 
 
 # Proto v4 upgrade classes (v4 is supported on 2.2, 3.0, 3.1, trunk)
@@ -948,6 +974,14 @@ create_upgrade_class(
     'ProtoV4Upgrade_AllVersions',
     [latest_2dot2, latest_3dot0, latest_3dot1, trunk_ccm_string],
     protocol_version=4
+)
+create_upgrade_class(
+    'ProtoV4Upgrade_AllVersions_RandomPartitioner',
+    [latest_2dot2, latest_3dot0, latest_3dot1, trunk_ccm_string],
+    protocol_version=4,
+    extra_config=(
+        ('partitioner', 'org.apache.cassandra.dht.RandomPartitioner'),
+    )
 )
 
 # FOR CUSTOM/LOCAL UPGRADE PATH TESTING:
