@@ -409,6 +409,8 @@ class AbortedQueriesTester(CQLTester):
     Test that read-queries that take longer than read_request_timeout_in_ms time out
     """
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10929')
     def local_query_test(self):
         """
         Check that a query running on the local coordinator node times out
