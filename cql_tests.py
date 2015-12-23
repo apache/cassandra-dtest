@@ -15,7 +15,7 @@ from thrift_bindings.v22.ttypes import \
 from thrift_bindings.v22.ttypes import (CfDef, Column, ColumnOrSuperColumn,
                                         Mutation)
 from thrift_tests import get_thrift_client
-from tools import debug, rows_to_list, since
+from tools import known_failure, debug, rows_to_list, since
 
 
 class CQLTester(Tester):
@@ -233,6 +233,8 @@ class MiscellaneousCQLTester(CQLTester):
     required.
     """
 
+    @known_failure(failure_source='driver',
+                   jira_url='https://datastax-oss.atlassian.net/browse/PYTHON-459')
     @since('2.1', max_version='3.0')
     def large_collection_errors_test(self):
         """
