@@ -5,6 +5,7 @@ import copy
 import errno
 import logging
 import os
+import pprint
 import re
 import shutil
 import subprocess
@@ -16,17 +17,16 @@ import traceback
 import types
 from unittest import TestCase
 
+from cassandra import ConsistencyLevel
 from cassandra.auth import PlainTextAuthProvider
 from cassandra.cluster import Cluster as PyCluster
 from cassandra.cluster import NoHostAvailable
-from cassandra.policies import WhiteListRoundRobinPolicy, RetryPolicy
-from cassandra import ConsistencyLevel
-from nose.exc import SkipTest
-
+from cassandra.policies import RetryPolicy, WhiteListRoundRobinPolicy
 from ccmlib.cluster import Cluster
 from ccmlib.cluster_factory import ClusterFactory
 from ccmlib.common import is_win
 from ccmlib.node import TimeoutError
+from nose.exc import SkipTest
 
 LOG_SAVED_DIR = "logs"
 try:
@@ -263,6 +263,28 @@ class Tester(TestCase):
         else:
             node.set_install_dir(install_dir=cdir)
 
+    def establish_config(self):
+        raise NotImplementedError()
+
+    def establish_default_config(self):
+        # the failure detector can be quite slow in such tests with quick start/stop
+        self.cluster.set_configuration_options(values={'phi_convict_threshold': 5})
+
+        timeout = 10000
+        if self.cluster_options is not None:
+            self.cluster.set_configuration_options(values=self.cluster_options)
+        else:
+            self.cluster.set_configuration_options(values={
+                'read_request_timeout_in_ms': timeout,
+                'range_request_timeout_in_ms': timeout,
+                'write_request_timeout_in_ms': timeout,
+                'truncate_request_timeout_in_ms': timeout,
+                'request_timeout_in_ms': timeout
+            })
+
+        debug("Done setting configuration options:")
+        debug(pprint.pformat(self.cluster._config_options, indent=4))
+
     def setUp(self):
         global CURRENT_TEST
         CURRENT_TEST = self.id() + self._testMethodName
@@ -303,20 +325,12 @@ class Tester(TestCase):
         self.cluster = self._get_cluster()
         if RECORD_COVERAGE:
             self.__setup_jacoco()
-        # the failure detector can be quite slow in such tests with quick start/stop
-        self.cluster.set_configuration_options(values={'phi_convict_threshold': 5})
 
-        timeout = 10000
-        if self.cluster_options is not None:
-            self.cluster.set_configuration_options(values=self.cluster_options)
-        else:
-            self.cluster.set_configuration_options(values={
-                'read_request_timeout_in_ms': timeout,
-                'range_request_timeout_in_ms': timeout,
-                'write_request_timeout_in_ms': timeout,
-                'truncate_request_timeout_in_ms': timeout,
-                'request_timeout_in_ms': timeout
-            })
+        try:
+            self.establish_config()
+        except NotImplementedError:
+            debug("Custom establish_config not found. Setting defaults.")
+            self.establish_default_config()
 
         with open(LAST_TEST_DIR, 'w') as f:
             f.write(self.test_path + '\n')
