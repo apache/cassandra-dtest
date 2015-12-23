@@ -143,8 +143,46 @@ class TestCqlsh(Tester):
 
         output, err = self.run_cqlsh(node1, 'use simple; SELECT * FROM simpledate')
 
-        self.assertIn("2143-04-19 11:21:01+0000", output)
-        self.assertIn("1943-04-19 11:21:01+0000", output)
+        if self.cluster.version() >= '3.2':
+            self.assertIn("2143-04-19 11:21:01.000000+0000", output)
+            self.assertIn("1943-04-19 11:21:01.000000+0000", output)
+        else:
+            self.assertIn("2143-04-19 11:21:01+0000", output)
+            self.assertIn("1943-04-19 11:21:01+0000", output)
+
+    @since('3.2')
+    def test_sub_second_precision(self):
+        """
+        Test that we can query at millisecond precision.
+        @jira_ticket 10428
+        """
+        self.cluster.populate(1)
+        self.cluster.start(wait_for_binary_proto=True)
+
+        node1, = self.cluster.nodelist()
+
+        node1.run_cqlsh(cmds="""
+            CREATE KEYSPACE simple WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
+            use simple;
+            create TABLE testsubsecond (id int, subid timestamp, value text, primary key (id, subid));
+            insert into testsubsecond (id, subid, value) VALUES (1, '1943-06-19 11:21:01.123+0000', 'abc');
+            insert into testsubsecond (id, subid, value) VALUES (2, '1943-06-19 11:21:01+0000', 'def')""")
+
+        output, err = node1.run_cqlsh(cmds="use simple; SELECT * FROM testsubsecond "
+                                           "WHERE id = 1 AND subid = '1943-06-19 11:21:01.123+0000'",
+                                      return_output=True)
+
+        debug(output)
+        self.assertIn("1943-06-19 11:21:01.123000+0000", output)
+        self.assertNotIn("1943-06-19 11:21:01.000000+0000", output)
+
+        output, err = node1.run_cqlsh(cmds="use simple; SELECT * FROM testsubsecond "
+                                           "WHERE id = 2 AND subid = '1943-06-19 11:21:01+0000'",
+                                      return_output=True)
+
+        debug(output)
+        self.assertIn("1943-06-19 11:21:01.000000+0000", output)
+        self.assertNotIn("1943-06-19 11:21:01.123000+0000", output)
 
     def verify_glass(self, node):
         session = self.patient_cql_connection(node)

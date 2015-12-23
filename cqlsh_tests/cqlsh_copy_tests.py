@@ -19,14 +19,11 @@ from cassandra.util import SortedSet
 from ccmlib.common import is_win
 
 from cqlsh_tools import (DummyColorMap, assert_csvs_items_equal, csv_rows,
-                         monkeypatch_driver, random_list,
-                         strip_timezone_if_time_string, unmonkeypatch_driver,
-                         write_rows_to_csv)
+                         monkeypatch_driver, random_list, unmonkeypatch_driver, write_rows_to_csv)
 from dtest import Tester, canReuseCluster, freshCluster, debug, DISABLE_VNODES
 from tools import known_failure, rows_to_list, since
 
 DEFAULT_FLOAT_PRECISION = 5  # magic number copied from cqlsh script
-DEFAULT_TIME_FORMAT = '%Y-%m-%d %H:%M:%S%z'  # based on cqlsh script
 
 PARTITIONERS = {
     "murmur3": "org.apache.cassandra.dht.Murmur3Partitioner",
@@ -116,6 +113,24 @@ class CqlshCopyTest(Tester):
         self.session.execute('DROP KEYSPACE IF EXISTS ks')
         self.create_ks(self.session, 'ks', 1)
 
+    @property
+    def default_time_format(self):
+        """
+        The default time format as defined in formatting.py if available (versions 2.2+) or
+        a hard-coded value for version 2.1
+        """
+        try:
+            return self._default_time_format
+        except AttributeError:
+            with self._cqlshlib():
+                try:
+                    from cqlshlib.formatting import DEFAULT_TIMESTAMP_FORMAT
+                    self._default_time_format = DEFAULT_TIMESTAMP_FORMAT
+                except ImportError:  # version 2.1
+                    self._default_time_format = '%Y-%m-%d %H:%M:%S%z'
+
+            return self._default_time_format
+
     def all_datatypes_prepare(self):
         self.prepare()
 
@@ -151,13 +166,15 @@ class CqlshCopyTest(Tester):
                 w frozen<set<set<inet>>>,
             )''')
 
+        default_time_format = self.default_time_format
+
         class Datetime(datetime.datetime):
 
             def __str__(self):
-                return self.strftime(DEFAULT_TIME_FORMAT)
+                return self.strftime(default_time_format)
 
             def __repr__(self):
-                return self.strftime(DEFAULT_TIME_FORMAT)
+                return self.strftime(default_time_format)
 
         def maybe_quote(s):
             """
@@ -255,26 +272,21 @@ class CqlshCopyTest(Tester):
             sys.path = saved_path
 
     def assertCsvResultEqual(self, csv_filename, results):
-        result_list = list(self.result_to_csv_rows(results))
-        processed_results = [[strip_timezone_if_time_string(v) for v in row]
-                             for row in result_list]
-
-        csv_file = list(csv_rows(csv_filename))
-        processed_csv = [[strip_timezone_if_time_string(v) for v in row]
-                         for row in csv_file]
+        processed_results = list(self.result_to_csv_rows(results))
+        csv_results = list(csv_rows(csv_filename))
 
         self.maxDiff = None
         try:
-            self.assertItemsEqual(processed_csv, processed_results)
+            self.assertItemsEqual(csv_results, processed_results)
         except Exception as e:
-            if len(processed_csv) != len(processed_results):
-                warning("Different # of entries. CSV: " + str(len(processed_csv)) +
+            if len(csv_results) != len(processed_results):
+                warning("Different # of entries. CSV: " + str(len(csv_results)) +
                         " vs results: " + str(len(processed_results)))
-            elif(processed_csv[0] is not None):
-                for x in range(0, len(processed_csv[0])):
-                    if processed_csv[0][x] != processed_results[0][x]:
+            elif csv_results[0] is not None:
+                for x in range(0, len(csv_results[0])):
+                    if csv_results[0][x] != processed_results[0][x]:
                         warning("Mismatch at index: " + str(x))
-                        warning("Value in csv: " + str(processed_csv[0][x]))
+                        warning("Value in csv: " + str(csv_results[0][x]))
                         warning("Value in result: " + str(processed_results[0][x]))
             raise e
 
@@ -306,7 +318,7 @@ class CqlshCopyTest(Tester):
                             val,
                             encoding=encoding_name,
                             date_time_format=date_time_format,
-                            time_format=time_format,
+                            time_format=self.default_time_format,
                             float_precision=float_precision,
                             colormap=DummyColorMap(),
                             nullval=None,
@@ -314,7 +326,7 @@ class CqlshCopyTest(Tester):
                             thousands_sep=None,
                             boolean_styles=None).strval
 
-    def result_to_csv_rows(self, result, time_format=DEFAULT_TIME_FORMAT, float_precision=DEFAULT_FLOAT_PRECISION):
+    def result_to_csv_rows(self, result, time_format=None, float_precision=DEFAULT_FLOAT_PRECISION):
         """
         Given an object returned from a CQL query, returns a string formatted by
         the cqlsh formatting utilities.
@@ -322,6 +334,8 @@ class CqlshCopyTest(Tester):
         # This has no real dependencies on Tester except that self._cqlshlib has
         # to grab self.cluster's install directory. This should be pulled out
         # into a bare function if cqlshlib is made easier to interact with.
+        if not time_format:
+            time_format = self.default_time_format
         return [[self.format_for_csv(v, time_format, float_precision) for v in row] for row in result]
 
     def test_list_data(self):
@@ -1729,6 +1743,39 @@ class CqlshCopyTest(Tester):
 
         do_test(expected_vals_usual, ',', '.')
         do_test(expected_vals_inverted, '.', ',')
+
+    @since('3.2')
+    def test_round_trip_with_sub_second_precision(self):
+        """
+        Test that we can import and export timestamp values with millisecond precision:
+
+        - create a csv file and import it
+        - export the data and check the values are as expected
+
+        @jira_ticket CASSANDRA-10428
+        """
+        self.prepare()
+        self.session.execute("create TABLE testsubsecond(id int PRIMARY KEY, subid timestamp)")
+
+        tempfile1 = self.get_temp_file()
+        tempfile2 = self.get_temp_file()
+        with open(tempfile1.name, 'w') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow([1, '1943-06-19 11:21:01+0000'])
+            writer.writerow([2, '1943-06-19 11:21:01.123+0000'])
+            writer.writerow([3, '1943-06-19 11:21:01.123456+0000'])
+
+        debug('Importing from csv file: {}'.format(tempfile1.name))
+        self.node1.run_cqlsh(cmds="COPY ks.testsubsecond FROM '{}'".format(tempfile1.name))
+
+        debug('Exporting to csv file: {}'.format(tempfile2.name))
+        self.node1.run_cqlsh(cmds="COPY ks.testsubsecond TO '{}'".format(tempfile2.name))
+
+        csv_results = sorted(list(csv_rows(tempfile2.name)))
+        self.assertItemsEqual([['1', '1943-06-19 11:21:01.000000+0000'],
+                               ['2', '1943-06-19 11:21:01.123000+0000'],
+                               ['3', '1943-06-19 11:21:01.124000+0000']],
+                              csv_results)
 
     def test_round_trip_with_num_processes(self):
         """
