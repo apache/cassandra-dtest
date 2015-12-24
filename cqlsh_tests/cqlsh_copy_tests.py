@@ -790,42 +790,46 @@ class CqlshCopyTest(Tester):
     def test_quoted_column_names_writing_dont_specify_names(self):
         self.quoted_column_names_writing_template(specify_column_names=False)
 
-    def data_validation_on_read_template(self, load_as_int, expect_invalid):
+    def data_validation_on_read_template(self, data, expected_err='Failed to import'):
         """
-        @param load_as_int the value that will be loaded into a table as an int value
-        @param expect_invalid whether or not to expect the COPY statement to fail
+        @param data - the data to be written to the csv file
+        @param expected_err - the error we expect or None if the test should succeed
 
         Test that reading from CSV files fails when there is a type mismatch
-        between the value being loaded and the type of the column by:
+        between the value being loaded and the type of the column or when data is missing
+        in the file. Perform the following:
 
-        - creating a table,
-        - writing a CSV file containing the value passed in as load_as_int, then
-        - COPYing that csv file into the table, loading load_as_int as an int.
+        - create a table,
+        - write a CSV file containing the data passed in as parameter
+        - COPY that csv file into the table
 
-        If expect_invalid, this test will succeed when the COPY command fails.
-        If not expect_invalid, this test will succeed when the COPY command prints
+        If expected_err is not None, this test will succeed when the COPY command fails and it
+        returns a matching error.
+        If expected_err is None, this test will succeed when the COPY command prints
         no errors and the table matches the loaded CSV file.
 
         @jira_ticket CASSANDRA-9302
+        @jira_ticket CASSANDRA-10854
         """
         self.prepare()
         self.session.execute("""
             CREATE TABLE testvalidate (
-                a int PRIMARY KEY,
-                b int
+                a int,
+                b int,
+                c int,
+                PRIMARY KEY(a, b)
             )""")
 
-        data = [[1, load_as_int]]
-
         self.tempfile = NamedTemporaryFile(delete=False)
+        debug('Writing {}'.format(self.tempfile.name))
         write_rows_to_csv(self.tempfile.name, data)
 
-        cmd = """COPY ks.testvalidate (a, b) FROM '{name}'""".format(name=self.tempfile.name)
+        cmd = """COPY ks.testvalidate (a, b, c) FROM '{name}'""".format(name=self.tempfile.name)
         out, err = self.node1.run_cqlsh(cmd, return_output=True)
         results = list(self.session.execute("SELECT * FROM testvalidate"))
 
-        if expect_invalid:
-            self.assertIn('Failed to import', err)
+        if expected_err:
+            self.assertIn(expected_err, err)
             self.assertFalse(results)
         else:
             self.assertFalse(err)
@@ -838,21 +842,21 @@ class CqlshCopyTest(Tester):
         test works.
         """
         # make sure the template works properly
-        self.data_validation_on_read_template(2, expect_invalid=False)
+        self.data_validation_on_read_template([[1, 1, 2]], expected_err=None)
 
     def test_read_invalid_float(self):
         """
         Use data_validation_on_read_template to test COPYing a float value from a
         CSV into an int column.
         """
-        self.data_validation_on_read_template(2.14, expect_invalid=True)
+        self.data_validation_on_read_template([[1, 1, 2.14]])
 
     def test_read_invalid_uuid(self):
         """
         Use data_validation_on_read_template to test COPYing a uuid value from a
         CSV into an int column.
         """
-        self.data_validation_on_read_template(uuid4(), expect_invalid=True)
+        self.data_validation_on_read_template([[1, 1, uuid4()]])
 
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10886',
@@ -862,7 +866,25 @@ class CqlshCopyTest(Tester):
         Use data_validation_on_read_template to test COPYing a text value from a
         CSV into an int column.
         """
-        self.data_validation_on_read_template('test', expect_invalid=True)
+        self.data_validation_on_read_template([[1, 1, 'test']])
+
+    def test_read_missing_partition_key(self):
+        """
+        Use data_validation_on_read_template to test COPYing an empty partition key.
+        @jira_ticket CASSANDRA-10854
+        """
+        self.data_validation_on_read_template([['', 1, 'test']],
+                                              expected_err="Failed to import 1 rows: ValueError - "
+                                                           "Cannot insert null value for primary key column")
+
+    def test_read_missing_clustering_key(self):
+        """
+        Use data_validation_on_read_template to test COPYing an empty clustering key.
+        @jira_ticket CASSANDRA-10854
+        """
+        self.data_validation_on_read_template([[1, '', 'test']],
+                                              expected_err="Failed to import 1 rows: ValueError - "
+                                                           "Cannot insert null value for primary key column")
 
     def test_all_datatypes_write(self):
         """
