@@ -7,6 +7,7 @@ from dtest import warning
 
 JOLOKIA_JAR = os.path.join('lib', 'jolokia-jvm-1.2.3-agent.jar')
 CLASSPATH_SEP = ';' if common.is_win() else ':'
+JVM_OPTIONS = "jvm.options"
 
 
 def jolokia_classpath():
@@ -54,15 +55,12 @@ def remove_perf_disable_shared_mem(node):
     """
     The Jolokia agent is incompatible with the -XX:+PerfDisableSharedMem JVM
     option (see https://github.com/rhuss/jolokia/issues/198 for details).  This
-    edits cassandra-env.sh (or the Windows equivalent) to remove that option.
+    edits jvm.options file to remove that option.
     """
-    if common.is_win():
-        conf_file = os.path.join(node.get_conf_dir(), common.CASSANDRA_WIN_ENV)
-    else:
-        conf_file = os.path.join(node.get_conf_dir(), common.CASSANDRA_ENV)
+    conf_file = os.path.join(node.get_conf_dir(), JVM_OPTIONS)
 
-    pattern = 'PerfDisableSharedMem'
-    replacement = ''
+    pattern = '\-XX:\+PerfDisableSharedMem'
+    replacement = '#-XX:+PerfDisableSharedMem'
     common.replace_in_file(conf_file, pattern, replacement)
 
 
