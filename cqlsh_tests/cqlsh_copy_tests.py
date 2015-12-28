@@ -1163,6 +1163,8 @@ class CqlshCopyTest(Tester):
         self.assertEqual([[num_records]], rows_to_list(self.session.execute("SELECT COUNT(*) FROM {}"
                                                                             .format(stress_table))))
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10938')
     @freshCluster()
     def test_bulk_round_trip_default(self):
         """
@@ -1172,6 +1174,8 @@ class CqlshCopyTest(Tester):
         """
         self._test_bulk_round_trip(nodes=3, partitioner="murmur3", num_operations=100000)
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10938')
     @freshCluster()
     def test_bulk_round_trip_blogposts(self):
         """
