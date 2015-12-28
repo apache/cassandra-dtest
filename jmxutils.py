@@ -55,12 +55,20 @@ def remove_perf_disable_shared_mem(node):
     """
     The Jolokia agent is incompatible with the -XX:+PerfDisableSharedMem JVM
     option (see https://github.com/rhuss/jolokia/issues/198 for details).  This
-    edits jvm.options file to remove that option.
+    edits cassandra-env.sh (or the Windows equivalent), or jvm.options file on 3.2+ to remove that option.
     """
-    conf_file = os.path.join(node.get_conf_dir(), JVM_OPTIONS)
+    if node.cluster.version() >= '3.2':
+        conf_file = os.path.join(node.get_conf_dir(), JVM_OPTIONS)
+        pattern = '\-XX:\+PerfDisableSharedMem'
+        replacement = '#-XX:+PerfDisableSharedMem'
+    else:
+        if common.is_win():
+            conf_file = os.path.join(node.get_conf_dir(), common.CASSANDRA_WIN_ENV)
+        else:
+            conf_file = os.path.join(node.get_conf_dir(), common.CASSANDRA_ENV)
+        pattern = 'PerfDisableSharedMem'
+        replacement = ''
 
-    pattern = '\-XX:\+PerfDisableSharedMem'
-    replacement = '#-XX:+PerfDisableSharedMem'
     common.replace_in_file(conf_file, pattern, replacement)
 
 
