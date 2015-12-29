@@ -2033,57 +2033,69 @@ class CqlshCopyTest(Tester):
         Test exporting a large number of rows into a csv file.
 
         If skip_count_checks is True then it means we cannot use "SELECT COUNT(*)" as it may time out but
-        it also means that we can be sure that one operation is one record and hence num_records=num_operations.
+        it also means that we can be sure that one cassandra-stress operation is one record and hence
+        num_records=num_operations.
         """
         self.prepare(nodes=nodes, partitioner=partitioner, configuration_options=configuration_options)
 
-        if not profile:
-            debug('Running stress without any user profile')
-            self.node1.stress(['write', 'n={}'.format(num_operations), '-rate', 'threads=50'])
-        else:
-            debug('Running stress with user profile {}'.format(profile))
-            self.node1.stress(['user', 'profile={}'.format(profile), 'ops(insert=1)',
-                               'n={}'.format(num_operations), '-rate', 'threads=50'])
+        def create_records():
+            if not profile:
+                debug('Running stress without any user profile')
+                self.node1.stress(['write', 'n={}'.format(num_operations), '-rate', 'threads=50'])
+            else:
+                debug('Running stress with user profile {}'.format(profile))
+                self.node1.stress(['user', 'profile={}'.format(profile), 'ops(insert=1)',
+                                   'n={}'.format(num_operations), '-rate', 'threads=50'])
 
-        if skip_count_checks:
-            num_records = num_operations
-        else:
-            num_records = rows_to_list(self.session.execute("SELECT COUNT(*) FROM {}".format(stress_table)))[0][0]
-            debug('Generated {} records'.format(num_records))
-            self.assertTrue(num_records >= num_operations, 'cassandra-stress did not import enough records')
+            if skip_count_checks:
+                return num_operations
+            else:
+                ret = rows_to_list(self.session.execute("SELECT COUNT(*) FROM {}".format(stress_table)))[0][0]
+                debug('Generated {} records'.format(ret))
+                self.assertTrue(ret >= num_operations, 'cassandra-stress did not import enough records')
+                return ret
 
-        tempfile = self.getTempFile()
+        def run_copy_to(filename):
+            debug('Exporting to csv file: {}'.format(filename.name))
+            start = datetime.datetime.now()
+            copy_to_cmd = "COPY {} TO '{}'".format(stress_table, filename.name)
+            if copy_to_options:
+                copy_to_cmd += ' WITH ' + ' AND '.join('{} = {}'.format(k, v) for k, v in copy_to_options.iteritems())
+            debug(copy_to_cmd)
+            self.node1.run_cqlsh(cmds=copy_to_cmd, show_output=True, cqlsh_options=['--debug'])
+            debug("COPY TO took {} to export {} records".format(datetime.datetime.now() - start, num_records))
 
-        debug('Exporting to csv file: {}'.format(tempfile.name))
-        start = datetime.datetime.now()
-        cmd = "COPY {} TO '{}'".format(stress_table, tempfile.name)
-        if copy_to_options:
-            cmd += ' WITH ' + ' AND '.join('{} = {}'.format(k, v) for k, v in copy_to_options.iteritems())
-        debug(cmd)
-        self.node1.run_cqlsh(cmds=cmd, show_output=True, cqlsh_options=['--connect-timeout=10', '--debug'])
-        debug("COPY TO took {} to export {} records".format(datetime.datetime.now() - start, num_records))
+        def run_copy_from(filename):
+            debug('Importing from csv file: {}'.format(filename.name))
+            start = datetime.datetime.now()
+            copy_from_cmd = "COPY {} FROM '{}'".format(stress_table, filename.name)
+            if copy_from_options:
+                copy_from_cmd += ' WITH ' + ' AND '.join('{} = {}'.format(k, v) for k, v in copy_from_options.iteritems())
+            debug(copy_from_cmd)
+            self.node1.run_cqlsh(cmds=copy_from_cmd, show_output=True, cqlsh_options=['--debug'])
+            debug("COPY FROM took {} to import {} records".format(datetime.datetime.now() - start, num_records))
 
-        # check all records were exported
-        self.assertEqual(num_records, sum(1 for _ in open(tempfile.name)))
+        num_records = create_records()
 
+        # Copy to the first csv files
+        tempfile1 = self.getTempFile()
+        run_copy_to(tempfile1)
+
+        # check all records generated were exported
+        self.assertEqual(num_records, sum(1 for _ in open(tempfile1.name)))
+
+        # import records from the first csv file
+        debug('Truncating {}...'.format(stress_table))
         self.session.execute("TRUNCATE {}".format(stress_table))
+        run_copy_from(tempfile1)
 
-        debug('Importing from csv file: {}'.format(tempfile.name))
-        start = datetime.datetime.now()
-        cmd = "COPY {} FROM '{}'".format(stress_table, tempfile.name)
-        if copy_from_options:
-            cmd += ' WITH ' + ' AND '.join('{} = {}'.format(k, v) for k, v in copy_from_options.iteritems())
-        debug(cmd)
-        self.node1.run_cqlsh(cmds=cmd, show_output=True, cqlsh_options=['--connect-timeout=10', '--debug'])
-        debug("COPY FROM took {} to import {} records".format(datetime.datetime.now() - start, num_records))
+        # export again to a second csv file
+        tempfile2 = self.getTempFile()
+        run_copy_to(tempfile2)
 
-        if not skip_count_checks:
-            self.assertEqual([[num_records]], rows_to_list(self.session.execute("SELECT COUNT(*) FROM {}"
-                                                                                .format(stress_table))))
-        # else:
-        # we could export again and count the number of records exported but we just assume everything is fine
-        # if we get no errors when importing, this case is only for testing the back-off policy
-        # (test_bulk_round_trip_with_timeouts)
+        # check the length of both files is the same to ensure all exported records were imported
+        self.assertEqual(sum(1 for _ in open(tempfile1.name)),
+                         sum(1 for _ in open(tempfile2.name)))
 
     @known_failure(failure_source='cassandra',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10938')
