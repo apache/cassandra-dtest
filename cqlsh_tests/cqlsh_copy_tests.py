@@ -522,7 +522,6 @@ class CqlshCopyTest(Tester):
             writer.writeheader()
             for a, b in data:
                 writer.writerow({'a': a, 'b': b})
-            csvfile.close
 
         cmds = "COPY ks.testcounter FROM '{name}'".format(name=tempfile.name)
         cmds += " WITH HEADER = true"
@@ -556,7 +555,6 @@ class CqlshCopyTest(Tester):
             writer.writeheader()
             for a, b in data:
                 writer.writerow({'a': a, 'b': b})
-            csvfile.close
 
         cmds = "COPY ks.testheader FROM '{name}'".format(name=tempfile.name)
         cmds += " WITH HEADER = true"
@@ -646,7 +644,6 @@ class CqlshCopyTest(Tester):
             writer = csv.DictWriter(csvfile, fieldnames=['a', 'b'])
             for a, b in data:
                 writer.writerow({'a': a, 'b': b})
-            csvfile.close
 
         self.node1.run_cqlsh(cmds="COPY ks.testttl FROM '{name}' WITH TTL = '5'".format(name=tempfile.name))
 
@@ -673,12 +670,12 @@ class CqlshCopyTest(Tester):
         self.prepare()
         tempfile = self.getTempFile()
         stress_table = 'keyspace1.standard1'
-        max_num_rows = 10000
+        num_file_rows = 10000
 
         debug('Running stress to generate a large CSV via COPY TO')
-        self.node1.stress(['write', 'n={}'.format(max_num_rows), '-rate', 'threads=50'])
+        self.node1.stress(['write', 'n={}'.format(num_file_rows), '-rate', 'threads=50'])
         self.node1.run_cqlsh(cmds="COPY {} TO '{}'".format(stress_table, tempfile.name))
-        self.assertEqual(max_num_rows, len(open(tempfile.name).readlines()))
+        self.assertEqual(num_file_rows, len(open(tempfile.name).readlines()))
 
         def do_test(num_rows, skip_rows):
             debug('Preparing to test {} max rows and {} skip rows by truncating table'.format(num_rows, skip_rows))
@@ -690,8 +687,8 @@ class CqlshCopyTest(Tester):
             self.node1.run_cqlsh(cmds="COPY {} FROM '{}' WITH MAXROWS = '{}' AND SKIPROWS='{}'"
                                  .format(stress_table, tempfile.name, num_rows, skip_rows))
 
-            expected_rows = num_rows if 0 <= num_rows < max_num_rows else max_num_rows
-            expected_rows -= min(max_num_rows, max(0, skip_rows))
+            expected_rows = num_rows if 0 <= num_rows < num_file_rows else num_file_rows
+            expected_rows -= min(num_file_rows, max(0, skip_rows))
             self.assertEqual([[expected_rows]],
                              rows_to_list(self.session.execute("SELECT COUNT(*) FROM {}".format(stress_table))))
             debug('Imported {} as expected'.format(expected_rows))
@@ -701,16 +698,16 @@ class CqlshCopyTest(Tester):
         do_test(0, 0)
         do_test(1, 0)
         do_test(100, 0)
-        do_test(max_num_rows, 0)
-        do_test(max_num_rows + 1, 0)
+        do_test(num_file_rows, 0)
+        do_test(num_file_rows + 1, 0)
 
         # skip rows tests
         do_test(-1, 100)
-        do_test(max_num_rows, 100)
+        do_test(num_file_rows, 100)
         do_test(100, 100)
-        do_test(max_num_rows, max_num_rows)
-        do_test(max_num_rows, max_num_rows + 1)
-        do_test(max_num_rows, -1)
+        do_test(num_file_rows, num_file_rows)
+        do_test(num_file_rows, num_file_rows + 1)
+        do_test(num_file_rows, -1)
 
     def test_reading_with_skip_cols(self):
         """
@@ -740,7 +737,6 @@ class CqlshCopyTest(Tester):
             writer = csv.DictWriter(csvfile, fieldnames=['a', 'b', 'c', 'd', 'e'])
             for a, b, c, d, e in data:
                 writer.writerow({'a': a, 'b': b, 'c': c, 'd': d, 'e': e})
-            csvfile.close
 
         def do_test(skip_cols, expected_results):
             self.session.execute('TRUNCATE ks.testskipcols')
@@ -769,6 +765,8 @@ class CqlshCopyTest(Tester):
         - import the csv file with skip_columns
         - check only the columns that were not skipped are in the table
 
+        Because COPY FROM for counters is not idempotent we expect that the values inserted continually increase.
+
         @jira_ticket CASSANDRA-9303
         """
         self.prepare()
@@ -788,7 +786,6 @@ class CqlshCopyTest(Tester):
             writer = csv.DictWriter(csvfile, fieldnames=['a', 'b', 'c', 'd', 'e'])
             for a, b, c, d, e in data:
                 writer.writerow({'a': a, 'b': b, 'c': c, 'd': d, 'e': e})
-            csvfile.close
 
         def do_test(skip_cols, expected_results):
             debug("Importing csv file {} with skipcols '{}'".format(tempfile, skip_cols))
@@ -854,8 +851,6 @@ class CqlshCopyTest(Tester):
         with open(tempfile.name, 'r') as csvfile:
             csv_values = sorted([(v[0], tokens[int(v[0])]) for v in csv.reader(csvfile)])
 
-        # debug(result)
-        # debug(csv_values)
         self.assertItemsEqual(csv_values, result)
 
     def test_reading_max_parse_errors(self):
@@ -890,7 +885,6 @@ class CqlshCopyTest(Tester):
                     writer.writerow({'a': i, 'b': 0, 'c': 'abc'})  # invalid
                 else:
                     writer.writerow({'a': i, 'b': 0, 'c': 2.0})  # valid
-            csvfile.close
 
         debug("Importing csv file {} with {} max parse errors".format(tempfile.name, max_parse_errors))
         out, err = self.node1.run_cqlsh(cmds="COPY ks.testmaxparseerrors FROM '{}' WITH MAXPARSEERRORS='{}'"
@@ -933,7 +927,6 @@ class CqlshCopyTest(Tester):
             writer = csv.DictWriter(csvfile, fieldnames=['a', 'b', 'c'])
             for i in xrange(num_rows):
                 writer.writerow({'a': i, 'b': 0, 'c': 2.0})
-            csvfile.close
 
         failures = {'failing_batch': {'id': 3, 'failures': 2}}
         os.environ['CQLSH_COPY_TEST_FAILURES'] = json.dumps(failures)
@@ -1003,7 +996,6 @@ class CqlshCopyTest(Tester):
                         else:
                             writer.writerow({'a': i, 'b': k, 'c': 2.0})  # valid
                             valid_rows.append([i, k, 2.0])
-                csvfile.close
 
             err_file_name = err_file.name if err_file else 'import_ks_testparseerrors.err'
             self.session.execute("TRUNCATE testparseerrors")
@@ -1068,8 +1060,6 @@ class CqlshCopyTest(Tester):
                 writer.writerow({'a': i, 'b': i, 'c': 2.0, 'd': 3.0, 'e': 4.0})
                 valid_rows.append([i, i, 2.0, 3.0, 4.0])
 
-            csvfile.close
-
         debug("Importing csv file {} with err_file {}".format(tempfile.name, err_file.name))
         cmd = "COPY ks.testwrongnumcols FROM '{}' WITH ERRFILE='{}'".format(tempfile.name, err_file.name)
         self.node1.run_cqlsh(cmds=cmd)
@@ -1115,7 +1105,6 @@ class CqlshCopyTest(Tester):
                 writer = csv.DictWriter(csvfile, fieldnames=['a', 'b', 'c'])
                 for k in xrange(num_rows_per_file):
                     writer.writerow({'a': i, 'b': k, 'c': 2.0})
-                csvfile.close
 
         def import_and_check(temp_files_str):
             self.session.execute("TRUNCATE testmultifiles")
@@ -1214,7 +1203,6 @@ class CqlshCopyTest(Tester):
             writer = csv.writer(csvfile)
             for a, b, c in data:
                 writer.writerow([a, c, b])
-            csvfile.close
 
         assert_csvs_items_equal(tempfile.name, reference_file.name)
 
@@ -1253,7 +1241,6 @@ class CqlshCopyTest(Tester):
             writer = csv.writer(csvfile)
             for a, b, c in data:
                 writer.writerow([a, c, b])
-        csvfile.close
 
         self.assertCsvResultEqual(reference_file.name, results)
 
@@ -1497,7 +1484,6 @@ class CqlshCopyTest(Tester):
             data_set = list(self.data)
             data_set[2] = '0x{}'.format(''.join('%02x' % c for c in self.data[2]))
             writer.writerow(data_set)
-            csvfile.close()
 
         debug('Importing from csv file: {name}'.format(name=tempfile.name))
         self.node1.run_cqlsh(cmds="COPY ks.testdatatype FROM '{name}'".format(name=tempfile.name))
@@ -1592,6 +1578,8 @@ class CqlshCopyTest(Tester):
         do_round_trip('TRUE', 'FALSE')
         do_round_trip('yes', 'no')
         do_round_trip('1', '0')
+        do_round_trip('TRUE', 'no')
+        do_round_trip('True', '0')
 
     def test_number_separators_round_trip(self):
         """
