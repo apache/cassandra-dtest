@@ -57,17 +57,12 @@ def remove_perf_disable_shared_mem(node):
     option (see https://github.com/rhuss/jolokia/issues/198 for details).  This
     edits cassandra-env.sh (or the Windows equivalent), or jvm.options file on 3.2+ to remove that option.
     """
-    if node.cluster.version() >= '3.2':
-        conf_file = os.path.join(node.get_conf_dir(), JVM_OPTIONS)
-        pattern = '\-XX:\+PerfDisableSharedMem'
-        replacement = '#-XX:+PerfDisableSharedMem'
+    if common.is_win():
+        conf_file = os.path.join(node.get_conf_dir(), common.CASSANDRA_WIN_ENV)
     else:
-        if common.is_win():
-            conf_file = os.path.join(node.get_conf_dir(), common.CASSANDRA_WIN_ENV)
-        else:
-            conf_file = os.path.join(node.get_conf_dir(), common.CASSANDRA_ENV)
-        pattern = 'PerfDisableSharedMem'
-        replacement = ''
+        conf_file = os.path.join(node.get_conf_dir(), common.CASSANDRA_ENV)
+    pattern = 'PerfDisableSharedMem'
+    replacement = ''
 
     common.replace_in_file(conf_file, pattern, replacement)
 
