@@ -1,13 +1,12 @@
-from dtest import Tester
-from tools import insert_c1c2, query_c1c2, no_vnodes, debug, since
-from assertions import assert_almost_equal
-
 import re
 import time
-from ccmlib.node import NodetoolError
-from ccmlib.node import TimeoutError
-from cassandra import ConsistencyLevel
 from threading import Thread
+
+from assertions import assert_almost_equal
+from cassandra import ConsistencyLevel
+from ccmlib.node import NodetoolError, TimeoutError
+from dtest import Tester
+from tools import debug, insert_c1c2, no_vnodes, query_c1c2, since
 
 
 class TestTopology(Tester):
@@ -168,7 +167,7 @@ class TestTopology(Tester):
         self.ignore_log_patterns.append(rejoin_err)
 
         self.cluster.populate(3).start(wait_for_binary_proto=True)
-        [node1, node2, node3] = self.cluster.nodelist()
+        node1, node2, node3 = self.cluster.nodelist()
 
         debug('decommissioning...')
         node3.decommission()
@@ -187,6 +186,13 @@ class TestTopology(Tester):
         self.assertIn(rejoin_err,
                       '\n'.join(['\n'.join(err_list)
                                  for err_list in node3.grep_log_for_errors()]))
+
+        # Give the node some time to shut down once it has detected
+        # its invalid state
+        start = time.time()
+        while start + 5 > time.time() and node3.is_running():
+            time.sleep(1)
+
         self.assertFalse(node3.is_running())
 
     @since('3.0')
