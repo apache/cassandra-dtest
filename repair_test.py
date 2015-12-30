@@ -154,7 +154,7 @@ class TestRepair(Tester):
             cluster.set_partitioner('org.apache.cassandra.dht.ByteOrderedPartitioner')
 
         # Disable hinted handoff and set batch commit log so this doesn't
-        # interfer with the test (this must be after the populate)
+        # interfere with the test (this must be after the populate)
         cluster.set_configuration_options(values={'hinted_handoff_enabled': False}, batch_commitlog=True)
         debug("Starting cluster..")
         cluster.populate(3).start()
