@@ -1545,10 +1545,16 @@ class CqlshCopyTest(Tester):
 
         @jira_ticket CASSANDRA-9303
         """
-        def do_round_trip(trueval, falseval):
+        def do_round_trip(trueval, falseval, invalid=False):
             debug('Exporting to csv file: {} with bool style {},{}'.format(tempfile.name, trueval, falseval))
-            self.node1.run_cqlsh(cmds="COPY ks.testbooleans TO '{}' WITH BOOLSTYLE='{}, {}'"
-                                 .format(tempfile.name, trueval, falseval))
+            _, err = self.node1.run_cqlsh(cmds="COPY ks.testbooleans TO '{}' WITH BOOLSTYLE='{}, {}'"
+                                          .format(tempfile.name, trueval, falseval), return_output=True)
+            if invalid:
+                expected_err = "Invalid boolean styles [{}, {}]".format(
+                    ', '.join(["'{}'".format(s.strip()) for s in trueval.split(',')]),
+                    ', '.join(["'{}'".format(s.strip()) for s in falseval.split(',')]))
+                self.assertIn(expected_err, err)
+                return
 
             self.assertItemsEqual([['0', falseval], ['1', trueval]], list(csv_rows(tempfile.name)))
             exported_results = list(self.session.execute("SELECT * FROM testbooleans"))
@@ -1580,6 +1586,12 @@ class CqlshCopyTest(Tester):
         do_round_trip('1', '0')
         do_round_trip('TRUE', 'no')
         do_round_trip('True', '0')
+
+        do_round_trip('TRUE', 'TRUE', invalid=True)
+        do_round_trip('TRUE', '', invalid=True)
+        do_round_trip('', 'FALSE', invalid=True)
+        do_round_trip('', '', invalid=True)
+        do_round_trip('yes, no', 'maybe', invalid=True)
 
     def test_number_separators_round_trip(self):
         """
