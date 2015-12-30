@@ -199,6 +199,8 @@ class TestRepair(Tester):
 
         self.assertEqual(len(out_of_sync_logs), 2, "Lines matching: " + str([elt[0] for elt in out_of_sync_logs]))
 
+        valid = [(node1.address(), node3.address()), (node3.address(), node1.address()), (node2.address(), node3.address()), (node3.address(), node2.address())]
+
         for line, m in out_of_sync_logs:
             self.assertEqual(int(m.group(3)), 1, "Expecting 1 range out of sync, got " + m.group(3))
             self.assertIn((m.group(1), m.group(2)), valid, str((m.group(1), m.group(2))))
