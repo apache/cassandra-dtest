@@ -6,6 +6,7 @@ import os
 import re
 import subprocess
 import sys
+from collections import defaultdict
 from decimal import Decimal
 from distutils.version import LooseVersion
 from tempfile import NamedTemporaryFile
@@ -1222,12 +1223,17 @@ Tracing session:""")
     @since('2.2')
     def test_client_warnings(self):
         """
-        Tests for CASSANDRA-9399, check client warnings.
+        Tests for CASSANDRA-9399, check client warnings:
+        - an unlogged batch across multiple partitions should generate a WARNING if at least one partition is
+        not local.
+
+        @jira_ticket CASSNADRA-9399
+        @jira_ticket CASSANDRA-9303
         """
-        self.cluster.populate(1)
+        self.cluster.populate(3)
         self.cluster.start(wait_for_binary_proto=True)
 
-        node1, = self.cluster.nodelist()
+        node1 = self.cluster.nodelist()[0]
 
         stdout, stderr = self.run_cqlsh(node1, cmds="""
             CREATE KEYSPACE client_warnings WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
@@ -1238,10 +1244,38 @@ Tracing session:""")
             debug(stderr)
             assert False, "Failed to execute cqlsh"
 
-        self.verify_output("USE client_warnings; BEGIN UNLOGGED BATCH INSERT INTO test (id, val) VALUES (1, 'abc') INSERT INTO test (id, val) VALUES (2, 'def') APPLY BATCH",
-                           node1, """
+        session = self.patient_cql_connection(node1)
+        metadata = session.cluster.metadata
+        prepared = session.prepare("INSERT INTO client_warnings.test (id, val) VALUES (?, '?')")
+
+        i = 0
+        vals_by_replicas = defaultdict(list)
+        while len(vals_by_replicas) < 3 or len(vals_by_replicas[node1.address()]) < 2:
+            pk = prepared.column_metadata[0].type.serialize(i, prepared.protocol_version)
+            replica = metadata.get_replicas('client_warnings', pk)[0].address
+            debug("{} -> {}".format(i, replica))
+            vals_by_replicas[replica].append(i)
+            i += 1
+
+        prefix = "USE client_warnings; BEGIN UNLOGGED BATCH "
+        suffix = " APPLY BATCH"
+        all_nodes_statments = []
+        node1_statements = []
+        for r, vals in vals_by_replicas.iteritems():
+            all_nodes_statments.append("INSERT INTO test (id, val) VALUES ({}, 'abc')".format(vals[0]))
+            if r == node1.address():
+                node1_statements = ["INSERT INTO test (id, val) VALUES ({}, 'abc')".format(v) for v in vals]
+
+        cmd_with_warning = prefix + " ".join(all_nodes_statments) + suffix
+        cmd_without_warning = prefix + " ".join(node1_statements) + suffix
+
+        debug(cmd_with_warning)
+        self.verify_output(cmd_with_warning, node1, """
 Warnings :
-Unlogged batch covering 2 partitions detected against table [client_warnings.test]. You should use a logged batch for atomicity, or asynchronous writes for performance.""")
+Unlogged batch covering 3 partitions detected against table [client_warnings.test]. You should use a logged batch for atomicity, or asynchronous writes for performance.""")
+
+        debug(cmd_without_warning)
+        self.verify_output(cmd_without_warning, node1, "")
 
     def test_connect_timeout(self):
         """
