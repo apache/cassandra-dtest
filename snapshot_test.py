@@ -36,7 +36,11 @@ class SnapshotTester(Tester):
         for x in xrange(0, self.cluster.data_dir_count):
             snapshot_dir = "{node_dir}/data{x}/{ks}/{cf}/snapshots/{name}".format(**locals())
             if not os.path.isdir(snapshot_dir):
-                snapshot_dir = glob.glob("{node_dir}/data{x}/{ks}/{cf}-*/snapshots/{name}".format(**locals()))[0]
+                snapshot_dirs = glob.glob("{node_dir}/data{x}/{ks}/{cf}-*/snapshots/{name}".format(**locals()))
+                if len(snapshot_dirs) > 0:
+                    snapshot_dir = snapshot_dirs[0]
+                else:
+                    continue
             debug("snapshot_dir is : " + snapshot_dir)
             debug("snapshot copy is : " + tmpdir)
 
@@ -49,16 +53,17 @@ class SnapshotTester(Tester):
         debug("Restoring snapshot....")
         for x in xrange(0, self.cluster.data_dir_count):
             snap_dir = os.path.join(snapshot_dir, str(x), ks, cf)
-            ip = node.address()
+            if os.path.exists(snap_dir):
+                ip = node.address()
 
-            args = [node.get_tool('sstableloader'), '-d', ip, snap_dir]
-            p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            stdout, stderr = p.communicate()
-            exit_status = p.wait()
+                args = [node.get_tool('sstableloader'), '-d', ip, snap_dir]
+                p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                stdout, stderr = p.communicate()
+                exit_status = p.wait()
 
-            if exit_status != 0:
-                raise Exception("sstableloader command '%s' failed; exit status: %d'; stdout: %s; stderr: %s" %
-                                (" ".join(args), exit_status, stdout, stderr))
+                if exit_status != 0:
+                    raise Exception("sstableloader command '%s' failed; exit status: %d'; stdout: %s; stderr: %s" %
+                                    (" ".join(args), exit_status, stdout, stderr))
 
 
 class TestSnapshot(SnapshotTester):
