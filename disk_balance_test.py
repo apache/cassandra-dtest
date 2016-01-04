@@ -5,6 +5,7 @@ from tools import since, new_node, create_c1c2_table, insert_c1c2, query_c1c2
 from assertions import assert_almost_equal
 from jmxutils import JolokiaAgent, make_mbean, remove_perf_disable_shared_mem
 
+
 @since('3.2')
 class TestDiskBalance(Tester):
     """

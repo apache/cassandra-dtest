@@ -127,7 +127,7 @@ class TestArchiveCommitlog(SnapshotTester):
 
     def restore_snapshot(self, snapshot_dir, node, ks, cf, name):
         debug("Restoring snapshot for cf ....")
-        data_dir = os.path.join(node.get_path(), 'data%s'%os.path.basename(snapshot_dir))
+        data_dir = os.path.join(node.get_path(), 'data{0}'.format(os.path.basename(snapshot_dir)))
         cfs = [s for s in os.listdir(snapshot_dir) if s.startswith(cf + "-")]
         if len(cfs) > 0:
             cf_id = cfs[0]
