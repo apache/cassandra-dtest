@@ -292,10 +292,11 @@ class TestSecondaryIndexes(Tester):
         before_files = []
         index_sstables_dirs = []
         for ddir in sstables_per_datadir:
-            base_tbl_dir = os.path.dirname(ddir[0])
-            index_sstables_dir = os.path.join(base_tbl_dir, '.ix_c0')
-            before_files.extend(os.listdir(index_sstables_dir))
-            index_sstables_dirs.append(index_sstables_dir)
+            if len(ddir) > 0:
+                base_tbl_dir = os.path.dirname(ddir[0])
+                index_sstables_dir = os.path.join(base_tbl_dir, '.ix_c0')
+                before_files.extend(os.listdir(index_sstables_dir))
+                index_sstables_dirs.append(index_sstables_dir)
 
         node1.nodetool("rebuild_index keyspace1 standard1 ix_c0")
         while not index_is_built():
