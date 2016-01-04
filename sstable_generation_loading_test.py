@@ -67,7 +67,7 @@ class TestSSTableGenerationAndLoading(Tester):
         node1.compact()
         node1.stop()
         time.sleep(1)
-        path = ""
+        paths = []
         for x in xrange(0, cluster.data_dir_count):
             basepath = os.path.join(node1.get_path(), 'data{0}'.format(x), 'keyspace1')
             for x in os.listdir(basepath):
@@ -78,15 +78,17 @@ class TestSSTableGenerationAndLoading(Tester):
             os.system('rm %s/*Filter.db' % path)
             os.system('rm %s/*Statistics.db' % path)
             os.system('rm %s/*Digest.sha1' % path)
+            paths.append(path)
 
         node1.start()
 
         time.sleep(10)
 
         data_found = 0
-        for fname in os.listdir(path):
-            if fname.endswith('Data.db'):
-                data_found += 1
+        for path in paths:
+            for fname in os.listdir(path):
+                if fname.endswith('Data.db'):
+                    data_found += 1
         self.assertGreater(data_found, 0, "After removing index, filter, stats, and digest files, the data file was deleted!")
 
     def sstableloader_compression_none_to_none_test(self):
