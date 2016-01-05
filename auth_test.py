@@ -144,6 +144,21 @@ class TestAuth(Tester):
         session = self.get_session(user='cassandra', password='cassandra')
         assert_invalid(session, 'DROP USER nonexistent', "nonexistent doesn't exist")
 
+    def drop_user_case_sensitive(self):
+        self.prepare()
+        cassandra = self.get_session(user='cassandra', password='cassandra')
+        cassandra.execute("CREATE USER Test WITH PASSWORD '12345'")
+        usercount = len(list(cassandra.execute("LIST USERS")))
+        cassandra.execute("DROP USER Test")
+        self.assertEqual(usercount - 1, len(list(cassandra.execute("LIST USERS"))))
+
+    def alter_user_case_sensitive(self):
+        self.prepare()
+        cassandra = self.get_session(user='cassandra', password='cassandra')
+        cassandra.execute("CREATE USER Test WITH PASSWORD '12345'")
+        cassandra.execute("ALTER USER Test WITH PASSWORD '54321'")
+
+
     def regular_users_can_alter_their_passwords_only_test(self):
         self.prepare()
 
