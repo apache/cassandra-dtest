@@ -12,14 +12,14 @@ from multiprocessing import Process, Queue
 from Queue import Empty, Full
 
 import psutil
-import schema_metadata_test
 from cassandra import ConsistencyLevel, WriteTimeout
 from cassandra.query import SimpleStatement
+
+import schema_metadata_test
 from dtest import Tester, debug
 from tools import generate_ssl_stores, known_failure, new_node
 
 trunk_version = '3.2'
-DEFAULT_PROTOCOL_VERSION = int(os.environ.get('DEFAULT_PROTOCOL_VERSION', 3))
 latest_2dot0 = '2.0.17'
 latest_2dot1 = '2.1.12'
 latest_2dot2 = '2.2.4'
@@ -267,7 +267,6 @@ class UpgradeTester(Tester):
     test_versions = None  # set on init to know which versions to use
     subprocs = None  # holds any subprocesses, for status checking and cleanup
     extra_config = None  # holds a non-mutable structure that can be cast as dict()
-    protocol_version = DEFAULT_PROTOCOL_VERSION
 
     def __init__(self, *args, **kwargs):
         # Ignore these log patterns:
@@ -804,7 +803,7 @@ class BootstrapMixin(object):
                 );""")
 
 
-def create_upgrade_class(clsname, version_list, protocol_version=DEFAULT_PROTOCOL_VERSION,
+def create_upgrade_class(clsname, version_list, protocol_version,
                          bootstrap_test=False, extra_config=(('partitioner', 'org.apache.cassandra.dht.Murmur3Partitioner'),)):
     """
     Dynamically creates a test subclass for testing the given versions.
@@ -925,7 +924,8 @@ create_upgrade_class(
 create_upgrade_class(
     'ProtoV3Upgrade_3_1_UpTo_Trunk',
     [latest_3dot1, trunk_ccm_string],
-    bootstrap_test=True
+    bootstrap_test=True,
+    protocol_version=3
 )
 create_upgrade_class(
     'ProtoV3Upgrade_AllVersions',
@@ -971,7 +971,8 @@ create_upgrade_class(
 create_upgrade_class(
     'ProtoV4Upgrade_3_1_UpTo_Trunk',
     [latest_3dot1, trunk_ccm_string],
-    bootstrap_test=True
+    bootstrap_test=True,
+    protocol_version=4
 )
 create_upgrade_class(
     'ProtoV4Upgrade_AllVersions',
