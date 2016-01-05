@@ -1,3 +1,4 @@
+import os
 import re
 
 from cassandra.concurrent import execute_concurrent_with_args
@@ -90,6 +91,30 @@ class TestConfiguration(Tester):
         write_to_trigger_fsync(session, 'ks', 'tab')
         self.assertGreater(commitlog_size(node), init_size,
                            msg='ALTER KEYSPACE was not respected')
+
+    def overlapping_data_folders(self):
+        """
+        @jira_ticket CASSANDRA-10902
+        """
+        self.cluster.populate(1)
+        node1 = self.cluster.nodelist()[0]
+        default_path = node1.get_path()
+        node1.set_configuration_options({'saved_caches_directory': os.path.join(default_path, 'data', 'saved_caches')})
+        remove_perf_disable_shared_mem(node1)
+        self.cluster.start(wait_for_binary_proto=True)
+
+        session = self.patient_exclusive_cql_connection(node1)
+        session.execute("CREATE KEYSPACE ks WITH REPLICATION = {'class': 'SimpleStrategy', 'replication_factor': 1}")
+        session.execute("CREATE TABLE ks.tab (key int PRIMARY KEY, a int)")
+        session.execute("INSERT INTO ks.tab (key, a) VALUES (%s, %s)", [0, 0])
+        session.execute("SELECT * FROM ks.tab WHERE key = %s", [0])
+
+        cache_service = make_mbean('db', type="Caches")
+        with JolokiaAgent(node1) as jmx:
+            jmx.execute_method(cache_service, 'saveCaches')
+
+        self.cluster.stop()
+        self.cluster.start(wait_for_binary_proto=True)
 
     def _check_chunk_length(self, session, value):
         result = session.cluster.metadata.keyspaces['ks'].tables['test_table'].as_cql_query()
