@@ -648,14 +648,14 @@ class Tester(TestCase):
         """
         Look for a pattern in the system.log of any in a given list
         of nodes.
-        :param nodes: The list of nodes whose logs to scan
-        :param pattern: The target pattern
-        :param timeout: How long to wait for the pattern. Note that
+        @param nodes The list of nodes whose logs to scan
+        @param pattern The target pattern
+        @param timeout How long to wait for the pattern. Note that
                         strictly speaking, timeout is not really a timeout,
                         but a maximum number of attempts. This implies that
                         the all the grepping takes no time at all, so it is
                         somewhat inaccurate, but probably close enough.
-        :return: The first node in whose log the pattern was found
+        @return The first node in whose log the pattern was found
         """
         for _ in range(timeout):
             for node in nodes:
