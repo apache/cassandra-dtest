@@ -14,6 +14,7 @@ from Queue import Empty, Full
 import psutil
 from cassandra import ConsistencyLevel, WriteTimeout
 from cassandra.query import SimpleStatement
+from six import print_
 
 import schema_metadata_test
 from dtest import Tester, debug
@@ -823,10 +824,10 @@ def create_upgrade_class(clsname, version_list, protocol_version,
     # short names for debug output
     parent_class_names = [cls.__name__ for cls in parent_classes]
 
-    print("Creating test class {} ".format(clsname))
-    print("  for C* versions: {} ".format(version_list))
-    print("  using protocol: v{}, and parent classes: {}".format(protocol_version, parent_class_names))
-    print("  to run these tests alone, use `nosetests {}.py:{}`".format(__name__, clsname))
+    print_("Creating test class {} ".format(clsname))
+    print_("  for C* versions: {} ".format(version_list))
+    print_("  using protocol: v{}, and parent classes: {}".format(protocol_version, parent_class_names))
+    print_("  to run these tests alone, use `nosetests {}.py:{}`".format(__name__, clsname))
 
     newcls = type(
         clsname,
