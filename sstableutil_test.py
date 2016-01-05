@@ -177,11 +177,11 @@ class SSTableUtilTest(Tester):
         """
         Read sstable files directly from disk
         """
-        keyspace_dir = os.path.join(node.get_path(), 'data', ks)
-
         ret = []
-        for ext in ('*.db', '*.txt', '*.adler32', '*.crc32'):
-            ret.extend(glob.glob(os.path.join(keyspace_dir, table + '-*', ext)))
+        for x in xrange(0, self.cluster.data_dir_count):
+            keyspace_dir = os.path.join(node.get_path(), 'data{0}'.format(x), ks)
+            for ext in ('*.db', '*.txt', '*.adler32', '*.crc32'):
+                ret.extend(glob.glob(os.path.join(keyspace_dir, table + '-*', ext)))
 
         return sorted(ret)
 

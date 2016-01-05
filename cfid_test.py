@@ -23,7 +23,7 @@ class TestCFID(Tester):
 
         # get a list of cf directories
         try:
-            cfs = os.listdir(node1.get_path() + "/data/ks")
+            cfs = os.listdir(node1.get_path() + "/data0/ks")
         except OSError:
             self.fail("Path to sstables not valid.")
 

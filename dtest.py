@@ -58,6 +58,7 @@ RECORD_COVERAGE = os.environ.get('RECORD_COVERAGE', '').lower() in ('yes', 'true
 REUSE_CLUSTER = os.environ.get('REUSE_CLUSTER', '').lower() in ('yes', 'true')
 SILENCE_DRIVER_ON_SHUTDOWN = os.environ.get('SILENCE_DRIVER_ON_SHUTDOWN', 'true').lower() in ('yes', 'true')
 IGNORE_REQUIRE = os.environ.get('IGNORE_REQUIRE', '').lower() in ('yes', 'true')
+DATADIR_COUNT = os.environ.get('DATADIR_COUNT', '3')
 
 CURRENT_TEST = ""
 
@@ -201,6 +202,8 @@ class Tester(TestCase):
 
         if OFFHEAP_MEMTABLES:
             cluster.set_configuration_options(values={'memtable_allocation_type': 'offheap_objects'})
+
+        cluster.set_datadir_count(DATADIR_COUNT)
 
         return cluster
 

@@ -38,9 +38,14 @@ class TestCompression(TestHelper):
             session.execute("insert into disabled_compression_table (id) values (uuid());")
 
         sstables = self.flush('disabled_compression_table')
-        sstable_path = self.get_table_path('disabled_compression_table')
-
-        self.assertEqual('NONE', self._get_compression_type(os.path.join(sstable_path, sstables['disabled_compression_table'][1])))
+        sstable_paths = self.get_table_paths('disabled_compression_table')
+        found = False
+        for sstable_path in sstable_paths:
+            sstable = os.path.join(sstable_path, sstables['disabled_compression_table'][1])
+            if os.path.exists(sstable):
+                self.assertEqual('NONE', self._get_compression_type(sstable))
+                found = True
+        self.assertTrue(found)
 
     @since("3.0")
     def compression_cql_options_test(self):
@@ -94,8 +99,14 @@ class TestCompression(TestHelper):
             session.execute("insert into compression_opts_table (id) values (uuid());")
 
         sstables = self.flush('compression_opts_table')
-        sstable_path = self.get_table_path('compression_opts_table')
-        self.assertEqual('DEFLATE', self._get_compression_type(os.path.join(sstable_path, sstables['compression_opts_table'][1])))
+        sstable_paths = self.get_table_paths('compression_opts_table')
+        found = False
+        for sstable_path in sstable_paths:
+            sstable = os.path.join(sstable_path, sstables['compression_opts_table'][1])
+            if os.path.exists(sstable):
+                self.assertEqual('DEFLATE', self._get_compression_type(sstable))
+                found = True
+        self.assertTrue(found)
 
     @since("3.0")
     def compression_cql_disabled_with_alter_test(self):

@@ -67,25 +67,28 @@ class TestSSTableGenerationAndLoading(Tester):
         node1.compact()
         node1.stop()
         time.sleep(1)
-        path = ""
-        basepath = os.path.join(node1.get_path(), 'data', 'keyspace1')
-        for x in os.listdir(basepath):
-            if x.startswith("standard1"):
-                path = os.path.join(basepath, x)
+        paths = []
+        for x in xrange(0, cluster.data_dir_count):
+            basepath = os.path.join(node1.get_path(), 'data{0}'.format(x), 'keyspace1')
+            for x in os.listdir(basepath):
+                if x.startswith("standard1"):
+                    path = os.path.join(basepath, x)
 
-        os.system('rm %s/*Index.db' % path)
-        os.system('rm %s/*Filter.db' % path)
-        os.system('rm %s/*Statistics.db' % path)
-        os.system('rm %s/*Digest.sha1' % path)
+            os.system('rm %s/*Index.db' % path)
+            os.system('rm %s/*Filter.db' % path)
+            os.system('rm %s/*Statistics.db' % path)
+            os.system('rm %s/*Digest.sha1' % path)
+            paths.append(path)
 
         node1.start()
 
         time.sleep(10)
 
         data_found = 0
-        for fname in os.listdir(path):
-            if fname.endswith('Data.db'):
-                data_found += 1
+        for path in paths:
+            for fname in os.listdir(path):
+                if fname.endswith('Data.db'):
+                    data_found += 1
         self.assertGreater(data_found, 0, "After removing index, filter, stats, and digest files, the data file was deleted!")
 
     def sstableloader_compression_none_to_none_test(self):
@@ -165,13 +168,14 @@ class TestSSTableGenerationAndLoading(Tester):
 
         debug("Making a copy of the sstables")
         # make a copy of the sstables
-        data_dir = os.path.join(node1.get_path(), 'data')
-        copy_root = os.path.join(node1.get_path(), 'data_copy')
-        for ddir in os.listdir(data_dir):
-            keyspace_dir = os.path.join(data_dir, ddir)
-            if os.path.isdir(keyspace_dir) and ddir != 'system':
-                copy_dir = os.path.join(copy_root, ddir)
-                dir_util.copy_tree(keyspace_dir, copy_dir)
+        for x in xrange(0, cluster.data_dir_count):
+            data_dir = os.path.join(node1.get_path(), 'data{0}'.format(x))
+            copy_root = os.path.join(node1.get_path(), 'data{0}_copy'.format(x))
+            for ddir in os.listdir(data_dir):
+                keyspace_dir = os.path.join(data_dir, ddir)
+                if os.path.isdir(keyspace_dir) and ddir != 'system':
+                    copy_dir = os.path.join(copy_root, ddir)
+                    dir_util.copy_tree(keyspace_dir, copy_dir)
 
         debug("Wiping out the data and restarting cluster")
         # wipe out the node data.
@@ -190,15 +194,16 @@ class TestSSTableGenerationAndLoading(Tester):
         sstableloader = os.path.join(cdir, 'bin', ccmcommon.platform_binary('sstableloader'))
         env = ccmcommon.make_cassandra_env(cdir, node1.get_path())
         host = node1.address()
-        sstablecopy_dir = os.path.join(copy_root, ks.strip('"'))
-        for cf_dir in os.listdir(sstablecopy_dir):
-            full_cf_dir = os.path.join(sstablecopy_dir, cf_dir)
-            if os.path.isdir(full_cf_dir):
-                cmd_args = [sstableloader, '--nodes', host, full_cf_dir]
-                p = subprocess.Popen(cmd_args, env=env)
-                exit_status = p.wait()
-                self.assertEqual(0, exit_status,
-                                 "sstableloader exited with a non-zero status: %d" % exit_status)
+        for x in xrange(0, cluster.data_dir_count):
+            sstablecopy_dir = os.path.join(node1.get_path(), 'data{0}_copy'.format(x), ks.strip('"'))
+            for cf_dir in os.listdir(sstablecopy_dir):
+                full_cf_dir = os.path.join(sstablecopy_dir, cf_dir)
+                if os.path.isdir(full_cf_dir):
+                    cmd_args = [sstableloader, '--nodes', host, full_cf_dir]
+                    p = subprocess.Popen(cmd_args, env=env)
+                    exit_status = p.wait()
+                    self.assertEqual(0, exit_status,
+                                     "sstableloader exited with a non-zero status: %d" % exit_status)
 
         def read_and_validate_data(session):
             for i in range(NUM_KEYS):

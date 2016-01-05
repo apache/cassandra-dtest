@@ -288,17 +288,23 @@ class TestSecondaryIndexes(Tester):
 
         stmt = session.prepare('select * from standard1 where "C0" = ?')
         self.assertEqual(1, len(list(session.execute(stmt, [lookup_value]))))
-        base_tbl_dir = os.path.dirname(node1.get_sstablespath(keyspace="keyspace1", tables=["standard1"])[0])
-        index_sstables_dir = os.path.join(base_tbl_dir, '.ix_c0')
-
-        before_files = os.listdir(index_sstables_dir)
+        before_files = []
+        index_sstables_dirs = []
+        for x in xrange(0, cluster.data_dir_count):
+            data_dir = os.path.join(node1.get_path(), 'data{0}/keyspace1'.format(x))
+            base_tbl_dir = os.path.join(data_dir, [s for s in os.listdir(data_dir) if s.startswith("standard1")][0])
+            index_sstables_dir = os.path.join(base_tbl_dir, '.ix_c0')
+            before_files.extend(os.listdir(index_sstables_dir))
+            index_sstables_dirs.append(index_sstables_dir)
 
         node1.nodetool("rebuild_index keyspace1 standard1 ix_c0")
         while not index_is_built():
             debug("waiting for index to rebuild")
             time.sleep(1)
 
-        after_files = os.listdir(index_sstables_dir)
+        after_files = []
+        for index_sstables_dir in index_sstables_dirs:
+            after_files.extend(os.listdir(index_sstables_dir))
         self.assertNotEqual(set(before_files), set(after_files))
         self.assertEqual(1, len(list(session.execute(stmt, [lookup_value]))))
 
