@@ -159,7 +159,10 @@ class TestCompaction(Tester):
         node1.flush()
         time.sleep(40)
         expired_sstables = node1.get_sstables('ks', 'cf')
-        self.assertEqual(len(expired_sstables), cluster.data_dir_count)
+        expected_sstable_count = 1
+        if self.cluster.version() > '3.1':
+            expected_sstable_count = cluster.data_dir_count
+        self.assertEqual(len(expired_sstables), expected_sstable_count)
         # write a new sstable to make DTCS check for expired sstables:
         for x in range(0, 100):
             session.execute('insert into cf (key, val) values (%d, %d)' % (x, x))
