@@ -834,7 +834,7 @@ def create_upgrade_class(clsname, version_list, protocol_version,
         {'test_versions': version_list, '__test__': True, 'protocol_version': protocol_version, 'extra_config': extra_config}
     )
 
-    if globals().get(clsname):
+    if clsname in globals():
         raise RuntimeError("Class by name already exists!")
 
     globals()[clsname] = newcls
