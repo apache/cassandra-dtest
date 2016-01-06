@@ -807,7 +807,7 @@ class BootstrapMixin(object):
 
 
 def create_upgrade_class(clsname, version_list, protocol_version,
-                         bootstrap_test=False, extra_config=(('partitioner', 'org.apache.cassandra.dht.Murmur3Partitioner'),)):
+                         bootstrap_test=False, extra_config=None):
     """
     Dynamically creates a test subclass for testing the given versions.
 
@@ -818,6 +818,9 @@ def create_upgrade_class(clsname, version_list, protocol_version,
     'extra_config' is tuple of config options that can (eventually) be cast as a dict,
     e.g. (('partitioner', org.apache.cassandra.dht.Murmur3Partitioner''))
     """
+    if extra_config is None:
+        extra_config=(('partitioner', 'org.apache.cassandra.dht.Murmur3Partitioner'),)
+
     if bootstrap_test:
         parent_classes = (UpgradeTester, BootstrapMixin)
     else:
