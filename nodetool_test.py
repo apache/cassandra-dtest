@@ -57,3 +57,35 @@ class TestNodetool(Tester):
                     rack = "rack{}".format(i % 2)
                     self.assertTrue(line.endswith(rack),
                                     "Expected rack {} for {} but got {}".format(rack, node.address(), line.rsplit(None, 1)[-1]))
+
+    def test_nodetool_timeout_commands(self):
+        """
+        @jira_ticket CASSANDRA-10953
+
+        Test that nodetool gettimeout and settimeout work at a basic level
+        """
+        cluster = self.cluster
+        cluster.populate([1]).start()
+        node = cluster.nodelist()[0]
+
+        types = ('read', 'range', 'write', 'counterwrite', 'cascontention',
+                 'truncate', 'streamingsocket', 'misc')
+
+        # read all of the timeouts, make sure we get a sane response
+        for timeout_type in types:
+            out, err = node.nodetool('gettimeout {}'.format(timeout_type))
+            self.assertEqual(0, len(err), err)
+            debug(out)
+            self.assertRegexpMatches(out, r'.* \d+ ms')
+
+        # set all of the timeouts to 123
+        for timeout_type in types:
+            _, err = node.nodetool('settimeout {} 123'.format(timeout_type))
+            self.assertEqual(0, len(err), err)
+
+        # verify that they're all reported as 123
+        for timeout_type in types:
+            out, err = node.nodetool('gettimeout {}'.format(timeout_type))
+            self.assertEqual(0, len(err), err)
+            debug(out)
+            self.assertRegexpMatches(out, r'.* 123 ms')
