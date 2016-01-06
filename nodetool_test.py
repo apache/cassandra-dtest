@@ -1,5 +1,6 @@
 from ccmlib.node import NodetoolError
 from dtest import Tester, debug
+from tools import since
 
 import os
 
@@ -58,6 +59,7 @@ class TestNodetool(Tester):
                     self.assertTrue(line.endswith(rack),
                                     "Expected rack {} for {} but got {}".format(rack, node.address(), line.rsplit(None, 1)[-1]))
 
+    @since('3.4')
     def test_nodetool_timeout_commands(self):
         """
         @jira_ticket CASSANDRA-10953
