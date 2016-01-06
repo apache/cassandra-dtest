@@ -667,6 +667,37 @@ class Tester(TestCase):
         raise TimeoutError(time.strftime("%d %b %Y %H:%M:%S", time.gmtime()) +
                            " Unable to find :" + pattern + " in any node log within " + str(timeout) + "s")
 
+    def get_jfr_jvm_args(self):
+        """
+        @return The JVM arguments required for attaching flight recorder to a Java process.
+        """
+        return ["-XX:+UnlockCommercialFeatures", "-XX:+FlightRecorder"]
+
+    def start_jfr_recording(self, nodes):
+        """
+        Start Java flight recorder provided the cluster was started with the correct jvm arguments.
+        """
+        for node in nodes:
+            p = subprocess.Popen(['jcmd', str(node.pid), 'JFR.start'],
+                                 stdout=subprocess.PIPE,
+                                 stderr=subprocess.PIPE)
+            stdout, stderr = p.communicate()
+            debug(stdout)
+            debug(stderr)
+
+    def dump_jfr_recording(self, nodes):
+        """
+        Save Java flight recorder results to file for analyzing with mission control.
+        """
+        for node in nodes:
+            p = subprocess.Popen(['jcmd', str(node.pid), 'JFR.dump',
+                                  'recording=1', 'filename=recording_{}.jfr'.format(node.address())],
+                                 stdout=subprocess.PIPE,
+                                 stderr=subprocess.PIPE)
+            stdout, stderr = p.communicate()
+            debug(stdout)
+            debug(stderr)
+
 
 def canReuseCluster(Tester):
     orig_init = Tester.__init__
