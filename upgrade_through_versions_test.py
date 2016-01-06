@@ -819,7 +819,7 @@ def create_upgrade_class(clsname, version_list, protocol_version,
     e.g. (('partitioner', org.apache.cassandra.dht.Murmur3Partitioner''))
     """
     if extra_config is None:
-        extra_config=(('partitioner', 'org.apache.cassandra.dht.Murmur3Partitioner'),)
+        extra_config = (('partitioner', 'org.apache.cassandra.dht.Murmur3Partitioner'),)
 
     if bootstrap_test:
         parent_classes = (UpgradeTester, BootstrapMixin)
