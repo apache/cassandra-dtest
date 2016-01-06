@@ -15,7 +15,7 @@ from cassandra.cluster import Cluster
 from cassandra.query import SimpleStatement
 
 from dtest import Tester, debug
-from tools import since, new_node
+from tools import since, new_node, known_failure
 from assertions import assert_all, assert_one, assert_invalid, assert_unavailable, assert_none, assert_crc_check_chance_equal
 
 
@@ -402,6 +402,9 @@ class TestMaterializedViews(Tester):
         for i in xrange(1000, 1100):
             assert_one(session, "SELECT * FROM t_by_v WHERE v = {}".format(-i), [-i, i])
 
+    @known_failure(failure_source='systemic',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10978',
+                   flaky=False)
     def add_write_survey_node_after_mv_test(self):
         """
         @jira_ticket CASSANDRA-10621
@@ -688,6 +691,9 @@ class TestMaterializedViews(Tester):
                 cl=ConsistencyLevel.ALL
             )
 
+    @known_failure(failure_source='systemic',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10977',
+                   flaky=False)
     def view_tombstone_test(self):
         """
         Test that a materialized views properly tombstone
