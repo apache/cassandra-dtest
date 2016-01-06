@@ -1,7 +1,7 @@
 import os
 import os.path
 from dtest import Tester, DISABLE_VNODES
-from tools import since, new_node, create_c1c2_table, insert_c1c2, query_c1c2
+from tools import since, new_node, create_c1c2_table, insert_c1c2, query_c1c2, known_failure
 from assertions import assert_almost_equal
 from jmxutils import JolokiaAgent, make_mbean, remove_perf_disable_shared_mem
 
@@ -24,6 +24,9 @@ class TestDiskBalance(Tester):
         for node in cluster.nodelist():
             self.assert_balanced(node)
 
+    @known_failure(failure_source='systemic',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10974',
+                   flaky=False)
     def disk_balance_bootstrap_test(self):
         cluster = self.cluster
         # apparently we have legitimate errors in the log when bootstrapping (see bootstrap_test.py)
@@ -50,6 +53,9 @@ class TestDiskBalance(Tester):
         for node in cluster.nodelist():
             self.assert_balanced(node)
 
+    @known_failure(failure_source='systemic',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10973',
+                   flaky=False)
     def disk_balance_decommission_test(self):
         cluster = self.cluster
         cluster.set_datadir_count(3)
