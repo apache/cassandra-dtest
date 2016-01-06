@@ -20,12 +20,14 @@ import schema_metadata_test
 from dtest import Tester, debug
 from tools import generate_ssl_stores, known_failure, new_node
 
-trunk_version = '3.2'
+trunk_version = '3.4'
 latest_2dot0 = '2.0.17'
 latest_2dot1 = '2.1.12'
 latest_2dot2 = '2.2.4'
 latest_3dot0 = '3.0.2'
 latest_3dot1 = '3.1.1'
+latest_3dot2 = '3.2'
+latest_3dot3 = '3.3'
 trunk_ccm_string = 'git:trunk'
 
 
@@ -923,24 +925,30 @@ create_upgrade_class(
     protocol_version=3
 )
 create_upgrade_class(
-    'ProtoV3Upgrade_3_1_UpTo_Trunk',
-    [latest_3dot1, trunk_ccm_string],
+    'ProtoV3Upgrade_3_1_UpTo_3_2',
+    [latest_3dot1, latest_3dot2],
+    bootstrap_test=True,
+    protocol_version=3
+)
+create_upgrade_class(
+    'ProtoV3Upgrade_3_2_UpTo_Trunk',
+    [latest_3dot2, trunk_ccm_string],
     bootstrap_test=True,
     protocol_version=3
 )
 create_upgrade_class(
     'ProtoV3Upgrade_AllVersions',
-    [latest_2dot1, latest_2dot2, latest_3dot0, latest_3dot1, trunk_ccm_string],
+    [latest_2dot1, latest_2dot2, latest_3dot0, latest_3dot1, latest_3dot2, trunk_ccm_string],
     protocol_version=3
 )
 create_upgrade_class(  # special case upgrade skipping 2.2
     'ProtoV3Upgrade_AllVersions_Skip_2_2',
-    [latest_2dot1, latest_3dot0, latest_3dot1, trunk_ccm_string],
+    [latest_2dot1, latest_3dot0, latest_3dot1, latest_3dot2, trunk_ccm_string],
     protocol_version=3
 )
 create_upgrade_class(
     'ProtoV3Upgrade_AllVersions_RandomPartitioner',
-    [latest_2dot1, latest_2dot2, latest_3dot0, latest_3dot1, trunk_ccm_string],
+    [latest_2dot1, latest_2dot2, latest_3dot0, latest_3dot1, latest_3dot2, trunk_ccm_string],
     protocol_version=3,
     extra_config=(
         ('partitioner', 'org.apache.cassandra.dht.RandomPartitioner'),
@@ -948,7 +956,7 @@ create_upgrade_class(
 )
 create_upgrade_class(
     'ProtoV3Upgrade_AllVersions_RandomPartitioner_Skip_2_2',
-    [latest_2dot1, latest_3dot0, latest_3dot1, trunk_ccm_string],
+    [latest_2dot1, latest_3dot0, latest_3dot1, latest_3dot2, trunk_ccm_string],
     protocol_version=3,
     extra_config=(
         ('partitioner', 'org.apache.cassandra.dht.RandomPartitioner'),
@@ -970,19 +978,25 @@ create_upgrade_class(
     protocol_version=4
 )
 create_upgrade_class(
-    'ProtoV4Upgrade_3_1_UpTo_Trunk',
-    [latest_3dot1, trunk_ccm_string],
+    'ProtoV4Upgrade_3_1_UpTo_3_2',
+    [latest_3dot1, latest_3dot2],
+    bootstrap_test=True,
+    protocol_version=4
+)
+create_upgrade_class(
+    'ProtoV4Upgrade_3_2_UpTo_Trunk',
+    [latest_3dot2, trunk_ccm_string],
     bootstrap_test=True,
     protocol_version=4
 )
 create_upgrade_class(
     'ProtoV4Upgrade_AllVersions',
-    [latest_2dot2, latest_3dot0, latest_3dot1, trunk_ccm_string],
+    [latest_2dot2, latest_3dot0, latest_3dot1, latest_3dot2, trunk_ccm_string],
     protocol_version=4
 )
 create_upgrade_class(
     'ProtoV4Upgrade_AllVersions_RandomPartitioner',
-    [latest_2dot2, latest_3dot0, latest_3dot1, trunk_ccm_string],
+    [latest_2dot2, latest_3dot0, latest_3dot1, latest_3dot2, trunk_ccm_string],
     protocol_version=4,
     extra_config=(
         ('partitioner', 'org.apache.cassandra.dht.RandomPartitioner'),
