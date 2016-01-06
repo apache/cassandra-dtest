@@ -73,19 +73,19 @@ class TestNodetool(Tester):
 
         # read all of the timeouts, make sure we get a sane response
         for timeout_type in types:
-            out, err = node.nodetool('gettimeout %s' % timeout_type)
+            out, err = node.nodetool('gettimeout {}'.format(timeout_type))
             self.assertEqual(0, len(err), err)
             debug(out)
             self.assertRegexpMatches(out, r'.* \d+ ms')
 
         # set all of the timeouts to 123
         for timeout_type in types:
-            _, err = node.nodetool('settimeout %s 123' % timeout_type)
+            _, err = node.nodetool('settimeout {} 123'.format(timeout_type))
             self.assertEqual(0, len(err), err)
 
         # verify that they're all reported as 123
         for timeout_type in types:
-            out, err = node.nodetool('gettimeout %s' % timeout_type)
+            out, err = node.nodetool('gettimeout {}'.format(timeout_type))
             self.assertEqual(0, len(err), err)
             debug(out)
             self.assertRegexpMatches(out, r'.* 123 ms')
