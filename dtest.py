@@ -669,7 +669,7 @@ class Tester(TestCase):
 
     def get_jfr_jvm_args(self):
         """
-        :return: The JVM arguments required for attaching flight recorder to a Java process.
+        @return The JVM arguments required for attaching flight recorder to a Java process.
         """
         return ["-XX:+UnlockCommercialFeatures", "-XX:+FlightRecorder"]
 

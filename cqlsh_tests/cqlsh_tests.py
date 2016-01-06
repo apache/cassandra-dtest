@@ -14,6 +14,7 @@ from uuid import UUID, uuid4
 
 from cassandra import InvalidRequest
 from cassandra.concurrent import execute_concurrent_with_args
+from cassandra.query import BatchStatement, BatchType
 
 from assertions import assert_all, assert_none
 from ccmlib import common
@@ -1227,6 +1228,9 @@ Tracing session:""")
         - an unlogged batch across multiple partitions should generate a WARNING if at least one partition is
         not local.
 
+        Execute two unlogged batches: one only with local partitions and the other one with non local partitions.
+        Check that only the second one generates a client warning.
+
         @jira_ticket CASSNADRA-9399
         @jira_ticket CASSANDRA-9303
         """
@@ -1246,36 +1250,57 @@ Tracing session:""")
 
         session = self.patient_cql_connection(node1)
         metadata = session.cluster.metadata
-        prepared = session.prepare("INSERT INTO client_warnings.test (id, val) VALUES (?, '?')")
+        prepared = session.prepare("INSERT INTO client_warnings.test (id, val) VALUES (?, 'abc')")
 
-        i = 0
-        vals_by_replicas = defaultdict(list)
-        while len(vals_by_replicas) < 3 or len(vals_by_replicas[node1.address()]) < 2:
+        def need_more_records(vals):
+            """
+            Receive a map of replicas to a list of primary key values stored on that replica.
+            We need at least one primary key value for each replica and for the first replica we need
+            at least two. Return a new candidate value until we have retrieved enough values.
+            """
+            i = 1
+            while len(vals) < 3 or len(vals[node1.address()]) < 2:
+                yield i
+                i += 1
+
+        def get_replica(i):
             pk = prepared.column_metadata[0].type.serialize(i, prepared.protocol_version)
-            replica = metadata.get_replicas('client_warnings', pk)[0].address
-            debug("{} -> {}".format(i, replica))
-            vals_by_replicas[replica].append(i)
-            i += 1
+            return metadata.get_replicas('client_warnings', pk)[0].address
 
-        prefix = "USE client_warnings; BEGIN UNLOGGED BATCH "
-        suffix = " APPLY BATCH"
-        all_nodes_statments = []
-        node1_statements = []
+        def get_vals_by_replica():
+            """
+            Return a map of replica addresses pointing to a list of primary key values
+            that are stored on that replica.
+            """
+            ret = defaultdict(list)
+            for i in need_more_records(ret):
+                replica = get_replica(i)
+                debug("{} -> {}".format(i, replica))
+                ret[replica].append(i)
+            return ret
+
+        vals_by_replicas = get_vals_by_replica()
+        batch_without_warning = BatchStatement(batch_type=BatchType.UNLOGGED)
+        batch_with_warning = BatchStatement(batch_type=BatchType.UNLOGGED)
+
         for r, vals in vals_by_replicas.iteritems():
-            all_nodes_statments.append("INSERT INTO test (id, val) VALUES ({}, 'abc')".format(vals[0]))
+            batch_with_warning.add(prepared, (vals[0],))
             if r == node1.address():
-                node1_statements = ["INSERT INTO test (id, val) VALUES ({}, 'abc')".format(v) for v in vals]
+                for v in vals:
+                    batch_without_warning.add(prepared, (v,))
 
-        cmd_with_warning = prefix + " ".join(all_nodes_statments) + suffix
-        cmd_without_warning = prefix + " ".join(node1_statements) + suffix
+        fut = session.execute_async(batch_without_warning)
+        _ = fut.result()  # wait for batch to complete before checking warnings
+        self.assertIsNone(fut.warnings)
 
-        debug(cmd_with_warning)
-        self.verify_output(cmd_with_warning, node1, """
-Warnings :
-Unlogged batch covering 3 partitions detected against table [client_warnings.test]. You should use a logged batch for atomicity, or asynchronous writes for performance.""")
-
-        debug(cmd_without_warning)
-        self.verify_output(cmd_without_warning, node1, "")
+        fut = session.execute_async(batch_with_warning)
+        _ = fut.result()  # wait for batch to complete before checking warnings
+        debug(fut.warnings)
+        self.assertIsNotNone(fut.warnings)
+        self.assertEquals(1, len(fut.warnings))
+        self.assertEquals("Unlogged batch covering 3 partitions detected against table [client_warnings.test]. " +
+                          "You should use a logged batch for atomicity, or asynchronous writes for performance.",
+                          fut.warnings[0])
 
     def test_connect_timeout(self):
         """
