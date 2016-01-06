@@ -693,6 +693,7 @@ class TestMaterializedViews(Tester):
         Test that a materialized views properly tombstone
 
         @jira_ticket CASSANDRA-10261
+        @jira_ticket CASSANDRA-10910
         """
 
         self.prepare(rf=3, options={'hinted_handoff_enabled': False})
@@ -718,6 +719,15 @@ class TestMaterializedViews(Tester):
             [1, 1, 'a', 3.0]
         )
 
+        session.execute(SimpleStatement("INSERT INTO t (id, v2) VALUES (1, 'b') USING TIMESTAMP 1",
+                                        consistency_level=ConsistencyLevel.ALL))
+
+        assert_one(
+            session,
+            "SELECT * FROM t_by_v WHERE v = 1",
+            [1, 1, 'b', 3.0]
+        )
+
         # change v's value and TS=3, tombstones v=1 and adds v=0 record
         session.execute(SimpleStatement("UPDATE t USING TIMESTAMP 3 SET v = 0 WHERE id = 1",
                                         consistency_level=ConsistencyLevel.ALL))
@@ -732,7 +742,7 @@ class TestMaterializedViews(Tester):
         assert_one(
             session,
             "SELECT * FROM t_by_v WHERE v = 1",
-            [1, 1, 'a', 3.0]
+            [1, 1, 'b', 3.0]
         )
 
         node2.start(wait_other_notice=True, wait_for_binary_proto=True)
@@ -754,7 +764,7 @@ class TestMaterializedViews(Tester):
         assert_one(
             session,
             "SELECT * FROM t_by_v WHERE v = 1",
-            [1, 1, 'a', 3.0],
+            [1, 1, 'b', 3.0],
             cl=ConsistencyLevel.ALL
         )
 
