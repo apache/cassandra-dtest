@@ -289,8 +289,8 @@ class UpgradeTester(Tester):
         switch_jdks(self.test_versions[0])
         self.cluster.set_install_dir(version=self.test_versions[0])
 
-    def establish_config(self):
-        self.establish_default_config()
+    def init_config(self):
+        self.init_default_config()
 
         if self.extra_config is not None:
             debug("Setting extra configuration options:\n" + pprint.pformat(dict(self.extra_config), indent=4))

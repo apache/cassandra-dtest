@@ -263,10 +263,10 @@ class Tester(TestCase):
         else:
             node.set_install_dir(install_dir=cdir)
 
-    def establish_config(self):
+    def init_config(self):
         raise NotImplementedError()
 
-    def establish_default_config(self):
+    def init_default_config(self):
         # the failure detector can be quite slow in such tests with quick start/stop
         self.cluster.set_configuration_options(values={'phi_convict_threshold': 5})
 
