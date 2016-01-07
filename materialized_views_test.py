@@ -1424,9 +1424,19 @@ class TestMaterializedViewsConsistency(Tester):
             self.rows[(row.a, row.b)] = row.c
 
     def single_partition_consistent_reads_after_write_test(self):
+        """
+        Tests consistency of multiple writes to a single partition
+
+        @jira_ticket CASSANDRA-10981
+        """
         self._consistent_reads_after_write_test(1)
 
     def multi_partition_consistent_reads_after_write_test(self):
+        """
+        Tests consistency of multiple writes to a multiple partitions
+
+        @jira_ticket CASSANDRA-10981
+        """
         self._consistent_reads_after_write_test(20)
 
     def _consistent_reads_after_write_test(self, num_partitions):
