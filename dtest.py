@@ -326,10 +326,10 @@ class Tester(TestCase):
             self.__setup_jacoco()
 
         try:
-            self.establish_config()
+            self.init_config()
         except NotImplementedError:
-            debug("Custom establish_config not found. Setting defaults.")
-            self.establish_default_config()
+            debug("Custom init_config not found. Setting defaults.")
+            self.init_default_config()
 
         with open(LAST_TEST_DIR, 'w') as f:
             f.write(self.test_path + '\n')
