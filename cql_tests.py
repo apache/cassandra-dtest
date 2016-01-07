@@ -402,7 +402,7 @@ class MiscellaneousCQLTester(CQLTester):
         assert len(res) == 2, res
 
 
-@since('3.0')
+@since('3.2')
 class AbortedQueriesTester(CQLTester):
     """
     @jira_ticket CASSANDRA-7392
