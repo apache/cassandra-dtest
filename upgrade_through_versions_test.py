@@ -280,6 +280,7 @@ class UpgradeTester(Tester):
             # and when it does, it gets replayed and everything is fine.
             r'Can\'t send migration request: node.*is down',
             r'RejectedExecutionException.*ThreadPoolExecutor has shut down',
+            r'Cannot update data center or rack from.*for live host'  # occurs due to test/ccm writing topo on down nodes
         ]
         self.subprocs = []
         Tester.__init__(self, *args, **kwargs)
