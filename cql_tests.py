@@ -441,7 +441,7 @@ class AbortedQueriesTester(CQLTester):
         mark = node.mark_log()
         statement = SimpleStatement("SELECT * from test1", consistency_level=ConsistencyLevel.ONE, retry_policy=FallthroughRetryPolicy())
         assert_unavailable(lambda c: debug(c.execute(statement)), session)
-        node.watch_log_for("Some operations timed out", from_mark=mark, timeout=60)
+        node.watch_log_for("operations timed out", from_mark=mark, timeout=60)
 
     @known_failure(failure_source='cassandra',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10929')
@@ -489,7 +489,7 @@ class AbortedQueriesTester(CQLTester):
         statement = SimpleStatement("SELECT * from test2 where col > 5 ALLOW FILTERING", consistency_level=ConsistencyLevel.ONE, retry_policy=FallthroughRetryPolicy())
         assert_unavailable(lambda c: debug(c.execute(statement)), session)
 
-        node2.watch_log_for("Some operations timed out", from_mark=mark, timeout=60)
+        node2.watch_log_for("operations timed out", from_mark=mark, timeout=60)
 
     @known_failure(failure_source='cassandra',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10929')
@@ -524,7 +524,7 @@ class AbortedQueriesTester(CQLTester):
         statement.consistency_level = ConsistencyLevel.ONE
         statement.retry_policy = FallthroughRetryPolicy()
         assert_unavailable(lambda c: debug(c.execute(statement, [50])), session)
-        node.watch_log_for("Some operations timed out", from_mark=mark, timeout=60)
+        node.watch_log_for("operations timed out", from_mark=mark, timeout=60)
 
     @known_failure(failure_source='cassandra',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10929')
@@ -562,4 +562,4 @@ class AbortedQueriesTester(CQLTester):
         mark = node2.mark_log()
         statement = SimpleStatement("SELECT * FROM mv WHERE col = 50", consistency_level=ConsistencyLevel.ONE, retry_policy=FallthroughRetryPolicy())
         assert_unavailable(lambda c: debug(c.execute(statement)), session)
-        node2.watch_log_for("Some operations timed out", from_mark=mark, timeout=60)
+        node2.watch_log_for("operations timed out", from_mark=mark, timeout=60)
