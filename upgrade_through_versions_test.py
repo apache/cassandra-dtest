@@ -270,6 +270,7 @@ class UpgradeTester(Tester):
     test_versions = None  # set on init to know which versions to use
     subprocs = None  # holds any subprocesses, for status checking and cleanup
     extra_config = None  # holds a non-mutable structure that can be cast as dict()
+    __test__ = False  # this is a base class only
 
     def __init__(self, *args, **kwargs):
         # Ignore these log patterns:
