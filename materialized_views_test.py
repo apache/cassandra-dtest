@@ -1301,15 +1301,15 @@ writeConsistency = ConsistencyLevel.QUORUM
 SimpleRow = collections.namedtuple('SimpleRow', 'a b c d')
 
 
-def row_generate(i):
-    return SimpleRow(a=i % 20, b=(i % 400) / 20, c=i, d=i)
+def row_generate(i, num_partitions):
+    return SimpleRow(a=i % num_partitions, b=(i % 400) / num_partitions, c=i, d=i)
 
 
 # Create a threaded session and execute queries from a Queue
-def thread_session(ip, queue, start, end, rows):
+def thread_session(ip, queue, start, end, rows, num_partitions):
 
     def execute_query(session, select_gi, i):
-        row = row_generate(i)
+        row = row_generate(i, num_partitions)
         if (row.a, row.b) in rows:
             base = rows[(row.a, row.b)]
         else:
@@ -1390,7 +1390,7 @@ class TestMaterializedViewsConsistency(Tester):
             )
         sys.stdout.flush()
 
-    def _do_row(self, insert_stmt, i):
+    def _do_row(self, insert_stmt, i, num_partitions):
 
         # Error callback for async requests
         def handle_errors(row, exc):
@@ -1408,7 +1408,7 @@ class TestMaterializedViewsConsistency(Tester):
         if i % self.update_stats_every == 0:
             self._print_write_status(i)
 
-        row = row_generate(i)
+        row = row_generate(i, num_partitions)
 
         async = self.session.execute_async(insert_stmt, row)
         errors = partial(handle_errors, row)
@@ -1423,7 +1423,13 @@ class TestMaterializedViewsConsistency(Tester):
         for row in data:
             self.rows[(row.a, row.b)] = row.c
 
-    def consistent_reads_after_write_test(self):
+    def single_partition_consistent_reads_after_write_test(self):
+        self._consistent_reads_after_write_test(1)
+
+    def multi_partition_consistent_reads_after_write_test(self):
+        self._consistent_reads_after_write_test(20)
+
+    def _consistent_reads_after_write_test(self, num_partitions):
 
         session = self.prepare()
         [node1, node2, node3] = self.cluster.nodelist()
@@ -1450,7 +1456,7 @@ class TestMaterializedViewsConsistency(Tester):
 
         debug("Writing data to base table")
         for i in range(upper / 10):
-            self._do_row(insert1, i)
+            self._do_row(insert1, i, num_partitions)
 
         debug("Creating materialized view")
         session.execute(
@@ -1462,7 +1468,7 @@ class TestMaterializedViewsConsistency(Tester):
 
         debug("Writing more data to base table")
         for i in range(upper / 10, upper):
-            self._do_row(insert1, i)
+            self._do_row(insert1, i, num_partitions)
 
         # Wait that all requests are done
         while self.num_request_done < upper:
@@ -1486,7 +1492,7 @@ class TestMaterializedViewsConsistency(Tester):
                 end = lower + (eachProcess * (i + 1))
             q = Queue()
             node_ip = self.get_ip_from_node(node2)
-            p = Process(target=thread_session, args=(node_ip, q, start, end, self.rows))
+            p = Process(target=thread_session, args=(node_ip, q, start, end, self.rows, num_partitions))
             p.start()
             queues[i] = q
 
