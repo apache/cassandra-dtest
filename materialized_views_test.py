@@ -373,6 +373,9 @@ class TestMaterializedViews(Tester):
 
         self._add_dc_after_mv_test({'dc1': 1, 'dc2': 1})
 
+    @known_failure(failure_source='systemic',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10987',
+                   flaky=True)
     def add_node_after_mv_test(self):
         """Test that materialized views work as expected when adding a node."""
 
