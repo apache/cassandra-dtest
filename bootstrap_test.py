@@ -342,7 +342,7 @@ class TestBootstrap(Tester):
         session = self.patient_cql_connection(node2)
         self.assertEquals(original_rows, list(session.execute("SELECT * FROM {}".format(stress_table,))))
 
-        # Decommision the new node and wipe its data
+        # Decommission the new node and wipe its data
         node2.decommission()
         node2.stop(wait_other_notice=True)
         self._cleanup(node2)
