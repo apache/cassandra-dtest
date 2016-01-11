@@ -297,3 +297,23 @@ class TestUpgrade8099(Tester):
 
         self.cluster.compact()
 
+    def upgrade_with_range_and_collection_tombstones(self):
+        cursor = self._setup_cluster()
+
+        print("Creating schema...")
+        cursor.execute("CREATE KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor': 1};")
+        cursor.execute('USE ks')
+        cursor.execute('CREATE TABLE t (k text, t int, c list<int>, PRIMARY KEY (k, t))')
+
+        print("Inserting...")
+        cursor.execute("INSERT INTO t(k, t, c) VALUES ('some_key', 0, %s)" % str([i for i in xrange(0, 10000)]))
+
+        print("Upgrading node...")
+        cursor = self._do_upgrade()
+
+        self.cluster.compact()
+
+        cursor.execute('USE ks')
+
+        print("Querying...")
+        assert_one(cursor, "SELECT k FROM t", ['some_key'])
