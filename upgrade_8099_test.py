@@ -1,7 +1,8 @@
-from dtest import Tester, debug
 import time
+
+from assertions import assert_all, assert_none, assert_one
+from dtest import Tester, debug
 from tools import since
-from assertions import assert_all, assert_one, assert_none
 
 
 @since('3.0')
