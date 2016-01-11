@@ -379,6 +379,7 @@ class TestUserTypes(Tester):
         node1, node2, node3 = cluster.nodelist()
         session = self.patient_cql_connection(node1)
         self.create_ks(session, 'user_type_indexing', 2)
+        session.default_consistency_level = ConsistencyLevel.LOCAL_QUORUM
 
         stmt = """
               CREATE TYPE t_person_name (
@@ -397,7 +398,7 @@ class TestUserTypes(Tester):
               )
            """
         session.execute(stmt)
-        # Make sure the scheam propagate
+        # Make sure the schema propagate
         time.sleep(2)
 
         # no index present yet, make sure there's an error trying to query column
