@@ -4,7 +4,7 @@ We plan to move to Python 3 in the near future. Where possible, new code should 
 
 - favor `format` over `%` for formatting strings.
 - use the `/` on numbers in a Python 3-compatible way. In particular, if you want floor division (which is the behavior of `/` in Python 2), use `//` instead. If you want the result of integer division to be a `float` (e.g. `1 / 2 == 0.5`), add `from __future__ import division` to the top of the imports and use `/`. For more infomration, see [the official Python 3 porting docs](https://docs.python.org/3/howto/pyporting.html#division).
-- use `absolute_imports` and `unicode_literals` in new test files.
+- use `absolute_import`, `division`, and `unicode_literals` in new test files.
 
 Contributions will be evaluated by PEP8. We now strictly enforce compliance, via a linter run with Travis CI against all new pull requests. We do not enforce the default limits on line length, but have established a maximum length of 200 chars as a sanity check. You can conform to PEP8 by running `autopep8` which can be installed via `pip`. 
 `pip install autopep8 && autopep8 --in-place -a --ignore E501`
@@ -61,4 +61,32 @@ Feel free to submit test plans without the implemented tests. If you are submitt
 
 ## Modules
 
-In some cases, we organize our test files by putting them in directories. If you do so, please export a module from that direcory py placing an `__init__.py file in the directory with the test files. This makes the modules visible to our test infrastructure scripts that divide tests into buckets for CI.
+In some cases, we organize our test files by putting them in directories. If you do so, please export a module from that directory by placing an `__init__.py` file in the directory with the test files. This makes the modules visible to our test infrastructure scripts that divide tests into buckets for CI.
+
+## Summary: Review Checklist
+
+- Correctness
+    - Does the test pass? If not, is the failure expected?
+    - If the test shells out to other processes,
+        - does it validate the output to ensure there were no failures?
+        - is it Windows-compatibile?
+    - Does the test exercise a new feature? If so, is it tagged with `@since` to skip older versions?
+- Style and Python 3 Compatibility:
+    - Does the code use `.format()` over `%` for format strings?
+    - If there are new test files, do they use the requested imports for Python 3 compatibility?
+    - Have the changes caused any style regressions? In particular, did Travis find any?
+    - Are `cassandra.cluster.Session` objects named `session` (and not `cursor`)?
+- Documentation and Metadata:
+    - Are new tests and test classes documented with docstrings?
+    - Are changed tests' documentation updated?
+    - Is Cassandra's desired behavior described in the documentation if it's not immediately readable in the test?
+    - Does the documentation include all appropriate Doxygen annotations, in particular `@jira_ticket`?
+    - If the test is supposed to fail, is it appropriately tagged with `@known_failure`?
+- Readability and Reusability
+    - Are any data structures built by looping that could be succinctly created in a comprehension
+    - Is there repeated logic that could be factored out and given a descriptive name?
+        - Does that repeated logic belong somewhere other than this particular test? Possible appropriate locations include the `tools` or `assertions` modules, or `ccm`.
+    - If there is no assertion in the test, should there be? If not, is the statement that would fail under a regression commented to indicate that?
+    - Is it possible for an uninitiated reader to understand what Casssandra behavior is being tested for?
+        - If not, could the code be rewritten so it is?
+        - If not, are there comments and documentation describing the desired behavior and how it's tested?
