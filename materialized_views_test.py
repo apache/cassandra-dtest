@@ -23,7 +23,7 @@ from assertions import assert_all, assert_one, assert_invalid, assert_unavailabl
 # pathological case of flushing schema keyspace for multiple data directories. See CASSANDRA-6696
 # for multiple data directory changes and CASSANDRA-10421 for compaction logging that must be
 # written.
-migration_wait = 2
+MIGRATION_WAIT = 2
 
 
 @since('3.0')
@@ -348,11 +348,11 @@ class TestMaterializedViews(Tester):
 
         debug("Bootstrapping new node in another dc")
         node4 = new_node(self.cluster, data_center='dc2')
-        node4.start(wait_other_notice=True, wait_for_binary_proto=True, jvm_args=["-Dcassandra.migration_task_wait_in_seconds={}".format(migration_wait)])
+        node4.start(wait_other_notice=True, wait_for_binary_proto=True, jvm_args=["-Dcassandra.migration_task_wait_in_seconds={}".format(MIGRATION_WAIT)])
 
         debug("Bootstrapping new node in another dc")
         node5 = new_node(self.cluster, remote_debug_port='1414', data_center='dc2')
-        node5.start(jvm_args=["-Dcassandra.migration_task_wait_in_seconds={}".format(migration_wait)])
+        node5.start(jvm_args=["-Dcassandra.migration_task_wait_in_seconds={}".format(MIGRATION_WAIT)])
 
         session2 = self.patient_exclusive_cql_connection(node4)
 
@@ -406,7 +406,7 @@ class TestMaterializedViews(Tester):
             assert_one(session, "SELECT * FROM t_by_v WHERE v = {}".format(-i), [-i, i])
 
         node4 = new_node(self.cluster)
-        node4.start(wait_for_binary_proto=True, jvm_args=["-Dcassandra.migration_task_wait_in_seconds={}".format(migration_wait)])
+        node4.start(wait_for_binary_proto=True, jvm_args=["-Dcassandra.migration_task_wait_in_seconds={}".format(MIGRATION_WAIT)])
 
         session2 = self.patient_exclusive_cql_connection(node4)
 
@@ -440,7 +440,7 @@ class TestMaterializedViews(Tester):
             assert_one(session, "SELECT * FROM t_by_v WHERE v = {}".format(-i), [-i, i])
 
         node4 = new_node(self.cluster)
-        node4.start(wait_for_binary_proto=True, jvm_args=["-Dcassandra.write_survey=true", "-Dcassandra.migration_task_wait_in_seconds={}".format(migration_wait)])
+        node4.start(wait_for_binary_proto=True, jvm_args=["-Dcassandra.write_survey=true", "-Dcassandra.migration_task_wait_in_seconds={}".format(MIGRATION_WAIT)])
 
         for i in xrange(1000, 1100):
             session.execute("INSERT INTO t (id, v) VALUES ({id}, {v})".format(id=i, v=-i))
