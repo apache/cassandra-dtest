@@ -62,3 +62,24 @@ Feel free to submit test plans without the implemented tests. If you are submitt
 ## Modules
 
 In some cases, we organize our test files by putting them in directories. If you do so, please export a module from that direcory py placing an `__init__.py file in the directory with the test files. This makes the modules visible to our test infrastructure scripts that divide tests into buckets for CI.
+
+## Summary: Review Checklist
+
+- Style and Python 3 Compatibility:
+    - Does the code use `.format()` over `%` for format strings?
+    - If there are new test files, do they use the requested imports for Python 3 compatibility?
+    - Have the changes caused any style regressions? In particular, did Travis find any?
+    - Are `cassandra.cluster.Session` objects named `session` (and not `cursor`)?
+- Documentation and Metadata:
+    - Are new tests and test classes documented with docstrings?
+    - Are changed tests' documentation updated?
+    - Is Cassandra's desired behavior described in the documentation if it's not immediately readable in the test?
+    - Does the documentation include all appropriate Doxygen annotations, in particular `@jira_ticket`?
+- Readability and Reusability
+    - Are any data structures built by looping that could be succinctly created in a comprehension
+    - Is there repeated logic that could be factored out and given a descriptive name?
+        - Does that repeated logic belong somewhere other than this particular test? Possible appropriate locations include the `tools` or `assertions` modules, or `ccm`.
+    - If there is no assertion in the test, should there be? If not, is the statement that would fail under a regression commented to indicate that?
+    - Is it possible for an uninitiated reader to understand what Casssandra behavior is being tested for?
+        - If not, could the code be rewritten so it is?
+        - If not, are there comments and documentation describing the desired behavior and how it's tested?
