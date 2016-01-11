@@ -259,7 +259,7 @@ class TestSecondaryIndexes(Tester):
         if all_match:
             return
         else:
-            time.sleep(0.10)
+            time.sleep(1)
             self.wait_for_schema_agreement(session)
 
     @since('3.0')
