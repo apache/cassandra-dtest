@@ -65,6 +65,12 @@ In some cases, we organize our test files by putting them in directories. If you
 
 ## Summary: Review Checklist
 
+- Correctness
+    - Does the test pass? If not, is the failure expected?
+    - If the test shells out to other processes,
+        - does it validate the output to ensure there were no failures?
+        - is it Windows-compatibile?
+    - Does the test exercise a new feature? If so, is it tagged with `@since` to skip older versions?
 - Style and Python 3 Compatibility:
     - Does the code use `.format()` over `%` for format strings?
     - If there are new test files, do they use the requested imports for Python 3 compatibility?
@@ -75,6 +81,7 @@ In some cases, we organize our test files by putting them in directories. If you
     - Are changed tests' documentation updated?
     - Is Cassandra's desired behavior described in the documentation if it's not immediately readable in the test?
     - Does the documentation include all appropriate Doxygen annotations, in particular `@jira_ticket`?
+    - If the test is supposed to fail, is it appropriately tagged with `@known_failure`?
 - Readability and Reusability
     - Are any data structures built by looping that could be succinctly created in a comprehension
     - Is there repeated logic that could be factored out and given a descriptive name?
