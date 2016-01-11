@@ -886,6 +886,8 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         expected_lines = [s.strip() for s in expected_response.split("\n") if s.strip()]
         self.assertEqual(expected_lines, lines)
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10997')
     def test_copy_to(self):
         self.cluster.populate(1).start()
         node1, = self.cluster.nodelist()
