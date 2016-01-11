@@ -2031,9 +2031,9 @@ class CqlshCopyTest(Tester):
     def test_round_trip_byte_ordered(self):
         self._test_round_trip(nodes=3, partitioner="byte")
 
-    @freshCluster()
     @known_failure(failure_source='cassandra',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10997')
+    @freshCluster()
     def test_source_copy_round_trip(self):
         """
         Like test_round_trip, but uses the SOURCE command to execute the
@@ -2328,9 +2328,9 @@ class CqlshCopyTest(Tester):
         self.assertIn('some records might be missing', err)
         self.assertTrue(len(open(tempfile.name).readlines()) < num_records)
 
-    @freshCluster()
     @known_failure(failure_source='cassandra',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10997')
+    @freshCluster()
     def test_copy_from_with_more_failures_than_max_attempts(self):
         """
         Test importing rows with failure injection by setting the environment variable CQLSH_COPY_TEST_FAILURES,
@@ -2367,9 +2367,9 @@ class CqlshCopyTest(Tester):
         num_records_imported = rows_to_list(self.session.execute("SELECT COUNT(*) FROM {}".format(stress_table)))[0][0]
         self.assertTrue(num_records_imported < num_records)
 
-    @freshCluster()
     @known_failure(failure_source='cassandra',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10997')
+    @freshCluster()
     def test_copy_from_with_fewer_failures_than_max_attempts(self):
         """
         Test importing rows with failure injection by setting the environment variable CQLSH_COPY_TEST_FAILURES,
@@ -2409,9 +2409,9 @@ class CqlshCopyTest(Tester):
         num_records_imported = rows_to_list(self.session.execute("SELECT COUNT(*) FROM {}".format(stress_table)))[0][0]
         self.assertEquals(num_records, num_records_imported)
 
-    @freshCluster()
     @known_failure(failure_source='cassandra',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10997')
+    @freshCluster()
     def test_copy_from_with_child_process_crashing(self):
         """
         Test importing rows with failure injection by setting the environment variable CQLSH_COPY_TEST_FAILURES,
