@@ -342,13 +342,48 @@ class TestBootstrap(Tester):
         session = self.patient_cql_connection(node2)
         self.assertEquals(original_rows, list(session.execute("SELECT * FROM {}".format(stress_table,))))
 
-        # Decommision the new node and wipe its data
+        # Decommission the new node and wipe its data
         node2.decommission()
         node2.stop(wait_other_notice=True)
         self._cleanup(node2)
         # Now start it, it should be allowed to join
         mark = node2.mark_log()
         node2.start(wait_other_notice=True)
+        node2.watch_log_for("JOINING:", from_mark=mark)
+
+    def decommissioned_wiped_node_can_gossip_to_single_seed_test(self):
+        """
+        @jira_ticket CASSANDRA-8072
+        @jira_ticket CASSANDRA-8422
+        Test that if we decommission a node, kill it and wipe its data, it can join a cluster with a single
+        seed node.
+        """
+        cluster = self.cluster
+        cluster.populate(1)
+        cluster.start(wait_for_binary_proto=True)
+
+        # Add a new node, bootstrap=True ensures that it is not a seed
+        node2 = new_node(cluster, bootstrap=True)
+        node2.start(wait_for_binary_proto=True, wait_other_notice=True)
+
+        # Decommision the new node and kill it
+        debug("Decommissioning & stopping node2")
+        node2.decommission()
+        node2.stop(wait_other_notice=False)
+
+        # Wipe its data
+        for data_dir in [os.path.join(node2.get_path(), "data{0}".format(x)) for x in xrange(0, self.cluster.data_dir_count)]:
+            debug("Deleting {}".format(data_dir))
+            shutil.rmtree(data_dir)
+
+        commitlog_dir = os.path.join(node2.get_path(), 'commitlogs')
+        debug("Deleting {}".format(commitlog_dir))
+        shutil.rmtree(commitlog_dir)
+
+        # Now start it, it should be allowed to join
+        mark = node2.mark_log()
+        debug("Restarting wiped node2")
+        node2.start(wait_other_notice=False)
         node2.watch_log_for("JOINING:", from_mark=mark)
 
     def failed_bootstrap_wiped_node_can_join_test(self):
