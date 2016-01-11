@@ -19,6 +19,13 @@ from tools import since, new_node, known_failure
 from assertions import assert_all, assert_one, assert_invalid, assert_unavailable, assert_none, assert_crc_check_chance_equal
 
 
+# CASSANDRA-10978. Migration wait (in seconds) to use in bootstrapping tests. Needed to handle
+# pathological case of flushing schema keyspace for multiple data directories. See CASSANDRA-6696
+# for multiple data directory changes and CASSANDRA-10421 for compaction logging that must be
+# written.
+MIGRATION_WAIT = 2
+
+
 @since('3.0')
 class TestMaterializedViews(Tester):
     """
@@ -314,6 +321,12 @@ class TestMaterializedViews(Tester):
         self.assertEqual(len(result), 1, "Expecting {} users, got {}".format(1, len(result)))
 
     def _add_dc_after_mv_test(self, rf):
+        """
+        @jira_ticket CASSANDRA-10978
+
+        Add datacenter with configurable replication.
+        """
+
         session = self.prepare(rf=rf)
 
         debug("Creating schema")
@@ -335,11 +348,11 @@ class TestMaterializedViews(Tester):
 
         debug("Bootstrapping new node in another dc")
         node4 = new_node(self.cluster, data_center='dc2')
-        node4.start(wait_other_notice=True, wait_for_binary_proto=True)
+        node4.start(wait_other_notice=True, wait_for_binary_proto=True, jvm_args=["-Dcassandra.migration_task_wait_in_seconds={}".format(MIGRATION_WAIT)])
 
         debug("Bootstrapping new node in another dc")
         node5 = new_node(self.cluster, remote_debug_port='1414', data_center='dc2')
-        node5.start()
+        node5.start(jvm_args=["-Dcassandra.migration_task_wait_in_seconds={}".format(MIGRATION_WAIT)])
 
         session2 = self.patient_exclusive_cql_connection(node4)
 
@@ -373,11 +386,12 @@ class TestMaterializedViews(Tester):
 
         self._add_dc_after_mv_test({'dc1': 1, 'dc2': 1})
 
-    @known_failure(failure_source='systemic',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10987',
-                   flaky=True)
     def add_node_after_mv_test(self):
-        """Test that materialized views work as expected when adding a node."""
+        """
+        @jira_ticket CASSANDRA-10978
+
+        Test that materialized views work as expected when adding a node.
+        """
 
         session = self.prepare()
 
@@ -392,7 +406,7 @@ class TestMaterializedViews(Tester):
             assert_one(session, "SELECT * FROM t_by_v WHERE v = {}".format(-i), [-i, i])
 
         node4 = new_node(self.cluster)
-        node4.start(wait_for_binary_proto=True)
+        node4.start(wait_for_binary_proto=True, jvm_args=["-Dcassandra.migration_task_wait_in_seconds={}".format(MIGRATION_WAIT)])
 
         session2 = self.patient_exclusive_cql_connection(node4)
 
@@ -405,12 +419,10 @@ class TestMaterializedViews(Tester):
         for i in xrange(1000, 1100):
             assert_one(session, "SELECT * FROM t_by_v WHERE v = {}".format(-i), [-i, i])
 
-    @known_failure(failure_source='systemic',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10978',
-                   flaky=False)
     def add_write_survey_node_after_mv_test(self):
         """
         @jira_ticket CASSANDRA-10621
+        @jira_ticket CASSANDRA-10978
 
         Test that materialized views work as expected when adding a node in write survey mode.
         """
@@ -428,7 +440,7 @@ class TestMaterializedViews(Tester):
             assert_one(session, "SELECT * FROM t_by_v WHERE v = {}".format(-i), [-i, i])
 
         node4 = new_node(self.cluster)
-        node4.start(wait_for_binary_proto=True, jvm_args=["-Dcassandra.write_survey=true"])
+        node4.start(wait_for_binary_proto=True, jvm_args=["-Dcassandra.write_survey=true", "-Dcassandra.migration_task_wait_in_seconds={}".format(MIGRATION_WAIT)])
 
         for i in xrange(1000, 1100):
             session.execute("INSERT INTO t (id, v) VALUES ({id}, {v})".format(id=i, v=-i))
