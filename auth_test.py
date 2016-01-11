@@ -31,6 +31,8 @@ class TestAuth(Tester):
             ALTER KEYSPACE system_auth
                 WITH replication = {'class':'SimpleStrategy', 'replication_factor':3};
         """)
+        # The driver schema metadata API is async. Force a hard refresh here, before we check that the alter succeeded.
+        session.cluster.refresh_schema_metadata()
 
         self.assertEquals(3, session.cluster.metadata.keyspaces['system_auth'].replication_strategy.replication_factor)
 
