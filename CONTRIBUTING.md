@@ -61,7 +61,7 @@ Feel free to submit test plans without the implemented tests. If you are submitt
 
 ## Modules
 
-In some cases, we organize our test files by putting them in directories. If you do so, please export a module from that direcory py placing an `__init__.py file in the directory with the test files. This makes the modules visible to our test infrastructure scripts that divide tests into buckets for CI.
+In some cases, we organize our test files by putting them in directories. If you do so, please export a module from that directory by placing an `__init__.py` file in the directory with the test files. This makes the modules visible to our test infrastructure scripts that divide tests into buckets for CI.
 
 ## Summary: Review Checklist
 
