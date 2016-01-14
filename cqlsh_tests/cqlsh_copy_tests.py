@@ -321,8 +321,7 @@ class CqlshCopyTest(Tester):
         # into a bare function if cqlshlib is made easier to interact with.
         return [[self.format_for_csv(v, time_format, float_precision) for v in row] for row in result]
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10997')
+
     def test_list_data(self):
         """
         Tests the COPY TO command with the list datatype by:
@@ -350,8 +349,7 @@ class CqlshCopyTest(Tester):
 
         self.assertCsvResultEqual(tempfile.name, results)
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10997')
+
     def test_tuple_data(self):
         """
         Tests the COPY TO command with the tuple datatype by:
@@ -409,24 +407,21 @@ class CqlshCopyTest(Tester):
 
         self.assertCsvResultEqual(tempfile.name, results)
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10997')
+
     def test_colon_delimiter(self):
         """
         Use non_default_delimiter_template to test COPY with the delimiter ':'.
         """
         self.non_default_delimiter_template(':')
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10997')
+
     def test_letter_delimiter(self):
         """
         Use non_default_delimiter_template to test COPY with the delimiter 'a'.
         """
         self.non_default_delimiter_template('a')
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10997')
+
     def test_number_delimiter(self):
         """
         Use non_default_delimiter_template to test COPY with the delimiter '1'.
@@ -463,24 +458,21 @@ class CqlshCopyTest(Tester):
 
         self.assertCsvResultEqual(tempfile.name, results)
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10997')
+
     def test_undefined_as_null_indicator(self):
         """
         Use custom_null_indicator_template to test COPY with NULL = undefined.
         """
         self.custom_null_indicator_template('undefined')
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10997')
+
     def test_null_as_null_indicator(self):
         """
         Use custom_null_indicator_template to test COPY with NULL = 'null'.
         """
         self.custom_null_indicator_template('null')
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10997')
+
     def test_writing_use_header(self):
         """
         Test that COPY can write a CSV with a header by:
@@ -581,8 +573,7 @@ class CqlshCopyTest(Tester):
         self.assertItemsEqual([tuple(d) for d in data],
                               [tuple(r) for r in rows_to_list(result)])
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10997')
+
     def test_datetimeformat_round_trip(self):
         """
         @jira_ticket CASSANDRA-10633
@@ -674,8 +665,7 @@ class CqlshCopyTest(Tester):
         result = rows_to_list(self.session.execute("SELECT * FROM testttl"))
         self.assertItemsEqual([], result)
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10997')
+
     def test_reading_with_skip_and_max_rows(self):
         """
         Test importing a rows from a CSV file with maxrows and skiprows:
@@ -820,8 +810,7 @@ class CqlshCopyTest(Tester):
         do_test('b', [[1, 1, 2, 2, 2], [2, 1, 2, 2, 2]])
         do_test('e', [[1, 2, 3, 3, 2], [2, 2, 3, 3, 2]])
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10997')
+
     def test_writing_with_token_boundaries(self):
         """
         Test COPY TO with the begin and end tokens specified in the WITH option by:
@@ -1143,8 +1132,7 @@ class CqlshCopyTest(Tester):
         import_and_check(','.join([os.path.join(gettempdir(), 'testreadmult[0-4]*.csv'),
                                    os.path.join(gettempdir(), 'testreadmult[5-9]*.csv')]))
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10997')
+
     def test_writing_with_max_output_size(self):
         """
         Test writing to multiple CSV files:
@@ -1194,8 +1182,7 @@ class CqlshCopyTest(Tester):
         do_test(500, False)
         do_test(100, False)
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10997')
+
     def test_explicit_column_order_writing(self):
         """
         Test that COPY can write to a CSV file when the order of columns is
@@ -1361,13 +1348,11 @@ class CqlshCopyTest(Tester):
 
         assert_csvs_items_equal(tempfile.name, reference_file.name)
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10997')
+
     def test_quoted_column_names_writing_specify_names(self):
         self.quoted_column_names_writing_template(specify_column_names=True)
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10997')
+
     def test_quoted_column_names_writing_dont_specify_names(self):
         self.quoted_column_names_writing_template(specify_column_names=False)
 
@@ -1467,8 +1452,7 @@ class CqlshCopyTest(Tester):
                                               expected_err="Failed to import 1 rows: ParseError - "
                                                            "Cannot insert null value for primary key column")
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10997')
+
     def test_all_datatypes_write(self):
         """
         Test that, after COPYing a table containing all CQL datatypes to a CSV
@@ -1525,8 +1509,7 @@ class CqlshCopyTest(Tester):
 
         self.assertCsvResultEqual(tempfile.name, results)
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10997')
+
     def test_all_datatypes_round_trip(self):
         """
         Test that a table containing all CQL datatypes successfully round-trips
@@ -1565,8 +1548,7 @@ class CqlshCopyTest(Tester):
 
         self.assertEqual(exported_results, imported_results)
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10997')
+
     def test_boolstyle_round_trip(self):
         """
         Test that a CSV file with booleans in a different style successfully round-trips
@@ -1630,8 +1612,7 @@ class CqlshCopyTest(Tester):
         do_round_trip('', '', invalid=True)
         do_round_trip('yes, no', 'maybe', invalid=True)
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10997')
+
     def test_number_separators_round_trip(self):
         """
         Test that a CSV file containing numbers with decimal and thousands separators in a different format
@@ -1768,8 +1749,7 @@ class CqlshCopyTest(Tester):
         do_test(expected_vals_usual, ',', '.')
         do_test(expected_vals_inverted, '.', ',')
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10997')
+
     def test_round_trip_with_num_processes(self):
         """
         Test exporting a large number of rows into a csv file with a fixed number of child processes.
@@ -1804,8 +1784,7 @@ class CqlshCopyTest(Tester):
         self.assertEqual([[num_records]], rows_to_list(self.session.execute("SELECT COUNT(*) FROM {}"
                                                                             .format(stress_table))))
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10997')
+
     def test_round_trip_with_rate_file(self):
         """
         Test a round trip with a large number of rows and a rate file. Make sure the rate file contains
@@ -2031,8 +2010,7 @@ class CqlshCopyTest(Tester):
     def test_round_trip_byte_ordered(self):
         self._test_round_trip(nodes=3, partitioner="byte")
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10997')
+
     @freshCluster()
     def test_source_copy_round_trip(self):
         """
@@ -2328,8 +2306,7 @@ class CqlshCopyTest(Tester):
         self.assertIn('some records might be missing', err)
         self.assertTrue(len(open(tempfile.name).readlines()) < num_records)
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10997')
+
     @freshCluster()
     def test_copy_from_with_more_failures_than_max_attempts(self):
         """
@@ -2367,8 +2344,7 @@ class CqlshCopyTest(Tester):
         num_records_imported = rows_to_list(self.session.execute("SELECT COUNT(*) FROM {}".format(stress_table)))[0][0]
         self.assertTrue(num_records_imported < num_records)
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10997')
+
     @freshCluster()
     def test_copy_from_with_fewer_failures_than_max_attempts(self):
         """
@@ -2409,8 +2385,7 @@ class CqlshCopyTest(Tester):
         num_records_imported = rows_to_list(self.session.execute("SELECT COUNT(*) FROM {}".format(stress_table)))[0][0]
         self.assertEquals(num_records, num_records_imported)
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10997')
+
     @freshCluster()
     def test_copy_from_with_child_process_crashing(self):
         """
