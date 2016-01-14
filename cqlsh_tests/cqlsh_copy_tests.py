@@ -2250,8 +2250,6 @@ class CqlshCopyTest(Tester):
         self.assertNotIn('some records might be missing', err)
         self.assertEqual(num_records, len(open(tempfile.name).readlines()))
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10858')
     @freshCluster()
     def test_copy_to_with_child_process_crashing(self):
         """
