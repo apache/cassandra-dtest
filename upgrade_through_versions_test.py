@@ -388,8 +388,8 @@ class UpgradeTester(Tester):
             write_proc.terminate()
             increment_proc.terminate()
             # wait for the verification queue's to empty (and check all rows) before continuing
-            self._wait_until_queue_condition('writes pending verification', verification_queue, operator.le, 0, max_wait_s=600)
-            self._wait_until_queue_condition('counters pending verification', incr_verify_queue, operator.le, 0, max_wait_s=600)
+            self._wait_until_queue_condition('writes pending verification', verification_queue, operator.le, 0, max_wait_s=1200)
+            self._wait_until_queue_condition('counters pending verification', incr_verify_queue, operator.le, 0, max_wait_s=1200)
             self._check_on_subprocs([verify_proc, incr_verify_proc])  # make sure the verification processes are running still
 
             self._terminate_subprocs()
@@ -575,7 +575,7 @@ class UpgradeTester(Tester):
                 self.assertEqual(x, k)
                 self.assertEqual(str(x), v)
 
-    def _wait_until_queue_condition(self, label, queue, opfunc, required_len, max_wait_s=300):
+    def _wait_until_queue_condition(self, label, queue, opfunc, required_len, max_wait_s=600):
         """
         Waits up to max_wait_s for queue size to return True when evaluated against a condition function from the operator module.
 
@@ -605,7 +605,7 @@ class UpgradeTester(Tester):
         else:
             raise RuntimeError("Ran out of time waiting for queue size ({}) to be '{}' to {}. Aborting.".format(qsize, opfunc.__name__, required_len))
 
-    def _start_continuous_write_and_verify(self, wait_for_rowcount=0, max_wait_s=300):
+    def _start_continuous_write_and_verify(self, wait_for_rowcount=0, max_wait_s=600):
         """
         Starts a writer process, a verifier process, a queue to track writes,
         and a queue to track successful verifications (which are rewrite candidates).
@@ -636,7 +636,7 @@ class UpgradeTester(Tester):
 
         return writer, verifier, to_verify_queue
 
-    def _start_continuous_counter_increment_and_verify(self, wait_for_rowcount=0, max_wait_s=300):
+    def _start_continuous_counter_increment_and_verify(self, wait_for_rowcount=0, max_wait_s=600):
         """
         Starts a counter incrementer process, a verifier process, a queue to track writes,
         and a queue to track successful verifications (which are re-increment candidates).
