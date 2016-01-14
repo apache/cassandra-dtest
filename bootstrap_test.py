@@ -88,6 +88,27 @@ class TestBootstrap(Tester):
         assert_almost_equal(size1, size2, error=0.3)
         assert_almost_equal(float(initial_size - empty_size), 2 * (size1 - float(empty_size)))
 
+    def simple_bootstrap_test_nodata(self):
+        """
+        @jira_ticket CASSANDRA-11010
+        Test that bootstrap completes if streaming from nodes with no data
+        """
+
+        cluster = self.cluster
+        # Create a two-node cluster
+        cluster.populate(2)
+        cluster.start(wait_other_notice=True)
+
+        # Bootstraping a new node
+        node3 = new_node(cluster)
+        node3.start()
+
+        node3.watch_log_for("Starting listening for CQL clients")
+        session = self.exclusive_cql_connection(node3)
+        rows = session.execute("SELECT bootstrapped FROM system.local WHERE key='local'")
+        self.assertEqual(rows[0][0], 'COMPLETED')
+
+
     def read_from_bootstrapped_node_test(self):
         """Test bootstrapped node sees existing data, eg. CASSANDRA-6648"""
         cluster = self.cluster
