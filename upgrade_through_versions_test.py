@@ -11,12 +11,12 @@ from distutils.version import LooseVersion
 from multiprocessing import Process, Queue
 from Queue import Empty, Full
 
-import psutil
-from cassandra import ConsistencyLevel, WriteTimeout
-from cassandra.query import SimpleStatement
 from six import print_
 
+import psutil
 import schema_metadata_test
+from cassandra import ConsistencyLevel, WriteTimeout
+from cassandra.query import SimpleStatement
 from dtest import Tester, debug
 from tools import generate_ssl_stores, known_failure, new_node
 
@@ -26,7 +26,7 @@ latest_2dot1 = '2.1.12'
 latest_2dot2 = '2.2.4'
 latest_3dot0 = '3.0.2'
 latest_3dot1 = '3.1.1'
-latest_3dot2 = '3.2'
+latest_3dot2 = '3.2.1'
 latest_3dot3 = '3.3'
 trunk_ccm_string = 'git:trunk'
 
