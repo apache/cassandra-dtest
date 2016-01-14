@@ -14,8 +14,6 @@ from tools import known_failure, since
 class TestJMX(Tester):
 
     @unittest.skipIf(sys.platform == "win32", 'Skip long tests on Windows')
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10859')
     def cfhistograms_test(self):
         """
         Test cfhistograms on large and small datasets
