@@ -6,7 +6,7 @@ from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
 
 from dtest import Tester, debug
-from tools import known_failure, insert_c1c2, no_vnodes, query_c1c2, since
+from tools import insert_c1c2, no_vnodes, query_c1c2, since
 
 
 class TestRepair(Tester):
@@ -40,8 +40,6 @@ class TestRepair(Tester):
                 node.start(wait_other_notice=True)
 
     @since('2.2.1')
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10860')
     def no_anticompaction_after_dclocal_repair_test(self):
         """
         @jira_ticket CASSANDRA-10422
@@ -62,8 +60,6 @@ class TestRepair(Tester):
             self.assertFalse(node.grep_log("Starting anticompaction"))
 
     @since('2.2.1')
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10860')
     def no_anticompaction_after_hostspecific_repair_test(self):
         """
         @jira_ticket CASSANDRA-10422
