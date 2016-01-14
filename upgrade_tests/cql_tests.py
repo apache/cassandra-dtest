@@ -922,9 +922,6 @@ class TestCQL(UpgradeTester):
             res = cursor.execute("SELECT id FROM users WHERE birth_year = 42")
             assert rows_to_list(res) == [['Tom'], ['Bob']]
 
-    @known_failure(failure_source='systemic',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10730',
-                   flaky=True)
     def deletion_test(self):
         """ Test simple deletion and in particular check for #4193 bug """
 
