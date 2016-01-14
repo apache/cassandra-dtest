@@ -20,7 +20,7 @@ from assertions import assert_all, assert_none
 from ccmlib import common
 from cqlsh_tools import monkeypatch_driver, unmonkeypatch_driver
 from dtest import Tester, debug
-from tools import create_c1c2_table, insert_c1c2, known_failure, rows_to_list, since
+from tools import create_c1c2_table, insert_c1c2, rows_to_list, since
 
 
 class TestCqlsh(Tester):
@@ -886,8 +886,6 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         expected_lines = [s.strip() for s in expected_response.split("\n") if s.strip()]
         self.assertEqual(expected_lines, lines)
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10997')
     def test_copy_to(self):
         self.cluster.populate(1).start()
         node1, = self.cluster.nodelist()
