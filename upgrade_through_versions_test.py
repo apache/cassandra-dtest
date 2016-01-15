@@ -294,9 +294,20 @@ class UpgradeTester(Tester):
     def init_config(self):
         self.init_default_config()
 
+        if self.cluster.version() > '2.1':
+            enable_udf = {'enable_user_defined_functions': 'true'}
+            debug("Setting configuration option:\n{}".format(
+                pprint.pformat(enable_udf, indent=4))
+            )
+            self.cluster.set_configuration_options(values=enable_udf)
+
         if self.extra_config is not None:
-            debug("Setting extra configuration options:\n" + pprint.pformat(dict(self.extra_config), indent=4))
-            self.cluster.set_configuration_options(values=dict(self.extra_config))
+            debug("Setting extra configuration options:\n{}".format(
+                pprint.pformat(dict(self.extra_config), indent=4))
+            )
+            self.cluster.set_configuration_options(
+                values=dict(self.extra_config)
+            )
 
     def parallel_upgrade_test(self):
         """
