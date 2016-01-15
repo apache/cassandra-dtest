@@ -294,7 +294,7 @@ class UpgradeTester(Tester):
     def init_config(self):
         self.init_default_config()
 
-        if self.cluster.version() > '2.1':
+        if self.cluster.version() >= '2.2':
             enable_udf = {'enable_user_defined_functions': 'true'}
             debug("Setting configuration option:\n{}".format(
                 pprint.pformat(enable_udf, indent=4))
