@@ -63,11 +63,18 @@ class TestTopology(Tester):
         cluster.flush()
 
         # Move nodes to balance the cluster
+        def move_node(node, token, ip):
+            mark = node.mark_log()
+            node.move(token)  # can't assume 0 is balanced with m3p
+            node.watch_log_for('{} state jump to NORMAL'.format(ip), from_mark=mark, timeout=180)
+            time.sleep(3)
+
         balancing_tokens = cluster.balanced_tokens(3)
-        escformat = '%s'
-        node1.move(escformat % balancing_tokens[0])  # can't assume 0 is balanced with m3p
-        node2.move(escformat % balancing_tokens[1])
-        node3.move(escformat % balancing_tokens[2])
+
+        move_node(node1, balancing_tokens[0], '127.0.0.1')
+        move_node(node2, balancing_tokens[1], '127.0.0.2')
+        move_node(node3, balancing_tokens[2], '127.0.0.3')
+
         time.sleep(1)
 
         cluster.cleanup()
