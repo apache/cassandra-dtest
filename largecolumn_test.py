@@ -16,6 +16,7 @@ class TestLargeColumn(Tester):
 
     def directbytes(self, node):
         output = node.nodetool("gcstats", capture_output=True)
+        debug(output)
         output = output[0].split("\n")
         assert output[0].strip().startswith("Interval"), "Expected output from nodetool gcstats starts with a header line with first column Interval"
         fields = output[1].split()
@@ -26,7 +27,7 @@ class TestLargeColumn(Tester):
 
     def cleanup_test(self):
         """
-        See CASSANDRA-8670
+        @jira_ticket CASSANDRA-8670
         """
         cluster = self.cluster
         # Commit log segment size needs to increase for the database to be willing to accept columns that large
@@ -55,4 +56,4 @@ class TestLargeColumn(Tester):
         # Any growth in memory usage should not be proportional column size. Really almost no memory should be used
         # since Netty was instructed to use a heap allocator
         diff = int(afterStress) - int(beforeStress)
-        assert diff < LARGE_COLUMN_SIZE, diff
+        self.assertLess(diff, LARGE_COLUMN_SIZE)
