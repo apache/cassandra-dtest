@@ -77,6 +77,7 @@ def offheap_memtable_val(node):
     offheap_memtable = memtable_allocation_type is not None and memtable_allocation_type.startswith('offheap')
     return 'MBeanIncrement' if offheap_memtable else 'MBeanEqual'
 
+
 class TestJMXMetrics(Tester):
 
     def __init__(self, *args, **kwargs):

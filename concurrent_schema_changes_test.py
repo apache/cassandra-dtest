@@ -519,7 +519,7 @@ class TestConcurrentSchemaChanges(Tester):
 
         cluster.stop()
 
-        ### restore the snapshots ##
+        # restore the snapshots
         # clear the commitlogs and data
         dirs = ('%s/commitlogs' % node1.get_path(),
                 '%s/commitlogs' % node2.get_path(),

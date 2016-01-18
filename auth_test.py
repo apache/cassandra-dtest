@@ -160,7 +160,6 @@ class TestAuth(Tester):
         cassandra.execute("CREATE USER Test WITH PASSWORD '12345'")
         cassandra.execute("ALTER USER Test WITH PASSWORD '54321'")
 
-
     def regular_users_can_alter_their_passwords_only_test(self):
         self.prepare()
 

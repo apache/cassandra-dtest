@@ -197,7 +197,7 @@ class TestCompaction(Tester):
         stress_write(node1, keycount=1)
         node1.nodetool('disableautocompaction')
 
-        stress_write(node1, keycount=200000*cluster.data_dir_count)
+        stress_write(node1, keycount=200000 * cluster.data_dir_count)
 
         threshold = "5"
         node1.nodetool('setcompactionthroughput -- ' + threshold)
