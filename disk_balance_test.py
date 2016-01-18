@@ -24,11 +24,10 @@ class TestDiskBalance(Tester):
         for node in cluster.nodelist():
             self.assert_balanced(node)
 
-    @known_failure(failure_source='systemic',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10974',
-                   flaky=False)
     def disk_balance_bootstrap_test(self):
         cluster = self.cluster
+        if not DISABLE_VNODES:
+            cluster.set_configuration_options(values={'num_tokens': 256})
         # apparently we have legitimate errors in the log when bootstrapping (see bootstrap_test.py)
         self.allow_log_errors = True
         cluster.set_configuration_options(values={'allocate_tokens_for_keyspace': 'keyspace1'})
@@ -53,12 +52,10 @@ class TestDiskBalance(Tester):
         for node in cluster.nodelist():
             self.assert_balanced(node)
 
-    @known_failure(failure_source='systemic',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10973',
-                   flaky=False)
     def disk_balance_decommission_test(self):
         cluster = self.cluster
-        cluster.set_datadir_count(3)
+        if not DISABLE_VNODES:
+            cluster.set_configuration_options(values={'num_tokens': 256})
         cluster.set_configuration_options(values={'allocate_tokens_for_keyspace': 'keyspace1'})
         cluster.populate(4).start(wait_for_binary_proto=True)
         node1 = cluster.nodes['node1']

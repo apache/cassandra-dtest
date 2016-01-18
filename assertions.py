@@ -55,11 +55,7 @@ def assert_all(session, query, expected, cl=ConsistencyLevel.ONE, ignore_order=F
 
 
 def assert_almost_equal(*args, **kwargs):
-    try:
-        error = kwargs['error']
-    except KeyError:
-        error = 0.16
-
+    error = kwargs['error'] if 'error' in kwargs else 0.16
     vmax = max(args)
     vmin = min(args)
     assert vmin > vmax * (1.0 - error) or vmin == vmax, "values not within %.2f%% of the max: %s (%s)" % (error * 100, args, kwargs['error_message'])
