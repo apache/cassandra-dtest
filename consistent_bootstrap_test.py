@@ -1,11 +1,13 @@
 from dtest import Tester, debug
-from tools import (create_c1c2_table, insert_c1c2, query_c1c2,
+from tools import (create_c1c2_table, known_failure, insert_c1c2, query_c1c2,
                    new_node, no_vnodes)
 from cassandra import ConsistencyLevel
 
 
 class TestBootstrapConsistency(Tester):
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11034')
     @no_vnodes()
     def consistent_reads_after_move_test(self):
         debug("Creating a ring")
