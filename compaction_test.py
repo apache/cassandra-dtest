@@ -213,7 +213,7 @@ class TestCompaction(Tester):
         avgthroughput = re.match(throughput_pattern, stringline).group(1).strip()
         debug(avgthroughput)
 
-        self.assertGreaterEqual(float(threshold), float(avgthroughput))
+        self.assertGreaterEqual(float(threshold), round(float(avgthroughput)))
 
     def compaction_strategy_switching_test(self):
         """Ensure that switching strategies does not result in problems.
