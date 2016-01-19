@@ -214,8 +214,6 @@ class TestPushedNotifications(Tester):
         notifications = waiter.wait_for_notifications(timeout=30.0, num_notifications=3)
         self.assertEquals(0, len(notifications))
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10932')
     @since("3.0")
     def schema_changes_test(self):
         """
@@ -242,22 +240,16 @@ class TestPushedNotifications(Tester):
         session.execute("drop KEYSPACE ks")
 
         debug("Waiting for notifications from {}".format(waiter.address,))
-        notifications = waiter.wait_for_notifications(timeout=60.0, num_notifications=14)
-        self.assertEquals(14, len(notifications))
+        notifications = waiter.wait_for_notifications(timeout=60.0, num_notifications=8)
+        self.assertEquals(8, len(notifications))
         self.assertDictContainsSubset({'change_type': u'CREATED', 'target_type': u'KEYSPACE'}, notifications[0])
-        self.assertDictContainsSubset({'change_type': u'UPDATED', 'target_type': u'KEYSPACE'}, notifications[1])
-        self.assertDictContainsSubset({'change_type': u'CREATED', 'target_type': u'TABLE', u'table': u't'}, notifications[2])
-        self.assertDictContainsSubset({'change_type': u'UPDATED', 'target_type': u'KEYSPACE'}, notifications[3])
-        self.assertDictContainsSubset({'change_type': u'UPDATED', 'target_type': u'TABLE', u'table': u't'}, notifications[4])
-        self.assertDictContainsSubset({'change_type': u'UPDATED', 'target_type': u'KEYSPACE'}, notifications[5])
-        self.assertDictContainsSubset({'change_type': u'CREATED', 'target_type': u'TABLE', u'table': u'mv'}, notifications[6])
-        self.assertDictContainsSubset({'change_type': u'UPDATED', 'target_type': u'KEYSPACE'}, notifications[7])
-        self.assertDictContainsSubset({'change_type': u'UPDATED', 'target_type': u'TABLE', u'table': u'mv'}, notifications[8])
-        self.assertDictContainsSubset({'change_type': u'UPDATED', 'target_type': u'KEYSPACE'}, notifications[9])
-        self.assertDictContainsSubset({'change_type': u'DROPPED', 'target_type': u'TABLE', u'table': u'mv'}, notifications[10])
-        self.assertDictContainsSubset({'change_type': u'UPDATED', 'target_type': u'KEYSPACE'}, notifications[11])
-        self.assertDictContainsSubset({'change_type': u'DROPPED', 'target_type': u'TABLE', u'table': u't'}, notifications[12])
-        self.assertDictContainsSubset({'change_type': u'DROPPED', 'target_type': u'KEYSPACE'}, notifications[13])
+        self.assertDictContainsSubset({'change_type': u'CREATED', 'target_type': u'TABLE', u'table': u't'}, notifications[1])
+        self.assertDictContainsSubset({'change_type': u'UPDATED', 'target_type': u'TABLE', u'table': u't'}, notifications[2])
+        self.assertDictContainsSubset({'change_type': u'CREATED', 'target_type': u'TABLE', u'table': u'mv'}, notifications[3])
+        self.assertDictContainsSubset({'change_type': u'UPDATED', 'target_type': u'TABLE', u'table': u'mv'}, notifications[4])
+        self.assertDictContainsSubset({'change_type': u'DROPPED', 'target_type': u'TABLE', u'table': u'mv'}, notifications[5])
+        self.assertDictContainsSubset({'change_type': u'DROPPED', 'target_type': u'TABLE', u'table': u't'}, notifications[6])
+        self.assertDictContainsSubset({'change_type': u'DROPPED', 'target_type': u'KEYSPACE'}, notifications[7])
 
 
 class TestVariousNotifications(Tester):
