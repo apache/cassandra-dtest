@@ -76,8 +76,13 @@ class TestCQL(UpgradeTester):
                 [UUID('550e8400-e29b-41d4-a716-446655440000'), 36, None, None],
             ], res
 
+    @since('2.0', max_version='2.2.X')
     def large_collection_errors_test(self):
         """ For large collections, make sure that we are printing warnings """
+
+        for version in self.get_node_versions():
+            if version >= '3.0':
+                raise SkipTest('version {} not compatible with protocol version 2'.format(version))
 
         # We only warn with protocol 2
         cursor = self.prepare(protocol_version=2)
@@ -4088,12 +4093,12 @@ class TestCQL(UpgradeTester):
         """
         @jira_ticket CASSANDRA-8062
         """
-        cursor = self.prepare(protocol_version=2)
-        cursor.execute("CREATE TABLE test (k int, c1 int, c2 text, PRIMARY KEY (k, c1, c2))")
-
         for version in self.get_node_versions():
             if version >= '3.0':
                 raise SkipTest('version {} not compatible with protocol version 2'.format(version))
+
+        cursor = self.prepare(protocol_version=2)
+        cursor.execute("CREATE TABLE test (k int, c1 int, c2 text, PRIMARY KEY (k, c1, c2))")
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
             debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
