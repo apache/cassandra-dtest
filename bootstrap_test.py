@@ -108,7 +108,6 @@ class TestBootstrap(Tester):
         rows = session.execute("SELECT bootstrapped FROM system.local WHERE key='local'")
         self.assertEqual(rows[0][0], 'COMPLETED')
 
-
     def read_from_bootstrapped_node_test(self):
         """Test bootstrapped node sees existing data, eg. CASSANDRA-6648"""
         cluster = self.cluster

@@ -373,7 +373,7 @@ class TestArchiveCommitlog(SnapshotTester):
                             tmp_commitlog=tmp_commitlog)),
                          (r'^restore_command=.*$', 'restore_command=cp -f %from %to'),
                          (r'^restore_directories=.*$', 'restore_directories={tmp_commitlog}'.format(
-                            tmp_commitlog=tmp_commitlog))])
+                          tmp_commitlog=tmp_commitlog))])
 
         cluster.start(wait_for_binary_proto=True)
 
