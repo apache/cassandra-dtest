@@ -1,7 +1,7 @@
 import os
 import os.path
 from dtest import Tester, DISABLE_VNODES
-from tools import since, new_node, create_c1c2_table, insert_c1c2, query_c1c2, known_failure
+from tools import since, new_node, create_c1c2_table, insert_c1c2, query_c1c2
 from assertions import assert_almost_equal
 from jmxutils import JolokiaAgent, make_mbean, remove_perf_disable_shared_mem
 
