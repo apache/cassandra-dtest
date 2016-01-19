@@ -1,9 +1,10 @@
 import os
 import os.path
-from dtest import Tester, DISABLE_VNODES
-from tools import since, new_node, create_c1c2_table, insert_c1c2, query_c1c2
+
 from assertions import assert_almost_equal
+from dtest import DISABLE_VNODES, Tester
 from jmxutils import JolokiaAgent, make_mbean, remove_perf_disable_shared_mem
+from tools import create_c1c2_table, insert_c1c2, new_node, query_c1c2, since
 
 
 @since('3.2')
