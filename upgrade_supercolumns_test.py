@@ -95,7 +95,7 @@ class TestSCUpgrade(Tester):
         if get_version_from_build(CASSANDRA_DIR) >= '2.1':
             # Upgrade nodes to 2.0.
             # See CASSANDRA-7008
-            self.upgrade_to_version("git:cassandra-2.0")
+            self.upgrade_to_version("binary:2.0.17")
             time.sleep(.5)
 
         # Upgrade node 1
@@ -203,7 +203,7 @@ class TestSCUpgrade(Tester):
         if get_version_from_build(CASSANDRA_DIR) >= '2.1':
             # Upgrade nodes to 2.0.
             # See CASSANDRA-7008
-            self.upgrade_to_version("git:cassandra-2.0", [node1])
+            self.upgrade_to_version("binary:2.0.17", [node1])
             time.sleep(.5)
         else:
             node1.drain()
@@ -234,7 +234,7 @@ class TestSCUpgrade(Tester):
         if get_version_from_build(CASSANDRA_DIR) >= '2.1':
             # Upgrade nodes to 2.0.
             # See CASSANDRA-7008
-            self.upgrade_to_version("git:cassandra-2.0", [node2, node3])
+            self.upgrade_to_version("binary:2.0.17", [node2, node3])
             time.sleep(.5)
         else:
             node2.drain()
