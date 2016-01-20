@@ -213,7 +213,10 @@ class TestCompaction(Tester):
         avgthroughput = re.match(throughput_pattern, stringline).group(1).strip()
         debug(avgthroughput)
 
-        self.assertGreaterEqual(float(threshold), round(float(avgthroughput)))
+        # The throughput in the log is computed independantly from the throttling and on the output files while
+        # throttling is on the input files, so while that throughput shouldn't be higher than the one set in
+        # principle, a bit of wiggle room is expected
+        self.assertGreaterEqual(float(threshold) + 0.5, float(avgthroughput))
 
     def compaction_strategy_switching_test(self):
         """Ensure that switching strategies does not result in problems.
