@@ -1,7 +1,4 @@
-import os
 import time
-
-from ccmlib.common import get_version_from_build
 
 from thrift_bindings.v22.ttypes import (KsDef, CfDef, Mutation, ColumnOrSuperColumn,
                                         Column, SuperColumn, SliceRange, SlicePredicate,
@@ -91,8 +88,7 @@ class TestSCUpgrade(Tester):
         session.cluster.shutdown()
         client.transport.close()
 
-        CASSANDRA_DIR = os.environ.get('CASSANDRA_DIR')
-        if get_version_from_build(CASSANDRA_DIR) >= '2.1':
+        if self.cluster.version() >= '2.1':
             # Upgrade nodes to 2.0.
             # See CASSANDRA-7008
             self.upgrade_to_version("binary:2.0.17")
@@ -199,8 +195,7 @@ class TestSCUpgrade(Tester):
         # If we are on 2.1 or any higher version upgrade to 2.0.latest.
         # Otherwise, we must be on a 2.0.x, so we should be upgrading to that version.
         # This will let us test upgrading from 1.2.19 to each of the 2.0 minor releases.
-        CASSANDRA_DIR = os.environ.get('CASSANDRA_DIR')
-        if get_version_from_build(CASSANDRA_DIR) >= '2.1':
+        if self.cluster.version() >= '2.1':
             # Upgrade nodes to 2.0.
             # See CASSANDRA-7008
             self.upgrade_to_version("binary:2.0.17", [node1])
@@ -231,7 +226,7 @@ class TestSCUpgrade(Tester):
 
             client.transport.close()
 
-        if get_version_from_build(CASSANDRA_DIR) >= '2.1':
+        if self.cluster.version() >= '2.1':
             # Upgrade nodes to 2.0.
             # See CASSANDRA-7008
             self.upgrade_to_version("binary:2.0.17", [node2, node3])
