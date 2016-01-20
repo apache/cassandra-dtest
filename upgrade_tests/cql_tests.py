@@ -3669,10 +3669,12 @@ class TestCQL(UpgradeTester):
             assert_all(cursor, "SELECT k, v FROM test WHERE m CONTAINS KEY 'a'", [[1, 1], [0, 0], [0, 1]])
             assert_all(cursor, "SELECT k, v FROM test WHERE k = 0 AND m CONTAINS KEY 'a'", [[0, 0], [0, 1]])
             assert_all(cursor, "SELECT k, v FROM test WHERE m CONTAINS KEY 'c'", [[0, 2]])
-            assert_none(cursor, "SELECT k, v FROM test  WHERE m CONTAINS KEY 'd'")
+            assert_none(cursor, "SELECT k, v FROM test WHERE m CONTAINS KEY 'd'")
 
-            # we're not allowed to create a value index if we already have a key one
-            assert_invalid(cursor, "CREATE INDEX ON test(m)")
+            # since 3.0, multiple indexes per-column are supported, so we can
+            # create a value index even though we already have one on the keys
+            if is_upgraded:
+                cursor.execute("CREATE INDEX ON test(m)")
 
     def nan_infinity_test(self):
         cursor = self.prepare()
