@@ -94,8 +94,8 @@ class TestCompaction(Tester):
             finalValue = int(output[output.find(":") + 1:output.find("\n")].strip())
         else:
             debug("datasize not found")
-
-        self.assertLess(finalValue, initialValue)
+        # allow 5% size increase - if we have few sstables it is not impossible that live size increases *slightly* after compaction
+        self.assertLess(finalValue, initialValue * 1.05)
 
     @known_failure(failure_source='cassandra',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10914',
