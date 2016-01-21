@@ -5,7 +5,7 @@ import subprocess
 
 from ccmlib import common
 from dtest import Tester, debug
-from tools import known_failure, since
+from tools import since
 
 
 class TestOfflineTools(Tester):
@@ -93,8 +93,6 @@ class TestOfflineTools(Tester):
             if pattern.search(output):
                 break
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10846')
     def sstableofflinerelevel_test(self):
         """
         Generate sstables of varying levels.
