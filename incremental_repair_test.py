@@ -1,7 +1,6 @@
 import os
 import time
 from re import findall
-from unittest import skip
 
 from cassandra import ConsistencyLevel
 from nose.plugins.attrib import attr
@@ -208,7 +207,6 @@ class TestIncRepair(Tester):
             assert_one(session, "select val from tab where key =" + str(x), [1])
 
     @attr('long')
-    @skip('hangs CI')
     def multiple_subsequent_repair_test(self):
         """
         Covers CASSANDRA-8366
