@@ -6,7 +6,7 @@ import time
 
 from assertions import assert_none, assert_one
 from dtest import Tester, debug
-from tools import known_failure, since
+from tools import since
 
 
 class TestCompaction(Tester):
@@ -95,9 +95,6 @@ class TestCompaction(Tester):
         # allow 5% size increase - if we have few sstables it is not impossible that live size increases *slightly* after compaction
         self.assertLess(finalValue, initialValue * 1.05)
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10914',
-                   flaky=True)
     def sstable_deletion_test(self):
         """
         Test that sstables are deleted properly when able after compaction.
