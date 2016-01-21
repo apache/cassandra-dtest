@@ -60,8 +60,6 @@ class TestCompaction(Tester):
 
         self.assertEqual(numfound, 10)
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10843')
     def data_size_test(self):
         """
         Ensure that data size does not have unwarranted increases after compaction.
