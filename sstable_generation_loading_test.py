@@ -67,8 +67,8 @@ class TestSSTableGenerationAndLoading(Tester):
         node1.stop()
         time.sleep(1)
         paths = []
-        for x in xrange(0, cluster.data_dir_count):
-            basepath = os.path.join(node1.get_path(), 'data{0}'.format(x), 'keyspace1')
+        for data_dir in node1.data_directories():
+            basepath = os.path.join(data_dir, 'keyspace1')
             for x in os.listdir(basepath):
                 if x.startswith("standard1"):
                     path = os.path.join(basepath, x)

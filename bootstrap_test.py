@@ -392,7 +392,7 @@ class TestBootstrap(Tester):
         node2.stop(wait_other_notice=False)
 
         # Wipe its data
-        for data_dir in [os.path.join(node2.get_path(), "data{0}".format(x)) for x in xrange(0, self.cluster.data_dir_count)]:
+        for data_dir in node2.data_directories():
             debug("Deleting {}".format(data_dir))
             shutil.rmtree(data_dir)
 
@@ -492,9 +492,8 @@ class TestBootstrap(Tester):
             assert_one(session, "SELECT count(*) from keyspace1.standard1", [500000], cl=ConsistencyLevel.ONE)
 
     def _cleanup(self, node):
-        data_dirs = [os.path.join(node.get_path(), 'data{0}'.format(x)) for x in xrange(0, self.cluster.data_dir_count)]
         commitlog_dir = os.path.join(node.get_path(), 'commitlogs')
-        for data_dir in data_dirs:
+        for data_dir in node.data_directories():
             debug("Deleting {}".format(data_dir))
             shutil.rmtree(data_dir)
         shutil.rmtree(commitlog_dir)

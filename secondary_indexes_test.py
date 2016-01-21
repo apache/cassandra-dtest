@@ -290,8 +290,8 @@ class TestSecondaryIndexes(Tester):
         self.assertEqual(1, len(list(session.execute(stmt, [lookup_value]))))
         before_files = []
         index_sstables_dirs = []
-        for x in xrange(0, cluster.data_dir_count):
-            data_dir = os.path.join(node1.get_path(), 'data{0}/keyspace1'.format(x))
+        for data_dir in node1.data_directories():
+            data_dir = os.path.join(data_dir, 'keyspace1')
             base_tbl_dir = os.path.join(data_dir, [s for s in os.listdir(data_dir) if s.startswith("standard1")][0])
             index_sstables_dir = os.path.join(base_tbl_dir, '.ix_c0')
             before_files.extend(os.listdir(index_sstables_dir))
