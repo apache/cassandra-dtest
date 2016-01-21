@@ -186,7 +186,9 @@ class SSTableUtilTest(Tester):
         return sorted(ret)
 
     def _get_sstable_transaction_logs(self, node, ks, table):
-        keyspace_dir = os.path.join(node.get_path(), 'data', ks)
-        ret = glob.glob(os.path.join(keyspace_dir, table + '-*', "*.log"))
+        ret = []
+        for x in xrange(0, self.cluster.data_dir_count):
+            keyspace_dir = os.path.join(node.get_path(), 'data{0}'.format(x), ks)
+            ret.extend(glob.glob(os.path.join(keyspace_dir, table + '-*', "*.log")))
 
         return sorted(ret)
