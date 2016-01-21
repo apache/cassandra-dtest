@@ -354,7 +354,7 @@ class TestSecondaryIndexes(Tester):
         cluster = self.cluster
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
-        session = self.patient_cql_connection(node1)
+        session = self.patient_exclusive_cql_connection(node3)
         session.max_trace_wait = 120
         session.execute("CREATE KEYSPACE ks WITH REPLICATION = {'class': 'SimpleStrategy', 'replication_factor': '1'};")
         session.execute("CREATE TABLE ks.cf (a text PRIMARY KEY, b text);")
@@ -401,10 +401,12 @@ class TestSecondaryIndexes(Tester):
 
         trace = result.get_query_trace()
 
-        # node2 is the coordinator for the query
+        # we have forced node3 to act as the coordinator for
+        # all requests by using an exclusive connection, so
+        # only node3 should select the index to use
         check_trace_events(trace,
                            "Index mean cardinalities are b_index:[0-9]*. Scanning with b_index.",
-                           [("127.0.0.1", 0, 0), ("127.0.0.2", 1, 1), ("127.0.0.3", 0, 0)])
+                           [("127.0.0.1", 0, 0), ("127.0.0.2", 0, 0), ("127.0.0.3", 1, 1)])
         # check that the index is used on each node, really we only care that the matching
         # message appears on every node, so the max count is not important
         check_trace_events(trace,
