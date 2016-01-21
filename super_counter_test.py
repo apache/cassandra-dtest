@@ -1,7 +1,6 @@
 import time
 
 from dtest import Tester, debug
-from tools import known_failure
 from thrift_tests import get_thrift_client
 
 from cql.cassandra.ttypes import CfDef, ColumnParent, CounterColumn, \
@@ -18,9 +17,6 @@ class TestSuperCounterClusterRestart(Tester):
         kwargs['cluster_options'] = {'start_rpc': 'true'}
         Tester.__init__(self, *args, **kwargs)
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10893',
-                   notes='Fails on Windows on trunk')
     def functional_test(self):
         NUM_SUBCOLS = 100
         NUM_ADDS = 100
