@@ -4,7 +4,7 @@ import re
 import time
 
 from dtest import Tester, debug, PRINT_DEBUG
-from tools import known_failure, no_vnodes, since
+from tools import no_vnodes, since
 
 from cassandra.query import SimpleStatement
 from cassandra import ConsistencyLevel
@@ -157,32 +157,23 @@ class ReplicationTest(Tester):
                 print("%s\t%s\t%s\t%s" % (t.source, t.source_elapsed, t.description, t.thread_name))
             print("-" * 40)
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10885',
-                   flaky=True)
     def simple_test(self):
         """Test the SimpleStrategy on a 3 node cluster"""
-        self.cluster.populate(3).start()
-        time.sleep(5)
+        self.cluster.populate(3).start(wait_for_binary_proto=True, wait_other_notice=True)
         node1 = self.cluster.nodelist()[0]
-        self.conn = self.patient_exclusive_cql_connection(node1)
-
-        # Install a tracing session so we can get info about who the
-        # coordinator is contacting:
-        session = self.conn
+        session = self.patient_exclusive_cql_connection(node1)
         session.max_trace_wait = 120
+        session.default_consistency_level = ConsistencyLevel.ALL
 
         replication_factor = 3
         self.create_ks(session, 'test', replication_factor)
         session.execute('CREATE TABLE test.test (id int PRIMARY KEY, value text)', trace=False)
-        # Wait for table creation, otherwise trace times out -
-        # CASSANDRA-5658
-        time.sleep(5)
 
         for key, token in murmur3_hashes.items():
             query = SimpleStatement("INSERT INTO test (id, value) VALUES (%s, 'asdf')" % key, consistency_level=ConsistencyLevel.ALL)
             future = session.execute_async(query, trace=True)
             future.result()
+            time.sleep(5)  # We need to wait for system_traces to be populated. See CASSANDRA-10882
             trace = future.get_query_trace(max_wait=120)
             self.pprint_trace(trace)
             stats = self.get_replicas_from_trace(trace)
@@ -197,26 +188,18 @@ class ReplicationTest(Tester):
             # acknowledged the write:
             self.assertEqual(stats['nodes_sent_write'], stats['nodes_responded_write'])
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10882')
     def network_topology_test(self):
         """Test the NetworkTopologyStrategy on a 2DC 3:3 node cluster"""
-        self.cluster.populate([3, 3]).start()
-        time.sleep(5)
+        self.cluster.populate([3, 3]).start(wait_for_binary_proto=True, wait_other_notice=True)
+
         node1 = self.cluster.nodelist()[0]
         ip_nodes = dict((node.address(), node) for node in self.cluster.nodelist())
-        self.conn = self.patient_exclusive_cql_connection(node1)
-
-        # Install a tracing session so we can get info about who the
-        # coordinator is contacting:
-        session = self.conn
+        session = self.patient_exclusive_cql_connection(node1)
 
         replication_factor = {'dc1': 2, 'dc2': 2}
         self.create_ks(session, 'test', replication_factor)
         session.execute('CREATE TABLE test.test (id int PRIMARY KEY, value text)', trace=False)
-        # Wait for table creation, otherwise trace times out -
-        # CASSANDRA-5658
-        time.sleep(5)
+        session.default_consistency_level = ConsistencyLevel.ALL
 
         forwarders_used = set()
 
@@ -224,6 +207,7 @@ class ReplicationTest(Tester):
             query = SimpleStatement("INSERT INTO test (id, value) VALUES (%s, 'asdf')" % key, consistency_level=ConsistencyLevel.ALL)
             future = session.execute_async(query, trace=True)
             future.result()
+            time.sleep(5)  # We need to wait for system_traces to be populated. See CASSANDRA-10882
             trace = future.get_query_trace(max_wait=120)
             self.pprint_trace(trace)
             stats = self.get_replicas_from_trace(trace)
