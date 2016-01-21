@@ -179,8 +179,6 @@ class TestCompaction(Tester):
         for expired_sstable in expired_sstables:
             assert expired_sstable not in node1.get_sstables('ks', 'cf')
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10842')
     def compaction_throughput_test(self):
         """
         Test setting compaction throughput.
