@@ -15,7 +15,7 @@ from cassandra.cluster import Cluster
 from cassandra.query import SimpleStatement
 
 from dtest import Tester, debug
-from tools import since, new_node, known_failure
+from tools import since, new_node
 from assertions import assert_all, assert_one, assert_invalid, assert_unavailable, assert_none, assert_crc_check_chance_equal
 
 
@@ -706,9 +706,6 @@ class TestMaterializedViews(Tester):
                 cl=ConsistencyLevel.ALL
             )
 
-    @known_failure(failure_source='systemic',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10977',
-                   flaky=False)
     def view_tombstone_test(self):
         """
         Test that a materialized views properly tombstone
