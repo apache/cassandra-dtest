@@ -1,5 +1,5 @@
 from dtest import Tester, debug
-from tools import since
+from tools import known_failure, since
 
 
 @since('2.2')
@@ -25,6 +25,8 @@ class TestLargeColumn(Tester):
             assert field.strip().isdigit() or field == 'NaN', "Expected numeric from fields from nodetool gcstats"
         return fields[6]
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11058')
     def cleanup_test(self):
         """
         @jira_ticket CASSANDRA-8670
