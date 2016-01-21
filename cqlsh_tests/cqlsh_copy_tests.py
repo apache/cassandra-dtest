@@ -23,7 +23,7 @@ from cqlsh_tools import (DummyColorMap, assert_csvs_items_equal, csv_rows,
                          strip_timezone_if_time_string, unmonkeypatch_driver,
                          write_rows_to_csv)
 from dtest import Tester, canReuseCluster, freshCluster, debug, DISABLE_VNODES
-from tools import known_failure, rows_to_list, since
+from tools import rows_to_list, since
 
 DEFAULT_FLOAT_PRECISION = 5  # magic number copied from cqlsh script
 DEFAULT_TIME_FORMAT = '%Y-%m-%d %H:%M:%S%z'  # based on cqlsh script
@@ -2110,9 +2110,6 @@ class CqlshCopyTest(Tester):
         self.assertEqual(sum(1 for _ in open(tempfile1.name)),
                          sum(1 for _ in open(tempfile2.name)))
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10938')
-    @freshCluster()
     def test_bulk_round_trip_default(self):
         """
         Test bulk import with default stress import (one row per operation)
@@ -2121,23 +2118,39 @@ class CqlshCopyTest(Tester):
         """
         self._test_bulk_round_trip(nodes=3, partitioner="murmur3", num_operations=100000)
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10938')
     @freshCluster()
     def test_bulk_round_trip_blogposts(self):
         """
-        Test bulk import with a user profile that inserts 10 rows per operation
+        Test bulk import with a user profile that inserts 10 rows per operation and has a replication factor 3
 
         @jira_ticket CASSANDRA-9302
         """
-        self._test_bulk_round_trip(nodes=3, partitioner="murmur3", num_operations=10000,
+        self._test_bulk_round_trip(nodes=5, partitioner="murmur3", num_operations=10000,
+                                   configuration_options={'batch_size_warn_threshold_in_kb': '10'},
                                    profile=os.path.join(os.path.dirname(os.path.realpath(__file__)), 'blogposts.yaml'),
                                    stress_table='stresscql.blogposts',
                                    copy_to_options={'PAGETIMEOUT': 60, 'PAGESIZE': 1000})
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10938')
     @freshCluster()
+    def test_bulk_round_trip_blogposts_with_max_connections(self):
+        """
+        Same as test_bulk_round_trip_blogposts but limit the maximum number of concurrent connections a host will
+        accept to simulate a failed connection to a replica that is up. We should have at most worker_processes * nodes
+        connections plus 1 (the cqlsh connection) and so 4 * 5 + 1 = 21 connections but each host will only accept
+        a maximum of 12 connections. This is an arbitrary number chosen so that we should get some failures but not
+        so many that we cannot continue (for COPY FROM the driver handles failed connections but it should be OK
+        as long as it can reach a replica).
+
+        @jira_ticket CASSANDRA-10938
+        """
+        self._test_bulk_round_trip(nodes=5, partitioner="murmur3", num_operations=10000,
+                                   configuration_options={'native_transport_max_concurrent_connections': '12',
+                                                          'batch_size_warn_threshold_in_kb': '10'},
+                                   profile=os.path.join(os.path.dirname(os.path.realpath(__file__)), 'blogposts.yaml'),
+                                   stress_table='stresscql.blogposts',
+                                   copy_to_options={'PAGETIMEOUT': 60, 'PAGESIZE': 1000, 'NUMPROCESSES': 5},
+                                   copy_from_options={'NUMPROCESSES': 4})
+
     def test_bulk_round_trip_with_timeouts(self):
         """
         Test bulk import with very short read and write timeout values, this should exercise the
@@ -2152,9 +2165,6 @@ class CqlshCopyTest(Tester):
                                    copy_to_options={'PAGETIMEOUT': 60, 'PAGESIZE': 1000},
                                    skip_count_checks=True)
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10938')
-    @freshCluster()
     def test_bulk_round_trip_with_low_ingestrate(self):
         """
         Test bulk import with default stress import (one row per operation) and a low
