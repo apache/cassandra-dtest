@@ -109,6 +109,8 @@ class TestPushedNotifications(Tester):
             self.assertEquals("MOVED_NODE", change_type)
             self.assertEquals(self.get_ip_from_node(node1), address)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11057')
     @no_vnodes()
     def move_single_node_localhost_test(self):
         """
