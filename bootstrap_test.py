@@ -323,19 +323,19 @@ class TestBootstrap(Tester):
         original_rows = list(session.execute("SELECT * FROM {}".format(stress_table,)))
 
         # Add a new node, bootstrap=True ensures that it is not a seed
-        node2 = new_node(cluster, bootstrap=True)
-        node2.start(wait_for_binary_proto=True)
+        node4 = new_node(cluster, bootstrap=True)
+        node4.start(wait_for_binary_proto=True)
 
-        session = self.patient_cql_connection(node2)
+        session = self.patient_cql_connection(node4)
         self.assertEquals(original_rows, list(session.execute("SELECT * FROM {}".format(stress_table,))))
 
         # Stop the new node and wipe its data
-        node2.stop(gently=gently)
-        self._cleanup(node2)
+        node4.stop(gently=gently)
+        self._cleanup(node4)
         # Now start it, it should not be allowed to join.
-        mark = node2.mark_log()
-        node2.start(no_wait=True)
-        node2.watch_log_for("A node with address /127.0.0.4 already exists, cancelling join", from_mark=mark)
+        mark = node4.mark_log()
+        node4.start(no_wait=True)
+        node4.watch_log_for("A node with address /127.0.0.4 already exists, cancelling join", from_mark=mark)
 
     def decommissioned_wiped_node_can_join_test(self):
         """
@@ -356,20 +356,20 @@ class TestBootstrap(Tester):
         original_rows = list(session.execute("SELECT * FROM {}".format(stress_table,)))
 
         # Add a new node, bootstrap=True ensures that it is not a seed
-        node2 = new_node(cluster, bootstrap=True)
-        node2.start(wait_for_binary_proto=True, wait_other_notice=True)
+        node4 = new_node(cluster, bootstrap=True)
+        node4.start(wait_for_binary_proto=True, wait_other_notice=True)
 
-        session = self.patient_cql_connection(node2)
+        session = self.patient_cql_connection(node4)
         self.assertEquals(original_rows, list(session.execute("SELECT * FROM {}".format(stress_table,))))
 
         # Decommission the new node and wipe its data
-        node2.decommission()
-        node2.stop(wait_other_notice=True)
-        self._cleanup(node2)
+        node4.decommission()
+        node4.stop(wait_other_notice=True)
+        self._cleanup(node4)
         # Now start it, it should be allowed to join
-        mark = node2.mark_log()
-        node2.start(wait_other_notice=True)
-        node2.watch_log_for("JOINING:", from_mark=mark)
+        mark = node4.mark_log()
+        node4.start(wait_other_notice=True)
+        node4.watch_log_for("JOINING:", from_mark=mark)
 
     def decommissioned_wiped_node_can_gossip_to_single_seed_test(self):
         """
