@@ -87,7 +87,6 @@ class SSTableUtilTest(Tester):
 
         # restart to make sure not data is lost
         node.start(wait_for_binary_proto=True)
-        node.watch_log_for("Compacted(.*)%s" % (TableName, ), filename=log_file_name)
 
         finalfiles, tmpfiles = self._check_files(node, KeyspaceName, TableName)
         self.assertEqual(0, len(tmpfiles))
@@ -115,7 +114,7 @@ class SSTableUtilTest(Tester):
         tmpfiles = _normcase_all(self._invoke_sstableutil(ks, table, type='tmp'))
         expected_oplogs = _normcase_all(self._get_sstable_transaction_logs(node, ks, table))
         tmpfiles_with_oplogs = _normcase_all(self._invoke_sstableutil(ks, table, type='tmp', oplogs=True))
-        oplogs = list(set(tmpfiles_with_oplogs) - set(tmpfiles))
+        oplogs = _normcase_all(sorted(list(set(tmpfiles_with_oplogs) - set(tmpfiles))))
 
         if expected_finalfiles is None:
             expected_finalfiles = allfiles
