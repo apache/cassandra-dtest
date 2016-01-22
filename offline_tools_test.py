@@ -141,7 +141,7 @@ class TestOfflineTools(Tester):
 
         # test by loading large amount data so we have multiple sstables
         cluster.start(wait_for_binary_proto=True)
-        keys = 100 * cluster.data_dir_count
+        keys = 200 * cluster.data_dir_count
         node1.stress(['write', 'n={0}K'.format(keys), '-schema', 'replication(factor=1)'])
         node1.flush()
         self.wait_for_compactions(node1)
