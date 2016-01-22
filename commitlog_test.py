@@ -368,6 +368,7 @@ class TestCommitLog(Tester):
         node.stop(gently=False)
 
         # check that ks.tbl hasn't been flushed
+        path = node.get_path()
         for data_dir in node.data_directories():
             ks_dir = os.path.join(data_dir, 'ks')
             db_dir = os.listdir(ks_dir)[0]
@@ -466,6 +467,7 @@ class TestCommitLog(Tester):
         # modify the compression parameters to look for a compressor that isn't there
         # while this scenario is pretty unlikely, if a jar or lib got moved or something,
         # you'd have a similar situation, which would be fixable by the user
+        path = node.get_path()
         cl_dir = os.path.join(path, 'commitlogs')
         self.assertTrue(len(os.listdir(cl_dir)) > 0)
         for cl in os.listdir(cl_dir):
