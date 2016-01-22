@@ -944,4 +944,4 @@ class TestConsistency(Tester):
         simple_query = SimpleStatement(query, consistency_level=ConsistencyLevel.QUORUM)
         session.execute(simple_query)
 
-        to_stop.start(wait_other_notice=True)
+        to_stop.start(wait_for_binary_proto=True, wait_other_notice=True)
