@@ -58,7 +58,8 @@ def assert_almost_equal(*args, **kwargs):
     error = kwargs['error'] if 'error' in kwargs else 0.16
     vmax = max(args)
     vmin = min(args)
-    assert vmin > vmax * (1.0 - error) or vmin == vmax, "values not within %.2f%% of the max: %s (%s)" % (error * 100, args, kwargs['error_message'])
+    error_message = '' if 'error_message' not in kwargs else kwargs['error_message']
+    assert vmin > vmax * (1.0 - error) or vmin == vmax, "values not within %.2f%% of the max: %s (%s)" % (error * 100, args, error_message)
 
 
 def assert_row_count(session, table_name, expected):
