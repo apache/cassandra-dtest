@@ -118,9 +118,9 @@ class TestCompaction(Tester):
         block_on_compaction_log(node1, ks='ks', table='cf')
         time.sleep(1)
         try:
-            for x in xrange(0, cluster.data_dir_count):
-                cfs = os.listdir(node1.get_path() + "/data{0}/ks".format(x))
-                ssdir = os.listdir(node1.get_path() + "/data{0}/ks/{1}".format(x, cfs[0]))
+            for data_dir in node1.data_directories():
+                cfs = os.listdir(os.path.join(data_dir, "ks"))
+                ssdir = os.listdir(os.path.join(data_dir, "ks", cfs[0]))
                 for afile in ssdir:
                     self.assertFalse("Data" in afile, afile)
 

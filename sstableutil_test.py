@@ -177,8 +177,8 @@ class SSTableUtilTest(Tester):
         Read sstable files directly from disk
         """
         ret = []
-        for x in xrange(0, self.cluster.data_dir_count):
-            keyspace_dir = os.path.join(node.get_path(), 'data{0}'.format(x), ks)
+        for data_dir in node.data_directories():
+            keyspace_dir = os.path.join(data_dir, ks)
             for ext in ('*.db', '*.txt', '*.adler32', '*.crc32'):
                 ret.extend(glob.glob(os.path.join(keyspace_dir, table + '-*', ext)))
 
@@ -186,8 +186,8 @@ class SSTableUtilTest(Tester):
 
     def _get_sstable_transaction_logs(self, node, ks, table):
         ret = []
-        for x in xrange(0, self.cluster.data_dir_count):
-            keyspace_dir = os.path.join(node.get_path(), 'data{0}'.format(x), ks)
+        for data_dir in node.data_directories():
+            keyspace_dir = os.path.join(data_dir, ks)
             ret.extend(glob.glob(os.path.join(keyspace_dir, table + '-*', "*.log")))
 
         return sorted(ret)

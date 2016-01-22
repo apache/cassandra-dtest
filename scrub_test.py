@@ -19,8 +19,8 @@ class TestHelper(Tester):
         """
         node1 = self.cluster.nodelist()[0]
         paths = []
-        for x in xrange(0, self.cluster.data_dir_count):
-            basepath = os.path.join(node1.get_path(), "data{0}".format(x), KEYSPACE)
+        for data_dir in node1.data_directories():
+            basepath = os.path.join(data_dir, KEYSPACE)
             for x in os.listdir(basepath):
                 if x.startswith(table):
                     paths.append(os.path.join(basepath, x))

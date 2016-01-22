@@ -180,8 +180,7 @@ class TestCommitLog(Tester):
         self.assertTrue(len(commitlog_files) > 0)
 
         debug("Verify no SSTables were flushed before abrupt stop")
-        for x in xrange(0, self.cluster.data_dir_count):
-            data_dir = os.path.join(node1.get_path(), 'data{0}'.format(x))
+        for data_dir in node1.data_directories():
             cf_id = [s for s in os.listdir(os.path.join(data_dir, "test")) if s.startswith("users")][0]
             cf_data_dir = glob.glob("{data_dir}/test/{cf_id}".format(**locals()))[0]
             cf_data_dir_files = os.listdir(cf_data_dir)
@@ -369,9 +368,8 @@ class TestCommitLog(Tester):
         node.stop(gently=False)
 
         # check that ks.tbl hasn't been flushed
-        path = node.get_path()
-        for x in xrange(0, self.cluster.data_dir_count):
-            ks_dir = os.path.join(path, 'data{0}'.format(x), 'ks')
+        for data_dir in node.data_directories():
+            ks_dir = os.path.join(data_dir, 'ks')
             db_dir = os.listdir(ks_dir)[0]
             sstables = len([f for f in os.listdir(os.path.join(ks_dir, db_dir)) if f.endswith('.db')])
             self.assertEqual(sstables, 0)
@@ -444,10 +442,9 @@ class TestCommitLog(Tester):
         node.stop(gently=False)
 
         # check that ks1.tbl hasn't been flushed
-        path = node.get_path()
         sstables = 0
-        for x in xrange(0, self.cluster.data_dir_count):
-            ks_dir = os.path.join(path, 'data{0}'.format(x), 'ks1')
+        for data_dir in node.data_directories():
+            ks_dir = os.path.join(data_dir, 'ks1')
             db_dir = os.listdir(ks_dir)[0]
             sstables = sstables + len([f for f in os.listdir(os.path.join(ks_dir, db_dir)) if f.endswith('.db')])
         self.assertEqual(sstables, 0)

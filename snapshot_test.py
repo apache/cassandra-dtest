@@ -30,13 +30,11 @@ class SnapshotTester(Tester):
         tmpdir = safe_mkdtemp()
         os.mkdir(os.path.join(tmpdir, ks))
         os.mkdir(os.path.join(tmpdir, ks, cf))
-        node_dir = node.get_path()
-
         # Find the snapshot dir, it's different in various C*
-        for x in xrange(0, self.cluster.data_dir_count):
-            snapshot_dir = "{node_dir}/data{x}/{ks}/{cf}/snapshots/{name}".format(**locals())
+        for data_dir in node.data_directories():
+            snapshot_dir = "{data_dir}/{ks}/{cf}/snapshots/{name}".format(**locals())
             if not os.path.isdir(snapshot_dir):
-                snapshot_dirs = glob.glob("{node_dir}/data{x}/{ks}/{cf}-*/snapshots/{name}".format(**locals()))
+                snapshot_dirs = glob.glob("{data_dir}/{ks}/{cf}-*/snapshots/{name}".format(**locals()))
                 if len(snapshot_dirs) > 0:
                     snapshot_dir = snapshot_dirs[0]
                 else:
