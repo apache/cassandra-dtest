@@ -1,8 +1,11 @@
-from dtest import Tester, debug
-import socket
 import os
+import socket
+
+from dtest import Tester, debug
+from tools import since
 
 
+@since('2.2.5')
 class TestGossipingPropertyFileSnitch(Tester):
 
     # Throws connection refused if cannot connect
