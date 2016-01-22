@@ -109,7 +109,8 @@ class TestDiskBalance(Tester):
 
     def alter_replication_factor_test(self):
         cluster = self.cluster
-        cluster.set_datadir_count(3)
+        if not DISABLE_VNODES:
+            cluster.set_configuration_options(values={'num_tokens': 256})
         cluster.set_configuration_options(values={'allocate_tokens_for_keyspace': 'keyspace1'})
         cluster.populate(3).start(wait_for_binary_proto=True)
         node1 = cluster.nodes['node1']
