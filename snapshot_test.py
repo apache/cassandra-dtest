@@ -30,7 +30,9 @@ class SnapshotTester(Tester):
         tmpdir = safe_mkdtemp()
         os.mkdir(os.path.join(tmpdir, ks))
         os.mkdir(os.path.join(tmpdir, ks, cf))
+
         # Find the snapshot dir, it's different in various C*
+        x = 0
         for data_dir in node.data_directories():
             snapshot_dir = "{data_dir}/{ks}/{cf}/snapshots/{name}".format(**locals())
             if not os.path.isdir(snapshot_dir):
@@ -44,6 +46,7 @@ class SnapshotTester(Tester):
 
             # Copy files from the snapshot dir to existing temp dir
             distutils.dir_util.copy_tree(str(snapshot_dir), os.path.join(tmpdir, str(x), ks, cf))
+            x += 1
 
         return tmpdir
 
