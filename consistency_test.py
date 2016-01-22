@@ -900,8 +900,7 @@ class TestConsistency(Tester):
             for i in xrange(0, 3):
                 assert res[i][1] == 'value%d' % (5 - i), 'Expecting value%d, got %s (%s)' % (5 - i, res[i][1], str(res))
 
-            truncate_statement = SimpleStatement('TRUNCATE cf', consistency_level=ConsistencyLevel.QUORUM)
-            session.execute(truncate_statement)
+            session.execute('TRUNCATE cf')
 
     def quorum_available_during_failure_test(self):
         CL = ConsistencyLevel.QUORUM
