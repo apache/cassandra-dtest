@@ -20,7 +20,7 @@ from thrift_bindings.v22.Cassandra import (CfDef, Column, ColumnDef,
                                            Mutation, NotFoundException,
                                            SlicePredicate, SliceRange,
                                            SuperColumn)
-from tools import known_failure, since
+from tools import since
 from assertions import assert_one, assert_none
 
 
