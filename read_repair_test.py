@@ -69,7 +69,7 @@ class TestReadRepair(Tester):
             # Column a must be at 1 everywhere
             assert res[0][1] == 1, res
             # Column b must be either 1 or None everywhere
-            assert res[0][2] == 1 or res[0][2] == None, res
+            assert res[0][2] == 1 or res[0][2] is None, res
 
         # Now query at ALL but selecting all columns
         cl_all_stmt = SimpleStatement("SELECT * FROM alter_rf_test.t1 WHERE k=1",
@@ -86,7 +86,6 @@ class TestReadRepair(Tester):
             session = self.patient_exclusive_cql_connection(n)
             res = rows_to_list(session.execute(cl_one_stmt))
             assert res == [[1, 1, 1]], res
-
 
     def identify_initial_placement(self, keyspace, table, key):
         nodes = self.cluster.nodelist()
