@@ -89,7 +89,7 @@ class TestSCUpgrade(Tester):
         client.transport.close()
 
         if self.cluster.version() >= '2.1':
-            # Upgrade nodes to 2.0.
+            # Upgrade nodes to 2.0 for intermediate sstable conversion
             # See CASSANDRA-7008
             self.upgrade_to_version("binary:2.0.17")
             time.sleep(.5)
