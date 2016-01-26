@@ -109,21 +109,20 @@ class TestCqlsh(Tester):
             CREATE KEYSPACE lwt WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
             CREATE TABLE lwt.lwt (id int PRIMARY KEY , value text)""")
 
-        output, err = self.run_cqlsh(
-            node1, "INSERT INTO lwt.lwt (id, value) VALUES (1, 'one') IF NOT EXISTS")
-        self.assertIn("[applied]", output)
+        def assert_applied(stmt, node=node1):
+            expected_substring = '[applied]'
+            output, _ = self.run_cqlsh(node, stmt)
+            msg = '{exp} not found in output from {stmt}: {routput}'.format(
+                exp=repr(expected_substring),
+                stmt=repr(stmt),
+                routput=repr(output)
+            )
+            self.assertIn(expected_substring, output, msg=msg)
 
-        output, err = self.run_cqlsh(
-            node1, "INSERT INTO lwt.lwt (id, value) VALUES (1, 'one') IF NOT EXISTS")
-        self.assertIn("[applied]", output)
-
-        output, err = self.run_cqlsh(
-            node1, "UPDATE lwt.lwt SET value = 'one' WHERE id = 1 IF value = 'one'")
-        self.assertIn("[applied]", output)
-
-        output, err = self.run_cqlsh(
-            node1, "UPDATE lwt.lwt SET value = 'one' WHERE id = 1 IF value = 'zzz'")
-        self.assertIn("[applied]", output)
+        assert_applied("INSERT INTO lwt.lwt (id, value) VALUES (1, 'one') IF NOT EXISTS")
+        assert_applied("INSERT INTO lwt.lwt (id, value) VALUES (1, 'one') IF NOT EXISTS")
+        assert_applied("UPDATE lwt.lwt SET value = 'one' WHERE id = 1 IF value = 'one'")
+        assert_applied("UPDATE lwt.lwt SET value = 'one' WHERE id = 1 IF value = 'zzz'")
 
     @since('2.2')
     def test_past_and_future_dates(self):
