@@ -364,7 +364,7 @@ class TestBootstrap(Tester):
 
         # Decommission the new node and wipe its data
         node4.decommission()
-        node4.stop(wait_other_notice=True)
+        node4.stop()
         self._cleanup(node4)
         # Now start it, it should be allowed to join
         mark = node4.mark_log()
