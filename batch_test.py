@@ -7,7 +7,7 @@ import sys
 from assertions import assert_invalid, assert_unavailable, assert_one
 from unittest import skipIf
 from dtest import CASSANDRA_DIR, Tester, debug
-from tools import debug, since
+from tools import since
 
 
 class TestBatch(Tester):
