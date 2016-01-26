@@ -139,8 +139,9 @@ class TestOfflineTools(Tester):
         self.assertIn("L0=1", output)
         self.assertEqual(rc, 0, msg=str(rc))
 
-        # test by loading large amount data so we have multiple sstables
         cluster.start(wait_for_binary_proto=True)
+        # test by loading large amount data so we have multiple sstables
+        # must write enough to create more than just L1 sstables
         keys = 200 * cluster.data_dir_count
         node1.stress(['write', 'n={0}K'.format(keys), '-schema', 'replication(factor=1)'])
         node1.flush()
