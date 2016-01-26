@@ -20,7 +20,7 @@ from thrift_bindings.v22.Cassandra import (CfDef, Column, ColumnDef,
                                            Mutation, NotFoundException,
                                            SlicePredicate, SliceRange,
                                            SuperColumn)
-from tools import known_failure, since
+from tools import since
 from assertions import assert_one, assert_none
 
 
@@ -2342,8 +2342,8 @@ class TestTruncate(ThriftTester):
 
 
 class TestCQLAccesses(ThriftTester):
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10867')
+
+    @since('3.0')
     def test_range_tombstone_and_static(self):
         node1, = self.cluster.nodelist()
         session = self.patient_cql_connection(node1)
