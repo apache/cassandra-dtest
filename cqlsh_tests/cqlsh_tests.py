@@ -93,6 +93,37 @@ class TestCqlsh(Tester):
         self.assertEqual({1: 'one', 2: 'two', 3: 'three', 4: 'four', 5: 'five'},
                          {k: v for k, v in rows})
 
+    def test_lwt(self):
+        """
+        Test LWT inserts and updates.
+
+        @jira_ticket CASSANDRA-11003
+        """
+
+        self.cluster.populate(1)
+        self.cluster.start(wait_for_binary_proto=True)
+
+        node1, = self.cluster.nodelist()
+
+        node1.run_cqlsh(cmds="""
+            CREATE KEYSPACE lwt WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
+            CREATE TABLE lwt.lwt (id int PRIMARY KEY , value text)""")
+
+        def assert_applied(stmt, node=node1):
+            expected_substring = '[applied]'
+            output, _ = self.run_cqlsh(node, stmt)
+            msg = '{exp} not found in output from {stmt}: {routput}'.format(
+                exp=repr(expected_substring),
+                stmt=repr(stmt),
+                routput=repr(output)
+            )
+            self.assertIn(expected_substring, output, msg=msg)
+
+        assert_applied("INSERT INTO lwt.lwt (id, value) VALUES (1, 'one') IF NOT EXISTS")
+        assert_applied("INSERT INTO lwt.lwt (id, value) VALUES (1, 'one') IF NOT EXISTS")
+        assert_applied("UPDATE lwt.lwt SET value = 'one' WHERE id = 1 IF value = 'one'")
+        assert_applied("UPDATE lwt.lwt SET value = 'one' WHERE id = 1 IF value = 'zzz'")
+
     @since('2.2')
     def test_past_and_future_dates(self):
         self.cluster.populate(1)
@@ -108,7 +139,7 @@ class TestCqlsh(Tester):
             insert into simpledate (id, value) VALUES (2, '1943-04-19 11:21:01+0000')""")
 
         session = self.patient_cql_connection(node1)
-        rows = list(session.execute("select id, value from simple.simpledate"))
+        list(session.execute("select id, value from simple.simpledate"))
 
         output, err = self.run_cqlsh(node1, 'use simple; SELECT * FROM simpledate')
 
@@ -913,7 +944,6 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
 
         # session
         with open(self.tempfile.name, 'r') as csvfile:
-            row_count = 0
             csvreader = csv.reader(csvfile)
             result_list = [map(str, cql_row) for cql_row in results]
             self.assertItemsEqual(result_list, csvreader)
@@ -1290,11 +1320,11 @@ Tracing session:""")
                     batch_without_warning.add(prepared, (v,))
 
         fut = session.execute_async(batch_without_warning)
-        _ = fut.result()  # wait for batch to complete before checking warnings
+        fut.result()  # wait for batch to complete before checking warnings
         self.assertIsNone(fut.warnings)
 
         fut = session.execute_async(batch_with_warning)
-        _ = fut.result()  # wait for batch to complete before checking warnings
+        fut.result()  # wait for batch to complete before checking warnings
         debug(fut.warnings)
         self.assertIsNotNone(fut.warnings)
         self.assertEquals(1, len(fut.warnings))
