@@ -30,6 +30,9 @@ class TestSCUpgrade(Tester):
         ]
         Tester.__init__(self, *args, **kwargs)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11078',
+                   notes='Fails when upgrading from 2.1')
     def upgrade_with_index_creation_test(self):
         cluster = self.cluster
 
@@ -140,7 +143,11 @@ class TestSCUpgrade(Tester):
         self.assertEqual('c%d' % j, column.name)
         self.assertEqual('v', column.value)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11078',
+                   notes='Fails when upgrading from 2.1')
     def upgrade_with_counters_test(self):
+
         cluster = self.cluster
 
         # Forcing cluster version on purpose
