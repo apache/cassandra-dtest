@@ -1,7 +1,7 @@
 import time
 
 from assertions import assert_all, assert_none, assert_one
-from dtest import Tester, debug
+from dtest import Tester
 from tools import since
 
 
@@ -25,7 +25,6 @@ class TestStorageEngineUpgrade(Tester):
             cursor.execute("CREATE KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor': 1};")
             cursor.execute('USE ks')
         return cursor
-
 
     def _do_upgrade(self, login_keyspace=True):
 
