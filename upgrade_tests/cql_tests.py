@@ -3071,12 +3071,6 @@ class TestCQL(UpgradeTester):
             assert_none(cursor, "SELECT * FROM test WHERE k=1", cl=ConsistencyLevel.SERIAL)
             assert_one(cursor, "DELETE FROM test WHERE k=1 IF EXISTS", [False])
 
-            # Using non-conditional update is dodgy here, but it's probably fine given the sleep
-            cursor.execute("UPDATE test USING TTL 1 SET v1=2 WHERE k=1")
-            time.sleep(1.5)
-            assert_one(cursor, "DELETE FROM test WHERE k=1 IF EXISTS", [False])
-            assert_none(cursor, "SELECT * FROM test WHERE k=1", cl=ConsistencyLevel.SERIAL)
-
             assert_one(cursor, "INSERT INTO test (k, v1) VALUES (2, 2) IF NOT EXISTS USING TTL 1", [True])
             time.sleep(1.5)
             assert_one(cursor, "DELETE FROM test WHERE k=2 IF EXISTS", [False])
@@ -3084,7 +3078,7 @@ class TestCQL(UpgradeTester):
 
             assert_one(cursor, "INSERT INTO test (k, v1) VALUES (3, 2) IF NOT EXISTS", [True])
             assert_one(cursor, "DELETE v1 FROM test WHERE k=3 IF EXISTS", [True])
-            assert_one(cursor, "SELECT * FROM test WHERE k=3", [3, None])
+            assert_one(cursor, "SELECT * FROM test WHERE k=3", [3, None], cl=ConsistencyLevel.SERIAL)
             assert_one(cursor, "DELETE v1 FROM test WHERE k=3 IF EXISTS", [True])
             assert_one(cursor, "DELETE FROM test WHERE k=3 IF EXISTS", [True])
 
@@ -4562,7 +4556,7 @@ class TestCQL(UpgradeTester):
                 assert_invalid(cursor, "DELETE FROM %s WHERE k=0 IF m[null] = 'foo'" % (table,))
                 assert_one(cursor, "DELETE FROM %s WHERE k=0 IF m['foo'] = 'foo'" % (table,), [False, {'foo': 'bar'}])
                 assert_one(cursor, "DELETE FROM %s WHERE k=0 IF m['foo'] = null" % (table,), [False, {'foo': 'bar'}])
-                assert_one(cursor, "SELECT * FROM %s" % (table,), [0, {'foo': 'bar'}])
+                assert_one(cursor, "SELECT * FROM %s" % (table,), [0, {'foo': 'bar'}], cl=ConsistencyLevel.SERIAL)
 
                 assert_one(cursor, "DELETE FROM %s WHERE k=0 IF m['foo'] = 'bar'" % (table,), [True])
                 assert_none(cursor, "SELECT * FROM %s" % (table,), cl=ConsistencyLevel.SERIAL)
