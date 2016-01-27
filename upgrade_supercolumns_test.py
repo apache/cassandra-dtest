@@ -1,7 +1,4 @@
-import os
 import time
-
-from ccmlib.common import get_version_from_build
 
 from thrift_bindings.v22.ttypes import (KsDef, CfDef, Mutation, ColumnOrSuperColumn,
                                         Column, SuperColumn, SliceRange, SlicePredicate,
@@ -33,6 +30,9 @@ class TestSCUpgrade(Tester):
         ]
         Tester.__init__(self, *args, **kwargs)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11078',
+                   notes='Fails when upgrading from 2.1')
     def upgrade_with_index_creation_test(self):
         cluster = self.cluster
 
@@ -91,11 +91,10 @@ class TestSCUpgrade(Tester):
         session.cluster.shutdown()
         client.transport.close()
 
-        CASSANDRA_DIR = os.environ.get('CASSANDRA_DIR')
-        if get_version_from_build(CASSANDRA_DIR) >= '2.1':
-            # Upgrade nodes to 2.0.
+        if self.cluster.version() >= '2.1':
+            # Upgrade nodes to 2.0 for intermediate sstable conversion
             # See CASSANDRA-7008
-            self.upgrade_to_version("git:cassandra-2.0")
+            self.upgrade_to_version("binary:2.0.17")
             time.sleep(.5)
 
         # Upgrade node 1
@@ -144,7 +143,11 @@ class TestSCUpgrade(Tester):
         self.assertEqual('c%d' % j, column.name)
         self.assertEqual('v', column.value)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11078',
+                   notes='Fails when upgrading from 2.1')
     def upgrade_with_counters_test(self):
+
         cluster = self.cluster
 
         # Forcing cluster version on purpose
@@ -199,11 +202,10 @@ class TestSCUpgrade(Tester):
         # If we are on 2.1 or any higher version upgrade to 2.0.latest.
         # Otherwise, we must be on a 2.0.x, so we should be upgrading to that version.
         # This will let us test upgrading from 1.2.19 to each of the 2.0 minor releases.
-        CASSANDRA_DIR = os.environ.get('CASSANDRA_DIR')
-        if get_version_from_build(CASSANDRA_DIR) >= '2.1':
+        if self.cluster.version() >= '2.1':
             # Upgrade nodes to 2.0.
             # See CASSANDRA-7008
-            self.upgrade_to_version("git:cassandra-2.0", [node1])
+            self.upgrade_to_version("binary:2.0.17", [node1])
             time.sleep(.5)
         else:
             node1.drain()
@@ -231,10 +233,10 @@ class TestSCUpgrade(Tester):
 
             client.transport.close()
 
-        if get_version_from_build(CASSANDRA_DIR) >= '2.1':
+        if self.cluster.version() >= '2.1':
             # Upgrade nodes to 2.0.
             # See CASSANDRA-7008
-            self.upgrade_to_version("git:cassandra-2.0", [node2, node3])
+            self.upgrade_to_version("binary:2.0.17", [node2, node3])
             time.sleep(.5)
         else:
             node2.drain()
