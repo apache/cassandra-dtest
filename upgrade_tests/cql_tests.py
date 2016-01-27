@@ -2936,9 +2936,6 @@ class TestCQL(UpgradeTester):
 
             cursor.execute("SELECT dateOf(t) FROM test")
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10836',
-                   flaky=True)
     def conditional_update_test(self):
         cursor = self.prepare()
 
@@ -2964,47 +2961,47 @@ class TestCQL(UpgradeTester):
 
             # Shouldn't apply
             assert_one(cursor, "INSERT INTO test (k, v1, v2) VALUES (0, 5, 'bar') IF NOT EXISTS", [False, 0, 2, 'foo', None])
-            assert_one(cursor, "SELECT * FROM test", [0, 2, 'foo', None])
+            assert_one(cursor, "SELECT * FROM test", [0, 2, 'foo', None], cl=ConsistencyLevel.SERIAL)
 
             # Should not apply
             assert_one(cursor, "UPDATE test SET v1 = 3, v2 = 'bar' WHERE k = 0 IF v1 = 4", [False, 2])
-            assert_one(cursor, "SELECT * FROM test", [0, 2, 'foo', None])
+            assert_one(cursor, "SELECT * FROM test", [0, 2, 'foo', None], cl=ConsistencyLevel.SERIAL)
 
             # Should apply (note: we want v2 before v1 in the statement order to exercise #5786)
             assert_one(cursor, "UPDATE test SET v2 = 'bar', v1 = 3 WHERE k = 0 IF v1 = 2", [True])
             assert_one(cursor, "UPDATE test SET v2 = 'bar', v1 = 3 WHERE k = 0 IF EXISTS", [True])
-            assert_one(cursor, "SELECT * FROM test", [0, 3, 'bar', None])
+            assert_one(cursor, "SELECT * FROM test", [0, 3, 'bar', None], cl=ConsistencyLevel.SERIAL)
 
             # Shouldn't apply, only one condition is ok
             assert_one(cursor, "UPDATE test SET v1 = 5, v2 = 'foobar' WHERE k = 0 IF v1 = 3 AND v2 = 'foo'", [False, 3, 'bar'])
-            assert_one(cursor, "SELECT * FROM test", [0, 3, 'bar', None])
+            assert_one(cursor, "SELECT * FROM test", [0, 3, 'bar', None], cl=ConsistencyLevel.SERIAL)
 
             # Should apply
             assert_one(cursor, "UPDATE test SET v1 = 5, v2 = 'foobar' WHERE k = 0 IF v1 = 3 AND v2 = 'bar'", [True])
-            assert_one(cursor, "SELECT * FROM test", [0, 5, 'foobar', None])
+            assert_one(cursor, "SELECT * FROM test", [0, 5, 'foobar', None], cl=ConsistencyLevel.SERIAL)
 
             # Shouldn't apply
             assert_one(cursor, "DELETE v2 FROM test WHERE k = 0 IF v1 = 3", [False, 5])
-            assert_one(cursor, "SELECT * FROM test", [0, 5, 'foobar', None])
+            assert_one(cursor, "SELECT * FROM test", [0, 5, 'foobar', None], cl=ConsistencyLevel.SERIAL)
 
             # Shouldn't apply
             assert_one(cursor, "DELETE v2 FROM test WHERE k = 0 IF v1 = null", [False, 5])
-            assert_one(cursor, "SELECT * FROM test", [0, 5, 'foobar', None])
+            assert_one(cursor, "SELECT * FROM test", [0, 5, 'foobar', None], cl=ConsistencyLevel.SERIAL)
 
             # Should apply
             assert_one(cursor, "DELETE v2 FROM test WHERE k = 0 IF v1 = 5", [True])
-            assert_one(cursor, "SELECT * FROM test", [0, 5, None, None])
+            assert_one(cursor, "SELECT * FROM test", [0, 5, None, None], cl=ConsistencyLevel.SERIAL)
 
             # Shouln't apply
             assert_one(cursor, "DELETE v1 FROM test WHERE k = 0 IF v3 = 4", [False, None])
 
             # Should apply
             assert_one(cursor, "DELETE v1 FROM test WHERE k = 0 IF v3 = null", [True])
-            assert_one(cursor, "SELECT * FROM test", [0, None, None, None])
+            assert_one(cursor, "SELECT * FROM test", [0, None, None, None], cl=ConsistencyLevel.SERIAL)
 
             # Should apply
             assert_one(cursor, "DELETE FROM test WHERE k = 0 IF v1 = null", [True])
-            assert_none(cursor, "SELECT * FROM test")
+            assert_none(cursor, "SELECT * FROM test", cl=ConsistencyLevel.SERIAL)
 
             # Shouldn't apply
             assert_one(cursor, "UPDATE test SET v1 = 3, v2 = 'bar' WHERE k = 0 IF EXISTS", [False])
@@ -3042,9 +3039,6 @@ class TestCQL(UpgradeTester):
             assert_one(cursor, "UPDATE test SET v2 = 'bar' WHERE k = 0 IF v1 IN (142, 276)", [False, 2])
             assert_one(cursor, "UPDATE test SET v2 = 'bar' WHERE k = 0 IF v1 IN ()", [False, 2])
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10836',
-                   flaky=True)
     def conditional_delete_test(self):
         cursor = self.prepare()
 
@@ -3072,28 +3066,23 @@ class TestCQL(UpgradeTester):
 
             assert_one(cursor, "DELETE FROM test WHERE k=1 IF EXISTS", [False])
 
-            cursor.execute("INSERT INTO test (k, v1) VALUES (1, 2)")
+            assert_one(cursor, "INSERT INTO test (k, v1) VALUES (1, 2) IF NOT EXISTS", [True])
             assert_one(cursor, "DELETE FROM test WHERE k=1 IF EXISTS", [True])
-            assert_none(cursor, "SELECT * FROM test WHERE k=1")
+            assert_none(cursor, "SELECT * FROM test WHERE k=1", cl=ConsistencyLevel.SERIAL)
             assert_one(cursor, "DELETE FROM test WHERE k=1 IF EXISTS", [False])
 
-            cursor.execute("UPDATE test USING TTL 1 SET v1=2 WHERE k=1")
-            time.sleep(1.5)
-            assert_one(cursor, "DELETE FROM test WHERE k=1 IF EXISTS", [False])
-            assert_none(cursor, "SELECT * FROM test WHERE k=1")
-
-            cursor.execute("INSERT INTO test (k, v1) VALUES (2, 2) USING TTL 1")
+            assert_one(cursor, "INSERT INTO test (k, v1) VALUES (2, 2) IF NOT EXISTS USING TTL 1", [True])
             time.sleep(1.5)
             assert_one(cursor, "DELETE FROM test WHERE k=2 IF EXISTS", [False])
-            assert_none(cursor, "SELECT * FROM test WHERE k=2")
+            assert_none(cursor, "SELECT * FROM test WHERE k=2", cl=ConsistencyLevel.SERIAL)
 
-            cursor.execute("INSERT INTO test (k, v1) VALUES (3, 2)")
+            assert_one(cursor, "INSERT INTO test (k, v1) VALUES (3, 2) IF NOT EXISTS", [True])
             assert_one(cursor, "DELETE v1 FROM test WHERE k=3 IF EXISTS", [True])
-            assert_one(cursor, "SELECT * FROM test WHERE k=3", [3, None])
+            assert_one(cursor, "SELECT * FROM test WHERE k=3", [3, None], cl=ConsistencyLevel.SERIAL)
             assert_one(cursor, "DELETE v1 FROM test WHERE k=3 IF EXISTS", [True])
             assert_one(cursor, "DELETE FROM test WHERE k=3 IF EXISTS", [True])
 
-            cursor.execute("INSERT INTO test2 (k, s, i, v) VALUES ('k', 's', 0, 'v')")
+            cursor.execute("INSERT INTO test2 (k, s, i, v) VALUES ('k', 's', 0, 'v') IF NOT EXISTS")
             assert_one(cursor, "DELETE v FROM test2 WHERE k='k' AND i=0 IF EXISTS", [True])
             assert_one(cursor, "DELETE FROM test2 WHERE k='k' AND i=0 IF EXISTS", [True])
             assert_one(cursor, "DELETE v FROM test2 WHERE k='k' AND i=0 IF EXISTS", [False])
@@ -3764,9 +3753,6 @@ class TestCQL(UpgradeTester):
             cursor.execute("DELETE s FROM test WHERE k=0")
             assert_all(cursor, "SELECT * FROM test", [[0, 1, None, 1]])
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10836',
-                   flaky=True)
     def static_columns_cas_test(self):
         cursor = self.prepare()
 
@@ -3786,22 +3772,24 @@ class TestCQL(UpgradeTester):
 
             # Test that INSERT IF NOT EXISTS concerns only the static column if no clustering nor regular columns
             # is provided, but concerns the CQL3 row targetted by the clustering columns otherwise
-            cursor.execute("INSERT INTO test(id, k, v) VALUES (1, 'foo', 'foo')")
+            assert_one(cursor, "INSERT INTO test(id, k, v) VALUES (1, 'foo', 'foo') IF NOT EXISTS", [True])
             assert_one(cursor, "INSERT INTO test(id, k, version) VALUES (1, 'foo', 1) IF NOT EXISTS", [False, 1, 'foo', None, 'foo'])
             assert_one(cursor, "INSERT INTO test(id, version) VALUES (1, 1) IF NOT EXISTS", [True])
-            assert_one(cursor, "SELECT * FROM test", [1, 'foo', 1, 'foo'])
+            assert_one(cursor, "SELECT * FROM test", [1, 'foo', 1, 'foo'], ConsistencyLevel.SERIAL)
+
+            # Dodgy as its not conditional, but this is not allowed with a condition and that's probably fine in practice so go with it
             cursor.execute("DELETE FROM test WHERE id = 1")
 
-            cursor.execute("INSERT INTO test(id, version) VALUES (0, 0)")
+            assert_one(cursor, "INSERT INTO test(id, version) VALUES (0, 0) IF NOT EXISTS", [True])
 
             assert_one(cursor, "UPDATE test SET v='foo', version=1 WHERE id=0 AND k='k1' IF version = 0", [True])
-            assert_all(cursor, "SELECT * FROM test", [[0, 'k1', 1, 'foo']])
+            assert_all(cursor, "SELECT * FROM test", [[0, 'k1', 1, 'foo']], ConsistencyLevel.SERIAL)
 
             assert_one(cursor, "UPDATE test SET v='bar', version=1 WHERE id=0 AND k='k2' IF version = 0", [False, 1])
-            assert_all(cursor, "SELECT * FROM test", [[0, 'k1', 1, 'foo']])
+            assert_all(cursor, "SELECT * FROM test", [[0, 'k1', 1, 'foo']], ConsistencyLevel.SERIAL)
 
             assert_one(cursor, "UPDATE test SET v='bar', version=2 WHERE id=0 AND k='k2' IF version = 1", [True])
-            assert_all(cursor, "SELECT * FROM test", [[0, 'k1', 2, 'foo'], [0, 'k2', 2, 'bar']])
+            assert_all(cursor, "SELECT * FROM test", [[0, 'k1', 2, 'foo'], [0, 'k2', 2, 'bar']], ConsistencyLevel.SERIAL)
 
             # Testing batches
             assert_one(cursor,
@@ -3821,7 +3809,7 @@ class TestCQL(UpgradeTester):
                            UPDATE test SET version=3 WHERE id=0 IF version=2;
                          APPLY BATCH
                        """, [True])
-            assert_all(cursor, "SELECT * FROM test", [[0, 'k1', 3, 'foobar'], [0, 'k2', 3, 'barfoo']])
+            assert_all(cursor, "SELECT * FROM test", [[0, 'k1', 3, 'foobar'], [0, 'k2', 3, 'barfoo']], ConsistencyLevel.SERIAL)
 
             assert_all(cursor,
                        """
@@ -3857,7 +3845,7 @@ class TestCQL(UpgradeTester):
                            INSERT INTO TEST (id, k, v) VALUES(1, 'k2', 'val2') IF NOT EXISTS;
                          APPLY BATCH
                        """, [True])
-            assert_all(cursor, "SELECT * FROM test WHERE id=1", [[1, 'k1', None, 'val1'], [1, 'k2', None, 'val2']])
+            assert_all(cursor, "SELECT * FROM test WHERE id=1", [[1, 'k1', None, 'val1'], [1, 'k2', None, 'val2']], ConsistencyLevel.SERIAL)
 
             assert_one(cursor,
                        """
@@ -3874,7 +3862,7 @@ class TestCQL(UpgradeTester):
                            INSERT INTO TEST (id, k, v) VALUES(1, 'k3', 'val3') IF NOT EXISTS;
                          APPLY BATCH
                        """, [False, 1, 'k2', None, 'val2'])
-            assert_all(cursor, "SELECT * FROM test WHERE id=1", [[1, 'k1', None, 'val1'], [1, 'k2', None, 'val2']])
+            assert_all(cursor, "SELECT * FROM test WHERE id=1", [[1, 'k1', None, 'val1'], [1, 'k2', None, 'val2']], ConsistencyLevel.SERIAL)
 
             assert_one(cursor,
                        """
@@ -3883,7 +3871,7 @@ class TestCQL(UpgradeTester):
                            INSERT INTO TEST (id, k, v, version) VALUES(1, 'k3', 'val3', 1) IF NOT EXISTS;
                          APPLY BATCH
                        """, [True])
-            assert_all(cursor, "SELECT * FROM test WHERE id=1", [[1, 'k1', 1, 'val1'], [1, 'k2', 1, 'newVal'], [1, 'k3', 1, 'val3']])
+            assert_all(cursor, "SELECT * FROM test WHERE id=1", [[1, 'k1', 1, 'val1'], [1, 'k2', 1, 'newVal'], [1, 'k3', 1, 'val3']], ConsistencyLevel.SERIAL)
 
             assert_one(cursor,
                        """
@@ -4275,9 +4263,6 @@ class TestCQL(UpgradeTester):
                 # not supported yet
                 check_invalid("m CONTAINS 'bar'", expected=SyntaxException)
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10836',
-                   flaky=True)
     def list_item_conditional_test(self):
         # Lists
         cursor = self.prepare()
@@ -4303,16 +4288,16 @@ class TestCQL(UpgradeTester):
 
                 table = "frozentlist" if frozen else "tlist"
 
-                cursor.execute("INSERT INTO %s(k, l) VALUES (0, ['foo', 'bar', 'foobar'])" % (table,))
+                assert_one(cursor, "INSERT INTO %s(k, l) VALUES (0, ['foo', 'bar', 'foobar']) IF NOT EXISTS" % (table,), [True])
 
                 assert_invalid(cursor, "DELETE FROM %s WHERE k=0 IF l[null] = 'foobar'" % (table,))
                 assert_invalid(cursor, "DELETE FROM %s WHERE k=0 IF l[-2] = 'foobar'" % (table,))
                 assert_one(cursor, "DELETE FROM %s WHERE k=0 IF l[1] = null" % (table,), [False, ['foo', 'bar', 'foobar']])
                 assert_one(cursor, "DELETE FROM %s WHERE k=0 IF l[1] = 'foobar'" % (table,), [False, ['foo', 'bar', 'foobar']])
-                assert_one(cursor, "SELECT * FROM %s" % (table,), [0, ['foo', 'bar', 'foobar']])
+                assert_one(cursor, "SELECT * FROM %s" % (table,), [0, ['foo', 'bar', 'foobar']], cl=ConsistencyLevel.SERIAL)
 
                 assert_one(cursor, "DELETE FROM %s WHERE k=0 IF l[1] = 'bar'" % (table,), [True])
-                assert_none(cursor, "SELECT * FROM %s" % (table,))
+                assert_none(cursor, "SELECT * FROM %s" % (table,), cl=ConsistencyLevel.SERIAL)
 
     @since('2.1.1')
     def expanded_list_item_conditional_test(self):
@@ -4393,9 +4378,6 @@ class TestCQL(UpgradeTester):
                 check_invalid("l[null] = null")
 
     @since('2.1.1')
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10836',
-                   flaky=True)
     def whole_set_conditional_test(self):
         cursor = self.prepare()
 
@@ -4419,11 +4401,11 @@ class TestCQL(UpgradeTester):
             for frozen in (False, True):
 
                 table = "frozentset" if frozen else "tset"
-                cursor.execute("INSERT INTO %s(k, s) VALUES (0, {'bar', 'foo'})" % (table,))
+                assert_one(cursor, "INSERT INTO %s(k, s) VALUES (0, {'bar', 'foo'}) IF NOT EXISTS" % (table,), [True])
 
                 def check_applies(condition):
                     assert_one(cursor, "UPDATE %s SET s = {'bar', 'foo'} WHERE k=0 IF %s" % (table, condition), [True])
-                    assert_one(cursor, "SELECT * FROM %s" % (table,), [0, set(['bar', 'foo'])])
+                    assert_one(cursor, "SELECT * FROM %s" % (table,), [0, set(['bar', 'foo'])], cl=ConsistencyLevel.SERIAL)
 
                 check_applies("s = {'bar', 'foo'}")
                 check_applies("s = {'foo', 'bar'}")
@@ -4441,7 +4423,7 @@ class TestCQL(UpgradeTester):
                 def check_does_not_apply(condition):
                     assert_one(cursor, "UPDATE %s SET s = {'bar', 'foo'} WHERE k=0 IF %s" % (table, condition),
                                [False, {'bar', 'foo'}])
-                    assert_one(cursor, "SELECT * FROM %s" % (table,), [0, {'bar', 'foo'}])
+                    assert_one(cursor, "SELECT * FROM %s" % (table,), [0, {'bar', 'foo'}], cl=ConsistencyLevel.SERIAL)
 
                 # should not apply
                 check_does_not_apply("s = {'baz'}")
@@ -4456,7 +4438,7 @@ class TestCQL(UpgradeTester):
 
                 def check_invalid(condition, expected=InvalidRequest):
                     assert_invalid(cursor, "UPDATE %s SET s = {'bar', 'foo'} WHERE k=0 IF %s" % (table, condition), expected=expected)
-                    assert_one(cursor, "SELECT * FROM %s" % (table,), [0, {'bar', 'foo'}])
+                    assert_one(cursor, "SELECT * FROM %s" % (table,), [0, {'bar', 'foo'}], cl=ConsistencyLevel.SERIAL)
 
                 check_invalid("s = {null}")
                 check_invalid("s < null")
@@ -4547,9 +4529,6 @@ class TestCQL(UpgradeTester):
                 check_invalid("m CONTAINS null", expected=SyntaxException)
                 check_invalid("m CONTAINS KEY null", expected=SyntaxException)
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10836',
-                   flaky=True)
     def map_item_conditional_test(self):
         cursor = self.prepare()
 
@@ -4573,14 +4552,14 @@ class TestCQL(UpgradeTester):
             for frozen in (False, True):
 
                 table = "frozentmap" if frozen else "tmap"
-                cursor.execute("INSERT INTO %s(k, m) VALUES (0, {'foo' : 'bar'})" % (table,))
+                assert_one(cursor, "INSERT INTO %s(k, m) VALUES (0, {'foo' : 'bar'}) IF NOT EXISTS" % (table,), [True])
                 assert_invalid(cursor, "DELETE FROM %s WHERE k=0 IF m[null] = 'foo'" % (table,))
                 assert_one(cursor, "DELETE FROM %s WHERE k=0 IF m['foo'] = 'foo'" % (table,), [False, {'foo': 'bar'}])
                 assert_one(cursor, "DELETE FROM %s WHERE k=0 IF m['foo'] = null" % (table,), [False, {'foo': 'bar'}])
-                assert_one(cursor, "SELECT * FROM %s" % (table,), [0, {'foo': 'bar'}])
+                assert_one(cursor, "SELECT * FROM %s" % (table,), [0, {'foo': 'bar'}], cl=ConsistencyLevel.SERIAL)
 
                 assert_one(cursor, "DELETE FROM %s WHERE k=0 IF m['foo'] = 'bar'" % (table,), [True])
-                assert_none(cursor, "SELECT * FROM %s" % (table,))
+                assert_none(cursor, "SELECT * FROM %s" % (table,), cl=ConsistencyLevel.SERIAL)
 
                 if self.get_version() > "2.1.1":
                     cursor.execute("INSERT INTO %s(k, m) VALUES (1, null)" % (table,))
@@ -4619,7 +4598,7 @@ class TestCQL(UpgradeTester):
 
                 def check_applies(condition):
                     assert_one(cursor, "UPDATE %s SET m = {'foo': 'bar'} WHERE k=0 IF %s" % (table, condition), [True])
-                    assert_one(cursor, "SELECT * FROM %s" % (table,), [0, {'foo': 'bar'}])
+                    assert_one(cursor, "SELECT * FROM %s" % (table,), [0, {'foo': 'bar'}], cl=ConsistencyLevel.SERIAL)
 
                 check_applies("m['xxx'] = null")
                 check_applies("m['foo'] < 'zzz'")
@@ -4636,7 +4615,7 @@ class TestCQL(UpgradeTester):
 
                 def check_does_not_apply(condition):
                     assert_one(cursor, "UPDATE %s SET m = {'foo': 'bar'} WHERE k=0 IF %s" % (table, condition), [False, {'foo': 'bar'}])
-                    assert_one(cursor, "SELECT * FROM %s" % (table,), [0, {'foo': 'bar'}])
+                    assert_one(cursor, "SELECT * FROM %s" % (table,), [0, {'foo': 'bar'}], cl=ConsistencyLevel.SERIAL)
 
                 check_does_not_apply("m['foo'] < 'aaa'")
                 check_does_not_apply("m['foo'] <= 'aaa'")
