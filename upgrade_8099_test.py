@@ -44,6 +44,11 @@ class TestStorageEngineUpgrade(Tester):
         return cursor
 
     def update_and_drop_column_test(self):
+        """
+        Checks that dropped columns are properly handled in legacy sstables
+
+        @jira_ticket CASSANDRA-11018
+        """
         cursor = self._setup_cluster()
 
         cursor.execute('CREATE TABLE t (k text PRIMARY KEY, a int, b int)')
@@ -59,15 +64,29 @@ class TestStorageEngineUpgrade(Tester):
         assert_one(cursor, "SELECT * FROM t", ['some_key', 0])
 
     def upgrade_with_clustered_CQL_table_test(self):
+        """
+        Validates we can do basic slice queries (forward and reverse ones) on legacy sstables for a CQL table
+        with a clustering column.
+        """
         self.upgrade_with_clustered_table("")
 
     def upgrade_with_clustered_compact_table_test(self):
+        """
+        Validates we can do basic slice queries (forward and reverse ones) on legacy sstables for a COMPACT table
+        with a clustering column.
+        """
         self.upgrade_with_clustered_table(" WITH COMPACT STORAGE")
 
     def upgrade_with_unclustered_CQL_table_test(self):
+        """
+        Validates we can do basic name queries on legacy sstables for a CQL table without clustering.
+        """
         self.upgrade_with_unclustered_table("")
 
     def upgrade_with_unclustered_compact_table_test(self):
+        """
+        Validates we can do basic name queries on legacy sstables for a COMPACT table without clustering.
+        """
         self.upgrade_with_unclustered_table(" WITH COMPACT STORAGE")
 
     def upgrade_with_clustered_table(self, table_options):
@@ -139,6 +158,9 @@ class TestStorageEngineUpgrade(Tester):
             assert_one(session, "SELECT * FROM t WHERE k = %d" % (n), [n, n + 1, n + 2, n + 3, n + 4])
 
     def upgrade_with_statics_test(self):
+        """
+        Validates we can read legacy sstables with static columns.
+        """
         PARTITIONS = 1
         ROWS = 10
 
@@ -163,9 +185,16 @@ class TestStorageEngineUpgrade(Tester):
             assert_all(session, "SELECT * FROM t WHERE k = %d ORDER BY t DESC" % (n), [[n, v, ROWS - 1, ROWS, v, v + 1] for v in xrange(ROWS - 1, -1, -1)])
 
     def upgrade_with_wide_partition_test(self):
+        """
+        Checks we can read old indexed sstable by creating large partitions (larger than the index block used by sstables).
+        """
         self.upgrade_with_wide_partition()
 
     def upgrade_with_wide_partition_reversed_test(self):
+        """
+        Checks we can read old indexed sstable by creating large partitions (larger than the index block used by sstables). This test
+        validates reverse queries.
+        """
         self.upgrade_with_wide_partition(query_modifier=" ORDER BY t DESC")
 
     def upgrade_with_wide_partition(self, query_modifier=""):
@@ -216,6 +245,9 @@ class TestStorageEngineUpgrade(Tester):
                 assert_none(session, query)
 
     def upgrade_with_index_test(self):
+        """
+        Checks a simple index can still be read after upgrade.
+        """
         PARTITIONS = 2
         ROWS = 4
 
@@ -242,6 +274,11 @@ class TestStorageEngineUpgrade(Tester):
         assert_all(session, "SELECT * FROM t WHERE v1 = 0", [[p, r, 0, r * 2] for p in xrange(0, PARTITIONS) for r in xrange(0, ROWS) if r % 2 == 0], ignore_order=True)
 
     def upgrade_with_range_tombstones(self):
+        """
+        Checks sstable including range tombstone can be read after upgrade.
+
+        @jira_ticket CASSANDRA-10360
+        """
         ROWS = 100
 
         session = self._setup_cluster()
@@ -263,6 +300,11 @@ class TestStorageEngineUpgrade(Tester):
         self.cluster.compact()
 
     def upgrade_with_range_and_collection_tombstones(self):
+        """
+        Check sstable including collection tombstone (inserted through adding a collection) can be read after upgrade.
+
+        @jira_ticket CASSANDRA-10743
+        """
         session = self._setup_cluster()
 
         session.execute('CREATE TABLE t (k text, t int, c list<int>, PRIMARY KEY (k, t))')
