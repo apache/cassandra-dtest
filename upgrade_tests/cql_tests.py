@@ -2666,6 +2666,55 @@ class TestCQL(UpgradeTester):
             res = cursor.execute("SELECT * FROM bar")
             assert rows_to_list(res) == [[1, 2]], res
 
+    def query_compact_tables_during_upgrade_test(self):
+        """
+        Check that un-upgraded sstables for compact storage tables
+        can be read after an upgrade. Checks for a regression where
+        when the coordinator is on < 3.0, a replica at >= 3.0 returns
+        0 results for any read request. When the >= 3.0 node is
+        the coordinator, the problem does not manifest. Likewise, if
+        the data is inserted after the replica is upgraded, or if
+        upgradesstables is run after upgrade, the query succeeds, so
+        the issue is with reading legacy format sstables in response to
+        a legacy format read request
+        @jira_ticket CASSANDRA-11087
+        """
+        cursor = self.prepare()
+        cursor.execute("""
+            CREATE TABLE t1 (
+                a int PRIMARY KEY,
+                b int
+            ) WITH COMPACT STORAGE;
+        """)
+
+        execute_concurrent_with_args(cursor,
+                                     cursor.prepare("INSERT INTO t1 (a, b) VALUES (?, ?)"),
+                                     [(i, i) for i in xrange(100)])
+        self.cluster.flush()
+
+        def check_read_all(cursor):
+            read_count = 0
+            # first read each row separately - obviously, we should be able to retrieve all 100
+            for i in xrange(100):
+                res = cursor.execute("SELECT * FROM t1 WHERE a = {a}".format(a=i))
+                read_count += len(rows_to_list(res))
+            debug("Querying for individual keys retrieved {c} results".format(c=read_count))
+            self.assertEqual(read_count, 100)
+            # now a range slice, again all 100 rows should be retrievable
+            res = cursor.execute("SELECT * FROM t1")
+            read_count = len(rows_to_list(res))
+            debug("Range request retrieved {c} rows".format(c=read_count))
+            self.assertEqual(read_count, 100)
+
+        for is_upgraded, cursor in self.do_upgrade(cursor):
+            debug("Querying {state} node".format(state="upgraded" if is_upgraded else "old"))
+            check_read_all(cursor)
+
+        debug("Querying upgraded node after running upgradesstables")
+        node1 = self.cluster.nodelist()[0]
+        node1.nodetool("upgradesstables -a")
+        check_read_all(self.patient_exclusive_cql_connection(node1, keyspace="ks"))
+
     def clustering_indexing_test(self):
         cursor = self.prepare()
 
