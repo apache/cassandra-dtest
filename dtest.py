@@ -17,6 +17,7 @@ import threading
 import time
 import traceback
 import types
+import glob
 from collections import OrderedDict
 from unittest import TestCase
 
@@ -462,6 +463,18 @@ class Tester(TestCase):
             # thread.interrupt_main will SIGINT in the main thread, which we can
             # catch to raise an exception with useful information
             thread.interrupt_main()
+
+    """
+    Finds files matching the glob pattern specified as argument on
+    the given keyspace in all nodes
+    """
+    def glob_data_dirs(self, path, ks="ks"):
+        result = []
+        for node in self.cluster.nodelist():
+            for data_dir in node.data_directories():
+                ks_dir = os.path.join(data_dir, ks, path)
+                result.extend(glob.glob(ks_dir))
+        return result
 
     def _catch_interrupt(self, signal, frame):
         """
