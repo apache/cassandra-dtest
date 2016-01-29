@@ -2,6 +2,7 @@ import time
 import threading
 
 from dtest import Tester
+from tools import require
 
 
 class TestMetadata(Tester):
@@ -27,6 +28,7 @@ class TestMetadata(Tester):
         node1.stress(['read', 'no-warmup', 'n=30000', '-schema', 'replication(factor=2)', 'compression=LZ4Compressor',
                       '-rate', 'threads=1'])
 
+    @require(11095, broken_in='2.0')
     def metadata_reset_while_compact_test(self):
         """
         Resets the schema while a compact, read and repair happens.
