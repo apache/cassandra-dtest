@@ -2071,7 +2071,7 @@ class CqlshCopyTest(Tester):
         def run_copy_to(filename):
             debug('Exporting to csv file: {}'.format(filename.name))
             start = datetime.datetime.now()
-            copy_to_cmd = "COPY {} TO '{}'".format(stress_table, filename.name)
+            copy_to_cmd = "CONSISTENCY ALL; COPY {} TO '{}'".format(stress_table, filename.name)
             if copy_to_options:
                 copy_to_cmd += ' WITH ' + ' AND '.join('{} = {}'.format(k, v) for k, v in copy_to_options.iteritems())
             debug(copy_to_cmd)
@@ -2135,11 +2135,9 @@ class CqlshCopyTest(Tester):
     def test_bulk_round_trip_blogposts_with_max_connections(self):
         """
         Same as test_bulk_round_trip_blogposts but limit the maximum number of concurrent connections a host will
-        accept to simulate a failed connection to a replica that is up. We should have at most worker_processes * nodes
-        connections plus 1 (the cqlsh connection) and so 4 * 5 + 1 = 21 connections but each host will only accept
-        a maximum of 12 connections. This is an arbitrary number chosen so that we should get some failures but not
-        so many that we cannot continue (for COPY FROM the driver handles failed connections but it should be OK
-        as long as it can reach a replica).
+        accept to simulate a failed connection to a replica that is up. Here we are interested in testing COPY TO
+        where we should have at most worker_processes * nodes connections plus 1 (the cqlsh connection). For COPY
+        FROM the driver handles retries. We use only 2 worker processes to make sure it suceeds.
 
         @jira_ticket CASSANDRA-10938
         """
@@ -2148,8 +2146,9 @@ class CqlshCopyTest(Tester):
                                                           'batch_size_warn_threshold_in_kb': '10'},
                                    profile=os.path.join(os.path.dirname(os.path.realpath(__file__)), 'blogposts.yaml'),
                                    stress_table='stresscql.blogposts',
-                                   copy_to_options={'PAGETIMEOUT': 60, 'PAGESIZE': 1000, 'NUMPROCESSES': 5},
-                                   copy_from_options={'NUMPROCESSES': 4})
+                                   copy_to_options={'PAGETIMEOUT': 60, 'PAGESIZE': 1000,
+                                                    'NUMPROCESSES': 5, 'MAXATTEMPTS': 20},
+                                   copy_from_options={'NUMPROCESSES': 2})
 
     def test_bulk_round_trip_with_timeouts(self):
         """
