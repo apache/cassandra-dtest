@@ -1,5 +1,5 @@
 from dtest import Tester, debug
-from tools import known_failure, since
+from tools import since
 
 
 @since('2.2')
@@ -15,6 +15,13 @@ class TestLargeColumn(Tester):
         node.stress(['read', 'n=5', "no-warmup", "cl=ALL", "-pop", "seq=1...5", "-schema", "replication(factor=2)", "-col", "n=fixed(1)", "size=fixed(" + size + ")", "-rate", "threads=1"])
 
     def directbytes(self, node):
+        def is_number(s):
+            try:
+                float(s)
+                return True
+            except ValueError:
+                return False
+
         output = node.nodetool("gcstats", capture_output=True)
         debug(output)
         output = output[0].split("\n")
@@ -22,11 +29,9 @@ class TestLargeColumn(Tester):
         fields = output[1].split()
         assert len(fields) >= 6, "Expected output from nodetool gcstats has at least six fields"
         for field in fields:
-            assert field.strip().isdigit() or field == 'NaN', "Expected numeric from fields from nodetool gcstats"
+            assert is_number(field.strip()) or field == 'NaN', "Expected numeric from fields from nodetool gcstats"
         return fields[6]
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11058')
     def cleanup_test(self):
         """
         @jira_ticket CASSANDRA-8670
