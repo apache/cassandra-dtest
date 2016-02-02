@@ -219,4 +219,12 @@ class UpgradeTester(Tester):
         return max(node_versions) if is_upgraded else min(node_versions)
 
     def tearDown(self):
+        # Ignore errors before upgrade on Windows
+        # We ignore errors from 2.1, because windows 2.1
+        # support is only beta. There are frequent log errors,
+        # related to filesystem interactions that are a direct result
+        # of the lack of full functionality on 2.1 Windows, and we dont
+        # want these to pollute our results.
+        if is_win() and self.cluster.version() <= '2.2':
+            self.cluster.nodelist()[1].mark_log_for_errors()
         super(UpgradeTester, self).tearDown()
