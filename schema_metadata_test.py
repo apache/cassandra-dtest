@@ -1,8 +1,8 @@
-import re
-
-from nose.tools import assert_equal, assert_in
+from collections import defaultdict
+from uuid import uuid4
 
 from dtest import Tester, debug
+from nose.tools import assert_equal, assert_in
 from tools import since
 
 
@@ -481,11 +481,17 @@ def verify_basic_datatype_table(created_on_version, current_version, keyspace, s
         assert_equal('tinyint', meta.columns['s'].cql_type)
 
 
+# TODO: rename this function since it generates names for not just tables
 def _table_name_builder(prefix, table_name):
-    if prefix == "":
-        return table_name
+    def get_uuid_str():
+        return str(uuid4()).replace('-', '')
+    try:
+        consistent_hasher = _table_name_builder.consistent_hasher
+    except AttributeError:
+        consistent_hasher = defaultdict(get_uuid_str)
+        _table_name_builder.consistent_hasher = consistent_hasher
 
-    return "{0}_{1}".format(re.sub(r"[^A-Za-z0-9]", "_", prefix), table_name)[-47:].lstrip('_')
+    return "gen_{}".format(consistent_hasher[prefix + table_name])  # 'gen' as in 'generated'
 
 
 class TestSchemaMetadata(Tester):
