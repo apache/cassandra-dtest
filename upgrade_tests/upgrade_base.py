@@ -1,10 +1,13 @@
 import os
+import re
 import sys
 import time
 from collections import namedtuple
+from distutils.version import LooseVersion
 from unittest import skipIf
 
 from ccmlib.common import get_version_from_build, is_win
+
 from dtest import DEBUG, Tester, debug
 from tools import cassandra_git_branch, since
 
@@ -17,6 +20,60 @@ UPGRADE_TO_DIR = os.environ.get('UPGRADE_TO_DIR', None)
 
 
 UpgradePath = namedtuple('UpgradePath', ('starting_version', 'upgrade_version'))
+
+
+# these should be latest tentative tags, falling back to the most recent release if no pending tentative
+latest_2dot0 = '2.0.17'
+latest_2dot1 = '2.1.13'
+latest_2dot2 = '2.2.5'
+latest_3dot0 = 'git:3.0.3-tentative'
+latest_3dot1 = '3.1.1'
+latest_3dot2 = '3.2.1'
+latest_3dot3 = 'git:3.3-tentative'
+
+head_2dot0 = 'git:cassandra-2.0'
+head_2dot1 = 'git:cassandra-2.1'
+head_2dot2 = 'git:cassandra-2.2'
+head_3dot0 = 'git:cassandra-3.0'
+head_3dot1 = 'git:cassandra-3.1'
+head_3dot2 = 'git:cassandra-3.2'
+head_3dot3 = 'git:cassandra-3.3'
+head_trunk = 'git:trunk'
+
+
+def sanitize_version(version, allow_ambiguous=True):
+    """
+    Takes version of the form cassandra-1.2, 2.0.10, or trunk.
+    Returns a LooseVersion(x.y.z)
+
+    If allow_ambiguous is False, will raise RuntimeError if no version is found.
+    """
+    if (version == 'git:trunk') or (version == 'trunk'):
+        return LooseVersion(head_trunk)
+
+    match = re.match('^.*(\d+\.+\d+\.*\d*).*$', unicode(version))
+    if match:
+        return LooseVersion(match.groups()[0])
+
+    if not allow_ambiguous:
+        raise RuntimeError("Version could not be identified")
+
+
+def switch_jdks(version):
+    cleaned_version = sanitize_version(version)
+
+    if cleaned_version is None:
+        debug("Not switching jdk as cassandra version couldn't be identified from {}".format(version))
+        return
+
+    try:
+        if version < LooseVersion('2.1'):
+            os.environ['JAVA_HOME'] = os.environ['JAVA7_HOME']
+        else:
+            os.environ['JAVA_HOME'] = os.environ['JAVA8_HOME']
+    except KeyError:
+        raise RuntimeError("You need to set JAVA7_HOME and JAVA8_HOME to run these tests!")
+    debug("Set JAVA_HOME: [{}] for cassandra version: [{}]".format(os.environ['JAVA_HOME'], version))
 
 
 def get_default_upgrade_path(job_version, cdir=None):

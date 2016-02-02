@@ -2,76 +2,26 @@ import operator
 import os
 import pprint
 import random
-import re
 import signal
 import time
 import uuid
 from collections import defaultdict
-from distutils.version import LooseVersion
 from multiprocessing import Process, Queue
 from Queue import Empty, Full
 
-from six import print_
-
 import psutil
-import schema_metadata_test
 from cassandra import ConsistencyLevel, WriteTimeout
 from cassandra.query import SimpleStatement
+from six import print_
+
+import schema_metadata_test
 from dtest import Tester, debug
 from tools import generate_ssl_stores, known_failure, new_node
-
-# these should be latest tentative tags, falling back to the most recent release if no pending tentative
-latest_2dot0 = '2.0.17'
-latest_2dot1 = '2.1.13'
-latest_2dot2 = '2.2.5'
-latest_3dot0 = 'git:3.0.3-tentative'
-latest_3dot1 = '3.1.1'
-latest_3dot2 = '3.2.1'
-latest_3dot3 = 'git:3.3-tentative'
-
-head_2dot0 = 'git:cassandra-2.0'
-head_2dot1 = 'git:cassandra-2.1'
-head_2dot2 = 'git:cassandra-2.2'
-head_3dot0 = 'git:cassandra-3.0'
-head_3dot1 = 'git:cassandra-3.1'
-head_3dot2 = 'git:cassandra-3.2'
-head_3dot3 = 'git:cassandra-3.3'
-head_trunk = 'git:trunk'
-
-
-def sanitize_version(version, allow_ambiguous=True):
-    """
-    Takes version of the form cassandra-1.2, 2.0.10, or trunk.
-    Returns a LooseVersion(x.y.z)
-
-    If allow_ambiguous is False, will raise RuntimeError if no version is found.
-    """
-    if (version == 'git:trunk') or (version == 'trunk'):
-        return LooseVersion(head_trunk)
-
-    match = re.match('^.*(\d+\.+\d+\.*\d*).*$', unicode(version))
-    if match:
-        return LooseVersion(match.groups()[0])
-
-    if not allow_ambiguous:
-        raise RuntimeError("Version could not be identified")
-
-
-def switch_jdks(version):
-    cleaned_version = sanitize_version(version)
-
-    if cleaned_version is None:
-        debug("Not switching jdk as cassandra version couldn't be identified from {}".format(version))
-        return
-
-    try:
-        if version < LooseVersion('2.1'):
-            os.environ['JAVA_HOME'] = os.environ['JAVA7_HOME']
-        else:
-            os.environ['JAVA_HOME'] = os.environ['JAVA8_HOME']
-    except KeyError:
-        raise RuntimeError("You need to set JAVA7_HOME and JAVA8_HOME to run these tests!")
-    debug("Set JAVA_HOME: [{}] for cassandra version: [{}]".format(os.environ['JAVA_HOME'], version))
+from upgrade_base import (head_2dot1, head_2dot2, head_3dot0, head_3dot1,
+                          head_3dot2, head_3dot3, head_trunk, latest_2dot0,
+                          latest_2dot1, latest_2dot2, latest_3dot0,
+                          latest_3dot1, latest_3dot2, latest_3dot3,
+                          switch_jdks)
 
 
 def data_writer(tester, to_verify_queue, verification_done_queue, rewrite_probability=0):
