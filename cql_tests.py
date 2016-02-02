@@ -234,7 +234,7 @@ class MiscellaneousCQLTester(CQLTester):
     """
 
     @known_failure(failure_source='driver',
-                   jira_url='https://datastax-oss.atlassian.net/browse/PYTHON-459')
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11108')
     @since('2.1', max_version='3.0')
     def large_collection_errors_test(self):
         """
