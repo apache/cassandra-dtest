@@ -62,6 +62,12 @@ def build_doc_context(tester, test_name, prepare=True, connection=None, nodes=No
         cli = os.path.join(cdir, 'bin', common.platform_binary('cqlsh'))
         env = common.make_cassandra_env(cdir, nodes[0].get_path())
         env['LANG'] = 'en_US.UTF-8'
+
+        # CASSANDRA-10428 changes the default time format to include microseconds (%f) but only
+        # for version 3.2 onwards, so we fix the default timestamp for the time-being, to
+        # avoid having multiple versions of these tests since it would be a bit messy to change the docstrings
+        env['CQLSH_DEFAULT_TIMESTAMP_FORMAT'] = '%Y-%m-%d %H:%M:%S%z'
+
         if LooseVersion(tester.cluster.version()) >= LooseVersion('2.1'):
             host = nodes[0].network_interfaces['binary'][0]
             port = nodes[0].network_interfaces['binary'][1]
