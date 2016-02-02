@@ -8,7 +8,6 @@ from ccmlib.common import get_version_from_build, is_win
 from dtest import DEBUG, Tester, debug
 from tools import cassandra_git_branch, since
 
-QUERY_OLD = os.environ.get('QUERY_OLD', 'true').lower() in ('yes', 'true')
 OLD_CASSANDRA_DIR = os.environ.get('OLD_CASSANDRA_DIR', None)
 OLD_CASSANDRA_VERSION = os.environ.get('OLD_CASSANDRA_VERSION', None)
 
@@ -223,11 +222,11 @@ class UpgradeTester(Tester):
         session = self.patient_exclusive_cql_connection(node1, protocol_version=self.protocol_version)
         session.set_keyspace('ks')
         sessions.append((True, session))
-        if QUERY_OLD:
-            # open a second session with the node on the old version
-            session = self.patient_exclusive_cql_connection(node2, protocol_version=self.protocol_version)
-            session.set_keyspace('ks')
-            sessions.append((False, session))
+
+        # open a second session with the node on the old version
+        session = self.patient_exclusive_cql_connection(node2, protocol_version=self.protocol_version)
+        session.set_keyspace('ks')
+        sessions.append((False, session))
 
         if self.CL:
             for is_upgraded, session in sessions:
