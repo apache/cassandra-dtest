@@ -11,18 +11,6 @@ from tools import cassandra_git_branch, since
 OLD_CASSANDRA_DIR = os.environ.get('OLD_CASSANDRA_DIR', None)
 OLD_CASSANDRA_VERSION = os.environ.get('OLD_CASSANDRA_VERSION', None)
 
-# This controls how many of the nodes are upgraded.  Accepted values are
-# "normal", "none", and "all".
-# The "normal" setting results in one of the two nodes being upgraded before
-# queries are run.
-# The "none" setting doesn't upgrade any nodes.  When combined with debug
-# logging, this is useful for seeing exactly what commands and responses
-# a 2.1 cluster will use.
-# The "all" setting upgrades all nodes before querying.  When combined with debug
-# logging, this is useful for seeing exactly what commands and responses
-# a 3.0 cluster will use.
-UPGRADE_MODE = os.environ.get('UPGRADE_MODE', 'normal').lower()
-
 # Specify a branch to upgrade to
 UPGRADE_TO = os.environ.get('UPGRADE_TO', None)
 UPGRADE_TO_DIR = os.environ.get('UPGRADE_TO_DIR', None)
@@ -160,13 +148,9 @@ class UpgradeTester(Tester):
         node1 = self.cluster.nodelist()[0]
         node2 = self.cluster.nodelist()[1]
 
-        if UPGRADE_MODE not in ('normal', 'all', 'none'):
-            raise Exception("UPGRADE_MODE should be one of 'normal', 'all', or 'none'")
-
         # stop the nodes
-        if UPGRADE_MODE != "none":
-            node1.drain()
-            node1.stop(gently=True)
+        node1.drain()
+        node1.stop(gently=True)
 
         # Ignore errors before upgrade on Windows
         # We ignore errors from 2.1, because windows 2.1
@@ -176,12 +160,6 @@ class UpgradeTester(Tester):
         # want these to pollute our results.
         if is_win() and self.cluster.version() <= '2.2':
             node1.mark_log_for_errors()
-
-        if UPGRADE_MODE == "all":
-            node2.drain()
-            node2.stop(gently=True)
-            if is_win() and self.cluster.version() <= '2.2':
-                node2.mark_log_for_errors()
 
         # choose version to upgrade to
         if UPGRADE_TO_DIR:
@@ -196,27 +174,15 @@ class UpgradeTester(Tester):
         debug('upgrading to {}'.format(install_kwargs))
 
         # start them again
-        if UPGRADE_MODE != "none":
-            node1.set_install_dir(**install_kwargs)
-            # this is a bandaid; after refactoring, upgrades should account for protocol version
-            new_version_from_build = get_version_from_build(node1.get_install_dir())
-            if (new_version_from_build >= '3' and self.protocol_version is not None and self.protocol_version < 3):
-                self.skip('Protocol version {} incompatible '
-                          'with Cassandra version {}'.format(self.protocol_version, new_version_from_build))
-            node1.set_log_level("DEBUG" if DEBUG else "INFO")
-            node1.set_configuration_options(values={'internode_compression': 'none'})
-            node1.start(wait_for_binary_proto=True, wait_other_notice=True)
-
-        if UPGRADE_MODE == "all":
-            node2.set_install_dir(**install_kwargs)
-            # this is a bandaid; after refactoring, upgrades should account for protocol version
-            new_version_from_build = get_version_from_build(node1.get_install_dir())
-            if (new_version_from_build >= '3' and self.protocol_version is not None and self.protocol_version < 3):
-                self.skip('Protocol version {} incompatible '
-                          'with Cassandra version {}'.format(self.protocol_version, new_version_from_build))
-            node2.set_log_level("DEBUG" if DEBUG else "INFO")
-            node2.set_configuration_options(values={'internode_compression': 'none'})
-            node2.start(wait_for_binary_proto=True, wait_other_notice=True)
+        node1.set_install_dir(**install_kwargs)
+        # this is a bandaid; after refactoring, upgrades should account for protocol version
+        new_version_from_build = get_version_from_build(node1.get_install_dir())
+        if (new_version_from_build >= '3' and self.protocol_version is not None and self.protocol_version < 3):
+            self.skip('Protocol version {} incompatible '
+                      'with Cassandra version {}'.format(self.protocol_version, new_version_from_build))
+        node1.set_log_level("DEBUG" if DEBUG else "INFO")
+        node1.set_configuration_options(values={'internode_compression': 'none'})
+        node1.start(wait_for_binary_proto=True, wait_other_notice=True)
 
         sessions = []
         session = self.patient_exclusive_cql_connection(node1, protocol_version=self.protocol_version)
@@ -253,12 +219,4 @@ class UpgradeTester(Tester):
         return max(node_versions) if is_upgraded else min(node_versions)
 
     def tearDown(self):
-        # Ignore errors before upgrade on Windows
-        # We ignore errors from 2.1, because windows 2.1
-        # support is only beta. There are frequent log errors,
-        # related to filesystem interactions that are a direct result
-        # of the lack of full functionality on 2.1 Windows, and we dont
-        # want these to pollute our results.
-        if is_win() and UPGRADE_MODE != "all" and self.cluster.version() <= '2.2':
-            self.cluster.nodelist()[1].mark_log_for_errors()
         super(UpgradeTester, self).tearDown()
