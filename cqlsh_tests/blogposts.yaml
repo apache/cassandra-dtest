@@ -3,7 +3,7 @@
 keyspace: stresscql
 
 keyspace_definition: |
-  CREATE KEYSPACE stresscql WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
+  CREATE KEYSPACE stresscql WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 3};
 
 table: blogposts
 
@@ -31,16 +31,16 @@ columnspec:
     cluster: fixed(5000)
 
   - name: url
-    size: uniform(30..300)
+    size: uniform(10..50)
 
   - name: title
-    size: gaussian(10..200)
+    size: gaussian(5..10)
 
   - name: author
-    size: uniform(5..20)
+    size: uniform(5..10)
 
   - name: body
-    size: gaussian(10..500)
+    size: gaussian(10..100)
 
 ### Batch Ratio Distribution Specifications ###
 
