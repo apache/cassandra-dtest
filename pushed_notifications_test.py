@@ -29,7 +29,7 @@ class NotificationWaiter(object):
         self.keyspace = keyspace
 
         # get a single, new connection
-        session = tester.patient_cql_connection(node)
+        session = tester.patient_exclusive_cql_connection(node)
         connection = session.cluster.connection_factory(self.address, is_control_connection=True)
 
         # coordinate with an Event
@@ -152,26 +152,26 @@ class TestPushedNotifications(Tester):
             notifications = waiter.wait_for_notifications(30.0)
             self.assertEquals(1 if waiter.node is node1 else 0, len(notifications))
 
-    @known_failure(failure_source='cassandra',
+    @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10870',
-                   flaky=True,
-                   notes='Flakes under C* 2.1')
+                   flaky=True)
     def restart_node_test(self):
         """
         @jira_ticket CASSANDRA-7816
         Restarting a node should generate exactly one DOWN and one UP notification
         """
 
-        self.cluster.populate(2).start()
+        self.cluster.populate(2).start(wait_for_binary_proto=True, wait_other_notice=True)
         node1, node2 = self.cluster.nodelist()
 
         waiter = NotificationWaiter(self, node1, ["STATUS_CHANGE", "TOPOLOGY_CHANGE"])
+        waiter.clear_notifications()
 
         for i in range(5):
             debug("Restarting second node...")
             node2.stop(wait_other_notice=True)
             node2.start(wait_other_notice=True)
-            debug("Waiting for notifications from {}".format(waiter.address,))
+            debug("Waiting for notifications from {}".format(waiter.address))
             notifications = waiter.wait_for_notifications(timeout=60.0, num_notifications=3)
             self.assertEquals(3, len(notifications))
             for notification in notifications:
