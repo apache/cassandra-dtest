@@ -2,6 +2,7 @@ import os
 import re
 import sys
 import time
+from abc import ABCMeta
 from collections import namedtuple
 from distutils.version import LooseVersion
 from unittest import skipIf
@@ -127,6 +128,8 @@ class UpgradeTester(Tester):
     When run on 3.0, this will test the upgrade path to trunk. When run on
     versions above 3.0, this will test the upgrade path from 3.0 to HEAD.
     """
+    # make this an abc so we can get all subclasses with __subclasses__()
+    __metaclass__ = ABCMeta
     NODES, RF, __test__, CL = 2, 1, False, None
 
     def prepare(self, ordered=False, create_keyspace=True, use_cache=False,
