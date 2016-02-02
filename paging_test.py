@@ -1558,7 +1558,11 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
         self.assertTrue(failure, "Cannot find tombstone failure threshold error in log")
 
     def test_deletion_with_distinct_paging(self):
-        """Test that deletion does not affect paging for distinct queries"""
+        """
+        Test that deletion does not affect paging for distinct queries.
+
+        @jira_ticket CASSANDRA-10010
+        """
         self.session = self.prepare()
         self.create_ks(self.session, 'test_paging_size', 2)
         self.session.execute("CREATE TABLE paging_test ( "
