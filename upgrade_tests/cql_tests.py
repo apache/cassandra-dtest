@@ -5232,9 +5232,19 @@ class TestCQL(UpgradeTester):
             assert_one(cursor, "SELECT * FROM foo.bar", [0, 0])
 
 
-class TestCQLNodes3RF3(TestCQL):
-    NODES, RF, __test__, CL = 3, 3, True, ConsistencyLevel.ALL
+specs = [
+    {'NODES': 3,
+     'RF': 3,
+     'CL': ConsistencyLevel.ALL,
+     '__test__': True},
+    {'NODES': 2,
+     'RF': 1,
+     '__test__': True},
+]
 
-
-class TestCQLNodes2RF1(TestCQL):
-    NODES, RF, __test__ = 2, 1, True
+for s in specs:
+    num_nodes, rf = s['NODES'], s['RF']
+    suffix = 'Nodes{num_nodes}RF{rf}'.format(num_nodes=num_nodes, rf=rf)
+    gen_class_name = TestCQL.__name__ + suffix
+    assert gen_class_name not in globals()
+    globals()[gen_class_name] = type(gen_class_name, (TestCQL,), s)
