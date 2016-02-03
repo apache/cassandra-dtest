@@ -143,14 +143,14 @@ class TestCqlsh(Tester):
 
         output, err = self.run_cqlsh(node1, 'use simple; SELECT * FROM simpledate')
 
-        if self.cluster.version() >= '3.2':
+        if self.cluster.version() >= '3.4':
             self.assertIn("2143-04-19 11:21:01.000000+0000", output)
             self.assertIn("1943-04-19 11:21:01.000000+0000", output)
         else:
             self.assertIn("2143-04-19 11:21:01+0000", output)
             self.assertIn("1943-04-19 11:21:01+0000", output)
 
-    @since('3.2')
+    @since('3.4')
     def test_sub_second_precision(self):
         """
         Test that we can query at millisecond precision.

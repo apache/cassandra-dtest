@@ -318,7 +318,7 @@ class CqlshCopyTest(Tester):
                             val,
                             encoding=encoding_name,
                             date_time_format=date_time_format,
-                            time_format=self.default_time_format,
+                            time_format=time_format,
                             float_precision=float_precision,
                             colormap=DummyColorMap(),
                             nullval=None,
@@ -1744,7 +1744,7 @@ class CqlshCopyTest(Tester):
         do_test(expected_vals_usual, ',', '.')
         do_test(expected_vals_inverted, '.', ',')
 
-    @since('3.2')
+    @since('3.4')
     def test_round_trip_with_sub_second_precision(self):
         """
         Test that we can import and export timestamp values with millisecond precision:
