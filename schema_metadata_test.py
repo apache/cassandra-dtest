@@ -1,8 +1,8 @@
-import re
-
-from nose.tools import assert_equal, assert_in
+from collections import defaultdict
+from uuid import uuid4
 
 from dtest import Tester, debug
+from nose.tools import assert_equal, assert_in
 from tools import since
 
 
@@ -10,19 +10,19 @@ def establish_durable_writes_keyspace(version, session, table_name_prefix=""):
     session.execute("""
         CREATE KEYSPACE {}
             WITH replication = {{'class': 'SimpleStrategy', 'replication_factor': 1}};
-    """.format(_table_name_builder(table_name_prefix, "durable_writes_default")))
+    """.format(_cql_name_builder(table_name_prefix, "durable_writes_default")))
 
     session.execute("""
         CREATE KEYSPACE {}
             WITH replication = {{'class': 'SimpleStrategy', 'replication_factor': 1}}
             AND durable_writes = 'false';
-    """.format(_table_name_builder(table_name_prefix, "durable_writes_false")))
+    """.format(_cql_name_builder(table_name_prefix, "durable_writes_false")))
 
     session.execute("""
         CREATE KEYSPACE {}
             WITH replication = {{'class': 'SimpleStrategy', 'replication_factor': 1}}
             AND durable_writes = 'true';
-    """.format(_table_name_builder(table_name_prefix, "durable_writes_true")))
+    """.format(_cql_name_builder(table_name_prefix, "durable_writes_true")))
 
 
 def verify_durable_writes_keyspace(created_on_version, current_version, keyspace, session, table_name_prefix=""):
@@ -32,14 +32,14 @@ def verify_durable_writes_keyspace(created_on_version, current_version, keyspace
         "durable_writes_false": False
     }
     for keyspace, is_durable in expected.iteritems():
-        keyspace_name = _table_name_builder(table_name_prefix, keyspace)
+        keyspace_name = _cql_name_builder(table_name_prefix, keyspace)
         meta = session.cluster.metadata.keyspaces[keyspace_name]
         assert_equal(is_durable, meta.durable_writes,
                      "keyspace [{}] had durable_writes of [{}] should be [{}]".format(keyspace_name, meta.durable_writes, is_durable))
 
 
 def establish_indexes_table(version, session, table_name_prefix=""):
-    table_name = _table_name_builder(table_name_prefix, "test_indexes")
+    table_name = _cql_name_builder(table_name_prefix, "test_indexes")
     cql = """
             create table {0} (
                         a uuid,
@@ -51,14 +51,14 @@ def establish_indexes_table(version, session, table_name_prefix=""):
               """
 
     session.execute(cql.format(table_name))
-    index_name = _table_name_builder("idx_" + table_name_prefix, table_name)
+    index_name = _cql_name_builder("idx_" + table_name_prefix, table_name)
     debug("table name: [{}], index name: [{}], prefix: [{}]".format(table_name, index_name, table_name_prefix))
     session.execute("CREATE INDEX {0} ON {1}( d )".format(index_name, table_name))
 
 
 def verify_indexes_table(created_on_version, current_version, keyspace, session, table_name_prefix=""):
-    table_name = _table_name_builder(table_name_prefix, "test_indexes")
-    index_name = _table_name_builder("idx_" + table_name_prefix, table_name)
+    table_name = _cql_name_builder(table_name_prefix, "test_indexes")
+    index_name = _cql_name_builder("idx_" + table_name_prefix, table_name)
     debug("table name: [{}], index name: [{}], prefix: [{}]".format(table_name, index_name, table_name_prefix))
     meta = session.cluster.metadata.keyspaces[keyspace].indexes[index_name]
 
@@ -78,7 +78,7 @@ def verify_indexes_table(created_on_version, current_version, keyspace, session,
 
 
 def establish_clustering_order_table(version, session, table_name_prefix=""):
-    table_name = _table_name_builder(table_name_prefix, "test_clustering_order")
+    table_name = _cql_name_builder(table_name_prefix, "test_clustering_order")
     cql = """
                 CREATE TABLE {0} (
                   event_type text,
@@ -93,7 +93,7 @@ def establish_clustering_order_table(version, session, table_name_prefix=""):
 
 
 def verify_clustering_order_table(created_on_version, current_version, keyspace, session, table_name_prefix=""):
-    table_name = _table_name_builder(table_name_prefix, "test_clustering_order")
+    table_name = _cql_name_builder(table_name_prefix, "test_clustering_order")
     meta = session.cluster.metadata.keyspaces[keyspace].tables[table_name]
     assert_equal(0, len(meta.indexes))
     assert_equal(2, len(meta.primary_key))
@@ -105,7 +105,7 @@ def verify_clustering_order_table(created_on_version, current_version, keyspace,
 
 
 def establish_compact_storage_table(version, session, table_name_prefix=""):
-    table_name = _table_name_builder(table_name_prefix, "test_compact_storage")
+    table_name = _cql_name_builder(table_name_prefix, "test_compact_storage")
     cql = """
                 CREATE TABLE {0} (
                   block_id uuid,
@@ -120,7 +120,7 @@ def establish_compact_storage_table(version, session, table_name_prefix=""):
 
 
 def verify_compact_storage_table(created_on_version, current_version, keyspace, session, table_name_prefix=""):
-    table_name = _table_name_builder(table_name_prefix, "test_compact_storage")
+    table_name = _cql_name_builder(table_name_prefix, "test_compact_storage")
     meta = session.cluster.metadata.keyspaces[keyspace].tables[table_name]
     assert_equal(3, len(meta.columns))
     assert_equal(2, len(meta.primary_key))
@@ -135,7 +135,7 @@ def verify_compact_storage_table(created_on_version, current_version, keyspace, 
 
 
 def establish_compact_storage_composite_table(version, session, table_name_prefix=""):
-    table_name = _table_name_builder(table_name_prefix, "test_compact_storage_composite")
+    table_name = _cql_name_builder(table_name_prefix, "test_compact_storage_composite")
     cql = """
                 CREATE TABLE {0} (
                     key text,
@@ -150,7 +150,7 @@ def establish_compact_storage_composite_table(version, session, table_name_prefi
 
 
 def verify_compact_storage_composite_table(created_on_version, current_version, keyspace, session, table_name_prefix=""):
-    table_name = _table_name_builder(table_name_prefix, "test_compact_storage_composite")
+    table_name = _cql_name_builder(table_name_prefix, "test_compact_storage_composite")
     meta = session.cluster.metadata.keyspaces[keyspace].tables[table_name]
     assert_equal(4, len(meta.columns))
     assert_equal(3, len(meta.primary_key))
@@ -168,7 +168,7 @@ def verify_compact_storage_composite_table(created_on_version, current_version, 
 
 
 def establish_nondefault_table_settings(version, session, table_name_prefix=""):
-    table_name = _table_name_builder(table_name_prefix, "test_nondefault_settings")
+    table_name = _cql_name_builder(table_name_prefix, "test_nondefault_settings")
     cql = """
         create table {0} (
                     a uuid,
@@ -209,7 +209,7 @@ def establish_nondefault_table_settings(version, session, table_name_prefix=""):
 
 
 def verify_nondefault_table_settings(created_on_version, current_version, keyspace, session, table_name_prefix=""):
-    table_name = _table_name_builder(table_name_prefix, "test_nondefault_settings")
+    table_name = _cql_name_builder(table_name_prefix, "test_nondefault_settings")
     meta = session.cluster.metadata.keyspaces[keyspace].tables[table_name]
 
     assert_equal('insightful information', meta.options['comment'])
@@ -256,8 +256,8 @@ def verify_nondefault_table_settings(created_on_version, current_version, keyspa
 def establish_uda(version, session, table_name_prefix=""):
     if version < '2.2':
         return
-    function_name = _table_name_builder(table_name_prefix, "test_uda_function")
-    aggregate_name = _table_name_builder(table_name_prefix, "test_uda_aggregate")
+    function_name = _cql_name_builder(table_name_prefix, "test_uda_function")
+    aggregate_name = _cql_name_builder(table_name_prefix, "test_uda_aggregate")
 
     session.execute('''
             CREATE FUNCTION {0}(current int, candidate int)
@@ -277,8 +277,8 @@ def establish_uda(version, session, table_name_prefix=""):
 def verify_uda(created_on_version, current_version, keyspace, session, table_name_prefix=""):
     if created_on_version < '2.2':
         return
-    function_name = _table_name_builder(table_name_prefix, "test_uda_function")
-    aggregate_name = _table_name_builder(table_name_prefix, "test_uda_aggregate")
+    function_name = _cql_name_builder(table_name_prefix, "test_uda_function")
+    aggregate_name = _cql_name_builder(table_name_prefix, "test_uda_aggregate")
 
     assert_in(function_name + "(int,int)", session.cluster.metadata.keyspaces[keyspace].functions.keys())
     assert_in(aggregate_name + "(int)", session.cluster.metadata.keyspaces[keyspace].aggregates.keys())
@@ -292,7 +292,7 @@ def verify_uda(created_on_version, current_version, keyspace, session, table_nam
 def establish_udf(version, session, table_name_prefix=""):
     if version < '2.2':
         return
-    function_name = _table_name_builder(table_name_prefix, "test_udf")
+    function_name = _cql_name_builder(table_name_prefix, "test_udf")
     session.execute('''
         CREATE OR REPLACE FUNCTION {0} (input double) CALLED ON NULL INPUT RETURNS double LANGUAGE java AS 'return Double.valueOf(Math.log(input.doubleValue()));';
         '''.format(function_name))
@@ -301,7 +301,7 @@ def establish_udf(version, session, table_name_prefix=""):
 def verify_udf(created_on_version, current_version, keyspace, session, table_name_prefix=""):
     if created_on_version < '2.2':
         return
-    function_name = _table_name_builder(table_name_prefix, "test_udf")
+    function_name = _cql_name_builder(table_name_prefix, "test_udf")
     assert_in(function_name + "(double)", session.cluster.metadata.keyspaces[keyspace].functions.keys())
     meta = session.cluster.metadata.keyspaces[keyspace].functions[function_name + "(double)"]
     assert_equal('java', meta.language)
@@ -314,7 +314,7 @@ def verify_udf(created_on_version, current_version, keyspace, session, table_nam
 def establish_udt_table(version, session, table_name_prefix=""):
     if version < '2.1':
         return
-    table_name = _table_name_builder(table_name_prefix, "test_udt")
+    table_name = _cql_name_builder(table_name_prefix, "test_udt")
     session.execute('''
           CREATE TYPE {0} (
               street text,
@@ -326,7 +326,7 @@ def establish_udt_table(version, session, table_name_prefix=""):
 def verify_udt_table(created_on_version, current_version, keyspace, session, table_name_prefix=""):
     if created_on_version < '2.1':
         return
-    table_name = _table_name_builder(table_name_prefix, "test_udt")
+    table_name = _cql_name_builder(table_name_prefix, "test_udt")
     meta = session.cluster.metadata.keyspaces[keyspace].user_types[table_name]
 
     assert_equal(meta.field_names, ['street', 'city', 'zip'])
@@ -341,7 +341,7 @@ def verify_udt_table(created_on_version, current_version, keyspace, session, tab
 def establish_static_column_table(version, session, table_name_prefix=""):
     if version < '2.0':
         return
-    table_name = _table_name_builder(table_name_prefix, "test_static_column")
+    table_name = _cql_name_builder(table_name_prefix, "test_static_column")
     session.execute('''
           CREATE TABLE {0} (
              user text,
@@ -355,7 +355,7 @@ def establish_static_column_table(version, session, table_name_prefix=""):
 def verify_static_column_table(created_on_version, current_version, keyspace, session, table_name_prefix=""):
     if created_on_version < '2.0':
         return
-    table_name = _table_name_builder(table_name_prefix, "test_static_column")
+    table_name = _cql_name_builder(table_name_prefix, "test_static_column")
     meta = session.cluster.metadata.keyspaces[keyspace].tables[table_name]
     assert_equal(4, len(meta.columns))
     assert_equal('text', meta.columns['user'].cql_type)
@@ -369,7 +369,7 @@ def verify_static_column_table(created_on_version, current_version, keyspace, se
 
 
 def establish_collection_datatype_table(version, session, table_name_prefix=""):
-    table_name = _table_name_builder(table_name_prefix, "test_collection_datatypes")
+    table_name = _cql_name_builder(table_name_prefix, "test_collection_datatypes")
     cql = '''
         CREATE TABLE {0} (
             id uuid PRIMARY KEY,
@@ -395,7 +395,7 @@ def establish_collection_datatype_table(version, session, table_name_prefix=""):
 
 
 def verify_collection_datatype_table(created_on_version, current_version, keyspace, session, table_name_prefix=""):
-    table_name = _table_name_builder(table_name_prefix, "test_collection_datatypes")
+    table_name = _cql_name_builder(table_name_prefix, "test_collection_datatypes")
     meta = session.cluster.metadata.keyspaces[keyspace].tables[table_name]
     if created_on_version > '2.1':
         assert_equal(13, len(meta.columns))
@@ -419,7 +419,7 @@ def verify_collection_datatype_table(created_on_version, current_version, keyspa
 
 
 def establish_basic_datatype_table(version, session, table_name_prefix=""):
-    table_name = _table_name_builder(table_name_prefix, "test_basic_datatypes")
+    table_name = _cql_name_builder(table_name_prefix, "test_basic_datatypes")
     cql = '''
         CREATE TABLE {0} (
             a ascii,
@@ -449,7 +449,7 @@ def establish_basic_datatype_table(version, session, table_name_prefix=""):
 
 
 def verify_basic_datatype_table(created_on_version, current_version, keyspace, session, table_name_prefix=""):
-    table_name = _table_name_builder(table_name_prefix, "test_basic_datatypes")
+    table_name = _cql_name_builder(table_name_prefix, "test_basic_datatypes")
     meta = session.cluster.metadata.keyspaces[keyspace].tables[table_name]
     if created_on_version > '2.2':
         assert_equal(19, len(meta.columns))
@@ -481,11 +481,16 @@ def verify_basic_datatype_table(created_on_version, current_version, keyspace, s
         assert_equal('tinyint', meta.columns['s'].cql_type)
 
 
-def _table_name_builder(prefix, table_name):
-    if prefix == "":
-        return table_name
+def _cql_name_builder(prefix, table_name):
+    def get_uuid_str():
+        return str(uuid4()).replace('-', '')
+    try:
+        consistent_hasher = _cql_name_builder.consistent_hasher
+    except AttributeError:
+        consistent_hasher = defaultdict(get_uuid_str)
+        _cql_name_builder.consistent_hasher = consistent_hasher
 
-    return "{0}_{1}".format(re.sub(r"[^A-Za-z0-9]", "_", prefix), table_name)[-47:].lstrip('_')
+    return "gen_{}".format(consistent_hasher[prefix + table_name])  # 'gen' as in 'generated'
 
 
 class TestSchemaMetadata(Tester):
