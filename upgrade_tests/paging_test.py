@@ -1712,20 +1712,20 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
             self.assertTrue(failed, "Cannot find tombstone failure threshold error in log for {} node".format(("upgraded" if is_upgraded else "old")))
 
 
-for klaus in BasePagingTester.__subclasses__():
-    specs = [
-        {'NODES': 3,
-         'RF': 3,
-         'CL': CL.ALL,
-         '__test__': True},
-        {'NODES': 2,
-         'RF': 1,
-         '__test__': True},
-    ]
+specs = [
+    {'NODES': 3,
+     'RF': 3,
+     'CL': CL.ALL,
+     '__test__': True},
+    {'NODES': 2,
+     'RF': 1,
+     '__test__': True},
+]
 
-    for s in specs:
-        num_nodes, rf = s['NODES'], s['RF']
+for klaus in BasePagingTester.__subclasses__():
+    for spec in specs:
+        num_nodes, rf = spec['NODES'], spec['RF']
         suffix = 'Nodes{num_nodes}RF{rf}'.format(num_nodes=num_nodes, rf=rf)
         gen_klaus_name = klaus.__name__ + suffix
         assert gen_klaus_name not in globals()
-        globals()[gen_klaus_name] = type(gen_klaus_name, (klaus,), s)
+        globals()[gen_klaus_name] = type(gen_klaus_name, (klaus,), spec)
