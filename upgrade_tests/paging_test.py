@@ -351,14 +351,6 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
             self.assertEqualIgnoreOrder(pf.all_data(), expected_data)
 
 
-class TestPagingSizeNodes3RF3(TestPagingSize):
-    NODES, RF, __test__, CL = 3, 3, True, CL.ALL
-
-
-class TestPagingSizeNodes2RF1(TestPagingSize):
-    NODES, RF, __test__ = 2, 1, True
-
-
 class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
     """
     Tests concerned with paging when CQL modifiers (such as order, limit, allow filtering) are used.
@@ -613,14 +605,6 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
                     """, format_funcs={'id': int, 'value': unicode}
                 )
             )
-
-
-class TestPagingWithModifiersNodes3RF3(TestPagingWithModifiers):
-    NODES, RF, __test__, CL = 3, 3, True, CL.ALL
-
-
-class TestPagingWithModifiersNodes2RF1(TestPagingWithModifiers):
-    NODES, RF, __test__ = 2, 1, True
 
 
 class TestPagingData(BasePagingTester, PageAssertionMixin):
@@ -1096,14 +1080,6 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
             self.assertEqualIgnoreOrder(expected_data, pf.all_data())
 
 
-class TestPagingDataNodes3RF3(TestPagingData):
-    NODES, RF, __test__, CL = 3, 3, True, CL.ALL
-
-
-class TestPagingDataNodes2RF1(TestPagingData):
-    NODES, RF, __test__ = 2, 1, True
-
-
 class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
     """
     Tests concerned with paging when the queried dataset changes while pages are being retrieved.
@@ -1298,14 +1274,6 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
             self.assertEqualIgnoreOrder(page3, page3expected)
 
 
-class TestPagingDatasetChangesNodes3RF3(TestPagingDatasetChanges):
-    NODES, RF, __test__, CL = 3, 3, True, CL.ALL
-
-
-class TestPagingDatasetChangesNodes2RF1(TestPagingDatasetChanges):
-    NODES, RF, __test__ = 2, 1, True
-
-
 class TestPagingQueryIsolation(BasePagingTester, PageAssertionMixin):
     """
     Tests concerned with isolation of paged queries (queries can't affect each other).
@@ -1393,14 +1361,6 @@ class TestPagingQueryIsolation(BasePagingTester, PageAssertionMixin):
             self.assertEqualIgnoreOrder(flatten_into_set(page_fetchers[8].all_data()), flatten_into_set(expected_data[15000:20000]))
             self.assertEqualIgnoreOrder(flatten_into_set(page_fetchers[9].all_data()), flatten_into_set(expected_data[20000:25000]))
             self.assertEqualIgnoreOrder(flatten_into_set(page_fetchers[10].all_data()), flatten_into_set(expected_data[:50000]))
-
-
-class TestPagingQueryIsolationNodes3RF3(TestPagingQueryIsolation):
-    NODES, RF, __test__, CL = 3, 3, True, CL.ALL
-
-
-class TestPagingQueryIsolationNodes2RF1(TestPagingQueryIsolation):
-    NODES, RF, __test__ = 2, 1, True
 
 
 class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
@@ -1752,9 +1712,20 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
             self.assertTrue(failed, "Cannot find tombstone failure threshold error in log for {} node".format(("upgraded" if is_upgraded else "old")))
 
 
-class TestPagingWithDeletionsNodes3RF3(TestPagingWithDeletions):
-    NODES, RF, __test__, CL = 3, 3, True, CL.ALL
+for klaus in BasePagingTester.__subclasses__():
+    specs = [
+        {'NODES': 3,
+         'RF': 3,
+         'CL': CL.ALL,
+         '__test__': True},
+        {'NODES': 2,
+         'RF': 1,
+         '__test__': True},
+    ]
 
-
-class TestPagingWithDeletionsNodes2RF1(TestPagingWithDeletions):
-    NODES, RF, __test__ = 2, 1, True
+    for s in specs:
+        num_nodes, rf = s['NODES'], s['RF']
+        suffix = 'Nodes{num_nodes}RF{rf}'.format(num_nodes=num_nodes, rf=rf)
+        gen_klaus_name = klaus.__name__ + suffix
+        assert gen_klaus_name not in globals()
+        globals()[gen_klaus_name] = type(gen_klaus_name, (klaus,), s)
