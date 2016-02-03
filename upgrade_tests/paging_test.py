@@ -10,7 +10,7 @@ from cassandra.query import SimpleStatement, dict_factory, named_tuple_factory
 from datahelp import create_rows, flatten_into_set, parse_data_into_dicts
 from dtest import debug, run_scenarios
 from tools import known_failure, rows_to_list, since
-from upgrade_base import UpgradeTester
+from upgrade_base import VALID_UPGRADE_PAIRS, UpgradeTester
 
 
 def assert_read_timeout_or_failure(session, query):
@@ -1712,20 +1712,22 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
             self.assertTrue(failed, "Cannot find tombstone failure threshold error in log for {} node".format(("upgraded" if is_upgraded else "old")))
 
 
-specs = [
+topology_specs = [
     {'NODES': 3,
      'RF': 3,
-     'CL': CL.ALL,
-     '__test__': True},
+     'CL': CL.ALL},
     {'NODES': 2,
-     'RF': 1,
-     '__test__': True},
+     'RF': 1},
 ]
+
+specs = [dict(s, UPGRADE_PATH=p, __test__=True)
+         for s, p in itertools.product(topology_specs, VALID_UPGRADE_PAIRS)]
 
 for klaus in BasePagingTester.__subclasses__():
     for spec in specs:
-        num_nodes, rf = spec['NODES'], spec['RF']
-        suffix = 'Nodes{num_nodes}RF{rf}'.format(num_nodes=num_nodes, rf=rf)
-        gen_klaus_name = klaus.__name__ + suffix
-        assert gen_klaus_name not in globals()
-        globals()[gen_klaus_name] = type(gen_klaus_name, (klaus,), spec)
+        suffix = 'Nodes{num_nodes}RF{rf}_{pathname}'.format(num_nodes=spec['NODES'],
+                                                            rf=spec['RF'],
+                                                            pathname=spec['UPGRADE_PATH'].name)
+        gen_class_name = klaus.__name__ + suffix
+        assert gen_class_name not in globals(), gen_class_name
+        globals()[gen_class_name] = type(gen_class_name, (klaus,), spec)
