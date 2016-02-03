@@ -109,7 +109,10 @@ class TestBootstrap(Tester):
         self.assertEqual(rows[0][0], 'COMPLETED')
 
     def read_from_bootstrapped_node_test(self):
-        """Test bootstrapped node sees existing data, eg. CASSANDRA-6648"""
+        """
+        Test bootstrapped node sees existing data
+        @jira_ticket CASSANDRA-6648
+        """
         cluster = self.cluster
         cluster.populate(3)
         cluster.start()
@@ -133,7 +136,9 @@ class TestBootstrap(Tester):
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10912',
                    flaky=True)
     def resumable_bootstrap_test(self):
-        """Test resuming bootstrap after data streaming failure"""
+        """
+        Test resuming bootstrap after data streaming failure
+        """
 
         cluster = self.cluster
         cluster.populate(2).start(wait_other_notice=True)
@@ -215,9 +220,10 @@ class TestBootstrap(Tester):
         assert rows[0][0] == 'COMPLETED', rows[0][0]
 
     def manual_bootstrap_test(self):
-        """Test adding a new node and bootstrappig it manually. No auto_bootstrap.
-           This test also verify that all data are OK after the addition of the new node.
-           eg. CASSANDRA-9022
+        """
+            Test adding a new node and bootstrapping it manually. No auto_bootstrap.
+            This test also verify that all data are OK after the addition of the new node.
+            @jira_ticket CASSANDRA-9022
         """
         cluster = self.cluster
         cluster.populate(2).start(wait_other_notice=True)
@@ -241,7 +247,10 @@ class TestBootstrap(Tester):
         self.assertEquals(original_rows, current_rows)
 
     def local_quorum_bootstrap_test(self):
-        """Test that CL local_quorum works while a node is bootstrapping. CASSANDRA-8058"""
+        """
+        Test that CL local_quorum works while a node is bootstrapping.
+        @jira_ticket CASSANDRA-8058
+        """
 
         cluster = self.cluster
         cluster.populate([1, 1])
