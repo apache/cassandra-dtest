@@ -76,6 +76,10 @@ logging.getLogger('cassandra').setLevel(logging.WARNING)
 initial_environment = copy.deepcopy(os.environ)
 
 
+class DtestTimeoutError(Exception):
+    pass
+
+
 def reset_environment_vars():
     os.environ.clear()
     os.environ.update(initial_environment)
