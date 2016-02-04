@@ -21,7 +21,7 @@ from ccmlib.common import is_win
 from cqlsh_tools import (DummyColorMap, assert_csvs_items_equal, csv_rows,
                          monkeypatch_driver, random_list, unmonkeypatch_driver, write_rows_to_csv)
 from dtest import Tester, canReuseCluster, freshCluster, debug, DISABLE_VNODES
-from tools import rows_to_list, since
+from tools import known_failure, rows_to_list, since
 
 DEFAULT_FLOAT_PRECISION = 5  # magic number copied from cqlsh script
 
@@ -582,6 +582,8 @@ class CqlshCopyTest(Tester):
         self.assertItemsEqual([tuple(d) for d in data],
                               [tuple(r) for r in rows_to_list(result)])
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11121')
     def test_datetimeformat_round_trip(self):
         """
         @jira_ticket CASSANDRA-10633
