@@ -41,14 +41,48 @@ murmur3_hashes = {
 }
 
 
+def query_system_traces_length(session):
+    return len(list(session.execute("SELECT * FROM system_traces.events")))
+
+
+def last_n_values_same(n, iterable):
+    last_n_values = iterable[-n:]
+    if len(last_n_values) != n:
+        return False
+    num_unique_values_in_last_n = len(set(last_n_values))
+    return num_unique_values_in_last_n == 1
+
+
+def block_on_trace(session):
+    results_from_query = []
+    num_same_results_required = 5
+
+    # We should never run into a timeout, because
+    # eventually trace events should stop being generated.
+    # Just in case though, we add a large timeout, to prevent
+    # deadlock.
+    start = time.time()
+    timeout = start + 180
+
+    while not last_n_values_same(num_same_results_required, results_from_query):
+        results_from_query.append(query_system_traces_length(session))
+        time.sleep(1)
+
+        if time.time() > timeout:
+            raise DtestTimeoutError()
+
+
 @no_vnodes()
 class ReplicationTest(Tester):
-    """This test suite looks at how data is replicated across a cluster
+    """
+    This test suite looks at how data is replicated across a cluster
     and who the coordinator, replicas and forwarders involved are.
     """
 
     def get_replicas_from_trace(self, trace):
-        """Look at trace and return a list of the replicas contacted"""
+        """
+        Look at trace and return a list of the replicas contacted
+        """
         coordinator = None
         nodes_sent_write = set([])  # Nodes sent a write request
         nodes_responded_write = set([])  # Nodes that acknowledges a write
@@ -107,8 +141,10 @@ class ReplicationTest(Tester):
 
     def get_replicas_for_token(self, token, replication_factor,
                                strategy='SimpleStrategy', nodes=None):
-        """Figure out which node(s) should receive data for a given token and
-        replication factor"""
+        """
+        Figure out which node(s) should receive data for a given token and
+        replication factor
+        """
         if not nodes:
             nodes = self.cluster.nodelist()
         token_ranges = sorted(zip([n.initial_token for n in nodes], nodes))
@@ -150,7 +186,9 @@ class ReplicationTest(Tester):
         return replicas
 
     def pprint_trace(self, trace):
-        """Pretty print a trace"""
+        """
+        Pretty print a trace
+        """
         if PRINT_DEBUG:
             print("-" * 40)
             for t in trace.events:
@@ -158,7 +196,9 @@ class ReplicationTest(Tester):
             print("-" * 40)
 
     def simple_test(self):
-        """Test the SimpleStrategy on a 3 node cluster"""
+        """
+        Test the SimpleStrategy on a 3 node cluster
+        """
         self.cluster.populate(3).start(wait_for_binary_proto=True, wait_other_notice=True)
         node1 = self.cluster.nodelist()[0]
         session = self.patient_exclusive_cql_connection(node1)
@@ -170,12 +210,14 @@ class ReplicationTest(Tester):
         session.execute('CREATE TABLE test.test (id int PRIMARY KEY, value text)', trace=False)
 
         for key, token in murmur3_hashes.items():
-            query = SimpleStatement("INSERT INTO test (id, value) VALUES (%s, 'asdf')" % key, consistency_level=ConsistencyLevel.ALL)
+            query = SimpleStatement("INSERT INTO test (id, value) VALUES ({}, 'asdf')".format(key), consistency_level=ConsistencyLevel.ALL)
             future = session.execute_async(query, trace=True)
             future.result()
-            time.sleep(5)  # We need to wait for system_traces to be populated. See CASSANDRA-10882
+            block_on_trace(session)
+
             trace = future.get_query_trace(max_wait=120)
             self.pprint_trace(trace)
+
             stats = self.get_replicas_from_trace(trace)
             replicas_should_be = set(self.get_replicas_for_token(
                 token, replication_factor))
@@ -189,7 +231,9 @@ class ReplicationTest(Tester):
             self.assertEqual(stats['nodes_sent_write'], stats['nodes_responded_write'])
 
     def network_topology_test(self):
-        """Test the NetworkTopologyStrategy on a 2DC 3:3 node cluster"""
+        """
+        Test the NetworkTopologyStrategy on a 2DC 3:3 node cluster
+        """
         self.cluster.populate([3, 3]).start(wait_for_binary_proto=True, wait_other_notice=True)
 
         node1 = self.cluster.nodelist()[0]
@@ -204,12 +248,14 @@ class ReplicationTest(Tester):
         forwarders_used = set()
 
         for key, token in murmur3_hashes.items():
-            query = SimpleStatement("INSERT INTO test (id, value) VALUES (%s, 'asdf')" % key, consistency_level=ConsistencyLevel.ALL)
+            query = SimpleStatement("INSERT INTO test (id, value) VALUES ({}, 'asdf')".format(key), consistency_level=ConsistencyLevel.ALL)
             future = session.execute_async(query, trace=True)
             future.result()
-            time.sleep(5)  # We need to wait for system_traces to be populated. See CASSANDRA-10882
+            block_on_trace(session)
+
             trace = future.get_query_trace(max_wait=120)
             self.pprint_trace(trace)
+
             stats = self.get_replicas_from_trace(trace)
             replicas_should_be = set(self.get_replicas_for_token(
                 token, replication_factor, strategy='NetworkTopologyStrategy'))
