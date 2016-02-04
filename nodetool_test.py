@@ -91,3 +91,47 @@ class TestNodetool(Tester):
             self.assertEqual(0, len(err), err)
             debug(out)
             self.assertRegexpMatches(out, r'.* 123 ms')
+
+    def test_meaningless_notice_in_status(self):
+        """
+        @jira_ticket CASSANDRA-10176
+
+        nodetool status don't return ownership when there is more than one user keyspace
+        define (since they likely have different replication infos making ownership
+        meaningless in general) and shows a helpful notice as to why it does that.
+        This test checks that said notice is only printed is there is indeed more than
+        one user keyspace.
+        """
+        cluster = self.cluster
+        cluster.populate([3]).start()
+
+        node = cluster.nodelist()[0]
+
+        notice_message = r'effective ownership information is meaningless'
+
+        # Do a first try without any keypace, we shouldn't have the notice
+        out, err = node.nodetool('status')
+        self.assertEqual(0, len(err), err)
+        self.assertNotRegexpMatches(out, notice_message)
+
+        session = self.patient_cql_connection(node)
+        session.execute("CREATE KEYSPACE ks1 WITH replication = { 'class':'SimpleStrategy', 'replication_factor':1}")
+
+        # With 1 keyspace, we should still not get the notice
+        out, err = node.nodetool('status')
+        self.assertEqual(0, len(err), err)
+        self.assertNotRegexpMatches(out, notice_message)
+
+        session.execute("CREATE KEYSPACE ks2 WITH replication = { 'class':'SimpleStrategy', 'replication_factor':1}")
+
+        # With 2 keyspaces with the same settings, we should not get the notice
+        out, err = node.nodetool('status')
+        self.assertEqual(0, len(err), err)
+        self.assertNotRegexpMatches(out, notice_message)
+
+        session.execute("CREATE KEYSPACE ks3 WITH replication = { 'class':'SimpleStrategy', 'replication_factor':3}")
+
+        # With a keyspace without the same replication factor, we should get the notice
+        out, err = node.nodetool('status')
+        self.assertEqual(0, len(err), err)
+        self.assertRegexpMatches(out, notice_message)
