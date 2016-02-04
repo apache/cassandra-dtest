@@ -132,7 +132,7 @@ class TestBootstrap(Tester):
         self.assertEquals(original_rows, new_rows)
 
     @since('2.2')
-    @known_failure(failure_source='systemic',
+    @known_failure(failure_source='cassandra',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10912',
                    flaky=True)
     def resumable_bootstrap_test(self):
