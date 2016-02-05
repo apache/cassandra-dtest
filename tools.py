@@ -169,7 +169,8 @@ def range_putget(cluster, session, cl=ConsistencyLevel.QUORUM):
 
 
 def replace_in_file(filepath, search_replacements):
-    """In-place file search and replace.
+    """
+    In-place file search and replace.
 
     filepath - The path of the file to edit
     search_replacements - a list of tuples (regex, replacement) that
@@ -259,12 +260,15 @@ class since(object):
 
 
 def no_vnodes():
-    """Skips the decorated test or test class if using vnodes."""
+    """
+    Skips the decorated test or test class if using vnodes.
+    """
     return unittest.skipIf(not DISABLE_VNODES, 'Test disabled for vnodes')
 
 
 def require(require_pattern, broken_in=None):
-    """Skips the decorated class or method, unless the argument
+    """
+    Skips the decorated class or method, unless the argument
     'require_pattern' is a case-insensitive regex match for the name of the git
     branch in the directory from which Cassandra is running. For example, the
     method defined here:
