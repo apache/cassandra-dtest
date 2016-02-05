@@ -1557,6 +1557,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
 
         self.assertTrue(failure, "Cannot find tombstone failure threshold error in log")
 
+    @since('2.2.6')
     def test_deletion_with_distinct_paging(self):
         """
         Test that deletion does not affect paging for distinct queries.
