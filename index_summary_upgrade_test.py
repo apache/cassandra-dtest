@@ -7,6 +7,10 @@ from jmxutils import JolokiaAgent, make_mbean, remove_perf_disable_shared_mem
 class TestUpgradeIndexSummary(Tester):
 
     def test_upgrade_index_summary(self):
+        """
+        @jira_ticket CASSANDRA-8993
+        """
+
         cluster = self.cluster
         cluster.populate(1)
         node = cluster.nodelist()[0]
