@@ -107,7 +107,6 @@ def putget(cluster, session, cl=ConsistencyLevel.QUORUM):
     _put_with_overwrite(cluster, session, 1, cl)
 
     # reads by name
-    ks = ["\'c%02d\'" % i for i in xrange(0, 100)]
     # We do not support proper IN queries yet
     # if cluster.version() >= "1.2":
     #    session.execute('SELECT * FROM cf USING CONSISTENCY %s WHERE key=\'k0\' AND c IN (%s)' % (cl, ','.join(ks)))
