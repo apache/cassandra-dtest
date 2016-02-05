@@ -102,7 +102,7 @@ class TestTopology(Tester):
         self.create_ks(session, 'ks', 2)
         self.create_cf(session, 'cf', columns={'c1': 'text', 'c2': 'text'})
 
-        insert_c1c2(session, n=10000, consistency=ConsistencyLevel.QUORUM)
+        insert_c1c2(session, n=30000, consistency=ConsistencyLevel.QUORUM)
 
         cluster.flush()
         sizes = [node.data_size() for node in cluster.nodelist() if node.is_running()]
@@ -116,7 +116,7 @@ class TestTopology(Tester):
         time.sleep(.5)
 
         # Check we can get all the keys
-        for n in xrange(0, 10000):
+        for n in xrange(0, 30000):
             query_c1c2(session, n, ConsistencyLevel.QUORUM)
 
         sizes = [node.data_size() for node in cluster.nodelist() if node.is_running()]
