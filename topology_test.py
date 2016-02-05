@@ -120,6 +120,7 @@ class TestTopology(Tester):
             query_c1c2(session, n, ConsistencyLevel.QUORUM)
 
         sizes = [node.data_size() for node in cluster.nodelist() if node.is_running()]
+        debug(sizes)
         three_node_sizes = sizes
         assert_almost_equal(sizes[0], sizes[1])
         assert_almost_equal((2.0 / 3.0) * sizes[0], sizes[2])
