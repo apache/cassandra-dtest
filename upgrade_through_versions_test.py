@@ -24,10 +24,10 @@ from tools import generate_ssl_stores, known_failure, new_node
 latest_2dot0 = '2.0.17'
 latest_2dot1 = '2.1.12'
 latest_2dot2 = '2.2.4'
-latest_3dot0 = 'git:tentative-3.0.3'
+latest_3dot0 = 'git:3.0.3-tentative'
 latest_3dot1 = '3.1.1'
 latest_3dot2 = '3.2.1'
-latest_3dot3 = 'git:tentative-3.3'
+latest_3dot3 = 'git:3.3-tentative'
 
 head_2dot0 = 'git:cassandra-2.0'
 head_2dot1 = 'git:cassandra-2.1'
