@@ -2,10 +2,13 @@ from cassandra.concurrent import execute_concurrent_with_args
 
 from dtest import Tester, debug
 from jmxutils import JolokiaAgent, make_mbean, remove_perf_disable_shared_mem
+from tools import known_failure
 
 
 class TestUpgradeIndexSummary(Tester):
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11127')
     def test_upgrade_index_summary(self):
         """
         @jira_ticket CASSANDRA-8993
