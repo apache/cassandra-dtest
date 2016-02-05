@@ -23,7 +23,7 @@ from assertions import assert_all, assert_one, assert_invalid, assert_unavailabl
 # pathological case of flushing schema keyspace for multiple data directories. See CASSANDRA-6696
 # for multiple data directory changes and CASSANDRA-10421 for compaction logging that must be
 # written.
-MIGRATION_WAIT = 2
+MIGRATION_WAIT = 5
 
 
 @since('3.0')
