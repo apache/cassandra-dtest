@@ -22,8 +22,8 @@ from tools import generate_ssl_stores, known_failure, new_node
 
 # these should be latest tentative tags, falling back to the most recent release if no pending tentative
 latest_2dot0 = '2.0.17'
-latest_2dot1 = '2.1.12'
-latest_2dot2 = '2.2.4'
+latest_2dot1 = '2.1.13'
+latest_2dot2 = '2.2.5'
 latest_3dot0 = 'git:3.0.3-tentative'
 latest_3dot1 = '3.1.1'
 latest_3dot2 = '3.2.1'
