@@ -865,10 +865,7 @@ def is_unreleased(version_or_tag):
     """
     For gating unnecessary testing of already released upgrade tests endpoints.
     """
-    if 'tentative' in version_or_tag:
-        return True
-
-    return False
+    return 'tentative' in version_or_tag
 
 
 # Proto v1 upgrade classes (v1 supported on 2.0, 2.1, 2.2)
