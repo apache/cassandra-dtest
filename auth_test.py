@@ -2,7 +2,7 @@ import os
 import re
 import time
 
-from assertions import assert_all, assert_invalid, assert_one
+from assertions import assert_all, assert_invalid, assert_one, assert_unauthorized
 from cassandra import AuthenticationFailed, InvalidRequest, Unauthorized
 from cassandra.cluster import NoHostAvailable
 from cassandra.protocol import SyntaxException
@@ -100,7 +100,7 @@ class TestAuth(Tester):
         cassandra.execute("CREATE USER jackob WITH PASSWORD '12345' NOSUPERUSER")
 
         jackob = self.get_session(user='jackob', password='12345')
-        self.assertUnauthorized('Only superusers are allowed to perform CREATE (\[ROLE\|USER\]|USER) queries', jackob, "CREATE USER james WITH PASSWORD '54321' NOSUPERUSER")
+        assert_unauthorized(jackob, "CREATE USER james WITH PASSWORD '54321' NOSUPERUSER", 'Only superusers are allowed to perform CREATE (\[ROLE\|USER\]|USER) queries', )
 
     @since('1.2', max_version='2.1.x')
     def password_authenticator_create_user_requires_password_test(self):
@@ -202,8 +202,7 @@ class TestAuth(Tester):
         self.assertEqual(3, len(rows))
 
         cathy = self.get_session(user='cathy', password='12345')
-        self.assertUnauthorized('Only superusers are allowed to perform DROP (\[ROLE\|USER\]|USER) queries',
-                                cathy, 'DROP USER dave')
+        assert_unauthorized(cathy, 'DROP USER dave', 'Only superusers are allowed to perform DROP (\[ROLE\|USER\]|USER) queries')
 
         rows = list(cassandra.execute("LIST USERS"))
         self.assertEqual(3, len(rows))
@@ -281,8 +280,8 @@ class TestAuth(Tester):
         cathy = self.get_session(user='cathy', password='12345')
         cathy.execute("ALTER USER cathy WITH PASSWORD '54321'")
         cathy = self.get_session(user='cathy', password='54321')
-        self.assertUnauthorized("You aren't allowed to alter this user|User cathy does not have sufficient privileges to perform the requested operation",
-                                cathy, "ALTER USER bob WITH PASSWORD 'cantchangeit'")
+        assert_unauthorized(cathy, "ALTER USER bob WITH PASSWORD 'cantchangeit'",
+                            "You aren't allowed to alter this user|User cathy does not have sufficient privileges to perform the requested operation")
 
     def users_cant_alter_their_superuser_status_test(self):
         """
@@ -293,8 +292,7 @@ class TestAuth(Tester):
         self.prepare()
 
         session = self.get_session(user='cassandra', password='cassandra')
-        self.assertUnauthorized("You aren't allowed to alter your own superuser status",
-                                session, "ALTER USER cassandra NOSUPERUSER")
+        assert_unauthorized(session, "ALTER USER cassandra NOSUPERUSER", "You aren't allowed to alter your own superuser status")
 
     def only_superuser_alters_superuser_status_test(self):
         """
@@ -311,8 +309,7 @@ class TestAuth(Tester):
         cassandra.execute("CREATE USER cathy WITH PASSWORD '12345'")
 
         cathy = self.get_session(user='cathy', password='12345')
-        self.assertUnauthorized("Only superusers are allowed to alter superuser status",
-                                cathy, "ALTER USER cassandra NOSUPERUSER")
+        assert_unauthorized(cathy, "ALTER USER cassandra NOSUPERUSER", "Only superusers are allowed to alter superuser status")
 
         cassandra.execute("ALTER USER cathy SUPERUSER")
 
@@ -370,9 +367,9 @@ class TestAuth(Tester):
         cassandra.execute("CREATE USER cathy WITH PASSWORD '12345'")
 
         cathy = self.get_session(user='cathy', password='12345')
-        self.assertUnauthorized("User cathy has no CREATE permission on <all keyspaces> or any of its parents",
-                                cathy,
-                                "CREATE KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor':1}")
+        assert_unauthorized(cathy,
+                            "CREATE KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor':1}",
+                            "User cathy has no CREATE permission on <all keyspaces> or any of its parents")
 
         cassandra.execute("GRANT CREATE ON ALL KEYSPACES TO cathy")
         cathy.execute("""CREATE KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor':1}""")
@@ -394,8 +391,8 @@ class TestAuth(Tester):
         cassandra.execute("CREATE KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor':1}")
 
         cathy = self.get_session(user='cathy', password='12345')
-        self.assertUnauthorized("User cathy has no CREATE permission on <keyspace ks> or any of its parents",
-                                cathy, "CREATE TABLE ks.cf (id int primary key)")
+        assert_unauthorized(cathy, "CREATE TABLE ks.cf (id int primary key)",
+                            "User cathy has no CREATE permission on <keyspace ks> or any of its parents")
 
         cassandra.execute("GRANT CREATE ON KEYSPACE ks TO cathy")
         cathy.execute("CREATE TABLE ks.cf (id int primary key)")
@@ -417,9 +414,9 @@ class TestAuth(Tester):
         cassandra.execute("CREATE KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor':1}")
 
         cathy = self.get_session(user='cathy', password='12345')
-        self.assertUnauthorized("User cathy has no ALTER permission on <keyspace ks> or any of its parents",
-                                cathy,
-                                "ALTER KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor':2}")
+        assert_unauthorized(cathy,
+                            "ALTER KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor':2}",
+                            "User cathy has no ALTER permission on <keyspace ks> or any of its parents")
 
         cassandra.execute("GRANT ALTER ON KEYSPACE ks TO cathy")
         cathy.execute("ALTER KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor':2}")
@@ -445,15 +442,13 @@ class TestAuth(Tester):
         cassandra.execute("CREATE TABLE ks.cf (id int primary key)")
 
         cathy = self.get_session(user='cathy', password='12345')
-        self.assertUnauthorized("User cathy has no ALTER permission on <table ks.cf> or any of its parents",
-                                cathy, "ALTER TABLE ks.cf ADD val int")
+        assert_unauthorized(cathy, "ALTER TABLE ks.cf ADD val int", "User cathy has no ALTER permission on <table ks.cf> or any of its parents")
 
         cassandra.execute("GRANT ALTER ON ks.cf TO cathy")
         cathy.execute("ALTER TABLE ks.cf ADD val int")
 
         cassandra.execute("REVOKE ALTER ON ks.cf FROM cathy")
-        self.assertUnauthorized("User cathy has no ALTER permission on <table ks.cf> or any of its parents",
-                                cathy, "CREATE INDEX ON ks.cf(val)")
+        assert_unauthorized(cathy, "CREATE INDEX ON ks.cf(val)", "User cathy has no ALTER permission on <table ks.cf> or any of its parents")
 
         cassandra.execute("GRANT ALTER ON ks.cf TO cathy")
         cathy.execute("CREATE INDEX ON ks.cf(val)")
@@ -461,8 +456,7 @@ class TestAuth(Tester):
         cassandra.execute("REVOKE ALTER ON ks.cf FROM cathy")
 
         cathy.execute("USE ks")
-        self.assertUnauthorized("User cathy has no ALTER permission on <table ks.cf> or any of its parents",
-                                cathy, "DROP INDEX cf_val_idx")
+        assert_unauthorized(cathy, "DROP INDEX cf_val_idx", "User cathy has no ALTER permission on <table ks.cf> or any of its parents")
 
         cassandra.execute("GRANT ALTER ON ks.cf TO cathy")
         cathy.execute("DROP INDEX cf_val_idx")
@@ -493,16 +487,14 @@ class TestAuth(Tester):
         create_mv = "CREATE MATERIALIZED VIEW ks.mv1 AS SELECT * FROM ks.cf WHERE id IS NOT NULL " \
                     "AND value IS NOT NULL PRIMARY KEY (value, id)"
         cathy = self.get_session(user='cathy', password='12345')
-        self.assertUnauthorized("User cathy has no ALTER permission on <table ks.cf> or any of its parents",
-                                cathy, create_mv)
+        assert_unauthorized(cathy, create_mv, "User cathy has no ALTER permission on <table ks.cf> or any of its parents")
 
         # Grant ALTER permission and CREATE MV
         cassandra.execute("GRANT ALTER ON ks.cf TO cathy")
         cathy.execute(create_mv)
 
         # TRY SELECT MV without SELECT permission on base table
-        self.assertUnauthorized("User cathy has no SELECT permission on <table ks.cf> or any of its parents",
-                                cathy, "SELECT * FROM ks.mv1")
+        assert_unauthorized(cathy, "SELECT * FROM ks.mv1", "User cathy has no SELECT permission on <table ks.cf> or any of its parents")
 
         # Grant SELECT permission and CREATE MV
         cassandra.execute("GRANT SELECT ON ks.cf TO cathy")
@@ -511,8 +503,7 @@ class TestAuth(Tester):
         # Revoke ALTER permission and try DROP MV
         cassandra.execute("REVOKE ALTER ON ks.cf FROM cathy")
         cathy.execute("USE ks")
-        self.assertUnauthorized("User cathy has no ALTER permission on <table ks.cf> or any of its parents",
-                                cathy, "DROP MATERIALIZED VIEW mv1")
+        assert_unauthorized(cathy, "DROP MATERIALIZED VIEW mv1", "User cathy has no ALTER permission on <table ks.cf> or any of its parents")
 
         # GRANT ALTER permission and DROP MV
         cassandra.execute("GRANT ALTER ON ks.cf TO cathy")
@@ -535,8 +526,7 @@ class TestAuth(Tester):
         cassandra.execute("CREATE KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor':1}")
 
         cathy = self.get_session(user='cathy', password='12345')
-        self.assertUnauthorized("User cathy has no DROP permission on <keyspace ks> or any of its parents",
-                                cathy, "DROP KEYSPACE ks")
+        assert_unauthorized(cathy, "DROP KEYSPACE ks", "User cathy has no DROP permission on <keyspace ks> or any of its parents")
 
         cassandra.execute("GRANT DROP ON KEYSPACE ks TO cathy")
         cathy.execute("DROP KEYSPACE ks")
@@ -559,8 +549,7 @@ class TestAuth(Tester):
         cassandra.execute("CREATE TABLE ks.cf (id int primary key)")
 
         cathy = self.get_session(user='cathy', password='12345')
-        self.assertUnauthorized("User cathy has no DROP permission on <table ks.cf> or any of its parents",
-                                cathy, "DROP TABLE ks.cf")
+        assert_unauthorized(cathy, "DROP TABLE ks.cf", "User cathy has no DROP permission on <table ks.cf> or any of its parents")
 
         cassandra.execute("GRANT DROP ON ks.cf TO cathy")
         cathy.execute("DROP TABLE ks.cf")
@@ -585,24 +574,19 @@ class TestAuth(Tester):
         cassandra.execute("CREATE TABLE ks.cf (id int primary key, val int)")
 
         cathy = self.get_session(user='cathy', password='12345')
-        self.assertUnauthorized("User cathy has no SELECT permission on <table ks.cf> or any of its parents",
-                                cathy, "SELECT * FROM ks.cf")
+        assert_unauthorized(cathy, "SELECT * FROM ks.cf", "User cathy has no SELECT permission on <table ks.cf> or any of its parents")
 
         cassandra.execute("GRANT SELECT ON ks.cf TO cathy")
         rows = list(cathy.execute("SELECT * FROM ks.cf"))
         self.assertEquals(0, len(rows))
 
-        self.assertUnauthorized("User cathy has no MODIFY permission on <table ks.cf> or any of its parents",
-                                cathy, "INSERT INTO ks.cf (id, val) VALUES (0, 0)")
+        assert_unauthorized(cathy, "INSERT INTO ks.cf (id, val) VALUES (0, 0)", "User cathy has no MODIFY permission on <table ks.cf> or any of its parents")
 
-        self.assertUnauthorized("User cathy has no MODIFY permission on <table ks.cf> or any of its parents",
-                                cathy, "UPDATE ks.cf SET val = 1 WHERE id = 1")
+        assert_unauthorized(cathy, "UPDATE ks.cf SET val = 1 WHERE id = 1", "User cathy has no MODIFY permission on <table ks.cf> or any of its parents")
 
-        self.assertUnauthorized("User cathy has no MODIFY permission on <table ks.cf> or any of its parents",
-                                cathy, "DELETE FROM ks.cf WHERE id = 1")
+        assert_unauthorized(cathy, "DELETE FROM ks.cf WHERE id = 1", "User cathy has no MODIFY permission on <table ks.cf> or any of its parents")
 
-        self.assertUnauthorized("User cathy has no MODIFY permission on <table ks.cf> or any of its parents",
-                                cathy, "TRUNCATE ks.cf")
+        assert_unauthorized(cathy, "TRUNCATE ks.cf", "User cathy has no MODIFY permission on <table ks.cf> or any of its parents")
 
         cassandra.execute("GRANT MODIFY ON ks.cf TO cathy")
         cathy.execute("INSERT INTO ks.cf (id, val) VALUES (0, 0)")
@@ -640,14 +624,12 @@ class TestAuth(Tester):
 
         cathy = self.get_session(user='cathy', password='12345')
         # missing both SELECT and AUTHORIZE
-        self.assertUnauthorized("User cathy has no AUTHORIZE permission on <all keyspaces> or any of its parents",
-                                cathy, "GRANT SELECT ON ALL KEYSPACES TO bob")
+        assert_unauthorized(cathy, "GRANT SELECT ON ALL KEYSPACES TO bob", "User cathy has no AUTHORIZE permission on <all keyspaces> or any of its parents")
 
         cassandra.execute("GRANT AUTHORIZE ON ALL KEYSPACES TO cathy")
 
         # still missing SELECT
-        self.assertUnauthorized("User cathy has no SELECT permission on <all keyspaces> or any of its parents",
-                                cathy, "GRANT SELECT ON ALL KEYSPACES TO bob")
+        assert_unauthorized(cathy, "GRANT SELECT ON ALL KEYSPACES TO bob", "User cathy has no SELECT permission on <all keyspaces> or any of its parents")
 
         cassandra.execute("GRANT SELECT ON ALL KEYSPACES TO cathy")
 
@@ -709,11 +691,9 @@ class TestAuth(Tester):
         cassandra.execute("DROP USER cathy")
         cassandra.execute("CREATE USER cathy WITH PASSWORD '12345'")
 
-        self.assertUnauthorized("User cathy has no MODIFY permission on <table ks.cf> or any of its parents",
-                                cathy, "INSERT INTO ks.cf (id, val) VALUES (0, 0)")
+        assert_unauthorized(cathy, "INSERT INTO ks.cf (id, val) VALUES (0, 0)", "User cathy has no MODIFY permission on <table ks.cf> or any of its parents")
 
-        self.assertUnauthorized("User cathy has no SELECT permission on <table ks.cf> or any of its parents",
-                                cathy, "SELECT * FROM ks.cf")
+        assert_unauthorized(cathy, "SELECT * FROM ks.cf", "User cathy has no SELECT permission on <table ks.cf> or any of its parents")
 
         # grant all the permissions back
         cassandra.execute("GRANT ALL ON ks.cf TO cathy")
@@ -726,11 +706,9 @@ class TestAuth(Tester):
         cassandra.execute("CREATE KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor':1}")
         cassandra.execute("CREATE TABLE ks.cf (id int primary key, val int)")
 
-        self.assertUnauthorized("User cathy has no MODIFY permission on <table ks.cf> or any of its parents",
-                                cathy, "INSERT INTO ks.cf (id, val) VALUES (0, 0)")
+        assert_unauthorized(cathy, "INSERT INTO ks.cf (id, val) VALUES (0, 0)", "User cathy has no MODIFY permission on <table ks.cf> or any of its parents")
 
-        self.assertUnauthorized("User cathy has no SELECT permission on <table ks.cf> or any of its parents",
-                                cathy, "SELECT * FROM ks.cf")
+        assert_unauthorized(cathy, "SELECT * FROM ks.cf", "User cathy has no SELECT permission on <table ks.cf> or any of its parents")
 
     def permissions_caching_test(self):
         """
@@ -757,16 +735,14 @@ class TestAuth(Tester):
         cathy2 = self.get_session(user='cathy', password='12345')
         cathys = [cathy, cathy2]
 
-        self.assertUnauthorized("User cathy has no SELECT permission on <table ks.cf> or any of its parents",
-                                cathy, "SELECT * FROM ks.cf")
+        assert_unauthorized(cathy, "SELECT * FROM ks.cf", "User cathy has no SELECT permission on <table ks.cf> or any of its parents")
 
         # grant SELECT to cathy
         cassandra.execute("GRANT SELECT ON ks.cf TO cathy")
         # should still fail after 1 second.
         time.sleep(1.0)
         for c in cathys:
-            self.assertUnauthorized("User cathy has no SELECT permission on <table ks.cf> or any of its parents",
-                                    c, "SELECT * FROM ks.cf")
+            assert_unauthorized(c, "SELECT * FROM ks.cf", "User cathy has no SELECT permission on <table ks.cf> or any of its parents")
 
         # wait until the cache definitely expires and retry - should succeed now
         time.sleep(1.5)
@@ -867,11 +843,9 @@ class TestAuth(Tester):
                                       ('bob', '<table ks.cf2>', 'MODIFY')],
                                      bob, "LIST ALL PERMISSIONS OF bob")
 
-        self.assertUnauthorized("You are not authorized to view everyone's permissions",
-                                bob, "LIST ALL PERMISSIONS")
+        assert_unauthorized(bob, "LIST ALL PERMISSIONS", "You are not authorized to view everyone's permissions")
 
-        self.assertUnauthorized("You are not authorized to view cathy's permissions",
-                                bob, "LIST ALL PERMISSIONS OF cathy")
+        assert_unauthorized(bob, "LIST ALL PERMISSIONS OF cathy", "You are not authorized to view cathy's permissions")
 
     def type_auth_test(self):
         """
@@ -889,12 +863,9 @@ class TestAuth(Tester):
         cassandra.execute("CREATE KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor':1}")
 
         cathy = self.get_session(user='cathy', password='12345')
-        self.assertUnauthorized("User cathy has no CREATE permission on <keyspace ks> or any of its parents",
-                                cathy, "CREATE TYPE ks.address (street text, city text)")
-        self.assertUnauthorized("User cathy has no ALTER permission on <keyspace ks> or any of its parents",
-                                cathy, "ALTER TYPE ks.address ADD zip_code int")
-        self.assertUnauthorized("User cathy has no DROP permission on <keyspace ks> or any of its parents",
-                                cathy, "DROP TYPE ks.address")
+        assert_unauthorized(cathy, "CREATE TYPE ks.address (street text, city text)", "User cathy has no CREATE permission on <keyspace ks> or any of its parents")
+        assert_unauthorized(cathy, "ALTER TYPE ks.address ADD zip_code int", "User cathy has no ALTER permission on <keyspace ks> or any of its parents")
+        assert_unauthorized(cathy, "DROP TYPE ks.address", "User cathy has no DROP permission on <keyspace ks> or any of its parents")
 
         cassandra.execute("GRANT CREATE ON KEYSPACE ks TO cathy")
         cathy.execute("CREATE TYPE ks.address (street text, city text)")
@@ -941,17 +912,6 @@ class TestAuth(Tester):
         rows = session.execute(query)
         perms = [(str(r.username), str(r.resource), str(r.permission)) for r in rows]
         self.assertEqual(sorted(expected), sorted(perms))
-
-    def assertUnauthorized(self, message, session, query):
-        """
-        Attempt to issue a query, and assert Unauthorized is raised.
-        @param message Expected error message
-        @param session Session to use
-        @param query Unauthorized query to run
-        """
-        with self.assertRaises(Unauthorized) as cm:
-            session.execute(query)
-        assert re.search(message, cm.exception.message), "Expected '%s', but got '%s'" % (message, cm.exception.message)
 
 
 def data_resource_creator_permissions(creator, resource):
@@ -1051,16 +1011,14 @@ class TestAuthRoles(Tester):
         cassandra.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND SUPERUSER = false AND LOGIN = true")
         mike = self.get_session(user='mike', password='12345')
 
-        assert_invalid(mike,
-                       "CREATE ROLE role2",
-                       "User mike does not have sufficient privileges to perform the requested operation",
-                       Unauthorized)
+        assert_unauthorized(mike,
+                            "CREATE ROLE role2",
+                            "User mike does not have sufficient privileges to perform the requested operation")
         cassandra.execute("CREATE ROLE role1")
 
-        assert_invalid(mike,
-                       "DROP ROLE role1",
-                       "User mike does not have sufficient privileges to perform the requested operation",
-                       Unauthorized)
+        assert_unauthorized(mike,
+                            "DROP ROLE role1",
+                            "User mike does not have sufficient privileges to perform the requested operation")
 
         assert_invalid(cassandra, "CREATE ROLE role1", "role1 already exists")
         cassandra.execute("DROP ROLE role1")
@@ -1103,23 +1061,18 @@ class TestAuthRoles(Tester):
         role1 = self.get_session(user='role1', password='22222')
 
         # only superusers can set superuser status
-        assert_invalid(mike, "ALTER ROLE role1 WITH SUPERUSER = true",
-                       "Only superusers are allowed to alter superuser status",
-                       Unauthorized)
-        assert_invalid(mike, "ALTER ROLE mike WITH SUPERUSER = true",
-                       "You aren't allowed to alter your own superuser status or that of a role granted to you",
-                       Unauthorized)
+        assert_unauthorized(mike, "ALTER ROLE role1 WITH SUPERUSER = true",
+                            "Only superusers are allowed to alter superuser status")
+        assert_unauthorized(mike, "ALTER ROLE mike WITH SUPERUSER = true",
+                            "You aren't allowed to alter your own superuser status or that of a role granted to you")
 
         # roles without necessary permissions cannot create, drop or alter roles except themselves
-        assert_invalid(role1, "CREATE ROLE role2 WITH LOGIN = false",
-                       "User role1 does not have sufficient privileges to perform the requested operation",
-                       Unauthorized)
-        assert_invalid(role1, "ALTER ROLE mike WITH LOGIN = false",
-                       "User role1 does not have sufficient privileges to perform the requested operation",
-                       Unauthorized)
-        assert_invalid(role1, "DROP ROLE mike",
-                       "User role1 does not have sufficient privileges to perform the requested operation",
-                       Unauthorized)
+        assert_unauthorized(role1, "CREATE ROLE role2 WITH LOGIN = false",
+                            "User role1 does not have sufficient privileges to perform the requested operation")
+        assert_unauthorized(role1, "ALTER ROLE mike WITH LOGIN = false",
+                            "User role1 does not have sufficient privileges to perform the requested operation")
+        assert_unauthorized(role1, "DROP ROLE mike",
+                            "User role1 does not have sufficient privileges to perform the requested operation")
         role1.execute("ALTER ROLE role1 WITH PASSWORD = '33333'")
 
         # roles with roleadmin can drop roles
@@ -1131,9 +1084,8 @@ class TestAuthRoles(Tester):
 
         # revoking role admin removes its privileges
         cassandra.execute("REVOKE administrator FROM mike")
-        assert_invalid(mike, "CREATE ROLE role3 WITH LOGIN = false",
-                       "User mike does not have sufficient privileges to perform the requested operation",
-                       Unauthorized)
+        assert_unauthorized(mike, "CREATE ROLE role3 WITH LOGIN = false",
+                            "User mike does not have sufficient privileges to perform the requested operation")
 
     def creator_of_db_resource_granted_all_permissions_test(self):
         """
@@ -1201,9 +1153,8 @@ class TestAuthRoles(Tester):
         mike.execute("CREATE ROLE role1 WITH SUPERUSER = false")
         mike.execute("GRANT non_superuser TO role1")
         mike.execute("GRANT another_superuser TO role1")
-        assert_invalid(mike, "CREATE ROLE role2 WITH SUPERUSER = true",
-                       "Only superusers can create a role with superuser status",
-                       Unauthorized)
+        assert_unauthorized(mike, "CREATE ROLE role2 WITH SUPERUSER = true",
+                            "Only superusers can create a role with superuser status")
         assert_all(cassandra, "LIST ROLES OF role1", [['another_superuser', True, False, {}],
                                                       ['non_superuser', False, False, {}],
                                                       ['role1', False, False, {}]])
@@ -1345,10 +1296,9 @@ class TestAuthRoles(Tester):
         cassandra.execute("CREATE ROLE john WITH PASSWORD = '12345' AND SUPERUSER = false AND LOGIN = true")
         cassandra.execute("CREATE ROLE role2")
 
-        assert_invalid(mike,
-                       "GRANT role2 TO john",
-                       "User mike does not have sufficient privileges to perform the requested operation",
-                       Unauthorized)
+        assert_unauthorized(mike,
+                            "GRANT role2 TO john",
+                            "User mike does not have sufficient privileges to perform the requested operation")
 
         # superusers can always grant roles
         cassandra.execute("GRANT role1 TO john")
@@ -1357,10 +1307,9 @@ class TestAuthRoles(Tester):
         mike.execute("GRANT role2 TO john")
 
         # same applies to REVOKEing roles
-        assert_invalid(mike,
-                       "REVOKE role1 FROM john",
-                       "User mike does not have sufficient privileges to perform the requested operation",
-                       Unauthorized)
+        assert_unauthorized(mike,
+                            "REVOKE role1 FROM john",
+                            "User mike does not have sufficient privileges to perform the requested operation")
         cassandra.execute("REVOKE role1 FROM john")
         mike.execute("REVOKE role2 from john")
 
@@ -1388,10 +1337,9 @@ class TestAuthRoles(Tester):
         assert_all(cassandra, "LIST ROLES OF mike NORECURSIVE", [mike_role, role2_role])
 
         mike = self.get_session(user='mike', password='12345')
-        assert_invalid(mike,
-                       "LIST ROLES OF cassandra",
-                       "You are not authorized to view roles granted to cassandra",
-                       Unauthorized)
+        assert_unauthorized(mike,
+                            "LIST ROLES OF cassandra",
+                            "You are not authorized to view roles granted to cassandra")
 
         assert_all(mike, "LIST ROLES", [mike_role, role1_role, role2_role])
         assert_all(mike, "LIST ROLES OF mike", [mike_role, role1_role, role2_role])
@@ -1431,18 +1379,16 @@ class TestAuthRoles(Tester):
         assert_one(mike, "SELECT * FROM ks.cf", [0, 0])
 
         cassandra.execute("REVOKE role1 FROM mike")
-        assert_invalid(mike,
-                       "INSERT INTO ks.cf (id, val) VALUES (0, 0)",
-                       "mike has no MODIFY permission on <table ks.cf> or any of its parents",
-                       Unauthorized)
+        assert_unauthorized(mike,
+                            "INSERT INTO ks.cf (id, val) VALUES (0, 0)",
+                            "mike has no MODIFY permission on <table ks.cf> or any of its parents")
 
         cassandra.execute("GRANT role1 TO mike")
         cassandra.execute("REVOKE ALL ON ks.cf FROM role1")
 
-        assert_invalid(mike,
-                       "INSERT INTO ks.cf (id, val) VALUES (0, 0)",
-                       "mike has no MODIFY permission on <table ks.cf> or any of its parents",
-                       Unauthorized)
+        assert_unauthorized(mike,
+                            "INSERT INTO ks.cf (id, val) VALUES (0, 0)",
+                            "mike has no MODIFY permission on <table ks.cf> or any of its parents")
 
     def filter_granted_permissions_by_resource_type_test(self):
         """
@@ -1674,14 +1620,12 @@ class TestAuthRoles(Tester):
                                        mike,
                                        "LIST ALL PERMISSIONS OF role1")
 
-        assert_invalid(mike,
-                       "LIST ALL PERMISSIONS",
-                       "You are not authorized to view everyone's permissions",
-                       Unauthorized)
-        assert_invalid(mike,
-                       "LIST ALL PERMISSIONS OF john",
-                       "You are not authorized to view john's permissions",
-                       Unauthorized)
+        assert_unauthorized(mike,
+                            "LIST ALL PERMISSIONS",
+                            "You are not authorized to view everyone's permissions")
+        assert_unauthorized(mike,
+                            "LIST ALL PERMISSIONS OF john",
+                            "You are not authorized to view john's permissions")
 
     def role_caching_authenticated_user_test(self):
         """
@@ -1903,10 +1847,9 @@ class TestAuthRoles(Tester):
         cassandra.execute("CREATE ROLE db_admin WITH SUPERUSER = true")
 
         mike = self.get_session(user='mike', password='12345')
-        assert_invalid(mike,
-                       "CREATE ROLE another_role WITH SUPERUSER = false AND LOGIN = false",
-                       "User mike does not have sufficient privileges to perform the requested operation",
-                       Unauthorized)
+        assert_unauthorized(mike,
+                            "CREATE ROLE another_role WITH SUPERUSER = false AND LOGIN = false",
+                            "User mike does not have sufficient privileges to perform the requested operation")
 
         cassandra.execute("GRANT db_admin TO mike")
         mike.execute("CREATE ROLE another_role WITH SUPERUSER = false AND LOGIN = false")
@@ -2031,9 +1974,8 @@ class TestAuthRoles(Tester):
         # grant EXECUTE on only one of the two functions
         cassandra.execute("GRANT EXECUTE ON FUNCTION ks.func_one(int) TO mike")
         mike.execute(select_one)
-        assert_invalid(mike, select_two,
-                       "User mike has no EXECUTE permission on <function ks.func_two\(int\)> or any of its parents",
-                       Unauthorized)
+        assert_unauthorized(mike, select_two,
+                            "User mike has no EXECUTE permission on <function ks.func_two\(int\)> or any of its parents")
         # granting EXECUTE on all of the parent keyspace's should enable mike to use both functions
         cassandra.execute("GRANT EXECUTE ON ALL FUNCTIONS IN KEYSPACE ks TO mike")
         mike.execute(select_one)
@@ -2041,18 +1983,16 @@ class TestAuthRoles(Tester):
         # revoke the keyspace level privilege and verify that the function specific perms are unaffected
         cassandra.execute("REVOKE EXECUTE ON ALL FUNCTIONS IN KEYSPACE ks FROM mike")
         mike.execute(select_one)
-        assert_invalid(mike, select_two,
-                       "User mike has no EXECUTE permission on <function ks.func_two\(int\)> or any of its parents",
-                       Unauthorized)
+        assert_unauthorized(mike, select_two,
+                            "User mike has no EXECUTE permission on <function ks.func_two\(int\)> or any of its parents")
         # now check that EXECUTE on ALL FUNCTIONS works in the same way
         cassandra.execute("GRANT EXECUTE ON ALL FUNCTIONS TO mike")
         mike.execute(select_one)
         mike.execute(select_two)
         cassandra.execute("REVOKE EXECUTE ON ALL FUNCTIONS FROM mike")
         mike.execute(select_one)
-        assert_invalid(mike, select_two,
-                       "User mike has no EXECUTE permission on <function ks.func_two\(int\)> or any of its parents",
-                       Unauthorized)
+        assert_unauthorized(mike, select_two,
+                            "User mike has no EXECUTE permission on <function ks.func_two\(int\)> or any of its parents")
         # finally, check that revoking function level permissions doesn't affect root/keyspace level perms
         cassandra.execute("GRANT EXECUTE ON ALL FUNCTIONS IN KEYSPACE ks TO mike")
         cassandra.execute("REVOKE EXECUTE ON FUNCTION ks.func_one(int) FROM mike")
@@ -2087,9 +2027,8 @@ class TestAuthRoles(Tester):
 
         # can't replace an existing function without ALTER permission on the parent ks
         cql = "CREATE OR REPLACE FUNCTION ks.plus_one( input int ) CALLED ON NULL INPUT RETURNS int LANGUAGE javascript as '1 + input'"
-        assert_invalid(mike, cql,
-                       "User mike has no ALTER permission on <function ks.plus_one\(int\)> or any of its parents",
-                       Unauthorized)
+        assert_unauthorized(mike, cql,
+                            "User mike has no ALTER permission on <function ks.plus_one\(int\)> or any of its parents")
         cassandra.execute("GRANT ALTER ON FUNCTION ks.plus_one(int) TO mike")
         mike.execute(cql)
 
@@ -2097,25 +2036,22 @@ class TestAuthRoles(Tester):
         cassandra.execute("GRANT EXECUTE ON FUNCTION ks.plus_one(int) TO mike")
         cassandra.execute("CREATE ROLE role1")
         cql = "GRANT EXECUTE ON FUNCTION ks.plus_one(int) TO role1"
-        assert_invalid(mike, cql,
-                       "User mike has no AUTHORIZE permission on <function ks.plus_one\(int\)> or any of its parents",
-                       Unauthorized)
+        assert_unauthorized(mike, cql,
+                            "User mike has no AUTHORIZE permission on <function ks.plus_one\(int\)> or any of its parents")
         cassandra.execute("GRANT AUTHORIZE ON FUNCTION ks.plus_one(int) TO mike")
         mike.execute(cql)
         # now revoke AUTHORIZE from mike
         cassandra.execute("REVOKE AUTHORIZE ON FUNCTION ks.plus_one(int) FROM mike")
         cql = "REVOKE EXECUTE ON FUNCTION ks.plus_one(int) FROM role1"
-        assert_invalid(mike, cql,
-                       "User mike has no AUTHORIZE permission on <function ks.plus_one\(int\)> or any of its parents",
-                       Unauthorized)
+        assert_unauthorized(mike, cql,
+                            "User mike has no AUTHORIZE permission on <function ks.plus_one\(int\)> or any of its parents")
         cassandra.execute("GRANT AUTHORIZE ON FUNCTION ks.plus_one(int) TO mike")
         mike.execute(cql)
 
         # can't drop a function without DROP
         cql = "DROP FUNCTION ks.plus_one(int)"
-        assert_invalid(mike, cql,
-                       "User mike has no DROP permission on <function ks.plus_one\(int\)> or any of its parents",
-                       Unauthorized)
+        assert_unauthorized(mike, cql,
+                            "User mike has no DROP permission on <function ks.plus_one\(int\)> or any of its parents")
         cassandra.execute("GRANT DROP ON FUNCTION ks.plus_one(int) TO mike")
         mike.execute(cql)
 
@@ -2131,9 +2067,8 @@ class TestAuthRoles(Tester):
 
         # can't create a new function without CREATE on the parent keyspace's collection of functions
         cql = "CREATE FUNCTION ks.plus_one ( input int ) CALLED ON NULL INPUT RETURNS int LANGUAGE javascript AS 'input + 1'"
-        assert_invalid(mike, cql,
-                       "User mike has no CREATE permission on <all functions in ks> or any of its parents",
-                       Unauthorized)
+        assert_unauthorized(mike, cql,
+                            "User mike has no CREATE permission on <all functions in ks> or any of its parents")
         cassandra.execute("GRANT CREATE ON ALL FUNCTIONS IN KEYSPACE ks TO mike")
         mike.execute(cql)
 
@@ -2312,10 +2247,9 @@ class TestAuthRoles(Tester):
         cassandra.execute("GRANT ALL PERMISSIONS ON ks.t1 TO mike")
         cassandra.execute("INSERT INTO ks.t1 (k,v) values (1,1)")
         mike = self.get_session(user='mike', password='12345')
-        assert_invalid(mike,
-                       cql,
-                       "User mike has no EXECUTE permission on <function ks.plus_one\(int\)> or any of its parents",
-                       Unauthorized)
+        assert_unauthorized(mike,
+                            cql,
+                            "User mike has no EXECUTE permission on <function ks.plus_one\(int\)> or any of its parents")
 
         cassandra.execute("GRANT EXECUTE ON FUNCTION ks.plus_one(int) TO mike")
         return mike.execute(cql)
@@ -2337,10 +2271,9 @@ class TestAuthRoles(Tester):
         cassandra.execute("GRANT SELECT ON ks.t1 TO mike")
         mike = self.get_session(user='mike', password='12345')
         select = "SELECT k, v, ks.plus_one(v) FROM ks.t1 WHERE k = 1"
-        assert_invalid(mike,
-                       select,
-                       "User mike has no EXECUTE permission on <function ks.plus_one\(int\)> or any of its parents",
-                       Unauthorized)
+        assert_unauthorized(mike,
+                            select,
+                            "User mike has no EXECUTE permission on <function ks.plus_one\(int\)> or any of its parents")
 
         cassandra.execute("GRANT function_user TO mike")
         assert_one(mike, select, [1, 1, 2])
@@ -2447,15 +2380,13 @@ class TestAuthRoles(Tester):
                           FINALFUNC final_function
                           INITCOND 0"""
         # check permissions to create the aggregate
-        assert_invalid(mike,
-                       create_aggregate_cql,
-                       "User mike has no EXECUTE permission on <function ks.state_function\(int, int\)> or any of its parents",
-                       Unauthorized)
+        assert_unauthorized(mike,
+                            create_aggregate_cql,
+                            "User mike has no EXECUTE permission on <function ks.state_function\(int, int\)> or any of its parents")
         cassandra.execute("GRANT EXECUTE ON FUNCTION ks.state_function(int, int) TO mike")
-        assert_invalid(mike,
-                       create_aggregate_cql,
-                       "User mike has no EXECUTE permission on <function ks.final_function\(int\)> or any of its parents",
-                       Unauthorized)
+        assert_unauthorized(mike,
+                            create_aggregate_cql,
+                            "User mike has no EXECUTE permission on <function ks.final_function\(int\)> or any of its parents")
         cassandra.execute("GRANT EXECUTE ON FUNCTION ks.final_function(int) TO mike")
         mike.execute(create_aggregate_cql)
 
@@ -2464,15 +2395,13 @@ class TestAuthRoles(Tester):
         cassandra.execute("REVOKE EXECUTE ON FUNCTION ks.state_function(int, int) FROM mike")
         cassandra.execute("REVOKE EXECUTE ON FUNCTION ks.final_function(int) FROM mike")
         execute_aggregate_cql = "SELECT ks.simple_aggregate(v) FROM ks.t1"
-        assert_invalid(mike,
-                       execute_aggregate_cql,
-                       "User mike has no EXECUTE permission on <function ks.state_function\(int, int\)> or any of its parents",
-                       Unauthorized)
+        assert_unauthorized(mike,
+                            execute_aggregate_cql,
+                            "User mike has no EXECUTE permission on <function ks.state_function\(int, int\)> or any of its parents")
         cassandra.execute("GRANT EXECUTE ON FUNCTION ks.state_function(int, int) TO mike")
-        assert_invalid(mike,
-                       execute_aggregate_cql,
-                       "User mike has no EXECUTE permission on <function ks.final_function\(int\)> or any of its parents",
-                       Unauthorized)
+        assert_unauthorized(mike,
+                            execute_aggregate_cql,
+                            "User mike has no EXECUTE permission on <function ks.final_function\(int\)> or any of its parents")
         cassandra.execute("GRANT EXECUTE ON FUNCTION ks.final_function(int) TO mike")
 
         # mike *does* have execute permission on the aggregate function, as its creator

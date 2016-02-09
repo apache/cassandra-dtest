@@ -1,5 +1,5 @@
 import re
-from cassandra import InvalidRequest, Unavailable, ConsistencyLevel, WriteFailure, WriteTimeout, ReadFailure, ReadTimeout
+from cassandra import InvalidRequest, Unavailable, ConsistencyLevel, WriteFailure, WriteTimeout, ReadFailure, ReadTimeout, Unauthorized
 from cassandra.query import SimpleStatement
 from tools import rows_to_list
 
@@ -28,6 +28,16 @@ def assert_invalid(session, query, matching=None, expected=InvalidRequest):
         msg = str(e)
         if matching is not None:
             assert re.search(matching, msg), "Error message does not contain " + matching + " (error = " + msg + ")"
+
+
+def assert_unauthorized(session, query, message):
+    """
+    Attempt to issue a query, and assert Unauthorized is raised.
+    @param message Expected error message
+    @param session Session to use
+    @param query Unauthorized query to run
+    """
+    assert_invalid(session, query, message, Unauthorized)
 
 
 def assert_one(session, query, expected, cl=ConsistencyLevel.ONE):
