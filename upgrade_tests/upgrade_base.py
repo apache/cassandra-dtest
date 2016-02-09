@@ -10,7 +10,7 @@ from unittest import skipIf
 from ccmlib.common import get_version_from_build, is_win
 
 from dtest import DEBUG, Tester, debug
-from tools import cassandra_git_branch, since
+from tools import cassandra_git_branch
 
 OLD_CASSANDRA_DIR = os.environ.get('OLD_CASSANDRA_DIR', None)
 OLD_CASSANDRA_VERSION = os.environ.get('OLD_CASSANDRA_VERSION', None)
@@ -118,7 +118,6 @@ def get_default_upgrade_path(job_version, cdir=None):
     return upgrade_path
 
 
-@since('3.0')
 @skipIf(sys.platform == 'win32', 'Skip upgrade tests on Windows')
 class UpgradeTester(Tester):
     """
