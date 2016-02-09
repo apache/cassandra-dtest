@@ -20,6 +20,9 @@ UPGRADE_TO = os.environ.get('UPGRADE_TO', None)
 UPGRADE_TO_DIR = os.environ.get('UPGRADE_TO_DIR', None)
 
 
+UPGRADE_TEST_RUN = os.environ.get('UPGRADE_TEST_RUN', '').lower() in {'true', 'yes'}
+
+
 UpgradePath = namedtuple('UpgradePath', ('starting_version', 'upgrade_version'))
 
 
@@ -118,6 +121,7 @@ def get_default_upgrade_path(job_version, cdir=None):
     return upgrade_path
 
 
+@skipIf(not UPGRADE_TEST_RUN, 'set UPGRADE_TEST_RUN=true to run upgrade tests')
 @skipIf(sys.platform == 'win32', 'Skip upgrade tests on Windows')
 class UpgradeTester(Tester):
     """
