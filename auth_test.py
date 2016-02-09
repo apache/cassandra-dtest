@@ -108,12 +108,13 @@ class TestAuth(Tester):
         * Launch a one node cluster
         * Connect as the default superuser
         * Verify we cannot create a new user without specifying a password for them
-        # TODO Verify we can create a new user if we do specify the password
+        * Verify we can create the new user if the password is specified
         """
         self.prepare()
 
         session = self.get_session(user='cassandra', password='cassandra')
         assert_invalid(session, "CREATE USER jackob NOSUPERUSER", 'PasswordAuthenticator requires PASSWORD option')
+        session.execute("CREATE USER jackob WITH PASSWORD '12345' NOSUPERUSER")
 
     def cant_create_existing_user_test(self):
         """
@@ -135,7 +136,7 @@ class TestAuth(Tester):
         * Create two new users, and two new superusers.
         * Verify that LIST USERS shows all five users.
         * Verify that the correct users are listed as super users.
-        # TODO: Connect as one of the new users, and check that the LIST USERS behavior is also correct there.
+        # Connect as one of the new users, and check that the LIST USERS behavior is also correct there.
         """
         self.prepare()
 
@@ -145,6 +146,18 @@ class TestAuth(Tester):
         session.execute("CREATE USER cathy WITH PASSWORD '12345' NOSUPERUSER")
         session.execute("CREATE USER dave WITH PASSWORD '12345' SUPERUSER")
 
+        rows = list(session.execute("LIST USERS"))
+        self.assertEqual(5, len(rows))
+        # {username: isSuperuser} dict.
+        users = dict([(r[0], r[1]) for r in rows])
+
+        self.assertTrue(users['cassandra'])
+        self.assertFalse(users['alex'])
+        self.assertTrue(users['bob'])
+        self.assertFalse(users['cathy'])
+        self.assertTrue(users['dave'])
+
+        dave = self.get_session(user='dave', password='12345')
         rows = list(session.execute("LIST USERS"))
         self.assertEqual(5, len(rows))
         # {username: isSuperuser} dict.
@@ -179,8 +192,6 @@ class TestAuth(Tester):
         * Connect as one of the new users, 'cathy'
         * Verify that 'cathy', not being a superuser, cannot drop other users, and gets an Unauthorized exception
         * Verify the default superuser can drop other users
-        # TODO: Test [or verify is tested elsewhere] that in 2.2+, superusers without the DROP_ROLE
-        permission cannot drop users
         """
         self.prepare()
 
@@ -217,15 +228,26 @@ class TestAuth(Tester):
         * Launch a one node cluster
         * Connect as the default superuser
         * Create a user, 'Test'
-        * Verify that dropping the user works
-        # TODO: This test doesn't show if case sensitivity exists or not, or if it even works.
-        Needs several more test cases to be rigorous.
+        * Verify that the drop user statement is case sensitive
         """
         self.prepare()
         cassandra = self.get_session(user='cassandra', password='cassandra')
         cassandra.execute("CREATE USER Test WITH PASSWORD '12345'")
         usercount = len(list(cassandra.execute("LIST USERS")))
+
+        # Should be invalid, as 'test' does not exist
+        assert_invalid(cassandra, "DROP USER test")
+
         cassandra.execute("DROP USER Test")
+        self.assertEqual(usercount - 1, len(list(cassandra.execute("LIST USERS"))))
+
+        cassandra.execute("CREATE USER test WITH PASSWORD '12345'")
+        usercount = len(list(cassandra.execute("LIST USERS")))
+
+        # Should be invalid, as 'TEST' does not exist
+        assert_invalid(cassandra, "DROP USER TEST")
+
+        cassandra.execute("DROP USER test")
         self.assertEqual(usercount - 1, len(list(cassandra.execute("LIST USERS"))))
 
     def alter_user_case_sensitive(self):
@@ -233,14 +255,13 @@ class TestAuth(Tester):
         * Launch a one node cluster
         * Connect as the default superuser
         * Create a user, 'Test'
-        * Verify that altering the user works
-        # TODO: This test doesn't show if case sensitivity exists or not, or if it even works.
-        Needs several more test cases to be rigorous.
+        * Verify that ALTER statements on the user are case sensitive
         """
         self.prepare()
         cassandra = self.get_session(user='cassandra', password='cassandra')
         cassandra.execute("CREATE USER Test WITH PASSWORD '12345'")
         cassandra.execute("ALTER USER Test WITH PASSWORD '54321'")
+        assert_invalid(cassandra, "ALTER USER test WITH PASSWORD '12345'")
 
     def regular_users_can_alter_their_passwords_only_test(self):
         """
@@ -607,13 +628,15 @@ class TestAuth(Tester):
         * Verify Unauthorized is still thrown if cathy tries to grant bob SELECT permissions
         * Grant cathy SELECT
         * Verify she can grant bob SELECT
-        # TODO: Check bob can SELECT
+        # Verify bob can SELECT
         """
         self.prepare()
 
         cassandra = self.get_session(user='cassandra', password='cassandra')
         cassandra.execute("CREATE USER cathy WITH PASSWORD '12345'")
         cassandra.execute("CREATE USER bob WITH PASSWORD '12345'")
+        cassandra.execute("CREATE KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor':1}")
+        cassandra.execute("CREATE TABLE ks.cf (id int primary key, val int)")
 
         cathy = self.get_session(user='cathy', password='12345')
         # missing both SELECT and AUTHORIZE
@@ -630,6 +653,9 @@ class TestAuth(Tester):
 
         # should succeed now with both SELECT and AUTHORIZE
         cathy.execute("GRANT SELECT ON ALL KEYSPACES TO bob")
+
+        bob = self.get_session(user='bob', password='12345')
+        bob.execute("SELECT * FROM ks.cf")
 
     def grant_revoke_nonexistent_user_or_ks_test(self):
         """
@@ -1279,7 +1305,6 @@ class TestAuthRoles(Tester):
         * Grant role1 to role2, and role2 to mike
         * Verify the output of LIST ROLES
         * REVOKE various roles, verify the output of LIST ROLES
-        # TODO This test seems redundant with many others. Verify/remove?
         """
         self.prepare()
         cassandra = self.get_session(user='cassandra', password='cassandra')
