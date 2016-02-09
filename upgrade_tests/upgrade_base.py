@@ -19,11 +19,10 @@ OLD_CASSANDRA_VERSION = os.environ.get('OLD_CASSANDRA_VERSION', None)
 UPGRADE_TO = os.environ.get('UPGRADE_TO', None)
 UPGRADE_TO_DIR = os.environ.get('UPGRADE_TO_DIR', None)
 
-
 UPGRADE_TEST_RUN = os.environ.get('UPGRADE_TEST_RUN', '').lower() in {'true', 'yes'}
 
 
-UpgradePath = namedtuple('UpgradePath', ('starting_version', 'upgrade_version'))
+UpgradePath = namedtuple('UpgradePath', ('name', 'starting_version', 'upgrade_version'))
 
 
 # these should be latest tentative tags, falling back to the most recent release if no pending tentative
@@ -116,7 +115,10 @@ def get_default_upgrade_path(job_version, cdir=None):
 
     err = 'Expected one or two upgrade path endpoints to be None; found {}'.format((start_version, upgrade_version))
     assert [start_version, upgrade_version].count(None) >= 1, err
-    upgrade_path = UpgradePath(start_version, upgrade_version)
+    upgrade_path = UpgradePath(
+        name='',
+        starting_version=start_version,
+        upgrade_version=upgrade_version)
     debug(upgrade_path)
     return upgrade_path
 
