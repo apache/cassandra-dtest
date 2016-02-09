@@ -1,12 +1,16 @@
 import os
+import re
 import sys
 import time
+from abc import ABCMeta
 from collections import namedtuple
+from distutils.version import LooseVersion
 from unittest import skipIf
 
 from ccmlib.common import get_version_from_build, is_win
+
 from dtest import DEBUG, Tester, debug
-from tools import cassandra_git_branch, since
+from tools import cassandra_git_branch
 
 OLD_CASSANDRA_DIR = os.environ.get('OLD_CASSANDRA_DIR', None)
 OLD_CASSANDRA_VERSION = os.environ.get('OLD_CASSANDRA_VERSION', None)
@@ -16,7 +20,64 @@ UPGRADE_TO = os.environ.get('UPGRADE_TO', None)
 UPGRADE_TO_DIR = os.environ.get('UPGRADE_TO_DIR', None)
 
 
+UPGRADE_TEST_RUN = os.environ.get('UPGRADE_TEST_RUN', '').lower() in {'true', 'yes'}
+
+
 UpgradePath = namedtuple('UpgradePath', ('starting_version', 'upgrade_version'))
+
+
+# these should be latest tentative tags, falling back to the most recent release if no pending tentative
+latest_2dot0 = '2.0.17'
+latest_2dot1 = '2.1.13'
+latest_2dot2 = '2.2.5'
+latest_3dot0 = '3.0.3'
+latest_3dot1 = '3.1.1'
+latest_3dot2 = '3.2.1'
+latest_3dot3 = '3.3'
+
+head_2dot0 = 'git:cassandra-2.0'
+head_2dot1 = 'git:cassandra-2.1'
+head_2dot2 = 'git:cassandra-2.2'
+head_3dot0 = 'git:cassandra-3.0'
+head_3dot1 = 'git:cassandra-3.1'
+head_3dot2 = 'git:cassandra-3.2'
+head_3dot3 = 'git:cassandra-3.3'
+head_trunk = 'git:trunk'
+
+
+def sanitize_version(version, allow_ambiguous=True):
+    """
+    Takes version of the form cassandra-1.2, 2.0.10, or trunk.
+    Returns a LooseVersion(x.y.z)
+
+    If allow_ambiguous is False, will raise RuntimeError if no version is found.
+    """
+    if (version == 'git:trunk') or (version == 'trunk'):
+        return LooseVersion(head_trunk)
+
+    match = re.match('^.*(\d+\.+\d+\.*\d*).*$', unicode(version))
+    if match:
+        return LooseVersion(match.groups()[0])
+
+    if not allow_ambiguous:
+        raise RuntimeError("Version could not be identified")
+
+
+def switch_jdks(version):
+    cleaned_version = sanitize_version(version)
+
+    if cleaned_version is None:
+        debug("Not switching jdk as cassandra version couldn't be identified from {}".format(version))
+        return
+
+    try:
+        if version < LooseVersion('2.1'):
+            os.environ['JAVA_HOME'] = os.environ['JAVA7_HOME']
+        else:
+            os.environ['JAVA_HOME'] = os.environ['JAVA8_HOME']
+    except KeyError:
+        raise RuntimeError("You need to set JAVA7_HOME and JAVA8_HOME to run these tests!")
+    debug("Set JAVA_HOME: [{}] for cassandra version: [{}]".format(os.environ['JAVA_HOME'], version))
 
 
 def get_default_upgrade_path(job_version, cdir=None):
@@ -60,7 +121,7 @@ def get_default_upgrade_path(job_version, cdir=None):
     return upgrade_path
 
 
-@since('3.0')
+@skipIf(not UPGRADE_TEST_RUN, 'set UPGRADE_TEST_RUN=true to run upgrade tests')
 @skipIf(sys.platform == 'win32', 'Skip upgrade tests on Windows')
 class UpgradeTester(Tester):
     """
@@ -70,6 +131,8 @@ class UpgradeTester(Tester):
     When run on 3.0, this will test the upgrade path to trunk. When run on
     versions above 3.0, this will test the upgrade path from 3.0 to HEAD.
     """
+    # make this an abc so we can get all subclasses with __subclasses__()
+    __metaclass__ = ABCMeta
     NODES, RF, __test__, CL = 2, 1, False, None
 
     def prepare(self, ordered=False, create_keyspace=True, use_cache=False,
