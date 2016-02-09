@@ -1,5 +1,6 @@
 # coding: utf-8
 
+import itertools
 import math
 import random
 import struct
@@ -16,11 +17,13 @@ from nose.exc import SkipTest
 
 from assertions import assert_all, assert_invalid, assert_none, assert_one
 from dtest import debug, freshCluster
-from thrift_bindings.v22.ttypes import ConsistencyLevel as ThriftConsistencyLevel
-from thrift_bindings.v22.ttypes import (CfDef, Column, ColumnOrSuperColumn, Mutation)
+from thrift_bindings.v22.ttypes import \
+    ConsistencyLevel as ThriftConsistencyLevel
+from thrift_bindings.v22.ttypes import (CfDef, Column, ColumnOrSuperColumn,
+                                        Mutation)
 from thrift_tests import get_thrift_client
 from tools import known_failure, require, rows_to_list, since
-from upgrade_base import UpgradeTester
+from upgrade_base import VALID_UPGRADE_PAIRS, UpgradeTester
 
 
 class TestCQL(UpgradeTester):
@@ -5225,26 +5228,27 @@ class TestCQL(UpgradeTester):
 
             future = cursor.execute_async("INSERT INTO foo.bar(k, v) VALUES (0, 0)", trace=True)
             future.result()
-            trace = future.get_query_trace(max_wait=120)
+            future.get_query_trace(max_wait=120)
 
             self.cluster.flush()
 
             assert_one(cursor, "SELECT * FROM foo.bar", [0, 0])
 
 
-specs = [
+topology_specs = [
     {'NODES': 3,
      'RF': 3,
-     'CL': ConsistencyLevel.ALL,
-     '__test__': True},
+     'CL': ConsistencyLevel.ALL},
     {'NODES': 2,
-     'RF': 1,
-     '__test__': True},
+     'RF': 1},
 ]
+specs = [dict(s, UPGRADE_PATH=p, __test__=True)
+         for s, p in itertools.product(topology_specs, VALID_UPGRADE_PAIRS)]
 
 for spec in specs:
-    num_nodes, rf = spec['NODES'], spec['RF']
-    suffix = 'Nodes{num_nodes}RF{rf}'.format(num_nodes=num_nodes, rf=rf)
+    suffix = 'Nodes{num_nodes}RF{rf}_{pathname}'.format(num_nodes=spec['NODES'],
+                                                        rf=spec['RF'],
+                                                        pathname=spec['UPGRADE_PATH'].name)
     gen_class_name = TestCQL.__name__ + suffix
-    assert gen_class_name not in globals()
+    assert gen_class_name not in globals(), gen_class_name
     globals()[gen_class_name] = type(gen_class_name, (TestCQL,), spec)

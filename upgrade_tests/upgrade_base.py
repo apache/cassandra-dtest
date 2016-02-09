@@ -10,14 +10,6 @@ from unittest import skipIf
 from ccmlib.common import get_version_from_build, is_win
 
 from dtest import DEBUG, Tester, debug
-from tools import cassandra_git_branch
-
-OLD_CASSANDRA_DIR = os.environ.get('OLD_CASSANDRA_DIR', None)
-OLD_CASSANDRA_VERSION = os.environ.get('OLD_CASSANDRA_VERSION', None)
-
-# Specify a branch to upgrade to
-UPGRADE_TO = os.environ.get('UPGRADE_TO', None)
-UPGRADE_TO_DIR = os.environ.get('UPGRADE_TO_DIR', None)
 
 UPGRADE_TEST_RUN = os.environ.get('UPGRADE_TEST_RUN', '').lower() in {'true', 'yes'}
 
@@ -92,50 +84,6 @@ def switch_jdks(version):
     debug("Set JAVA_HOME: [{}] for cassandra version: [{}]".format(os.environ['JAVA_HOME'], version))
 
 
-def get_default_upgrade_path(job_version, cdir=None):
-    """
-    Given a version (which should be specified as a LooseVersion,
-    StrictVersion, or NormalizedVersion object), return a tuple (start, target)
-    whose members indicate the git branch that should be downloaded for the
-    starting or target versions for an upgrade test. One or both of these
-    will be None, so this specifies at most one end of the upgrade path.
-
-    We assume that the version being passed in is the version of C* being
-    tested on a CassCI job, which means if the version is less than 3.0, we
-    will be running on JDK 1.7. This means we can't run 3.0+ on this version.
-    """
-    start_version, upgrade_version = None, None
-    debug('getting default job version for {}'.format(job_version))
-
-    start_2_2_X_release = 'binary:2.2.3'
-
-    if '2.1' <= job_version < '2.2':
-        # If this is 2.1.X, we can upgrade to 2.2.
-        # Skip 2.2.X->3.X because of JDK compatibility.
-        upgrade_version = start_2_2_X_release
-    elif '3.0' <= job_version < '3.1':
-        try:
-            branch = cassandra_git_branch(cdir=cdir)
-        except:
-            branch = None
-        start_version = ('binary:3.0.0-rc1'
-                         if branch == 'trunk'
-                         else start_2_2_X_release)
-    elif '3.1' <= job_version:
-        # 2.2->3.X, where X > 0, isn't a supported upgrade path,
-        # but 3.0->3.X is.
-        start_version = 'git:cassandra-3.0'
-
-    err = 'Expected one or two upgrade path endpoints to be None; found {}'.format((start_version, upgrade_version))
-    assert [start_version, upgrade_version].count(None) >= 1, err
-    upgrade_path = UpgradePath(
-        name='',
-        starting_version=start_version,
-        upgrade_version=upgrade_version)
-    debug(upgrade_path)
-    return upgrade_path
-
-
 @skipIf(not UPGRADE_TEST_RUN, 'set UPGRADE_TEST_RUN=true to run upgrade tests')
 @skipIf(sys.platform == 'win32', 'Skip upgrade tests on Windows')
 class UpgradeTester(Tester):
@@ -148,7 +96,7 @@ class UpgradeTester(Tester):
     """
     # make this an abc so we can get all subclasses with __subclasses__()
     __metaclass__ = ABCMeta
-    NODES, RF, __test__, CL = 2, 1, False, None
+    NODES, RF, __test__, CL, UPGRADE_PATH = 2, 1, False, None, None
 
     def prepare(self, ordered=False, create_keyspace=True, use_cache=False,
                 nodes=None, rf=None, protocol_version=None, cl=None, **kwargs):
@@ -176,33 +124,11 @@ class UpgradeTester(Tester):
             cluster.set_configuration_options(values={'start_rpc': True})
 
         cluster.set_configuration_options(values={'internode_compression': 'none'})
-        if not cluster.nodelist():
-            cluster.populate(nodes)
-            node1 = cluster.nodelist()[0]
-            self.original_install_dir = node1.get_install_dir()
-            self.original_version = get_version_from_build(node_path=node1.get_path())
-            self.upgrade_path = get_default_upgrade_path(self.original_version, cdir=self.original_install_dir)
-            if OLD_CASSANDRA_DIR:
-                cluster.set_install_dir(install_dir=OLD_CASSANDRA_DIR)
-                debug('running C* from {}'.format(OLD_CASSANDRA_DIR))
-            elif OLD_CASSANDRA_VERSION:
-                cluster.set_install_dir(version=OLD_CASSANDRA_VERSION)
-                debug('installed C* {}'.format(OLD_CASSANDRA_VERSION))
-            elif self.upgrade_path.starting_version:
-                try:
-                    cluster.set_install_dir(version=self.upgrade_path.starting_version)
-                except:
-                    if self.upgrade_path.starting_version.startswith('binary'):
-                        debug('Exception while downloading {}; falling back to source'.format(
-                            self.upgrade_path.starting_version))
-                        version_number = self.upgrade_path.starting_version.split(':')[-1]
-                        source_ccm_id = 'git:cassandra-' + version_number
-                        debug('Source identifier: {}'.format(source_ccm_id))
-                        cluster.set_install_dir(version=source_ccm_id)
 
-            # in other cases, just use the existing install directory
-            cluster.start(wait_for_binary_proto=True)
-            debug('starting from {}'.format(get_version_from_build(node1.get_install_dir())))
+        cluster.populate(nodes)
+        node1 = cluster.nodelist()[0]
+        cluster.set_install_dir(version=self.UPGRADE_PATH.starting_version)
+        cluster.start(wait_for_binary_proto=True)
 
         node1 = cluster.nodelist()[0]
         time.sleep(0.2)
@@ -239,20 +165,10 @@ class UpgradeTester(Tester):
         if is_win() and self.cluster.version() <= '2.2':
             node1.mark_log_for_errors()
 
-        # choose version to upgrade to
-        if UPGRADE_TO_DIR:
-            install_kwargs = {'install_dir': UPGRADE_TO_DIR}
-        elif UPGRADE_TO:
-            install_kwargs = {'version': UPGRADE_TO}
-        elif self.upgrade_path.upgrade_version:
-            install_kwargs = {'version': self.upgrade_path.upgrade_version}
-        else:
-            install_kwargs = {'install_dir': self.original_install_dir}
+        debug('upgrading node1 to {}'.format(self.UPGRADE_PATH.upgrade_version))
 
-        debug('upgrading to {}'.format(install_kwargs))
+        node1.set_install_dir(version=self.UPGRADE_PATH.upgrade_version)
 
-        # start them again
-        node1.set_install_dir(**install_kwargs)
         # this is a bandaid; after refactoring, upgrades should account for protocol version
         new_version_from_build = get_version_from_build(node1.get_install_dir())
         if (new_version_from_build >= '3' and self.protocol_version is not None and self.protocol_version < 3):
