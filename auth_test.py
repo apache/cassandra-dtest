@@ -615,7 +615,7 @@ class TestAuth(Tester):
         self.assertEquals(1, len(rows))
 
         rows = list(cathy.execute("TRUNCATE ks.cf"))
-        assert len(rows) == 0
+        self.assertItemsEqual(rows, [])
 
     def grant_revoke_auth_test(self):
         """
@@ -793,7 +793,7 @@ class TestAuth(Tester):
             cnt += 1
             time.sleep(0.1)
 
-        assert success
+        self.assertTrue(success)
 
     def list_permissions_test(self):
         """
@@ -908,7 +908,6 @@ class TestAuth(Tester):
         Sets up and launches C* cluster.
         @param nodes Number of nodes in the cluster. Default is 1
         @param permissions_validity The timeout for the permissions cache in ms. Default is 0.
-        # TODO: Remove this sleep probably?
         """
         config = {'authenticator': 'org.apache.cassandra.auth.PasswordAuthenticator',
                   'authorizer': 'org.apache.cassandra.auth.CassandraAuthorizer',
@@ -916,9 +915,7 @@ class TestAuth(Tester):
         self.cluster.set_configuration_options(values=config)
         self.cluster.populate(nodes).start()
 
-        # default user setup is delayed by 10 seconds to reduce log spam
-        time.sleep(10)
-        n = self.wait_for_any_log(self.cluster.nodelist(), 'Created default superuser', 10)
+        n = self.wait_for_any_log(self.cluster.nodelist(), 'Created default superuser', 25)
         debug("Default role created by " + n.name)
 
     def get_session(self, node_idx=0, user=None, password=None):
@@ -1295,7 +1292,7 @@ class TestAuthRoles(Tester):
 
         cassandra.execute("DROP ROLE role1")
         cassandra.execute("DROP ROLE role2")
-        assert len(list(cassandra.execute("LIST ALL PERMISSIONS OF mike"))) == 0
+        self.assertItemsEqual(list(cassandra.execute("LIST ALL PERMISSIONS OF mike")), [])
 
     def grant_revoke_roles_test(self):
         """
@@ -1629,7 +1626,7 @@ class TestAuthRoles(Tester):
                                        "LIST ALTER PERMISSION ON ROLE role1 OF role2")
         # make sure ALTER on role2 is excluded properly when OF is for another role
         cassandra.execute("CREATE ROLE role3 WITH SUPERUSER = false AND LOGIN = false")
-        assert len(list(cassandra.execute("LIST ALTER PERMISSION ON ROLE role1 OF role3"))) == 0
+        self.assertItemsEqual(list(cassandra.execute("LIST ALTER PERMISSION ON ROLE role1 OF role3")), [])
 
         # now check users can list their own permissions
         mike = self.get_session(user='mike', password='12345')
@@ -1724,7 +1721,7 @@ class TestAuthRoles(Tester):
             except Unauthorized as e:
                 unauthorized = e
 
-        assert unauthorized is not None
+        self.assertIsNotNone(unauthorized)
 
     def drop_non_existent_role_should_not_update_cache(self):
         """
@@ -2510,6 +2507,18 @@ class TestAuthRoles(Tester):
         assert isinstance(error, AuthenticationFailed), "Expected AuthenticationFailed, got %s" % error
         assert re.search(pattern, error.message), "Expected: %s" % pattern
 
+    def get_session(self, node_idx=0, user=None, password=None):
+        """
+        Connect with a set of credentials to a given node. Connection is not exclusive to that node.
+        @param node_idx Initial node to connect to
+        @param user User to connect as
+        @param password Password to use
+        @return Session as user, to specified node
+        """
+        node = self.cluster.nodelist()[node_idx]
+        session = self.patient_cql_connection(node, user=user, password=password)
+        return session
+
     def prepare(self, nodes=1, roles_expiry=0):
         config = {'authenticator': 'org.apache.cassandra.auth.PasswordAuthenticator',
                   'authorizer': 'org.apache.cassandra.auth.CassandraAuthorizer',
@@ -2518,20 +2527,8 @@ class TestAuthRoles(Tester):
                   'roles_validity_in_ms': roles_expiry}
         self.cluster.set_configuration_options(values=config)
         self.cluster.populate(nodes).start(no_wait=True)
-        # default user setup is delayed by 10 seconds to reduce log spam
 
-        if nodes == 1:
-            self.cluster.nodelist()[0].watch_log_for("Created default superuser")
-        else:
-            # can't just watch for log - the line will appear in just one of the nodes' logs
-            # only one test uses more than 1 node, though, so some sleep is fine.
-            time.sleep(15)
-
-    def get_session(self, node_idx=0, user=None, password=None):
-        # TODO: Collapse with auth_test get_session
-        node = self.cluster.nodelist()[node_idx]
-        conn = self.patient_cql_connection(node, user=user, password=password)
-        return conn
+        self.wait_for_any_log(self.cluster.nodelist(), 'Created default superuser', 25)
 
     def assert_permissions_listed(self, expected, session, query):
         rows = session.execute(query)
@@ -2539,8 +2536,7 @@ class TestAuthRoles(Tester):
         self.assertEqual(sorted(expected), sorted(perms))
 
     def assert_no_permissions(self, session, query):
-        # TODO: Cleanup this assertion
-        assert len(list(session.execute(query))) == 0
+        self.assertItemsEqual(list(session.execute(query)), [])
 
 
 def role_creator_permissions(creator, role):
