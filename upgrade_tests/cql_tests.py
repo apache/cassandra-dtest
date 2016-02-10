@@ -23,7 +23,7 @@ from thrift_bindings.v22.ttypes import (CfDef, Column, ColumnOrSuperColumn,
                                         Mutation)
 from thrift_tests import get_thrift_client
 from tools import known_failure, require, rows_to_list, since
-from upgrade_base import VALID_UPGRADE_PAIRS, UpgradeTester
+from upgrade_base import UPGRADE_TEST_RUN, VALID_UPGRADE_PAIRS, UpgradeTester
 
 
 class TestCQL(UpgradeTester):
@@ -5242,7 +5242,7 @@ topology_specs = [
     {'NODES': 2,
      'RF': 1},
 ]
-specs = [dict(s, UPGRADE_PATH=p, __test__=True)
+specs = [dict(s, UPGRADE_PATH=p, __test__=UPGRADE_TEST_RUN)
          for s, p in itertools.product(topology_specs, VALID_UPGRADE_PAIRS)]
 
 for spec in specs:

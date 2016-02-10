@@ -10,7 +10,7 @@ from cassandra.query import SimpleStatement, dict_factory, named_tuple_factory
 from datahelp import create_rows, flatten_into_set, parse_data_into_dicts
 from dtest import debug, run_scenarios
 from tools import known_failure, rows_to_list, since
-from upgrade_base import VALID_UPGRADE_PAIRS, UpgradeTester
+from upgrade_base import UPGRADE_TEST_RUN, VALID_UPGRADE_PAIRS, UpgradeTester
 
 
 def assert_read_timeout_or_failure(session, query):
@@ -1720,7 +1720,7 @@ topology_specs = [
      'RF': 1},
 ]
 
-specs = [dict(s, UPGRADE_PATH=p, __test__=True)
+specs = [dict(s, UPGRADE_PATH=p, __test__=UPGRADE_TEST_RUN)
          for s, p in itertools.product(topology_specs, VALID_UPGRADE_PAIRS)]
 
 for klaus in BasePagingTester.__subclasses__():

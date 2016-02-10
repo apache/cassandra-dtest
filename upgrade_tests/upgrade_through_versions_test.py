@@ -17,11 +17,11 @@ from six import print_
 import schema_metadata_test
 from dtest import Tester, debug
 from tools import generate_ssl_stores, known_failure, new_node
-from upgrade_base import (head_2dot1, head_2dot2, head_3dot0, head_3dot1,
-                          head_3dot2, head_3dot3, head_trunk, latest_2dot0,
-                          latest_2dot1, latest_2dot2, latest_3dot0,
-                          latest_3dot1, latest_3dot2, latest_3dot3,
-                          switch_jdks)
+from upgrade_base import (UPGRADE_TEST_RUN, head_2dot1, head_2dot2, head_3dot0,
+                          head_3dot1, head_3dot2, head_3dot3, head_trunk,
+                          latest_2dot0, latest_2dot1, latest_2dot2,
+                          latest_3dot0, latest_3dot1, latest_3dot2,
+                          latest_3dot3, switch_jdks)
 
 
 def data_writer(tester, to_verify_queue, verification_done_queue, rewrite_probability=0):
@@ -801,7 +801,7 @@ def create_upgrade_class(clsname, version_list, protocol_version,
     newcls = type(
         clsname,
         parent_classes,
-        {'test_versions': version_list, '__test__': True, 'protocol_version': protocol_version, 'extra_config': extra_config}
+        {'test_versions': version_list, '__test__': UPGRADE_TEST_RUN, 'protocol_version': protocol_version, 'extra_config': extra_config}
     )
 
     if clsname in globals():
