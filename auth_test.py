@@ -884,6 +884,40 @@ class TestAuth(Tester):
         cassandra.execute("GRANT DROP ON KEYSPACE ks TO cathy")
         cathy.execute("DROP TYPE ks.address")
 
+    def restart_node_doesnt_lose_auth_data_test(self):
+        """
+        * Launch a one node cluster
+        * Connect as the default superuser
+        * Create some new users, grant them permissions
+        * Stop the cluster, switch to AllowAll auth, restart the cluster
+        * Stop the cluster, switch back to auth, restart the cluster
+        * Check all user auth data was preserved
+        """
+        self.prepare()
+        cassandra = self.get_session(user='cassandra', password='cassandra')
+        cassandra.execute("CREATE USER cathy WITH PASSWORD '12345'")
+        cassandra.execute("CREATE USER philip WITH PASSWORD 'strongpass'")
+        cassandra.execute("CREATE KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor':1}")
+        cassandra.execute("CREATE TABLE ks.cf (id int PRIMARY KEY)")
+        cassandra.execute("GRANT ALL ON ks.cf to philip")
+
+        self.cluster.stop()
+        config = {'authenticator': 'org.apache.cassandra.auth.AllowAllAuthenticator',
+                  'authorizer': 'org.apache.cassandra.auth.AllowAllAuthorizer'}
+        self.cluster.set_configuration_options(values=config)
+        self.cluster.start(wait_for_binary_proto=True)
+
+        self.cluster.stop()
+        config = {'authenticator': 'org.apache.cassandra.auth.PasswordAuthenticator',
+                  'authorizer': 'org.apache.cassandra.auth.CassandraAuthorizer'}
+        self.cluster.set_configuration_options(values=config)
+        self.cluster.start(wait_for_binary_proto=True)
+
+        philip = self.get_session(user='philip', password='strongpass')
+        cathy = self.get_session(user='cathy', password='12345')
+        assert_unauthorized(cathy, "SELECT * FROM ks.cf", "User cathy has no SELECT permission on <table ks.cf> or any of its parents")
+        philip.execute("SELECT * FROM ks.cf")
+
     def prepare(self, nodes=1, permissions_validity=0):
         """
         Sets up and launches C* cluster.
