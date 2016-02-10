@@ -238,7 +238,8 @@ class TestAuth(Tester):
         assert_invalid(cassandra, "DROP USER test")
 
         cassandra.execute("DROP USER Test")
-        self.assertEqual(usercount - 1, len(list(cassandra.execute("LIST USERS"))))
+        rows = list(cassandra.execute("LIST USERS"))
+        self.assertItemsEqual(rows, ['cassandra'])
 
         cassandra.execute("CREATE USER test WITH PASSWORD '12345'")
         usercount = len(list(cassandra.execute("LIST USERS")))
@@ -247,7 +248,8 @@ class TestAuth(Tester):
         assert_invalid(cassandra, "DROP USER TEST")
 
         cassandra.execute("DROP USER test")
-        self.assertEqual(usercount - 1, len(list(cassandra.execute("LIST USERS"))))
+        rows = list(cassandra.execute("LIST USERS"))
+        self.assertItemsEqual(rows, ['cassandra'])
 
     def alter_user_case_sensitive(self):
         """
@@ -261,6 +263,13 @@ class TestAuth(Tester):
         cassandra.execute("CREATE USER Test WITH PASSWORD '12345'")
         cassandra.execute("ALTER USER Test WITH PASSWORD '54321'")
         assert_invalid(cassandra, "ALTER USER test WITH PASSWORD '12345'")
+        assert_invalid(cassandra, "ALTER USER TEST WITH PASSWORD '12345'")
+
+        cassandra.execute('DROP USER Test')
+        cassandra.execute("CREATE USER test WITH PASSWORD '12345'")
+        assert_invalid(cassandra, "ALTER USER Test WITH PASSWORD '12345'")
+        assert_invalid(cassandra, "ALTER USER TEST WITH PASSWORD '12345'")
+        cassandra.execute("ALTER USER test WITH PASSWORD '54321'")
 
     def regular_users_can_alter_their_passwords_only_test(self):
         """
@@ -337,19 +346,20 @@ class TestAuth(Tester):
         session = self.get_session(user='cassandra', password='cassandra')
 
         users = list(session.execute("LIST USERS"))
-        self.assertEqual(1, len(users))  # cassandra
+        assert_one(session, "LIST USERS", ['cassandra', True])
 
         session.execute("CREATE USER IF NOT EXISTS aleksey WITH PASSWORD 'sup'")
         session.execute("CREATE USER IF NOT EXISTS aleksey WITH PASSWORD 'ignored'")
 
-        users = list(session.execute("LIST USERS"))
-        self.assertEqual(2, len(users))  # cassandra + aleksey
+        aleksey = self.get_session(user='aleksey', password='sup')
+
+        assert_all(session, "LIST USERS", [['aleksey', False], ['cassandra', True]])
 
         session.execute("DROP USER IF EXISTS aleksey")
-        session.execute("DROP USER IF EXISTS aleksey")
+        assert_one(session, "LIST USERS", ['cassandra', True])
 
-        users = list(session.execute("LIST USERS"))
-        self.assertEqual(1, len(users))  # cassandra
+        session.execute("DROP USER IF EXISTS aleksey")
+        assert_one(session, "LIST USERS", ['cassandra', True])
 
     def create_ks_auth_test(self):
         """
