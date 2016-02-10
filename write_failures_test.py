@@ -1,13 +1,10 @@
 import uuid
 
-from cassandra import WriteTimeout, WriteFailure
-from cassandra import ConsistencyLevel
+from cassandra import ConsistencyLevel, WriteFailure, WriteTimeout
 
 from dtest import Tester
-
-from thrift_tests import get_thrift_client
 from thrift_bindings.v22 import ttypes as thrift_types
-
+from thrift_tests import get_thrift_client
 from tools import since
 
 KEYSPACE = "foo"
