@@ -1,6 +1,6 @@
 from cassandra.concurrent import execute_concurrent_with_args
 
-from dtest import Tester, debug
+from dtest import OFFHEAP_MEMTABLES, Tester, debug
 from jmxutils import JolokiaAgent, make_mbean, remove_perf_disable_shared_mem
 from tools import known_failure
 
@@ -21,6 +21,9 @@ class TestUpgradeIndexSummary(Tester):
 
         # start out with a 2.0 version
         cluster.set_install_dir(version='2.0.12')
+        if "memtable_allocation_type" in cluster._config_options:
+            cluster._config_options.__delitem__("memtable_allocation_type")
+            debug("Removed memtable_allocation_type from 2.0 configuration")
         node.set_install_dir(version='2.0.12')
         node.set_log_level("INFO")
         node.stop()
@@ -48,6 +51,9 @@ class TestUpgradeIndexSummary(Tester):
         node.watch_log_for("DRAINED")
         node.stop()
         cluster.set_install_dir(version='2.1.3')  # 2.1.3 is affected by CASSANDRA-8993
+        if OFFHEAP_MEMTABLES:
+            cluster.set_configuration_options(values={'memtable_allocation_type': 'offheap_objects'})
+            debug("Added memtable_allocation_type back to 2.1 configuration")
         node.set_install_dir(version='2.1.3')
         debug("Set new cassandra dir for %s: %s" % (node.name, node.get_install_dir()))
 
@@ -80,6 +86,11 @@ class TestUpgradeIndexSummary(Tester):
         node.watch_log_for("DRAINED")
         node.stop()
         cluster.set_install_dir(original_install_dir)
+        if OFFHEAP_MEMTABLES:
+            # memtable_allocation_type is not supported in the 3.0-3.3 branches
+            if '3.0' <= cluster.version() < '3.4':
+                cluster._config_options.__delitem__("memtable_allocation_type")
+                debug("Removed memtable_allocation_type from %s configuration" % cluster.version())
         node.set_install_dir(original_install_dir)
         debug("Set new cassandra dir for %s: %s" % (node.name, node.get_install_dir()))
 
