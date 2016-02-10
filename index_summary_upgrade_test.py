@@ -90,7 +90,7 @@ class TestUpgradeIndexSummary(Tester):
             # memtable_allocation_type is not supported in the 3.0-3.3 branches
             if '3.0' <= cluster.version() < '3.4':
                 cluster._config_options.__delitem__("memtable_allocation_type")
-                debug("Removed memtable_allocation_type from %s configuration" % cluster.version())
+                debug("Removed memtable_allocation_type from {} configuration".format(cluster.version()))
         node.set_install_dir(original_install_dir)
         debug("Set new cassandra dir for %s: %s" % (node.name, node.get_install_dir()))
 
