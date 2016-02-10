@@ -121,6 +121,34 @@ class TestSchema(Tester):
         rows = session.execute("SELECT * FROM cf WHERE c2 = 5")
         self.assertEqual([[3, 4, 5]], rows_to_list(rows))
 
+    def drop_column_and_restart_test(self):
+        """
+        Simply insert data in a table, drop a column involved in the insert and restart the node afterwards.
+        This ensures that the dropped_columns system table is properly flushed on the alter or the restart
+        fails as in CASSANDRA-11050.
+
+        @jira_ticket CASSANDRA-11050
+        """
+        session = self.prepare()
+
+        session.execute("USE ks")
+        session.execute("CREATE TABLE t (k int PRIMARY KEY, c1 int, c2 int)")
+
+        session.execute("INSERT INTO t (k, c1, c2) VALUES (0, 0, 0)")
+        session.execute("ALTER TABLE t DROP c2")
+
+        rows = session.execute("SELECT * FROM t")
+        self.assertEqual([[0, 0]], rows_to_list(rows))
+
+        self.cluster.stop()
+        self.cluster.start()
+
+        session = self.patient_cql_connection(self.cluster.nodelist()[0])
+
+        session.execute("USE ks")
+        rows = session.execute("SELECT * FROM t")
+        self.assertEqual([[0, 0]], rows_to_list(rows))
+
     def prepare(self):
         cluster = self.cluster
         cluster.populate(1).start()
