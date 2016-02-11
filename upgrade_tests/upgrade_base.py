@@ -37,6 +37,7 @@ head_trunk = 'git:trunk'
 
 
 VALID_UPGRADE_PAIRS = (
+    # commented out until we have a solution for specifying java versions in upgrade tests
     # UpgradePath(name='2_0_UpTo_2_1_HEAD', starting_version=latest_2dot0, upgrade_version='git:cassandra-2.1'),
     UpgradePath(name='2_1_UpTo_2_2_HEAD', starting_version=latest_2dot1, upgrade_version=head_2dot2),
     UpgradePath(name='2_1_UpTo_3_0_HEAD', starting_version=latest_2dot1, upgrade_version=head_3dot0),
