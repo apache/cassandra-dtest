@@ -2089,7 +2089,7 @@ class CqlshCopyTest(Tester):
                               stress_table='keyspace1.standard1',
                               configuration_options=None,
                               skip_count_checks=False,
-                              copy_to_options={'PAGETIMEOUT': 10, 'PAGESIZE': 1000},
+                              copy_to_options=None,
                               copy_from_options=None):
         """
         Test exporting a large number of rows into a csv file.
@@ -2098,6 +2098,11 @@ class CqlshCopyTest(Tester):
         it also means that we can be sure that one cassandra-stress operation is one record and hence
         num_records=num_operations.
         """
+        if configuration_options is None:
+            configuration_options = {}
+        if copy_to_options is None:
+            copy_to_options = {'PAGETIMEOUT': 10, 'PAGESIZE': 1000}
+
         self.prepare(nodes=nodes, partitioner=partitioner, configuration_options=configuration_options)
 
         def create_records():
