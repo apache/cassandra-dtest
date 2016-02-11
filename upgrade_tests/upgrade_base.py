@@ -37,13 +37,20 @@ head_trunk = 'git:trunk'
 
 
 VALID_UPGRADE_PAIRS = (
+    # commented out until we have a solution for specifying java versions in upgrade tests
     # UpgradePath(name='2_0_UpTo_2_1_HEAD', starting_version=latest_2dot0, upgrade_version='git:cassandra-2.1'),
     UpgradePath(name='2_1_UpTo_2_2_HEAD', starting_version=latest_2dot1, upgrade_version=head_2dot2),
     UpgradePath(name='2_1_UpTo_3_0_HEAD', starting_version=latest_2dot1, upgrade_version=head_3dot0),
+    UpgradePath(name='2_1_UpTo_3_3_HEAD', starting_version=latest_2dot1, upgrade_version=head_3dot3),
+    UpgradePath(name='2_1_UpTo_Trunk', starting_version=latest_2dot1, upgrade_version=head_trunk),
     UpgradePath(name='2_2_UpTo_3_0_HEAD', starting_version=latest_2dot2, upgrade_version=head_3dot0),
+    UpgradePath(name='2_2_UpTo_3_3_HEAD', starting_version=latest_2dot2, upgrade_version=head_3dot3),
+    UpgradePath(name='2_2_UpTo_Trunk', starting_version=latest_2dot2, upgrade_version=head_trunk),
     UpgradePath(name='2_1_HEAD_UpTo_2_2', starting_version=head_2dot1, upgrade_version=latest_2dot2),
     UpgradePath(name='2_1_HEAD_UpTo_3_0', starting_version=head_2dot1, upgrade_version=latest_3dot0),
     UpgradePath(name='2_2_HEAD_UpTo_3_0', starting_version=head_2dot2, upgrade_version=latest_3dot0),
+    UpgradePath(name='2_1_HEAD_UpTo_Trunk', starting_version=head_2dot1, upgrade_version=head_trunk),
+    UpgradePath(name='2_2_HEAD_UpTo_Trunk', starting_version=head_2dot2, upgrade_version=head_trunk),
     UpgradePath(name='3_0_UpTo_Trunk', starting_version=latest_3dot0, upgrade_version=head_trunk),
     UpgradePath(name='3_2_UpTo_Trunk', starting_version=latest_3dot2, upgrade_version=head_trunk),
 )
