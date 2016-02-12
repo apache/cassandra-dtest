@@ -490,7 +490,7 @@ class Tester(TestCase):
             session.execute(query % (name, "'class':'SimpleStrategy', 'replication_factor':%d" % rf))
         else:
             assert len(rf) != 0, "At least one datacenter/rf pair is needed"
-            # we assume networkTopolyStrategy
+            # we assume networkTopologyStrategy
             options = (', ').join(['\'%s\':%d' % (d, r) for d, r in rf.iteritems()])
             session.execute(query % (name, "'class':'NetworkTopologyStrategy', %s" % options))
         session.execute('USE %s' % name)
