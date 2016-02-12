@@ -21,7 +21,7 @@ from ccmlib.common import is_win
 from cqlsh_tools import (DummyColorMap, assert_csvs_items_equal, csv_rows,
                          monkeypatch_driver, random_list, unmonkeypatch_driver, write_rows_to_csv)
 from dtest import Tester, canReuseCluster, freshCluster, debug, DISABLE_VNODES
-from tools import known_failure, rows_to_list, since
+from tools import rows_to_list, since
 
 DEFAULT_FLOAT_PRECISION = 5  # magic number copied from cqlsh script
 
@@ -582,8 +582,6 @@ class CqlshCopyTest(Tester):
         self.assertItemsEqual([tuple(d) for d in data],
                               [tuple(r) for r in rows_to_list(result)])
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11121')
     def test_datetimeformat_round_trip(self):
         """
         @jira_ticket CASSANDRA-10633
@@ -2103,6 +2101,11 @@ class CqlshCopyTest(Tester):
         if copy_to_options is None:
             copy_to_options = {'PAGETIMEOUT': 10, 'PAGESIZE': 1000}
 
+        # The default truncate timeout of 10 seconds that is set in init_default_config() is not
+        # enough for truncating larger tables, see CASSANDRA-11157
+        if 'truncate_request_timeout_in_ms' not in configuration_options:
+            configuration_options['truncate_request_timeout_in_ms'] = 60000
+
         self.prepare(nodes=nodes, partitioner=partitioner, configuration_options=configuration_options)
 
         def create_records():
@@ -2164,6 +2167,7 @@ class CqlshCopyTest(Tester):
         self.assertEqual(sum(1 for _ in open(tempfile1.name)),
                          sum(1 for _ in open(tempfile2.name)))
 
+    @freshCluster()
     def test_bulk_round_trip_default(self):
         """
         Test bulk import with default stress import (one row per operation)
@@ -2204,6 +2208,7 @@ class CqlshCopyTest(Tester):
                                                     'NUMPROCESSES': 5, 'MAXATTEMPTS': 20},
                                    copy_from_options={'NUMPROCESSES': 2})
 
+    @freshCluster()
     def test_bulk_round_trip_with_timeouts(self):
         """
         Test bulk import with very short read and write timeout values, this should exercise the
@@ -2218,6 +2223,7 @@ class CqlshCopyTest(Tester):
                                    copy_to_options={'PAGETIMEOUT': 60, 'PAGESIZE': 1000},
                                    skip_count_checks=True)
 
+    @freshCluster()
     def test_bulk_round_trip_with_low_ingestrate(self):
         """
         Test bulk import with default stress import (one row per operation) and a low
