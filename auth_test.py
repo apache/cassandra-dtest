@@ -1,3 +1,4 @@
+from collections import namedtuple
 import os
 import re
 import time
@@ -976,12 +977,17 @@ def data_resource_creator_permissions(creator, resource):
             permissions.append((creator, '<all functions in %s>' % keyspace, perm))
     return permissions
 
+# First value is the role name
 # Second value is superuser status
-# Third value is login status, See #7653 for explanation.
-mike_role = ['mike', False, True, {}]
-role1_role = ['role1', False, False, {}]
-role2_role = ['role2', False, False, {}]
-cassandra_role = ['cassandra', True, True, {}]
+# Third value is login status
+# Fourth value is role options
+# See CASSANDRA-7653 for explanations of these
+Role = namedtuple('Role', ['name', 'superuser', 'login', 'options'])
+
+mike_role = Role('mike', False, True, {})
+role1_role = Role('role1', False, False, {})
+role2_role = Role('role2', False, False, {})
+cassandra_role = Role('cassandra', True, True, {})
 
 
 @since('2.2')
@@ -1008,13 +1014,13 @@ class TestAuthRoles(Tester):
         """
         self.prepare()
         cassandra = self.get_session(user='cassandra', password='cassandra')
-        assert_one(cassandra, 'LIST ROLES', cassandra_role)
+        assert_one(cassandra, 'LIST ROLES', list(cassandra_role))
 
         cassandra.execute("CREATE ROLE role1")
-        assert_all(cassandra, "LIST ROLES", [cassandra_role, role1_role])
+        assert_all(cassandra, "LIST ROLES", [list(cassandra_role), list(role1_role)])
 
         cassandra.execute("DROP ROLE role1")
-        assert_one(cassandra, "LIST ROLES", cassandra_role)
+        assert_one(cassandra, "LIST ROLES", list(cassandra_role))
 
     def conditional_create_drop_role_test(self):
         """
@@ -1027,15 +1033,15 @@ class TestAuthRoles(Tester):
         """
         self.prepare()
         cassandra = self.get_session(user='cassandra', password='cassandra')
-        assert_one(cassandra, "LIST ROLES", cassandra_role)
+        assert_one(cassandra, "LIST ROLES", list(cassandra_role))
 
         cassandra.execute("CREATE ROLE IF NOT EXISTS role1")
         cassandra.execute("CREATE ROLE IF NOT EXISTS role1")
-        assert_all(cassandra, "LIST ROLES", [cassandra_role, role1_role])
+        assert_all(cassandra, "LIST ROLES", [list(cassandra_role), list(role1_role)])
 
         cassandra.execute("DROP ROLE IF EXISTS role1")
         cassandra.execute("DROP ROLE IF EXISTS role1")
-        assert_one(cassandra, "LIST ROLES", cassandra_role)
+        assert_one(cassandra, "LIST ROLES", list(cassandra_role))
 
     def create_drop_role_validation_test(self):
         """
@@ -1122,9 +1128,9 @@ class TestAuthRoles(Tester):
         # roles with roleadmin can drop roles
         mike.execute("DROP ROLE role1")
         assert_all(cassandra, "LIST ROLES", [['administrator', False, False, {}],
-                                             cassandra_role,
+                                             list(cassandra_role),
                                              ['klaus', False, True, {}],
-                                             mike_role])
+                                             list(mike_role)])
 
         # revoking role admin removes its privileges
         cassandra.execute("REVOKE administrator FROM mike")
@@ -1248,19 +1254,19 @@ class TestAuthRoles(Tester):
         cassandra.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND SUPERUSER = false AND LOGIN = true")
         cassandra.execute("GRANT role2 TO role1")
         cassandra.execute("GRANT role1 TO mike")
-        assert_all(cassandra, "LIST ROLES OF mike", [mike_role, role1_role, role2_role])
+        assert_all(cassandra, "LIST ROLES OF mike", [list(mike_role), list(role1_role), list(role2_role)])
 
         # drop the role indirectly granted
         cassandra.execute("DROP ROLE role2")
-        assert_all(cassandra, "LIST ROLES OF mike", [mike_role, role1_role])
+        assert_all(cassandra, "LIST ROLES OF mike", [list(mike_role), list(role1_role)])
 
         cassandra.execute("CREATE ROLE role2")
         cassandra.execute("GRANT role2 to role1")
-        assert_all(cassandra, "LIST ROLES OF mike", [mike_role, role1_role, role2_role])
+        assert_all(cassandra, "LIST ROLES OF mike", [list(mike_role), list(role1_role), list(role2_role)])
         # drop the directly granted role
         cassandra.execute("DROP ROLE role1")
-        assert_one(cassandra, "LIST ROLES OF mike", mike_role)
-        assert_all(cassandra, "LIST ROLES", [cassandra_role, mike_role, role2_role])
+        assert_one(cassandra, "LIST ROLES OF mike", list(mike_role))
+        assert_all(cassandra, "LIST ROLES", [list(cassandra_role), list(mike_role), list(role2_role)])
 
     def drop_role_revokes_permissions_granted_on_it_test(self):
         """
@@ -1306,15 +1312,15 @@ class TestAuthRoles(Tester):
         cassandra.execute("GRANT role1 TO role2")
         cassandra.execute("GRANT role2 TO mike")
 
-        assert_all(cassandra, "LIST ROLES OF role2", [role1_role, role2_role])
-        assert_all(cassandra, "LIST ROLES OF mike", [mike_role, role1_role, role2_role])
-        assert_all(cassandra, "LIST ROLES OF mike NORECURSIVE", [mike_role, role2_role])
+        assert_all(cassandra, "LIST ROLES OF role2", [list(role1_role), list(role2_role)])
+        assert_all(cassandra, "LIST ROLES OF mike", [list(mike_role), list(role1_role), list(role2_role)])
+        assert_all(cassandra, "LIST ROLES OF mike NORECURSIVE", [list(mike_role), list(role2_role)])
 
         cassandra.execute("REVOKE role2 FROM mike")
-        assert_one(cassandra, "LIST ROLES OF mike", mike_role)
+        assert_one(cassandra, "LIST ROLES OF mike", list(mike_role))
 
         cassandra.execute("REVOKE role1 FROM role2")
-        assert_one(cassandra, "LIST ROLES OF role2", role2_role)
+        assert_one(cassandra, "LIST ROLES OF role2", list(role2_role))
 
     def grant_revoke_role_validation_test(self):
         """
@@ -1371,30 +1377,30 @@ class TestAuthRoles(Tester):
         cassandra.execute("CREATE ROLE role1")
         cassandra.execute("CREATE ROLE role2")
 
-        assert_all(cassandra, "LIST ROLES", [cassandra_role, mike_role, role1_role, role2_role])
+        assert_all(cassandra, "LIST ROLES", [list(cassandra_role), list(mike_role), list(role1_role), list(role2_role)])
 
         cassandra.execute("GRANT role1 TO role2")
         cassandra.execute("GRANT role2 TO mike")
 
-        assert_all(cassandra, "LIST ROLES OF role2", [role1_role, role2_role])
-        assert_all(cassandra, "LIST ROLES OF mike", [mike_role, role1_role, role2_role])
-        assert_all(cassandra, "LIST ROLES OF mike NORECURSIVE", [mike_role, role2_role])
+        assert_all(cassandra, "LIST ROLES OF role2", [list(role1_role), list(role2_role)])
+        assert_all(cassandra, "LIST ROLES OF mike", [list(mike_role), list(role1_role), list(role2_role)])
+        assert_all(cassandra, "LIST ROLES OF mike NORECURSIVE", [list(mike_role), list(role2_role)])
 
         mike = self.get_session(user='mike', password='12345')
         assert_unauthorized(mike,
                             "LIST ROLES OF cassandra",
                             "You are not authorized to view roles granted to cassandra")
 
-        assert_all(mike, "LIST ROLES", [mike_role, role1_role, role2_role])
-        assert_all(mike, "LIST ROLES OF mike", [mike_role, role1_role, role2_role])
-        assert_all(mike, "LIST ROLES OF mike NORECURSIVE", [mike_role, role2_role])
-        assert_all(mike, "LIST ROLES OF role2", [role1_role, role2_role])
+        assert_all(mike, "LIST ROLES", [list(mike_role), list(role1_role), list(role2_role)])
+        assert_all(mike, "LIST ROLES OF mike", [list(mike_role), list(role1_role), list(role2_role)])
+        assert_all(mike, "LIST ROLES OF mike NORECURSIVE", [list(mike_role), list(role2_role)])
+        assert_all(mike, "LIST ROLES OF role2", [list(role1_role), list(role2_role)])
 
         # without SELECT permission on the root level roles resource, LIST ROLES with no OF
         # returns only the roles granted to the user. With it, it includes all roles.
-        assert_all(mike, "LIST ROLES", [mike_role, role1_role, role2_role])
+        assert_all(mike, "LIST ROLES", [list(mike_role), list(role1_role), list(role2_role)])
         cassandra.execute("GRANT DESCRIBE ON ALL ROLES TO mike")
-        assert_all(mike, "LIST ROLES", [cassandra_role, mike_role, role1_role, role2_role])
+        assert_all(mike, "LIST ROLES", [list(cassandra_role), list(mike_role), list(role1_role), list(role2_role)])
 
     def grant_revoke_permissions_test(self):
         """
@@ -1771,7 +1777,7 @@ class TestAuthRoles(Tester):
         self.prepare()
         cassandra = self.get_session(user='cassandra', password='cassandra')
         cassandra.execute("CREATE USER mike WITH PASSWORD '12345' NOSUPERUSER")
-        assert_one(cassandra, "LIST ROLES OF mike", mike_role)
+        assert_one(cassandra, "LIST ROLES OF mike", list(mike_role))
 
         cassandra.execute("CREATE USER super_user WITH PASSWORD '12345' SUPERUSER")
         assert_one(cassandra, "LIST ROLES OF super_user", ["super_user", True, True, {}])
@@ -1828,7 +1834,7 @@ class TestAuthRoles(Tester):
         self.prepare()
         cassandra = self.get_session(user='cassandra', password='cassandra')
         cassandra.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND SUPERUSER = false AND LOGIN = true")
-        assert_one(cassandra, "LIST ROLES OF mike", mike_role)
+        assert_one(cassandra, "LIST ROLES OF mike", list(mike_role))
         self.get_session(user='mike', password='12345')
 
         cassandra.execute("ALTER ROLE mike WITH LOGIN = false")
@@ -1898,9 +1904,9 @@ class TestAuthRoles(Tester):
         cassandra.execute("GRANT db_admin TO mike")
         mike.execute("CREATE ROLE another_role WITH SUPERUSER = false AND LOGIN = false")
         assert_all(mike, "LIST ROLES", [["another_role", False, False, {}],
-                                        cassandra_role,
+                                        list(cassandra_role),
                                         ["db_admin", True, False, {}],
-                                        mike_role])
+                                        list(mike_role)])
 
     def list_users_considers_inherited_superuser_status_test(self):
         """
@@ -2465,7 +2471,7 @@ class TestAuthRoles(Tester):
         cassandra.execute("CREATE ROLE mike WITH LOGIN = true")
         # hack an invalid entry into the roles table for roleA
         cassandra.execute("UPDATE system_auth.roles SET member_of = {'role1'} where role = 'mike'")
-        assert_all(cassandra, "LIST ROLES OF mike", [mike_role])
+        assert_all(cassandra, "LIST ROLES OF mike", [list(mike_role)])
 
     def setup_table(self, session):
         session.execute("CREATE KEYSPACE ks WITH REPLICATION = {'class':'SimpleStrategy', 'replication_factor':1}")
