@@ -62,6 +62,7 @@ REUSE_CLUSTER = os.environ.get('REUSE_CLUSTER', '').lower() in ('yes', 'true')
 SILENCE_DRIVER_ON_SHUTDOWN = os.environ.get('SILENCE_DRIVER_ON_SHUTDOWN', 'true').lower() in ('yes', 'true')
 IGNORE_REQUIRE = os.environ.get('IGNORE_REQUIRE', '').lower() in ('yes', 'true')
 DATADIR_COUNT = os.environ.get('DATADIR_COUNT', '3')
+ENABLE_ACTIVE_LOG_WATCHING = os.environ.get('ENABLE_ACTIVE_LOG_WATCHING', '').lower() in ('yes', 'true')
 
 CURRENT_TEST = ""
 
@@ -332,8 +333,9 @@ class Tester(TestCase):
                 pass
 
         self.cluster = self._get_cluster()
-        if not self.allow_log_errors:
-            self.begin_active_log_watch()
+        if ENABLE_ACTIVE_LOG_WATCHING:
+            if not self.allow_log_errors:
+                self.begin_active_log_watch()
         if RECORD_COVERAGE:
             self.__setup_jacoco()
 
