@@ -394,8 +394,8 @@ class Tester(TestCase):
         # thread.interrupt_main will SIGINT in the main thread, which we can
         # catch to raise an exception with useful information
         debug('Errors were just seen in logs, ending test!')
-        thread.interrupt_main()
         self.exit_with_exception = AssertionError(message)
+        thread.interrupt_main()
 
     def _catch_interrupt(self, signal, frame):
         try:
