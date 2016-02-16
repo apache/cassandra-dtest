@@ -370,6 +370,8 @@ class Tester(TestCase):
         When called prepares exception instance, then will indirectly
         cause _catch_interrupt to be called, which can raise the exception in the main
         program thread.
+
+        @param errordata is a dictonary mapping node name to failure list.
         """
         # in some cases self.allow_log_errors may get set after proactive log checking has been enabled
         # so we need to double-check first thing before proceeding
@@ -398,6 +400,13 @@ class Tester(TestCase):
         thread.interrupt_main()
 
     def _catch_interrupt(self, signal, frame):
+        """
+        Signal handler for registering on SIGINT.
+
+        If called will look for a stored exception and raise it to abort test.
+        If a stored exception is not present, this handler has likely caught a
+        user interrupt via CTRL-C, and will raise a KeyboardInterrupt.
+        """
         try:
             # check if we have a persisted exception to fail with
             raise self.exit_with_exception
