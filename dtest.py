@@ -368,7 +368,7 @@ class Tester(TestCase):
         """
         Callback handler used in conjunction with begin_active_log_watch.
         When called prepares exception instance, then will indirectly
-        cause catch_interrupt to be called, which can raise the exception in the main
+        cause _catch_interrupt to be called, which can raise the exception in the main
         program thread.
         """
         # in some cases self.allow_log_errors may get set after proactive log checking has been enabled
