@@ -2,7 +2,6 @@
 Home for upgrade-related tests that don't fit in with the core upgrade testing in dtest.upgrade_through_versions
 """
 from cassandra import ConsistencyLevel as CL
-
 from upgrade_base import UPGRADE_TEST_RUN, VALID_UPGRADE_PAIRS, UpgradeTester
 
 
@@ -15,6 +14,8 @@ class TestForRegressions(UpgradeTester):
     def test_10822(self):
         """
         @jira_ticket CASSANDRA-10822
+
+        Original issue was seen when upgrading from 2.1 to 3.X versions.
         """
         session = self.prepare()
 
