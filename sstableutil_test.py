@@ -84,6 +84,8 @@ class SSTableUtilTest(Tester):
 
         # restart to make sure not data is lost
         node.start(wait_for_binary_proto=True)
+        # in some environments, a compaction may start that would change sstable files. We should wait if so
+        node.wait_for_compactions()
 
         finalfiles, tmpfiles = self._check_files(node, KeyspaceName, TableName)
         self.assertEqual(0, len(tmpfiles))
