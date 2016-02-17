@@ -2,18 +2,20 @@
 Home for upgrade-related tests that don't fit in with the core upgrade testing in dtest.upgrade_through_versions
 """
 from cassandra import ConsistencyLevel as CL
-from upgrade_base import UpgradeTester
+from upgrade_base import UPGRADE_TEST_RUN, VALID_UPGRADE_PAIRS, UpgradeTester
 
 
 class TestForRegressions(UpgradeTester):
     """
     Catch-all class for regression tests on specific versions.
     """
-    NODES, RF, __test__, CL = 2, 1, True, CL.ONE
+    NODES, RF, __test__, CL = 2, 1, False, CL.ONE
 
     def test_10822(self):
         """
         @jira_ticket CASSANDRA-10822
+
+        Original issue was seen when upgrading from 2.1 to 3.X versions.
         """
         session = self.prepare()
 
@@ -51,3 +53,11 @@ class TestForRegressions(UpgradeTester):
             for symbol, year in symbol_years:
                 count = s[1].execute("select count(*) from financial.symbol_history where symbol='{}' and year={};".format(symbol, year))[0][0]
                 self.assertEqual(count, expected_rows, "actual {} did not match expected {}".format(count, expected_rows))
+
+
+for path in VALID_UPGRADE_PAIRS:
+    gen_class_name = TestForRegressions.__name__ + path.name
+    assert gen_class_name not in globals(), gen_class_name
+    spec = {'UPGRADE_PATH': path,
+            '__test__': UPGRADE_TEST_RUN}
+    globals()[gen_class_name] = type(gen_class_name, (TestForRegressions,), spec)
