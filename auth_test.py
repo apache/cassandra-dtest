@@ -137,7 +137,7 @@ class TestAuth(Tester):
         * Create two new users, and two new superusers.
         * Verify that LIST USERS shows all five users.
         * Verify that the correct users are listed as super users.
-        # Connect as one of the new users, and check that the LIST USERS behavior is also correct there.
+        * Connect as one of the new users, and check that the LIST USERS behavior is also correct there.
         """
         self.prepare()
 
