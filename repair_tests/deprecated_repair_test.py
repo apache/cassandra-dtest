@@ -1,10 +1,8 @@
 from cassandra import ConsistencyLevel
-from cassandra.query import SimpleStatement
 from ccmlib.common import is_win
-
 from dtest import Tester, debug
-from tools import since, insert_c1c2, query_c1c2
 from jmxutils import JolokiaAgent, make_mbean, remove_perf_disable_shared_mem
+from tools import insert_c1c2, since
 
 
 @since("2.2")
@@ -12,38 +10,10 @@ class TestDeprecatedRepairAPI(Tester):
     """
     @jira_ticket CASSANDRA-9570
 
-    Test if depreated repair JMX API runs with expected parameters
+    Test if deprecated repair JMX API runs with expected parameters
     """
 
-    def check_rows_on_node(self, node_to_check, rows, found=None, missings=None, restart=True):
-        if found is None:
-            found = []
-        if missings is None:
-            missings = []
-        stopped_nodes = []
-
-        for node in self.cluster.nodes.values():
-            if node.is_running() and node is not node_to_check:
-                stopped_nodes.append(node)
-                node.stop(wait_other_notice=True)
-
-        session = self.patient_cql_connection(node_to_check, 'ks')
-        result = session.execute("SELECT * FROM cf LIMIT %d" % (rows * 2))
-        assert len(result) == rows, len(result)
-
-        for k in found:
-            query_c1c2(session, k, ConsistencyLevel.ONE)
-
-        for k in missings:
-            query = SimpleStatement("SELECT c1, c2 FROM cf WHERE key='k%d'" % k, consistency_level=ConsistencyLevel.ONE)
-            res = session.execute(query)
-            assert len(filter(lambda x: len(x) != 0, res)) == 0, res
-
-        if restart:
-            for node in stopped_nodes:
-                node.start(wait_other_notice=True)
-
-    def force_repair_async_1_test(self, ):
+    def force_repair_async_1_test(self):
         """
         test forceRepairAsync(String keyspace, boolean isSequential,
                               Collection<String> dataCenters,
@@ -60,7 +30,7 @@ class TestDeprecatedRepairAPI(Tester):
         self.assertEqual(opt["hosts"], "[]", opt)
         self.assertEqual(opt["column_families"], "[cf]", opt)
 
-    def force_repair_async_2_test(self, ):
+    def force_repair_async_2_test(self):
         """
         test forceRepairAsync(String keyspace, int parallelismDegree,
                               Collection<String> dataCenters,
@@ -77,7 +47,7 @@ class TestDeprecatedRepairAPI(Tester):
         self.assertEqual(opt["hosts"], "[]", opt)
         self.assertEqual(opt["column_families"], "[]", opt)
 
-    def force_repair_async_3_test(self, ):
+    def force_repair_async_3_test(self):
         """
         test forceRepairAsync(String keyspace, boolean isSequential,
                               boolean isLocal, boolean primaryRange,
@@ -93,7 +63,7 @@ class TestDeprecatedRepairAPI(Tester):
         self.assertEqual(opt["hosts"], "[]", opt)
         self.assertEqual(opt["column_families"], "[cf]", opt)
 
-    def force_repair_range_async_1_test(self, ):
+    def force_repair_range_async_1_test(self):
         """
         test forceRepairRangeAsync(String beginToken, String endToken,
                                    String keyspaceName, boolean isSequential,
@@ -112,7 +82,7 @@ class TestDeprecatedRepairAPI(Tester):
         self.assertEqual(opt["ranges"], "1", opt)
         self.assertEqual(opt["column_families"], "[cf]", opt)
 
-    def force_repair_range_async_2_test(self, ):
+    def force_repair_range_async_2_test(self):
         """
         test forceRepairRangeAsync(String beginToken, String endToken,
                                    String keyspaceName, int parallelismDegree,
@@ -131,7 +101,7 @@ class TestDeprecatedRepairAPI(Tester):
         self.assertEqual(opt["ranges"], "1", opt)
         self.assertEqual(opt["column_families"], "[cf]", opt)
 
-    def force_repair_range_async_3_test(self, ):
+    def force_repair_range_async_3_test(self):
         """
         test forceRepairRangeAsync(String beginToken, String endToken,
                                    String keyspaceName, boolean isSequential,
@@ -150,6 +120,13 @@ class TestDeprecatedRepairAPI(Tester):
         self.assertEqual(opt["column_families"], "[cf]", opt)
 
     def _deprecated_repair_jmx(self, method, arguments):
+        """
+        * Launch a two node, two DC cluster
+        * Create a keyspace and table
+        * Insert some data
+        * Call the deprecated repair JMX API based on the arguments passed into this method
+        * Check the node log to see if the correct repair was performed based on the jmx args
+        """
         cluster = self.cluster
 
         debug("Starting cluster..")
@@ -172,7 +149,9 @@ class TestDeprecatedRepairAPI(Tester):
         # wait for log to start
         node1.watch_log_for("Starting repair command")
         # get repair parameters from the log
-        l = node1.grep_log("Starting repair command #1, repairing keyspace ks with repair options \(parallelism: (?P<parallelism>\w+), primary range: (?P<pr>\w+), incremental: (?P<incremental>\w+), job threads: (?P<jobs>\d+), ColumnFamilies: (?P<cfs>.+), dataCenters: (?P<dc>.+), hosts: (?P<hosts>.+), # of ranges: (?P<ranges>\d+)\)")
+        l = node1.grep_log(("Starting repair command #1, repairing keyspace ks with repair options \(parallelism: (?P<parallelism>\w+), primary range: (?P<pr>\w+), "
+                            "incremental: (?P<incremental>\w+), job threads: (?P<jobs>\d+), ColumnFamilies: (?P<cfs>.+), dataCenters: (?P<dc>.+), "
+                            "hosts: (?P<hosts>.+), # of ranges: (?P<ranges>\d+)\)"))
         self.assertEqual(len(l), 1)
         line, m = l[0]
         return {"parallelism": m.group("parallelism"),

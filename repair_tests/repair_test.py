@@ -4,7 +4,6 @@ from unittest import skip
 
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
-
 from dtest import Tester, debug
 from tools import insert_c1c2, no_vnodes, query_c1c2, since
 
@@ -12,6 +11,15 @@ from tools import insert_c1c2, no_vnodes, query_c1c2, since
 class TestRepair(Tester):
 
     def check_rows_on_node(self, node_to_check, rows, found=None, missings=None, restart=True):
+        """
+        Function to verify the rows on a given node, without interference
+        from the other nodes in the cluster
+        @param node_to_check The given node to check. Should be the node, not the index
+        @param rows The number of rows we expect
+        @param found A list of partition keys that we expect to be on the node
+        @param missings A list of partition keys we expect NOT to be on the node
+        @param restart Whether or not we should restart the nodes we shut down to perform the assertions. Should only be False if the call to check_rows_on_node is the last line in the test.
+        """
         if found is None:
             found = []
         if missings is None:
@@ -24,14 +32,14 @@ class TestRepair(Tester):
                 node.stop(wait_other_notice=True)
 
         session = self.patient_cql_connection(node_to_check, 'ks')
-        result = list(session.execute("SELECT * FROM cf LIMIT %d" % (rows * 2)))
+        result = list(session.execute("SELECT * FROM cf LIMIT {}".format(rows * 2)))
         self.assertEqual(len(result), rows, len(result))
 
         for k in found:
             query_c1c2(session, k, ConsistencyLevel.ONE)
 
         for k in missings:
-            query = SimpleStatement("SELECT c1, c2 FROM cf WHERE key='k%d'" % k, consistency_level=ConsistencyLevel.ONE)
+            query = SimpleStatement("SELECT c1, c2 FROM cf WHERE key='k{}'".format(k), consistency_level=ConsistencyLevel.ONE)
             res = list(session.execute(query))
             self.assertEqual(len(filter(lambda x: len(x) != 0, res)), 0, res)
 
@@ -42,19 +50,27 @@ class TestRepair(Tester):
     @since('2.2.1')
     def no_anticompaction_after_dclocal_repair_test(self):
         """
+        * Launch a four node, two DC cluster
+        * Start a -local repair on node1 in dc1
+        * Assert that the dc1 nodes see repair messages
+        * Assert that the dc2 nodes do not see repair messages
+        * Assert no nodes anticompact
+        # TODO: Verify the anticompaction with sstablemetadata, not just logs
         @jira_ticket CASSANDRA-10422
         """
         cluster = self.cluster
         debug("Starting cluster..")
         cluster.populate([2, 2]).start(wait_for_binary_proto=True)
         node1_1, node2_1, node1_2, node2_2 = cluster.nodelist()
-        node1_1.stress(stress_options=['write', 'n=50K', 'cl=ONE', '-schema', 'replication(factor=4)'])
+        node1_1.stress(stress_options=['write', 'n=50K', 'cl=ONE', '-schema', 'replication(factor=4)', '-rate', 'threads=50'])
         node1_1.nodetool("repair -local keyspace1 standard1")
         self.assertTrue(node1_1.grep_log("Not a global repair"))
         self.assertTrue(node2_1.grep_log("Not a global repair"))
+
         # dc2 should not see these messages:
         self.assertFalse(node1_2.grep_log("Not a global repair"))
         self.assertFalse(node2_2.grep_log("Not a global repair"))
+
         # and no nodes should do anticompaction:
         for node in cluster.nodelist():
             self.assertFalse(node.grep_log("Starting anticompaction"))
@@ -62,13 +78,18 @@ class TestRepair(Tester):
     @since('2.2.1')
     def no_anticompaction_after_hostspecific_repair_test(self):
         """
+        * Launch a four node, two DC cluster
+        * Start a repair on all nodes, by enumerating with -hosts
+        * Assert all nodes see a repair messages
+        * Assert no nodes anticompact
+        # TODO: Verify the anticompaction with sstablemetadata, not just logs
         @jira_ticket CASSANDRA-10422
         """
         cluster = self.cluster
         debug("Starting cluster..")
         cluster.populate([2, 2]).start(wait_for_binary_proto=True)
         node1_1, node2_1, node1_2, node2_2 = cluster.nodelist()
-        node1_1.stress(stress_options=['write', 'n=100K', 'cl=ONE', '-schema', 'replication(factor=4)'])
+        node1_1.stress(stress_options=['write', 'n=100K', 'cl=ONE', '-schema', 'replication(factor=4)', '-rate', 'threads=50'])
         node1_1.nodetool("repair -hosts 127.0.0.1,127.0.0.2,127.0.0.3,127.0.0.4 keyspace1 standard1")
         for node in cluster.nodelist():
             self.assertTrue(node.grep_log("Not a global repair"))
@@ -78,13 +99,18 @@ class TestRepair(Tester):
     @since('2.2.4')
     def no_anticompaction_after_subrange_repair_test(self):
         """
+        * Launch a three node, two DC cluster
+        * Start a repair on a token range
+        * Assert all nodes see repair messages
+        * Assert no nodes anticompact
+        # TODO: Verify the anticompaction with sstablemetadata, not just logs
         @jira_ticket CASSANDRA-10422
         """
         cluster = self.cluster
         debug("Starting cluster..")
         cluster.populate(3).start(wait_for_binary_proto=True)
         node1, node2, node3 = cluster.nodelist()
-        node1.stress(stress_options=['write', 'n=50K', 'cl=ONE', '-schema', 'replication(factor=3)'])
+        node1.stress(stress_options=['write', 'n=50K', 'cl=ONE', '-schema', 'replication(factor=3)', '-rate', 'threads=50'])
         node1.nodetool("repair -st 0 -et 1000 keyspace1 standard1")
         for node in cluster.nodelist():
             self.assertTrue(node.grep_log("Not a global repair"))
@@ -94,6 +120,9 @@ class TestRepair(Tester):
     @since('2.2.1')
     def anticompaction_after_normal_repair_test(self):
         """
+        * Launch a four node, two DC cluster
+        * Start a normal repair
+        * Assert every node anticompacts
         @jira_ticket CASSANDRA-10422
         """
         cluster = self.cluster
@@ -105,23 +134,46 @@ class TestRepair(Tester):
         for node in cluster.nodelist():
             self.assertTrue("Starting anticompaction")
 
-    def simple_sequential_repair_test(self, ):
+    def simple_sequential_repair_test(self):
+        """
+        Calls simple repair test with a sequential repair
+        """
         self._simple_repair(sequential=True)
 
-    def simple_parallel_repair_test(self, ):
+    def simple_parallel_repair_test(self):
+        """
+        Calls simple repair test with a parallel repair
+        """
         self._simple_repair(sequential=False)
 
     def empty_vs_gcable_sequential_repair_test(self):
+        """
+        Calls empty_vs_gcable repair test with a sequential repair
+        """
         self._empty_vs_gcable_no_repair(sequential=True)
 
     def empty_vs_gcable_parallel_repair_test(self):
+        """
+        Calls empty_vs_gcable repair test with a parallel repair
+        """
         self._empty_vs_gcable_no_repair(sequential=False)
 
-    @no_vnodes()  # https://issues.apache.org/jira/browse/CASSANDRA-5220
-    def simple_repair_order_preserving_test(self, ):
+    @no_vnodes()
+    def simple_repair_order_preserving_test(self):
+        """
+        Calls simple repair test with OPP and sequential repair
+        @jira_ticket CASSANDRA-5220
+        """
         self._simple_repair(order_preserving_partitioner=True)
 
     def _repair_options(self, ks='', cf=None, sequential=True):
+        """
+        Function for assembling appropriate repair CLI options,
+        based on C* version, as defaults have changed.
+        @param ks The keyspace to repair
+        @param cf The table(s) to repair
+        @param sequential If the repair should be a sequential repair [vs parallel]
+        """
         if cf is None:
             cf = []
         opts = []
@@ -144,6 +196,24 @@ class TestRepair(Tester):
         return opts
 
     def _simple_repair(self, order_preserving_partitioner=False, sequential=True):
+        """
+        * Configure a three node cluster to not use hinted handoff, and to use batch commitlog
+        * Launch the cluster
+        * Create a keyspace at RF 3 and table
+        * Insert one thousand rows at CL ALL
+        * Flush on node3 and shut it down
+        * Insert one row at CL TWO
+        * Restart node3
+        * Insert one thousand more rows at CL ALL
+        * Flush all nodes
+        * Check node3 only has 2000 keys
+        * Check node1 and node2 have 2001 keys
+        * Perform the repair type specified by the parent test
+        * Assert the appropriate messages are logged
+        * Assert node3 now has all data
+
+        @jira_ticket CASSANDRA-4373
+        """
         cluster = self.cluster
 
         if order_preserving_partitioner:
@@ -210,7 +280,7 @@ class TestRepair(Tester):
         """
         Repairing empty partition and tombstoned partition older than gc grace
         should be treated as the same and no repair is necessary.
-        See CASSANDRA-8979.
+        @jira_ticket CASSANDRA-8979.
         """
         cluster = self.cluster
         cluster.populate(2)
@@ -255,17 +325,17 @@ class TestRepair(Tester):
             # insert some data
             for i in xrange(0, 10):
                 for j in xrange(0, 1000):
-                    query = SimpleStatement("INSERT INTO %s (key, c1, c2) VALUES ('k%d', 'v%d', 'value')" % (cf, i, j), consistency_level=ConsistencyLevel.ONE)
+                    query = SimpleStatement("INSERT INTO {} (key, c1, c2) VALUES ('k{}', 'v{}', 'value')".format(cf, i, j), consistency_level=ConsistencyLevel.ONE)
                     session.execute(query)
             node1.flush()
             # delete those data, half with row tombstone, and the rest with cell range tombstones
             for i in xrange(0, 5):
-                query = SimpleStatement("DELETE FROM %s WHERE key='k%d'" % (cf, i), consistency_level=ConsistencyLevel.ONE)
+                query = SimpleStatement("DELETE FROM {} WHERE key='k{}'".format(cf, i), consistency_level=ConsistencyLevel.ONE)
                 session.execute(query)
             node1.flush()
             for i in xrange(5, 10):
                 for j in xrange(0, 1000):
-                    query = SimpleStatement("DELETE FROM %s WHERE key='k%d' AND c1='v%d'" % (cf, i, j), consistency_level=ConsistencyLevel.ONE)
+                    query = SimpleStatement("DELETE FROM {} WHERE key='k{}' AND c1='v{}'".format(cf, i, j), consistency_level=ConsistencyLevel.ONE)
                     session.execute(query)
             node1.flush()
 
@@ -279,7 +349,7 @@ class TestRepair(Tester):
         # check no rows will be returned
         for cf in ['cf1', 'cf2']:
             for i in xrange(0, 10):
-                query = SimpleStatement("SELECT c1, c2 FROM %s WHERE key='k%d'" % (cf, i), consistency_level=ConsistencyLevel.ALL)
+                query = SimpleStatement("SELECT c1, c2 FROM {} WHERE key='k{}'".format(cf, i), consistency_level=ConsistencyLevel.ALL)
                 res = list(session.execute(query))
                 self.assertEqual(len(filter(lambda x: len(x) != 0, res)), 0, res)
 
@@ -291,6 +361,11 @@ class TestRepair(Tester):
         self.assertGreater(len(out_of_sync_logs), 0, "Non GC-able data should be repaired")
 
     def local_dc_repair_test(self):
+        """
+        * Set up a multi DC cluster
+        * Perform a -local repair on one DC
+        * Assert only nodes in that DC are repaired
+        """
         cluster = self._setup_multi_dc()
         node1 = cluster.nodes["node1"]
         node2 = cluster.nodes["node2"]
@@ -302,7 +377,7 @@ class TestRepair(Tester):
 
         # Verify that only nodes in dc1 are involved in repair
         out_of_sync_logs = node1.grep_log("/([0-9.]+) and /([0-9.]+) have ([0-9]+) range\(s\) out of sync")
-        self.assertEqual(len(out_of_sync_logs), 1, "Lines matching: %d" % len(out_of_sync_logs))
+        self.assertEqual(len(out_of_sync_logs), 1, "Lines matching: {}".format(len(out_of_sync_logs)))
         line, m = out_of_sync_logs[0]
         self.assertEqual(int(m.group(3)), 1, "Expecting 1 range out of sync, got " + m.group(3))
         valid = [node1.address(), node2.address()]
@@ -313,6 +388,11 @@ class TestRepair(Tester):
         self.check_rows_on_node(node2, 2001, found=[1000], restart=False)
 
     def dc_repair_test(self):
+        """
+        * Set up a multi DC cluster
+        * Perform a -dc repair on two dc's
+        * Assert only nodes on those dcs were repaired
+        """
         cluster = self._setup_multi_dc()
         node1 = cluster.nodes["node1"]
         node2 = cluster.nodes["node2"]
@@ -331,8 +411,7 @@ class TestRepair(Tester):
         for line, m in out_of_sync_logs:
             self.assertEqual(int(m.group(3)), 1, "Expecting 1 range out of sync, got " + m.group(3))
             self.assertIn((m.group(1), m.group(2)), valid, str((m.group(1), m.group(2))))
-            valid.remove((m.group(1), m.group(2)))
-            valid.remove((m.group(2), m.group(1)))
+
         # Check node2 now has the key
         self.check_rows_on_node(node2, 2001, found=[1000], restart=False)
 
@@ -401,7 +480,7 @@ class TestRepairDataSystemTable(Tester):
         self.node1 = self.cluster.nodelist()[0]
         self.session = self.patient_cql_connection(self.node1)
 
-        self.node1.stress(stress_options=['write', 'n=5000', 'cl=ONE', '-schema', 'replication(factor=3)'])
+        self.node1.stress(stress_options=['write', 'n=5K', 'cl=ONE', '-schema', 'replication(factor=3)'])
 
         self.cluster.flush()
 

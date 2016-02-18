@@ -3,12 +3,12 @@ import time
 from re import findall
 from unittest import skip
 
-from cassandra import ConsistencyLevel
 from nose.plugins.attrib import attr
 
 from assertions import assert_almost_equal, assert_one
-from ccmlib.node import Node
+from cassandra import ConsistencyLevel
 from ccmlib.common import is_win
+from ccmlib.node import Node
 from dtest import Tester, debug
 from tools import insert_c1c2
 
@@ -24,6 +24,14 @@ class TestIncRepair(Tester):
         Tester.__init__(self, *args, **kwargs)
 
     def sstable_marking_test(self):
+        """
+        * Launch a three node cluster
+        * Stop node3
+        * Write 10K rows with stress
+        * Start node3
+        * Issue an incremental repair, and wait for it to finish
+        * Run sstablemetadata on every node, assert that all sstables are marked as repaired
+        """
         cluster = self.cluster
         # hinted handoff can create SSTable that we don't need after node3 restarted
         cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
@@ -32,7 +40,7 @@ class TestIncRepair(Tester):
 
         node3.stop(gently=True)
 
-        node1.stress(['write', 'n=10000', '-schema', 'replication(factor=3)'])
+        node1.stress(['write', 'n=10K', '-schema', 'replication(factor=3)'])
         node1.flush()
         node2.flush()
 
@@ -44,7 +52,6 @@ class TestIncRepair(Tester):
         else:
             node3.nodetool("repair -par -inc")
 
-        output = ""
         with open('sstables.txt', 'w') as f:
             node1.run_sstablemetadata(output_file=f, keyspace='keyspace1')
             node2.run_sstablemetadata(output_file=f, keyspace='keyspace1')
@@ -58,6 +65,23 @@ class TestIncRepair(Tester):
         os.remove('sstables.txt')
 
     def multiple_repair_test(self):
+        """
+        * Launch a three node cluster
+        * Create a keyspace with RF 3 and a table
+        * Insert 49 rows
+        * Stop node3
+        * Insert 50 more rows
+        * Restart node3
+        * Issue an incremental repair on node3
+        * Stop node2
+        * Insert a final50 rows
+        * Restart node2
+        * Issue an incremental repair on node2
+        * Replace node3 with a new node
+        * Verify data integrity
+        # TODO: Several more verifications of data need to be interspersed throughout the test. The final assertion is insufficient.
+        @jira_ticket CASSANDRA-10644
+        """
         cluster = self.cluster
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
@@ -118,10 +142,25 @@ class TestIncRepair(Tester):
         assert_one(session, "SELECT COUNT(*) FROM ks.cf LIMIT 200", [149])
 
     def sstable_repairedset_test(self):
+        """
+        * Launch a two node cluster
+        * Insert data with stress
+        * Stop node2
+        * Run sstablerepairedset against node2
+        * Start node2
+        * Run sstablemetadata on both nodes, pipe to a file
+        * Verify the output of sstablemetadata shows no repairs have occurred
+        * Stop node1
+        * Insert more data with stress
+        * Start node1
+        * Issue an incremental repair
+        * Run sstablemetadata on both nodes again, pipe to a new file
+        * Verify repairs occurred and repairedAt was updated
+        """
         cluster = self.cluster
         cluster.populate(2).start()
         node1, node2 = cluster.nodelist()
-        node1.stress(['write', 'n=10000', '-schema', 'replication(factor=2)'])
+        node1.stress(['write', 'n=10K', '-schema', 'replication(factor=2)', '-rate', 'threads=50'])
 
         node1.flush()
         node2.flush()
@@ -135,8 +174,28 @@ class TestIncRepair(Tester):
             node2.run_sstablemetadata(output_file=f, keyspace='keyspace1')
             node1.run_sstablemetadata(output_file=f, keyspace='keyspace1')
 
+        with open('initial.txt', 'r') as r:
+            initialoutput = r.read()
+
+        matches = findall('(?<=Repaired at:).*', initialoutput)
+        uniquematches = []
+        matchcount = []
+        for value in matches:
+            if value not in uniquematches:
+                uniquematches.append(value)
+                matchcount.append(1)
+            else:
+                index = uniquematches.index(value)
+                matchcount[index] = matchcount[index] + 1
+
+        self.assertGreaterEqual(len(uniquematches), 2)
+
+        self.assertGreaterEqual(max(matchcount), 2)
+
+        self.assertIn('Repaired at: 0', initialoutput)
+
         node1.stop()
-        node2.stress(['write', 'n=15000', '-schema', 'replication(factor=2)'])
+        node2.stress(['write', 'n=15K', '-schema', 'replication(factor=2)'])
         node2.flush()
         node1.start(wait_for_binary_proto=True)
 
@@ -170,12 +229,26 @@ class TestIncRepair(Tester):
 
         self.assertGreaterEqual(max(matchcount), 2)
 
-        self.assertNotIn('repairedAt: 0', finaloutput)
+        self.assertNotIn('Repaired at: 0', finaloutput)
 
         os.remove('initial.txt')
         os.remove('final.txt')
 
     def compaction_test(self):
+        """
+        Test we can major compact after an incremental repair
+        * Launch a three node cluster
+        * Create a keyspace with RF 3 and a table
+        * Stop node3
+        * Insert 100 rows
+        * Restart node3
+        * Issue an incremental repair
+        * Insert 50 more rows
+        * Perform a major compaction on node3
+        * Verify all data is present
+        # TODO: I have no idea what this is testing. The assertions do not verify anything meaningful.
+        # TODO: Fix all the string formatting
+        """
         cluster = self.cluster
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
@@ -198,9 +271,8 @@ class TestIncRepair(Tester):
             node3.nodetool("repair -par -inc")
         for x in range(0, 150):
             session.execute("insert into tab(key,val) values(" + str(x) + ",1)")
-        node1.flush()
-        node2.flush()
-        node3.flush()
+
+        cluster.flush()
 
         node3.nodetool('compact')
 
@@ -211,13 +283,21 @@ class TestIncRepair(Tester):
     @skip('hangs CI')
     def multiple_subsequent_repair_test(self):
         """
-        Covers CASSANDRA-8366
+        @jira_ticket CASSANDRA-8366
 
-        There is an issue with subsequent inc repairs.
+        There is an issue with subsequent inc repairs increasing load size.
+        So we perform several repairs and check that the expected amount of data exists.
+        * Launch a three node cluster
+        * Write 5M rows with stress
+        * Wait for minor compactions to finish
+        * Issue an incremental repair on each node, sequentially
+        * Issue major compactions on each node
+        * Sleep for a while so load size can be propagated between nodes
+        * Verify the correct amount of data is on each node
         """
         cluster = self.cluster
         cluster.populate(3).start()
-        [node1, node2, node3] = cluster.nodelist()
+        node1, node2, node3 = cluster.nodelist()
 
         debug("Inserting data with stress")
         node1.stress(['write', 'n=5M', '-rate', 'threads=10', '-schema', 'replication(factor=3)'])
@@ -269,10 +349,14 @@ class TestIncRepair(Tester):
     def sstable_marking_test_not_intersecting_all_ranges(self):
         """
         @jira_ticket CASSANDRA-10299
+        * Launch a four node cluster
+        * Insert data with stress
+        * Issue an incremental repair on each node sequentially
+        * Assert no extra, unrepaired sstables are generated
         """
         cluster = self.cluster
         cluster.populate(4, use_vnodes=True).start()
-        [node1, node2, node3, node4] = cluster.nodelist()
+        node1, node2, node3, node4 = cluster.nodelist()
 
         debug("Inserting data with stress")
         node1.stress(['write', 'n=3', '-rate', 'threads=1', '-schema', 'replication(factor=3)'])
@@ -280,25 +364,16 @@ class TestIncRepair(Tester):
         debug("Flushing nodes")
         cluster.flush()
 
-        if self.cluster.version() >= '2.2':
-            debug("Repairing node 1")
-            node1.nodetool("repair")
-            debug("Repairing node 2")
-            node2.nodetool("repair")
-            debug("Repairing node 3")
-            node3.nodetool("repair")
-            debug("Repairing node 4")
-            node4.nodetool("repair")
+        repair_options = '' if self.cluster.version() >= '2.2' else '-inc -par'
 
-        else:
-            debug("Repairing node 1")
-            node1.nodetool("repair -inc -par")
-            debug("Repairing node 2")
-            node2.nodetool("repair -inc -par")
-            debug("Repairing node 3")
-            node3.nodetool("repair -inc -par")
-            debug("Repairing node 4")
-            node4.nodetool("repair -inc -par")
+        debug("Repairing node 1")
+        node1.nodetool("repair {}".format(repair_options))
+        debug("Repairing node 2")
+        node2.nodetool("repair {}".format(repair_options))
+        debug("Repairing node 3")
+        node3.nodetool("repair {}".format(repair_options))
+        debug("Repairing node 4")
+        node4.nodetool("repair {}".format(repair_options))
 
         with open("final.txt", "w") as h:
             node1.run_sstablemetadata(output_file=h, keyspace='keyspace1')
