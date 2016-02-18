@@ -474,14 +474,6 @@ class TestSecondaryIndexesOnCollections(Tester):
         for (success, result) in results:
             self.assertTrue(success, "didn't get success on insert: {0}".format(result))
 
-        # no index present yet, make sure there's an error trying to query column
-        stmt = ("SELECT * from simple_with_tuple where single_tuple = (1)")
-
-        if self.cluster.version() < "3":
-            assert_invalid(session, stmt, 'No secondary indexes on the restricted columns support the provided operators')
-        else:
-            assert_invalid(session, stmt, 'No supported secondary index found for the non primary key columns restrictions')
-
         session.execute("CREATE INDEX idx_single_tuple ON simple_with_tuple(single_tuple);")
         session.execute("CREATE INDEX idx_double_tuple ON simple_with_tuple(double_tuple);")
         session.execute("CREATE INDEX idx_triple_tuple ON simple_with_tuple(triple_tuple);")
@@ -555,15 +547,6 @@ class TestSecondaryIndexesOnCollections(Tester):
                 "uuids list<uuid>"
                 ");")
         session.execute(stmt)
-
-        # no index present yet, make sure there's an error trying to query column
-        stmt = ("SELECT * from list_index_search.users where uuids contains {some_uuid}"
-                ).format(some_uuid=uuid.uuid4())
-
-        if self.cluster.version() < "3":
-            assert_invalid(session, stmt, 'No secondary indexes on the restricted columns support the provided operators')
-        else:
-            assert_invalid(session, stmt, 'No supported secondary index found for the non primary key columns restrictions')
 
         # add index and query again (even though there are no rows in the table yet)
         stmt = "CREATE INDEX user_uuids on list_index_search.users (uuids);"
@@ -653,13 +636,6 @@ class TestSecondaryIndexesOnCollections(Tester):
                 "email text,"
                 "uuids set<uuid>);")
         session.execute(stmt)
-
-        # no index present yet, make sure there's an error trying to query column
-        stmt = ("SELECT * from set_index_search.users where uuids contains {some_uuid}").format(some_uuid=uuid.uuid4())
-        if self.cluster.version() < "3":
-            assert_invalid(session, stmt, 'No secondary indexes on the restricted columns support the provided operators')
-        else:
-            assert_invalid(session, stmt, 'No supported secondary index found for the non primary key columns restrictions')
 
         # add index and query again (even though there are no rows in the table yet)
         stmt = "CREATE INDEX user_uuids on set_index_search.users (uuids);"
@@ -800,17 +776,6 @@ class TestSecondaryIndexesOnCollections(Tester):
                 "email text,"
                 "uuids map<uuid, uuid>);")
         session.execute(stmt)
-
-        no_index_error = ('No secondary indexes on the restricted columns support the provided operators'
-                          if self.cluster.version() < '3' else
-                          'No supported secondary index found for the non primary key columns restrictions')
-        # no index present yet, make sure there's an error trying to query column
-        stmt = ("SELECT * from map_index_search.users where uuids contains {some_uuid}").format(some_uuid=uuid.uuid4())
-        assert_invalid(session, stmt, no_index_error)
-
-        stmt = ("SELECT * from map_index_search.users where uuids contains key {some_uuid}"
-                ).format(some_uuid=uuid.uuid4())
-        assert_invalid(session, stmt, no_index_error)
 
         # add index on keys and query again (even though there are no rows in the table yet)
         stmt = "CREATE INDEX user_uuids on map_index_search.users (KEYS(uuids));"
