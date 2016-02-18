@@ -151,6 +151,8 @@ class TestCqlsh(Tester):
             self.assertIn("1943-04-19 11:21:01+0000", output)
 
     @since('3.4')
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11184')
     def test_sub_second_precision(self):
         """
         Test that we can query at millisecond precision.

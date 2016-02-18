@@ -1745,6 +1745,8 @@ class CqlshCopyTest(Tester):
         do_test(expected_vals_inverted, '.', ',')
 
     @since('3.4')
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11185')
     def test_round_trip_with_sub_second_precision(self):
         """
         Test that we can import and export timestamp values with millisecond precision:
