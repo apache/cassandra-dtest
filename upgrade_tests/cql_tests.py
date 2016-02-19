@@ -4099,7 +4099,11 @@ class TestCQL(UpgradeTester):
             assert_one(cursor, "UPDATE test SET v = 1 WHERE k = 0 IF lock = null", [True])
 
     def tuple_notation_test(self):
-        """ Test the syntax introduced by #4851 """
+        """
+        Test the syntax introduced in CASSANDRA-4851
+
+        @jira_ticket CASSANDRA-4851
+        """
         cursor = self.prepare()
 
         cursor.execute("CREATE TABLE test (k int, v1 int, v2 int, v3 int, PRIMARY KEY (k, v1, v2, v3))")
