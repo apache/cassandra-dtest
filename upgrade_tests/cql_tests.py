@@ -4098,6 +4098,9 @@ class TestCQL(UpgradeTester):
             time.sleep(2)
             assert_one(cursor, "UPDATE test SET v = 1 WHERE k = 0 IF lock = null", [True])
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11196',
+                   flaky=True)
     def tuple_notation_test(self):
         """
         Test the syntax introduced in CASSANDRA-4851
