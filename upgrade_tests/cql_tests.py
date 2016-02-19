@@ -3715,8 +3715,14 @@ class TestCQL(UpgradeTester):
 
             # since 3.0, multiple indexes per-column are supported, so we can
             # create a value index even though we already have one on the keys
+            # note: creating the second index would be legal before upgrade if
+            # the starting version is >= 3.0, we only attempt it on the upgraded
+            # node to avoid "duplicate index definition" errors
             if is_upgraded:
-                cursor.execute("CREATE INDEX ON test(m)")
+                if self.get_node_version(is_upgraded) >= '3.0':
+                    cursor.execute("CREATE INDEX ON test(m)")
+                else:
+                    assert_invalid(cursor, "CREATE INDEX on test(m)")
 
     def nan_infinity_test(self):
         cursor = self.prepare()
