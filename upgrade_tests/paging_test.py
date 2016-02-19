@@ -809,6 +809,10 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
             self.assertEqualIgnoreOrder(expected_data, pf.all_data())
 
     @since('2.0.6')
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11195',
+                   flaky=True,
+                   notes='so far only observed on 2-node clusters w/ RF=1')
     def static_columns_paging_test(self):
         """
         Exercises paging with static columns to detect bugs
