@@ -8,13 +8,16 @@ import os
 import pprint
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
+import thread
 import threading
 import time
 import traceback
 import types
+from collections import OrderedDict
 from unittest import TestCase
 
 from cassandra import ConsistencyLevel
@@ -59,6 +62,7 @@ REUSE_CLUSTER = os.environ.get('REUSE_CLUSTER', '').lower() in ('yes', 'true')
 SILENCE_DRIVER_ON_SHUTDOWN = os.environ.get('SILENCE_DRIVER_ON_SHUTDOWN', 'true').lower() in ('yes', 'true')
 IGNORE_REQUIRE = os.environ.get('IGNORE_REQUIRE', '').lower() in ('yes', 'true')
 DATADIR_COUNT = os.environ.get('DATADIR_COUNT', '3')
+ENABLE_ACTIVE_LOG_WATCHING = os.environ.get('ENABLE_ACTIVE_LOG_WATCHING', '').lower() in ('yes', 'true')
 
 CURRENT_TEST = ""
 
@@ -329,6 +333,9 @@ class Tester(TestCase):
                 pass
 
         self.cluster = self._get_cluster()
+        if ENABLE_ACTIVE_LOG_WATCHING:
+            if not self.allow_log_errors:
+                self.begin_active_log_watch()
         if RECORD_COVERAGE:
             self.__setup_jacoco()
 
@@ -345,6 +352,67 @@ class Tester(TestCase):
         self.modify_log(self.cluster)
         self.connections = []
         self.runners = []
+
+    def begin_active_log_watch(self):
+        """
+        Calls into ccm to start actively watching logs.
+
+        In the event that errors are seen in logs, ccm will call back to _log_error_handler.
+        """
+        # log watching happens in another thread, but we want it to halt the main
+        # thread's execution, which we have to do by registering a signal handler
+        signal.signal(signal.SIGINT, self._catch_interrupt)
+        self.cluster.actively_watch_logs_for_error(self._log_error_handler, interval=0.25)
+
+    def _log_error_handler(self, errordata):
+        """
+        Callback handler used in conjunction with begin_active_log_watch.
+        When called prepares exception instance, then will indirectly
+        cause _catch_interrupt to be called, which can raise the exception in the main
+        program thread.
+
+        @param errordata is a dictonary mapping node name to failure list.
+        """
+        # in some cases self.allow_log_errors may get set after proactive log checking has been enabled
+        # so we need to double-check first thing before proceeding
+        if self.allow_log_errors:
+            return
+
+        reportable_errordata = OrderedDict()
+
+        for nodename, errors in errordata.items():
+            filtered_errors = list(self.__filter_errors(['\n'.join(msg) for msg in errors]))
+            if len(filtered_errors) is not 0:
+                reportable_errordata[nodename] = filtered_errors
+
+        # no errors worthy of halting the test
+        if not reportable_errordata:
+            return
+
+        message = "Errors seen in logs for: {nodes}".format(nodes=", ".join(reportable_errordata.keys()))
+        for nodename, errors in reportable_errordata.items():
+            message += "\n{nodename}: {errors}".format(nodename=nodename, errors=errors)
+
+        # thread.interrupt_main will SIGINT in the main thread, which we can
+        # catch to raise an exception with useful information
+        debug('Errors were just seen in logs, ending test!')
+        self.exit_with_exception = AssertionError(message)
+        thread.interrupt_main()
+
+    def _catch_interrupt(self, signal, frame):
+        """
+        Signal handler for registering on SIGINT.
+
+        If called will look for a stored exception and raise it to abort test.
+        If a stored exception is not present, this handler has likely caught a
+        user interrupt via CTRL-C, and will raise a KeyboardInterrupt.
+        """
+        try:
+            # check if we have a persisted exception to fail with
+            raise self.exit_with_exception
+        except AttributeError:
+            # looks like this was just a plain CTRL-C event
+            raise KeyboardInterrupt()
 
     def copy_logs(self, directory=None, name=None):
         """Copy the current cluster's log files somewhere, by default to LOG_SAVED_DIR with a name of 'last'"""
