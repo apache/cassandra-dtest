@@ -30,7 +30,7 @@ class DeleteInsertTest(Tester):
         rows = [r for r in self.rows if r[2] == group]
         ids = [r[0] for r in rows]
         session.execute('DELETE FROM test WHERE id in (%s)' % ', '.join(ids))
-        return rows
+        return list(rows)
 
     def insert_all_rows(self, session):
         self.insert_some_rows(session, self.rows)
@@ -68,7 +68,7 @@ class DeleteInsertTest(Tester):
                 session = self.connection
                 query = SimpleStatement("SELECT * FROM delete_insert_search_test.test WHERE group = 'group2'", consistency_level=ConsistencyLevel.LOCAL_QUORUM)
                 rows = session.execute(query)
-                assert len(rows) == len(deleted)
+                assert len(list(rows)) == len(deleted)
 
         threads = []
         for x in range(20):
