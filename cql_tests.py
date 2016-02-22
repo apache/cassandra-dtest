@@ -92,23 +92,23 @@ class StorageProxyCQLTester(CQLTester):
         session.execute("ALTER TABLE test1 ADD v2 int")
 
         for i in range(0, 10):
-            session.execute("INSERT INTO test1 (k, v1, v2) VALUES (%d, %d, %d)" % (i, i, i))
-            session.execute("INSERT INTO test2 (k, c1, v1) VALUES (%d, %d, %d)" % (i, i, i))
+            session.execute("INSERT INTO test1 (k, v1, v2) VALUES ({i}, {i}, {i})".format(i=i))
+            session.execute("INSERT INTO test2 (k, c1, v1) VALUES ({i}, {i}, {i})".format(i=i))
 
         res = sorted(session.execute("SELECT * FROM test1"))
-        assert rows_to_list(res) == [[i, i, i] for i in range(0, 10)], res
+        self.assertEqual(rows_to_list(res), [[i, i, i] for i in range(0, 10)])
 
         res = sorted(session.execute("SELECT * FROM test2"))
-        assert rows_to_list(res) == [[i, i, i] for i in range(0, 10)], res
+        self.assertEqual(rows_to_list(res), [[i, i, i] for i in range(0, 10)])
 
         session.execute("TRUNCATE test1")
         session.execute("TRUNCATE test2")
 
         res = session.execute("SELECT * FROM test1")
-        assert rows_to_list(res) == [], res
+        self.assertEqual(rows_to_list(res), [])
 
         res = session.execute("SELECT * FROM test2")
-        assert rows_to_list(res) == [], res
+        self.assertEqual(rows_to_list(res), [])
 
         session.execute("DROP TABLE test1")
         session.execute("DROP TABLE test2")
@@ -126,10 +126,10 @@ class StorageProxyCQLTester(CQLTester):
         session.execute("CREATE INDEX testidx ON test3 (v1)")
 
         for i in range(0, 10):
-            session.execute("INSERT INTO test3 (k, v1, v2) VALUES (%d, %d, %d)" % (i, i, i))
+            session.execute("INSERT INTO test3 (k, v1, v2) VALUES ({i}, {i}, {i})".format(i=i))
 
         res = session.execute("SELECT * FROM test3 WHERE v1 = 0")
-        assert rows_to_list(res) == [[0, 0, 0]], res
+        self.assertEqual(rows_to_list(res), [[0, 0, 0]])
 
         session.execute("DROP INDEX testidx")
 
@@ -175,36 +175,36 @@ class StorageProxyCQLTester(CQLTester):
         session.execute("CREATE TABLE test7 (kind text, time int, v1 int, v2 int, PRIMARY KEY(kind, time) )")
 
         for i in range(0, 10):
-            session.execute("INSERT INTO test7 (kind, time, v1, v2) VALUES ('ev1', %d, %d, %d)" % (i, i, i))
-            session.execute("INSERT INTO test7 (kind, time, v1, v2) VALUES ('ev2', %d, %d, %d)" % (i, i, i))
+            session.execute("INSERT INTO test7 (kind, time, v1, v2) VALUES ('ev1', {i}, {i}, {i})".format(i=i))
+            session.execute("INSERT INTO test7 (kind, time, v1, v2) VALUES ('ev2', {i}, {i}, {i})".format(i=i))
 
         res = session.execute("SELECT COUNT(*) FROM test7 WHERE kind = 'ev1'")
-        assert rows_to_list(res) == [[10]], res
+        self.assertEqual(rows_to_list(res), [[10]])
 
         res = session.execute("SELECT COUNT(*) FROM test7 WHERE kind IN ('ev1', 'ev2')")
-        assert rows_to_list(res) == [[20]], res
+        self.assertEqual(rows_to_list(res), [[20]])
 
         res = session.execute("SELECT COUNT(*) FROM test7 WHERE kind IN ('ev1', 'ev2') AND time=0")
-        assert rows_to_list(res) == [[2]], res
+        self.assertEqual(rows_to_list(res), [[2]])
 
         res = session.execute("SELECT * FROM test7 WHERE kind = 'ev1'")
-        assert rows_to_list(res) == [['ev1', i, i, i] for i in range(0, 10)], res
+        self.assertEqual(rows_to_list(res), [['ev1', i, i, i] for i in range(0, 10)])
 
         res = session.execute("SELECT * FROM test7 WHERE kind = 'ev2'")
-        assert rows_to_list(res) == [['ev2', i, i, i] for i in range(0, 10)], res
+        self.assertEqual(rows_to_list(res), [['ev2', i, i, i] for i in range(0, 10)])
 
         for i in range(0, 10):
-            session.execute("UPDATE test7 SET v1 = 0, v2 = 0 where kind = 'ev1' AND time=%d" % (i,))
+            session.execute("UPDATE test7 SET v1 = 0, v2 = 0 where kind = 'ev1' AND time={i}".format(i=i))
 
         res = session.execute("SELECT * FROM test7 WHERE kind = 'ev1'")
-        assert rows_to_list(res) == [['ev1', i, 0, 0] for i in range(0, 10)], res
+        self.assertEqual(rows_to_list(res), [['ev1', i, 0, 0] for i in range(0, 10)])
 
         res = session.execute("DELETE FROM test7 WHERE kind = 'ev1'")
         res = session.execute("SELECT * FROM test7 WHERE kind = 'ev1'")
-        assert rows_to_list(res) == [], res
+        self.assertEqual(rows_to_list(res), [])
 
         res = session.execute("SELECT COUNT(*) FROM test7 WHERE kind = 'ev1'")
-        assert rows_to_list(res) == [[0]], res
+        self.assertEqual(rows_to_list(res), [[0]])
 
     def batch_test(self):
         """
@@ -262,7 +262,7 @@ class MiscellaneousCQLTester(CQLTester):
 
         # Insert more than the max, which is 65535
         for i in range(70000):
-            session.execute("UPDATE maps SET properties[%i] = 'x' WHERE userid = 'user'" % i)
+            session.execute("UPDATE maps SET properties[{}] = 'x' WHERE userid = 'user'".format(i))
 
         # Query for the data and throw exception
         session.execute("SELECT properties FROM maps WHERE userid = 'user'")
@@ -298,7 +298,7 @@ class MiscellaneousCQLTester(CQLTester):
             ThriftConsistencyLevel.ONE)
 
         res = session.execute("SELECT * FROM test")
-        assert rows_to_list(res) == [[2, 4, 8]], res
+        self.assertEqual(rows_to_list(res), [[2, 4, 8]])
 
     def rename_test(self):
         session = self.prepare(start_rpc=True)
@@ -404,7 +404,7 @@ class MiscellaneousCQLTester(CQLTester):
         session.execute("INSERT INTO test (k, v) VALUES ('bar', 1)")
 
         res = list(session.execute("SELECT * FROM test"))
-        assert len(res) == 2, res
+        self.assertEqual(len(res), 2, msg=res)
 
 
 @since('3.2')
