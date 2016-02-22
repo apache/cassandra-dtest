@@ -3333,9 +3333,6 @@ class TestCQL(UpgradeTester):
             assert_invalid(cursor, 'SELECT DISTINCT pk0 FROM regular', matching="queries must request all the partition key columns")
             assert_invalid(cursor, 'SELECT DISTINCT pk0, pk1, ck0 FROM regular', matching="queries must only request partition key columns")
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10762',
-                   flaky=False)
     def select_distinct_with_deletions_test(self):
         cursor = self.prepare()
         cursor.execute('CREATE TABLE t1 (k int PRIMARY KEY, c int, v int)')
