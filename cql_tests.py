@@ -91,15 +91,15 @@ class StorageProxyCQLTester(CQLTester):
 
         session.execute("ALTER TABLE test1 ADD v2 int")
 
-        for i in xrange(0, 10):
+        for i in range(0, 10):
             session.execute("INSERT INTO test1 (k, v1, v2) VALUES (%d, %d, %d)" % (i, i, i))
             session.execute("INSERT INTO test2 (k, c1, v1) VALUES (%d, %d, %d)" % (i, i, i))
 
         res = sorted(session.execute("SELECT * FROM test1"))
-        assert rows_to_list(res) == [[i, i, i] for i in xrange(0, 10)], res
+        assert rows_to_list(res) == [[i, i, i] for i in range(0, 10)], res
 
         res = sorted(session.execute("SELECT * FROM test2"))
-        assert rows_to_list(res) == [[i, i, i] for i in xrange(0, 10)], res
+        assert rows_to_list(res) == [[i, i, i] for i in range(0, 10)], res
 
         session.execute("TRUNCATE test1")
         session.execute("TRUNCATE test2")
@@ -125,7 +125,7 @@ class StorageProxyCQLTester(CQLTester):
         session.execute("CREATE TABLE test3 (k int PRIMARY KEY, v1 int, v2 int)")
         session.execute("CREATE INDEX testidx ON test3 (v1)")
 
-        for i in xrange(0, 10):
+        for i in range(0, 10):
             session.execute("INSERT INTO test3 (k, v1, v2) VALUES (%d, %d, %d)" % (i, i, i))
 
         res = session.execute("SELECT * FROM test3 WHERE v1 = 0")
@@ -174,7 +174,7 @@ class StorageProxyCQLTester(CQLTester):
 
         session.execute("CREATE TABLE test7 (kind text, time int, v1 int, v2 int, PRIMARY KEY(kind, time) )")
 
-        for i in xrange(0, 10):
+        for i in range(0, 10):
             session.execute("INSERT INTO test7 (kind, time, v1, v2) VALUES ('ev1', %d, %d, %d)" % (i, i, i))
             session.execute("INSERT INTO test7 (kind, time, v1, v2) VALUES ('ev2', %d, %d, %d)" % (i, i, i))
 
@@ -188,16 +188,16 @@ class StorageProxyCQLTester(CQLTester):
         assert rows_to_list(res) == [[2]], res
 
         res = session.execute("SELECT * FROM test7 WHERE kind = 'ev1'")
-        assert rows_to_list(res) == [['ev1', i, i, i] for i in xrange(0, 10)], res
+        assert rows_to_list(res) == [['ev1', i, i, i] for i in range(0, 10)], res
 
         res = session.execute("SELECT * FROM test7 WHERE kind = 'ev2'")
-        assert rows_to_list(res) == [['ev2', i, i, i] for i in xrange(0, 10)], res
+        assert rows_to_list(res) == [['ev2', i, i, i] for i in range(0, 10)], res
 
-        for i in xrange(0, 10):
+        for i in range(0, 10):
             session.execute("UPDATE test7 SET v1 = 0, v2 = 0 where kind = 'ev1' AND time=%d" % (i,))
 
         res = session.execute("SELECT * FROM test7 WHERE kind = 'ev1'")
-        assert rows_to_list(res) == [['ev1', i, 0, 0] for i in xrange(0, 10)], res
+        assert rows_to_list(res) == [['ev1', i, 0, 0] for i in range(0, 10)], res
 
         res = session.execute("DELETE FROM test7 WHERE kind = 'ev1'")
         res = session.execute("SELECT * FROM test7 WHERE kind = 'ev1'")
@@ -439,7 +439,7 @@ class AbortedQueriesTester(CQLTester):
             );
         """)
 
-        for i in xrange(500):
+        for i in range(500):
             session.execute("INSERT INTO test1 (id, val) VALUES ({}, 'foo')".format(i))
 
         mark = node.mark_log()
@@ -476,8 +476,8 @@ class AbortedQueriesTester(CQLTester):
             );
         """)
 
-        for i in xrange(500):
-            for j in xrange(10):
+        for i in range(500):
+            for j in range(10):
                 session.execute("INSERT INTO test2 (id, col, val) VALUES ({}, {}, 'foo')".format(i, j))
 
         mark = node2.mark_log()
@@ -528,7 +528,7 @@ class AbortedQueriesTester(CQLTester):
 
         session.execute("CREATE INDEX ON test3 (col)")
 
-        for i in xrange(500):
+        for i in range(500):
             session.execute("INSERT INTO test3 (id, col, val) VALUES ({}, {}, 'foo')".format(i, i // 10))
 
         mark = node.mark_log()
@@ -567,7 +567,7 @@ class AbortedQueriesTester(CQLTester):
         session.execute(("CREATE MATERIALIZED VIEW mv AS SELECT * FROM test4 "
                          "WHERE col IS NOT NULL AND id IS NOT NULL PRIMARY KEY (col, id)"))
 
-        for i in xrange(50):
+        for i in range(50):
             session.execute("INSERT INTO test4 (id, col, val) VALUES ({}, {}, 'foo')".format(i, i // 10))
 
         mark = node2.mark_log()
