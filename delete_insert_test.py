@@ -41,10 +41,10 @@ class DeleteInsertTest(Tester):
 
     def delete_insert_search_test(self):
         cluster = self.cluster
-        cluster.populate([2, 2]).start()
+        cluster.populate([2, 2]).start(wait_for_binary_proto=True)
         node1 = cluster.nodelist()[0]
 
-        session = self.cql_connection(node1)
+        session = self.patient_cql_connection(node1)
         session.consistency_level = 'LOCAL_QUORUM'
 
         self.create_ddl(session)
