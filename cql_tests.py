@@ -21,7 +21,8 @@ from tools import debug, rows_to_list, since
 class CQLTester(Tester):
 
     def prepare(self, ordered=False, create_keyspace=True, use_cache=False,
-                nodes=1, rf=1, protocol_version=None, user=None, password=None, **kwargs):
+                nodes=1, rf=1, protocol_version=None, user=None, password=None,
+                start_rpc=False, **kwargs):
         cluster = self.cluster
 
         if (ordered):
@@ -30,7 +31,6 @@ class CQLTester(Tester):
         if (use_cache):
             cluster.set_configuration_options(values={'row_cache_size_in_mb': 100})
 
-        start_rpc = kwargs.pop('start_rpc', False)
         if start_rpc:
             cluster.set_configuration_options(values={'start_rpc': True})
 
