@@ -1,13 +1,12 @@
 import time
 from threading import Event
 
-from nose.tools import timed
-
 from assertions import assert_invalid
 from cassandra import ConsistencyLevel as CL
 from cassandra import ReadFailure
 from cassandra.query import SimpleStatement
 from dtest import Tester, debug
+from nose.tools import timed
 from tools import known_failure, no_vnodes, since
 
 
@@ -152,6 +151,9 @@ class TestPushedNotifications(Tester):
             notifications = waiter.wait_for_notifications(30.0)
             self.assertEquals(1 if waiter.node is node1 else 0, len(notifications))
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11211',
+                   flaky=True)
     def restart_node_test(self):
         """
         @jira_ticket CASSANDRA-7816
