@@ -256,7 +256,7 @@ class StorageProxyCQLTester(CQLTester):
         res = session.execute("SELECT * FROM test7 WHERE kind = 'ev1'")
         self.assertEqual(rows_to_list(res), [['ev1', i, 0, 0] for i in range(0, 10)])
 
-        res = session.execute("DELETE FROM test7 WHERE kind = 'ev1'")
+        session.execute("DELETE FROM test7 WHERE kind = 'ev1'")
         res = session.execute("SELECT * FROM test7 WHERE kind = 'ev1'")
         self.assertEqual(rows_to_list(res), [])
 
