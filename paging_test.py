@@ -1084,6 +1084,81 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
             self.assertEqual(res, [[1, 1],
                                    [2, 2]])
 
+    def test_paging_with_no_clustering_columns(self):
+
+        """
+        test paging for tables without clustering columns
+        @jira_ticket CASSANDRA-11208
+        """
+
+        session = self.prepare()
+        self.create_ks(session, 'test_paging_with_no_clustering_columns', 2)
+        session.execute("CREATE TABLE test (a int primary key, b int)")
+        session.execute("CREATE TABLE test_compact (a int primary key, b int) WITH COMPACT STORAGE")
+        session.row_factory = tuple_factory
+
+        for table in ('test', 'test_compact'):
+
+            for i in xrange(5):
+                session.execute("INSERT INTO {} (a, b) VALUES ({}, {})".format(table, i, i))
+
+            for page_size in (2, 3, 4, 5, 7, 10):
+                session.default_fetch_size = page_size
+
+                # Range query
+                res = rows_to_list(session.execute("SELECT * FROM {}".format(table)))
+                self.assertEqual(res, [[1, 1],
+                                       [0, 0],
+                                       [2, 2],
+                                       [4, 4],
+                                       [3, 3]])
+
+                # Range query with LIMIT
+                res = rows_to_list(session.execute("SELECT * FROM {} LIMIT 3".format(table)))
+                self.assertEqual(res, [[1, 1],
+                                       [0, 0],
+                                       [2, 2]])
+
+                # Range query with DISTINCT
+                res = rows_to_list(session.execute("SELECT DISTINCT a FROM {}".format(table)))
+                self.assertEqual(res, [[1],
+                                       [0],
+                                       [2],
+                                       [4],
+                                       [3]])
+
+                # Range query with DISTINCT and LIMIT
+                res = rows_to_list(session.execute("SELECT DISTINCT a FROM {} LIMIT 3".format(table)))
+                self.assertEqual(res, [[1],
+                                       [0],
+                                       [2]])
+
+                # Multi-partition query
+                res = rows_to_list(session.execute("SELECT * FROM {} WHERE a IN (1, 2, 3, 4)".format(table)))
+                self.assertEqual(res, [[1, 1],
+                                       [2, 2],
+                                       [3, 3],
+                                       [4, 4]])
+
+                # Multi-partition query with LIMIT
+                res = rows_to_list(session.execute("SELECT * FROM {} WHERE a IN (1, 2, 3, 4) LIMIT 3".format(table)))
+                self.assertEqual(res, [[1, 1],
+                                       [2, 2],
+                                       [3, 3]])
+
+                # Multi-partition query with DISTINCT
+                res = rows_to_list(session.execute("SELECT DISTINCT a FROM {} WHERE a IN (1, 2, 3, 4)".format(table)))
+                self.assertEqual(res, [[1],
+                                       [2],
+                                       [3],
+                                       [4]])
+
+                # Multi-partition query with DISTINCT and LIMIT
+                res = rows_to_list(session.execute("SELECT DISTINCT a FROM {} WHERE a IN (1, 2, 3, 4) LIMIT 3".format(table)))
+                self.assertEqual(res, [[1],
+                                       [2],
+                                       [3]])
+
 
 @since('2.0')
 class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
