@@ -20,7 +20,8 @@ from tools import debug, rows_to_list, since
 
 class CQLTester(Tester):
 
-    def prepare(self, ordered=False, create_keyspace=True, use_cache=False, nodes=1, rf=1, protocol_version=None, user=None, password=None, **kwargs):
+    def prepare(self, ordered=False, create_keyspace=True, use_cache=False,
+                nodes=1, rf=1, protocol_version=None, user=None, password=None, **kwargs):
         cluster = self.cluster
 
         if (ordered):
@@ -66,11 +67,15 @@ class StorageProxyCQLTester(CQLTester):
         """
         session = self.prepare(create_keyspace=False)
 
-        session.execute("CREATE KEYSPACE ks WITH replication = { 'class':'SimpleStrategy', 'replication_factor':1} AND DURABLE_WRITES = true")
+        session.execute("CREATE KEYSPACE ks WITH replication = "
+                        "{ 'class':'SimpleStrategy', 'replication_factor':1} "
+                        "AND DURABLE_WRITES = true")
 
         session.execute("USE ks")
 
-        session.execute("ALTER KEYSPACE ks WITH replication = { 'class' : 'NetworkTopologyStrategy', 'dc1' : 1 } AND DURABLE_WRITES = false")
+        session.execute("ALTER KEYSPACE ks WITH replication = "
+                        "{ 'class' : 'NetworkTopologyStrategy', 'dc1' : 1 } "
+                        "AND DURABLE_WRITES = false")
 
         session.execute("DROP KEYSPACE ks")
         assert_invalid(session, "USE ks", expected=InvalidRequest)
@@ -145,7 +150,9 @@ class StorageProxyCQLTester(CQLTester):
         session.execute("DROP TABLE test4")
         session.execute("DROP TABLE test5")
         session.execute("DROP TYPE address_t")
-        assert_invalid(session, "CREATE TABLE test6 (id int PRIMARY KEY, address frozen<address_t>)", expected=InvalidRequest)
+        assert_invalid(session,
+                       "CREATE TABLE test6 (id int PRIMARY KEY, address frozen<address_t>)",
+                       expected=InvalidRequest)
 
     def user_test(self):
         """
@@ -418,8 +425,9 @@ class AbortedQueriesTester(CQLTester):
         # introduced by CASSANDRA-7392 to pause by the specified amount of milliseconds during each
         # iteration of non system queries, so that these queries take much longer to complete,
         # see ReadCommand.withStateTracking()
-        cluster.populate(1).start(wait_for_binary_proto=True, jvm_args=["-Dcassandra.monitoring_check_interval_ms=50",
-                                                                        "-Dcassandra.test.read_iteration_delay_ms=1500"])
+        cluster.populate(1).start(wait_for_binary_proto=True,
+                                  jvm_args=["-Dcassandra.monitoring_check_interval_ms=50",
+                                            "-Dcassandra.test.read_iteration_delay_ms=1500"])
         node = cluster.nodelist()[0]
         session = self.patient_cql_connection(node)
 
@@ -435,7 +443,9 @@ class AbortedQueriesTester(CQLTester):
             session.execute("INSERT INTO test1 (id, val) VALUES ({}, 'foo')".format(i))
 
         mark = node.mark_log()
-        statement = SimpleStatement("SELECT * from test1", consistency_level=ConsistencyLevel.ONE, retry_policy=FallthroughRetryPolicy())
+        statement = SimpleStatement("SELECT * from test1",
+                                    consistency_level=ConsistencyLevel.ONE,
+                                    retry_policy=FallthroughRetryPolicy())
         assert_unavailable(lambda c: debug(c.execute(statement)), session)
         node.watch_log_for("operations timed out", from_mark=mark, timeout=60)
 
@@ -450,8 +460,9 @@ class AbortedQueriesTester(CQLTester):
         node1, node2 = cluster.nodelist()
 
         node1.start(wait_for_binary_proto=True, join_ring=False)  # ensure other node executes queries
-        node2.start(wait_for_binary_proto=True, jvm_args=["-Dcassandra.monitoring_check_interval_ms=50",
-                                                          "-Dcassandra.test.read_iteration_delay_ms=1500"])  # see above for explanation
+        node2.start(wait_for_binary_proto=True,
+                    jvm_args=["-Dcassandra.monitoring_check_interval_ms=50",
+                              "-Dcassandra.test.read_iteration_delay_ms=1500"])  # see above for explanation
 
         session = self.patient_exclusive_cql_connection(node1)
 
@@ -471,16 +482,24 @@ class AbortedQueriesTester(CQLTester):
 
         mark = node2.mark_log()
 
-        statement = SimpleStatement("SELECT * from test2", consistency_level=ConsistencyLevel.ONE, retry_policy=FallthroughRetryPolicy())
+        statement = SimpleStatement("SELECT * from test2",
+                                    consistency_level=ConsistencyLevel.ONE,
+                                    retry_policy=FallthroughRetryPolicy())
         assert_unavailable(lambda c: debug(c.execute(statement)), session)
 
-        statement = SimpleStatement("SELECT * from test2 where id = 1", consistency_level=ConsistencyLevel.ONE, retry_policy=FallthroughRetryPolicy())
+        statement = SimpleStatement("SELECT * from test2 where id = 1",
+                                    consistency_level=ConsistencyLevel.ONE,
+                                    retry_policy=FallthroughRetryPolicy())
         assert_unavailable(lambda c: debug(c.execute(statement)), session)
 
-        statement = SimpleStatement("SELECT * from test2 where id IN (1, 10,  20) AND col < 10", consistency_level=ConsistencyLevel.ONE, retry_policy=FallthroughRetryPolicy())
+        statement = SimpleStatement("SELECT * from test2 where id IN (1, 10,  20) AND col < 10",
+                                    consistency_level=ConsistencyLevel.ONE,
+                                    retry_policy=FallthroughRetryPolicy())
         assert_unavailable(lambda c: debug(c.execute(statement)), session)
 
-        statement = SimpleStatement("SELECT * from test2 where col > 5 ALLOW FILTERING", consistency_level=ConsistencyLevel.ONE, retry_policy=FallthroughRetryPolicy())
+        statement = SimpleStatement("SELECT * from test2 where col > 5 ALLOW FILTERING",
+                                    consistency_level=ConsistencyLevel.ONE,
+                                    retry_policy=FallthroughRetryPolicy())
         assert_unavailable(lambda c: debug(c.execute(statement)), session)
 
         node2.watch_log_for("operations timed out", from_mark=mark, timeout=60)
@@ -492,8 +511,9 @@ class AbortedQueriesTester(CQLTester):
         cluster = self.cluster
         cluster.set_configuration_options(values={'read_request_timeout_in_ms': 1000})
 
-        cluster.populate(1).start(wait_for_binary_proto=True, jvm_args=["-Dcassandra.monitoring_check_interval_ms=50",
-                                                                        "-Dcassandra.test.read_iteration_delay_ms=1500"])  # see above for explanation
+        cluster.populate(1).start(wait_for_binary_proto=True,
+                                  jvm_args=["-Dcassandra.monitoring_check_interval_ms=50",
+                                            "-Dcassandra.test.read_iteration_delay_ms=1500"])  # see above for explanation
         node = cluster.nodelist()[0]
         session = self.patient_cql_connection(node)
 
@@ -529,8 +549,9 @@ class AbortedQueriesTester(CQLTester):
         node1, node2 = cluster.nodelist()
 
         node1.start(wait_for_binary_proto=True, join_ring=False)  # ensure other node executes queries
-        node2.start(wait_for_binary_proto=True, jvm_args=["-Dcassandra.monitoring_check_interval_ms=50",
-                                                          "-Dcassandra.test.read_iteration_delay_ms=1500"])  # see above for explanation
+        node2.start(wait_for_binary_proto=True,
+                    jvm_args=["-Dcassandra.monitoring_check_interval_ms=50",
+                              "-Dcassandra.test.read_iteration_delay_ms=1500"])  # see above for explanation
 
         session = self.patient_exclusive_cql_connection(node1)
 
@@ -550,6 +571,8 @@ class AbortedQueriesTester(CQLTester):
             session.execute("INSERT INTO test4 (id, col, val) VALUES ({}, {}, 'foo')".format(i, i // 10))
 
         mark = node2.mark_log()
-        statement = SimpleStatement("SELECT * FROM mv WHERE col = 50", consistency_level=ConsistencyLevel.ONE, retry_policy=FallthroughRetryPolicy())
+        statement = SimpleStatement("SELECT * FROM mv WHERE col = 50",
+                                    consistency_level=ConsistencyLevel.ONE,
+                                    retry_policy=FallthroughRetryPolicy())
         assert_unavailable(lambda c: debug(c.execute(statement)), session)
         node2.watch_log_for("operations timed out", from_mark=mark, timeout=60)
