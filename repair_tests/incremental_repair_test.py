@@ -10,7 +10,7 @@ from cassandra import ConsistencyLevel
 from ccmlib.common import is_win
 from ccmlib.node import Node
 from dtest import Tester, debug
-from tools import insert_c1c2
+from tools import insert_c1c2, known_failure
 
 
 class TestIncRepair(Tester):
@@ -141,6 +141,9 @@ class TestIncRepair(Tester):
 
         assert_one(session, "SELECT COUNT(*) FROM ks.cf LIMIT 200", [149])
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11220',
+                   flaky=False)
     def sstable_repairedset_test(self):
         """
         * Launch a two node cluster
