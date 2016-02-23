@@ -227,10 +227,10 @@ class StorageProxyCQLTester(CQLTester):
 @canReuseCluster
 class MiscellaneousCQLTester(CQLTester):
     """
-    CQL tests that cannot be performed as Java unit tests, see CASSANDRA-9160. Please consider
-    writing java unit tests for CQL validation, add a new test here only if there is a reason for it,
-    e.g. something related to the client protocol or thrift, or examining the log files, or multiple nodes
-    required.
+    CQL tests that cannot be performed as Java unit tests, see CASSANDRA-9160.
+    Please consider writing java unit tests for CQL validation, add a new test
+    here only if there is a reason for it, e.g. something related to the client
+    protocol or thrift, or examining the log files, or multiple nodes required.
     """
 
     @since('2.1', max_version='3.0')
