@@ -688,9 +688,9 @@ class AbortedQueriesTester(CQLTester):
             session.execute("INSERT INTO test3 (id, col, val) VALUES ({}, {}, 'foo')".format(i, i // 10))
 
         mark = node.mark_log()
-        statement = session.prepare("SELECT * from test3 WHERE col < ? ALLOW FILTERING",
-                                    consistency_level=ConsistencyLevel.ONE,
-                                    retry_policy=FallthroughRetryPolicy())
+        statement = session.prepare("SELECT * from test3 WHERE col < ? ALLOW FILTERING")
+        statement.consistency_level = ConsistencyLevel.ONE
+        statement.retry_policy = FallthroughRetryPolicy()
         assert_unavailable(lambda c: debug(c.execute(statement, [50])), session)
         node.watch_log_for("operations timed out", from_mark=mark, timeout=60)
 
