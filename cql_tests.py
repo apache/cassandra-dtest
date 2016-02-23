@@ -1,5 +1,6 @@
 # coding: utf-8
 
+import itertools
 import struct
 import time
 
@@ -622,9 +623,8 @@ class AbortedQueriesTester(CQLTester):
             );
         """)
 
-        for i in range(500):
-            for j in range(10):
-                session.execute("INSERT INTO test2 (id, col, val) VALUES ({}, {}, 'foo')".format(i, j))
+        for i, j in itertools.product(range(500), range(10)):
+            session.execute("INSERT INTO test2 (id, col, val) VALUES ({}, {}, 'foo')".format(i, j))
 
         mark = node2.mark_log()
 
