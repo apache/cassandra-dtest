@@ -200,7 +200,7 @@ class TestRepair(Tester):
         if ks:
             opts += [ks]
         if cf:
-            opts += cf
+            opts += [cf]
         return opts
 
     def _simple_repair(self, order_preserving_partitioner=False, sequential=True):
@@ -426,6 +426,37 @@ class TestRepair(Tester):
         # Check node2 now has the key
         self.check_rows_on_node(node2, 2001, found=[1000], restart=False)
 
+    def dc_parallel_repair_test(self):
+        """
+        * Set up a multi DC cluster
+        * Perform a -dc repair on two dc's, with -dcpar
+        * Assert only nodes on those dcs were repaired
+        """
+        cluster = self._setup_multi_dc()
+        node1 = cluster.nodes["node1"]
+        node2 = cluster.nodes["node2"]
+        node3 = cluster.nodes["node3"]
+
+        debug("starting repair...")
+        opts = ["-dc", "dc1", "-dc", "dc2", "-dcpar"]
+        opts += self._repair_options(ks="ks", sequential=False)
+        node1.repair(opts)
+
+        # Verify that only nodes in dc1 and dc2 are involved in repair
+        out_of_sync_logs = node1.grep_log("/([0-9.]+) and /([0-9.]+) have ([0-9]+) range\(s\) out of sync")
+        self.assertEqual(len(out_of_sync_logs), 2, "Lines matching: " + str([elt[0] for elt in out_of_sync_logs]))
+        valid = [(node1.address(), node2.address()), (node2.address(), node1.address()),
+                 (node2.address(), node3.address()), (node3.address(), node2.address())]
+        for line, m in out_of_sync_logs:
+            self.assertEqual(int(m.group(3)), 1, "Expecting 1 range out of sync, got " + m.group(3))
+            self.assertIn((m.group(1), m.group(2)), valid, str((m.group(1), m.group(2))))
+
+        # Check node2 now has the key
+        self.check_rows_on_node(node2, 2001, found=[1000], restart=False)
+
+        # Check the repair was a dc parallel repair
+        self.assertEqual(len(node1.grep_log('parallelism: dc_parallel')), 1)
+
     def _setup_multi_dc(self):
         """
         Sets up 3 DCs (2 nodes in 'dc1', and one each in 'dc2' and 'dc3').
@@ -440,13 +471,13 @@ class TestRepair(Tester):
         # populate 2 nodes in dc1, and one node each in dc2 and dc3
         cluster.populate([2, 1, 1]).start()
 
-        [node1, node2, node3, node4] = cluster.nodelist()
+        node1, node2, node3, node4 = cluster.nodelist()
         session = self.patient_cql_connection(node1)
-        session.execute("CREATE KEYSPACE ks WITH replication = {'class': 'NetworkTopologyStrategy', 'dc1': 2, 'dc2': 1, 'dc3':1};")
+        session.execute("CREATE KEYSPACE ks WITH replication = {'class': 'NetworkTopologyStrategy', 'dc1': 2, 'dc2': 1, 'dc3':1}")
         session.execute("USE ks")
         self.create_cf(session, 'cf', read_repair=0.0, columns={'c1': 'text', 'c2': 'text'})
 
-        # Insert 1000 keys, kill node 3, insert 1 key, restart node 3, insert 1000 more keys
+        # Insert 1000 keys, kill node 2, insert 1 key, restart node 2, insert 1000 more keys
         debug("Inserting data...")
         insert_c1c2(session, n=1000, consistency=ConsistencyLevel.ALL)
         node2.flush()
@@ -506,6 +537,79 @@ class TestRepair(Tester):
                 found_message = True
                 break
         self.assertTrue(found_message)
+
+    @no_vnodes()
+    def token_range_repair_test(self):
+        """
+        Test repair using the -st and -et options
+        * Launch a three node cluster
+        * Insert some data at RF 2
+        * Shut down node2, insert more data, restore node2
+        * Issue a repair on a range that only belongs to node1
+        * Verify that nodes 1 and 2, and only nodes 1+2, are repaired
+        """
+        cluster = self.cluster
+        cluster.set_configuration_options(values={'hinted_handoff_enabled': False}, batch_commitlog=True)
+        debug("Starting cluster..")
+        cluster.populate(3).start(wait_for_binary_proto=True)
+
+        node1, node2, node3 = cluster.nodelist()
+
+        self._range_repair(repair_opts=['-st', str(node3.initial_token), '-et', str(node1.initial_token)])
+
+    @no_vnodes()
+    def partitioner_range_repair_test(self):
+        """
+        Test repair using the -pr option
+        * Launch a three node cluster
+        * Insert some data at RF 2
+        * Shut down node2, insert more data, restore node2
+        * Issue a repair on a range that only belongs to node1
+        * Verify that nodes 1 and 2, and only nodes 1+2, are repaired
+        """
+        cluster = self.cluster
+        cluster.set_configuration_options(values={'hinted_handoff_enabled': False}, batch_commitlog=True)
+        debug("Starting cluster..")
+        cluster.populate(3).start(wait_for_binary_proto=True)
+
+        node1, node2, node3 = cluster.nodelist()
+
+        self._range_repair(repair_opts=['-pr'])
+
+    def _range_repair(self, repair_opts):
+        """
+        @param repair_opts A list of strings which represent cli args to nodetool repair
+        * Launch a three node cluster
+        * Insert some data at RF 2
+        * Shut down node2, insert more data, restore node2
+        * Issue a repair on a range that only belongs to node1, using repair_opts
+        * Verify that nodes 1 and 2, and only nodes 1+2, are repaired
+        """
+        cluster = self.cluster
+        node1, node2, node3 = cluster.nodelist()
+
+        # Insert data, kill node 2, insert more data, restart node 2, insert another set of data
+        debug("Inserting data...")
+        node1.stress(['write', 'n=20K', 'cl=ALL', '-schema', 'replication(factor=2)', '-rate', 'threads=30'])
+
+        node2.flush()
+        node2.stop(wait_other_notice=True)
+
+        node1.stress(['write', 'n=20K', 'cl=ONE', '-schema', 'replication(factor=2)', '-rate', 'threads=30', '-pop', 'seq=20..40K'])
+        node2.start(wait_for_binary_proto=True, wait_other_notice=True)
+
+        node1.stress(['write', 'n=20K', 'cl=ALL', '-schema', 'replication(factor=2)', '-rate', 'threads=30', '-pop', 'seq=40..60K'])
+
+        cluster.flush()
+
+        # Repair only the range node 1 owns
+        opts = repair_opts
+        opts += self._repair_options(ks='keyspace1', cf='standard1', sequential=False)
+        node1.repair(opts)
+
+        self.assertEqual(len(node1.grep_log('are consistent for standard1')), 0, "Nodes 1 and 2 should not be consistent.")
+        self.assertEqual(len(node1.grep_log("/127.0.0.2 and /127.0.0.1 have ([0-9]+) range\(s\) out of sync")), 1)
+        self.assertEqual(len(node3.grep_log('Repair command')), 0, "Node 3 should not have been involved in the repair.")
 
 
 RepairTableContents = namedtuple('RepairTableContents',
