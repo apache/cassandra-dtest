@@ -628,6 +628,9 @@ class SnitchConfigurationUpdateTest(Tester):
                                         racks=["rack1", "rack1", "rack1"],
                                         error='')
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11227',
+                   flaky=True)
     def test_failed_snitch_update_property_file_snitch(self):
         """
         @jira_ticket CASSANDRA-10243
