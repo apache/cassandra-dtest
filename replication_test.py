@@ -1,13 +1,12 @@
-from collections import defaultdict
 import os
 import re
 import time
+from collections import defaultdict
 
-from dtest import Tester, debug, PRINT_DEBUG
-from tools import no_vnodes, since
-
-from cassandra.query import SimpleStatement
 from cassandra import ConsistencyLevel
+from cassandra.query import SimpleStatement
+from dtest import PRINT_DEBUG, Tester, debug
+from tools import known_failure, no_vnodes, since
 
 TRACE_DETERMINE_REPLICAS = re.compile('Determining replicas for mutation')
 TRACE_SEND_MESSAGE = re.compile('Sending (?:MUTATION|REQUEST_RESPONSE) message to /([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)')
@@ -230,6 +229,9 @@ class ReplicationTest(Tester):
             # acknowledged the write:
             self.assertEqual(stats['nodes_sent_write'], stats['nodes_responded_write'])
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11221',
+                   flaky=True)
     def network_topology_test(self):
         """
         Test the NetworkTopologyStrategy on a 2DC 3:3 node cluster
