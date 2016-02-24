@@ -17,6 +17,14 @@ def post_cassandra_10392(version):
 
 
 class TestCqlTracing(Tester):
+    """
+    Smoke test that the default implementation for tracing works. Also test
+    that Cassandra falls back to the default tracing implementation when the
+    user specifies an invalid implementation.
+
+    # TODO write a mock Tracing implementation and assert, at least, it can be
+    #      instantiated when specified as a custom tracing implementation.
+    """
 
     def prepare(self, create_keyspace=True, nodes=3, rf=3, protocol_version=3, jvm_args=None, **kwargs):
         if jvm_args is None:
@@ -43,6 +51,7 @@ class TestCqlTracing(Tester):
         * SELECT from the table and assert it ran with tracing
 
         @param session The Session object to use to create a table.
+        @jira_ticket CASSANDRA-10392
         """
 
         node1 = self.cluster.nodelist()[0]
@@ -92,7 +101,9 @@ class TestCqlTracing(Tester):
 
     def tracing_simple_test(self):
         """
-        Test tracing using the default tracing class.
+        Test tracing using the default tracing class. See trace().
+
+        @jira_ticket CASSANDRA-10392
         """
         session = self.prepare()
         self.trace(session)
@@ -100,7 +111,15 @@ class TestCqlTracing(Tester):
     def tracing_unknown_impl_test(self):
         """
         Test that Cassandra logs an error, but keeps its default tracing
-        behavior when a nonexistent tracing class is specified.
+        behavior, when a nonexistent tracing class is specified.
+
+        * set a nonexistent custom tracing class
+        * run trace()
+        * if running the test on a version with custom tracing classes
+          implemented, check that an error about the nonexistent class was
+          logged.
+
+        @jira_ticket CASSANDRA-10392
         """
         expected_error = 'Cannot use class junk for tracing'
         session = self.prepare(jvm_args=['-Dcassandra.custom_tracing_class=junk'])
@@ -116,7 +135,19 @@ class TestCqlTracing(Tester):
 
     def tracing_default_impl_test(self):
         """
-        Test default Tracing class
+        Test that Cassandra logs an error, but keeps its default tracing
+        behavior, when the default tracing class is specified.
+
+        This doesn't work because the constructor for the default
+        implementation isn't accessible.
+
+        * set the default tracing class as a custom tracing class
+        * run trace()
+        * if running the test on a version with custom tracing classes
+          implemented, check that an error about the class was
+          logged.
+
+        @jira_ticket CASSANDRA-10392
         """
         expected_error = 'Cannot use class org.apache.cassandra.tracing.TracingImpl'
         session = self.prepare(jvm_args=['-Dcassandra.custom_tracing_class=org.apache.cassandra.tracing.TracingImpl'])
