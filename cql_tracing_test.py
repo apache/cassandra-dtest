@@ -9,7 +9,10 @@ from dtest import Tester, debug
 
 class TestCqlTracing(Tester):
 
-    def prepare(self, create_keyspace=True, nodes=3, rf=3, protocol_version=3, jvm_args=[], **kwargs):
+    def prepare(self, create_keyspace=True, nodes=3, rf=3, protocol_version=3, jvm_args=None, **kwargs):
+        if jvm_args is None:
+            jvm_args = []
+
         cluster = self.cluster
         cluster.populate(nodes).start(wait_for_binary_proto=True, jvm_args=jvm_args)
         cluster.nodelist()[0].watch_log_for(' listening ')
