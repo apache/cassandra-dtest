@@ -160,3 +160,9 @@ class TestCqlTracing(Tester):
             self.assertEqual(len(errs[0]), 1)
             err = errs[0][0]
             self.assertIn(expected_error, err)
+            # make sure it logged the error for the correct reason. this isn't
+            # part of the expected error to avoid having to escape parens and
+            # periods for regexes.
+            self.assertIn("Default constructor for Tracing class"
+                          "'org.apache.cassandra.tracing.TracingImpl' is inaccessible.",
+                          err)
