@@ -3,6 +3,19 @@
 from dtest import Tester, debug
 
 
+def post_cassandra_10392(version):
+    """
+    Return a bool indicating whether or not `version` has had CASSANDRA-10392
+    merged or not. It was merged into trunk after 3.0.3 on the 3.0 release
+    track and after 3.3 on the v3 tick-tock release track, so this simply
+    checks the passed-in version against those versions.
+
+    @param version A C* version, typically a Version object from
+                   distutils.version
+    """
+    return ('3.0.3' < version < '3.1' or '3.3' < version)
+
+
 class TestCqlTracing(Tester):
 
     def prepare(self, create_keyspace=True, nodes=3, rf=3, protocol_version=3, jvm_args=None, **kwargs):
@@ -78,18 +91,41 @@ class TestCqlTracing(Tester):
         self.assertIn(" Frodo |  Baggins", out)
 
     def tracing_simple_test(self):
-        """ Test Simple Tracing """
+        """
+        Test tracing using the default tracing class.
+        """
         session = self.prepare()
         self.trace(session)
 
     def tracing_unknown_impl_test(self):
-        """ Test unknown Tracing class """
+        """
+        Test that Cassandra logs an error, but keeps its default tracing
+        behavior when a nonexistent tracing class is specified.
+        """
+        expected_error = 'Cannot use class junk for tracing'
         session = self.prepare(jvm_args=['-Dcassandra.custom_tracing_class=junk'])
-        self.ignore_log_patterns = ['Cannot use class junk for tracing']
+        self.ignore_log_patterns = [expected_error]
         self.trace(session)
 
+        if post_cassandra_10392(self.cluster.version()):
+            errs = self.cluster.nodelist()[0].grep_log_for_errors()
+            self.assertEqual(len(errs), 1)
+            self.assertEqual(len(errs[0]), 1)
+            err = errs[0][0]
+            self.assertIn(expected_error, err)
+
     def tracing_default_impl_test(self):
-        """ Test default Tracing class """
+        """
+        Test default Tracing class
+        """
+        expected_error = 'Cannot use class org.apache.cassandra.tracing.TracingImpl'
         session = self.prepare(jvm_args=['-Dcassandra.custom_tracing_class=org.apache.cassandra.tracing.TracingImpl'])
-        self.ignore_log_patterns = ['Cannot use class org.apache.cassandra.tracing.TracingImpl']
+        self.ignore_log_patterns = [expected_error]
         self.trace(session)
+
+        if post_cassandra_10392(self.cluster.version()):
+            errs = self.cluster.nodelist()[0].grep_log_for_errors()
+            self.assertEqual(len(errs), 1)
+            self.assertEqual(len(errs[0]), 1)
+            err = errs[0][0]
+            self.assertIn(expected_error, err)
