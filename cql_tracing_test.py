@@ -22,6 +22,15 @@ class TestCqlTracing(Tester):
         return session
 
     def trace(self, session):
+        """
+        * CREATE a table
+        * enable TRACING
+        * SELECT on a known system table and assert it ran with tracing by checking the output
+        * INSERT a row into the created system table and assert it ran with tracing
+        * SELECT from the table and assert it ran with tracing
+
+        @param session The Session object to use to create a table.
+        """
 
         node1 = self.cluster.nodelist()[0]
 
