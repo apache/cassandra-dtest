@@ -48,6 +48,12 @@ class TestCqlTracing(Tester):
             "INSERT INTO ks.users (userid, firstname, lastname, age) "
             "VALUES (550e8400-e29b-41d4-a716-446655440000, 'Frodo', 'Baggins', 32)",
             return_output=True)
+        self.assertIn('Tracing session: ', out)
+        self.assertIn('127.0.0.1', out)
+        self.assertIn('127.0.0.2', out)
+        self.assertIn('127.0.0.3', out)
+        self.assertIn('Parsing INSERT INTO ks.users ', out)
+        self.assertIn('Request complete ', out)
 
         # Queries
         out, err = node1.run_cqlsh('CONSISTENCY ALL; TRACING ON; SELECT firstname, lastname '
