@@ -65,7 +65,8 @@ class TestCqlTracing(Tester):
         self.assertIn('Request complete ', out)
 
         # Queries
-        out, err = node1.run_cqlsh('CONSISTENCY ALL; TRACING ON; SELECT firstname, lastname '
+        out, err = node1.run_cqlsh('CONSISTENCY ALL; TRACING ON; '
+                                   'SELECT firstname, lastname '
                                    'FROM ks.users WHERE userid = 550e8400-e29b-41d4-a716-446655440000',
                                    return_output=True)
         debug(out)
