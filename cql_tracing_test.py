@@ -1,9 +1,5 @@
 # coding: utf-8
 
-import os
-import subprocess
-import sys
-from ccmlib import common
 from dtest import Tester, debug
 
 
@@ -25,21 +21,6 @@ class TestCqlTracing(Tester):
             self.create_ks(session, 'ks', rf)
         return session
 
-    def run_cqlsh(self, node, cmds, cqlsh_options=[]):
-        cdir = node.get_install_dir()
-        cli = os.path.join(cdir, 'bin', common.platform_binary('cqlsh'))
-        env = common.make_cassandra_env(cdir, node.get_path())
-        env['LANG'] = 'en_US.UTF-8'
-        host = node.network_interfaces['binary'][0]
-        port = node.network_interfaces['binary'][1]
-        args = cqlsh_options + [host, str(port)]
-        sys.stdout.flush()
-        p = subprocess.Popen([cli] + args, env=env, stdin=subprocess.PIPE, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-        for cmd in cmds.split(';'):
-            p.stdin.write(cmd + ';\n')
-        p.stdin.write("quit;\n")
-        return p.communicate()
-
     def trace(self, session):
 
         node1 = self.cluster.nodelist()[0]
@@ -54,18 +35,24 @@ class TestCqlTracing(Tester):
             );
         """)
 
-        out, err = self.run_cqlsh(node1, 'TRACING ON')
+        out, err = node1.run_cqlsh('TRACING ON', return_output=True)
         self.assertIn('Tracing is enabled', out)
 
-        out, err = self.run_cqlsh(node1, 'TRACING ON; SELECT * from system.peers')
+        out, err = node1.run_cqlsh('TRACING ON; SELECT * from system.peers', return_output=True)
         self.assertIn('Tracing session: ', out)
         self.assertIn('Request complete ', out)
 
         # Inserts
-        out, err = self.run_cqlsh(node1, "CONSISTENCY ALL; INSERT INTO ks.users (userid, firstname, lastname, age) VALUES (550e8400-e29b-41d4-a716-446655440000, 'Frodo', 'Baggins', 32)")
+        out, err = node1.run_cqlsh(
+            "CONSISTENCY ALL; TRACING ON; "
+            "INSERT INTO ks.users (userid, firstname, lastname, age) "
+            "VALUES (550e8400-e29b-41d4-a716-446655440000, 'Frodo', 'Baggins', 32)",
+            return_output=True)
 
         # Queries
-        out, err = self.run_cqlsh(node1, 'CONSISTENCY ALL; TRACING ON; SELECT firstname, lastname FROM ks.users WHERE userid = 550e8400-e29b-41d4-a716-446655440000')
+        out, err = node1.run_cqlsh('CONSISTENCY ALL; TRACING ON; SELECT firstname, lastname '
+                                   'FROM ks.users WHERE userid = 550e8400-e29b-41d4-a716-446655440000',
+                                   return_output=True)
         debug(out)
         self.assertIn('Tracing session: ', out)
         self.assertIn(' 127.0.0.1 ', out)
