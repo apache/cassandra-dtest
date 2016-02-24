@@ -1,12 +1,12 @@
-from dtest import Tester
-from cassandra import ConsistencyLevel
-from cassandra.query import SimpleStatement
-
 import random
 import time
 import uuid
+
 from assertions import assert_invalid, assert_one
-from tools import rows_to_list, since
+from cassandra import ConsistencyLevel
+from cassandra.query import SimpleStatement
+from dtest import Tester
+from tools import known_failure, rows_to_list, since
 
 
 class TestCounters(Tester):
@@ -42,6 +42,9 @@ class TestCounters(Tester):
                 assert len(res[c]) == 2, "Expecting key and counter for counter%i, got %s" % (c, str(res[c]))
                 assert res[c][1] == i + 1, "Expecting counter%i = %i, got %i" % (c, i + 1, res[c][0])
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11228',
+                   flaky=True)
     def upgrade_test(self):
         """ Test for bug of #4436 """
 
