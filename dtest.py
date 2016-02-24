@@ -20,6 +20,9 @@ import types
 from collections import OrderedDict
 from unittest import TestCase
 
+from nose.exc import SkipTest
+from six import print_
+
 from cassandra import ConsistencyLevel
 from cassandra.auth import PlainTextAuthProvider
 from cassandra.cluster import Cluster as PyCluster
@@ -29,7 +32,6 @@ from ccmlib.cluster import Cluster
 from ccmlib.cluster_factory import ClusterFactory
 from ccmlib.common import is_win
 from ccmlib.node import TimeoutError
-from nose.exc import SkipTest
 
 LOG_SAVED_DIR = "logs"
 try:
@@ -391,12 +393,14 @@ class Tester(TestCase):
 
         message = "Errors seen in logs for: {nodes}".format(nodes=", ".join(reportable_errordata.keys()))
         for nodename, errors in reportable_errordata.items():
-            message += "\n{nodename}: {errors}".format(nodename=nodename, errors=errors)
+            for error in errors:
+                message += "\n{nodename}: {error}".format(nodename=nodename, error=error)
 
         # thread.interrupt_main will SIGINT in the main thread, which we can
         # catch to raise an exception with useful information
         debug('Errors were just seen in logs, ending test!')
-        self.exit_with_exception = AssertionError(message)
+        print_("Error details: \n{message}".format(message=message))
+        self.exit_with_exception = AssertionError("Log error encountered during active log scanning, see stdout")
         thread.interrupt_main()
 
     def _catch_interrupt(self, signal, frame):
@@ -640,7 +644,9 @@ class Tester(TestCase):
                         ['\n'.join(msg) for msg in node.grep_log_for_errors()]))
                     if len(errors) is not 0:
                         failed = True
-                        raise AssertionError('Unexpected error in %s node log: %s' % (node.name, errors))
+                        for error in errors:
+                            print_("Unexpected error in {node_name} log, error: \n{error}".format(node_name=node.name, error=error))
+                        raise AssertionError('Unexpected error in log, see stdout')
         finally:
             try:
                 if failed or KEEP_LOGS:
