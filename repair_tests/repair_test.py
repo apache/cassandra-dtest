@@ -611,6 +611,48 @@ class TestRepair(Tester):
         self.assertEqual(len(node1.grep_log("/127.0.0.2 and /127.0.0.1 have ([0-9]+) range\(s\) out of sync")), 1)
         self.assertEqual(len(node3.grep_log('Repair command')), 0, "Node 3 should not have been involved in the repair.")
 
+    def trace_threads_repair(self):
+        """
+        * Launch a three node cluster
+        * Insert some data at RF 2
+        * Shut down node2, insert more data, restore node2
+        * Issue a repair on to node1, setting job threads to 2 and with tracing enabled
+        * Check the trace data was written, and that the right job thread count was used
+        """
+        cluster = self.cluster
+        cluster.set_configuration_options(values={'hinted_handoff_enabled': False}, batch_commitlog=True)
+        debug("Starting cluster..")
+        cluster.populate(3).start(wait_for_binary_proto=True)
+
+        node1, node2, node3 = cluster.nodelist()
+
+        debug("Inserting data...")
+        node1.stress(['write', 'n=20K', 'cl=ALL', '-schema', 'replication(factor=2)', '-rate', 'threads=30'])
+
+        node2.flush()
+        node2.stop(wait_other_notice=True)
+
+        node1.stress(['write', 'n=20K', 'cl=ONE', '-schema', 'replication(factor=2)', '-rate', 'threads=30', '-pop', 'seq=20..40K'])
+        node2.start(wait_for_binary_proto=True, wait_other_notice=True)
+
+        node1.stress(['write', 'n=20K', 'cl=ALL', '-schema', 'replication(factor=2)', '-rate', 'threads=30', '-pop', 'seq=40..60K'])
+
+        cluster.flush()
+
+        job_thread_count = '2'
+        opts = ['-tr', '-j', job_thread_count]
+        opts += self._repair_options(ks='keyspace1', cf='standard1', sequential=False)
+        node1.repair(opts)
+
+        time.sleep(5)  # Give the trace table some time to populate
+
+        session = self.patient_cql_connection(node1)
+        rows = list(session.execute("SELECT activity FROM system_traces.events"))
+        self.assertGreater(len(rows), 2500, "We expected more trace data from repair. Found {} rows.".format(len(rows)))
+        self.assertIn('job threads: {}'.format(job_thread_count),
+                      rows[0][0],
+                      'Expected {} job threads in repair options. Instead we saw {}'.format(job_thread_count, rows[0][0]))
+
 
 RepairTableContents = namedtuple('RepairTableContents',
                                  ['parent_repair_history', 'repair_history'])
