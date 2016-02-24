@@ -15,7 +15,6 @@ class TestCqlTracing(Tester):
 
         cluster = self.cluster
         cluster.populate(nodes).start(wait_for_binary_proto=True, jvm_args=jvm_args)
-        cluster.nodelist()[0].watch_log_for(' listening ')
 
         node1 = cluster.nodelist()[0]
 
