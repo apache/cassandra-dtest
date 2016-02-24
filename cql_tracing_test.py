@@ -82,11 +82,11 @@ class TestCqlTracing(Tester):
     def tracing_unknown_impl_test(self):
         """ Test unknown Tracing class """
         session = self.prepare(jvm_args=['-Dcassandra.custom_tracing_class=junk'])
-        self.ignore_log_patterns = ["Cannot use class junk for tracing"]
+        self.ignore_log_patterns = ['Cannot use class junk for tracing']
         self.trace(session)
 
     def tracing_default_impl_test(self):
         """ Test default Tracing class """
         session = self.prepare(jvm_args=['-Dcassandra.custom_tracing_class=org.apache.cassandra.tracing.TracingImpl'])
-        self.ignore_log_patterns = ["Cannot use class org.apache.cassandra.tracing.TracingImpl"]
+        self.ignore_log_patterns = ['Cannot use class org.apache.cassandra.tracing.TracingImpl']
         self.trace(session)
