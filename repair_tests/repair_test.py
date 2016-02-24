@@ -5,7 +5,7 @@ from unittest import skip
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
 from dtest import Tester, debug
-from tools import insert_c1c2, no_vnodes, query_c1c2, since
+from tools import insert_c1c2, known_failure, no_vnodes, query_c1c2, since
 
 
 class TestRepair(Tester):
@@ -360,6 +360,9 @@ class TestRepair(Tester):
         out_of_sync_logs = node2.grep_log("/([0-9.]+) and /([0-9.]+) have ([0-9]+) range\(s\) out of sync for cf2")
         self.assertGreater(len(out_of_sync_logs), 0, "Non GC-able data should be repaired")
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11229',
+                   flaky=True)
     def local_dc_repair_test(self):
         """
         * Set up a multi DC cluster
