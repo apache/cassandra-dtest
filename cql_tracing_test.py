@@ -40,12 +40,12 @@ class TestCqlTracing(Tester):
         p.stdin.write("quit;\n")
         return p.communicate()
 
-    def trace(self, cursor):
+    def trace(self, session):
 
         node1 = self.cluster.nodelist()[0]
 
         # Create
-        cursor.execute("""
+        session.execute("""
             CREATE TABLE ks.users (
                 userid uuid PRIMARY KEY,
                 firstname text,
@@ -76,17 +76,17 @@ class TestCqlTracing(Tester):
 
     def tracing_simple_test(self):
         """ Test Simple Tracing """
-        cursor = self.prepare()
-        self.trace(cursor)
+        session = self.prepare()
+        self.trace(session)
 
     def tracing_unknown_impl_test(self):
         """ Test unknown Tracing class """
-        cursor = self.prepare(jvm_args=['-Dcassandra.custom_tracing_class=junk'])
+        session = self.prepare(jvm_args=['-Dcassandra.custom_tracing_class=junk'])
         self.ignore_log_patterns = ["Cannot use class junk for tracing"]
-        self.trace(cursor)
+        self.trace(session)
 
     def tracing_default_impl_test(self):
         """ Test default Tracing class """
-        cursor = self.prepare(jvm_args=['-Dcassandra.custom_tracing_class=org.apache.cassandra.tracing.TracingImpl'])
+        session = self.prepare(jvm_args=['-Dcassandra.custom_tracing_class=org.apache.cassandra.tracing.TracingImpl'])
         self.ignore_log_patterns = ["Cannot use class org.apache.cassandra.tracing.TracingImpl"]
-        self.trace(cursor)
+        self.trace(session)
