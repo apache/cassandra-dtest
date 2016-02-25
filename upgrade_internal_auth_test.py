@@ -1,11 +1,10 @@
 import time
 
+from assertions import assert_all, assert_invalid
 from cassandra import Unauthorized
 from ccmlib.common import is_win
-
-from assertions import assert_all, assert_invalid
 from dtest import Tester, debug
-from tools import since
+from tools import known_failure, since
 
 
 @since('2.2')
@@ -25,6 +24,10 @@ class TestAuthUpgrade(Tester):
                                      'authorizer': 'CassandraAuthorizer'}
         Tester.__init__(self, *args, **kwargs)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11250',
+                   flaky=True,
+                   notes='windows')
     def upgrade_to_22_test(self):
         self.do_upgrade_with_internal_auth("git:cassandra-2.2")
 
