@@ -88,6 +88,9 @@ class TestBootstrap(Tester):
         assert_almost_equal(size1, size2, error=0.3)
         assert_almost_equal(float(initial_size - empty_size), 2 * (size1 - float(empty_size)))
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11231',
+                   flaky=True)
     def simple_bootstrap_test_nodata(self):
         """
         @jira_ticket CASSANDRA-11010
