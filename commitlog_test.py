@@ -273,6 +273,10 @@ class TestCommitLog(Tester):
             [2, 2]
         )
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11245',
+                   flaky=False,
+                   notes='windows')
     def die_failure_policy_test(self):
         """ Test the die commitlog failure policy """
         self.prepare(configuration={
