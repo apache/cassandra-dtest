@@ -1,11 +1,10 @@
 import re
 import sys
-import unittest
 import time
+import unittest
 
 import ccmlib.common
 from ccmlib.node import NodetoolError
-
 from dtest import Tester, debug
 from jmxutils import JolokiaAgent, make_mbean, remove_perf_disable_shared_mem
 from tools import known_failure, since
@@ -198,6 +197,10 @@ class TestJMX(Tester):
                 time.sleep(2)
 
     @since('2.2')
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11241',
+                   flaky=False,
+                   notes='windows')
     def phi_test(self):
         """
         Check functioning of nodetool failuredetector.
