@@ -417,19 +417,19 @@ class MiscellaneousCQLTester(CQLTester):
         """
         @jira_ticket CASSANDRA-8101
 
-        - assert INSERTing into a nonexistent table fails
-        # TODO why?
+        - assert INSERTing into a nonexistent table fails normally, with an InvalidRequest exception
         - create a table with ascii and text columns
         - assert that trying to execute an insert statement with non-UTF8 contents raises a ProtocolException
             - tries to insert into a nonexistent column to make sure the ProtocolException is raised over other errors
         """
         session = self.prepare()
+        # this should fail as normal, not with a ProtocolException
         assert_invalid(session, u"insert into invalid_string_literals (k, a) VALUES (0, '\u038E\u0394\u03B4\u03E0')")
 
-        # since the protocol requires strings to be valid UTF-8, the error response to this is a ProtocolError
         session = self.cql_connection(self.cluster.nodelist()[0], keyspace='ks')
         session.execute("create table invalid_string_literals (k int primary key, a ascii, b text)")
 
+        # since the protocol requires strings to be valid UTF-8, the error response to this is a ProtocolException
         with self.assertRaisesRegexp(ProtocolException, 'Cannot decode string as UTF8'):
             session.execute("insert into invalid_string_literals (k, c) VALUES (0, '\xc2\x01')")
 
