@@ -140,6 +140,10 @@ class TestRepair(Tester):
         """
         self._simple_repair(sequential=True)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11247',
+                   flaky=True,
+                   notes='windows')
     def simple_parallel_repair_test(self):
         """
         Calls simple repair test with a parallel repair
