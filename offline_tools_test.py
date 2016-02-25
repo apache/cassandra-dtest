@@ -5,7 +5,7 @@ import subprocess
 
 from ccmlib import common
 from dtest import Tester, debug
-from tools import since
+from tools import known_failure, since
 
 
 class TestOfflineTools(Tester):
@@ -14,6 +14,10 @@ class TestOfflineTools(Tester):
     # in the classpath
     ignore_log_patterns = ["Unable to initialize MemoryMeter"]
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11235',
+                   flaky=False,
+                   notes='windows')
     def sstablelevelreset_test(self):
         """
         Insert data and call sstablelevelreset on a series of
