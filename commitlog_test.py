@@ -6,14 +6,13 @@ import struct
 import subprocess
 import time
 
+from assertions import assert_almost_equal, assert_none, assert_one
 from cassandra import WriteTimeout
 from cassandra.cluster import NoHostAvailable, OperationTimedOut
-
 from ccmlib.common import is_win
 from ccmlib.node import Node, TimeoutError
-from assertions import assert_almost_equal, assert_none, assert_one
 from dtest import Tester, debug
-from tools import since, rows_to_list
+from tools import known_failure, rows_to_list, since
 
 
 class TestCommitLog(Tester):
@@ -286,6 +285,10 @@ class TestCommitLog(Tester):
         self.assertTrue(failure, "Cannot find the commitlog failure message in logs")
         self.assertFalse(self.node1.is_running(), "Node1 should not be running")
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11242',
+                   flaky=True,
+                   notes='windows')
     def ignore_failure_policy_test(self):
         """ Test the ignore commitlog failure policy """
         self.prepare(configuration={
