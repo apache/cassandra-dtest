@@ -482,9 +482,6 @@ class MiscellaneousCQLTester(CQLTester):
         - assert prepared statement containing that column also still works
         - ALTER the table, changing the type of a column
         - assert that both prepared statements still work
-
-        # TODO this basically tests driver behavior if I read it correctly.
-        # Should this be in dtests at all?
         """
         session = self.prepare()
 
