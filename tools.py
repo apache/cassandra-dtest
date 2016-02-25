@@ -448,3 +448,9 @@ def get_schema_metadata(session):
     cluster = session.cluster
     cluster.refresh_schema_metadata()
     return cluster.metadata
+
+
+def get_table_metadata(session, keyspace_name, table_name):
+    cluster = session.cluster
+    cluster.refresh_table_metadata(keyspace_name, table_name)
+    return cluster.metadata.keyspaces[keyspace_name].tables[table_name]
