@@ -436,3 +436,15 @@ class KillOnBootstrap(Thread):
     def run(self):
         self.node.watch_log_for("JOINING: Starting to bootstrap")
         self.node.stop(gently=False)
+
+
+def get_keyspace_metadata(session, keyspace_name):
+    cluster = session.cluster
+    cluster.refresh_keyspace_metadata(keyspace_name)
+    return cluster.metadata.keyspaces[keyspace_name]
+
+
+def get_schema_metadata(session):
+    cluster = session.cluster
+    cluster.refresh_schema_metadata()
+    return cluster.metadata

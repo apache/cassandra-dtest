@@ -5,6 +5,7 @@ import struct
 import time
 
 from cassandra import ConsistencyLevel, InvalidRequest
+from cassandra.metadata import NetworkTopologyStrategy, SimpleStrategy
 from cassandra.policies import FallthroughRetryPolicy
 from cassandra.protocol import ProtocolException
 from cassandra.query import SimpleStatement
@@ -16,7 +17,7 @@ from thrift_bindings.v22.ttypes import \
 from thrift_bindings.v22.ttypes import (CfDef, Column, ColumnOrSuperColumn,
                                         Mutation)
 from thrift_tests import get_thrift_client
-from tools import debug, rows_to_list, since
+from tools import debug, get_keyspace_metadata, get_schema_metadata, rows_to_list, since
 
 
 class CQLTester(Tester):
@@ -71,26 +72,32 @@ class StorageProxyCQLTester(CQLTester):
         Smoke test that basic keyspace operations work:
 
         - create a keyspace
-        - USE that keyspace
+        - assert keyspace exists and is configured as expected with the driver metadata API
         - ALTER it
-        - #TODO: assert the ALTER worked
+        - assert keyspace was correctly altered with the driver metadata API
         - DROP it
-        - attempt to USE it again, asserting it raises an InvalidRequest exception
+        - assert keyspace is no longer in keyspace metadata
         """
         session = self.prepare(create_keyspace=False)
 
+        self.assertNotIn('ks', get_schema_metadata(session).keyspaces)
         session.execute("CREATE KEYSPACE ks WITH replication = "
                         "{ 'class':'SimpleStrategy', 'replication_factor':1} "
                         "AND DURABLE_WRITES = true")
-
-        session.execute("USE ks")
+        self.assertIn('ks', get_schema_metadata(session).keyspaces)
+        ks_meta = get_keyspace_metadata(session, 'ks')
+        self.assertTrue(ks_meta.durable_writes)
+        self.assertIsInstance(ks_meta.replication_strategy, SimpleStrategy)
 
         session.execute("ALTER KEYSPACE ks WITH replication = "
                         "{ 'class' : 'NetworkTopologyStrategy', 'dc1' : 1 } "
                         "AND DURABLE_WRITES = false")
+        ks_meta = get_keyspace_metadata(session, 'ks')
+        self.assertFalse(ks_meta.durable_writes)
+        self.assertIsInstance(ks_meta.replication_strategy, NetworkTopologyStrategy)
 
         session.execute("DROP KEYSPACE ks")
-        assert_invalid(session, "USE ks", expected=InvalidRequest)
+        self.assertNotIn('ks', get_schema_metadata(session).keyspaces)
 
     def table_test(self):
         """
