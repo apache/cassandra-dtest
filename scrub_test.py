@@ -402,6 +402,10 @@ class TestScrub(TestHelper):
         users = self.query_users(session)
         self.assertEqual(initial_users, users)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11240',
+                   flaky=False,
+                   notes='windows')
     def test_standalone_scrub_essential_files_only(self):
         cluster = self.cluster
         cluster.populate(1).start()
