@@ -211,6 +211,7 @@ class StorageProxyCQLTester(CQLTester):
         session.execute("ALTER TYPE address_t ADD phones set<text>")
         self.assertIn('phones', types_meta['address_t'].field_names)
 
+        # drop the table so we can safely drop the type it uses
         session.execute("DROP TABLE test4")
 
         session.execute("DROP TYPE address_t")
