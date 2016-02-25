@@ -440,9 +440,6 @@ class MiscellaneousCQLTester(CQLTester):
         client.system_add_column_family(cfdef)
 
         session.execute("INSERT INTO ks.test (key, column1, column2, column3, value) VALUES ('foo', 4, 3, 2, 'bar')")
-
-        time.sleep(1)
-
         session.execute("ALTER TABLE test RENAME column1 TO foo1 AND column2 TO foo2 AND column3 TO foo3")
         assert_one(session, "SELECT foo1, foo2, foo3 FROM test", [4, 3, 2])
 
