@@ -488,7 +488,6 @@ class MiscellaneousCQLTester(CQLTester):
 
         # TODO this basically tests driver behavior if I read it correctly.
         # Should this be in dtests at all?
-        # TODO should these assert that the ALTERs happened correctly?
         """
         session = self.prepare()
 
