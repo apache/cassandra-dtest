@@ -222,6 +222,10 @@ class TestCommitLog(Tester):
 
         self._segment_size_test(5, compressed=True)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11248',
+                   flaky=True,
+                   notes='windows')
     def stop_failure_policy_test(self):
         """ Test the stop commitlog failure policy (default one) """
         self.prepare()
