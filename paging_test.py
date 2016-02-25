@@ -1,12 +1,11 @@
 import time
 import uuid
 
+from assertions import assert_invalid
 from cassandra import ConsistencyLevel as CL
-from cassandra import InvalidRequest, ReadTimeout, ReadFailure
+from cassandra import InvalidRequest, ReadFailure, ReadTimeout
 from cassandra.policies import FallthroughRetryPolicy
 from cassandra.query import SimpleStatement, dict_factory, named_tuple_factory
-
-from assertions import assert_invalid
 from datahelp import create_rows, flatten_into_set, parse_data_into_dicts
 from dtest import Tester, run_scenarios
 from tools import known_failure, since
@@ -603,6 +602,10 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
         self.assertEqualIgnoreOrder(pf.all_data(), expected_data)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11249',
+                   flaky=True,
+                   notes='windows')
     def test_paging_across_multi_wide_rows(self):
         session = self.prepare()
         self.create_ks(session, 'test_paging_size', 2)
