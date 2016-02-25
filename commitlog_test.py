@@ -248,6 +248,10 @@ class TestCommitLog(Tester):
               "SELECT * FROM test;"
             """)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11248',
+                   flaky=True,
+                   notes='windows')
     def stop_commit_failure_policy_test(self):
         """ Test the stop_commit commitlog failure policy """
         self.prepare(configuration={
