@@ -429,7 +429,11 @@ class MiscellaneousCQLTester(CQLTester):
         session = self.cql_connection(self.cluster.nodelist()[0], keyspace='ks')
         session.execute("create table invalid_string_literals (k int primary key, a ascii, b text)")
 
-        # since the protocol requires strings to be valid UTF-8, the error response to this is a ProtocolException
+        # this should still fail with an InvalidRequest
+        assert_invalid(session, u"insert into invalid_string_literals (k, c) VALUES (0, '\u038E\u0394\u03B4\u03E0')")
+        # but since the protocol requires strings to be valid UTF-8, the error
+        # response to this is a ProtocolException, not an error about the
+        # nonexistent column
         with self.assertRaisesRegexp(ProtocolException, 'Cannot decode string as UTF8'):
             session.execute("insert into invalid_string_literals (k, c) VALUES (0, '\xc2\x01')")
 
