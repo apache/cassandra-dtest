@@ -1,5 +1,6 @@
 # coding: utf-8
 
+import itertools
 import struct
 import time
 
@@ -20,16 +21,17 @@ from tools import debug, rows_to_list, since
 
 class CQLTester(Tester):
 
-    def prepare(self, ordered=False, create_keyspace=True, use_cache=False, nodes=1, rf=1, protocol_version=None, user=None, password=None, **kwargs):
+    def prepare(self, ordered=False, create_keyspace=True, use_cache=False,
+                nodes=1, rf=1, protocol_version=None, user=None, password=None,
+                start_rpc=False, **kwargs):
         cluster = self.cluster
 
-        if (ordered):
+        if ordered:
             cluster.set_partitioner("org.apache.cassandra.dht.ByteOrderedPartitioner")
 
-        if (use_cache):
+        if use_cache:
             cluster.set_configuration_options(values={'row_cache_size_in_mb': 100})
 
-        start_rpc = kwargs.pop('start_rpc', False)
         if start_rpc:
             cluster.set_configuration_options(values={'start_rpc': True})
 
@@ -56,28 +58,56 @@ class StorageProxyCQLTester(CQLTester):
     """
     Each CQL statement is exercised at least once in order to
     ensure we execute the code path in StorageProxy.
+    # TODO This probably isn't true anymore?
     Note that in depth CQL validation is done in Java unit tests,
     see CASSANDRA-9160.
+
+    # TODO I'm not convinced we need these. Seems like all the functionality
+    #      is covered in greater detail in other test classes.
     """
 
     def keyspace_test(self):
         """
-        CREATE KEYSPACE, USE KEYSPACE, ALTER KEYSPACE, DROP KEYSPACE statements
+        Smoke test that basic keyspace operations work:
+
+        - create a keyspace
+        - USE that keyspace
+        - ALTER it
+        - #TODO: assert the ALTER worked
+        - DROP it
+        - attempt to USE it again, asserting it raises an InvalidRequest exception
         """
         session = self.prepare(create_keyspace=False)
 
-        session.execute("CREATE KEYSPACE ks WITH replication = { 'class':'SimpleStrategy', 'replication_factor':1} AND DURABLE_WRITES = true")
+        session.execute("CREATE KEYSPACE ks WITH replication = "
+                        "{ 'class':'SimpleStrategy', 'replication_factor':1} "
+                        "AND DURABLE_WRITES = true")
 
         session.execute("USE ks")
 
-        session.execute("ALTER KEYSPACE ks WITH replication = { 'class' : 'NetworkTopologyStrategy', 'dc1' : 1 } AND DURABLE_WRITES = false")
+        session.execute("ALTER KEYSPACE ks WITH replication = "
+                        "{ 'class' : 'NetworkTopologyStrategy', 'dc1' : 1 } "
+                        "AND DURABLE_WRITES = false")
 
         session.execute("DROP KEYSPACE ks")
         assert_invalid(session, "USE ks", expected=InvalidRequest)
 
     def table_test(self):
         """
-        CREATE TABLE, ALTER TABLE, TRUNCATE TABLE, DROP TABLE statements
+        Smoke test that basic table operations work:
+
+        - create 2 tables, one with and one without COMPACT STORAGE
+        - ALTER the table without COMPACT STORAGE, adding a column
+
+        For each of those tables:
+
+        - insert 10 values
+        - SELECT * and assert the values are there
+        - TRUNCATE the table
+        - SELECT * and assert there are no values
+        - DROP the table
+        - SELECT * and assert the statement raises an InvalidRequest
+        # TODO run SELECTs to make sure each statement works
         """
         session = self.prepare()
 
@@ -86,24 +116,24 @@ class StorageProxyCQLTester(CQLTester):
 
         session.execute("ALTER TABLE test1 ADD v2 int")
 
-        for i in xrange(0, 10):
-            session.execute("INSERT INTO test1 (k, v1, v2) VALUES (%d, %d, %d)" % (i, i, i))
-            session.execute("INSERT INTO test2 (k, c1, v1) VALUES (%d, %d, %d)" % (i, i, i))
+        for i in range(0, 10):
+            session.execute("INSERT INTO test1 (k, v1, v2) VALUES ({i}, {i}, {i})".format(i=i))
+            session.execute("INSERT INTO test2 (k, c1, v1) VALUES ({i}, {i}, {i})".format(i=i))
 
         res = sorted(session.execute("SELECT * FROM test1"))
-        assert rows_to_list(res) == [[i, i, i] for i in xrange(0, 10)], res
+        self.assertEqual(rows_to_list(res), [[i, i, i] for i in range(0, 10)])
 
         res = sorted(session.execute("SELECT * FROM test2"))
-        assert rows_to_list(res) == [[i, i, i] for i in xrange(0, 10)], res
+        self.assertEqual(rows_to_list(res), [[i, i, i] for i in range(0, 10)])
 
         session.execute("TRUNCATE test1")
         session.execute("TRUNCATE test2")
 
         res = session.execute("SELECT * FROM test1")
-        assert rows_to_list(res) == [], res
+        self.assertEqual(rows_to_list(res), [])
 
         res = session.execute("SELECT * FROM test2")
-        assert rows_to_list(res) == [], res
+        self.assertEqual(rows_to_list(res), [])
 
         session.execute("DROP TABLE test1")
         session.execute("DROP TABLE test2")
@@ -113,18 +143,26 @@ class StorageProxyCQLTester(CQLTester):
 
     def index_test(self):
         """
-        CREATE INDEX, DROP INDEX statements
+        Smoke test CQL statements related to indexes:
+
+        - CREATE a table
+        - CREATE an index on that table
+        - INSERT 10 values into the table
+        - SELECT from the table over the indexed value and assert the expected values come back
+        - drop the index
+        - assert SELECTing over the indexed value raises an InvalidRequest
+        # TODO run SELECTs to make sure each statement works
         """
         session = self.prepare()
 
         session.execute("CREATE TABLE test3 (k int PRIMARY KEY, v1 int, v2 int)")
         session.execute("CREATE INDEX testidx ON test3 (v1)")
 
-        for i in xrange(0, 10):
-            session.execute("INSERT INTO test3 (k, v1, v2) VALUES (%d, %d, %d)" % (i, i, i))
+        for i in range(0, 10):
+            session.execute("INSERT INTO test3 (k, v1, v2) VALUES ({i}, {i}, {i})".format(i=i))
 
         res = session.execute("SELECT * FROM test3 WHERE v1 = 0")
-        assert rows_to_list(res) == [[0, 0, 0]], res
+        self.assertEqual(rows_to_list(res), [[0, 0, 0]])
 
         session.execute("DROP INDEX testidx")
 
@@ -132,7 +170,15 @@ class StorageProxyCQLTester(CQLTester):
 
     def type_test(self):
         """
-        CREATE TYPE, ALTER TYPE, DROP TYPE statements
+        Smoke test basic TYPE operations:
+
+        - CREATE a type
+        - CREATE a table using that type
+        - ALTER the type and CREATE another table
+        - DROP the tables and type
+        - CREATE another table using the DROPped type and assert it fails with an InvalidRequest
+        # TODO run SELECTs to make sure each statement works
+        # TODO is this even necessary given the existence of the auth_tests?
         """
         session = self.prepare()
 
@@ -145,11 +191,19 @@ class StorageProxyCQLTester(CQLTester):
         session.execute("DROP TABLE test4")
         session.execute("DROP TABLE test5")
         session.execute("DROP TYPE address_t")
-        assert_invalid(session, "CREATE TABLE test6 (id int PRIMARY KEY, address frozen<address_t>)", expected=InvalidRequest)
+        assert_invalid(session,
+                       "CREATE TABLE test6 (id int PRIMARY KEY, address frozen<address_t>)",
+                       expected=InvalidRequest)
 
     def user_test(self):
         """
-        CREATE USER, ALTER USER, DROP USER statements
+        Smoke test for basic USER queries:
+
+        - get a session as the default superuser
+        - CREATE a user
+        - ALTER that user by giving it a different password
+        - DROP that user
+        # TODO list users after each to make sure each statement works
         """
         session = self.prepare(user='cassandra', password='cassandra')
 
@@ -161,47 +215,62 @@ class StorageProxyCQLTester(CQLTester):
 
     def statements_test(self):
         """
-        INSERT, UPDATE, SELECT, SELECT COUNT, DELETE statements
+        Smoke test SELECT and UPDATE statements:
+
+        - create a table
+        - insert 20 rows into the table
+        - run SELECT COUNT queries and assert they return the correct values
+            - bare and with IN and equality conditions
+        - run SELECT * queries with = conditions
+        - run UPDATE queries
+        - SELECT * and assert the UPDATEd values are there
+        - DELETE with a = condition
+        - SELECT the deleted values and make sure nothing is returned
+        # TODO run SELECTs to make sure each statement works
         """
         session = self.prepare()
 
         session.execute("CREATE TABLE test7 (kind text, time int, v1 int, v2 int, PRIMARY KEY(kind, time) )")
 
-        for i in xrange(0, 10):
-            session.execute("INSERT INTO test7 (kind, time, v1, v2) VALUES ('ev1', %d, %d, %d)" % (i, i, i))
-            session.execute("INSERT INTO test7 (kind, time, v1, v2) VALUES ('ev2', %d, %d, %d)" % (i, i, i))
+        for i in range(0, 10):
+            session.execute("INSERT INTO test7 (kind, time, v1, v2) VALUES ('ev1', {i}, {i}, {i})".format(i=i))
+            session.execute("INSERT INTO test7 (kind, time, v1, v2) VALUES ('ev2', {i}, {i}, {i})".format(i=i))
 
         res = session.execute("SELECT COUNT(*) FROM test7 WHERE kind = 'ev1'")
-        assert rows_to_list(res) == [[10]], res
+        self.assertEqual(rows_to_list(res), [[10]])
 
         res = session.execute("SELECT COUNT(*) FROM test7 WHERE kind IN ('ev1', 'ev2')")
-        assert rows_to_list(res) == [[20]], res
+        self.assertEqual(rows_to_list(res), [[20]])
 
         res = session.execute("SELECT COUNT(*) FROM test7 WHERE kind IN ('ev1', 'ev2') AND time=0")
-        assert rows_to_list(res) == [[2]], res
+        self.assertEqual(rows_to_list(res), [[2]])
 
         res = session.execute("SELECT * FROM test7 WHERE kind = 'ev1'")
-        assert rows_to_list(res) == [['ev1', i, i, i] for i in xrange(0, 10)], res
+        self.assertEqual(rows_to_list(res), [['ev1', i, i, i] for i in range(0, 10)])
 
         res = session.execute("SELECT * FROM test7 WHERE kind = 'ev2'")
-        assert rows_to_list(res) == [['ev2', i, i, i] for i in xrange(0, 10)], res
+        self.assertEqual(rows_to_list(res), [['ev2', i, i, i] for i in range(0, 10)])
 
-        for i in xrange(0, 10):
-            session.execute("UPDATE test7 SET v1 = 0, v2 = 0 where kind = 'ev1' AND time=%d" % (i,))
+        for i in range(0, 10):
+            session.execute("UPDATE test7 SET v1 = 0, v2 = 0 where kind = 'ev1' AND time={i}".format(i=i))
 
         res = session.execute("SELECT * FROM test7 WHERE kind = 'ev1'")
-        assert rows_to_list(res) == [['ev1', i, 0, 0] for i in xrange(0, 10)], res
+        self.assertEqual(rows_to_list(res), [['ev1', i, 0, 0] for i in range(0, 10)])
 
-        res = session.execute("DELETE FROM test7 WHERE kind = 'ev1'")
+        session.execute("DELETE FROM test7 WHERE kind = 'ev1'")
         res = session.execute("SELECT * FROM test7 WHERE kind = 'ev1'")
-        assert rows_to_list(res) == [], res
+        self.assertEqual(rows_to_list(res), [])
 
         res = session.execute("SELECT COUNT(*) FROM test7 WHERE kind = 'ev1'")
-        assert rows_to_list(res) == [[0]], res
+        self.assertEqual(rows_to_list(res), [[0]])
 
     def batch_test(self):
         """
-        BATCH statement
+        Smoke test for BATCH statements:
+
+        - CREATE a table
+        - create a BATCH statement and execute it at QUORUM
+        # TODO run SELECTs to make sure each statement works
         """
         session = self.prepare()
 
@@ -227,16 +296,24 @@ class StorageProxyCQLTester(CQLTester):
 @canReuseCluster
 class MiscellaneousCQLTester(CQLTester):
     """
-    CQL tests that cannot be performed as Java unit tests, see CASSANDRA-9160. Please consider
-    writing java unit tests for CQL validation, add a new test here only if there is a reason for it,
-    e.g. something related to the client protocol or thrift, or examining the log files, or multiple nodes
-    required.
+    CQL tests that cannot be performed as Java unit tests, see CASSANDRA-9160.
+    If you're considering adding a test here, consider writing Java unit tests
+    for CQL validation instead. Add a new test here only if there is a reason
+    for it, e.g. the test is related to the client protocol or thrift, requires
+    examining the log files, or must run on multiple nodes.
     """
 
     @since('2.1', max_version='3.0')
     def large_collection_errors_test(self):
         """
-        For large collections, make sure that we are printing warnings.
+        Assert C* logs warnings when selecting too large a collection over
+        protocol v2:
+
+        - prepare the cluster and connect using protocol v2
+        - CREATE a table containing a map column
+        - insert over 65535 elements into the map
+        - select all the elements of the map
+        - assert that the correct error was logged
         """
 
         # We only warn with protocol 2
@@ -255,7 +332,7 @@ class MiscellaneousCQLTester(CQLTester):
 
         # Insert more than the max, which is 65535
         for i in range(70000):
-            session.execute("UPDATE maps SET properties[%i] = 'x' WHERE userid = 'user'" % i)
+            session.execute("UPDATE maps SET properties[{}] = 'x' WHERE userid = 'user'".format(i))
 
         # Query for the data and throw exception
         session.execute("SELECT properties FROM maps WHERE userid = 'user'")
@@ -264,7 +341,15 @@ class MiscellaneousCQLTester(CQLTester):
                             "http://cassandra.apache.org/doc/cql3/CQL.html#collections for more details.")
 
     def cql3_insert_thrift_test(self):
-        """ Check that we can insert from thrift into a CQL3 table (#4377) """
+        """
+        Check that we can insert from thrift into a CQL3 table:
+
+        - CREATE a table via CQL
+        - insert values via thrift
+        - SELECT the inserted values and assert they are there as expected
+
+        @jira_ticket CASSANDRA-4377
+        """
         session = self.prepare(start_rpc=True)
 
         session.execute("""
@@ -291,9 +376,18 @@ class MiscellaneousCQLTester(CQLTester):
             ThriftConsistencyLevel.ONE)
 
         res = session.execute("SELECT * FROM test")
-        assert rows_to_list(res) == [[2, 4, 8]], res
+        self.assertEqual(rows_to_list(res), [[2, 4, 8]])
 
     def rename_test(self):
+        """
+        Check that a thrift-created table can be renamed via CQL:
+
+        - create a table via the thrift interface
+        - INSERT a row via CQL
+        - ALTER the name of the table via CQL
+        - SELECT from the table and assert the values inserted are there
+        # TODO why doesn't this check that the column names were actually changed?
+        """
         session = self.prepare(start_rpc=True)
 
         node = self.cluster.nodelist()[0]
@@ -322,22 +416,46 @@ class MiscellaneousCQLTester(CQLTester):
     def invalid_string_literals_test(self):
         """
         @jira_ticket CASSANDRA-8101
+
+        - assert INSERTing into a nonexistent table fails normally, with an InvalidRequest exception
+        - create a table with ascii and text columns
+        - assert that trying to execute an insert statement with non-UTF8 contents raises a ProtocolException
+            - tries to insert into a nonexistent column to make sure the ProtocolException is raised over other errors
         """
         session = self.prepare()
+        # this should fail as normal, not with a ProtocolException
         assert_invalid(session, u"insert into invalid_string_literals (k, a) VALUES (0, '\u038E\u0394\u03B4\u03E0')")
 
-        # since the protocol requires strings to be valid UTF-8, the error response to this is a ProtocolError
         session = self.cql_connection(self.cluster.nodelist()[0], keyspace='ks')
         session.execute("create table invalid_string_literals (k int primary key, a ascii, b text)")
-        try:
+
+        # this should still fail with an InvalidRequest
+        assert_invalid(session, u"insert into invalid_string_literals (k, c) VALUES (0, '\u038E\u0394\u03B4\u03E0')")
+        # but since the protocol requires strings to be valid UTF-8, the error
+        # response to this is a ProtocolException, not an error about the
+        # nonexistent column
+        with self.assertRaisesRegexp(ProtocolException, 'Cannot decode string as UTF8'):
             session.execute("insert into invalid_string_literals (k, c) VALUES (0, '\xc2\x01')")
-            self.fail("Expected error")
-        except ProtocolException as e:
-            self.assertTrue("Cannot decode string as UTF8" in str(e))
 
     def prepared_statement_invalidation_test(self):
         """
         @jira_ticket CASSANDRA-7910
+
+        - CREATE a table and INSERT a row
+        - prepare 2 prepared SELECT statements
+        - SELECT the row with a bound prepared statement and assert it returns the expected row
+        - ALTER the table, dropping a column
+        - assert prepared statement without that column in it still works
+        - assert prepared statement containing that column fails
+        - ALTER the table, adding a column
+        - assert prepared statement without that column in it still works
+        - assert prepared statement containing that column also still works
+        - ALTER the table, changing the type of a column
+        - assert that both prepared statements still work
+
+        # TODO this basically tests driver behavior if I read it correctly.
+        # Should this be in dtests at all?
+        # TODO should these assert that the ALTERs happened correctly?
         """
         session = self.prepare()
 
@@ -374,7 +492,17 @@ class MiscellaneousCQLTester(CQLTester):
 
     @freshCluster()
     def range_slice_test(self):
-        """ Test a regression from #1337 """
+        """
+        Regression test for CASSANDRA-1337:
+
+        - CREATE a table
+        - INSERT 2 rows
+        - SELECT * from the table
+        - assert 2 rows were returned
+
+        @jira_ticket CASSANDRA-1337
+        # TODO I don't see how this is an interesting test or how it tests 1337.
+        """
 
         cluster = self.cluster
 
@@ -397,19 +525,36 @@ class MiscellaneousCQLTester(CQLTester):
         session.execute("INSERT INTO test (k, v) VALUES ('bar', 1)")
 
         res = list(session.execute("SELECT * FROM test"))
-        assert len(res) == 2, res
+        self.assertEqual(len(res), 2, msg=res)
 
 
 @since('3.2')
 class AbortedQueriesTester(CQLTester):
     """
     @jira_ticket CASSANDRA-7392
-    Test that read-queries that take longer than read_request_timeout_in_ms time out
+
+    Test that read-queries that take longer than read_request_timeout_in_ms
+    time out.
+
+    # TODO The important part of these is "set up a combination of
+    #      configuration options that will make all reads time out, then
+    #      try to read and assert it times out". This can probably be made much
+    #      simpler -- most of the logic can be factored out. In many cases it
+    #      probably isn't even necessary to define a custom table or to insert
+    #      more than one value.
     """
 
     def local_query_test(self):
         """
-        Check that a query running on the local coordinator node times out
+        Check that a query running on the local coordinator node times out:
+
+        - set a 1-second read timeout
+        - start the cluster with read_iteration_delay set to 1.5 seconds
+            - (this will cause read queries to take longer than the read timeout)
+        - CREATE and INSERT into a table
+        - SELECT * from the table using a retry policy that never retries, and assert it times out
+
+        @jira_ticket CASSANDRA-7392
         """
         cluster = self.cluster
         cluster.set_configuration_options(values={'read_request_timeout_in_ms': 1000})
@@ -418,8 +563,9 @@ class AbortedQueriesTester(CQLTester):
         # introduced by CASSANDRA-7392 to pause by the specified amount of milliseconds during each
         # iteration of non system queries, so that these queries take much longer to complete,
         # see ReadCommand.withStateTracking()
-        cluster.populate(1).start(wait_for_binary_proto=True, jvm_args=["-Dcassandra.monitoring_check_interval_ms=50",
-                                                                        "-Dcassandra.test.read_iteration_delay_ms=1500"])
+        cluster.populate(1).start(wait_for_binary_proto=True,
+                                  jvm_args=["-Dcassandra.monitoring_check_interval_ms=50",
+                                            "-Dcassandra.test.read_iteration_delay_ms=1500"])
         node = cluster.nodelist()[0]
         session = self.patient_cql_connection(node)
 
@@ -431,17 +577,32 @@ class AbortedQueriesTester(CQLTester):
             );
         """)
 
-        for i in xrange(500):
+        for i in range(500):
             session.execute("INSERT INTO test1 (id, val) VALUES ({}, 'foo')".format(i))
 
         mark = node.mark_log()
-        statement = SimpleStatement("SELECT * from test1", consistency_level=ConsistencyLevel.ONE, retry_policy=FallthroughRetryPolicy())
+        statement = SimpleStatement("SELECT * from test1",
+                                    consistency_level=ConsistencyLevel.ONE,
+                                    retry_policy=FallthroughRetryPolicy())
         assert_unavailable(lambda c: debug(c.execute(statement)), session)
         node.watch_log_for("operations timed out", from_mark=mark, timeout=60)
 
     def remote_query_test(self):
         """
-        Check that a query running on a node other than the coordinator times out
+        Check that a query running on a node other than the coordinator times out:
+
+        - populate the cluster with 2 nodes
+        - set a 1-second read timeout
+        - start one node without having it join the ring
+        - start the other node with read_iteration_delay set to 1.5 seconds
+            - (this will cause read queries to take longer than the read timeout)
+        - CREATE a table
+        - INSERT 5000 rows on a session on the node that is not a member of the ring
+        - run SELECT statements and assert they fail
+        # TODO refactor SELECT statements:
+        #        - run the statements in a loop to reduce duplication
+        #        - watch the log after each query
+        #        - assert we raise the right error
         """
         cluster = self.cluster
         cluster.set_configuration_options(values={'read_request_timeout_in_ms': 1000})
@@ -450,8 +611,9 @@ class AbortedQueriesTester(CQLTester):
         node1, node2 = cluster.nodelist()
 
         node1.start(wait_for_binary_proto=True, join_ring=False)  # ensure other node executes queries
-        node2.start(wait_for_binary_proto=True, jvm_args=["-Dcassandra.monitoring_check_interval_ms=50",
-                                                          "-Dcassandra.test.read_iteration_delay_ms=1500"])  # see above for explanation
+        node2.start(wait_for_binary_proto=True,
+                    jvm_args=["-Dcassandra.monitoring_check_interval_ms=50",
+                              "-Dcassandra.test.read_iteration_delay_ms=1500"])  # see above for explanation
 
         session = self.patient_exclusive_cql_connection(node1)
 
@@ -465,35 +627,53 @@ class AbortedQueriesTester(CQLTester):
             );
         """)
 
-        for i in xrange(500):
-            for j in xrange(10):
-                session.execute("INSERT INTO test2 (id, col, val) VALUES ({}, {}, 'foo')".format(i, j))
+        for i, j in itertools.product(range(500), range(10)):
+            session.execute("INSERT INTO test2 (id, col, val) VALUES ({}, {}, 'foo')".format(i, j))
 
         mark = node2.mark_log()
 
-        statement = SimpleStatement("SELECT * from test2", consistency_level=ConsistencyLevel.ONE, retry_policy=FallthroughRetryPolicy())
+        statement = SimpleStatement("SELECT * from test2",
+                                    consistency_level=ConsistencyLevel.ONE,
+                                    retry_policy=FallthroughRetryPolicy())
         assert_unavailable(lambda c: debug(c.execute(statement)), session)
 
-        statement = SimpleStatement("SELECT * from test2 where id = 1", consistency_level=ConsistencyLevel.ONE, retry_policy=FallthroughRetryPolicy())
+        statement = SimpleStatement("SELECT * from test2 where id = 1",
+                                    consistency_level=ConsistencyLevel.ONE,
+                                    retry_policy=FallthroughRetryPolicy())
         assert_unavailable(lambda c: debug(c.execute(statement)), session)
 
-        statement = SimpleStatement("SELECT * from test2 where id IN (1, 10,  20) AND col < 10", consistency_level=ConsistencyLevel.ONE, retry_policy=FallthroughRetryPolicy())
+        statement = SimpleStatement("SELECT * from test2 where id IN (1, 10,  20) AND col < 10",
+                                    consistency_level=ConsistencyLevel.ONE,
+                                    retry_policy=FallthroughRetryPolicy())
         assert_unavailable(lambda c: debug(c.execute(statement)), session)
 
-        statement = SimpleStatement("SELECT * from test2 where col > 5 ALLOW FILTERING", consistency_level=ConsistencyLevel.ONE, retry_policy=FallthroughRetryPolicy())
+        statement = SimpleStatement("SELECT * from test2 where col > 5 ALLOW FILTERING",
+                                    consistency_level=ConsistencyLevel.ONE,
+                                    retry_policy=FallthroughRetryPolicy())
         assert_unavailable(lambda c: debug(c.execute(statement)), session)
 
         node2.watch_log_for("operations timed out", from_mark=mark, timeout=60)
 
     def index_query_test(self):
         """
-        Check that a secondary index query times out
+        Check that a secondary index query times out:
+
+        - populate a 1-node cluster
+        - set a 1-second read timeout
+        - start one node without having it join the ring
+        - start the other node with read_iteration_delay set to 1.5 seconds
+            - (this will cause read queries to take longer than the read timeout)
+        - CREATE a table
+        - CREATE an index on the table
+        - INSERT 500 values into the table
+        - SELECT over the table and assert it times out
         """
         cluster = self.cluster
         cluster.set_configuration_options(values={'read_request_timeout_in_ms': 1000})
 
-        cluster.populate(1).start(wait_for_binary_proto=True, jvm_args=["-Dcassandra.monitoring_check_interval_ms=50",
-                                                                        "-Dcassandra.test.read_iteration_delay_ms=1500"])  # see above for explanation
+        cluster.populate(1).start(wait_for_binary_proto=True,
+                                  jvm_args=["-Dcassandra.monitoring_check_interval_ms=50",
+                                            "-Dcassandra.test.read_iteration_delay_ms=1500"])  # see above for explanation
         node = cluster.nodelist()[0]
         session = self.patient_cql_connection(node)
 
@@ -508,7 +688,7 @@ class AbortedQueriesTester(CQLTester):
 
         session.execute("CREATE INDEX ON test3 (col)")
 
-        for i in xrange(500):
+        for i in range(500):
             session.execute("INSERT INTO test3 (id, col, val) VALUES ({}, {}, 'foo')".format(i, i // 10))
 
         mark = node.mark_log()
@@ -520,7 +700,17 @@ class AbortedQueriesTester(CQLTester):
 
     def materialized_view_test(self):
         """
-        Check that a materialized view query times out
+        Check that a materialized view query times out:
+
+        - populate a 2-node cluster
+        - set a 1-second read timeout
+        - start one node without having it join the ring
+        - start the other node with read_iteration_delay set to 1.5 seconds
+            - (this will cause read queries to take longer than the read timeout)
+        - CREATE a table
+        - CREATE a materialized view over that table
+        - INSERT 50 values into that table
+        - assert querying that table results in an unavailable exception
         """
         cluster = self.cluster
         cluster.set_configuration_options(values={'read_request_timeout_in_ms': 1000})
@@ -529,8 +719,9 @@ class AbortedQueriesTester(CQLTester):
         node1, node2 = cluster.nodelist()
 
         node1.start(wait_for_binary_proto=True, join_ring=False)  # ensure other node executes queries
-        node2.start(wait_for_binary_proto=True, jvm_args=["-Dcassandra.monitoring_check_interval_ms=50",
-                                                          "-Dcassandra.test.read_iteration_delay_ms=1500"])  # see above for explanation
+        node2.start(wait_for_binary_proto=True,
+                    jvm_args=["-Dcassandra.monitoring_check_interval_ms=50",
+                              "-Dcassandra.test.read_iteration_delay_ms=1500"])  # see above for explanation
 
         session = self.patient_exclusive_cql_connection(node1)
 
@@ -546,10 +737,12 @@ class AbortedQueriesTester(CQLTester):
         session.execute(("CREATE MATERIALIZED VIEW mv AS SELECT * FROM test4 "
                          "WHERE col IS NOT NULL AND id IS NOT NULL PRIMARY KEY (col, id)"))
 
-        for i in xrange(50):
+        for i in range(50):
             session.execute("INSERT INTO test4 (id, col, val) VALUES ({}, {}, 'foo')".format(i, i // 10))
 
         mark = node2.mark_log()
-        statement = SimpleStatement("SELECT * FROM mv WHERE col = 50", consistency_level=ConsistencyLevel.ONE, retry_policy=FallthroughRetryPolicy())
+        statement = SimpleStatement("SELECT * FROM mv WHERE col = 50",
+                                    consistency_level=ConsistencyLevel.ONE,
+                                    retry_policy=FallthroughRetryPolicy())
         assert_unavailable(lambda c: debug(c.execute(statement)), session)
         node2.watch_log_for("operations timed out", from_mark=mark, timeout=60)
