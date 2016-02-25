@@ -228,12 +228,24 @@ class StorageProxyCQLTester(CQLTester):
         # TODO list users after each to make sure each statement works
         """
         session = self.prepare(user='cassandra', password='cassandra')
+        node1 = self.cluster.nodelist()[0]
+
+        def get_usernames():
+            return [user.name for user in session.execute('LIST USERS')]
+
+        self.assertNotIn('user1', get_usernames())
 
         session.execute("CREATE USER user1 WITH PASSWORD 'secret'")
+        # use patient to retry until it works, because it takes some time for
+        # the CREATE to take
+        self.patient_cql_connection(node1, user='user1', password='secret')
 
         session.execute("ALTER USER user1 WITH PASSWORD 'secret^2'")
+        # use patient for same reason as above
+        self.patient_cql_connection(node1, user='user1', password='secret^2')
 
         session.execute("DROP USER user1")
+        self.assertNotIn('user1', get_usernames())
 
     def statements_test(self):
         """
