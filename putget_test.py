@@ -1,12 +1,13 @@
-from dtest import Tester
-import tools as tools
-from tools import no_vnodes, create_c1c2_table, retry_till_success
-from cassandra import ConsistencyLevel
-
 import time
 
-from thrift.transport import TTransport, TSocket
 from thrift.protocol import TBinaryProtocol
+from thrift.transport import TSocket, TTransport
+
+import tools as tools
+from cassandra import ConsistencyLevel
+from dtest import Tester
+from tools import (create_c1c2_table, known_failure, no_vnodes,
+                   retry_till_success)
 
 
 class TestPutGet(Tester):
@@ -41,6 +42,10 @@ class TestPutGet(Tester):
 
         tools.putget(cluster, session)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-',
+                   flaky=True,
+                   notes='windows')
     def non_local_read_test(self):
         """ This test reads from a coordinator we know has no copy of the data """
         cluster = self.cluster
