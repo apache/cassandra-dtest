@@ -43,7 +43,7 @@ class TestPutGet(Tester):
         tools.putget(cluster, session)
 
     @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11251',
                    flaky=True,
                    notes='windows')
     def non_local_read_test(self):
