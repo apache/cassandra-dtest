@@ -13,6 +13,10 @@ class TestReadRepair(Tester):
         self.cluster.populate(3).start(wait_for_binary_proto=True)
 
     @since('3.0')
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11266',
+                   flaky=False,
+                   notes='windows')
     def alter_rf_and_run_read_repair_test(self):
         """
         @jira_ticket CASSANDRA-10655
