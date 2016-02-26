@@ -633,6 +633,10 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
         self.assertEqualIgnoreOrder(pf.all_data(), expected_data)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11253',
+                   flaky=True,
+                   notes='windows')
     def test_paging_using_secondary_indexes(self):
         session = self.prepare()
         self.create_ks(session, 'test_paging_size', 2)
