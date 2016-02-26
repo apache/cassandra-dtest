@@ -213,8 +213,6 @@ class TestUserFunctions(Tester):
 
         session.execute("create type test (a text, b int);")
 
-        assert_invalid(session, "create table tab (key int primary key, udt test);")
-
         session.execute("create table tab (key int primary key, udt frozen<test>);")
 
         session.execute("insert into tab (key, udt) values (1, {a: 'un', b:1});")
