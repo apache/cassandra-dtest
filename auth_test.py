@@ -1,15 +1,16 @@
-from collections import namedtuple
 import os
 import re
 import time
+from collections import namedtuple
 
-from assertions import assert_all, assert_invalid, assert_one, assert_unauthorized
+from assertions import (assert_all, assert_invalid, assert_one,
+                        assert_unauthorized)
 from cassandra import AuthenticationFailed, InvalidRequest, Unauthorized
 from cassandra.cluster import NoHostAvailable
 from cassandra.protocol import SyntaxException
 from ccmlib.common import get_version_from_build
 from dtest import Tester, debug
-from tools import since
+from tools import known_failure, since
 
 
 class TestAuth(Tester):
@@ -885,6 +886,10 @@ class TestAuth(Tester):
         cassandra.execute("GRANT DROP ON KEYSPACE ks TO cathy")
         cathy.execute("DROP TYPE ks.address")
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11254',
+                   flaky=False,
+                   notes='windows')
     def restart_node_doesnt_lose_auth_data_test(self):
         """
         * Launch a one node cluster
