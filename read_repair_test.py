@@ -2,9 +2,8 @@ import time
 
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
-
-from dtest import Tester, debug, PRINT_DEBUG
-from tools import since, rows_to_list
+from dtest import PRINT_DEBUG, Tester, debug
+from tools import known_failure, rows_to_list, since
 
 
 class TestReadRepair(Tester):
@@ -104,6 +103,10 @@ class TestReadRepair(Tester):
         return initial_replica, non_replicas
 
     @since('2.0')
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11252',
+                   flaky=True,
+                   notes='windows')
     def range_slice_query_with_tombstones_test(self):
         """
         @jira_ticket CASSANDRA-8989
