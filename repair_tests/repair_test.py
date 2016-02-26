@@ -1,4 +1,5 @@
 import time
+import threading
 from collections import namedtuple
 from unittest import skip
 
@@ -463,6 +464,49 @@ class TestRepair(Tester):
         for node in [node1, node3, node4]:
             self.check_rows_on_node(node, 2001, found=[1000])
         return cluster
+
+    @since('2.2')
+    def parallel_table_repair_noleak(self):
+        """
+        @jira_ticket CASSANDRA-11215
+
+        Tests that multiple parallel repairs on the same table isn't
+        causing reference leaks.
+        """
+        self.ignore_log_patterns = [
+            "Cannot start multiple repair sessions over the same sstables",  # The message we are expecting
+            "Validation failed in",                                          # Expecting validation to fail
+            "RMI Runtime",                                                   # JMX Repair failures
+            "Session completed with the following error",                    # The nodetool repair error
+            "ValidationExecutor",                                            # Errors by the validation executor
+            "RepairJobTask"                                                  # Errors by the repair job task
+        ]
+
+        cluster = self.cluster
+        debug("Starting cluster..")
+        cluster.populate([3]).start(wait_for_binary_proto=True)
+        node1, node2, node3 = cluster.nodelist()
+        node1.stress(stress_options=['write', 'n=10k', 'cl=ONE', '-schema', 'replication(factor=3)', '-rate', 'threads=50'])
+
+        # Start multiple repairs in parallel
+        threads = []
+        for i in range(3):
+            t = threading.Thread(target=node1.nodetool, args=("repair keyspace1 standard1",))
+            threads.append(t)
+            t.start()
+
+        # Wait for the repairs to finish
+        for t in threads:
+            t.join()
+
+        found_message = False
+        # All nodes should reject multiple repairs and have no reference leaks
+        for node in cluster.nodelist():
+            if len(node.grep_log("Cannot start multiple repair sessions over the same sstables")) > 0:
+                found_message = True
+                break
+        self.assertTrue(found_message)
+
 
 RepairTableContents = namedtuple('RepairTableContents',
                                  ['parent_repair_history', 'repair_history'])
