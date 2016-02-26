@@ -1,23 +1,23 @@
-import time
 import collections
-import sys
-import traceback
 import re
-
+import sys
+import time
+import traceback
 from functools import partial
-# TODO add in requirements.txt
-from enum import Enum  # Remove when switching to py3
 from multiprocessing import Process, Queue
 from unittest import skipIf
 
+# TODO add in requirements.txt
+from enum import Enum  # Remove when switching to py3
+
+from assertions import (assert_all, assert_crc_check_chance_equal,
+                        assert_invalid, assert_none, assert_one,
+                        assert_unavailable)
 from cassandra import ConsistencyLevel
 from cassandra.cluster import Cluster
 from cassandra.query import SimpleStatement
-
 from dtest import Tester, debug
-from tools import since, new_node
-from assertions import assert_all, assert_one, assert_invalid, assert_unavailable, assert_none, assert_crc_check_chance_equal
-
+from tools import known_failure, new_node, since
 
 # CASSANDRA-10978. Migration wait (in seconds) to use in bootstrapping tests. Needed to handle
 # pathological case of flushing schema keyspace for multiple data directories. See CASSANDRA-6696
@@ -706,6 +706,9 @@ class TestMaterializedViews(Tester):
                 cl=ConsistencyLevel.ALL
             )
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11265',
+                   flaky=True)
     def view_tombstone_test(self):
         """
         Test that a materialized views properly tombstone
