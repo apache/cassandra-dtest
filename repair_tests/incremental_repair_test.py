@@ -64,6 +64,10 @@ class TestIncRepair(Tester):
 
         os.remove('sstables.txt')
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11268',
+                   flaky=True,
+                   notes='windows')
     def multiple_repair_test(self):
         """
         * Launch a three node cluster
