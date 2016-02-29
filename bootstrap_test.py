@@ -310,11 +310,15 @@ class TestBootstrap(Tester):
 
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11281',
-                   flaky=False,
+                   flaky=True,
                    notes='windows')
     def shutdown_wiped_node_cannot_join_test(self):
         self._wiped_node_cannot_join_test(gently=True)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11281',
+                   flaky=True,
+                   notes='windows')
     def killed_wiped_node_cannot_join_test(self):
         self._wiped_node_cannot_join_test(gently=False)
 
