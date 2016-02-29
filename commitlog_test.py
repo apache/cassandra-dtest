@@ -423,6 +423,10 @@ class TestCommitLog(Tester):
         self.assertFalse(node.is_running())
 
     @since('2.2')
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11276',
+                   flaky=True,
+                   notes='windows')
     def test_compression_error(self):
         """
         @jira_ticket CASSANDRA-7886
