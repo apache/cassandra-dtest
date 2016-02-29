@@ -212,9 +212,9 @@ class TestCompaction(Tester):
         self.assertGreaterEqual(float(threshold) + 0.5, float(avgthroughput))
 
     @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11282',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11281',
                    flaky=True,
-                   notes='see also 11283')
+                   notes='windows')
     def compaction_strategy_switching_test(self):
         """Ensure that switching strategies does not result in problems.
         Insert data, switch strategies, then check against data loss.
