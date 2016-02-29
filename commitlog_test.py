@@ -349,6 +349,10 @@ class TestCommitLog(Tester):
         )
 
     @since('2.2')
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11285',
+                   flaky=True,
+                   notes='windows')
     def test_bad_crc(self):
         """
         if the commit log header crc (checksum) doesn't match the actual crc of the header data,
