@@ -8,14 +8,14 @@ import time
 from collections import OrderedDict
 from uuid import UUID, uuid4
 
+from nose.exc import SkipTest
+
+from assertions import assert_all, assert_invalid, assert_none, assert_one
 from cassandra import ConsistencyLevel, InvalidRequest
 from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.protocol import ProtocolException, SyntaxException
 from cassandra.query import SimpleStatement
 from cassandra.util import sortedset
-from nose.exc import SkipTest
-
-from assertions import assert_all, assert_invalid, assert_none, assert_one
 from dtest import debug, freshCluster
 from thrift_bindings.v22.ttypes import \
     ConsistencyLevel as ThriftConsistencyLevel
@@ -3333,6 +3333,9 @@ class TestCQL(UpgradeTester):
             assert_invalid(cursor, 'SELECT DISTINCT pk0 FROM regular', matching="queries must request all the partition key columns")
             assert_invalid(cursor, 'SELECT DISTINCT pk0, pk1, ck0 FROM regular', matching="queries must only request partition key columns")
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11277',
+                   flaky=False)
     def select_distinct_with_deletions_test(self):
         cursor = self.prepare()
         cursor.execute('CREATE TABLE t1 (k int PRIMARY KEY, c int, v int)')
