@@ -8,6 +8,7 @@ import sys
 import time
 from collections import namedtuple
 from contextlib import contextmanager
+from functools import partial
 from decimal import Decimal
 from dtest import warning
 from tempfile import NamedTemporaryFile, gettempdir, template
@@ -111,7 +112,8 @@ class CqlshCopyTest(Tester):
         self.session = self.patient_cql_connection(self.node1)
 
         self.session.execute('DROP KEYSPACE IF EXISTS ks')
-        self.create_ks(self.session, 'ks', 1)
+        self.ks = 'ks'
+        self.create_ks(self.session, self.ks, 1)
 
     @property
     def default_time_format(self):
@@ -271,8 +273,16 @@ class CqlshCopyTest(Tester):
         finally:
             sys.path = saved_path
 
-    def assertCsvResultEqual(self, csv_filename, results):
-        processed_results = list(self.result_to_csv_rows(results))
+    def assertCsvResultEqual(self, csv_filename, results, table_name=None, columns=None, cql_type_names=None):
+        if cql_type_names is None:
+            if table_name:
+                table_meta = self.session.cluster.metadata.keyspaces[self.ks].tables[table_name]
+                cql_type_names = [table_meta.columns[c].cql_type for c in table_meta.columns
+                                  if columns is None or c in columns]
+            else:
+                raise RuntimeError("table_name is required if cql_type_names are not specified")
+
+        processed_results = list(self.result_to_csv_rows(results, cql_type_names))
         csv_results = list(csv_rows(csv_filename))
 
         self.maxDiff = None
@@ -290,7 +300,7 @@ class CqlshCopyTest(Tester):
                         warning("Value in result: " + str(processed_results[0][x]))
             raise e
 
-    def format_for_csv(self, val, time_format, float_precision):
+    def format_for_csv(self, val, cql_type_name, time_format, float_precision):
         with self._cqlshlib() as cqlshlib:
             from cqlshlib.formatting import format_value
             try:
@@ -300,22 +310,29 @@ class CqlshCopyTest(Tester):
             except ImportError:
                 date_time_format = None
 
-            #  try:
-            #     from cqlshlib.formatting
+            try:
+                from cqlshlib.formatting import CqlType
+                cql_type = CqlType(cql_type_name, self.session.cluster.metadata.keyspaces[self.ks])
+            except ImportError:
+                # Backward compatibility before formatting.CqlType was introduced:
+                # we must convert blob types to bytearray instances;
+                # the format_value() signature was changed and the first type(val) argument removed, so we add it via
+                # a partial binding;
+                # cql_type will be ignored so we set it to None
+                #
+                # Once the minimum version supported is 3.6 this code can be dropped.
+                if isinstance(val, str) and hasattr(self, 'data') and self.data[2] == val:
+                    val = bytearray(val)
+
+                format_value = partial(format_value, type(val))
+                cql_type = None
+
         encoding_name = 'utf-8'  # codecs.lookup(locale.getpreferredencoding()).name
 
-        # this seems gross but if the blob isn't set to type:bytearray is won't compare correctly
-        if isinstance(val, str) and hasattr(self, 'data') and self.data[2] == val:
-            var_type = bytearray
-            val = bytearray(val)
-        else:
-            var_type = type(val)
-
         # different versions use time_format or date_time_format
-        # but all versions reject spurious values, so we just use both
-        # here
-        return format_value(var_type,
-                            val,
+        # but all versions reject spurious values, so we just use both here
+        return format_value(val,
+                            cqltype=cql_type,
                             encoding=encoding_name,
                             date_time_format=date_time_format,
                             time_format=time_format,
@@ -326,7 +343,7 @@ class CqlshCopyTest(Tester):
                             thousands_sep=None,
                             boolean_styles=None).strval
 
-    def result_to_csv_rows(self, result, time_format=None, float_precision=DEFAULT_FLOAT_PRECISION):
+    def result_to_csv_rows(self, results, cql_type_names, time_format=None, float_precision=DEFAULT_FLOAT_PRECISION):
         """
         Given an object returned from a CQL query, returns a string formatted by
         the cqlsh formatting utilities.
@@ -336,7 +353,8 @@ class CqlshCopyTest(Tester):
         # into a bare function if cqlshlib is made easier to interact with.
         if not time_format:
             time_format = self.default_time_format
-        return [[self.format_for_csv(v, time_format, float_precision) for v in row] for row in result]
+        return [[self.format_for_csv(v, t, time_format, float_precision)
+                 for v, t in zip(row, cql_type_names)] for row in results]
 
     def test_list_data(self):
         """
@@ -363,7 +381,7 @@ class CqlshCopyTest(Tester):
         debug('Exporting to csv file: {name}'.format(name=tempfile.name))
         self.node1.run_cqlsh(cmds="COPY ks.testlist TO '{name}'".format(name=tempfile.name))
 
-        self.assertCsvResultEqual(tempfile.name, results)
+        self.assertCsvResultEqual(tempfile.name, results, 'testlist')
 
     def test_tuple_data(self):
         """
@@ -390,7 +408,7 @@ class CqlshCopyTest(Tester):
         debug('Exporting to csv file: {name}'.format(name=tempfile.name))
         self.node1.run_cqlsh(cmds="COPY ks.testtuple TO '{name}'".format(name=tempfile.name))
 
-        self.assertCsvResultEqual(tempfile.name, results)
+        self.assertCsvResultEqual(tempfile.name, results, 'testtuple')
 
     def non_default_delimiter_template(self, delimiter):
         """
@@ -420,7 +438,7 @@ class CqlshCopyTest(Tester):
         cmds += " WITH DELIMITER = '{d}'".format(d=delimiter)
         self.node1.run_cqlsh(cmds=cmds)
 
-        self.assertCsvResultEqual(tempfile.name, results)
+        self.assertCsvResultEqual(tempfile.name, results, 'testdelimiter')
 
     def test_colon_delimiter(self):
         """
@@ -468,7 +486,7 @@ class CqlshCopyTest(Tester):
         results = [[indicator if value is None else value for value in row]
                    for row in results]
 
-        self.assertCsvResultEqual(tempfile.name, results)
+        self.assertCsvResultEqual(tempfile.name, results, 'testnullindicator')
 
     def test_undefined_as_null_indicator(self):
         """
@@ -631,9 +649,12 @@ class CqlshCopyTest(Tester):
         cmds += " WITH DATETIMEFORMAT = '{}'".format(format)
         self.node1.run_cqlsh(cmds=cmds)
 
+        table_meta = self.session.cluster.metadata.keyspaces[self.ks].tables['testdatetimeformat']
+        cql_type_names = [table_meta.columns[c].cql_type for c in table_meta.columns]
+
         imported_results = list(self.session.execute("SELECT * FROM testdatetimeformat"))
-        self.assertItemsEqual(self.result_to_csv_rows(exported_results, time_format=format),
-                              self.result_to_csv_rows(imported_results, time_format=format))
+        self.assertItemsEqual(self.result_to_csv_rows(exported_results, cql_type_names, time_format=format),
+                              self.result_to_csv_rows(imported_results, cql_type_names, time_format=format))
 
     @since('3.2')
     def test_reading_with_ttl(self):
@@ -1010,7 +1031,7 @@ class CqlshCopyTest(Tester):
                                 invalid_rows.append(['bb', k, '1.0'])
                             else:  # fail on a value
                                 writer.writerow({'a': i, 'b': k, 'c': 'abc'})
-                                invalid_rows.append([i, k, 'abc'])
+                                invalid_rows.append([str(i), k, 'abc'])
                         else:
                             writer.writerow({'a': i, 'b': k, 'c': 2.0})  # valid
                             valid_rows.append([i, k, 2.0])
@@ -1030,7 +1051,7 @@ class CqlshCopyTest(Tester):
             debug('Checking valid rows')
             self.assertItemsEqual(valid_rows, results)
             debug('Checking invalid rows')
-            self.assertCsvResultEqual(err_file_name, invalid_rows)
+            self.assertCsvResultEqual(err_file_name, invalid_rows, cql_type_names=['text', 'int', 'text'])
 
         do_test(100, 2, 1, self.get_temp_file())
         do_test(10, 50, 1, self.get_temp_file())
@@ -1070,8 +1091,8 @@ class CqlshCopyTest(Tester):
         valid_rows = []
         with open(tempfile.name, 'w') as csvfile:  # c, d is missing
             writer = csv.DictWriter(csvfile, fieldnames=['a', 'b', 'e'])
-            writer.writerow({'a': 0, 'b': 0, 'e': 1.0})
-            invalid_rows.append([0, 0, '1.0'])
+            writer.writerow({'a': 0, 'b': 0, 'e': 1})
+            invalid_rows.append([0, 0, 1.0])
 
             writer = csv.DictWriter(csvfile, fieldnames=['a', 'b', 'c', 'd', 'e'])
             for i in xrange(1, 100):
@@ -1087,7 +1108,7 @@ class CqlshCopyTest(Tester):
         debug('Checking valid rows')
         self.assertItemsEqual(valid_rows, results)
         debug('Checking invalid rows')
-        self.assertCsvResultEqual(err_file.name, invalid_rows)
+        self.assertCsvResultEqual(err_file.name, invalid_rows, 'testwrongnumcols', columns=['a', 'b', 'e'])
 
         os.unlink(err_file.name)
 
@@ -1260,7 +1281,7 @@ class CqlshCopyTest(Tester):
             for a, b, c in data:
                 writer.writerow([a, c, b])
 
-        self.assertCsvResultEqual(reference_file.name, results)
+        self.assertCsvResultEqual(reference_file.name, results, 'testorder')
 
     def quoted_column_names_reading_template(self, specify_column_names):
         """
@@ -1296,7 +1317,7 @@ class CqlshCopyTest(Tester):
         self.node1.run_cqlsh(stmt)
 
         results = list(self.session.execute("SELECT * FROM testquoted"))
-        self.assertCsvResultEqual(tempfile.name, results)
+        self.assertCsvResultEqual(tempfile.name, results, 'testquoted')
 
     def test_quoted_column_names_reading_specify_names(self):
         """
@@ -1401,7 +1422,7 @@ class CqlshCopyTest(Tester):
             self.assertFalse(results)
         else:
             self.assertFalse(err)
-            self.assertCsvResultEqual(tempfile.name, results)
+            self.assertCsvResultEqual(tempfile.name, results, 'testvalidate')
 
     def test_read_valid_data(self):
         """
@@ -1475,7 +1496,7 @@ class CqlshCopyTest(Tester):
 
         results = list(self.session.execute("SELECT * FROM testdatatype"))
 
-        self.assertCsvResultEqual(tempfile.name, results)
+        self.assertCsvResultEqual(tempfile.name, results, 'testdatatype')
 
     def test_all_datatypes_read(self):
         """
@@ -1505,7 +1526,7 @@ class CqlshCopyTest(Tester):
 
         results = list(self.session.execute("SELECT * FROM testdatatype"))
 
-        self.assertCsvResultEqual(tempfile.name, results)
+        self.assertCsvResultEqual(tempfile.name, results, 'testdatatype')
 
     def test_all_datatypes_round_trip(self):
         """
@@ -1738,8 +1759,13 @@ class CqlshCopyTest(Tester):
 
             imported_results = list(self.session.execute("SELECT * FROM testnumberseps"))
             self.assertEqual(len(expected_vals), len(imported_results))
-            self.assertEqual(self.result_to_csv_rows(exported_results),  # we format as if we were comparing to csv
-                             self.result_to_csv_rows(imported_results))  # to overcome loss of precision in the import
+
+            table_meta = self.session.cluster.metadata.keyspaces[self.ks].tables['testnumberseps']
+            cql_type_names = [table_meta.columns[c].cql_type for c in table_meta.columns]
+
+            # we format as if we were comparing to csv to overcome loss of precision in the import
+            self.assertEqual(self.result_to_csv_rows(exported_results, cql_type_names),
+                             self.result_to_csv_rows(imported_results, cql_type_names))
 
         do_test(expected_vals_usual, ',', '.')
         do_test(expected_vals_inverted, '.', ',')
