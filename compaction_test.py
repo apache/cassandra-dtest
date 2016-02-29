@@ -6,7 +6,7 @@ import time
 
 from assertions import assert_none, assert_one
 from dtest import Tester, debug
-from tools import since
+from tools import known_failure, since
 
 
 class TestCompaction(Tester):
@@ -211,6 +211,10 @@ class TestCompaction(Tester):
         # principle, a bit of wiggle room is expected
         self.assertGreaterEqual(float(threshold) + 0.5, float(avgthroughput))
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11282',
+                   flaky=True,
+                   notes='see also 11283')
     def compaction_strategy_switching_test(self):
         """Ensure that switching strategies does not result in problems.
         Insert data, switch strategies, then check against data loss.
