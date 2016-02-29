@@ -198,6 +198,10 @@ class TestScrubIndexes(TestHelper):
         assert len(ret) == 8
         return ret
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11284',
+                   flaky=True,
+                   notes='windows')
     def test_scrub_static_table(self):
         cluster = self.cluster
         cluster.populate(1).start()
@@ -268,6 +272,10 @@ class TestScrubIndexes(TestHelper):
         users = self.query_users(session)
         self.assertEqual(initial_users, users)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11284',
+                   flaky=True,
+                   notes='windows')
     def test_scrub_collections_table(self):
         cluster = self.cluster
         cluster.populate(1).start()
