@@ -76,7 +76,7 @@ DISABLE_VNODES = not CONFIG.vnodes
 
 
 if os.environ.get('DISABLE_VNODES', '').lower() in ('yes', 'true'):
-    print 'DISABLE_VNODES environment variable deprecated. Use `runner.py --no-vnodes` instead.'
+    print 'DISABLE_VNODES environment variable deprecated. Use `./run_dtests.py --vnodes false` instead.'
 
 
 CURRENT_TEST = ""
