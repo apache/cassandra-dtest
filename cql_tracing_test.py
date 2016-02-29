@@ -1,6 +1,7 @@
 # coding: utf-8
 
 from dtest import Tester, debug
+from tools import known_failure
 
 
 def post_cassandra_10392(version):
@@ -108,6 +109,9 @@ class TestCqlTracing(Tester):
         session = self.prepare()
         self.trace(session)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11278',
+                   flaky=False)
     def tracing_unknown_impl_test(self):
         """
         Test that Cassandra logs an error, but keeps its default tracing
@@ -133,6 +137,9 @@ class TestCqlTracing(Tester):
             err = errs[0][0]
             self.assertIn(expected_error, err)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11278',
+                   flaky=False)
     def tracing_default_impl_test(self):
         """
         Test that Cassandra logs an error, but keeps its default tracing
