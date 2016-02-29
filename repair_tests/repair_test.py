@@ -678,7 +678,7 @@ class TestRepair(Tester):
         node1, node2, node3 = cluster.nodelist()
 
         # Valid job thread counts: 1, 2, 3, and 4
-        for i in range(1,5):
+        for i in range(1, 5):
             debug("Inserting data...")
             node1.stress(['write', 'n=2K', 'cl=ALL', '-schema', 'replication(factor=2)', '-rate', 'threads=30', '-pop', 'seq={}..{}K'.format(2 * (i - 1), 2 * i)])
 
@@ -691,23 +691,23 @@ class TestRepair(Tester):
             node1.stress(['write', 'n=2K', 'cl=ALL', '-schema', 'replication(factor=2)', '-rate', 'threads=30', '-pop', 'seq={}..{}K'.format(2 * (i + 1), 2 * (i + 2))])
 
             cluster.flush()
-            session=self.patient_cql_connection(node1)
+            session = self.patient_cql_connection(node1)
             session.execute("TRUNCATE system_traces.events")
 
-            job_thread_count=i
-            opts=['-tr', '-j', str(job_thread_count)]
+            job_thread_count = i
+            opts = ['-tr', '-j', str(job_thread_count)]
             opts += _repair_options(self.cluster.version(), ks='keyspace1', cf='standard1', sequential=False)
             node1.repair(opts)
 
             time.sleep(5)  # Give the trace table some time to populate
 
-            rows=list(session.execute("SELECT activity FROM system_traces.events"))
+            rows = list(session.execute("SELECT activity FROM system_traces.events"))
             self.assertIn('job threads: {}'.format(job_thread_count),
                           rows[0][0],
                           'Expected {} job threads in repair options. Instead we saw {}'.format(job_thread_count, rows[0][0]))
 
 
-RepairTableContents=namedtuple('RepairTableContents',
+RepairTableContents = namedtuple('RepairTableContents',
                                  ['parent_repair_history', 'repair_history'])
 
 
@@ -730,8 +730,8 @@ class TestRepairDataSystemTable(Tester):
 
         Tester.setUp(self)
         self.cluster.populate(5).start(wait_for_binary_proto=True)
-        self.node1=self.cluster.nodelist()[0]
-        self.session=self.patient_cql_connection(self.node1)
+        self.node1 = self.cluster.nodelist()[0]
+        self.session = self.patient_cql_connection(self.node1)
 
         self.node1.stress(stress_options=['write', 'n=5K', 'cl=ONE', '-schema', 'replication(factor=3)'])
 
@@ -749,18 +749,18 @@ class TestRepairDataSystemTable(Tester):
         repair information about system keyspaces, or at least keyspaces with
         'system' in their names.
         """
-        session=self.patient_cql_connection(node)
+        session = self.patient_cql_connection(node)
 
         def execute_with_all(stmt):
             return session.execute(SimpleStatement(stmt, consistency_level=ConsistencyLevel.ALL))
 
-        parent_repair_history=execute_with_all('SELECT * FROM system_distributed.parent_repair_history;')
-        repair_history=execute_with_all('SELECT * FROM system_distributed.repair_history;')
+        parent_repair_history = execute_with_all('SELECT * FROM system_distributed.parent_repair_history;')
+        repair_history = execute_with_all('SELECT * FROM system_distributed.repair_history;')
 
         if not include_system_keyspaces:
-            parent_repair_history=[row for row in parent_repair_history
+            parent_repair_history = [row for row in parent_repair_history
                                      if 'system' not in row.keyspace_name]
-            repair_history=[row for row in repair_history if
+            repair_history = [row for row in repair_history if
                               'system' not in row.keyspace_name]
         return RepairTableContents(parent_repair_history=parent_repair_history,
                                    repair_history=repair_history)
@@ -769,7 +769,7 @@ class TestRepairDataSystemTable(Tester):
     def initial_empty_repair_tables_test(self):
         debug('repair tables:')
         debug(self.repair_table_contents(node=self.node1, include_system_keyspaces=False))
-        repair_tables_dict=self.repair_table_contents(node=self.node1, include_system_keyspaces=False)._asdict()
+        repair_tables_dict = self.repair_table_contents(node=self.node1, include_system_keyspaces=False)._asdict()
         for table_name, table_contents in repair_tables_dict.items():
             self.assertFalse(table_contents, '{} is non-empty'.format(table_name))
 
@@ -782,7 +782,7 @@ class TestRepairDataSystemTable(Tester):
         - checking that there are a non-zero number of entries in `parent_repair_history`.
         """
         self.node1.repair()
-        parent_repair_history, _=self.repair_table_contents(node=self.node1, include_system_keyspaces=False)
+        parent_repair_history, _ = self.repair_table_contents(node=self.node1, include_system_keyspaces=False)
         self.assertTrue(len(parent_repair_history))
 
     @known_failure(failure_source='test',
@@ -798,5 +798,5 @@ class TestRepairDataSystemTable(Tester):
         - checking that there are a non-zero number of entries in `repair_history`.
         """
         self.node1.repair()
-        _, repair_history=self.repair_table_contents(node=self.node1, include_system_keyspaces=False)
+        _, repair_history = self.repair_table_contents(node=self.node1, include_system_keyspaces=False)
         self.assertTrue(len(repair_history))
