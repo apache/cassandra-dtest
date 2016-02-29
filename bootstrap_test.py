@@ -308,6 +308,10 @@ class TestBootstrap(Tester):
         failure = regex.search(output)
         self.assertIsNone(failure, "Error during stress while bootstrapping")
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11281',
+                   flaky=False,
+                   notes='windows')
     def shutdown_wiped_node_cannot_join_test(self):
         self._wiped_node_cannot_join_test(gently=True)
 
