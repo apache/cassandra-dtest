@@ -4,7 +4,8 @@ import os.path
 from assertions import assert_almost_equal
 from dtest import DISABLE_VNODES, Tester
 from jmxutils import JolokiaAgent, make_mbean, remove_perf_disable_shared_mem
-from tools import create_c1c2_table, insert_c1c2, new_node, query_c1c2, since
+from tools import (create_c1c2_table, insert_c1c2, known_failure, new_node,
+                   query_c1c2, since)
 
 
 @since('3.2')
@@ -26,6 +27,9 @@ class TestDiskBalance(Tester):
         for node in cluster.nodelist():
             self.assert_balanced(node)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11279',
+                   flaky=True)
     def disk_balance_bootstrap_test(self):
         cluster = self.cluster
         if not DISABLE_VNODES:
