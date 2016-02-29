@@ -9,6 +9,34 @@ from dtest import Tester, debug
 from tools import insert_c1c2, known_failure, no_vnodes, query_c1c2, since
 
 
+def _repair_options(version, ks='', cf=None, sequential=True):
+    """
+    Function for assembling appropriate repair CLI options,
+    based on C* version, as defaults have changed.
+    @param ks The keyspace to repair
+    @param cf The table to repair
+    @param sequential If the repair should be a sequential repair [vs parallel]
+    """
+    opts = []
+
+    # since version 2.2, default is parallel, otherwise it's sequential
+    if sequential:
+        if version >= '2.2':
+            opts += ['-seq']
+    else:
+        if version < '2.2':
+            opts += ['-par']
+
+    # test with full repair
+    if version >= '2.2':
+        opts += ['-full']
+    if ks:
+        opts += [ks]
+    if cf:
+        opts += [cf]
+    return opts
+
+
 class TestRepair(Tester):
 
     def check_rows_on_node(self, node_to_check, rows, found=None, missings=None, restart=True):
@@ -174,35 +202,6 @@ class TestRepair(Tester):
         """
         self._simple_repair(order_preserving_partitioner=True)
 
-    def _repair_options(self, ks='', cf=None, sequential=True):
-        """
-        Function for assembling appropriate repair CLI options,
-        based on C* version, as defaults have changed.
-        @param ks The keyspace to repair
-        @param cf The table(s) to repair
-        @param sequential If the repair should be a sequential repair [vs parallel]
-        """
-        if cf is None:
-            cf = []
-        opts = []
-        version = self.cluster.version()
-        # since version 2.2, default is parallel, otherwise it's sequential
-        if sequential:
-            if version >= '2.2':
-                opts += ['-seq']
-        else:
-            if version < '2.2':
-                opts += ['-par']
-
-        # test with full repair
-        if version >= '2.2':
-            opts += ['-full']
-        if ks:
-            opts += [ks]
-        if cf:
-            opts += [cf]
-        return opts
-
     def _simple_repair(self, order_preserving_partitioner=False, sequential=True):
         """
         * Configure a three node cluster to not use hinted handoff, and to use batch commitlog
@@ -265,7 +264,7 @@ class TestRepair(Tester):
         # Run repair
         start = time.time()
         debug("starting repair...")
-        node1.repair(self._repair_options(ks='ks', sequential=sequential))
+        node1.repair(_repair_options(self.cluster.version(), ks='ks', sequential=sequential))
         debug("Repair time: {end}".format(end=time.time() - start))
 
         # Validate that only one range was transfered
@@ -273,13 +272,16 @@ class TestRepair(Tester):
 
         self.assertEqual(len(out_of_sync_logs), 2, "Lines matching: " + str([elt[0] for elt in out_of_sync_logs]))
 
-        valid = [(node1.address(), node3.address()), (node3.address(), node1.address()), (node2.address(), node3.address()), (node3.address(), node2.address())]
+        valid_out_of_sync_pairs = [{node1.address(), node3.address()},
+                                   {node3.address(), node1.address()},
+                                   {node2.address(), node3.address()},
+                                   {node3.address(), node2.address()}]
 
         for line, m in out_of_sync_logs:
-            self.assertEqual(int(m.group(3)), 1, "Expecting 1 range out of sync, got " + m.group(3))
-            self.assertIn((m.group(1), m.group(2)), valid, str((m.group(1), m.group(2))))
-            valid.remove((m.group(1), m.group(2)))
-            valid.remove((m.group(2), m.group(1)))
+            self.assertEqual(int(m.group(3)), 1, "Expecting 1 range out of sync for {} and {}, but saw {}".format(m.group(1), m.group(2), line))
+            self.assertIn({m.group(1), m.group(2)}, valid_out_of_sync_pairs, str((m.group(1), m.group(2))))
+            valid_out_of_sync_pairs.remove((m.group(1), m.group(2)))
+            valid_out_of_sync_pairs.remove((m.group(2), m.group(1)))
 
         # Check node3 now has the key
         self.check_rows_on_node(node3, 2001, found=[1000], restart=False)
@@ -352,7 +354,7 @@ class TestRepair(Tester):
 
         # bring up node2 and repair
         node2.start(wait_for_binary_proto=True, wait_other_notice=True)
-        node2.repair(self._repair_options(ks='ks', sequential=sequential))
+        node2.repair(_repair_options(self.cluster.version(), ks='ks', sequential=sequential))
 
         # check no rows will be returned
         for cf in ['cf1', 'cf2']:
@@ -383,18 +385,18 @@ class TestRepair(Tester):
 
         debug("starting repair...")
         opts = ["-local"]
-        opts += self._repair_options(ks="ks")
+        opts += _repair_options(self.cluster.version(), ks="ks")
         node1.repair(opts)
 
         # Verify that only nodes in dc1 are involved in repair
         out_of_sync_logs = node1.grep_log("/([0-9.]+) and /([0-9.]+) have ([0-9]+) range\(s\) out of sync")
         self.assertEqual(len(out_of_sync_logs), 1, "Lines matching: {}".format(len(out_of_sync_logs)))
         line, m = out_of_sync_logs[0]
-        self.assertEqual(int(m.group(3)), 1, "Expecting 1 range out of sync, got " + m.group(3))
-        valid = [node1.address(), node2.address()]
-        self.assertIn(m.group(1), valid, "Unrelated node found in local repair: " + m.group(1))
-        valid.remove(m.group(1))
-        self.assertIn(m.group(2), valid, "Unrelated node found in local repair: " + m.group(2))
+        self.assertEqual(int(m.group(3)), 1, "Expecting 1 range out of sync for {} and {}, but saw {}".format(m.group(1), m.group(2), line))
+        valid_out_of_sync_pairs = [node1.address(), node2.address()]
+        self.assertIn(m.group(1), valid_out_of_sync_pairs, "Unrelated node found in local repair: " + m.group(1))
+        valid_out_of_sync_pairs.remove(m.group(1))
+        self.assertIn(m.group(2), valid_out_of_sync_pairs, "Unrelated node found in local repair: " + m.group(2))
         # Check node2 now has the key
         self.check_rows_on_node(node2, 2001, found=[1000], restart=False)
 
@@ -411,17 +413,19 @@ class TestRepair(Tester):
 
         debug("starting repair...")
         opts = ["-dc", "dc1", "-dc", "dc2"]
-        opts += self._repair_options(ks="ks")
+        opts += _repair_options(self.cluster.version(), ks="ks")
         node1.repair(opts)
 
         # Verify that only nodes in dc1 and dc2 are involved in repair
         out_of_sync_logs = node1.grep_log("/([0-9.]+) and /([0-9.]+) have ([0-9]+) range\(s\) out of sync")
         self.assertEqual(len(out_of_sync_logs), 2, "Lines matching: " + str([elt[0] for elt in out_of_sync_logs]))
-        valid = [(node1.address(), node2.address()), (node2.address(), node1.address()),
-                 (node2.address(), node3.address()), (node3.address(), node2.address())]
+        valid_out_of_sync_pairs = [{node1.address(), node2.address()},
+                                   {node2.address(), node1.address()},
+                                   {node2.address(), node3.address()},
+                                   {node3.address(), node2.address()}]
         for line, m in out_of_sync_logs:
-            self.assertEqual(int(m.group(3)), 1, "Expecting 1 range out of sync, got " + m.group(3))
-            self.assertIn((m.group(1), m.group(2)), valid, str((m.group(1), m.group(2))))
+            self.assertEqual(int(m.group(3)), 1, "Expecting 1 range out of sync for {} and {}, but saw {}".format(m.group(1), m.group(2), line))
+            self.assertIn({m.group(1), m.group(2)}, valid_out_of_sync_pairs, str((m.group(1), m.group(2))))
 
         # Check node2 now has the key
         self.check_rows_on_node(node2, 2001, found=[1000], restart=False)
@@ -439,23 +443,28 @@ class TestRepair(Tester):
 
         debug("starting repair...")
         opts = ["-dc", "dc1", "-dc", "dc2", "-dcpar"]
-        opts += self._repair_options(ks="ks", sequential=False)
+        opts += _repair_options(self.cluster.version(), ks="ks", sequential=False)
         node1.repair(opts)
 
         # Verify that only nodes in dc1 and dc2 are involved in repair
         out_of_sync_logs = node1.grep_log("/([0-9.]+) and /([0-9.]+) have ([0-9]+) range\(s\) out of sync")
         self.assertEqual(len(out_of_sync_logs), 2, "Lines matching: " + str([elt[0] for elt in out_of_sync_logs]))
-        valid = [(node1.address(), node2.address()), (node2.address(), node1.address()),
-                 (node2.address(), node3.address()), (node3.address(), node2.address())]
+        valid_out_of_sync_pairs = [{node1.address(), node2.address()},
+                                   {node2.address(), node1.address()},
+                                   {node2.address(), node3.address()},
+                                   {node3.address(), node2.address()}]
         for line, m in out_of_sync_logs:
-            self.assertEqual(int(m.group(3)), 1, "Expecting 1 range out of sync, got " + m.group(3))
-            self.assertIn((m.group(1), m.group(2)), valid, str((m.group(1), m.group(2))))
+            self.assertEqual(int(m.group(3)), 1, "Expecting 1 range out of sync for {} and {}, but saw {}".format(m.group(1), m.group(2), line))
+            self.assertIn({m.group(1), m.group(2)}, valid_out_of_sync_pairs, str((m.group(1), m.group(2))))
 
         # Check node2 now has the key
         self.check_rows_on_node(node2, 2001, found=[1000], restart=False)
 
         # Check the repair was a dc parallel repair
-        self.assertEqual(len(node1.grep_log('parallelism: dc_parallel')), 1)
+        if self.cluster.version() >= '2.2':
+            self.assertEqual(len(node1.grep_log('parallelism: dc_parallel')), 1, str(node1.grep_log('parallelism')))
+        else:
+            self.assertEqual(len(node1.grep_log('parallelism=PARALLEL')), 1, str(node1.grep_log('parallelism')))
 
     def _setup_multi_dc(self):
         """
@@ -555,7 +564,7 @@ class TestRepair(Tester):
 
         node1, node2, node3 = cluster.nodelist()
 
-        self._range_repair(repair_opts=['-st', str(node3.initial_token), '-et', str(node1.initial_token)])
+        self._parameterized_range_repair(repair_opts=['-st', str(node3.initial_token), '-et', str(node1.initial_token)])
 
     @no_vnodes()
     def partitioner_range_repair_test(self):
@@ -574,9 +583,9 @@ class TestRepair(Tester):
 
         node1, node2, node3 = cluster.nodelist()
 
-        self._range_repair(repair_opts=['-pr'])
+        self._parameterized_range_repair(repair_opts=['-pr'])
 
-    def _range_repair(self, repair_opts):
+    def _parameterized_range_repair(self, repair_opts):
         """
         @param repair_opts A list of strings which represent cli args to nodetool repair
         * Launch a three node cluster
@@ -604,14 +613,14 @@ class TestRepair(Tester):
 
         # Repair only the range node 1 owns
         opts = repair_opts
-        opts += self._repair_options(ks='keyspace1', cf='standard1', sequential=False)
+        opts += _repair_options(self.cluster.version(), ks='keyspace1', cf='standard1', sequential=False)
         node1.repair(opts)
 
         self.assertEqual(len(node1.grep_log('are consistent for standard1')), 0, "Nodes 1 and 2 should not be consistent.")
         self.assertEqual(len(node1.grep_log("/127.0.0.2 and /127.0.0.1 have ([0-9]+) range\(s\) out of sync")), 1)
         self.assertEqual(len(node3.grep_log('Repair command')), 0, "Node 3 should not have been involved in the repair.")
 
-    def trace_threads_repair(self):
+    def trace_threads_repair_test(self):
         """
         * Launch a three node cluster
         * Insert some data at RF 2
@@ -641,14 +650,13 @@ class TestRepair(Tester):
 
         job_thread_count = '2'
         opts = ['-tr', '-j', job_thread_count]
-        opts += self._repair_options(ks='keyspace1', cf='standard1', sequential=False)
+        opts += _repair_options(self.cluster.version(), ks='keyspace1', cf='standard1', sequential=False)
         node1.repair(opts)
 
         time.sleep(5)  # Give the trace table some time to populate
 
         session = self.patient_cql_connection(node1)
         rows = list(session.execute("SELECT activity FROM system_traces.events"))
-        self.assertGreater(len(rows), 2500, "We expected more trace data from repair. Found {} rows.".format(len(rows)))
         self.assertIn('job threads: {}'.format(job_thread_count),
                       rows[0][0],
                       'Expected {} job threads in repair options. Instead we saw {}'.format(job_thread_count, rows[0][0]))
