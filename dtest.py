@@ -33,6 +33,11 @@ from ccmlib.cluster_factory import ClusterFactory
 from ccmlib.common import is_win
 from ccmlib.node import TimeoutError
 
+# We don't want test files to know about the plugins module, so we import
+# constants here and re-export them.
+from plugins.dtestconfig import _CONFIG as CONFIG
+from plugins.dtestconfig import GlobalConfigObject
+
 LOG_SAVED_DIR = "logs"
 try:
     os.mkdir(LOG_SAVED_DIR)
@@ -56,7 +61,6 @@ TRACE = os.environ.get('TRACE', '').lower() in ('yes', 'true')
 KEEP_LOGS = os.environ.get('KEEP_LOGS', '').lower() in ('yes', 'true')
 KEEP_TEST_DIR = os.environ.get('KEEP_TEST_DIR', '').lower() in ('yes', 'true')
 PRINT_DEBUG = os.environ.get('PRINT_DEBUG', '').lower() in ('yes', 'true')
-DISABLE_VNODES = os.environ.get('DISABLE_VNODES', '').lower() in ('yes', 'true')
 OFFHEAP_MEMTABLES = os.environ.get('OFFHEAP_MEMTABLES', '').lower() in ('yes', 'true')
 NUM_TOKENS = os.environ.get('NUM_TOKENS', '256')
 RECORD_COVERAGE = os.environ.get('RECORD_COVERAGE', '').lower() in ('yes', 'true')
@@ -65,6 +69,21 @@ SILENCE_DRIVER_ON_SHUTDOWN = os.environ.get('SILENCE_DRIVER_ON_SHUTDOWN', 'true'
 IGNORE_REQUIRE = os.environ.get('IGNORE_REQUIRE', '').lower() in ('yes', 'true')
 DATADIR_COUNT = os.environ.get('DATADIR_COUNT', '3')
 ENABLE_ACTIVE_LOG_WATCHING = os.environ.get('ENABLE_ACTIVE_LOG_WATCHING', '').lower() in ('yes', 'true')
+
+# devault values for configuration from configuration plugin
+_default_config = GlobalConfigObject(
+    vnodes=True,
+)
+
+if CONFIG is None:
+    CONFIG = _default_config
+
+DISABLE_VNODES = not CONFIG.vnodes
+
+
+if os.environ.get('DISABLE_VNODES', '').lower() in ('yes', 'true'):
+    print 'DISABLE_VNODES environment variable deprecated. Use `./run_dtests.py --vnodes false` instead.'
+
 
 CURRENT_TEST = ""
 
