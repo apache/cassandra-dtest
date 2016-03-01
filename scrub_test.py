@@ -344,6 +344,10 @@ class TestScrub(TestHelper):
         assert len(ret) == 5
         return ret
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11284',
+                   flaky=True,
+                   notes='windows')
     def test_nodetool_scrub(self):
         cluster = self.cluster
         cluster.populate(1).start()
