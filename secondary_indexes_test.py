@@ -4,13 +4,14 @@ import re
 import time
 import uuid
 
-from dtest import Tester, debug
-from tools import since, rows_to_list
 from assertions import assert_invalid, assert_one
 from cassandra import InvalidRequest
-from cassandra.concurrent import execute_concurrent, execute_concurrent_with_args
-from cassandra.query import BatchStatement, SimpleStatement
+from cassandra.concurrent import (execute_concurrent,
+                                  execute_concurrent_with_args)
 from cassandra.protocol import ConfigurationException
+from cassandra.query import BatchStatement, SimpleStatement
+from dtest import Tester, debug
+from tools import known_failure, rows_to_list, since
 
 
 class TestSecondaryIndexes(Tester):
@@ -342,6 +343,9 @@ class TestSecondaryIndexes(Tester):
         self.assertEqual(2, len(rows))
 
     @since('3.0')
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11289',
+                   flaky=True)
     def test_only_coordinator_chooses_index_for_query(self):
         """
         Checks that the index to use is selected (once) on the coordinator and
