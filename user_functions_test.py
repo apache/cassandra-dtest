@@ -3,10 +3,12 @@ import os
 import time
 
 from cassandra import FunctionFailure
-from ccmlib.common import get_version_from_build
 
-from assertions import assert_invalid, assert_none, assert_one
-from dtest import Tester
+from distutils.version import LooseVersion
+
+from ccmlib.common import get_version_from_build
+from dtest import Tester, debug
+from assertions import assert_invalid, assert_one, assert_none
 from tools import since
 
 
@@ -208,24 +210,6 @@ class TestUserFunctions(Tester):
 
         assert_invalid(session, "create aggregate aggthree(int) sfunc test stype int finalfunc aggtwo")
 
-    def udf_with_frozen_udt_test(self):
-        session = self.prepare()
-
-        session.execute("create type test (a text, b int);")
-
-        session.execute("create table tab (key int primary key, udt frozen<test>);")
-
-        session.execute("insert into tab (key, udt) values (1, {a: 'un', b:1});")
-        session.execute("insert into tab (key, udt) values (2, {a: 'deux', b:2});")
-        session.execute("insert into tab (key, udt) values (3, {a: 'trois', b:3});")
-
-        session.execute("create function funk(udt test) called on null input returns int language java as 'return Integer.valueOf(udt.getInt(\"b\"));';")
-
-        assert_one(session, "select sum(funk(udt)) from tab", [6])
-
-        assert_invalid(session, "drop type test;")
-
-    @since('3.6')
     def udf_with_udt_test(self):
         """
         Test UDFs that operate on non-frozen UDTs.
@@ -233,20 +217,28 @@ class TestUserFunctions(Tester):
         @since 3.6
         """
         session = self.prepare()
-
         session.execute("create type test (a text, b int);")
-
-        session.execute("create table tab (key int primary key, udt test);")
-
-        session.execute("insert into tab (key, udt) values (1, {a: 'un', b:1});")
-        session.execute("insert into tab (key, udt) values (2, {a: 'deux', b:2});")
-        session.execute("insert into tab (key, udt) values (3, {a: 'trois', b:3});")
-
         session.execute("create function funk(udt test) called on null input returns int language java as 'return Integer.valueOf(udt.getInt(\"b\"));';")
 
-        assert_one(session, "select sum(funk(udt)) from tab", [6])
+        if LooseVersion(self.cluster.version()) >= LooseVersion('3.6'):
+            frozen_vals = (False, True)
+        else:
+            frozen_vals = (False,)
 
-        assert_invalid(session, "drop type test;")
+        for frozen in frozen_vals:
+            debug("Using {} UDTs".format("frozen" if frozen else "non-frozen"))
+
+            table_name = "tab_frozen" if frozen else "tab"
+            column_type = "frozen<test>" if frozen else "test"
+            session.execute("create table {} (key int primary key, udt {});".format(table_name, column_type))
+
+            session.execute("insert into %s (key, udt) values (1, {a: 'un', b:1});" % (table_name,))
+            session.execute("insert into %s (key, udt) values (2, {a: 'deux', b:2});" % (table_name,))
+            session.execute("insert into %s (key, udt) values (3, {a: 'trois', b:3});" % (table_name,))
+
+            assert_one(session, "select sum(funk(udt)) from {}".format(table_name), [6])
+
+            assert_invalid(session, "drop type test;")
 
     @since('2.2')
     def udf_with_udt_keyspace_isolation_test(self):
