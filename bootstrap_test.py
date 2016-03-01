@@ -395,6 +395,10 @@ class TestBootstrap(Tester):
         node4.start(wait_other_notice=True)
         node4.watch_log_for("JOINING:", from_mark=mark)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11281',
+                   flaky=True,
+                   notes='windows')
     def decommissioned_wiped_node_can_gossip_to_single_seed_test(self):
         """
         @jira_ticket CASSANDRA-8072
