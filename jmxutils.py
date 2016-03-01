@@ -53,6 +53,22 @@ def make_mbean(package, type, **kwargs):
     return rv
 
 
+def apply_jmx_authentication(node):
+    replacement_list = [
+        ('JVM_OPTS="\$JVM_OPTS -Dcom.sun.management.jmxremote.authenticate=false"',
+         'JVM_OPTS="$JVM_OPTS -Dcom.sun.management.jmxremote.authenticate=true"'),
+        ('JVM_OPTS="\$JVM_OPTS -Dcom.sun.management.jmxremote.password.file=/etc/cassandra/jmxremote.password"',
+         '#JVM_OPTS="$JVM_OPTS -Dcom.sun.management.jmxremote.password.file=/etc/cassandra/jmxremote.password"'),
+        ('#JVM_OPTS="\$JVM_OPTS -Dcassandra.jmx.remote.login.config=CassandraLogin"',
+         'JVM_OPTS="$JVM_OPTS -Dcassandra.jmx.remote.login.config=CassandraLogin"'),
+        ('#JVM_OPTS="\$JVM_OPTS -Djava.security.auth.login.config=\$CASSANDRA_HOME/conf/cassandra-jaas.config"',
+         'JVM_OPTS="$JVM_OPTS -Djava.security.auth.login.config=$CASSANDRA_HOME/conf/cassandra-jaas.config"'),
+        ('#JVM_OPTS="\$JVM_OPTS -Dcassandra.jmx.authorizer=org.apache.cassandra.auth.jmx.AuthorizationProxy"',
+         'JVM_OPTS="$JVM_OPTS -Dcassandra.jmx.authorizer=org.apache.cassandra.auth.jmx.AuthorizationProxy"')
+    ]
+    common.replaces_in_file(node.envfilename(), replacement_list)
+
+
 def remove_perf_disable_shared_mem(node):
     """
     The Jolokia agent is incompatible with the -XX:+PerfDisableSharedMem JVM
@@ -64,10 +80,7 @@ def remove_perf_disable_shared_mem(node):
         pattern = '\-XX:\+PerfDisableSharedMem'
         replacement = '#-XX:+PerfDisableSharedMem'
     else:
-        if common.is_win():
-            conf_file = os.path.join(node.get_conf_dir(), common.CASSANDRA_WIN_ENV)
-        else:
-            conf_file = os.path.join(node.get_conf_dir(), common.CASSANDRA_ENV)
+        conf_file = node.envfilename()
         pattern = 'PerfDisableSharedMem'
         replacement = ''
 
