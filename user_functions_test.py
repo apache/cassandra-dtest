@@ -208,12 +208,35 @@ class TestUserFunctions(Tester):
 
         assert_invalid(session, "create aggregate aggthree(int) sfunc test stype int finalfunc aggtwo")
 
-    def udf_with_udt_test(self):
+    def udf_with_frozen_udt_test(self):
         session = self.prepare()
 
         session.execute("create type test (a text, b int);")
 
         session.execute("create table tab (key int primary key, udt frozen<test>);")
+
+        session.execute("insert into tab (key, udt) values (1, {a: 'un', b:1});")
+        session.execute("insert into tab (key, udt) values (2, {a: 'deux', b:2});")
+        session.execute("insert into tab (key, udt) values (3, {a: 'trois', b:3});")
+
+        session.execute("create function funk(udt test) called on null input returns int language java as 'return Integer.valueOf(udt.getInt(\"b\"));';")
+
+        assert_one(session, "select sum(funk(udt)) from tab", [6])
+
+        assert_invalid(session, "drop type test;")
+
+    @since('3.6')
+    def udf_with_udt_test(self):
+        """
+        Test UDFs that operate on non-frozen UDTs.
+        @jira_ticket CASSANDRA-7423
+        @since 3.6
+        """
+        session = self.prepare()
+
+        session.execute("create type test (a text, b int);")
+
+        session.execute("create table tab (key int primary key, udt test);")
 
         session.execute("insert into tab (key, udt) values (1, {a: 'un', b:1});")
         session.execute("insert into tab (key, udt) values (2, {a: 'deux', b:2});")
