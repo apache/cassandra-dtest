@@ -357,6 +357,10 @@ class TestBootstrap(Tester):
         node4.start(no_wait=True)
         node4.watch_log_for("A node with address /127.0.0.4 already exists, cancelling join", from_mark=mark)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11281',
+                   flaky=True,
+                   notes='windows')
     def decommissioned_wiped_node_can_join_test(self):
         """
         @jira_ticket CASSANDRA-9765
