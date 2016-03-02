@@ -886,10 +886,6 @@ class TestAuth(Tester):
         cassandra.execute("GRANT DROP ON KEYSPACE ks TO cathy")
         cathy.execute("DROP TYPE ks.address")
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11254',
-                   flaky=False,
-                   notes='windows')
     def restart_node_doesnt_lose_auth_data_test(self):
         """
         * Launch a one node cluster
