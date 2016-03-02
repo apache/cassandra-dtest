@@ -542,6 +542,10 @@ class TestRepairDataSystemTable(Tester):
         parent_repair_history, _ = self.repair_table_contents(node=self.node1, include_system_keyspaces=False)
         self.assertTrue(len(parent_repair_history))
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11298',
+                   flaky=True,
+                   notes='windows')
     def repair_table_test(self):
         """
         Test that `system_distributed.repair_history` is properly populated
