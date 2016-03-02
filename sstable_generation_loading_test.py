@@ -134,8 +134,8 @@ class TestSSTableGenerationAndLoading(Tester):
             self.create_schema(session, ks, compression)
             # create a materialized view
             session.execute("CREATE MATERIALIZED VIEW mv1 AS "
-                             "SELECT key FROM standard1 WHERE key IS NOT NULL AND c IS NOT NULL AND v IS NOT NULL "
-                             "PRIMARY KEY (v)")
+                            "SELECT key FROM standard1 WHERE key IS NOT NULL AND c IS NOT NULL AND v IS NOT NULL "
+                            "PRIMARY KEY (v)")
 
         self.load_sstable_with_configuration(ks='"Keyspace1"', create_schema=create_schema_with_mv)
 
