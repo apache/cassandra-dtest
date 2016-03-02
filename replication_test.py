@@ -229,9 +229,6 @@ class ReplicationTest(Tester):
             # acknowledged the write:
             self.assertEqual(stats['nodes_sent_write'], stats['nodes_responded_write'])
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11221',
-                   flaky=True)
     def network_topology_test(self):
         """
         Test the NetworkTopologyStrategy on a 2DC 3:3 node cluster
