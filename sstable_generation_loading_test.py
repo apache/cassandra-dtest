@@ -130,6 +130,9 @@ class TestSSTableGenerationAndLoading(Tester):
         self.load_sstable_with_configuration(ks='"Keyspace1"')
 
     def sstableloader_with_mv_test(self):
+        """
+        @jira_ticket CASSANDRA-11275
+        """
         def create_schema_with_mv(session, ks, compression):
             self.create_schema(session, ks, compression)
             # create a materialized view
