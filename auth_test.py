@@ -10,7 +10,7 @@ from cassandra.cluster import NoHostAvailable
 from cassandra.protocol import SyntaxException
 from ccmlib.common import get_version_from_build
 from dtest import Tester, debug
-from tools import known_failure, since
+from tools import since
 
 
 class TestAuth(Tester):
