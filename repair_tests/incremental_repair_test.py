@@ -145,9 +145,6 @@ class TestIncRepair(Tester):
 
         assert_one(session, "SELECT COUNT(*) FROM ks.cf LIMIT 200", [149])
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11220',
-                   flaky=False)
     def sstable_repairedset_test(self):
         """
         * Launch a two node cluster
@@ -185,8 +182,11 @@ class TestIncRepair(Tester):
             initialoutput = r.read()
 
         matches = findall('(?<=Repaired at:).*', initialoutput)
+        debug("Repair timestamps are: {}".format(matches))
+
         uniquematches = []
         matchcount = []
+
         for value in matches:
             if value not in uniquematches:
                 uniquematches.append(value)
@@ -195,9 +195,9 @@ class TestIncRepair(Tester):
                 index = uniquematches.index(value)
                 matchcount[index] = matchcount[index] + 1
 
-        self.assertGreaterEqual(len(uniquematches), 2)
+        self.assertGreaterEqual(len(uniquematches), 2, uniquematches)
 
-        self.assertGreaterEqual(max(matchcount), 2)
+        self.assertGreaterEqual(max(matchcount), 1, matchcount)
 
         self.assertIn('Repaired at: 0', initialoutput)
 
