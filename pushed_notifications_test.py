@@ -1,12 +1,13 @@
 import time
 from threading import Event
 
+from nose.tools import timed
+
 from assertions import assert_invalid
 from cassandra import ConsistencyLevel as CL
 from cassandra import ReadFailure
 from cassandra.query import SimpleStatement
 from dtest import Tester, debug
-from nose.tools import timed
 from tools import known_failure, no_vnodes, since
 
 
@@ -151,9 +152,6 @@ class TestPushedNotifications(Tester):
             notifications = waiter.wait_for_notifications(30.0)
             self.assertEquals(1 if waiter.node is node1 else 0, len(notifications), notifications)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11211',
-                   flaky=True)
     def restart_node_test(self):
         """
         @jira_ticket CASSANDRA-7816
@@ -162,8 +160,9 @@ class TestPushedNotifications(Tester):
 
         self.cluster.populate(2).start(wait_for_binary_proto=True, wait_other_notice=True)
         node1, node2 = self.cluster.nodelist()
-
+        # need to block so that these notifications don't confuse the state below
         waiter = NotificationWaiter(self, node1, ["STATUS_CHANGE", "TOPOLOGY_CHANGE"])
+        waiter.wait_for_notifications(timeout=60, num_notifications=2)
         waiter.clear_notifications()
 
         for i in range(5):
