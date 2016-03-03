@@ -101,7 +101,7 @@ class TestPushedNotifications(Tester):
         for waiter in waiters:
             debug("Waiting for notification from {}".format(waiter.address,))
             notifications = waiter.wait_for_notifications(60.0)
-            self.assertEquals(1, len(notifications))
+            self.assertEquals(1, len(notifications), notifications)
             notification = notifications[0]
             change_type = notification["change_type"]
             address, port = notification["address"]
@@ -149,7 +149,7 @@ class TestPushedNotifications(Tester):
         for waiter in waiters:
             debug("Waiting for notification from {}".format(waiter.address,))
             notifications = waiter.wait_for_notifications(30.0)
-            self.assertEquals(1 if waiter.node is node1 else 0, len(notifications))
+            self.assertEquals(1 if waiter.node is node1 else 0, len(notifications), notifications)
 
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11211',
@@ -172,7 +172,7 @@ class TestPushedNotifications(Tester):
             node2.start(wait_other_notice=True)
             debug("Waiting for notifications from {}".format(waiter.address))
             notifications = waiter.wait_for_notifications(timeout=60.0, num_notifications=3)
-            self.assertEquals(3, len(notifications))
+            self.assertEquals(3, len(notifications), notifications)
             for notification in notifications:
                 self.assertEquals(self.get_ip_from_node(node2), notification["address"][0])
             self.assertEquals("DOWN", notifications[0]["change_type"])
@@ -213,7 +213,7 @@ class TestPushedNotifications(Tester):
         # check that node1 did not send UP or DOWN notification for node2
         debug("Waiting for notifications from {}".format(waiter.address,))
         notifications = waiter.wait_for_notifications(timeout=30.0, num_notifications=3)
-        self.assertEquals(0, len(notifications))
+        self.assertEquals(0, len(notifications), notifications)
 
     @since("3.0")
     def schema_changes_test(self):
@@ -242,7 +242,7 @@ class TestPushedNotifications(Tester):
 
         debug("Waiting for notifications from {}".format(waiter.address,))
         notifications = waiter.wait_for_notifications(timeout=60.0, num_notifications=8)
-        self.assertEquals(8, len(notifications))
+        self.assertEquals(8, len(notifications), notifications)
         self.assertDictContainsSubset({'change_type': u'CREATED', 'target_type': u'KEYSPACE'}, notifications[0])
         self.assertDictContainsSubset({'change_type': u'CREATED', 'target_type': u'TABLE', u'table': u't'}, notifications[1])
         self.assertDictContainsSubset({'change_type': u'UPDATED', 'target_type': u'TABLE', u'table': u't'}, notifications[2])
