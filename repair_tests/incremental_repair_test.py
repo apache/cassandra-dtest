@@ -10,7 +10,7 @@ from cassandra import ConsistencyLevel
 from ccmlib.common import is_win
 from ccmlib.node import Node
 from dtest import Tester, debug
-from tools import insert_c1c2, known_failure
+from tools import insert_c1c2, since, known_failure
 
 
 class TestIncRepair(Tester):
@@ -285,6 +285,20 @@ class TestIncRepair(Tester):
 
         for x in range(0, 150):
             assert_one(session, "select val from tab where key =" + str(x), [1])
+
+    @since("2.2")
+    def multiple_full_repairs_lcs_test(self):
+        """
+        @jira_ticket CASSANDRA-11172 - repeated full repairs should not cause infinite loop in getNextBackgroundTask
+        """
+        cluster = self.cluster
+        cluster.populate(2).start(wait_for_binary_proto=True)
+        node1, node2 = cluster.nodelist()
+        for x in xrange(0, 10):
+            node1.stress(['write', 'n=100k', '-rate', 'threads=10', '-schema', 'compaction(strategy=LeveledCompactionStrategy,sstable_size_in_mb=10)', 'replication(factor=2)'])
+            cluster.flush()
+            cluster.wait_for_compactions()
+            node1.nodetool("repair -full keyspace1 standard1")
 
     @attr('long')
     @skip('hangs CI')
