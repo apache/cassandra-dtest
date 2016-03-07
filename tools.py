@@ -13,9 +13,9 @@ from threading import Thread
 from cassandra import ConsistencyLevel
 from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.query import SimpleStatement
+from ccmlib.node import Node
 from nose.plugins.attrib import attr
 
-from ccmlib.node import Node
 from dtest import CASSANDRA_DIR, DISABLE_VNODES, IGNORE_REQUIRE, debug
 
 
@@ -436,3 +436,21 @@ class KillOnBootstrap(Thread):
     def run(self):
         self.node.watch_log_for("JOINING: Starting to bootstrap")
         self.node.stop(gently=False)
+
+
+def get_keyspace_metadata(session, keyspace_name):
+    cluster = session.cluster
+    cluster.refresh_keyspace_metadata(keyspace_name)
+    return cluster.metadata.keyspaces[keyspace_name]
+
+
+def get_schema_metadata(session):
+    cluster = session.cluster
+    cluster.refresh_schema_metadata()
+    return cluster.metadata
+
+
+def get_table_metadata(session, keyspace_name, table_name):
+    cluster = session.cluster
+    cluster.refresh_table_metadata(keyspace_name, table_name)
+    return cluster.metadata.keyspaces[keyspace_name].tables[table_name]

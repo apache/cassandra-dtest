@@ -5,6 +5,7 @@ import struct
 import time
 
 from cassandra import ConsistencyLevel, InvalidRequest
+from cassandra.metadata import NetworkTopologyStrategy, SimpleStrategy
 from cassandra.policies import FallthroughRetryPolicy
 from cassandra.protocol import ProtocolException
 from cassandra.query import SimpleStatement
@@ -17,6 +18,10 @@ from thrift_bindings.v22.ttypes import (CfDef, Column, ColumnOrSuperColumn,
                                         Mutation)
 from thrift_tests import get_thrift_client
 from tools import debug, rows_to_list, since
+from utils.metadata_wrapper import (UpdatingClusterMetadataWrapper,
+                                    UpdatingKeyspaceMetadataWrapper,
+                                    UpdatingMetadataDictWrapper,
+                                    UpdatingTableMetadataWrapper)
 
 
 class CQLTester(Tester):
@@ -71,26 +76,33 @@ class StorageProxyCQLTester(CQLTester):
         Smoke test that basic keyspace operations work:
 
         - create a keyspace
-        - USE that keyspace
+        - assert keyspace exists and is configured as expected with the driver metadata API
         - ALTER it
-        - #TODO: assert the ALTER worked
+        - assert keyspace was correctly altered with the driver metadata API
         - DROP it
-        - attempt to USE it again, asserting it raises an InvalidRequest exception
+        - assert keyspace is no longer in keyspace metadata
         """
         session = self.prepare(create_keyspace=False)
+        meta = UpdatingClusterMetadataWrapper(session.cluster)
 
+        self.assertNotIn('ks', meta.keyspaces)
         session.execute("CREATE KEYSPACE ks WITH replication = "
                         "{ 'class':'SimpleStrategy', 'replication_factor':1} "
                         "AND DURABLE_WRITES = true")
+        self.assertIn('ks', meta.keyspaces)
 
-        session.execute("USE ks")
+        ks_meta = UpdatingKeyspaceMetadataWrapper(session.cluster, ks_name='ks')
+        self.assertTrue(ks_meta.durable_writes)
+        self.assertIsInstance(ks_meta.replication_strategy, SimpleStrategy)
 
         session.execute("ALTER KEYSPACE ks WITH replication = "
                         "{ 'class' : 'NetworkTopologyStrategy', 'dc1' : 1 } "
                         "AND DURABLE_WRITES = false")
+        self.assertFalse(ks_meta.durable_writes)
+        self.assertIsInstance(ks_meta.replication_strategy, NetworkTopologyStrategy)
 
         session.execute("DROP KEYSPACE ks")
-        assert_invalid(session, "USE ks", expected=InvalidRequest)
+        self.assertNotIn('ks', meta.keyspaces)
 
     def table_test(self):
         """
@@ -111,10 +123,17 @@ class StorageProxyCQLTester(CQLTester):
         """
         session = self.prepare()
 
+        ks_meta = UpdatingKeyspaceMetadataWrapper(session.cluster, ks_name='ks')
+
         session.execute("CREATE TABLE test1 (k int PRIMARY KEY, v1 int)")
+        self.assertIn('test1', ks_meta.tables)
         session.execute("CREATE TABLE test2 (k int, c1 int, v1 int, PRIMARY KEY (k, c1)) WITH COMPACT STORAGE")
+        self.assertIn('test2', ks_meta.tables)
+
+        t1_meta = UpdatingTableMetadataWrapper(session.cluster, ks_name='ks', table_name='test1')
 
         session.execute("ALTER TABLE test1 ADD v2 int")
+        self.assertIn('v2', t1_meta.columns)
 
         for i in range(0, 10):
             session.execute("INSERT INTO test1 (k, v1, v2) VALUES ({i}, {i}, {i})".format(i=i))
@@ -136,10 +155,9 @@ class StorageProxyCQLTester(CQLTester):
         self.assertEqual(rows_to_list(res), [])
 
         session.execute("DROP TABLE test1")
+        self.assertNotIn('test1', ks_meta.tables)
         session.execute("DROP TABLE test2")
-
-        assert_invalid(session, "SELECT * FROM test1", expected=InvalidRequest)
-        assert_invalid(session, "SELECT * FROM test2", expected=InvalidRequest)
+        self.assertNotIn('test2', ks_meta.tables)
 
     def index_test(self):
         """
@@ -156,7 +174,9 @@ class StorageProxyCQLTester(CQLTester):
         session = self.prepare()
 
         session.execute("CREATE TABLE test3 (k int PRIMARY KEY, v1 int, v2 int)")
+        table_meta = UpdatingTableMetadataWrapper(session.cluster, ks_name='ks', table_name='test3')
         session.execute("CREATE INDEX testidx ON test3 (v1)")
+        self.assertIn('testidx', table_meta.indexes)
 
         for i in range(0, 10):
             session.execute("INSERT INTO test3 (k, v1, v2) VALUES ({i}, {i}, {i})".format(i=i))
@@ -165,8 +185,7 @@ class StorageProxyCQLTester(CQLTester):
         self.assertEqual(rows_to_list(res), [[0, 0, 0]])
 
         session.execute("DROP INDEX testidx")
-
-        assert_invalid(session, "SELECT * FROM test3 where v1 = 0", expected=InvalidRequest)
+        self.assertNotIn('testidx', table_meta.indexes)
 
     def type_test(self):
         """
@@ -181,19 +200,22 @@ class StorageProxyCQLTester(CQLTester):
         # TODO is this even necessary given the existence of the auth_tests?
         """
         session = self.prepare()
+        ks_meta = UpdatingKeyspaceMetadataWrapper(session.cluster, ks_name='ks')
+        types_meta = UpdatingMetadataDictWrapper(parent=ks_meta, attr_name='user_types')
 
         session.execute("CREATE TYPE address_t (street text, city text, zip_code int)")
+        self.assertIn('address_t', types_meta)
+
         session.execute("CREATE TABLE test4 (id int PRIMARY KEY, address frozen<address_t>)")
 
         session.execute("ALTER TYPE address_t ADD phones set<text>")
-        session.execute("CREATE TABLE test5 (id int PRIMARY KEY, address frozen<address_t>)")
+        self.assertIn('phones', types_meta['address_t'].field_names)
 
+        # drop the table so we can safely drop the type it uses
         session.execute("DROP TABLE test4")
-        session.execute("DROP TABLE test5")
+
         session.execute("DROP TYPE address_t")
-        assert_invalid(session,
-                       "CREATE TABLE test6 (id int PRIMARY KEY, address frozen<address_t>)",
-                       expected=InvalidRequest)
+        self.assertNotIn('address_t', types_meta)
 
     def user_test(self):
         """
@@ -206,12 +228,24 @@ class StorageProxyCQLTester(CQLTester):
         # TODO list users after each to make sure each statement works
         """
         session = self.prepare(user='cassandra', password='cassandra')
+        node1 = self.cluster.nodelist()[0]
+
+        def get_usernames():
+            return [user.name for user in session.execute('LIST USERS')]
+
+        self.assertNotIn('user1', get_usernames())
 
         session.execute("CREATE USER user1 WITH PASSWORD 'secret'")
+        # use patient to retry until it works, because it takes some time for
+        # the CREATE to take
+        self.patient_cql_connection(node1, user='user1', password='secret')
 
         session.execute("ALTER USER user1 WITH PASSWORD 'secret^2'")
+        # use patient for same reason as above
+        self.patient_cql_connection(node1, user='user1', password='secret^2')
 
         session.execute("DROP USER user1")
+        self.assertNotIn('user1', get_usernames())
 
     def statements_test(self):
         """
@@ -386,7 +420,6 @@ class MiscellaneousCQLTester(CQLTester):
         - INSERT a row via CQL
         - ALTER the name of the table via CQL
         - SELECT from the table and assert the values inserted are there
-        # TODO why doesn't this check that the column names were actually changed?
         """
         session = self.prepare(start_rpc=True)
 
@@ -407,9 +440,6 @@ class MiscellaneousCQLTester(CQLTester):
         client.system_add_column_family(cfdef)
 
         session.execute("INSERT INTO ks.test (key, column1, column2, column3, value) VALUES ('foo', 4, 3, 2, 'bar')")
-
-        time.sleep(1)
-
         session.execute("ALTER TABLE test RENAME column1 TO foo1 AND column2 TO foo2 AND column3 TO foo3")
         assert_one(session, "SELECT foo1, foo2, foo3 FROM test", [4, 3, 2])
 
@@ -452,10 +482,6 @@ class MiscellaneousCQLTester(CQLTester):
         - assert prepared statement containing that column also still works
         - ALTER the table, changing the type of a column
         - assert that both prepared statements still work
-
-        # TODO this basically tests driver behavior if I read it correctly.
-        # Should this be in dtests at all?
-        # TODO should these assert that the ALTERs happened correctly?
         """
         session = self.prepare()
 
