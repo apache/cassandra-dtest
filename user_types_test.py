@@ -401,17 +401,7 @@ class TestUserTypes(Tester):
         # Make sure the schema propagate
         time.sleep(2)
 
-        # no index present yet, make sure there's an error trying to query column
-        stmt = """
-              SELECT * from person_likes where name = {first:'Nero', middle: 'Claudius Caesar Augustus', last: 'Germanicus'};
-            """
-
-        if self.cluster.version() < "3":
-            assert_invalid(session, stmt, 'No secondary indexes on the restricted columns support the provided operators')
-        else:
-            assert_invalid(session, stmt, 'No supported secondary index found for the non primary key columns restrictions')
-
-        # add index and query again (even though there are no rows in the table yet)
+        # add index and query (even though there are no rows in the table yet)
         stmt = """
               CREATE INDEX person_likes_name on person_likes (name);
             """

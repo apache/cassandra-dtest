@@ -5,10 +5,11 @@ from assertions import assert_invalid
 from cassandra import ConsistencyLevel as CL
 from cassandra import InvalidRequest, ReadFailure, ReadTimeout
 from cassandra.policies import FallthroughRetryPolicy
-from cassandra.query import SimpleStatement, dict_factory, named_tuple_factory
+from cassandra.query import SimpleStatement, dict_factory, named_tuple_factory, tuple_factory
+from assertions import assert_invalid
 from datahelp import create_rows, flatten_into_set, parse_data_into_dicts
 from dtest import Tester, run_scenarios
-from tools import known_failure, since
+from tools import known_failure, rows_to_list, since
 
 
 class Page(object):
@@ -934,6 +935,154 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
         results = list(session.execute("SELECT * FROM test WHERE a IN (0, 1, 2, 3, 4)"))
         self.assertEqual([0, 1, 2, 3, 4], sorted([r.s for r in results]))
+
+    @since('3.0.0')
+    def test_paging_with_filtering(self):
+
+        """
+        @jira_ticket CASSANDRA-6377
+        """
+
+        session = self.prepare()
+        self.create_ks(session, 'test_paging_with_filtering', 2)
+        session.execute("CREATE TABLE test (a int, b int, s int static, c int, d int, primary key (a, b))")
+        session.row_factory = tuple_factory
+
+        for i in xrange(5):
+            session.execute("INSERT INTO test (a, s) VALUES ({}, {})".format(i, i))
+            # Lets a row with only static values
+            if i != 2:
+                for j in xrange(4):
+                    session.execute("INSERT INTO test (a, b, c, d) VALUES ({}, {}, {}, {})".format(i, j, j, i + j))
+
+        for page_size in (2, 3, 4, 5, 7, 10):
+            session.default_fetch_size = page_size
+
+            # Range queries
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE c = 2 ALLOW FILTERING"))
+            self.assertEqual(res, [[1, 2, 1, 2, 3],
+                                   [0, 2, 0, 2, 2],
+                                   [4, 2, 4, 2, 6],
+                                   [3, 2, 3, 2, 5]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE c > 1 AND c <= 2 ALLOW FILTERING"))
+            self.assertEqual(res, [[1, 2, 1, 2, 3],
+                                   [0, 2, 0, 2, 2],
+                                   [4, 2, 4, 2, 6],
+                                   [3, 2, 3, 2, 5]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE c = 2 AND d > 4 ALLOW FILTERING"))
+            self.assertEqual(res, [[4, 2, 4, 2, 6],
+                                   [3, 2, 3, 2, 5]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE c = 2 AND s > 1 ALLOW FILTERING"))
+            self.assertEqual(res, [[4, 2, 4, 2, 6],
+                                   [3, 2, 3, 2, 5]])
+
+            # Range queries with LIMIT
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE c = 2 LIMIT 2 ALLOW FILTERING"))
+            self.assertEqual(res, [[1, 2, 1, 2, 3],
+                                   [0, 2, 0, 2, 2]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE c = 2 AND s >= 1 LIMIT 2 ALLOW FILTERING"))
+            self.assertEqual(res, [[1, 2, 1, 2, 3],
+                                   [4, 2, 4, 2, 6]])
+
+            # Range query with DISTINCT
+            res = rows_to_list(session.execute("SELECT DISTINCT a, s FROM test WHERE s >= 1 ALLOW FILTERING"))
+            self.assertEqual(res, [[1, 1],
+                                   [2, 2],
+                                   [4, 4],
+                                   [3, 3]])
+
+            # Range query with DISTINCT and LIMIT
+            res = rows_to_list(session.execute("SELECT DISTINCT a, s FROM test WHERE s >= 1 LIMIT 2 ALLOW FILTERING"))
+            self.assertEqual(res, [[1, 1],
+                                   [2, 2]])
+
+            # Single partition queries
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a = 0 AND c >= 1 ALLOW FILTERING"))
+            self.assertEqual(res, [[0, 1, 0, 1, 1],
+                                   [0, 2, 0, 2, 2],
+                                   [0, 3, 0, 3, 3]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a= 0 AND c >= 1 AND c <=2 ALLOW FILTERING"))
+            self.assertEqual(res, [[0, 1, 0, 1, 1],
+                                   [0, 2, 0, 2, 2]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a = 0 AND c >= 1 AND d = 1 ALLOW FILTERING"))
+            self.assertEqual(res, [[0, 1, 0, 1, 1]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a = 3 AND c >= 1 AND s > 1 ALLOW FILTERING"))
+            self.assertEqual(res, [[3, 1, 3, 1, 4],
+                                   [3, 2, 3, 2, 5],
+                                   [3, 3, 3, 3, 6]])
+
+            # Single partition queries with LIMIT
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a = 0 AND c >= 1 LIMIT 2 ALLOW FILTERING"))
+            self.assertEqual(res, [[0, 1, 0, 1, 1],
+                                   [0, 2, 0, 2, 2]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a = 3 AND c >= 1 AND s > 1 LIMIT 2 ALLOW FILTERING"))
+            self.assertEqual(res, [[3, 1, 3, 1, 4],
+                                   [3, 2, 3, 2, 5]])
+
+            #  Single partition query with DISTINCT
+            res = rows_to_list(session.execute("SELECT DISTINCT a, s FROM test WHERE a = 2 AND s >= 1 ALLOW FILTERING"))
+            self.assertEqual(res, [[2, 2]])
+
+            # Single partition query with ORDER BY
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a = 0 AND c >= 1 ORDER BY b DESC ALLOW FILTERING"))
+            self.assertEqual(res, [[0, 3, 0, 3, 3],
+                                   [0, 2, 0, 2, 2],
+                                   [0, 1, 0, 1, 1]])
+
+            # Single partition query with ORDER BY and LIMIT
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a = 0 AND c >= 1 ORDER BY b DESC LIMIT 2 ALLOW FILTERING"))
+            self.assertEqual(res, [[0, 3, 0, 3, 3],
+                                   [0, 2, 0, 2, 2]])
+
+            # Multi-partitions queries
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a IN (0, 1, 2, 3, 4) AND  c = 2 ALLOW FILTERING"))
+            self.assertEqual(res, [[0, 2, 0, 2, 2],
+                                   [1, 2, 1, 2, 3],
+                                   [3, 2, 3, 2, 5],
+                                   [4, 2, 4, 2, 6]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a IN (0, 1, 2, 3, 4) AND c > 1 AND c <=2 ALLOW FILTERING"))
+            self.assertEqual(res, [[0, 2, 0, 2, 2],
+                                   [1, 2, 1, 2, 3],
+                                   [3, 2, 3, 2, 5],
+                                   [4, 2, 4, 2, 6]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a IN (0, 1, 2, 3, 4) AND c = 2 AND d > 4 ALLOW FILTERING"))
+            self.assertEqual(res, [[3, 2, 3, 2, 5],
+                                   [4, 2, 4, 2, 6]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a IN (0, 1, 2, 3, 4) AND c = 2 AND s > 1 ALLOW FILTERING"))
+            self.assertEqual(res, [[3, 2, 3, 2, 5],
+                                   [4, 2, 4, 2, 6]])
+
+            # Multi-partitions queries with LIMIT
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a IN (0, 1, 2, 3, 4) AND c = 2 LIMIT 2 ALLOW FILTERING"))
+            self.assertEqual(res, [[0, 2, 0, 2, 2],
+                                   [1, 2, 1, 2, 3]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a IN (0, 1, 2, 3, 4) AND c = 2 AND s >= 1 LIMIT 2 ALLOW FILTERING"))
+            self.assertEqual(res, [[1, 2, 1, 2, 3],
+                                   [3, 2, 3, 2, 5]])
+
+            # Multi-partitions query with DISTINCT
+            res = rows_to_list(session.execute("SELECT DISTINCT a, s FROM test WHERE a IN (0, 1, 2, 3, 4) AND s >= 1 ALLOW FILTERING"))
+            self.assertEqual(res, [[1, 1],
+                                   [2, 2],
+                                   [3, 3],
+                                   [4, 4]])
+
+            # Multi-partitions query with DISTINCT and LIMIT
+            res = rows_to_list(session.execute("SELECT DISTINCT a, s FROM test WHERE a IN (0, 1, 2, 3, 4) AND s >= 1 LIMIT 2 ALLOW FILTERING"))
+            self.assertEqual(res, [[1, 1],
+                                   [2, 2]])
 
 
 @since('2.0')
