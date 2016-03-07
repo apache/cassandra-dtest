@@ -1,20 +1,7 @@
 # coding: utf-8
 
 from dtest import Tester, debug
-from tools import known_failure
-
-
-def post_cassandra_10392(version):
-    """
-    Return a bool indicating whether or not `version` has had CASSANDRA-10392
-    merged or not. It was merged into trunk after 3.0.3 on the 3.0 release
-    track and after 3.3 on the v3 tick-tock release track, so this simply
-    checks the passed-in version against those versions.
-
-    @param version A C* version, typically a Version object from
-                   distutils.version
-    """
-    return ('3.0.3' < version < '3.1' or '3.3' < version)
+from tools import since
 
 
 class TestCqlTracing(Tester):
@@ -109,9 +96,7 @@ class TestCqlTracing(Tester):
         session = self.prepare()
         self.trace(session)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11278',
-                   flaky=False)
+    @since('3.4')
     def tracing_unknown_impl_test(self):
         """
         Test that Cassandra logs an error, but keeps its default tracing
@@ -130,16 +115,13 @@ class TestCqlTracing(Tester):
         self.ignore_log_patterns = [expected_error]
         self.trace(session)
 
-        if post_cassandra_10392(self.cluster.version()):
-            errs = self.cluster.nodelist()[0].grep_log_for_errors()
-            self.assertEqual(len(errs), 1)
-            self.assertEqual(len(errs[0]), 1)
-            err = errs[0][0]
-            self.assertIn(expected_error, err)
+        errs = self.cluster.nodelist()[0].grep_log_for_errors()
+        self.assertEqual(len(errs), 1)
+        self.assertEqual(len(errs[0]), 1)
+        err = errs[0][0]
+        self.assertIn(expected_error, err)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11278',
-                   flaky=False)
+    @since('3.4')
     def tracing_default_impl_test(self):
         """
         Test that Cassandra logs an error, but keeps its default tracing
@@ -161,15 +143,14 @@ class TestCqlTracing(Tester):
         self.ignore_log_patterns = [expected_error]
         self.trace(session)
 
-        if post_cassandra_10392(self.cluster.version()):
-            errs = self.cluster.nodelist()[0].grep_log_for_errors()
-            self.assertEqual(len(errs), 1)
-            self.assertEqual(len(errs[0]), 1)
-            err = errs[0][0]
-            self.assertIn(expected_error, err)
-            # make sure it logged the error for the correct reason. this isn't
-            # part of the expected error to avoid having to escape parens and
-            # periods for regexes.
-            self.assertIn("Default constructor for Tracing class "
-                          "'org.apache.cassandra.tracing.TracingImpl' is inaccessible.",
-                          err)
+        errs = self.cluster.nodelist()[0].grep_log_for_errors()
+        self.assertEqual(len(errs), 1)
+        self.assertEqual(len(errs[0]), 1)
+        err = errs[0][0]
+        self.assertIn(expected_error, err)
+        # make sure it logged the error for the correct reason. this isn't
+        # part of the expected error to avoid having to escape parens and
+        # periods for regexes.
+        self.assertIn("Default constructor for Tracing class "
+                      "'org.apache.cassandra.tracing.TracingImpl' is inaccessible.",
+                      err)
