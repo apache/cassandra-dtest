@@ -2,6 +2,7 @@ git+https://github.com/datastax/python-driver.git@cassandra-test
 git+https://github.com/pcmanus/ccm.git
 cql
 decorator
+docopt
 enum34
 flaky
 futures
@@ -11,4 +12,3 @@ psutil
 pycassa
 six
 thrift
-docopt
