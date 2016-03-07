@@ -208,6 +208,26 @@ class TestTTL(Tester):
         self.smart_sleep(start, 4)
         assert_all(self.session1, "SELECT * FROM ttl_table;", [[1, 42, None, None]])
 
+    @since('3.6')
+    def set_ttl_to_zero_to_default_ttl_test(self):
+        """
+        Test that we can remove the default ttl by setting the ttl explicitly to zero.
+        CASSANDRA-11207
+        """
+
+        self.prepare(default_time_to_live=2)
+
+        start = time.time()
+        self.session1.execute("INSERT INTO ttl_table (key, col1, col2, col3) VALUES ({}, {}, {}, {});".format(1, 1, 1, 1))
+        self.session1.execute("INSERT INTO ttl_table (key, col1, col2, col3) VALUES ({}, {}, {}, {});".format(2, 1, 1, 1))
+        self.session1.execute("UPDATE ttl_table using ttl 0 set col1=42 where key={};".format(1))
+        self.session1.execute("UPDATE ttl_table using ttl 3 set col1=42 where key={};".format(2))
+        self.smart_sleep(start, 5)
+
+        # The first row should be deleted, using ttl 0 should fallback to default_time_to_live
+        assert_all(self.session1, "SELECT * FROM ttl_table;", [[1, 42, None, None]])
+
+    @since('2.1', max_version='3.5')
     def remove_column_ttl_with_default_ttl_test(self):
         """
         Test that we cannot remove a column ttl when a default ttl is set.

@@ -105,7 +105,7 @@ class ThriftTester(BaseTester):
             Cassandra.CfDef('Keyspace1', 'Indexed1', column_metadata=[Cassandra.ColumnDef('birthdate', 'LongType', Cassandra.IndexType.KEYS, 'birthdate_index')]),
             Cassandra.CfDef('Keyspace1', 'Indexed2', comparator_type='TimeUUIDType', column_metadata=[Cassandra.ColumnDef(uuid.UUID('00000000-0000-1000-0000-000000000000').bytes, 'LongType', Cassandra.IndexType.KEYS)]),
             Cassandra.CfDef('Keyspace1', 'Indexed3', comparator_type='TimeUUIDType', column_metadata=[Cassandra.ColumnDef(uuid.UUID('00000000-0000-1000-0000-000000000000').bytes, 'UTF8Type', Cassandra.IndexType.KEYS)]),
-
+            Cassandra.CfDef('Keyspace1', 'Expiring', default_time_to_live=2)
         ])
 
         keyspace2 = Cassandra.KsDef('Keyspace2', 'org.apache.cassandra.locator.SimpleStrategy', {'replication_factor': '1'},
@@ -1026,11 +1026,11 @@ class TestMutations(ThriftTester):
                           InvalidRequestException)
         # start > finish, key version
         _expect_exception(lambda: get_range_slice(client, ColumnParent('Standard1'), SlicePredicate(column_names=['']), 'z', 'a', 1, ConsistencyLevel.ONE), InvalidRequestException)
-        # ttl must be positive
-        column = Column('cttl1', 'value1', 0, 0)
+        # ttl must be greater or equals to zero
+        column = Column('cttl1', 'value1', 0, -1)
         _expect_exception(lambda: client.insert('key1', ColumnParent('Standard1'), column, ConsistencyLevel.ONE),
                           InvalidRequestException)
-        # don't allow super_column in Deletion for standard ColumnFamily
+        # don't allow super_column in Deletion for standard Columntest_expiration_with_default_ttl_and_zero_ttl
         deletion = Deletion(1, 'supercolumn', None)
         mutation = Mutation(deletion=deletion)
         mutations = {'key': {'Standard1': [mutation]}}
@@ -1891,6 +1891,26 @@ class TestMutations(ThriftTester):
         assert c == column
         time.sleep(3)
         _expect_missing(lambda: client.get('key1', ColumnPath('Standard1', column='cttl3'), ConsistencyLevel.ONE))
+
+    def test_expiration_with_default_ttl(self):
+        """ Test that column with default ttl do expires """
+        _set_keyspace('Keyspace1')
+        column = Column('cttl3', 'value1', 0)
+        client.insert('key1', ColumnParent('Expiring'), column, ConsistencyLevel.ONE)
+        c = client.get('key1', ColumnPath('Expiring', column='cttl3'), ConsistencyLevel.ONE).column
+        time.sleep(3)
+        _expect_missing(lambda: client.get('key1', ColumnPath('Expiring', column='cttl3'), ConsistencyLevel.ONE))
+
+    def test_expiration_with_default_ttl_and_zero_ttl(self):
+        """
+        Test that we can remove the default ttl by setting the ttl explicitly to zero
+        CASSANDRA-11207
+        """
+        _set_keyspace('Keyspace1')
+        column = Column('cttl3', 'value1', 0, 0)
+        client.insert('key1', ColumnParent('Expiring'), column, ConsistencyLevel.ONE)
+        c = client.get('key1', ColumnPath('Expiring', column='cttl3'), ConsistencyLevel.ONE).column
+        self.assertEqual(Column('cttl3', 'value1', 0), c)
 
     def test_simple_expiration_batch_mutate(self):
         """ Test that column ttled do expires using batch_mutate """
