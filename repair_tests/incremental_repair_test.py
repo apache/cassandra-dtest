@@ -1,3 +1,4 @@
+from collections import Counter
 import os
 import time
 from re import findall
@@ -188,16 +189,8 @@ class TestIncRepair(Tester):
         matches = findall('(?<=Repaired at:).*', initialoutput)
         debug("Repair timestamps are: {}".format(matches))
 
-        uniquematches = []
-        matchcount = []
-
-        for value in matches:
-            if value not in uniquematches:
-                uniquematches.append(value)
-                matchcount.append(1)
-            else:
-                index = uniquematches.index(value)
-                matchcount[index] = matchcount[index] + 1
+        uniquematches = set(matches)
+        matchcount = Counter(matches)
 
         self.assertGreaterEqual(len(uniquematches), 2, uniquematches)
 
@@ -226,15 +219,8 @@ class TestIncRepair(Tester):
 
         debug(matches)
 
-        uniquematches = []
-        matchcount = []
-        for value in matches:
-            if value not in uniquematches:
-                uniquematches.append(value)
-                matchcount.append(1)
-            else:
-                index = uniquematches.index(value)
-                matchcount[index] = matchcount[index] + 1
+        uniquematches = set(matches)
+        matchcount = Counter(matches)
 
         self.assertGreaterEqual(len(uniquematches), 2)
 
