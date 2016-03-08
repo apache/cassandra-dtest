@@ -188,7 +188,6 @@ class TestIncRepair(Tester):
         uniquematches = set(matches)
         matchcount = Counter(matches)
 
-
         self.assertGreaterEqual(len(uniquematches), 2, uniquematches)
 
         self.assertGreaterEqual(max(matchcount), 1, matchcount)
@@ -216,15 +215,8 @@ class TestIncRepair(Tester):
 
         debug(matches)
 
-        uniquematches = []
-        matchcount = []
-        for value in matches:
-            if value not in uniquematches:
-                uniquematches.append(value)
-                matchcount.append(1)
-            else:
-                index = uniquematches.index(value)
-                matchcount[index] = matchcount[index] + 1
+        uniquematches = set(matches)
+        matchcount = Counter(matches)
 
         self.assertGreaterEqual(len(uniquematches), 2)
 
