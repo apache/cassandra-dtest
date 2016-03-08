@@ -10,11 +10,11 @@ from multiprocessing import Process, Queue
 from Queue import Empty, Full
 
 import psutil
-from cassandra import ConsistencyLevel, WriteTimeout
-from cassandra.query import SimpleStatement
 from six import print_
 
 import schema_metadata_test
+from cassandra import ConsistencyLevel, WriteTimeout
+from cassandra.query import SimpleStatement
 from dtest import Tester, debug
 from tools import generate_ssl_stores, known_failure, new_node
 from upgrade_base import (UPGRADE_TEST_RUN, head_2dot1, head_2dot2, head_3dot0,
@@ -736,16 +736,10 @@ class BootstrapMixin(object):
         self._check_values()
         self._check_counters()
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11197',
-                   flaky=True)
     def bootstrap_test(self):
         # try and add a new node
         self.upgrade_scenario(after_upgrade_call=(self._bootstrap_new_node,))
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11197',
-                   flaky=True)
     def bootstrap_multidc_test(self):
         # try and add a new node
         # multi dc, 2 nodes in each dc
