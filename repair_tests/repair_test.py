@@ -273,15 +273,11 @@ class TestRepair(Tester):
         self.assertEqual(len(out_of_sync_logs), 2, "Lines matching: " + str([elt[0] for elt in out_of_sync_logs]))
 
         valid_out_of_sync_pairs = [{node1.address(), node3.address()},
-                                   {node3.address(), node1.address()},
-                                   {node2.address(), node3.address()},
-                                   {node3.address(), node2.address()}]
+                                   {node2.address(), node3.address()}]
 
         for line, m in out_of_sync_logs:
             self.assertEqual(int(m.group(3)), 1, "Expecting 1 range out of sync for {} and {}, but saw {}".format(m.group(1), m.group(2), line))
             self.assertIn({m.group(1), m.group(2)}, valid_out_of_sync_pairs, str((m.group(1), m.group(2))))
-            valid_out_of_sync_pairs.remove({m.group(1), m.group(2)})
-            valid_out_of_sync_pairs.remove({m.group(2), m.group(1)})
 
         # Check node3 now has the key
         self.check_rows_on_node(node3, 2001, found=[1000], restart=False)
@@ -420,9 +416,7 @@ class TestRepair(Tester):
         out_of_sync_logs = node1.grep_log("/([0-9.]+) and /([0-9.]+) have ([0-9]+) range\(s\) out of sync")
         self.assertEqual(len(out_of_sync_logs), 2, "Lines matching: " + str([elt[0] for elt in out_of_sync_logs]))
         valid_out_of_sync_pairs = [{node1.address(), node2.address()},
-                                   {node2.address(), node1.address()},
-                                   {node2.address(), node3.address()},
-                                   {node3.address(), node2.address()}]
+                                   {node2.address(), node3.address()}]
         for line, m in out_of_sync_logs:
             self.assertEqual(int(m.group(3)), 1, "Expecting 1 range out of sync for {} and {}, but saw {}".format(m.group(1), m.group(2), line))
             self.assertIn({m.group(1), m.group(2)}, valid_out_of_sync_pairs, str((m.group(1), m.group(2))))
@@ -450,9 +444,7 @@ class TestRepair(Tester):
         out_of_sync_logs = node1.grep_log("/([0-9.]+) and /([0-9.]+) have ([0-9]+) range\(s\) out of sync")
         self.assertEqual(len(out_of_sync_logs), 2, "Lines matching: " + str([elt[0] for elt in out_of_sync_logs]))
         valid_out_of_sync_pairs = [{node1.address(), node2.address()},
-                                   {node2.address(), node1.address()},
-                                   {node2.address(), node3.address()},
-                                   {node3.address(), node2.address()}]
+                                   {node2.address(), node3.address()}]
         for line, m in out_of_sync_logs:
             self.assertEqual(int(m.group(3)), 1, "Expecting 1 range out of sync for {} and {}, but saw {}".format(m.group(1), m.group(2), line))
             self.assertIn({m.group(1), m.group(2)}, valid_out_of_sync_pairs, str((m.group(1), m.group(2))))
