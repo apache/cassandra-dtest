@@ -349,6 +349,9 @@ class SnitchConfigurationUpdateTest(Tester):
             else:
                 raise RuntimeError("Ran out of time waiting for topology to change on node {}".format(i))
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11318',
+                   flaky=True)
     def test_rf_collapse_gossiping_property_file_snitch(self):
         """
         @jira_ticket CASSANDRA-10238
