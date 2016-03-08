@@ -172,11 +172,23 @@ class TestBootstrap(Tester):
         # bring back node1 and invoke nodetool bootstrap to resume bootstrapping
         node1.start(wait_other_notice=True)
         node3.nodetool('bootstrap resume')
-        # check if we skipped already retrieved ranges
-        node3.watch_log_for("already available. Skipping streaming.")
+
         node3.watch_log_for("Resume complete", from_mark=mark)
         rows = list(session.execute("SELECT bootstrapped FROM system.local WHERE key='local'"))
         assert rows[0][0] == 'COMPLETED', rows[0][0]
+
+        # cleanup to guarantee each node will only have sstables of its ranges
+        cluster.cleanup()
+
+        debug("Check data is present")
+        # Let's check stream bootstrap completely transferred data
+        stdout, stderr = node3.stress(['read', 'n=100k', "no-warmup", '-schema',
+                                       'replication(factor=2)', '-rate', 'threads=8'],
+                                      capture_output=True)
+
+        if stdout and "FAILURE" in stdout:
+            debug(stdout)
+            assert False, "Cannot read inserted data after bootstrap"
 
     @since('2.2')
     def bootstrap_with_reset_bootstrap_state_test(self):
