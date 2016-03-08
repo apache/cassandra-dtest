@@ -636,8 +636,6 @@ class TestRepair(Tester):
         node1.stress(['write', 'n=20K', 'cl=ONE', '-schema', 'replication(factor=2)', '-rate', 'threads=30', '-pop', 'seq=20..40K'])
         node2.start(wait_for_binary_proto=True, wait_other_notice=True)
 
-        node1.stress(['write', 'n=20K', 'cl=ALL', '-schema', 'replication(factor=2)', '-rate', 'threads=30', '-pop', 'seq=40..60K'])
-
         cluster.flush()
 
         job_thread_count = '2'
@@ -649,6 +647,8 @@ class TestRepair(Tester):
 
         session = self.patient_cql_connection(node1)
         rows = list(session.execute("SELECT activity FROM system_traces.events"))
+        # This check assumes that the only (or at least first) thing to write to `system_traces.events.activity` is
+        # the repair task triggered in the test.
         self.assertIn('job threads: {}'.format(job_thread_count),
                       rows[0][0],
                       'Expected {} job threads in repair options. Instead we saw {}'.format(job_thread_count, rows[0][0]))
@@ -670,7 +670,7 @@ class TestRepair(Tester):
         node1, node2, node3 = cluster.nodelist()
 
         # Valid job thread counts: 1, 2, 3, and 4
-        for i in range(1, 5):
+        for job_thread_count in range(1, 5):
             debug("Inserting data...")
             node1.stress(['write', 'n=2K', 'cl=ALL', '-schema', 'replication(factor=2)', '-rate', 'threads=30', '-pop', 'seq={}..{}K'.format(2 * (i - 1), 2 * i)])
 
@@ -680,13 +680,10 @@ class TestRepair(Tester):
             node1.stress(['write', 'n=2K', 'cl=ONE', '-schema', 'replication(factor=2)', '-rate', 'threads=30', '-pop', 'seq={}..{}K'.format(2 * (i), 2 * (i + 1))])
             node2.start(wait_for_binary_proto=True, wait_other_notice=True)
 
-            node1.stress(['write', 'n=2K', 'cl=ALL', '-schema', 'replication(factor=2)', '-rate', 'threads=30', '-pop', 'seq={}..{}K'.format(2 * (i + 1), 2 * (i + 2))])
-
             cluster.flush()
             session = self.patient_cql_connection(node1)
             session.execute("TRUNCATE system_traces.events")
 
-            job_thread_count = i
             opts = ['-tr', '-j', str(job_thread_count)]
             opts += _repair_options(self.cluster.version(), ks='keyspace1', cf='standard1', sequential=False)
             node1.repair(opts)
@@ -694,6 +691,8 @@ class TestRepair(Tester):
             time.sleep(5)  # Give the trace table some time to populate
 
             rows = list(session.execute("SELECT activity FROM system_traces.events"))
+            # This check assumes that the only (or at least first) thing to write to `system_traces.events.activity` is
+            # the repair task triggered in the test.
             self.assertIn('job threads: {}'.format(job_thread_count),
                           rows[0][0],
                           'Expected {} job threads in repair options. Instead we saw {}'.format(job_thread_count, rows[0][0]))
