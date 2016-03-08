@@ -1901,6 +1901,7 @@ class TestMutations(ThriftTester):
         time.sleep(3)
         _expect_missing(lambda: client.get('key1', ColumnPath('Expiring', column='cttl3'), ConsistencyLevel.ONE))
 
+    @since('3.6')
     def test_expiration_with_default_ttl_and_zero_ttl(self):
         """
         Test that we can remove the default ttl by setting the ttl explicitly to zero
