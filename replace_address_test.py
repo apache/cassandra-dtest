@@ -1,5 +1,4 @@
 from time import sleep
-from unittest import skip
 
 from cassandra import ConsistencyLevel, ReadTimeout, Unavailable
 from cassandra.query import SimpleStatement
@@ -222,7 +221,9 @@ class TestReplaceAddress(Tester):
         self.assertEqual(len(movedTokensList), numNodes)
 
     @since('2.2')
-    @skip('test hangs: see CASSANDRA-9831')
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-9831',
+                   flaky=True)
     def resumable_replace_test(self):
         """Test resumable bootstrap while replacing node"""
 
@@ -245,6 +246,8 @@ class TestReplaceAddress(Tester):
         # replace node 3 with node 4
         debug("Starting node 4 to replace node 3")
         node4 = Node('node4', cluster, True, ('127.0.0.4', 9160), ('127.0.0.4', 7000), '7400', '0', None, binary_interface=('127.0.0.4', 9042))
+        # keep timeout low so that test won't hang
+        node4.set_configuration_options(values={'streaming_socket_timeout_in_ms': 1000})
         cluster.add(node4, False)
         try:
             node4.start(jvm_args=["-Dcassandra.replace_address_first_boot=127.0.0.3"])
@@ -298,6 +301,8 @@ class TestReplaceAddress(Tester):
         # replace node 3 with node 4
         debug("Starting node 4 to replace node 3")
         node4 = Node('node4', cluster, True, ('127.0.0.4', 9160), ('127.0.0.4', 7000), '7400', '0', None, binary_interface=('127.0.0.4', 9042))
+        # keep timeout low so that test won't hang
+        node4.set_configuration_options(values={'streaming_socket_timeout_in_ms': 1000})
         cluster.add(node4, False)
         try:
             node4.start(jvm_args=["-Dcassandra.replace_address_first_boot=127.0.0.3"], wait_other_notice=False)
