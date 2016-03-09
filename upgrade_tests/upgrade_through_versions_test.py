@@ -10,18 +10,18 @@ from multiprocessing import Process, Queue
 from Queue import Empty, Full
 
 import psutil
+from cassandra import ConsistencyLevel, WriteTimeout
+from cassandra.query import SimpleStatement
 from six import print_
 
 import schema_metadata_test
-from cassandra import ConsistencyLevel, WriteTimeout
-from cassandra.query import SimpleStatement
 from dtest import Tester, debug
 from tools import generate_ssl_stores, known_failure, new_node
 from upgrade_base import (UPGRADE_TEST_RUN, head_2dot1, head_2dot2, head_3dot0,
-                          head_3dot1, head_3dot2, head_3dot3, head_trunk,
-                          latest_2dot0, latest_2dot1, latest_2dot2,
-                          latest_3dot0, latest_3dot1, latest_3dot2,
-                          latest_3dot3, switch_jdks)
+                          head_3dot1, head_3dot3, head_trunk, latest_2dot0,
+                          latest_2dot1, latest_2dot2, latest_3dot0,
+                          latest_3dot1, latest_3dot2, latest_3dot3,
+                          switch_jdks)
 
 
 def data_writer(tester, to_verify_queue, verification_done_queue, rewrite_probability=0):
@@ -989,26 +989,6 @@ create_upgrade_class(
     bootstrap_test=True,
     protocol_version=3
 )
-if is_unreleased(latest_3dot1):
-    create_upgrade_class(
-        'ProtoV3Upgrade_3_0_UpTo_3_1_Latest',
-        [latest_3dot0, latest_3dot1],
-        bootstrap_test=True,
-        protocol_version=3
-    )
-create_upgrade_class(
-    'ProtoV3Upgrade_3_1_UpTo_3_2_HEAD',
-    [latest_3dot1, head_3dot2],
-    bootstrap_test=True,
-    protocol_version=3
-)
-if is_unreleased(latest_3dot2):
-    create_upgrade_class(
-        'ProtoV3Upgrade_3_1_UpTo_3_2_Latest',
-        [latest_3dot1, latest_3dot2],
-        bootstrap_test=True,
-        protocol_version=3
-    )
 create_upgrade_class(
     'ProtoV3Upgrade_3_2_UpTo_3_3_HEAD',
     [latest_3dot2, head_trunk],
@@ -1071,44 +1051,11 @@ if is_unreleased(latest_3dot0):
         protocol_version=4
     )
 create_upgrade_class(
-    'ProtoV4Upgrade_3_0_UpTo_3_1_HEAD',
-    [latest_3dot0, head_3dot1],
-    bootstrap_test=True,
-    protocol_version=4
-)
-if is_unreleased(latest_3dot1):
-    create_upgrade_class(
-        'ProtoV4Upgrade_3_0_UpTo_3_1_Latest',
-        [latest_3dot0, latest_3dot1],
-        bootstrap_test=True,
-        protocol_version=4
-    )
-create_upgrade_class(
-    'ProtoV4Upgrade_3_1_UpTo_3_2_HEAD',
-    [latest_3dot1, head_3dot2],
-    bootstrap_test=True,
-    protocol_version=4
-)
-if is_unreleased(latest_3dot2):
-    create_upgrade_class(
-        'ProtoV4Upgrade_3_1_UpTo_3_2_Latest',
-        [latest_3dot1, latest_3dot2],
-        bootstrap_test=True,
-        protocol_version=4
-    )
-create_upgrade_class(
     'ProtoV4Upgrade_3_2_UpTo_3_3_HEAD',
     [latest_3dot2, head_3dot3],
     bootstrap_test=True,
     protocol_version=4
 )
-if is_unreleased(latest_3dot3):
-    create_upgrade_class(
-        'ProtoV4Upgrade_3_2_UpTo_3_3_Latest',
-        [latest_3dot2, latest_3dot3],
-        bootstrap_test=True,
-        protocol_version=4
-    )
 create_upgrade_class(
     'ProtoV4Upgrade_3_3_UpTo_Trunk_HEAD',
     [latest_3dot3, head_trunk],
