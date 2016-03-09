@@ -974,9 +974,9 @@ class TestMutations(ThriftTester):
         _expect_exception(lambda: client.insert('key1', ColumnParent('Standard1'), Column('x' * (2**16), 'value', 0), ConsistencyLevel.ONE), InvalidRequestException)
 
     @known_failure(failure_source='test',
-                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11326',
-                    flaky=True,
-                    notes='Failed small number of times on trunk')
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11326',
+                   flaky=True,
+                   notes='Failed small number of times on trunk')
     def test_bad_calls(self):
         _set_keyspace('Keyspace1')
         # missing arguments
