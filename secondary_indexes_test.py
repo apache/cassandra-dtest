@@ -369,9 +369,9 @@ class TestSecondaryIndexes(Tester):
 
         cluster.flush()
 
-        def check_trace_events(trace, regex, expected_matches):
+        def check_trace_events(trace, regex, expected_matches, on_failure):
             """
-            Check for the presence of certain trace events. exact_matches should be a list of
+            Check for the presence of certain trace events. expected_matches should be a list of
             tuple(source, min_count, max_count) indicating that of all the trace events for the
             the source, the supplied regex should match at least min_count trace messages & at
             most max_count messages. E.g. [(127.0.0.1, 1, 10), (127.0.0.2, 0, 0)]
@@ -388,13 +388,22 @@ class TestSecondaryIndexes(Tester):
                 if match:
                     if event.source in match_counts:
                         match_counts[event.source] += 1
-
             for event_source, min_matches, max_matches in expected_matches:
                 if match_counts[event_source] < min_matches or match_counts[event_source] > max_matches:
-                    self.fail("Expected to find between {min} and {max} trace events matching {pattern} from {source}, "
-                              "but actually found {actual}. (Full counts: {all})"
-                              .format(min=min_matches, max=max_matches, pattern=regex, source=event_source,
-                                      actual=match_counts[event_source], all=match_counts))
+                    on_failure(trace, regex, expected_matches, match_counts, event_source, min_matches, max_matches)
+
+        def halt_on_failure(trace, regex, expected_matches, match_counts, event_source, min_expected, max_expected):
+            self.fail("Expected to find between {min} and {max} trace events matching {pattern} from {source}, "
+                      "but actually found {actual}. (Full counts: {all})"
+                      .format(min=min_expected, max=max_expected, pattern=regex, source=event_source,
+                              actual=match_counts[event_source], all=match_counts))
+
+        def retry_on_failure(trace, regex, expected_matches, match_counts, event_source, min_expected, max_expected):
+            debug("Trace event inspection did not match expected, sleeping before re-fetching trace events. "
+                  "Expected: {expected} Actual: {actual}".format(expected=expected_matches, actual=match_counts))
+            time.sleep(2)
+            trace.populate(max_wait=2.0)
+            check_trace_events(trace, regex, expected_matches, halt_on_failure)
 
         query = SimpleStatement("SELECT * FROM ks.cf WHERE b='1';")
         result = session.execute(query, trace=True)
@@ -407,12 +416,14 @@ class TestSecondaryIndexes(Tester):
         # only node3 should select the index to use
         check_trace_events(trace,
                            "Index mean cardinalities are b_index:[0-9]*. Scanning with b_index.",
-                           [("127.0.0.1", 0, 0), ("127.0.0.2", 0, 0), ("127.0.0.3", 1, 1)])
+                           [("127.0.0.1", 0, 0), ("127.0.0.2", 0, 0), ("127.0.0.3", 1, 1)],
+                           retry_on_failure)
         # check that the index is used on each node, really we only care that the matching
         # message appears on every node, so the max count is not important
         check_trace_events(trace,
                            "Executing read on ks.cf using index b_index",
-                           [("127.0.0.1", 1, 200), ("127.0.0.2", 1, 200), ("127.0.0.3", 1, 200)])
+                           [("127.0.0.1", 1, 200), ("127.0.0.2", 1, 200), ("127.0.0.3", 1, 200)],
+                           retry_on_failure)
 
     def test_query_indexes_with_vnodes(self):
         """
