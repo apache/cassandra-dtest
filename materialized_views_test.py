@@ -708,7 +708,8 @@ class TestMaterializedViews(Tester):
 
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11265',
-                   flaky=True)
+                   flaky=True,
+                   notes='fails on various 3.0 and 3.X branches')
     def view_tombstone_test(self):
         """
         Test that a materialized views properly tombstone
