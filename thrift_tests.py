@@ -20,7 +20,7 @@ from thrift_bindings.v22.Cassandra import (CfDef, Column, ColumnDef,
                                            Mutation, NotFoundException,
                                            SlicePredicate, SliceRange,
                                            SuperColumn)
-from tools import since, known_failiure
+from tools import since, known_failure
 from assertions import assert_one, assert_none
 
 
@@ -973,7 +973,7 @@ class TestMutations(ThriftTester):
         client.insert('key1', ColumnParent('Standard1'), Column('x' * (2**16 - 1), 'value', 0), ConsistencyLevel.ONE)
         _expect_exception(lambda: client.insert('key1', ColumnParent('Standard1'), Column('x' * (2**16), 'value', 0), ConsistencyLevel.ONE), InvalidRequestException)
 
-    @known_failiure(failure_source='test',
+    @known_failure(failure_source='test',
                     jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11326',
                     flaky=True,
                     notes='Failed small number of times on trunk')
