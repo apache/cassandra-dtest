@@ -276,8 +276,9 @@ class TestRepair(Tester):
                                    {node2.address(), node3.address()}]
 
         for line, m in out_of_sync_logs:
-            self.assertEqual(int(m.group(3)), 1, "Expecting 1 range out of sync for {} and {}, but saw {}".format(m.group(1), m.group(2), line))
-            self.assertIn({m.group(1), m.group(2)}, valid_out_of_sync_pairs, str((m.group(1), m.group(2))))
+            num_out_of_sync_ranges, out_of_sync_nodes = m.group(3), {m.group(1), m.group(2)}
+            self.assertEqual(int(num_out_of_sync_ranges), 1, "Expecting 1 range out of sync for {}, but saw {}".format(out_of_sync_nodes, line))
+            self.assertIn(out_of_sync_nodes, valid_out_of_sync_pairs, str(out_of_sync_nodes))
 
         # Check node3 now has the key
         self.check_rows_on_node(node3, 2001, found=[1000], restart=False)
@@ -387,12 +388,16 @@ class TestRepair(Tester):
         # Verify that only nodes in dc1 are involved in repair
         out_of_sync_logs = node1.grep_log("/([0-9.]+) and /([0-9.]+) have ([0-9]+) range\(s\) out of sync")
         self.assertEqual(len(out_of_sync_logs), 1, "Lines matching: {}".format(len(out_of_sync_logs)))
+
         line, m = out_of_sync_logs[0]
-        self.assertEqual(int(m.group(3)), 1, "Expecting 1 range out of sync for {} and {}, but saw {}".format(m.group(1), m.group(2), line))
+        num_out_of_sync_ranges, out_of_sync_nodes = m.group(3), {m.group(1), m.group(2)}
+
+        self.assertEqual(int(num_out_of_sync_ranges), 1, "Expecting 1 range out of sync for {}, but saw {}".format(out_of_sync_nodes, line))
         valid_out_of_sync_pairs = [node1.address(), node2.address()]
-        self.assertIn(m.group(1), valid_out_of_sync_pairs, "Unrelated node found in local repair: " + m.group(1))
+        self.assertIn(out_of_sync_nodes[0], valid_out_of_sync_pairs, "Unrelated node found in local repair: {}".format(out_of_sync_nodes[0]))
+
         valid_out_of_sync_pairs.remove(m.group(1))
-        self.assertIn(m.group(2), valid_out_of_sync_pairs, "Unrelated node found in local repair: " + m.group(2))
+        self.assertIn(out_of_sync_nodes[1], valid_out_of_sync_pairs, "Unrelated node found in local repair: {}".format(out_of_sync_nodes[1]))
         # Check node2 now has the key
         self.check_rows_on_node(node2, 2001, found=[1000], restart=False)
 
@@ -417,9 +422,11 @@ class TestRepair(Tester):
         self.assertEqual(len(out_of_sync_logs), 2, "Lines matching: " + str([elt[0] for elt in out_of_sync_logs]))
         valid_out_of_sync_pairs = [{node1.address(), node2.address()},
                                    {node2.address(), node3.address()}]
+
         for line, m in out_of_sync_logs:
-            self.assertEqual(int(m.group(3)), 1, "Expecting 1 range out of sync for {} and {}, but saw {}".format(m.group(1), m.group(2), line))
-            self.assertIn({m.group(1), m.group(2)}, valid_out_of_sync_pairs, str((m.group(1), m.group(2))))
+            num_out_of_sync_ranges, out_of_sync_nodes = m.group(3), {m.group(1), m.group(2)}
+            self.assertEqual(int(num_out_of_sync_ranges), 1, "Expecting 1 range out of sync for {}, but saw {}".format(out_of_sync_nodes, line))
+            self.assertIn(out_of_sync_nodes, valid_out_of_sync_pairs, str(out_of_sync_nodes))
 
         # Check node2 now has the key
         self.check_rows_on_node(node2, 2001, found=[1000], restart=False)
@@ -445,9 +452,11 @@ class TestRepair(Tester):
         self.assertEqual(len(out_of_sync_logs), 2, "Lines matching: " + str([elt[0] for elt in out_of_sync_logs]))
         valid_out_of_sync_pairs = [{node1.address(), node2.address()},
                                    {node2.address(), node3.address()}]
+
         for line, m in out_of_sync_logs:
-            self.assertEqual(int(m.group(3)), 1, "Expecting 1 range out of sync for {} and {}, but saw {}".format(m.group(1), m.group(2), line))
-            self.assertIn({m.group(1), m.group(2)}, valid_out_of_sync_pairs, str((m.group(1), m.group(2))))
+            num_out_of_sync_ranges, out_of_sync_nodes = m.group(3), {m.group(1), m.group(2)}
+            self.assertEqual(int(num_out_of_sync_ranges), 1, "Expecting 1 range out of sync for {}, but saw {}".format(out_of_sync_nodes, line))
+            self.assertIn(out_of_sync_nodes, valid_out_of_sync_pairs, str(out_of_sync_nodes))
 
         # Check node2 now has the key
         self.check_rows_on_node(node2, 2001, found=[1000], restart=False)
