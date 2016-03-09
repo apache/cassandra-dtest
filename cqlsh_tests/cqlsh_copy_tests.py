@@ -14,6 +14,7 @@ from tempfile import NamedTemporaryFile, gettempdir, template
 from uuid import uuid1, uuid4
 
 from cassandra.murmur3 import murmur3
+from cassandra.cluster import ConsistencyLevel, SimpleStatement
 from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.util import SortedSet
 from ccmlib.common import is_win
@@ -2122,7 +2123,8 @@ class CqlshCopyTest(Tester):
             if skip_count_checks:
                 return num_operations
             else:
-                ret = rows_to_list(self.session.execute("SELECT COUNT(*) FROM {}".format(stress_table)))[0][0]
+                count_statement = SimpleStatement("SELECT COUNT(*) FROM {}".format(stress_table), ConsistencyLevel.ALL)
+                ret = rows_to_list(self.session.execute(count_statement))[0][0]
                 debug('Generated {} records'.format(ret))
                 self.assertTrue(ret >= num_operations, 'cassandra-stress did not import enough records')
                 return ret
@@ -2177,6 +2179,16 @@ class CqlshCopyTest(Tester):
         @jira_ticket CASSANDRA-9302
         """
         self._test_bulk_round_trip(nodes=3, partitioner="murmur3", num_operations=100000)
+
+    def test_bulk_round_trip_non_prepared_statements(self):
+        """
+        Test bulk import with default stress import (one row per operation) and without
+        prepared statements.
+
+        @jira_ticket CASSANDRA-11053
+        """
+        self._test_bulk_round_trip(nodes=3, partitioner="murmur3", num_operations=100000,
+                                   copy_from_options={'PREPAREDSTATEMENTS': False})
 
     @freshCluster()
     def test_bulk_round_trip_blogposts(self):
