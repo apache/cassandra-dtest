@@ -1,5 +1,5 @@
 from dtest import Tester
-from tools import debug, known_failure
+from tools import debug, known_failure, require
 from jmxutils import JolokiaAgent, make_mbean, remove_perf_disable_shared_mem
 
 
@@ -85,6 +85,7 @@ class TestJMXMetrics(Tester):
 
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10845')
+    @require('10845')
     def begin_test(self):
         """
         @jira_ticket CASSANDRA-7436
