@@ -58,6 +58,9 @@ class TestDiskBalance(Tester):
         for node in cluster.nodelist():
             self.assert_balanced(node)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11279',
+                   flaky=True)
     def disk_balance_decommission_test(self):
         cluster = self.cluster
         if not DISABLE_VNODES:
