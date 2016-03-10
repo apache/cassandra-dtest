@@ -393,11 +393,8 @@ class TestRepair(Tester):
         num_out_of_sync_ranges, out_of_sync_nodes = m.group(3), {m.group(1), m.group(2)}
 
         self.assertEqual(int(num_out_of_sync_ranges), 1, "Expecting 1 range out of sync for {}, but saw {}".format(out_of_sync_nodes, line))
-        valid_out_of_sync_pairs = [node1.address(), node2.address()]
-        self.assertIn(out_of_sync_nodes[0], valid_out_of_sync_pairs, "Unrelated node found in local repair: {}".format(out_of_sync_nodes[0]))
-
-        valid_out_of_sync_pairs.remove(m.group(1))
-        self.assertIn(out_of_sync_nodes[1], valid_out_of_sync_pairs, "Unrelated node found in local repair: {}".format(out_of_sync_nodes[1]))
+        valid_out_of_sync_pairs = {node1.address(), node2.address()}
+        self.assertEqual(out_of_sync_nodes, valid_out_of_sync_pairs, "Unrelated node found in local repair: {}, expected {}".format(out_of_sync_nodes, valid_out_of_sync_pairs))
         # Check node2 now has the key
         self.check_rows_on_node(node2, 2001, found=[1000], restart=False)
 
@@ -479,7 +476,7 @@ class TestRepair(Tester):
         cluster.set_configuration_options(values={'hinted_handoff_enabled': False}, batch_commitlog=True)
         debug("Starting cluster..")
         # populate 2 nodes in dc1, and one node each in dc2 and dc3
-        cluster.populate([2, 1, 1]).start()
+        cluster.populate([2, 1, 1]).start(wait_for_binary_proto=True)
 
         node1, node2, node3, node4 = cluster.nodelist()
         session = self.patient_cql_connection(node1)
@@ -681,12 +678,14 @@ class TestRepair(Tester):
         # Valid job thread counts: 1, 2, 3, and 4
         for job_thread_count in range(1, 5):
             debug("Inserting data...")
-            node1.stress(['write', 'n=2K', 'cl=ALL', '-schema', 'replication(factor=2)', '-rate', 'threads=30', '-pop', 'seq={}..{}K'.format(2 * (i - 1), 2 * i)])
+            node1.stress(['write', 'n=2K', 'cl=ALL', '-schema', 'replication(factor=2)', '-rate',
+                          'threads=30', '-pop', 'seq={}..{}K'.format(2 * (job_thread_count - 1), 2 * job_thread_count)])
 
             node2.flush()
             node2.stop(wait_other_notice=True)
 
-            node1.stress(['write', 'n=2K', 'cl=ONE', '-schema', 'replication(factor=2)', '-rate', 'threads=30', '-pop', 'seq={}..{}K'.format(2 * (i), 2 * (i + 1))])
+            node1.stress(['write', 'n=2K', 'cl=ONE', '-schema', 'replication(factor=2)', '-rate',
+                          'threads=30', '-pop', 'seq={}..{}K'.format(2 * (job_thread_count), 2 * (job_thread_count + 1))])
             node2.start(wait_for_binary_proto=True, wait_other_notice=True)
 
             cluster.flush()
