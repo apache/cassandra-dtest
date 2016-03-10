@@ -678,12 +678,14 @@ class TestRepair(Tester):
         # Valid job thread counts: 1, 2, 3, and 4
         for job_thread_count in range(1, 5):
             debug("Inserting data...")
-            node1.stress(['write', 'n=2K', 'cl=ALL', '-schema', 'replication(factor=2)', '-rate', 'threads=30', '-pop', 'seq={}..{}K'.format(2 * (i - 1), 2 * i)])
+            node1.stress(['write', 'n=2K', 'cl=ALL', '-schema', 'replication(factor=2)', '-rate',
+                          'threads=30', '-pop', 'seq={}..{}K'.format(2 * (job_thread_count - 1), 2 * job_thread_count)])
 
             node2.flush()
             node2.stop(wait_other_notice=True)
 
-            node1.stress(['write', 'n=2K', 'cl=ONE', '-schema', 'replication(factor=2)', '-rate', 'threads=30', '-pop', 'seq={}..{}K'.format(2 * (i), 2 * (i + 1))])
+            node1.stress(['write', 'n=2K', 'cl=ONE', '-schema', 'replication(factor=2)', '-rate',
+                          'threads=30', '-pop', 'seq={}..{}K'.format(2 * (job_thread_count), 2 * (job_thread_count + 1))])
             node2.start(wait_for_binary_proto=True, wait_other_notice=True)
 
             cluster.flush()
