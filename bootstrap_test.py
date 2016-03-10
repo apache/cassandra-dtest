@@ -88,9 +88,6 @@ class TestBootstrap(Tester):
         assert_almost_equal(size1, size2, error=0.3)
         assert_almost_equal(float(initial_size - empty_size), 2 * (size1 - float(empty_size)))
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11231',
-                   flaky=True)
     def simple_bootstrap_test_nodata(self):
         """
         @jira_ticket CASSANDRA-11010
@@ -102,12 +99,11 @@ class TestBootstrap(Tester):
         cluster.populate(2)
         cluster.start(wait_other_notice=True)
 
-        # Bootstraping a new node
+        # Bootstrapping a new node
         node3 = new_node(cluster)
-        node3.start()
+        node3.start(wait_for_binary_proto=True, wait_other_notice=True)
 
-        node3.watch_log_for("Starting listening for CQL clients")
-        session = self.exclusive_cql_connection(node3)
+        session = self.patient_exclusive_cql_connection(node3)
         rows = session.execute("SELECT bootstrapped FROM system.local WHERE key='local'")
         self.assertEqual(rows[0][0], 'COMPLETED')
 
