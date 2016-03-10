@@ -67,7 +67,7 @@ class TestBootstrap(Tester):
         # get any error
         reader = self.go(lambda _: query_c1c2(session, random.randint(0, keys - 1), ConsistencyLevel.ONE))
 
-        # Bootstraping a new node
+        # Bootstrapping a new node
         node2 = new_node(cluster)
         node2.set_configuration_options(values={'initial_token': tokens[1]})
         node2.start(wait_for_binary_proto=True)
@@ -117,7 +117,7 @@ class TestBootstrap(Tester):
         cluster.start()
 
         node1 = cluster.nodes['node1']
-        node1.stress(['write', 'n=10000', '-rate', 'threads=8'])
+        node1.stress(['write', 'n=10K', '-rate', 'threads=8'])
 
         session = self.patient_cql_connection(node1)
         stress_table = 'keyspace1.standard1'
@@ -143,7 +143,7 @@ class TestBootstrap(Tester):
         cluster.populate(2).start(wait_other_notice=True)
 
         node1 = cluster.nodes['node1']
-        node1.stress(['write', 'n=100000', '-schema', 'replication(factor=2)'])
+        node1.stress(['write', 'n=100K', '-schema', 'replication(factor=2)'])
         node1.flush()
 
         # kill node1 in the middle of streaming to let it fail
@@ -165,7 +165,7 @@ class TestBootstrap(Tester):
         node3.watch_log_for("Starting listening for CQL clients")
         mark = node3.mark_log()
         # check if node3 is still in bootstrap mode
-        session = self.exclusive_cql_connection(node3)
+        session = self.patient_exclusive_cql_connection(node3)
         rows = list(session.execute("SELECT bootstrapped FROM system.local WHERE key='local'"))
         assert len(rows) == 1
         assert rows[0][0] == 'IN_PROGRESS', rows[0][0]
@@ -187,7 +187,7 @@ class TestBootstrap(Tester):
         cluster.populate(2).start(wait_other_notice=True)
 
         node1 = cluster.nodes['node1']
-        node1.stress(['write', 'n=100000', '-schema', 'replication(factor=2)'])
+        node1.stress(['write', 'n=100K', '-schema', 'replication(factor=2)'])
         node1.flush()
 
         # kill node1 in the middle of streaming to let it fail
@@ -213,7 +213,7 @@ class TestBootstrap(Tester):
         node3.watch_log_for("Listening for thrift clients...", from_mark=mark)
 
         # check if 2nd bootstrap succeeded
-        session = self.exclusive_cql_connection(node3)
+        session = self.patient_exclusive_cql_connection(node3)
         rows = list(session.execute("SELECT bootstrapped FROM system.local WHERE key='local'"))
         assert len(rows) == 1
         assert rows[0][0] == 'COMPLETED', rows[0][0]
@@ -228,7 +228,7 @@ class TestBootstrap(Tester):
         cluster.populate(2).start(wait_other_notice=True)
         (node1, node2) = cluster.nodelist()
 
-        node1.stress(['write', 'n=1000', '-schema', 'replication(factor=2)',
+        node1.stress(['write', 'n=1K', '-schema', 'replication(factor=2)',
                       '-rate', 'threads=1', '-pop', 'dist=UNIFORM(1..1000)'])
 
         session = self.patient_exclusive_cql_connection(node2)
@@ -290,7 +290,7 @@ class TestBootstrap(Tester):
 
         with tempfile.TemporaryFile(mode='w+') as tmpfile:
             node1.stress(['user', 'profile=' + stress_config.name, 'ops(insert=1)',
-                          'n=500000', 'cl=LOCAL_QUORUM',
+                          'n=500K', 'cl=LOCAL_QUORUM',
                           '-rate', 'threads=5',
                           '-errors', 'retries=2'],
                          stdout=tmpfile, stderr=subprocess.STDOUT)
@@ -333,7 +333,7 @@ class TestBootstrap(Tester):
 
         # write some data
         node1 = cluster.nodelist()[0]
-        node1.stress(['write', 'n=10000', '-rate', 'threads=8'])
+        node1.stress(['write', 'n=10K', '-rate', 'threads=8'])
 
         session = self.patient_cql_connection(node1)
         original_rows = list(session.execute("SELECT * FROM {}".format(stress_table,)))
@@ -446,7 +446,7 @@ class TestBootstrap(Tester):
 
         # write some data, enough for the bootstrap to fail later on
         node1 = cluster.nodelist()[0]
-        node1.stress(['write', 'n=100000', '-rate', 'threads=8'])
+        node1.stress(['write', 'n=100K', '-rate', 'threads=8'])
         node1.flush()
 
         session = self.patient_cql_connection(node1)
