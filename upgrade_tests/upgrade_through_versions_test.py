@@ -10,11 +10,10 @@ from multiprocessing import Process, Queue
 from Queue import Empty, Full
 
 import psutil
-from cassandra import ConsistencyLevel, WriteTimeout
-from cassandra.query import SimpleStatement
 from six import print_
 
-import schema_metadata_test
+from cassandra import ConsistencyLevel, WriteTimeout
+from cassandra.query import SimpleStatement
 from dtest import Tester, debug
 from tools import generate_ssl_stores, known_failure, new_node
 from upgrade_base import (UPGRADE_TEST_RUN, head_2dot1, head_2dot2, head_3dot0,
@@ -337,7 +336,6 @@ class UpgradeTester(Tester):
         time.sleep(5)  # sigh...
 
         self._log_current_ver(self.test_versions[0])
-        self.created_metadata_versions = []
 
         if rolling:
             # start up processes to write and verify data
@@ -377,18 +375,12 @@ class UpgradeTester(Tester):
                 self._write_values()
                 self._increment_counters()
 
-                for completed_version in self.created_metadata_versions:
-                    self._check_metadata_schemas(completed_version[0], completed_version[1])
-                self._create_metadata_schemas(self.test_versions[self.test_versions.index(tag) - 1])
-
                 self.upgrade_to_version(tag)
                 self.cluster.set_install_dir(version=tag)
 
                 self._check_values()
                 self._check_counters()
                 self._check_select_count()
-                for completed_version in self.created_metadata_versions:
-                    self._check_metadata_schemas(completed_version[0], completed_version[1])
 
             # run custom post-upgrade callables
         for call in after_upgrade_call:
@@ -473,29 +465,6 @@ class UpgradeTester(Tester):
         debug(
             "Current upgrade path: {}".format(
                 vers[:curr_index] + ['***' + current_tag + '***'] + vers[curr_index + 1:]))
-
-    def _create_metadata_schemas(self, tag):
-        safe_name = "t" + tag  # add a letter so we don't break C* naming rules in the case of bare versions
-
-        self.created_metadata_versions.append((self.cluster.version(), tag))
-        session = self.patient_cql_connection(self.node2)
-        session.execute('use upgrade')
-        debug("schema metadata establish tables tag: {0}".format(safe_name))
-
-        for m in filter(lambda mtd: mtd.startswith('establish_'), dir(schema_metadata_test)):
-            debug("schema establish calling: [{0}]".format(m))
-            getattr(schema_metadata_test, m)(self.cluster.version(), session, safe_name)
-
-    def _check_metadata_schemas(self, version, tag):
-        safe_name = "t" + tag  # mirrors the name safety convention in _create_metadata_schemas
-
-        session = self.patient_cql_connection(self.node2)
-        session.execute('use upgrade')
-        debug("schema metadata verify version: {0}, tag: {1}".format(version, safe_name))
-
-        for m in filter(lambda mtd: mtd.startswith('verify_'), dir(schema_metadata_test)):
-            debug("schema verify calling: [{0}]".format(m))
-            getattr(schema_metadata_test, m)(version, self.cluster.version(), 'upgrade', session, safe_name)
 
     def _create_schema_for_rolling(self):
         """
