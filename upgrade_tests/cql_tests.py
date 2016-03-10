@@ -3334,7 +3334,7 @@ class TestCQL(UpgradeTester):
             assert_invalid(cursor, 'SELECT DISTINCT pk0, pk1, ck0 FROM regular', matching="queries must only request partition key columns")
 
     @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11277',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11126',
                    flaky=False)
     def select_distinct_with_deletions_test(self):
         cursor = self.prepare()
