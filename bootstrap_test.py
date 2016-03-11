@@ -4,6 +4,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+import threading
 import time
 
 from assertions import assert_almost_equal, assert_one
@@ -517,6 +518,38 @@ class TestBootstrap(Tester):
         # data loads.
         for _ in xrange(5):
             assert_one(session, "SELECT count(*) from keyspace1.standard1", [500000], cl=ConsistencyLevel.ONE)
+
+    def test_cleanup(self):
+        """
+        Make sure we remove processed files during cleanup
+        """
+        cluster = self.cluster
+        cluster.set_configuration_options(values={'concurrent_compactors': 1})
+        cluster.populate(1)
+        cluster.start(wait_for_binary_proto=True)
+        node1, = cluster.nodelist()
+        for x in xrange(0, 5):
+            node1.stress(['write', 'n=100k', '-schema', 'compaction(strategy=SizeTieredCompactionStrategy,enabled=false)', 'replication(factor=1)', '-rate', 'threads=10'])
+            node1.flush()
+        node2 = new_node(cluster)
+        node2.start(wait_for_binary_proto=True, wait_other_notice=True)
+        event = threading.Event()
+        failed = threading.Event()
+        thread = threading.Thread(target=self._monitor_datadir, args=(node1, event, len(node1.get_sstables("keyspace1", "standard1")), failed))
+        thread.start()
+        node1.cleanup()
+        event.set()
+        thread.join()
+        self.assertFalse(failed.is_set())
+
+    def _monitor_datadir(self, node, event, basecount, failed):
+        while True:
+            if len(node.get_sstables("keyspace1", "standard1")) > basecount + 1:
+                failed.set()
+                return
+            if event.is_set():
+                return
+            time.sleep(.1)
 
     def _cleanup(self, node):
         commitlog_dir = os.path.join(node.get_path(), 'commitlogs')
