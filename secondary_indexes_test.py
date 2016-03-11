@@ -3,14 +3,16 @@ import random
 import re
 import time
 import uuid
+from unittest import skipIf
 
-from assertions import assert_invalid, assert_one
 from cassandra import InvalidRequest
 from cassandra.concurrent import (execute_concurrent,
                                   execute_concurrent_with_args)
 from cassandra.protocol import ConfigurationException
 from cassandra.query import BatchStatement, SimpleStatement
-from dtest import Tester, debug
+
+from assertions import assert_invalid, assert_one
+from dtest import OFFHEAP_MEMTABLES, Tester, debug
 from tools import known_failure, rows_to_list, since
 
 
@@ -776,6 +778,7 @@ class TestSecondaryIndexesOnCollections(Tester):
         session.cluster.refresh_schema_metadata()
         self.assertEqual(0, len(session.cluster.metadata.keyspaces["map_double_index"].indexes))
 
+    @skipIf(OFFHEAP_MEMTABLES, 'Hangs with offheap memtables')
     def test_map_indexes(self):
         """
         Checks that secondary indexes on maps work for querying on both keys and values
