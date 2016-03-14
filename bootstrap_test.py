@@ -522,6 +522,7 @@ class TestBootstrap(Tester):
     @require(11179)
     def test_cleanup(self):
         """
+        @jira_ticket CASSANDRA-11179
         Make sure we remove processed files during cleanup
         """
         cluster = self.cluster
