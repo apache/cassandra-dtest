@@ -618,6 +618,7 @@ class TestRepair(Tester):
         self.assertEqual(len(node1.grep_log("/127.0.0.2 and /127.0.0.1 have ([0-9]+) range\(s\) out of sync")), 1)
         self.assertEqual(len(node3.grep_log('Repair command')), 0, "Node 3 should not have been involved in the repair.")
 
+    @since('2.2')
     def trace_repair_test(self):
         """
         * Launch a three node cluster
@@ -659,6 +660,7 @@ class TestRepair(Tester):
                       rows[0][0],
                       'Expected {} job threads in repair options. Instead we saw {}'.format(job_thread_count, rows[0][0]))
 
+    @since('2.2')
     def thread_count_repair_test(self):
         """
         * Launch a three node cluster
