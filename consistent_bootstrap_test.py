@@ -16,7 +16,6 @@ class TestBootstrapConsistency(Tester):
 
         cluster.populate(3, tokens=[0, 2**48, 2**62]).start()
         node1, node2, node3 = cluster.nodelist()
-        cluster.start()
 
         debug("Set to talk to node 2")
         n2session = self.patient_cql_connection(node2)
@@ -53,7 +52,7 @@ class TestBootstrapConsistency(Tester):
         cluster.set_configuration_options(values={'hinted_handoff_enabled': False, 'write_request_timeout_in_ms': 60000,
                                                   'read_request_timeout_in_ms': 60000, 'dynamic_snitch_badness_threshold': 0.0}, batch_commitlog=True)
 
-        cluster.populate(2).start()
+        cluster.populate(2)
         node1, node2 = cluster.nodelist()
         cluster.start(wait_for_binary_proto=True, wait_other_notice=True)
 

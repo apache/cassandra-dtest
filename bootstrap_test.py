@@ -156,7 +156,7 @@ class TestBootstrap(Tester):
         # keep timeout low so that test won't hang
         node3.set_configuration_options(values={'streaming_socket_timeout_in_ms': 1000})
         try:
-            node3.start()
+            node3.start(wait_other_notice=False)
         except NodeError:
             pass  # node doesn't start as expected
         t.join()
@@ -350,7 +350,7 @@ class TestBootstrap(Tester):
         self._cleanup(node4)
         # Now start it, it should not be allowed to join.
         mark = node4.mark_log()
-        node4.start(no_wait=True)
+        node4.start(no_wait=True, wait_other_notice=False)
         node4.watch_log_for("A node with address /127.0.0.4 already exists, cancelling join", from_mark=mark)
 
     @known_failure(failure_source='test',
@@ -502,7 +502,7 @@ class TestBootstrap(Tester):
         node2.start(wait_other_notice=True)
 
         node3 = new_node(cluster, remote_debug_port='2003')
-        process = node3.start()
+        process = node3.start(wait_other_notice=False)
         stdout, stderr = process.communicate()
         self.assertIn(bootstrap_error, stderr, msg=stderr)
         time.sleep(.5)
