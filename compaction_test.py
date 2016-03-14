@@ -96,6 +96,36 @@ class TestCompaction(Tester):
         # allow 5% size increase - if we have few sstables it is not impossible that live size increases *slightly* after compaction
         self.assertLess(finalValue, initialValue * 1.05)
 
+    def bloomfilter_size_test(self):
+        """
+        @jira_ticket CASSANDRA-11344
+        Check that bloom filter size is between 50KB and 100KB for 100K keys
+        """
+        cluster = self.cluster
+        cluster.populate(1).start(wait_for_binary_proto=True)
+        [node1] = cluster.nodelist()
+
+        node1.stress(['write', 'n=100K', "no-warmup", "cl=ONE", "-rate",
+                      "threads=300", "-schema", "replication(factor=1)",
+                      "compaction(strategy=org.apache.cassandra.db.compaction."
+                      "LeveledCompactionStrategy,sstable_size_in_mb=1)"])
+
+        node1.flush()
+
+        node1.wait_for_compactions()
+
+        table_name = 'standard1'
+        output = node1.nodetool('cfstats', True)[0]
+        output = output[output.find(table_name):]
+        output = output[output.find("Bloom filter space used"):]
+        bfSize = int(output[output.find(":") + 1:output.find("\n")].strip())
+
+        debug("bloom filter size is: {}".format(bfSize))
+
+        self.assertGreaterEqual(bfSize, 50000)
+        self.assertLessEqual(bfSize, 100000)
+
+
     def sstable_deletion_test(self):
         """
         Test that sstables are deleted properly when able after compaction.
