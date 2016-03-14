@@ -13,7 +13,7 @@ from cassandra.concurrent import execute_concurrent_with_args
 from ccmlib.node import NodeError
 from dtest import Tester, debug
 from tools import (InterruptBootstrap, KillOnBootstrap, known_failure,
-                   new_node, query_c1c2, since)
+                   new_node, query_c1c2, since, require)
 
 
 class TestBootstrap(Tester):
@@ -519,6 +519,7 @@ class TestBootstrap(Tester):
         for _ in xrange(5):
             assert_one(session, "SELECT count(*) from keyspace1.standard1", [500000], cl=ConsistencyLevel.ONE)
 
+    @require(11179)
     def test_cleanup(self):
         """
         Make sure we remove processed files during cleanup
