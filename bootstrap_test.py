@@ -537,19 +537,21 @@ class TestBootstrap(Tester):
         node2.start(wait_for_binary_proto=True, wait_other_notice=True)
         event = threading.Event()
         failed = threading.Event()
-        thread = threading.Thread(target=self._monitor_datadir, args=(node1, event, len(node1.get_sstables("keyspace1", "standard1")), failed))
+        jobs = 1
+        thread = threading.Thread(target=self._monitor_datadir, args=(node1, event, len(node1.get_sstables("keyspace1", "standard1")), jobs, failed))
         thread.start()
-        node1.nodetool("cleanup --seq keyspace1 standard1")
+        node1.nodetool("cleanup -j {} keyspace1 standard1".format(jobs))
         event.set()
         thread.join()
         self.assertFalse(failed.is_set())
 
-    def _monitor_datadir(self, node, event, basecount, failed):
+    def _monitor_datadir(self, node, event, basecount, jobs, failed):
         while True:
             sstables = node.get_sstables("keyspace1", "standard1")
+            debug("---")
             for sstable in sstables:
                 debug(sstable)
-            if len(sstables) > basecount + 1:
+            if len(sstables) > basecount + jobs:
                 failed.set()
                 return
             if event.is_set():
