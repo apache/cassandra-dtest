@@ -19,6 +19,7 @@ class TestGlobalRowKeyCache(Tester):
 
         for keycache_size in (0, 10):
             for rowcache_size in (0, 10):
+                cluster.stop()
                 debug("Testing with keycache size of %d MB, rowcache size of %d MB " %
                       (keycache_size, rowcache_size))
                 keyspace_name = 'ks_%d_%d' % (keycache_size, rowcache_size)

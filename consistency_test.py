@@ -921,7 +921,6 @@ class TestConsistency(Tester):
             tokens = cluster.balanced_tokens(3)
             cluster.populate(3, tokens=tokens).start()
         node1, node2, node3 = cluster.nodelist()
-        cluster.start()
 
         debug("Set to talk to node 2")
         session = self.patient_cql_connection(node2)

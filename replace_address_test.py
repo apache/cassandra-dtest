@@ -65,7 +65,7 @@ class TestReplaceAddress(Tester):
         debug(numNodes)
 
         debug("Inserting Data...")
-        node1.stress(['write', 'n=10000', '-schema', 'replication(factor=3)'])
+        node1.stress(['write', 'n=10K', '-schema', 'replication(factor=3)'])
 
         session = self.patient_cql_connection(node1)
         session.default_timeout = 45
@@ -105,7 +105,7 @@ class TestReplaceAddress(Tester):
 
         # check that restarting node 3 doesn't work
         debug("Try to restart node 3 (should fail)")
-        node3.start()
+        node3.start(wait_other_notice=False)
         checkCollision = node1.grep_log("between /127.0.0.3 and /127.0.0.4; /127.0.0.4 is the new owner")
         debug(checkCollision)
         self.assertEqual(len(checkCollision), 1)
@@ -123,7 +123,7 @@ class TestReplaceAddress(Tester):
         cluster.add(node4, False)
 
         mark = node4.mark_log()
-        node4.start(replace_address='127.0.0.3')
+        node4.start(replace_address='127.0.0.3', wait_other_notice=False)
         node4.watch_log_for("java.lang.UnsupportedOperationException: Cannot replace a live node...", from_mark=mark)
         self.check_not_running(node4)
 
@@ -139,7 +139,7 @@ class TestReplaceAddress(Tester):
 
         # try to replace an unassigned ip address
         mark = node4.mark_log()
-        node4.start(replace_address='127.0.0.5')
+        node4.start(replace_address='127.0.0.5', wait_other_notice=False)
         node4.watch_log_for("java.lang.RuntimeException: Cannot replace_address /127.0.0.5 because it doesn't exist in gossip", from_mark=mark)
         self.check_not_running(node4)
 
@@ -166,7 +166,7 @@ class TestReplaceAddress(Tester):
         debug(numNodes)
 
         debug("Inserting Data...")
-        node1.stress(['write', 'n=10000', '-schema', 'replication(factor=3)'])
+        node1.stress(['write', 'n=10K', '-schema', 'replication(factor=3)'])
 
         session = self.patient_cql_connection(node1)
         stress_table = 'keyspace1.standard1'
@@ -202,7 +202,7 @@ class TestReplaceAddress(Tester):
 
         # check that restarting node 3 doesn't work
         debug("Try to restart node 3 (should fail)")
-        node3.start()
+        node3.start(wait_other_notice=False)
         checkCollision = node1.grep_log("between /127.0.0.3 and /127.0.0.4; /127.0.0.4 is the new owner")
         debug(checkCollision)
         self.assertEqual(len(checkCollision), 1)
@@ -230,7 +230,7 @@ class TestReplaceAddress(Tester):
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
 
-        node1.stress(['write', 'n=100000', '-schema', 'replication(factor=3)'])
+        node1.stress(['write', 'n=100K', '-schema', 'replication(factor=3)'])
 
         session = self.patient_cql_connection(node1)
         stress_table = 'keyspace1.standard1'
@@ -300,7 +300,7 @@ class TestReplaceAddress(Tester):
         node4 = Node('node4', cluster, True, ('127.0.0.4', 9160), ('127.0.0.4', 7000), '7400', '0', None, binary_interface=('127.0.0.4', 9042))
         cluster.add(node4, False)
         try:
-            node4.start(jvm_args=["-Dcassandra.replace_address_first_boot=127.0.0.3"])
+            node4.start(jvm_args=["-Dcassandra.replace_address_first_boot=127.0.0.3"], wait_other_notice=False)
         except NodeError:
             pass  # node doesn't start as expected
         t.join()

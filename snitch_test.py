@@ -63,7 +63,7 @@ class TestGossipingPropertyFileSnitch(Tester):
         stress_table = 'keyspace1.standard1'
         original_rows = list(session.execute("SELECT * FROM {}".format(stress_table)))
 
-        node2.start(wait_for_binary_proto=True)
+        node2.start(wait_for_binary_proto=True, wait_other_notice=False)
         node2.watch_log_for("Starting Messaging Service on /{}:{}".format(NODE2_LISTEN_ADDRESS, STORAGE_PORT), timeout=60)
         node2.watch_log_for("Starting Messaging Service on /{}:{}".format(NODE2_BROADCAST_ADDRESS, STORAGE_PORT), timeout=60)
         self._test_connect(NODE2_LISTEN_ADDRESS, STORAGE_PORT)
