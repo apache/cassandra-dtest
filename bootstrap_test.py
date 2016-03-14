@@ -524,7 +524,7 @@ class TestBootstrap(Tester):
         Make sure we remove processed files during cleanup
         """
         cluster = self.cluster
-        cluster.set_configuration_options(values={'concurrent_compactors': 1})
+        cluster.set_configuration_options(values={'concurrent_compactors': 4})
         cluster.populate(1)
         cluster.start(wait_for_binary_proto=True)
         node1, = cluster.nodelist()
@@ -537,14 +537,17 @@ class TestBootstrap(Tester):
         failed = threading.Event()
         thread = threading.Thread(target=self._monitor_datadir, args=(node1, event, len(node1.get_sstables("keyspace1", "standard1")), failed))
         thread.start()
-        node1.cleanup()
+        node1.nodetool("cleanup --seq keyspace1 standard1")
         event.set()
         thread.join()
         self.assertFalse(failed.is_set())
 
     def _monitor_datadir(self, node, event, basecount, failed):
         while True:
-            if len(node.get_sstables("keyspace1", "standard1")) > basecount + 1:
+            sstables = node.get_sstables("keyspace1", "standard1")
+            for sstable in sstables:
+                debug(sstable)
+            if len(sstables) > basecount + 1:
                 failed.set()
                 return
             if event.is_set():
