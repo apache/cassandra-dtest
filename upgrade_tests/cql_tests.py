@@ -4267,8 +4267,6 @@ class TestCQL(UpgradeTester):
                 l frozen<list<text>>
             )""")
 
-        cl = getattr(self, 'CL', ConsistencyLevel.ONE)
-
         for is_upgraded, cursor in self.do_upgrade(cursor):
             debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE tlist")
@@ -4280,7 +4278,7 @@ class TestCQL(UpgradeTester):
                 cursor.execute("INSERT INTO {}(k, l) VALUES (0, ['foo', 'bar', 'foobar'])".format(table))
 
                 def check_applies(condition):
-                    assert_one(cursor, "UPDATE {} SET l = ['foo', 'bar', 'foobar'] WHERE k=0 IF {}".format(table, condition), [True], cl=cl)
+                    assert_one(cursor, "UPDATE {} SET l = ['foo', 'bar', 'foobar'] WHERE k=0 IF {}".format(table, condition), [True], cl=self.CL)
                     assert_one(cursor, "SELECT * FROM {}".format(table), [0, ['foo', 'bar', 'foobar']])  # read back at default cl.one
 
                 check_applies("l = ['foo', 'bar', 'foobar']")
@@ -4297,7 +4295,7 @@ class TestCQL(UpgradeTester):
 
                 def check_does_not_apply(condition):
                     assert_one(cursor, "UPDATE {} SET l = ['foo', 'bar', 'foobar'] WHERE k=0 IF {}".format(table, condition),
-                               [False, ['foo', 'bar', 'foobar']], cl=cl)
+                               [False, ['foo', 'bar', 'foobar']], cl=self.CL)
                     assert_one(cursor, "SELECT * FROM {}".format((table)), [0, ['foo', 'bar', 'foobar']])  # read back at default cl.one
 
                 # should not apply
@@ -4316,7 +4314,7 @@ class TestCQL(UpgradeTester):
 
                 def check_invalid(condition, expected=InvalidRequest):
                     assert_invalid(cursor, "UPDATE {} SET l = ['foo', 'bar', 'foobar'] WHERE k=0 IF {}".format(table, condition), expected=expected)
-                    assert_one(cursor, "SELECT * FROM {}".format(table), [0, ['foo', 'bar', 'foobar']], cl=cl)
+                    assert_one(cursor, "SELECT * FROM {}".format(table), [0, ['foo', 'bar', 'foobar']], cl=self.CL)
 
                 check_invalid("l = [null]")
                 check_invalid("l < null")
