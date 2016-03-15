@@ -2,6 +2,7 @@ import os
 import random
 import re
 import subprocess
+import json
 
 from ccmlib import common
 from dtest import Tester, debug
@@ -271,6 +272,102 @@ class TestOfflineTools(Tester):
         node1.flush()
         [(out, error, rc)] = node1.run_sstableexpiredblockers(keyspace="ks", column_family="cf")
         self.assertIn("blocks 2 expired sstables from getting dropped", out)
+
+    def sstableupgrade_test(self):
+        """
+        Test that sstableupgrade functions properly offline on a same-version Cassandra sstable, a
+        stdout message of "Found 0 sstables that need upgrading." should be returned.
+        """
+        # Set up original node version to test for upgrade
+        cluster = self.cluster
+        testversion = cluster.version()
+        original_install_dir = cluster.get_install_dir()
+        debug('Original install dir: {}'.format(original_install_dir))
+
+        # Set up last major version to upgrade from, assuming 2.1 branch is the oldest tested version
+        if testversion < '2.2':
+            # Upgrading from 2.0->2.1 fails due to the jamm 0.2.5->0.3.0 jar update.
+            #   ** This will happen again next time jamm version is upgraded.
+            # CCM doesn't handle this upgrade correctly and results in an error when flushing 2.1:
+            #   Error opening zip file or JAR manifest missing : /home/mshuler/git/cassandra/lib/jamm-0.2.5.jar
+            # The 2.1 installed jamm version is 0.3.0, but bin/cassandra.in.sh used by nodetool still has 0.2.5
+            # (when this is fixed in CCM issue #463, install version='git:cassandra-2.0' as below)
+            self.skipTest('Skipping 2.1 test due to jamm.jar version upgrade problem in CCM node configuration.')
+        elif testversion < '3.0':
+            debug('Test version: {} - installing git:cassandra-2.1'.format(testversion))
+            cluster.set_install_dir(version='git:cassandra-2.1')
+        # As of 3.5, sstable format 'ma' from 3.0 is still the latest - install 2.2 to upgrade from
+        else:
+            debug('Test version: {} - installing git:cassandra-2.2'.format(testversion))
+            cluster.set_install_dir(version='git:cassandra-2.2')
+
+        # Start up last major version, write out an sstable to upgrade, and stop node
+        cluster.populate(1).start(wait_for_binary_proto=True)
+        [node1] = cluster.nodelist()
+        # Check that node1 is actually what we expect
+        debug('Downgraded install dir: {}'.format(node1.get_install_dir()))
+        session = self.patient_cql_connection(node1)
+        self.create_ks(session, 'ks', 1)
+        session.execute('create table ks.cf (key int PRIMARY KEY, val int) with gc_grace_seconds=0')
+        session.execute('insert into ks.cf (key, val) values (1,1)')
+        node1.flush()
+        cluster.stop()
+        debug('Beginning ks.cf sstable: {}'.format(node1.get_sstables(keyspace='ks', column_family='cf')))
+
+        # Upgrade Cassandra to original testversion and run sstableupgrade
+        cluster.set_install_dir(original_install_dir)
+        # Check that node1 is actually upgraded
+        debug('Upgraded to original install dir: {}'.format(node1.get_install_dir()))
+        # Perform a node start/stop so system tables get internally updated, otherwise we may get "Unknown keyspace/table ks.cf"
+        cluster.start(wait_for_binary_proto=True)
+        node1.flush()
+        cluster.stop()
+        [(out, error, rc)] = node1.run_sstableupgrade(keyspace='ks', column_family='cf')
+        debug(out)
+        debug(error)
+        debug('Upgraded ks.cf sstable: {}'.format(node1.get_sstables(keyspace='ks', column_family='cf')))
+        self.assertIn('Found 1 sstables that need upgrading.', out)
+
+        # Check that sstableupgrade finds no upgrade needed on current version.
+        [(out, error, rc)] = node1.run_sstableupgrade(keyspace='ks', column_family='cf')
+        debug(out)
+        debug(error)
+        self.assertIn('Found 0 sstables that need upgrading.', out)
+
+    @since('3.0')
+    def sstabledump_test(self):
+        """
+        Test that sstabledump functions properly offline to output the contents of a table.
+        """
+        cluster = self.cluster
+        cluster.populate(1).start(wait_for_binary_proto=True)
+        [node1] = cluster.nodelist()
+        session = self.patient_cql_connection(node1)
+        self.create_ks(session, 'ks', 1)
+        session.execute('create table ks.cf (key int PRIMARY KEY, val int) with gc_grace_seconds=0')
+        session.execute('insert into ks.cf (key, val) values (1,1)')
+        node1.flush()
+        cluster.stop()
+        [(out, error, rc)] = node1.run_sstabledump(keyspace='ks', column_families=['cf'])
+        debug(out)
+        debug(error)
+
+        # Load the json output and check that it contains the inserted key=1
+        s = json.loads(out)
+        debug(s)
+        self.assertEqual(len(s), 1)
+        dumped_row = s[0]
+        self.assertEqual(dumped_row['partition']['key'], ['1'])
+
+        # Check that we only get the key back using the enumerate option
+        [(out, error, rc)] = node1.run_sstabledump(keyspace='ks', column_families=['cf'], enumerate_keys=True)
+        debug(out)
+        debug(error)
+        s = json.loads(out)
+        debug(s)
+        self.assertEqual(len(s), 1)
+        dumped_row = s[0][0]
+        self.assertEqual(dumped_row, '1')
 
     def _check_stderr_error(self, error):
         if len(error) > 0:
