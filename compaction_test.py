@@ -101,17 +101,28 @@ class TestCompaction(Tester):
         @jira_ticket CASSANDRA-11344
         Check that bloom filter size is between 50KB and 100KB for 100K keys
         """
+        if not hasattr(self, 'strategy') or self.strategy == "LeveledCompactionStrategy":
+            strategy_string = 'strategy=LeveledCompactionStrategy,sstable_size_in_mb=1'
+            min_bf_size = 50000
+            max_bf_size = 100000
+        else:
+            if self.strategy == "DateTieredCompactionStrategy":
+                strategy_string = "strategy=DateTieredCompactionStrategy,base_time_seconds=86400"  # we want a single sstable, so make sure we don't have a tiny first window
+            else:
+                strategy_string = "strategy={}".format(self.strategy)
+            min_bf_size = 100000
+            max_bf_size = 150000
         cluster = self.cluster
         cluster.populate(1).start(wait_for_binary_proto=True)
         [node1] = cluster.nodelist()
 
-        node1.stress(['write', 'n=100K', "no-warmup", "cl=ONE", "-rate",
-                      "threads=300", "-schema", "replication(factor=1)",
-                      "compaction(strategy=org.apache.cassandra.db.compaction."
-                      "LeveledCompactionStrategy,sstable_size_in_mb=1)"])
+        for x in xrange(0, 5):
+            node1.stress(['write', 'n=100K', "no-warmup", "cl=ONE", "-rate",
+                          "threads=300", "-schema", "replication(factor=1)",
+                          "compaction({},enabled=false)".format(strategy_string)])
+            node1.flush()
 
-        node1.flush()
-
+        node1.nodetool('enableautocompaction')
         node1.wait_for_compactions()
 
         table_name = 'standard1'
@@ -122,9 +133,8 @@ class TestCompaction(Tester):
 
         debug("bloom filter size is: {}".format(bfSize))
 
-        self.assertGreaterEqual(bfSize, 50000)
-        self.assertLessEqual(bfSize, 100000)
-
+        self.assertGreaterEqual(bfSize, min_bf_size)
+        self.assertLessEqual(bfSize, max_bf_size)
 
     def sstable_deletion_test(self):
         """
