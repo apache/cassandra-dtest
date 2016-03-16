@@ -4275,11 +4275,11 @@ class TestCQL(UpgradeTester):
             for frozen in (False, True):
 
                 table = "frozentlist" if frozen else "tlist"
-                cursor.execute("INSERT INTO %s(k, l) VALUES (0, ['foo', 'bar', 'foobar'])" % (table,))
+                cursor.execute("INSERT INTO {}(k, l) VALUES (0, ['foo', 'bar', 'foobar'])".format(table))
 
                 def check_applies(condition):
-                    assert_one(cursor, "UPDATE %s SET l = ['foo', 'bar', 'foobar'] WHERE k=0 IF %s" % (table, condition), [True])
-                    assert_one(cursor, "SELECT * FROM %s" % (table,), [0, ['foo', 'bar', 'foobar']])
+                    assert_one(cursor, "UPDATE {} SET l = ['foo', 'bar', 'foobar'] WHERE k=0 IF {}".format(table, condition), [True], cl=self.CL)
+                    assert_one(cursor, "SELECT * FROM {}".format(table), [0, ['foo', 'bar', 'foobar']])  # read back at default cl.one
 
                 check_applies("l = ['foo', 'bar', 'foobar']")
                 check_applies("l != ['baz']")
@@ -4294,9 +4294,9 @@ class TestCQL(UpgradeTester):
                 check_applies("l != null AND l IN (['foo', 'bar', 'foobar'])")
 
                 def check_does_not_apply(condition):
-                    assert_one(cursor, "UPDATE %s SET l = ['foo', 'bar', 'foobar'] WHERE k=0 IF %s" % (table, condition),
-                               [False, ['foo', 'bar', 'foobar']])
-                    assert_one(cursor, "SELECT * FROM %s" % (table,), [0, ['foo', 'bar', 'foobar']])
+                    assert_one(cursor, "UPDATE {} SET l = ['foo', 'bar', 'foobar'] WHERE k=0 IF {}".format(table, condition),
+                               [False, ['foo', 'bar', 'foobar']], cl=self.CL)
+                    assert_one(cursor, "SELECT * FROM {}".format((table)), [0, ['foo', 'bar', 'foobar']])  # read back at default cl.one
 
                 # should not apply
                 check_does_not_apply("l = ['baz']")
@@ -4313,8 +4313,8 @@ class TestCQL(UpgradeTester):
                 check_does_not_apply("l > ['zzz'] AND l < ['zzz']")
 
                 def check_invalid(condition, expected=InvalidRequest):
-                    assert_invalid(cursor, "UPDATE %s SET l = ['foo', 'bar', 'foobar'] WHERE k=0 IF %s" % (table, condition), expected=expected)
-                    assert_one(cursor, "SELECT * FROM %s" % (table,), [0, ['foo', 'bar', 'foobar']])
+                    assert_invalid(cursor, "UPDATE {} SET l = ['foo', 'bar', 'foobar'] WHERE k=0 IF {}".format(table, condition), expected=expected)
+                    assert_one(cursor, "SELECT * FROM {}".format(table), [0, ['foo', 'bar', 'foobar']], cl=self.CL)
 
                 check_invalid("l = [null]")
                 check_invalid("l < null")
