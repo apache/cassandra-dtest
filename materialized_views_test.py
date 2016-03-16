@@ -758,7 +758,8 @@ class TestMaterializedViews(Tester):
         debug('Shutdown node2')
         node2.stop(wait_other_notice=True)
 
-        session.execute("UPDATE t USING TIMESTAMP 4 SET v = 1 WHERE id = 1")
+        session.execute(SimpleStatement("UPDATE t USING TIMESTAMP 4 SET v = 1 WHERE id = 1",
+                                        consistency_level=ConsistencyLevel.QUORUM))
 
         assert_one(
             session,
