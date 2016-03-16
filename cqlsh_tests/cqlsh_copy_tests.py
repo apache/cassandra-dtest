@@ -546,19 +546,21 @@ class CqlshCopyTest(Tester):
         self.prepare()
         self.session.execute("""
             CREATE TABLE testcounter (
-                a int primary key,
-                b counter
+                a int,
+                b text,
+                c counter,
+                PRIMARY KEY (a, b)
             )""")
 
         tempfile = self.get_temp_file()
 
-        data = [[1, 20], [2, 40], [3, 60], [4, 80]]
+        data = [[1, '1', 20], [2, '2', 40], [3, '3', 60], [4, '4', 80]]
 
         with open(tempfile.name, 'w') as csvfile:
-            writer = csv.DictWriter(csvfile, fieldnames=['a', 'b'])
+            writer = csv.DictWriter(csvfile, fieldnames=['a', 'b', 'c'])
             writer.writeheader()
-            for a, b in data:
-                writer.writerow({'a': a, 'b': b})
+            for a, b, c in data:
+                writer.writerow({'a': a, 'b': b, 'c': c})
 
         cmds = "COPY ks.testcounter FROM '{name}'".format(name=tempfile.name)
         cmds += " WITH HEADER = true"
