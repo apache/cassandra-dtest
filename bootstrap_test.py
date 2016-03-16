@@ -130,10 +130,11 @@ class TestBootstrap(Tester):
         new_rows = list(session.execute("SELECT * FROM %s" % (stress_table,)))
         self.assertEquals(original_rows, new_rows)
 
-    @since('2.2')
     @known_failure(failure_source='cassandra',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10912',
-                   flaky=True)
+                   flaky=True,
+                   notes='flaps on most versions on Linux')
+    @since('2.2')
     def resumable_bootstrap_test(self):
         """
         Test resuming bootstrap after data streaming failure
