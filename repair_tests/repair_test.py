@@ -615,8 +615,15 @@ class TestRepair(Tester):
         node1.repair(opts)
 
         self.assertEqual(len(node1.grep_log('are consistent for standard1')), 0, "Nodes 1 and 2 should not be consistent.")
-        self.assertEqual(len(node1.grep_log("/127.0.0.2 and /127.0.0.1 have ([0-9]+) range\(s\) out of sync")), 1)
         self.assertEqual(len(node3.grep_log('Repair command')), 0, "Node 3 should not have been involved in the repair.")
+
+        out_of_sync_logs = node1.grep_log("/([0-9.]+) and /([0-9.]+) have ([0-9]+) range\(s\) out of sync")
+        _, matches = out_of_sync_logs[0]
+        out_of_sync_nodes = {matches.group(1), matches.group(2)}
+
+        valid_out_of_sync_pairs = [{node1.address(), node2.address()}]
+
+        self.assertIn(out_of_sync_nodes, valid_out_of_sync_pairs, str(out_of_sync_nodes))
 
     @since('2.2')
     def trace_repair_test(self):
