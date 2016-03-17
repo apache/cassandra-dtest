@@ -1,13 +1,23 @@
-from dtest import Tester
-
 import time
-from jmxutils import make_mbean, JolokiaAgent, remove_perf_disable_shared_mem
+
+from dtest import Tester
+from jmxutils import JolokiaAgent, make_mbean, remove_perf_disable_shared_mem
+from tools import known_failure, rows_to_list
 
 
 class TestDeletion(Tester):
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11364',
+                   flaky=True,
+                   notes='flaked with "unable to connect" on 3.0')
     def gc_test(self):
-        """ Test that tombstone are fully purge after gc_grace """
+        """
+        Test that tombstone purging doesn't bring back deleted data by writing
+        2 rows to a table with gc_grace=0, deleting one of those rows, then
+        asserting that it isn't present in the results of SELECT *, before and
+        after a flush and compaction.
+        """
         cluster = self.cluster
 
         cluster.populate(1).start()
@@ -22,19 +32,21 @@ class TestDeletion(Tester):
         session.execute('insert into cf (key, c1) values (2,1)')
         node1.flush()
 
-        result = list(session.execute('select * from cf;'))
-        assert len(result) == 2 and len(result[0]) == 2 and len(result[1]) == 2, result
+        self.assertEqual(rows_to_list(session.execute('select * from cf;')),
+                         [[1, 1], [2, 1]])
 
         session.execute('delete from cf where key=1')
-        result = list(session.execute('select * from cf;'))
+
+        self.assertEqual(rows_to_list(session.execute('select * from cf;')),
+                         [[2, 1]])
 
         node1.flush()
         time.sleep(.5)
         node1.compact()
         time.sleep(.5)
 
-        result = list(session.execute('select * from cf;'))
-        assert len(result) == 1 and len(result[0]) == 2, result
+        self.assertEqual(rows_to_list(session.execute('select * from cf;')),
+                         [[2, 1]])
 
     def tombstone_size_test(self):
         self.cluster.populate(1)
