@@ -2,9 +2,10 @@ import re
 import time
 from threading import Thread
 
-from assertions import assert_almost_equal
 from cassandra import ConsistencyLevel
 from ccmlib.node import NodetoolError, TimeoutError
+
+from assertions import assert_almost_equal
 from dtest import Tester
 from tools import debug, insert_c1c2, no_vnodes, query_c1c2, since
 
