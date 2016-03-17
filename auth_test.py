@@ -2506,7 +2506,7 @@ class TestAuthRoles(Tester):
                   'permissions_validity_in_ms': 0,
                   'roles_validity_in_ms': roles_expiry}
         self.cluster.set_configuration_options(values=config)
-        self.cluster.populate(nodes).start()
+        self.cluster.populate(nodes).start(wait_for_binary_proto=True)
 
         self.wait_for_any_log(self.cluster.nodelist(), 'Created default superuser', 25)
 
