@@ -2,10 +2,15 @@ from dtest import Tester
 
 import time
 from jmxutils import make_mbean, JolokiaAgent, remove_perf_disable_shared_mem
+from tools import known_failure
 
 
 class TestDeletion(Tester):
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11364',
+                   flaky=True,
+                   notes='flaked with "unable to connect" on 3.0')
     def gc_test(self):
         """ Test that tombstone are fully purge after gc_grace """
         cluster = self.cluster
