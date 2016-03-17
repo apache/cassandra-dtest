@@ -3,12 +3,13 @@ import re
 import time
 from collections import namedtuple
 
-from assertions import (assert_all, assert_invalid, assert_one,
-                        assert_unauthorized)
 from cassandra import AuthenticationFailed, InvalidRequest, Unauthorized
 from cassandra.cluster import NoHostAvailable
 from cassandra.protocol import SyntaxException
 from ccmlib.common import get_version_from_build
+
+from assertions import (assert_all, assert_invalid, assert_one,
+                        assert_unauthorized)
 from dtest import Tester, debug
 from tools import since
 
