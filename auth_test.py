@@ -160,7 +160,7 @@ class TestAuth(Tester):
         self.assertFalse(users['cathy'])
         self.assertTrue(users['dave'])
 
-        dave = self.get_session(user='dave', password='12345')
+        self.get_session(user='dave', password='12345')
         rows = list(session.execute("LIST USERS"))
         self.assertEqual(5, len(rows))
         # {username: isSuperuser} dict.
@@ -235,7 +235,6 @@ class TestAuth(Tester):
         self.prepare()
         cassandra = self.get_session(user='cassandra', password='cassandra')
         cassandra.execute("CREATE USER Test WITH PASSWORD '12345'")
-        usercount = len(list(cassandra.execute("LIST USERS")))
 
         # Should be invalid, as 'test' does not exist
         assert_invalid(cassandra, "DROP USER test")
@@ -245,7 +244,6 @@ class TestAuth(Tester):
         self.assertItemsEqual(rows, ['cassandra'])
 
         cassandra.execute("CREATE USER test WITH PASSWORD '12345'")
-        usercount = len(list(cassandra.execute("LIST USERS")))
 
         # Should be invalid, as 'TEST' does not exist
         assert_invalid(cassandra, "DROP USER TEST")
@@ -348,13 +346,12 @@ class TestAuth(Tester):
         self.prepare()
         session = self.get_session(user='cassandra', password='cassandra')
 
-        users = list(session.execute("LIST USERS"))
         assert_one(session, "LIST USERS", ['cassandra', True])
 
         session.execute("CREATE USER IF NOT EXISTS aleksey WITH PASSWORD 'sup'")
         session.execute("CREATE USER IF NOT EXISTS aleksey WITH PASSWORD 'ignored'")
 
-        aleksey = self.get_session(user='aleksey', password='sup')
+        self.get_session(user='aleksey', password='sup')
 
         assert_all(session, "LIST USERS", [['aleksey', False], ['cassandra', True]])
 
