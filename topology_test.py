@@ -7,7 +7,8 @@ from ccmlib.node import NodetoolError, TimeoutError
 
 from assertions import assert_almost_equal
 from dtest import Tester
-from tools import debug, insert_c1c2, no_vnodes, query_c1c2, since
+from tools import (debug, insert_c1c2, known_failure, no_vnodes, query_c1c2,
+                   since)
 
 
 class TestTopology(Tester):
@@ -204,6 +205,10 @@ class TestTopology(Tester):
 
         self.assertFalse(node3.is_running())
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11377',
+                   flaky=True,
+                   notes="flaps when a node doesn't come up")
     @since('3.0')
     def crash_during_decommission_test(self):
         """
