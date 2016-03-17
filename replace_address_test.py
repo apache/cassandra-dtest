@@ -221,9 +221,6 @@ class TestReplaceAddress(Tester):
         self.assertEqual(len(movedTokensList), numNodes)
 
     @since('2.2')
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-9831',
-                   flaky=True)
     def resumable_replace_test(self):
         """Test resumable bootstrap while replacing node"""
 
