@@ -25,8 +25,6 @@ from cqlsh_tools import (DummyColorMap, assert_csvs_items_equal, csv_rows,
 from dtest import Tester, canReuseCluster, freshCluster, debug, DISABLE_VNODES
 from tools import rows_to_list, since, known_failure
 
-DEFAULT_FLOAT_PRECISION = 5  # magic number copied from cqlsh script
-
 PARTITIONERS = {
     "murmur3": "org.apache.cassandra.dht.Murmur3Partitioner",
     "random": "org.apache.cassandra.dht.RandomPartitioner",
@@ -301,7 +299,7 @@ class CqlshCopyTest(Tester):
                         warning("Value in result: " + str(processed_results[0][x]))
             raise e
 
-    def format_for_csv(self, val, cql_type_name, time_format, float_precision):
+    def format_for_csv(self, val, cql_type_name, time_format):
         with self._cqlshlib() as cqlshlib:
             from cqlshlib.formatting import format_value
             try:
@@ -330,6 +328,12 @@ class CqlshCopyTest(Tester):
 
         encoding_name = 'utf-8'  # codecs.lookup(locale.getpreferredencoding()).name
 
+        # CASSANDRA-11255 increased COPY TO DOUBLE PRECISION TO 12
+        if cql_type_name == 'double' and self.cluster.version() >= '3.6':
+            float_precision = 12
+        else:
+            float_precision = 5
+
         # different versions use time_format or date_time_format
         # but all versions reject spurious values, so we just use both here
         return format_value(val,
@@ -344,7 +348,7 @@ class CqlshCopyTest(Tester):
                             thousands_sep=None,
                             boolean_styles=None).strval
 
-    def result_to_csv_rows(self, results, cql_type_names, time_format=None, float_precision=DEFAULT_FLOAT_PRECISION):
+    def result_to_csv_rows(self, results, cql_type_names, time_format=None):
         """
         Given an object returned from a CQL query, returns a string formatted by
         the cqlsh formatting utilities.
@@ -354,7 +358,7 @@ class CqlshCopyTest(Tester):
         # into a bare function if cqlshlib is made easier to interact with.
         if not time_format:
             time_format = self.default_time_format
-        return [[self.format_for_csv(v, t, time_format, float_precision)
+        return [[self.format_for_csv(v, t, time_format)
                  for v, t in zip(row, cql_type_names)] for row in results]
 
     def test_list_data(self):
@@ -1719,24 +1723,29 @@ class CqlshCopyTest(Tester):
             self.session.execute(insert_statement, [1000000, 0, 0, 0, 0, 0, Decimal(0), 0, 0])
 
             # comma as thousands sep and dot as decimal sep
+            # the precision for double values was increased from 5 to 12 in 3.6, see CASSANDRA-11255
+            double_val_1 = '5.12346' if self.cluster.version() < '3.6' else '5.12345678'
+            double_val_2 = '123,456,789.56' if self.cluster.version() < '3.6' else '123,456,789.560000002384'
             expected_vals_usual = [
                 ['0', '10', '10', '10', '10', '10', '10', '10', '10'],
-                ['1', '127', '255', '1,000', '1,000', '1,000', '5.5', '5.5', '5.12346'],
+                ['1', '127', '255', '1,000', '1,000', '1,000', '5.5', '5.5', double_val_1],
                 ['2', '127', '255', '1,000,000', '1,000,000', '1,000,000', '0.001', '0.001', '0.001'],
                 ['3', '127', '255', '1,000,000,005', '1,000,000,005', '1,000,000,005',
-                 '1,234.56', '1,234.56006', '123,456,789.56'],
+                 '1,234.56', '1,234.56006', double_val_2],
                 ['4', '127', '255', '-1,000,000,005', '-1,000,000,005', '-1,000,000,005',
                  '-1,234.56', '-1,234.56006', '-1,234.56'],
                 ['1,000,000', '0', '0', '0', '0', '0', '0', '0', '0']
             ]
 
             # dot as thousands sep and comma as decimal sep
+            double_val_1 = '5,12346' if self.cluster.version() < '3.6' else '5,12345678'
+            double_val_2 = '123.456.789,56' if self.cluster.version() < '3.6' else '123.456.789,560000002384'
             expected_vals_inverted = [
                 ['0', '10', '10', '10', '10', '10', '10', '10', '10'],
-                ['1', '127', '255', '1.000', '1.000', '1.000', '5,5', '5,5', '5,12346'],
+                ['1', '127', '255', '1.000', '1.000', '1.000', '5,5', '5,5', double_val_1],
                 ['2', '127', '255', '1.000.000', '1.000.000', '1.000.000', '0,001', '0,001', '0,001'],
                 ['3', '127', '255', '1.000.000.005', '1.000.000.005', '1.000.000.005',
-                 '1.234,56', '1.234,56006', '123.456.789,56'],
+                 '1.234,56', '1.234,56006', double_val_2],
                 ['4', '127', '255', '-1.000.000.005', '-1.000.000.005', '-1.000.000.005',
                  '-1.234,56', '-1.234,56006', '-1.234,56'],
                 ['1.000.000', '0', '0', '0', '0', '0', '0', '0', '0']
@@ -1805,6 +1814,60 @@ class CqlshCopyTest(Tester):
                                ['2', '1943-06-19 11:21:01.123000+0000'],
                                ['3', '1943-06-19 11:21:01.124000+0000']],
                               csv_results)
+
+    @since('3.6')
+    def test_round_trip_with_different_number_precision(self):
+        """
+        Test that we can import and export double and float values with a default precision (12 for doubles
+        and 5 for floats) or with a precision as specified by the user:
+
+        - create a csv file and import it
+        - export the data to another csv file
+        - check the first and last csv file contents match
+        - repeat with different precisions
+
+        @jira_ticket CASSANDRA-11255
+        """
+        self.prepare()
+        self.session.execute("create TABLE testfloatprecision(id int PRIMARY KEY, val1 float, val2 double)")
+
+        def do_test(float_precision, double_precision):
+            tempfile1 = self.get_temp_file()
+            tempfile2 = self.get_temp_file()
+            float_format_str = "{{0:.{}g}}".format(float_precision if float_precision is not None else 5)
+            double_format_str = "{{0:.{}g}}".format(double_precision if double_precision is not None else 12)
+
+            with open(tempfile1.name, 'w') as csvfile:
+                writer = csv.writer(csvfile)
+                writer.writerow([1, float_format_str.format(1.12345), double_format_str.format(1.123456789123)])
+
+            debug('Importing from {}'.format(tempfile1.name))
+            self.node1.run_cqlsh(cmds="COPY ks.testfloatprecision FROM '{}'".format(tempfile1.name))
+
+            cmd = "COPY ks.testfloatprecision TO '{}'".format(tempfile2.name)
+            if double_precision is not None or float_precision is not None:
+                cmd += " WITH"
+            if double_precision is not None:
+                cmd += " DOUBLEPRECISION={}".format(double_precision)
+                if float_precision is not None:
+                    cmd += " AND"
+            if float_precision is not None:
+                cmd += " FLOATPRECISION={}".format(float_precision)
+
+            debug('Exporting to {} with {}'.format(tempfile2.name, cmd))
+            self.node1.run_cqlsh(cmds=cmd)
+
+            self.assertItemsEqual(sorted(list(csv_rows(tempfile1.name))), sorted(list(csv_rows(tempfile2.name))))
+
+        do_test(None, None)
+        do_test(None, 10)
+        do_test(3, None)
+        do_test(0, 0)
+        do_test(1, 1)
+        do_test(3, 3)
+        do_test(5, 5)
+        do_test(5, 12)
+        do_test(5, 15)
 
     def test_round_trip_with_num_processes(self):
         """
