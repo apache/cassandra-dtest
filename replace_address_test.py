@@ -226,7 +226,12 @@ class TestReplaceAddress(Tester):
                    flaky=False,
                    notes='fails hard on linux')
     def resumable_replace_test(self):
-        """Test resumable bootstrap while replacing node"""
+        """
+        Test resumable bootstrap while replacing node. Feature introduced in
+        2.2 with ticket https://issues.apache.org/jira/browse/CASSANDRA-8838
+
+        @jira_ticket https://issues.apache.org/jira/browse/CASSANDRA-8838
+        """
 
         cluster = self.cluster
         cluster.populate(3).start()
