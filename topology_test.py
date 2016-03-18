@@ -7,7 +7,7 @@ from ccmlib.node import NodetoolError, TimeoutError
 
 from assertions import assert_almost_equal
 from dtest import Tester
-from tools import (debug, insert_c1c2, known_failure, no_vnodes, query_c1c2,
+from tools import (debug, insert_c1c2, no_vnodes, query_c1c2,
                    since)
 
 
