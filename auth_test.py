@@ -3,12 +3,13 @@ import re
 import time
 from collections import namedtuple
 
-from assertions import (assert_all, assert_invalid, assert_one,
-                        assert_unauthorized)
 from cassandra import AuthenticationFailed, InvalidRequest, Unauthorized
 from cassandra.cluster import NoHostAvailable
 from cassandra.protocol import SyntaxException
 from ccmlib.common import get_version_from_build
+
+from assertions import (assert_all, assert_invalid, assert_one,
+                        assert_unauthorized)
 from dtest import Tester, debug
 from tools import since
 
@@ -159,7 +160,7 @@ class TestAuth(Tester):
         self.assertFalse(users['cathy'])
         self.assertTrue(users['dave'])
 
-        dave = self.get_session(user='dave', password='12345')
+        self.get_session(user='dave', password='12345')
         rows = list(session.execute("LIST USERS"))
         self.assertEqual(5, len(rows))
         # {username: isSuperuser} dict.
@@ -234,7 +235,6 @@ class TestAuth(Tester):
         self.prepare()
         cassandra = self.get_session(user='cassandra', password='cassandra')
         cassandra.execute("CREATE USER Test WITH PASSWORD '12345'")
-        usercount = len(list(cassandra.execute("LIST USERS")))
 
         # Should be invalid, as 'test' does not exist
         assert_invalid(cassandra, "DROP USER test")
@@ -244,7 +244,6 @@ class TestAuth(Tester):
         self.assertItemsEqual(rows, ['cassandra'])
 
         cassandra.execute("CREATE USER test WITH PASSWORD '12345'")
-        usercount = len(list(cassandra.execute("LIST USERS")))
 
         # Should be invalid, as 'TEST' does not exist
         assert_invalid(cassandra, "DROP USER TEST")
@@ -347,13 +346,12 @@ class TestAuth(Tester):
         self.prepare()
         session = self.get_session(user='cassandra', password='cassandra')
 
-        users = list(session.execute("LIST USERS"))
         assert_one(session, "LIST USERS", ['cassandra', True])
 
         session.execute("CREATE USER IF NOT EXISTS aleksey WITH PASSWORD 'sup'")
         session.execute("CREATE USER IF NOT EXISTS aleksey WITH PASSWORD 'ignored'")
 
-        aleksey = self.get_session(user='aleksey', password='sup')
+        self.get_session(user='aleksey', password='sup')
 
         assert_all(session, "LIST USERS", [['aleksey', False], ['cassandra', True]])
 
@@ -2506,7 +2504,7 @@ class TestAuthRoles(Tester):
                   'permissions_validity_in_ms': 0,
                   'roles_validity_in_ms': roles_expiry}
         self.cluster.set_configuration_options(values=config)
-        self.cluster.populate(nodes).start()
+        self.cluster.populate(nodes).start(wait_for_binary_proto=True)
 
         self.wait_for_any_log(self.cluster.nodelist(), 'Created default superuser', 25)
 
