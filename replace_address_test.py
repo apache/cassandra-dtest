@@ -220,10 +220,6 @@ class TestReplaceAddress(Tester):
         debug(movedTokensList[0])
         self.assertEqual(len(movedTokensList), numNodes)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11376',
-                   flaky=False,
-                   notes='fails hard on linux')
     @since('2.2')
     def resumable_replace_test(self):
         """
@@ -256,7 +252,7 @@ class TestReplaceAddress(Tester):
         node4.set_configuration_options(values={'streaming_socket_timeout_in_ms': 1000})
         cluster.add(node4, False)
         try:
-            node4.start(jvm_args=["-Dcassandra.replace_address_first_boot=127.0.0.3"])
+            node4.start(jvm_args=["-Dcassandra.replace_address_first_boot=127.0.0.3"], wait_other_notice=False)
         except NodeError:
             pass  # node doesn't start as expected
         t.join()
