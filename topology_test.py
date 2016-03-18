@@ -208,10 +208,6 @@ class TestTopology(Tester):
 
         self.assertFalse(node3.is_running())
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11377',
-                   flaky=True,
-                   notes="flaps when a node doesn't come up")
     @since('3.0')
     def crash_during_decommission_test(self):
         """
@@ -236,7 +232,7 @@ class TestTopology(Tester):
                 break
             debug("Restarting node2")
             node2.stop(gently=False)
-            node2.start(wait_for_binary_proto=True)
+            node2.start(wait_for_binary_proto=True, wait_other_notice=False)
 
         debug("Waiting for decommission to complete")
         t.join()
