@@ -1115,6 +1115,10 @@ class TestMaterializedViews(Tester):
 
         assert_none(session2, "SELECT * FROM ks.t_by_v WHERE v2 = 'a'", cl=ConsistencyLevel.QUORUM)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11384',
+                   flaky=True,
+                   notes='flapped on 3.0 novnode job')
     def complex_mv_select_statements_test(self):
         """
         Test complex MV select statements
