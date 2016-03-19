@@ -6,7 +6,7 @@ from assertions import assert_invalid, assert_one
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
 from dtest import Tester
-from tools import known_failure, rows_to_list, since
+from tools import rows_to_list, since
 
 
 class TestCounters(Tester):
