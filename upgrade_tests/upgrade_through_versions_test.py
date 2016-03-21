@@ -268,9 +268,6 @@ class UpgradeTester(Tester):
         """
         self.upgrade_scenario()
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10612',
-                   flaky=True)
     def rolling_upgrade_test(self):
         """
         Test rolling upgrade of the cluster, so we have mixed versions part way through.
@@ -280,9 +277,6 @@ class UpgradeTester(Tester):
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11162',
                    flaky=False)
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10612',
-                   flaky=True)
     def parallel_upgrade_with_internode_ssl_test(self):
         """
         Test upgrading cluster all at once (requires cluster downtime), with internode ssl.
