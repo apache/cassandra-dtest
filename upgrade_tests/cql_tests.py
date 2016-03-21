@@ -4707,6 +4707,8 @@ class TestCQL(UpgradeTester):
                 check_invalid("m['foo'] CONTAINS KEY 367", expected=SyntaxException)
                 check_invalid("m[null] = null")
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11395')
     @since("2.1.1")
     def cas_and_list_index_test(self):
         """ Test for 7499 test """
