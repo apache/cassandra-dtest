@@ -272,7 +272,7 @@ class TestStorageEngineUpgrade(Tester):
 
         assert_all(session, "SELECT * FROM t WHERE v1 = 0", [[p, r, 0, r * 2] for p in xrange(0, PARTITIONS) for r in xrange(0, ROWS) if r % 2 == 0], ignore_order=True)
 
-    def upgrade_with_range_tombstones(self):
+    def upgrade_with_range_tombstones_test(self):
         """
         Checks sstable including range tombstone can be read after upgrade.
 
@@ -298,7 +298,7 @@ class TestStorageEngineUpgrade(Tester):
 
         self.cluster.compact()
 
-    def upgrade_with_range_and_collection_tombstones(self):
+    def upgrade_with_range_and_collection_tombstones_test(self):
         """
         Check sstable including collection tombstone (inserted through adding a collection) can be read after upgrade.
 
