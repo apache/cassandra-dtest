@@ -1,6 +1,7 @@
 import os
 import random
 import re
+import string
 import tempfile
 import time
 
@@ -413,11 +414,8 @@ class TestCompaction(Tester):
             self.skipTest('major compaction not implemented for LCS in this version of Cassandra')
 
 
-def get_random_word(wordLen):
-    word = ''
-    for i in range(wordLen):
-        word += random.choice('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789')
-    return word
+def get_random_word(wordLen, population=string.ascii_letters + string.digits):
+    return ''.join([random.choice(population) for _ in range(wordLen)])
 
 
 def block_on_compaction_log(node, ks=None, table=None):
