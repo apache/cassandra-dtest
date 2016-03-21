@@ -20,7 +20,7 @@ from assertions import assert_all, assert_none
 from ccmlib import common
 from cqlsh_tools import monkeypatch_driver, unmonkeypatch_driver
 from dtest import Tester, debug
-from tools import create_c1c2_table, insert_c1c2, rows_to_list, since, known_failure
+from tools import create_c1c2_table, insert_c1c2, rows_to_list, since
 
 
 class TestCqlsh(Tester):
@@ -151,8 +151,6 @@ class TestCqlsh(Tester):
             self.assertIn("1943-04-19 11:21:01+0000", output)
 
     @since('3.4')
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11184')
     def test_sub_second_precision(self):
         """
         Test that we can query at millisecond precision.
