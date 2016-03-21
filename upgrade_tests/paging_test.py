@@ -1125,6 +1125,9 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
 
             self.assertEqualIgnoreOrder(pf.all_data(), expected_data)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11396',
+                   flaky=True)
     def test_data_change_impacting_later_page(self):
         cursor = self.prepare()
         cursor.execute("CREATE TABLE paging_test ( id int, mytext text, PRIMARY KEY (id, mytext) )")

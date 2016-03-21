@@ -3149,6 +3149,9 @@ class TestCQL(UpgradeTester):
                 assert_invalid(cursor, "DELETE FROM test2 WHERE k = 0 AND i > 0 IF EXISTS")
                 assert_invalid(cursor, "DELETE FROM test2 WHERE k = 0 AND i > 0 IF v = 'foo'")
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11396',
+                   flaky=True)
     @freshCluster()
     def range_key_ordered_test(self):
         cursor = self.prepare(ordered=True)
@@ -3267,6 +3270,9 @@ class TestCQL(UpgradeTester):
             cursor.execute("UPDATE test_compact SET v = 3 WHERE k1 IN () AND k2 = 2")
             assert_nothing_changed("test_compact")
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11396',
+                   flaky=True)
     def collection_flush_test(self):
         """ Test for 5805 bug """
         cursor = self.prepare()
@@ -4737,6 +4743,9 @@ class TestCQL(UpgradeTester):
 
             assert_one(cursor, "SELECT * FROM test", [0, ['foo', 'bar'], 'foobar'])
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11396',
+                   flaky=True)
     @since("2.0")
     def static_with_limit_test(self):
         """ Test LIMIT when static columns are present (#6956) """
