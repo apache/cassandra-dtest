@@ -268,6 +268,9 @@ class UpgradeTester(Tester):
         """
         self.upgrade_scenario()
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11393',
+                   flaky=True)
     def rolling_upgrade_test(self):
         """
         Test rolling upgrade of the cluster, so we have mixed versions part way through.
