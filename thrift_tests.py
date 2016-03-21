@@ -7,6 +7,7 @@ from thrift.protocol import TBinaryProtocol
 from thrift.Thrift import TApplicationException
 from thrift.transport import TSocket, TTransport
 
+from assertions import assert_none, assert_one
 from dtest import DISABLE_VNODES, NUM_TOKENS, Tester, debug
 from thrift_bindings.v22 import Cassandra
 from thrift_bindings.v22.Cassandra import (CfDef, Column, ColumnDef,
@@ -20,8 +21,7 @@ from thrift_bindings.v22.Cassandra import (CfDef, Column, ColumnDef,
                                            Mutation, NotFoundException,
                                            SlicePredicate, SliceRange,
                                            SuperColumn)
-from tools import since, known_failure
-from assertions import assert_one, assert_none
+from tools import since
 
 
 def get_thrift_client(host='127.0.0.1', port=9160):
@@ -973,10 +973,6 @@ class TestMutations(ThriftTester):
         client.insert('key1', ColumnParent('Standard1'), Column('x' * (2**16 - 1), 'value', 0), ConsistencyLevel.ONE)
         _expect_exception(lambda: client.insert('key1', ColumnParent('Standard1'), Column('x' * (2**16), 'value', 0), ConsistencyLevel.ONE), InvalidRequestException)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11326',
-                   flaky=True,
-                   notes='Failed small number of times on trunk')
     def test_bad_calls(self):
         _set_keyspace('Keyspace1')
         # missing arguments
