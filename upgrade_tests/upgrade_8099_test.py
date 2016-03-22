@@ -105,38 +105,60 @@ class TestStorageEngineUpgrade(Tester):
         session = self._do_upgrade()
 
         for n in range(0, PARTITIONS):
-            assert_all(session, "SELECT * FROM t WHERE k = %d" % (n), [[n, v, v] for v in range(0, ROWS)])
-            assert_all(session, "SELECT * FROM t WHERE k = %d ORDER BY t DESC" % (n), [[n, v, v] for v in range(ROWS - 1, -1, -1)])
+            assert_all(session,
+                       "SELECT * FROM t WHERE k = %d" % (n),
+                       [[n, v, v] for v in range(0, ROWS)])
+            assert_all(session,
+                       "SELECT * FROM t WHERE k = %d ORDER BY t DESC" % (n),
+                       [[n, v, v] for v in range(ROWS - 1, -1, -1)])
 
             # Querying a "large" slice
             start = ROWS / 10
             end = ROWS - 1 - (ROWS / 10)
-            assert_all(session, "SELECT * FROM t WHERE k = %d AND t >= %d AND t < %d" % (n, start, end), [[n, v, v] for v in range(start, end)])
-            assert_all(session, "SELECT * FROM t WHERE k = %d AND t >= %d AND t < %d ORDER BY t DESC" % (n, start, end), [[n, v, v] for v in range(end - 1, start - 1, -1)])
+            assert_all(session,
+                       "SELECT * FROM t WHERE k = %d AND t >= %d AND t < %d" % (n, start, end),
+                       [[n, v, v] for v in range(start, end)])
+            assert_all(session,
+                       "SELECT * FROM t WHERE k = %d AND t >= %d AND t < %d ORDER BY t DESC" % (n, start, end),
+                       [[n, v, v] for v in range(end - 1, start - 1, -1)])
 
             # Querying a "small" slice
             start = ROWS / 2
             end = ROWS / 2 + 5
-            assert_all(session, "SELECT * FROM t WHERE k = %d AND t >= %d AND t < %d" % (n, start, end), [[n, v, v] for v in range(start, end)])
-            assert_all(session, "SELECT * FROM t WHERE k = %d AND t >= %d AND t < %d ORDER BY t DESC" % (n, start, end), [[n, v, v] for v in range(end - 1, start - 1, -1)])
+            assert_all(session,
+                       "SELECT * FROM t WHERE k = %d AND t >= %d AND t < %d" % (n, start, end),
+                       [[n, v, v] for v in range(start, end)])
+            assert_all(session,
+                       "SELECT * FROM t WHERE k = %d AND t >= %d AND t < %d ORDER BY t DESC" % (n, start, end),
+                       [[n, v, v] for v in range(end - 1, start - 1, -1)])
 
         self.cluster.compact()
 
         for n in range(0, PARTITIONS):
             assert_all(session, "SELECT * FROM t WHERE k = %d" % (n), [[n, v, v] for v in range(0, ROWS)])
-            assert_all(session, "SELECT * FROM t WHERE k = %d ORDER BY t DESC" % (n), [[n, v, v] for v in range(ROWS - 1, -1, -1)])
+            assert_all(session,
+                       "SELECT * FROM t WHERE k = %d ORDER BY t DESC" % (n),
+                       [[n, v, v] for v in range(ROWS - 1, -1, -1)])
 
             # Querying a "large" slice
             start = ROWS / 10
             end = ROWS - 1 - (ROWS / 10)
-            assert_all(session, "SELECT * FROM t WHERE k = %d AND t >= %d AND t < %d" % (n, start, end), [[n, v, v] for v in range(start, end)])
-            assert_all(session, "SELECT * FROM t WHERE k = %d AND t >= %d AND t < %d ORDER BY t DESC" % (n, start, end), [[n, v, v] for v in range(end - 1, start - 1, -1)])
+            assert_all(session,
+                       "SELECT * FROM t WHERE k = %d AND t >= %d AND t < %d" % (n, start, end),
+                       [[n, v, v] for v in range(start, end)])
+            assert_all(session,
+                       "SELECT * FROM t WHERE k = %d AND t >= %d AND t < %d ORDER BY t DESC" % (n, start, end),
+                       [[n, v, v] for v in range(end - 1, start - 1, -1)])
 
             # Querying a "small" slice
             start = ROWS / 2
             end = ROWS / 2 + 5
-            assert_all(session, "SELECT * FROM t WHERE k = %d AND t >= %d AND t < %d" % (n, start, end), [[n, v, v] for v in range(start, end)])
-            assert_all(session, "SELECT * FROM t WHERE k = %d AND t >= %d AND t < %d ORDER BY t DESC" % (n, start, end), [[n, v, v] for v in range(end - 1, start - 1, -1)])
+            assert_all(session,
+                       "SELECT * FROM t WHERE k = %d AND t >= %d AND t < %d" % (n, start, end),
+                       [[n, v, v] for v in range(start, end)])
+            assert_all(session,
+                       "SELECT * FROM t WHERE k = %d AND t >= %d AND t < %d ORDER BY t DESC" % (n, start, end),
+                       [[n, v, v] for v in range(end - 1, start - 1, -1)])
 
     def upgrade_with_unclustered_table(self, table_options):
         PARTITIONS = 5
@@ -176,14 +198,22 @@ class TestStorageEngineUpgrade(Tester):
         session = self._do_upgrade()
 
         for n in range(0, PARTITIONS):
-            assert_all(session, "SELECT * FROM t WHERE k = %d" % (n), [[n, v, ROWS - 1, ROWS, v, v + 1] for v in range(0, ROWS)])
-            assert_all(session, "SELECT * FROM t WHERE k = %d ORDER BY t DESC" % (n), [[n, v, ROWS - 1, ROWS, v, v + 1] for v in range(ROWS - 1, -1, -1)])
+            assert_all(session,
+                       "SELECT * FROM t WHERE k = %d" % (n),
+                       [[n, v, ROWS - 1, ROWS, v, v + 1] for v in range(0, ROWS)])
+            assert_all(session,
+                       "SELECT * FROM t WHERE k = %d ORDER BY t DESC" % (n),
+                       [[n, v, ROWS - 1, ROWS, v, v + 1] for v in range(ROWS - 1, -1, -1)])
 
         self.cluster.compact()
 
         for n in range(0, PARTITIONS):
-            assert_all(session, "SELECT * FROM t WHERE k = %d" % (n), [[n, v, ROWS - 1, ROWS, v, v + 1] for v in range(0, ROWS)])
-            assert_all(session, "SELECT * FROM t WHERE k = %d ORDER BY t DESC" % (n), [[n, v, ROWS - 1, ROWS, v, v + 1] for v in range(ROWS - 1, -1, -1)])
+            assert_all(session,
+                       "SELECT * FROM t WHERE k = %d" % (n),
+                       [[n, v, ROWS - 1, ROWS, v, v + 1] for v in range(0, ROWS)])
+            assert_all(session,
+                       "SELECT * FROM t WHERE k = %d ORDER BY t DESC" % (n),
+                       [[n, v, ROWS - 1, ROWS, v, v + 1] for v in range(ROWS - 1, -1, -1)])
 
     def upgrade_with_wide_partition_test(self):
         """
@@ -264,15 +294,24 @@ class TestStorageEngineUpgrade(Tester):
 
         self.cluster.flush()
 
-        assert_all(session, "SELECT * FROM t WHERE v1 = 0", [[p, r, 0, r * 2] for p in range(0, PARTITIONS) for r in range(0, ROWS) if r % 2 == 0], ignore_order=True)
+        assert_all(session,
+                   "SELECT * FROM t WHERE v1 = 0",
+                   [[p, r, 0, r * 2] for p in range(0, PARTITIONS) for r in range(0, ROWS) if r % 2 == 0],
+                   ignore_order=True)
 
         session = self._do_upgrade()
 
-        assert_all(session, "SELECT * FROM t WHERE v1 = 0", [[p, r, 0, r * 2] for p in range(0, PARTITIONS) for r in range(0, ROWS) if r % 2 == 0], ignore_order=True)
+        assert_all(session,
+                   "SELECT * FROM t WHERE v1 = 0",
+                   [[p, r, 0, r * 2] for p in range(0, PARTITIONS) for r in range(0, ROWS) if r % 2 == 0],
+                   ignore_order=True)
 
         self.cluster.compact()
 
-        assert_all(session, "SELECT * FROM t WHERE v1 = 0", [[p, r, 0, r * 2] for p in range(0, PARTITIONS) for r in range(0, ROWS) if r % 2 == 0], ignore_order=True)
+        assert_all(session,
+                   "SELECT * FROM t WHERE v1 = 0",
+                   [[p, r, 0, r * 2] for p in range(0, PARTITIONS) for r in range(0, ROWS) if r % 2 == 0],
+                   ignore_order=True)
 
     def upgrade_with_range_tombstones_test(self):
         """
