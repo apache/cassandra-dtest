@@ -1479,6 +1479,40 @@ class CqlshCopyTest(Tester):
                                               expected_err="Failed to import 1 rows: ParseError - "
                                                            "Cannot insert null value for primary key column")
 
+    def test_read_wrong_column_names(self):
+        """
+        Test that if the wrong column name is specified in the COPY FROM command,
+        then an appropriate error is returned by:
+
+        - creating a table,
+        - write a CSV file containing some data
+        - COPY that csv file into the table with an incorrect column name
+
+        @jira_ticket CASSANDRA-11333
+        """
+        self.prepare()
+        self.session.execute("""
+            CREATE TABLE testwrongcolumns (
+                a int,
+                b int,
+                c int,
+                PRIMARY KEY(a, b)
+            )""")
+
+        tempfile = self.get_temp_file()
+        debug('Writing {}'.format(tempfile.name))
+        write_rows_to_csv(tempfile.name, [[1, 1, 1]])
+
+        cmd = """COPY ks.testwrongcolumns (a, b, d) FROM '{}'""".format(tempfile.name)
+        out, err = self.node1.run_cqlsh(cmd, return_output=True)
+        debug(out)
+        debug(err)
+        results = list(self.session.execute("SELECT * FROM testwrongcolumns"))
+
+        self.assertIn('Invalid column name d', err)
+        self.assertNotIn('child process(es) died unexpectedly', err)
+        self.assertFalse(results)
+
     def test_all_datatypes_write(self):
         """
         Test that, after COPYing a table containing all CQL datatypes to a CSV
