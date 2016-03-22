@@ -62,7 +62,7 @@ class TestRepair(Tester):
 
         session = self.patient_cql_connection(node_to_check, 'ks')
         result = list(session.execute("SELECT * FROM cf LIMIT {}".format(rows * 2)))
-        self.assertEqual(len(result), rows, len(result))
+        self.assertEqual(len(result), rows)
 
         for k in found:
             query_c1c2(session, k, ConsistencyLevel.ONE)
