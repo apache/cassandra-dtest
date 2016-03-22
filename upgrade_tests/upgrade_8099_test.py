@@ -67,14 +67,14 @@ class TestStorageEngineUpgrade(Tester):
         Validates we can do basic slice queries (forward and reverse ones) on legacy sstables for a CQL table
         with a clustering column.
         """
-        self.upgrade_with_clustered_table("")
+        self.upgrade_with_clustered_table()
 
     def upgrade_with_clustered_compact_table_test(self):
         """
         Validates we can do basic slice queries (forward and reverse ones) on legacy sstables for a COMPACT table
         with a clustering column.
         """
-        self.upgrade_with_clustered_table(" WITH COMPACT STORAGE")
+        self.upgrade_with_clustered_table(compact_storage=True)
 
     def upgrade_with_unclustered_CQL_table_test(self):
         """
@@ -88,13 +88,15 @@ class TestStorageEngineUpgrade(Tester):
         """
         self.upgrade_with_unclustered_table(" WITH COMPACT STORAGE")
 
-    def upgrade_with_clustered_table(self, table_options):
+    def upgrade_with_clustered_table(self, compact_storage=False):
         PARTITIONS = 2
         ROWS = 1000
 
         session = self._setup_cluster()
 
-        session.execute('CREATE TABLE t (k int, t int, v int, PRIMARY KEY (k, t))' + table_options)
+        session.execute(
+            'CREATE TABLE t (k int, t int, v int, PRIMARY KEY (k, t))' +
+            (' WITH COMPACT STORAGE' if compact_storage else ''))
 
         for n in xrange(0, PARTITIONS):
             for r in xrange(0, ROWS):
