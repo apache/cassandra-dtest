@@ -1129,6 +1129,7 @@ class TestMaterializedViews(Tester):
         cluster.populate(3).start()
         node1 = cluster.nodelist()[0]
         session = self.patient_cql_connection(node1)
+        session.default_consistency_level = ConsistencyLevel.QUORUM
 
         debug("Creating keyspace")
         session.execute("CREATE KEYSPACE mvtest WITH replication = "
