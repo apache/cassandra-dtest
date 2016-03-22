@@ -199,7 +199,14 @@ class UpgradeTester(Tester):
             for is_upgraded, session in sessions:
                 session.default_consistency_level = self.CL
 
-        return sessions
+        # Let the nodes settle briefly before yielding connections in turn (on the upgraded and non-upgraded alike)
+        # CASSANDRA-11396 was the impetus for this change, wherein some apparent perf noise was preventing
+        # CL.ALL from being reached. The newly upgraded node needs to settle because it has just barely started, and each
+        # non-upgraded node needs a chance to settle as well, because the entire cluster (or isolated nodes) may have been doing resource intensive activities
+        # immediately before.
+        for s in sessions:
+            time.sleep(5)
+            yield s
 
     def get_version(self):
         node1 = self.cluster.nodelist()[0]
