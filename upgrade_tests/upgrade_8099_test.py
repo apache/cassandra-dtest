@@ -80,13 +80,13 @@ class TestStorageEngineUpgrade(Tester):
         """
         Validates we can do basic name queries on legacy sstables for a CQL table without clustering.
         """
-        self.upgrade_with_unclustered_table("")
+        self.upgrade_with_unclustered_table()
 
     def upgrade_with_unclustered_compact_table_test(self):
         """
         Validates we can do basic name queries on legacy sstables for a COMPACT table without clustering.
         """
-        self.upgrade_with_unclustered_table(" WITH COMPACT STORAGE")
+        self.upgrade_with_unclustered_table(compact_storage=True)
 
     def upgrade_with_clustered_table(self, compact_storage=False):
         PARTITIONS = 2
@@ -160,12 +160,13 @@ class TestStorageEngineUpgrade(Tester):
                        "SELECT * FROM t WHERE k = %d AND t >= %d AND t < %d ORDER BY t DESC" % (n, start, end),
                        [[n, v, v] for v in range(end - 1, start - 1, -1)])
 
-    def upgrade_with_unclustered_table(self, table_options):
+    def upgrade_with_unclustered_table(self, compact_storage=False):
         PARTITIONS = 5
 
         session = self._setup_cluster()
 
-        session.execute('CREATE TABLE t (k int PRIMARY KEY, v1 int, v2 int, v3 int, v4 int)' + table_options)
+        session.execute('CREATE TABLE t (k int PRIMARY KEY, v1 int, v2 int, v3 int, v4 int)' +
+                        (' WITH COMPACT STORAGE' if compact_storage else ''))
 
         for n in range(0, PARTITIONS):
                 session.execute("INSERT INTO t(k, v1, v2, v3, v4) VALUES (%d, %d, %d, %d, %d)" % (n, n + 1, n + 2, n + 3, n + 4))
