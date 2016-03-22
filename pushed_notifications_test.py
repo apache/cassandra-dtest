@@ -109,28 +109,29 @@ class TestPushedNotifications(Tester):
             self.assertEquals("MOVED_NODE", change_type)
             self.assertEquals(self.get_ip_from_node(node1), address)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11057')
     @no_vnodes()
     def move_single_node_localhost_test(self):
         """
         @jira_ticket  CASSANDRA-10052
         Test that we don't get NODE_MOVED notifications from nodes other than the local one,
-        when rpc_address is set to localhost.
+        when rpc_address is set to localhost (127.0.0.1).
 
-        To set-up this test we override the rpc_address to "localhost" for all nodes, and
+        To set-up this test we override the rpc_address to "localhost (127.0.0.1)" for all nodes, and
         therefore we must change the rpc port or else processes won't start.
         """
         cluster = self.cluster
         cluster.populate(3)
         node1, node2, node3 = cluster.nodelist()
 
-        # change node3 'rpc_address' from '127.0.0.x' to 'localhost', increase port numbers
+        # change node's 'rpc_address' from '127.0.0.x' to 'localhost (127.0.0.1)', increase port numbers
         i = 0
         for node in cluster.nodelist():
-            node.network_interfaces['thrift'] = ('localhost', node.network_interfaces['thrift'][1] + i)
-            node.network_interfaces['binary'] = ('localhost', node.network_interfaces['thrift'][1] + 1)
+            # See CASSANDRA-11057 for IPv6 issues and why we set 127.0.0.1 for CCM
+            debug('Set 127.0.0.1 to prevent IPv6 java prefs, set rpc_address: localhost in cassandra.yaml')
+            node.network_interfaces['thrift'] = ('127.0.0.1', node.network_interfaces['thrift'][1] + i)
+            node.network_interfaces['binary'] = ('127.0.0.1', node.network_interfaces['thrift'][1] + 1)
             node.import_config_files()  # this regenerates the yaml file and sets 'rpc_address' to the 'thrift' address
+            node.set_configuration_options(values={'rpc_address': 'localhost'})
             debug(node.show())
             i = i + 2
 
