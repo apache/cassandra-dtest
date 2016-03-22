@@ -1462,7 +1462,7 @@ class TestMaterializedViewsConsistency(Tester):
     def _consistent_reads_after_write_test(self, num_partitions):
 
         session = self.prepare()
-        [node1, node2, node3] = self.cluster.nodelist()
+        node1, node2, node3 = self.cluster.nodelist()
 
         # Test config
         lower = 0
