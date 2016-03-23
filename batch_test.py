@@ -1,11 +1,11 @@
+import sys
 import time
+from unittest import skipIf
 
 from cassandra import ConsistencyLevel, Timeout, Unavailable
 from cassandra.query import SimpleStatement
-import sys
 
-from assertions import assert_invalid, assert_unavailable, assert_one
-from unittest import skipIf
+from assertions import assert_invalid, assert_one, assert_unavailable
 from dtest import CASSANDRA_DIR, Tester, debug
 from tools import since
 

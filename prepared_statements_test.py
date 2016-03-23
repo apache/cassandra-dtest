@@ -1,5 +1,6 @@
-from dtest import Tester
 from cassandra import InvalidRequest
+
+from dtest import Tester
 
 KEYSPACE = "foo"
 

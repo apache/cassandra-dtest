@@ -10,10 +10,10 @@ from multiprocessing import Process, Queue
 from Queue import Empty, Full
 
 import psutil
-from six import print_
-
 from cassandra import ConsistencyLevel, WriteTimeout
 from cassandra.query import SimpleStatement
+from six import print_
+
 from dtest import Tester, debug
 from tools import generate_ssl_stores, known_failure, new_node
 from upgrade_base import (UPGRADE_TEST_RUN, head_2dot1, head_2dot2, head_3dot0,

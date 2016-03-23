@@ -1,12 +1,13 @@
 import glob
 import os
-import pycassa
 import shlex
 import subprocess
 import time
 import unittest
 
-from dtest import Tester, debug, DEFAULT_DIR
+import pycassa
+
+from dtest import DEFAULT_DIR, Tester, debug
 from jmxutils import JolokiaAgent, make_mbean, remove_perf_disable_shared_mem
 
 JNA_PATH = '/usr/share/java/jna.jar'

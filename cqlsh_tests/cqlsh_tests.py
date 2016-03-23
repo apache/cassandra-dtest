@@ -15,9 +15,9 @@ from uuid import UUID, uuid4
 from cassandra import InvalidRequest
 from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.query import BatchStatement, BatchType
+from ccmlib import common
 
 from assertions import assert_all, assert_none
-from ccmlib import common
 from cqlsh_tools import monkeypatch_driver, unmonkeypatch_driver
 from dtest import Tester, debug
 from tools import create_c1c2_table, insert_c1c2, rows_to_list, since

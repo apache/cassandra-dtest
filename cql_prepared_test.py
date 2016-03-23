@@ -1,7 +1,7 @@
+import time
+
 from dtest import Tester
 from tools import since
-
-import time
 
 
 @since("1.2")

@@ -1,11 +1,13 @@
+import re
 import time
 import uuid
-import re
-from dtest import Tester
-from tools import since, require
-from assertions import assert_invalid
-from cassandra import Unauthorized, ConsistencyLevel
+
+from cassandra import ConsistencyLevel, Unauthorized
 from cassandra.query import SimpleStatement
+
+from assertions import assert_invalid
+from dtest import Tester
+from tools import require, since
 
 
 def listify(item):

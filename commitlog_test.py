@@ -6,11 +6,12 @@ import struct
 import subprocess
 import time
 
-from assertions import assert_almost_equal, assert_none, assert_one
 from cassandra import WriteTimeout
 from cassandra.cluster import NoHostAvailable, OperationTimedOut
 from ccmlib.common import is_win
 from ccmlib.node import Node, TimeoutError
+
+from assertions import assert_almost_equal, assert_none, assert_one
 from dtest import Tester, debug
 from tools import known_failure, rows_to_list, since
 

@@ -1,6 +1,7 @@
-from dtest import Tester, debug
 import datetime
 import random
+
+from dtest import Tester, debug
 
 status_messages = (
     "I''m going to the Cassandra Summit in June!",

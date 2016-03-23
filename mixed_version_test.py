@@ -1,8 +1,8 @@
-from cassandra import ConsistencyLevel, ReadTimeout, OperationTimedOut
+from cassandra import ConsistencyLevel, OperationTimedOut, ReadTimeout
 from cassandra.query import SimpleStatement
 
-from tools import since
 from dtest import Tester, debug
+from tools import since
 
 
 class TestSchemaChanges(Tester):

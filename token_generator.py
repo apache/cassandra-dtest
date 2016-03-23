@@ -4,10 +4,11 @@ import re
 import subprocess
 import time
 
+from cassandra.util import sortedset
 from ccmlib import common
+
 from dtest import Tester, debug
 from tools import rows_to_list
-from cassandra.util import sortedset
 
 
 class TokenGenerator(Tester):

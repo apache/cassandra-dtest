@@ -1,10 +1,11 @@
+import json
 import os
 import random
 import re
 import subprocess
-import json
 
 from ccmlib import common
+
 from dtest import Tester, debug
 from tools import known_failure, since
 

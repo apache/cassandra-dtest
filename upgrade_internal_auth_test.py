@@ -1,8 +1,9 @@
 import time
 
-from assertions import assert_all, assert_invalid
 from cassandra import Unauthorized
 from ccmlib.common import is_win
+
+from assertions import assert_all, assert_invalid
 from dtest import Tester, debug
 from tools import known_failure, since
 

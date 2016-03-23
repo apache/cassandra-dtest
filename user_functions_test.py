@@ -2,11 +2,12 @@ import math
 import os
 import time
 
-from ccmlib.common import get_version_from_build
-from dtest import Tester
-from assertions import assert_invalid, assert_one, assert_none
-from tools import since
 from cassandra import FunctionFailure
+from ccmlib.common import get_version_from_build
+
+from assertions import assert_invalid, assert_none, assert_one
+from dtest import Tester
+from tools import since
 
 
 @since('2.2')

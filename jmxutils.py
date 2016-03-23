@@ -1,8 +1,10 @@
-import ccmlib.common as common
-from urllib2 import urlopen
 import json
 import os
 import subprocess
+from urllib2 import urlopen
+
+import ccmlib.common as common
+
 from dtest import warning
 
 JOLOKIA_JAR = os.path.join('lib', 'jolokia-jvm-1.2.3-agent.jar')

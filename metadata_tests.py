@@ -1,5 +1,5 @@
-import time
 import threading
+import time
 from unittest import skip
 
 from dtest import Tester

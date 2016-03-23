@@ -1,7 +1,8 @@
 import time
 
-from assertions import assert_invalid
 from cassandra.concurrent import execute_concurrent_with_args
+
+from assertions import assert_invalid
 from dtest import Tester
 from tools import rows_to_list
 

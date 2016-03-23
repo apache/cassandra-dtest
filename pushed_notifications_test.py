@@ -1,12 +1,12 @@
 import time
 from threading import Event
 
-from nose.tools import timed
-
-from assertions import assert_invalid
 from cassandra import ConsistencyLevel as CL
 from cassandra import ReadFailure
 from cassandra.query import SimpleStatement
+from nose.tools import timed
+
+from assertions import assert_invalid
 from dtest import Tester, debug
 from tools import known_failure, no_vnodes, since
 

@@ -1,17 +1,14 @@
 import time
 from collections import OrderedDict
-from cassandra.util import sortedset
-from cassandra.query import SimpleStatement
+
 from cassandra import ConsistencyLevel
+from cassandra.query import SimpleStatement
+from cassandra.util import sortedset
+
+from assertions import (assert_all, assert_almost_equal, assert_none,
+                        assert_row_count, assert_unavailable)
 from dtest import Tester
 from tools import since
-from assertions import (
-    assert_all,
-    assert_none,
-    assert_row_count,
-    assert_almost_equal,
-    assert_unavailable
-)
 
 
 @since('2.0')

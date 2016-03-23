@@ -1,4 +1,5 @@
 from cassandra.query import SimpleStatement
+
 from dtest import TRACE, Tester, debug
 from tools import no_vnodes
 

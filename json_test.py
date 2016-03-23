@@ -5,8 +5,10 @@ import re
 import subprocess
 import sys
 from distutils.version import LooseVersion
+
 from ccmlib import common
 from ccmlib.common import is_win
+
 from dtest import Tester
 from tools import since
 

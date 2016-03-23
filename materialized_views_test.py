@@ -7,15 +7,15 @@ from functools import partial
 from multiprocessing import Process, Queue
 from unittest import skipIf
 
+from cassandra import ConsistencyLevel
+from cassandra.cluster import Cluster
+from cassandra.query import SimpleStatement
 # TODO add in requirements.txt
 from enum import Enum  # Remove when switching to py3
 
 from assertions import (assert_all, assert_crc_check_chance_equal,
                         assert_invalid, assert_none, assert_one,
                         assert_unavailable)
-from cassandra import ConsistencyLevel
-from cassandra.cluster import Cluster
-from cassandra.query import SimpleStatement
 from dtest import Tester, debug
 from tools import known_failure, new_node, since
 

@@ -6,9 +6,10 @@ import traceback
 from collections import OrderedDict
 from copy import deepcopy
 
-from assertions import assert_none, assert_unavailable
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
+
+from assertions import assert_none, assert_unavailable
 from dtest import DISABLE_VNODES, Tester, debug
 from tools import (create_c1c2_table, insert_c1c2, insert_columns,
                    known_failure, query_c1c2, rows_to_list, since)

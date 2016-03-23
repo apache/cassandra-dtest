@@ -1,11 +1,11 @@
-from thrift_bindings.v22.ttypes import (KsDef, CfDef, Mutation, ColumnOrSuperColumn,
-                                        Column, SuperColumn, SliceRange, SlicePredicate,
-                                        ColumnParent)
-from thrift_bindings.v22.ttypes import ConsistencyLevel as ThriftConsistencyLevel
-
-from thrift_tests import get_thrift_client
-
 from dtest import Tester
+from thrift_bindings.v22.ttypes import \
+    ConsistencyLevel as ThriftConsistencyLevel
+from thrift_bindings.v22.ttypes import (CfDef, Column, ColumnOrSuperColumn,
+                                        ColumnParent, KsDef, Mutation,
+                                        SlicePredicate, SliceRange,
+                                        SuperColumn)
+from thrift_tests import get_thrift_client
 
 
 class TestSCCache(Tester):

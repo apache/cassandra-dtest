@@ -1,29 +1,30 @@
 # coding: utf-8
 import csv
 import datetime
-import json
 import glob
+import json
 import os
 import sys
 import time
 from collections import namedtuple
 from contextlib import contextmanager
-from functools import partial
 from decimal import Decimal
-from dtest import warning
+from functools import partial
 from tempfile import NamedTemporaryFile, gettempdir, template
 from uuid import uuid1, uuid4
 
-from cassandra.murmur3 import murmur3
 from cassandra.cluster import ConsistencyLevel, SimpleStatement
 from cassandra.concurrent import execute_concurrent_with_args
+from cassandra.murmur3 import murmur3
 from cassandra.util import SortedSet
 from ccmlib.common import is_win
 
 from cqlsh_tools import (DummyColorMap, assert_csvs_items_equal, csv_rows,
-                         monkeypatch_driver, random_list, unmonkeypatch_driver, write_rows_to_csv)
-from dtest import Tester, canReuseCluster, freshCluster, debug, DISABLE_VNODES
-from tools import rows_to_list, since, known_failure
+                         monkeypatch_driver, random_list, unmonkeypatch_driver,
+                         write_rows_to_csv)
+from dtest import (DISABLE_VNODES, Tester, canReuseCluster, debug,
+                   freshCluster, warning)
+from tools import known_failure, rows_to_list, since
 
 PARTITIONERS = {
     "murmur3": "org.apache.cassandra.dht.Murmur3Partitioner",

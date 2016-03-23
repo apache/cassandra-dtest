@@ -1,10 +1,10 @@
 import os
+import time
 
 from cassandra import ConsistencyLevel
 
 from dtest import DISABLE_VNODES, Tester
-from tools import create_c1c2_table, insert_c1c2, query_c1c2, since, no_vnodes
-import time
+from tools import create_c1c2_table, insert_c1c2, no_vnodes, query_c1c2, since
 
 
 @since('3.0')
