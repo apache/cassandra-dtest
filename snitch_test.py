@@ -2,7 +2,7 @@ import os
 import socket
 
 from dtest import Tester, debug
-from tools import since, known_failure
+from tools import since
 
 
 @since('2.2.5')
