@@ -1479,6 +1479,7 @@ class CqlshCopyTest(Tester):
                                               expected_err="Failed to import 1 rows: ParseError - "
                                                            "Cannot insert null value for primary key column")
 
+    @since('2.2')
     def test_read_wrong_column_names(self):
         """
         Test that if the wrong column name is specified in the COPY FROM command,
