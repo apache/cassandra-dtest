@@ -15,9 +15,6 @@ class TestGossipingPropertyFileSnitch(Tester):
         s.connect((address, port))
         s.close()
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11362',
-                   flaky=True)
     def test_prefer_local_reconnect_on_listen_address(self):
         """
         @jira_ticket CASSANDRA-9748
