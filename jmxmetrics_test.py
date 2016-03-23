@@ -1,6 +1,6 @@
 from dtest import Tester
-from tools import debug, known_failure, require
 from jmxutils import JolokiaAgent, make_mbean, remove_perf_disable_shared_mem
+from tools import debug, known_failure, require
 
 
 # We currently only have attributes that are incrementing.

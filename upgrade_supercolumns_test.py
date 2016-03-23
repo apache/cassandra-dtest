@@ -1,13 +1,13 @@
 import time
 
-from thrift_bindings.v22.ttypes import (KsDef, CfDef, Mutation, ColumnOrSuperColumn,
-                                        Column, SuperColumn, SliceRange, SlicePredicate,
-                                        ColumnParent, CounterColumn)
-from thrift_bindings.v22.ttypes import ConsistencyLevel as ThriftConsistencyLevel
-
-from thrift_tests import get_thrift_client
-
 from dtest import Tester, debug
+from thrift_bindings.v22.ttypes import \
+    ConsistencyLevel as ThriftConsistencyLevel
+from thrift_bindings.v22.ttypes import (CfDef, Column, ColumnOrSuperColumn,
+                                        ColumnParent, CounterColumn, KsDef,
+                                        Mutation, SlicePredicate, SliceRange,
+                                        SuperColumn)
+from thrift_tests import get_thrift_client
 from tools import known_failure, since
 
 

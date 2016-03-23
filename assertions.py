@@ -4,6 +4,7 @@ from cassandra import (ConsistencyLevel, InvalidRequest, ReadFailure,
                        ReadTimeout, Unauthorized, Unavailable, WriteFailure,
                        WriteTimeout)
 from cassandra.query import SimpleStatement
+
 from tools import rows_to_list
 
 

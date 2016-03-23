@@ -1,10 +1,10 @@
 import time
 
+from cassandra import ConsistencyLevel
 from thrift.protocol import TBinaryProtocol
 from thrift.transport import TSocket, TTransport
 
 import tools as tools
-from cassandra import ConsistencyLevel
 from dtest import Tester
 from tools import (create_c1c2_table, known_failure, no_vnodes,
                    retry_till_success)

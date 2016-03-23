@@ -5,6 +5,7 @@ from collections import defaultdict
 
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
+
 from dtest import PRINT_DEBUG, Tester, debug
 from tools import known_failure, no_vnodes, since
 

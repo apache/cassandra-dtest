@@ -2,6 +2,7 @@
 Home for upgrade-related tests that don't fit in with the core upgrade testing in dtest.upgrade_through_versions
 """
 from cassandra import ConsistencyLevel as CL
+
 from tools import known_failure
 from upgrade_base import UPGRADE_TEST_RUN, VALID_UPGRADE_PAIRS, UpgradeTester
 

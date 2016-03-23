@@ -1,5 +1,6 @@
-from dtest import Tester
 import os
+
+from dtest import Tester
 
 
 class TestCFID(Tester):

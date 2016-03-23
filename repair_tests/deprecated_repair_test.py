@@ -1,5 +1,6 @@
 from cassandra import ConsistencyLevel
 from ccmlib.common import is_win
+
 from dtest import Tester, debug
 from jmxutils import JolokiaAgent, make_mbean, remove_perf_disable_shared_mem
 from tools import insert_c1c2, since

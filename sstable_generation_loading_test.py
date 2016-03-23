@@ -1,10 +1,11 @@
-from distutils import dir_util
 import os
 import subprocess
 import time
+from distutils import dir_util
+
+from ccmlib import common as ccmcommon
 
 from dtest import Tester, debug
-from ccmlib import common as ccmcommon
 
 
 class TestSSTableGenerationAndLoading(Tester):

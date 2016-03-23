@@ -1,17 +1,17 @@
-from collections import Counter
 import os
 import time
+from collections import Counter
 from re import findall
 from unittest import skip
 
-from nose.plugins.attrib import attr
-
-from assertions import assert_almost_equal, assert_one
 from cassandra import ConsistencyLevel
 from ccmlib.common import is_win
 from ccmlib.node import Node
+from nose.plugins.attrib import attr
+
+from assertions import assert_almost_equal, assert_one
 from dtest import Tester, debug
-from tools import insert_c1c2, since, known_failure
+from tools import insert_c1c2, known_failure, since
 
 
 class TestIncRepair(Tester):

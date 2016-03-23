@@ -1,6 +1,6 @@
-from dtest import Tester
-
 import time
+
+from dtest import Tester
 
 
 class TestRangeGhosts(Tester):

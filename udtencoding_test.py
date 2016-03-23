@@ -1,7 +1,7 @@
-from dtest import Tester
-from assertions import assert_invalid
-
 import time
+
+from assertions import assert_invalid
+from dtest import Tester
 
 
 class TestUDTEncoding(Tester):

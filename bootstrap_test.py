@@ -6,10 +6,11 @@ import subprocess
 import tempfile
 import time
 
-from assertions import assert_almost_equal, assert_one
 from cassandra import ConsistencyLevel
 from cassandra.concurrent import execute_concurrent_with_args
 from ccmlib.node import NodeError
+
+from assertions import assert_almost_equal, assert_one
 from dtest import Tester, debug
 from tools import (InterruptBootstrap, KillOnBootstrap, known_failure,
                    new_node, query_c1c2, since)

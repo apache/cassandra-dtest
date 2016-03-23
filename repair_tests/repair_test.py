@@ -5,6 +5,7 @@ from unittest import skip
 
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
+
 from dtest import Tester, debug
 from tools import insert_c1c2, known_failure, no_vnodes, query_c1c2, since
 

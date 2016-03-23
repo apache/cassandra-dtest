@@ -3,9 +3,10 @@
 import time
 from threading import Thread
 
-from assertions import assert_unavailable
 from cassandra import ConsistencyLevel, WriteTimeout
 from cassandra.query import SimpleStatement
+
+from assertions import assert_unavailable
 from dtest import Tester
 from tools import no_vnodes, since
 

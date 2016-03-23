@@ -6,7 +6,9 @@
 #  options string: py
 #
 
-from thrift.Thrift import TType, TMessageType, TException, TApplicationException
+from thrift.Thrift import (TApplicationException, TException, TMessageType,
+                           TType)
+
 from ttypes import *
 
 VERSION = "20.1.0"

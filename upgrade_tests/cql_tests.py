@@ -8,14 +8,14 @@ import time
 from collections import OrderedDict
 from uuid import UUID, uuid4
 
-from nose.exc import SkipTest
-
-from assertions import assert_all, assert_invalid, assert_none, assert_one
 from cassandra import ConsistencyLevel, InvalidRequest
 from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.protocol import ProtocolException, SyntaxException
 from cassandra.query import SimpleStatement
 from cassandra.util import sortedset
+from nose.exc import SkipTest
+
+from assertions import assert_all, assert_invalid, assert_none, assert_one
 from dtest import debug, freshCluster
 from thrift_bindings.v22.ttypes import \
     ConsistencyLevel as ThriftConsistencyLevel

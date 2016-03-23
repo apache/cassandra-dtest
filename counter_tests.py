@@ -2,9 +2,10 @@ import random
 import time
 import uuid
 
-from assertions import assert_invalid, assert_one
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
+
+from assertions import assert_invalid, assert_one
 from dtest import Tester
 from tools import rows_to_list, since
 

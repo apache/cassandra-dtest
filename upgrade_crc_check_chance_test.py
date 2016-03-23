@@ -1,6 +1,6 @@
+from assertions import assert_crc_check_chance_equal, assert_one
 from dtest import Tester, debug
 from tools import since
-from assertions import assert_one, assert_crc_check_chance_equal
 
 
 @since('3.0')

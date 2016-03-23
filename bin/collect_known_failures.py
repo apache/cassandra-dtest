@@ -11,10 +11,10 @@ In addition, you should call it from the same directory from which you'd call
 `nosetests`.
 """
 
-from functools import partial
 import json
 import os
 import sys
+from functools import partial
 
 import nose
 

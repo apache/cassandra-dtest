@@ -20,9 +20,6 @@ import types
 from collections import OrderedDict
 from unittest import TestCase
 
-from nose.exc import SkipTest
-from six import print_
-
 from cassandra import ConsistencyLevel
 from cassandra.auth import PlainTextAuthProvider
 from cassandra.cluster import Cluster as PyCluster
@@ -32,10 +29,12 @@ from ccmlib.cluster import Cluster
 from ccmlib.cluster_factory import ClusterFactory
 from ccmlib.common import is_win
 from ccmlib.node import TimeoutError
+from nose.exc import SkipTest
+from six import print_
 
+from plugins.dtestconfig import _CONFIG as CONFIG
 # We don't want test files to know about the plugins module, so we import
 # constants here and re-export them.
-from plugins.dtestconfig import _CONFIG as CONFIG
 from plugins.dtestconfig import GlobalConfigObject
 
 LOG_SAVED_DIR = "logs"

@@ -1,8 +1,9 @@
+import os
+
 from ccmlib.node import NodetoolError
+
 from dtest import Tester, debug
 from tools import since
-
-import os
 
 
 class TestNodetool(Tester):

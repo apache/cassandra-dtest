@@ -1,10 +1,10 @@
 import time
 
+from cql.cassandra.ttypes import (CfDef, ColumnParent, ColumnPath,
+                                  ConsistencyLevel, CounterColumn)
+
 from dtest import Tester, debug
 from thrift_tests import get_thrift_client
-
-from cql.cassandra.ttypes import CfDef, ColumnParent, CounterColumn, \
-    ConsistencyLevel, ColumnPath
 
 
 class TestSuperCounterClusterRestart(Tester):
