@@ -8,12 +8,9 @@ from thrift_bindings.v22.ttypes import (CfDef, Column, ColumnOrSuperColumn,
                                         Mutation, SlicePredicate, SliceRange,
                                         SuperColumn)
 from thrift_tests import get_thrift_client
-from tools import known_failure, since
+from tools import since
 
 
-@known_failure(failure_source='test',
-               jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10868',
-               notes='Fails when run on JDK8')
 @since('2.0', max_version='2.1.x')
 class TestSCUpgrade(Tester):
     """
@@ -30,9 +27,6 @@ class TestSCUpgrade(Tester):
         ]
         Tester.__init__(self, *args, **kwargs)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11078',
-                   notes='Fails when upgrading from 2.1')
     def upgrade_with_index_creation_test(self):
         cluster = self.cluster
 
@@ -91,11 +85,10 @@ class TestSCUpgrade(Tester):
         session.cluster.shutdown()
         client.transport.close()
 
-        if self.cluster.version() >= '2.1':
-            # Upgrade nodes to 2.0 for intermediate sstable conversion
-            # See CASSANDRA-7008
-            self.upgrade_to_version("binary:2.0.17")
-            time.sleep(.5)
+        # Upgrade nodes to 2.0 for intermediate sstable conversion
+        # See CASSANDRA-7008
+        self.upgrade_to_version("binary:2.0.17")
+        time.sleep(.5)
 
         # Upgrade node 1
         node1.flush()
@@ -143,9 +136,6 @@ class TestSCUpgrade(Tester):
         self.assertEqual('c%d' % j, column.name)
         self.assertEqual('v', column.value)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11078',
-                   notes='Fails when upgrading from 2.1')
     def upgrade_with_counters_test(self):
 
         cluster = self.cluster
@@ -202,17 +192,10 @@ class TestSCUpgrade(Tester):
         # If we are on 2.1 or any higher version upgrade to 2.0.latest.
         # Otherwise, we must be on a 2.0.x, so we should be upgrading to that version.
         # This will let us test upgrading from 1.2.19 to each of the 2.0 minor releases.
-        if self.cluster.version() >= '2.1':
-            # Upgrade nodes to 2.0.
-            # See CASSANDRA-7008
-            self.upgrade_to_version("binary:2.0.17", [node1])
-            time.sleep(.5)
-        else:
-            node1.drain()
-            node1.watch_log_for("DRAINED")
-            node1.stop(wait_other_notice=False)
-            self.set_node_to_current_version(node1)
-            node1.start(wait_other_notice=True)
+        # Upgrade nodes to 2.0.
+        # See CASSANDRA-7008
+        self.upgrade_to_version("binary:2.0.17", [node1])
+        time.sleep(.5)
 
         # wait for the RPC server to start
         session = self.patient_exclusive_cql_connection(node1)
@@ -233,22 +216,10 @@ class TestSCUpgrade(Tester):
 
             client.transport.close()
 
-        if self.cluster.version() >= '2.1':
-            # Upgrade nodes to 2.0.
-            # See CASSANDRA-7008
-            self.upgrade_to_version("binary:2.0.17", [node2, node3])
-            time.sleep(.5)
-        else:
-            node2.drain()
-            node3.drain()
-            node2.watch_log_for("DRAINED")
-            node3.watch_log_for("DRAINED")
-            node2.stop(wait_other_notice=False)
-            node3.stop(wait_other_notice=False)
-            self.set_node_to_current_version(node2)
-            self.set_node_to_current_version(node3)
-            node2.start(wait_other_notice=True)
-            node3.start(wait_other_notice=True)
+        # Upgrade nodes to 2.0.
+        # See CASSANDRA-7008
+        self.upgrade_to_version("binary:2.0.17", [node2, node3])
+        time.sleep(.5)
 
         host, port = node1.network_interfaces['thrift']
         client = get_thrift_client(host, port)
