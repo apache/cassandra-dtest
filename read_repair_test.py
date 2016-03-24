@@ -11,6 +11,7 @@ class TestReadRepair(Tester):
 
     def setUp(self):
         Tester.setUp(self)
+        self.cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
         self.cluster.populate(3).start(wait_for_binary_proto=True)
 
     @known_failure(failure_source='test',
@@ -164,6 +165,51 @@ class TestReadRepair(Tester):
             assert "Appending to commitlog" not in activity
             assert "Adding to cf memtable" not in activity
             assert "Acquiring switchLock read lock" not in activity
+
+    @since('2.2')
+    def test_gcable_tombstone_resurrection_on_range_slice_query(self):
+        """
+        @jira_ticket CASSANDRA-11427
+
+        Range queries before the 11427 will trigger read repairs for puregable tombstones on hosts that already compacted given tombstones.
+        This will result in constant transfer and compaction actions sourced by few nodes seeding purgeable tombstones and triggered e.g.
+        by periodical jobs scanning data range wise.
+        """
+
+        node1, node2, _ = self.cluster.nodelist()
+
+        session1 = self.patient_cql_connection(node1)
+        self.create_ks(session1, 'gcts', 3)
+        query = """
+            CREATE TABLE gcts.cf1 (
+                key text,
+                c1 text,
+                PRIMARY KEY (key, c1)
+            )
+            WITH gc_grace_seconds=0
+            AND compaction = {'class': 'SizeTieredCompactionStrategy', 'enabled': 'false'};
+        """
+        session1.execute(query)
+
+        # create row tombstone
+        delete_stmt = SimpleStatement("DELETE FROM gcts.cf1 WHERE key = 'a'", consistency_level=ConsistencyLevel.ALL)
+        session1.execute(delete_stmt)
+
+        # flush single sstable with tombstone
+        node1.flush()
+        node2.flush()
+
+        # purge tombstones from node2 (gc grace 0)
+        node2.compact()
+
+        # execute range slice query, which should not trigger read-repair for purged TS
+        future = session1.execute_async(SimpleStatement("SELECT * FROM gcts.cf1", consistency_level=ConsistencyLevel.ALL), trace=True)
+        future.result()
+        trace = future.get_query_trace(max_wait=120)
+        self.pprint_trace(trace)
+        for trace_event in trace.events:
+            activity = trace_event.description
+            assert "Sending READ_REPAIR message" not in activity
 
     def pprint_trace(self, trace):
         """Pretty print a trace"""
