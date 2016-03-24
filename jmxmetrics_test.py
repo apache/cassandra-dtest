@@ -84,7 +84,8 @@ class TestJMXMetrics(Tester):
         Tester.__init__(self, *args, **kwargs)
 
     @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10845')
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10845',
+                   notes='depends on a number of invalid assumptions about metrics')
     @require('10845')
     def begin_test(self):
         """

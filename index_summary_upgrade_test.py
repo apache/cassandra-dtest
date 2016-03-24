@@ -8,7 +8,8 @@ from tools import known_failure
 class TestUpgradeIndexSummary(Tester):
 
     @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11127')
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11127',
+                   notes='Fails on Linux on 3.0 branch, fails on Windows')
     def test_upgrade_index_summary(self):
         """
         @jira_ticket CASSANDRA-8993

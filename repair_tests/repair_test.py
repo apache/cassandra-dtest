@@ -367,7 +367,8 @@ class TestRepair(Tester):
 
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11229',
-                   flaky=True)
+                   flaky=True,
+                   notes='has flapped on 2.2 and trunk offheap tests')
     def local_dc_repair_test(self):
         """
         * Set up a multi DC cluster
