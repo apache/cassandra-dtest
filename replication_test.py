@@ -523,7 +523,9 @@ class SnitchConfigurationUpdateTest(Tester):
                                   snitch_lines_before, snitch_lines_after, final_racks, nodes_to_shutdown):
         cluster = self.cluster
         cluster.populate(nodes)
-        cluster.set_configuration_options(values={'endpoint_snitch': 'org.apache.cassandra.locator.{}'.format(snitch_class_name)})
+        cluster.set_configuration_options(
+            values={'endpoint_snitch': 'org.apache.cassandra.locator.{}'.format(snitch_class_name)}
+        )
 
         # start with separate racks
         for i, node in enumerate(cluster.nodelist()):
