@@ -541,6 +541,8 @@ class SnitchConfigurationUpdateTest(Tester):
         session.execute("CREATE KEYSPACE testing WITH replication = {{{}}}".format(options))
         session.execute("CREATE TABLE testing.rf_test (key text PRIMARY KEY, value text)")
 
+        # avoid errors in nodetool calls below checking for the endpoint count
+        session.cluster.control_connection.wait_for_schema_agreement()
         # make sure endpoint count is correct before continuing with the rest of the test
         self.check_endpoint_count('testing', 'rf_test', cluster.nodelist(), rf)
 
