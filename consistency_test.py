@@ -306,6 +306,10 @@ class TestAvailability(TestHelper):
 
         self._test_simple_strategy(combinations)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11438',
+                   flaky=True,
+                   notes='Fails on CI because too many nodes started')
     def test_network_topology_strategy(self):
         """
         Test for multiple datacenters, using network topology replication strategy.
@@ -566,6 +570,10 @@ class TestAccuracy(TestHelper):
         self.log("Testing single dc, users, each quorum reads")
         self._run_test_function_in_parallel(TestAccuracy.Validation.validate_users, [self.nodes], [self.rf], combinations)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11438',
+                   flaky=True,
+                   notes='Fails on CI because too many nodes started')
     def test_network_topology_strategy_users(self):
         """
         Test for multiple datacenters, users table.
