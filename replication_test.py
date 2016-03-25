@@ -84,10 +84,10 @@ class ReplicationTest(Tester):
         Look at trace and return a list of the replicas contacted
         """
         coordinator = None
-        nodes_sent_write = set([])  # Nodes sent a write request
-        nodes_responded_write = set([])  # Nodes that acknowledges a write
-        replicas_written = set([])  # Nodes that wrote to their commitlog
-        forwarders = set([])  # Nodes that forwarded a write to another node
+        nodes_sent_write = set()  # Nodes sent a write request
+        nodes_responded_write = set()  # Nodes that acknowledges a write
+        replicas_written = set()  # Nodes that wrote to their commitlog
+        forwarders = set()  # Nodes that forwarded a write to another node
         nodes_contacted = defaultdict(set)  # node -> list of nodes that were contacted
 
         for trace_event in trace.events:
