@@ -4,7 +4,7 @@ import time
 from cassandra import ConsistencyLevel
 
 from dtest import DISABLE_VNODES, Tester
-from tools import create_c1c2_table, insert_c1c2, no_vnodes, query_c1c2, since
+from tools import create_c1c2_table, known_failure, insert_c1c2, no_vnodes, query_c1c2, since
 
 
 @since('3.0')
@@ -70,6 +70,10 @@ class TestHintedHandoffConfig(Tester):
             else:
                 query_c1c2(session, n, ConsistencyLevel.ONE, tolerate_missing=True, must_be_missing=True)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11439',
+                   flaky=False,
+                   notes='Windows')
     def nodetool_test(self):
         """
         Test various nodetool commands
@@ -120,6 +124,10 @@ class TestHintedHandoffConfig(Tester):
 
         self._do_hinted_handoff(node1, node2, True)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11439',
+                   flaky=False,
+                   notes='Windows')
     def hintedhandoff_dc_disabled_test(self):
         """
         Test global hinted handoff enabled with the dc disabled
@@ -133,6 +141,10 @@ class TestHintedHandoffConfig(Tester):
 
         self._do_hinted_handoff(node1, node2, False)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11439',
+                   flaky=False,
+                   notes='Windows')
     def hintedhandoff_dc_reenabled_test(self):
         """
         Test global hinted handoff enabled with the dc disabled first and then re-enabled
