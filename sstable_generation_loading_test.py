@@ -165,7 +165,7 @@ class TestSSTableGenerationAndLoading(Tester):
 
         debug("creating keyspace and inserting")
         session = self.cql_connection(node1)
-        create_schema(self, session, ks, pre_compression)
+        self.create_schema(session, ks, pre_compression)
 
         for i in range(NUM_KEYS):
             session.execute("UPDATE standard1 SET v='%d' WHERE KEY='%d' AND c='col'" % (i, i))
@@ -195,7 +195,7 @@ class TestSSTableGenerationAndLoading(Tester):
 
         debug("re-creating the keyspace and column families.")
         session = self.cql_connection(node1)
-        create_schema(self, session, ks, post_compression)
+        self.create_schema(session, ks, post_compression)
         time.sleep(2)
 
         debug("Calling sstableloader")
