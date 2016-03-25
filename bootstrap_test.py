@@ -143,8 +143,8 @@ class TestBootstrap(Tester):
         cluster.populate(2).start(wait_other_notice=True)
 
         node1 = cluster.nodes['node1']
-        node1.stress(['write', 'n=100K', '-schema', 'replication(factor=2)'])
-        node1.flush()
+        node1.stress(['write', 'n=100K', 'cl=TWO', '-schema', 'replication(factor=2)'])
+        cluster.flush()
 
         # kill node1 in the middle of streaming to let it fail
         t = InterruptBootstrap(node1)
