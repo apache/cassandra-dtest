@@ -350,6 +350,10 @@ class SnitchConfigurationUpdateTest(Tester):
             else:
                 raise RuntimeError("Ran out of time waiting for topology to change on node {}".format(i))
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11439',
+                   flaky=False,
+                   notes='Windows')
     def test_rf_collapse_gossiping_property_file_snitch(self):
         """
         @jira_ticket CASSANDRA-10238
@@ -366,6 +370,10 @@ class SnitchConfigurationUpdateTest(Tester):
                                        final_racks=["rack1", "rack1", "rack1"],
                                        nodes_to_shutdown=[0, 2])
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11439',
+                   flaky=False,
+                   notes='Windows')
     def test_rf_expand_gossiping_property_file_snitch(self):
         """
         @jira_ticket CASSANDRA-10238
@@ -382,6 +390,10 @@ class SnitchConfigurationUpdateTest(Tester):
                                        final_racks=["rack0", "rack1", "rack2"],
                                        nodes_to_shutdown=[0, 2])
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11439',
+                   flaky=False,
+                   notes='Windows')
     def test_rf_collapse_gossiping_property_file_snitch_multi_dc(self):
         """
         @jira_ticket CASSANDRA-10238
@@ -398,6 +410,10 @@ class SnitchConfigurationUpdateTest(Tester):
                                        final_racks=["rack1", "rack1", "rack1", "rack1", "rack1", "rack1"],
                                        nodes_to_shutdown=[0, 2, 3, 5])
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11439',
+                   flaky=False,
+                   notes='Windows')
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11417',
                    flaky=True)
@@ -417,6 +433,10 @@ class SnitchConfigurationUpdateTest(Tester):
                                        final_racks=["rack0", "rack1", "rack2", "rack0", "rack1", "rack2"],
                                        nodes_to_shutdown=[0, 2, 3, 5])
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11439',
+                   flaky=False,
+                   notes='Windows')
     def test_rf_collapse_property_file_snitch(self):
         """
         @jira_ticket CASSANDRA-10238
@@ -433,6 +453,10 @@ class SnitchConfigurationUpdateTest(Tester):
                                        final_racks=["rack0", "rack0", "rack0"],
                                        nodes_to_shutdown=[1, 2])
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11439',
+                   flaky=False,
+                   notes='Windows')
     def test_rf_expand_property_file_snitch(self):
         """
         @jira_ticket CASSANDRA-10238
@@ -615,6 +639,10 @@ class SnitchConfigurationUpdateTest(Tester):
         else:
             node1.watch_log_for("Fatal exception during initialization", from_mark=mark)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11439',
+                   flaky=False,
+                   notes='Windows')
     def test_failed_snitch_update_gossiping_property_file_snitch(self):
         """
         @jira_ticket CASSANDRA-10243
@@ -629,6 +657,10 @@ class SnitchConfigurationUpdateTest(Tester):
                                         racks=["rack1", "rack1", "rack1"],
                                         error='')
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11439',
+                   flaky=False,
+                   notes='Windows')
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11227',
                    flaky=True)
