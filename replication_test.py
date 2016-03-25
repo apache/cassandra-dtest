@@ -6,7 +6,7 @@ from collections import defaultdict
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
 
-from dtest import PRINT_DEBUG, Tester, debug
+from dtest import PRINT_DEBUG, DtestTimeoutError, Tester, debug
 from tools import known_failure, no_vnodes, since
 
 TRACE_DETERMINE_REPLICAS = re.compile('Determining replicas for mutation')
