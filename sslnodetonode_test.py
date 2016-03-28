@@ -5,17 +5,16 @@ import time
 
 import sslkeytool
 from dtest import Tester
-from tools import known_failure
+from tools import since
 
 _LOG_ERR_SIG = "^javax.net.ssl.SSLHandshakeException: sun.security.validator.ValidatorException: Certificate signature validation failed$"
 _LOG_ERR_IP = "^javax.net.ssl.SSLHandshakeException: java.security.cert.CertificateException: No subject alternative names matching IP address [0-9.]+ found$"
 _LOG_ERR_HOST = "^javax.net.ssl.SSLHandshakeException: java.security.cert.CertificateException: No name matching \S+ found$"
 
 
+@since('3.6')
 class TestNodeToNodeSSLEncryption(Tester):
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11445')
     def ssl_enabled_test(self):
         """Should be able to start with valid ssl options"""
 
@@ -26,8 +25,6 @@ class TestNodeToNodeSSLEncryption(Tester):
         self.cluster.start()
         self.cql_connection(self.node1)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11445')
     def ssl_wrong_hostname_no_validation_test(self):
         """Should be able to start with valid ssl options"""
 
@@ -39,8 +36,6 @@ class TestNodeToNodeSSLEncryption(Tester):
         time.sleep(2)
         self.cql_connection(self.node1)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11445')
     def ssl_wrong_hostname_with_validation_test(self):
         """Should be able to start with valid ssl options"""
 
@@ -61,8 +56,6 @@ class TestNodeToNodeSSLEncryption(Tester):
         self.cluster.stop()
         self.assertTrue(found)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11445')
     def ca_mismatch_test(self):
         """CA mismatch should cause nodes to fail to connect"""
 
