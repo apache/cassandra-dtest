@@ -24,7 +24,7 @@ from cqlsh_tools import (DummyColorMap, assert_csvs_items_equal, csv_rows,
                          write_rows_to_csv)
 from dtest import (DISABLE_VNODES, Tester, canReuseCluster, debug,
                    freshCluster, warning)
-from tools import known_failure, rows_to_list, since
+from tools import rows_to_list, since
 
 PARTITIONERS = {
     "murmur3": "org.apache.cassandra.dht.Murmur3Partitioner",
@@ -1939,9 +1939,6 @@ class CqlshCopyTest(Tester):
         self.assertEqual([[num_records]], rows_to_list(self.session.execute("SELECT COUNT(*) FROM {}"
                                                                             .format(stress_table))))
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11361',
-                   notes='fails on 2.1')
     def test_round_trip_with_rate_file(self):
         """
         Test a round trip with a large number of rows and a rate file. Make sure the rate file contains
