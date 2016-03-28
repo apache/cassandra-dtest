@@ -6,7 +6,7 @@ from collections import defaultdict
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
 
-from dtest import PRINT_DEBUG, Tester, debug
+from dtest import PRINT_DEBUG, DtestTimeoutError, Tester, debug
 from tools import known_failure, no_vnodes, since
 
 TRACE_DETERMINE_REPLICAS = re.compile('Determining replicas for mutation')
@@ -84,10 +84,10 @@ class ReplicationTest(Tester):
         Look at trace and return a list of the replicas contacted
         """
         coordinator = None
-        nodes_sent_write = set([])  # Nodes sent a write request
-        nodes_responded_write = set([])  # Nodes that acknowledges a write
-        replicas_written = set([])  # Nodes that wrote to their commitlog
-        forwarders = set([])  # Nodes that forwarded a write to another node
+        nodes_sent_write = set()  # Nodes sent a write request
+        nodes_responded_write = set()  # Nodes that acknowledges a write
+        replicas_written = set()  # Nodes that wrote to their commitlog
+        forwarders = set()  # Nodes that forwarded a write to another node
         nodes_contacted = defaultdict(set)  # node -> list of nodes that were contacted
 
         for trace_event in trace.events:
@@ -547,7 +547,9 @@ class SnitchConfigurationUpdateTest(Tester):
                                   snitch_lines_before, snitch_lines_after, final_racks, nodes_to_shutdown):
         cluster = self.cluster
         cluster.populate(nodes)
-        cluster.set_configuration_options(values={'endpoint_snitch': 'org.apache.cassandra.locator.{}'.format(snitch_class_name)})
+        cluster.set_configuration_options(
+            values={'endpoint_snitch': 'org.apache.cassandra.locator.{}'.format(snitch_class_name)}
+        )
 
         # start with separate racks
         for i, node in enumerate(cluster.nodelist()):
@@ -563,6 +565,8 @@ class SnitchConfigurationUpdateTest(Tester):
         session.execute("CREATE KEYSPACE testing WITH replication = {{{}}}".format(options))
         session.execute("CREATE TABLE testing.rf_test (key text PRIMARY KEY, value text)")
 
+        # avoid errors in nodetool calls below checking for the endpoint count
+        session.cluster.control_connection.wait_for_schema_agreement()
         # make sure endpoint count is correct before continuing with the rest of the test
         self.check_endpoint_count('testing', 'rf_test', cluster.nodelist(), rf)
 
