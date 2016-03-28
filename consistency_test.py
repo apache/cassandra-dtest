@@ -12,7 +12,7 @@ from cassandra.query import SimpleStatement
 from assertions import assert_none, assert_unavailable
 from dtest import DISABLE_VNODES, Tester, debug
 from tools import (create_c1c2_table, insert_c1c2, insert_columns,
-                   known_failure, query_c1c2, rows_to_list, since)
+                   known_failure, query_c1c2, require, rows_to_list, since)
 
 
 class TestHelper(Tester):
@@ -310,6 +310,7 @@ class TestAvailability(TestHelper):
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11438',
                    flaky=True,
                    notes='Fails on CI because too many nodes started')
+    @require(11438)
     def test_network_topology_strategy(self):
         """
         Test for multiple datacenters, using network topology replication strategy.
@@ -341,7 +342,12 @@ class TestAvailability(TestHelper):
 
         self._test_network_topology_strategy(combinations)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11438',
+                   flaky=True,
+                   notes='Fails on CI because too many nodes started')
     @since("3.0")
+    @require(11438)
     def test_network_topology_strategy_each_quorum(self):
         """
         @jira_ticket CASSANDRA-10584
@@ -574,6 +580,7 @@ class TestAccuracy(TestHelper):
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11438',
                    flaky=True,
                    notes='Fails on CI because too many nodes started')
+    @require(11438)
     def test_network_topology_strategy_users(self):
         """
         Test for multiple datacenters, users table.
@@ -609,7 +616,12 @@ class TestAccuracy(TestHelper):
         self.log("Testing multiple dcs, users")
         self._run_test_function_in_parallel(TestAccuracy.Validation.validate_users, self.nodes, self.rf.values(), combinations),
 
+    @known_failure(failure_source='test',
+               jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11438',
+               flaky=True,
+               notes='Fails on CI because too many nodes started')
     @since("3.0")
+    @require(11438)
     def test_network_topology_strategy_each_quorum_users(self):
         """
         @jira_ticket CASSANDRA-10584
