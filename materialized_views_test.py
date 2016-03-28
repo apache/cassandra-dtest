@@ -17,7 +17,7 @@ from assertions import (assert_all, assert_crc_check_chance_equal,
                         assert_invalid, assert_none, assert_one,
                         assert_unavailable)
 from dtest import Tester, debug
-from tools import known_failure, new_node, since
+from tools import known_failure, new_node, require, since
 
 # CASSANDRA-10978. Migration wait (in seconds) to use in bootstrapping tests. Needed to handle
 # pathological case of flushing schema keyspace for multiple data directories. See CASSANDRA-6696
@@ -1444,6 +1444,7 @@ class TestMaterializedViewsConsistency(Tester):
     @known_failure(failure_source='cassandra',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11290',
                    flaky=True)
+    @require(11290)
     def single_partition_consistent_reads_after_write_test(self):
         """
         Tests consistency of multiple writes to a single partition
