@@ -617,9 +617,9 @@ class TestAccuracy(TestHelper):
         self._run_test_function_in_parallel(TestAccuracy.Validation.validate_users, self.nodes, self.rf.values(), combinations),
 
     @known_failure(failure_source='test',
-               jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11438',
-               flaky=True,
-               notes='Fails on CI because too many nodes started')
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11438',
+                   flaky=True,
+                   notes='Fails on CI because too many nodes started')
     @since("3.0")
     @require(11438)
     def test_network_topology_strategy_each_quorum_users(self):
@@ -742,6 +742,7 @@ class TestAccuracy(TestHelper):
 
 
 class TestConsistency(Tester):
+
     def short_read_test(self):
         """
         @jira_ticket CASSANDRA-9460
