@@ -3413,9 +3413,6 @@ class TestCQL(UpgradeTester):
             debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
             assert_invalid(cursor, "SELECT * FROM test WHERE a = 3 AND b IN (1, 3)")
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11395',
-                   flaky=True)
     def bug_6069_test(self):
         cursor = self.prepare()
 
@@ -4523,9 +4520,6 @@ class TestCQL(UpgradeTester):
                 # not supported yet
                 check_invalid("m CONTAINS 'bar'", expected=SyntaxException)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11395',
-                   flaky=True)
     @since('2.1.1')
     def whole_map_conditional_test(self):
         cursor = self.prepare()
@@ -4713,9 +4707,6 @@ class TestCQL(UpgradeTester):
                 check_invalid("m['foo'] CONTAINS KEY 367", expected=SyntaxException)
                 check_invalid("m[null] = null")
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11395',
-                   flaky=True)
     @since("2.1.1")
     def cas_and_list_index_test(self):
         """ Test for 7499 test """
