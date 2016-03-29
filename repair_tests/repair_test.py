@@ -715,6 +715,32 @@ class TestRepair(Tester):
                           rows[0][0],
                           'Expected {} job threads in repair options. Instead we saw {}'.format(job_thread_count, rows[0][0]))
 
+    @no_vnodes()
+    def test_multiple_concurrent_repairs(self):
+        """
+        @jira_ticket CASSANDRA-11451
+        Make sure we can run sub range repairs in parallel - and verify that we actually do repair
+        """
+        cluster = self.cluster
+        cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
+        cluster.populate(3).start(wait_for_binary_proto=True)
+        node1, node2, node3 = cluster.nodelist()
+        node2.stop(wait_other_notice=True)
+        node1.stress(['write', 'n=1M', '-schema', 'replication(factor=3)', '-rate', 'threads=30'])
+        node2.start(wait_for_binary_proto=True)
+        t1 = threading.Thread(target=node1.nodetool, args=('repair keyspace1 standard1 -st {} -et {}'.format(str(node3.initial_token), str(node1.initial_token)),))
+        t2 = threading.Thread(target=node2.nodetool, args=('repair keyspace1 standard1 -st {} -et {}'.format(str(node1.initial_token), str(node2.initial_token)),))
+        t3 = threading.Thread(target=node3.nodetool, args=('repair keyspace1 standard1 -st {} -et {}'.format(str(node2.initial_token), str(node3.initial_token)),))
+        t1.start()
+        t2.start()
+        t3.start()
+        t1.join()
+        t2.join()
+        t3.join()
+        node1.stop(wait_other_notice=True)
+        node3.stop(wait_other_notice=True)
+        (stdout, stderr) = node2.stress(['read', 'n=1M', '-rate', 'threads=30', '-node', node2.address()], capture_output=True)
+        self.assertTrue(len(stderr) == 0, stderr)
 
 RepairTableContents = namedtuple('RepairTableContents',
                                  ['parent_repair_history', 'repair_history'])
