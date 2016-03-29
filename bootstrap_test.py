@@ -4,6 +4,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+import threading
 import time
 
 from cassandra import ConsistencyLevel
@@ -13,7 +14,7 @@ from ccmlib.node import NodeError
 from assertions import assert_almost_equal, assert_one
 from dtest import Tester, debug
 from tools import (InterruptBootstrap, KillOnBootstrap, known_failure,
-                   new_node, query_c1c2, since)
+                   new_node, query_c1c2, since, require)
 
 
 class TestBootstrap(Tester):
@@ -530,6 +531,45 @@ class TestBootstrap(Tester):
         # data loads.
         for _ in xrange(5):
             assert_one(session, "SELECT count(*) from keyspace1.standard1", [500000], cl=ConsistencyLevel.ONE)
+
+    @require(11179)
+    def test_cleanup(self):
+        """
+        @jira_ticket CASSANDRA-11179
+        Make sure we remove processed files during cleanup
+        """
+        cluster = self.cluster
+        cluster.set_configuration_options(values={'concurrent_compactors': 4})
+        cluster.populate(1)
+        cluster.start(wait_for_binary_proto=True)
+        node1, = cluster.nodelist()
+        for x in xrange(0, 5):
+            node1.stress(['write', 'n=100k', '-schema', 'compaction(strategy=SizeTieredCompactionStrategy,enabled=false)', 'replication(factor=1)', '-rate', 'threads=10'])
+            node1.flush()
+        node2 = new_node(cluster)
+        node2.start(wait_for_binary_proto=True, wait_other_notice=True)
+        event = threading.Event()
+        failed = threading.Event()
+        jobs = 1
+        thread = threading.Thread(target=self._monitor_datadir, args=(node1, event, len(node1.get_sstables("keyspace1", "standard1")), jobs, failed))
+        thread.start()
+        node1.nodetool("cleanup -j {} keyspace1 standard1".format(jobs))
+        event.set()
+        thread.join()
+        self.assertFalse(failed.is_set())
+
+    def _monitor_datadir(self, node, event, basecount, jobs, failed):
+        while True:
+            sstables = node.get_sstables("keyspace1", "standard1")
+            debug("---")
+            for sstable in sstables:
+                debug(sstable)
+            if len(sstables) > basecount + jobs:
+                failed.set()
+                return
+            if event.is_set():
+                return
+            time.sleep(.1)
 
     def _cleanup(self, node):
         commitlog_dir = os.path.join(node.get_path(), 'commitlogs')
