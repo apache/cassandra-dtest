@@ -210,7 +210,7 @@ if __name__ == '__main__':
             'import nose\n'
             'from plugins.dtestconfig import DtestConfigPlugin, GlobalConfigObject\n'
             'nose.main(addplugins=[DtestConfigPlugin({config})])\n'
-        ).format(config=repr(config), nose_argv=repr(nose_argv))
+        ).format(config=repr(config))
         temp = NamedTemporaryFile(dir=getcwd())
         debug('Writing the following to {}:'.format(temp.name))
 
