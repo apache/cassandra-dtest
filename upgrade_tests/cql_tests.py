@@ -3431,7 +3431,7 @@ class TestCQL(UpgradeTester):
             cursor.execute("TRUNCATE test")
 
             assert_one(cursor, "INSERT INTO test(k, s) VALUES (0, {1, 2, 3}) IF NOT EXISTS", [True])
-            assert_one(cursor, "SELECT * FROM test", [0, {1, 2, 3}])
+            assert_one(cursor, "SELECT * FROM test", [0, {1, 2, 3}], cl=ConsistencyLevel.SERIAL)
 
     def bug_6115_test(self):
         cursor = self.prepare()
@@ -4555,7 +4555,7 @@ class TestCQL(UpgradeTester):
 
                 def check_applies(condition):
                     assert_one(cursor, "UPDATE %s SET m = {'foo': 'bar'} WHERE k=0 IF %s" % (table, condition), [True])
-                    assert_one(cursor, "SELECT * FROM %s" % (table,), [0, {'foo': 'bar'}])
+                    assert_one(cursor, "SELECT * FROM %s" % (table,), [0, {'foo': 'bar'}], cl=ConsistencyLevel.SERIAL)
 
                 check_applies("m = {'foo': 'bar'}")
                 check_applies("m > {'a': 'a'}")
@@ -4571,7 +4571,7 @@ class TestCQL(UpgradeTester):
 
                 def check_does_not_apply(condition):
                     assert_one(cursor, "UPDATE %s SET m = {'foo': 'bar'} WHERE k=0 IF %s" % (table, condition), [False, {'foo': 'bar'}])
-                    assert_one(cursor, "SELECT * FROM %s" % (table,), [0, {'foo': 'bar'}])
+                    assert_one(cursor, "SELECT * FROM %s" % (table,), [0, {'foo': 'bar'}], cl=ConsistencyLevel.SERIAL)
 
                 # should not apply
                 check_does_not_apply("m = {'a': 'a'}")
@@ -4586,7 +4586,7 @@ class TestCQL(UpgradeTester):
 
                 def check_invalid(condition, expected=InvalidRequest):
                     assert_invalid(cursor, "UPDATE %s SET m = {'foo': 'bar'} WHERE k=0 IF %s" % (table, condition), expected=expected)
-                    assert_one(cursor, "SELECT * FROM %s" % (table,), [0, {'foo': 'bar'}])
+                    assert_one(cursor, "SELECT * FROM %s" % (table,), [0, {'foo': 'bar'}], cl=ConsistencyLevel.SERIAL)
 
                 check_invalid("m = {null: null}")
                 check_invalid("m = {'a': null}")
@@ -4738,7 +4738,8 @@ class TestCQL(UpgradeTester):
             assert_one(cursor, "UPDATE test SET l[0] = 'foo' WHERE k = 0 IF v = 'barfoo'", [False, 'foobar'])
             assert_one(cursor, "UPDATE test SET l[0] = 'foo' WHERE k = 0 IF v = 'foobar'", [True])
 
-            assert_one(cursor, "SELECT * FROM test", [0, ['foo', 'bar'], 'foobar'])
+            # since we write at all, and LWT update (serial), we need to read back at serial (or higher)
+            assert_one(cursor, "SELECT * FROM test", [0, ['foo', 'bar'], 'foobar'], cl=ConsistencyLevel.SERIAL)
 
     @since("2.0")
     def static_with_limit_test(self):
