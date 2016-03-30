@@ -1,7 +1,7 @@
 # coding: utf-8
 
 from dtest import Tester, debug
-from tools import since
+from tools import known_failure, since
 
 
 class TestCqlTracing(Tester):
@@ -96,6 +96,9 @@ class TestCqlTracing(Tester):
         session = self.prepare()
         self.trace(session)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11465',
+                   flaky=True)
     @since('3.4')
     def tracing_unknown_impl_test(self):
         """
