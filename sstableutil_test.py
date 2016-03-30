@@ -56,7 +56,7 @@ class SSTableUtilTest(Tester):
         cluster.populate(1).start(wait_for_binary_proto=True)
         node = cluster.nodelist()[0]
 
-        numrecords = 400000
+        numrecords = 500000
 
         self._create_data(node, KeyspaceName, TableName, numrecords)
         finalfiles, tmpfiles = self._check_files(node, KeyspaceName, TableName)
@@ -76,7 +76,7 @@ class SSTableUtilTest(Tester):
         # should compaction finish before the node is killed, this test would fail,
         # in which case try increasing numrecords
         finalfiles, tmpfiles = self._check_files(node, KeyspaceName, TableName, finalfiles)
-        self.assertTrue(len(tmpfiles) > 0)
+        self.assertGreater(len(tmpfiles), 0)
 
         self._invoke_sstableutil(KeyspaceName, TableName, cleanup=True)
 
