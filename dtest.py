@@ -20,6 +20,7 @@ import types
 from collections import OrderedDict
 from unittest import TestCase
 
+from cassandra import cluster as cluster_module
 from cassandra import ConsistencyLevel
 from cassandra.auth import PlainTextAuthProvider
 from cassandra.cluster import Cluster as PyCluster
@@ -95,6 +96,26 @@ logging.basicConfig(filename=os.path.join(LOG_SAVED_DIR, "dtest.log"),
 LOG = logging.getLogger('dtest')
 # set python-driver log level to WARN by default for dtest
 logging.getLogger('cassandra').setLevel(logging.WARNING)
+
+
+class expect_control_connection_failures(object):
+    """
+    We're just using a class here as a one-off object with a filter method, for
+    use as a filter object in the driver logger. It's frustrating that we can't
+    just pass in a function, but we need an object with a .filter method. Oh
+    well, I guess that's what old stdlib libraries are like.
+    """
+    @staticmethod
+    def filter(record):
+        expected_strings = [
+            'Control connection failed to connect, shutting down Cluster:',
+            '[control connection] Error connecting to '
+        ]
+        for s in expected_strings:
+            if s in record.msg or s in record.name:
+                return False
+        return True
+
 
 # copy the initial environment variables so we can reset them later:
 initial_environment = copy.deepcopy(os.environ)
@@ -534,7 +555,8 @@ class Tester(TestCase):
         if is_win():
             timeout *= 2
 
-        return retry_till_success(
+        cluster_module.log.addFilter(expect_control_connection_failures)
+        session = retry_till_success(
             self.cql_connection,
             node,
             keyspace=keyspace,
@@ -547,6 +569,8 @@ class Tester(TestCase):
             ssl_opts=ssl_opts,
             bypassed_exception=NoHostAvailable
         )
+        cluster_module.log.removeFilter(expect_control_connection_failures)
+        return session
 
     def patient_exclusive_cql_connection(self, node, keyspace=None,
                                          user=None, password=None, timeout=30, compression=True,
