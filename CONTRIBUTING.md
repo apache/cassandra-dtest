@@ -9,6 +9,14 @@ We plan to move to Python 3 in the near future. Where possible, new code should 
 Contributions will be evaluated by PEP8. We now strictly enforce compliance, via a linter run with Travis CI against all new pull requests. We do not enforce the default limits on line length, but have established a maximum length of 200 chars as a sanity check. You can conform to PEP8 by running `autopep8` which can be installed via `pip`. 
 `pip install autopep8 && autopep8 --in-place -a --ignore E501`
 
+Another way to make sure that your code will pass compliance checks is to run flake8 from a commit hook:
+
+```
+flake8 --install-hook
+git config flake8.strict true
+git config flake8.ignore E501,F811,F812,F821,F822,F823,F831,F841,N8,C9
+```
+
 We do not enforce import sorting, but if you choose to organize imports by some convention, use the `isort` tool (`pip install isort`).
 
 Please use `session`, and not `cursor` when naming your connection variables, to match the style preferred by the DataStax Python Driver, which is how these tests
