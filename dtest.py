@@ -555,20 +555,23 @@ class Tester(TestCase):
             timeout *= 2
 
         logging.getLogger('cassandra.cluster').addFilter(expect_control_connection_failures)
-        session = retry_till_success(
-            self.cql_connection,
-            node,
-            keyspace=keyspace,
-            user=user,
-            password=password,
-            timeout=timeout,
-            compression=compression,
-            protocol_version=protocol_version,
-            port=port,
-            ssl_opts=ssl_opts,
-            bypassed_exception=NoHostAvailable
-        )
-        logging.getLogger('cassandra.cluster').removeFilter(expect_control_connection_failures)
+        try:
+            session = retry_till_success(
+                self.cql_connection,
+                node,
+                keyspace=keyspace,
+                user=user,
+                password=password,
+                timeout=timeout,
+                compression=compression,
+                protocol_version=protocol_version,
+                port=port,
+                ssl_opts=ssl_opts,
+                bypassed_exception=NoHostAvailable
+            )
+        finally:
+            logging.getLogger('cassandra.cluster').removeFilter(expect_control_connection_failures)
+
         return session
 
     def patient_exclusive_cql_connection(self, node, keyspace=None,
