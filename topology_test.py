@@ -198,7 +198,7 @@ class TestTopology(Tester):
         # Give the node some time to shut down once it has detected
         # its invalid state
         start = time.time()
-        while start + 5 > time.time() and node3.is_running():
+        while start + 10 > time.time() and node3.is_running():
             time.sleep(1)
 
         self.assertFalse(node3.is_running())
