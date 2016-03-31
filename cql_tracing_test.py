@@ -119,6 +119,7 @@ class TestCqlTracing(Tester):
         self.trace(session)
 
         errs = self.cluster.nodelist()[0].grep_log_for_errors()
+        debug('Errors after attempted trace with unknown tracing class: {errs}'.format(errs=errs))
         self.assertEqual(len(errs), 1)
         self.assertEqual(len(errs[0]), 1)
         err = errs[0][0]
@@ -150,6 +151,7 @@ class TestCqlTracing(Tester):
         self.trace(session)
 
         errs = self.cluster.nodelist()[0].grep_log_for_errors()
+        debug('Errors after attempted trace with default tracing class: {errs}'.format(errs=errs))
         self.assertEqual(len(errs), 1)
         self.assertEqual(len(errs[0]), 1)
         err = errs[0][0]
