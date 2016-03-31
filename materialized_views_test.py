@@ -865,6 +865,10 @@ class TestMaterializedViews(Tester):
                 cl=ConsistencyLevel.ONE
             )
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11470',
+                   flaky=True,
+                   notes='Fails on trunk.')
     def base_replica_repair_test(self):
         """
         Test that a materialized view are consistent after the repair of the base replica.
