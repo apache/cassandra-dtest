@@ -25,6 +25,10 @@ class TestAuthUpgrade(Tester):
                                      'authorizer': 'CassandraAuthorizer'}
         Tester.__init__(self, *args, **kwargs)
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11469',
+                   flaky=True,
+                   notes='Fails ~30% of the time.')
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11250',
                    flaky=True,
