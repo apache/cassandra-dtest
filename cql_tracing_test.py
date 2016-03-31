@@ -124,6 +124,9 @@ class TestCqlTracing(Tester):
         err = errs[0][0]
         self.assertIn(expected_error, err)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11465',
+                   flaky=True)
     @since('3.4')
     def tracing_default_impl_test(self):
         """
