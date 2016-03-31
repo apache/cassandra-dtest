@@ -20,7 +20,6 @@ import types
 from collections import OrderedDict
 from unittest import TestCase
 
-from cassandra import cluster as cluster_module
 from cassandra import ConsistencyLevel
 from cassandra.auth import PlainTextAuthProvider
 from cassandra.cluster import Cluster as PyCluster
@@ -555,7 +554,7 @@ class Tester(TestCase):
         if is_win():
             timeout *= 2
 
-        cluster_module.log.addFilter(expect_control_connection_failures)
+        logging.getLogger('cassandra.cluster').addFilter(expect_control_connection_failures)
         session = retry_till_success(
             self.cql_connection,
             node,
@@ -569,7 +568,7 @@ class Tester(TestCase):
             ssl_opts=ssl_opts,
             bypassed_exception=NoHostAvailable
         )
-        cluster_module.log.removeFilter(expect_control_connection_failures)
+        logging.getLogger('cassandra.cluster').removeFilter(expect_control_connection_failures)
         return session
 
     def patient_exclusive_cql_connection(self, node, keyspace=None,
