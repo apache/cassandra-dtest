@@ -37,6 +37,10 @@ class TestAuthUpgrade(Tester):
         self.do_upgrade_with_internal_auth("git:cassandra-2.2")
 
     @since('3.0')
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11393',
+                   flaky=True,
+                   notes='Fails on upgrade to 3.0.')
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11267',
                    flaky=True,
