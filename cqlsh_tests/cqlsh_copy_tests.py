@@ -2360,6 +2360,7 @@ class CqlshCopyTest(Tester):
                                    configuration_options={'range_request_timeout_in_ms': '200',
                                                           'write_request_timeout_in_ms': '100'},
                                    copy_to_options={'PAGETIMEOUT': 60, 'PAGESIZE': 1000},
+                                   copy_from_options={'MAXINSERTERRORS': -1},
                                    skip_count_checks=True)
 
     @freshCluster()
