@@ -2373,6 +2373,18 @@ class CqlshCopyTest(Tester):
         self._test_bulk_round_trip(nodes=3, partitioner="murmur3", num_operations=10000,
                                    copy_from_options={'INGESTRATE': 1500})
 
+    @freshCluster()
+    def test_bulk_round_trip_with_single_core(self):
+        """
+        Perform a round trip on a simulated single core machine. When determining the number of cores,
+        copyutil.py will return the number carried by the environment variable CQLSH_COPY_TEST_NUM_CORES if it has
+        been set.
+
+        @jira_ticket CASSANDRA-11053
+        """
+        os.environ['CQLSH_COPY_TEST_NUM_CORES'] = '1'
+        self._test_bulk_round_trip(nodes=3, partitioner="murmur3", num_operations=100000)
+
     def prepare_copy_to_with_failures(self):
         """
         Create a cluster for testing COPY TO with failure injection, we need at least 3 token ranges
