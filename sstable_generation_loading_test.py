@@ -15,6 +15,11 @@ class TestSSTableGenerationAndLoading(Tester):
         super(TestSSTableGenerationAndLoading, self).__init__(*argv, **kwargs)
         self.allow_log_errors = True
 
+    def create_schema(self, session, ks, compression):
+        self.create_ks(session, ks, rf=2)
+        self.create_cf(session, "standard1", compression=compression)
+        self.create_cf(session, "counter1", compression=compression, columns={'v': 'counter'})
+
     def incompressible_data_in_compressed_table_test(self):
         """
         tests for the bug that caused #3370:
@@ -125,7 +130,20 @@ class TestSSTableGenerationAndLoading(Tester):
         """
         self.load_sstable_with_configuration(ks='"Keyspace1"')
 
-    def load_sstable_with_configuration(self, pre_compression=None, post_compression=None, ks="ks"):
+    def sstableloader_with_mv_test(self):
+        """
+        @jira_ticket CASSANDRA-11275
+        """
+        def create_schema_with_mv(session, ks, compression):
+            self.create_schema(session, ks, compression)
+            # create a materialized view
+            session.execute("CREATE MATERIALIZED VIEW mv1 AS "
+                            "SELECT key FROM standard1 WHERE key IS NOT NULL AND c IS NOT NULL AND v IS NOT NULL "
+                            "PRIMARY KEY (v)")
+
+        self.load_sstable_with_configuration(ks='"Keyspace1"', create_schema=create_schema_with_mv)
+
+    def load_sstable_with_configuration(self, pre_compression=None, post_compression=None, ks="ks", create_schema=create_schema):
         """
         tests that the sstableloader works by using it to load data.
         Compression of the columnfamilies being loaded, and loaded into
@@ -146,14 +164,9 @@ class TestSSTableGenerationAndLoading(Tester):
         node1, node2 = cluster.nodelist()
         time.sleep(.5)
 
-        def create_schema(session, compression):
-            self.create_ks(session, ks, rf=2)
-            self.create_cf(session, "standard1", compression=compression)
-            self.create_cf(session, "counter1", compression=compression, columns={'v': 'counter'})
-
         debug("creating keyspace and inserting")
         session = self.cql_connection(node1)
-        create_schema(session, pre_compression)
+        self.create_schema(session, ks, pre_compression)
 
         for i in range(NUM_KEYS):
             session.execute("UPDATE standard1 SET v='%d' WHERE KEY='%d' AND c='col'" % (i, i))
@@ -183,7 +196,7 @@ class TestSSTableGenerationAndLoading(Tester):
 
         debug("re-creating the keyspace and column families.")
         session = self.cql_connection(node1)
-        create_schema(session, post_compression)
+        self.create_schema(session, ks, post_compression)
         time.sleep(2)
 
         debug("Calling sstableloader")
