@@ -1085,6 +1085,33 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
             self.assertEqual(res, [[1, 1],
                                    [2, 2]])
 
+    @since('2.1.14')
+    def test_paging_on_compact_table_with_tombstone_on_first_column(self):
+
+        """
+        test paging, on  COMPACT tables without clustering columns, when the first column has a tombstone
+        @jira_ticket CASSANDRA-11467
+        """
+
+        session = self.prepare()
+        self.create_ks(session, 'test_paging_on_compact_table_with_tombstone', 2)
+        session.execute("CREATE TABLE test (a int primary key, b int, c int) WITH COMPACT STORAGE")
+        session.row_factory = tuple_factory
+
+        for i in xrange(5):
+            session.execute("INSERT INTO test (a, b, c) VALUES ({}, {}, {})".format(i, 1, 1))
+            session.execute("DELETE b FROM test WHERE a = {}".format(i))
+
+        for page_size in (2, 3, 4, 5, 7, 10):
+            session.default_fetch_size = page_size
+
+            res = rows_to_list(session.execute("SELECT * FROM test"))
+            self.assertEqual(res, [[1, None, 1],
+                                   [0, None, 1],
+                                   [2, None, 1],
+                                   [4, None, 1],
+                                   [3, None, 1]])
+
     def test_paging_with_no_clustering_columns(self):
 
         """
