@@ -262,6 +262,8 @@ class TestVariousNotifications(Tester):
     Tests for various notifications/messages from Cassandra.
     """
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11476')
     @since('2.2')
     def tombstone_failure_threshold_message_test(self):
         """
