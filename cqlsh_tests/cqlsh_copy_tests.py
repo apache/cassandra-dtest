@@ -24,7 +24,7 @@ from cqlsh_tools import (DummyColorMap, assert_csvs_items_equal, csv_rows,
                          write_rows_to_csv)
 from dtest import (DISABLE_VNODES, Tester, canReuseCluster, debug,
                    freshCluster, warning)
-from tools import rows_to_list, since
+from tools import rows_to_list, since, known_failure
 
 PARTITIONERS = {
     "murmur3": "org.apache.cassandra.dht.Murmur3Partitioner",
@@ -2297,6 +2297,9 @@ class CqlshCopyTest(Tester):
                          sum(1 for _ in open(tempfile2.name)))
 
     @freshCluster()
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11494',
+                   flaky=True)
     def test_bulk_round_trip_default(self):
         """
         Test bulk import with default stress import (one row per operation)
