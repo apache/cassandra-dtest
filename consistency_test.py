@@ -639,9 +639,6 @@ class TestAccuracy(TestHelper):
         self.log("Testing multiple dcs, users, each quorum reads")
         self._run_test_function_in_parallel(TestAccuracy.Validation.validate_users, self.nodes, self.rf.values(), combinations)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11225',
-                   flaky=True)
     def test_simple_strategy_counters(self):
         """
         Test for a single datacenter, counters table.
