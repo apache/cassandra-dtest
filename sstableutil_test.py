@@ -6,7 +6,7 @@ from ccmlib import common
 from ccmlib.node import NodetoolError
 
 from dtest import Tester, debug
-from tools import InterruptCompaction, since
+from tools import InterruptCompaction, since, known_failure
 
 # These must match the stress schema names
 KeyspaceName = 'keyspace1'
@@ -45,6 +45,9 @@ class SSTableUtilTest(Tester):
         finalfiles, tmpfiles = self._check_files(node, KeyspaceName, TableName)
         self.assertEqual(0, len(tmpfiles))
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11497',
+                   flaky=True)
     def abortedcompaction_test(self):
         """
         @jira_ticket CASSANDRA-7066
