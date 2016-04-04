@@ -23,21 +23,21 @@ These are instructions for setting up dtests on a fresh install of Ubuntu Linux 
         gnuwin32: http://gnuwin32.sourceforge.net/
         apache ant: https://ant.apache.org/bindownload.cgi
 
-## Install Oracle Java 7:
+## Install Oracle Java 8:
 * java and misc tools:
 
         sudo apt-get install software-properties-common
         sudo add-apt-repository ppa:webupd8team/java
         sudo apt-get update
-        sudo apt-get install oracle-java7-installer
+        sudo apt-get install oracle-java8-installer
 
         Windows: http://www.oracle.com/technetwork/java/javase/downloads/index.html
 
-* Ensure that java is a HotSpot 1.7.x version:
+* Ensure that java is a HotSpot 1.8.x version:
 
         # java -version
-        java version "1.7.0_40"
-        Java(TM) SE Runtime Environment (build 1.7.0_40-b43)
+        java version "1.8.0_73"
+        Java(TM) SE Runtime Environment (build 1.8.0_73)
         Java HotSpot(TM) 64-Bit Server VM (build 24.0-b56, mixed mode)
 
 * install ant
