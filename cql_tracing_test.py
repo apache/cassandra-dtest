@@ -114,8 +114,8 @@ class TestCqlTracing(Tester):
         @jira_ticket CASSANDRA-10392
         """
         expected_error = 'Cannot use class junk for tracing'
-        session = self.prepare(jvm_args=['-Dcassandra.custom_tracing_class=junk'])
         self.ignore_log_patterns = [expected_error]
+        session = self.prepare(jvm_args=['-Dcassandra.custom_tracing_class=junk'])
         self.trace(session)
 
         errs = self.cluster.nodelist()[0].grep_log_for_errors()
@@ -146,8 +146,8 @@ class TestCqlTracing(Tester):
         @jira_ticket CASSANDRA-10392
         """
         expected_error = 'Cannot use class org.apache.cassandra.tracing.TracingImpl'
-        session = self.prepare(jvm_args=['-Dcassandra.custom_tracing_class=org.apache.cassandra.tracing.TracingImpl'])
         self.ignore_log_patterns = [expected_error]
+        session = self.prepare(jvm_args=['-Dcassandra.custom_tracing_class=org.apache.cassandra.tracing.TracingImpl'])
         self.trace(session)
 
         errs = self.cluster.nodelist()[0].grep_log_for_errors()
