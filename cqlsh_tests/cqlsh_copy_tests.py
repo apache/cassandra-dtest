@@ -922,7 +922,7 @@ class CqlshCopyTest(Tester):
             )""")
 
         tempfile = self.get_temp_file()
-        num_rows = 10000
+        num_rows = 500000
         max_parse_errors = 10
 
         with open(tempfile.name, 'w') as csvfile:
@@ -940,6 +940,7 @@ class CqlshCopyTest(Tester):
 
         self.assertIn('Exceeded maximum number of parse errors {}'.format(max_parse_errors), err)
         num_rows_imported = rows_to_list(self.session.execute("SELECT COUNT(*) FROM ks.testmaxparseerrors"))[0][0]
+        debug("Imported {} rows".format(num_rows_imported))
         self.assertTrue(num_rows_imported < (num_rows / 2))  # less than the maximum number of valid rows in the csv
 
     def test_reading_max_insert_errors(self):
@@ -2388,6 +2389,18 @@ class CqlshCopyTest(Tester):
         """
         os.environ['CQLSH_COPY_TEST_NUM_CORES'] = '1'
         self._test_bulk_round_trip(nodes=3, partitioner="murmur3", num_operations=100000)
+
+    @freshCluster()
+    @since('3.0.5')
+    def test_bulk_round_trip_with_backoff(self):
+        """
+        Test bulk import with default stress import (one row per operation) and COPY options
+        that exercise the new back-off policy introduced by CASSANDRA-11320.
+
+        @jira_ticket CASSANDRA-11320
+        """
+        self._test_bulk_round_trip(nodes=3, partitioner="murmur3", num_operations=250000,
+                                   copy_from_options={'MAXINFLIGHTMESSAGES': 64, 'MAXPENDINGCHUNKS': 1})
 
     def prepare_copy_to_with_failures(self):
         """
