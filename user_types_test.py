@@ -7,7 +7,7 @@ from cassandra.query import SimpleStatement
 
 from assertions import assert_invalid
 from dtest import Tester
-from tools import require, since
+from tools import require, since, known_failure
 
 
 def listify(item):
@@ -621,6 +621,9 @@ class TestUserTypes(Tester):
 
         assert_invalid(session, stmt, 'A user type cannot contain counters')
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11498',
+                   flaky=True)
     def test_type_as_clustering_col(self):
         """Tests user types as clustering column"""
         # make sure we can define a table with a user type as a clustering column
