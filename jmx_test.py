@@ -200,11 +200,11 @@ class TestJMX(Tester):
                 debug(jmx.read_attribute(compaction_manager, 'CompactionSummary'))
                 time.sleep(2)
 
-    @since('2.2')
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11241',
                    flaky=False,
                    notes='windows')
+    @since('2.2')
     def phi_test(self):
         """
         Check functioning of nodetool failuredetector.

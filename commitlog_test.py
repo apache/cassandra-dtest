@@ -352,11 +352,11 @@ class TestCommitLog(Tester):
             [2, 2]
         )
 
-    @since('2.2')
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11285',
                    flaky=True,
                    notes='windows')
+    @since('2.2')
     def test_bad_crc(self):
         """
         if the commit log header crc (checksum) doesn't match the actual crc of the header data,
@@ -430,11 +430,11 @@ class TestCommitLog(Tester):
             node.wait_for_binary_interface(from_mark=mark, timeout=20)
         self.assertFalse(node.is_running())
 
-    @since('2.2')
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11276',
                    flaky=True,
                    notes='windows')
+    @since('2.2')
     def test_compression_error(self):
         """
         @jira_ticket CASSANDRA-7886

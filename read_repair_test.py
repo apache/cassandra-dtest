@@ -13,11 +13,11 @@ class TestReadRepair(Tester):
         Tester.setUp(self)
         self.cluster.populate(3).start(wait_for_binary_proto=True)
 
-    @since('3.0')
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11266',
                    flaky=False,
                    notes='windows')
+    @since('3.0')
     def alter_rf_and_run_read_repair_test(self):
         """
         @jira_ticket CASSANDRA-10655
@@ -107,11 +107,11 @@ class TestReadRepair(Tester):
 
         return initial_replica, non_replicas
 
-    @since('2.0')
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11252',
                    flaky=True,
                    notes='windows')
+    @since('2.0')
     def range_slice_query_with_tombstones_test(self):
         """
         @jira_ticket CASSANDRA-8989

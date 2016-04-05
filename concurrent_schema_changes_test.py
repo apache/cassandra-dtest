@@ -20,10 +20,10 @@ def wait(delay=2):
     time.sleep(delay)
 
 
-@require(10699)
 @known_failure(failure_source='cassandra',
                jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10699',
                flaky=True)
+@require(10699)
 class TestConcurrentSchemaChanges(Tester):
 
     def __init__(self, *argv, **kwargs):
