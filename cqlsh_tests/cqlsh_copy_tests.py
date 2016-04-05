@@ -2297,10 +2297,10 @@ class CqlshCopyTest(Tester):
         self.assertEqual(sum(1 for _ in open(tempfile1.name)),
                          sum(1 for _ in open(tempfile2.name)))
 
-    @freshCluster()
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11494',
                    flaky=True)
+    @freshCluster()
     def test_bulk_round_trip_default(self):
         """
         Test bulk import with default stress import (one row per operation)
