@@ -268,14 +268,27 @@ class TestUserTypes(Tester):
 
         stmt = """
               UPDATE bucket
-              SET other_containers = other_containers + [{{stuff: 'stuff2', more_stuff: {{sub_one: 'one_other', sub_two: 'two_other'}}}}]
+              SET other_containers = other_containers + [
+                   {{
+                       stuff: 'stuff2',
+                       more_stuff: {{sub_one: 'one_other', sub_two: 'two_other'}}
+                   }}
+              ]
               WHERE id={id};
            """.format(id=_id)
         session.execute(stmt)
 
         stmt = """
               UPDATE bucket
-              SET other_containers = other_containers + [{{stuff: 'stuff3', more_stuff: {{sub_one: 'one_2_other', sub_two: 'two_2_other'}}}}, {{stuff: 'stuff4', more_stuff: {{sub_one: 'one_3_other', sub_two: 'two_3_other'}}}}]
+              SET other_containers = other_containers + [
+                  {{
+                      stuff: 'stuff3',
+                      more_stuff: {{sub_one: 'one_2_other', sub_two: 'two_2_other'}}
+                  }},
+                  {{stuff: 'stuff4',
+                    more_stuff: {{sub_one: 'one_3_other', sub_two: 'two_3_other'}}
+                  }}
+              ]
               WHERE id={id};
            """.format(id=_id)
         session.execute(stmt)
@@ -297,7 +310,20 @@ class TestUserTypes(Tester):
             _id = uuid.uuid4()
             stmt = """
               UPDATE bucket
-              SET other_containers = other_containers + [{{stuff: 'stuff3', more_stuff: {{sub_one: 'one_2_other', sub_two: 'two_2_other'}}}}, {{stuff: 'stuff4', more_stuff: {{sub_one: 'one_3_other', sub_two: 'two_3_other'}}}}]
+              SET other_containers = other_containers + [
+                  {{
+                      stuff: 'stuff3',
+                      more_stuff: {{
+                          sub_one: 'one_2_other', sub_two: 'two_2_other'
+                      }}
+                  }},
+                  {{
+                      stuff: 'stuff4',
+                      more_stuff: {{
+                          sub_one: 'one_3_other', sub_two: 'two_3_other'
+                      }}
+                  }}
+              ]
               WHERE id={id};
            """.format(id=_id)
             session.execute(stmt)
