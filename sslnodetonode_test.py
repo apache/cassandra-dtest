@@ -5,7 +5,7 @@ import time
 
 import sslkeytool
 from dtest import Tester
-from tools import since
+from tools import since, known_failure
 
 _LOG_ERR_SIG = "^javax.net.ssl.SSLHandshakeException: sun.security.validator.ValidatorException: Certificate signature validation failed$"
 _LOG_ERR_IP = "^javax.net.ssl.SSLHandshakeException: java.security.cert.CertificateException: No subject alternative names matching IP address [0-9.]+ found$"
@@ -36,6 +36,10 @@ class TestNodeToNodeSSLEncryption(Tester):
         time.sleep(2)
         self.cql_connection(self.node1)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11506',
+                   flaky=False,
+                   notes='windows')
     def ssl_wrong_hostname_with_validation_test(self):
         """Should be able to start with valid ssl options"""
 
@@ -56,6 +60,10 @@ class TestNodeToNodeSSLEncryption(Tester):
         self.cluster.stop()
         self.assertTrue(found)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11506',
+                   flaky=False,
+                   notes='windows')
     def ca_mismatch_test(self):
         """CA mismatch should cause nodes to fail to connect"""
 
