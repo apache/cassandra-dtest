@@ -144,6 +144,9 @@ class TestCommitLog(Tester):
         with open(os.devnull, 'w') as devnull:
             self.node1.stress(['write', 'n=1M', '-col', 'size=FIXED(1000)', '-rate', 'threads=25'], stdout=devnull, stderr=subprocess.STDOUT)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11499',
+                   flaky=True)
     def test_commitlog_replay_on_startup(self):
         """ Test commit log replay """
         node1 = self.node1
