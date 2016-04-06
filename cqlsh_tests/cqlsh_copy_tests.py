@@ -322,7 +322,7 @@ class CqlshCopyTest(Tester):
                 # cql_type will be ignored so we set it to None
                 #
                 # Once the minimum version supported is 3.6 this code can be dropped.
-                if isinstance(val, str) and hasattr(self, 'data') and self.data[2] == val:
+                if isinstance(val, str) and cql_type_name == 'blob':
                     val = bytearray(val)
 
                 format_value = partial(format_value, type(val))
@@ -539,19 +539,18 @@ class CqlshCopyTest(Tester):
         self.assertItemsEqual(csv_values,
                               [['a', 'b'], ['1', '10'], ['2', '20'], ['3', '30']])
 
-    def test_reading_counter(self):
+    def _test_reading_counter_template(self, copy_options=None):
         """
-        Test that COPY can read a CSV of COUNTER by:
+        Test that COPY can read a csv file of COUNTER values by:
 
         - creating a table,
         - writing a CSV with COUNTER data with header,
         - importing the contents of the CSV file using COPY with header,
         - checking that the contents of the table are the written values.
-        @jira_ticket CASSANDRA-9043
         """
         self.prepare()
         self.session.execute("""
-            CREATE TABLE testcounter (
+            CREATE TABLE IF NOT EXISTS testcounter (
                 a int,
                 b text,
                 c counter,
@@ -568,12 +567,36 @@ class CqlshCopyTest(Tester):
             for a, b, c in data:
                 writer.writerow({'a': a, 'b': b, 'c': c})
 
+        self.session.execute("TRUNCATE TABLE testcounter")
         cmds = "COPY ks.testcounter FROM '{name}'".format(name=tempfile.name)
         cmds += " WITH HEADER = true"
-        self.node1.run_cqlsh(cmds=cmds)
+        if copy_options:
+            for opt, val in copy_options.iteritems():
+                cmds += " AND {} = {}".format(opt, val)
+
+        debug("Running {}".format(cmds))
+        self.node1.run_cqlsh(cmds=cmds, show_output=True, cqlsh_options=['--debug'])
 
         result = self.session.execute("SELECT * FROM testcounter")
         self.assertItemsEqual(data, rows_to_list(result))
+
+    def test_reading_counter(self):
+        """
+        Test that COPY can read a csv file of COUNTER values.
+
+        @jira_ticket CASSANDRA-9043
+        """
+        self._test_reading_counter_template()
+
+    @since('2.2.5')
+    def test_reading_counter_without_batching(self):
+        """
+        Test that COPY can read a csv file of COUNTER values with batching disabled,
+        that is MAXBATCHSIZE set to 1.
+
+        @jira_ticket CASSANDRA-11474
+        """
+        self._test_reading_counter_template(copy_options={'MAXBATCHSIZE': '1'})
 
     def test_reading_use_header(self):
         """
@@ -2653,3 +2676,50 @@ class CqlshCopyTest(Tester):
         self.assertIn('1 child process(es) died unexpectedly, aborting', err)
         num_records_imported = rows_to_list(self.session.execute("SELECT COUNT(*) FROM {}".format(stress_table)))[0][0]
         self.assertTrue(num_records_imported < num_records)
+
+    @since('2.2.5')
+    @freshCluster()
+    def test_copy_from_with_large_cql_rows(self):
+        """
+        Test importing CQL rows that are larger than batch_size_warn_threshold_in_kb and
+        batch_size_fail_threshold_in_kb. Test with and without prepared statements.
+
+        @jira_ticket CASSANDRA-11474
+        """
+        num_records = 1000
+        self.prepare(nodes=1, configuration_options={'batch_size_warn_threshold_in_kb': '1',   # warn with 1kb and fail
+                                                     'batch_size_fail_threshold_in_kb': '5'})  # with 5kb size batches
+
+        debug('Running stress')
+        stress_table_name = 'standard1'
+        self.ks = 'keyspace1'
+        stress_ks_table_name = self.ks + '.' + stress_table_name
+        self.node1.stress(['write', 'n={}'.format(num_records),
+                           '-rate', 'threads=50',
+                           '-col', 'n=FIXED(10)', 'SIZE=FIXED(1024)'])  # 10 columns of 1kb each
+
+        tempfile = self.get_temp_file()
+        debug('Exporting to csv file {} to generate a file'.format(tempfile.name))
+        self.node1.run_cqlsh(cmds="COPY {} TO '{}'".format(stress_ks_table_name, tempfile.name),
+                             show_output=True, cqlsh_options=['--debug'])
+
+        # Import using prepared statements (the default) and verify
+        self.session.execute("TRUNCATE {}".format(stress_ks_table_name))
+
+        debug('Importing from csv file {}'.format(tempfile.name))
+        self.node1.run_cqlsh(cmds="COPY {} FROM '{}' WITH MAXBATCHSIZE=1".format(stress_ks_table_name, tempfile.name),
+                             show_output=True, cqlsh_options=['--debug'])
+
+        results = list(self.session.execute("SELECT * FROM {}".format(stress_ks_table_name)))
+        self.assertCsvResultEqual(tempfile.name, results, stress_table_name)
+
+        # Import without prepared statements and verify
+        self.session.execute("TRUNCATE {}".format(stress_ks_table_name))
+
+        debug('Importing from csv file {}'.format(tempfile.name))
+        self.node1.run_cqlsh(cmds="COPY {} FROM '{}' WITH MAXBATCHSIZE=1 AND PREPAREDSTATEMENTS=FALSE"
+                             .format(stress_ks_table_name, tempfile.name),
+                             show_output=True, cqlsh_options=['--debug'])
+
+        results = list(self.session.execute("SELECT * FROM {}".format(stress_ks_table_name)))
+        self.assertCsvResultEqual(tempfile.name, results, stress_table_name)
