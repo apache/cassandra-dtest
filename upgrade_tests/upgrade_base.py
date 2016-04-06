@@ -3,7 +3,6 @@ import re
 import sys
 import time
 from abc import ABCMeta
-from collections import namedtuple
 from distutils.version import LooseVersion
 from unittest import skipIf
 
@@ -14,48 +13,6 @@ from dtest import DEBUG, Tester, debug
 UPGRADE_TEST_RUN = os.environ.get('UPGRADE_TEST_RUN', '').lower() in {'true', 'yes'}
 
 
-UpgradePath = namedtuple('UpgradePath', ('name', 'starting_version', 'upgrade_version'))
-
-
-# these should be latest tentative tags, falling back to the most recent release if no pending tentative
-latest_2dot0 = '2.0.17'
-latest_2dot1 = '2.1.13'
-latest_2dot2 = '2.2.5'
-latest_3dot0 = '3.0.3'
-latest_3dot1 = '3.1.1'
-latest_3dot2 = '3.2.1'
-latest_3dot3 = '3.3'
-
-head_2dot0 = 'git:cassandra-2.0'
-head_2dot1 = 'git:cassandra-2.1'
-head_2dot2 = 'git:cassandra-2.2'
-head_3dot0 = 'git:cassandra-3.0'
-head_3dot1 = 'git:cassandra-3.1'
-head_3dot2 = 'git:cassandra-3.2'
-head_3dot3 = 'git:cassandra-3.3'
-head_trunk = 'git:trunk'
-
-
-VALID_UPGRADE_PAIRS = (
-    # commented out until we have a solution for specifying java versions in upgrade tests
-    # UpgradePath(name='2_0_UpTo_2_1_HEAD', starting_version=latest_2dot0, upgrade_version='git:cassandra-2.1'),
-    UpgradePath(name='2_1_UpTo_2_2_HEAD', starting_version=latest_2dot1, upgrade_version=head_2dot2),
-    UpgradePath(name='2_1_UpTo_3_0_HEAD', starting_version=latest_2dot1, upgrade_version=head_3dot0),
-    UpgradePath(name='2_1_UpTo_3_3_HEAD', starting_version=latest_2dot1, upgrade_version=head_3dot3),
-    UpgradePath(name='2_1_UpTo_Trunk', starting_version=latest_2dot1, upgrade_version=head_trunk),
-    UpgradePath(name='2_2_UpTo_3_0_HEAD', starting_version=latest_2dot2, upgrade_version=head_3dot0),
-    UpgradePath(name='2_2_UpTo_3_3_HEAD', starting_version=latest_2dot2, upgrade_version=head_3dot3),
-    UpgradePath(name='2_2_UpTo_Trunk', starting_version=latest_2dot2, upgrade_version=head_trunk),
-    UpgradePath(name='2_1_HEAD_UpTo_2_2', starting_version=head_2dot1, upgrade_version=latest_2dot2),
-    UpgradePath(name='2_1_HEAD_UpTo_3_0', starting_version=head_2dot1, upgrade_version=latest_3dot0),
-    UpgradePath(name='2_2_HEAD_UpTo_3_0', starting_version=head_2dot2, upgrade_version=latest_3dot0),
-    UpgradePath(name='2_1_HEAD_UpTo_Trunk', starting_version=head_2dot1, upgrade_version=head_trunk),
-    UpgradePath(name='2_2_HEAD_UpTo_Trunk', starting_version=head_2dot2, upgrade_version=head_trunk),
-    UpgradePath(name='3_0_UpTo_Trunk', starting_version=latest_3dot0, upgrade_version=head_trunk),
-    UpgradePath(name='3_2_UpTo_Trunk', starting_version=latest_3dot2, upgrade_version=head_trunk),
-)
-
-
 def sanitize_version(version, allow_ambiguous=True):
     """
     Takes version of the form cassandra-1.2, 2.0.10, or trunk.
@@ -64,7 +21,7 @@ def sanitize_version(version, allow_ambiguous=True):
     If allow_ambiguous is False, will raise RuntimeError if no version is found.
     """
     if (version == 'git:trunk') or (version == 'trunk'):
-        return LooseVersion(head_trunk)
+        return LooseVersion('git:trunk')
 
     match = re.match('^.*(\d+\.+\d+\.*\d*).*$', unicode(version))
     if match:

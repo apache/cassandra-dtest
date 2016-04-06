@@ -5,7 +5,7 @@ import random
 import signal
 import time
 import uuid
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 from multiprocessing import Process, Queue
 from Queue import Empty, Full
 
@@ -16,11 +16,10 @@ from six import print_
 
 from dtest import Tester, debug
 from tools import generate_ssl_stores, known_failure, new_node
-from upgrade_base import (UPGRADE_TEST_RUN, head_2dot1, head_2dot2, head_3dot0,
-                          head_3dot1, head_3dot3, head_trunk, latest_2dot0,
-                          latest_2dot1, latest_2dot2, latest_3dot0,
-                          latest_3dot1, latest_3dot2, latest_3dot3,
-                          switch_jdks)
+from upgrade_base import UPGRADE_TEST_RUN, switch_jdks
+from upgrade_manifest import (build_upgrade_pairs, current_2_0_x,
+                              current_2_1_x, current_2_2_x, current_3_0_x,
+                              head_trunk, indev_2_2_x, next_2_2_x)
 
 
 def data_writer(tester, to_verify_queue, verification_done_queue, rewrite_probability=0):
@@ -787,258 +786,74 @@ def create_upgrade_class(clsname, version_list, protocol_version,
     return newcls
 
 
-def is_unreleased(version_or_tag):
-    """
-    For gating unnecessary testing of already released upgrade tests endpoints.
-    """
-    return 'tentative' in version_or_tag
+MultiUpgrade = namedtuple('MultiUpgrade', ('name', 'version_metas', 'protocol_version', 'extra_config'))
 
+MULTI_UPGRADES = (
+    # Proto v1 upgrades (v1 supported on 2.0, 2.1, 2.2)
+    MultiUpgrade(name='ProtoV1Upgrade_AllVersions_EndsAt_indev_2_2_x',
+                 version_metas=[current_2_0_x, current_2_1_x, indev_2_2_x], protocol_version=1, extra_config=None),
+    MultiUpgrade(name='ProtoV1Upgrade_AllVersions_RandomPartitioner_EndsAt_indev_2_2_x',
+                 version_metas=[current_2_0_x, current_2_1_x, indev_2_2_x], protocol_version=1,
+                 extra_config=(
+                    ('partitioner', 'org.apache.cassandra.dht.RandomPartitioner'),
+                 )),
+    MultiUpgrade(name='ProtoV1Upgrade_AllVersions_EndsAt_next_2_2_x',
+                 version_metas=[current_2_0_x, current_2_1_x, next_2_2_x], protocol_version=1, extra_config=None),
+    MultiUpgrade(name='ProtoV1Upgrade_AllVersions_RandomPartitioner_EndsAt_indev_2_2_x',
+                 version_metas=[current_2_0_x, current_2_1_x, next_2_2_x], protocol_version=1,
+                 extra_config=(
+                    ('partitioner', 'org.apache.cassandra.dht.RandomPartitioner'),
+                 )),
 
-# Proto v1 upgrade classes (v1 supported on 2.0, 2.1, 2.2)
-create_upgrade_class(
-    'ProtoV1Upgrade_2_0_UpTo_2_1_HEAD',
-    [latest_2dot0, head_2dot1],
-    bootstrap_test=True,
-    protocol_version=1
-)
-if is_unreleased(latest_2dot1):
-    create_upgrade_class(
-        'ProtoV1Upgrade_2_0_UpTo_2_1_Latest',
-        [latest_2dot0, latest_2dot1],
-        bootstrap_test=True,
-        protocol_version=1
-    )
-create_upgrade_class(
-    'ProtoV1Upgrade_2_1_UpTo_2_2_HEAD',
-    [latest_2dot1, head_2dot2],
-    bootstrap_test=True,
-    protocol_version=1
-)
-if is_unreleased(latest_2dot2):
-    create_upgrade_class(
-        'ProtoV1Upgrade_2_1_UpTo_2_2_Latest',
-        [latest_2dot1, latest_2dot2],
-        bootstrap_test=True,
-        protocol_version=1
-    )
-create_upgrade_class(
-    'ProtoV1Upgrade_AllVersions_EndsAt_2_2_HEAD',
-    [latest_2dot0, latest_2dot1, head_2dot2],
-    protocol_version=1
-)
-if is_unreleased(latest_2dot2):
-    create_upgrade_class(
-        'ProtoV1Upgrade_AllVersions_EndsAt_2_2_Latest',
-        [latest_2dot0, latest_2dot1, latest_2dot2],
-        protocol_version=1
-    )
-create_upgrade_class(
-    'ProtoV1Upgrade_AllVersions_RandomPartitioner_EndsAt_2_2_HEAD',
-    [latest_2dot0, latest_2dot1, head_2dot2],
-    protocol_version=1,
-    extra_config=(
-        ('partitioner', 'org.apache.cassandra.dht.RandomPartitioner'),
-    )
-)
-if is_unreleased(latest_2dot2):
-    create_upgrade_class(
-        'ProtoV1Upgrade_AllVersions_RandomPartitioner_EndsAt_2_2_Latest',
-        [latest_2dot0, latest_2dot1, latest_2dot2],
-        protocol_version=1,
-        extra_config=(
-            ('partitioner', 'org.apache.cassandra.dht.RandomPartitioner'),
-        )
-    )
+    # Proto v2 upgrades (v2 is supported on 2.0, 2.1, 2.2)
+    MultiUpgrade(name='ProtoV2Upgrade_AllVersions_EndsAt_indev_2_2_x',
+                 version_metas=[current_2_0_x, current_2_1_x, indev_2_2_x], protocol_version=2, extra_config=None),
+    MultiUpgrade(name='ProtoV2Upgrade_AllVersions_RandomPartitioner_EndsAt_indev_2_2_x',
+                 version_metas=[current_2_0_x, current_2_1_x, indev_2_2_x], protocol_version=2,
+                 extra_config=(
+                    ('partitioner', 'org.apache.cassandra.dht.RandomPartitioner'),
+                 )),
+    MultiUpgrade(name='ProtoV2Upgrade_AllVersions_EndsAt_next_2_2x',
+                 version_metas=[current_2_0_x, current_2_1_x, next_2_2_x], protocol_version=2, extra_config=None),
+    MultiUpgrade(name='ProtoV2Upgrade_AllVersions_RandomPartitioner_EndsAt_next_2_2_x',
+                 version_metas=[current_2_0_x, current_2_1_x, next_2_2_x], protocol_version=2,
+                 extra_config=(
+                     ('partitioner', 'org.apache.cassandra.dht.RandomPartitioner'),
+                 )),
 
-# Proto v2 upgrade classes (v2 is supported on 2.0, 2.1, 2.2)
-create_upgrade_class(
-    'ProtoV2Upgrade_2_0_UpTo_2_1_HEAD',
-    [latest_2dot0, head_2dot1],
-    bootstrap_test=True,
-    protocol_version=2
-)
-if is_unreleased(latest_2dot1):
-    create_upgrade_class(
-        'ProtoV2Upgrade_2_0_UpTo_2_1_Latest',
-        [latest_2dot0, latest_2dot1],
-        bootstrap_test=True,
-        protocol_version=2
-    )
-create_upgrade_class(
-    'ProtoV2Upgrade_2_1_UpTo_2_2_HEAD',
-    [latest_2dot1, head_2dot2],
-    bootstrap_test=True,
-    protocol_version=2
-)
-if is_unreleased(latest_2dot2):
-    create_upgrade_class(
-        'ProtoV2Upgrade_2_1_UpTo_2_2_Latest',
-        [latest_2dot1, latest_2dot2],
-        bootstrap_test=True,
-        protocol_version=2
-    )
-create_upgrade_class(
-    'ProtoV2Upgrade_AllVersions_EndsAt_2_2_HEAD',
-    [latest_2dot0, latest_2dot1, head_2dot2],
-    protocol_version=2
-)
-if is_unreleased(latest_2dot2):
-    create_upgrade_class(
-        'ProtoV2Upgrade_AllVersions_EndsAt_2_2_Latest',
-        [latest_2dot0, latest_2dot1, latest_2dot2],
-        protocol_version=2
-    )
-create_upgrade_class(
-    'ProtoV2Upgrade_AllVersions_RandomPartitioner_EndsAt_2_2_HEAD',
-    [latest_2dot0, latest_2dot1, head_2dot2],
-    protocol_version=2,
-    extra_config=(
-        ('partitioner', 'org.apache.cassandra.dht.RandomPartitioner'),
-    )
-)
-if is_unreleased(latest_2dot2):
-    create_upgrade_class(
-        'ProtoV2Upgrade_AllVersions_RandomPartitioner_EndsAt_2_2_Latest',
-        [latest_2dot0, latest_2dot1, latest_2dot2],
-        protocol_version=2,
-        extra_config=(
-            ('partitioner', 'org.apache.cassandra.dht.RandomPartitioner'),
-        )
-    )
+    # Proto v3 upgrades (v3 is supported on 2.1, 2.2, 3.0, 3.1, trunk)
+    MultiUpgrade(name='ProtoV3Upgrade_AllVersions_EndsAt_Trunk_HEAD',
+                 version_metas=[current_2_1_x, current_2_2_x, current_3_0_x, head_trunk], protocol_version=3, extra_config=None),
+    MultiUpgrade(name='ProtoV3Upgrade_AllVersions_RandomPartitioner_EndsAt_Trunk_HEAD',
+                 version_metas=[current_2_1_x, current_2_2_x, current_3_0_x, head_trunk], protocol_version=3,
+                 extra_config=(
+                     ('partitioner', 'org.apache.cassandra.dht.RandomPartitioner'),
+                 )),
 
-
-# Proto v3 upgrade classes (v3 is supported on 2.1, 2.2, 3.0, 3.1, trunk)
-create_upgrade_class(
-    'ProtoV3Upgrade_2_1_UpTo_2_2_HEAD',
-    [latest_2dot1, head_2dot2],
-    bootstrap_test=True,
-    protocol_version=3
-)
-if is_unreleased(latest_2dot2):
-    create_upgrade_class(
-        'ProtoV3Upgrade_2_1_UpTo_2_2_Latest',
-        [latest_2dot1, latest_2dot2],
-        bootstrap_test=True,
-        protocol_version=3
-    )
-create_upgrade_class(  # special case upgrade skipping 2.2
-    'ProtoV3Upgrade_2_1_UpTo_3_0_HEAD',
-    [latest_2dot1, head_3dot0],
-    bootstrap_test=True,
-    protocol_version=3
-)
-if is_unreleased(latest_3dot0):
-    create_upgrade_class(  # special case upgrade skipping 2.2
-        'ProtoV3Upgrade_2_1_UpTo_3_0_Latest',
-        [latest_2dot1, latest_3dot0],
-        bootstrap_test=True,
-        protocol_version=3
-    )
-create_upgrade_class(
-    'ProtoV3Upgrade_2_2_UpTo_3_0_HEAD',
-    [latest_2dot2, head_3dot0],
-    bootstrap_test=True,
-    protocol_version=3
-)
-if is_unreleased(latest_3dot0):
-    create_upgrade_class(
-        'ProtoV3Upgrade_2_2_UpTo_3_0_Latest',
-        [latest_2dot2, latest_3dot0],
-        bootstrap_test=True,
-        protocol_version=3
-    )
-create_upgrade_class(
-    'ProtoV3Upgrade_3_0_UpTo_3_1_HEAD',
-    [latest_3dot0, head_3dot1],
-    bootstrap_test=True,
-    protocol_version=3
-)
-create_upgrade_class(
-    'ProtoV3Upgrade_3_2_UpTo_3_3_HEAD',
-    [latest_3dot2, head_trunk],
-    bootstrap_test=True,
-    protocol_version=3
-)
-if is_unreleased(latest_3dot3):
-    create_upgrade_class(
-        'ProtoV3Upgrade_3_2_UpTo_3_3_Latest',
-        [latest_3dot2, latest_3dot3],
-        bootstrap_test=True,
-        protocol_version=3
-    )
-create_upgrade_class(
-    'ProtoV3Upgrade_3_3_UpTo_Trunk_HEAD',
-    [latest_3dot3, head_trunk],
-    bootstrap_test=True,
-    protocol_version=3
-)
-create_upgrade_class(
-    'ProtoV3Upgrade_AllVersions_EndsAt_Trunk_HEAD',
-    [latest_2dot1, latest_2dot2, latest_3dot0, latest_3dot1, latest_3dot2, latest_3dot3, head_trunk],
-    protocol_version=3
-)
-create_upgrade_class(  # special case upgrade skipping 2.2
-    'ProtoV3Upgrade_AllVersions_Skip_2_2_EndsAt_Trunk_HEAD',
-    [latest_2dot1, latest_3dot0, latest_3dot1, latest_3dot2, latest_3dot3, head_trunk],
-    protocol_version=3
-)
-create_upgrade_class(
-    'ProtoV3Upgrade_AllVersions_RandomPartitioner_EndsAt_Trunk_HEAD',
-    [latest_2dot1, latest_2dot2, latest_3dot0, latest_3dot1, latest_3dot2, latest_3dot3, head_trunk],
-    protocol_version=3,
-    extra_config=(
-        ('partitioner', 'org.apache.cassandra.dht.RandomPartitioner'),
-    )
-)
-create_upgrade_class(
-    'ProtoV3Upgrade_AllVersions_RandomPartitioner_Skip_2_2_EndsAt_Trunk_HEAD',
-    [latest_2dot1, latest_3dot0, latest_3dot1, latest_3dot2, latest_3dot3, head_trunk],
-    protocol_version=3,
-    extra_config=(
-        ('partitioner', 'org.apache.cassandra.dht.RandomPartitioner'),
-    )
+    # Proto v4 upgrades (v4 is supported on 2.2, 3.0, 3.1, trunk)
+    MultiUpgrade(name='ProtoV4Upgrade_AllVersions_EndsAt_Trunk_HEAD',
+                 version_metas=[current_2_2_x, current_3_0_x, head_trunk], protocol_version=4, extra_config=None),
+    MultiUpgrade(name='ProtoV4Upgrade_AllVersions_RandomPartitioner_EndsAt_Trunk_HEAD',
+                 version_metas=[current_2_2_x, current_3_0_x, head_trunk], protocol_version=4,
+                 extra_config=(
+                    ('partitioner', 'org.apache.cassandra.dht.RandomPartitioner'),
+                 )),
 )
 
+for upgrade in MULTI_UPGRADES:
+    # if any version_metas are None, this means they are verions not to be tested currently
+    if all(upgrade.version_metas):
+        create_upgrade_class(upgrade.name, [m.version for m in upgrade.version_metas], protocol_version=upgrade.protocol_version, extra_config=upgrade.extra_config)
 
-# Proto v4 upgrade classes (v4 is supported on 2.2, 3.0, 3.1, trunk)
-create_upgrade_class(
-    'ProtoV4Upgrade_2_2_UpTo_3_0_HEAD',
-    [latest_2dot2, head_3dot0],
-    bootstrap_test=True,
-    protocol_version=4
-)
-if is_unreleased(latest_3dot0):
+
+for pair in build_upgrade_pairs():
     create_upgrade_class(
-        'ProtoV4Upgrade_2_2_UpTo_3_0_Latest',
-        [latest_2dot2, latest_3dot0],
-        bootstrap_test=True,
-        protocol_version=4
+        'Test' + pair.name,
+        [pair.starting_version, pair.upgrade_version],
+        protocol_version=pair.starting_meta.max_proto_v,
+        bootstrap_test=True
     )
-create_upgrade_class(
-    'ProtoV4Upgrade_3_2_UpTo_3_3_HEAD',
-    [latest_3dot2, head_3dot3],
-    bootstrap_test=True,
-    protocol_version=4
-)
-create_upgrade_class(
-    'ProtoV4Upgrade_3_3_UpTo_Trunk_HEAD',
-    [latest_3dot3, head_trunk],
-    bootstrap_test=True,
-    protocol_version=4
-)
-create_upgrade_class(
-    'ProtoV4Upgrade_AllVersions_EndsAt_Trunk_HEAD',
-    [latest_2dot2, latest_3dot0, latest_3dot1, latest_3dot2, latest_3dot3, head_trunk],
-    protocol_version=4
-)
-create_upgrade_class(
-    'ProtoV4Upgrade_AllVersions_RandomPartitioner_EndsAt_Trunk_HEAD',
-    [latest_2dot2, latest_3dot0, latest_3dot1, latest_3dot2, latest_3dot3, head_trunk],
-    protocol_version=4,
-    extra_config=(
-        ('partitioner', 'org.apache.cassandra.dht.RandomPartitioner'),
-    )
-)
+
 
 # FOR CUSTOM/LOCAL UPGRADE PATH TESTING:
 #    Define UPGRADE_PATH in your env as a comma-separated list of versions
