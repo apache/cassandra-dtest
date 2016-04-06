@@ -228,13 +228,13 @@ class TestReplaceAddress(Tester):
         debug(movedTokensList[0])
         self.assertEqual(len(movedTokensList), numNodes)
 
+    @since('3.6')
     def fail_without_replace_test(self):
         """
         When starting a node from a clean slate with the same address as
         an existing down node, the node should error out even when
         auto_bootstrap = false (or the node is a seed) and tell the user
         to use replace_address.
-
         @jira_ticket CASSANDRA-10134
         """
         debug("Starting cluster with 3 nodes.")
@@ -250,10 +250,7 @@ class TestReplaceAddress(Tester):
         cluster.start()
 
         debug("Inserting Data...")
-        if cluster.version() < "2.1":
-            node1.stress(['-o', 'insert', '--num-keys=10000', '--replication-factor=3'])
-        else:
-            node1.stress(['write', 'n=10000', '-schema', 'replication(factor=3)'])
+        node1.stress(['write', 'n=10K', '-schema', 'replication(factor=3)'])
 
         mark = None
         for auto_bootstrap in (True, False):
@@ -268,10 +265,75 @@ class TestReplaceAddress(Tester):
                     rmtree(d)
 
             node3.set_configuration_options(values={'auto_bootstrap': auto_bootstrap})
-            debug("Starting node 3 with auto_boostrap = {val}".format(val=auto_bootstrap))
+            debug("Starting node 3 with auto_bootstrap = {val}".format(val=auto_bootstrap))
             node3.start(wait_other_notice=False)
             node3.watch_log_for('Use cassandra.replace_address if you want to replace this node', from_mark=mark, timeout=20)
             mark = node3.mark_log()
+
+    @since('3.6')
+    def unsafe_replace_test(self):
+        """
+        To handle situations such as failed disk in a JBOD, it may be desirable to
+        replace a node without bootstrapping. In such scenarios best practice
+        advice has been to wipe the node's system keyspace data, set the initial
+        tokens via cassandra.yaml, startup without bootstrap and then repair.
+        Starting the node as a replacement allows the tokens to be learned from
+        gossip, but previously required auto_bootstrap=true. Since CASSANDRA-10134
+        replacement is allowed without bootstrapping, but it requires the operator
+        to acknowledge the risk in doing so by setting the cassandra.allow_unsafe_replace
+        system property at startup.
+
+        @jira_ticket CASSANDRA-10134
+        """
+        debug('Starting cluster with 3 nodes.')
+        cluster = self.cluster
+        cluster.populate(3)
+        node1, node2, node3 = cluster.nodelist()
+        cluster.seeds.remove(node3)
+        NUM_TOKENS = os.environ.get('NUM_TOKENS', '256')
+        if DISABLE_VNODES:
+            cluster.set_configuration_options(values={'initial_token': None, 'num_tokens': 1})
+        else:
+            cluster.set_configuration_options(values={'initial_token': None, 'num_tokens': NUM_TOKENS})
+        cluster.start()
+
+        debug('Inserting Data...')
+        node1.stress(['write', 'n=10K', '-schema', 'replication(factor=3)'])
+
+        session = self.patient_cql_connection(node1)
+        query = SimpleStatement('select * from keyspace1.standard1 LIMIT 1', consistency_level=ConsistencyLevel.THREE)
+        initialData = list(session.execute(query))
+
+        for set_allow_unsafe_flag in [False, True]:
+            debug('Stopping node 3.')
+            node3.stop(gently=False)
+
+            # completely delete the system keyspace data plus commitlog and saved caches
+            for d in node3.data_directories():
+                system_data = os.path.join(d, 'system')
+                if os.path.exists(system_data):
+                    rmtree(system_data)
+
+            for d in ['commitlogs', 'saved_caches']:
+                p = os.path.join(node3.get_path(), d)
+                if os.path.exists(p):
+                    rmtree(p)
+
+            node3.set_configuration_options(values={'auto_bootstrap': False})
+            mark = node3.mark_log()
+
+            if set_allow_unsafe_flag:
+                debug('Starting node3 with auto_bootstrap = false and replace_address = 127.0.0.3 and allow_unsafe_replace = true')
+                node3.start(replace_address='127.0.0.3', wait_for_binary_proto=True, jvm_args=['-Dcassandra.allow_unsafe_replace=true'])
+                # query should work again
+                debug('Verifying querying works again.')
+                finalData = list(session.execute(query))
+                self.assertListEqual(initialData, finalData)
+            else:
+                debug('Starting node 3 with auto_bootstrap = false and replace_address = 127.0.0.3')
+                node3.start(replace_address='127.0.0.3', wait_other_notice=False)
+                node3.watch_log_for('To perform this operation, please restart with -Dcassandra.allow_unsafe_replace=true',
+                                    from_mark=mark, timeout=20)
 
     @since('2.2')
     def resumable_replace_test(self):
@@ -384,4 +446,3 @@ class TestReplaceAddress(Tester):
         debug("Verifying querying works again.")
         finalData = list(session.execute(query))
         self.assertListEqual(initialData, finalData)
-
