@@ -95,12 +95,13 @@ class TestHelper(Tester):
         cluster.populate(nodes)
 
         if isinstance(nodes, int):
-            # Changing the snitch from SimpleSnitch to PropertyFileSnitch even in the
+            # Changing the snitch to PropertyFileSnitch even in the
             # single dc tests ensures that StorageProxy sorts the replicas eligible
             # for reading by proximity to the local host, essentially picking the
             # local host for local reads, see IEndpointSnitch.sortByProximity() and
             # StorageProxy.getLiveSortedEndpoints(), which is called by the AbstractReadExecutor
-            # to determine the target replicas
+            # to determine the target replicas. The default case, a SimpleSnitch wrapped in
+            # a dynamic snitch, may rarely choose a different replica.
             debug('Changing snitch for single dc case')
             for node in cluster.nodelist():
                 node.data_center = 'dc1'
