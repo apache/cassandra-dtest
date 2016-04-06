@@ -268,14 +268,27 @@ class TestUserTypes(Tester):
 
         stmt = """
               UPDATE bucket
-              SET other_containers = other_containers + [{{stuff: 'stuff2', more_stuff: {{sub_one: 'one_other', sub_two: 'two_other'}}}}]
+              SET other_containers = other_containers + [
+                   {{
+                       stuff: 'stuff2',
+                       more_stuff: {{sub_one: 'one_other', sub_two: 'two_other'}}
+                   }}
+              ]
               WHERE id={id};
            """.format(id=_id)
         session.execute(stmt)
 
         stmt = """
               UPDATE bucket
-              SET other_containers = other_containers + [{{stuff: 'stuff3', more_stuff: {{sub_one: 'one_2_other', sub_two: 'two_2_other'}}}}, {{stuff: 'stuff4', more_stuff: {{sub_one: 'one_3_other', sub_two: 'two_3_other'}}}}]
+              SET other_containers = other_containers + [
+                  {{
+                      stuff: 'stuff3',
+                      more_stuff: {{sub_one: 'one_2_other', sub_two: 'two_2_other'}}
+                  }},
+                  {{stuff: 'stuff4',
+                    more_stuff: {{sub_one: 'one_3_other', sub_two: 'two_3_other'}}
+                  }}
+              ]
               WHERE id={id};
            """.format(id=_id)
         session.execute(stmt)
@@ -297,7 +310,20 @@ class TestUserTypes(Tester):
             _id = uuid.uuid4()
             stmt = """
               UPDATE bucket
-              SET other_containers = other_containers + [{{stuff: 'stuff3', more_stuff: {{sub_one: 'one_2_other', sub_two: 'two_2_other'}}}}, {{stuff: 'stuff4', more_stuff: {{sub_one: 'one_3_other', sub_two: 'two_3_other'}}}}]
+              SET other_containers = other_containers + [
+                  {{
+                      stuff: 'stuff3',
+                      more_stuff: {{
+                          sub_one: 'one_2_other', sub_two: 'two_2_other'
+                      }}
+                  }},
+                  {{
+                      stuff: 'stuff4',
+                      more_stuff: {{
+                          sub_one: 'one_3_other', sub_two: 'two_3_other'
+                      }}
+                  }}
+              ]
               WHERE id={id};
            """.format(id=_id)
             session.execute(stmt)
@@ -629,7 +655,7 @@ class TestUserTypes(Tester):
         # make sure we can define a table with a user type as a clustering column
         # and do a basic insert/query of data in that table.
         cluster = self.cluster
-        cluster.populate(3).start()
+        cluster.populate(3).start(wait_for_binary_proto=True)
         node1, node2, node3 = cluster.nodelist()
         session = self.patient_cql_connection(node1)
         self.create_ks(session, 'user_type_pkeys', 2)
@@ -650,6 +676,8 @@ class TestUserTypes(Tester):
               )
            """
         session.execute(stmt)
+        # address CASSANDRA-11498
+        session.cluster.control_connection.wait_for_schema_agreement()
 
         # create a bit of data and expect a natural order based on clustering user types
 
