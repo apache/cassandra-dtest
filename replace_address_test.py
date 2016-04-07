@@ -5,7 +5,7 @@ from cassandra.query import SimpleStatement
 from ccmlib.node import Node, NodeError
 
 from dtest import DISABLE_VNODES, Tester, debug
-from tools import InterruptBootstrap, known_failure, since
+from tools import InterruptBootstrap, since
 
 
 class NodeUnavailable(Exception):
@@ -277,10 +277,6 @@ class TestReplaceAddress(Tester):
         finalData = list(session.execute(query))
         self.assertListEqual(initialData, finalData)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11246',
-                   flaky=True,
-                   notes='windows')
     @since('2.2')
     def replace_with_reset_resume_state_test(self):
         """Test replace with resetting bootstrap progress"""
