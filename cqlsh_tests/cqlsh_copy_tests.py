@@ -25,6 +25,7 @@ from cqlsh_tools import (DummyColorMap, assert_csvs_items_equal, csv_rows,
 from dtest import (DISABLE_VNODES, Tester, canReuseCluster, debug,
                    freshCluster, warning)
 from tools import rows_to_list, since, known_failure
+from unittest import skip
 
 PARTITIONERS = {
     "murmur3": "org.apache.cassandra.dht.Murmur3Partitioner",
@@ -903,6 +904,7 @@ class CqlshCopyTest(Tester):
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11505',
                    flaky=True)
+    @skip('hangs CI')
     def test_reading_max_parse_errors(self):
         """
         Test that importing a csv file is aborted when we reach the maximum number of parse errors:
