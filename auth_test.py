@@ -225,7 +225,7 @@ class TestAuth(Tester):
         session = self.get_session(user='cassandra', password='cassandra')
         assert_invalid(session, 'DROP USER nonexistent', "nonexistent doesn't exist")
 
-    def drop_user_case_sensitive(self):
+    def drop_user_case_sensitive_test(self):
         """
         * Launch a one node cluster
         * Connect as the default superuser
@@ -252,7 +252,7 @@ class TestAuth(Tester):
         rows = list(cassandra.execute("LIST USERS"))
         self.assertItemsEqual(rows, ['cassandra'])
 
-    def alter_user_case_sensitive(self):
+    def alter_user_case_sensitive_test(self):
         """
         * Launch a one node cluster
         * Connect as the default superuser
