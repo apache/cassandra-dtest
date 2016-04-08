@@ -7,7 +7,7 @@ from cassandra.query import SimpleStatement
 
 from assertions import assert_invalid
 from dtest import Tester
-from tools import require, since, known_failure
+from tools import since, known_failure
 
 
 def listify(item):
@@ -696,10 +696,12 @@ class TestUserTypes(Tester):
 
             self.assertEqual(listify(res), [[[u'a', u'z'], [u'c', u'a'], [u'c', u'f'], [u'c', u'z'], [u'd', u'e'], [u'z', u'a']]])
 
-    @since('3.0')
-    @require('7423')
+    @since('3.6')
     def udt_subfield_test(self):
-        self.skipTest("Feature In Development")
+        """
+        @jira_ticket CASSANDRA-7423
+        @since 3.6
+        """
         cluster = self.cluster
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
@@ -707,37 +709,37 @@ class TestUserTypes(Tester):
         self.create_ks(session, 'user_types', 1)
 
         # Check we can create non-frozen table
-        session.execute("CREATE TYPE udt (first text, second int, third int)")
+        session.execute("CREATE TYPE udt (first ascii, second int, third int)")
         session.execute("CREATE TABLE t (id int PRIMARY KEY, v udt)")
 
         # Fill in a full UDT across two statements
         # Ensure all subfields are set
-        session.execute("UPDATE t set v[first] = 'a' WHERE id=0")
         session.execute("INSERT INTO t (id, v) VALUES (0, {third: 2, second: 1})")
+        session.execute("UPDATE t set v.first = 'a' WHERE id=0")
         rows = list(session.execute("SELECT * FROM t WHERE id = 0"))
-        self.assertEqual(listify(rows[0]), [0, ['a', 1, 2]])
+        self.assertEqual(listify(rows[0]), [[0, ['a', 1, 2]]])
 
         # Create a full udt
         # Update a subfield on the udt
         # Read back the updated udt
         session.execute("INSERT INTO t (id, v) VALUES (0, {first: 'c', second: 3, third: 33})")
-        session.execute("UPDATE t set v[second] = 5 where id=0")
+        session.execute("UPDATE t set v.second = 5 where id=0")
         rows = list(session.execute("SELECT * FROM t WHERE id=0"))
-        self.assertEqual(listify(rows[0]), [0, ['c', 5, 33]])
+        self.assertEqual(listify(rows[0]), [[0, ['c', 5, 33]]])
 
         # Rewrite the entire udt
         # Read back
-        session.execute("INSERT INTO t (id, v) VALUES (0, {first: 'alpha': second: 111, third: 100})")
+        session.execute("INSERT INTO t (id, v) VALUES (0, {first: 'alpha', second: 111, third: 100})")
         rows = list(session.execute("SELECT * FROM t WHERE id=0"))
-        self.assertEqual(listify(rows[0]), [0, ['alpha', 111, 100]])
+        self.assertEqual(listify(rows[0]), [[0, ['alpha', 111, 100]]])
 
         # Send three subfield updates to udt
         # Read back
-        session.execute("UPDATE t set v[first] = 'beta' WHERE id=0")
-        session.execute("UPDATE t set v[first] = 'delta' WHERE id=0")
-        session.execute("UPDATE t set v[second] = -10 WHERE id=0")
+        session.execute("UPDATE t set v.first = 'beta' WHERE id=0")
+        session.execute("UPDATE t set v.first = 'delta' WHERE id=0")
+        session.execute("UPDATE t set v.second = -10 WHERE id=0")
         rows = list(session.execute("SELECT * FROM t WHERE id=0"))
-        self.assertEqual(listify(rows[0]), [0, ['delta', -10, 100]])
+        self.assertEqual(listify(rows[0]), [[0, ['delta', -10, 100]]])
 
         # Send conflicting updates serially to different nodes
         # Read back
@@ -745,29 +747,28 @@ class TestUserTypes(Tester):
         session2 = self.exclusive_cql_connection(node2)
         session3 = self.exclusive_cql_connection(node3)
 
-        session1.execute("UPDATE user_types.t set v[third] = 101 WHERE id=0")
-        session2.execute("UPDATE user_types.t set v[third] = 102 WHERE id=0")
-        session2.execute("UPDATE user_types.t set v[third] = 103 WHERE id=0")
+        session1.execute("UPDATE user_types.t set v.third = 101 WHERE id=0")
+        session2.execute("UPDATE user_types.t set v.third = 102 WHERE id=0")
+        session3.execute("UPDATE user_types.t set v.third = 103 WHERE id=0")
         query = SimpleStatement("SELECT * FROM t WHERE id = 0", consistency_level=ConsistencyLevel.ALL)
         rows = list(session.execute(query))
-        self.assertEqual(listify(rows[0]), [0, ['delta', -10, 103]])
+        self.assertEqual(listify(rows[0]), [[0, ['delta', -10, 103]]])
         session1.shutdown()
         session2.shutdown()
         session3.shutdown()
 
         # Write full UDT, set one field to null, read back
         session.execute("INSERT INTO t (id, v) VALUES (0, {first:'cass', second:3, third:0})")
-        session.execute("INSERT INTO t (id, v) VALUES (0, {first:null})")
+        session.execute("UPDATE t SET v.first = null WHERE id = 0")
         rows = list(session.execute("SELECT * FROM t WHERE id=0"))
-        self.assertEqual(listify(rows[0]), [0, [None, 3, 0]])
+        self.assertEqual(listify(rows[0]), [[0, [None, 3, 0]]])
 
-        # Create UDT with collection, update just collection, read back
-        session.execute("CREATE TYPE uc (a int, b set<int>)")
-        session.execute("CREATE TABLE tc (id int PRIMARY KEY, v uc)")
-        session.execute("INSERT INTO tc (id, v) VALUES (0, {a:0, b:{1,2,3}})")
-        session.execute("UPDATE tc SET v[b] = v[b] + {4,5} where id=0")
-        rows = list(session.execute("SELECT * from tc WHERE id=0"))
-        self.assertEqual(listify(rows[0]), [0, [0, [1, 2, 3, 4, 5]]])
+        rows = list(session.execute("SELECT v.first FROM t WHERE id=0"))
+        self.assertEqual(listify(rows[0]), [[None]])
+        rows = list(session.execute("SELECT v.second FROM t WHERE id=0"))
+        self.assertEqual(listify(rows[0]), [[3]])
+        rows = list(session.execute("SELECT v.third FROM t WHERE id=0"))
+        self.assertEqual(listify(rows[0]), [[0]])
 
     @since('2.2')
     def test_user_type_isolation(self):
