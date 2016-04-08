@@ -98,8 +98,8 @@ class TestConfiguration(Tester):
         """
         self.cluster.populate(1)
         node1 = self.cluster.nodelist()[0]
-        default_path = node1.get_path()
-        node1.set_configuration_options({'saved_caches_directory': os.path.join(default_path, 'data', 'saved_caches')})
+        default_path = node1.data_directories()[0]
+        node1.set_configuration_options({'saved_caches_directory': os.path.join(default_path, 'saved_caches')})
         remove_perf_disable_shared_mem(node1)
         self.cluster.start(wait_for_binary_proto=True)
 
