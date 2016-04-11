@@ -240,7 +240,7 @@ class TestAuth(Tester):
         assert_invalid(cassandra, "DROP USER test")
 
         cassandra.execute("DROP USER Test")
-        rows = list(cassandra.execute("LIST USERS"))
+        rows = [x[0] for x in list(cassandra.execute("LIST USERS"))]
         self.assertItemsEqual(rows, ['cassandra'])
 
         cassandra.execute("CREATE USER test WITH PASSWORD '12345'")
@@ -249,7 +249,7 @@ class TestAuth(Tester):
         assert_invalid(cassandra, "DROP USER TEST")
 
         cassandra.execute("DROP USER test")
-        rows = list(cassandra.execute("LIST USERS"))
+        rows = [x[0] for x in list(cassandra.execute("LIST USERS"))]
         self.assertItemsEqual(rows, ['cassandra'])
 
     def alter_user_case_sensitive_test(self):
