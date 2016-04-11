@@ -223,7 +223,7 @@ class TestUserFunctions(Tester):
         if LooseVersion(self.cluster.version()) >= LooseVersion('3.6'):
             frozen_vals = (False, True)
         else:
-            frozen_vals = (False,)
+            frozen_vals = (True,)
 
         for frozen in frozen_vals:
             debug("Using {} UDTs".format("frozen" if frozen else "non-frozen"))
