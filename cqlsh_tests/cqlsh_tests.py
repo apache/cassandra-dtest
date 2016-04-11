@@ -6,7 +6,6 @@ import os
 import re
 import subprocess
 import sys
-from collections import defaultdict
 from decimal import Decimal
 from distutils.version import LooseVersion
 from tempfile import NamedTemporaryFile
@@ -1293,16 +1292,23 @@ Tracing session:""")
     def test_client_warnings(self):
         """
         Tests for CASSANDRA-9399, check client warnings:
-        - an unlogged batch across multiple partitions should generate a WARNING if at least one partition is
-        not local.
+        - an unlogged batch across multiple partitions should generate a WARNING if there are more than
+        unlogged_batch_across_partitions_warn_threshold partitions.
 
-        Execute two unlogged batches: one only with local partitions and the other one with non local partitions.
+        Execute two unlogged batches: one only with fewer partitions and the other one with more than
+        unlogged_batch_across_partitions_warn_threshold partitions.
+
         Check that only the second one generates a client warning.
 
         @jira_ticket CASSNADRA-9399
         @jira_ticket CASSANDRA-9303
+        @jira_ticket CASSANDRA-11529
         """
+        max_partitions_per_batch = 5
         self.cluster.populate(3)
+        self.cluster.set_configuration_options({
+            'unlogged_batch_across_partitions_warn_threshold': str(max_partitions_per_batch)})
+
         self.cluster.start(wait_for_binary_proto=True)
 
         node1 = self.cluster.nodelist()[0]
@@ -1317,45 +1323,15 @@ Tracing session:""")
             assert False, "Failed to execute cqlsh"
 
         session = self.patient_cql_connection(node1)
-        metadata = session.cluster.metadata
         prepared = session.prepare("INSERT INTO client_warnings.test (id, val) VALUES (?, 'abc')")
 
-        def need_more_records(vals):
-            """
-            Receive a map of replicas to a list of primary key values stored on that replica.
-            We need at least one primary key value for each replica and for the first replica we need
-            at least two. Return a new candidate value until we have retrieved enough values.
-            """
-            i = 1
-            while len(vals) < 3 or len(vals[node1.address()]) < 2:
-                yield i
-                i += 1
-
-        def get_replica(i):
-            pk = prepared.column_metadata[0].type.serialize(i, prepared.protocol_version)
-            return metadata.get_replicas('client_warnings', pk)[0].address
-
-        def get_vals_by_replica():
-            """
-            Return a map of replica addresses pointing to a list of primary key values
-            that are stored on that replica.
-            """
-            ret = defaultdict(list)
-            for i in need_more_records(ret):
-                replica = get_replica(i)
-                debug("{} -> {}".format(i, replica))
-                ret[replica].append(i)
-            return ret
-
-        vals_by_replicas = get_vals_by_replica()
         batch_without_warning = BatchStatement(batch_type=BatchType.UNLOGGED)
         batch_with_warning = BatchStatement(batch_type=BatchType.UNLOGGED)
 
-        for r, vals in vals_by_replicas.iteritems():
-            batch_with_warning.add(prepared, (vals[0],))
-            if r == node1.address():
-                for v in vals:
-                    batch_without_warning.add(prepared, (v,))
+        for i in xrange(max_partitions_per_batch + 1):
+            batch_with_warning.add(prepared, (i,))
+            if i < max_partitions_per_batch:
+                batch_without_warning.add(prepared, (i,))
 
         fut = session.execute_async(batch_without_warning)
         fut.result()  # wait for batch to complete before checking warnings
@@ -1366,7 +1342,8 @@ Tracing session:""")
         debug(fut.warnings)
         self.assertIsNotNone(fut.warnings)
         self.assertEquals(1, len(fut.warnings))
-        self.assertEquals("Unlogged batch covering 3 partitions detected against table [client_warnings.test]. " +
+        self.assertEquals("Unlogged batch covering {} partitions detected against table [client_warnings.test]. "
+                          .format(max_partitions_per_batch + 1) +
                           "You should use a logged batch for atomicity, or asynchronous writes for performance.",
                           fut.warnings[0])
 
