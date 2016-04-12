@@ -1187,6 +1187,84 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
                                        [2],
                                        [3]])
 
+    @since('3.6')
+    def test_per_partition_limit_paging(self):
+        """
+        Test paging with per partition limit queries.
+
+        @jira_ticket CASSANDRA-11535
+        """
+        session = self.prepare()
+        self.create_ks(session, 'test_paging_with_per_partition_limit', 2)
+        session.execute("CREATE TABLE test (a int, b int, c int, PRIMARY KEY (a, b))")
+        session.row_factory = tuple_factory
+
+        for i in range(5):
+            for j in range(5):
+                session.execute("INSERT INTO test (a, b, c) VALUES ({}, {}, {})".format(i, j, j))
+
+        for page_size in (2, 3, 4, 5, 15, 16, 17, 100):
+            res = rows_to_list(session.execute("SELECT * FROM test PER PARTITION LIMIT 2"))
+            self.assertEqualIgnoreOrder(res, [[0, 0, 0],
+                                              [0, 1, 1],
+                                              [1, 0, 0],
+                                              [1, 1, 1],
+                                              [2, 0, 0],
+                                              [2, 1, 1],
+                                              [3, 0, 0],
+                                              [3, 1, 1],
+                                              [4, 0, 0],
+                                              [4, 1, 1]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test PER PARTITION LIMIT 2 LIMIT 6"))
+            self.assertEqual(6, len(res))
+
+            for row in res:
+                # since partitions are coming unordered, we don't know which are trimmed by the limit
+                self.assertTrue(row[0] in set(range(5)))
+                self.assertTrue(row[1] in set(range(2)))
+                self.assertTrue(row[1] in set(range(2)))
+
+            # even/odd number of results
+            res = rows_to_list(session.execute("SELECT * FROM test PER PARTITION LIMIT 2 LIMIT 5"))
+            self.assertEqual(5, len(res))
+
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a IN (1,2,3) PER PARTITION LIMIT 3"))
+            self.assertEqualIgnoreOrder(res, [[1, 0, 0],
+                                              [1, 1, 1],
+                                              [1, 2, 2],
+                                              [2, 0, 0],
+                                              [2, 1, 1],
+                                              [2, 2, 2],
+                                              [3, 0, 0],
+                                              [3, 1, 1],
+                                              [3, 2, 2]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a = 1 PER PARTITION LIMIT 4"))
+            self.assertEqual(res, [[1, 0, 0],
+                                   [1, 1, 1],
+                                   [1, 2, 2],
+                                   [1, 3, 3]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a = 1 ORDER BY b DESC PER PARTITION LIMIT 4"))
+            self.assertEqual(res, [[1, 4, 4],
+                                   [1, 3, 3],
+                                   [1, 2, 2],
+                                   [1, 1, 1]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a = 1 PER PARTITION LIMIT 4 LIMIT 3"))
+            self.assertEqual(res, [[1, 0, 0],
+                                   [1, 1, 1],
+                                   [1, 2, 2]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a = 1 AND b > 1 PER PARTITION LIMIT 2 ALLOW FILTERING"))
+            self.assertEqual(res, [[1, 2, 2],
+                                   [1, 3, 3]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a = 1 AND b > 1 ORDER BY b DESC PER PARTITION LIMIT 2 ALLOW FILTERING"))
+            self.assertEqual(res, [[1, 4, 4],
+                                   [1, 3, 3]])
+
 
 @since('2.0')
 class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
