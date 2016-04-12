@@ -467,33 +467,61 @@ class CqlshCopyTest(Tester):
 
     def custom_null_indicator_template(self, indicator):
         """
-        @param indicator the null indicator to be used in COPY
+        @param indicator the null indicator to be used in COPY, set to None to use the default indicator
 
-        A parametrized test that tests COPY with a given null indicator.
+        A parametrized test that tests COPY with a given null indicator:
+
+        - insert some data including rows with missing values
+        - export the data and check that the csv file contains the expected null indicator for the missing values
+        - truncate the table and import the csv file
+        - check that the data imported is the same as originally inserted
+
         """
         self.all_datatypes_prepare()
         self.session.execute("""
             CREATE TABLE testnullindicator (
                 a int primary key,
-                b text
+                b text,
+                c int,
+                d float,
+                e timestamp
             )""")
-        insert_non_null = self.session.prepare("INSERT INTO testnullindicator (a, b) VALUES (?, ?)")
+        insert_non_null = self.session.prepare("INSERT INTO testnullindicator (a, b, c, d, e) VALUES (?, ?, ?, ?, ?)")
         execute_concurrent_with_args(self.session, insert_non_null,
-                                     [(1, 'eggs'), (100, 'sausage')])
+                                     [(1, 'eggs', 1, 1.1, datetime.datetime(2015, 1, 1, 0, 00, 0, 0, UTC())),
+                                      (100, 'sausage', 100, 2.2, datetime.datetime(2016, 1, 1, 0, 00, 0, 0, UTC()))])
         insert_null = self.session.prepare("INSERT INTO testnullindicator (a) VALUES (?)")
         execute_concurrent_with_args(self.session, insert_null, [(2,), (200,)])
 
         tempfile = self.get_temp_file()
         debug('Exporting to csv file: {name}'.format(name=tempfile.name))
         cmds = "COPY ks.testnullindicator TO '{name}'".format(name=tempfile.name)
-        cmds += " WITH NULL = '{d}'".format(d=indicator)
+        if indicator:
+            cmds += " WITH NULL = '{d}'".format(d=indicator)
         self.node1.run_cqlsh(cmds=cmds)
 
-        results = list(self.session.execute("SELECT a, b FROM ks.testnullindicator"))
-        results = [[indicator if value is None else value for value in row]
-                   for row in results]
+        results = list(self.session.execute("SELECT * FROM ks.testnullindicator"))
+        results_with_null_indicator = [[indicator if value is None else value for value in row] for row in results]
+        self.assertCsvResultEqual(tempfile.name, results_with_null_indicator, 'testnullindicator')
 
-        self.assertCsvResultEqual(tempfile.name, results, 'testnullindicator')
+        # Now import back the csv file
+        self.session.execute('TRUNCATE ks.testnullindicator')
+        debug('Importing from csv file: {name}'.format(name=tempfile.name))
+        cmds = "COPY ks.testnullindicator FROM '{name}'".format(name=tempfile.name)
+        if indicator:
+            cmds += " WITH NULL = '{d}'".format(d=indicator)
+        self.node1.run_cqlsh(cmds=cmds)
+
+        results_imported = list(self.session.execute("SELECT * FROM ks.testnullindicator"))
+        self.assertEquals(results, results_imported)
+
+    def test_default_null_indicator(self):
+        """
+        Test the default null indicator
+
+        @jira_ticket CASSANDRA-11549
+        """
+        self.custom_null_indicator_template('undefined')
 
     def test_undefined_as_null_indicator(self):
         """
