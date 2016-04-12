@@ -982,13 +982,13 @@ class CqlshCopyTest(Tester):
 
         - create a table
         - create a csv file with some data
-        - fail one batch permanently (via CQLSH_COPY_TEST_FAILURES so that chunk_size rows will fail a # of times higher than
-        the maximum number of attempts)
+        - fail one chunk permanently (via CQLSH_COPY_TEST_FAILURES so that chunk_size rows will fail a # of times higher
+          than the maximum number of attempts)
         - import the csv file
         - check that:
-         - if chunk_size is bigger than max_insert_errors the import is aborted (we import fewer rows that the total
-         number of allowed rows and we display the correct error message)
-         - otherwise the import operation completes for all rows except for the failed batch
+          - if chunk_size is bigger than max_insert_errors the import is aborted (we import fewer rows that the total
+            number of allowed rows and we display the correct error message)
+          - otherwise the import operation completes for all rows except for the failed chunk
 
         @jira_ticket CASSANDRA-9303
         """
@@ -1014,7 +1014,7 @@ class CqlshCopyTest(Tester):
 
         def do_test(max_insert_errors, chunk_size):
             self.session.execute("TRUNCATE ks.testmaxinserterrors")
-            num_expected_rows = num_rows - chunk_size  # one batch will fail
+            num_expected_rows = num_rows - chunk_size  # one chunk will fail
 
             debug("Importing csv file {} with {} max insert errors and chunk size {}"
                   .format(tempfile.name, max_insert_errors, chunk_size))
@@ -1025,6 +1025,7 @@ class CqlshCopyTest(Tester):
                                             return_output=True, cqlsh_options=['--debug'])
 
             num_rows_imported = rows_to_list(self.session.execute("SELECT COUNT(*) FROM ks.testmaxinserterrors"))[0][0]
+            debug("Imported {}".format(num_rows_imported))
             if max_insert_errors < chunk_size:
                 self.assertIn('Exceeded maximum number of insert errors {}'.format(max_insert_errors), err)
                 self.assertTrue(num_rows_imported <= num_expected_rows,
