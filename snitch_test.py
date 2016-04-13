@@ -39,7 +39,7 @@ class TestGossipingPropertyFileSnitch(Tester):
         cluster.populate(2)
         node1, node2 = cluster.nodelist()
 
-        cluster.seeds = [node1]
+        cluster.seeds = [NODE1_BROADCAST_ADDRESS]
         cluster.set_configuration_options(values={'endpoint_snitch': 'org.apache.cassandra.locator.GossipingPropertyFileSnitch',
                                                   'listen_on_broadcast_address': 'true'})
         node1.set_configuration_options(values={'broadcast_address': NODE1_BROADCAST_ADDRESS})
