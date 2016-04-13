@@ -427,6 +427,9 @@ class TestSecondaryIndexes(Tester):
                            [("127.0.0.1", 1, 200), ("127.0.0.2", 1, 200), ("127.0.0.3", 1, 200)],
                            retry_on_failure)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11564',
+                   flaky=False)
     def test_query_indexes_with_vnodes(self):
         """
         Verifies correct query behaviour in the presence of vnodes
