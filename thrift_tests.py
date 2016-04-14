@@ -105,6 +105,7 @@ class ThriftTester(BaseTester):
             Cassandra.CfDef('Keyspace1', 'Indexed1', column_metadata=[Cassandra.ColumnDef('birthdate', 'LongType', Cassandra.IndexType.KEYS, 'birthdate_index')]),
             Cassandra.CfDef('Keyspace1', 'Indexed2', comparator_type='TimeUUIDType', column_metadata=[Cassandra.ColumnDef(uuid.UUID('00000000-0000-1000-0000-000000000000').bytes, 'LongType', Cassandra.IndexType.KEYS)]),
             Cassandra.CfDef('Keyspace1', 'Indexed3', comparator_type='TimeUUIDType', column_metadata=[Cassandra.ColumnDef(uuid.UUID('00000000-0000-1000-0000-000000000000').bytes, 'UTF8Type', Cassandra.IndexType.KEYS)]),
+            Cassandra.CfDef('Keyspace1', 'Indexed4', column_metadata=[Cassandra.ColumnDef('a', 'LongType', Cassandra.IndexType.KEYS, 'a_index'), Cassandra.ColumnDef('z', 'UTF8Type')]),
             Cassandra.CfDef('Keyspace1', 'Expiring', default_time_to_live=2)
         ])
 
@@ -2301,6 +2302,31 @@ class TestMutations(ThriftTester):
         time.sleep(3)
         result = client.get_range_slices(cp, sp, key_range, ConsistencyLevel.ONE)
         assert len(result) == 0, result
+
+    def test_index_scan_indexed_column_outside_slice_predicate(self):
+        """
+        Verify that performing an indexed read works when the indexed column
+        is not included in the slice predicate. Checks both cases where the
+        predicate contains a slice range or a set of column names, which
+        translate to slice and names queries server-side.
+        @jira_ticket CASSANDRA-11523
+        """
+        _set_keyspace('Keyspace1')
+        client.insert('key1', ColumnParent('Indexed4'), Column('a', _i64(1), 0), ConsistencyLevel.ONE)
+        client.insert('key1', ColumnParent('Indexed4'), Column('z', 'zzz', 0), ConsistencyLevel.ONE)
+        cp = ColumnParent('Indexed4')
+        sp = SlicePredicate(slice_range=SliceRange('z', 'z'))
+        key_range = KeyRange('', '', None, None, [IndexExpression('a', IndexOperator.EQ, _i64(1))], 100)
+        result = client.get_range_slices(cp, sp, key_range, ConsistencyLevel.ONE)
+        assert len(result) == 1, result
+        assert len(result[0].columns) == 1, result[0].columns
+        assert result[0].columns[0].column.name == 'z'
+
+        sp = SlicePredicate(column_names=['z'])
+        result = client.get_range_slices(cp, sp, key_range, ConsistencyLevel.ONE)
+        assert len(result) == 1, result
+        assert len(result[0].columns) == 1, result[0].columns
+        assert result[0].columns[0].column.name == 'z'
 
     def test_column_not_found_quorum(self):
         _set_keyspace('Keyspace1')
