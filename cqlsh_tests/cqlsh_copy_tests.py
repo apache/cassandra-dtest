@@ -15,6 +15,7 @@ from uuid import uuid1, uuid4
 
 from cassandra.cluster import ConsistencyLevel, SimpleStatement
 from cassandra.concurrent import execute_concurrent_with_args
+from cassandra.cqltypes import EMPTY
 from cassandra.murmur3 import murmur3
 from cassandra.util import SortedSet
 from ccmlib.common import is_win
@@ -274,7 +275,8 @@ class CqlshCopyTest(Tester):
         finally:
             sys.path = saved_path
 
-    def assertCsvResultEqual(self, csv_filename, results, table_name=None, columns=None, cql_type_names=None):
+    def assertCsvResultEqual(self, csv_filename, results, table_name=None,
+                             columns=None, cql_type_names=None, nullval=''):
         if cql_type_names is None:
             if table_name:
                 table_meta = self.session.cluster.metadata.keyspaces[self.ks].tables[table_name]
@@ -283,7 +285,7 @@ class CqlshCopyTest(Tester):
             else:
                 raise RuntimeError("table_name is required if cql_type_names are not specified")
 
-        processed_results = list(self.result_to_csv_rows(results, cql_type_names))
+        processed_results = list(self.result_to_csv_rows(results, cql_type_names, nullval=nullval))
         csv_results = list(csv_rows(csv_filename))
 
         self.maxDiff = None
@@ -301,9 +303,10 @@ class CqlshCopyTest(Tester):
                         warning("Value in result: " + str(processed_results[0][x]))
             raise e
 
-    def format_for_csv(self, val, cql_type_name, time_format):
+    def format_for_csv(self, val, cql_type_name, time_format, nullval):
         with self._cqlshlib() as cqlshlib:
-            from cqlshlib.formatting import format_value
+            from cqlshlib.formatting import format_value, format_value_default
+            from cqlshlib.displaying import NO_COLOR_MAP
             try:
                 from cqlshlib.formatting import DateTimeFormat
                 date_time_format = DateTimeFormat()
@@ -330,6 +333,9 @@ class CqlshCopyTest(Tester):
 
         encoding_name = 'utf-8'  # codecs.lookup(locale.getpreferredencoding()).name
 
+        if val is None or val == EMPTY or val == nullval:
+            return format_value_default(nullval, colormap=NO_COLOR_MAP)
+
         # CASSANDRA-11255 increased COPY TO DOUBLE PRECISION TO 12
         if cql_type_name == 'double' and self.cluster.version() >= '3.6':
             float_precision = 12
@@ -350,7 +356,7 @@ class CqlshCopyTest(Tester):
                             thousands_sep=None,
                             boolean_styles=None).strval
 
-    def result_to_csv_rows(self, results, cql_type_names, time_format=None):
+    def result_to_csv_rows(self, results, cql_type_names, time_format=None, nullval=''):
         """
         Given an object returned from a CQL query, returns a string formatted by
         the cqlsh formatting utilities.
@@ -360,7 +366,7 @@ class CqlshCopyTest(Tester):
         # into a bare function if cqlshlib is made easier to interact with.
         if not time_format:
             time_format = self.default_time_format
-        return [[self.format_for_csv(v, t, time_format)
+        return [[self.format_for_csv(v, t, time_format, nullval)
                  for v, t in zip(row, cql_type_names)] for row in results]
 
     def test_list_data(self):
@@ -502,7 +508,8 @@ class CqlshCopyTest(Tester):
 
         results = list(self.session.execute("SELECT * FROM ks.testnullindicator"))
         results_with_null_indicator = [[indicator if value is None else value for value in row] for row in results]
-        self.assertCsvResultEqual(tempfile.name, results_with_null_indicator, 'testnullindicator')
+        nullval = indicator if indicator is not None else ''
+        self.assertCsvResultEqual(tempfile.name, results_with_null_indicator, 'testnullindicator', nullval=nullval)
 
         # Now import back the csv file
         self.session.execute('TRUNCATE ks.testnullindicator')
