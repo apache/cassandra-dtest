@@ -357,9 +357,6 @@ class TestIncRepair(Tester):
         expected_load_size = 4.5  # In GB
         assert_almost_equal(load_size, expected_load_size, error=0.25)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11563',
-                   flaky=False)
     def sstable_marking_test_not_intersecting_all_ranges(self):
         """
         @jira_ticket CASSANDRA-10299
@@ -369,7 +366,7 @@ class TestIncRepair(Tester):
         * Assert no extra, unrepaired sstables are generated
         """
         cluster = self.cluster
-        cluster.populate(4, use_vnodes=True).start()
+        cluster.populate(4).start(wait_for_binary_proto=True)
         node1, node2, node3, node4 = cluster.nodelist()
 
         debug("Inserting data with stress")
