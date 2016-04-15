@@ -687,9 +687,6 @@ class TestUserTypes(Tester):
 
             self.assertEqual(listify(res), [[[u'a', u'z']], [[u'c', u'a']], [[u'c', u'f']], [[u'c', u'z']], [[u'd', u'e']], [[u'z', u'a']]])
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11560',
-                   flaky=False)
     @since('3.6')
     def udt_subfield_test(self):
         """
