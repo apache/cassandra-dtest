@@ -8,7 +8,7 @@ from thrift_bindings.v22.ttypes import (CfDef, Column, ColumnOrSuperColumn,
                                         Mutation, SlicePredicate, SliceRange,
                                         SuperColumn)
 from thrift_tests import get_thrift_client
-from tools import since
+from tools import known_failure, since
 
 
 @since('2.0', max_version='2.1.x')
@@ -136,6 +136,10 @@ class TestSCUpgrade(Tester):
         self.assertEqual('c%d' % j, column.name)
         self.assertEqual('v', column.value)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11597',
+                   flaky=False,
+                   notes='fails on 2.1')
     def upgrade_with_counters_test(self):
 
         cluster = self.cluster
