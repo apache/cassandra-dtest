@@ -4,6 +4,7 @@ from threading import Event
 from cassandra import ConsistencyLevel as CL
 from cassandra import ReadFailure
 from cassandra.query import SimpleStatement
+from ccmlib.node import TimeoutError
 from nose.tools import timed
 
 from assertions import assert_invalid
@@ -262,8 +263,6 @@ class TestVariousNotifications(Tester):
     Tests for various notifications/messages from Cassandra.
     """
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11476')
     @since('2.2')
     def tombstone_failure_threshold_message_test(self):
         """
@@ -313,12 +312,19 @@ class TestVariousNotifications(Tester):
 
         read_failure_query()
 
-        failure = (node1.grep_log(failure_msg) or
-                   node2.grep_log(failure_msg) or
-                   node3.grep_log(failure_msg))
+        # In almost all cases, we should find the failure message on node1 within a few seconds.
+        # If it is not on node1, we grep all logs, as it *absolutely* should be somewhere.
+        # If we still cannot find it then, we fail the test, as this is a problem.
+        try:
+            node1.watch_log_for(failure_msg, timeout=5)
+        except TimeoutError:
+            failure = (node1.grep_log(failure_msg) or
+                       node2.grep_log(failure_msg) or
+                       node3.grep_log(failure_msg))
 
-        self.assertTrue(failure, ("Cannot find tombstone failure threshold error in log "
-                                  "after failed query"))
+            self.assertTrue(failure, ("Cannot find tombstone failure threshold error in log "
+                                      "after failed query"))
+
         mark1 = node1.mark_log()
         mark2 = node2.mark_log()
         mark3 = node3.mark_log()
@@ -332,9 +338,15 @@ class TestVariousNotifications(Tester):
 
         range_request_failure_query()
 
-        failure = (node1.watch_log_for(failure_msg, from_mark=mark1, timeout=5) or
-                   node2.watch_log_for(failure_msg, from_mark=mark2, timeout=5) or
-                   node3.watch_log_for(failure_msg, from_mark=mark3, timeout=5))
+        # In almost all cases, we should find the failure message on node1 within a few seconds.
+        # If it is not on node1, we grep all logs, as it *absolutely* should be somewhere.
+        # If we still cannot find it then, we fail the test, as this is a problem.
+        try:
+            node1.watch_log_for(failure_msg, from_mark=mark1, timeout=5)
+        except TimeoutError:
+            failure = (node1.grep_log(failure_msg, from_mark=mark1) or
+                       node2.grep_log(failure_msg, from_mark=mark2) or
+                       node3.grep_log(failure_msg, from_mark=mark3))
 
-        self.assertTrue(failure, ("Cannot find tombstone failure threshold error in log "
-                                  "after range_request_timeout_query"))
+            self.assertTrue(failure, ("Cannot find tombstone failure threshold error in log "
+                                      "after range_request_timeout_query"))
