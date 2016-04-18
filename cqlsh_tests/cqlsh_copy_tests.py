@@ -2266,7 +2266,7 @@ class CqlshCopyTest(Tester):
             if skip_count_checks:
                 return num_operations
             else:
-                count_statement = SimpleStatement("SELECT COUNT(*) FROM {}".format(stress_table), ConsistencyLevel.ALL)
+                count_statement = SimpleStatement("SELECT COUNT(*) FROM {}".format(stress_table), consistency_level=ConsistencyLevel.ALL)
                 ret = rows_to_list(self.session.execute(count_statement))[0][0]
                 debug('Generated {} records'.format(ret))
                 self.assertTrue(ret >= num_operations, 'cassandra-stress did not import enough records')
