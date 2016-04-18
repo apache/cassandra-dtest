@@ -12,7 +12,7 @@ from cassandra.protocol import ConfigurationException
 from cassandra.query import BatchStatement, SimpleStatement
 
 from assertions import assert_invalid, assert_one
-from dtest import OFFHEAP_MEMTABLES, Tester, debug
+from dtest import DISABLE_VNODES, OFFHEAP_MEMTABLES, Tester, debug
 from tools import known_failure, rows_to_list, since
 
 
@@ -427,16 +427,14 @@ class TestSecondaryIndexes(Tester):
                            [("127.0.0.1", 1, 200), ("127.0.0.2", 1, 200), ("127.0.0.3", 1, 200)],
                            retry_on_failure)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11564',
-                   flaky=False)
+    @skipIf(DISABLE_VNODES, "Test should only run with vnodes")
     def test_query_indexes_with_vnodes(self):
         """
         Verifies correct query behaviour in the presence of vnodes
         @jira_ticket CASSANDRA-11104
         """
         cluster = self.cluster
-        cluster.populate(2, use_vnodes=True).start()
+        cluster.populate(2).start()
         node1, node2 = cluster.nodelist()
         session = self.patient_cql_connection(node1)
         session.execute("CREATE KEYSPACE ks WITH REPLICATION = {'class': 'SimpleStrategy', 'replication_factor': '1'};")
