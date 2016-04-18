@@ -2318,9 +2318,6 @@ class CqlshCopyTest(Tester):
 
         return ret
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11494',
-                   flaky=True)
     @freshCluster()
     def test_bulk_round_trip_default(self):
         """
@@ -2330,9 +2327,6 @@ class CqlshCopyTest(Tester):
         """
         self._test_bulk_round_trip(nodes=3, partitioner="murmur3", num_operations=100000)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11565',
-                   flaky=True)
     def test_bulk_round_trip_non_prepared_statements(self):
         """
         Test bulk import with default stress import (one row per operation) and without
