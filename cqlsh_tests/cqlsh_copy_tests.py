@@ -2229,6 +2229,16 @@ class CqlshCopyTest(Tester):
         If skip_count_checks is True then it means we cannot use "SELECT COUNT(*)" as it may time out but
         it also means that we can be sure that one cassandra-stress operation is one record and hence
         num_records=num_operations.
+
+        Perform the following:
+        - create the records with cassandra-stress
+        - export the records to a csv file
+        - truncate the table and import the csv file
+        - export the records to another csv file
+        - check that the length of the two csv files is the same
+
+        Therefore, 3 COPY operations are run in total. Return a list of tuples, containing stdout and stderr
+        for all 3 copy operations.
         """
         if configuration_options is None:
             configuration_options = {}
@@ -2241,6 +2251,8 @@ class CqlshCopyTest(Tester):
             configuration_options['truncate_request_timeout_in_ms'] = 60000
 
         self.prepare(nodes=nodes, partitioner=partitioner, configuration_options=configuration_options)
+
+        ret = []
 
         def create_records():
             if not profile:
@@ -2267,7 +2279,8 @@ class CqlshCopyTest(Tester):
             if copy_to_options:
                 copy_to_cmd += ' WITH ' + ' AND '.join('{} = {}'.format(k, v) for k, v in copy_to_options.iteritems())
             debug(copy_to_cmd)
-            self.node1.run_cqlsh(cmds=copy_to_cmd, show_output=True, cqlsh_options=['--debug'])
+            ret.append(self.node1.run_cqlsh(cmds=copy_to_cmd, show_output=True,
+                                            return_output=True, cqlsh_options=['--debug']))
             debug("COPY TO took {} to export {} records".format(datetime.datetime.now() - start, num_records))
 
         def run_copy_from(filename):
@@ -2277,7 +2290,8 @@ class CqlshCopyTest(Tester):
             if copy_from_options:
                 copy_from_cmd += ' WITH ' + ' AND '.join('{} = {}'.format(k, v) for k, v in copy_from_options.iteritems())
             debug(copy_from_cmd)
-            self.node1.run_cqlsh(cmds=copy_from_cmd, show_output=True, cqlsh_options=['--debug'])
+            ret.append(self.node1.run_cqlsh(cmds=copy_from_cmd, show_output=True,
+                                            return_output=True, cqlsh_options=['--debug']))
             debug("COPY FROM took {} to import {} records".format(datetime.datetime.now() - start, num_records))
 
         num_records = create_records()
@@ -2301,6 +2315,8 @@ class CqlshCopyTest(Tester):
         # check the length of both files is the same to ensure all exported records were imported
         self.assertEqual(sum(1 for _ in open(tempfile1.name)),
                          sum(1 for _ in open(tempfile2.name)))
+
+        return ret
 
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11494',
@@ -2396,7 +2412,11 @@ class CqlshCopyTest(Tester):
         @jira_ticket CASSANDRA-11053
         """
         os.environ['CQLSH_COPY_TEST_NUM_CORES'] = '1'
-        self._test_bulk_round_trip(nodes=3, partitioner="murmur3", num_operations=100000)
+        ret = self._test_bulk_round_trip(nodes=3, partitioner="murmur3", num_operations=100000)
+        if self.cluster.version() >= '3.6':
+            debug('Checking that number of cores detected is correct')
+            for out, _ in ret:
+                self.assertIn("Detected 1 core", out)
 
     @freshCluster()
     @since('3.0.5')
