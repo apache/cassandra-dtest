@@ -132,8 +132,9 @@ class TestBootstrap(Tester):
         new_rows = list(session.execute("SELECT * FROM %s" % (stress_table,)))
         self.assertEquals(original_rows, new_rows)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11414')
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11414',
+                   flaky=True)
     @since('2.2')
     def resumable_bootstrap_test(self):
         """
@@ -144,7 +145,7 @@ class TestBootstrap(Tester):
         cluster.populate(2).start(wait_other_notice=True)
 
         node1 = cluster.nodes['node1']
-        node1.stress(['write', 'n=100K', 'cl=TWO', '-schema', 'replication(factor=2)'])
+        node1.stress(['write', 'n=100K', 'cl=TWO', '-schema', 'replication(factor=2)', '-rate', 'threads=50'])
         cluster.flush()
 
         # kill node1 in the middle of streaming to let it fail
@@ -168,15 +169,15 @@ class TestBootstrap(Tester):
         # check if node3 is still in bootstrap mode
         session = self.patient_exclusive_cql_connection(node3)
         rows = list(session.execute("SELECT bootstrapped FROM system.local WHERE key='local'"))
-        assert len(rows) == 1
-        assert rows[0][0] == 'IN_PROGRESS', rows[0][0]
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0][0], 'IN_PROGRESS')
         # bring back node1 and invoke nodetool bootstrap to resume bootstrapping
         node1.start(wait_other_notice=True)
         node3.nodetool('bootstrap resume')
 
         node3.watch_log_for("Resume complete", from_mark=mark)
         rows = list(session.execute("SELECT bootstrapped FROM system.local WHERE key='local'"))
-        assert rows[0][0] == 'COMPLETED', rows[0][0]
+        self.assertEqual(rows[0][0], 'COMPLETED')
 
         # cleanup to guarantee each node will only have sstables of its ranges
         cluster.cleanup()
