@@ -5,7 +5,7 @@ from cassandra.query import SimpleStatement
 from ccmlib.node import Node, NodeError
 
 from dtest import DISABLE_VNODES, Tester, debug
-from tools import InterruptBootstrap, since
+from tools import InterruptBootstrap, known_failure, since
 
 
 class NodeUnavailable(Exception):
@@ -151,6 +151,10 @@ class TestReplaceAddress(Tester):
 
         self.assertFalse(node.is_running())
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11608',
+                   flaky=True,
+                   notes='flapped on Windows on 2.2')
     def replace_first_boot_test(self):
         debug("Starting cluster with 3 nodes.")
         cluster = self.cluster
