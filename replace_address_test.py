@@ -154,7 +154,7 @@ class TestReplaceAddress(Tester):
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11608',
                    flaky=True,
-                   notes='flapped on Windows on 2.2')
+                   notes='flapped on offheap job on 2.2')
     def replace_first_boot_test(self):
         debug("Starting cluster with 3 nodes.")
         cluster = self.cluster
