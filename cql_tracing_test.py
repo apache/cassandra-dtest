@@ -89,6 +89,7 @@ class TestCqlTracing(Tester):
 
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11598',
+                   flaky=True,
                    notes='failed once on 2.1 offheap tests')
     def tracing_simple_test(self):
         """
