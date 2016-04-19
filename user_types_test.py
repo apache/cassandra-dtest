@@ -7,7 +7,7 @@ from cassandra.query import SimpleStatement
 
 from assertions import assert_invalid
 from dtest import Tester
-from tools import since, known_failure
+from tools import since
 
 
 def listify(item):
@@ -45,6 +45,7 @@ class TestUserTypes(Tester):
         node1, node2, node3 = cluster.nodelist()
         session = self.patient_cql_connection(node1)
         self.create_ks(session, 'user_type_dropping', 2)
+        session.default_consistency_level = ConsistencyLevel.LOCAL_QUORUM
 
         stmt = """
               USE user_type_dropping
@@ -107,6 +108,7 @@ class TestUserTypes(Tester):
         node1, node2, node3 = cluster.nodelist()
         session = self.patient_cql_connection(node1)
         self.create_ks(session, 'nested_user_type_dropping', 2)
+        session.default_consistency_level = ConsistencyLevel.LOCAL_QUORUM
 
         stmt = """
               USE nested_user_type_dropping
@@ -156,6 +158,7 @@ class TestUserTypes(Tester):
         node1, node2, node3 = cluster.nodelist()
         session = self.cql_connection(node1)
         self.create_ks(session, 'user_type_enforcement', 2)
+        session.default_consistency_level = ConsistencyLevel.LOCAL_QUORUM
 
         stmt = """
               USE user_type_enforcement
@@ -197,10 +200,6 @@ class TestUserTypes(Tester):
         rows = list(session.execute(stmt))
         self.assertEqual(0, len(rows))
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11607',
-                   flaky=True,
-                   notes='flaps on 2.2 on Windows')
     def test_nested_user_types(self):
         """Tests user types within user types"""
         cluster = self.cluster
@@ -208,6 +207,7 @@ class TestUserTypes(Tester):
         node1, node2, node3 = cluster.nodelist()
         session = self.patient_cql_connection(node1)
         self.create_ks(session, 'user_types', 2)
+        session.default_consistency_level = ConsistencyLevel.LOCAL_QUORUM
 
         stmt = """
               USE user_types
@@ -343,6 +343,7 @@ class TestUserTypes(Tester):
         node1, node2, node3 = cluster.nodelist()
         session = self.patient_cql_connection(node1)
         self.create_ks(session, 'user_type_pkeys', 2)
+        session.default_consistency_level = ConsistencyLevel.LOCAL_QUORUM
 
         stmt = """
               CREATE TYPE t_person_name (
@@ -585,6 +586,7 @@ class TestUserTypes(Tester):
         node1, node2, node3 = cluster.nodelist()
         session = self.patient_cql_connection(node1)
         self.create_ks(session, 'user_types', 2)
+        session.default_consistency_level = ConsistencyLevel.LOCAL_QUORUM
 
         stmt = """
               USE user_types
@@ -651,6 +653,7 @@ class TestUserTypes(Tester):
         node1, node2, node3 = cluster.nodelist()
         session = self.patient_cql_connection(node1)
         self.create_ks(session, 'user_type_pkeys', 2)
+        session.default_consistency_level = ConsistencyLevel.LOCAL_QUORUM
 
         stmt = """
               CREATE TYPE t_letterpair (
@@ -699,6 +702,7 @@ class TestUserTypes(Tester):
         node1, node2, node3 = cluster.nodelist()
         session = self.patient_cql_connection(node1)
         self.create_ks(session, 'user_types', 1)
+        session.default_consistency_level = ConsistencyLevel.LOCAL_QUORUM
 
         # Check we can create non-frozen table
         session.execute("CREATE TYPE udt (first ascii, second int, third int)")
