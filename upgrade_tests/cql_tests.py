@@ -3466,6 +3466,9 @@ class TestCQL(UpgradeTester):
             # Insert a non-version 1 uuid
             assert_invalid(cursor, "INSERT INTO test(k, c, v) VALUES (0, 0, 550e8400-e29b-41d4-a716-446655440000)")
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11609',
+                   flaky=False)
     def user_types_test(self):
         cursor = self.prepare()
 
