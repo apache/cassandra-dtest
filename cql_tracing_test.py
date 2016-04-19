@@ -87,10 +87,10 @@ class TestCqlTracing(Tester):
         self.assertIn('Request complete ', out)
         self.assertIn(" Frodo |  Baggins", out)
 
-    @known_failure(failure_source='test',
+    @known_failure(failure_source='cassandra',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11598',
                    flaky=True,
-                   notes='failed once on 2.1 offheap tests')
+                   notes='fails intermittently 2.1 tests. NEVER on other versions.')
     def tracing_simple_test(self):
         """
         Test tracing using the default tracing class. See trace().
