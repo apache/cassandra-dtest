@@ -3526,6 +3526,9 @@ class TestCQL(UpgradeTester):
             res = cursor.execute(stmt)
             # TODO: deserialize the value here and check it's right.
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11613',
+                   flaky=False)
     def more_user_types_test(self):
         """ user type test that does a little more nesting"""
 
