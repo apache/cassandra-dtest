@@ -197,6 +197,10 @@ class TestUserTypes(Tester):
         rows = list(session.execute(stmt))
         self.assertEqual(0, len(rows))
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11607',
+                   flaky=True,
+                   notes='flaps on 2.2 on Windows')
     def test_nested_user_types(self):
         """Tests user types within user types"""
         cluster = self.cluster
