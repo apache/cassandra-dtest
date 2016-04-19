@@ -66,7 +66,7 @@ class TestUserTypes(Tester):
               )
            """
         session.execute(stmt)
-        # Make sure the scheam propagate
+        # Make sure the schema propagate
         time.sleep(2)
 
         _id = uuid.uuid4()
@@ -179,7 +179,7 @@ class TestUserTypes(Tester):
               )
            """
         session.execute(stmt)
-        # Make sure the scheam propagate
+        # Make sure the schema propagate
         time.sleep(2)
 
         # here we will attempt an insert statement which should fail
@@ -232,8 +232,8 @@ class TestUserTypes(Tester):
            """
         session.execute(stmt)
 
-        #  Create a table that holds and item, a container, and a
-        #  list of containers:
+        # Create a table that holds and item, a container, and a
+        # list of containers:
         stmt = """
               CREATE TABLE bucket (
                id uuid PRIMARY KEY,
@@ -243,10 +243,10 @@ class TestUserTypes(Tester):
               )
            """
         session.execute(stmt)
-        # Make sure the scheam propagate
+        # Make sure the schema propagate
         time.sleep(2)
 
-        #  Insert some data:
+        # Insert some data:
         _id = uuid.uuid4()
         stmt = """
               INSERT INTO bucket (id, primary_item)
@@ -363,7 +363,7 @@ class TestUserTypes(Tester):
               )
            """
         session.execute(stmt)
-        # Make sure the scheam propagate
+        # Make sure the schema propagate
         time.sleep(2)
 
         _id = uuid.uuid4()
