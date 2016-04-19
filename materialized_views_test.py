@@ -651,9 +651,9 @@ class TestMaterializedViews(Tester):
             )
 
     @known_failure(failure_source='test',
-            jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11612',
-            flaky=True,
-            notes='flaps on Windows')
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11612',
+                   flaky=True,
+                   notes='flaps on Windows')
     def interrupt_build_process_test(self):
         """Test that an interupted MV build process is resumed as it should"""
 
