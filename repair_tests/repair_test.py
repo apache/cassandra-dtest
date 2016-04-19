@@ -429,6 +429,10 @@ class TestRepair(Tester):
         # Check node2 now has the key
         self.check_rows_on_node(node2, 2001, found=[1000], restart=False)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11605',
+                   flaky=True,
+                   notes='flaky on Windows')
     def dc_parallel_repair_test(self):
         """
         * Set up a multi DC cluster
