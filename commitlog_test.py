@@ -211,7 +211,7 @@ class TestCommitLog(Tester):
         debug("Verify commit log was replayed on startup")
         node1.start()
         node1.watch_log_for("Log replay complete")
-        # Here we verify there was more than 0 replayed mutations
+        # Here we verify there were more than 0 replayed mutations
         zero_replays = node1.grep_log(" 0 replayed mutations")
         self.assertEqual(0, len(zero_replays))
 
@@ -298,12 +298,14 @@ class TestCommitLog(Tester):
         self.assertTrue(self.node1.is_running(), "Node1 should still be running")
 
         # Cannot write anymore after the failure
+        debug('attempting to insert to node with failing commitlog; should fail')
         with self.assertRaises((OperationTimedOut, WriteTimeout)):
             self.session1.execute("""
               INSERT INTO test (key, col1) VALUES (2, 2);
             """)
 
         # Should be able to read
+        debug('attempting to read from node with failing commitlog; should succeed')
         assert_one(
             self.session1,
             "SELECT * FROM test where key=2;",
