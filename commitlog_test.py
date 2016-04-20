@@ -89,7 +89,7 @@ class TestCommitLog(Tester):
 
     def _get_commitlog_files(self):
         """
-        Returns the number of commitlog files in the directory
+        Returns the paths to commitlog files
         """
         return [os.path.join(path, filename)
                 for path in self._get_commitlog_paths()
