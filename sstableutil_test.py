@@ -6,7 +6,7 @@ from ccmlib import common
 from ccmlib.node import NodetoolError
 
 from dtest import Tester, debug
-from tools import InterruptCompaction, since, known_failure
+from tools import InterruptCompaction, since
 
 # These must match the stress schema names
 KeyspaceName = 'keyspace1'
