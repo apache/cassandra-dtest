@@ -110,7 +110,7 @@ class TestCommitLog(Tester):
         time.sleep(1)
 
         commitlogs = self._get_commitlog_files()
-        self.assertTrue(len(commitlogs) > 0, "No commit log files were created")
+        self.assertGreater(len(commitlogs), 0, 'No commit log files were created')
 
         # the most recently-written segment of the commitlog may be smaller
         # than the expected size, so we allow exactly one segment to be smaller
