@@ -132,7 +132,7 @@ class TestCommitLog(Tester):
                     # if no compression is used, the size will be close to what we expect
                     assert_almost_equal(size, segment_size, error=0.05)
             except AssertionError as e:
-                #  the last segment may be smaller
+                # the last segment may be smaller
                 if not smaller_found:
                     self.assertLessEqual(size, segment_size)
                     smaller_found = True
