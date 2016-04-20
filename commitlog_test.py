@@ -43,6 +43,9 @@ class TestCommitLog(Tester):
         default_conf = {'commitlog_sync_period_in_ms': 1000}
 
         set_conf = dict(default_conf, **configuration)
+        debug('setting commitlog configuration with the following values: '
+              '{set_conf} and the following kwargs: {kwargs}'.format(
+                  set_conf=set_conf, kwargs=kwargs))
         self.cluster.set_configuration_options(values=set_conf, **kwargs)
         self.cluster.start()
         self.session1 = self.patient_cql_connection(self.node1)
@@ -59,39 +62,38 @@ class TestCommitLog(Tester):
             self.session1.execute(query)
 
     def _change_commitlog_perms(self, mod):
-        path = self._get_commitlog_path()
-        os.chmod(path, mod)
-        commitlogs = glob.glob(path + '/*')
-        for commitlog in commitlogs:
-            os.chmod(commitlog, mod)
+        for path in self._get_commitlog_paths():
+            debug('changing permissions to {perms} on {path}'.format(perms=oct(mod), path=path))
+            os.chmod(path, mod)
+            commitlogs = glob.glob(path + '/*')
 
-    def _get_commitlog_path(self):
+            if commitlogs:
+                debug('changing permissions to {perms} on the following files:'
+                      '\n  {files}'.format(perms=oct(mod), files='\n  '.join(commitlogs)))
+            else:
+                debug(self._change_commitlog_perms.__name__ + ' called on empty commitlog directory '
+                      '{path} with permissions {perms}'.format(path=path, perms=oct(mod)))
+
+            for commitlog in commitlogs:
+                os.chmod(commitlog, mod)
+
+    def _get_commitlog_paths(self):
         """
-        Returns the commitlog path
+        Returns the list of commitlog and cdc paths
         """
-        return os.path.join(self.node1.get_path(), 'commitlogs')
+        # TODO: this does not account for non-default commitlog/cdc paths
+        # specified in cassandra.yaml
+        return [d for d in [os.path.join(self.node1.get_path(), 'commitlogs'),
+                            os.path.join(self.node1.get_path(), 'cdc')]
+                if os.path.isdir(d)]
 
     def _get_commitlog_files(self):
         """
-        Returns the number of commitlog files in the directory
+        Returns the paths to commitlog files
         """
-        path = self._get_commitlog_path()
-        return [os.path.join(path, p) for p in os.listdir(path)]
-
-    def _get_commitlog_size(self):
-        """
-        Returns the commitlog directory size in MB
-        """
-        path = self._get_commitlog_path()
-        cmd_args = ['du', '-m', path]
-        p = subprocess.Popen(cmd_args, stdout=subprocess.PIPE,
-                             stderr=subprocess.PIPE)
-        stdout, stderr = p.communicate()
-        exit_status = p.returncode
-        self.assertEqual(0, exit_status,
-                         "du exited with a non-zero status: %d" % exit_status)
-        size = int(stdout.split('\t')[0])
-        return size
+        return [os.path.join(path, filename)
+                for path in self._get_commitlog_paths()
+                for filename in os.listdir(path)]
 
     def _segment_size_test(self, segment_size_in_mb, compressed=False):
         """
@@ -108,7 +110,7 @@ class TestCommitLog(Tester):
         time.sleep(1)
 
         commitlogs = self._get_commitlog_files()
-        self.assertTrue(len(commitlogs) > 0, "No commit log files were created")
+        self.assertGreater(len(commitlogs), 0, 'No commit log files were created')
 
         # the most recently-written segment of the commitlog may be smaller
         # than the expected size, so we allow exactly one segment to be smaller
@@ -118,6 +120,7 @@ class TestCommitLog(Tester):
             size_in_mb = int(size / 1024 / 1024)
             debug('segment file {} {}; smaller already found: {}'.format(f, size_in_mb, smaller_found))
             if size_in_mb < 1 or size < (segment_size * 0.1):
+                debug('segment file not yet used; moving to next file')
                 continue  # commitlog not yet used
 
             try:
@@ -129,7 +132,7 @@ class TestCommitLog(Tester):
                     # if no compression is used, the size will be close to what we expect
                     assert_almost_equal(size, segment_size, error=0.05)
             except AssertionError as e:
-                #  the last segment may be smaller
+                # the last segment may be smaller
                 if not smaller_found:
                     self.assertLessEqual(size, segment_size)
                     smaller_found = True
@@ -140,6 +143,7 @@ class TestCommitLog(Tester):
         """
         Provoke the commitlog failure
         """
+        debug('Provoking commitlog failure')
         # Test things are ok at this point
         self.session1.execute("""
             INSERT INTO test (key, col1) VALUES (1, 1);
@@ -207,7 +211,7 @@ class TestCommitLog(Tester):
         debug("Verify commit log was replayed on startup")
         node1.start()
         node1.watch_log_for("Log replay complete")
-        # Here we verify there was more than 0 replayed mutations
+        # Here we verify there were more than 0 replayed mutations
         zero_replays = node1.grep_log(" 0 replayed mutations")
         self.assertEqual(0, len(zero_replays))
 
@@ -294,12 +298,14 @@ class TestCommitLog(Tester):
         self.assertTrue(self.node1.is_running(), "Node1 should still be running")
 
         # Cannot write anymore after the failure
+        debug('attempting to insert to node with failing commitlog; should fail')
         with self.assertRaises((OperationTimedOut, WriteTimeout)):
             self.session1.execute("""
               INSERT INTO test (key, col1) VALUES (2, 2);
             """)
 
         # Should be able to read
+        debug('attempting to read from node with failing commitlog; should succeed')
         assert_one(
             self.session1,
             "SELECT * FROM test where key=2;",
