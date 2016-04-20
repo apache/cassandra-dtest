@@ -120,6 +120,7 @@ class TestCommitLog(Tester):
             size_in_mb = int(size / 1024 / 1024)
             debug('segment file {} {}; smaller already found: {}'.format(f, size_in_mb, smaller_found))
             if size_in_mb < 1 or size < (segment_size * 0.1):
+                debug('segment file not yet used; moving to next file')
                 continue  # commitlog not yet used
 
             try:
