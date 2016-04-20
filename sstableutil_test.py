@@ -31,7 +31,8 @@ class SSTableUtilTest(Tester):
     def compaction_test(self):
         """
         @jira_ticket CASSANDRA-7066
-        Check we can list the sstable files after successfull compaction (no temporary sstable files)
+
+        Check that we can list sstable files after a successful compaction (no temporary sstable files)
         """
         cluster = self.cluster
         cluster.populate(1).start(wait_for_binary_proto=True)
@@ -51,41 +52,45 @@ class SSTableUtilTest(Tester):
     def abortedcompaction_test(self):
         """
         @jira_ticket CASSANDRA-7066
-        Check we can list the sstable files after aborted compaction (temporary sstable files)
-        Then perform a cleanup and verify the temporary files are gone
+        @jira_ticket CASSANDRA-11497
+
+        Check that we can cleanup temporary files after a compaction is aborted.
         """
         log_file_name = 'debug.log'
         cluster = self.cluster
         cluster.populate(1).start(wait_for_binary_proto=True)
         node = cluster.nodelist()[0]
 
-        numrecords = 750000
+        numrecords = 250000
 
         self._create_data(node, KeyspaceName, TableName, numrecords)
         finalfiles, tmpfiles = self._check_files(node, KeyspaceName, TableName)
         self.assertEqual(0, len(tmpfiles))
 
-        t = InterruptCompaction(node, TableName, filename=log_file_name)
+        t = InterruptCompaction(node, TableName, filename=log_file_name, delay=2)
         t.start()
 
         try:
+            debug("Compacting...")
             node.compact()
-            assert False, "Compaction should have failed"
         except NodetoolError:
             pass  # expected to fail
 
         t.join()
 
-        # should compaction finish before the node is killed, this test would fail,
-        # in which case try increasing numrecords
         finalfiles, tmpfiles = self._check_files(node, KeyspaceName, TableName, finalfiles)
-        self.assertGreater(len(tmpfiles), 0)
+        # In most cases we should end up with some temporary files to clean up, but it may happen
+        # that no temporary files are created if compaction finishes too early or starts too late
+        # see CASSANDRA-11497
+        debug("Got {} final files and {} tmp files after compaction was interrupted"
+              .format(len(finalfiles), len(tmpfiles)))
 
         self._invoke_sstableutil(KeyspaceName, TableName, cleanup=True)
 
         self._check_files(node, KeyspaceName, TableName, finalfiles, [])
 
         # restart to make sure not data is lost
+        debug("Restarting node...")
         node.start(wait_for_binary_proto=True)
         # in some environments, a compaction may start that would change sstable files. We should wait if so
         node.wait_for_compactions()
@@ -93,7 +98,7 @@ class SSTableUtilTest(Tester):
         finalfiles, tmpfiles = self._check_files(node, KeyspaceName, TableName)
         self.assertEqual(0, len(tmpfiles))
 
-        debug("Run stress to ensure data is readable")
+        debug("Running stress to ensure data is readable")
         self._read_data(node, numrecords)
 
     def _create_data(self, node, ks, table, numrecords):
@@ -146,7 +151,7 @@ class SSTableUtilTest(Tester):
         """
         Invoke sstableutil and return the list of files, if any
         """
-        debug("About to invoke sstableutil...")
+        debug("About to invoke sstableutil with type {}...".format(type))
         node1 = self.cluster.nodelist()[0]
         env = common.make_cassandra_env(node1.get_install_cassandra_root(), node1.get_node_cassandra_root())
         tool_bin = node1.get_tool('sstableutil')
@@ -168,10 +173,12 @@ class SSTableUtilTest(Tester):
             debug(stderr)
             assert False, "Error invoking sstableutil; returned {code}".format(code=p.returncode)
 
-        debug(stdout)
+        if stdout:
+            debug(stdout)
+
         match = ks + os.sep + table + '-'
         ret = sorted(filter(lambda s: match in s, stdout.splitlines()))
-        debug("Got %d files" % (len(ret),))
+        debug("Got {} files of type {}".format(len(ret), type))
         return ret
 
     def _get_sstable_files(self, node, ks, table):
