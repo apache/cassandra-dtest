@@ -35,11 +35,13 @@ class TestCommitLog(Tester):
         self._change_commitlog_perms(stat.S_IWRITE | stat.S_IREAD | stat.S_IEXEC)
         super(TestCommitLog, self).tearDown()
 
-    def prepare(self, configuration={}, create_test_keyspace=True, **kwargs):
-        conf = {'commitlog_sync_period_in_ms': 1000}
+    def prepare(self, configuration=None, create_test_keyspace=True, **kwargs):
+        if configuration is None:
+            configuration = {}
+        default_conf = {'commitlog_sync_period_in_ms': 1000}
 
-        conf.update(configuration)
-        self.cluster.set_configuration_options(values=conf, **kwargs)
+        set_conf = dict(default_conf, **configuration)
+        self.cluster.set_configuration_options(values=set_conf, **kwargs)
         self.cluster.start()
         self.session1 = self.patient_cql_connection(self.node1)
         if create_test_keyspace:
