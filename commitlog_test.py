@@ -78,21 +78,6 @@ class TestCommitLog(Tester):
         path = self._get_commitlog_path()
         return [os.path.join(path, p) for p in os.listdir(path)]
 
-    def _get_commitlog_size(self):
-        """
-        Returns the commitlog directory size in MB
-        """
-        path = self._get_commitlog_path()
-        cmd_args = ['du', '-m', path]
-        p = subprocess.Popen(cmd_args, stdout=subprocess.PIPE,
-                             stderr=subprocess.PIPE)
-        stdout, stderr = p.communicate()
-        exit_status = p.returncode
-        self.assertEqual(0, exit_status,
-                         "du exited with a non-zero status: %d" % exit_status)
-        size = int(stdout.split('\t')[0])
-        return size
-
     def _segment_size_test(self, segment_size_in_mb, compressed=False):
         """
         Execute a basic commitlog test and validate the commitlog files
