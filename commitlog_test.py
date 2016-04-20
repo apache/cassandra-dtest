@@ -32,6 +32,8 @@ class TestCommitLog(Tester):
         [self.node1] = self.cluster.nodelist()
 
     def tearDown(self):
+        # Some of the tests change commitlog permissions to provoke failure
+        # so this changes them back so we can delete them.
         self._change_commitlog_perms(stat.S_IWRITE | stat.S_IREAD | stat.S_IEXEC)
         super(TestCommitLog, self).tearDown()
 
