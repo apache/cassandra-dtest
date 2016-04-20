@@ -17,7 +17,9 @@ from tools import known_failure, rows_to_list, since
 
 
 class TestCommitLog(Tester):
-    """ CommitLog Tests """
+    """
+    CommitLog Tests
+    """
 
     def __init__(self, *argv, **kwargs):
         kwargs['cluster_options'] = {'start_rpc': 'true'}
@@ -30,14 +32,18 @@ class TestCommitLog(Tester):
         [self.node1] = self.cluster.nodelist()
 
     def tearDown(self):
+        # Some of the tests change commitlog permissions to provoke failure
+        # so this changes them back so we can delete them.
         self._change_commitlog_perms(stat.S_IWRITE | stat.S_IREAD | stat.S_IEXEC)
         super(TestCommitLog, self).tearDown()
 
-    def prepare(self, configuration={}, create_test_keyspace=True, **kwargs):
-        conf = {'commitlog_sync_period_in_ms': 1000}
+    def prepare(self, configuration=None, create_test_keyspace=True, **kwargs):
+        if configuration is None:
+            configuration = {}
+        default_conf = {'commitlog_sync_period_in_ms': 1000}
 
-        conf.update(configuration)
-        self.cluster.set_configuration_options(values=conf, **kwargs)
+        set_conf = dict(default_conf, **configuration)
+        self.cluster.set_configuration_options(values=set_conf, **kwargs)
         self.cluster.start()
         self.session1 = self.patient_cql_connection(self.node1)
         if create_test_keyspace:
@@ -60,19 +66,22 @@ class TestCommitLog(Tester):
             os.chmod(commitlog, mod)
 
     def _get_commitlog_path(self):
-        """ Returns the commitlog path """
-
+        """
+        Returns the commitlog path
+        """
         return os.path.join(self.node1.get_path(), 'commitlogs')
 
     def _get_commitlog_files(self):
-        """ Returns the number of commitlog files in the directory """
-
+        """
+        Returns the number of commitlog files in the directory
+        """
         path = self._get_commitlog_path()
         return [os.path.join(path, p) for p in os.listdir(path)]
 
     def _get_commitlog_size(self):
-        """ Returns the commitlog directory size in MB """
-
+        """
+        Returns the commitlog directory size in MB
+        """
         path = self._get_commitlog_path()
         cmd_args = ['du', '-m', path]
         p = subprocess.Popen(cmd_args, stdout=subprocess.PIPE,
@@ -85,8 +94,9 @@ class TestCommitLog(Tester):
         return size
 
     def _segment_size_test(self, segment_size_in_mb, compressed=False):
-        """ Execute a basic commitlog test and validate the commitlog files """
-
+        """
+        Execute a basic commitlog test and validate the commitlog files
+        """
         conf = {'commitlog_segment_size_in_mb': segment_size_in_mb}
         if compressed:
             conf['commitlog_compression'] = [{'class_name': 'LZ4Compressor'}]
@@ -127,8 +137,9 @@ class TestCommitLog(Tester):
                     raise e
 
     def _provoke_commitlog_failure(self):
-        """ Provoke the commitlog failure """
-
+        """
+        Provoke the commitlog failure
+        """
         # Test things are ok at this point
         self.session1.execute("""
             INSERT INTO test (key, col1) VALUES (1, 1);
@@ -148,7 +159,9 @@ class TestCommitLog(Tester):
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11499',
                    flaky=True)
     def test_commitlog_replay_on_startup(self):
-        """ Test commit log replay """
+        """
+        Test commit log replay
+        """
         node1 = self.node1
         node1.set_configuration_options(batch_commitlog=True)
         node1.start()
@@ -205,25 +218,29 @@ class TestCommitLog(Tester):
                               [[u'gandalf', 1955, u'male', u'p@$$', u'WA']])
 
     def default_segment_size_test(self):
-        """ Test default commitlog_segment_size_in_mb (32MB) """
-
+        """
+        Test default commitlog_segment_size_in_mb (32MB)
+        """
         self._segment_size_test(32)
 
     def small_segment_size_test(self):
-        """ Test a small commitlog_segment_size_in_mb (5MB) """
-
+        """
+        Test a small commitlog_segment_size_in_mb (5MB)
+        """
         self._segment_size_test(5)
 
     @since('2.2')
     def default_compressed_segment_size_test(self):
-        """ Test default compressed commitlog_segment_size_in_mb (32MB) """
-
+        """
+        Test default compressed commitlog_segment_size_in_mb (32MB)
+        """
         self._segment_size_test(32, compressed=True)
 
     @since('2.2')
     def small_compressed_segment_size_test(self):
-        """ Test a small compressed commitlog_segment_size_in_mb (5MB) """
-
+        """
+        Test a small compressed commitlog_segment_size_in_mb (5MB)
+        """
         self._segment_size_test(5, compressed=True)
 
     @known_failure(failure_source='test',
@@ -231,7 +248,9 @@ class TestCommitLog(Tester):
                    flaky=True,
                    notes='windows')
     def stop_failure_policy_test(self):
-        """ Test the stop commitlog failure policy (default one) """
+        """
+        Test the stop commitlog failure policy (default one)
+        """
         self.prepare()
 
         self._provoke_commitlog_failure()
@@ -257,7 +276,9 @@ class TestCommitLog(Tester):
                    flaky=True,
                    notes='windows')
     def stop_commit_failure_policy_test(self):
-        """ Test the stop_commit commitlog failure policy """
+        """
+        Test the stop_commit commitlog failure policy
+        """
         self.prepare(configuration={
             'commit_failure_policy': 'stop_commit'
         })
@@ -290,7 +311,9 @@ class TestCommitLog(Tester):
                    flaky=False,
                    notes='windows')
     def die_failure_policy_test(self):
-        """ Test the die commitlog failure policy """
+        """
+        Test the die commitlog failure policy
+        """
         self.prepare(configuration={
             'commit_failure_policy': 'die'
         })
@@ -306,7 +329,9 @@ class TestCommitLog(Tester):
                    flaky=True,
                    notes='windows')
     def ignore_failure_policy_test(self):
-        """ Test the ignore commitlog failure policy """
+        """
+        Test the ignore commitlog failure policy
+        """
         self.prepare(configuration={
             'commit_failure_policy': 'ignore'
         })
@@ -438,7 +463,8 @@ class TestCommitLog(Tester):
     def test_compression_error(self):
         """
         @jira_ticket CASSANDRA-7886
-        if the commit log header refers to an unknown compression class, and the commit_failure_policy is stop, C* shouldn't startup
+        if the commit log header refers to an unknown compression class, and
+        the commit_failure_policy is stop, C* shouldn't start up
         """
         if not hasattr(self, 'ignore_log_patterns'):
             self.ignore_log_patterns = []
