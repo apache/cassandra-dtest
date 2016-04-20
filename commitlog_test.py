@@ -62,37 +62,38 @@ class TestCommitLog(Tester):
             self.session1.execute(query)
 
     def _change_commitlog_perms(self, mod):
-        path = self._get_commitlog_path()
-        debug('changing permissions to {perms} on {path}'.format(perms=oct(mod), path=path))
-        os.chmod(path, mod)
-        commitlogs = glob.glob(path + '/*')
+        for path in self._get_commitlog_paths():
+            debug('changing permissions to {perms} on {path}'.format(perms=oct(mod), path=path))
+            os.chmod(path, mod)
+            commitlogs = glob.glob(path + '/*')
 
-        if commitlogs:
-            debug(
-                'changing permissions to {perms} on the following files:'
-                '\n  {files}'.format(perms=oct(mod), files='\n  '.join(commitlogs))
-            )
-        else:
-            debug(
-                self._change_commitlog_perms.__name__ + ' called on empty commitlog directories'
-                ' with permissions {perms}'.format(perms=oct(mod))
-            )
+            if commitlogs:
+                debug('changing permissions to {perms} on the following files:'
+                      '\n  {files}'.format(perms=oct(mod), files='\n  '.join(commitlogs)))
+            else:
+                debug(self._change_commitlog_perms.__name__ + ' called on empty commitlog directory '
+                      '{path} with permissions {perms}'.format(path=path, perms=oct(mod)))
 
-        for commitlog in commitlogs:
-            os.chmod(commitlog, mod)
+            for commitlog in commitlogs:
+                os.chmod(commitlog, mod)
 
-    def _get_commitlog_path(self):
+    def _get_commitlog_paths(self):
         """
-        Returns the commitlog path
+        Returns the list of commitlog and cdc paths
         """
-        return os.path.join(self.node1.get_path(), 'commitlogs')
+        # TODO: this does not account for non-default commitlog/cdc paths
+        # specified in cassandra.yaml
+        return [d for d in [os.path.join(self.node1.get_path(), 'commitlogs'),
+                            os.path.join(self.node1.get_path(), 'cdc')]
+                if os.path.isdir(d)]
 
     def _get_commitlog_files(self):
         """
         Returns the number of commitlog files in the directory
         """
-        path = self._get_commitlog_path()
-        return [os.path.join(path, p) for p in os.listdir(path)]
+        return [os.path.join(path, filename)
+                for path in self._get_commitlog_paths()
+                for filename in os.listdir(path)]
 
     def _segment_size_test(self, segment_size_in_mb, compressed=False):
         """
