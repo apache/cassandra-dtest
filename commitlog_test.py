@@ -43,6 +43,9 @@ class TestCommitLog(Tester):
         default_conf = {'commitlog_sync_period_in_ms': 1000}
 
         set_conf = dict(default_conf, **configuration)
+        debug('setting commitlog configuration with the following values: '
+              '{set_conf} and the following kwargs: {kwargs}'.format(
+                  set_conf=set_conf, kwargs=kwargs))
         self.cluster.set_configuration_options(values=set_conf, **kwargs)
         self.cluster.start()
         self.session1 = self.patient_cql_connection(self.node1)
@@ -60,8 +63,21 @@ class TestCommitLog(Tester):
 
     def _change_commitlog_perms(self, mod):
         path = self._get_commitlog_path()
+        debug('changing permissions to {perms} on {path}'.format(perms=oct(mod), path=path))
         os.chmod(path, mod)
         commitlogs = glob.glob(path + '/*')
+
+        if commitlogs:
+            debug(
+                'changing permissions to {perms} on the following files:'
+                '\n  {files}'.format(perms=oct(mod), files='\n  '.join(commitlogs))
+            )
+        else:
+            debug(
+                self._change_commitlog_perms.__name__ + ' called on empty commitlog directories'
+                ' with permissions {perms}'.format(perms=oct(mod))
+            )
+
         for commitlog in commitlogs:
             os.chmod(commitlog, mod)
 
@@ -125,6 +141,7 @@ class TestCommitLog(Tester):
         """
         Provoke the commitlog failure
         """
+        debug('Provoking commitlog failure')
         # Test things are ok at this point
         self.session1.execute("""
             INSERT INTO test (key, col1) VALUES (1, 1);
