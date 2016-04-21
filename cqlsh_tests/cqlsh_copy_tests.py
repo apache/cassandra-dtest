@@ -15,6 +15,7 @@ from uuid import uuid1, uuid4
 
 from cassandra.cluster import ConsistencyLevel, SimpleStatement
 from cassandra.concurrent import execute_concurrent_with_args
+from cassandra.cqltypes import EMPTY
 from cassandra.murmur3 import murmur3
 from cassandra.util import SortedSet
 from ccmlib.common import is_win
@@ -274,7 +275,8 @@ class CqlshCopyTest(Tester):
         finally:
             sys.path = saved_path
 
-    def assertCsvResultEqual(self, csv_filename, results, table_name=None, columns=None, cql_type_names=None):
+    def assertCsvResultEqual(self, csv_filename, results, table_name=None,
+                             columns=None, cql_type_names=None, nullval=''):
         if cql_type_names is None:
             if table_name:
                 table_meta = self.session.cluster.metadata.keyspaces[self.ks].tables[table_name]
@@ -283,7 +285,7 @@ class CqlshCopyTest(Tester):
             else:
                 raise RuntimeError("table_name is required if cql_type_names are not specified")
 
-        processed_results = list(self.result_to_csv_rows(results, cql_type_names))
+        processed_results = list(self.result_to_csv_rows(results, cql_type_names, nullval=nullval))
         csv_results = list(csv_rows(csv_filename))
 
         self.maxDiff = None
@@ -301,9 +303,10 @@ class CqlshCopyTest(Tester):
                         warning("Value in result: " + str(processed_results[0][x]))
             raise e
 
-    def format_for_csv(self, val, cql_type_name, time_format):
+    def format_for_csv(self, val, cql_type_name, time_format, nullval):
         with self._cqlshlib() as cqlshlib:
-            from cqlshlib.formatting import format_value
+            from cqlshlib.formatting import format_value, format_value_default
+            from cqlshlib.displaying import NO_COLOR_MAP
             try:
                 from cqlshlib.formatting import DateTimeFormat
                 date_time_format = DateTimeFormat()
@@ -330,6 +333,9 @@ class CqlshCopyTest(Tester):
 
         encoding_name = 'utf-8'  # codecs.lookup(locale.getpreferredencoding()).name
 
+        if val is None or val == EMPTY or val == nullval:
+            return format_value_default(nullval, colormap=NO_COLOR_MAP)
+
         # CASSANDRA-11255 increased COPY TO DOUBLE PRECISION TO 12
         if cql_type_name == 'double' and self.cluster.version() >= '3.6':
             float_precision = 12
@@ -350,7 +356,7 @@ class CqlshCopyTest(Tester):
                             thousands_sep=None,
                             boolean_styles=None).strval
 
-    def result_to_csv_rows(self, results, cql_type_names, time_format=None):
+    def result_to_csv_rows(self, results, cql_type_names, time_format=None, nullval=''):
         """
         Given an object returned from a CQL query, returns a string formatted by
         the cqlsh formatting utilities.
@@ -360,7 +366,7 @@ class CqlshCopyTest(Tester):
         # into a bare function if cqlshlib is made easier to interact with.
         if not time_format:
             time_format = self.default_time_format
-        return [[self.format_for_csv(v, t, time_format)
+        return [[self.format_for_csv(v, t, time_format, nullval)
                  for v, t in zip(row, cql_type_names)] for row in results]
 
     def test_list_data(self):
@@ -467,33 +473,62 @@ class CqlshCopyTest(Tester):
 
     def custom_null_indicator_template(self, indicator):
         """
-        @param indicator the null indicator to be used in COPY
+        @param indicator the null indicator to be used in COPY, set to None to use the default indicator
 
-        A parametrized test that tests COPY with a given null indicator.
+        A parametrized test that tests COPY with a given null indicator:
+
+        - insert some data including rows with missing values
+        - export the data and check that the csv file contains the expected null indicator for the missing values
+        - truncate the table and import the csv file
+        - check that the data imported is the same as originally inserted
+
         """
         self.all_datatypes_prepare()
         self.session.execute("""
             CREATE TABLE testnullindicator (
                 a int primary key,
-                b text
+                b text,
+                c int,
+                d float,
+                e timestamp
             )""")
-        insert_non_null = self.session.prepare("INSERT INTO testnullindicator (a, b) VALUES (?, ?)")
+        insert_non_null = self.session.prepare("INSERT INTO testnullindicator (a, b, c, d, e) VALUES (?, ?, ?, ?, ?)")
         execute_concurrent_with_args(self.session, insert_non_null,
-                                     [(1, 'eggs'), (100, 'sausage')])
+                                     [(1, 'eggs', 1, 1.1, datetime.datetime(2015, 1, 1, 0, 00, 0, 0, UTC())),
+                                      (100, 'sausage', 100, 2.2, datetime.datetime(2016, 1, 1, 0, 00, 0, 0, UTC()))])
         insert_null = self.session.prepare("INSERT INTO testnullindicator (a) VALUES (?)")
         execute_concurrent_with_args(self.session, insert_null, [(2,), (200,)])
 
         tempfile = self.get_temp_file()
         debug('Exporting to csv file: {name}'.format(name=tempfile.name))
         cmds = "COPY ks.testnullindicator TO '{name}'".format(name=tempfile.name)
-        cmds += " WITH NULL = '{d}'".format(d=indicator)
+        if indicator:
+            cmds += " WITH NULL = '{d}'".format(d=indicator)
         self.node1.run_cqlsh(cmds=cmds)
 
-        results = list(self.session.execute("SELECT a, b FROM ks.testnullindicator"))
-        results = [[indicator if value is None else value for value in row]
-                   for row in results]
+        results = list(self.session.execute("SELECT * FROM ks.testnullindicator"))
+        results_with_null_indicator = [[indicator if value is None else value for value in row] for row in results]
+        nullval = indicator if indicator is not None else ''
+        self.assertCsvResultEqual(tempfile.name, results_with_null_indicator, 'testnullindicator', nullval=nullval)
 
-        self.assertCsvResultEqual(tempfile.name, results, 'testnullindicator')
+        # Now import back the csv file
+        self.session.execute('TRUNCATE ks.testnullindicator')
+        debug('Importing from csv file: {name}'.format(name=tempfile.name))
+        cmds = "COPY ks.testnullindicator FROM '{name}'".format(name=tempfile.name)
+        if indicator:
+            cmds += " WITH NULL = '{d}'".format(d=indicator)
+        self.node1.run_cqlsh(cmds=cmds)
+
+        results_imported = list(self.session.execute("SELECT * FROM ks.testnullindicator"))
+        self.assertEquals(results, results_imported)
+
+    def test_default_null_indicator(self):
+        """
+        Test the default null indicator
+
+        @jira_ticket CASSANDRA-11549
+        """
+        self.custom_null_indicator_template('undefined')
 
     def test_undefined_as_null_indicator(self):
         """
@@ -977,13 +1012,13 @@ class CqlshCopyTest(Tester):
 
         - create a table
         - create a csv file with some data
-        - fail one batch permanently (via CQLSH_COPY_TEST_FAILURES so that chunk_size rows will fail a # of times higher than
-        the maximum number of attempts)
+        - fail one chunk permanently (via CQLSH_COPY_TEST_FAILURES so that chunk_size rows will fail a # of times higher
+          than the maximum number of attempts)
         - import the csv file
         - check that:
-         - if chunk_size is bigger than max_insert_errors the import is aborted (we import fewer rows that the total
-         number of allowed rows and we display the correct error message)
-         - otherwise the import operation completes for all rows except for the failed batch
+          - if chunk_size is bigger than max_insert_errors the import is aborted (we import fewer rows that the total
+            number of allowed rows and we display the correct error message)
+          - otherwise the import operation completes for all rows except for the failed chunk
 
         @jira_ticket CASSANDRA-9303
         """
@@ -1009,7 +1044,7 @@ class CqlshCopyTest(Tester):
 
         def do_test(max_insert_errors, chunk_size):
             self.session.execute("TRUNCATE ks.testmaxinserterrors")
-            num_expected_rows = num_rows - chunk_size  # one batch will fail
+            num_expected_rows = num_rows - chunk_size  # one chunk will fail
 
             debug("Importing csv file {} with {} max insert errors and chunk size {}"
                   .format(tempfile.name, max_insert_errors, chunk_size))
@@ -1020,6 +1055,7 @@ class CqlshCopyTest(Tester):
                                             return_output=True, cqlsh_options=['--debug'])
 
             num_rows_imported = rows_to_list(self.session.execute("SELECT COUNT(*) FROM ks.testmaxinserterrors"))[0][0]
+            debug("Imported {}".format(num_rows_imported))
             if max_insert_errors < chunk_size:
                 self.assertIn('Exceeded maximum number of insert errors {}'.format(max_insert_errors), err)
                 self.assertTrue(num_rows_imported <= num_expected_rows,
