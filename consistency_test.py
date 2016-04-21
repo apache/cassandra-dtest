@@ -324,8 +324,6 @@ class TestAvailability(TestHelper):
 
         self._test_simple_strategy(combinations)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11496')
     def test_network_topology_strategy(self):
         """
         Test for multiple datacenters, using network topology replication strategy.
