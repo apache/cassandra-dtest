@@ -25,8 +25,7 @@ from cqlsh_tools import (DummyColorMap, assert_csvs_items_equal, csv_rows,
                          write_rows_to_csv)
 from dtest import (DISABLE_VNODES, Tester, canReuseCluster, debug,
                    freshCluster, warning)
-from tools import rows_to_list, since, known_failure
-from unittest import skip
+from tools import rows_to_list, since
 
 PARTITIONERS = {
     "murmur3": "org.apache.cassandra.dht.Murmur3Partitioner",
