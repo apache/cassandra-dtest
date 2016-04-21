@@ -8,6 +8,7 @@ flaky
 futures
 nose
 nose-test-select
+parse
 psutil
 pycassa
 six

@@ -10,6 +10,7 @@ from cassandra import WriteTimeout
 from cassandra.cluster import NoHostAvailable, OperationTimedOut
 from ccmlib.common import is_win
 from ccmlib.node import Node, TimeoutError
+from parse import parse
 
 from assertions import assert_almost_equal, assert_none, assert_one
 from dtest import Tester, debug
@@ -205,9 +206,15 @@ class TestCommitLog(Tester):
         debug("Verify commit log was replayed on startup")
         node1.start()
         node1.watch_log_for("Log replay complete")
-        # Here we verify there were more than 0 replayed mutations
-        zero_replays = node1.grep_log(" 0 replayed mutations")
-        self.assertEqual(0, len(zero_replays))
+        # Here we verify from the logs that some mutations were replayed
+        replays = [match_tuple[0] for match_tuple in node1.grep_log(" \d+ replayed mutations")]
+        debug('The following log lines indicate that mutations were replayed: {msgs}'.format(msgs=replays))
+        num_replayed_mutations = [
+            parse('{} {num_mutations:d} replayed mutations{}', line).named['num_mutations']
+            for line in replays
+        ]
+        # assert there were some lines where more than zero mutations were replayed
+        self.assertNotEqual([m for m in num_replayed_mutations if m > 0], [])
 
         debug("Make query and ensure data is present")
         session = self.patient_cql_connection(node1)
