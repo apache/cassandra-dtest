@@ -200,13 +200,7 @@ class TestCommitLog(Tester):
         self.assertTrue(len(commitlog_files) > 0)
 
         debug("Verify no SSTables were flushed before abrupt stop")
-        for data_dir in node1.data_directories():
-            cf_id = [s for s in os.listdir(os.path.join(data_dir, "test")) if s.startswith("users")][0]
-            cf_data_dir = glob.glob("{data_dir}/test/{cf_id}".format(**locals()))[0]
-            cf_data_dir_files = os.listdir(cf_data_dir)
-            if "backups" in cf_data_dir_files:
-                cf_data_dir_files.remove("backups")
-            self.assertEqual(0, len(cf_data_dir_files))
+        self.assertEqual(0, len(node1.get_sstables('test', 'users')))
 
         debug("Verify commit log was replayed on startup")
         node1.start()
