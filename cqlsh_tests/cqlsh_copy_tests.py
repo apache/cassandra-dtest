@@ -959,10 +959,6 @@ class CqlshCopyTest(Tester):
 
         self.assertItemsEqual(csv_values, result)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11505',
-                   flaky=True)
-    @skip('hangs CI')
     def test_reading_max_parse_errors(self):
         """
         Test that importing a csv file is aborted when we reach the maximum number of parse errors:
