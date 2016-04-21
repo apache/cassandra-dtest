@@ -434,12 +434,16 @@ class Tester(TestCase):
             for error in errors:
                 message += "\n{nodename}: {error}".format(nodename=nodename, error=error)
 
-        # thread.interrupt_main will SIGINT in the main thread, which we can
-        # catch to raise an exception with useful information
-        debug('Errors were just seen in logs, ending test!')
-        print_("Error details: \n{message}".format(message=message))
-        self.exit_with_exception = AssertionError("Log error encountered during active log scanning, see stdout")
-        thread.interrupt_main()
+        try:
+            debug('Errors were just seen in logs, ending test (if not ending already)!')
+            print_("Error details: \n{message}".format(message=message))
+            self.test_is_ending  # will raise AttributeError if not present
+        except AttributeError:
+            self.test_is_ending = True
+            self.exit_with_exception = AssertionError("Log error encountered during active log scanning, see stdout")
+            # thread.interrupt_main will SIGINT in the main thread, which we can
+            # catch to raise an exception with useful information
+            thread.interrupt_main()
 
     def _catch_interrupt(self, signal, frame):
         """
@@ -669,6 +673,10 @@ class Tester(TestCase):
                 pass
 
     def tearDown(self):
+        # test_is_ending prevents active log watching from being able to interrupt the test
+        # which we don't want to happen once tearDown begins
+        self.test_is_ending = True
+
         reset_environment_vars()
 
         for con in self.connections:
