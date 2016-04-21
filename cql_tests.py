@@ -553,6 +553,32 @@ class MiscellaneousCQLTester(CQLTester):
         res = list(session.execute("SELECT * FROM test"))
         self.assertEqual(len(res), 2, msg=res)
 
+    def many_columns_test(self):
+        """
+        Test for tables with thousands of columns.
+        For CASSANDRA-11621.
+        """
+
+        session = self.prepare()
+        width = 5000
+        cluster = self.cluster
+
+        session.execute("CREATE TABLE very_wide_table (pk int PRIMARY KEY, " +
+                        ",".join(map(lambda i: "c_{} int".format(i), range(width))) +
+                        ")")
+
+        session.execute("INSERT INTO very_wide_table (pk, " +
+                        ",".join(map(lambda i: "c_{}".format(i), range(width))) +
+                        ") VALUES (100," +
+                        ",".join(map(lambda i: str(i), range(width))) +
+                        ")")
+
+        res = session.execute("SELECT " +
+                              ",".join(map(lambda i: "c_{}".format(i), range(width))) +
+                              " FROM very_wide_table")
+
+        self.assertEqual(rows_to_list(res), [[i for i in range(width)]])
+
 
 @since('3.2')
 class AbortedQueriesTester(CQLTester):
