@@ -11,7 +11,7 @@ from ccmlib.common import get_version_from_build
 from assertions import (assert_all, assert_invalid, assert_one,
                         assert_unauthorized)
 from dtest import Tester, debug
-from tools import since
+from tools import since, known_failure
 
 
 class TestAuth(Tester):
@@ -884,6 +884,10 @@ class TestAuth(Tester):
         cassandra.execute("GRANT DROP ON KEYSPACE ks TO cathy")
         cathy.execute("DROP TYPE ks.address")
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11636',
+                   flaky=False,
+                   notes='failed once on 2.1')
     def restart_node_doesnt_lose_auth_data_test(self):
         """
         * Launch a one node cluster
