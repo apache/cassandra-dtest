@@ -5,7 +5,7 @@ from cassandra.query import SimpleStatement
 from ccmlib.node import Node, NodeError
 
 from dtest import DISABLE_VNODES, Tester, debug
-from tools import InterruptBootstrap, since
+from tools import InterruptBootstrap, known_failure, since
 
 
 class NodeUnavailable(Exception):
@@ -32,6 +32,10 @@ class TestReplaceAddress(Tester):
         Tester.__init__(self, *args, **kwargs)
         self.allow_log_errors = True
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11652',
+                   flaky=True,
+                   notes='failed on windows')
     def replace_stopped_node_test(self):
         """
         Test that we can replace a node that is not shutdown gracefully.
