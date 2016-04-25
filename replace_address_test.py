@@ -35,7 +35,7 @@ class TestReplaceAddress(Tester):
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11652',
                    flaky=True,
-                   notes='failed on windows')
+                   notes='windows')
     def replace_stopped_node_test(self):
         """
         Test that we can replace a node that is not shutdown gracefully.
