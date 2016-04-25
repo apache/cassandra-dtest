@@ -14,7 +14,7 @@ from ccmlib.node import NodeError
 from assertions import assert_almost_equal, assert_one
 from dtest import Tester, debug
 from tools import (InterruptBootstrap, KillOnBootstrap, known_failure,
-                   new_node, query_c1c2, require, since)
+                   new_node, query_c1c2, since)
 
 
 class TestBootstrap(Tester):
