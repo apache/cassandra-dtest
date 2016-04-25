@@ -2754,3 +2754,49 @@ class CqlshCopyTest(Tester):
 
         results = list(self.session.execute("SELECT * FROM {}".format(stress_ks_table_name)))
         self.assertCsvResultEqual(tempfile.name, results, stress_table_name)
+
+    def test_copy_from_with_brackets_in_UDT(self):
+        """
+        Test that we can import a user defined type even when it contains brackets in its values.
+
+        @jira_ticket CASSANDRA-11633
+        """
+        self.prepare()
+
+        self.session.execute('CREATE TYPE udt_with_special_chars (val1 text, val2 text, val3 text)')
+        self.session.execute('CREATE TABLE testspecialcharsinudt (a int PRIMARY KEY, b frozen<udt_with_special_chars>)')
+
+        class MyType(namedtuple('MyType', ('val1', 'val2', 'val3'))):
+            __slots__ = ()
+
+            def __repr__(self):
+                return "{{val1: '{}', val2: '{}', val3: '{}'}}"\
+                    .format(self.val1, self.val2, self.val3)
+
+        self.session.cluster.register_user_type('ks', 'udt_with_special_chars', MyType)
+
+        tempfile = self.get_temp_file()
+
+        rows = [[1, MyType('N[ 56 58', '', '')],
+                [2, MyType('N{ 56 58', '', '')],
+                [3, MyType('N( 56 58', '', '')],
+                [4, MyType('N[ 56 58]', '', '')],
+                [5, MyType('N{ 56 58]', '', '')]]
+
+        with open(tempfile.name, 'w') as csvfile:
+            writer = csv.writer(csvfile)
+            for row in rows:
+                writer.writerow(row)
+
+        def _test(preparedStatements):
+            debug('Importing from csv file: {name}'.format(name=tempfile.name))
+            self.node1.run_cqlsh(cmds="COPY ks.testspecialcharsinudt FROM '{}' WITH PREPAREDSTATEMENTS = {}"
+                                 .format(tempfile.name, preparedStatements),
+                                 show_output=True, cqlsh_options=['--debug'])
+
+            results = list(self.session.execute("SELECT * FROM testspecialcharsinudt"))
+            debug(results)
+            self.assertCsvResultEqual(tempfile.name, results, 'testspecialcharsinudt')
+
+        _test(True)
+        _test(False)
