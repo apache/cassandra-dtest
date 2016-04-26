@@ -1085,9 +1085,71 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
             self.assertEqual(res, [[1, 1],
                                    [2, 2]])
 
+    def _test_paging_with_filtering_on_counter_columns(self, session, with_compact_storage):
+        if with_compact_storage:
+            self.create_ks(session, 'test_flt_counter_columns_compact_storage', 2)
+            session.execute("CREATE TABLE test (a int, b int, c int, cnt counter, PRIMARY KEY (a, b, c)) WITH COMPACT STORAGE")
+        else:
+            self.create_ks(session, 'test_flt_counter_columns', 2)
+            session.execute("CREATE TABLE test (a int, b int, c int, cnt counter, PRIMARY KEY (a, b, c))")
+
+        for i in xrange(5):
+            for j in xrange(10):
+                session.execute("UPDATE test SET cnt = cnt + {} WHERE a={} AND b={} AND c={}".format(j + 2, i, j, j + 1))
+
+        for page_size in (2, 3, 4, 5, 7, 10, 20):
+            session.default_fetch_size = page_size
+
+            # single partition
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a = 4 AND b > 3 AND c > 3 AND cnt > 8 ALLOW FILTERING"))
+            self.assertEqual(res, [[4, 7, 8, 9],
+                                   [4, 8, 9, 10],
+                                   [4, 9, 10, 11]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a = 4 AND b > 3 AND c > 3 AND cnt >= 8 ALLOW FILTERING"))
+            self.assertEqual(res, [[4, 6, 7, 8],
+                                   [4, 7, 8, 9],
+                                   [4, 8, 9, 10],
+                                   [4, 9, 10, 11]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a = 4 AND b > 3 AND c > 3 AND cnt >= 8 AND cnt < 10 ALLOW FILTERING"))
+            self.assertEqual(res, [[4, 6, 7, 8],
+                                   [4, 7, 8, 9]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a = 4 AND b > 3 AND c > 3 AND cnt >= 8 AND cnt <= 10 ALLOW FILTERING"))
+            self.assertEqual(res, [[4, 6, 7, 8],
+                                   [4, 7, 8, 9],
+                                   [4, 8, 9, 10]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE cnt = 5 ALLOW FILTERING"))
+            self.assertEqualIgnoreOrder(res, [[0, 3, 4, 5],
+                                              [1, 3, 4, 5],
+                                              [2, 3, 4, 5],
+                                              [3, 3, 4, 5],
+                                              [4, 3, 4, 5]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a IN (1,2,3) AND cnt = 5 ALLOW FILTERING"))
+            self.assertEqualIgnoreOrder(res, [[1, 3, 4, 5],
+                                              [2, 3, 4, 5],
+                                              [3, 3, 4, 5]])
+
+    @since('3.6')
+    def test_paging_with_filtering_on_counter_columns(self):
+
+        """
+        test paging, when filtering on counter columns
+        @jira_ticket CASSANDRA-11629
+        """
+
+        session = self.prepare()
+        session.row_factory = tuple_factory
+
+        self._test_paging_with_filtering_on_counter_columns(session, False)
+        self._test_paging_with_filtering_on_counter_columns(session, True)
+
     def _test_paging_with_filtering_on_clustering_columns(self, session, with_compact_storage):
         if with_compact_storage:
-            self.create_ks(session, 'test_flt_clustering_columns_copmact_storage', 2)
+            self.create_ks(session, 'test_flt_clustering_columns_compact_storage', 2)
             session.execute("CREATE TABLE test (a int, b int, c int, d int, PRIMARY KEY (a, b, c)) WITH COMPACT STORAGE")
         else:
             self.create_ks(session, 'test_flt_clustering_columns', 2)
