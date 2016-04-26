@@ -13,9 +13,6 @@ from tools import known_failure, replace_in_file, safe_mkdtemp
 
 class SnapshotTester(Tester):
 
-    def __init__(self, *args, **kwargs):
-        Tester.__init__(self, *args, **kwargs)
-
     def insert_rows(self, session, start, end):
         insert_statement = session.prepare("INSERT INTO ks.cf (key, val) VALUES (?, 'asdf')")
         args = [(r,) for r in range(start, end)]
@@ -68,9 +65,6 @@ class SnapshotTester(Tester):
 
 
 class TestSnapshot(SnapshotTester):
-
-    def __init__(self, *args, **kwargs):
-        SnapshotTester.__init__(self, *args, **kwargs)
 
     def test_basic_snapshot_and_restore(self):
         cluster = self.cluster
