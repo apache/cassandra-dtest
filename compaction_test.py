@@ -107,7 +107,7 @@ class TestCompaction(Tester):
         """
         if not hasattr(self, 'strategy') or self.strategy == "LeveledCompactionStrategy":
             strategy_string = 'strategy=LeveledCompactionStrategy,sstable_size_in_mb=1'
-            min_bf_size = 50000
+            min_bf_size = 40000
             max_bf_size = 100000
         else:
             if self.strategy == "DateTieredCompactionStrategy":
