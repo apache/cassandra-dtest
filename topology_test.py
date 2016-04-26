@@ -48,6 +48,9 @@ class TestTopology(Tester):
 
         time.sleep(10)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11666',
+                   flaky=True)
     @no_vnodes()
     def movement_test(self):
         cluster = self.cluster
