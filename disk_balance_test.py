@@ -4,8 +4,7 @@ import os.path
 from assertions import assert_almost_equal
 from dtest import DISABLE_VNODES, Tester
 from jmxutils import JolokiaAgent, make_mbean, remove_perf_disable_shared_mem
-from tools import (create_c1c2_table, insert_c1c2, known_failure, new_node,
-                   query_c1c2, since)
+from tools import (create_c1c2_table, insert_c1c2, new_node, query_c1c2, since)
 
 
 @since('3.2')
@@ -27,9 +26,6 @@ class TestDiskBalance(Tester):
         for node in cluster.nodelist():
             self.assert_balanced(node)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11279',
-                   flaky=True)
     def disk_balance_bootstrap_test(self):
         cluster = self.cluster
         if not DISABLE_VNODES:
@@ -40,27 +36,12 @@ class TestDiskBalance(Tester):
         cluster.populate(4).start(wait_for_binary_proto=True)
         node1 = cluster.nodes['node1']
 
-        node1.stress(['write', 'n=10k', '-rate', 'threads=100', '-schema', 'replication(factor=3)'])
+        node1.stress(['write', 'n=50k', '-rate', 'threads=100', '-schema', 'replication(factor=3)', 'compaction(strategy=SizeTieredCompactionStrategy,enabled=false)'])
         cluster.flush()
         node5 = new_node(cluster)
         node5.start(wait_for_binary_proto=True)
         self.assert_balanced(node5)
 
-        cluster.cleanup()
-
-        self.assert_balanced(node5)
-
-        if DISABLE_VNODES:
-            for node in cluster.nodelist():
-                node.nodetool('relocatesstables')
-            self.assertTrue(len(node5.grep_log("No sstables to RELOCATE for keyspace1.standard1")) > 0)
-
-        for node in cluster.nodelist():
-            self.assert_balanced(node)
-
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11279',
-                   flaky=True)
     def disk_balance_decommission_test(self):
         cluster = self.cluster
         if not DISABLE_VNODES:
@@ -69,18 +50,13 @@ class TestDiskBalance(Tester):
         cluster.populate(4).start(wait_for_binary_proto=True)
         node1 = cluster.nodes['node1']
         node4 = cluster.nodes['node4']
-        node1.stress(['write', 'n=1', '-rate', 'threads=100', '-schema', 'replication(factor=2)'])
-        for node in cluster.nodelist():
-            node.nodetool('disableautocompaction')
-
-        node1.stress(['write', 'n=10k', '-rate', 'threads=100', '-schema', 'replication(factor=2)'])
+        node1.stress(['write', 'n=50k', '-rate', 'threads=100', '-schema', 'replication(factor=2)', 'compaction(strategy=SizeTieredCompactionStrategy,enabled=false)'])
         cluster.flush()
 
         node4.decommission()
 
-        if DISABLE_VNODES:
-            for node in cluster.nodelist():
-                node.nodetool('relocatesstables')
+        for node in cluster.nodelist():
+            node.nodetool('relocatesstables')
 
         for node in cluster.nodelist():
             self.assert_balanced(node)
@@ -137,4 +113,4 @@ class TestDiskBalance(Tester):
             for sstable in sstabledir:
                 sum = sum + os.path.getsize(sstable)
             sums.append(sum)
-        assert_almost_equal(*sums, error=0.2, error_message=node.name)
+        assert_almost_equal(*sums, error=0.1, error_message=node.name)
