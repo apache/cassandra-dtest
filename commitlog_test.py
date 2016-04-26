@@ -107,7 +107,7 @@ class TestCommitLog(Tester):
         self.prepare(configuration=conf, create_test_keyspace=False)
 
         segment_size = segment_size_in_mb * 1024 * 1024
-        self.node1.stress(['write', 'n=150000', '-rate', 'threads=25'])
+        self.node1.stress(['write', 'n=150k', '-rate', 'threads=25'])
         time.sleep(1)
 
         commitlogs = self._get_commitlog_files()
