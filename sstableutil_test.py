@@ -46,9 +46,6 @@ class SSTableUtilTest(Tester):
         finalfiles, tmpfiles = self._check_files(node, KeyspaceName, TableName)
         self.assertEqual(0, len(tmpfiles))
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11653',
-                   flaky=True)
     def abortedcompaction_test(self):
         """
         @jira_ticket CASSANDRA-7066
