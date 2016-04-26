@@ -150,27 +150,39 @@ class TestArchiveCommitlog(SnapshotTester):
                    flaky=True,
                    notes='failed once on 2.1')
     def test_archive_commitlog_with_active_commitlog(self):
-        """Copy the active commitlogs to the archive directory before restoration"""
+        """
+        Copy the active commitlogs to the archive directory before restoration
+        """
         self.run_archive_commitlog(restore_point_in_time=False, archive_active_commitlogs=True)
 
     def dont_test_archive_commitlog(self):
-        """Run the archive commitlog test, but forget to add the restore commands:"""
+        """
+        Run the archive commitlog test, but forget to add the restore commands
+        """
         self.run_archive_commitlog(restore_point_in_time=False, restore_archived_commitlog=False)
 
     def test_archive_commitlog_point_in_time(self):
-        """Test archive commit log with restore_point_in_time setting"""
+        """
+        Test archive commit log with restore_point_in_time setting
+        """
         self.run_archive_commitlog(restore_point_in_time=True)
 
     def test_archive_commitlog_point_in_time_with_active_commitlog(self):
-        """Test archive commit log with restore_point_in_time setting"""
+        """
+        Test archive commit log with restore_point_in_time setting
+        """
         self.run_archive_commitlog(restore_point_in_time=True, archive_active_commitlogs=True)
 
     def test_archive_commitlog_point_in_time_with_active_commitlog_ln(self):
-        """Test archive commit log with restore_point_in_time setting"""
+        """
+        Test archive commit log with restore_point_in_time setting
+        """
         self.run_archive_commitlog(restore_point_in_time=True, archive_active_commitlogs=True, archive_command='ln')
 
     def run_archive_commitlog(self, restore_point_in_time=False, restore_archived_commitlog=True, archive_active_commitlogs=False, archive_command='cp'):
-        """Run archive commit log restoration test"""
+        """
+        Run archive commit log restoration test
+        """
 
         cluster = self.cluster
         cluster.populate(1)
