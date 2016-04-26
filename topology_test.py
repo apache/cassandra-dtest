@@ -7,7 +7,8 @@ from ccmlib.node import NodetoolError, TimeoutError
 
 from assertions import assert_almost_equal
 from dtest import Tester
-from tools import debug, insert_c1c2, no_vnodes, query_c1c2, since, known_failure
+from tools import (debug, insert_c1c2, known_failure, no_vnodes, query_c1c2,
+                   since)
 
 
 class TestTopology(Tester):
@@ -47,10 +48,6 @@ class TestTopology(Tester):
 
         time.sleep(10)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11539',
-                   flaky=True,
-                   notes='trunk/3.5 flaps with >16%')
     @no_vnodes()
     def movement_test(self):
         cluster = self.cluster
@@ -63,7 +60,7 @@ class TestTopology(Tester):
         self.create_ks(session, 'ks', 1)
         self.create_cf(session, 'cf', columns={'c1': 'text', 'c2': 'text'})
 
-        insert_c1c2(session, n=10000, consistency=ConsistencyLevel.ONE)
+        insert_c1c2(session, n=30000, consistency=ConsistencyLevel.ONE)
 
         cluster.flush()
 
@@ -85,7 +82,7 @@ class TestTopology(Tester):
         cluster.cleanup()
 
         # Check we can get all the keys
-        for n in xrange(0, 10000):
+        for n in xrange(0, 30000):
             query_c1c2(session, n, ConsistencyLevel.ONE)
 
         # Now the load should be basically even
