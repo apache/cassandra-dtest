@@ -21,7 +21,7 @@ class SnapshotTester(Tester):
     def make_snapshot(self, node, ks, cf, name):
         debug("Making snapshot....")
         node.flush()
-        snapshot_cmd = 'snapshot {ks} -cf {cf} -t {name}'.format(**locals())
+        snapshot_cmd = 'snapshot {ks} -cf {cf} -t {name}'.format(ks=ks, cf=cf, name=name)
         debug("Running snapshot cmd: {snapshot_cmd}".format(snapshot_cmd=snapshot_cmd))
         node.nodetool(snapshot_cmd)
         tmpdir = safe_mkdtemp()
@@ -31,9 +31,9 @@ class SnapshotTester(Tester):
         # Find the snapshot dir, it's different in various C*
         x = 0
         for data_dir in node.data_directories():
-            snapshot_dir = "{data_dir}/{ks}/{cf}/snapshots/{name}".format(**locals())
+            snapshot_dir = "{data_dir}/{ks}/{cf}/snapshots/{name}".format(data_dir=data_dir, ks=ks, cf=cf, name=name)
             if not os.path.isdir(snapshot_dir):
-                snapshot_dirs = glob.glob("{data_dir}/{ks}/{cf}-*/snapshots/{name}".format(**locals()))
+                snapshot_dirs = glob.glob("{data_dir}/{ks}/{cf}-*/snapshots/{name}".format(data_dir=data_dir, ks=ks, cf=cf, name=name))
                 if len(snapshot_dirs) > 0:
                     snapshot_dir = snapshot_dirs[0]
                 else:
@@ -111,7 +111,7 @@ class TestArchiveCommitlog(SnapshotTester):
     def make_snapshot(self, node, ks, cf, name):
         debug("Making snapshot....")
         node.flush()
-        snapshot_cmd = 'snapshot {ks} -cf {cf} -t {name}'.format(**locals())
+        snapshot_cmd = 'snapshot {ks} -cf {cf} -t {name}'.format(ks=ks, cf=cf, name=name)
         debug("Running snapshot cmd: {snapshot_cmd}".format(snapshot_cmd=snapshot_cmd))
         node.nodetool(snapshot_cmd)
         tmpdirs = []
@@ -131,7 +131,7 @@ class TestArchiveCommitlog(SnapshotTester):
         cfs = [s for s in os.listdir(snapshot_dir) if s.startswith(cf + "-")]
         if len(cfs) > 0:
             cf_id = cfs[0]
-            glob_path = "{snapshot_dir}/{cf_id}/snapshots/{name}".format(**locals())
+            glob_path = "{snapshot_dir}/{cf_id}/snapshots/{name}".format(snapshot_dir=snapshot_dir, cf_id=cf_id, name=name)
             globbed = glob.glob(glob_path)
             if len(globbed) > 0:
                 snapshot_dir = globbed[0]
@@ -309,7 +309,7 @@ class TestArchiveCommitlog(SnapshotTester):
                 if restore_point_in_time:
                     restore_time = time.strftime("%Y:%m:%d %H:%M:%S", insert_cutoff_times[1])
                     replace_in_file(os.path.join(node1.get_path(), 'conf', 'commitlog_archiving.properties'),
-                                    [(r'^restore_point_in_time=.*$', 'restore_point_in_time={restore_time}'.format(**locals()))])
+                                    [(r'^restore_point_in_time=.*$', 'restore_point_in_time={restore_time}'.format(restore_time=restore_time))])
 
             debug("Restarting node1..")
             node1.stop()
