@@ -257,7 +257,8 @@ class TestArchiveCommitlog(SnapshotTester):
             commitlog_dir = os.path.join(node1.get_path(), 'commitlogs')
             debug("node1 commitlog dir: " + commitlog_dir)
 
-            self.assertTrue(len(set(os.listdir(tmp_commitlog)) - set(os.listdir(commitlog_dir))) > 0)
+            self.assertNotEqual(set(os.listdir(tmp_commitlog)) - set(os.listdir(commitlog_dir)),
+                                set())
 
             cluster.flush()
             cluster.compact()
@@ -403,7 +404,8 @@ class TestArchiveCommitlog(SnapshotTester):
 
             cluster.flush()
 
-            self.assertGreater(len(set(os.listdir(tmp_commitlog)) - set(os.listdir(commitlog_dir))), 0)
+            self.assertNotEqual(set(os.listdir(tmp_commitlog)) - set(os.listdir(commitlog_dir)),
+                                set())
 
             debug("Flushing and doing first restart")
             cluster.compact()
