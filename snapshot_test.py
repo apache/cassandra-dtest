@@ -13,6 +13,10 @@ from tools import known_failure, replace_in_file, safe_mkdtemp
 
 class SnapshotTester(Tester):
 
+    def create_schema(self, session):
+        self.create_ks(session, 'ks', 1)
+        session.execute('CREATE TABLE ks.cf ( key int PRIMARY KEY, val text);')
+
     def insert_rows(self, session, start, end):
         insert_statement = session.prepare("INSERT INTO ks.cf (key, val) VALUES (?, 'asdf')")
         args = [(r,) for r in range(start, end)]
@@ -71,8 +75,7 @@ class TestSnapshot(SnapshotTester):
         cluster.populate(1).start()
         (node1,) = cluster.nodelist()
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'ks', 1)
-        session.execute('CREATE TABLE ks.cf ( key int PRIMARY KEY, val text);')
+        self.create_schema(session)
 
         self.insert_rows(session, 0, 100)
         snapshot_dir = self.make_snapshot(node1, 'ks', 'cf', 'basic')
@@ -85,8 +88,7 @@ class TestSnapshot(SnapshotTester):
 
         # Drop the keyspace, make sure we have no data:
         session.execute('DROP KEYSPACE ks')
-        self.create_ks(session, 'ks', 1)
-        session.execute('CREATE TABLE ks.cf ( key int PRIMARY KEY, val text);')
+        self.create_schema(session)
         rows = session.execute('SELECT count(*) from ks.cf')
         self.assertEqual(rows[0][0], 0)
 
