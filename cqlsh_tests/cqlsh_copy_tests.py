@@ -171,13 +171,21 @@ class CqlshCopyTest(Tester):
 
         default_time_format = self.default_time_format
 
+        try:
+            from cqlshlib.formatting import round_microseconds
+        except ImportError:
+            round_microseconds = None
+
         class Datetime(datetime.datetime):
+            def _format_for_csv(self):
+                ret = self.strftime(default_time_format)
+                return round_microseconds(ret) if round_microseconds else ret
 
             def __str__(self):
-                return self.strftime(default_time_format)
+                return self._format_for_csv()
 
             def __repr__(self):
-                return self.strftime(default_time_format)
+                return self._format_for_csv()
 
         def maybe_quote(s):
             """
@@ -310,6 +318,8 @@ class CqlshCopyTest(Tester):
                 from cqlshlib.formatting import DateTimeFormat
                 date_time_format = DateTimeFormat()
                 date_time_format.timestamp_format = time_format
+                if hasattr(date_time_format, 'milliseconds_only'):
+                    date_time_format.milliseconds_only = True
             except ImportError:
                 date_time_format = None
 
@@ -350,7 +360,7 @@ class CqlshCopyTest(Tester):
                             time_format=time_format,
                             float_precision=float_precision,
                             colormap=DummyColorMap(),
-                            nullval=None,
+                            nullval=nullval,
                             decimal_sep=None,
                             thousands_sep=None,
                             boolean_styles=None).strval
@@ -470,7 +480,7 @@ class CqlshCopyTest(Tester):
         """
         self.non_default_delimiter_template('1')
 
-    def custom_null_indicator_template(self, indicator):
+    def custom_null_indicator_template(self, indicator=None, copy_from_options=None):
         """
         @param indicator the null indicator to be used in COPY, set to None to use the default indicator
 
@@ -482,28 +492,38 @@ class CqlshCopyTest(Tester):
         - check that the data imported is the same as originally inserted
 
         """
-        self.all_datatypes_prepare()
+        self.prepare()
         self.session.execute("""
             CREATE TABLE testnullindicator (
                 a int primary key,
                 b text,
                 c int,
                 d float,
-                e timestamp
+                e timestamp,
+                f list<int>
             )""")
-        insert_non_null = self.session.prepare("INSERT INTO testnullindicator (a, b, c, d, e) VALUES (?, ?, ?, ?, ?)")
+        insert_non_null = self.session.prepare("INSERT INTO testnullindicator (a, b, c, d, e, f) " +
+                                               "VALUES (?, ?, ?, ?, ?, ?)")
         execute_concurrent_with_args(self.session, insert_non_null,
-                                     [(1, 'eggs', 1, 1.1, datetime.datetime(2015, 1, 1, 0, 00, 0, 0, UTC())),
-                                      (100, 'sausage', 100, 2.2, datetime.datetime(2016, 1, 1, 0, 00, 0, 0, UTC()))])
+                                     [(1, 'eggs', 1, 1.1,
+                                       datetime.datetime(2015, 1, 1, 0, 00, 0, 0, UTC()), [1, 2, 3]),
+                                      (100, 'sausage', 100, 2.2, None, None)])
         insert_null = self.session.prepare("INSERT INTO testnullindicator (a) VALUES (?)")
         execute_concurrent_with_args(self.session, insert_null, [(2,), (200,)])
+
+        if copy_from_options is None:
+            copy_from_options = dict()
+
+        if indicator:
+            copy_from_options['NULL'] = indicator
 
         tempfile = self.get_temp_file()
         debug('Exporting to csv file: {name}'.format(name=tempfile.name))
         cmds = "COPY ks.testnullindicator TO '{name}'".format(name=tempfile.name)
         if indicator:
             cmds += " WITH NULL = '{d}'".format(d=indicator)
-        self.node1.run_cqlsh(cmds=cmds)
+        debug(cmds)
+        self.node1.run_cqlsh(cmds=cmds, show_output=True, cqlsh_options=['--debug'])
 
         results = list(self.session.execute("SELECT * FROM ks.testnullindicator"))
         results_with_null_indicator = [[indicator if value is None else value for value in row] for row in results]
@@ -514,20 +534,32 @@ class CqlshCopyTest(Tester):
         self.session.execute('TRUNCATE ks.testnullindicator')
         debug('Importing from csv file: {name}'.format(name=tempfile.name))
         cmds = "COPY ks.testnullindicator FROM '{name}'".format(name=tempfile.name)
-        if indicator:
-            cmds += " WITH NULL = '{d}'".format(d=indicator)
-        self.node1.run_cqlsh(cmds=cmds)
+        if copy_from_options:
+            first = True
+            for k, v in copy_from_options.iteritems():
+                cmds += ' {} {} = {}'.format('WITH' if first else 'AND', k, v)
+                first = False
+        debug(cmds)
+        self.node1.run_cqlsh(cmds=cmds, show_output=True, cqlsh_options=['--debug'])
 
         results_imported = list(self.session.execute("SELECT * FROM ks.testnullindicator"))
         self.assertEquals(results, results_imported)
 
     def test_default_null_indicator(self):
         """
-        Test the default null indicator
+        Test the default null indicator.
 
         @jira_ticket CASSANDRA-11549
         """
-        self.custom_null_indicator_template('undefined')
+        self.custom_null_indicator_template()
+
+    def test_default_null_indicator_no_prepared_statements(self):
+        """
+        Test the default null indicator without prepared statements.
+
+        @jira_ticket CASSANDRA-11631
+        """
+        self.custom_null_indicator_template(copy_from_options={'PREPAREDSTATEMENTS': 'False'})
 
     def test_undefined_as_null_indicator(self):
         """
@@ -535,11 +567,46 @@ class CqlshCopyTest(Tester):
         """
         self.custom_null_indicator_template('undefined')
 
+    def test_undefined_as_null_indicator_no_prepared_statements(self):
+        """
+        Use custom_null_indicator_template to test COPY with NULL = undefined and no prepared statements.
+        """
+        self.custom_null_indicator_template('undefined', copy_from_options={'PREPAREDSTATEMENTS': 'False'})
+
     def test_null_as_null_indicator(self):
         """
         Use custom_null_indicator_template to test COPY with NULL = 'null'.
         """
         self.custom_null_indicator_template('null')
+
+    def test_reading_collections_with_empty_values(self):
+        """
+        Inserting null values in collections, for example in lists, results in assertion errors server side.
+        Therefore, rather tha converting empty values to None like for top level types, a parse error will be
+        raised to make debugging the problem easier. Note that we only check for empty values, we ignore the
+        null indicator.
+
+        @jira_ticket CASSANDRA-11631
+        """
+        self.prepare()
+        self.session.execute("""
+            CREATE TABLE testnullvalsincollections (
+                a int primary key,
+                b list<int>
+            )""")
+
+        tempfile = self.get_temp_file()
+        with open(tempfile.name, 'w') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=['a', 'b'])
+            writer.writerow({'a': 1, 'b': "[1,2,3]"})
+            writer.writerow({'a': 2, 'b': "[1,,3]"})
+
+        debug('Importing from csv file: {name}'.format(name=tempfile.name))
+        cmds = "COPY ks.testnullvalsincollections FROM '{name}'".format(name=tempfile.name)
+        out, err = self.node1.run_cqlsh(cmds=cmds, cqlsh_options=['--debug'], return_output=True)
+        debug(out)
+        debug(err)
+        self.assertIn("ParseError - Failed to parse [1,,3] : Empty values are not allowed", err)
 
     def test_writing_use_header(self):
         """
@@ -1593,13 +1660,18 @@ class CqlshCopyTest(Tester):
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""")
         self.session.execute(insert_statement, self.data)
 
-        tempfile = self.get_temp_file()
-        debug('Exporting to csv file: {name}'.format(name=tempfile.name))
-        self.node1.run_cqlsh(cmds="COPY ks.testdatatype TO '{name}'".format(name=tempfile.name))
+        def _test(prepared_statements):
+            tempfile = self.get_temp_file()
+            debug('Exporting to csv file: {name}'.format(name=tempfile.name))
+            self.node1.run_cqlsh(cmds="COPY ks.testdatatype TO '{}' WITH PREPAREDSTATEMENTS = {}"
+                                 .format(tempfile.name, prepared_statements),
+                                 show_output=True, cqlsh_options=['--debug'])
 
-        results = list(self.session.execute("SELECT * FROM testdatatype"))
+            results = list(self.session.execute("SELECT * FROM testdatatype"))
+            self.assertCsvResultEqual(tempfile.name, results, 'testdatatype')
 
-        self.assertCsvResultEqual(tempfile.name, results, 'testdatatype')
+        _test(True)
+        _test(False)
 
     def test_all_datatypes_read(self):
         """
@@ -1624,12 +1696,18 @@ class CqlshCopyTest(Tester):
             data_set[2] = '0x{}'.format(''.join('%02x' % c for c in self.data[2]))
             writer.writerow(data_set)
 
-        debug('Importing from csv file: {name}'.format(name=tempfile.name))
-        self.node1.run_cqlsh(cmds="COPY ks.testdatatype FROM '{name}'".format(name=tempfile.name))
+        def _test(prepared_statements):
+            debug('Importing from csv file: {name}'.format(name=tempfile.name))
+            self.node1.run_cqlsh(cmds="COPY ks.testdatatype FROM '{}' WITH PREPAREDSTATEMENTS = {}"
+                                 .format(tempfile.name, prepared_statements),
+                                 show_output=True, cqlsh_options=['--debug'])
 
-        results = list(self.session.execute("SELECT * FROM testdatatype"))
+            results = list(self.session.execute("SELECT * FROM testdatatype"))
 
-        self.assertCsvResultEqual(tempfile.name, results, 'testdatatype')
+            self.assertCsvResultEqual(tempfile.name, results, 'testdatatype')
+
+        _test(True)
+        _test(False)
 
     def test_all_datatypes_round_trip(self):
         """
@@ -1655,19 +1733,26 @@ class CqlshCopyTest(Tester):
 
         tempfile = self.get_temp_file()
         debug('Exporting to csv file: {name}'.format(name=tempfile.name))
-        self.node1.run_cqlsh(cmds="COPY ks.testdatatype TO '{name}'".format(name=tempfile.name))
+        self.node1.run_cqlsh(cmds="COPY ks.testdatatype TO '{}'".format(tempfile.name),
+                             show_output=True, cqlsh_options=['--debug'])
 
         exported_results = list(self.session.execute("SELECT * FROM testdatatype"))
 
-        self.session.execute('TRUNCATE ks.testdatatype')
+        def _test(prepared_statements):
+            self.session.execute('TRUNCATE ks.testdatatype')
 
-        self.node1.run_cqlsh(cmds="COPY ks.testdatatype FROM '{name}'".format(name=tempfile.name))
+            self.node1.run_cqlsh(cmds="COPY ks.testdatatype FROM '{}' WITH PREPAREDSTATEMENTS = {}"
+                                 .format(tempfile.name, prepared_statements),
+                                 show_output=True, cqlsh_options=['--debug'])
 
-        imported_results = list(self.session.execute("SELECT * FROM testdatatype"))
+            imported_results = list(self.session.execute("SELECT * FROM testdatatype"))
 
-        assert len(imported_results) == 1
+            assert len(imported_results) == 1
 
-        self.assertEqual(exported_results, imported_results)
+            self.assertEqual(exported_results, imported_results)
+
+        _test(True)
+        _test(False)
 
     def test_boolstyle_round_trip(self):
         """
@@ -1906,9 +1991,9 @@ class CqlshCopyTest(Tester):
         self.node1.run_cqlsh(cmds="COPY ks.testsubsecond TO '{}'".format(tempfile2.name))
 
         csv_results = sorted(list(csv_rows(tempfile2.name)))
-        self.assertItemsEqual([['1', '1943-06-19 11:21:01.000000+0000'],
-                               ['2', '1943-06-19 11:21:01.123000+0000'],
-                               ['3', '1943-06-19 11:21:01.124000+0000']],
+        self.assertItemsEqual([['1', '1943-06-19 11:21:01.000+0000'],
+                               ['2', '1943-06-19 11:21:01.123+0000'],
+                               ['3', '1943-06-19 11:21:01.124+0000']],
                               csv_results)
 
     @since('3.6')
@@ -2771,7 +2856,9 @@ class CqlshCopyTest(Tester):
 
             def __repr__(self):
                 return "{{val1: '{}', val2: '{}', val3: '{}'}}"\
-                    .format(self.val1, self.val2, self.val3)
+                    .format(self.val1 if self.val1 else '',
+                            self.val2 if self.val2 else '',
+                            self.val3 if self.val3 else '')
 
         self.session.cluster.register_user_type('ks', 'udt_with_special_chars', MyType)
 
@@ -2790,13 +2877,17 @@ class CqlshCopyTest(Tester):
 
         def _test(preparedStatements):
             debug('Importing from csv file: {name}'.format(name=tempfile.name))
-            self.node1.run_cqlsh(cmds="COPY ks.testspecialcharsinudt FROM '{}' WITH PREPAREDSTATEMENTS = {}"
-                                 .format(tempfile.name, preparedStatements),
-                                 show_output=True, cqlsh_options=['--debug'])
+            cmds = "COPY ks.testspecialcharsinudt FROM '{}' WITH PREPAREDSTATEMENTS = {}"\
+                .format(tempfile.name, preparedStatements)
+            debug(cmds)
+            self.node1.run_cqlsh(cmds=cmds, show_output=True, cqlsh_options=['--debug'])
 
             results = list(self.session.execute("SELECT * FROM testspecialcharsinudt"))
             debug(results)
-            self.assertCsvResultEqual(tempfile.name, results, 'testspecialcharsinudt')
+            # we set nullval to the literal string '' to ensure the csv formatting output on trunk
+            # matches the __repr__ of MyType() and we need the '' around values to ensure we write
+            # quoted values in the csv
+            self.assertCsvResultEqual(tempfile.name, results, 'testspecialcharsinudt', nullval="''")
 
         _test(True)
         _test(False)
