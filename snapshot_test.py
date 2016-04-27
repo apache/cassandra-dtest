@@ -13,8 +13,9 @@ from tools import known_failure, replace_in_file, safe_mkdtemp
 
 class SnapshotTester(Tester):
 
-    def __init__(self, *args, **kwargs):
-        Tester.__init__(self, *args, **kwargs)
+    def create_schema(self, session):
+        self.create_ks(session, 'ks', 1)
+        session.execute('CREATE TABLE ks.cf ( key int PRIMARY KEY, val text);')
 
     def insert_rows(self, session, start, end):
         insert_statement = session.prepare("INSERT INTO ks.cf (key, val) VALUES (?, 'asdf')")
@@ -24,7 +25,7 @@ class SnapshotTester(Tester):
     def make_snapshot(self, node, ks, cf, name):
         debug("Making snapshot....")
         node.flush()
-        snapshot_cmd = 'snapshot {ks} -cf {cf} -t {name}'.format(**locals())
+        snapshot_cmd = 'snapshot {ks} -cf {cf} -t {name}'.format(ks=ks, cf=cf, name=name)
         debug("Running snapshot cmd: {snapshot_cmd}".format(snapshot_cmd=snapshot_cmd))
         node.nodetool(snapshot_cmd)
         tmpdir = safe_mkdtemp()
@@ -34,9 +35,9 @@ class SnapshotTester(Tester):
         # Find the snapshot dir, it's different in various C*
         x = 0
         for data_dir in node.data_directories():
-            snapshot_dir = "{data_dir}/{ks}/{cf}/snapshots/{name}".format(**locals())
+            snapshot_dir = "{data_dir}/{ks}/{cf}/snapshots/{name}".format(data_dir=data_dir, ks=ks, cf=cf, name=name)
             if not os.path.isdir(snapshot_dir):
-                snapshot_dirs = glob.glob("{data_dir}/{ks}/{cf}-*/snapshots/{name}".format(**locals()))
+                snapshot_dirs = glob.glob("{data_dir}/{ks}/{cf}-*/snapshots/{name}".format(data_dir=data_dir, ks=ks, cf=cf, name=name))
                 if len(snapshot_dirs) > 0:
                     snapshot_dir = snapshot_dirs[0]
                 else:
@@ -69,16 +70,12 @@ class SnapshotTester(Tester):
 
 class TestSnapshot(SnapshotTester):
 
-    def __init__(self, *args, **kwargs):
-        SnapshotTester.__init__(self, *args, **kwargs)
-
     def test_basic_snapshot_and_restore(self):
         cluster = self.cluster
         cluster.populate(1).start()
         (node1,) = cluster.nodelist()
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'ks', 1)
-        session.execute('CREATE TABLE ks.cf ( key int PRIMARY KEY, val text);')
+        self.create_schema(session)
 
         self.insert_rows(session, 0, 100)
         snapshot_dir = self.make_snapshot(node1, 'ks', 'cf', 'basic')
@@ -91,8 +88,7 @@ class TestSnapshot(SnapshotTester):
 
         # Drop the keyspace, make sure we have no data:
         session.execute('DROP KEYSPACE ks')
-        self.create_ks(session, 'ks', 1)
-        session.execute('CREATE TABLE ks.cf ( key int PRIMARY KEY, val text);')
+        self.create_schema(session)
         rows = session.execute('SELECT count(*) from ks.cf')
         self.assertEqual(rows[0][0], 0)
 
@@ -117,7 +113,7 @@ class TestArchiveCommitlog(SnapshotTester):
     def make_snapshot(self, node, ks, cf, name):
         debug("Making snapshot....")
         node.flush()
-        snapshot_cmd = 'snapshot {ks} -cf {cf} -t {name}'.format(**locals())
+        snapshot_cmd = 'snapshot {ks} -cf {cf} -t {name}'.format(ks=ks, cf=cf, name=name)
         debug("Running snapshot cmd: {snapshot_cmd}".format(snapshot_cmd=snapshot_cmd))
         node.nodetool(snapshot_cmd)
         tmpdirs = []
@@ -137,7 +133,7 @@ class TestArchiveCommitlog(SnapshotTester):
         cfs = [s for s in os.listdir(snapshot_dir) if s.startswith(cf + "-")]
         if len(cfs) > 0:
             cf_id = cfs[0]
-            glob_path = "{snapshot_dir}/{cf_id}/snapshots/{name}".format(**locals())
+            glob_path = "{snapshot_dir}/{cf_id}/snapshots/{name}".format(snapshot_dir=snapshot_dir, cf_id=cf_id, name=name)
             globbed = glob.glob(glob_path)
             if len(globbed) > 0:
                 snapshot_dir = globbed[0]
@@ -156,27 +152,39 @@ class TestArchiveCommitlog(SnapshotTester):
                    flaky=True,
                    notes='failed once on 2.1')
     def test_archive_commitlog_with_active_commitlog(self):
-        """Copy the active commitlogs to the archive directory before restoration"""
+        """
+        Copy the active commitlogs to the archive directory before restoration
+        """
         self.run_archive_commitlog(restore_point_in_time=False, archive_active_commitlogs=True)
 
     def dont_test_archive_commitlog(self):
-        """Run the archive commitlog test, but forget to add the restore commands:"""
+        """
+        Run the archive commitlog test, but forget to add the restore commands
+        """
         self.run_archive_commitlog(restore_point_in_time=False, restore_archived_commitlog=False)
 
     def test_archive_commitlog_point_in_time(self):
-        """Test archive commit log with restore_point_in_time setting"""
+        """
+        Test archive commit log with restore_point_in_time setting
+        """
         self.run_archive_commitlog(restore_point_in_time=True)
 
     def test_archive_commitlog_point_in_time_with_active_commitlog(self):
-        """Test archive commit log with restore_point_in_time setting"""
+        """
+        Test archive commit log with restore_point_in_time setting
+        """
         self.run_archive_commitlog(restore_point_in_time=True, archive_active_commitlogs=True)
 
     def test_archive_commitlog_point_in_time_with_active_commitlog_ln(self):
-        """Test archive commit log with restore_point_in_time setting"""
+        """
+        Test archive commit log with restore_point_in_time setting
+        """
         self.run_archive_commitlog(restore_point_in_time=True, archive_active_commitlogs=True, archive_command='ln')
 
     def run_archive_commitlog(self, restore_point_in_time=False, restore_archived_commitlog=True, archive_active_commitlogs=False, archive_command='cp'):
-        """Run archive commit log restoration test"""
+        """
+        Run archive commit log restoration test
+        """
 
         cluster = self.cluster
         cluster.populate(1)
@@ -251,7 +259,8 @@ class TestArchiveCommitlog(SnapshotTester):
             commitlog_dir = os.path.join(node1.get_path(), 'commitlogs')
             debug("node1 commitlog dir: " + commitlog_dir)
 
-            self.assertTrue(len(set(os.listdir(tmp_commitlog)) - set(os.listdir(commitlog_dir))) > 0)
+            self.assertNotEqual(set(os.listdir(tmp_commitlog)) - set(os.listdir(commitlog_dir)),
+                                set())
 
             cluster.flush()
             cluster.compact()
@@ -315,7 +324,7 @@ class TestArchiveCommitlog(SnapshotTester):
                 if restore_point_in_time:
                     restore_time = time.strftime("%Y:%m:%d %H:%M:%S", insert_cutoff_times[1])
                     replace_in_file(os.path.join(node1.get_path(), 'conf', 'commitlog_archiving.properties'),
-                                    [(r'^restore_point_in_time=.*$', 'restore_point_in_time={restore_time}'.format(**locals()))])
+                                    [(r'^restore_point_in_time=.*$', 'restore_point_in_time={restore_time}'.format(restore_time=restore_time))])
 
             debug("Restarting node1..")
             node1.stop()
@@ -397,7 +406,8 @@ class TestArchiveCommitlog(SnapshotTester):
 
             cluster.flush()
 
-            self.assertGreater(len(set(os.listdir(tmp_commitlog)) - set(os.listdir(commitlog_dir))), 0)
+            self.assertNotEqual(set(os.listdir(tmp_commitlog)) - set(os.listdir(commitlog_dir)),
+                                set())
 
             debug("Flushing and doing first restart")
             cluster.compact()
