@@ -14,7 +14,7 @@ from ccmlib.node import NodeError
 from assertions import assert_almost_equal, assert_one
 from dtest import Tester, debug
 from tools import (InterruptBootstrap, KillOnBootstrap, known_failure,
-                   new_node, query_c1c2, since, require)
+                   new_node, query_c1c2, require, since)
 
 
 class TestBootstrap(Tester):
@@ -533,7 +533,6 @@ class TestBootstrap(Tester):
         for _ in xrange(5):
             assert_one(session, "SELECT count(*) from keyspace1.standard1", [500000], cl=ConsistencyLevel.ONE)
 
-    @require(11179)
     def test_cleanup(self):
         """
         @jira_ticket CASSANDRA-11179
