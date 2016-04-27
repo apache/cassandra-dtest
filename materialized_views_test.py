@@ -298,6 +298,10 @@ class TestMaterializedViews(Tester):
             "Expecting {} materialized view, got {}".format(1, len(result))
         )
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11674',
+                   flaky=True,
+                   notes='failed once on 3.0')
     def clustering_column_test(self):
         """Test that we can use clustering columns as primary key for a materialized view"""
 
