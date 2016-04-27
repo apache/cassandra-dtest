@@ -536,7 +536,7 @@ class TestBootstrap(Tester):
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11673',
                    flaky=False,
-                   notes='2.1 failure, test recently un-required due to 11179 being committed')
+                   notes='2.1, 2.2 failure, test recently un-required due to 11179 being committed')
     def test_cleanup(self):
         """
         @jira_ticket CASSANDRA-11179
