@@ -157,9 +157,6 @@ class TestTopology(Tester):
         for n in xrange(0, 10000):
             query_c1c2(session, n, ConsistencyLevel.ONE)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11665',
-                   flaky=True)
     @since('3.0')
     @no_vnodes()
     def decommissioned_node_cant_rejoin_test(self):
@@ -203,9 +200,10 @@ class TestTopology(Tester):
                                  for err_list in node3.grep_log_for_errors()]))
 
         # Give the node some time to shut down once it has detected
-        # its invalid state
+        # its invalid state. If it doesn't shut down in the 30 seconds,
+        # consider filing a bug. It shouldn't take more than 10, in most cases.
         start = time.time()
-        while start + 10 > time.time() and node3.is_running():
+        while start + 30 > time.time() and node3.is_running():
             time.sleep(1)
 
         self.assertFalse(node3.is_running())
