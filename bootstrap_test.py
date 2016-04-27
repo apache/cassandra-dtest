@@ -533,6 +533,10 @@ class TestBootstrap(Tester):
         for _ in xrange(5):
             assert_one(session, "SELECT count(*) from keyspace1.standard1", [500000], cl=ConsistencyLevel.ONE)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11673',
+                   flaky=False,
+                   notes='2.1 failure, test recently un-required due to 11179 being committed')
     def test_cleanup(self):
         """
         @jira_ticket CASSANDRA-11179
