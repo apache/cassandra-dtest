@@ -1497,6 +1497,62 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
             self.assertEqual(res, [[1, 4, 4],
                                    [1, 3, 3]])
 
+    def test_paging_for_range_name_queries(self):
+        """
+        test paging for range name queries
+        @jira_ticket CASSANDRA-11669
+        """
+
+        session = self.prepare()
+        self.create_ks(session, 'test_paging_for_range_name_queries', 2)
+        session.execute("CREATE TABLE test (a int, b int, c int, d int, PRIMARY KEY(a, b, c))")
+        session.execute("CREATE TABLE test_compact (a int, b int, c int, d int, PRIMARY KEY(a, b, c)) WITH COMPACT STORAGE")
+        session.row_factory = tuple_factory
+
+        for table in ('test', 'test_compact'):
+
+            for i in xrange(4):
+                for j in xrange(4):
+                    for k in xrange(4):
+                        session.execute("INSERT INTO {} (a, b, c, d) VALUES ({}, {}, {}, {})".format(table, i, j, k, i + j))
+
+            for page_size in (2, 3, 4, 5, 7, 10):
+                session.default_fetch_size = page_size
+
+                res = rows_to_list(session.execute("SELECT * FROM {} WHERE b = 1 AND c = 1  ALLOW FILTERING".format(table)))
+                self.assertEqual(res, [[1, 1, 1, 2],
+                                       [0, 1, 1, 1],
+                                       [2, 1, 1, 3],
+                                       [3, 1, 1, 4]])
+
+                res = rows_to_list(session.execute("SELECT * FROM {} WHERE b = 1 AND c IN (1, 2) ALLOW FILTERING".format(table)))
+                self.assertEqual(res, [[1, 1, 1, 2],
+                                       [1, 1, 2, 2],
+                                       [0, 1, 1, 1],
+                                       [0, 1, 2, 1],
+                                       [2, 1, 1, 3],
+                                       [2, 1, 2, 3],
+                                       [3, 1, 1, 4],
+                                       [3, 1, 2, 4]])
+
+                res = rows_to_list(session.execute("SELECT * FROM {} WHERE b IN (1, 2) AND c IN (1, 2)  ALLOW FILTERING".format(table)))
+                self.assertEqual(res, [[1, 1, 1, 2],
+                                       [1, 1, 2, 2],
+                                       [1, 2, 1, 3],
+                                       [1, 2, 2, 3],
+                                       [0, 1, 1, 1],
+                                       [0, 1, 2, 1],
+                                       [0, 2, 1, 2],
+                                       [0, 2, 2, 2],
+                                       [2, 1, 1, 3],
+                                       [2, 1, 2, 3],
+                                       [2, 2, 1, 4],
+                                       [2, 2, 2, 4],
+                                       [3, 1, 1, 4],
+                                       [3, 1, 2, 4],
+                                       [3, 2, 1, 5],
+                                       [3, 2, 2, 5]])
+
 
 @since('2.0')
 class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
