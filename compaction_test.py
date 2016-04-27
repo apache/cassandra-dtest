@@ -99,7 +99,7 @@ class TestCompaction(Tester):
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11463',
                    flaky=False,
-                   notes='Fails on 2.1')
+                   notes='Fails on 2.1, one failure on trunk offheap')
     def bloomfilter_size_test(self):
         """
         @jira_ticket CASSANDRA-11344
