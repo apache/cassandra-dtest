@@ -1,14 +1,16 @@
 import time
 
+from flaky import flaky
+
 from dtest import Tester, debug
 from thrift_bindings.v22.ttypes import \
     ConsistencyLevel as ThriftConsistencyLevel
 from thrift_bindings.v22.ttypes import (CfDef, Column, ColumnOrSuperColumn,
                                         ColumnParent, CounterColumn, KsDef,
                                         Mutation, SlicePredicate, SliceRange,
-                                        SuperColumn)
+                                        SuperColumn, TimedOutException)
 from thrift_tests import get_thrift_client
-from tools import known_failure, since
+from tools import RerunTestException, requires_rerun, since
 
 
 @since('2.0', max_version='2.1.x')
@@ -136,12 +138,8 @@ class TestSCUpgrade(Tester):
         self.assertEqual('c%d' % j, column.name)
         self.assertEqual('v', column.value)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11597',
-                   flaky=False,
-                   notes='fails on 2.1')
+    @flaky(max_runs=3, rerun_filter=requires_rerun)
     def upgrade_with_counters_test(self):
-
         cluster = self.cluster
 
         # Forcing cluster version on purpose
@@ -191,7 +189,10 @@ class TestSCUpgrade(Tester):
                 col_name = 'c%d' % j
                 column = CounterColumn(name=col_name, value=1)
                 for k in range(20):
-                    client.add('Counter1', column_parent, column, ThriftConsistencyLevel.ONE)
+                    try:
+                        client.add('Counter1', column_parent, column, ThriftConsistencyLevel.ONE)
+                    except TimedOutException:
+                        raise RerunTestException("re-run test to verify")
 
         # If we are on 2.1 or any higher version upgrade to 2.0.latest.
         # Otherwise, we must be on a 2.0.x, so we should be upgrading to that version.
@@ -216,7 +217,10 @@ class TestSCUpgrade(Tester):
                     col_name = 'c%d' % j
                     column = CounterColumn(name=col_name, value=1)
                     for k in range(50):
-                        client.add('Counter1', column_parent, column, ThriftConsistencyLevel.ONE)
+                        try:
+                            client.add('Counter1', column_parent, column, ThriftConsistencyLevel.ONE)
+                        except TimedOutException:
+                            raise RerunTestException("re-run test to verify")
 
             client.transport.close()
 
