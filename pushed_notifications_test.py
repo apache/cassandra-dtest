@@ -81,25 +81,25 @@ class TestPushedNotifications(Tester):
     Tests for pushed native protocol notification from Cassandra.
     """
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11667',
-                   flaky=True,
-                   notes='only one failure so far')
     @no_vnodes()
     def move_single_node_test(self):
         """
         @jira_ticket CASSANDRA-8516
-        Moving a token should result in NODE_MOVED notifications.
+        Moving a token should result in MOVED_NODE notifications.
         """
         self.cluster.populate(3).start(wait_for_binary_proto=True, wait_other_notice=True)
 
         # Despite waiting for each node to see the other nodes as UP, there is apparently
         # still a race condition that can result in NEW_NODE events being sent.  We don't
-        # want to accidentally collect those, so for now we will just sleep a few seconds.
-        time.sleep(3)
+        # want to accidentally collect those, so we block on the
+        # arrival of the first notification, then clear both waiters.
 
         waiters = [NotificationWaiter(self, node, ["TOPOLOGY_CHANGE"])
                    for node in self.cluster.nodes.values()]
+        waiters[0].wait_for_notifications(timeout=60, num_notifications=1)
+
+        for waiter in waiters:
+            waiter.clear_notifications()
 
         node1 = self.cluster.nodes.values()[0]
         node1.move("123")
