@@ -216,7 +216,7 @@ class TestStorageEngineUpgrade(Tester):
                        "SELECT * FROM t WHERE k = %d ORDER BY t DESC" % (n),
                        [[n, v, ROWS - 1, ROWS, v, v + 1] for v in range(ROWS - 1, -1, -1)])
 
-    @known_failure(failure_source='test',
+    @known_failure(failure_source='cassandra',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11663',
                    flaky=False)
     def upgrade_with_wide_partition_test(self):
@@ -225,7 +225,7 @@ class TestStorageEngineUpgrade(Tester):
         """
         self.upgrade_with_wide_partition()
 
-    @known_failure(failure_source='test',
+    @known_failure(failure_source='cassandra',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11663',
                    flaky=False)
     def upgrade_with_wide_partition_reversed_test(self):
