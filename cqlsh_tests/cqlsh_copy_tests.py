@@ -26,8 +26,8 @@ from cqlsh_tools import (DummyColorMap, assert_csvs_items_equal, csv_rows,
 from dtest import (DISABLE_VNODES, Tester, canReuseCluster, debug,
                    freshCluster, warning)
 from tools import known_failure, rows_to_list, since
-from util.metadata_wrapper import (UpdatingClusterMetadataWrapper,
-                                   UpdatingTableMetadataWrapper)
+from utils.metadata_wrapper import (UpdatingClusterMetadataWrapper,
+                                    UpdatingTableMetadataWrapper)
 
 PARTITIONERS = {
     "murmur3": "org.apache.cassandra.dht.Murmur3Partitioner",
