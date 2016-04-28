@@ -10,7 +10,7 @@ from ccmlib import common
 from ccmlib.common import is_win
 
 from dtest import Tester
-from tools import known_failure, since
+from tools import since
 
 
 def build_doc_context(tester, test_name, prepare=True, connection=None, nodes=None):
@@ -198,9 +198,6 @@ class ToJsonSelectTests(Tester):
     Tests using toJson with a SELECT statement
     """
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11651',
-                   flaky=False)
     def basic_data_types_test(self):
         """
         Create our schema:
@@ -304,9 +301,6 @@ class ToJsonSelectTests(Tester):
         """
         run_func_docstring(tester=self, test_func=self.counters_test)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11650',
-                   flaky=False)
     def complex_data_types_test(self):
         """
         Build some user types and a schema that uses them:
@@ -847,9 +841,6 @@ class FromJsonInsertTests(Tester):
     Tests using fromJson within INSERT statements.
     """
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11648',
-                   flaky=False)
     def basic_data_types_test(self):
         """
         Create a table with the primitive types:
@@ -1137,9 +1128,6 @@ class JsonFullRowInsertSelect(Tester):
     Tests for creating full rows from json documents, selecting full rows back as json documents, and related functionality.
     """
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11649',
-                   flaky=False)
     def simple_schema_test(self):
         """
         Create schema:
