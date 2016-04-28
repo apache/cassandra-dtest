@@ -569,6 +569,7 @@ class TestBootstrap(Tester):
             for sstable in sstables:
                 debug(sstable)
             if len(sstables) > basecount + jobs:
+                debug("Current count is {}, basecount was {}".format(len(sstables), basecount))
                 failed.set()
                 return
             if event.is_set():
