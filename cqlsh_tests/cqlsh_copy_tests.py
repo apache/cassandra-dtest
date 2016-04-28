@@ -288,7 +288,11 @@ class CqlshCopyTest(Tester):
                              columns=None, cql_type_names=None, nullval=''):
         if cql_type_names is None:
             if table_name:
-                table_meta = self.get_table_meta(table_name)
+                table_meta = UpdatingTableMetadataWrapper(
+                    self.session.cluster,
+                    ks_name=self.ks,
+                    table_name=table_name
+                )
                 cql_type_names = [table_meta.columns[c].cql_type for c in table_meta.columns
                                   if columns is None or c in columns]
             else:
