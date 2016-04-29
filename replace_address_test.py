@@ -228,6 +228,10 @@ class TestReplaceAddress(Tester):
         debug(movedTokensList[0])
         self.assertEqual(len(movedTokensList), numNodes)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11691',
+                   flaky=False,
+                   notes='Windows')
     @since('3.6')
     def fail_without_replace_test(self):
         """
