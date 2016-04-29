@@ -26,6 +26,8 @@ from cqlsh_tools import (DummyColorMap, assert_csvs_items_equal, csv_rows,
 from dtest import (DISABLE_VNODES, Tester, canReuseCluster, debug,
                    freshCluster, warning)
 from tools import known_failure, rows_to_list, since
+from utils.metadata_wrapper import (UpdatingClusterMetadataWrapper,
+                                    UpdatingTableMetadataWrapper)
 
 PARTITIONERS = {
     "murmur3": "org.apache.cassandra.dht.Murmur3Partitioner",
@@ -286,7 +288,11 @@ class CqlshCopyTest(Tester):
                              columns=None, cql_type_names=None, nullval=''):
         if cql_type_names is None:
             if table_name:
-                table_meta = self.session.cluster.metadata.keyspaces[self.ks].tables[table_name]
+                table_meta = UpdatingTableMetadataWrapper(
+                    self.session.cluster,
+                    ks_name=self.ks,
+                    table_name=table_name
+                )
                 cql_type_names = [table_meta.columns[c].cql_type for c in table_meta.columns
                                   if columns is None or c in columns]
             else:
@@ -325,7 +331,8 @@ class CqlshCopyTest(Tester):
 
             try:
                 from cqlshlib.formatting import CqlType
-                cql_type = CqlType(cql_type_name, self.session.cluster.metadata.keyspaces[self.ks])
+                cluster_meta = UpdatingClusterMetadataWrapper(self.session.cluster)
+                cql_type = CqlType(cql_type_name, cluster_meta.keyspaces[self.ks])
             except ImportError:
                 # Backward compatibility before formatting.CqlType was introduced:
                 # we must convert blob types to bytearray instances;
@@ -545,10 +552,6 @@ class CqlshCopyTest(Tester):
         results_imported = list(self.session.execute("SELECT * FROM ks.testnullindicator"))
         self.assertEquals(results, results_imported)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11675',
-                   flaky=True,
-                   notes='failed once on trunk')
     def test_default_null_indicator(self):
         """
         Test the default null indicator.
@@ -565,10 +568,6 @@ class CqlshCopyTest(Tester):
         """
         self.custom_null_indicator_template(copy_from_options={'PREPAREDSTATEMENTS': 'False'})
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11675',
-                   flaky=True,
-                   notes='failed once on trunk')
     def test_undefined_as_null_indicator(self):
         """
         Use custom_null_indicator_template to test COPY with NULL = undefined.
@@ -581,10 +580,6 @@ class CqlshCopyTest(Tester):
         """
         self.custom_null_indicator_template('undefined', copy_from_options={'PREPAREDSTATEMENTS': 'False'})
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11675',
-                   flaky=True,
-                   notes='failed once on trunk')
     def test_null_as_null_indicator(self):
         """
         Use custom_null_indicator_template to test COPY with NULL = 'null'.
@@ -794,7 +789,9 @@ class CqlshCopyTest(Tester):
         cmds += " WITH DATETIMEFORMAT = '{}'".format(format)
         self.node1.run_cqlsh(cmds=cmds)
 
-        table_meta = self.session.cluster.metadata.keyspaces[self.ks].tables['testdatetimeformat']
+        table_meta = UpdatingTableMetadataWrapper(self.session.cluster,
+                                                  ks_name=self.ks,
+                                                  table_name='testdatetimeformat')
         cql_type_names = [table_meta.columns[c].cql_type for c in table_meta.columns]
 
         imported_results = list(self.session.execute("SELECT * FROM testdatetimeformat"))
@@ -1654,10 +1651,6 @@ class CqlshCopyTest(Tester):
         self.assertNotIn('child process(es) died unexpectedly', err)
         self.assertFalse(results)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11675',
-                   flaky=True,
-                   notes='failed once on trunk')
     def test_all_datatypes_write(self):
         """
         Test that, after COPYing a table containing all CQL datatypes to a CSV
@@ -1969,7 +1962,9 @@ class CqlshCopyTest(Tester):
             imported_results = list(self.session.execute("SELECT * FROM testnumberseps"))
             self.assertEqual(len(expected_vals), len(imported_results))
 
-            table_meta = self.session.cluster.metadata.keyspaces[self.ks].tables['testnumberseps']
+            table_meta = UpdatingTableMetadataWrapper(self.session.cluster,
+                                                      ks_name=self.ks,
+                                                      table_name='testnumberseps')
             cql_type_names = [table_meta.columns[c].cql_type for c in table_meta.columns]
 
             # we format as if we were comparing to csv to overcome loss of precision in the import
@@ -1979,10 +1974,6 @@ class CqlshCopyTest(Tester):
         do_test(expected_vals_usual, ',', '.')
         do_test(expected_vals_inverted, '.', ',')
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11675',
-                   flaky=True,
-                   notes='failed once on trunk')
     @since('3.4')
     def test_round_trip_with_sub_second_precision(self):
         """
@@ -2864,10 +2855,6 @@ class CqlshCopyTest(Tester):
         results = list(self.session.execute("SELECT * FROM {}".format(stress_ks_table_name)))
         self.assertCsvResultEqual(tempfile.name, results, stress_table_name)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11675',
-                   flaky=True,
-                   notes='failed once on trunk')
     def test_copy_from_with_brackets_in_UDT(self):
         """
         Test that we can import a user defined type even when it contains brackets in its values.
