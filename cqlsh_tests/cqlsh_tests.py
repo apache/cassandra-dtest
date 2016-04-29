@@ -438,6 +438,39 @@ UPDATE varcharmaptable SET varcharvarintmap['Vitrum edere possum, mihi non nocet
 
         self.verify_glass(node1)
 
+    def test_unicode_syntax_error(self):
+        """
+        Ensure that syntax errors involving unicode are handled correctly.
+        @jira_ticket CASSANDRA-11626
+        """
+
+        self.cluster.populate(1)
+        self.cluster.start(wait_for_binary_proto=True)
+
+        node1, = self.cluster.nodelist()
+
+        output, err = node1.run_cqlsh(cmds=u"ä;".encode('utf8'), return_output=True)
+        err = err.decode('utf8')
+        self.assertIn(u'Invalid syntax', err)
+        self.assertIn(u'ä', err)
+
+    def test_unicode_invalid_request_error(self):
+        """
+        Ensure that invalid request errors involving unicode are handled correctly.
+        @jira_ticket CASSANDRA-11626
+        """
+        self.cluster.populate(1)
+        self.cluster.start(wait_for_binary_proto=True)
+
+        node1, = self.cluster.nodelist()
+
+        cmd = u'''create keyspace "ä" WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'};'''
+        cmd = cmd.encode('utf8')
+        output, err = node1.run_cqlsh(cmds=cmd, return_output=True)
+
+        err = err.decode('utf8')
+        self.assertIn(u'"ä" is not a valid keyspace name', err)
+
     def test_with_empty_values(self):
         """
         CASSANDRA-7196. Make sure the server returns empty values and CQLSH prints them properly
