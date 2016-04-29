@@ -447,7 +447,7 @@ class TestBootstrap(Tester):
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11281',
                    flaky=True,
-                   notes='windows')
+                   notes='windows, one fail on linux no-vnode 2.2')
     def failed_bootstrap_wiped_node_can_join_test(self):
         """
         @jira_ticket CASSANDRA-9765
