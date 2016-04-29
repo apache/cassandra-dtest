@@ -414,6 +414,9 @@ class SnitchConfigurationUpdateTest(Tester):
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11439',
                    flaky=False,
                    notes='Windows')
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11686',
+                   flaky=True)
     def test_rf_expand_gossiping_property_file_snitch_multi_dc(self):
         """
         @jira_ticket CASSANDRA-10238
