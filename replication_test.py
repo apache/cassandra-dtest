@@ -391,6 +391,9 @@ class SnitchConfigurationUpdateTest(Tester):
                                        nodes_to_shutdown=[0, 2])
 
     @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11690',
+                   flaky=True)
+    @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11439',
                    flaky=False,
                    notes='Windows')
