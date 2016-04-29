@@ -1436,6 +1436,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
                 session.execute("INSERT INTO test (a, b, c) VALUES ({}, {}, {})".format(i, j, j))
 
         for page_size in (2, 3, 4, 5, 15, 16, 17, 100):
+            session.default_fetch_size = page_size
             res = rows_to_list(session.execute("SELECT * FROM test PER PARTITION LIMIT 2"))
             self.assertEqualIgnoreOrder(res, [[0, 0, 0],
                                               [0, 1, 1],
@@ -1462,21 +1463,35 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
             self.assertEqual(5, len(res))
 
             res = rows_to_list(session.execute("SELECT * FROM test WHERE a IN (1,2,3) PER PARTITION LIMIT 3"))
-            self.assertEqualIgnoreOrder(res, [[1, 0, 0],
-                                              [1, 1, 1],
-                                              [1, 2, 2],
-                                              [2, 0, 0],
-                                              [2, 1, 1],
-                                              [2, 2, 2],
-                                              [3, 0, 0],
-                                              [3, 1, 1],
-                                              [3, 2, 2]])
+            self.assertEqual(res, [[1, 0, 0],
+                                   [1, 1, 1],
+                                   [1, 2, 2],
+                                   [2, 0, 0],
+                                   [2, 1, 1],
+                                   [2, 2, 2],
+                                   [3, 0, 0],
+                                   [3, 1, 1],
+                                   [3, 2, 2]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a IN (1,2,3) PER PARTITION LIMIT 3 LIMIT 7"))
+            self.assertEqual(res, [[1, 0, 0],
+                                   [1, 1, 1],
+                                   [1, 2, 2],
+                                   [2, 0, 0],
+                                   [2, 1, 1],
+                                   [2, 2, 2],
+                                   [3, 0, 0]])
 
             res = rows_to_list(session.execute("SELECT * FROM test WHERE a = 1 PER PARTITION LIMIT 4"))
             self.assertEqual(res, [[1, 0, 0],
                                    [1, 1, 1],
                                    [1, 2, 2],
                                    [1, 3, 3]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a = 1 PER PARTITION LIMIT 3"))
+            self.assertEqual(res, [[1, 0, 0],
+                                   [1, 1, 1],
+                                   [1, 2, 2]])
 
             res = rows_to_list(session.execute("SELECT * FROM test WHERE a = 1 ORDER BY b DESC PER PARTITION LIMIT 4"))
             self.assertEqual(res, [[1, 4, 4],
