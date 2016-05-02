@@ -836,6 +836,10 @@ class CqlshCopyTest(Tester):
         result = rows_to_list(self.session.execute("SELECT * FROM testttl"))
         self.assertItemsEqual([], result)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11701',
+                   flaky=True,
+                   notes='windows')
     def test_reading_with_skip_and_max_rows(self):
         """
         Test importing a rows from a CSV file with maxrows and skiprows:
