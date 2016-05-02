@@ -6,7 +6,7 @@ from ccmlib import common
 from ccmlib.node import NodetoolError
 
 from dtest import Tester, debug
-from tools import InterruptCompaction, known_failure, since
+from tools import InterruptCompaction, since
 
 # These must match the stress schema names
 KeyspaceName = 'keyspace1'
@@ -46,9 +46,6 @@ class SSTableUtilTest(Tester):
         finalfiles, tmpfiles = self._check_files(node, KeyspaceName, TableName)
         self.assertEqual(0, len(tmpfiles))
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11692',
-                   flaky=True)
     def abortedcompaction_test(self):
         """
         @jira_ticket CASSANDRA-7066
@@ -65,7 +62,8 @@ class SSTableUtilTest(Tester):
 
         self._create_data(node, KeyspaceName, TableName, numrecords)
         finalfiles, tmpfiles = self._check_files(node, KeyspaceName, TableName)
-        self.assertEqual(0, len(tmpfiles))
+        self.assertTrue(len(finalfiles) > 0, "Expected to find some final files")
+        self.assertEqual(0, len(tmpfiles), "Expected no tmp files")
 
         t = InterruptCompaction(node, TableName, filename=log_file_name, delay=2)
         t.start()
@@ -78,7 +76,9 @@ class SSTableUtilTest(Tester):
 
         t.join()
 
-        finalfiles, tmpfiles = self._check_files(node, KeyspaceName, TableName, finalfiles)
+        finalfiles = _normcase_all(self._invoke_sstableutil(KeyspaceName, TableName, type='final'))
+        tmpfiles = _normcase_all(self._invoke_sstableutil(KeyspaceName, TableName, type='tmp'))
+
         # In most cases we should end up with some temporary files to clean up, but it may happen
         # that no temporary files are created if compaction finishes too early or starts too late
         # see CASSANDRA-11497
