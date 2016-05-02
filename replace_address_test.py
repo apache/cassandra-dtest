@@ -274,6 +274,10 @@ class TestReplaceAddress(Tester):
             node3.watch_log_for('Use cassandra.replace_address if you want to replace this node', from_mark=mark, timeout=20)
             mark = node3.mark_log()
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11700',
+                   flaky=True,
+                   notes='windows')
     @since('3.6')
     def unsafe_replace_test(self):
         """
