@@ -564,7 +564,7 @@ class TestBootstrap(Tester):
 
     def _monitor_datadir(self, node, event, basecount, jobs, failed):
         while True:
-            sstables = node.get_sstables("keyspace1", "standard1")
+            sstables = [s for s in node.get_sstables("keyspace1", "standard1") if "tmplink" not in s]
             debug("---")
             for sstable in sstables:
                 debug(sstable)
