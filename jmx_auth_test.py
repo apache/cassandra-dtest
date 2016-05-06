@@ -1,12 +1,15 @@
 from ccmlib.node import NodetoolError
+
 from dtest import Tester
 from jmxutils import apply_jmx_authentication
-from tools import since
+from tools import known_failure, since
 
 
 @since('3.6')
 class TestJMXAuth(Tester):
-
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11730',
+                   flaky=False, notes='windows')
     def basic_auth_test(self):
         """
         Some basic smoke testing of JMX authentication and authorization.
