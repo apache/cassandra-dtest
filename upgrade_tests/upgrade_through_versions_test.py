@@ -280,10 +280,6 @@ class UpgradeTester(Tester):
         """
         self.upgrade_scenario(internode_ssl=True)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11668',
-                   flaky=True,
-                   notes='failing on 3.2 upgrade to 3.3 head')
     def rolling_upgrade_with_internode_ssl_test(self):
         """
         Rolling upgrade test using internode ssl.
