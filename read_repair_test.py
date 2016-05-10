@@ -209,7 +209,7 @@ class TestReadRepair(Tester):
         self.pprint_trace(trace)
         for trace_event in trace.events:
             activity = trace_event.description
-            assert "Sending READ_REPAIR message" not in activity
+            self.assertNotIn("Sending READ_REPAIR message", activity)
 
     def pprint_trace(self, trace):
         """Pretty print a trace"""
