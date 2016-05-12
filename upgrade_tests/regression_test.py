@@ -4,7 +4,8 @@ Home for upgrade-related tests that don't fit in with the core upgrade testing i
 from cassandra import ConsistencyLevel as CL
 
 from tools import known_failure
-from upgrade_base import UPGRADE_TEST_RUN, VALID_UPGRADE_PAIRS, UpgradeTester
+from upgrade_base import UPGRADE_TEST_RUN, UpgradeTester
+from upgrade_manifest import build_upgrade_pairs
 
 
 class TestForRegressions(UpgradeTester):
@@ -60,7 +61,7 @@ class TestForRegressions(UpgradeTester):
                 self.assertEqual(count, expected_rows, "actual {} did not match expected {}".format(count, expected_rows))
 
 
-for path in VALID_UPGRADE_PAIRS:
+for path in build_upgrade_pairs():
     gen_class_name = TestForRegressions.__name__ + path.name
     assert gen_class_name not in globals(), gen_class_name
     spec = {'UPGRADE_PATH': path,
