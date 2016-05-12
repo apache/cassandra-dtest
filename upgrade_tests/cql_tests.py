@@ -3529,6 +3529,9 @@ class TestCQL(UpgradeTester):
     @known_failure(failure_source='cassandra',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11613',
                    flaky=False)
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11760',
+                   flaky=False)
     def more_user_types_test(self):
         """ user type test that does a little more nesting"""
 
