@@ -34,7 +34,13 @@ next_3_x = None  # None if not yet tagged
 head_trunk = VersionMeta(name='head_trunk', variant='indev', version='git:trunk', min_proto_v=3, max_proto_v=4)
 
 
-# maps an VersionMeta representing a line/variant to a list of other VersionMeta's representing supported upgrades
+# MANIFEST maps a VersionMeta representing a line/variant to a list of other VersionMeta's representing supported upgrades
+# Note on versions: 2.0 must upgrade to 2.1. Once at 2.1 or newer, upgrade is supported to any later version, including trunk (for now).
+# "supported upgrade" means a few basic things, for an upgrade of version 'A' to higher version 'B':
+#   1) The cluster will function in a mixed-version state, with some nodes on version A and some nodes on version B. Schema modifications are not supported on mixed-version clusters.
+#   2) Features exclusive to version B may not work until all nodes are running version B.
+#   3) Nodes upgraded to version B can read data stored by the predecessor version A, and from a data standpoint will function the same as if they always ran version B.
+#   4) If a new sstable format is present in version B, writes will occur in that format after upgrade. Running sstableupgrade on version B will proactively convert version A sstables to version B.
 MANIFEST = {
     # commented out until we have a solution for specifying java versions in upgrade tests
     # indev_2_0_x:                [indev_2_1_x, current_2_1_x, next_2_1_x],
@@ -77,9 +83,9 @@ def _is_targeted_variant_combo(origin_meta, destination_meta):
       current -> next (aka: released -> proposed release point)
       next -> in-dev (aka: proposed release point -> branch)
     """
-    return (origin_meta.variant == 'current' and destination_meta.variant == 'indev')\
-        or (origin_meta.variant == 'current' and destination_meta.variant == 'next')\
-        or (origin_meta.variant == 'next' and destination_meta.variant == 'indev')
+    return ((origin_meta.variant == 'current' and destination_meta.variant == 'indev') or
+            (origin_meta.variant == 'current' and destination_meta.variant == 'next') or
+            (origin_meta.variant == 'next' and destination_meta.variant == 'indev'))
 
 
 def build_upgrade_pairs():
@@ -104,13 +110,13 @@ def build_upgrade_pairs():
                 continue
 
             valid_upgrade_pairs.append(
-                    UpgradePath(
-                        name='Upgrade_' + origin_meta.name + '_To_' + destination_meta.name,
-                        starting_version=origin_meta.version,
-                        upgrade_version=destination_meta.version,
-                        starting_meta=origin_meta,
-                        upgrade_meta=destination_meta
-                    )
+                UpgradePath(
+                    name='Upgrade_' + origin_meta.name + '_To_' + destination_meta.name,
+                    starting_version=origin_meta.version,
+                    upgrade_version=destination_meta.version,
+                    starting_meta=origin_meta,
+                    upgrade_meta=destination_meta
+                )
             )
 
     return valid_upgrade_pairs
