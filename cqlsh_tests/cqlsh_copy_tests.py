@@ -2507,6 +2507,9 @@ class CqlshCopyTest(Tester):
                                    stress_table='stresscql.blogposts',
                                    copy_to_options={'PAGETIMEOUT': 60, 'PAGESIZE': 1000})
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11800',
+                   flaky=True)
     @freshCluster()
     def test_bulk_round_trip_blogposts_with_max_connections(self):
         """
