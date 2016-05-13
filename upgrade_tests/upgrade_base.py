@@ -1,9 +1,7 @@
 import os
-import re
 import sys
 import time
 from abc import ABCMeta
-from distutils.version import LooseVersion
 from unittest import skipIf
 
 from ccmlib.common import get_version_from_build, is_win
@@ -13,39 +11,11 @@ from dtest import DEBUG, Tester, debug
 UPGRADE_TEST_RUN = os.environ.get('UPGRADE_TEST_RUN', '').lower() in {'true', 'yes'}
 
 
-def sanitize_version(version, allow_ambiguous=True):
-    """
-    Takes version of the form cassandra-1.2, 2.0.10, or trunk.
-    Returns a LooseVersion(x.y.z)
-
-    If allow_ambiguous is False, will raise RuntimeError if no version is found.
-    """
-    if (version == 'git:trunk') or (version == 'trunk'):
-        return LooseVersion('git:trunk')
-
-    match = re.match('^.*(\d+\.+\d+\.*\d*).*$', unicode(version))
-    if match:
-        return LooseVersion(match.groups()[0])
-
-    if not allow_ambiguous:
-        raise RuntimeError("Version could not be identified")
-
-
-def switch_jdks(version):
-    cleaned_version = sanitize_version(version)
-
-    if cleaned_version is None:
-        debug("Not switching jdk as cassandra version couldn't be identified from {}".format(version))
-        return
-
+def switch_jdks(major_version_int):
     try:
-        if version < LooseVersion('2.1'):
-            os.environ['JAVA_HOME'] = os.environ['JAVA7_HOME']
-        else:
-            os.environ['JAVA_HOME'] = os.environ['JAVA8_HOME']
+        os.environ['JAVA_HOME'] = os.environ['JAVA{}_HOME'.format(major_version_int)]
     except KeyError:
-        raise RuntimeError("You need to set JAVA7_HOME and JAVA8_HOME to run these tests!")
-    debug("Set JAVA_HOME: [{}] for cassandra version: [{}]".format(os.environ['JAVA_HOME'], version))
+        raise RuntimeError("You need to set JAVA{}_HOME to run these tests!".format(major_version_int))
 
 
 @skipIf(not UPGRADE_TEST_RUN, 'set UPGRADE_TEST_RUN=true to run upgrade tests')
