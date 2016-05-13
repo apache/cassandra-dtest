@@ -47,21 +47,21 @@ MANIFEST = {
     # current_2_0_x: [indev_2_0_x, indev_2_1_x, current_2_1_x, next_2_1_x],
     # next_2_0_x:                 [indev_2_1_x, current_2_1_x, next_2_1_x],
 
-    indev_2_1_x:                [indev_2_2_x, current_2_2_x, next_2_2_x, indev_3_0_x, current_3_0_x, next_3_0_x, indev_3_x, current_3_x, next_3_x, head_trunk],
+    indev_2_1_x: [indev_2_2_x, current_2_2_x, next_2_2_x, indev_3_0_x, current_3_0_x, next_3_0_x, indev_3_x, current_3_x, next_3_x, head_trunk],
     current_2_1_x: [indev_2_1_x, indev_2_2_x, current_2_2_x, next_2_2_x, indev_3_0_x, current_3_0_x, next_3_0_x, indev_3_x, current_3_x, next_3_x, head_trunk],
-    next_2_1_x:                 [indev_2_2_x, current_2_2_x, next_2_2_x, indev_3_0_x, current_3_0_x, next_3_0_x, indev_3_x, current_3_x, next_3_x, head_trunk],
+    next_2_1_x: [indev_2_2_x, current_2_2_x, next_2_2_x, indev_3_0_x, current_3_0_x, next_3_0_x, indev_3_x, current_3_x, next_3_x, head_trunk],
 
-    indev_2_2_x:                [indev_3_0_x, current_3_0_x, next_3_0_x, indev_3_x, current_3_x, next_3_x, head_trunk],
+    indev_2_2_x: [indev_3_0_x, current_3_0_x, next_3_0_x, indev_3_x, current_3_x, next_3_x, head_trunk],
     current_2_2_x: [indev_2_2_x, indev_3_0_x, current_3_0_x, next_3_0_x, indev_3_x, current_3_x, next_3_x, head_trunk],
-    next_2_2_x:                 [indev_3_0_x, current_3_0_x, next_3_0_x, indev_3_x, current_3_x, next_3_x, head_trunk],
+    next_2_2_x: [indev_3_0_x, current_3_0_x, next_3_0_x, indev_3_x, current_3_x, next_3_x, head_trunk],
 
-    indev_3_0_x:                [indev_3_x, current_3_x, next_3_x, head_trunk],
+    indev_3_0_x: [indev_3_x, current_3_x, next_3_x, head_trunk],
     current_3_0_x: [indev_3_0_x, indev_3_x, current_3_x, next_3_x, head_trunk],
-    next_3_0_x:                 [indev_3_x, current_3_x, next_3_x, head_trunk],
+    next_3_0_x: [indev_3_x, current_3_x, next_3_x, head_trunk],
 
-    indev_3_x:              [head_trunk],
+    indev_3_x: [head_trunk],
     current_3_x: [indev_3_x, head_trunk],
-    next_3_x:               [head_trunk],
+    next_3_x: [head_trunk],
 }
 
 
