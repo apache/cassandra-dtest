@@ -33,7 +33,6 @@ next_3_x = None  # None if not yet tagged
 
 head_trunk = VersionMeta(name='head_trunk', variant='indev', version='git:trunk', min_proto_v=3, max_proto_v=4)
 
-
 # MANIFEST maps a VersionMeta representing a line/variant to a list of other VersionMeta's representing supported upgrades
 # Note on versions: 2.0 must upgrade to 2.1. Once at 2.1 or newer, upgrade is supported to any later version, including trunk (for now).
 # "supported upgrade" means a few basic things, for an upgrade of version 'A' to higher version 'B':
@@ -64,6 +63,21 @@ MANIFEST = {
     next_3_x: [head_trunk],
 }
 
+# Local env and custom path testing instructions. Use these steps to REPLACE the normal upgrade test cases with your own.
+# 1) Add a VersionMeta for each version you wish to test (see examples below). Update the name, version, and protocol restrictions as needed. Use a unique name for each VersionMeta.
+# 2) Update OVERRIDE_MANIFEST (see example below).
+# 3) If using ccm local: slugs, make sure you have LOCAL_GIT_REPO defined in your env. This is the path to your git repo.
+# 4) Run the tests! To run all, use 'nosetests -v upgrade_tests/'. To run specific tests, use 'nosetests -vs --collect-only' to preview the test names, then run nosetests using the desired test name.
+custom_1 = VersionMeta(name='custom_branch_1', variant='indev', version='local:some_branch', min_proto_v=3, max_proto_v=4)
+custom_2 = VersionMeta(name='custom_branch_2', variant='indev', version='git:trunk', min_proto_v=3, max_proto_v=4)
+custom_3 = VersionMeta(name='custom_branch_3', variant='indev', version='git:cassandra-3.5', min_proto_v=3, max_proto_v=4)
+custom_4 = VersionMeta(name='custom_branch_4', variant='indev', version='git:cassandra-3.6', min_proto_v=3, max_proto_v=4)
+OVERRIDE_MANIFEST = {
+    # EXAMPLE:
+    # custom_1: [custom_2, custom_3],  # creates a test of custom_1 -> custom_2, and another test from custom_1 -> custom_3
+    # custom_3: [custom_4]             # creates a test of custom_3 -> custom_4
+}
+
 
 def _have_common_proto(origin_meta, destination_meta):
     """
@@ -83,7 +97,8 @@ def _is_targeted_variant_combo(origin_meta, destination_meta):
       current -> next (aka: released -> proposed release point)
       next -> in-dev (aka: proposed release point -> branch)
     """
-    return ((origin_meta.variant == 'current' and destination_meta.variant == 'indev') or
+    return (bool(OVERRIDE_MANIFEST) or  # if we're overriding the test manifest, we don't want to filter anything out
+            (origin_meta.variant == 'current' and destination_meta.variant == 'indev') or
             (origin_meta.variant == 'current' and destination_meta.variant == 'next') or
             (origin_meta.variant == 'next' and destination_meta.variant == 'indev'))
 
@@ -95,7 +110,9 @@ def build_upgrade_pairs():
     Returns a list of UpgradePath's.
     """
     valid_upgrade_pairs = []
-    for origin_meta, destination_metas in MANIFEST.items():
+    manifest = OVERRIDE_MANIFEST or MANIFEST
+
+    for origin_meta, destination_metas in manifest.items():
         for destination_meta in destination_metas:
             if not (origin_meta and destination_meta):  # None means we don't care about that version, which means we don't care about iterations involving it either
                 debug("skipping class creation as a version is undefined (this is normal), versions: {} and {}".format(origin_meta, destination_meta))
