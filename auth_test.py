@@ -2533,14 +2533,8 @@ class TestAuthRoles(Tester):
 
 
 def role_creator_permissions(creator, role):
-    permissions = []
-    for perm in 'ALTER', 'DROP', 'AUTHORIZE':
-        permissions.append((creator, role, perm))
-    return permissions
+    return [(creator, role, perm) for perm in ('ALTER', 'DROP', 'AUTHORIZE')]
 
 
 def function_resource_creator_permissions(creator, resource):
-    permissions = []
-    for perm in 'ALTER', 'DROP', 'AUTHORIZE', 'EXECUTE':
-        permissions.append((creator, resource, perm))
-    return permissions
+    return [(creator, resource, perm) for perm in ('ALTER', 'DROP', 'AUTHORIZE', 'EXECUTE')]
