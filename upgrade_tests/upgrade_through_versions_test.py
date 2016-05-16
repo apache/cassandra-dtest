@@ -242,10 +242,13 @@ class UpgradeTester(Tester):
         Tester.__init__(self, *args, **kwargs)
 
     def setUp(self):
+        debug("Upgrade test beginning, setting CASSANDRA_VERSION to {}, and jdk to {}. (Prior values will be restored after test)."
+              .format(self.test_version_metas[0].version, self.test_version_metas[0].java_version))
+        os.environ['CASSANDRA_VERSION'] = self.test_version_metas[0].version
+        switch_jdks(self.test_version_metas[0].java_version)
+
         super(UpgradeTester, self).setUp()
         debug("Versions to test (%s): %s" % (type(self), str([v.version for v in self.test_version_metas])))
-        switch_jdks(self.test_version_metas[0].java_version)
-        self.cluster.set_install_dir(version=self.test_version_metas[0].version)
 
     def init_config(self):
         self.init_default_config()

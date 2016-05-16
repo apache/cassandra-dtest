@@ -12,10 +12,19 @@ UPGRADE_TEST_RUN = os.environ.get('UPGRADE_TEST_RUN', '').lower() in {'true', 'y
 
 
 def switch_jdks(major_version_int):
+    """
+    Changes the jdk version globally, by setting JAVA_HOME = JAVA[N]_HOME.
+    This means the environment must have JAVA[N]_HOME set to switch to jdk version N.
+    """
     try:
-        os.environ['JAVA_HOME'] = os.environ['JAVA{}_HOME'.format(major_version_int)]
+        os.environ['JAVA{}_HOME'.format(major_version_int)]
     except KeyError:
         raise RuntimeError("You need to set JAVA{}_HOME to run these tests!".format(major_version_int))
+
+    # don't change if the same version was requested
+    if os.environ.get('JAVA_HOME') != os.environ['JAVA{}_HOME'.format(major_version_int)]:
+        debug("Switching jdk to {}".format(major_version_int))
+        os.environ['JAVA_HOME'] = os.environ['JAVA{}_HOME'.format(major_version_int)]
 
 
 @skipIf(not UPGRADE_TEST_RUN, 'set UPGRADE_TEST_RUN=true to run upgrade tests')
@@ -31,6 +40,13 @@ class UpgradeTester(Tester):
     # make this an abc so we can get all subclasses with __subclasses__()
     __metaclass__ = ABCMeta
     NODES, RF, __test__, CL, UPGRADE_PATH = 2, 1, False, None, None
+
+    def setUp(self):
+        debug("Upgrade test beginning, setting CASSANDRA_VERSION to {}, and jdk to {}. (Prior values will be restored after test)."
+              .format(self.UPGRADE_PATH.starting_version, self.UPGRADE_PATH.starting_meta.java_version))
+        switch_jdks(self.UPGRADE_PATH.starting_meta.java_version)
+        os.environ['CASSANDRA_VERSION'] = self.UPGRADE_PATH.starting_version
+        super(UpgradeTester, self).setUp()
 
     def prepare(self, ordered=False, create_keyspace=True, use_cache=False,
                 nodes=None, rf=None, protocol_version=None, cl=None, **kwargs):
@@ -100,6 +116,7 @@ class UpgradeTester(Tester):
             node1.mark_log_for_errors()
 
         debug('upgrading node1 to {}'.format(self.UPGRADE_PATH.upgrade_version))
+        switch_jdks(self.UPGRADE_PATH.upgrade_meta.java_version)
 
         node1.set_install_dir(version=self.UPGRADE_PATH.upgrade_version)
 
