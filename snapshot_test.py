@@ -8,7 +8,7 @@ import time
 from cassandra.concurrent import execute_concurrent_with_args
 
 from dtest import Tester, debug
-from tools import replace_in_file, safe_mkdtemp
+from tools import known_failure, replace_in_file, safe_mkdtemp
 
 
 class SnapshotTester(Tester):
@@ -144,9 +144,17 @@ class TestArchiveCommitlog(SnapshotTester):
                 debug("snapshot_dir is : " + snapshot_dir)
                 distutils.dir_util.copy_tree(snapshot_dir, os.path.join(data_dir, ks, cf_id))
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11811',
+                   flaky=False,
+                   notes='Fails on windows.')
     def test_archive_commitlog(self):
         self.run_archive_commitlog(restore_point_in_time=False)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11811',
+                   flaky=False,
+                   notes='Fails on windows.')
     def test_archive_commitlog_with_active_commitlog(self):
         """
         Copy the active commitlogs to the archive directory before restoration
@@ -159,18 +167,30 @@ class TestArchiveCommitlog(SnapshotTester):
         """
         self.run_archive_commitlog(restore_point_in_time=False, restore_archived_commitlog=False)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11811',
+                   flaky=False,
+                   notes='Fails on windows.')
     def test_archive_commitlog_point_in_time(self):
         """
         Test archive commit log with restore_point_in_time setting
         """
         self.run_archive_commitlog(restore_point_in_time=True)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11811',
+                   flaky=False,
+                   notes='Fails on windows.')
     def test_archive_commitlog_point_in_time_with_active_commitlog(self):
         """
         Test archive commit log with restore_point_in_time setting
         """
         self.run_archive_commitlog(restore_point_in_time=True, archive_active_commitlogs=True)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11811',
+                   flaky=False,
+                   notes='Fails on windows.')
     def test_archive_commitlog_point_in_time_with_active_commitlog_ln(self):
         """
         Test archive commit log with restore_point_in_time setting
