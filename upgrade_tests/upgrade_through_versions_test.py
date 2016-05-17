@@ -388,7 +388,7 @@ class UpgradeTester(Tester):
         for call in after_upgrade_call:
             call()
 
-            debug('All nodes successfully upgraded to %s' % version_meta)
+            debug('All nodes successfully upgraded to %s' % version_meta.version)
             self._log_current_ver(version_meta)
 
         cluster.stop()
