@@ -6,32 +6,39 @@ from dtest import debug
 # They also contain VersionMeta's for each version the path is testing
 UpgradePath = namedtuple('UpgradePath', ('name', 'starting_version', 'upgrade_version', 'starting_meta', 'upgrade_meta'))
 
-# VersionMeta's capture data about version lines, protocols supported, and current version identifiers
-# they should have a 'variant' value of 'current', 'indev', or 'next':
-#    'current' means most recent released version, 'indev' means where changing code is found, 'next' means a tentative tag
-VersionMeta = namedtuple('VersionMeta', ('name', 'variant', 'version', 'min_proto_v', 'max_proto_v'))
+
+class VersionMeta(namedtuple('_VersionMeta', ('name', 'variant', 'version', 'min_proto_v', 'max_proto_v', 'java_versions'))):
+    """
+    VersionMeta's are namedtuples that capture data about version lines, protocols supported, and current version identifiers
+    they must have a 'variant' value of 'current', 'indev', or 'next', where 'current' means most recent released version,
+    'indev' means where changing code is found, 'next' means a tentative tag.
+    """
+    @property
+    def java_version(self):
+        return max(self.java_versions)
+
 
 indev_2_0_x = None  # None if release not likely
-current_2_0_x = VersionMeta(name='current_2_0_x', variant='current', version='2.0.17', min_proto_v=1, max_proto_v=2)
+current_2_0_x = VersionMeta(name='current_2_0_x', variant='current', version='2.0.17', min_proto_v=1, max_proto_v=2, java_versions=(7,))
 next_2_0_x = None  # None if not yet tagged
 
-indev_2_1_x = VersionMeta(name='indev_2_1_x', variant='indev', version='git:cassandra-2.1', min_proto_v=1, max_proto_v=3)
-current_2_1_x = VersionMeta(name='current_2_1_x', variant='current', version='2.1.14', min_proto_v=1, max_proto_v=3)
+indev_2_1_x = VersionMeta(name='indev_2_1_x', variant='indev', version='git:cassandra-2.1', min_proto_v=1, max_proto_v=3, java_versions=(7, 8))
+current_2_1_x = VersionMeta(name='current_2_1_x', variant='current', version='2.1.14', min_proto_v=1, max_proto_v=3, java_versions=(7, 8))
 next_2_1_x = None  # None if not yet tagged
 
-indev_2_2_x = VersionMeta(name='indev_2_2_x', variant='indev', version='git:cassandra-2.2', min_proto_v=1, max_proto_v=4)
-current_2_2_x = VersionMeta(name='current_2_2_x', variant='current', version='2.2.6', min_proto_v=1, max_proto_v=4)
+indev_2_2_x = VersionMeta(name='indev_2_2_x', variant='indev', version='git:cassandra-2.2', min_proto_v=1, max_proto_v=4, java_versions=(7, 8))
+current_2_2_x = VersionMeta(name='current_2_2_x', variant='current', version='2.2.6', min_proto_v=1, max_proto_v=4, java_versions=(7, 8))
 next_2_2_x = None  # None if not yet tagged
 
-indev_3_0_x = VersionMeta(name='indev_3_0_x', variant='indev', version='git:cassandra-3.0', min_proto_v=3, max_proto_v=4)
-current_3_0_x = VersionMeta(name='current_3_0_x', variant='current', version='3.0.5', min_proto_v=3, max_proto_v=4)
+indev_3_0_x = VersionMeta(name='indev_3_0_x', variant='indev', version='git:cassandra-3.0', min_proto_v=3, max_proto_v=4, java_versions=(8,))
+current_3_0_x = VersionMeta(name='current_3_0_x', variant='current', version='3.0.5', min_proto_v=3, max_proto_v=4, java_versions=(8,))
 next_3_0_x = None  # None if not yet tagged
 
-indev_3_x = VersionMeta(name='indev_3_x', variant='indev', version='git:cassandra-3.7', min_proto_v=3, max_proto_v=4)
-current_3_x = VersionMeta(name='current_3_x', variant='current', version='3.5', min_proto_v=3, max_proto_v=4)
+indev_3_x = VersionMeta(name='indev_3_x', variant='indev', version='git:cassandra-3.7', min_proto_v=3, max_proto_v=4, java_versions=(8,))
+current_3_x = VersionMeta(name='current_3_x', variant='current', version='3.5', min_proto_v=3, max_proto_v=4, java_versions=(8,))
 next_3_x = None  # None if not yet tagged
 
-head_trunk = VersionMeta(name='head_trunk', variant='indev', version='git:trunk', min_proto_v=3, max_proto_v=4)
+head_trunk = VersionMeta(name='head_trunk', variant='indev', version='git:trunk', min_proto_v=3, max_proto_v=4, java_versions=(8,))
 
 # MANIFEST maps a VersionMeta representing a line/variant to a list of other VersionMeta's representing supported upgrades
 # Note on versions: 2.0 must upgrade to 2.1. Once at 2.1 or newer, upgrade is supported to any later version, including trunk (for now).
@@ -41,10 +48,9 @@ head_trunk = VersionMeta(name='head_trunk', variant='indev', version='git:trunk'
 #   3) Nodes upgraded to version B can read data stored by the predecessor version A, and from a data standpoint will function the same as if they always ran version B.
 #   4) If a new sstable format is present in version B, writes will occur in that format after upgrade. Running sstableupgrade on version B will proactively convert version A sstables to version B.
 MANIFEST = {
-    # commented out until we have a solution for specifying java versions in upgrade tests
-    # indev_2_0_x:                [indev_2_1_x, current_2_1_x, next_2_1_x],
-    # current_2_0_x: [indev_2_0_x, indev_2_1_x, current_2_1_x, next_2_1_x],
-    # next_2_0_x:                 [indev_2_1_x, current_2_1_x, next_2_1_x],
+    indev_2_0_x: [indev_2_1_x, current_2_1_x, next_2_1_x],
+    current_2_0_x: [indev_2_0_x, indev_2_1_x, current_2_1_x, next_2_1_x],
+    next_2_0_x: [indev_2_1_x, current_2_1_x, next_2_1_x],
 
     indev_2_1_x: [indev_2_2_x, current_2_2_x, next_2_2_x, indev_3_0_x, current_3_0_x, next_3_0_x, indev_3_x, current_3_x, next_3_x, head_trunk],
     current_2_1_x: [indev_2_1_x, indev_2_2_x, current_2_2_x, next_2_2_x, indev_3_0_x, current_3_0_x, next_3_0_x, indev_3_x, current_3_x, next_3_x, head_trunk],
@@ -68,10 +74,10 @@ MANIFEST = {
 # 2) Update OVERRIDE_MANIFEST (see example below).
 # 3) If using ccm local: slugs, make sure you have LOCAL_GIT_REPO defined in your env. This is the path to your git repo.
 # 4) Run the tests! To run all, use 'nosetests -v upgrade_tests/'. To run specific tests, use 'nosetests -vs --collect-only' to preview the test names, then run nosetests using the desired test name.
-custom_1 = VersionMeta(name='custom_branch_1', variant='indev', version='local:some_branch', min_proto_v=3, max_proto_v=4)
-custom_2 = VersionMeta(name='custom_branch_2', variant='indev', version='git:trunk', min_proto_v=3, max_proto_v=4)
-custom_3 = VersionMeta(name='custom_branch_3', variant='indev', version='git:cassandra-3.5', min_proto_v=3, max_proto_v=4)
-custom_4 = VersionMeta(name='custom_branch_4', variant='indev', version='git:cassandra-3.6', min_proto_v=3, max_proto_v=4)
+custom_1 = VersionMeta(name='custom_branch_1', variant='indev', version='local:some_branch', min_proto_v=3, max_proto_v=4, java_versions=(7, 8))
+custom_2 = VersionMeta(name='custom_branch_2', variant='indev', version='git:trunk', min_proto_v=3, max_proto_v=4, java_versions=(7, 8))
+custom_3 = VersionMeta(name='custom_branch_3', variant='indev', version='git:cassandra-3.5', min_proto_v=3, max_proto_v=4, java_versions=(7, 8))
+custom_4 = VersionMeta(name='custom_branch_4', variant='indev', version='git:cassandra-3.6', min_proto_v=3, max_proto_v=4, java_versions=(7, 8))
 OVERRIDE_MANIFEST = {
     # EXAMPLE:
     # custom_1: [custom_2, custom_3],  # creates a test of custom_1 -> custom_2, and another test from custom_1 -> custom_3

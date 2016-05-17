@@ -1,9 +1,7 @@
 import os
-import re
 import sys
 import time
 from abc import ABCMeta
-from distutils.version import LooseVersion
 from unittest import skipIf
 
 from ccmlib.common import get_version_from_build, is_win
@@ -13,39 +11,23 @@ from dtest import DEBUG, Tester, debug
 UPGRADE_TEST_RUN = os.environ.get('UPGRADE_TEST_RUN', '').lower() in {'true', 'yes'}
 
 
-def sanitize_version(version, allow_ambiguous=True):
+def switch_jdks(major_version_int):
     """
-    Takes version of the form cassandra-1.2, 2.0.10, or trunk.
-    Returns a LooseVersion(x.y.z)
-
-    If allow_ambiguous is False, will raise RuntimeError if no version is found.
+    Changes the jdk version globally, by setting JAVA_HOME = JAVA[N]_HOME.
+    This means the environment must have JAVA[N]_HOME set to switch to jdk version N.
     """
-    if (version == 'git:trunk') or (version == 'trunk'):
-        return LooseVersion('git:trunk')
-
-    match = re.match('^.*(\d+\.+\d+\.*\d*).*$', unicode(version))
-    if match:
-        return LooseVersion(match.groups()[0])
-
-    if not allow_ambiguous:
-        raise RuntimeError("Version could not be identified")
-
-
-def switch_jdks(version):
-    cleaned_version = sanitize_version(version)
-
-    if cleaned_version is None:
-        debug("Not switching jdk as cassandra version couldn't be identified from {}".format(version))
-        return
+    new_java_home = 'JAVA{}_HOME'.format(major_version_int)
 
     try:
-        if version < LooseVersion('2.1'):
-            os.environ['JAVA_HOME'] = os.environ['JAVA7_HOME']
-        else:
-            os.environ['JAVA_HOME'] = os.environ['JAVA8_HOME']
+        os.environ[new_java_home]
     except KeyError:
-        raise RuntimeError("You need to set JAVA7_HOME and JAVA8_HOME to run these tests!")
-    debug("Set JAVA_HOME: [{}] for cassandra version: [{}]".format(os.environ['JAVA_HOME'], version))
+        raise RuntimeError("You need to set {} to run these tests!".format(new_java_home))
+
+    # don't change if the same version was requested
+    current_java_home = os.environ.get('JAVA_HOME')
+    if current_java_home != os.environ[new_java_home]:
+        debug("Switching jdk to version {} (JAVA_HOME is changing from {} to {})".format(major_version_int, current_java_home or 'undefined', os.environ[new_java_home]))
+        os.environ['JAVA_HOME'] = os.environ[new_java_home]
 
 
 @skipIf(not UPGRADE_TEST_RUN, 'set UPGRADE_TEST_RUN=true to run upgrade tests')
@@ -61,6 +43,13 @@ class UpgradeTester(Tester):
     # make this an abc so we can get all subclasses with __subclasses__()
     __metaclass__ = ABCMeta
     NODES, RF, __test__, CL, UPGRADE_PATH = 2, 1, False, None, None
+
+    def setUp(self):
+        debug("Upgrade test beginning, setting CASSANDRA_VERSION to {}, and jdk to {}. (Prior values will be restored after test)."
+              .format(self.UPGRADE_PATH.starting_version, self.UPGRADE_PATH.starting_meta.java_version))
+        switch_jdks(self.UPGRADE_PATH.starting_meta.java_version)
+        os.environ['CASSANDRA_VERSION'] = self.UPGRADE_PATH.starting_version
+        super(UpgradeTester, self).setUp()
 
     def prepare(self, ordered=False, create_keyspace=True, use_cache=False,
                 nodes=None, rf=None, protocol_version=None, cl=None, **kwargs):
@@ -130,6 +119,7 @@ class UpgradeTester(Tester):
             node1.mark_log_for_errors()
 
         debug('upgrading node1 to {}'.format(self.UPGRADE_PATH.upgrade_version))
+        switch_jdks(self.UPGRADE_PATH.upgrade_meta.java_version)
 
         node1.set_install_dir(version=self.UPGRADE_PATH.upgrade_version)
 
