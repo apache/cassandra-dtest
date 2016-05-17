@@ -19,6 +19,9 @@ from tools import known_failure, rows_to_list, since
 class TestSecondaryIndexes(Tester):
 
     def bug3367_test(self):
+        """
+        @jira_ticket CASSANDRA-3367
+        """
         cluster = self.cluster
         cluster.populate(1).start()
         [node1] = cluster.nodelist()
@@ -116,7 +119,8 @@ class TestSecondaryIndexes(Tester):
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11729',
                    flaky=False)
     def test_6924_dropping_ks(self):
-        """Tests CASSANDRA-6924
+        """
+        @jira_ticket CASSANDRA-6924
 
         Data inserted immediately after dropping and recreating a
         keyspace with an indexed column familiy is not included
@@ -126,8 +130,7 @@ class TestSecondaryIndexes(Tester):
         cluster = self.cluster
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
-        conn = self.patient_cql_connection(node1)
-        session = conn
+        session = self.patient_cql_connection(node1)
 
         # This only occurs when dropping and recreating with
         # the same name, so loop through this test a few times:
@@ -153,7 +156,8 @@ class TestSecondaryIndexes(Tester):
             self.assertEqual(count, 10)
 
     def test_6924_dropping_cf(self):
-        """Tests CASSANDRA-6924
+        """
+        @jira_ticket CASSANDRA-6924
 
         Data inserted immediately after dropping and recreating an
         indexed column family is not included in the index.
@@ -162,8 +166,8 @@ class TestSecondaryIndexes(Tester):
         cluster = self.cluster
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
-        conn = self.patient_cql_connection(node1)
-        session = conn
+        session = self.patient_cql_connection(node1)
+
         self.create_ks(session, 'ks', 1)
 
         # This only occurs when dropping and recreating with
@@ -189,7 +193,8 @@ class TestSecondaryIndexes(Tester):
             self.assertEqual(count, 10)
 
     def test_8280_validate_indexed_values(self):
-        """Tests CASSANDRA-8280
+        """
+        @jira_ticket CASSANDRA-8280
 
         Reject inserts & updates where values of any indexed
         column is > 64k
@@ -197,8 +202,8 @@ class TestSecondaryIndexes(Tester):
         cluster = self.cluster
         cluster.populate(1).start()
         node1 = cluster.nodelist()[0]
-        conn = self.patient_cql_connection(node1)
-        session = conn
+        session = self.patient_cql_connection(node1)
+
         self.create_ks(session, 'ks', 1)
 
         self.insert_row_with_oversize_value("CREATE TABLE %s(a int, b int, c text, PRIMARY KEY (a))",
