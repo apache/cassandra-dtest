@@ -16,15 +16,18 @@ def switch_jdks(major_version_int):
     Changes the jdk version globally, by setting JAVA_HOME = JAVA[N]_HOME.
     This means the environment must have JAVA[N]_HOME set to switch to jdk version N.
     """
+    new_java_home = 'JAVA{}_HOME'.format(major_version_int)
+
     try:
-        os.environ['JAVA{}_HOME'.format(major_version_int)]
+        os.environ[new_java_home]
     except KeyError:
-        raise RuntimeError("You need to set JAVA{}_HOME to run these tests!".format(major_version_int))
+        raise RuntimeError("You need to set {} to run these tests!".format(new_java_home))
 
     # don't change if the same version was requested
-    if os.environ.get('JAVA_HOME') != os.environ['JAVA{}_HOME'.format(major_version_int)]:
-        debug("Switching jdk to {}".format(major_version_int))
-        os.environ['JAVA_HOME'] = os.environ['JAVA{}_HOME'.format(major_version_int)]
+    current_java_home = os.environ.get('JAVA_HOME')
+    if current_java_home != os.environ[new_java_home]:
+        debug("Switching jdk to version {} (JAVA_HOME is changing from {} to {})".format(major_version_int, current_java_home or 'undefined', os.environ[new_java_home]))
+        os.environ['JAVA_HOME'] = os.environ[new_java_home]
 
 
 @skipIf(not UPGRADE_TEST_RUN, 'set UPGRADE_TEST_RUN=true to run upgrade tests')
