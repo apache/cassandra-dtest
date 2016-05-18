@@ -46,6 +46,8 @@ class TestTopology(Tester):
         node2.decommission()
         node2.stop(wait_other_notice=True)
 
+        # This sleep is here to give the cluster time to hit the AssertionError
+        # described in 9912. Do not remove it.
         time.sleep(10)
 
     @no_vnodes()
