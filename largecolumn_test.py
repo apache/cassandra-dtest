@@ -32,6 +32,10 @@ class TestLargeColumn(Tester):
             assert is_number(field.strip()) or field == 'NaN', "Expected numeric from fields from nodetool gcstats"
         return fields[6]
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11838',
+                   flaky=True,
+                   notes='OOM on trunk')
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11234',
                    flaky=False,
