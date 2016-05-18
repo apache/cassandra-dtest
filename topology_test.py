@@ -37,12 +37,12 @@ class TestTopology(Tester):
         cluster = self.cluster
         cluster.populate(3)
         cluster.start(wait_for_binary_proto=True, jvm_args=["-Dcassandra.size_recorder_interval=1"])
-        [node1, node2, node3] = cluster.nodelist()
+        node1, node2, node3 = cluster.nodelist()
 
         # write some data
         node1.stress(['write', 'n=10K', '-rate', 'threads=8'])
 
-        # Decommision node and wipe its data
+        # Decommission node and wipe its data
         node2.decommission()
         node2.stop(wait_other_notice=True)
 
