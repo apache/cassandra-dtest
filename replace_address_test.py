@@ -399,6 +399,8 @@ class TestReplaceAddress(Tester):
         finalData = list(session.execute(query))
         self.assertListEqual(initialData, finalData)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11835')
     @since('2.2')
     def replace_with_reset_resume_state_test(self):
         """Test replace with resetting bootstrap progress"""
@@ -407,7 +409,7 @@ class TestReplaceAddress(Tester):
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
 
-        node1.stress(['write', 'n=100000', '-schema', 'replication(factor=3)'])
+        node1.stress(['write', 'n=100K', '-schema', 'replication(factor=3)'])
 
         session = self.patient_cql_connection(node1)
         stress_table = 'keyspace1.standard1'
