@@ -672,6 +672,10 @@ class TestRepair(Tester):
                       rows[0][0],
                       'Expected {} job threads in repair options. Instead we saw {}'.format(job_thread_count, rows[0][0]))
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11836',
+                   flaky=True,
+                   notes='Windows')
     @since('2.2')
     def thread_count_repair_test(self):
         """
