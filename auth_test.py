@@ -1,4 +1,3 @@
-import os
 import re
 import time
 from collections import namedtuple
@@ -6,11 +5,10 @@ from collections import namedtuple
 from cassandra import AuthenticationFailed, InvalidRequest, Unauthorized
 from cassandra.cluster import NoHostAvailable
 from cassandra.protocol import SyntaxException
-from ccmlib.common import get_version_from_build
 
 from assertions import (assert_all, assert_invalid, assert_one,
                         assert_unauthorized)
-from dtest import Tester, debug
+from dtest import CASSANDRA_VERSION_FROM_BUILD, Tester, debug
 from tools import known_failure, since
 
 
@@ -996,8 +994,7 @@ class TestAuthRoles(Tester):
     """
 
     def __init__(self, *args, **kwargs):
-        CASSANDRA_DIR = os.environ.get('CASSANDRA_DIR')
-        if get_version_from_build(CASSANDRA_DIR) >= '3.0':
+        if CASSANDRA_VERSION_FROM_BUILD >= '3.0':
             kwargs['cluster_options'] = {'enable_user_defined_functions': 'true',
                                          'enable_scripted_user_defined_functions': 'true'}
         else:
