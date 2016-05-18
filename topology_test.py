@@ -47,7 +47,7 @@ class TestTopology(Tester):
 
         # Decommission node and wipe its data
         node2.decommission()
-        node2.stop(wait_other_notice=True)
+        node2.stop()
 
         # This sleep is here to give the cluster time to hit the AssertionError
         # described in 9912. Do not remove it.
