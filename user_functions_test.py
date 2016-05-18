@@ -1,14 +1,11 @@
 import math
-import os
 import time
+from distutils.version import LooseVersion
 
 from cassandra import FunctionFailure
 
-from distutils.version import LooseVersion
-
-from ccmlib.common import get_version_from_build
-from dtest import Tester, debug
-from assertions import assert_invalid, assert_one, assert_none
+from assertions import assert_invalid, assert_none, assert_one
+from dtest import CASSANDRA_VERSION_FROM_BUILD, Tester, debug
 from tools import since
 
 
@@ -16,8 +13,7 @@ from tools import since
 class TestUserFunctions(Tester):
 
     def __init__(self, *args, **kwargs):
-        CASSANDRA_DIR = os.environ.get('CASSANDRA_DIR')
-        if get_version_from_build(CASSANDRA_DIR) >= '3.0':
+        if CASSANDRA_VERSION_FROM_BUILD >= '3.0':
             kwargs['cluster_options'] = {'enable_user_defined_functions': 'true',
                                          'enable_scripted_user_defined_functions': 'true'}
         else:
