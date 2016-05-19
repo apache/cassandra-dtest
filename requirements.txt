@@ -6,6 +6,7 @@ docopt
 enum34
 flaky
 futures
+mock
 nose
 nose-test-select
 parse
