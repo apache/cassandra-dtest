@@ -19,7 +19,8 @@ from ccmlib import common
 from assertions import assert_all, assert_none
 from cqlsh_tools import monkeypatch_driver, unmonkeypatch_driver
 from dtest import Tester, debug
-from tools import create_c1c2_table, known_failure, insert_c1c2, rows_to_list, since
+from tools import (create_c1c2_table, insert_c1c2, known_failure, rows_to_list,
+                   since)
 
 
 class TestCqlsh(Tester):
@@ -1580,9 +1581,11 @@ Tracing session:""")
         self.assertEqual(0, len(stderr), stderr)
         self.assertEqual(0, len(stdout), stdout)
 
-    def run_cqlsh(self, node, cmds, cqlsh_options=[], env_vars=None):
+    def run_cqlsh(self, node, cmds, cqlsh_options=None, env_vars=None):
         if env_vars is None:
             env_vars = {}
+        if cqlsh_options is None:
+            cqlsh_options = []
         cdir = node.get_install_dir()
         cli = os.path.join(cdir, 'bin', common.platform_binary('cqlsh'))
         env = common.make_cassandra_env(cdir, node.get_path())
