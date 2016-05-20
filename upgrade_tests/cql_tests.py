@@ -4198,6 +4198,10 @@ class TestCQL(UpgradeTester):
             assert_all(cursor, "SELECT * FROM test WHERE k=0 AND c1 = 0 AND c2 IN (0, 2) ORDER BY c1 ASC", [[0, 0, 0], [0, 0, 2]])
             assert_all(cursor, "SELECT * FROM test WHERE k=0 AND c1 = 0 AND c2 IN (0, 2) ORDER BY c1 DESC", [[0, 0, 2], [0, 0, 0]])
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11859',
+                   flaky=False,
+                   notes='Fails on 2.0 to 2.1 upgrade')
     def in_order_by_without_selecting_test(self):
         """ Test that columns don't need to be selected for ORDER BY when there is a IN (#4911) """
 
