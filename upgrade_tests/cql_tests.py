@@ -1693,8 +1693,7 @@ class TestCQL(UpgradeTester):
                 cursor.execute("INSERT INTO test (k, v) VALUES (%s, %s)", (i, i))
 
             cursor.default_fetch_size = None
-            results = rows_to_list(cursor.execute("SELECT * FROM test"))
-            results.sort()
+            results = sorted(rows_to_list(cursor.execute("SELECT * FROM test")))
             self.assertEqual(10, len(results))
             self.assertEqual([[i, i] for i in range(10)], results)
 
@@ -4604,7 +4603,6 @@ class TestCQL(UpgradeTester):
                 check_invalid("m CONTAINS KEY 'foo'", expected=SyntaxException)
                 check_invalid("m CONTAINS null", expected=SyntaxException)
                 check_invalid("m CONTAINS KEY null", expected=SyntaxException)
-
 
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11857',
