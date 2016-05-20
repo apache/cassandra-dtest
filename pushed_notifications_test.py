@@ -1,4 +1,5 @@
 import time
+from datetime import datetime
 from threading import Event
 
 from cassandra import ConsistencyLevel as CL
@@ -47,7 +48,7 @@ class NotificationWaiter(object):
         """
         Called when a notification is pushed from Cassandra.
         """
-        debug("Source {} sent {}".format(self.address, notification))
+        debug("Got {} from {} at {}".format(notification, self.address, datetime.now()))
 
         if self.keyspace and notification['keyspace'] and self.keyspace != notification['keyspace']:
             return  # we are not interested in this schema change
@@ -72,6 +73,7 @@ class NotificationWaiter(object):
         return self.notifications
 
     def clear_notifications(self):
+        debug("Clearing notifications...")
         self.notifications = []
         self.event.clear()
 
@@ -91,18 +93,16 @@ class TestPushedNotifications(Tester):
         """
         self.cluster.populate(3).start(wait_for_binary_proto=True, wait_other_notice=True)
 
-        # Despite waiting for each node to see the other nodes as UP, there is apparently
-        # still a race condition that can result in NEW_NODE events being sent.  We don't
-        # want to accidentally collect those, so we block on the
-        # arrival of the first notification, then clear both waiters.
-
         waiters = [NotificationWaiter(self, node, ["TOPOLOGY_CHANGE"])
                    for node in self.cluster.nodes.values()]
-        waiters[0].wait_for_notifications(timeout=60, num_notifications=1)
 
-        for waiter in waiters:
-            waiter.clear_notifications()
+        # The first node sends NEW_NODE for the other 2 nodes during startup, in case they are
+        # late due to network delays let's block a bit longer
+        debug("Waiting for unwanted notifications....")
+        waiters[0].wait_for_notifications(timeout=30, num_notifications=2)
+        waiters[0].clear_notifications()
 
+        debug("Issuing move command....")
         node1 = self.cluster.nodes.values()[0]
         node1.move("123")
 
@@ -128,30 +128,21 @@ class TestPushedNotifications(Tester):
         """
         cluster = self.cluster
         cluster.populate(3)
-        node1, node2, node3 = cluster.nodelist()
 
-        # change node's 'rpc_address' from '127.0.0.x' to 'localhost (127.0.0.1)', increase port numbers
-        i = 0
-        for node in cluster.nodelist():
-            # See CASSANDRA-11057 for IPv6 issues and why we set 127.0.0.1 for CCM
-            debug('Set 127.0.0.1 to prevent IPv6 java prefs, set rpc_address: localhost in cassandra.yaml')
-            node.network_interfaces['thrift'] = ('127.0.0.1', node.network_interfaces['thrift'][1] + i)
-            node.network_interfaces['binary'] = ('127.0.0.1', node.network_interfaces['thrift'][1] + 1)
-            node.import_config_files()  # this regenerates the yaml file and sets 'rpc_address' to the 'thrift' address
-            node.set_configuration_options(values={'rpc_address': 'localhost'})
-            debug(node.show())
-            i = i + 2
+        self.change_rpc_address_to_localhost()
 
         cluster.start(wait_for_binary_proto=True, wait_other_notice=True)
-
-        # Despite waiting for each node to see the other nodes as UP, there is apparently
-        # still a race condition that can result in NEW_NODE events being sent.  We don't
-        # want to accidentally collect those, so for now we will just sleep a few seconds.
-        time.sleep(3)
 
         waiters = [NotificationWaiter(self, node, ["TOPOLOGY_CHANGE"])
                    for node in self.cluster.nodes.values()]
 
+        # The first node sends NEW_NODE for the other 2 nodes during startup, in case they are
+        # late due to network delays let's block a bit longer
+        debug("Waiting for unwanted notifications...")
+        waiters[0].wait_for_notifications(timeout=30, num_notifications=2)
+        waiters[0].clear_notifications()
+
+        debug("Issuing move command....")
         node1 = self.cluster.nodes.values()[0]
         node1.move("123")
 
@@ -172,9 +163,13 @@ class TestPushedNotifications(Tester):
 
         self.cluster.populate(2).start(wait_for_binary_proto=True, wait_other_notice=True)
         node1, node2 = self.cluster.nodelist()
-        # need to block so that these notifications don't confuse the state below
+
         waiter = NotificationWaiter(self, node1, ["STATUS_CHANGE", "TOPOLOGY_CHANGE"])
-        waiter.wait_for_notifications(timeout=60, num_notifications=2)
+
+        # need to block for up to 2 notifications (NEW_NODE and UP) so that these notifications
+        # don't confuse the state below
+        debug("Waiting for unwanted notifications...")
+        waiter.wait_for_notifications(timeout=30, num_notifications=2)
         waiter.clear_notifications()
 
         for i in range(5):
@@ -182,13 +177,12 @@ class TestPushedNotifications(Tester):
             node2.stop(wait_other_notice=True)
             node2.start(wait_other_notice=True)
             debug("Waiting for notifications from {}".format(waiter.address))
-            notifications = waiter.wait_for_notifications(timeout=60.0, num_notifications=3)
-            self.assertEquals(3, len(notifications), notifications)
+            notifications = waiter.wait_for_notifications(timeout=60.0, num_notifications=2)
+            self.assertEquals(2, len(notifications), notifications)
             for notification in notifications:
                 self.assertEquals(self.get_ip_from_node(node2), notification["address"][0])
             self.assertEquals("DOWN", notifications[0]["change_type"])
             self.assertEquals("UP", notifications[1]["change_type"])
-            self.assertEquals("NEW_NODE", notifications[2]["change_type"])
             waiter.clear_notifications()
 
     @known_failure(failure_source='cassandra',
@@ -206,15 +200,9 @@ class TestPushedNotifications(Tester):
         cluster.populate(2)
         node1, node2 = cluster.nodelist()
 
-        i = 0  # change 'rpc_address' from '127.0.0.x' to 'localhost' and diversify port numbers
-        for node in cluster.nodelist():
-            node.network_interfaces['thrift'] = ('localhost', node.network_interfaces['thrift'][1] + i)
-            node.network_interfaces['binary'] = ('localhost', node.network_interfaces['thrift'][1] + 1)
-            node.import_config_files()  # this regenerates the yaml file and sets 'rpc_address' to the 'thrift' address
-            debug(node.show())
-            i = i + 2
+        self.change_rpc_address_to_localhost()
 
-        cluster.start(wait_for_binary_proto=True)
+        cluster.start(wait_for_binary_proto=True, wait_other_notice=True)
 
         # register for notification with node1
         waiter = NotificationWaiter(self, node1, ["STATUS_CHANGE", "TOPOLOGY_CHANGE"])
@@ -226,8 +214,24 @@ class TestPushedNotifications(Tester):
 
         # check that node1 did not send UP or DOWN notification for node2
         debug("Waiting for notifications from {}".format(waiter.address,))
-        notifications = waiter.wait_for_notifications(timeout=30.0, num_notifications=3)
+        notifications = waiter.wait_for_notifications(timeout=30.0, num_notifications=2)
         self.assertEquals(0, len(notifications), notifications)
+
+    def change_rpc_address_to_localhost(self):
+        """
+        change node's 'rpc_address' from '127.0.0.x' to 'localhost (127.0.0.1)', increase port numbers
+        """
+        cluster = self.cluster
+
+        i = 0
+        for node in cluster.nodelist():
+            debug('Set 127.0.0.1 to prevent IPv6 java prefs, set rpc_address: localhost in cassandra.yaml')
+            node.network_interfaces['thrift'] = ('127.0.0.1', node.network_interfaces['thrift'][1] + i)
+            node.network_interfaces['binary'] = ('127.0.0.1', node.network_interfaces['thrift'][1] + 1)
+            node.import_config_files()  # this regenerates the yaml file and sets 'rpc_address' to the 'thrift' address
+            node.set_configuration_options(values={'rpc_address': 'localhost'})
+            debug(node.show())
+            i += 2
 
     @since("3.0")
     def schema_changes_test(self):
