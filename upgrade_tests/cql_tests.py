@@ -3986,6 +3986,10 @@ class TestCQL(UpgradeTester):
             # We don't support that
             assert_invalid(cursor, "SELECT s FROM test WHERE v = 1")
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11863',
+                   flaky=False,
+                   notes='Fails on 2.0 to 2.1 upgrade')
     def static_columns_with_distinct_test(self):
         cursor = self.prepare()
 
