@@ -3638,6 +3638,10 @@ class TestCQL(UpgradeTester):
             execute_concurrent_with_args(cursor, insert_statement, [(i,) for i in range(10002, 15001)])
             assert_one(cursor, "SELECT COUNT(*) FROM test", [15000])
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11862',
+                   flaky=False,
+                   notes='Fails on 2.0 to 2.1 upgrade')
     def collection_indexing_test(self):
         cursor = self.prepare()
 
