@@ -2458,7 +2458,7 @@ class TestCQL(UpgradeTester):
             ('test', '10015', 'NY', 36, 'New York'),
             ('test', '07182', 'NJ', 34, 'Newark'),
             ('test', '73301', 'TX', 48, 'Austin'),
-            ('test', '94102', 'CA', 06, 'San Francisco'),
+            ('test', '94102', 'CA', 6, 'San Francisco'),
 
             ('test2', '06029', 'CT', 9, 'Ellington'),
             ('test2', '06031', 'CT', 9, 'Falls Village'),
@@ -2467,7 +2467,7 @@ class TestCQL(UpgradeTester):
             ('test2', '10015', 'NY', 36, 'New York'),
             ('test2', '07182', 'NJ', 34, 'Newark'),
             ('test2', '73301', 'TX', 48, 'Austin'),
-            ('test2', '94102', 'CA', 06, 'San Francisco'),
+            ('test2', '94102', 'CA', 6, 'San Francisco'),
         ]
 
         create = """
