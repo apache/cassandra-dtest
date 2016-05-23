@@ -4874,11 +4874,11 @@ class TestCQL(UpgradeTester):
 
             assert_all(cursor, "SELECT * FROM test WHERE k2 = 0 AND v >= 2 ALLOW FILTERING", [[2, 0, 7], [0, 0, 3], [1, 0, 4]])
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11860',
-                   flaky=False,
-                   notes='Fails on 2.0 to 2.1 upgrade')
+    @since('2.1')
     def invalid_custom_timestamp_test(self):
+        """
+        @jira_ticket CASSANDRA-7067
+        """
         cursor = self.prepare()
 
         # Conditional updates
