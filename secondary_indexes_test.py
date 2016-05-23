@@ -787,6 +787,10 @@ class TestSecondaryIndexesOnCollections(Tester):
         session.cluster.refresh_schema_metadata()
         self.assertEqual(0, len(session.cluster.metadata.keyspaces["map_double_index"].indexes))
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11879',
+                   flaky=True,
+                   notes='Windows')
     @skipIf(OFFHEAP_MEMTABLES, 'Hangs with offheap memtables')
     def test_map_indexes(self):
         """
