@@ -496,6 +496,9 @@ class TestCQL(UpgradeTester):
             res = cursor.execute("SELECT firstname FROM users WHERE userid = f47ac10b-58cc-4372-a567-0e02b2c3d479 AND age = 33")
             assert rows_to_list(res) == [['Samwise']], res
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11878',
+                   flaky=True)
     def select_key_in_test(self):
         """ Query for KEY IN (...) """
         cursor = self.prepare()
