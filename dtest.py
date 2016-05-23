@@ -392,6 +392,7 @@ class Tester(TestCase):
         self.modify_log(self.cluster)
         self.connections = []
         self.runners = []
+        self.maxDiff = None
 
     def begin_active_log_watch(self):
         """
