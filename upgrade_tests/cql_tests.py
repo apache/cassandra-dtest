@@ -4357,10 +4357,7 @@ class TestCQL(UpgradeTester):
                 # not supported yet
                 check_invalid("m CONTAINS 'bar'", expected=SyntaxException)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11856',
-                   flaky=False,
-                   notes='Fails on 2.0 to 2.1 upgrade')
+    @since('2.1')
     def list_item_conditional_test(self):
         # Lists
         cursor = self.prepare()
