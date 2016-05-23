@@ -3828,11 +3828,13 @@ class TestCQL(UpgradeTester):
             cursor.execute("DELETE s FROM test WHERE k=0")
             assert_all(cursor, "SELECT * FROM test", [[0, 1, None, 1]])
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11858',
-                   flaky=False,
-                   notes='Fails on 2.0 to 2.1 upgrade')
+    @since('2.1')
     def static_columns_cas_test(self):
+        """"
+        @jira_ticket CASSANDRA-6839
+        @jira_ticket CASSANDRA-6561
+        """
+
         cursor = self.prepare()
 
         cursor.execute("""
