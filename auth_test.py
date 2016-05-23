@@ -1,3 +1,4 @@
+import os
 import re
 import time
 from collections import namedtuple
@@ -5,10 +6,11 @@ from collections import namedtuple
 from cassandra import AuthenticationFailed, InvalidRequest, Unauthorized
 from cassandra.cluster import NoHostAvailable
 from cassandra.protocol import SyntaxException
+from ccmlib.common import get_version_from_build
 
 from assertions import (assert_all, assert_invalid, assert_one,
                         assert_unauthorized)
-from dtest import CASSANDRA_VERSION_FROM_BUILD, Tester, debug
+from dtest import Tester, debug
 from tools import since
 
 
@@ -994,7 +996,8 @@ class TestAuthRoles(Tester):
     """
 
     def __init__(self, *args, **kwargs):
-        if CASSANDRA_VERSION_FROM_BUILD >= '3.0':
+        CASSANDRA_DIR = os.environ.get('CASSANDRA_DIR')
+        if get_version_from_build(CASSANDRA_DIR) >= '3.0':
             kwargs['cluster_options'] = {'enable_user_defined_functions': 'true',
                                          'enable_scripted_user_defined_functions': 'true'}
         else:
@@ -2515,8 +2518,14 @@ class TestAuthRoles(Tester):
 
 
 def role_creator_permissions(creator, role):
-    return [(creator, role, perm) for perm in ('ALTER', 'DROP', 'AUTHORIZE')]
+    permissions = []
+    for perm in 'ALTER', 'DROP', 'AUTHORIZE':
+        permissions.append((creator, role, perm))
+    return permissions
 
 
 def function_resource_creator_permissions(creator, resource):
-    return [(creator, resource, perm) for perm in ('ALTER', 'DROP', 'AUTHORIZE', 'EXECUTE')]
+    permissions = []
+    for perm in 'ALTER', 'DROP', 'AUTHORIZE', 'EXECUTE':
+        permissions.append((creator, resource, perm))
+    return permissions
