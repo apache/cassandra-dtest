@@ -3693,11 +3693,11 @@ class TestCQL(UpgradeTester):
             assert_all(cursor, "SELECT k, v FROM test WHERE m CONTAINS 2", [[0, 1]])
             assert_none(cursor, "SELECT k, v FROM test  WHERE m CONTAINS 4")
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11861',
-                   flaky=False,
-                   notes='Fails on 2.0 to 2.1 upgrade')
+    @since('2.1')
     def map_keys_indexing_test(self):
+        """
+        @jira_ticket CASSANDRA-6383
+        """
         cursor = self.prepare()
 
         cursor.execute("""
