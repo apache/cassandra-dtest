@@ -20,6 +20,7 @@ import types
 from collections import OrderedDict
 from unittest import TestCase
 
+import ccmlib.repository
 from cassandra import ConsistencyLevel
 from cassandra.auth import PlainTextAuthProvider
 from cassandra.cluster import Cluster as PyCluster
@@ -27,7 +28,7 @@ from cassandra.cluster import NoHostAvailable
 from cassandra.policies import RetryPolicy, WhiteListRoundRobinPolicy
 from ccmlib.cluster import Cluster
 from ccmlib.cluster_factory import ClusterFactory
-from ccmlib.common import is_win
+from ccmlib.common import get_version_from_build, is_win
 from ccmlib.node import TimeoutError
 from nose.exc import SkipTest
 from six import print_
@@ -95,6 +96,22 @@ logging.basicConfig(filename=os.path.join(LOG_SAVED_DIR, "dtest.log"),
 LOG = logging.getLogger('dtest')
 # set python-driver log level to WARN by default for dtest
 logging.getLogger('cassandra').setLevel(logging.WARNING)
+
+# There are times when we want to know the C* version we're testing against
+# before we call Tester.setUp. In the general case, we can't know that -- the
+# test method could use any version it wants for self.cluster. However, we can
+# get the version from build.xml in the C* repository specified by
+# CASSANDRA_VERSION or CASSANDRA_DIR. This should use the same resolution
+# strategy as the actual checkout code in Tester.setUp; if it does not, that is
+# a bug.
+_cassandra_version_slug = os.environ.get('CASSANDRA_VERSION')
+# Prefer CASSANDRA_VERSION if it's set in the environment. If not, use CASSANDRA_DIR
+if _cassandra_version_slug:
+    # fetch but don't build the specified C* version
+    ccm_repo_cache_dir, _ = ccmlib.repository.setup(_cassandra_version_slug)
+    CASSANDRA_VERSION_FROM_BUILD = get_version_from_build(ccm_repo_cache_dir)
+else:
+    CASSANDRA_VERSION_FROM_BUILD = get_version_from_build(CASSANDRA_DIR)
 
 
 class expect_control_connection_failures(object):
