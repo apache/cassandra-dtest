@@ -924,7 +924,7 @@ class TestSecondaryIndexesOnCollections(Tester):
                     ).format(unshared_uuid2=log_entry['unshared_uuid2'])
 
             rows = list(session.execute(stmt))
-            self.assertEqual(1, len(rows))
+            self.assertEqual(1, len(rows), rows)
 
             db_user_id, db_email, db_uuids = rows[0]
             self.assertEqual(db_user_id, log_entry['user_id'])
