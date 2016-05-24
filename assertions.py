@@ -1,9 +1,10 @@
-from nose.tools import assert_regexp_matches, assert_equal
+from nose.tools import assert_regexp_matches, assert_equal, assert_false
 
 from cassandra import (InvalidRequest, ReadFailure,
                        ReadTimeout, Unauthorized, Unavailable, WriteFailure,
                        WriteTimeout)
 from cassandra.query import SimpleStatement
+from time import sleep
 
 import tools
 
@@ -240,3 +241,16 @@ def assert_length_equal(object_with_length, expected_length):
     assert_equal(len(object_with_length), expected_length,
                  "Expected {} to have length {}, but instead is of length {}".format(object_with_length,
                                                                                      expected_length, len(object_with_length)))
+
+
+def assert_not_running(node):
+    """
+    Assert that a given node is not running
+    @param node The node to check status
+    """
+    attempts = 0
+    while node.is_running() and attempts < 10:
+        sleep(1)
+        attempts = attempts + 1
+
+    assert_false(node.is_running())
