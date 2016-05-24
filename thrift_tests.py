@@ -1855,7 +1855,7 @@ class TestMutations(ThriftTester):
         assert server_cf.column_metadata[0].index_name == modified_cd.index_name
 
         # sleep a bit to give time for the index to build.
-        time.sleep(0.5)
+        time.sleep(5)
 
         # repeat query on one index expression
         result = client.get_range_slices(cp, sp, key_range, ConsistencyLevel.ONE)
