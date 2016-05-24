@@ -788,6 +788,9 @@ class TestSecondaryIndexesOnCollections(Tester):
         self.assertEqual(0, len(session.cluster.metadata.keyspaces["map_double_index"].indexes))
 
     @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11884',
+                   flaky=True)
+    @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11879',
                    flaky=True,
                    notes='Windows')
