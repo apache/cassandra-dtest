@@ -439,9 +439,6 @@ UPDATE varcharmaptable SET varcharvarintmap['Vitrum edere possum, mihi non nocet
 
         self.verify_glass(node1)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11799',
-                   flaky=False)
     def test_unicode_syntax_error(self):
         """
         Ensure that syntax errors involving unicode are handled correctly.
@@ -458,9 +455,6 @@ UPDATE varcharmaptable SET varcharvarintmap['Vitrum edere possum, mihi non nocet
         self.assertIn(u'Invalid syntax', err)
         self.assertIn(u'ä', err)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11799',
-                   flaky=False)
     def test_unicode_invalid_request_error(self):
         """
         Ensure that invalid request errors involving unicode are handled correctly.
