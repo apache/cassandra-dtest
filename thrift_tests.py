@@ -1816,9 +1816,6 @@ class TestMutations(ThriftTester):
         client.system_drop_column_family('BlankCF')
         client.system_drop_column_family('BlankCF2')
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11864',
-                   flaky=True)
     def test_dynamic_indexes_with_system_update_cf(self):
         _set_keyspace('Keyspace1')
         cd = ColumnDef('birthdate', 'BytesType', None, None)
