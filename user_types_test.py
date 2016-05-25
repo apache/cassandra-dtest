@@ -513,8 +513,8 @@ class TestUserTypes(Tester):
         self.assertEqual(like, u'preserving unions')
 
     @known_failure(failure_source='cassandra',
-                jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11890',
-                flaky=False)
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11890',
+                   flaky=False)
     def test_type_keyspace_permission_isolation(self):
         """
         Confirm permissions are respected for types in different keyspaces
