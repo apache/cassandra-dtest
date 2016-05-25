@@ -11,7 +11,7 @@ from ccmlib.common import get_version_from_build
 from assertions import (assert_all, assert_invalid, assert_one,
                         assert_unauthorized)
 from dtest import Tester, debug
-from tools import since
+from tools import known_failure, since
 
 
 class TestAuth(Tester):
@@ -1073,6 +1073,9 @@ class TestAuthRoles(Tester):
         cassandra.execute("DROP ROLE role1")
         assert_invalid(cassandra, "DROP ROLE role1", "role1 doesn't exist")
 
+    @known_failure(failure_source='cassandra',
+                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11890',
+                    flaky=False)  
     def role_admin_validation_test(self):
         """
         * Launch a one node cluster
@@ -1781,6 +1784,9 @@ class TestAuthRoles(Tester):
         cassandra.execute("CREATE USER super_user WITH PASSWORD '12345' SUPERUSER")
         assert_one(cassandra, "LIST ROLES OF super_user", ["super_user", True, True, {}])
 
+    @known_failure(failure_source='cassandra',
+                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11890',
+                    flaky=False)  
     def role_name_test(self):
         """
         Simple test to verify the behaviour of quoting when creating roles & users
@@ -1821,6 +1827,9 @@ class TestAuthRoles(Tester):
         self.get_session(user='USER2', password='12345')
         self.assert_unauthenticated("Username and/or password are incorrect", 'User2', '12345')
 
+    @known_failure(failure_source='cassandra',
+                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11890',
+                    flaky=False)
     def role_requires_login_privilege_to_authenticate_test(self):
         """
         * Launch a one node cluster
@@ -1844,6 +1853,9 @@ class TestAuthRoles(Tester):
         assert_one(cassandra, "LIST ROLES OF mike", ["mike", False, True, {}])
         self.get_session(user='mike', password='12345')
 
+    @known_failure(failure_source='cassandra',
+                jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11890',
+                flaky=False)
     def roles_do_not_inherit_login_privilege_test(self):
         """
         * Launch a one node cluster
@@ -1864,6 +1876,9 @@ class TestAuthRoles(Tester):
 
         self.assert_unauthenticated("mike is not permitted to log in", "mike", "12345")
 
+    @known_failure(failure_source='cassandra',
+                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11890',
+                    flaky=False)  
     def role_requires_password_to_login_test(self):
         """
         * Launch a one node cluster

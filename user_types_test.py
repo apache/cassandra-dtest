@@ -7,7 +7,7 @@ from cassandra.query import SimpleStatement
 
 from assertions import assert_invalid
 from dtest import Tester
-from tools import since
+from tools import known_failure, since
 
 
 def listify(item):
@@ -512,6 +512,9 @@ class TestUserTypes(Tester):
         self.assertEqual(first_name, u'Abraham')
         self.assertEqual(like, u'preserving unions')
 
+    @known_failure(failure_source='cassandra',
+                jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11890',
+                flaky=False)
     def test_type_keyspace_permission_isolation(self):
         """
         Confirm permissions are respected for types in different keyspaces
