@@ -22,7 +22,7 @@ from thrift_bindings.v22.ttypes import \
 from thrift_bindings.v22.ttypes import (CfDef, Column, ColumnOrSuperColumn,
                                         Mutation)
 from thrift_tests import get_thrift_client
-from tools import known_failure, require, rows_to_list, since
+from tools import require, rows_to_list, since
 from upgrade_base import UPGRADE_TEST_RUN, UpgradeTester
 from upgrade_manifest import build_upgrade_pairs
 
@@ -3991,10 +3991,7 @@ class TestCQL(UpgradeTester):
             # We don't support that
             assert_invalid(cursor, "SELECT s FROM test WHERE v = 1")
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11863',
-                   flaky=False,
-                   notes='Fails on 2.0 to 2.1 upgrade')
+    @since('2.1')
     def static_columns_with_distinct_test(self):
         cursor = self.prepare()
 
