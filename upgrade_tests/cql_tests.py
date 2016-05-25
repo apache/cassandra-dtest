@@ -22,7 +22,7 @@ from thrift_bindings.v22.ttypes import \
 from thrift_bindings.v22.ttypes import (CfDef, Column, ColumnOrSuperColumn,
                                         Mutation)
 from thrift_tests import get_thrift_client
-from tools import require, rows_to_list, since
+from tools import known_failure, require, rows_to_list, since
 from upgrade_base import UPGRADE_TEST_RUN, UpgradeTester
 from upgrade_manifest import build_upgrade_pairs
 
