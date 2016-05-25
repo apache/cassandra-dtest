@@ -53,9 +53,12 @@ class PrintJiraURLPlugin(nose.plugins.Plugin):
 
 if __name__ == '__main__':
     argv = sys.argv + ['--collect-only', '-v']
-    env = {}
-    env.update(os.environ)
-    env['CASSANDRA_VERSION'] = 'git:trunk'  # the tests need a version to run
-    os.environ
-    nose.main(addplugins=[PrintJiraURLPlugin()],
-              argv=argv, env=env)
+
+    # The tests need a CASSANDRA_VERSION or CASSANDRA_DIR environment variable
+    # to run at all, so we specify it here. However, we have to do so by
+    # modifying os.environ, rather than using the env parameter to nose.main,
+    # because env does not do what you think it does:
+    # http://stackoverflow.com/a/28611124
+    os.environ['CASSANDRA_VERSION'] = 'git:trunk'
+
+    nose.main(addplugins=[PrintJiraURLPlugin()], argv=argv)
