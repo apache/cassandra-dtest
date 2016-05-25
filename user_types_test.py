@@ -7,7 +7,7 @@ from cassandra.query import SimpleStatement
 
 from assertions import assert_invalid
 from dtest import Tester
-from tools import known_failure, since
+from tools import since
 
 
 def listify(item):
@@ -512,9 +512,6 @@ class TestUserTypes(Tester):
         self.assertEqual(first_name, u'Abraham')
         self.assertEqual(like, u'preserving unions')
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11890',
-                   flaky=False)
     def test_type_keyspace_permission_isolation(self):
         """
         Confirm permissions are respected for types in different keyspaces
@@ -574,8 +571,8 @@ class TestUserTypes(Tester):
         user2_session.execute("ALTER TYPE ks2.simple_type RENAME user_number TO user_num;")
 
         # finally, drop the types using the correct user w/permissions to do so, consistency all avoids using a sleep
-        user1_session.execute(SimpleStatement("DROP TYPE ks1.simple_type;", ConsistencyLevel.ALL))
-        user2_session.execute(SimpleStatement("DROP TYPE ks2.simple_type;", ConsistencyLevel.ALL))
+        user1_session.execute(SimpleStatement("DROP TYPE ks1.simple_type;", consistency_level=ConsistencyLevel.ALL))
+        user2_session.execute(SimpleStatement("DROP TYPE ks2.simple_type;", consistency_level=ConsistencyLevel.ALL))
 
         time.sleep(5)
 
