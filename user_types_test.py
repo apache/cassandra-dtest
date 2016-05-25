@@ -512,7 +512,7 @@ class TestUserTypes(Tester):
         self.assertEqual(first_name, u'Abraham')
         self.assertEqual(like, u'preserving unions')
 
-    @known_failure(failure_source='cassandra',
+    @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11890',
                    flaky=False)
     def test_type_keyspace_permission_isolation(self):
