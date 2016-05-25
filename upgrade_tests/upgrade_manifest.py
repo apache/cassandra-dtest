@@ -34,7 +34,7 @@ indev_3_0_x = VersionMeta(name='indev_3_0_x', variant='indev', version='git:cass
 current_3_0_x = VersionMeta(name='current_3_0_x', variant='current', version='3.0.6', min_proto_v=3, max_proto_v=4, java_versions=(8,))
 next_3_0_x = None  # None if not yet tagged
 
-indev_3_x = VersionMeta(name='indev_3_x', variant='indev', version='git:cassandra-3.7', min_proto_v=3, max_proto_v=4, java_versions=(8,))
+indev_3_x = VersionMeta(name='indev_3_x', variant='indev', version='git:cassandra-3.6', min_proto_v=3, max_proto_v=4, java_versions=(8,))
 current_3_x = VersionMeta(name='current_3_x', variant='current', version='3.5', min_proto_v=3, max_proto_v=4, java_versions=(8,))
 next_3_x = None  # None if not yet tagged
 
