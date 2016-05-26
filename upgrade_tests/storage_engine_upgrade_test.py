@@ -100,64 +100,64 @@ class TestStorageEngineUpgrade(Tester):
 
         for n in range(PARTITIONS):
             for r in range(ROWS):
-                session.execute("INSERT INTO t(k, t, v) VALUES (%d, %d, %d)" % (n, r, r))
+                session.execute("INSERT INTO t(k, t, v) VALUES ({n}, {r}, {r})".format(n=n, r=r))
 
         session = self._do_upgrade()
 
         for n in range(PARTITIONS):
             assert_all(session,
-                       "SELECT * FROM t WHERE k = %d" % (n),
+                       "SELECT * FROM t WHERE k = {}".format(n),
                        [[n, v, v] for v in range(ROWS)])
             assert_all(session,
-                       "SELECT * FROM t WHERE k = %d ORDER BY t DESC" % (n),
+                       "SELECT * FROM t WHERE k = {} ORDER BY t DESC".format(n),
                        [[n, v, v] for v in range(ROWS - 1, -1, -1)])
 
             # Querying a "large" slice
             start = ROWS / 10
             end = ROWS - 1 - (ROWS / 10)
             assert_all(session,
-                       "SELECT * FROM t WHERE k = %d AND t >= %d AND t < %d" % (n, start, end),
+                       "SELECT * FROM t WHERE k = {n} AND t >= {start} AND t < {end}".format(n=n, start=start, end=end),
                        [[n, v, v] for v in range(start, end)])
             assert_all(session,
-                       "SELECT * FROM t WHERE k = %d AND t >= %d AND t < %d ORDER BY t DESC" % (n, start, end),
+                       "SELECT * FROM t WHERE k = {n} AND t >= {start} AND t < {end} ORDER BY t DESC".format(n=n, start=start, end=end),
                        [[n, v, v] for v in range(end - 1, start - 1, -1)])
 
             # Querying a "small" slice
             start = ROWS / 2
             end = ROWS / 2 + 5
             assert_all(session,
-                       "SELECT * FROM t WHERE k = %d AND t >= %d AND t < %d" % (n, start, end),
+                       "SELECT * FROM t WHERE k = {n} AND t >= {start} AND t < {end}".format(n=n, start=start, end=end),
                        [[n, v, v] for v in range(start, end)])
             assert_all(session,
-                       "SELECT * FROM t WHERE k = %d AND t >= %d AND t < %d ORDER BY t DESC" % (n, start, end),
+                       "SELECT * FROM t WHERE k = {n} AND t >= {start} AND t < {end} ORDER BY t DESC".format(n=n, start=start, end=end),
                        [[n, v, v] for v in range(end - 1, start - 1, -1)])
 
         self.cluster.compact()
 
         for n in range(PARTITIONS):
-            assert_all(session, "SELECT * FROM t WHERE k = %d" % (n), [[n, v, v] for v in range(ROWS)])
+            assert_all(session, "SELECT * FROM t WHERE k = {}".format(n), [[n, v, v] for v in range(ROWS)])
             assert_all(session,
-                       "SELECT * FROM t WHERE k = %d ORDER BY t DESC" % (n),
+                       "SELECT * FROM t WHERE k = {} ORDER BY t DESC".format(n),
                        [[n, v, v] for v in range(ROWS - 1, -1, -1)])
 
             # Querying a "large" slice
             start = ROWS / 10
             end = ROWS - 1 - (ROWS / 10)
             assert_all(session,
-                       "SELECT * FROM t WHERE k = %d AND t >= %d AND t < %d" % (n, start, end),
+                       "SELECT * FROM t WHERE k = {n} AND t >= {start} AND t < {end}".format(n=n, start=start, end=end),
                        [[n, v, v] for v in range(start, end)])
             assert_all(session,
-                       "SELECT * FROM t WHERE k = %d AND t >= %d AND t < %d ORDER BY t DESC" % (n, start, end),
+                       "SELECT * FROM t WHERE k = {n} AND t >= {start} AND t < {end} ORDER BY t DESC".format(n=n, start=start, end=end),
                        [[n, v, v] for v in range(end - 1, start - 1, -1)])
 
             # Querying a "small" slice
             start = ROWS / 2
             end = ROWS / 2 + 5
             assert_all(session,
-                       "SELECT * FROM t WHERE k = %d AND t >= %d AND t < %d" % (n, start, end),
+                       "SELECT * FROM t WHERE k = {n} AND t >= {start} AND t < {end}".format(n=n, start=start, end=end),
                        [[n, v, v] for v in range(start, end)])
             assert_all(session,
-                       "SELECT * FROM t WHERE k = %d AND t >= %d AND t < %d ORDER BY t DESC" % (n, start, end),
+                       "SELECT * FROM t WHERE k = {n} AND t >= {start} AND t < {end} ORDER BY t DESC".format(n=n, start=start, end=end),
                        [[n, v, v] for v in range(end - 1, start - 1, -1)])
 
     def upgrade_with_unclustered_table(self, compact_storage=False):
@@ -169,17 +169,17 @@ class TestStorageEngineUpgrade(Tester):
                         (' WITH COMPACT STORAGE' if compact_storage else ''))
 
         for n in range(PARTITIONS):
-            session.execute("INSERT INTO t(k, v1, v2, v3, v4) VALUES (%d, %d, %d, %d, %d)" % (n, n + 1, n + 2, n + 3, n + 4))
+            session.execute("INSERT INTO t(k, v1, v2, v3, v4) VALUES ({}, {}, {}, {}, {})".format(n, n + 1, n + 2, n + 3, n + 4))
 
         session = self._do_upgrade()
 
         for n in range(PARTITIONS):
-            assert_one(session, "SELECT * FROM t WHERE k = %d" % (n), [n, n + 1, n + 2, n + 3, n + 4])
+            assert_one(session, "SELECT * FROM t WHERE k = {}".format(n), [n, n + 1, n + 2, n + 3, n + 4])
 
         self.cluster.compact()
 
         for n in range(PARTITIONS):
-            assert_one(session, "SELECT * FROM t WHERE k = %d" % (n), [n, n + 1, n + 2, n + 3, n + 4])
+            assert_one(session, "SELECT * FROM t WHERE k = {}".format(n), [n, n + 1, n + 2, n + 3, n + 4])
 
     def upgrade_with_statics_test(self):
         """
@@ -194,26 +194,26 @@ class TestStorageEngineUpgrade(Tester):
 
         for n in range(PARTITIONS):
             for r in range(ROWS):
-                session.execute("INSERT INTO t(k, s1, s2, t, v1, v2) VALUES (%d, %d, %d, %d, %d, %d)" % (n, r, r + 1, r, r, r + 1))
+                session.execute("INSERT INTO t(k, s1, s2, t, v1, v2) VALUES ({}, {}, {}, {}, {}, {})".format(n, r, r + 1, r, r, r + 1))
 
         session = self._do_upgrade()
 
         for n in range(PARTITIONS):
             assert_all(session,
-                       "SELECT * FROM t WHERE k = %d" % (n),
+                       "SELECT * FROM t WHERE k = {}".format(n),
                        [[n, v, ROWS - 1, ROWS, v, v + 1] for v in range(ROWS)])
             assert_all(session,
-                       "SELECT * FROM t WHERE k = %d ORDER BY t DESC" % (n),
+                       "SELECT * FROM t WHERE k = {} ORDER BY t DESC".format(n),
                        [[n, v, ROWS - 1, ROWS, v, v + 1] for v in range(ROWS - 1, -1, -1)])
 
         self.cluster.compact()
 
         for n in range(PARTITIONS):
             assert_all(session,
-                       "SELECT * FROM t WHERE k = %d" % (n),
+                       "SELECT * FROM t WHERE k = {}".format(n),
                        [[n, v, ROWS - 1, ROWS, v, v + 1] for v in range(ROWS)])
             assert_all(session,
-                       "SELECT * FROM t WHERE k = %d ORDER BY t DESC" % (n),
+                       "SELECT * FROM t WHERE k = {} ORDER BY t DESC".format(n),
                        [[n, v, ROWS - 1, ROWS, v, v + 1] for v in range(ROWS - 1, -1, -1)])
 
     @known_failure(failure_source='cassandra',
@@ -248,22 +248,22 @@ class TestStorageEngineUpgrade(Tester):
             bigish_blob = bigish_blob + "0000"
 
         for r in range(ROWS):
-            session.execute("INSERT INTO t(k, t, v1, v2, v3) VALUES (%d, %d, %d, %s, {%d, %d})" % (0, r, r, bigish_blob, r * 2, r * 3))
+            session.execute("INSERT INTO t(k, t, v1, v2, v3) VALUES ({}, {}, {}, {}, {{{}, {}}})".format(0, r, r, bigish_blob, r * 2, r * 3))
 
         self.cluster.flush()
 
         # delete every other row
         for r in range(0, ROWS, 2):
-            session.execute("DELETE FROM t WHERE k=0 AND t=%d" % (r))
+            session.execute("DELETE FROM t WHERE k=0 AND t={}".format(r))
 
         # delete the set from every other remaining row
         for r in range(1, ROWS, 4):
-            session.execute("UPDATE t SET v3={} WHERE k=0 AND t=%d" % (r))
+            session.execute("UPDATE t SET v3={{}} WHERE k=0 AND t={}".format(r))
 
         session = self._do_upgrade()
 
         for r in range(0, ROWS):
-            query = "SELECT t, v1, v3 FROM t WHERE k = 0 AND t=%d%s" % (r, query_modifier)
+            query = "SELECT t, v1, v3 FROM t WHERE k = 0 AND t={}{}".format(r, query_modifier)
             if (r - 1) % 4 == 0:
                 assert_one(session, query, [r, r, None])
             elif (r + 1) % 2 == 0:
@@ -274,7 +274,7 @@ class TestStorageEngineUpgrade(Tester):
         self.cluster.compact()
 
         for r in range(ROWS):
-            query = "SELECT t, v1, v3 FROM t WHERE k = 0 AND t=%d%s" % (r, query_modifier)
+            query = "SELECT t, v1, v3 FROM t WHERE k = 0 AND t={}{}".format(r, query_modifier)
             if (r - 1) % 4 == 0:
                 assert_one(session, query, [r, r, None])
             elif (r + 1) % 2 == 0:
@@ -297,7 +297,7 @@ class TestStorageEngineUpgrade(Tester):
 
         for p in range(PARTITIONS):
             for r in range(ROWS):
-                session.execute("INSERT INTO t(k, t, v1, v2) VALUES (%d, %d, %d, %d)" % (p, r, r % 2, r * 2))
+                session.execute("INSERT INTO t(k, t, v1, v2) VALUES ({}, {}, {}, {})".format(p, r, r % 2, r * 2))
 
         self.cluster.flush()
 
@@ -333,12 +333,12 @@ class TestStorageEngineUpgrade(Tester):
         session.execute('CREATE TABLE t (k int, t1 int, t2 int, PRIMARY KEY (k, t1, t2))')
 
         for n in range(ROWS):
-            session.execute("INSERT INTO t(k, t1, t2) VALUES (0, 0, %d)" % n)
+            session.execute("INSERT INTO t(k, t1, t2) VALUES (0, 0, {})".format(n))
 
         session.execute("DELETE FROM t WHERE k=0 AND t1=0")
 
         for n in range(0, ROWS, 2):
-            session.execute("INSERT INTO t(k, t1, t2) VALUES (0, 0, %d)" % n)
+            session.execute("INSERT INTO t(k, t1, t2) VALUES (0, 0, {})".format(n))
 
         session = self._do_upgrade()
 
