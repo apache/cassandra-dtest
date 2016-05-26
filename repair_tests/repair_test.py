@@ -228,7 +228,9 @@ class TestRepair(Tester):
 
         # Disable hinted handoff and set batch commit log so this doesn't
         # interfere with the test (this must be after the populate)
-        cluster.set_configuration_options(values={'hinted_handoff_enabled': False}, batch_commitlog=True)
+        cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
+        cluster.set_batch_commitlog(batch_commitlog=True)
+
         debug("Starting cluster..")
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
@@ -291,7 +293,8 @@ class TestRepair(Tester):
         """
         cluster = self.cluster
         cluster.populate(2)
-        cluster.set_configuration_options(values={'hinted_handoff_enabled': False}, batch_commitlog=True)
+        cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
+        cluster.set_batch_commitlog(batch_commitlog=True)
         cluster.start()
         node1, node2 = cluster.nodelist()
 
@@ -478,7 +481,8 @@ class TestRepair(Tester):
 
         # Disable hinted handoff and set batch commit log so this doesn't
         # interfer with the test (this must be after the populate)
-        cluster.set_configuration_options(values={'hinted_handoff_enabled': False}, batch_commitlog=True)
+        cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
+        cluster.set_batch_commitlog(batch_commitlog=True)
         debug("Starting cluster..")
         # populate 2 nodes in dc1, and one node each in dc2 and dc3
         cluster.populate([2, 1, 1]).start(wait_for_binary_proto=True)
@@ -561,7 +565,8 @@ class TestRepair(Tester):
         * Verify that nodes 1 and 2, and only nodes 1+2, are repaired
         """
         cluster = self.cluster
-        cluster.set_configuration_options(values={'hinted_handoff_enabled': False}, batch_commitlog=True)
+        cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
+        cluster.set_batch_commitlog(batch_commitlog=True)
         debug("Starting cluster..")
         cluster.populate(3).start(wait_for_binary_proto=True)
 
@@ -580,7 +585,8 @@ class TestRepair(Tester):
         * Verify that nodes 1 and 2, and only nodes 1+2, are repaired
         """
         cluster = self.cluster
-        cluster.set_configuration_options(values={'hinted_handoff_enabled': False}, batch_commitlog=True)
+        cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
+        cluster.set_batch_commitlog(batch_commitlog=True)
         debug("Starting cluster..")
         cluster.populate(3).start(wait_for_binary_proto=True)
 
@@ -640,7 +646,8 @@ class TestRepair(Tester):
         * Check the trace data was written, and that the right job thread count was used
         """
         cluster = self.cluster
-        cluster.set_configuration_options(values={'hinted_handoff_enabled': False}, batch_commitlog=True)
+        cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
+        cluster.set_batch_commitlog(batch_commitlog=True)
         debug("Starting cluster..")
         cluster.populate(3).start(wait_for_binary_proto=True)
 
@@ -687,7 +694,8 @@ class TestRepair(Tester):
         * Repeat steps 2 through 5 with all job count options
         """
         cluster = self.cluster
-        cluster.set_configuration_options(values={'hinted_handoff_enabled': False}, batch_commitlog=True)
+        cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
+        cluster.set_batch_commitlog(batch_commitlog=True)
         debug("Starting cluster..")
         cluster.populate(3).start(wait_for_binary_proto=True)
 
