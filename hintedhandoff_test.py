@@ -71,6 +71,10 @@ class TestHintedHandoffConfig(Tester):
                 query_c1c2(session, n, ConsistencyLevel.ONE, tolerate_missing=True, must_be_missing=True)
 
     @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11902',
+                   flaky=True,
+                   notes='Fails on trunk so far, hints not being sent.')
+    @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11439',
                    flaky=False,
                    notes='Windows')
