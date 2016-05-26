@@ -14,6 +14,17 @@ KEYSPACE = 'ks'
 
 
 class TestHelper(Tester):
+
+    def setUp(self):
+        """
+        disable JBOD configuration for scrub tests.
+        range-aware JBOD can skip generation in SSTable,
+        and some tests rely on generation numbers/
+        (see CASSANDRA-11693 and increase_sstable_generations)
+        """
+        super(TestHelper, self).setUp(self)
+        self.cluster.set_datadir_count(1)
+
     def get_table_paths(self, table):
         """
         Return the path where the table sstables are located
