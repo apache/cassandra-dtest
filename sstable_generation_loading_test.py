@@ -98,9 +98,9 @@ class TestSSTableGenerationAndLoading(Tester):
         self.assertGreater(data_found, 0, "After removing index, filter, stats, and digest files, the data file was deleted!")
 
     @known_failure(failure_source='test',
-               jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11896',
-               flaky=True,
-               notes='windows')
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11896',
+                   flaky=True,
+                   notes='windows')
     def sstableloader_compression_none_to_none_test(self):
         self.load_sstable_with_configuration(None, None)
 
