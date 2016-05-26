@@ -6,6 +6,7 @@ from distutils import dir_util
 from ccmlib import common as ccmcommon
 
 from dtest import Tester, debug
+from tools import known_failure
 
 
 class TestSSTableGenerationAndLoading(Tester):
