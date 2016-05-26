@@ -17,7 +17,7 @@ from thrift_bindings.v22.ttypes import \
 from thrift_bindings.v22.ttypes import (CfDef, Column, ColumnOrSuperColumn,
                                         Mutation)
 from thrift_tests import get_thrift_client
-from tools import debug, rows_to_list, since
+from tools import debug, rows_to_list, since, known_failure
 from utils.metadata_wrapper import (UpdatingClusterMetadataWrapper,
                                     UpdatingKeyspaceMetadataWrapper,
                                     UpdatingMetadataDictWrapper,
@@ -750,6 +750,10 @@ class AbortedQueriesTester(CQLTester):
         assert_unavailable(lambda c: debug(c.execute(statement, [50])), session)
         node.watch_log_for("operations timed out", from_mark=mark, timeout=60)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11898',
+                   flaky=True
+                   )
     def materialized_view_test(self):
         """
         Check that a materialized view query times out:

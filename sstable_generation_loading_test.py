@@ -96,21 +96,37 @@ class TestSSTableGenerationAndLoading(Tester):
                     data_found += 1
         self.assertGreater(data_found, 0, "After removing index, filter, stats, and digest files, the data file was deleted!")
 
+    @known_failure(failure_source='test',
+               jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11896',
+               flaky=True,
+               notes='windows')
     def sstableloader_compression_none_to_none_test(self):
         self.load_sstable_with_configuration(None, None)
 
     def sstableloader_compression_none_to_snappy_test(self):
         self.load_sstable_with_configuration(None, 'Snappy')
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11896',
+                   flaky=True,
+                   notes='windows')
     def sstableloader_compression_none_to_deflate_test(self):
         self.load_sstable_with_configuration(None, 'Deflate')
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11896',
+                   flaky=True,
+                   notes='windows')
     def sstableloader_compression_snappy_to_none_test(self):
         self.load_sstable_with_configuration('Snappy', None)
 
     def sstableloader_compression_snappy_to_snappy_test(self):
         self.load_sstable_with_configuration('Snappy', 'Snappy')
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11896',
+                   flaky=True,
+                   notes='windows')
     def sstableloader_compression_snappy_to_deflate_test(self):
         self.load_sstable_with_configuration('Snappy', 'Deflate')
 
