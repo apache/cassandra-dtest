@@ -1,5 +1,7 @@
 # coding: utf-8
 
+from distutils.version import LooseVersion
+
 from dtest import Tester, debug
 from tools import known_failure, since
 
@@ -68,9 +70,13 @@ class TestCqlTracing(Tester):
             "VALUES (550e8400-e29b-41d4-a716-446655440000, 'Frodo', 'Baggins', 32)",
             return_output=True)
         self.assertIn('Tracing session: ', out)
-        self.assertIn('127.0.0.1', out)
-        self.assertIn('127.0.0.2', out)
-        self.assertIn('127.0.0.3', out)
+
+        # Restricted to 2.2+ due to flakiness on 2.1.  See CASSANDRA-11598 for details.
+        if LooseVersion(self.cluster.version()) >= LooseVersion('2.2'):
+            self.assertIn('127.0.0.1', out)
+            self.assertIn('127.0.0.2', out)
+            self.assertIn('127.0.0.3', out)
+
         self.assertIn('Parsing INSERT INTO ks.users ', out)
         self.assertIn('Request complete ', out)
 
@@ -87,10 +93,6 @@ class TestCqlTracing(Tester):
         self.assertIn('Request complete ', out)
         self.assertIn(" Frodo |  Baggins", out)
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11598',
-                   flaky=True,
-                   notes='fails intermittently 2.1 tests. NEVER on other versions.')
     def tracing_simple_test(self):
         """
         Test tracing using the default tracing class. See trace().
