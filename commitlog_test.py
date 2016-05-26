@@ -5,6 +5,7 @@ import stat
 import struct
 import subprocess
 import time
+from distutils.version import LooseVersion
 
 from cassandra import WriteTimeout
 from cassandra.cluster import NoHostAvailable, OperationTimedOut
@@ -159,6 +160,77 @@ class TestCommitLog(Tester):
 
         with open(os.devnull, 'w') as devnull:
             self.node1.stress(['write', 'n=1M', '-col', 'size=FIXED(1000)', '-rate', 'threads=25'], stdout=devnull, stderr=subprocess.STDOUT)
+
+    @since('3.0.7')
+    def test_mv_lock_contention_during_replay(self):
+        """
+        Ensure that we don't generate WriteTimeoutExceptions during commitlog
+        replay due to MV lock contention.  Fixed in 3.0.7 and 3.7.
+        @jira_ticket CASSANDRA-11891
+        """
+
+        cluster_ver = LooseVersion(self.cluster.version())
+        if LooseVersion('3.1') <= cluster_ver < LooseVersion('3.7'):
+            self.skipTest("Fixed in 3.0.7 and 3.7")
+
+        node1 = self.node1
+        node1.set_configuration_options(batch_commitlog=True)
+        node1.start()
+        session = self.patient_cql_connection(node1)
+
+        debug("Creating schema")
+        self.create_ks(session, 'Test', 1)
+        session.execute("""
+            CREATE TABLE mytable (
+                a int,
+                b int,
+                c int,
+                PRIMARY KEY (a, b)
+            );
+        """)
+
+        session.execute("""
+            CREATE MATERIALIZED VIEW myview
+            AS SELECT * FROM mytable
+            WHERE a IS NOT NULL AND b IS NOT NULL
+            PRIMARY KEY (a, b);
+        """)
+
+        debug("Insert data")
+        num_rows = 1024  # maximum number of mutations replayed at once by the commit log
+        for i in xrange(num_rows):
+            session.execute("INSERT INTO Test.mytable (a, b, c) VALUES (0, %d, %d)" % (i, i))
+
+        node1.stop(gently=False)
+        node1.mark_log_for_errors()
+
+        debug("Verify commitlog was written before abrupt stop")
+        commitlog_dir = os.path.join(node1.get_path(), 'commitlogs')
+        commitlog_files = os.listdir(commitlog_dir)
+        self.assertNotEqual([], commitlog_files, commitlog_files)
+
+        # set a short timeout to ensure lock contention will generally exceed this
+        node1.set_configuration_options({'write_request_timeout_in_ms': 30})
+        debug("Starting node again")
+        node1.start()
+
+        debug("Verify commit log was replayed on startup")
+        start_time = time.time()
+        while (time.time() - start_time) < 120.0:
+            matches = node1.grep_log(r".*WriteTimeoutException.*")
+            self.assertEqual([], matches, matches)
+
+            replay_complete = node1.grep_log("Log replay complete")
+            if replay_complete:
+                break
+        else:
+            self.fail("Did not finish commitlog replay within 120 seconds")
+
+        debug("Reconnecting to node")
+        session = self.patient_cql_connection(node1)
+        debug("Make query to ensure data is present")
+        res = list(session.execute("SELECT * FROM Test.mytable"))
+        self.assertEqual(num_rows, len(res), res)
 
     def test_commitlog_replay_on_startup(self):
         """
