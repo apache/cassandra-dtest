@@ -121,7 +121,6 @@ def assert_one(session, query, expected, cl=None):
     list_res = rows_to_list(res)
     assert list_res == [expected], "Expected {} from {}, but got {}".format([expected], query, list_res)
 
-
 def assert_none(session, query, cl=None):
     """
     Assert query returns nothing
@@ -137,7 +136,6 @@ def assert_none(session, query, cl=None):
     res = session.execute(simple_query)
     list_res = rows_to_list(res)
     assert list_res == [], "Expected nothing from {}, but got {}".format(query, list_res)
-
 
 def assert_all(session, query, expected, cl=None, ignore_order=False):
     """

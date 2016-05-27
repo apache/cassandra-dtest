@@ -20,7 +20,7 @@ from cassandra.murmur3 import murmur3
 from cassandra.util import SortedSet
 from ccmlib.common import is_win
 
-from assertionsn import assert_length_equal
+from assertions import assert_length_equal
 from cqlsh_tools import (DummyColorMap, assert_csvs_items_equal, csv_rows,
                          monkeypatch_driver, random_list, unmonkeypatch_driver,
                          write_rows_to_csv)
