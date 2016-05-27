@@ -5,7 +5,7 @@ from threading import Event
 from cassandra import ConsistencyLevel as CL
 from cassandra import ReadFailure
 from cassandra.query import SimpleStatement
-from ccmlib.node import TimeoutError
+from ccmlib.node import TimeoutError, Node
 from nose.tools import timed
 
 from assertions import assert_invalid
@@ -216,6 +216,46 @@ class TestPushedNotifications(Tester):
         debug("Waiting for notifications from {}".format(waiter.address,))
         notifications = waiter.wait_for_notifications(timeout=30.0, num_notifications=2)
         self.assertEquals(0, len(notifications), notifications)
+
+    def add_and_remove_node_test(self):
+        """
+        Test that NEW_NODE and REMOVED_NODE are sent correctly as nodes join and leave.
+        @jira_ticket CASSANDRA-11038
+        """
+        self.cluster.populate(1).start(wait_for_binary_proto=True)
+        node1 = self.cluster.nodelist()[0]
+
+        waiter = NotificationWaiter(self, node1, ["STATUS_CHANGE", "TOPOLOGY_CHANGE"])
+
+        # need to block for up to 2 notifications (NEW_NODE and UP) so that these notifications
+        # don't confuse the state below
+        debug("Waiting for unwanted notifications...")
+        waiter.wait_for_notifications(timeout=30, num_notifications=2)
+        waiter.clear_notifications()
+
+        debug("Adding second node...")
+        node2 = Node('node2', self.cluster, True, ('127.0.0.2', 9160), ('127.0.0.2', 7000), '7200', '0', None, ('127.0.0.2', 9042))
+        self.cluster.add(node2, False)
+        node2.start(wait_other_notice=True)
+        debug("Waiting for notifications from {}".format(waiter.address))
+        notifications = waiter.wait_for_notifications(timeout=60.0, num_notifications=2)
+        self.assertEquals(2, len(notifications), notifications)
+        for notification in notifications:
+            self.assertEquals(self.get_ip_from_node(node2), notification["address"][0])
+            self.assertEquals("NEW_NODE", notifications[0]["change_type"])
+            self.assertEquals("UP", notifications[1]["change_type"])
+
+        debug("Removing second node...")
+        waiter.clear_notifications()
+        node2.decommission()
+        node2.stop(gently=False)
+        debug("Waiting for notifications from {}".format(waiter.address))
+        notifications = waiter.wait_for_notifications(timeout=60.0, num_notifications=2)
+        self.assertEquals(2, len(notifications), notifications)
+        for notification in notifications:
+            self.assertEquals(self.get_ip_from_node(node2), notification["address"][0])
+            self.assertEquals("REMOVED_NODE", notifications[0]["change_type"])
+            self.assertEquals("DOWN", notifications[1]["change_type"])
 
     def change_rpc_address_to_localhost(self):
         """
