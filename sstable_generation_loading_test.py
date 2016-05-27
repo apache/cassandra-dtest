@@ -5,6 +5,7 @@ from distutils import dir_util
 
 from ccmlib import common as ccmcommon
 
+from assertions import assert_one
 from dtest import Tester, debug
 from tools import known_failure
 
@@ -178,10 +179,10 @@ class BaseSStableLoaderTest(Tester):
 
         def read_and_validate_data(session):
             for i in range(NUM_KEYS):
-                rows = list(session.execute("SELECT * FROM standard1 WHERE KEY='%d'" % i))
-                self.assertEquals([str(i), 'col', str(i)], list(rows[0]))
-                rows = list(session.execute("SELECT * FROM counter1 WHERE KEY='%d'" % i))
-                self.assertEquals([str(i), 1], list(rows[0]))
+                query = "SELECT * FROM standard1 WHERE KEY='{}'".format(i)
+                assert_one(session, query, [str(i), 'col', str(i)])
+                query = "SELECT * FROM counter1 WHERE KEY='{}'".format(i)
+                assert_one(session, query, [str(i), 1])
 
         debug("Reading data back")
         # Now we should have sstables with the loaded data, and the existing

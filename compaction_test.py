@@ -6,8 +6,8 @@ import subprocess
 import tempfile
 import time
 
-from assertions import assert_none, assert_one
 from ccmlib import common
+from assertions import assert_none, assert_one, assert_length_equal
 from dtest import Tester, debug
 from nose.tools import assert_equal
 from tools import known_failure, since
@@ -319,7 +319,7 @@ class TestCompaction(Tester):
             session.execute("UPDATE ks.large SET properties[%i] = '%s' WHERE userid = 'user'" % (i, get_random_word(strlen)))
 
         ret = list(session.execute("SELECT properties from ks.large where userid = 'user'"))
-        assert len(ret) == 1
+        assert_length_equal(ret, 1)
         self.assertEqual(200, len(ret[0][0].keys()))
 
         node.flush()
@@ -330,8 +330,7 @@ class TestCompaction(Tester):
         node.watch_log_for('{} large partition ks/large:user \({}\)'.format(verb, sizematcher), from_mark=mark, timeout=180)
 
         ret = list(session.execute("SELECT properties from ks.large where userid = 'user'"))
-
-        assert len(ret) == 1
+        assert_length_equal(ret, 1)
         self.assertEqual(200, len(ret[0][0].keys()))
 
     def disable_autocompaction_nodetool_test(self):

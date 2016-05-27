@@ -137,6 +137,7 @@ class TestConfiguration(Tester):
         assert chunk_length == value, "Expected chunk_length: %s.  We got: %s" % (value, chunk_length)
 
 
+
 def write_to_trigger_fsync(session, ks, table):
     """
     Given a session, a keyspace name, and a table name, inserts enough values

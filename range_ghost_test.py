@@ -1,5 +1,6 @@
 import time
 
+from assertions import assert_length_equal
 from dtest import Tester
 
 
@@ -22,7 +23,7 @@ class TestRangeGhosts(Tester):
             session.execute("UPDATE cf SET c = 'value' WHERE key = 'k%i'" % i)
 
         res = list(session.execute("SELECT * FROM cf LIMIT 10000"))
-        assert len(res) == rows, res
+        assert_length_equal(res, rows)
 
         node1.flush()
 
@@ -31,11 +32,11 @@ class TestRangeGhosts(Tester):
 
         res = list(session.execute("SELECT * FROM cf LIMIT 10000"))
         # no ghosts in 1.2+
-        assert len(res) == rows / 2, len(res)
+        assert_length_equal(res, rows / 2)
 
         node1.flush()
         time.sleep(1)  # make sure tombstones are collected
         node1.compact()
 
         res = list(session.execute("SELECT * FROM cf LIMIT 10000"))
-        assert len(res) == rows / 2, len(res)
+        assert_length_equal(res, rows / 2)

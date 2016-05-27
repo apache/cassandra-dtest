@@ -2,14 +2,13 @@ import Queue
 import sys
 import threading
 import time
-import traceback
 from collections import OrderedDict
 from copy import deepcopy
 
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
 
-from assertions import assert_none, assert_unavailable
+from assertions import assert_none, assert_unavailable, assert_length_equal
 from dtest import DISABLE_VNODES, Tester, debug
 from tools import (create_c1c2_table, insert_c1c2, insert_columns,
                    known_failure, query_c1c2, rows_to_list, since)
@@ -185,10 +184,11 @@ class TestHelper(Tester):
         res = session.execute(statement)
         ret = rows_to_list(res)
         if check_ret:
-            assert ret[0][1] == val, "Got %s from %s, expected %s at %s" % (ret[0][1],
-                                                                            session.cluster.contact_points,
-                                                                            val,
-                                                                            self._name(consistency))
+            self.assertEqual(ret[0][1], val, "Got {} from {}, expected {} at {}".format(ret[0][1],
+                                                                                        session.cluster.contact_points,
+                                                                                        val,
+                                                                                        self._name(consistency)))
+
         return ret[0][1] if ret else 0
 
     def read_counter(self, session, id, consistency):
@@ -447,9 +447,8 @@ class TestAccuracy(TestHelper):
                 for s in sessions:
                     if outer.query_user(s, n, val, read_cl, check_ret=strong_consistency):
                         num += 1
-                assert num >= write_nodes, \
-                    "Failed to read value from sufficient number of nodes, required %d but  got %d - [%d, %s]" \
-                    % (write_nodes, num, n, val)
+                self.assertGreaterEqual(num, write_nodes, "Failed to read value from sufficient number of nodes, required {} but got {} - [{}, {}]"
+                                        .format(write_nodes, num, n, val))
 
             for n in xrange(start, end):
                 age = 30
@@ -485,9 +484,8 @@ class TestAccuracy(TestHelper):
                 results = []
                 for s in sessions:
                     results.append(outer.query_counter(s, n, val, read_cl, check_ret=strong_consistency))
-                assert results.count(val) >= write_nodes, \
-                    "Failed to read value from sufficient number of nodes, required %d nodes to have a counter " \
-                    "value of %s at key %d, instead got these values: %s" % (write_nodes, val, n, results)
+                self.assertGreaterEqual(results.count(val), write_nodes, "Failed to read value from sufficient number of nodes, required {} nodes to have a counter "
+                                        "value of {} at key {}, instead got these values: {}".format(write_nodes, val, n, results))
 
             for n in xrange(start, end):
                 c = outer.read_counter(sessions[0], n, ConsistencyLevel.ALL)
@@ -540,7 +538,8 @@ class TestAccuracy(TestHelper):
             err_type, err, err_traceback = exceptions_queue.get()
             debug("Failed with exception {}: {}".format(err_type, err.message))
             traceback.print_exception(err_type, err, err_traceback)
-            assert False, err.message
+
+            self.fail(err.message)
 
     def test_simple_strategy_users(self):
         """
@@ -785,10 +784,11 @@ class TestConsistency(Tester):
             query = SimpleStatement('SELECT c, v FROM cf WHERE key=\'k0\' LIMIT 3', consistency_level=ConsistencyLevel.QUORUM)
             rows = list(session.execute(query))
             res = rows
-            assert len(res) == 3, 'Expecting 3 values, got %d (%s)' % (len(res), str(res))
+            assert_length_equal(res, 3)
+
             # value 0, 1 and 2 have been deleted
             for i in xrange(1, 4):
-                assert res[i - 1][1] == 'value%d' % (i + 2), 'Expecting value%d, got %s (%s)' % (i + 2, res[i - 1][1], str(res))
+                self.assertEqual(res[i - 1][1], 'value {}'.format(i + 2), 'Expecting value {}, got {} ({})'.format(i + 2, res[i - 1][1], str(res)))
 
             truncate_statement = SimpleStatement('TRUNCATE cf', consistency_level=ConsistencyLevel.QUORUM)
             session.execute(truncate_statement)
@@ -824,9 +824,7 @@ class TestConsistency(Tester):
         # Query first column
         session = self.patient_cql_connection(node1, 'ks')
 
-        query = SimpleStatement('SELECT c, v FROM cf WHERE key=\'k0\' LIMIT 1', consistency_level=ConsistencyLevel.QUORUM)
-        res = list(session.execute(query))
-        assert len(res) == 0, res
+        assert_none(sesion, "SELECT c, v FROM cf WHERE key=\'k0\' LIMIT 1", cl=ConsistencyLevel.QUORUM)
 
     def short_read_quorum_delete_test(self):
         """
@@ -935,10 +933,11 @@ class TestConsistency(Tester):
             query = SimpleStatement('SELECT c, v FROM cf WHERE key=\'k0\' ORDER BY c DESC LIMIT 3', consistency_level=ConsistencyLevel.QUORUM)
             rows = list(session.execute(query))
             res = rows
-            assert len(res) == 3, 'Expecting 3 values, got %d (%s)' % (len(res), str(res))
+            assert_length_equal(res, 3)
+
             # value 6, 7 and 8 have been deleted
             for i in xrange(0, 3):
-                assert res[i][1] == 'value%d' % (5 - i), 'Expecting value%d, got %s (%s)' % (5 - i, res[i][1], str(res))
+                self.assertEqual(res[i][1], 'value%d' % (5 - i), 'Expecting value {}, got {} ({})'.format(5 - i, res[i][1], str(res)))
 
             session.execute('TRUNCATE cf')
 

@@ -1,4 +1,3 @@
-import re
 import time
 import uuid
 
@@ -30,7 +29,7 @@ class TestUserTypes(Tester):
     def assertUnauthorized(self, session, query, message):
         with self.assertRaises(Unauthorized) as cm:
             session.execute(query)
-        assert re.search(message, cm.exception.message), "Expected: %s" % message
+        self.assertRegexpMatches(cm.exception.message, message)
 
     def assertNoTypes(self, session):
         for keyspace in session.cluster.metadata.keyspaces.values():

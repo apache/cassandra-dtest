@@ -176,7 +176,7 @@ class PageAssertionMixin(object):
         return self.assertItemsEqual(actual, expected)
 
     def assertIsSubsetOf(self, subset, superset):
-        assert flatten_into_set(subset).issubset(flatten_into_set(superset))
+        self.assertLessEqual(flatten_into_set(subset), flatten_into_set(superset))
 
 
 class BasePagingTester(Tester):
@@ -516,7 +516,8 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
                 )
             else:
                 # this should not happen
-                assert False
+                self.fail("Invalid scenario configuration. Scenario is: {}".format(scenario))
+                self.assertTrue(False, "This should not happen.")
 
             pf = PageFetcher(future).request_all()
             self.assertEqual(pf.num_results_all(), scenario['expect_pgsizes'])
