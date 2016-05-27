@@ -117,14 +117,18 @@ class TestSecondaryIndexes(Tester):
 
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11729',
-                   flaky=False)
+                   flaky=True)
     def test_6924_dropping_ks(self):
         """
         @jira_ticket CASSANDRA-6924
+        @jira_ticket CASSANDRA-11729
 
         Data inserted immediately after dropping and recreating a
         keyspace with an indexed column familiy is not included
         in the index.
+
+        This test can be flaky due to concurrency issues during
+        schema updates. See CASSANDRA-11729 for an explanation.
         """
         # Reproducing requires at least 3 nodes:
         cluster = self.cluster
