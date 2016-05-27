@@ -451,28 +451,6 @@ class TestCompaction(Tester):
         time.sleep(2)
         self.assertTrue(len(node.grep_log('Compacting.+to_disable', filename=log_file)) > 0, 'Found no log items for {0}'.format(self.strategy))
 
-    def stress_no_purge_test(self):
-        """
-        @jira_ticket CASSANDRA-11831
-        Run a longer compaction with never_purge_tombstones to make sure we don't refresh the overlaps
-        """
-        cluster = self.cluster
-        cluster.populate(1).start(jvm_args=["-Dcassandra.never_purge_tombstones=true"], wait_for_binary_proto=True)
-        [node] = cluster.nodelist()
-        node.nodetool("setcompactionthroughput 1")
-        for i in xrange(0, 4):
-            node.stress(['write', 'n=300k', "no-warmup"])
-            node.flush()
-        node.wait_for_compactions()
-        if node.get_cassandra_version() < '2.2':
-            log_file = 'system.log'
-        else:
-            log_file = 'debug.log'
-        self.assertTrue(len(node.grep_log('You are running with -Dcassandra.never_purge_tombstones=true',
-                                          filename=log_file)) > 0)
-        self.assertTrue(len(node.grep_log('not refreshing overlaps - running with -Dcassandra.never_purge_tombstones=true',
-                                          filename=log_file)) > 0)
-
     def skip_if_no_major_compaction(self):
         if self.cluster.version() < '2.2' and self.strategy == 'LeveledCompactionStrategy':
             self.skipTest('major compaction not implemented for LCS in this version of Cassandra')
