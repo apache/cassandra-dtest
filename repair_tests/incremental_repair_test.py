@@ -146,10 +146,6 @@ class TestIncRepair(Tester):
 
         assert_one(session, "SELECT COUNT(*) FROM ks.cf LIMIT 200", [149])
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11436',
-                   flaky=False,
-                   notes='Fails on 2.1 and 2.2 w/o vnodes')
     def sstable_repairedset_test(self):
         """
         * Launch a two node cluster
@@ -167,6 +163,7 @@ class TestIncRepair(Tester):
         * Verify repairs occurred and repairedAt was updated
         """
         cluster = self.cluster
+        cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
         cluster.populate(2).start()
         node1, node2 = cluster.nodelist()
         node1.stress(['write', 'n=10K', '-schema', 'replication(factor=2)', '-rate', 'threads=50'])
