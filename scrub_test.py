@@ -211,9 +211,6 @@ class TestScrubIndexes(TestHelper):
         return ret
 
     @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11693',
-                   flaky=True)
-    @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11284',
                    flaky=True,
                    notes='windows')
