@@ -237,7 +237,7 @@ class TestCommitLog(Tester):
         Test commit log replay
         """
         node1 = self.node1
-        node1.set_configuration_options(batch_commitlog=True)
+        node1.set_batch_commitlog(batch_commitlog=True)
         node1.start()
 
         debug("Insert data")
