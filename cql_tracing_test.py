@@ -69,6 +69,7 @@ class TestCqlTracing(Tester):
             "INSERT INTO ks.users (userid, firstname, lastname, age) "
             "VALUES (550e8400-e29b-41d4-a716-446655440000, 'Frodo', 'Baggins', 32)",
             return_output=True)
+        debug(out)
         self.assertIn('Tracing session: ', out)
 
         # Restricted to 2.2+ due to flakiness on 2.1.  See CASSANDRA-11598 for details.
