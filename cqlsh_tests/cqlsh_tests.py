@@ -438,6 +438,10 @@ UPDATE varcharmaptable SET varcharvarintmap['Vitrum edere possum, mihi non nocet
 
         self.verify_glass(node1)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://datastax.jira.com/browse/CSTAR-574',
+                   flaky=False,
+                   notes='Offheap and Windows jobs ONLY')
     def test_unicode_syntax_error(self):
         """
         Ensure that syntax errors involving unicode are handled correctly.
@@ -457,6 +461,10 @@ UPDATE varcharmaptable SET varcharvarintmap['Vitrum edere possum, mihi non nocet
     @known_failure(failure_source='cassandra',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11895',
                    flaky=False)
+    @known_failure(failure_source='test',
+                   jira_url='https://datastax.jira.com/browse/CSTAR-574',
+                   flaky=False,
+                   notes='Offheap and Windows jobs ONLY')
     def test_unicode_invalid_request_error(self):
         """
         Ensure that invalid request errors involving unicode are handled correctly.
