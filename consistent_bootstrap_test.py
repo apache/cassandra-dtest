@@ -12,8 +12,7 @@ class TestBootstrapConsistency(Tester):
         debug("Creating a ring")
         cluster = self.cluster
         cluster.set_configuration_options(values={'hinted_handoff_enabled': False, 'write_request_timeout_in_ms': 60000,
-                                                  'read_request_timeout_in_ms': 60000, 'dynamic_snitch_badness_threshold': 0.0})
-        cluster.set_batch_commitlog(batch_commitlog=True)
+                                                  'read_request_timeout_in_ms': 60000, 'dynamic_snitch_badness_threshold': 0.0}, batch_commitlog=True)
 
         cluster.populate(3, tokens=[0, 2**48, 2**62]).start()
         node1, node2, node3 = cluster.nodelist()
@@ -51,8 +50,7 @@ class TestBootstrapConsistency(Tester):
         debug("Creating a ring")
         cluster = self.cluster
         cluster.set_configuration_options(values={'hinted_handoff_enabled': False, 'write_request_timeout_in_ms': 60000,
-                                                  'read_request_timeout_in_ms': 60000, 'dynamic_snitch_badness_threshold': 0.0})
-        cluster.set_batch_commitlog(batch_commitlog=True)
+                                                  'read_request_timeout_in_ms': 60000, 'dynamic_snitch_badness_threshold': 0.0}, batch_commitlog=True)
 
         cluster.populate(2)
         node1, node2 = cluster.nodelist()
