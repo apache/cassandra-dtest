@@ -52,7 +52,8 @@ class TestConfiguration(Tester):
             # writes should block on commitlog fsync
             self.cluster.populate(1)
             node = self.cluster.nodelist()[0]
-            self.cluster.set_configuration_options(values={'commitlog_segment_size_in_mb': 1}, batch_commitlog=True)
+            self.cluster.set_configuration_options(values={'commitlog_segment_size_in_mb': 1})
+            self.cluster.set_batch_commitlog(enabled=True)
 
             # disable JVM option so we can use Jolokia
             # this has to happen after .set_configuration_options because of implmentation details
