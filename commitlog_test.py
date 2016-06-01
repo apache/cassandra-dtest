@@ -199,15 +199,14 @@ class TestCommitLog(Tester):
         debug("Insert data")
         num_rows = 1024  # maximum number of mutations replayed at once by the commit log
         for i in xrange(num_rows):
-            session.execute("INSERT INTO Test.mytable (a, b, c) VALUES (0, %d, %d)" % (i, i))
+            session.execute("INSERT INTO Test.mytable (a, b, c) VALUES (0, {i}, {i})".format(i=i))
 
         node1.stop(gently=False)
         node1.mark_log_for_errors()
 
         debug("Verify commitlog was written before abrupt stop")
-        commitlog_dir = os.path.join(node1.get_path(), 'commitlogs')
-        commitlog_files = os.listdir(commitlog_dir)
-        self.assertNotEqual([], commitlog_files, commitlog_files)
+        commitlog_files = os.listdir(os.path.join(node1.get_path(), 'commitlogs'))
+        self.assertNotEqual([], commitlog_files)
 
         # set a short timeout to ensure lock contention will generally exceed this
         node1.set_configuration_options({'write_request_timeout_in_ms': 30})
@@ -215,16 +214,13 @@ class TestCommitLog(Tester):
         node1.start()
 
         debug("Verify commit log was replayed on startup")
-        start_time = time.time()
-        while (time.time() - start_time) < 120.0:
+        start_time, replay_complete = time.time(), False
+        while not replay_complete:
             matches = node1.grep_log(r".*WriteTimeoutException.*")
-            self.assertEqual([], matches, matches)
+            self.assertEqual([], matches)
 
             replay_complete = node1.grep_log("Log replay complete")
-            if replay_complete:
-                break
-        else:
-            self.fail("Did not finish commitlog replay within 120 seconds")
+            self.assertLess(time.time() - start_time, 120, "Did not finish commitlog replay within 120 seconds")
 
         debug("Reconnecting to node")
         session = self.patient_cql_connection(node1)
