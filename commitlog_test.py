@@ -205,8 +205,7 @@ class TestCommitLog(Tester):
         node1.mark_log_for_errors()
 
         debug("Verify commitlog was written before abrupt stop")
-        commitlog_dir = os.path.join(node1.get_path(), 'commitlogs')
-        commitlog_files = os.listdir(commitlog_dir)
+        commitlog_files = os.listdir(os.path.join(node1.get_path(), 'commitlogs'))
         self.assertNotEqual([], commitlog_files, commitlog_files)
 
         # set a short timeout to ensure lock contention will generally exceed this
