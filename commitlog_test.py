@@ -206,7 +206,7 @@ class TestCommitLog(Tester):
 
         debug("Verify commitlog was written before abrupt stop")
         commitlog_files = os.listdir(os.path.join(node1.get_path(), 'commitlogs'))
-        self.assertNotEqual([], commitlog_files, commitlog_files)
+        self.assertNotEqual([], commitlog_files)
 
         # set a short timeout to ensure lock contention will generally exceed this
         node1.set_configuration_options({'write_request_timeout_in_ms': 30})
@@ -217,7 +217,7 @@ class TestCommitLog(Tester):
         start_time = time.time()
         while (time.time() - start_time) < 120.0:
             matches = node1.grep_log(r".*WriteTimeoutException.*")
-            self.assertEqual([], matches, matches)
+            self.assertEqual([], matches)
 
             replay_complete = node1.grep_log("Log replay complete")
             if replay_complete:
