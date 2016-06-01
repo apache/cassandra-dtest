@@ -12,7 +12,7 @@ class TestJson(Tester):
 
         debug("Starting cluster...")
         cluster = self.cluster
-        cluster.set_configuration_options(batch_commitlog=True)
+        cluster.set_batch_commitlog(enabled=True)
         cluster.populate(1).start()
 
         debug("Version: " + cluster.version())
