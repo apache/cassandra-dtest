@@ -22,7 +22,7 @@ class TestHelper(Tester):
         and some tests rely on generation numbers/
         (see CASSANDRA-11693 and increase_sstable_generations)
         """
-        super(TestHelper, self).setUp(self)
+        super(TestHelper, self).setUp()
         self.cluster.set_datadir_count(1)
 
     def get_table_paths(self, table):
