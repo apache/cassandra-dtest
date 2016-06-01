@@ -215,14 +215,12 @@ class TestCommitLog(Tester):
 
         debug("Verify commit log was replayed on startup")
         start_time, replay_complete = time.time(), False
-        while not replay_complete and (time.time() - start_time) < 120.0:
+        while not replay_complete:
             matches = node1.grep_log(r".*WriteTimeoutException.*")
             self.assertEqual([], matches)
 
             replay_complete = node1.grep_log("Log replay complete")
-        else:
-            if not replay_complete:
-                self.fail("Did not finish commitlog replay within 120 seconds")
+            self.assertLess(time.time() - start_time, 120, "Did not finish commitlog replay within 120 seconds")
 
         debug("Reconnecting to node")
         session = self.patient_cql_connection(node1)
