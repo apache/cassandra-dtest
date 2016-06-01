@@ -199,7 +199,7 @@ class TestCommitLog(Tester):
         debug("Insert data")
         num_rows = 1024  # maximum number of mutations replayed at once by the commit log
         for i in xrange(num_rows):
-            session.execute("INSERT INTO Test.mytable (a, b, c) VALUES (0, %d, %d)" % (i, i))
+            session.execute("INSERT INTO Test.mytable (a, b, c) VALUES (0, {i}, {i})".format(i=i))
 
         node1.stop(gently=False)
         node1.mark_log_for_errors()
