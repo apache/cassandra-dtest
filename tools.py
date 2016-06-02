@@ -11,7 +11,7 @@ import unittest
 from distutils.version import LooseVersion
 from threading import Thread
 
-from assertions import assert_length_equal
+import assertions
 from cassandra import ConsistencyLevel
 from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.query import SimpleStatement
@@ -82,11 +82,11 @@ def query_c1c2(session, key, consistency=ConsistencyLevel.QUORUM, tolerate_missi
     query = SimpleStatement('SELECT c1, c2 FROM cf WHERE key=\'k%d\'' % key, consistency_level=consistency)
     rows = list(session.execute(query))
     if not tolerate_missing:
-        assert_length_equal(rows, 1)
+        assertions.assert_length_equal(rows, 1)
         res = rows[0]
         assert_true(len(res) == 2 and res[0] == 'value1' and res[1] == 'value2', res)
     if must_be_missing:
-        assert_length_equal(rows, 0)
+        assertions.assert_length_equal(rows, 0)
 
 
 # work for cluster started by populate

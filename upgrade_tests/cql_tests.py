@@ -83,11 +83,11 @@ class TestCQL(UpgradeTester):
                 raise SkipTest('version {} not compatible with protocol version 2'.format(version))
 
         # We only warn with protocol 2
-        cursor=self.prepare(protocol_version = 2)
+        cursor = self.prepare(protocol_version=2)
 
-        cluster=self.cluster
-        node1=cluster.nodelist()[0]
-        self.ignore_log_patterns=["Detected collection for table"]
+        cluster = self.cluster
+        node1 = cluster.nodelist()[0]
+        self.ignore_log_patterns = ["Detected collection for table"]
 
         cursor.execute("""
             CREATE TABLE maps (
@@ -112,7 +112,7 @@ class TestCQL(UpgradeTester):
 
     def noncomposite_static_cf_test(self):
         """ Test non-composite static CF syntax """
-        cursor=self.prepare()
+        cursor = self.prepare()
 
         # Create
         cursor.execute("""
@@ -160,7 +160,7 @@ class TestCQL(UpgradeTester):
 
     def dynamic_cf_test(self):
         """ Test non-composite dynamic CF syntax """
-        cursor=self.prepare()
+        cursor = self.prepare()
 
         cursor.execute("""
             CREATE TABLE clicks (
@@ -197,7 +197,7 @@ class TestCQL(UpgradeTester):
 
     def dense_cf_test(self):
         """ Test composite 'dense' CF syntax """
-        cursor=self.prepare()
+        cursor = self.prepare()
 
         cursor.execute("""
             CREATE TABLE connections (
@@ -250,7 +250,7 @@ class TestCQL(UpgradeTester):
 
     def sparse_cf_test(self):
         """ Test composite 'sparse' CF syntax """
-        cursor=self.prepare()
+        cursor = self.prepare()
 
         cursor.execute("""
             CREATE TABLE timeline (
@@ -267,8 +267,8 @@ class TestCQL(UpgradeTester):
             debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE timeline")
 
-            frodo_id=UUID('550e8400-e29b-41d4-a716-446655440000')
-            sam_id=UUID('f47ac10b-58cc-4372-a567-0e02b2c3d479')
+            frodo_id = UUID('550e8400-e29b-41d4-a716-446655440000')
+            sam_id = UUID('f47ac10b-58cc-4372-a567-0e02b2c3d479')
 
             # Inserts
             cursor.execute("INSERT INTO timeline (userid, posted_month, posted_day, body, posted_by) VALUES (%s, 1, 12, 'Something else', 'Frodo Baggins')", (frodo_id,))
@@ -291,7 +291,7 @@ class TestCQL(UpgradeTester):
     @freshCluster()
     def limit_ranges_test(self):
         """ Validate LIMIT option for 'range queries' in SELECT statements """
-        cursor=self.prepare(ordered = True)
+        cursor = self.prepare(ordered=True)
 
         cursor.execute("""
             CREATE TABLE clicks (
@@ -318,7 +318,7 @@ class TestCQL(UpgradeTester):
 
     def limit_multiget_test(self):
         """ Validate LIMIT option for 'multiget' in SELECT statements """
-        cursor=self.prepare()
+        cursor = self.prepare()
 
         cursor.execute("""
             CREATE TABLE clicks (
@@ -351,7 +351,7 @@ class TestCQL(UpgradeTester):
 
     def simple_tuple_query_test(self):
         """Covers CASSANDRA-8613"""
-        cursor=self.prepare()
+        cursor = self.prepare()
 
         cursor.execute("create table bard (a int, b int, c int, d int , e int, PRIMARY KEY (a, b, c, d, e))")
 
@@ -371,7 +371,7 @@ class TestCQL(UpgradeTester):
 
     def limit_sparse_test(self):
         """ Validate LIMIT option for sparse table in SELECT statements """
-        cursor=self.prepare()
+        cursor = self.prepare()
 
         cursor.execute("""
             CREATE TABLE clicks (
@@ -400,7 +400,7 @@ class TestCQL(UpgradeTester):
 
     def counters_test(self):
         """ Validate counter support """
-        cursor=self.prepare()
+        cursor = self.prepare()
 
         cursor.execute("""
             CREATE TABLE clicks (
@@ -416,6 +416,7 @@ class TestCQL(UpgradeTester):
             cursor.execute("TRUNCATE clicks")
 
             cursor.execute("UPDATE clicks SET total = total + 1 WHERE userid = 1 AND url = 'http://foo.com'")
+
             assert_one(cursor, "SELECT total FROM clicks WHERE userid = 1 AND url = 'http://foo.com'", [1])
 
             cursor.execute("UPDATE clicks SET total = total - 4 WHERE userid = 1 AND url = 'http://foo.com'")
@@ -429,7 +430,7 @@ class TestCQL(UpgradeTester):
 
     def indexed_with_eq_test(self):
         """ Check that you can query for an indexed column even with a key EQ clause """
-        cursor=self.prepare()
+        cursor = self.prepare()
 
         # Create
         cursor.execute("""
@@ -456,7 +457,7 @@ class TestCQL(UpgradeTester):
 
             assert_one(cursor, "SELECT firstname FROM users WHERE userid = f47ac10b-58cc-4372-a567-0e02b2c3d479 AND age = 33", ['Samwise'])
 
-    @known_failure(failure_source = 'test',
+    @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11878',
                    flaky=True)
     def select_key_in_test(self):
@@ -1020,6 +1021,7 @@ class TestCQL(UpgradeTester):
             res = list(cursor.execute("SELECT k, c, writetime(c), ttl(c) FROM test"))
 
             assert_length_equal(res, 2)
+
             for r in res:
                 self.assertIsInstance(r[2], (int, long))
                 if r[0] == 1:
@@ -1031,6 +1033,7 @@ class TestCQL(UpgradeTester):
             res = list(cursor.execute("SELECT k, c, blobAsBigint(bigintAsBlob(writetime(c))), ttl(c) FROM test"))
 
             assert_length_equal(res, 2)
+
             for r in res:
                 self.assertIsInstance(r[2], (int, long))
                 if r[0] == 1:
@@ -1041,6 +1044,7 @@ class TestCQL(UpgradeTester):
             res = list(cursor.execute("SELECT k, c, writetime(c), blobAsInt(intAsBlob(ttl(c))) FROM test"))
 
             assert_length_equal(res, 2)
+
             for r in res:
                 self.assertIsInstance(r[2], (int, long))
                 if r[0] == 1:
@@ -1165,7 +1169,6 @@ class TestCQL(UpgradeTester):
                 cursor.execute("DELETE FROM test1 WHERE k = %d AND c1 = 0" % i)
 
             for i in xrange(0, rows):
-
                 assert_all(cursor, "SELECT v1, v2 FROM test1 WHERE k = %d" % i, [[x, x] for x in xrange(i * cpr + col1, (i + 1) * cpr)])
 
             self.cluster.flush()
@@ -1205,7 +1208,6 @@ class TestCQL(UpgradeTester):
 
             assert_all(cursor, "SELECT v1 FROM test1 WHERE k = 0", [['{}{}'.format(c1, c2)] for c1 in xrange(0, 4) for c2 in xrange(0, 2) if c1 != 1])
 
-
     def delete_row_test(self):
         """ Test deletion of rows """
         cursor = self.prepare()
@@ -1232,6 +1234,7 @@ class TestCQL(UpgradeTester):
             cursor.execute(q % (0, 1, 0, 3, 3))
 
             cursor.execute("DELETE FROM test WHERE k = 0 AND c1 = 0 AND c2 = 0")
+
             res = list(cursor.execute("SELECT * FROM test"))
 
             assert_length_equal(res, 3)
@@ -1284,11 +1287,13 @@ class TestCQL(UpgradeTester):
 
             q = "UPDATE user SET {} WHERE fn='Bilbo' AND ln='Baggins'"
             cursor.execute(q.format("tags = { 'a', 'c', 'b' }"))
+
             assert_all(cursor, "SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'", [[set(['a', 'b', 'c'])]])
 
             time.sleep(.01)
 
             cursor.execute(q % "tags = { 'm', 'n' }")
+
             assert_all(cursor, "SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'", [[set(['m', 'n'])]])
 
             cursor.execute("DELETE tags['m'] FROM user WHERE fn='Bilbo' AND ln='Baggins'")
@@ -1296,7 +1301,6 @@ class TestCQL(UpgradeTester):
 
             cursor.execute("DELETE tags FROM user WHERE fn='Bilbo' AND ln='Baggins'")
             assert_all(cursor, "SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'", [])
-
 
     def map_test(self):
         cursor = self.prepare()
@@ -1325,12 +1329,14 @@ class TestCQL(UpgradeTester):
 
             q = "UPDATE user SET %s WHERE fn='Bilbo' AND ln='Baggins'"
             cursor.execute(q % "m = { 'a' : 4 , 'c' : 3, 'b' : 2 }")
+
             assert_all(cursor, "SELECT m FROM user WHERE fn='Bilbo' AND ln='Baggins'", [[{'a': 4, 'b': 2, 'c': 3}]])
 
             time.sleep(.01)
 
             # Check we correctly overwrite
             cursor.execute(q % "m = { 'm' : 4 , 'n' : 1, 'o' : 2 }")
+
             assert_all(cursor, "SELECT m FROM user WHERE fn='Bilbo' AND ln='Baggins'", [[{'m': 4, 'n': 1, 'o': 2}]])
 
             cursor.execute(q % "m = {}")
@@ -2200,9 +2206,8 @@ class TestCQL(UpgradeTester):
             debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE test")
 
-            cursor.execute()
-            query = "INSERT INTO test (k, b) VALUES (true, false)"
-            assert_one(cursor, query, [True, False])
+            cursor.execute("INSERT INTO test (k, b) VALUES (true, false)")
+            assert_one(cursor, "SELECT * FROM test WHERE k = true", [True, False])
 
     def multiordering_test(self):
         cursor = self.prepare()
@@ -2629,7 +2634,7 @@ class TestCQL(UpgradeTester):
             cursor.execute("TRUNCATE bar")
 
             cursor.execute("INSERT INTO bar (id, i) VALUES (1, 2);")
-            assert_one(cursor, "SELECT * FROM bar", [[1, 2]])
+            assert_one(cursor, "SELECT * FROM bar", [1, 2])
 
     def query_compact_tables_during_upgrade_test(self):
         """
