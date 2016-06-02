@@ -95,11 +95,13 @@ class UpgradeTester(Tester):
 
         return session
 
-    def do_upgrade(self, session):
+    def do_upgrade(self, session, return_nodes=False):
         """
         Upgrades the first node in the cluster and returns a list of
         (is_upgraded, Session) tuples.  If `is_upgraded` is true, the
-        Session is connected to the upgraded node.
+        Session is connected to the upgraded node. If `return_nodes`
+        is True, a tuple of (is_upgraded, Session, Node) will be
+        returned instead.
         """
         session.cluster.shutdown()
         node1 = self.cluster.nodelist()[0]
@@ -135,12 +137,20 @@ class UpgradeTester(Tester):
         sessions = []
         session = self.patient_exclusive_cql_connection(node1, protocol_version=self.protocol_version)
         session.set_keyspace('ks')
-        sessions.append((True, session))
+
+        if return_nodes:
+            sessions.append((True, session, node1))
+        else:
+            sessions.append((True, session))
 
         # open a second session with the node on the old version
         session = self.patient_exclusive_cql_connection(node2, protocol_version=self.protocol_version)
         session.set_keyspace('ks')
-        sessions.append((False, session))
+
+        if return_nodes:
+            sessions.append((False, session, node2))
+        else:
+            sessions.append((False, session))
 
         if self.CL:
             for is_upgraded, session in sessions:

@@ -1609,7 +1609,7 @@ class TestCQL(UpgradeTester):
         when communicating with 2.2 nodes.
         @jira_ticket CASSANDRA-11930
         """
-        cursor = self.prepare(start_rpc=True)
+        session = self.prepare(start_rpc=True)
         node = self.cluster.nodelist()[0]
         host, port = node.network_interfaces['thrift']
 
@@ -1629,13 +1629,12 @@ class TestCQL(UpgradeTester):
             column_metadata=column_defs)
         client.system_add_column_family(cfdef)
 
-        # dumb schema agreement wait (we're using Thrift)
-        time.sleep(5.0)
+        session.cluster.wait_for_schema_agreement()
 
-        for is_upgraded, cursor, node in self.do_upgrade(cursor, return_nodes=True):
+        for is_upgraded, session, node in self.do_upgrade(session, return_nodes=True):
             debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
 
-            cursor.execute("TRUNCATE ks.cf")
+            session.execute("TRUNCATE ks.cf")
 
             host, port = node.network_interfaces['thrift']
             client = get_thrift_client(host, port)
@@ -1661,7 +1660,7 @@ class TestCQL(UpgradeTester):
                 # sanity check on the query
                 fetch_slice = SlicePredicate(slice_range=SliceRange('', '', False, 100))
                 row = client.get_slice(key, ColumnParent(column_family='cf'), fetch_slice, ThriftConsistencyLevel.ALL)
-                self.assertEqual(6, len(row))
+                self.assertEqual(6, len(row), row)
                 cols = OrderedDict([(cosc.column.name, cosc.column.value) for cosc in row])
                 debug(cols)
                 self.assertEqual('val0', cols['a'])
@@ -1676,7 +1675,7 @@ class TestCQL(UpgradeTester):
 
                 # check remaining columns
                 row = client.get_slice(key, ColumnParent(column_family='cf'), fetch_slice, ThriftConsistencyLevel.ALL)
-                self.assertEqual(3, len(row))
+                self.assertEqual(3, len(row), row)
                 cols = OrderedDict([(cosc.column.name, cosc.column.value) for cosc in row])
                 debug(cols)
                 self.assertEqual('val0', cols['a'])
