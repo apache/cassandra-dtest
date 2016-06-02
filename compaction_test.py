@@ -2,11 +2,14 @@ import os
 import random
 import re
 import string
+import subprocess
 import tempfile
 import time
 
 from assertions import assert_none, assert_one
+from ccmlib import common
 from dtest import Tester, debug
+from nose.tools import assert_equal
 from tools import known_failure, since
 
 
@@ -451,9 +454,56 @@ class TestCompaction(Tester):
         time.sleep(2)
         self.assertTrue(len(node.grep_log('Compacting.+to_disable', filename=log_file)) > 0, 'Found no log items for {0}'.format(self.strategy))
 
+    @since('3.7')
+    def user_defined_compaction_test(self):
+        """
+        Test a user defined compaction task by generating a few sstables with cassandra stress
+        and autocompaction disabled, and then passing a list of sstable data files directly to nodetool compact.
+        Check that after compaction there is only one sstable per node directory. Make sure to use sstableutil
+        to list only final files because after a compaction some temporary files may still not have been deleted.
+
+        @jira_ticket CASSANDRA-11765
+        """
+        cluster = self.cluster
+        cluster.populate(1).start(wait_for_binary_proto=True)
+        [node1] = cluster.nodelist()
+
+        # disableautocompaction only disables compaction for existing tables,
+        # so initialize stress tables with stress first
+        stress_write(node1, keycount=1)
+        node1.nodetool('disableautocompaction')
+
+        stress_write(node1, keycount=500000)
+        node1.nodetool('flush keyspace1 standard1')
+
+        sstable_files = ' '.join(get_sstable_data_files(node1, 'keyspace1', 'standard1'))
+        debug('Compacting {}'.format(sstable_files))
+        node1.nodetool('compact --user-defined {}'.format(sstable_files))
+
+        sstable_files = get_sstable_data_files(node1, 'keyspace1', 'standard1')
+        self.assertEquals(len(node1.data_directories()), len(sstable_files),
+                          'Expected one sstable data file per node directory but got {}'.format(sstable_files))
+
     def skip_if_no_major_compaction(self):
         if self.cluster.version() < '2.2' and self.strategy == 'LeveledCompactionStrategy':
             self.skipTest('major compaction not implemented for LCS in this version of Cassandra')
+
+
+def get_sstable_data_files(node, ks, table):
+    """
+    Read sstable data files by using sstableutil, so we ignore temporary files
+    """
+    env = common.make_cassandra_env(node.get_install_cassandra_root(), node.get_node_cassandra_root())
+    args = [node.get_tool('sstableutil'), '--type', 'final', ks, table]
+
+    p = subprocess.Popen(args, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    stdout, stderr = p.communicate()
+
+    assert_equal(p.returncode, 0, "Error invoking sstableutil; returned {code}; {err}"
+                 .format(code=p.returncode, err=stderr))
+
+    ret = sorted(filter(lambda s: s.endswith('-Data.db'), stdout.splitlines()))
+    return ret
 
 
 def get_random_word(wordLen, population=string.ascii_letters + string.digits):
