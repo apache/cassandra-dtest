@@ -174,7 +174,7 @@ class TestCommitLog(Tester):
             self.skipTest("Fixed in 3.0.7 and 3.7")
 
         node1 = self.node1
-        node1.set_configuration_options(batch_commitlog=True)
+        node1.set_batch_commitlog(enabled=True)
         node1.start()
         session = self.patient_cql_connection(node1)
 
