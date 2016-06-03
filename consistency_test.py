@@ -355,6 +355,9 @@ class TestAvailability(TestHelper):
 
         self._test_network_topology_strategy(combinations)
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11950',
+                   flaky=True)
     @since("3.0")
     def test_network_topology_strategy_each_quorum(self):
         """
