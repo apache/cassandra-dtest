@@ -134,26 +134,27 @@ class UpgradeTester(Tester):
         node1.set_configuration_options(values={'internode_compression': 'none'})
         node1.start(wait_for_binary_proto=True, wait_other_notice=True)
 
-        sessions = []
+        sessions_and_meta = []
         session = self.patient_exclusive_cql_connection(node1, protocol_version=self.protocol_version)
         session.set_keyspace('ks')
 
         if return_nodes:
-            sessions.append((True, session, node1))
+            sessions_and_meta.append((True, session, node1))
         else:
-            sessions.append((True, session))
+            sessions_and_meta.append((True, session))
 
         # open a second session with the node on the old version
         session = self.patient_exclusive_cql_connection(node2, protocol_version=self.protocol_version)
         session.set_keyspace('ks')
 
         if return_nodes:
-            sessions.append((False, session, node2))
+            sessions_and_meta.append((False, session, node2))
         else:
-            sessions.append((False, session))
+            sessions_and_meta.append((False, session))
 
         if self.CL:
-            for is_upgraded, session in sessions:
+            for session_and_meta in sessions_and_meta:
+                session = session_and_meta[1]
                 session.default_consistency_level = self.CL
 
         # Let the nodes settle briefly before yielding connections in turn (on the upgraded and non-upgraded alike)
@@ -161,7 +162,7 @@ class UpgradeTester(Tester):
         # CL.ALL from being reached. The newly upgraded node needs to settle because it has just barely started, and each
         # non-upgraded node needs a chance to settle as well, because the entire cluster (or isolated nodes) may have been doing resource intensive activities
         # immediately before.
-        for s in sessions:
+        for s in sessions_and_meta:
             time.sleep(5)
             yield s
 

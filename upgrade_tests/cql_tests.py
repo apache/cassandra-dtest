@@ -7,6 +7,7 @@ import struct
 import time
 from collections import OrderedDict
 from uuid import UUID, uuid4
+from distutils.version import LooseVersion
 
 from cassandra import ConsistencyLevel, InvalidRequest
 from cassandra.concurrent import execute_concurrent_with_args
@@ -1629,10 +1630,16 @@ class TestCQL(UpgradeTester):
             column_metadata=column_defs)
         client.system_add_column_family(cfdef)
 
-        session.cluster.wait_for_schema_agreement()
+        session.cluster.control_connection.wait_for_schema_agreement()
 
         for is_upgraded, session, node in self.do_upgrade(session, return_nodes=True):
             debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
+
+            upgrade_to_version = LooseVersion(self.get_node_version(is_upgraded=True))
+            if LooseVersion('3.0.0') <= upgrade_to_version <= LooseVersion('3.0.6'):
+                self.skip('CASSANDRA-11930 was fixed in 3.0.7 and 3.7')
+            elif LooseVersion('3.1') <= upgrade_to_version <= LooseVersion('3.6'):
+                self.skip('CASSANDRA-11930 was fixed in 3.0.7 and 3.7')
 
             session.execute("TRUNCATE ks.cf")
 
