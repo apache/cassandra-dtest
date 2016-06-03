@@ -6,7 +6,7 @@ from cassandra import FunctionFailure
 
 from assertions import assert_invalid, assert_none, assert_one
 from dtest import CASSANDRA_VERSION_FROM_BUILD, Tester, debug
-from tools import since
+from tools import since, known_failure
 
 
 @since('2.2')
@@ -32,6 +32,9 @@ class TestUserFunctions(Tester):
             self.create_ks(session, 'ks', rf)
         return session
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11951',
+                   flaky=True)
     def test_migration(self):
         """ Test migration of user functions """
         cluster = self.cluster
