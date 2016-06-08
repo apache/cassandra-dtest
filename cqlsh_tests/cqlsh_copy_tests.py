@@ -1503,10 +1503,9 @@ class CqlshCopyTest(Tester):
         """
         self.quoted_column_names_reading_template(specify_column_names=False)
 
-    def quoted_column_names_writing_template(self, specify_column_names):
+    def test_quoted_column_names_writing(self):
         """
-        @param specify_column_names if truthy, specify column names in COPY statement
-        A parameterized test. Test that COPY can write to a table with quoted
+        Test that COPY can write to a table with quoted
         column names by:
 
         - creating a table with quoted column names,
@@ -1527,31 +1526,24 @@ class CqlshCopyTest(Tester):
 
         data = [[1, 'no'], [2, 'Yes'],
                 [3, 'True'], [4, 'false']]
+
         insert_statement = self.session.prepare("""INSERT INTO testquoted ("IdNumber", "select") VALUES (?, ?)""")
         execute_concurrent_with_args(self.session, insert_statement, data)
 
-        tempfile = self.get_temp_file()
-        stmt = ("""COPY ks.testquoted ("IdNumber", "select") TO '{name}'"""
-                if specify_column_names else
-                """COPY ks.testquoted TO '{name}'""").format(name=tempfile.name)
-        self.node1.run_cqlsh(stmt)
+        for specify_column_names in (True, False):
+            tempfile = self.get_temp_file()
+            stmt = ("""COPY ks.testquoted ("IdNumber", "select") TO '{name}'"""
+                    if specify_column_names else
+                    """COPY ks.testquoted TO '{name}'""").format(name=tempfile.name)
+            self.node1.run_cqlsh(stmt)
 
-        reference_file = self.get_temp_file()
-        write_rows_to_csv(reference_file.name, data)
+            reference_file = self.get_temp_file()
+            write_rows_to_csv(reference_file.name, data)
 
-        assert_csvs_items_equal(tempfile.name, reference_file.name)
+            assert_csvs_items_equal(tempfile.name, reference_file.name)
 
-    def test_quoted_column_names_writing_specify_names(self):
-        self.quoted_column_names_writing_template(specify_column_names=True)
-
-    def test_quoted_column_names_writing_dont_specify_names(self):
-        self.quoted_column_names_writing_template(specify_column_names=False)
-
-    def data_validation_on_read_template(self, data, expected_err='Failed to import'):
+    def test_data_validation_on_read_template(self):
         """
-        @param data - the data to be written to the csv file
-        @param expected_err - the error we expect or None if the test should succeed
-
         Test that reading from CSV files fails when there is a type mismatch
         between the value being loaded and the type of the column or when data is missing
         in the file. Perform the following:
@@ -1577,68 +1569,43 @@ class CqlshCopyTest(Tester):
                 PRIMARY KEY(a, b)
             )""")
 
-        tempfile = self.get_temp_file()
-        debug('Writing {}'.format(tempfile.name))
-        write_rows_to_csv(tempfile.name, data)
+        data_err_pairs = [
+            # sanity check that the test works
+            ([[1, 1, 2]], None),
 
-        cmd = """COPY ks.testvalidate (a, b, c) FROM '{name}'""".format(name=tempfile.name)
-        out, err = self.node1.run_cqlsh(cmd, return_output=True)
-        results = list(self.session.execute("SELECT * FROM testvalidate"))
+            # test copying a float to an int column
+            ([[1, 1, 2.14]], 'Failed to import'),
 
-        if expected_err:
-            self.assertIn(expected_err, err)
-            self.assertFalse(results)
-        else:
-            self.assertFalse(err)
-            self.assertCsvResultEqual(tempfile.name, results, 'testvalidate')
+            # test copying a uuid to an int column
+            ([[1, 1, uuid4()]], 'Failed to import'),
 
-    def test_read_valid_data(self):
-        """
-        Use data_validation_on_read_template to test COPYing an int value from a
-        CSV into an int column. This test exists to make sure the parameterized
-        test works.
-        """
-        # make sure the template works properly
-        self.data_validation_on_read_template([[1, 1, 2]], expected_err=None)
+            # test copying a text value to an int column
+            ([[1, 1, 'test']], 'Failed to import'),
 
-    def test_read_invalid_float(self):
-        """
-        Use data_validation_on_read_template to test COPYing a float value from a
-        CSV into an int column.
-        """
-        self.data_validation_on_read_template([[1, 1, 2.14]])
+            # test using an empty partition key
+            ([['', 1, 'test']], "Failed to import 1 rows: ParseError - Cannot insert null value for primary key column"),
 
-    def test_read_invalid_uuid(self):
-        """
-        Use data_validation_on_read_template to test COPYing a uuid value from a
-        CSV into an int column.
-        """
-        self.data_validation_on_read_template([[1, 1, uuid4()]])
+            # test using an empty clustering key
+            ([[1, '', 'test']], "Failed to import 1 rows: ParseError - Cannot insert null value for primary key column"),
+        ]
 
-    def test_read_invalid_text(self):
-        """
-        Use data_validation_on_read_template to test COPYing a text value from a
-        CSV into an int column.
-        """
-        self.data_validation_on_read_template([[1, 1, 'test']])
+        for (data, expected_err) in data_err_pairs:
+            self.session.execute("TRUNCATE testvalidate")
 
-    def test_read_missing_partition_key(self):
-        """
-        Use data_validation_on_read_template to test COPYing an empty partition key.
-        @jira_ticket CASSANDRA-10854
-        """
-        self.data_validation_on_read_template([['', 1, 'test']],
-                                              expected_err="Failed to import 1 rows: ParseError - "
-                                                           "Cannot insert null value for primary key column")
+            tempfile = self.get_temp_file()
+            debug('Writing {}'.format(tempfile.name))
+            write_rows_to_csv(tempfile.name, data)
 
-    def test_read_missing_clustering_key(self):
-        """
-        Use data_validation_on_read_template to test COPYing an empty clustering key.
-        @jira_ticket CASSANDRA-10854
-        """
-        self.data_validation_on_read_template([[1, '', 'test']],
-                                              expected_err="Failed to import 1 rows: ParseError - "
-                                                           "Cannot insert null value for primary key column")
+            cmd = """COPY ks.testvalidate (a, b, c) FROM '{name}'""".format(name=tempfile.name)
+            out, err = self.node1.run_cqlsh(cmd, return_output=True)
+            results = list(self.session.execute("SELECT * FROM testvalidate"))
+
+            if expected_err:
+                self.assertIn(expected_err, err)
+                self.assertFalse(results)
+            else:
+                self.assertFalse(err)
+                self.assertCsvResultEqual(tempfile.name, results, 'testvalidate')
 
     @since('2.2')
     def test_read_wrong_column_names(self):
