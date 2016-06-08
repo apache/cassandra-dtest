@@ -16,7 +16,7 @@ class TestSSTableSplit(Tester):
     def split_test(self):
         """
         Check that after running compaction, sstablessplit can succesfully split
-        The resultant sstable.  Check that split is reversable and that data is readable
+        The resultant sstable.  Check that split is reversible and that data is readable
         after carrying out these operations.
         """
         cluster = self.cluster
@@ -25,7 +25,8 @@ class TestSSTableSplit(Tester):
         version = cluster.version()
 
         debug("Run stress to insert data")
-        node.stress(['write', 'n=1000000', '-rate', 'threads=10'])
+        node.stress(['write', 'n=1000', 'no-warmup', '-rate', 'threads=50',
+                     '-col', 'n=FIXED(10)', 'SIZE=FIXED(1024)'])
 
         self._do_compaction(node)
         self._do_split(node, version)
@@ -33,13 +34,13 @@ class TestSSTableSplit(Tester):
         self._do_split(node, version)
 
         debug("Run stress to ensure data is readable")
-        node.stress(['read', 'n=1000000', '-rate', 'threads=25'])
+        node.stress(['read', 'n=1000', '-rate', 'threads=25',
+                     '-col', 'n=FIXED(10)', 'SIZE=FIXED(1024)'])
 
     def _do_compaction(self, node):
         debug("Compact sstables.")
         node.flush()
         node.compact()
-        node.flush()
         keyspace = 'keyspace1'
         sstables = node.get_sstables(keyspace, '')
         debug("Number of sstables after compaction: %s" % len(sstables))
@@ -95,13 +96,16 @@ class TestSSTableSplit(Tester):
         node = cluster.nodelist()[0]
 
         debug("Run stress to insert data")
-        node.stress(['write', 'n=2000000', '-rate', 'threads=10',
-                     '-schema', 'compaction(strategy=LeveledCompactionStrategy, sstable_size_in_mb=10)'])
+        node.stress(['write', 'n=300', 'no-warmup', '-rate', 'threads=50',
+                     '-col', 'n=FIXED(10)', 'SIZE=FIXED(1024)'])
         self._do_compaction(node)
         node.stop()
-        result = node.run_sstablesplit(keyspace='keyspace1', size=2, no_snapshot=True)
+        result = node.run_sstablesplit(keyspace='keyspace1', size=1, no_snapshot=True)
 
         for (stdout, stderr, rc) in result:
             debug(stderr)
             failure = stderr.find("java.lang.AssertionError: Data component is missing")
             self.assertEqual(failure, -1, "Error during sstablesplit")
+
+        sstables = node.get_sstables('keyspace1', '')
+        self.assertGreaterEqual(len(sstables), 1, sstables)
