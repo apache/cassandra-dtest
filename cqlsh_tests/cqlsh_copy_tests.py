@@ -6,7 +6,7 @@ import json
 import os
 import sys
 import time
-from collections import namedtuple
+from collections import namedtuple, defaultdict
 from contextlib import contextmanager
 from decimal import Decimal
 from functools import partial
@@ -316,8 +316,8 @@ class CqlshCopyTest(Tester):
                         warning("Value in result: " + str(processed_results[0][x]))
             raise e
 
-    def format_for_csv(self, val, cql_type_name, time_format, nullval):
-        with self._cqlshlib() as cqlshlib:
+    def make_csv_formatter(self, time_format, nullval):
+        with self._cqlshlib() as cqlshlib:  # noqa
             from cqlshlib.formatting import format_value, format_value_default
             from cqlshlib.displaying import NO_COLOR_MAP
             try:
@@ -329,11 +329,11 @@ class CqlshCopyTest(Tester):
             except ImportError:
                 date_time_format = None
 
-            try:
-                from cqlshlib.formatting import CqlType
-                cluster_meta = UpdatingClusterMetadataWrapper(self.session.cluster)
-                cql_type = CqlType(cql_type_name, cluster_meta.keyspaces[self.ks])
-            except ImportError:
+        encoding_name = 'utf-8'  # codecs.lookup(locale.getpreferredencoding()).name
+        color_map = DummyColorMap()
+
+        def formatter(val, cql_type_name, cql_type):
+            if cql_type is None:
                 # Backward compatibility before formatting.CqlType was introduced:
                 # we must convert blob types to bytearray instances;
                 # the format_value() signature was changed and the first type(val) argument removed, so we add it via
@@ -344,33 +344,34 @@ class CqlshCopyTest(Tester):
                 if isinstance(val, str) and cql_type_name == 'blob':
                     val = bytearray(val)
 
-                format_value = partial(format_value, type(val))
-                cql_type = None
+                format_fn = partial(format_value, type(val))
+            else:
+                format_fn = format_value
 
-        encoding_name = 'utf-8'  # codecs.lookup(locale.getpreferredencoding()).name
+            if val is None or val == EMPTY or val == nullval:
+                return format_value_default(nullval, colormap=NO_COLOR_MAP)
 
-        if val is None or val == EMPTY or val == nullval:
-            return format_value_default(nullval, colormap=NO_COLOR_MAP)
+            # CASSANDRA-11255 increased COPY TO DOUBLE PRECISION TO 12
+            if cql_type_name == 'double' and self.cluster.version() >= '3.6':
+                float_precision = 12
+            else:
+                float_precision = 5
 
-        # CASSANDRA-11255 increased COPY TO DOUBLE PRECISION TO 12
-        if cql_type_name == 'double' and self.cluster.version() >= '3.6':
-            float_precision = 12
-        else:
-            float_precision = 5
+            # different versions use time_format or date_time_format
+            # but all versions reject spurious values, so we just use both here
+            return format_fn(val,
+                             cqltype=cql_type,
+                             encoding=encoding_name,
+                             date_time_format=date_time_format,
+                             time_format=time_format,
+                             float_precision=float_precision,
+                             colormap=color_map,
+                             nullval=nullval,
+                             decimal_sep=None,
+                             thousands_sep=None,
+                             boolean_styles=None).strval
 
-        # different versions use time_format or date_time_format
-        # but all versions reject spurious values, so we just use both here
-        return format_value(val,
-                            cqltype=cql_type,
-                            encoding=encoding_name,
-                            date_time_format=date_time_format,
-                            time_format=time_format,
-                            float_precision=float_precision,
-                            colormap=DummyColorMap(),
-                            nullval=nullval,
-                            decimal_sep=None,
-                            thousands_sep=None,
-                            boolean_styles=None).strval
+        return formatter
 
     def result_to_csv_rows(self, results, cql_type_names, time_format=None, nullval=''):
         """
@@ -382,8 +383,24 @@ class CqlshCopyTest(Tester):
         # into a bare function if cqlshlib is made easier to interact with.
         if not time_format:
             time_format = self.default_time_format
-        return [[self.format_for_csv(v, t, time_format, nullval)
-                 for v, t in zip(row, cql_type_names)] for row in results]
+
+        processed = []
+        format_fn = self.make_csv_formatter(time_format, nullval)
+
+        # build the typemap once ahead of time to speed up formatting
+        try:
+            from cqlshlib.formatting import CqlType
+            cluster_meta = UpdatingClusterMetadataWrapper(self.session.cluster)
+            ks_meta = cluster_meta.keyspaces[self.ks]
+            cql_type_map = dict([(type_name, CqlType(type_name, ks_meta)) for type_name in cql_type_names])
+        except ImportError:
+            cql_type_map = defaultdict()
+
+        for i, row in enumerate(results):
+            formatted_row = [format_fn(v, t, cql_type_map[t])
+                             for v, t in zip(row, cql_type_names)]
+            processed.append(formatted_row)
+        return processed
 
     def test_list_data(self):
         """
@@ -2836,7 +2853,8 @@ class CqlshCopyTest(Tester):
         self.ks = 'keyspace1'
         stress_ks_table_name = self.ks + '.' + stress_table_name
         self.node1.stress(['write', 'n={}'.format(num_records),
-                           'no-warmup', '-rate', 'threads=50',
+                           'no-warmup',
+                           '-rate', 'threads=50',
                            '-col', 'n=FIXED(10)', 'SIZE=FIXED(1024)'])  # 10 columns of 1kb each
 
         tempfile = self.get_temp_file()
@@ -2857,7 +2875,7 @@ class CqlshCopyTest(Tester):
         # Import without prepared statements and verify
         self.session.execute("TRUNCATE {}".format(stress_ks_table_name))
 
-        debug('Importing from csv file {}'.format(tempfile.name))
+        debug('Importing from csv file with MAXBATCHSIZE=1 {}'.format(tempfile.name))
         self.node1.run_cqlsh(cmds="COPY {} FROM '{}' WITH MAXBATCHSIZE=1 AND PREPAREDSTATEMENTS=FALSE"
                              .format(stress_ks_table_name, tempfile.name),
                              show_output=True, cqlsh_options=['--debug'])
