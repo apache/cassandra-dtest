@@ -41,7 +41,7 @@ class TestIncRepair(Tester):
 
         node3.stop(gently=True)
 
-        node1.stress(['write', 'n=10K', '-schema', 'replication(factor=3)'])
+        node1.stress(['write', 'n=10K', 'no-warmup', '-schema', 'replication(factor=3)'])
         node1.flush()
         node2.flush()
 
@@ -166,7 +166,7 @@ class TestIncRepair(Tester):
         cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
         cluster.populate(2).start()
         node1, node2 = cluster.nodelist()
-        node1.stress(['write', 'n=10K', '-schema', 'replication(factor=2)', '-rate', 'threads=50'])
+        node1.stress(['write', 'n=10K', 'no-warmup', '-schema', 'replication(factor=2)', '-rate', 'threads=50'])
 
         node1.flush()
         node2.flush()
@@ -196,7 +196,7 @@ class TestIncRepair(Tester):
         self.assertIn('Repaired at: 0', initialoutput)
 
         node1.stop()
-        node2.stress(['write', 'n=15K', '-schema', 'replication(factor=2)'])
+        node2.stress(['write', 'n=15K', 'no-warmup', '-schema', 'replication(factor=2)'])
         node2.flush()
         node1.start(wait_for_binary_proto=True)
 
@@ -282,7 +282,7 @@ class TestIncRepair(Tester):
         cluster.populate(2).start(wait_for_binary_proto=True)
         node1, node2 = cluster.nodelist()
         for x in xrange(0, 10):
-            node1.stress(['write', 'n=100k', '-rate', 'threads=10', '-schema', 'compaction(strategy=LeveledCompactionStrategy,sstable_size_in_mb=10)', 'replication(factor=2)'])
+            node1.stress(['write', 'n=100k', 'no-warmup', '-rate', 'threads=10', '-schema', 'compaction(strategy=LeveledCompactionStrategy,sstable_size_in_mb=10)', 'replication(factor=2)'])
             cluster.flush()
             cluster.wait_for_compactions()
             node1.nodetool("repair -full keyspace1 standard1")
@@ -308,7 +308,7 @@ class TestIncRepair(Tester):
         node1, node2, node3 = cluster.nodelist()
 
         debug("Inserting data with stress")
-        node1.stress(['write', 'n=5M', '-rate', 'threads=10', '-schema', 'replication(factor=3)'])
+        node1.stress(['write', 'n=5M', 'no-warmup', '-rate', 'threads=10', '-schema', 'replication(factor=3)'])
 
         debug("Flushing nodes")
         cluster.flush()
@@ -367,7 +367,7 @@ class TestIncRepair(Tester):
         node1, node2, node3, node4 = cluster.nodelist()
 
         debug("Inserting data with stress")
-        node1.stress(['write', 'n=3', '-rate', 'threads=1', '-schema', 'replication(factor=3)'])
+        node1.stress(['write', 'n=3', 'no-warmup', '-rate', 'threads=1', '-schema', 'replication(factor=3)'])
 
         debug("Flushing nodes")
         cluster.flush()

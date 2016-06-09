@@ -20,7 +20,7 @@ class TestDiskBalance(Tester):
         cluster.populate(4).start(wait_for_binary_proto=True)
         node1 = cluster.nodes['node1']
 
-        node1.stress(['write', 'n=10k', '-rate', 'threads=100', '-schema', 'replication(factor=2)'])
+        node1.stress(['write', 'n=10k', 'no-warmup', '-rate', 'threads=100', '-schema', 'replication(factor=2)'])
         cluster.flush()
         # make sure the data directories are balanced:
         for node in cluster.nodelist():
@@ -36,7 +36,7 @@ class TestDiskBalance(Tester):
         cluster.populate(4).start(wait_for_binary_proto=True)
         node1 = cluster.nodes['node1']
 
-        node1.stress(['write', 'n=50k', '-rate', 'threads=100', '-schema', 'replication(factor=3)', 'compaction(strategy=SizeTieredCompactionStrategy,enabled=false)'])
+        node1.stress(['write', 'n=50k', 'no-warmup', '-rate', 'threads=100', '-schema', 'replication(factor=3)', 'compaction(strategy=SizeTieredCompactionStrategy,enabled=false)'])
         cluster.flush()
         node5 = new_node(cluster)
         node5.start(wait_for_binary_proto=True)
@@ -50,7 +50,7 @@ class TestDiskBalance(Tester):
         cluster.populate(4).start(wait_for_binary_proto=True)
         node1 = cluster.nodes['node1']
         node4 = cluster.nodes['node4']
-        node1.stress(['write', 'n=50k', '-rate', 'threads=100', '-schema', 'replication(factor=2)', 'compaction(strategy=SizeTieredCompactionStrategy,enabled=false)'])
+        node1.stress(['write', 'n=50k', 'no-warmup', '-rate', 'threads=100', '-schema', 'replication(factor=2)', 'compaction(strategy=SizeTieredCompactionStrategy,enabled=false)'])
         cluster.flush()
 
         node4.decommission()
@@ -97,11 +97,11 @@ class TestDiskBalance(Tester):
         cluster.set_configuration_options(values={'allocate_tokens_for_keyspace': 'keyspace1'})
         cluster.populate(3).start(wait_for_binary_proto=True)
         node1 = cluster.nodes['node1']
-        node1.stress(['write', 'n=1', '-rate', 'threads=100', '-schema', 'replication(factor=1)'])
+        node1.stress(['write', 'n=1', 'no-warmup', '-rate', 'threads=100', '-schema', 'replication(factor=1)'])
         cluster.flush()
         session = self.patient_cql_connection(node1)
         session.execute("ALTER KEYSPACE keyspace1 WITH replication = {'class':'SimpleStrategy', 'replication_factor':2}")
-        node1.stress(['write', 'n=100k', '-rate', 'threads=100'])
+        node1.stress(['write', 'n=100k', 'no-warmup', '-rate', 'threads=100'])
         cluster.flush()
         for node in cluster.nodelist():
             self.assert_balanced(node)

@@ -59,7 +59,7 @@ class TestGossipingPropertyFileSnitch(Tester):
         self._test_connect(NODE1_BROADCAST_ADDRESS, STORAGE_PORT)
 
         # write some data to node1
-        node1.stress(['write', 'n=10K', '-rate', 'threads=8'])
+        node1.stress(['write', 'n=10K', 'no-warmup', '-rate', 'threads=8'])
 
         session = self.patient_cql_connection(node1)
         stress_table = 'keyspace1.standard1'

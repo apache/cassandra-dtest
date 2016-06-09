@@ -25,7 +25,7 @@ class TestJMX(Tester):
         cluster.populate(3).start(wait_for_binary_proto=True)
         node1, node2, node3 = cluster.nodelist()
 
-        node1.stress(['write', 'n=500K', '-schema', 'replication(factor=3)'])
+        node1.stress(['write', 'n=500K', 'no-warmup', '-schema', 'replication(factor=3)'])
         node1.flush()
         node1.stop(gently=False)
 
@@ -64,7 +64,7 @@ class TestJMX(Tester):
         cluster.start(wait_for_binary_proto=True)
 
         version = cluster.version()
-        node1.stress(['write', 'n=10K', '-schema', 'replication(factor=3)'])
+        node1.stress(['write', 'n=10K', 'no-warmup', '-schema', 'replication(factor=3)'])
 
         typeName = "ColumnFamily" if version <= '2.2.X' else 'Table'
         debug('Version {} typeName {}'.format(version, typeName))
@@ -105,11 +105,11 @@ class TestJMX(Tester):
         cluster.start(wait_for_binary_proto=True)
 
         # Run a quick stress command to create the keyspace and table
-        node.stress(['write', 'n=1'])
+        node.stress(['write', 'n=1', 'no-warmup'])
         # Disable compaction on the table
         node.nodetool('disableautocompaction keyspace1 standard1')
         node.nodetool('setcompactionthroughput 1')
-        node.stress(['write', 'n=150K'])
+        node.stress(['write', 'n=150K', 'no-warmup'])
         node.flush()
         # Run a major compaction. This will be the compaction whose
         # progress we track.

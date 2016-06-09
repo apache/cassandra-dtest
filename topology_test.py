@@ -40,7 +40,7 @@ class TestTopology(Tester):
         node1, node2, node3 = cluster.nodelist()
 
         # write some data
-        node1.stress(['write', 'n=10K', '-rate', 'threads=8'])
+        node1.stress(['write', 'n=10K', 'no-warmup', '-rate', 'threads=8'])
 
         # Decommission node and wipe its data
         node2.decommission()

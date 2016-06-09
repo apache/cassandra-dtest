@@ -72,7 +72,7 @@ class TestReplaceAddress(Tester):
         debug(numNodes)
 
         debug("Inserting Data...")
-        node1.stress(['write', 'n=10K', '-schema', 'replication(factor=3)'])
+        node1.stress(['write', 'n=10K', 'no-warmup', '-schema', 'replication(factor=3)'])
 
         session = self.patient_cql_connection(node1)
         session.default_timeout = 45
@@ -173,7 +173,7 @@ class TestReplaceAddress(Tester):
         debug(numNodes)
 
         debug("Inserting Data...")
-        node1.stress(['write', 'n=10K', '-schema', 'replication(factor=3)'])
+        node1.stress(['write', 'n=10K', 'no-warmup', '-schema', 'replication(factor=3)'])
 
         session = self.patient_cql_connection(node1)
         stress_table = 'keyspace1.standard1'
@@ -254,7 +254,7 @@ class TestReplaceAddress(Tester):
         cluster.start()
 
         debug("Inserting Data...")
-        node1.stress(['write', 'n=10K', '-schema', 'replication(factor=3)'])
+        node1.stress(['write', 'n=10K', 'no-warmup', '-schema', 'replication(factor=3)'])
 
         mark = None
         for auto_bootstrap in (True, False):
@@ -306,7 +306,7 @@ class TestReplaceAddress(Tester):
         cluster.start()
 
         debug('Inserting Data...')
-        node1.stress(['write', 'n=10K', '-schema', 'replication(factor=3)'])
+        node1.stress(['write', 'n=10K', 'no-warmup', '-schema', 'replication(factor=3)'])
 
         session = self.patient_cql_connection(node1)
         query = SimpleStatement('select * from keyspace1.standard1 LIMIT 1', consistency_level=ConsistencyLevel.THREE)
@@ -356,7 +356,7 @@ class TestReplaceAddress(Tester):
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
 
-        node1.stress(['write', 'n=100K', '-schema', 'replication(factor=3)'])
+        node1.stress(['write', 'n=100K', 'no-warmup', '-schema', 'replication(factor=3)'])
 
         session = self.patient_cql_connection(node1)
         stress_table = 'keyspace1.standard1'
@@ -409,7 +409,7 @@ class TestReplaceAddress(Tester):
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
 
-        node1.stress(['write', 'n=100K', '-schema', 'replication(factor=3)'])
+        node1.stress(['write', 'n=100K', 'no-warmup', '-schema', 'replication(factor=3)'])
 
         session = self.patient_cql_connection(node1)
         stress_table = 'keyspace1.standard1'
