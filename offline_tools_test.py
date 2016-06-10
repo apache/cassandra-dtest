@@ -85,12 +85,8 @@ class TestOfflineTools(Tester):
         self.assertTrue(max(final_levels) == 0)
 
     def get_levels(self, data):
-        levels = []
-        for sstable in data:
-            (metadata, error, rc) = sstable
-            level = int(re.findall("SSTable Level: [0-9]", metadata)[0][-1])
-            levels.append(level)
-        return levels
+        (out, err, rc) = data
+        return map(int, re.findall("SSTable Level: ([0-9])", out))
 
     def wait_for_compactions(self, node):
         pattern = re.compile("pending tasks: 0")
@@ -109,6 +105,7 @@ class TestOfflineTools(Tester):
         @jira_ticket CASSANRDA-8031
         """
         cluster = self.cluster
+        cluster.set_configuration_options(values={'compaction_throughput_mb_per_sec': 0})
         cluster.populate(1).start(wait_for_binary_proto=True)
         node1 = cluster.nodelist()[0]
 
@@ -123,7 +120,9 @@ class TestOfflineTools(Tester):
 
         # now test by generating keyspace but not flushing sstables
 
-        node1.stress(['write', 'n=1', '-schema', 'replication(factor=1)'])
+        node1.stress(['write', 'n=1', 'no-warmup',
+                      '-schema', 'replication(factor=1)',
+                      '-col', 'n=FIXED(10)', 'SIZE=FIXED(1024)'])
         cluster.stop(gently=False)
 
         (output, error, rc) = node1.run_sstableofflinerelevel("keyspace1", "standard1", output=True)
@@ -134,9 +133,12 @@ class TestOfflineTools(Tester):
         # test by flushing (sstable should be level 0)
         cluster.start(wait_for_binary_proto=True)
         session = self.patient_cql_connection(node1)
+        debug("Altering compaction strategy to LCS")
         session.execute("ALTER TABLE keyspace1.standard1 with compaction={'class': 'LeveledCompactionStrategy', 'sstable_size_in_mb':1};")
 
-        node1.stress(['write', 'n=1K', '-schema', 'replication(factor=1)'])
+        node1.stress(['write', 'n=1K', 'no-warmup',
+                      '-schema', 'replication(factor=1)',
+                      '-col', 'n=FIXED(10)', 'SIZE=FIXED(1024)'])
 
         node1.flush()
         cluster.stop()
@@ -148,15 +150,23 @@ class TestOfflineTools(Tester):
         cluster.start(wait_for_binary_proto=True)
         # test by loading large amount data so we have multiple sstables
         # must write enough to create more than just L1 sstables
-        keys = 200 * cluster.data_dir_count
-        node1.stress(['write', 'n={0}K'.format(keys), '-schema', 'replication(factor=1)'])
+        keys = 2 * cluster.data_dir_count
+        node1.stress(['write', 'n={0}K'.format(keys), 'no-warmup',
+                      '-schema', 'replication(factor=1)',
+                      '-col', 'n=FIXED(10)', 'SIZE=FIXED(1024)'])
         node1.flush()
+        debug("Waiting for compactions to finish")
         self.wait_for_compactions(node1)
+        debug("Stopping node")
         cluster.stop()
+        debug("Done stopping node")
 
         # Let's reset all sstables to L0
+        debug("Getting initial levels")
         initial_levels = self.get_levels(node1.run_sstablemetadata(keyspace="keyspace1", column_families=["standard1"]))
+        debug("Running sstablelevelreset")
         (output, error, rc) = node1.run_sstablelevelreset("keyspace1", "standard1", output=True)
+        debug("Getting final levels")
         final_levels = self.get_levels(node1.run_sstablemetadata(keyspace="keyspace1", column_families=["standard1"]))
 
         # let's make sure there was at least 3 levels (L0, L1 and L2)
@@ -165,8 +175,11 @@ class TestOfflineTools(Tester):
         self.assertEqual(max(final_levels), 0)
 
         # time to relevel sstables
+        debug("Getting initial levels")
         initial_levels = self.get_levels(node1.run_sstablemetadata(keyspace="keyspace1", column_families=["standard1"]))
+        debug("Running sstableofflinerelevel")
         (output, error, rc) = node1.run_sstableofflinerelevel("keyspace1", "standard1", output=True)
+        debug("Getting final levels")
         final_levels = self.get_levels(node1.run_sstablemetadata(keyspace="keyspace1", column_families=["standard1"]))
 
         debug(output)
