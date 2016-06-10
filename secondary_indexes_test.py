@@ -287,7 +287,7 @@ class TestSecondaryIndexes(Tester):
         node1, = cluster.nodelist()
         session = self.patient_cql_connection(node1)
 
-        node1.stress(['write', 'n=50K'])
+        node1.stress(['write', 'n=50K', 'no-warmup'])
         session.execute("use keyspace1;")
         lookup_value = session.execute('select "C0" from standard1 limit 1')[0].C0
         session.execute('CREATE INDEX ix_c0 ON standard1("C0");')

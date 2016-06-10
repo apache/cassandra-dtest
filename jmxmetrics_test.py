@@ -151,7 +151,7 @@ class TestJMXMetrics(Tester):
                     self.assertEqual(before[alias_counter], jmx.read_attribute(mbean, attribute))
                     alias_counter += 1
 
-            node.stress(['write', 'n=100K'])
+            node.stress(['write', 'n=100K', 'no-warmup'])
 
             errors = []
             after = []

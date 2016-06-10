@@ -25,6 +25,7 @@ class TestSSTableSplit(Tester):
         version = cluster.version()
 
         debug("Run stress to insert data")
+
         node.stress(['write', 'n=1000', 'no-warmup', '-rate', 'threads=50',
                      '-col', 'n=FIXED(10)', 'SIZE=FIXED(1024)'])
 
@@ -98,6 +99,7 @@ class TestSSTableSplit(Tester):
         debug("Run stress to insert data")
         node.stress(['write', 'n=300', 'no-warmup', '-rate', 'threads=50',
                      '-col', 'n=FIXED(10)', 'SIZE=FIXED(1024)'])
+
         self._do_compaction(node)
         node.stop()
         result = node.run_sstablesplit(keyspace='keyspace1', size=1, no_snapshot=True)

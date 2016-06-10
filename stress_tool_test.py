@@ -41,7 +41,7 @@ class TestStressSparsenessRatio(Tester):
         """
         self.cluster.populate(1).start(wait_for_binary_proto=True)
         node = self.cluster.nodelist()[0]
-        node.stress(['write', 'n=1000', '-rate', 'threads=50', '-col', 'n=FIXED(50)',
+        node.stress(['write', 'n=1000', 'no-warmup', '-rate', 'threads=50', '-col', 'n=FIXED(50)',
                      '-insert', 'row-population-ratio={ratio_spec}'.format(ratio_spec=ratio_spec)])
         session = self.patient_cql_connection(node)
         written = rows_to_list(session.execute('SELECT * FROM keyspace1.standard1;'))

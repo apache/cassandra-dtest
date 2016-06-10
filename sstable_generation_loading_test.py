@@ -68,7 +68,7 @@ class TestSSTableGenerationAndLoading(Tester):
 
         # Makinge sure the cluster is ready to accept the subsequent
         # stress connection. This was an issue on Windows.
-        node1.stress(['write', 'n=10K', '-rate', 'threads=8'])
+        node1.stress(['write', 'n=10K', 'no-warmup', '-rate', 'threads=8'])
         node1.flush()
         node1.compact()
         node1.stop()

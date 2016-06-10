@@ -105,14 +105,14 @@ class SSTableUtilTest(Tester):
         """
          This is just to create the schema so we can disable compaction
         """
-        node.stress(['write', 'n=1', '-rate', 'threads=1'])
+        node.stress(['write', 'n=1', 'no-warmup', '-rate', 'threads=1'])
         node.nodetool('disableautocompaction %s %s' % (ks, table))
 
-        node.stress(['write', 'n=%d' % (numrecords), '-rate', 'threads=50'])
+        node.stress(['write', 'n=%d' % (numrecords), 'no-warmup', '-rate', 'threads=50'])
         node.flush()
 
     def _read_data(self, node, numrecords):
-        node.stress(['read', 'n=%d' % (numrecords,), '-rate', 'threads=25'])
+        node.stress(['read', 'n=%d' % (numrecords,), 'no-warmup', '-rate', 'threads=25'])
 
     def _check_files(self, node, ks, table, expected_finalfiles=None, expected_tmpfiles=None):
         sstablefiles = _normcase_all(self._get_sstable_files(node, ks, table))

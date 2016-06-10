@@ -92,7 +92,7 @@ class TestRepair(Tester):
         debug("Starting cluster..")
         cluster.populate([2, 2]).start(wait_for_binary_proto=True)
         node1_1, node2_1, node1_2, node2_2 = cluster.nodelist()
-        node1_1.stress(stress_options=['write', 'n=50K', 'cl=ONE', '-schema', 'replication(factor=4)', '-rate', 'threads=50'])
+        node1_1.stress(stress_options=['write', 'n=50K', 'no-warmup', 'cl=ONE', '-schema', 'replication(factor=4)', '-rate', 'threads=50'])
         node1_1.nodetool("repair -local keyspace1 standard1")
         self.assertTrue(node1_1.grep_log("Not a global repair"))
         self.assertTrue(node2_1.grep_log("Not a global repair"))
@@ -119,7 +119,7 @@ class TestRepair(Tester):
         debug("Starting cluster..")
         cluster.populate([2, 2]).start(wait_for_binary_proto=True)
         node1_1, node2_1, node1_2, node2_2 = cluster.nodelist()
-        node1_1.stress(stress_options=['write', 'n=100K', 'cl=ONE', '-schema', 'replication(factor=4)', '-rate', 'threads=50'])
+        node1_1.stress(stress_options=['write', 'n=100K', 'no-warmup', 'cl=ONE', '-schema', 'replication(factor=4)', '-rate', 'threads=50'])
         node1_1.nodetool("repair -hosts 127.0.0.1,127.0.0.2,127.0.0.3,127.0.0.4 keyspace1 standard1")
         for node in cluster.nodelist():
             self.assertTrue(node.grep_log("Not a global repair"))
@@ -140,7 +140,7 @@ class TestRepair(Tester):
         debug("Starting cluster..")
         cluster.populate(3).start(wait_for_binary_proto=True)
         node1, node2, node3 = cluster.nodelist()
-        node1.stress(stress_options=['write', 'n=50K', 'cl=ONE', '-schema', 'replication(factor=3)', '-rate', 'threads=50'])
+        node1.stress(stress_options=['write', 'n=50K', 'no-warmup', 'cl=ONE', '-schema', 'replication(factor=3)', '-rate', 'threads=50'])
         node1.nodetool("repair -st 0 -et 1000 keyspace1 standard1")
         for node in cluster.nodelist():
             self.assertTrue(node.grep_log("Not a global repair"))
@@ -159,7 +159,7 @@ class TestRepair(Tester):
         debug("Starting cluster..")
         cluster.populate([2, 2]).start(wait_for_binary_proto=True)
         node1_1, node2_1, node1_2, node2_2 = cluster.nodelist()
-        node1_1.stress(stress_options=['write', 'n=50K', 'cl=ONE', '-schema', 'replication(factor=4)'])
+        node1_1.stress(stress_options=['write', 'n=50K', 'no-warmup', 'cl=ONE', '-schema', 'replication(factor=4)'])
         node1_1.nodetool("repair keyspace1 standard1")
         for node in cluster.nodelist():
             self.assertTrue("Starting anticompaction")
@@ -532,7 +532,7 @@ class TestRepair(Tester):
         debug("Starting cluster..")
         cluster.populate([3]).start(wait_for_binary_proto=True)
         node1, node2, node3 = cluster.nodelist()
-        node1.stress(stress_options=['write', 'n=10k', 'cl=ONE', '-schema', 'replication(factor=3)', '-rate', 'threads=50'])
+        node1.stress(stress_options=['write', 'n=10k', 'no-warmup', 'cl=ONE', '-schema', 'replication(factor=3)', '-rate', 'threads=50'])
 
         # Start multiple repairs in parallel
         threads = []
@@ -607,15 +607,15 @@ class TestRepair(Tester):
 
         # Insert data, kill node 2, insert more data, restart node 2, insert another set of data
         debug("Inserting data...")
-        node1.stress(['write', 'n=20K', 'cl=ALL', '-schema', 'replication(factor=2)', '-rate', 'threads=30'])
+        node1.stress(['write', 'n=20K', 'no-warmup', 'cl=ALL', '-schema', 'replication(factor=2)', '-rate', 'threads=30'])
 
         node2.flush()
         node2.stop(wait_other_notice=True)
 
-        node1.stress(['write', 'n=20K', 'cl=ONE', '-schema', 'replication(factor=2)', '-rate', 'threads=30', '-pop', 'seq=20..40K'])
+        node1.stress(['write', 'n=20K', 'no-warmup', 'cl=ONE', '-schema', 'replication(factor=2)', '-rate', 'threads=30', '-pop', 'seq=20..40K'])
         node2.start(wait_for_binary_proto=True, wait_other_notice=True)
 
-        node1.stress(['write', 'n=20K', 'cl=ALL', '-schema', 'replication(factor=2)', '-rate', 'threads=30', '-pop', 'seq=40..60K'])
+        node1.stress(['write', 'n=20K', 'no-warmup', 'cl=ALL', '-schema', 'replication(factor=2)', '-rate', 'threads=30', '-pop', 'seq=40..60K'])
 
         cluster.flush()
 
@@ -653,12 +653,12 @@ class TestRepair(Tester):
         node1, node2, node3 = cluster.nodelist()
 
         debug("Inserting data...")
-        node1.stress(['write', 'n=20K', 'cl=ALL', '-schema', 'replication(factor=2)', '-rate', 'threads=30'])
+        node1.stress(['write', 'n=20K', 'no-warmup', 'cl=ALL', '-schema', 'replication(factor=2)', '-rate', 'threads=30'])
 
         node2.flush()
         node2.stop(wait_other_notice=True)
 
-        node1.stress(['write', 'n=20K', 'cl=ONE', '-schema', 'replication(factor=2)', '-rate', 'threads=30', '-pop', 'seq=20..40K'])
+        node1.stress(['write', 'n=20K', 'no-warmup', 'cl=ONE', '-schema', 'replication(factor=2)', '-rate', 'threads=30', '-pop', 'seq=20..40K'])
         node2.start(wait_for_binary_proto=True, wait_other_notice=True)
 
         cluster.flush()
@@ -703,13 +703,13 @@ class TestRepair(Tester):
         # Valid job thread counts: 1, 2, 3, and 4
         for job_thread_count in range(1, 5):
             debug("Inserting data...")
-            node1.stress(['write', 'n=2K', 'cl=ALL', '-schema', 'replication(factor=2)', '-rate',
+            node1.stress(['write', 'n=2K', 'no-warmup', 'cl=ALL', '-schema', 'replication(factor=2)', '-rate',
                           'threads=30', '-pop', 'seq={}..{}K'.format(2 * (job_thread_count - 1), 2 * job_thread_count)])
 
             node2.flush()
             node2.stop(wait_other_notice=True)
 
-            node1.stress(['write', 'n=2K', 'cl=ONE', '-schema', 'replication(factor=2)', '-rate',
+            node1.stress(['write', 'n=2K', 'no-warmup', 'cl=ONE', '-schema', 'replication(factor=2)', '-rate',
                           'threads=30', '-pop', 'seq={}..{}K'.format(2 * (job_thread_count), 2 * (job_thread_count + 1))])
             node2.start(wait_for_binary_proto=True, wait_other_notice=True)
 
@@ -741,7 +741,7 @@ class TestRepair(Tester):
         cluster.populate(3).start(wait_for_binary_proto=True)
         node1, node2, node3 = cluster.nodelist()
         node2.stop(wait_other_notice=True)
-        node1.stress(['write', 'n=1M', '-schema', 'replication(factor=3)', '-rate', 'threads=30'])
+        node1.stress(['write', 'n=1M', 'no-warmup', '-schema', 'replication(factor=3)', '-rate', 'threads=30'])
         node2.start(wait_for_binary_proto=True)
         t1 = threading.Thread(target=node1.nodetool, args=('repair keyspace1 standard1 -st {} -et {}'.format(str(node3.initial_token), str(node1.initial_token)),))
         t2 = threading.Thread(target=node2.nodetool, args=('repair keyspace1 standard1 -st {} -et {}'.format(str(node1.initial_token), str(node2.initial_token)),))
@@ -754,7 +754,7 @@ class TestRepair(Tester):
         t3.join()
         node1.stop(wait_other_notice=True)
         node3.stop(wait_other_notice=True)
-        (stdout, stderr) = node2.stress(['read', 'n=1M', '-rate', 'threads=30', '-node', node2.address()], capture_output=True)
+        (stdout, stderr) = node2.stress(['read', 'n=1M', 'no-warmup', '-rate', 'threads=30', '-node', node2.address()], capture_output=True)
         self.assertTrue(len(stderr) == 0, stderr)
 
 RepairTableContents = namedtuple('RepairTableContents',
@@ -783,7 +783,7 @@ class TestRepairDataSystemTable(Tester):
         self.node1 = self.cluster.nodelist()[0]
         self.session = self.patient_cql_connection(self.node1)
 
-        self.node1.stress(stress_options=['write', 'n=5K', 'cl=ONE', '-schema', 'replication(factor=3)'])
+        self.node1.stress(stress_options=['write', 'n=5K', 'no-warmup', 'cl=ONE', '-schema', 'replication(factor=3)'])
 
         self.cluster.flush()
 

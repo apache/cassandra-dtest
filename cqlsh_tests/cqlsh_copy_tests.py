@@ -858,7 +858,7 @@ class CqlshCopyTest(Tester):
         num_file_rows = 10000
 
         debug('Running stress to generate a large CSV via COPY TO')
-        self.node1.stress(['write', 'n={}'.format(num_file_rows), '-rate', 'threads=50'])
+        self.node1.stress(['write', 'n={}'.format(num_file_rows), 'no-warmup', '-rate', 'threads=50'])
         self.node1.run_cqlsh(cmds="COPY {} TO '{}'".format(stress_table, tempfile.name))
         self.assertEqual(num_file_rows, len(open(tempfile.name).readlines()))
 
@@ -1325,7 +1325,7 @@ class CqlshCopyTest(Tester):
         stress_table = 'keyspace1.standard1'
 
         self.prepare()
-        self.node1.stress(['write', 'n={}'.format(num_records), '-rate', 'threads=50'])
+        self.node1.stress(['write', 'n={}'.format(num_records), 'no-warmup', '-rate', 'threads=50'])
 
         def do_test(max_size, header):
             tempfile = self.get_temp_file(prefix='testwritemult', suffix='.csv')
@@ -2081,7 +2081,7 @@ class CqlshCopyTest(Tester):
         stress_table = 'keyspace1.standard1'
 
         debug('Running stress without any user profile')
-        self.node1.stress(['write', 'n={}'.format(num_records), '-rate', 'threads=50'])
+        self.node1.stress(['write', 'n={}'.format(num_records), 'no-warmup', '-rate', 'threads=50'])
 
         tempfile = self.get_temp_file()
         debug('Exporting to csv file: {}'.format(tempfile.name))
@@ -2126,7 +2126,7 @@ class CqlshCopyTest(Tester):
         self.prepare()
 
         debug('Running stress')
-        self.node1.stress(['write', 'n={}'.format(num_rows), '-rate', 'threads=50'])
+        self.node1.stress(['write', 'n={}'.format(num_rows), 'no-warmup', '-rate', 'threads=50'])
 
         debug('Exporting to csv file: {}'.format(tempfile.name))
         self.node1.run_cqlsh(cmds="COPY {} TO '{}' WITH RATEFILE='{}' AND REPORTFREQUENCY='{}'"
@@ -2165,7 +2165,7 @@ class CqlshCopyTest(Tester):
 
         debug('Running stress')
         stress_table = 'keyspace1.standard1'
-        self.node1.stress(['write', 'n=1K', '-rate', 'threads=50'])
+        self.node1.stress(['write', 'n=1K', 'no-warmup', '-rate', 'threads=50'])
 
         def create_config_file(config_lines):
             config_file = self.get_temp_file()
@@ -2414,11 +2414,11 @@ class CqlshCopyTest(Tester):
         def create_records():
             if not profile:
                 debug('Running stress without any user profile')
-                self.node1.stress(['write', 'n={}'.format(num_operations), '-rate', 'threads=50'])
+                self.node1.stress(['write', 'n={}'.format(num_operations), 'no-warmup', '-rate', 'threads=50'])
             else:
                 debug('Running stress with user profile {}'.format(profile))
                 self.node1.stress(['user', 'profile={}'.format(profile), 'ops(insert=1)',
-                                   'n={}'.format(num_operations), '-rate', 'threads=50'])
+                                   'n={}'.format(num_operations), 'no-warmup', '-rate', 'threads=50'])
 
             if skip_count_checks:
                 return num_operations
@@ -2621,7 +2621,7 @@ class CqlshCopyTest(Tester):
 
         debug('Running stress')
         stress_table = 'keyspace1.standard1'
-        self.node1.stress(['write', 'n={}'.format(num_records), '-rate', 'threads=50'])
+        self.node1.stress(['write', 'n={}'.format(num_records), 'no-warmup', '-rate', 'threads=50'])
 
         tempfile = self.get_temp_file()
         failures = {'failing_range': {'start': start, 'end': end, 'num_failures': 5}}
@@ -2653,7 +2653,7 @@ class CqlshCopyTest(Tester):
 
         debug('Running stress')
         stress_table = 'keyspace1.standard1'
-        self.node1.stress(['write', 'n={}'.format(num_records), '-rate', 'threads=50'])
+        self.node1.stress(['write', 'n={}'.format(num_records), 'no-warmup', '-rate', 'threads=50'])
 
         tempfile = self.get_temp_file()
         failures = {'failing_range': {'start': start, 'end': end, 'num_failures': 3}}
@@ -2684,7 +2684,7 @@ class CqlshCopyTest(Tester):
 
         debug('Running stress')
         stress_table = 'keyspace1.standard1'
-        self.node1.stress(['write', 'n={}'.format(num_records), '-rate', 'threads=50'])
+        self.node1.stress(['write', 'n={}'.format(num_records), 'no-warmup', '-rate', 'threads=50'])
 
         tempfile = self.get_temp_file()
         failures = {'exit_range': {'start': start, 'end': end}}
@@ -2718,7 +2718,7 @@ class CqlshCopyTest(Tester):
 
         debug('Running stress')
         stress_table = 'keyspace1.standard1'
-        self.node1.stress(['write', 'n={}'.format(num_records), '-rate', 'threads=50'])
+        self.node1.stress(['write', 'n={}'.format(num_records), 'no-warmup', '-rate', 'threads=50'])
 
         tempfile = self.get_temp_file()
         debug('Exporting to csv file {} to generate a file'.format(tempfile.name))
@@ -2758,7 +2758,7 @@ class CqlshCopyTest(Tester):
 
         debug('Running stress')
         stress_table = 'keyspace1.standard1'
-        self.node1.stress(['write', 'n={}'.format(num_records), '-rate', 'threads=50'])
+        self.node1.stress(['write', 'n={}'.format(num_records), 'no-warmup', '-rate', 'threads=50'])
 
         tempfile = self.get_temp_file()
         debug('Exporting to csv file {} to generate a file'.format(tempfile.name))
@@ -2794,7 +2794,7 @@ class CqlshCopyTest(Tester):
 
         debug('Running stress')
         stress_table = 'keyspace1.standard1'
-        self.node1.stress(['write', 'n={}'.format(num_records), '-rate', 'threads=50'])
+        self.node1.stress(['write', 'n={}'.format(num_records), 'no-warmup', '-rate', 'threads=50'])
 
         tempfile = self.get_temp_file()
         debug('Exporting to csv file {} to generate a file'.format(tempfile.name))
@@ -2836,7 +2836,7 @@ class CqlshCopyTest(Tester):
         self.ks = 'keyspace1'
         stress_ks_table_name = self.ks + '.' + stress_table_name
         self.node1.stress(['write', 'n={}'.format(num_records),
-                           '-rate', 'threads=50',
+                           'no-warmup', '-rate', 'threads=50',
                            '-col', 'n=FIXED(10)', 'SIZE=FIXED(1024)'])  # 10 columns of 1kb each
 
         tempfile = self.get_temp_file()
