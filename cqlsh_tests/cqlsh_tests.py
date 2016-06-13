@@ -1403,6 +1403,9 @@ Tracing session:""")
         stdout, stderr = self.run_cqlsh(node1, cmds='USE system', cqlsh_options=['--debug', '--connect-timeout=10'])
         self.assertTrue("Using connect timeout: 10 seconds" in stderr)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11999',
+                   flaky=True)
     def test_refresh_schema_on_timeout_error(self):
         """
         @jira_ticket CASSANDRA-9689
