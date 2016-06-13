@@ -21,7 +21,7 @@ from thrift_bindings.v22.Cassandra import (CfDef, Column, ColumnDef,
                                            Mutation, NotFoundException,
                                            SlicePredicate, SliceRange,
                                            SuperColumn)
-from tools import since
+from tools import since, known_failure
 
 
 def get_thrift_client(host='127.0.0.1', port=9160):
