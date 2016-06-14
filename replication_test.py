@@ -195,6 +195,9 @@ class ReplicationTest(Tester):
                 print("%s\t%s\t%s\t%s" % (t.source, t.source_elapsed, t.description, t.thread_name))
             print("-" * 40)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11927',
+                   flaky=True)
     def simple_test(self):
         """
         Test the SimpleStrategy on a 3 node cluster
