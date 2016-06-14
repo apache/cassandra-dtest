@@ -495,12 +495,16 @@ class Tester(TestCase):
             os.mkdir(logdir)
             for n, log, debuglog, gclog, compactionlog in logs:
                 if os.path.exists(log):
+                    self.assertGreaterEqual(os.path.getsize(log), 0)
                     shutil.copyfile(log, os.path.join(logdir, n + ".log"))
                 if os.path.exists(debuglog):
+                    self.assertGreaterEqual(os.path.getsize(debuglog), 0)
                     shutil.copyfile(debuglog, os.path.join(logdir, n + "_debug.log"))
                 if os.path.exists(gclog):
+                    self.assertGreaterEqual(os.path.getsize(gclog), 0)
                     shutil.copyfile(gclog, os.path.join(logdir, n + "_gc.log"))
                 if os.path.exists(compactionlog):
+                    self.assertGreaterEqual(os.path.getsize(compactionlog), 0)
                     shutil.copyfile(compactionlog, os.path.join(logdir, n + "_compaction.log"))
             if os.path.exists(name):
                 os.unlink(name)
