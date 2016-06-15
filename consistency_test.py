@@ -12,6 +12,7 @@ from assertions import assert_none, assert_unavailable, assert_length_equal
 from dtest import DISABLE_VNODES, Tester, debug
 from tools import (create_c1c2_table, insert_c1c2, insert_columns,
                    known_failure, query_c1c2, rows_to_list, since)
+from nose.tools import assert_greater_equal
 
 
 class TestHelper(Tester):
@@ -447,8 +448,8 @@ class TestAccuracy(TestHelper):
                 for s in sessions:
                     if outer.query_user(s, n, val, read_cl, check_ret=strong_consistency):
                         num += 1
-                self.assertGreaterEqual(num, write_nodes, "Failed to read value from sufficient number of nodes, required {} but got {} - [{}, {}]"
-                                        .format(write_nodes, num, n, val))
+                assert_greater_equal(num, write_nodes, "Failed to read value from sufficient number of nodes, required {} but got {} - [{}, {}]"
+                                     .format(write_nodes, num, n, val))
 
             for n in xrange(start, end):
                 age = 30
@@ -484,8 +485,8 @@ class TestAccuracy(TestHelper):
                 results = []
                 for s in sessions:
                     results.append(outer.query_counter(s, n, val, read_cl, check_ret=strong_consistency))
-                self.assertGreaterEqual(results.count(val), write_nodes, "Failed to read value from sufficient number of nodes, required {} nodes to have a counter "
-                                        "value of {} at key {}, instead got these values: {}".format(write_nodes, val, n, results))
+                assert_greater_equal(results.count(val), write_nodes, "Failed to read value from sufficient number of nodes, required {} nodes to have a counter "
+                                     "value of {} at key {}, instead got these values: {}".format(write_nodes, val, n, results))
 
             for n in xrange(start, end):
                 c = outer.read_counter(sessions[0], n, ConsistencyLevel.ALL)
@@ -535,7 +536,7 @@ class TestAccuracy(TestHelper):
                 break
 
         if not exceptions_queue.empty():
-            raise exceptions_queue.get()
+            raise exceptions_queue.get()[1]
 
     def test_simple_strategy_users(self):
         """
@@ -784,7 +785,7 @@ class TestConsistency(Tester):
 
             # value 0, 1 and 2 have been deleted
             for i in xrange(1, 4):
-                self.assertEqual(res[i - 1][1], 'value {}'.format(i + 2), 'Expecting value {}, got {} ({})'.format(i + 2, res[i - 1][1], str(res)))
+                self.assertEqual(res[i - 1][1], 'value{}'.format(i + 2), 'Expecting value{}, got {} ({})'.format(i + 2, res[i - 1][1], str(res)))
 
             truncate_statement = SimpleStatement('TRUNCATE cf', consistency_level=ConsistencyLevel.QUORUM)
             session.execute(truncate_statement)
@@ -820,7 +821,7 @@ class TestConsistency(Tester):
         # Query first column
         session = self.patient_cql_connection(node1, 'ks')
 
-        assert_none(sesion, "SELECT c, v FROM cf WHERE key=\'k0\' LIMIT 1", cl=ConsistencyLevel.QUORUM)
+        assert_none(session, "SELECT c, v FROM cf WHERE key=\'k0\' LIMIT 1", cl=ConsistencyLevel.QUORUM)
 
     def short_read_quorum_delete_test(self):
         """
@@ -862,7 +863,7 @@ class TestConsistency(Tester):
         # we read the first row in the partition (so with a LIMIT 1) and A and B answer first.
         node3.flush()
         node3.stop(wait_other_notice=True)
-        self.assert_none(session, "SELECT * FROM t WHERE id = 0 LIMIT 1", cl=ConsistencyLevel.QUORUM)
+        assert_none(session, "SELECT * FROM t WHERE id = 0 LIMIT 1", cl=ConsistencyLevel.QUORUM)
 
     def readrepair_test(self):
         cluster = self.cluster

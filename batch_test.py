@@ -185,7 +185,8 @@ class TestBatch(Tester):
             INSERT INTO users (id, firstname, lastname) VALUES (1, 'Will', 'Turner')
             APPLY BATCH
         """, consistency_level=ConsistencyLevel.ANY)
-        assert_all(session, "SElECT * FROM users", [[0, u'Jack', u'Sparrow'], [1, u'Will', u'Turner']])
+        session.execute(query)
+        assert_all(session, "SElECT * FROM users", [[1, u'Will', u'Turner'], [0, u'Jack', u'Sparrow']])
 
     def acknowledged_by_batchlog_not_set_when_batchlog_write_fails_test(self):
         """ Test that acknowledged_by_batchlog is False if batchlog can't be written """
