@@ -7,6 +7,7 @@ import struct
 import time
 from collections import OrderedDict
 from uuid import UUID, uuid4
+from distutils.version import LooseVersion
 
 from cassandra import ConsistencyLevel, InvalidRequest
 from cassandra.concurrent import execute_concurrent_with_args
@@ -20,7 +21,8 @@ from dtest import debug, freshCluster
 from thrift_bindings.v22.ttypes import \
     ConsistencyLevel as ThriftConsistencyLevel
 from thrift_bindings.v22.ttypes import (CfDef, Column, ColumnOrSuperColumn,
-                                        Mutation)
+                                        Mutation, ColumnDef, SliceRange, Deletion,
+                                        SlicePredicate, ColumnParent)
 from thrift_tests import get_thrift_client
 from tools import known_failure, require, rows_to_list, since
 from upgrade_base import UPGRADE_TEST_RUN, UpgradeTester
@@ -1601,6 +1603,91 @@ class TestCQL(UpgradeTester):
 
             res = cursor.execute("SELECT * FROM test")
             assert rows_to_list(res) == [[2, 4, 8]], res
+
+    def cql3_non_compound_range_tombstones_test(self):
+        """
+        Checks that 3.0 serializes RangeTombstoneLists correctly
+        when communicating with 2.2 nodes.
+        @jira_ticket CASSANDRA-11930
+        """
+        session = self.prepare(start_rpc=True)
+        node = self.cluster.nodelist()[0]
+        host, port = node.network_interfaces['thrift']
+
+        client = get_thrift_client(host, port)
+        client.transport.open()
+        client.set_keyspace('ks')
+
+        # create a CF with mixed static and dynamic cols
+        column_defs = [ColumnDef('static1', 'Int32Type', None, None, None)]
+        cfdef = CfDef(
+            keyspace='ks',
+            name='cf',
+            column_type='Standard',
+            comparator_type='AsciiType',
+            key_validation_class='AsciiType',
+            default_validation_class='AsciiType',
+            column_metadata=column_defs)
+        client.system_add_column_family(cfdef)
+
+        session.cluster.control_connection.wait_for_schema_agreement()
+
+        for is_upgraded, session, node in self.do_upgrade(session, return_nodes=True):
+            debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
+
+            upgrade_to_version = LooseVersion(self.get_node_version(is_upgraded=True))
+            if LooseVersion('3.0.0') <= upgrade_to_version <= LooseVersion('3.0.6'):
+                self.skip('CASSANDRA-11930 was fixed in 3.0.7 and 3.7')
+            elif LooseVersion('3.1') <= upgrade_to_version <= LooseVersion('3.6'):
+                self.skip('CASSANDRA-11930 was fixed in 3.0.7 and 3.7')
+
+            session.execute("TRUNCATE ks.cf")
+
+            host, port = node.network_interfaces['thrift']
+            client = get_thrift_client(host, port)
+            client.transport.open()
+            client.set_keyspace('ks')
+
+            # insert a number of keys so that we'll get rows on both the old and upgraded nodes
+            for key in ['key{}'.format(i) for i in range(10)]:
+                debug("Using key " + key)
+
+                # insert "static" column
+                client.batch_mutate(
+                    {key: {'cf': [Mutation(ColumnOrSuperColumn(column=Column(name='static1', value=struct.pack('>i', 1), timestamp=100)))]}},
+                    ThriftConsistencyLevel.ALL)
+
+                # insert "dynamic" columns
+                for i, column_name in enumerate(('a', 'b', 'c', 'd', 'e')):
+                    column_value = 'val{}'.format(i)
+                    client.batch_mutate(
+                        {key: {'cf': [Mutation(ColumnOrSuperColumn(column=Column(name=column_name, value=column_value, timestamp=100)))]}},
+                        ThriftConsistencyLevel.ALL)
+
+                # sanity check on the query
+                fetch_slice = SlicePredicate(slice_range=SliceRange('', '', False, 100))
+                row = client.get_slice(key, ColumnParent(column_family='cf'), fetch_slice, ThriftConsistencyLevel.ALL)
+                self.assertEqual(6, len(row), row)
+                cols = OrderedDict([(cosc.column.name, cosc.column.value) for cosc in row])
+                debug(cols)
+                self.assertEqual('val0', cols['a'])
+                self.assertEqual('val4', cols['e'])
+                self.assertEqual(struct.pack('>i', 1), cols['static1'])
+
+                # delete a slice of dynamic columns
+                slice_range = SliceRange('b', 'd', False, 100)
+                client.batch_mutate(
+                    {key: {'cf': [Mutation(deletion=Deletion(timestamp=101, predicate=SlicePredicate(slice_range=slice_range)))]}},
+                    ThriftConsistencyLevel.ALL)
+
+                # check remaining columns
+                row = client.get_slice(key, ColumnParent(column_family='cf'), fetch_slice, ThriftConsistencyLevel.ALL)
+                self.assertEqual(3, len(row), row)
+                cols = OrderedDict([(cosc.column.name, cosc.column.value) for cosc in row])
+                debug(cols)
+                self.assertEqual('val0', cols['a'])
+                self.assertEqual('val4', cols['e'])
+                self.assertEqual(struct.pack('>i', 1), cols['static1'])
 
     def row_existence_test(self):
         """ Check the semantic of CQL row existence (part of #4361) """
