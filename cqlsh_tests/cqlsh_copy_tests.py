@@ -6,7 +6,7 @@ import json
 import os
 import sys
 import time
-from collections import namedtuple
+from collections import namedtuple, defaultdict
 from contextlib import contextmanager
 from decimal import Decimal
 from functools import partial
@@ -316,8 +316,8 @@ class CqlshCopyTest(Tester):
                         warning("Value in result: " + str(processed_results[0][x]))
             raise e
 
-    def format_for_csv(self, val, cql_type_name, time_format, nullval):
-        with self._cqlshlib() as cqlshlib:
+    def make_csv_formatter(self, time_format, nullval):
+        with self._cqlshlib() as cqlshlib:  # noqa
             from cqlshlib.formatting import format_value, format_value_default
             from cqlshlib.displaying import NO_COLOR_MAP
             try:
@@ -329,11 +329,11 @@ class CqlshCopyTest(Tester):
             except ImportError:
                 date_time_format = None
 
-            try:
-                from cqlshlib.formatting import CqlType
-                cluster_meta = UpdatingClusterMetadataWrapper(self.session.cluster)
-                cql_type = CqlType(cql_type_name, cluster_meta.keyspaces[self.ks])
-            except ImportError:
+        encoding_name = 'utf-8'  # codecs.lookup(locale.getpreferredencoding()).name
+        color_map = DummyColorMap()
+
+        def formatter(val, cql_type_name, cql_type):
+            if cql_type is None:
                 # Backward compatibility before formatting.CqlType was introduced:
                 # we must convert blob types to bytearray instances;
                 # the format_value() signature was changed and the first type(val) argument removed, so we add it via
@@ -344,33 +344,34 @@ class CqlshCopyTest(Tester):
                 if isinstance(val, str) and cql_type_name == 'blob':
                     val = bytearray(val)
 
-                format_value = partial(format_value, type(val))
-                cql_type = None
+                format_fn = partial(format_value, type(val))
+            else:
+                format_fn = format_value
 
-        encoding_name = 'utf-8'  # codecs.lookup(locale.getpreferredencoding()).name
+            if val is None or val == EMPTY or val == nullval:
+                return format_value_default(nullval, colormap=NO_COLOR_MAP)
 
-        if val is None or val == EMPTY or val == nullval:
-            return format_value_default(nullval, colormap=NO_COLOR_MAP)
+            # CASSANDRA-11255 increased COPY TO DOUBLE PRECISION TO 12
+            if cql_type_name == 'double' and self.cluster.version() >= '3.6':
+                float_precision = 12
+            else:
+                float_precision = 5
 
-        # CASSANDRA-11255 increased COPY TO DOUBLE PRECISION TO 12
-        if cql_type_name == 'double' and self.cluster.version() >= '3.6':
-            float_precision = 12
-        else:
-            float_precision = 5
+            # different versions use time_format or date_time_format
+            # but all versions reject spurious values, so we just use both here
+            return format_fn(val,
+                             cqltype=cql_type,
+                             encoding=encoding_name,
+                             date_time_format=date_time_format,
+                             time_format=time_format,
+                             float_precision=float_precision,
+                             colormap=color_map,
+                             nullval=nullval,
+                             decimal_sep=None,
+                             thousands_sep=None,
+                             boolean_styles=None).strval
 
-        # different versions use time_format or date_time_format
-        # but all versions reject spurious values, so we just use both here
-        return format_value(val,
-                            cqltype=cql_type,
-                            encoding=encoding_name,
-                            date_time_format=date_time_format,
-                            time_format=time_format,
-                            float_precision=float_precision,
-                            colormap=DummyColorMap(),
-                            nullval=nullval,
-                            decimal_sep=None,
-                            thousands_sep=None,
-                            boolean_styles=None).strval
+        return formatter
 
     def result_to_csv_rows(self, results, cql_type_names, time_format=None, nullval=''):
         """
@@ -382,8 +383,24 @@ class CqlshCopyTest(Tester):
         # into a bare function if cqlshlib is made easier to interact with.
         if not time_format:
             time_format = self.default_time_format
-        return [[self.format_for_csv(v, t, time_format, nullval)
-                 for v, t in zip(row, cql_type_names)] for row in results]
+
+        processed = []
+        format_fn = self.make_csv_formatter(time_format, nullval)
+
+        # build the typemap once ahead of time to speed up formatting
+        try:
+            from cqlshlib.formatting import CqlType
+            cluster_meta = UpdatingClusterMetadataWrapper(self.session.cluster)
+            ks_meta = cluster_meta.keyspaces[self.ks]
+            cql_type_map = dict([(type_name, CqlType(type_name, ks_meta)) for type_name in cql_type_names])
+        except ImportError:
+            cql_type_map = defaultdict()
+
+        for i, row in enumerate(results):
+            formatted_row = [format_fn(v, t, cql_type_map[t])
+                             for v, t in zip(row, cql_type_names)]
+            processed.append(formatted_row)
+        return processed
 
     def test_list_data(self):
         """
@@ -1486,10 +1503,9 @@ class CqlshCopyTest(Tester):
         """
         self.quoted_column_names_reading_template(specify_column_names=False)
 
-    def quoted_column_names_writing_template(self, specify_column_names):
+    def test_quoted_column_names_writing(self):
         """
-        @param specify_column_names if truthy, specify column names in COPY statement
-        A parameterized test. Test that COPY can write to a table with quoted
+        Test that COPY can write to a table with quoted
         column names by:
 
         - creating a table with quoted column names,
@@ -1510,31 +1526,24 @@ class CqlshCopyTest(Tester):
 
         data = [[1, 'no'], [2, 'Yes'],
                 [3, 'True'], [4, 'false']]
+
         insert_statement = self.session.prepare("""INSERT INTO testquoted ("IdNumber", "select") VALUES (?, ?)""")
         execute_concurrent_with_args(self.session, insert_statement, data)
 
-        tempfile = self.get_temp_file()
-        stmt = ("""COPY ks.testquoted ("IdNumber", "select") TO '{name}'"""
-                if specify_column_names else
-                """COPY ks.testquoted TO '{name}'""").format(name=tempfile.name)
-        self.node1.run_cqlsh(stmt)
+        for specify_column_names in (True, False):
+            tempfile = self.get_temp_file()
+            stmt = ("""COPY ks.testquoted ("IdNumber", "select") TO '{name}'"""
+                    if specify_column_names else
+                    """COPY ks.testquoted TO '{name}'""").format(name=tempfile.name)
+            self.node1.run_cqlsh(stmt)
 
-        reference_file = self.get_temp_file()
-        write_rows_to_csv(reference_file.name, data)
+            reference_file = self.get_temp_file()
+            write_rows_to_csv(reference_file.name, data)
 
-        assert_csvs_items_equal(tempfile.name, reference_file.name)
+            assert_csvs_items_equal(tempfile.name, reference_file.name)
 
-    def test_quoted_column_names_writing_specify_names(self):
-        self.quoted_column_names_writing_template(specify_column_names=True)
-
-    def test_quoted_column_names_writing_dont_specify_names(self):
-        self.quoted_column_names_writing_template(specify_column_names=False)
-
-    def data_validation_on_read_template(self, data, expected_err='Failed to import'):
+    def test_data_validation_on_read_template(self):
         """
-        @param data - the data to be written to the csv file
-        @param expected_err - the error we expect or None if the test should succeed
-
         Test that reading from CSV files fails when there is a type mismatch
         between the value being loaded and the type of the column or when data is missing
         in the file. Perform the following:
@@ -1560,68 +1569,43 @@ class CqlshCopyTest(Tester):
                 PRIMARY KEY(a, b)
             )""")
 
-        tempfile = self.get_temp_file()
-        debug('Writing {}'.format(tempfile.name))
-        write_rows_to_csv(tempfile.name, data)
+        data_err_pairs = [
+            # sanity check that the test works
+            ([[1, 1, 2]], None),
 
-        cmd = """COPY ks.testvalidate (a, b, c) FROM '{name}'""".format(name=tempfile.name)
-        out, err = self.node1.run_cqlsh(cmd, return_output=True)
-        results = list(self.session.execute("SELECT * FROM testvalidate"))
+            # test copying a float to an int column
+            ([[1, 1, 2.14]], 'Failed to import'),
 
-        if expected_err:
-            self.assertIn(expected_err, err)
-            self.assertFalse(results)
-        else:
-            self.assertFalse(err)
-            self.assertCsvResultEqual(tempfile.name, results, 'testvalidate')
+            # test copying a uuid to an int column
+            ([[1, 1, uuid4()]], 'Failed to import'),
 
-    def test_read_valid_data(self):
-        """
-        Use data_validation_on_read_template to test COPYing an int value from a
-        CSV into an int column. This test exists to make sure the parameterized
-        test works.
-        """
-        # make sure the template works properly
-        self.data_validation_on_read_template([[1, 1, 2]], expected_err=None)
+            # test copying a text value to an int column
+            ([[1, 1, 'test']], 'Failed to import'),
 
-    def test_read_invalid_float(self):
-        """
-        Use data_validation_on_read_template to test COPYing a float value from a
-        CSV into an int column.
-        """
-        self.data_validation_on_read_template([[1, 1, 2.14]])
+            # test using an empty partition key
+            ([['', 1, 'test']], "Failed to import 1 rows: ParseError - Cannot insert null value for primary key column"),
 
-    def test_read_invalid_uuid(self):
-        """
-        Use data_validation_on_read_template to test COPYing a uuid value from a
-        CSV into an int column.
-        """
-        self.data_validation_on_read_template([[1, 1, uuid4()]])
+            # test using an empty clustering key
+            ([[1, '', 'test']], "Failed to import 1 rows: ParseError - Cannot insert null value for primary key column"),
+        ]
 
-    def test_read_invalid_text(self):
-        """
-        Use data_validation_on_read_template to test COPYing a text value from a
-        CSV into an int column.
-        """
-        self.data_validation_on_read_template([[1, 1, 'test']])
+        for (data, expected_err) in data_err_pairs:
+            self.session.execute("TRUNCATE testvalidate")
 
-    def test_read_missing_partition_key(self):
-        """
-        Use data_validation_on_read_template to test COPYing an empty partition key.
-        @jira_ticket CASSANDRA-10854
-        """
-        self.data_validation_on_read_template([['', 1, 'test']],
-                                              expected_err="Failed to import 1 rows: ParseError - "
-                                                           "Cannot insert null value for primary key column")
+            tempfile = self.get_temp_file()
+            debug('Writing {}'.format(tempfile.name))
+            write_rows_to_csv(tempfile.name, data)
 
-    def test_read_missing_clustering_key(self):
-        """
-        Use data_validation_on_read_template to test COPYing an empty clustering key.
-        @jira_ticket CASSANDRA-10854
-        """
-        self.data_validation_on_read_template([[1, '', 'test']],
-                                              expected_err="Failed to import 1 rows: ParseError - "
-                                                           "Cannot insert null value for primary key column")
+            cmd = """COPY ks.testvalidate (a, b, c) FROM '{name}'""".format(name=tempfile.name)
+            out, err = self.node1.run_cqlsh(cmd, return_output=True)
+            results = list(self.session.execute("SELECT * FROM testvalidate"))
+
+            if expected_err:
+                self.assertIn(expected_err, err)
+                self.assertFalse(results)
+            else:
+                self.assertFalse(err)
+                self.assertCsvResultEqual(tempfile.name, results, 'testvalidate')
 
     @since('2.2')
     def test_read_wrong_column_names(self):
@@ -2836,7 +2820,8 @@ class CqlshCopyTest(Tester):
         self.ks = 'keyspace1'
         stress_ks_table_name = self.ks + '.' + stress_table_name
         self.node1.stress(['write', 'n={}'.format(num_records),
-                           'no-warmup', '-rate', 'threads=50',
+                           'no-warmup',
+                           '-rate', 'threads=50',
                            '-col', 'n=FIXED(10)', 'SIZE=FIXED(1024)'])  # 10 columns of 1kb each
 
         tempfile = self.get_temp_file()
@@ -2857,7 +2842,7 @@ class CqlshCopyTest(Tester):
         # Import without prepared statements and verify
         self.session.execute("TRUNCATE {}".format(stress_ks_table_name))
 
-        debug('Importing from csv file {}'.format(tempfile.name))
+        debug('Importing from csv file with MAXBATCHSIZE=1 {}'.format(tempfile.name))
         self.node1.run_cqlsh(cmds="COPY {} FROM '{}' WITH MAXBATCHSIZE=1 AND PREPAREDSTATEMENTS=FALSE"
                              .format(stress_ks_table_name, tempfile.name),
                              show_output=True, cqlsh_options=['--debug'])
