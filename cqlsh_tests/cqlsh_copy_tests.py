@@ -6,7 +6,7 @@ import json
 import os
 import sys
 import time
-from collections import namedtuple, defaultdict
+from collections import namedtuple
 from contextlib import contextmanager
 from decimal import Decimal
 from functools import partial
@@ -394,10 +394,10 @@ class CqlshCopyTest(Tester):
             ks_meta = cluster_meta.keyspaces[self.ks]
             cql_type_map = dict([(type_name, CqlType(type_name, ks_meta)) for type_name in cql_type_names])
         except ImportError:
-            cql_type_map = defaultdict()
+            cql_type_map = {}
 
         for i, row in enumerate(results):
-            formatted_row = [format_fn(v, t, cql_type_map[t])
+            formatted_row = [format_fn(v, t, cql_type_map.get(t))
                              for v, t in zip(row, cql_type_names)]
             processed.append(formatted_row)
         return processed
