@@ -37,6 +37,10 @@ def _repair_options(version, ks='', cf=None, sequential=True):
         opts += [cf]
     return opts
 
+LEGACY_SSTABLES_JVM_ARGS = ["-Dcassandra.streamdes.initial_mem_buffer_size=1",
+                            "-Dcassandra.streamdes.max_mem_buffer_size=5",
+                            "-Dcassandra.streamdes.max_spill_file_size=16"]
+
 
 class TestRepair(Tester):
 
@@ -194,6 +198,24 @@ class TestRepair(Tester):
         """
         self._empty_vs_gcable_no_repair(sequential=False)
 
+    @since('3.0')
+    def repair_after_upgrade_test(self):
+        """
+        @jira_ticket CASSANDRA-10990
+        """
+        default_install_dir = self.cluster.get_install_dir()
+        cluster = self.cluster
+        cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
+        cluster.set_batch_commitlog(enabled=True)
+
+        # Forcing cluster version on purpose
+        debug("Starting cluster..")
+        cluster.set_install_dir(version="2.1.9")
+        self._populate_cluster()
+
+        self._do_upgrade(default_install_dir)
+        self._repair_and_verify(True)
+
     @no_vnodes()
     def simple_repair_order_preserving_test(self):
         """
@@ -202,29 +224,8 @@ class TestRepair(Tester):
         """
         self._simple_repair(order_preserving_partitioner=True)
 
-    def _simple_repair(self, order_preserving_partitioner=False, sequential=True):
-        """
-        * Configure a three node cluster to not use hinted handoff, and to use batch commitlog
-        * Launch the cluster
-        * Create a keyspace at RF 3 and table
-        * Insert one thousand rows at CL ALL
-        * Flush on node3 and shut it down
-        * Insert one row at CL TWO
-        * Restart node3
-        * Insert one thousand more rows at CL ALL
-        * Flush all nodes
-        * Check node3 only has 2000 keys
-        * Check node1 and node2 have 2001 keys
-        * Perform the repair type specified by the parent test
-        * Assert the appropriate messages are logged
-        * Assert node3 now has all data
-
-        @jira_ticket CASSANDRA-4373
-        """
+    def _populate_cluster(self, start=True):
         cluster = self.cluster
-
-        if order_preserving_partitioner:
-            cluster.set_partitioner('org.apache.cassandra.dht.ByteOrderedPartitioner')
 
         # Disable hinted handoff and set batch commit log so this doesn't
         # interfere with the test (this must be after the populate)
@@ -248,6 +249,35 @@ class TestRepair(Tester):
         insert_c1c2(session, keys=range(1001, 2001), consistency=ConsistencyLevel.ALL)
 
         cluster.flush()
+
+    def _simple_repair(self, order_preserving_partitioner=False, sequential=True):
+        """
+        * Configure a three node cluster to not use hinted handoff, and to use batch commitlog
+        * Launch the cluster
+        * Create a keyspace at RF 3 and table
+        * Insert one thousand rows at CL ALL
+        * Flush on node3 and shut it down
+        * Insert one row at CL TWO
+        * Restart node3
+        * Insert one thousand more rows at CL ALL
+        * Flush all nodes
+        * Check node3 only has 2000 keys
+        * Check node1 and node2 have 2001 keys
+        * Perform the repair type specified by the parent test
+        * Assert the appropriate messages are logged
+        * Assert node3 now has all data
+
+        @jira_ticket CASSANDRA-4373
+        """
+        if order_preserving_partitioner:
+            cluster.set_partitioner('org.apache.cassandra.dht.ByteOrderedPartitioner')
+
+        self._populate_cluster()
+        self._repair_and_verify(sequential)
+
+    def _repair_and_verify(self, sequential=True):
+        cluster = self.cluster
+        node1, node2, node3 = cluster.nodelist()
 
         # Verify that node3 has only 2000 keys
         debug("Checking data on node3...")
@@ -756,6 +786,20 @@ class TestRepair(Tester):
         node3.stop(wait_other_notice=True)
         (stdout, stderr) = node2.stress(['read', 'n=1M', 'no-warmup', '-rate', 'threads=30', '-node', node2.address()], capture_output=True)
         self.assertTrue(len(stderr) == 0, stderr)
+
+    def _do_upgrade(self, default_install_dir):
+        cluster = self.cluster
+
+        for node in cluster.nodelist():
+            debug("Upgrading %s" % node.name)
+            if node.is_running():
+                node.flush()
+                time.sleep(1)
+                node.stop(wait_other_notice=True)
+            node.set_install_dir(install_dir=default_install_dir)
+            node.start(wait_other_notice=True, wait_for_binary_proto=True)
+            cursor = self.patient_cql_connection(node)
+        cluster.set_install_dir(default_install_dir)
 
 RepairTableContents = namedtuple('RepairTableContents',
                                  ['parent_repair_history', 'repair_history'])

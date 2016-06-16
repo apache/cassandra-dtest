@@ -1,15 +1,24 @@
 import time
+import os
 
 from assertions import assert_all, assert_none, assert_one
-from dtest import Tester
-from tools import known_failure, since
+from dtest import Tester, debug
+from tools import known_failure, since, new_node
+
+LEGACY_SSTABLES_JVM_ARGS = ["-Dcassandra.streamdes.initial_mem_buffer_size=1",
+                            "-Dcassandra.streamdes.max_mem_buffer_size=5",
+                            "-Dcassandra.streamdes.max_spill_file_size=128"]
 
 
 @since('3.0')
 class TestStorageEngineUpgrade(Tester):
-    def setUp(self):
+    def setUp(self, bootstrap=False, jvm_args=None):
         super(TestStorageEngineUpgrade, self).setUp()
         self.default_install_dir = self.cluster.get_install_dir()
+        self.bootstrap = bootstrap
+        if jvm_args is None:
+            jvm_args = []
+        self.jvm_args = jvm_args
 
     def _setup_cluster(self, create_keyspace=True):
         cluster = self.cluster
@@ -27,8 +36,8 @@ class TestStorageEngineUpgrade(Tester):
         return cursor
 
     def _do_upgrade(self, login_keyspace=True):
-
-        node1 = self.cluster.nodelist()[0]
+        cluster = self.cluster
+        node1 = cluster.nodelist()[0]
 
         node1.flush()
         time.sleep(.5)
@@ -36,6 +45,16 @@ class TestStorageEngineUpgrade(Tester):
 
         node1.set_install_dir(install_dir=self.default_install_dir)
         node1.start(wait_other_notice=True, wait_for_binary_proto=True)
+
+        if self.bootstrap:
+            cluster.set_install_dir(install_dir=self.default_install_dir)
+            # Add a new node, bootstrap=True ensures that it is not a seed
+            node2 = new_node(cluster, bootstrap=True)
+            node2.start(wait_for_binary_proto=True, jvm_args=self.jvm_args)
+
+            temp_files = self.glob_data_dirs(os.path.join('*', "tmp", "*.dat"))
+            debug("temp files: " + str(temp_files))
+            self.assertEquals(0, len(temp_files), "Temporary files were not cleaned up.")
 
         cursor = self.patient_cql_connection(node1)
         if login_keyspace:
@@ -363,3 +382,9 @@ class TestStorageEngineUpgrade(Tester):
         self.cluster.compact()
 
         assert_one(session, "SELECT k FROM t", ['some_key'])
+
+
+@since('3.0')
+class TestBootstrapAfterUpgrade(TestStorageEngineUpgrade):
+    def setUp(self):
+        super(TestBootstrapAfterUpgrade, self).setUp(bootstrap=True, jvm_args=LEGACY_SSTABLES_JVM_ARGS)
