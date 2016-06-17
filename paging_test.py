@@ -939,7 +939,6 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
     @since('3.0.0')
     def test_paging_with_filtering(self):
-
         """
         @jira_ticket CASSANDRA-6377
         """
@@ -1133,9 +1132,11 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
                                               [2, 3, 4, 5],
                                               [3, 3, 4, 5]])
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12025',
+                   flaky=True)
     @since('3.6')
     def test_paging_with_filtering_on_counter_columns(self):
-
         """
         test paging, when filtering on counter columns
         @jira_ticket CASSANDRA-11629
@@ -1231,7 +1232,6 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
     @since('3.6')
     def test_paging_with_filtering_on_clustering_columns(self):
-
         """
         test paging, when filtering on clustering columns
         @jira_ticket CASSANDRA-11310
@@ -1243,7 +1243,6 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
     @since('3.6')
     def test_paging_with_filtering_on_clustering_columns_with_contains(self):
-
         """
         test paging, when filtering on clustering columns (frozen collections) with CONTAINS statement
         @jira_ticket CASSANDRA-11310
@@ -1335,7 +1334,6 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
     @since('3.6')
     def test_paging_with_filtering_on_static_columns(self):
-
         """
         test paging, when filtering on static columns
         @jira_ticket CASSANDRA-11310
@@ -1381,7 +1379,6 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
     @since('2.1.14')
     def test_paging_on_compact_table_with_tombstone_on_first_column(self):
-
         """
         test paging, on  COMPACT tables without clustering columns, when the first column has a tombstone
         @jira_ticket CASSANDRA-11467
@@ -1407,7 +1404,6 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
                                    [3, None, 1]])
 
     def test_paging_with_no_clustering_columns(self):
-
         """
         test paging for tables without clustering columns
         @jira_ticket CASSANDRA-11208
