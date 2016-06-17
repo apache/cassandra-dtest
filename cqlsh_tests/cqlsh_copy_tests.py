@@ -179,6 +179,7 @@ class CqlshCopyTest(Tester):
             round_microseconds = None
 
         class Datetime(datetime.datetime):
+
             def _format_for_csv(self):
                 ret = self.strftime(default_time_format)
                 return round_microseconds(ret) if round_microseconds else ret
@@ -2669,6 +2670,9 @@ class CqlshCopyTest(Tester):
         self.assertNotIn('some records might be missing', err)
         self.assertEqual(num_records, len(open(tempfile.name).readlines()))
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12024',
+                   flaky=True)
     @freshCluster()
     def test_copy_to_with_child_process_crashing(self):
         """
