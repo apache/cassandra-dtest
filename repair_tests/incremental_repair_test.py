@@ -146,6 +146,9 @@ class TestIncRepair(Tester):
 
         assert_one(session, "SELECT COUNT(*) FROM ks.cf LIMIT 200", [149])
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12006',
+                   flaky=True)
     def sstable_repairedset_test(self):
         """
         * Launch a two node cluster
