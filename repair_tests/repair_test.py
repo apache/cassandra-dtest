@@ -216,6 +216,9 @@ class TestRepair(Tester):
         self._do_upgrade(default_install_dir)
         self._repair_and_verify(True)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12022',
+                   flaky=False)
     @no_vnodes()
     def simple_repair_order_preserving_test(self):
         """
