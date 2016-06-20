@@ -9,7 +9,7 @@ from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
 
 from assertions import assert_none, assert_unavailable, assert_length_equal
-from dtest import DISABLE_VNODES, Tester, debug
+from dtest import DISABLE_VNODES, Tester, debug, MultiError
 from tools import (create_c1c2_table, insert_c1c2, insert_columns,
                    known_failure, query_c1c2, rows_to_list, since)
 from nose.tools import assert_greater_equal
@@ -536,7 +536,8 @@ class TestAccuracy(TestHelper):
                 break
 
         if not exceptions_queue.empty():
-            raise exceptions_queue.get()[1]
+            _, exceptions, tracebacks = zip(*exceptions_queue.queue)
+            raise MultiError(exceptions=exceptions, tracebacks=tracebacks)
 
     def test_simple_strategy_users(self):
         """
