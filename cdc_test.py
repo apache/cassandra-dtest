@@ -252,12 +252,9 @@ class TestCDC(Tester):
                           s=time.time() - start))
                 error_found = True
 
-        debug(
-            'number of rows inserted: ' +
-            str(len(list(
-                session.execute('SELECT * FROM ' + ks_name + '.' + full_cdc_table_name)
-            )))
-        )
+        self.assertLess(0, rows_loaded,
+                        'No CDC rows inserted. This may happen when '
+                        'cdc_total_space_in_mb > commitlog_segment_size_in_mb')
 
         commitlog_dir = os.path.join(node.get_path(), 'commitlogs')
         commitlogs_size = size_of_files_in_dir(commitlog_dir)
