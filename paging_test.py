@@ -2231,8 +2231,6 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
             values={'tombstone_failure_threshold': 500}
         )
         self.session = self.prepare()
-        node1, node2, node3 = self.cluster.nodelist()
-
         self.setup_data()
 
         # Add more data
@@ -2254,11 +2252,8 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
                            "paging_test.* query aborted")
         else:
             failure_msg = ("Scanned over.* tombstones during query.* query aborted")
-        failure = (node1.grep_log(failure_msg) or
-                   node2.grep_log(failure_msg) or
-                   node3.grep_log(failure_msg))
 
-        self.assertTrue(failure, "Cannot find tombstone failure threshold error in log")
+        self.wait_for_any_log(self.cluster.nodelist(), failure_msg, 25)
 
     @since('2.2.6')
     def test_deletion_with_distinct_paging(self):
