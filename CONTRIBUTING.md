@@ -6,7 +6,7 @@ We plan to move to Python 3 in the near future. Where possible, new code should 
 - use the `/` on numbers in a Python 3-compatible way. In particular, if you want floor division (which is the behavior of `/` in Python 2), use `//` instead. If you want the result of integer division to be a `float` (e.g. `1 / 2 == 0.5`), add `from __future__ import division` to the top of the imports and use `/`. For more infomration, see [the official Python 3 porting docs](https://docs.python.org/3/howto/pyporting.html#division).
 - use `absolute_import`, `division`, and `unicode_literals` in new test files.
 
-Contributions will be evaluated by PEP8. We now strictly enforce compliance, via a linter run with Travis CI against all new pull requests. We do not enforce the default limits on line length, but have established a maximum length of 200 chars as a sanity check. You can conform to PEP8 by running `autopep8` which can be installed via `pip`. 
+Contributions will be evaluated by PEP8. We now strictly enforce compliance, via a linter run with Travis CI against all new pull requests. We do not enforce the default limits on line length, but have established a maximum length of 200 chars as a sanity check. You can conform to PEP8 by running `autopep8` which can be installed via `pip`.
 `pip install autopep8 && autopep8 --in-place -a --ignore E501`
 
 Another way to make sure that your code will pass compliance checks is to run flake8 from a commit hook:
@@ -70,6 +70,14 @@ Feel free to submit test plans without the implemented tests. If you are submitt
 ## Modules
 
 In some cases, we organize our test files by putting them in directories. If you do so, please export a module from that directory by placing an `__init__.py` file in the directory with the test files. This makes the modules visible to our test infrastructure scripts that divide tests into buckets for CI.
+
+##Assertions
+
+- When possible, you should use the assert functions from `assertions.py`.
+        https://github.com/riptano/cassandra-dtest/blob/master/assertions.py
+- When none of these are applicable, use python's built in unittest assertions
+        https://docs.python.org/2/library/unittest.html#assert-methods.
+- Naked assert statements should never be used, e.g. `assert True`
 
 ## Summary: Review Checklist
 

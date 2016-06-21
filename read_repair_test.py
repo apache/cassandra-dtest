@@ -3,7 +3,7 @@ import time
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
 
-from assertions import assert_all, assert_one, assert_length_equal
+from assertions import assert_one, assert_length_equal
 from dtest import PRINT_DEBUG, Tester, debug
 from tools import known_failure, rows_to_list, since
 
@@ -86,7 +86,7 @@ class TestReadRepair(Tester):
         for n in self.cluster.nodelist():
             debug("Checking " + n.name)
             session = self.patient_exclusive_cql_connection(n)
-            assert_all(session, query, [[1, 1, 1]], cl=ConsistencyLevel.ONE)
+            assert_one(session, query, [1, 1, 1], cl=ConsistencyLevel.ONE)
 
     def identify_initial_placement(self, keyspace, table, key):
         nodes = self.cluster.nodelist()

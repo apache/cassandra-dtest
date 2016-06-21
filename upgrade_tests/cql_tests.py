@@ -224,17 +224,22 @@ class TestCQL(UpgradeTester):
             cursor.execute("UPDATE connections SET time = 42 WHERE userid = f47ac10b-58cc-4372-a567-0e02b2c3d479 AND ip = '192.168.0.4'")
 
             # Queries
-            assert_all(cursor, "SELECT ip, port, time FROM connections WHERE userid = 550e8400-e29b-41d4-a716-446655440000", [['192.168.0.1', 80, 42], ['192.168.0.2', 80, 24], ['192.168.0.2', 90, 42]])
+            assert_all(cursor, "SELECT ip, port, time FROM connections WHERE userid = 550e8400-e29b-41d4-a716-446655440000",
+                       [['192.168.0.1', 80, 42], ['192.168.0.2', 80, 24], ['192.168.0.2', 90, 42]])
 
-            assert_all(cursor, "SELECT ip, port, time FROM connections WHERE userid = 550e8400-e29b-41d4-a716-446655440000 and ip >= '192.168.0.2'", [['192.168.0.2', 80, 24], ['192.168.0.2', 90, 42]])
+            assert_all(cursor, "SELECT ip, port, time FROM connections WHERE userid = 550e8400-e29b-41d4-a716-446655440000 and ip >= '192.168.0.2'",
+                       [['192.168.0.2', 80, 24], ['192.168.0.2', 90, 42]])
 
-            assert_all(cursor, "SELECT ip, port, time FROM connections WHERE userid = 550e8400-e29b-41d4-a716-446655440000 and ip = '192.168.0.2'", [['192.168.0.2', 80, 24], ['192.168.0.2', 90, 42]])
+            assert_all(cursor, "SELECT ip, port, time FROM connections WHERE userid = 550e8400-e29b-41d4-a716-446655440000 and ip = '192.168.0.2'",
+                       [['192.168.0.2', 80, 24], ['192.168.0.2', 90, 42]])
 
             assert_none(cursor, "SELECT ip, port, time FROM connections WHERE userid = 550e8400-e29b-41d4-a716-446655440000 and ip > '192.168.0.2'")
 
-            assert_one(cursor, "SELECT ip, port, time FROM connections WHERE userid = f47ac10b-58cc-4372-a567-0e02b2c3d479 AND ip = '192.168.0.3'", ['192.168.0.3', None, 42])
+            assert_one(cursor, "SELECT ip, port, time FROM connections WHERE userid = f47ac10b-58cc-4372-a567-0e02b2c3d479 AND ip = '192.168.0.3'",
+                       ['192.168.0.3', None, 42])
 
-            assert_one(cursor, "SELECT ip, port, time FROM connections WHERE userid = f47ac10b-58cc-4372-a567-0e02b2c3d479 AND ip = '192.168.0.4'", ['192.168.0.3', None, 42])
+            assert_one(cursor, "SELECT ip, port, time FROM connections WHERE userid = f47ac10b-58cc-4372-a567-0e02b2c3d479 AND ip = '192.168.0.4'",
+                       ['192.168.0.3', None, 42])
 
             # Deletion
             cursor.execute("DELETE time FROM connections WHERE userid = 550e8400-e29b-41d4-a716-446655440000 AND ip = '192.168.0.2' AND port = 80")
@@ -1364,29 +1369,23 @@ class TestCQL(UpgradeTester):
             cursor.execute(q % "tags = tags + [ 'foo' ]")
             cursor.execute(q % "tags = tags + [ 'foobar' ]")
 
-            res = cursor.execute("SELECT tags FROM user")
-            self.assertItemsEqual(rows_to_list(res), [[['foo', 'bar', 'foo', 'foobar']]])
+            assert_one(cursor, "SELECT tags FROM user", [['foo', 'bar', 'foo', 'foobar']])
 
             q = "UPDATE user SET %s WHERE fn='Bilbo' AND ln='Baggins'"
             cursor.execute(q % "tags = [ 'a', 'c', 'b', 'c' ]")
-            res = cursor.execute("SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'")
-            self.assertItemsEqual(rows_to_list(res), [[['a', 'c', 'b', 'c']]])
+            assert_one(cursor, "SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'", [['a', 'c', 'b', 'c']])
 
             cursor.execute(q % "tags = [ 'm', 'n' ] + tags")
-            res = cursor.execute("SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'")
-            self.assertItemsEqual(rows_to_list(res), [[['m', 'n', 'a', 'c', 'b', 'c']]])
+            assert_one(cursor, "SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'", [['m', 'n', 'a', 'c', 'b', 'c']])
 
             cursor.execute(q % "tags[2] = 'foo', tags[4] = 'bar'")
-            res = cursor.execute("SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'")
-            self.assertItemsEqual(rows_to_list(res), [[['m', 'n', 'foo', 'c', 'bar', 'c']]])
+            assert_one(cursor, "SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'", [['m', 'n', 'foo', 'c', 'bar', 'c']])
 
             cursor.execute("DELETE tags[2] FROM user WHERE fn='Bilbo' AND ln='Baggins'")
-            res = cursor.execute("SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'")
-            self.assertItemsEqual(rows_to_list(res), [[['m', 'n', 'c', 'bar', 'c']]])
+            assert_one(cursor, "SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'", [['m', 'n', 'c', 'bar', 'c']])
 
             cursor.execute(q % "tags = tags - [ 'bar' ]")
-            res = cursor.execute("SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'")
-            self.assertItemsEqual(rows_to_list(res), [[['m', 'n', 'c', 'c']]])
+            assert_one(cursor, "SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'", [['m', 'n', 'c', 'c']])
 
     def multi_collection_test(self):
         cursor = self.prepare()
@@ -1411,8 +1410,7 @@ class TestCQL(UpgradeTester):
             cursor.execute("UPDATE ks.foo SET M = {'foo': 1, 'bar' : 3} WHERE k = b017f48f-ae67-11e1-9096-005056c00008;")
             cursor.execute("UPDATE ks.foo SET M = M + {'foobar' : 4} WHERE k = b017f48f-ae67-11e1-9096-005056c00008;")
 
-            res = cursor.execute("SELECT L, M, S FROM foo WHERE k = b017f48f-ae67-11e1-9096-005056c00008")
-            self.assertItemsEqual(rows_to_list(res), [[
+            assert_all(cursor, "SELECT L, M, S FROM foo WHERE k = b017f48f-ae67-11e1-9096-005056c00008", [[
                 [1, 3, 5, 7, 11, 13],
                 OrderedDict([('bar', 3), ('foo', 1), ('foobar', 4)]),
                 sortedset([1, 3, 5, 7, 11, 13])
@@ -2153,8 +2151,7 @@ class TestCQL(UpgradeTester):
 
             cursor.execute("INSERT INTO test(k, l, c) VALUES(3, [0, 1, 2], 4)")
             cursor.execute("UPDATE test SET l[0] = 1, c = 42 WHERE k = 3")
-            res = cursor.execute("SELECT l, c FROM test WHERE k = 3")
-            self.assertItemsEqual(rows_to_list(res), [[[1, 1, 2], 42]])
+            assert_one(cursor, "SELECT l, c FROM test WHERE k = 3", [[1, 1, 2], 42])
 
     def batch_and_list_test(self):
         cursor = self.prepare()
@@ -2178,8 +2175,7 @@ class TestCQL(UpgradeTester):
               APPLY BATCH
             """)
 
-            res = cursor.execute("SELECT l FROM test WHERE k = 0")
-            self.assertItemsEqual(rows_to_list(res[0]), [[1, 2, 3]])
+            assert_one(cursor, "SELECT l FROM test WHERE k = 0", [[1, 2, 3]])
 
             cursor.execute("""
               BEGIN BATCH
@@ -2189,8 +2185,7 @@ class TestCQL(UpgradeTester):
               APPLY BATCH
             """)
 
-            res = cursor.execute("SELECT l FROM test WHERE k = 1")
-            self.assertItemsEqual(rows_to_list(res[0]), [[3, 2, 1]])
+            assert_one(cursor, "SELECT l FROM test WHERE k = 1", [[3, 2, 1]])
 
     def boolean_test(self):
         cursor = self.prepare()
@@ -2283,8 +2278,7 @@ class TestCQL(UpgradeTester):
             cursor.execute("INSERT INTO test (k, l1, l2) VALUES (0, [1, 2, 3], [4, 5, 6])")
             cursor.execute("UPDATE test SET l2[1] = 42, l1[1] = 24  WHERE k = 0")
 
-            res = cursor.execute("SELECT l1, l2 FROM test WHERE k = 0")
-            self.assertItemsEqual(rows_to_list(res), [[[1, 24, 3], [4, 42, 6]]])
+            assert_all(cursor, "SELECT l1, l2 FROM test WHERE k = 0", [[1, 24, 3], [4, 42, 6]])
 
     @freshCluster()
     def composite_index_collections_test(self):
@@ -2303,7 +2297,7 @@ class TestCQL(UpgradeTester):
         cursor.execute("CREATE INDEX ON blogs(author)")
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
-            debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
+            debug("Querying {} node".wait_for_schema_agreement("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE blogs")
 
             req = "INSERT INTO blogs (blog_id, time1, time2, author, content) VALUES (%d, %d, %d, '%s', %s)"
@@ -2337,7 +2331,7 @@ class TestCQL(UpgradeTester):
             """)
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
-            debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
+            debug("Querying {} node".format("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE test")
 
             for i in range(0, 3):
@@ -2362,17 +2356,17 @@ class TestCQL(UpgradeTester):
         """)
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
-            debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
+            debug("Querying {} node".format("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE test")
 
             nb_keys = 30
             nb_deletes = 5
 
             for i in range(0, nb_keys):
-                cursor.execute("INSERT INTO test(k, v) VALUES (%d, %d)" % (i, i))
+                cursor.execute("INSERT INTO test(k, v) VALUES ({}, {})".format(i, i))
 
             for i in random.sample(xrange(nb_keys), nb_deletes):
-                cursor.execute("DELETE FROM test WHERE k = %d" % i)
+                cursor.execute("DELETE FROM test WHERE k = {}".format(i))
 
             res = list(cursor.execute("SELECT * FROM test LIMIT {}".format(nb_keys / 2)))
             assert_length_equal(res, nb_keys / 2)
@@ -2388,7 +2382,7 @@ class TestCQL(UpgradeTester):
         """)
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
-            debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
+            debug("Querying {} node".format("upgraded" if is_upgraded else "old",))
             assert_invalid(cursor, "SELECT ttl(l) FROM test WHERE k = 0")
             assert_invalid(cursor, "SELECT writetime(l) FROM test WHERE k = 0")
 
@@ -4513,12 +4507,12 @@ class TestCQL(UpgradeTester):
             )""")
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
-            debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
+            debug("Querying {} node".format("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE tmap")
             cursor.execute("TRUNCATE frozentmap")
 
             for frozen in (False, True):
-                debug("Testing %s maps" % ("frozen" if frozen else "normal"))
+                debug("Testing {]} maps".format("frozen" if frozen else "normal"))
 
                 table = "frozentmap" if frozen else "tmap"
                 cursor.execute("INSERT INTO %s(k, m) VALUES (0, {'foo' : 'bar'})" % (table,))
@@ -4628,19 +4622,19 @@ class TestCQL(UpgradeTester):
             )""")
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
-            debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
+            debug("Querying {} node".format("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE tmap")
             cursor.execute("TRUNCATE frozentmap")
 
             for frozen in (False, True):
-                debug("Testing %s maps" % ("frozen" if frozen else "normal"))
+                debug("Testing {} maps".format("frozen" if frozen else "normal"))
 
                 table = "frozentmap" if frozen else "tmap"
-                cursor.execute("INSERT INTO %s(k, m) VALUES (0, {'foo' : 'bar'})" % (table,))
+                cursor.execute("INSERT INTO {}(k, m) VALUES (0, {'foo' : 'bar'})".format(table,))
 
                 def check_applies(condition):
                     assert_one(cursor, "UPDATE %s SET m = {'foo': 'bar'} WHERE k=0 IF %s" % (table, condition), [True])
-                    assert_one(cursor, "SELECT * FROM %s" % (table,), [0, {'foo': 'bar'}], cl=ConsistencyLevel.SERIAL)
+                    assert_one(cursor, "SELECT * FROM {}".format(table,), [0, {'foo': 'bar'}], cl=ConsistencyLevel.SERIAL)
 
                 check_applies("m['xxx'] = null")
                 check_applies("m['foo'] < 'zzz'")
@@ -4656,8 +4650,8 @@ class TestCQL(UpgradeTester):
                 check_applies("m['foo'] < 'zzz' AND m['foo'] > 'aaa'")
 
                 def check_does_not_apply(condition):
-                    assert_one(cursor, "UPDATE %s SET m = {'foo': 'bar'} WHERE k=0 IF %s" % (table, condition), [False, {'foo': 'bar'}])
-                    assert_one(cursor, "SELECT * FROM %s" % (table,), [0, {'foo': 'bar'}], cl=ConsistencyLevel.SERIAL)
+                    assert_one(cursor, "UPDATE {} SET m = {'foo': 'bar'} WHERE k=0 IF {}".format(table, condition), [False, {'foo': 'bar'}])
+                    assert_one(cursor, "SELECT * FROM {}".format(table,), [0, {'foo': 'bar'}], cl=ConsistencyLevel.SERIAL)
 
                 check_does_not_apply("m['foo'] < 'aaa'")
                 check_does_not_apply("m['foo'] <= 'aaa'")
@@ -4670,8 +4664,8 @@ class TestCQL(UpgradeTester):
                 check_does_not_apply("m['foo'] != null AND m['foo'] = null")
 
                 def check_invalid(condition, expected=InvalidRequest):
-                    assert_invalid(cursor, "UPDATE %s SET m = {'foo': 'bar'} WHERE k=0 IF %s" % (table, condition), expected=expected)
-                    assert_one(cursor, "SELECT * FROM %s" % (table,), [0, {'foo': 'bar'}])
+                    assert_invalid(cursor, "UPDATE {} SET m = {'foo': 'bar'} WHERE k=0 IF {}".format(table, condition), expected=expected)
+                    assert_one(cursor, "SELECT * FROM {}".format(table,), [0, {'foo': 'bar'}])
 
                 check_invalid("m['foo'] < null")
                 check_invalid("m['foo'] <= null")
@@ -4698,7 +4692,7 @@ class TestCQL(UpgradeTester):
         """)
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
-            debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
+            debug("Querying {} node".format("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE test")
 
             cursor.execute("INSERT INTO test(k, v, l) VALUES(0, 'foobar', ['foi', 'bar'])")
@@ -4724,12 +4718,12 @@ class TestCQL(UpgradeTester):
         """)
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
-            debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
+            debug("Querying {} node".format("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE test")
 
             cursor.execute("INSERT INTO test(k, s) VALUES(0, 42)")
             for i in range(0, 4):
-                cursor.execute("INSERT INTO test(k, v) VALUES(0, %d)" % i)
+                cursor.execute("INSERT INTO test(k, v) VALUES(0, {})".format(i))
 
             assert_one(cursor, "SELECT * FROM test WHERE k = 0 LIMIT 1", [0, 0, 42])
             assert_all(cursor, "SELECT * FROM test WHERE k = 0 LIMIT 2", [[0, 0, 42], [0, 1, 42]])
@@ -4751,7 +4745,7 @@ class TestCQL(UpgradeTester):
         """)
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
-            debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
+            debug("Querying {} node".format("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE test")
 
             cursor.execute("INSERT INTO test(pkey, static_value) VALUES ('partition1', 'static value')")
@@ -4773,7 +4767,7 @@ class TestCQL(UpgradeTester):
         """)
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
-            debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
+            debug("Querying {} node".format("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE test")
 
             for i in range(0, 4):
@@ -4806,7 +4800,7 @@ class TestCQL(UpgradeTester):
         cursor.execute("CREATE INDEX ON test(k2)")
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
-            debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
+            debug("Querying {} node".format("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE test")
 
             cursor.execute("INSERT INTO test(k1, k2, v) VALUES (0, 0, 1)")
@@ -4833,7 +4827,7 @@ class TestCQL(UpgradeTester):
         cursor.execute("CREATE TABLE counters (k int PRIMARY KEY, c counter)")
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
-            debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
+            debug("Querying {} node".format("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE test")
             cursor.execute("TRUNCATE counters")
 
@@ -4866,7 +4860,7 @@ class TestCQL(UpgradeTester):
         """)
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
-            debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
+            debug("Querying {} node".format("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE test")
 
             cursor.execute("INSERT INTO test (a, b, c) VALUES (1, 2, 3)")
@@ -4890,7 +4884,7 @@ class TestCQL(UpgradeTester):
         """)
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
-            debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
+            debug("Querying {} node".format("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE test")
 
             cursor.execute("INSERT INTO test (a, b, c, d) VALUES (1, 2, 3, 3)")
@@ -4918,7 +4912,7 @@ class TestCQL(UpgradeTester):
         cursor.execute("create index lastAccessIndex ON session_data (last_access)")
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
-            debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
+            debug("Querying {} node".format("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE session_data")
 
             assert_one(cursor, "select count(*) from session_data where app_name='foo' and account='bar' and last_access > 4 allow filtering", [0])
@@ -4938,7 +4932,7 @@ class TestCQL(UpgradeTester):
         """)
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
-            debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
+            debug("Querying {} node".format("upgraded" if is_upgraded else "old",))
             # A blob that is not 4 bytes should be rejected
             assert_invalid(cursor, "INSERT INTO test(k, v) VALUES (0, blobAsInt(0x01))")
 
@@ -4948,7 +4942,7 @@ class TestCQL(UpgradeTester):
         cursor.execute("create table invalid_string_literals (k int primary key, a ascii, b text)")
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
-            debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
+            debug("Querying {} node".format("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE invalid_string_literals")
 
             assert_invalid(cursor, u"insert into ks.invalid_string_literals (k, a) VALUES (0, '\u038E\u0394\u03B4\u03E0')")
@@ -4966,7 +4960,7 @@ class TestCQL(UpgradeTester):
         cursor.execute("CREATE TABLE test (k int PRIMARY KEY, v int)")
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
-            debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
+            debug("Querying {} node".format("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE test")
 
             cursor.execute("INSERT INTO test (k, v) VALUES (1, 1) USING TIMESTAMP -42")
@@ -4981,7 +4975,7 @@ class TestCQL(UpgradeTester):
         cursor.execute("CREATE TABLE test (k int PRIMARY KEY, v map<int, text>)")
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
-            debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
+            debug("Querying {} node".format("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE test")
 
             cursor.execute("INSERT INTO test (k, v) VALUES ( 0, {1:'a', 2:'b', 3:'c', 4:'d'})")
@@ -5009,7 +5003,7 @@ class TestCQL(UpgradeTester):
         cursor.execute("CREATE TABLE test (k int PRIMARY KEY, v set<text>)")
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
-            debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
+            debug("Querying {} node".format("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE test")
 
             cursor.execute("INSERT INTO test (k, v) VALUES ( 0, {'e', 'a', 'd', 'b'})")
@@ -5040,7 +5034,7 @@ class TestCQL(UpgradeTester):
         cursor.execute("CREATE TABLE test (k int PRIMARY KEY, v list<text>)")
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
-            debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
+            debug("Querying {} node".format("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE test")
 
             cursor.execute("INSERT INTO test (k, v) VALUES ( 0, ['e', 'a', 'd', 'b'])")
@@ -5068,7 +5062,7 @@ class TestCQL(UpgradeTester):
         cursor.execute("CREATE TABLE test (k int PRIMARY KEY, v map<int, text>)")
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
-            debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
+            debug("Querying {} node".format("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE test")
 
             cursor.execute("INSERT INTO test (k, v) VALUES ( 0, {1:'a', 2:'b', 3:'c', 4:'d'})")
@@ -5097,7 +5091,7 @@ class TestCQL(UpgradeTester):
         cursor.execute("CREATE TABLE test (k int PRIMARY KEY, v set<text>)")
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
-            debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
+            debug("Querying {} node".format("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE test")
 
             cursor.execute("INSERT INTO test (k, v) VALUES ( 0, {'e', 'a', 'd', 'b'})")
@@ -5128,7 +5122,7 @@ class TestCQL(UpgradeTester):
         cursor.execute("CREATE TABLE test (k int PRIMARY KEY, v list<text>)")
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
-            debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
+            debug("Querying {} node".format("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE test")
 
             cursor.execute("INSERT INTO test (k, v) VALUES ( 0, ['e', 'a', 'd', 'b'])")
@@ -5155,7 +5149,7 @@ class TestCQL(UpgradeTester):
         cursor.execute("CREATE  TABLE space1.table1(a int, b int, c text,primary key(a,b))")
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
-            debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
+            debug("Querying {} node".format("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE space1.table1")
 
             cursor.execute("INSERT INTO space1.table1(a,b,c) VALUES(1,1,'1')")
@@ -5209,7 +5203,7 @@ class TestCQL(UpgradeTester):
         time.sleep(0.5)
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
-            debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
+            debug("Querying {} node".format("upgraded" if is_upgraded else "old",))
             assert_all(cursor, "SELECT k FROM ks.test WHERE v = 0", [[0]])
 
     def bug_10652_test(self):
@@ -5219,7 +5213,7 @@ class TestCQL(UpgradeTester):
         cursor.execute("CREATE TABLE foo.bar (k int PRIMARY KEY, v int)")
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
-            debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
+            debug("Querying {} node".format("upgraded" if is_upgraded else "old",))
 
             future = cursor.execute_async("INSERT INTO foo.bar(k, v) VALUES (0, 0)", trace=True)
             future.result()
