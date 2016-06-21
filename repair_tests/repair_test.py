@@ -273,7 +273,7 @@ class TestRepair(Tester):
         @jira_ticket CASSANDRA-4373
         """
         if order_preserving_partitioner:
-            cluster.set_partitioner('org.apache.cassandra.dht.ByteOrderedPartitioner')
+            self.cluster.set_partitioner('org.apache.cassandra.dht.ByteOrderedPartitioner')
 
         self._populate_cluster()
         self._repair_and_verify(sequential)
