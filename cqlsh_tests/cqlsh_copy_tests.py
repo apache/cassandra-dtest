@@ -816,6 +816,9 @@ class CqlshCopyTest(Tester):
         self.assertItemsEqual(self.result_to_csv_rows(exported_results, cql_type_names, time_format=format),
                               self.result_to_csv_rows(imported_results, cql_type_names, time_format=format))
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12059',
+                   flaky=True)
     @since('3.2')
     def test_reading_with_ttl(self):
         """
@@ -1414,6 +1417,9 @@ class CqlshCopyTest(Tester):
 
         assert_csvs_items_equal(tempfile.name, reference_file.name)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12067',
+                   flaky=True)
     def test_explicit_column_order_reading(self):
         """
         Test that COPY can write to a CSV file when the order of columns is
@@ -1543,6 +1549,9 @@ class CqlshCopyTest(Tester):
 
             assert_csvs_items_equal(tempfile.name, reference_file.name)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12070',
+                   flaky=True)
     def test_data_validation_on_read_template(self):
         """
         Test that reading from CSV files fails when there is a type mismatch
@@ -1999,6 +2008,9 @@ class CqlshCopyTest(Tester):
                                ['3', '1943-06-19 11:21:01.124+0000']],
                               csv_results)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12061',
+                   flaky=True)
     @since('3.6')
     def test_round_trip_with_different_number_precision(self):
         """
@@ -2136,6 +2148,9 @@ class CqlshCopyTest(Tester):
 
         check_rate_file()
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12069',
+                   flaky=True)
     def test_copy_options_from_config_file(self):
         """
         Test that we can specify configuration options in a config file, optionally using multiple sections,
