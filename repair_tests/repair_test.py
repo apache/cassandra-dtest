@@ -198,6 +198,9 @@ class TestRepair(Tester):
         """
         self._empty_vs_gcable_no_repair(sequential=False)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12057',
+                   flaky=False)
     @since('3.0')
     def repair_after_upgrade_test(self):
         """

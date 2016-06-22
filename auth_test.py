@@ -9,7 +9,7 @@ from cassandra.protocol import SyntaxException
 from assertions import (assert_all, assert_invalid, assert_one,
                         assert_unauthorized)
 from dtest import CASSANDRA_VERSION_FROM_BUILD, Tester, debug
-from tools import since
+from tools import since, known_failure
 
 
 class TestAuth(Tester):
@@ -66,6 +66,9 @@ class TestAuth(Tester):
             session = self.patient_exclusive_cql_connection(node, user='cassandra', password='cassandra')
             self.assertEquals(3, session.cluster.metadata.keyspaces['system_auth'].replication_strategy.replication_factor)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12064',
+                   flaky=True)
     def login_test(self):
         """
         * Launch a one node cluster

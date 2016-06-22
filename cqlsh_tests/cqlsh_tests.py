@@ -689,6 +689,9 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
 (6 rows)
 """)
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12058',
+                   flaky=True)
     def test_describe(self):
         """
         @jira_ticket CASSANDRA-7814
