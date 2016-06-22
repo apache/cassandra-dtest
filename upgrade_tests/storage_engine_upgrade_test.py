@@ -4,6 +4,9 @@ import os
 from assertions import assert_all, assert_none, assert_one
 from dtest import Tester, debug
 from tools import since, new_node
+from sstable_generation_loading_test import BaseSStableLoaderTest
+from unittest import skipIf
+from upgrade_base import UPGRADE_TEST_RUN
 
 LEGACY_SSTABLES_JVM_ARGS = ["-Dcassandra.streamdes.initial_mem_buffer_size=1",
                             "-Dcassandra.streamdes.max_mem_buffer_size=5",
@@ -11,6 +14,7 @@ LEGACY_SSTABLES_JVM_ARGS = ["-Dcassandra.streamdes.initial_mem_buffer_size=1",
 
 
 @since('3.0')
+@skipIf(not UPGRADE_TEST_RUN, 'set UPGRADE_TEST_RUN=true to run upgrade tests')
 class TestStorageEngineUpgrade(Tester):
     def setUp(self, bootstrap=False, jvm_args=None):
         super(TestStorageEngineUpgrade, self).setUp()
@@ -382,3 +386,37 @@ class TestStorageEngineUpgrade(Tester):
 class TestBootstrapAfterUpgrade(TestStorageEngineUpgrade):
     def setUp(self):
         super(TestBootstrapAfterUpgrade, self).setUp(bootstrap=True, jvm_args=LEGACY_SSTABLES_JVM_ARGS)
+
+
+@since('3.0')
+@skipIf(not UPGRADE_TEST_RUN, 'set UPGRADE_TEST_RUN=true to run upgrade tests')
+class TestLoadKaSStables(BaseSStableLoaderTest):
+    __test__ = True
+    upgrade_from = '2.1.6'
+    jvm_args = LEGACY_SSTABLES_JVM_ARGS
+
+
+@since('3.0')
+@skipIf(not UPGRADE_TEST_RUN, 'set UPGRADE_TEST_RUN=true to run upgrade tests')
+class TestLoadKaCompactSStables(BaseSStableLoaderTest):
+    __test__ = True
+    upgrade_from = '2.1.6'
+    jvm_args = LEGACY_SSTABLES_JVM_ARGS
+    compact = True
+
+
+@since('3.0')
+@skipIf(not UPGRADE_TEST_RUN, 'set UPGRADE_TEST_RUN=true to run upgrade tests')
+class TestLoadLaSStables(BaseSStableLoaderTest):
+    __test__ = True
+    upgrade_from = '2.2.4'
+    jvm_args = LEGACY_SSTABLES_JVM_ARGS
+
+
+@since('3.0')
+@skipIf(not UPGRADE_TEST_RUN, 'set UPGRADE_TEST_RUN=true to run upgrade tests')
+class TestLoadLaCompactSStables(BaseSStableLoaderTest):
+    __test__ = True
+    upgrade_from = '2.2.4'
+    jvm_args = LEGACY_SSTABLES_JVM_ARGS
+    compact = True
