@@ -9,7 +9,7 @@ from cassandra.protocol import SyntaxException
 from assertions import (assert_all, assert_invalid, assert_one,
                         assert_unauthorized)
 from dtest import CASSANDRA_VERSION_FROM_BUILD, Tester, debug
-from tools import since, known_failure
+from tools import known_failure, since
 
 
 class TestAuth(Tester):
@@ -1178,6 +1178,9 @@ class TestAuthRoles(Tester):
                                        cassandra,
                                        "LIST ALL PERMISSIONS")
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12072',
+                   flaky=True)
     def create_and_grant_roles_with_superuser_status_test(self):
         """
         * Launch a one node cluster
@@ -2226,6 +2229,9 @@ class TestAuthRoles(Tester):
         cassandra.execute("DROP FUNCTION ks.plus_one(int)")
         self.assert_no_permissions(cassandra, "LIST ALL PERMISSIONS OF mike")
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12072',
+                   flaky=True)
     def drop_keyspace_cleans_up_function_level_permissions_test(self):
         """
         * Launch a one node cluster
@@ -2249,6 +2255,9 @@ class TestAuthRoles(Tester):
         cassandra.execute("DROP KEYSPACE ks")
         self.assert_no_permissions(cassandra, "LIST ALL PERMISSIONS OF mike")
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12072',
+                   flaky=True)
     def udf_permissions_in_selection_test(self):
         """
         Verify EXECUTE permission works in a SELECT when UDF is one of the columns requested

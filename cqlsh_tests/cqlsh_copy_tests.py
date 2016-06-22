@@ -430,6 +430,9 @@ class CqlshCopyTest(Tester):
 
         self.assertCsvResultEqual(tempfile.name, results, 'testlist')
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12072',
+                   flaky=True)
     def test_tuple_data(self):
         """
         Tests the COPY TO command with the tuple datatype by:
@@ -1059,6 +1062,9 @@ class CqlshCopyTest(Tester):
 
         self.assertItemsEqual(csv_values, result)
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12072',
+                   flaky=True)
     def test_reading_max_parse_errors(self):
         """
         Test that importing a csv file is aborted when we reach the maximum number of parse errors:
@@ -1617,6 +1623,9 @@ class CqlshCopyTest(Tester):
                 self.assertFalse(err)
                 self.assertCsvResultEqual(tempfile.name, results, 'testvalidate')
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12072',
+                   flaky=True)
     @since('2.2')
     def test_read_wrong_column_names(self):
         """
@@ -1764,6 +1773,9 @@ class CqlshCopyTest(Tester):
         _test(True)
         _test(False)
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12072',
+                   flaky=True)
     def test_boolstyle_round_trip(self):
         """
         Test that a CSV file with booleans in a different style successfully round-trips
