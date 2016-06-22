@@ -72,11 +72,9 @@ class TestCqlTracing(Tester):
         debug(out)
         self.assertIn('Tracing session: ', out)
 
-        # Restricted to 2.2+ due to flakiness on 2.1.  See CASSANDRA-11598 for details.
-        if LooseVersion(self.cluster.version()) >= LooseVersion('2.2'):
-            self.assertIn('127.0.0.1', out)
-            self.assertIn('127.0.0.2', out)
-            self.assertIn('127.0.0.3', out)
+        self.assertIn('/127.0.0.1', out)
+        self.assertIn('/127.0.0.2', out)
+        self.assertIn('/127.0.0.3', out)
 
         self.assertIn('Parsing INSERT INTO ks.users ', out)
         self.assertIn('Request complete ', out)
@@ -88,9 +86,11 @@ class TestCqlTracing(Tester):
                                    return_output=True)
         debug(out)
         self.assertIn('Tracing session: ', out)
-        self.assertIn(' 127.0.0.1 ', out)
-        self.assertIn(' 127.0.0.2 ', out)
-        self.assertIn(' 127.0.0.3 ', out)
+        # Restricted to 2.2+ due to flakiness on 2.1.  See CASSANDRA-11598 for details.
+        if LooseVersion(self.cluster.version()) >= LooseVersion('2.2'):
+            self.assertIn(' 127.0.0.1 ', out)
+            self.assertIn(' 127.0.0.2 ', out)
+            self.assertIn(' 127.0.0.3 ', out)
         self.assertIn('Request complete ', out)
         self.assertIn(" Frodo |  Baggins", out)
 
