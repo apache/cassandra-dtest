@@ -200,6 +200,10 @@ class TestRepair(Tester):
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12057',
                    flaky=False)
     @since('3.0')
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12065',
+                   flaky=True,
+                   notes='windows')
     def repair_after_upgrade_test(self):
         """
         @jira_ticket CASSANDRA-10990
