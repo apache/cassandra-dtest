@@ -498,9 +498,6 @@ class TestCQL(UpgradeTester):
             res = cursor.execute("SELECT firstname FROM users WHERE userid = f47ac10b-58cc-4372-a567-0e02b2c3d479 AND age = 33")
             assert rows_to_list(res) == [['Samwise']], res
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11878',
-                   flaky=True)
     def select_key_in_test(self):
         """ Query for KEY IN (...) """
         cursor = self.prepare()
@@ -3616,12 +3613,6 @@ class TestCQL(UpgradeTester):
             res = cursor.execute(stmt)
             # TODO: deserialize the value here and check it's right.
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11613',
-                   flaky=False)
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11760',
-                   flaky=False)
     def more_user_types_test(self):
         """ user type test that does a little more nesting"""
 
@@ -4212,9 +4203,6 @@ class TestCQL(UpgradeTester):
             time.sleep(2)
             assert_one(cursor, "UPDATE test SET v = 1 WHERE k = 0 IF lock = null", [True])
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11196',
-                   flaky=True)
     def tuple_notation_test(self):
         """
         Test the syntax introduced in CASSANDRA-4851
@@ -4249,9 +4237,6 @@ class TestCQL(UpgradeTester):
 
             assert_invalid(cursor, "SELECT v1, v2, v3 FROM test WHERE k = 0 AND (v1, v3) > (1, 0)")
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10896',
-                   notes='should be possible for skip logic in loop below to work in CI environment')
     @since('2.0', max_version='2.2.X')
     def test_v2_protocol_IN_with_tuples(self):
         """
