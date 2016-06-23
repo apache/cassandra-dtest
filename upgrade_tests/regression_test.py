@@ -3,7 +3,6 @@ Home for upgrade-related tests that don't fit in with the core upgrade testing i
 """
 from cassandra import ConsistencyLevel as CL
 
-from tools import known_failure
 from upgrade_base import UPGRADE_TEST_RUN, UpgradeTester
 from upgrade_manifest import build_upgrade_pairs
 
@@ -14,9 +13,6 @@ class TestForRegressions(UpgradeTester):
     """
     NODES, RF, __test__, CL = 2, 1, False, CL.ONE
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11291',
-                   flaky=False)
     def test_10822(self):
         """
         @jira_ticket CASSANDRA-10822
