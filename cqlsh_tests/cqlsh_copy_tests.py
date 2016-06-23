@@ -2823,10 +2823,6 @@ class CqlshCopyTest(Tester):
         num_records_imported = rows_to_list(self.session.execute("SELECT COUNT(*) FROM {}".format(stress_table)))[0][0]
         self.assertTrue(num_records_imported < num_records)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11676',
-                   flaky=True,
-                   notes='failed once on trunk offheap')
     @since('2.2.5')
     @freshCluster()
     def test_copy_from_with_large_cql_rows(self):
