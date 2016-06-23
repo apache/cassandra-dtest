@@ -271,9 +271,6 @@ class UpgradeTester(Tester):
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11393',
                    flaky=True)
     @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11765',
-                   flaky=True)
-    @known_failure(failure_source='cassandra',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11767',
                    flaky=True)
     def rolling_upgrade_test(self):
