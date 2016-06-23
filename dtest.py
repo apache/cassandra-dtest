@@ -468,6 +468,7 @@ class Tester(TestCase):
     Finds files matching the glob pattern specified as argument on
     the given keyspace in all nodes
     """
+
     def glob_data_dirs(self, path, ks="ks"):
         result = []
         for node in self.cluster.nodelist():

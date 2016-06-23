@@ -12,6 +12,7 @@ class TestDiskBalance(Tester):
     """
     @jira_ticket CASSANDRA-6696
     """
+
     def disk_balance_stress_test(self):
         cluster = self.cluster
         cluster.set_configuration_options(values={'allocate_tokens_for_keyspace': 'keyspace1'})

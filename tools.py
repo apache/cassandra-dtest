@@ -450,6 +450,7 @@ class InterruptCompaction(Thread):
     available in a file called "debug.log" unless a
     different name is passed in as a paramter.
     """
+
     def __init__(self, node, tablename, filename='debug.log', delay=0):
         Thread.__init__(self)
         self.node = node

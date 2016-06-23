@@ -70,9 +70,9 @@ class TestGossipingPropertyFileSnitch(Tester):
         self._test_connect(NODE2_BROADCAST_ADDRESS, STORAGE_PORT)
 
         node1.watch_log_for("Intiated reconnect to an Internal IP /{} for the /{}".format(NODE2_LISTEN_ADDRESS,
-                            NODE2_BROADCAST_ADDRESS), filename='debug.log', timeout=60)
+                                                                                          NODE2_BROADCAST_ADDRESS), filename='debug.log', timeout=60)
         node2.watch_log_for("Intiated reconnect to an Internal IP /{} for the /{}".format(NODE1_LISTEN_ADDRESS,
-                            NODE1_BROADCAST_ADDRESS), filename='debug.log', timeout=60)
+                                                                                          NODE1_BROADCAST_ADDRESS), filename='debug.log', timeout=60)
 
         # read data from node2 just to make sure data and connectivity is OK
         session = self.patient_exclusive_cql_connection(node2)
