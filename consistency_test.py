@@ -890,8 +890,6 @@ class TestConsistency(Tester):
         for n in xrange(0, 10000):
             query_c1c2(session, n, ConsistencyLevel.ONE)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11438')
     def short_read_reversed_test(self):
         """
         @jira_ticket CASSANDRA-9460
