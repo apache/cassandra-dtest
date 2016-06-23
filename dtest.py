@@ -115,6 +115,26 @@ else:
     CASSANDRA_VERSION_FROM_BUILD = get_version_from_build(CASSANDRA_DIR)
 
 
+# Determine the location of the libjemalloc jar so that we can specify it
+# through environment variables when start Cassandra.  This reduces startup
+# time, making the dtests run faster.
+def find_libjemalloc():
+    if is_win():
+        # let the normal bat script handle finding libjemalloc
+        return ""
+
+    this_dir = os.path.dirname(os.path.realpath(__file__))
+    script = os.path.join(this_dir, "findlibjemalloc.sh")
+    p = subprocess.Popen([script], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    stdout, stderr = p.communicate()
+    if stderr or not stdout:
+        return "-"  # tells C* not to look for libjemalloc
+    else:
+        return stdout
+
+CASSANDRA_LIBJEMALLOC = find_libjemalloc()
+
+
 class expect_control_connection_failures(object):
     """
     We're just using a class here as a one-off object with a filter method, for
@@ -270,6 +290,7 @@ class Tester(TestCase):
             cluster.set_configuration_options(values={'memtable_allocation_type': 'offheap_objects'})
 
         cluster.set_datadir_count(DATADIR_COUNT)
+        cluster.set_environment_variable('CASSANDRA_LIBJEMALLOC', CASSANDRA_LIBJEMALLOC)
 
         return cluster
 
