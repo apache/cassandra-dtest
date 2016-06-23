@@ -3,7 +3,7 @@ import os
 
 from assertions import assert_all, assert_none, assert_one
 from dtest import Tester, debug
-from tools import known_failure, since, new_node
+from tools import since, new_node
 
 LEGACY_SSTABLES_JVM_ARGS = ["-Dcassandra.streamdes.initial_mem_buffer_size=1",
                             "-Dcassandra.streamdes.max_mem_buffer_size=5",
@@ -235,18 +235,12 @@ class TestStorageEngineUpgrade(Tester):
                        "SELECT * FROM t WHERE k = {} ORDER BY t DESC".format(n),
                        [[n, v, ROWS - 1, ROWS, v, v + 1] for v in range(ROWS - 1, -1, -1)])
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11663',
-                   flaky=False)
     def upgrade_with_wide_partition_test(self):
         """
         Checks we can read old indexed sstable by creating large partitions (larger than the index block used by sstables).
         """
         self.upgrade_with_wide_partition()
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11663',
-                   flaky=False)
     def upgrade_with_wide_partition_reversed_test(self):
         """
         Checks we can read old indexed sstable by creating large partitions (larger than the index block used by sstables). This test
