@@ -2612,10 +2612,17 @@ class CqlshCopyTest(Tester):
             start = tokens[1]
             end = tokens[2]
         else:
-            start = 0
-            end = 5000000000000000000
             self.prepare(nodes=1)
+            metadata = self.session.cluster.metadata
+            metadata.token_map.rebuild_keyspace(self.ks, build_if_absent=True)
+            ring = [t.value for t in metadata.token_map.tokens_to_hosts_by_ks[self.ks].keys()]
+            self.assertTrue(len(ring) >= 3, 'Not enough ranges in the ring for this test')
+            ring.sort()
+            idx = len(ring) / 2
+            start = ring[idx]
+            end = ring[idx + 1]
 
+        debug("Using failure range: {}, {}".format(start, end))
         return start, end
 
     @freshCluster()
