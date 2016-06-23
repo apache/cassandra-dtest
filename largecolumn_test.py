@@ -33,7 +33,7 @@ class TestLargeColumn(Tester):
         return fields[6]
 
     @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11838',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11937',
                    flaky=True,
                    notes='OOM on trunk')
     @known_failure(failure_source='test',
