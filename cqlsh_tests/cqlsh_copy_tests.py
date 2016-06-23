@@ -1171,9 +1171,6 @@ class CqlshCopyTest(Tester):
         do_test(100, 50)
         do_test(50, 50)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11732',
-                   flaky=True)
     def test_reading_with_parse_errors(self):
         """
         Test importing a CSV file where not all rows can be parsed:
