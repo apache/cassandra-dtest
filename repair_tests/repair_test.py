@@ -168,8 +168,6 @@ class TestRepair(Tester):
         for node in cluster.nodelist():
             self.assertTrue("Starting anticompaction")
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11438')
     def simple_sequential_repair_test(self):
         """
         Calls simple repair test with a sequential repair
@@ -219,9 +217,6 @@ class TestRepair(Tester):
         self._do_upgrade(default_install_dir)
         self._repair_and_verify(True)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12022',
-                   flaky=False)
     @no_vnodes()
     def simple_repair_order_preserving_test(self):
         """
@@ -405,10 +400,6 @@ class TestRepair(Tester):
         out_of_sync_logs = node2.grep_log("/([0-9.]+) and /([0-9.]+) have ([0-9]+) range\(s\) out of sync for cf2")
         self.assertGreater(len(out_of_sync_logs), 0, "Non GC-able data should be repaired")
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11229',
-                   flaky=True,
-                   notes='has flapped on 2.2 and trunk offheap tests')
     def local_dc_repair_test(self):
         """
         * Set up a multi DC cluster
