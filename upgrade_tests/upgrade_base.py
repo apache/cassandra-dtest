@@ -44,6 +44,13 @@ class UpgradeTester(Tester):
     __metaclass__ = ABCMeta
     NODES, RF, __test__, CL, UPGRADE_PATH = 2, 1, False, None, None
 
+    def __init__(self, *args, **kwargs):
+        self.ignore_log_patterns = [
+            # Normal occurance. See CASSANDRA-12026. Likely won't be needed after C* 4.0.
+            r'Unknown column cdc during deserialization',
+        ]
+        super(UpgradeTester, self).__init__(*args, **kwargs)
+
     def setUp(self):
         debug("Upgrade test beginning, setting CASSANDRA_VERSION to {}, and jdk to {}. (Prior values will be restored after test)."
               .format(self.UPGRADE_PATH.starting_version, self.UPGRADE_PATH.starting_meta.java_version))

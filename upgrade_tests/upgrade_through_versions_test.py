@@ -236,7 +236,10 @@ class UpgradeTester(Tester):
             # and when it does, it gets replayed and everything is fine.
             r'Can\'t send migration request: node.*is down',
             r'RejectedExecutionException.*ThreadPoolExecutor has shut down',
-            r'Cannot update data center or rack from.*for live host'  # occurs due to test/ccm writing topo on down nodes
+            # Occurs due to test/ccm writing topo on down nodes
+            r'Cannot update data center or rack from.*for live host',
+            # Normal occurance. See CASSANDRA-12026. Likely won't be needed after C* 4.0.
+            r'Unknown column cdc during deserialization',
         ]
         self.subprocs = []
         Tester.__init__(self, *args, **kwargs)
