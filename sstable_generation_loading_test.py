@@ -38,6 +38,10 @@ class BaseSStableLoaderTest(Tester):
     def sstableloader_compression_none_to_none_test(self):
         self.load_sstable_with_configuration(None, None)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12087',
+                   flaky=True,
+                   notes='windows')
     def sstableloader_compression_none_to_snappy_test(self):
         self.load_sstable_with_configuration(None, 'Snappy')
 

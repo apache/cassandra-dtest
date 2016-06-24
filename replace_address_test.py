@@ -342,7 +342,10 @@ class TestReplaceAddress(Tester):
                 node3.start(replace_address='127.0.0.3', wait_other_notice=False)
                 node3.watch_log_for('To perform this operation, please restart with -Dcassandra.allow_unsafe_replace=true',
                                     from_mark=mark, timeout=20)
-
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12085',
+                   flaky=True,
+                   notes='windows')
     @since('2.2')
     def resumable_replace_test(self):
         """
