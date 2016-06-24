@@ -6,6 +6,7 @@ import time
 import uuid
 
 from ccmlib import common
+from assertions import assert_length_equal
 
 from dtest import Tester, debug
 from tools import known_failure, since
@@ -101,7 +102,7 @@ class TestHelper(Tester):
         node1 = self.cluster.nodelist()[0]
         response = node1.nodetool(cmd, capture_output=True)[0]
         if not common.is_win():  # nodetool always prints out on windows
-            self.assertEqual(len(response), 0, response)  # nodetool does not print anything unless there is an error
+            assert_length_equal(response, 0)  # nodetool does not print anything unless there is an error
 
     def launch_standalone_scrub(self, ks, cf):
         """
@@ -207,7 +208,7 @@ class TestScrubIndexes(TestHelper):
         ret.extend(list(session.execute("SELECT * FROM users WHERE state='TX'")))
         ret.extend(list(session.execute("SELECT * FROM users WHERE gender='f'")))
         ret.extend(list(session.execute("SELECT * FROM users WHERE birth_year=1978")))
-        self.assertEqual(len(ret), 8, ret)
+        assert_length_equal(ret, 8)
         return ret
 
     @known_failure(failure_source='test',
@@ -353,7 +354,7 @@ class TestScrub(TestHelper):
 
     def query_users(self, session):
         ret = list(session.execute("SELECT * FROM users"))
-        self.assertEqual(len(ret), 5, ret)
+        assert_length_equal(ret, 5)
         return ret
 
     @known_failure(failure_source='test',

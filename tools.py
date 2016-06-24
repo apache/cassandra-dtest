@@ -115,7 +115,7 @@ def insert_columns(tester, session, key, columns_count, consistency=ConsistencyL
 def query_columns(tester, session, key, columns_count, consistency=ConsistencyLevel.QUORUM, offset=0):
     query = SimpleStatement('SELECT c, v FROM cf WHERE key=\'k%s\' AND c >= \'c%06d\' AND c <= \'c%06d\'' % (key, offset, columns_count + offset - 1), consistency_level=consistency)
     res = list(session.execute(query))
-    assert_equal(len(res), columns_count, "{} != {} ({}-{})".format(len(res), columns_count, offset, columns_count + offset - 1))
+    assert_length_equal(res, columns_count)
     for i in xrange(0, columns_count):
         assert_equal(res[i][1], 'value{}'.format(i + offset))
 
@@ -178,7 +178,7 @@ def _put_with_overwrite(cluster, session, nb_keys, cl=ConsistencyLevel.QUORUM):
 
 
 def _validate_row(cluster, res):
-    assert_equal(len(res), 100)
+    assert_length_equal(res, 100)
     for i in xrange(0, 100):
         if i % 5 == 0:
             assert_equal(res[i][2], 'value{}'.format(i * 4), 'for {}, expecting value{}, got {}'.format(i, i * 4, res[i][2]))
@@ -198,7 +198,7 @@ def range_putget(cluster, session, cl=ConsistencyLevel.QUORUM):
     paged_results = session.execute('SELECT * FROM cf LIMIT 10000000')
     rows = [result for result in paged_results]
 
-    assert_equal(len(rows), keys * 100)
+    assert_length_equal(rows, keys * 100)
     for k in xrange(0, keys):
         res = rows[:100]
         del rows[:100]

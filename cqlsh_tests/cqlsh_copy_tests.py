@@ -1768,8 +1768,6 @@ class CqlshCopyTest(Tester):
 
             imported_results = list(self.session.execute("SELECT * FROM testdatatype"))
 
-            assert_length_equal(imported_results, 1)
-
             self.assertEqual(exported_results, imported_results)
 
         _test(True)
@@ -1813,7 +1811,6 @@ class CqlshCopyTest(Tester):
                                  .format(tempfile.name, trueval, falseval))
 
             imported_results = list(self.session.execute("SELECT * FROM testbooleans"))
-            assert_length_equal(imported_results, 2)
             self.assertEqual(exported_results, imported_results)
 
         self.prepare()

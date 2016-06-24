@@ -517,7 +517,6 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
             else:
                 # this should not happen
                 self.fail("Invalid scenario configuration. Scenario is: {}".format(scenario))
-                self.assertTrue(False, "This should not happen.")
 
             pf = PageFetcher(future).request_all()
             self.assertEqual(pf.num_results_all(), scenario['expect_pgsizes'])

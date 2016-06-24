@@ -154,11 +154,11 @@ class TestHelper(Tester):
         session.execute(statement)
 
     def delete_user(self, session, userid, consistency):
-        statement = SimpleStatement("DELETE FROM users where userid = {}".format(userid,), consistency_level=consistency)
+        statement = SimpleStatement("DELETE FROM users where userid = {}".format(userid), consistency_level=consistency)
         session.execute(statement)
 
     def query_user(self, session, userid, age, consistency, check_ret=True):
-        statement = SimpleStatement("SELECT userid, age FROM users where userid = {}".format(userid,), consistency_level=consistency)
+        statement = SimpleStatement("SELECT userid, age FROM users where userid = {}".format(userid), consistency_level=consistency)
         res = session.execute(statement)
         expected = [[userid, age]] if age else []
         ret = rows_to_list(res) == expected
@@ -175,13 +175,13 @@ class TestHelper(Tester):
         """)
 
     def update_counter(self, session, id, consistency, serial_consistency=None):
-        text = "UPDATE counters SET c = c + 1 WHERE id = {}".format(id,)
+        text = "UPDATE counters SET c = c + 1 WHERE id = {}".format(id)
         statement = SimpleStatement(text, consistency_level=consistency, serial_consistency_level=serial_consistency)
         session.execute(statement)
         return statement
 
     def query_counter(self, session, id, val, consistency, check_ret=True):
-        statement = SimpleStatement("SELECT * from counters WHERE id = {}".format(id,), consistency_level=consistency)
+        statement = SimpleStatement("SELECT * from counters WHERE id = {}".format(id), consistency_level=consistency)
         res = session.execute(statement)
         ret = rows_to_list(res)
         if check_ret:
