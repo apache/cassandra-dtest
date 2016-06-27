@@ -237,4 +237,6 @@ def assert_length_equal(object_with_length, expected_length):
     Examples:
     assert_length_equal(res, nb_counter)
     """
-    assert_equal(len(object_with_length), expected_length, object_with_length)
+    assert_equal(len(object_with_length), expected_length,
+                 "Expected {} to have length {}, but instead is of length {}".format(object_with_length,
+                                                                                     expected_length, len(object_with_length)))

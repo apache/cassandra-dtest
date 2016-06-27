@@ -282,13 +282,13 @@ class TestCQL(UpgradeTester):
             cursor.execute("UPDATE timeline SET body = 'Yet one more message' WHERE userid = %s AND posted_month = 1 and posted_day = 30", (frodo_id,))
 
             # Queries
-            assert_one(cursor, "SELECT body, posted_by FROM timeline WHERE userid = {} AND posted_month = 1 AND posted_day = 24".format(frodo_id,), ['Something something', 'Frodo Baggins'])
+            assert_one(cursor, "SELECT body, posted_by FROM timeline WHERE userid = {} AND posted_month = 1 AND posted_day = 24".format(frodo_id), ['Something something', 'Frodo Baggins'])
 
-            assert_all(cursor, "SELECT posted_day, body, posted_by FROM timeline WHERE userid = {} AND posted_month = 1 AND posted_day > 12".format(frodo_id,), [
+            assert_all(cursor, "SELECT posted_day, body, posted_by FROM timeline WHERE userid = {} AND posted_month = 1 AND posted_day > 12".format(frodo_id), [
                 [24, 'Something something', 'Frodo Baggins'],
                 [30, 'Yet one more message', None]])
 
-            assert_all(cursor, "SELECT posted_day, body, posted_by FROM timeline WHERE userid = {} AND posted_month = 1".format(frodo_id,), [
+            assert_all(cursor, "SELECT posted_day, body, posted_by FROM timeline WHERE userid = {} AND posted_month = 1".format(frodo_id), [
                 [12, 'Something else', 'Frodo Baggins'],
                 [24, 'Something something', 'Frodo Baggins'],
                 [30, 'Yet one more message', None]])
@@ -3320,7 +3320,7 @@ class TestCQL(UpgradeTester):
         cursor.execute("""
             CREATE TABLE test (
                 k int PRIMARY KEY,
-                t timeuuid,
+                t timeuuid
             )
         """)
 
@@ -3995,7 +3995,7 @@ class TestCQL(UpgradeTester):
 
             keys = ",".join(map(str, range(10)))
 
-            rows = list(cursor.execute("SELECT DISTINCT k, s FROM test WHERE k IN ({})".format(keys,)))
+            rows = list(cursor.execute("SELECT DISTINCT k, s FROM test WHERE k IN ({})".format(keys)))
             self.assertEqual(range(10), [r[0] for r in rows])
             self.assertEqual(range(10), [r[1] for r in rows])
 
@@ -4630,11 +4630,11 @@ class TestCQL(UpgradeTester):
                 debug("Testing {} maps".format("frozen" if frozen else "normal"))
 
                 table = "frozentmap" if frozen else "tmap"
-                cursor.execute("INSERT INTO {}(k, m) VALUES (0, {'foo' : 'bar'})".format(table,))
+                cursor.execute("INSERT INTO {}(k, m) VALUES (0, {'foo' : 'bar'})".format(table))
 
                 def check_applies(condition):
                     assert_one(cursor, "UPDATE %s SET m = {'foo': 'bar'} WHERE k=0 IF %s" % (table, condition), [True])
-                    assert_one(cursor, "SELECT * FROM {}".format(table,), [0, {'foo': 'bar'}], cl=ConsistencyLevel.SERIAL)
+                    assert_one(cursor, "SELECT * FROM {}".format(table), [0, {'foo': 'bar'}], cl=ConsistencyLevel.SERIAL)
 
                 check_applies("m['xxx'] = null")
                 check_applies("m['foo'] < 'zzz'")
@@ -4651,7 +4651,7 @@ class TestCQL(UpgradeTester):
 
                 def check_does_not_apply(condition):
                     assert_one(cursor, "UPDATE {} SET m = {'foo': 'bar'} WHERE k=0 IF {}".format(table, condition), [False, {'foo': 'bar'}])
-                    assert_one(cursor, "SELECT * FROM {}".format(table,), [0, {'foo': 'bar'}], cl=ConsistencyLevel.SERIAL)
+                    assert_one(cursor, "SELECT * FROM {}".format(table), [0, {'foo': 'bar'}], cl=ConsistencyLevel.SERIAL)
 
                 check_does_not_apply("m['foo'] < 'aaa'")
                 check_does_not_apply("m['foo'] <= 'aaa'")
@@ -4665,7 +4665,7 @@ class TestCQL(UpgradeTester):
 
                 def check_invalid(condition, expected=InvalidRequest):
                     assert_invalid(cursor, "UPDATE {} SET m = {'foo': 'bar'} WHERE k=0 IF {}".format(table, condition), expected=expected)
-                    assert_one(cursor, "SELECT * FROM {}".format(table,), [0, {'foo': 'bar'}])
+                    assert_one(cursor, "SELECT * FROM {}".format(table), [0, {'foo': 'bar'}])
 
                 check_invalid("m['foo'] < null")
                 check_invalid("m['foo'] <= null")

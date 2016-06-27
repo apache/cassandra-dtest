@@ -197,7 +197,7 @@ class TestHelper(Tester):
         Return the current counter value. If we find no value we return zero
         because after the next update the counter will become one.
         """
-        statement = SimpleStatement("SELECT c from counters WHERE id = {}".format(id,), consistency_level=consistency)
+        statement = SimpleStatement("SELECT c from counters WHERE id = {}".format(id), consistency_level=consistency)
         ret = rows_to_list(session.execute(statement))
         return ret[0][0] if ret else 0
 
@@ -218,7 +218,7 @@ class TestAvailability(TestHelper):
 
         num_alive = nodes
         for node in xrange(nodes):
-            debug('Testing node {} in single dc with {} nodes alive'.format(node, num_alive,))
+            debug('Testing node {} in single dc with {} nodes alive'.format(node, num_alive))
             session = self.patient_exclusive_cql_connection(cluster.nodelist()[node], self.ksname)
             for combination in combinations:
                 self._test_insert_query_from_node(session, 0, [rf], [num_alive], *combination)

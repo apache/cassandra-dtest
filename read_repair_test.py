@@ -3,7 +3,7 @@ import time
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
 
-from assertions import assert_one, assert_length_equal
+from assertions import assert_one
 from dtest import PRINT_DEBUG, Tester, debug
 from tools import known_failure, rows_to_list, since
 
@@ -69,11 +69,8 @@ class TestReadRepair(Tester):
             debug("Checking " + n.name)
             session = self.patient_exclusive_cql_connection(n)
             res = rows_to_list(session.execute(cl_one_stmt))
-            assert_length_equal(res, 1)
-            # Column a must be at 1 everywhere
-            self.assertEqual(res[0][1], 1, res)
-            # Column b must be either 1 or None everywhere
-            self.assertTrue(res[0][2] == 1 or res[0][2] is None, res)
+            # Column a must be 1 everywhere, and column b must be either 1 or None everywhere
+            self.assertIn(res, [[[1, 1]], [[1, None]]])
 
         # Now query at ALL but selecting all columns
         query = "SELECT * FROM alter_rf_test.t1 WHERE k=1"
