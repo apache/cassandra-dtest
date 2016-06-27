@@ -1334,6 +1334,10 @@ class CqlshCopyTest(Tester):
         import_and_check(','.join([os.path.join(gettempdir(), 'testreadmult[0-4]*.csv'),
                                    os.path.join(gettempdir(), 'testreadmult[5-9]*.csv')]))
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12086',
+                   flaky=True,
+                   notes='windows')
     def test_writing_with_max_output_size(self):
         """
         Test writing to multiple CSV files:
@@ -1351,10 +1355,6 @@ class CqlshCopyTest(Tester):
         self.prepare()
         self.node1.stress(['write', 'n={}'.format(num_records), 'no-warmup', '-rate', 'threads=50'])
 
-        @known_failure(failure_source='test',
-                       jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12086',
-                       flaky=True,
-                       notes='windows')
         def do_test(max_size, header):
             tempfile = self.get_temp_file(prefix='testwritemult', suffix='.csv')
             debug('Exporting to csv file: {} with max size {} and header {}'
