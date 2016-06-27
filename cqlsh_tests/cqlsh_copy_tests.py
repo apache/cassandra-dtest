@@ -2078,6 +2078,9 @@ class CqlshCopyTest(Tester):
         do_test(5, 12)
         do_test(5, 15)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12072',
+                   flaky=True)
     def test_round_trip_with_num_processes(self):
         """
         Test exporting a large number of rows into a csv file with a fixed number of child processes.

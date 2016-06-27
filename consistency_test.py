@@ -573,6 +573,9 @@ class TestAccuracy(TestHelper):
         self.log("Testing single dc, users")
         self._run_test_function_in_parallel(TestAccuracy.Validation.validate_users, [self.nodes], [self.rf], combinations)
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12096',
+                   flaky=True)
     @since("3.0")
     def test_simple_strategy_each_quorum_users(self):
         """
@@ -643,6 +646,9 @@ class TestAccuracy(TestHelper):
         self.log("Testing multiple dcs, users, each quorum reads")
         self._run_test_function_in_parallel(TestAccuracy.Validation.validate_users, self.nodes, self.rf.values(), combinations)
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12092',
+                   flaky=True)
     def test_simple_strategy_counters(self):
         """
         Test for a single datacenter, counters table.
@@ -689,6 +695,9 @@ class TestAccuracy(TestHelper):
         self.log("Testing single dc, counters, each quorum reads")
         self._run_test_function_in_parallel(TestAccuracy.Validation.validate_counters, [self.nodes], [self.rf], combinations)
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12093',
+                   flaky=True)
     def test_network_topology_strategy_counters(self):
         """
         Test for multiple datacenters, counters table.
@@ -719,6 +728,9 @@ class TestAccuracy(TestHelper):
         self.log("Testing multiple dcs, counters")
         self._run_test_function_in_parallel(TestAccuracy.Validation.validate_counters, self.nodes, self.rf.values(), combinations),
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12094',
+                   flaky=True)
     @since("3.0")
     def test_network_topology_strategy_each_quorum_counters(self):
         """
