@@ -1679,6 +1679,9 @@ class TestAuthRoles(Tester):
                             "LIST ALL PERMISSIONS OF john",
                             "You are not authorized to view john's permissions")
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12072',
+                   flaky=True)
     def role_caching_authenticated_user_test(self):
         """
         This test is to show that the role caching in AuthenticatedUser
@@ -2312,6 +2315,9 @@ class TestAuthRoles(Tester):
         cassandra.execute("GRANT EXECUTE ON FUNCTION ks.plus_one(int) TO mike")
         return mike.execute(cql)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12072',
+                   flaky=True)
     def inheritence_of_udf_permissions_test(self):
         """
         * Launch a one node cluster
@@ -2375,6 +2381,9 @@ class TestAuthRoles(Tester):
                        "Altering permissions on builtin functions is not supported",
                        InvalidRequest)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12072',
+                   flaky=True)
     def disallow_grant_execute_on_non_function_resources_test(self):
         """
         * Launch a one node cluster
