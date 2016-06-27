@@ -1352,9 +1352,9 @@ class CqlshCopyTest(Tester):
         self.node1.stress(['write', 'n={}'.format(num_records), 'no-warmup', '-rate', 'threads=50'])
 
         @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12086',
-                   flaky=True,
-                   notes='windows')
+                       jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12086',
+                       flaky=True,
+                       notes='windows')
         def do_test(max_size, header):
             tempfile = self.get_temp_file(prefix='testwritemult', suffix='.csv')
             debug('Exporting to csv file: {} with max size {} and header {}'
