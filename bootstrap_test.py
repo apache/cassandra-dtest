@@ -14,7 +14,7 @@ from ccmlib.node import NodeError
 from assertions import assert_almost_equal, assert_one
 from dtest import Tester, debug
 from tools import (InterruptBootstrap, KillOnBootstrap, known_failure,
-                   new_node, query_c1c2, since)
+                   new_node, no_vnodes, query_c1c2, since)
 
 
 class TestBootstrap(Tester):
@@ -95,6 +95,7 @@ class TestBootstrap(Tester):
 
         self.check_bootstrap_state(node2, 'COMPLETED')
 
+    @no_vnodes()
     def simple_bootstrap_test(self):
         def bootstrap(cluster, token):
             node2 = new_node(cluster)
@@ -104,6 +105,7 @@ class TestBootstrap(Tester):
 
         self._base_bootstrap_test(bootstrap)
 
+    @no_vnodes()
     def bootstrap_on_write_survey_test(self):
         def bootstrap_on_write_survey_and_join(cluster, token):
             node2 = new_node(cluster)
