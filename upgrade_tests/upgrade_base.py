@@ -67,7 +67,6 @@ class UpgradeTester(Tester):
         self.CL = cl  # store for later use in do_upgrade
 
         assert nodes >= 2, "backwards compatibility tests require at least two nodes"
-        assert not self._preserve_cluster, "preserve_cluster cannot be True for upgrade tests"
 
         self.protocol_version = protocol_version
 

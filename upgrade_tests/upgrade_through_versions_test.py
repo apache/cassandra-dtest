@@ -254,7 +254,7 @@ class UpgradeTester(Tester):
         debug("Versions to test (%s): %s" % (type(self), str([v.version for v in self.test_version_metas])))
 
     def init_config(self):
-        self.init_default_config()
+        Tester.init_config(self)
 
         if self.extra_config is not None:
             debug("Setting extra configuration options:\n{}".format(
