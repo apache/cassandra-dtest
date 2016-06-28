@@ -6,13 +6,14 @@ from distutils import dir_util
 from ccmlib import common as ccmcommon
 
 from dtest import Tester, debug
-from tools import since, known_failure
+from tools import known_failure
 
-LEGACY_SSTABLES_JVM_ARGS = ["-Dcassandra.streamdes.initial_mem_buffer_size=1",
-                            "-Dcassandra.streamdes.max_mem_buffer_size=5",
-                            "-Dcassandra.streamdes.max_spill_file_size=64"]
+# WARNING: sstableloader tests should be added to TestSSTableGenerationAndLoading (below),
+# and not to BaseSStableLoaderTest (which is shared with upgrade tests)
 
 
+# Also used by upgrade_tests/storage_engine_upgrade_test
+# to test loading legacy sstables
 class BaseSStableLoaderTest(Tester):
     __test__ = False
     upgrade_from = None
@@ -28,8 +29,9 @@ class BaseSStableLoaderTest(Tester):
 
     def create_schema(self, session, ks, compression):
         self.create_ks(session, ks, rf=2)
-        self.create_cf(session, "standard1", compression=compression)
-        self.create_cf(session, "counter1", compression=compression, columns={'v': 'counter'})
+        self.create_cf(session, "standard1", compression=compression, compact_storage=self.compact)
+        self.create_cf(session, "counter1", compression=compression, columns={'v': 'counter'},
+                       compact_storage=self.compact)
 
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11896',
@@ -77,13 +79,6 @@ class BaseSStableLoaderTest(Tester):
 
     def sstableloader_compression_deflate_to_deflate_test(self):
         self.load_sstable_with_configuration('Deflate', 'Deflate')
-
-    def sstableloader_uppercase_keyspace_name_test(self):
-        """
-        Make sure sstableloader works with upper case keyspace
-        @jira_ticket CASSANDRA-10806
-        """
-        self.load_sstable_with_configuration(ks='"Keyspace1"')
 
     def sstableloader_with_mv_test(self):
         """
@@ -217,38 +212,15 @@ class BaseSStableLoaderTest(Tester):
                     self.assertEquals(0, len(temp_files), "Temporary files were not cleaned up.")
 
 
-@since('3.0')
-class TestLoadKaSStables(BaseSStableLoaderTest):
-    __test__ = True
-    upgrade_from = '2.1.6'
-    jvm_args = LEGACY_SSTABLES_JVM_ARGS
-
-
-@since('3.0')
-class TestLoadKaCompactSStables(BaseSStableLoaderTest):
-    __test__ = True
-    upgrade_from = '2.1.6'
-    jvm_args = LEGACY_SSTABLES_JVM_ARGS
-    compact = True
-
-
-@since('3.0')
-class TestLoadLaSStables(BaseSStableLoaderTest):
-    __test__ = True
-    upgrade_from = '2.2.4'
-    jvm_args = LEGACY_SSTABLES_JVM_ARGS
-
-
-@since('3.0')
-class TestLoadLaCompactSStables(BaseSStableLoaderTest):
-    __test__ = True
-    upgrade_from = '2.2.4'
-    jvm_args = LEGACY_SSTABLES_JVM_ARGS
-    compact = True
-
-
 class TestSSTableGenerationAndLoading(BaseSStableLoaderTest):
     __test__ = True
+
+    def sstableloader_uppercase_keyspace_name_test(self):
+        """
+        Make sure sstableloader works with upper case keyspace
+        @jira_ticket CASSANDRA-10806
+        """
+        self.load_sstable_with_configuration(ks='"Keyspace1"')
 
     def incompressible_data_in_compressed_table_test(self):
         """
