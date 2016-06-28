@@ -111,10 +111,11 @@ class TestBootstrap(Tester):
             node2 = new_node(cluster)
             node2.set_configuration_options(values={'initial_token': token})
             node2.start(jvm_args=["-Dcassandra.write_survey=true"], wait_for_binary_proto=True)
-            self.assertTrue(len(node2.grep_log('Startup complete, but write survey mode is active, not becoming an active ring member.')) > 0)
+
+            self.assertTrue(len(node2.grep_log('Startup complete, but write survey mode is active, not becoming an active ring member.')))
             self.check_bootstrap_state(node2, 'IN_PROGRESS')
             node2.nodetool("join")
-            self.assertTrue(len(node2.grep_log('Leaving write survey mode and joining ring at operator request')) > 0)
+            self.assertTrue(len(node2.grep_log('Leaving write survey mode and joining ring at operator request')))
             return node2
 
         self._base_bootstrap_test(bootstrap_on_write_survey_and_join)
