@@ -14,10 +14,15 @@ from ccmlib.node import NodeError
 from assertions import assert_almost_equal, assert_one
 from dtest import Tester, debug
 from tools import (InterruptBootstrap, KillOnBootstrap, known_failure,
-                   new_node, query_c1c2, since)
+                   new_node, no_vnodes, query_c1c2, since)
 
 
 class TestBootstrap(Tester):
+
+    def check_bootstrap_state(self, node, expected_state):
+        session = self.patient_exclusive_cql_connection(node)
+        rows = session.execute("SELECT bootstrapped FROM system.local WHERE key='local'")
+        self.assertEqual(rows[0][0], expected_state)
 
     def __init__(self, *args, **kwargs):
         kwargs['cluster_options'] = {'start_rpc': 'true'}
@@ -34,7 +39,7 @@ class TestBootstrap(Tester):
         Tester.__init__(self, *args, **kwargs)
         self.allow_log_errors = True
 
-    def simple_bootstrap_test(self):
+    def _base_bootstrap_test(self, bootstrap):
         cluster = self.cluster
         tokens = cluster.balanced_tokens(2)
         cluster.set_configuration_options(values={'num_tokens': 1})
@@ -70,9 +75,7 @@ class TestBootstrap(Tester):
         reader = self.go(lambda _: query_c1c2(session, random.randint(0, keys - 1), ConsistencyLevel.ONE))
 
         # Bootstrapping a new node
-        node2 = new_node(cluster)
-        node2.set_configuration_options(values={'initial_token': tokens[1]})
-        node2.start(wait_for_binary_proto=True)
+        node2 = bootstrap(cluster, tokens[1])
         node2.compact()
 
         reader.check()
@@ -90,6 +93,33 @@ class TestBootstrap(Tester):
         assert_almost_equal(size1, size2, error=0.3)
         assert_almost_equal(float(initial_size - empty_size), 2 * (size1 - float(empty_size)))
 
+        self.check_bootstrap_state(node2, 'COMPLETED')
+
+    @no_vnodes()
+    def simple_bootstrap_test(self):
+        def bootstrap(cluster, token):
+            node2 = new_node(cluster)
+            node2.set_configuration_options(values={'initial_token': token})
+            node2.start(wait_for_binary_proto=True)
+            return node2
+
+        self._base_bootstrap_test(bootstrap)
+
+    @no_vnodes()
+    def bootstrap_on_write_survey_test(self):
+        def bootstrap_on_write_survey_and_join(cluster, token):
+            node2 = new_node(cluster)
+            node2.set_configuration_options(values={'initial_token': token})
+            node2.start(jvm_args=["-Dcassandra.write_survey=true"], wait_for_binary_proto=True)
+
+            self.assertTrue(len(node2.grep_log('Startup complete, but write survey mode is active, not becoming an active ring member.')))
+            self.check_bootstrap_state(node2, 'IN_PROGRESS')
+            node2.nodetool("join")
+            self.assertTrue(len(node2.grep_log('Leaving write survey mode and joining ring at operator request')))
+            return node2
+
+        self._base_bootstrap_test(bootstrap_on_write_survey_and_join)
+
     def simple_bootstrap_test_nodata(self):
         """
         @jira_ticket CASSANDRA-11010
@@ -105,9 +135,7 @@ class TestBootstrap(Tester):
         node3 = new_node(cluster)
         node3.start(wait_for_binary_proto=True, wait_other_notice=True)
 
-        session = self.patient_exclusive_cql_connection(node3)
-        rows = session.execute("SELECT bootstrapped FROM system.local WHERE key='local'")
-        self.assertEqual(rows[0][0], 'COMPLETED')
+        self.check_bootstrap_state(node3, 'COMPLETED')
 
     def read_from_bootstrapped_node_test(self):
         """
@@ -176,8 +204,7 @@ class TestBootstrap(Tester):
         node3.nodetool('bootstrap resume')
 
         node3.watch_log_for("Resume complete", from_mark=mark)
-        rows = list(session.execute("SELECT bootstrapped FROM system.local WHERE key='local'"))
-        self.assertEqual(rows[0][0], 'COMPLETED')
+        self.check_bootstrap_state(node3, 'COMPLETED')
 
         # cleanup to guarantee each node will only have sstables of its ranges
         cluster.cleanup()
@@ -226,8 +253,7 @@ class TestBootstrap(Tester):
         node3.watch_log_for("Listening for thrift clients...", from_mark=mark)
 
         # check if 2nd bootstrap succeeded
-        session = self.patient_exclusive_cql_connection(node3)
-        assert_one(session, "SELECT bootstrapped FROM system.local WHERE key='local'", ['COMPLETED'])
+        self.check_bootstrap_state(node3, 'COMPLETED')
 
     def manual_bootstrap_test(self):
         """
