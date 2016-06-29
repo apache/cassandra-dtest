@@ -178,7 +178,7 @@ def _put_with_overwrite(cluster, session, nb_keys, cl=ConsistencyLevel.QUORUM):
 
 
 def _validate_row(cluster, res):
-    assert_length_equal(res, 100)
+    assertions.assert_length_equal(res, 100)
     for i in xrange(0, 100):
         if i % 5 == 0:
             assert_equal(res[i][2], 'value{}'.format(i * 4), 'for {}, expecting value{}, got {}'.format(i, i * 4, res[i][2]))
