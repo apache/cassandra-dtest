@@ -109,6 +109,9 @@ class TestRebuild(Tester):
         for i in xrange(0, keys):
             query_c1c2(session, i, ConsistencyLevel.ALL)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12111',
+                   flaky=False)
     def rebuild_ranges_test(self):
         """
         @jira_ticket CASSANDRA-10406
