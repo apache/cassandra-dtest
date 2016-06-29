@@ -5,6 +5,7 @@ from distutils import dir_util
 
 from ccmlib import common as ccmcommon
 
+from assertions import assert_one
 from dtest import Tester, debug
 from tools import known_failure
 
@@ -101,7 +102,7 @@ class BaseSStableLoaderTest(Tester):
         NUM_KEYS = 1000
 
         for compression_option in (pre_compression, post_compression):
-            assert compression_option in (None, 'Snappy', 'Deflate')
+            self.assertIn(compression_option, (None, 'Snappy', 'Deflate'))
 
         debug("Testing sstableloader with pre_compression=%s and post_compression=%s" % (pre_compression, post_compression))
         if self.upgrade_from:
@@ -123,8 +124,8 @@ class BaseSStableLoaderTest(Tester):
         self.create_schema(session, ks, pre_compression)
 
         for i in range(NUM_KEYS):
-            session.execute("UPDATE standard1 SET v='%d' WHERE KEY='%d' AND c='col'" % (i, i))
-            session.execute("UPDATE counter1 SET v=v+1 WHERE KEY='%d'" % i)
+            session.execute("UPDATE standard1 SET v='{}' WHERE KEY='{}' AND c='col'".format(i, i))
+            session.execute("UPDATE counter1 SET v=v+1 WHERE KEY='{}'".format(i))
 
         node1.nodetool('drain')
         node1.stop()
@@ -174,14 +175,14 @@ class BaseSStableLoaderTest(Tester):
                     p = subprocess.Popen(cmd_args, env=env)
                     exit_status = p.wait()
                     self.assertEqual(0, exit_status,
-                                     "sstableloader exited with a non-zero status: %d" % exit_status)
+                                     "sstableloader exited with a non-zero status: {}".format(exit_status))
 
         def read_and_validate_data(session):
             for i in range(NUM_KEYS):
-                rows = list(session.execute("SELECT * FROM standard1 WHERE KEY='%d'" % i))
-                self.assertEquals([str(i), 'col', str(i)], list(rows[0]))
-                rows = list(session.execute("SELECT * FROM counter1 WHERE KEY='%d'" % i))
-                self.assertEquals([str(i), 1], list(rows[0]))
+                query = "SELECT * FROM standard1 WHERE KEY='{}'".format(i)
+                assert_one(session, query, [str(i), 'col', str(i)])
+                query = "SELECT * FROM counter1 WHERE KEY='{}'".format(i)
+                assert_one(session, query, [str(i), 1])
 
         debug("Reading data back")
         # Now we should have sstables with the loaded data, and the existing

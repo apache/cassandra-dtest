@@ -177,7 +177,7 @@ class TestPutGet(Tester):
             # print row.key
             # print cols
 
-        assert len(columns) == 95, "Regression in cassandra-4919. Expected 95 columns, got %d." % len(columns)
+        self.assertEqual(len(columns), 95, "Regression in cassandra-4919. Expected 95 columns, got {}.".format(len(columns)))
 
 
 class ThriftConnection(object):
@@ -282,5 +282,5 @@ class ThriftConnection(object):
                                       timeout=30)
             col = cosc.column
             value = col.value
-            assert value == 'val_0', "column did not have the same value that was inserted!"
+            self.assertEqual(value, 'val_0')
         return self

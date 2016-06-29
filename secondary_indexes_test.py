@@ -11,7 +11,7 @@ from cassandra.concurrent import (execute_concurrent,
 from cassandra.protocol import ConfigurationException
 from cassandra.query import BatchStatement, SimpleStatement
 
-from assertions import assert_invalid, assert_one
+from assertions import assert_invalid, assert_one, assert_row_count
 from dtest import DISABLE_VNODES, OFFHEAP_MEMTABLES, Tester, debug
 from tools import known_failure, rows_to_list, since
 
@@ -45,14 +45,11 @@ class TestSecondaryIndexes(Tester):
         session.execute("INSERT INTO users (KEY, password, gender, state, birth_year) VALUES ('user3', 'ch@ngem3c', 'f', 'FL', 1978);")
         session.execute("INSERT INTO users (KEY, password, gender, state, birth_year) VALUES ('user4', 'ch@ngem3d', 'm', 'TX', 1974);")
 
-        result = list(session.execute("SELECT * FROM users;"))
-        assert len(result) == 4, "Expecting 4 users, got" + str(result)
+        assert_row_count(session, "users", 4)
 
-        result = list(session.execute("SELECT * FROM users WHERE state='TX';"))
-        assert len(result) == 2, "Expecting 2 users, got" + str(result)
+        assert_row_count(session, "users", 2, "state='TX'")
 
-        result = list(session.execute("SELECT * FROM users WHERE state='CA';"))
-        assert len(result) == 1, "Expecting 1 users, got" + str(result)
+        assert_row_count(session, "users", 1, "state='CA'")
 
     def test_low_cardinality_indexes(self):
         """
@@ -254,7 +251,7 @@ class TestSecondaryIndexes(Tester):
     def _execute_and_fail(self, operation, cql_string):
         try:
             operation()
-            assert False, "Expecting query %s to be invalid" % cql_string
+            self.fail("Expecting query {} to be invalid".format(cql_string))
         except AssertionError as e:
             raise e
         except InvalidRequest:

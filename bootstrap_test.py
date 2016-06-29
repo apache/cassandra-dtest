@@ -188,9 +188,8 @@ class TestBootstrap(Tester):
                                        'replication(factor=2)', '-rate', 'threads=8'],
                                       capture_output=True)
 
-        if stdout and "FAILURE" in stdout:
-            debug(stdout)
-            assert False, "Cannot read inserted data after bootstrap"
+        if stdout is not None:
+            self.assertNotIn("FAILURE", stdout)
 
     @since('2.2')
     def bootstrap_with_reset_bootstrap_state_test(self):
@@ -228,9 +227,7 @@ class TestBootstrap(Tester):
 
         # check if 2nd bootstrap succeeded
         session = self.patient_exclusive_cql_connection(node3)
-        rows = list(session.execute("SELECT bootstrapped FROM system.local WHERE key='local'"))
-        assert len(rows) == 1
-        assert rows[0][0] == 'COMPLETED', rows[0][0]
+        assert_one(session, "SELECT bootstrapped FROM system.local WHERE key='local'", ['COMPLETED'])
 
     def manual_bootstrap_test(self):
         """
