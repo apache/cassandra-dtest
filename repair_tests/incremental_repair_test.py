@@ -169,7 +169,7 @@ class TestIncRepair(Tester):
         cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
         cluster.populate(2).start()
         node1, node2 = cluster.nodelist()
-        node1.stress(['write', 'n=10K', 'no-warmup', '-schema', 'replication(factor=2)', '-rate', 'threads=50'])
+        node1.stress(['write', 'n=10K', 'no-warmup', '-schema', 'replication(factor=2)', 'compaction(strategy=SizeTieredCompactionStrategy,enabled=false)', '-rate', 'threads=50'])
 
         node1.flush()
         node2.flush()
