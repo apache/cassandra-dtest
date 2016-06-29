@@ -2,8 +2,9 @@ import time
 
 from cassandra.concurrent import execute_concurrent_with_args
 
-from assertions import assert_invalid, assert_all, assert_one
+from assertions import assert_invalid
 from dtest import Tester
+from tools import rows_to_list
 
 
 class TestSchema(Tester):
@@ -80,7 +81,8 @@ class TestSchema(Tester):
 
         # test that c1 values have been compacted away.
         session = self.patient_cql_connection(node)
-        assert_all(session, "SELECT c1 FROM ks.cf", [[None], [None], [None], [4]], ignore_order=True)
+        rows = session.execute("SELECT c1 FROM ks.cf")
+        self.assertEqual([[None], [None], [None], [4]], sorted(rows_to_list(rows)))
 
     def drop_column_queries_test(self):
         session = self.prepare()
@@ -102,17 +104,23 @@ class TestSchema(Tester):
         session.execute("INSERT INTO cf (key, c1, c2) VALUES (3, 4, 5)")
 
         # test that old (pre-drop) c1 values aren't returned and new ones are.
-        assert_all(session, "SELECT c1 FROM cf", [[None], [None], [None], [4]], ignore_order=True)
+        rows = session.execute("SELECT c1 FROM cf")
+        self.assertEqual([[None], [None], [None], [4]], sorted(rows_to_list(rows)))
 
-        assert_all(session, "SELECT * FROM cf", [[0, None, 2], [1, None, 3], [2, None, 4], [3, 4, 5]], ignore_order=True)
+        rows = session.execute("SELECT * FROM cf")
+        self.assertEqual([[0, None, 2], [1, None, 3], [2, None, 4], [3, 4, 5]], sorted(rows_to_list(rows)))
 
-        assert_one(session, "SELECT c1 FROM cf WHERE key = 0", [None])
+        rows = session.execute("SELECT c1 FROM cf WHERE key = 0")
+        self.assertEqual([[None]], rows_to_list(rows))
 
-        assert_one(session, "SELECT c1 FROM cf WHERE key = 3", [4])
+        rows = session.execute("SELECT c1 FROM cf WHERE key = 3")
+        self.assertEqual([[4]], rows_to_list(rows))
 
-        assert_one(session, "SELECT * FROM cf WHERE c2 = 2", [0, None, 2])
+        rows = session.execute("SELECT * FROM cf WHERE c2 = 2")
+        self.assertEqual([[0, None, 2]], rows_to_list(rows))
 
-        assert_one(session, "SELECT * FROM cf WHERE c2 = 5", [3, 4, 5])
+        rows = session.execute("SELECT * FROM cf WHERE c2 = 5")
+        self.assertEqual([[3, 4, 5]], rows_to_list(rows))
 
     def drop_column_and_restart_test(self):
         """
@@ -130,7 +138,8 @@ class TestSchema(Tester):
         session.execute("INSERT INTO t (k, c1, c2) VALUES (0, 0, 0)")
         session.execute("ALTER TABLE t DROP c2")
 
-        assert_one(session, "SELECT * FROM t", [0, 0])
+        rows = session.execute("SELECT * FROM t")
+        self.assertEqual([[0, 0]], rows_to_list(rows))
 
         self.cluster.stop()
         self.cluster.start()
@@ -138,7 +147,8 @@ class TestSchema(Tester):
         session = self.patient_cql_connection(self.cluster.nodelist()[0])
 
         session.execute("USE ks")
-        assert_one(session, "SELECT * FROM t", [0, 0])
+        rows = session.execute("SELECT * FROM t")
+        self.assertEqual([[0, 0]], rows_to_list(rows))
 
     def prepare(self):
         cluster = self.cluster

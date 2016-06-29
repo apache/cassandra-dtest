@@ -215,8 +215,9 @@ class TestBootstrap(Tester):
                                        'replication(factor=2)', '-rate', 'threads=8'],
                                       capture_output=True)
 
-        if stdout is not None:
-            self.assertNotIn("FAILURE", stdout)
+        if stdout and "FAILURE" in stdout:
+            debug(stdout)
+            assert False, "Cannot read inserted data after bootstrap"
 
     @since('2.2')
     def bootstrap_with_reset_bootstrap_state_test(self):

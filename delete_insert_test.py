@@ -68,7 +68,7 @@ class DeleteInsertTest(Tester):
                 session = self.connection
                 query = SimpleStatement("SELECT * FROM delete_insert_search_test.test WHERE group = 'group2'", consistency_level=ConsistencyLevel.LOCAL_QUORUM)
                 rows = session.execute(query)
-                self.assertEqual(len(list(rows)), len(deleted), "Expecting the length of {} to be equal to the length of {}.".format(list(rows), deleted))
+                assert len(list(rows)) == len(deleted)
 
         threads = []
         for x in range(20):

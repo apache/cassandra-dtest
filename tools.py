@@ -11,13 +11,11 @@ import unittest
 from distutils.version import LooseVersion
 from threading import Thread
 
-import assertions
 from cassandra import ConsistencyLevel
 from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.query import SimpleStatement
 from ccmlib.node import Node
 from nose.plugins.attrib import attr
-from nose.tools import assert_equal, assert_in, assert_true, assert_is_instance
 
 from dtest import CASSANDRA_DIR, DISABLE_VNODES, IGNORE_REQUIRE, debug
 
@@ -82,11 +80,11 @@ def query_c1c2(session, key, consistency=ConsistencyLevel.QUORUM, tolerate_missi
     query = SimpleStatement('SELECT c1, c2 FROM cf WHERE key=\'k%d\'' % key, consistency_level=consistency)
     rows = list(session.execute(query))
     if not tolerate_missing:
-        assertions.assert_length_equal(rows, 1)
+        assert len(rows) == 1
         res = rows[0]
-        assert_true(len(res) == 2 and res[0] == 'value1' and res[1] == 'value2', res)
+        assert len(res) == 2 and res[0] == 'value1' and res[1] == 'value2', res
     if must_be_missing:
-        assertions.assert_length_equal(rows, 0)
+        assert len(rows) == 0
 
 
 # work for cluster started by populate
@@ -115,9 +113,9 @@ def insert_columns(tester, session, key, columns_count, consistency=ConsistencyL
 def query_columns(tester, session, key, columns_count, consistency=ConsistencyLevel.QUORUM, offset=0):
     query = SimpleStatement('SELECT c, v FROM cf WHERE key=\'k%s\' AND c >= \'c%06d\' AND c <= \'c%06d\'' % (key, offset, columns_count + offset - 1), consistency_level=consistency)
     res = list(session.execute(query))
-    assert_length_equal(res, columns_count)
+    assert len(res) == columns_count, "%s != %s (%s-%s)" % (len(res), columns_count, offset, columns_count + offset - 1)
     for i in xrange(0, columns_count):
-        assert_equal(res[i][1], 'value{}'.format(i + offset))
+        assert res[i][1] == 'value%d' % (i + offset)
 
 
 def retry_till_success(fun, *args, **kwargs):
@@ -178,14 +176,14 @@ def _put_with_overwrite(cluster, session, nb_keys, cl=ConsistencyLevel.QUORUM):
 
 
 def _validate_row(cluster, res):
-    assert_length_equal(res, 100)
+    assert len(res) == 100, len(res)
     for i in xrange(0, 100):
         if i % 5 == 0:
-            assert_equal(res[i][2], 'value{}'.format(i * 4), 'for {}, expecting value{}, got {}'.format(i, i * 4, res[i][2]))
+            assert res[i][2] == 'value%d' % (i * 4), 'for %d, expecting value%d, got %s' % (i, i * 4, res[i][2])
         elif i % 2 == 0:
-            assert_equal(res[i][2], 'value{}'.format(i * 2), 'for {}, expecting value{}, got {}'.format(i, i * 2, res[i][2]))
+            assert res[i][2] == 'value%d' % (i * 2), 'for %d, expecting value%d, got %s' % (i, i * 2, res[i][2])
         else:
-            assert_equal(res[i][2], 'value{}'.format(i), 'for {}, expecting value{}, got {}'.format(i, i, res[i][2]))
+            assert res[i][2] == 'value%d' % i, 'for %d, expecting value%d, got %s' % (i, i, res[i][2])
 
 
 # Simple puts and range gets, with overwrites and flushes between inserts to
@@ -198,7 +196,7 @@ def range_putget(cluster, session, cl=ConsistencyLevel.QUORUM):
     paged_results = session.execute('SELECT * FROM cf LIMIT 10000000')
     rows = [result for result in paged_results]
 
-    assert_length_equal(rows, keys * 100)
+    assert len(rows) == keys * 100, len(rows)
     for k in xrange(0, keys):
         res = rows[:100]
         del rows[:100]
@@ -394,8 +392,8 @@ def known_failure(failure_source, jira_url, flaky=False, notes=None):
     valid_failure_sources = ('cassandra', 'test', 'systemic', 'driver')
 
     def wrapper(f):
-        assert_in(failure_source, valid_failure_sources)
-        assert_is_instance(flaky, bool)
+        assert failure_source in valid_failure_sources
+        assert isinstance(flaky, bool)
 
         tagged_func = attr(known_failure=failure_source,
                            jira_url=jira_url)(f)

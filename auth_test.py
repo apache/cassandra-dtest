@@ -82,11 +82,11 @@ class TestAuth(Tester):
         try:
             self.get_session(user='cassandra', password='badpassword')
         except NoHostAvailable as e:
-            self.assertIsInstance(e.errors.values()[0], AuthenticationFailed)
+            assert isinstance(e.errors.values()[0], AuthenticationFailed)
         try:
             self.get_session(user='doesntexist', password='doesntmatter')
         except NoHostAvailable as e:
-            self.assertIsInstance(e.errors.values()[0], AuthenticationFailed)
+            assert isinstance(e.errors.values()[0], AuthenticationFailed)
 
     # from 2.2 role creation is granted by CREATE_ROLE permissions, not superuser status
     @since('1.2', max_version='2.1.x')

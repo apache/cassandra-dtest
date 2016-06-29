@@ -189,4 +189,4 @@ class TestPaxos(Tester):
             errors = errors + w.errors
             retries = retries + w.retries
 
-        self.assertTrue((value == threads * iterations) and (errors == 0), "value={}, errors={}, retries={}".format(value, errors, retries))
+        assert (value == threads * iterations) and (errors == 0), "value=%d, errors=%d, retries=%d" % (value, errors, retries)

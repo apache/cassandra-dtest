@@ -7,18 +7,23 @@ from cassandra import ConsistencyLevel as CL
 from cassandra import InvalidRequest, ReadFailure, ReadTimeout
 from cassandra.query import SimpleStatement, dict_factory, named_tuple_factory
 
-from assertions import assert_exception
 from datahelp import create_rows, flatten_into_set, parse_data_into_dicts
 from dtest import debug, run_scenarios
 from tools import known_failure, rows_to_list, since
 from upgrade_base import UPGRADE_TEST_RUN, UpgradeTester
 from upgrade_manifest import build_upgrade_pairs
 
-from nose.tools import assert_not_in
-
 
 def assert_read_timeout_or_failure(session, query):
-    assert_exception(session, query, expected=(ReadTimeout, ReadFailure))
+    try:
+        res = session.execute(query)
+        assert False, "Expecting query to be invalid: got %s" % res
+    except AssertionError as e:
+        raise e
+    except ReadTimeout as e:
+        pass
+    except ReadFailure as e:
+        pass
 
 
 class Page(object):
@@ -177,12 +182,11 @@ class PageFetcher(object):
 
 class PageAssertionMixin(object):
     """Can be added to subclasses of unittest.Tester"""
-
     def assertEqualIgnoreOrder(self, actual, expected):
         return self.assertItemsEqual(actual, expected)
 
     def assertIsSubsetOf(self, subset, superset):
-        self.assertLessEqual(flatten_into_set(subset), flatten_into_set(superset))
+        assert flatten_into_set(subset).issubset(flatten_into_set(superset))
 
 
 class BasePagingTester(UpgradeTester):
@@ -352,7 +356,6 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
     """
     Tests concerned with paging when CQL modifiers (such as order, limit, allow filtering) are used.
     """
-
     def test_with_order_by(self):
         """"
         Paging over a single partition with ordering should work.
@@ -544,7 +547,7 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
                     )
                 else:
                     # this should not happen
-                    self.fail("Invalid configuration, this should never happen, please go into the code")
+                    assert False
 
                 pf = PageFetcher(future).request_all()
                 self.assertEqual(pf.num_results_all(), scenario['expect_pgsizes'])
@@ -1086,7 +1089,6 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
     """
     Tests concerned with paging when the queried dataset changes while pages are being retrieved.
     """
-
     def test_data_change_impacting_earlier_page(self):
         cursor = self.prepare()
         cursor.execute("CREATE TABLE paging_test ( id int, mytext text, PRIMARY KEY (id, mytext) )")
@@ -1281,7 +1283,6 @@ class TestPagingQueryIsolation(BasePagingTester, PageAssertionMixin):
     """
     Tests concerned with isolation of paged queries (queries can't affect each other).
     """
-
     def test_query_isolation(self):
         """
         Interleave some paged queries and make sure nothing bad happens.
@@ -1730,5 +1731,5 @@ for klaus in BasePagingTester.__subclasses__():
                                                             rf=spec['RF'],
                                                             pathname=spec['UPGRADE_PATH'].name)
         gen_class_name = klaus.__name__ + suffix
-        assert_not_in(gen_class_name, globals())
+        assert gen_class_name not in globals(), gen_class_name
         globals()[gen_class_name] = type(gen_class_name, (klaus,), spec)

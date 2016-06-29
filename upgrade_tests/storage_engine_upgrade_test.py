@@ -16,7 +16,6 @@ LEGACY_SSTABLES_JVM_ARGS = ["-Dcassandra.streamdes.initial_mem_buffer_size=1",
 @since('3.0')
 @skipIf(not UPGRADE_TEST_RUN, 'set UPGRADE_TEST_RUN=true to run upgrade tests')
 class TestStorageEngineUpgrade(Tester):
-
     def setUp(self, bootstrap=False, jvm_args=None):
         super(TestStorageEngineUpgrade, self).setUp()
         self.default_install_dir = self.cluster.get_install_dir()

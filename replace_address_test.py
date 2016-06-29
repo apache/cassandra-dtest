@@ -7,7 +7,6 @@ from cassandra import ConsistencyLevel, ReadTimeout, Unavailable
 from cassandra.query import SimpleStatement
 from ccmlib.node import Node, NodeError
 
-from assertions import assert_one
 from dtest import DISABLE_VNODES, Tester, debug
 from tools import InterruptBootstrap, known_failure, since
 
@@ -395,8 +394,9 @@ class TestReplaceAddress(Tester):
 
         # check if 2nd bootstrap succeeded
         session = self.exclusive_cql_connection(node4)
-        queryTwo = "SELECT bootstrapped FROM system.local WHERE key='local'"
-        assert_one(session, queryTwo, ['COMPLETED'])
+        rows = list(session.execute("SELECT bootstrapped FROM system.local WHERE key='local'"))
+        assert len(rows) == 1
+        assert rows[0][0] == 'COMPLETED', rows[0][0]
 
         # query should work again
         debug("Verifying querying works again.")
@@ -452,8 +452,9 @@ class TestReplaceAddress(Tester):
 
         # check if 2nd bootstrap succeeded
         session = self.exclusive_cql_connection(node4)
-        queryTwo = "SELECT bootstrapped FROM system.local WHERE key='local'"
-        assert_one(session, queryTwo, ['COMPLETED'])
+        rows = list(session.execute("SELECT bootstrapped FROM system.local WHERE key='local'"))
+        assert len(rows) == 1
+        assert rows[0][0] == 'COMPLETED', rows[0][0]
 
         # query should work again
         debug("Verifying querying works again.")

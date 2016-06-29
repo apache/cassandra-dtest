@@ -622,9 +622,9 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         output, err = self.run_cqlsh(node, query, ['-u', 'cassandra', '-p', 'cassandra'])
         if common.is_win():
             output = output.replace('\r', '')
-
-        self.assertEqual(len(err), 0, "Failed to execute cqlsh: {}".format(err))
-
+        if len(err) > 0:
+            debug(err)
+            assert False, "Failed to execute cqlsh"
         debug(output)
         self.assertTrue(expected in output, "Output \n {%s} \n doesn't contain expected\n {%s}" % (output, expected))
 
@@ -1238,7 +1238,9 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
             INSERT INTO values (part, val1, val2, val3, val4) VALUES ('min', %d, %d, -32768, -128);
             INSERT INTO values (part, val1, val2, val3, val4) VALUES ('max', %d, %d, 32767, 127)""" % (-1 << 31, -1 << 63, (1 << 31) - 1, (1 << 63) - 1))
 
-        self.assertEqual(len(stderr), 0, "Failed to execute cqlsh: {}".format(stderr))
+        if len(stderr) > 0:
+            debug(stderr)
+            assert False, "Failed to execute cqlsh"
 
         self.verify_output("select * from int_checks.values", node1, """
  part | val1        | val2                 | val3   | val4
@@ -1280,7 +1282,9 @@ CREATE TABLE int_checks.values (
                                         % (datetime.MINYEAR - 1, datetime.MINYEAR, datetime.MAXYEAR, datetime.MAXYEAR + 1,))
         # outside the MIN and MAX range it should print the number of days from the epoch
 
-        self.assertEqual(len(stderr), 0, "Failed to execute cqlsh: {}".format(stderr))
+        if len(stderr) > 0:
+            debug(stderr)
+            assert False, "Failed to execute cqlsh"
 
         self.verify_output("select * from datetime_checks.values", node1, """
  d          | t
@@ -1321,7 +1325,9 @@ CREATE TABLE datetime_checks.values (
             INSERT INTO test (id, val) VALUES (2, 'lkjlk');
             INSERT INTO test (id, val) VALUES (3, 'iuiou')""")
 
-        self.assertEqual(len(stderr), 0, "Failed to execute cqlsh: {}".format(stderr))
+        if len(stderr) > 0:
+            debug(stderr)
+            assert False, "Failed to execute cqlsh"
 
         self.verify_output("use tracing_checks; tracing on; select * from test", node1, """Now Tracing is enabled
 
@@ -1365,7 +1371,9 @@ Tracing session:""")
             USE client_warnings;
             CREATE TABLE test (id int, val text, PRIMARY KEY (id))""")
 
-        self.assertEqual(len(stderr), 0, "Failed to execute cqlsh: {}".format(stderr))
+        if len(stderr) > 0:
+            debug(stderr)
+            assert False, "Failed to execute cqlsh"
 
         session = self.patient_cql_connection(node1)
         prepared = session.prepare("INSERT INTO client_warnings.test (id, val) VALUES (?, 'abc')")
