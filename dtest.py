@@ -701,7 +701,7 @@ class Tester(TestCase):
             query += ' AND compression = {}'
 
         if read_repair is not None:
-            query = '%s AND read_repair_chance=%f' % (query, read_repair)
+            query = '%s AND read_repair_chance=%f AND dclocal_read_repair_chance=%f' % (query, read_repair, read_repair)
         if gc_grace is not None:
             query = '%s AND gc_grace_seconds=%d' % (query, gc_grace)
         if speculative_retry is not None:
