@@ -9,6 +9,7 @@ import time
 from assertions import assert_none, assert_one
 from ccmlib import common
 from dtest import Tester, debug
+from distutils.version import LooseVersion
 from nose.tools import assert_equal
 from tools import known_failure, since
 
@@ -199,7 +200,7 @@ class TestCompaction(Tester):
         time.sleep(40)
         expired_sstables = node1.get_sstables('ks', 'cf')
         expected_sstable_count = 1
-        if self.cluster.version() > '3.1':
+        if LooseVersion(self.cluster.version()) > LooseVersion('3.1'):
             expected_sstable_count = cluster.data_dir_count
         self.assertEqual(len(expired_sstables), expected_sstable_count)
         # write a new sstable to make DTCS check for expired sstables:
@@ -241,7 +242,7 @@ class TestCompaction(Tester):
 
         matches = block_on_compaction_log(node1)
         stringline = matches[0]
-        units = 'MB/s' if cluster.version() < '3.6' else '(K|M|G)iB/s'
+        units = 'MB/s' if LooseVersion(cluster.version()) < LooseVersion('3.6') else '(K|M|G)iB/s'
         throughput_pattern = re.compile('''.*           # it doesn't matter what the line starts with
                                            =            # wait for an equals sign
                                            ([\s\d\.]*)  # capture a decimal number, possibly surrounded by whitespace
@@ -326,7 +327,7 @@ class TestCompaction(Tester):
 
         node.nodetool('compact ks large')
         verb = 'Writing' if self.cluster.version() > '2.2' else 'Compacting'
-        sizematcher = '\d+ bytes' if self.cluster.version() < '3.6' else '\d+\.\d{3}(K|M|G)iB'
+        sizematcher = '\d+ bytes' if LooseVersion(self.cluster.version()) < LooseVersion('3.6') else '\d+\.\d{3}(K|M|G)iB'
         node.watch_log_for('{} large partition ks/large:user \({}\)'.format(verb, sizematcher), from_mark=mark, timeout=180)
 
         ret = list(session.execute("SELECT properties from ks.large where userid = 'user'"))

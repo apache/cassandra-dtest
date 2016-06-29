@@ -6,6 +6,7 @@ from urllib2 import urlopen
 import ccmlib.common as common
 
 from dtest import warning
+from distutils.version import LooseVersion
 
 JOLOKIA_JAR = os.path.join('lib', 'jolokia-jvm-1.2.3-agent.jar')
 CLASSPATH_SEP = ';' if common.is_win() else ':'
@@ -75,7 +76,7 @@ def remove_perf_disable_shared_mem(node):
     option (see https://github.com/rhuss/jolokia/issues/198 for details).  This
     edits cassandra-env.sh (or the Windows equivalent), or jvm.options file on 3.2+ to remove that option.
     """
-    if node.cluster.version() >= '3.2':
+    if LooseVersion(node.cluster.version()) >= LooseVersion('3.2'):
         conf_file = os.path.join(node.get_conf_dir(), JVM_OPTIONS)
         pattern = '\-XX:\+PerfDisableSharedMem'
         replacement = '#-XX:+PerfDisableSharedMem'
