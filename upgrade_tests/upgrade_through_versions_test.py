@@ -633,7 +633,7 @@ class UpgradeTester(Tester):
             if fail_count > 100:
                 break
 
-        assert fail_count < 100, "Too many counter increment failures"
+        self.assertLess(fail_count, 100, "Too many counter increment failures")
 
     def _check_counters(self):
         debug("Checking counter values...")
@@ -654,7 +654,7 @@ class UpgradeTester(Tester):
                     # counter wasn't found
                     actual_value = None
 
-                assert actual_value == expected_value, "Counter not at expected value. Got %s, expected %s" % (actual_value, expected_value)
+                self.assertEqual(actual_value, expected_value)
 
     def _check_select_count(self, consistency_level=ConsistencyLevel.ALL):
         debug("Checking SELECT COUNT(*)")
@@ -680,6 +680,7 @@ class BootstrapMixin(object):
     Using this class is not currently feasible on lengthy upgrade paths, as each
     version bump adds a node and this will eventually exhaust resources.
     """
+
     def _bootstrap_new_node(self):
         # Check we can bootstrap a new node on the upgraded cluster:
         debug("Adding a node to the cluster")

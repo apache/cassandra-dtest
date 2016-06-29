@@ -6,6 +6,7 @@ import time
 import uuid
 
 from ccmlib import common
+from assertions import assert_length_equal
 
 from dtest import Tester, debug
 from tools import known_failure, since
@@ -54,13 +55,13 @@ class TestHelper(Tester):
         Return the sstable files at a specific location
         """
         ret = []
-        debug('Checking sstables in %s' % (paths))
+        debug('Checking sstables in {}'.format(paths))
 
         for ext in ('*.db', '*.txt', '*.adler32', '*.sha1'):
             for path in paths:
                 for fname in glob.glob(os.path.join(path, ext)):
                     bname = os.path.basename(fname)
-                    debug('Found sstable file %s' % (bname))
+                    debug('Found sstable file {}'.format(bname))
                     ret.append(bname)
         return ret
 
@@ -84,13 +85,13 @@ class TestHelper(Tester):
         """
         sstables = {}
         table_sstables = self.get_sstable_files(self.get_table_paths(table))
-        assert len(table_sstables) > 0
+        self.assertGreater(len(table_sstables), 0)
         sstables[table] = sorted(table_sstables)
 
         for index in indexes:
             index_sstables = self.get_sstable_files(self.get_index_paths(table, index))
-            assert len(index_sstables) > 0
-            sstables[index] = sorted('%s/%s' % (index, sstable) for sstable in index_sstables)
+            self.assertGreater(len(index_sstables), 0)
+            sstables[index] = sorted('{}/{}'.format(index, sstable) for sstable in index_sstables)
 
         return sstables
 
@@ -101,7 +102,7 @@ class TestHelper(Tester):
         node1 = self.cluster.nodelist()[0]
         response = node1.nodetool(cmd, capture_output=True)[0]
         if not common.is_win():  # nodetool always prints out on windows
-            assert len(response) == 0, response  # nodetool does not print anything unless there is an error
+            assert_length_equal(response, 0)  # nodetool does not print anything unless there is an error
 
     def launch_standalone_scrub(self, ks, cf):
         """
@@ -119,15 +120,15 @@ class TestHelper(Tester):
         # if we have less than 64G free space, we get this warning - ignore it
         if err and "Consider adding more capacity" not in err:
             debug(err)
-            assert False, 'sstablescrub failed'
+            self.fail('sstablescrub failed')
 
     def perform_node_tool_cmd(self, cmd, table, indexes):
         """
         Perform a nodetool command on a table and the indexes specified
         """
-        self.launch_nodetool_cmd('%s %s %s' % (cmd, KEYSPACE, table))
+        self.launch_nodetool_cmd('{} {} {}'.format(cmd, KEYSPACE, table))
         for index in indexes:
-            self.launch_nodetool_cmd('%s %s %s.%s' % (cmd, KEYSPACE, table, index))
+            self.launch_nodetool_cmd('{} {} {}.{}'.format(cmd, KEYSPACE, table, index))
 
     def flush(self, table, *indexes):
         """
@@ -153,7 +154,7 @@ class TestHelper(Tester):
         """
         self.launch_standalone_scrub(KEYSPACE, table)
         for index in indexes:
-            self.launch_standalone_scrub(KEYSPACE, '%s.%s' % (table, index))
+            self.launch_standalone_scrub(KEYSPACE, '{}.{}'.format(table, index))
         return self.get_sstables(table, indexes)
 
     def increment_generation_by(self, sstable, generation_increment):
@@ -171,7 +172,7 @@ class TestHelper(Tester):
             increment_by = len(set(re.match('.*(\d)[^0-9].*', s).group(1) for s in table_sstables))
             sstables[table_or_index] = [self.increment_generation_by(s, increment_by) for s in table_sstables]
 
-        debug('sstables after increment %s' % (str(sstables)))
+        debug('sstables after increment {}'.format(str(sstables)))
 
 
 @since('2.2')
@@ -207,7 +208,7 @@ class TestScrubIndexes(TestHelper):
         ret.extend(list(session.execute("SELECT * FROM users WHERE state='TX'")))
         ret.extend(list(session.execute("SELECT * FROM users WHERE gender='f'")))
         ret.extend(list(session.execute("SELECT * FROM users WHERE birth_year=1978")))
-        assert len(ret) == 8
+        assert_length_equal(ret, 8)
         return ret
 
     @known_failure(failure_source='test',
@@ -248,7 +249,7 @@ class TestScrubIndexes(TestHelper):
         cluster.start()
 
         session = self.patient_cql_connection(node1)
-        session.execute('USE %s' % (KEYSPACE))
+        session.execute('USE {}'.format(KEYSPACE))
 
         users = self.query_users(session)
         self.assertEqual(initial_users, users)
@@ -279,7 +280,7 @@ class TestScrubIndexes(TestHelper):
 
         cluster.start()
         session = self.patient_cql_connection(node1)
-        session.execute('USE %s' % (KEYSPACE))
+        session.execute('USE {}'.format(KEYSPACE))
 
         users = self.query_users(session)
         self.assertEqual(initial_users, users)
@@ -353,7 +354,7 @@ class TestScrub(TestHelper):
 
     def query_users(self, session):
         ret = list(session.execute("SELECT * FROM users"))
-        assert len(ret) == 5
+        assert_length_equal(ret, 5)
         return ret
 
     @known_failure(failure_source='test',
@@ -398,7 +399,7 @@ class TestScrub(TestHelper):
         cluster.start()
 
         session = self.patient_cql_connection(node1)
-        session.execute('USE %s' % (KEYSPACE))
+        session.execute('USE {}'.format(KEYSPACE))
 
         users = self.query_users(session)
         self.assertEqual(initial_users, users)
@@ -429,7 +430,7 @@ class TestScrub(TestHelper):
 
         cluster.start()
         session = self.patient_cql_connection(node1)
-        session.execute('USE %s' % (KEYSPACE))
+        session.execute('USE {}'.format(KEYSPACE))
 
         users = self.query_users(session)
         self.assertEqual(initial_users, users)
@@ -462,7 +463,7 @@ class TestScrub(TestHelper):
 
         cluster.start()
         session = self.patient_cql_connection(node1)
-        session.execute('USE %s' % (KEYSPACE))
+        session.execute('USE {}'.format(KEYSPACE))
 
         users = self.query_users(session)
         self.assertEqual(initial_users, users)

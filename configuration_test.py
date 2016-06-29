@@ -129,12 +129,10 @@ class TestConfiguration(Tester):
             if 'compression' in result:
                 params = result
 
-        assert params is not '', "Looking for the string 'sstable_compression', but could not find it in {str}".format(str=result)
-
+        self.assertNotEqual(params, '', "Looking for the string 'sstable_compression', but could not find it in {str}".format(str=result))
         chunk_string = "chunk_length_kb" if self.cluster.version() < '3.0' else "chunk_length_in_kb"
         chunk_length = int(re.search("{chunk}.*?:.*?'(\d*?)'".format(chunk=chunk_string), result).groups()[0])
-
-        assert chunk_length == value, "Expected chunk_length: %s.  We got: %s" % (value, chunk_length)
+        self.assertEqual(chunk_length, value, "Expected chunk_length: {}.  We got: {}".format(value, chunk_length))
 
 
 def write_to_trigger_fsync(session, ks, table):

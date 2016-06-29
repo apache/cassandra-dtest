@@ -5,7 +5,7 @@ import uuid
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
 
-from assertions import assert_invalid, assert_one
+from assertions import assert_invalid, assert_one, assert_length_equal
 from dtest import Tester
 from tools import rows_to_list, since
 
@@ -38,10 +38,10 @@ class TestCounters(Tester):
             query = SimpleStatement("SELECT key, c FROM cf WHERE key IN (%s)" % keys, consistency_level=ConsistencyLevel.QUORUM)
             res = list(session.execute(query))
 
-            assert len(res) == nb_counter
+            assert_length_equal(res, nb_counter)
             for c in xrange(0, nb_counter):
-                assert len(res[c]) == 2, "Expecting key and counter for counter%i, got %s" % (c, str(res[c]))
-                assert res[c][1] == i + 1, "Expecting counter%i = %i, got %i" % (c, i + 1, res[c][0])
+                self.assertEqual(len(res[c]), 2, "Expecting key and counter for counter {}, got {}".format(c, str(res[c])))
+                self.assertEqual(res[c][1], i + 1, "Expecting counter {} = {}, got {}".format(c, i + 1, res[c][0]))
 
     def upgrade_test(self):
         """ Test for bug of #4436 """
@@ -83,9 +83,9 @@ class TestCounters(Tester):
             query = SimpleStatement("SELECT * FROM counterTable", consistency_level=ConsistencyLevel.QUORUM)
             rows = list(session.execute(query))
 
-            assert len(rows) == len(keys), "Expected %d rows, got %d: %s" % (len(keys), len(rows), str(rows))
+            self.assertEqual(len(rows), len(keys), "Expected {} rows, got {}: {}".format(len(keys), len(rows), str(rows)))
             for row in rows:
-                assert row[1] == i * updates, "Unexpected value %s" % str(row)
+                self.assertEqual(row[1], i * updates, "Unexpected value {}".format(str(row)))
 
         def rolling_restart():
             # Rolling restart
