@@ -198,7 +198,7 @@ def range_putget(cluster, session, cl=ConsistencyLevel.QUORUM):
     paged_results = session.execute('SELECT * FROM cf LIMIT 10000000')
     rows = [result for result in paged_results]
 
-    assert_length_equal(rows, keys * 100)
+    assertions.assert_length_equal(rows, keys * 100)
     for k in xrange(0, keys):
         res = rows[:100]
         del rows[:100]
