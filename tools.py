@@ -115,7 +115,7 @@ def insert_columns(tester, session, key, columns_count, consistency=ConsistencyL
 def query_columns(tester, session, key, columns_count, consistency=ConsistencyLevel.QUORUM, offset=0):
     query = SimpleStatement('SELECT c, v FROM cf WHERE key=\'k%s\' AND c >= \'c%06d\' AND c <= \'c%06d\'' % (key, offset, columns_count + offset - 1), consistency_level=consistency)
     res = list(session.execute(query))
-    assert_length_equal(res, columns_count)
+    assertions.assert_length_equal(res, columns_count)
     for i in xrange(0, columns_count):
         assert_equal(res[i][1], 'value{}'.format(i + offset))
 
