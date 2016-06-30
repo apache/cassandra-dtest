@@ -3421,6 +3421,7 @@ class TestCQL(UpgradeTester):
             # Insert a non-version 1 uuid
             assert_invalid(cursor, "INSERT INTO test(k, c, v) VALUES (0, 0, 550e8400-e29b-41d4-a716-446655440000)")
 
+    @since('2.1')
     def user_types_test(self):
         cursor = self.prepare()
 
@@ -3481,6 +3482,7 @@ class TestCQL(UpgradeTester):
             """.format(id=userID_1)
             # TODO: deserialize the value here and check it's right.
 
+    @since('2.1')
     def more_user_types_test(self):
         """ user type test that does a little more nesting"""
 
