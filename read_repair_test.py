@@ -16,6 +16,10 @@ class TestReadRepair(Tester):
         self.cluster.populate(3).start(wait_for_binary_proto=True)
 
     @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12122',
+                   flaky=False,
+                   notes='[[1, 1, None]] not found in [[[1, 1]], [[1, None]]]')
+    @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11266',
                    flaky=False,
                    notes='windows')
