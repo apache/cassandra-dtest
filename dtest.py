@@ -283,7 +283,7 @@ class Tester(TestCase):
         init_default_config(self.cluster, self.cluster_options)
 
     def setUp(self):
-        self.set_current_test_name()
+        self.set_current_tst_name()
         kill_windows_cassandra_procs()
         maybe_cleanup_cluster_from_last_test_file()
 
@@ -300,7 +300,9 @@ class Tester(TestCase):
         self.connections = []
         self.runners = []
 
-    def set_current_test_name(self):
+    # this is intentionally spelled 'tst' instead of 'test' to avoid
+    # making unittest think it's a test method
+    def set_current_tst_name(self):
         global CURRENT_TEST
         CURRENT_TEST = self.id() + self._testMethodName
 
@@ -964,18 +966,10 @@ class ReusableClusterTester(Tester):
     def setUpClass(cls):
         kill_windows_cassandra_procs()
         maybe_cleanup_cluster_from_last_test_file()
-
-        cls.test_path = get_test_path()
-        cls.cluster = create_ccm_cluster(cls.test_path, name='test')
-        cls.init_config()
-
-        maybe_setup_jacoco(cls.test_path)
-        cls.init_config()
-        write_last_test_file(cls.test_path, cls.cluster)
-        set_log_levels(cls.cluster)
+        cls.initialize_cluster()
 
     def setUp(self):
-        self.set_current_test_name()
+        self.set_current_tst_name()
         self.connections = []
 
         # TODO enable active log watching
@@ -1003,10 +997,45 @@ class ReusableClusterTester(Tester):
             except Exception as e:
                 print "Error saving log:", str(e)
             finally:
+                reset_environment_vars()
                 if failed:
                     cleanup_cluster(self.cluster, self.test_path)
-                    reset_environment_vars()
-                    self.__class__.setUpClass()
+                    kill_windows_cassandra_procs()
+                    self.initialize_cluster()
+
+    @classmethod
+    def initialize_cluster(cls):
+        """
+        This method is responsible for initializing and configuring a ccm
+        cluster for the next set of tests.  This can be called for two
+        different reasons:
+         * A class of tests is starting
+         * A test method failed/errored, so the cluster has been wiped
+
+        Subclasses that require custom initialization should generally
+        do so by overriding post_initialize_cluster().
+        """
+        cls.test_path = get_test_path()
+        cls.cluster = create_ccm_cluster(cls.test_path, name='test')
+        cls.init_config()
+
+        maybe_setup_jacoco(cls.test_path)
+        cls.init_config()
+        write_last_test_file(cls.test_path, cls.cluster)
+        set_log_levels(cls.cluster)
+
+        cls.post_initialize_cluster()
+
+    @classmethod
+    def post_initialize_cluster(cls):
+        """
+        This method is called after the ccm cluster has been created
+        and default config options have been applied.  Any custom
+        initialization for a test class should generally be done
+        here in order to correctly handle cluster restarts after
+        test method failures.
+        """
+        pass
 
     @classmethod
     def init_config(cls):

@@ -46,14 +46,25 @@ class ThriftTester(ReusableClusterTester):
     cluster_options = {'partitioner': 'org.apache.cassandra.dht.ByteOrderedPartitioner',
                        'start_rpc': 'true'}
 
-    def __init__(self, *args, **kwargs):
-        ReusableClusterTester.__init__(self, *args, **kwargs)
-
     @classmethod
     def setUpClass(cls):
         # super() needs to be used here for 'cls' to be bound to the correct class
         super(ThriftTester, cls).setUpClass()
 
+    def setUp(self):
+        ReusableClusterTester.setUp(self)
+
+        # this is ugly, but the whole test module is written against a global client
+        global client
+        client = get_thrift_client()
+        client.transport.open()
+
+    def tearDown(self):
+        client.transport.close()
+        ReusableClusterTester.tearDown(self)
+
+    @classmethod
+    def post_initialize_cluster(cls):
         cluster = cls.cluster
         cluster.populate(1)
         node1, = cluster.nodelist()
@@ -70,18 +81,6 @@ class ThriftTester(ReusableClusterTester):
         cls.client = get_thrift_client()
         cls.client.transport.open()
         cls.define_schema()
-
-    def setUp(self):
-        ReusableClusterTester.setUp(self)
-
-        # this is ugly, but the whole test module is written against a global client
-        global client
-        client = get_thrift_client()
-        client.transport.open()
-
-    def tearDown(self):
-        client.transport.close()
-        ReusableClusterTester.tearDown(self)
 
     @classmethod
     def init_config(cls):
@@ -318,24 +317,25 @@ _MULTI_SLICE_COLUMNS = [Column('a', '1', 0), Column('b', '2', 0), Column('c', '3
 
 class TestMutations(ThriftTester):
 
+    def truncate_all(self, *table_names):
+        for table in table_names:
+            client.truncate(table)
+
     def test_insert(self):
         _set_keyspace('Keyspace1')
-        client.truncate('Standard1')
+        self.truncate_all('Standard1')
         _insert_simple()
         _verify_simple()
 
     def test_empty_slice(self):
         _set_keyspace('Keyspace1')
-        client.truncate('Standard2')
-        client.truncate('Super1')
+        self.truncate_all('Standard2', 'Super1')
         assert _big_slice('key1', ColumnParent('Standard2')) == []
         assert _big_slice('key1', ColumnParent('Super1')) == []
 
     def test_cas(self):
         _set_keyspace('Keyspace1')
-        client.truncate('Standard1')
-        client.truncate('Standard3')
-        client.truncate('Standard4')
+        self.truncate_all('Standard1', 'Standard3', 'Standard4')
 
         def cas(expected, updates, column_family):
             return client.cas('key1', column_family, expected, updates, ConsistencyLevel.SERIAL, ConsistencyLevel.QUORUM)
@@ -382,7 +382,7 @@ class TestMutations(ThriftTester):
 
     def test_missing_super(self):
         _set_keyspace('Keyspace1')
-        client.truncate('Super1')
+        self.truncate_all('Super1')
 
         _expect_missing(lambda: client.get('key1', ColumnPath('Super1', 'sc1', _i64(1)), ConsistencyLevel.ONE))
         _insert_super()
@@ -390,9 +390,7 @@ class TestMutations(ThriftTester):
 
     def test_count(self):
         _set_keyspace('Keyspace1')
-        client.truncate('Standard1')
-        client.truncate('Standard2')
-        client.truncate('Super1')
+        self.truncate_all('Standard1', 'Standard2', 'Super1')
 
         _insert_simple()
         _insert_super()
@@ -412,7 +410,7 @@ class TestMutations(ThriftTester):
 
     def test_count_paging(self):
         _set_keyspace('Keyspace1')
-        client.truncate('Standard1')
+        self.truncate_all('Standard1')
 
         _insert_simple()
 
@@ -433,7 +431,7 @@ class TestMutations(ThriftTester):
     # test get_count() to work correctly with 'count' settings around page size (CASSANDRA-4833)
     def test_count_around_page_size(self):
         _set_keyspace('Keyspace1')
-        client.truncate('Standard1')
+        self.truncate_all('Standard1')
 
         def slice_predicate(count):
             return SlicePredicate(slice_range=SliceRange('', '', False, count))
@@ -462,14 +460,14 @@ class TestMutations(ThriftTester):
 
     def test_super_insert(self):
         _set_keyspace('Keyspace1')
-        client.truncate('Super1')
+        self.truncate_all('Super1')
 
         _insert_super()
         _verify_super()
 
     def test_super_get(self):
         _set_keyspace('Keyspace1')
-        client.truncate('Super1')
+        self.truncate_all('Super1')
 
         _insert_super()
         result = client.get('key1', ColumnPath('Super1', 'sc2'), ConsistencyLevel.ONE).super_column
@@ -477,7 +475,7 @@ class TestMutations(ThriftTester):
 
     def test_super_subcolumn_limit(self):
         _set_keyspace('Keyspace1')
-        client.truncate('Super1')
+        self.truncate_all('Super1')
         _insert_super()
         p = SlicePredicate(slice_range=SliceRange('', '', False, 1))
         column_parent = ColumnParent('Super1', 'sc2')
@@ -491,7 +489,7 @@ class TestMutations(ThriftTester):
 
     def test_long_order(self):
         _set_keyspace('Keyspace1')
-        client.truncate('StandardLong1')
+        self.truncate_all('StandardLong1')
 
         def long_xrange(start, stop, step):
             i = start
@@ -508,7 +506,7 @@ class TestMutations(ThriftTester):
 
     def test_integer_order(self):
         _set_keyspace('Keyspace1')
-        client.truncate('StandardInteger1')
+        self.truncate_all('StandardInteger1')
 
         def long_xrange(start, stop, step):
             i = start
@@ -526,7 +524,7 @@ class TestMutations(ThriftTester):
 
     def test_time_uuid(self):
         _set_keyspace('Keyspace2')
-        client.truncate('Super4')
+        self.truncate_all('Super4')
 
         import uuid
         L = []
@@ -572,7 +570,7 @@ class TestMutations(ThriftTester):
 
     def test_long_remove(self):
         _set_keyspace('Keyspace1')
-        client.truncate('StandardLong1')
+        self.truncate_all('StandardLong1')
 
         column_parent = ColumnParent('StandardLong1')
         sp = SlicePredicate(slice_range=SliceRange('', '', False, 1))
@@ -591,7 +589,7 @@ class TestMutations(ThriftTester):
 
     def test_integer_remove(self):
         _set_keyspace('Keyspace1')
-        client.truncate('StandardInteger1')
+        self.truncate_all('StandardInteger1')
 
         column_parent = ColumnParent('StandardInteger1')
         sp = SlicePredicate(slice_range=SliceRange('', '', False, 1))
@@ -610,15 +608,13 @@ class TestMutations(ThriftTester):
 
     def test_batch_insert(self):
         _set_keyspace('Keyspace1')
-        client.truncate('Standard1')
-        client.truncate('Standard2')
+        self.truncate_all('Standard1', 'Standard2')
         _insert_batch()
         _verify_batch()
 
     def test_batch_mutate_standard_columns(self):
         _set_keyspace('Keyspace1')
-        client.truncate('Standard1')
-        client.truncate('Standard2')
+        self.truncate_all('Standard1', 'Standard2')
 
         column_families = ['Standard1', 'Standard2']
         keys = ['key_%d' % i for i in range(27, 32)]
@@ -634,8 +630,7 @@ class TestMutations(ThriftTester):
 
     def test_batch_mutate_remove_standard_columns(self):
         _set_keyspace('Keyspace1')
-        client.truncate('Standard1')
-        client.truncate('Standard2')
+        self.truncate_all('Standard1', 'Standard2')
 
         column_families = ['Standard1', 'Standard2']
         keys = ['key_%d' % i for i in range(11, 21)]
@@ -655,8 +650,7 @@ class TestMutations(ThriftTester):
 
     def test_batch_mutate_remove_standard_row(self):
         _set_keyspace('Keyspace1')
-        client.truncate('Standard1')
-        client.truncate('Standard2')
+        self.truncate_all('Standard1', 'Standard2')
 
         column_families = ['Standard1', 'Standard2']
         keys = ['key_%d' % i for i in range(11, 21)]
@@ -676,8 +670,7 @@ class TestMutations(ThriftTester):
 
     def test_batch_mutate_remove_super_columns_with_standard_under(self):
         _set_keyspace('Keyspace1')
-        client.truncate('Super1')
-        client.truncate('Super2')
+        self.truncate_all('Super1', 'Super2')
 
         column_families = ['Super1', 'Super2']
         keys = ['key_%d' % i for i in range(11, 21)]
@@ -703,7 +696,7 @@ class TestMutations(ThriftTester):
 
     def test_batch_mutate_remove_super_columns_with_none_given_underneath(self):
         _set_keyspace('Keyspace1')
-        client.truncate('Super1')
+        self.truncate_all('Super1')
 
         keys = ['key_%d' % i for i in range(17, 21)]
 
@@ -734,7 +727,7 @@ class TestMutations(ThriftTester):
 
     def test_batch_mutate_remove_super_columns_entire_row(self):
         _set_keyspace('Keyspace1')
-        client.truncate('Super1')
+        self.truncate_all('Super1')
 
         keys = ['key_%d' % i for i in range(17, 21)]
 
@@ -763,7 +756,7 @@ class TestMutations(ThriftTester):
     # known failure: see CASSANDRA-10046
     def test_batch_mutate_remove_slice_standard(self):
         _set_keyspace('Keyspace1')
-        client.truncate('Standard1')
+        self.truncate_all('Standard1')
 
         columns = [Column('c1', 'value1', 0),
                    Column('c2', 'value2', 0),
@@ -786,7 +779,7 @@ class TestMutations(ThriftTester):
     # known failure: see CASSANDRA-10046
     def test_batch_mutate_remove_slice_of_entire_supercolumns(self):
         _set_keyspace('Keyspace1')
-        client.truncate('Super1')
+        self.truncate_all('Super1')
 
         columns = [SuperColumn(name='sc1', columns=[Column(_i64(1), 'value1', 0)]),
                    SuperColumn(name='sc2',
@@ -814,7 +807,7 @@ class TestMutations(ThriftTester):
     @since('1.0', '2.2')
     def test_batch_mutate_remove_slice_part_of_supercolumns(self):
         _set_keyspace('Keyspace1')
-        client.truncate('Super1')
+        self.truncate_all('Super1')
 
         columns = [Column(_i64(1), 'value1', 0),
                    Column(_i64(2), 'value2', 0),
@@ -837,8 +830,7 @@ class TestMutations(ThriftTester):
 
     def test_batch_mutate_insertions_and_deletions(self):
         _set_keyspace('Keyspace1')
-        client.truncate('Super1')
-        client.truncate('Super2')
+        self.truncate_all('Super1', 'Super2')
 
         first_insert = SuperColumn("sc1",
                                    columns=[Column(_i64(20), 'value20', 3),
@@ -928,7 +920,7 @@ class TestMutations(ThriftTester):
 
     def test_column_name_lengths(self):
         _set_keyspace('Keyspace1')
-        client.truncate('Standard1')
+        self.truncate_all('Standard1')
 
         _expect_exception(lambda: client.insert('key1', ColumnParent('Standard1'), Column('', 'value', 0), ConsistencyLevel.ONE), InvalidRequestException)
         client.insert('key1', ColumnParent('Standard1'), Column('x' * 1, 'value', 0), ConsistencyLevel.ONE)
@@ -1015,8 +1007,7 @@ class TestMutations(ThriftTester):
 
     def test_batch_insert_super(self):
         _set_keyspace('Keyspace1')
-        client.truncate('Super1')
-        client.truncate('Super2')
+        self.truncate_all('Super1', 'Super2')
 
         cfmap = {'Super1': [Mutation(ColumnOrSuperColumn(super_column=c))
                             for c in _SUPER_COLUMNS],
@@ -1028,7 +1019,7 @@ class TestMutations(ThriftTester):
 
     def test_cf_remove_column(self):
         _set_keyspace('Keyspace1')
-        client.truncate('Standard1')
+        self.truncate_all('Standard1')
 
         _insert_simple()
         client.remove('key1', ColumnPath('Standard1', column='c1'), 1, ConsistencyLevel.ONE)
@@ -1058,8 +1049,7 @@ class TestMutations(ThriftTester):
 
     def test_cf_remove(self):
         _set_keyspace('Keyspace1')
-        client.truncate('Standard1')
-        client.truncate('Super1')
+        self.truncate_all('Standard1', 'Super1')
 
         _insert_simple()
         _insert_super()
@@ -1085,7 +1075,7 @@ class TestMutations(ThriftTester):
 
     def test_super_cf_remove_and_range_slice(self):
         _set_keyspace('Keyspace1')
-        client.truncate('Super1')
+        self.truncate_all('Super1')
 
         client.insert('key3', ColumnParent('Super1', 'sc1'), Column(_i64(1), 'v1', 0), ConsistencyLevel.ONE)
         client.remove('key3', ColumnPath('Super1', 'sc1'), 5, ConsistencyLevel.ONE)
@@ -1098,8 +1088,7 @@ class TestMutations(ThriftTester):
 
     def test_super_cf_remove_column(self):
         _set_keyspace('Keyspace1')
-        client.truncate('Standard1')
-        client.truncate('Super1')
+        self.truncate_all('Standard1', 'Super1')
 
         _insert_simple()
         _insert_super()
@@ -1145,8 +1134,7 @@ class TestMutations(ThriftTester):
 
     def test_super_cf_remove_supercolumn(self):
         _set_keyspace('Keyspace1')
-        client.truncate('Standard1')
-        client.truncate('Super1')
+        self.truncate_all('Standard1', 'Super1')
 
         _insert_simple()
         _insert_super()
@@ -1185,7 +1173,7 @@ class TestMutations(ThriftTester):
 
     def test_super_cf_resurrect_subcolumn(self):
         _set_keyspace('Keyspace1')
-        client.truncate('Super1')
+        self.truncate_all('Super1')
 
         key = 'vijay'
         client.insert(key, ColumnParent('Super1', 'sc1'), Column(_i64(4), 'value4', 0), ConsistencyLevel.ONE)
@@ -1199,8 +1187,7 @@ class TestMutations(ThriftTester):
 
     def test_empty_range(self):
         _set_keyspace('Keyspace1')
-        client.truncate('Standard1')
-        client.truncate('Super1')
+        self.truncate_all('Standard1', 'Super1')
 
         assert get_range_slice(client, ColumnParent('Standard1'), SlicePredicate(column_names=['c1', 'c1']), '', '', 1000, ConsistencyLevel.ONE) == []
         _insert_simple()
@@ -1208,7 +1195,7 @@ class TestMutations(ThriftTester):
 
     def test_range_with_remove(self):
         _set_keyspace('Keyspace1')
-        client.truncate('Standard1')
+        self.truncate_all('Standard1')
 
         _insert_simple()
         assert get_range_slice(client, ColumnParent('Standard1'), SlicePredicate(column_names=['c1', 'c1']), 'key1', '', 1000, ConsistencyLevel.ONE)[0].key == 'key1'
@@ -1220,7 +1207,7 @@ class TestMutations(ThriftTester):
 
     def test_range_with_remove_cf(self):
         _set_keyspace('Keyspace1')
-        client.truncate('Standard1')
+        self.truncate_all('Standard1')
 
         _insert_simple()
         assert get_range_slice(client, ColumnParent('Standard1'), SlicePredicate(column_names=['c1', 'c1']), 'key1', '', 1000, ConsistencyLevel.ONE)[0].key == 'key1'
@@ -1231,7 +1218,7 @@ class TestMutations(ThriftTester):
 
     def test_range_collation(self):
         _set_keyspace('Keyspace1')
-        client.truncate('Standard1')
+        self.truncate_all('Standard1')
 
         for key in ['-a', '-b', 'a', 'b'] + [str(i) for i in xrange(100)]:
             client.insert(key, ColumnParent('Standard1'), Column(key, 'v', 0), ConsistencyLevel.ONE)
@@ -1244,7 +1231,7 @@ class TestMutations(ThriftTester):
 
     def test_range_partial(self):
         _set_keyspace('Keyspace1')
-        client.truncate('Standard1')
+        self.truncate_all('Standard1')
 
         for key in ['-a', '-b', 'a', 'b'] + [str(i) for i in xrange(100)]:
             client.insert(key, ColumnParent('Standard1'), Column(key, 'v', 0), ConsistencyLevel.ONE)
@@ -1268,14 +1255,14 @@ class TestMutations(ThriftTester):
 
     def test_get_slice_range(self):
         _set_keyspace('Keyspace1')
-        client.truncate('Standard1')
+        self.truncate_all('Standard1')
 
         _insert_range()
         _verify_range()
 
     def test_get_slice_super_range(self):
         _set_keyspace('Keyspace1')
-        client.truncate('Super1')
+        self.truncate_all('Super1')
 
         _insert_super_range()
         _verify_super_range()
@@ -1286,7 +1273,7 @@ class TestMutations(ThriftTester):
                    notes='Fails on windows')
     def test_get_range_slices_tokens(self):
         _set_keyspace('Keyspace2')
-        client.truncate('Super3')
+        self.truncate_all('Super3')
 
         for key in ['key1', 'key2', 'key3', 'key4', 'key5']:
             for cname in ['col1', 'col2', 'col3', 'col4', 'col5']:
@@ -1302,7 +1289,7 @@ class TestMutations(ThriftTester):
 
     def test_get_range_slice_super(self):
         _set_keyspace('Keyspace2')
-        client.truncate('Super3')
+        self.truncate_all('Super3')
 
         for key in ['key1', 'key2', 'key3', 'key4', 'key5']:
             for cname in ['col1', 'col2', 'col3', 'col4', 'col5']:
@@ -1321,7 +1308,7 @@ class TestMutations(ThriftTester):
 
     def test_get_range_slice(self):
         _set_keyspace('Keyspace1')
-        client.truncate('Standard1')
+        self.truncate_all('Standard1')
 
         for key in ['key1', 'key2', 'key3', 'key4', 'key5']:
             for cname in ['col1', 'col2', 'col3', 'col4', 'col5']:
@@ -1378,7 +1365,7 @@ class TestMutations(ThriftTester):
 
     def test_wrapped_range_slices(self):
         _set_keyspace('Keyspace1')
-        client.truncate('Standard1')
+        self.truncate_all('Standard1')
 
         def copp_token(key):
             # I cheated and generated this from Java
@@ -1401,8 +1388,7 @@ class TestMutations(ThriftTester):
 
     def test_get_slice_by_names(self):
         _set_keyspace('Keyspace1')
-        client.truncate('Standard1')
-        client.truncate('Super1')
+        self.truncate_all('Standard1', 'Super1')
 
         _insert_range()
         p = SlicePredicate(column_names=['c1', 'c2'])
@@ -1446,7 +1432,7 @@ class TestMutations(ThriftTester):
         """Insert multiple keys and retrieve them using the multiget_slice interface"""
 
         _set_keyspace('Keyspace1')
-        client.truncate('Standard1')
+        self.truncate_all('Standard1')
 
         # Generate a list of 10 keys and insert them
         num_keys = 10
@@ -1465,7 +1451,7 @@ class TestMutations(ThriftTester):
     def test_multi_count(self):
         """Insert multiple keys and count them using the multiget interface"""
         _set_keyspace('Keyspace1')
-        client.truncate('Standard1')
+        self.truncate_all('Standard1')
 
         # Generate a list of 10 keys countaining 1 to 10 columns and insert them
         num_keys = 10
@@ -1486,7 +1472,7 @@ class TestMutations(ThriftTester):
 
     def test_batch_mutate_super_deletion(self):
         _set_keyspace('Keyspace1')
-        client.truncate('Super1')
+        self.truncate_all('Super1')
 
         _insert_super('test')
         d = Deletion(1, predicate=SlicePredicate(column_names=['sc1']))
@@ -1496,7 +1482,7 @@ class TestMutations(ThriftTester):
 
     def test_super_reinsert(self):
         _set_keyspace('Keyspace1')
-        client.truncate('Super1')
+        self.truncate_all('Super1')
 
         for x in xrange(3):
             client.insert('key1', ColumnParent('Super1', 'sc2'), Column(_i64(x), 'value', 1), ConsistencyLevel.ONE)
@@ -1887,7 +1873,7 @@ class TestMutations(ThriftTester):
     def test_insert_ttl(self):
         """ Test simple insertion of a column with ttl """
         _set_keyspace('Keyspace1')
-        client.truncate('Standard1')
+        self.truncate_all('Standard1')
 
         column = Column('cttl1', 'value1', 0, 5)
         client.insert('key1', ColumnParent('Standard1'), column, ConsistencyLevel.ONE)
@@ -1896,7 +1882,7 @@ class TestMutations(ThriftTester):
     def test_simple_expiration(self):
         """ Test that column ttled do expires """
         _set_keyspace('Keyspace1')
-        client.truncate('Standard1')
+        self.truncate_all('Standard1')
 
         column = Column('cttl3', 'value1', 0, 2)
         client.insert('key1', ColumnParent('Standard1'), column, ConsistencyLevel.ONE)
@@ -1908,7 +1894,7 @@ class TestMutations(ThriftTester):
     def test_expiration_with_default_ttl(self):
         """ Test that column with default ttl do expires """
         _set_keyspace('Keyspace1')
-        client.truncate('Expiring')
+        self.truncate_all('Expiring')
 
         column = Column('cttl3', 'value1', 0)
         client.insert('key1', ColumnParent('Expiring'), column, ConsistencyLevel.ONE)
@@ -1923,7 +1909,7 @@ class TestMutations(ThriftTester):
         CASSANDRA-11207
         """
         _set_keyspace('Keyspace1')
-        client.truncate('Expiring')
+        self.truncate_all('Expiring')
 
         column = Column('cttl3', 'value1', 0, 0)
         client.insert('key1', ColumnParent('Expiring'), column, ConsistencyLevel.ONE)
@@ -1933,7 +1919,7 @@ class TestMutations(ThriftTester):
     def test_simple_expiration_batch_mutate(self):
         """ Test that column ttled do expires using batch_mutate """
         _set_keyspace('Keyspace1')
-        client.truncate('Standard1')
+        self.truncate_all('Standard1')
 
         column = Column('cttl4', 'value1', 0, 2)
         cfmap = {'Standard1': [Mutation(ColumnOrSuperColumn(column))]}
@@ -1946,7 +1932,7 @@ class TestMutations(ThriftTester):
     def test_update_expiring(self):
         """ Test that updating a column with ttl override the ttl """
         _set_keyspace('Keyspace1')
-        client.truncate('Standard1')
+        self.truncate_all('Standard1')
 
         column1 = Column('cttl4', 'value1', 0, 1)
         client.insert('key1', ColumnParent('Standard1'), column1, ConsistencyLevel.ONE)
@@ -1958,7 +1944,7 @@ class TestMutations(ThriftTester):
     def test_remove_expiring(self):
         """ Test removing a column with ttl """
         _set_keyspace('Keyspace1')
-        client.truncate('Standard1')
+        self.truncate_all('Standard1')
 
         column = Column('cttl5', 'value1', 0, 10)
         client.insert('key1', ColumnParent('Standard1'), column, ConsistencyLevel.ONE)
@@ -1972,7 +1958,7 @@ class TestMutations(ThriftTester):
 
     def test_incr_decr_standard_add(self):
         _set_keyspace('Keyspace1')
-        key = 'test_incr_decr_standard_add'
+        key = self._testMethodName
 
         d1 = 12
         d2 = -21
@@ -1995,7 +1981,7 @@ class TestMutations(ThriftTester):
 
     def test_incr_decr_super_add(self):
         _set_keyspace('Keyspace1')
-        key = 'test_incr_decr_super_add'
+        key = self._testMethodName
 
         d1 = -234
         d2 = 52345
@@ -2017,8 +2003,8 @@ class TestMutations(ThriftTester):
 
     def test_incr_standard_remove(self):
         _set_keyspace('Keyspace1')
-        key1 = 'test_incr_standard_remove_1'
-        key2 = 'test_incr_standard_remove_2'
+        key1 = self._testMethodName + "_1"
+        key2 = self._testMethodName + "_2"
 
         d1 = 124
 
@@ -2040,8 +2026,8 @@ class TestMutations(ThriftTester):
 
     def test_incr_super_remove(self):
         _set_keyspace('Keyspace1')
-        key1 = 'test_incr_super_remove_1'
-        key2 = 'test_incr_super_remove_2'
+        key1 = self._testMethodName + "_1"
+        key2 = self._testMethodName + "_2"
 
         d1 = 52345
 
@@ -2063,8 +2049,8 @@ class TestMutations(ThriftTester):
 
     def test_incr_decr_standard_remove(self):
         _set_keyspace('Keyspace1')
-        key1 = 'test_incr_decr_standard_remove_1'
-        key2 = 'test_incr_decr_standard_remove_2'
+        key1 = self._testMethodName + "_1"
+        key2 = self._testMethodName + "_2"
 
         d1 = 124
 
@@ -2086,8 +2072,8 @@ class TestMutations(ThriftTester):
 
     def test_incr_decr_super_remove(self):
         _set_keyspace('Keyspace1')
-        key1 = 'test_incr_decr_super_remove_1'
-        key2 = 'test_incr_decr_super_remove_2'
+        key1 = self._testMethodName + "_1"
+        key2 = self._testMethodName + "_2"
 
         d1 = 52345
 
@@ -2109,7 +2095,7 @@ class TestMutations(ThriftTester):
 
     def test_incr_decr_standard_batch_add(self):
         _set_keyspace('Keyspace1')
-        key = 'test_incr_decr_standard_batch_add'
+        key = self._testMethodName
 
         d1 = 12
         d2 = -21
@@ -2125,8 +2111,8 @@ class TestMutations(ThriftTester):
 
     def test_incr_decr_standard_batch_remove(self):
         _set_keyspace('Keyspace1')
-        key1 = 'test_incr_decr_standard_batch_remove_1'
-        key2 = 'test_incr_decr_standard_batch_remove_2'
+        key1 = self._testMethodName + "_1"
+        key2 = self._testMethodName + "_2"
 
         d1 = 12
         d2 = -21
@@ -2166,7 +2152,7 @@ class TestMutations(ThriftTester):
     def test_range_deletion(self):
         """ Tests CASSANDRA-7990 """
         _set_keyspace('Keyspace1')
-        client.truncate('StandardComposite')
+        self.truncate_all('StandardComposite')
 
         def composite(item1, item2=None, eoc='\x00'):
             packed = _i16(len(item1)) + item1 + eoc
@@ -2195,7 +2181,7 @@ class TestMutations(ThriftTester):
 
     def test_incr_decr_standard_slice(self):
         _set_keyspace('Keyspace1')
-        key = 'test_incr_decr_standard_slice'
+        key = self._testMethodName
 
         d1 = 12
         d2 = -21
@@ -2214,8 +2200,8 @@ class TestMutations(ThriftTester):
 
     def test_incr_decr_standard_multiget_slice(self):
         _set_keyspace('Keyspace1')
-        key1 = 'test_incr_decr_standard_multiget_slice_1'
-        key2 = 'test_incr_decr_standard_multiget_slice_2'
+        key1 = self._testMethodName + "_1"
+        key2 = self._testMethodName + "_2"
 
         d1 = 12
         d2 = -21
@@ -2241,7 +2227,7 @@ class TestMutations(ThriftTester):
 
     def test_counter_get_slice_range(self):
         _set_keyspace('Keyspace1')
-        key = 'test_counter_get_slice_range'
+        key = self._testMethodName
 
         client.add(key, ColumnParent('Counter1'), CounterColumn('c1', 1), ConsistencyLevel.ONE)
         client.add(key, ColumnParent('Counter1'), CounterColumn('c2', 2), ConsistencyLevel.ONE)
@@ -2269,7 +2255,7 @@ class TestMutations(ThriftTester):
 
     def test_counter_get_slice_super_range(self):
         _set_keyspace('Keyspace1')
-        key = 'test_counter_get_slice_super_range'
+        key = self._testMethodName
 
         client.add(key, ColumnParent('SuperCounter1', 'sc1'), CounterColumn(_i64(4), 4), ConsistencyLevel.ONE)
         client.add(key, ColumnParent('SuperCounter1', 'sc2'), CounterColumn(_i64(5), 5), ConsistencyLevel.ONE)
@@ -2290,7 +2276,7 @@ class TestMutations(ThriftTester):
 
     def test_index_scan(self):
         _set_keyspace('Keyspace1')
-        client.truncate('Indexed1')
+        self.truncate_all('Indexed1')
 
         client.insert('key1', ColumnParent('Indexed1'), Column('birthdate', _i64(1), 0), ConsistencyLevel.ONE)
         client.insert('key2', ColumnParent('Indexed1'), Column('birthdate', _i64(2), 0), ConsistencyLevel.ONE)
@@ -2321,7 +2307,7 @@ class TestMutations(ThriftTester):
 
     def test_index_scan_uuid_names(self):
         _set_keyspace('Keyspace1')
-        client.truncate('Indexed3')
+        self.truncate_all('Indexed3')
 
         sp = SlicePredicate(slice_range=SliceRange('', ''))
         cp = ColumnParent('Indexed3')  # timeuuid name, utf8 values
@@ -2347,7 +2333,7 @@ class TestMutations(ThriftTester):
     def test_index_scan_expiring(self):
         """ Test that column ttled expires from KEYS index"""
         _set_keyspace('Keyspace1')
-        client.truncate('Indexed1')
+        self.truncate_all('Indexed1')
 
         client.insert('key1', ColumnParent('Indexed1'), Column('birthdate', _i64(1), 0, 2), ConsistencyLevel.ONE)
         cp = ColumnParent('Indexed1')
@@ -2370,7 +2356,7 @@ class TestMutations(ThriftTester):
         @jira_ticket CASSANDRA-11523
         """
         _set_keyspace('Keyspace1')
-        client.truncate('Indexed4')
+        self.truncate_all('Indexed4')
 
         client.insert('key1', ColumnParent('Indexed4'), Column('a', _i64(1), 0), ConsistencyLevel.ONE)
         client.insert('key1', ColumnParent('Indexed4'), Column('z', 'zzz', 0), ConsistencyLevel.ONE)
@@ -2390,7 +2376,7 @@ class TestMutations(ThriftTester):
 
     def test_column_not_found_quorum(self):
         _set_keyspace('Keyspace1')
-        client.truncate('Standard1')
+        self.truncate_all('Standard1')
 
         key = 'doesntexist'
         column_path = ColumnPath(column_family="Standard1", column="idontexist")
@@ -2402,7 +2388,7 @@ class TestMutations(ThriftTester):
 
     def test_get_range_slice_after_deletion(self):
         _set_keyspace('Keyspace2')
-        client.truncate('Super3')
+        self.truncate_all('Super3')
 
         key = 'key1'
         # three supercoluns, each with "col1" subcolumn
@@ -2428,7 +2414,7 @@ class TestMutations(ThriftTester):
 
     def test_multi_slice(self):
         _set_keyspace('Keyspace1')
-        client.truncate('Standard1')
+        self.truncate_all('Standard1')
 
         _insert_six_columns('abc')
         L = [result.column
@@ -2442,11 +2428,11 @@ class TestMutations(ThriftTester):
         _insert_super()
 
         # truncate Standard1
-        client.truncate('Standard1')
+        self.truncate_all('Standard1')
         assert _big_slice('key1', ColumnParent('Standard1')) == []
 
         # truncate Super1
-        client.truncate('Super1')
+        self.truncate_all('Super1')
         assert _big_slice('key1', ColumnParent('Super1')) == []
         assert _big_slice('key1', ColumnParent('Super1', 'sc1')) == []
 
