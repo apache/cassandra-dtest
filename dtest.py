@@ -134,7 +134,7 @@ def find_libjemalloc():
             return "-"  # tells C* not to look for libjemalloc
         else:
             return stdout
-    except Exception, exc:
+    except Exception as exc:
         print "Failed to run script to prelocate libjemalloc ({}): {}".format(script, exc)
         return ""
 
@@ -549,11 +549,11 @@ class Tester(TestCase):
             # we assume simpleStrategy
             session.execute(query % (name, "'class':'SimpleStrategy', 'replication_factor':%d" % rf))
         else:
-            assert len(rf) != 0, "At least one datacenter/rf pair is needed"
+            self.assertGreaterEqual(len(rf), 0, "At least one datacenter/rf pair is needed")
             # we assume networkTopologyStrategy
             options = (', ').join(['\'%s\':%d' % (d, r) for d, r in rf.iteritems()])
             session.execute(query % (name, "'class':'NetworkTopologyStrategy', %s" % options))
-        session.execute('USE %s' % name)
+        session.execute('USE {}'.format(name))
 
     # We default to UTF8Type because it's simpler to use in tests
     def create_cf(self, session, name, key_type="varchar", speculative_retry=None, read_repair=None, compression=None,
@@ -562,7 +562,7 @@ class Tester(TestCase):
         additional_columns = ""
         if columns is not None:
             for k, v in columns.items():
-                additional_columns = "%s, %s %s" % (additional_columns, k, v)
+                additional_columns = "{}, {} {}".format(additional_columns, k, v)
 
         if additional_columns == "":
             query = 'CREATE COLUMNFAMILY %s (key %s, c varchar, v varchar, PRIMARY KEY(key, c)) WITH comment=\'test cf\'' % (name, key_type)

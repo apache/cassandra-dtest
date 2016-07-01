@@ -25,11 +25,11 @@ class TestLargeColumn(Tester):
         output = node.nodetool("gcstats", capture_output=True)
         debug(output)
         output = output[0].split("\n")
-        assert output[0].strip().startswith("Interval"), "Expected output from nodetool gcstats starts with a header line with first column Interval"
+        self.assertRegexpMatches(output[0].strip(), 'Interval')
         fields = output[1].split()
-        assert len(fields) >= 6, "Expected output from nodetool gcstats has at least six fields"
+        self.assertGreaterEqual(len(fields), 6, "Expected output from nodetool gcstats has at least six fields. However, fields is: {}".format(fields))
         for field in fields:
-            assert is_number(field.strip()) or field == 'NaN', "Expected numeric from fields from nodetool gcstats"
+            self.assertTrue(is_number(field.strip()) or field == 'NaN', "Expected numeric from fields from nodetool gcstats. However, field.strip() is: {}".format(field.strip()))
         return fields[6]
 
     @known_failure(failure_source='cassandra',

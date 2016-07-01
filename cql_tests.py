@@ -10,14 +10,14 @@ from cassandra.policies import FallthroughRetryPolicy
 from cassandra.protocol import ProtocolException
 from cassandra.query import SimpleStatement
 
-from assertions import assert_invalid, assert_one, assert_unavailable
+from assertions import assert_invalid, assert_one, assert_unavailable, assert_none, assert_all
 from dtest import Tester, canReuseCluster, freshCluster
 from thrift_bindings.v22.ttypes import \
     ConsistencyLevel as ThriftConsistencyLevel
 from thrift_bindings.v22.ttypes import (CfDef, Column, ColumnOrSuperColumn,
                                         Mutation)
 from thrift_tests import get_thrift_client
-from tools import debug, rows_to_list, since, known_failure
+from tools import debug, since, known_failure
 from utils.metadata_wrapper import (UpdatingClusterMetadataWrapper,
                                     UpdatingKeyspaceMetadataWrapper,
                                     UpdatingMetadataDictWrapper,
@@ -137,20 +137,16 @@ class StorageProxyCQLTester(CQLTester):
             session.execute("INSERT INTO test1 (k, v1, v2) VALUES ({i}, {i}, {i})".format(i=i))
             session.execute("INSERT INTO test2 (k, c1, v1) VALUES ({i}, {i}, {i})".format(i=i))
 
-        res = sorted(session.execute("SELECT * FROM test1"))
-        self.assertEqual(rows_to_list(res), [[i, i, i] for i in range(0, 10)])
+        assert_all(session, "SELECT * FROM test1", [[i, i, i] for i in range(0, 10)], ignore_order=True)
 
-        res = sorted(session.execute("SELECT * FROM test2"))
-        self.assertEqual(rows_to_list(res), [[i, i, i] for i in range(0, 10)])
+        assert_all(session, "SELECT * FROM test2", [[i, i, i] for i in range(0, 10)], ignore_order=True)
 
         session.execute("TRUNCATE test1")
         session.execute("TRUNCATE test2")
 
-        res = session.execute("SELECT * FROM test1")
-        self.assertEqual(rows_to_list(res), [])
+        assert_none(session, "SELECT * FROM test1")
 
-        res = session.execute("SELECT * FROM test2")
-        self.assertEqual(rows_to_list(res), [])
+        assert_none(session, "SELECT * FROM test2")
 
         session.execute("DROP TABLE test1")
         self.assertNotIn('test1', ks_meta.tables)
@@ -179,8 +175,7 @@ class StorageProxyCQLTester(CQLTester):
         for i in range(0, 10):
             session.execute("INSERT INTO test3 (k, v1, v2) VALUES ({i}, {i}, {i})".format(i=i))
 
-        res = session.execute("SELECT * FROM test3 WHERE v1 = 0")
-        self.assertEqual(rows_to_list(res), [[0, 0, 0]])
+        assert_one(session, "SELECT * FROM test3 WHERE v1 = 0", [0, 0, 0])
 
         session.execute("DROP INDEX testidx")
         self.assertNotIn('testidx', table_meta.indexes)
@@ -268,33 +263,25 @@ class StorageProxyCQLTester(CQLTester):
             session.execute("INSERT INTO test7 (kind, time, v1, v2) VALUES ('ev1', {i}, {i}, {i})".format(i=i))
             session.execute("INSERT INTO test7 (kind, time, v1, v2) VALUES ('ev2', {i}, {i}, {i})".format(i=i))
 
-        res = session.execute("SELECT COUNT(*) FROM test7 WHERE kind = 'ev1'")
-        self.assertEqual(rows_to_list(res), [[10]])
+        assert_one(session, "SELECT COUNT(*) FROM test7 WHERE kind = 'ev1'", [10])
 
-        res = session.execute("SELECT COUNT(*) FROM test7 WHERE kind IN ('ev1', 'ev2')")
-        self.assertEqual(rows_to_list(res), [[20]])
+        assert_one(session, "SELECT COUNT(*) FROM test7 WHERE kind IN ('ev1', 'ev2')", [20])
 
-        res = session.execute("SELECT COUNT(*) FROM test7 WHERE kind IN ('ev1', 'ev2') AND time=0")
-        self.assertEqual(rows_to_list(res), [[2]])
+        assert_one(session, "SELECT COUNT(*) FROM test7 WHERE kind IN ('ev1', 'ev2') AND time=0", [2])
 
-        res = session.execute("SELECT * FROM test7 WHERE kind = 'ev1'")
-        self.assertEqual(rows_to_list(res), [['ev1', i, i, i] for i in range(0, 10)])
+        assert_all(session, "SELECT * FROM test7 WHERE kind = 'ev1'", [['ev1', i, i, i] for i in range(0, 10)])
 
-        res = session.execute("SELECT * FROM test7 WHERE kind = 'ev2'")
-        self.assertEqual(rows_to_list(res), [['ev2', i, i, i] for i in range(0, 10)])
+        assert_all(session, "SELECT * FROM test7 WHERE kind = 'ev2'", [['ev2', i, i, i] for i in range(0, 10)])
 
         for i in range(0, 10):
             session.execute("UPDATE test7 SET v1 = 0, v2 = 0 where kind = 'ev1' AND time={i}".format(i=i))
 
-        res = session.execute("SELECT * FROM test7 WHERE kind = 'ev1'")
-        self.assertEqual(rows_to_list(res), [['ev1', i, 0, 0] for i in range(0, 10)])
+        assert_all(session, "SELECT * FROM test7 WHERE kind = 'ev1'", [['ev1', i, 0, 0] for i in range(0, 10)])
 
         session.execute("DELETE FROM test7 WHERE kind = 'ev1'")
-        res = session.execute("SELECT * FROM test7 WHERE kind = 'ev1'")
-        self.assertEqual(rows_to_list(res), [])
+        assert_none(session, "SELECT * FROM test7 WHERE kind = 'ev1'")
 
-        res = session.execute("SELECT COUNT(*) FROM test7 WHERE kind = 'ev1'")
-        self.assertEqual(rows_to_list(res), [[0]])
+        assert_one(session, "SELECT COUNT(*) FROM test7 WHERE kind = 'ev1'", [0])
 
     def batch_test(self):
         """
@@ -407,8 +394,7 @@ class MiscellaneousCQLTester(CQLTester):
             {key: {'test': [Mutation(ColumnOrSuperColumn(column=Column(name=column_name, value=value, timestamp=100)))]}},
             ThriftConsistencyLevel.ONE)
 
-        res = session.execute("SELECT * FROM test")
-        self.assertEqual(rows_to_list(res), [[2, 4, 8]])
+        assert_one(session, "SELECT * FROM test", [2, 4, 8])
 
     def rename_test(self):
         """
@@ -571,11 +557,9 @@ class MiscellaneousCQLTester(CQLTester):
                         ",".join(map(lambda i: str(i), range(width))) +
                         ")")
 
-        res = session.execute("SELECT " +
-                              ",".join(map(lambda i: "c_{}".format(i), range(width))) +
-                              " FROM very_wide_table")
-
-        self.assertEqual(rows_to_list(res), [[i for i in range(width)]])
+        assert_all(session, "SELECT " +
+                   ",".join(map(lambda i: "c_{}".format(i), range(width))) +
+                   " FROM very_wide_table", [[i for i in range(width)]])
 
 
 @since('3.2')
@@ -821,64 +805,45 @@ class LWTTester(CQLTester):
             CREATE TABLE lwt_with_static (a int, b int, s int static, d text, PRIMARY KEY (a, b))
         """)
 
-        res = session.execute("UPDATE lwt_with_static SET s = 1 WHERE a = 1 IF s = NULL")
-        self.assertEqual(rows_to_list(res), [[True]])
+        assert_one(session, "UPDATE lwt_with_static SET s = 1 WHERE a = 1 IF s = NULL", [True])
 
-        res = session.execute("SELECT * FROM lwt_with_static")
-        self.assertEqual(rows_to_list(res), [[1, None, 1, None]])
+        assert_one(session, "SELECT * FROM lwt_with_static", [1, None, 1, None])
 
-        res = session.execute("UPDATE lwt_with_static SET s = 2 WHERE a = 2 IF EXISTS")
-        self.assertEqual(rows_to_list(res), [[False]])
+        assert_one(session, "UPDATE lwt_with_static SET s = 2 WHERE a = 2 IF EXISTS", [False])
 
-        res = session.execute("SELECT * FROM lwt_with_static WHERE a = 1")
-        self.assertEqual(rows_to_list(res), [[1, None, 1, None]])
+        assert_one(session, "SELECT * FROM lwt_with_static WHERE a = 1", [1, None, 1, None])
 
-        res = session.execute("INSERT INTO lwt_with_static (a, s) VALUES (2, 2) IF NOT EXISTS")
-        self.assertEqual(rows_to_list(res), [[True]])
+        assert_one(session, "INSERT INTO lwt_with_static (a, s) VALUES (2, 2) IF NOT EXISTS", [True])
 
-        res = session.execute("SELECT * FROM lwt_with_static WHERE a = 2")
-        self.assertEqual(rows_to_list(res), [[2, None, 2, None]])
+        assert_one(session, "SELECT * FROM lwt_with_static WHERE a = 2", [2, None, 2, None])
 
-        res = session.execute("BEGIN BATCH\n" +
-                              "INSERT INTO lwt_with_static (a, b, d) values (3, 3, 'a');\n" +
-                              "UPDATE lwt_with_static SET s = 3 WHERE a = 3 IF s = null;\n" +
-                              "APPLY BATCH;")
-        self.assertEqual(rows_to_list(res), [[True]])
+        assert_one(session, "BEGIN BATCH\n" +
+                   "INSERT INTO lwt_with_static (a, b, d) values (3, 3, 'a');\n" +
+                   "UPDATE lwt_with_static SET s = 3 WHERE a = 3 IF s = null;\n" +
+                   "APPLY BATCH;", [True])
 
-        res = session.execute("SELECT * FROM lwt_with_static WHERE a = 3")
-        self.assertEqual(rows_to_list(res), [[3, 3, 3, "a"]])
+        assert_one(session, "SELECT * FROM lwt_with_static WHERE a = 3", [3, 3, 3, "a"])
 
         # LWT applies before INSERT
-        res = session.execute("BEGIN BATCH\n" +
-                              "INSERT INTO lwt_with_static (a, b, d) values (4, 4, 'a');\n" +
-                              "UPDATE lwt_with_static SET s = 4 WHERE a = 4 IF s = null;\n" +
-                              "APPLY BATCH;")
-        self.assertEqual(rows_to_list(res), [[True]])
+        assert_one(session, "BEGIN BATCH\n" +
+                   "INSERT INTO lwt_with_static (a, b, d) values (4, 4, 'a');\n" +
+                   "UPDATE lwt_with_static SET s = 4 WHERE a = 4 IF s = null;\n" +
+                   "APPLY BATCH;", [True])
 
-        res = session.execute("SELECT * FROM lwt_with_static WHERE a = 4")
-        self.assertEqual(rows_to_list(res), [[4, 4, 4, "a"]])
+        assert_one(session, "SELECT * FROM lwt_with_static WHERE a = 4", [4, 4, 4, "a"])
 
     def _validate_non_existing_or_null_values(self, table_name, session):
-        res = session.execute("UPDATE {} SET s = 1 WHERE a = 1 IF s = NULL".format(table_name))
-        self.assertEqual(rows_to_list(res), [[True]])
+        assert_one(session, "UPDATE {} SET s = 1 WHERE a = 1 IF s = NULL".format(table_name), [True])
 
-        res = session.execute("SELECT a, s, d FROM {} WHERE a = 1".format(table_name))
-        self.assertEqual(rows_to_list(res),
-                         [[1, 1, None]])
+        assert_one(session, "SELECT a, s, d FROM {} WHERE a = 1".format(table_name), [1, 1, None])
 
-        res = session.execute("UPDATE {} SET s = 2 WHERE a = 2 IF s IN (10,20,NULL)".format(table_name))
-        self.assertEqual(rows_to_list(res), [[True]])
+        assert_one(session, "UPDATE {} SET s = 2 WHERE a = 2 IF s IN (10,20,NULL)".format(table_name), [True])
 
-        res = session.execute("SELECT a, s, d FROM {} WHERE a = 2".format(table_name))
-        self.assertEqual(rows_to_list(res),
-                         [[2, 2, None]])
+        assert_one(session, "SELECT a, s, d FROM {} WHERE a = 2".format(table_name), [2, 2, None])
 
-        res = session.execute("UPDATE {} SET s = 4 WHERE a = 4 IF s != 4".format(table_name))
-        self.assertEqual(rows_to_list(res),
-                         [[True]])
-        res = session.execute("SELECT a, s, d FROM {} WHERE a = 4".format(table_name))
-        self.assertEqual(rows_to_list(res),
-                         [[4, 4, None]])
+        assert_one(session, "UPDATE {} SET s = 4 WHERE a = 4 IF s != 4".format(table_name), [True])
+
+        assert_one(session, "SELECT a, s, d FROM {} WHERE a = 4".format(table_name), [4, 4, None])
 
     @since('2.1')
     def conditional_updates_on_static_columns_with_null_values_test(self):
@@ -894,20 +859,14 @@ class LWTTester(CQLTester):
 
         self._validate_non_existing_or_null_values(table_name, session)
 
-        res = session.execute("UPDATE {} SET s = 30 WHERE a = 3 IF s IN (10,20,30)".format(table_name))
-        self.assertEqual(rows_to_list(res),
-                         [[False]])
-        res = session.execute("SELECT * FROM {} WHERE a = 3".format(table_name))
-        self.assertEqual(rows_to_list(res),
-                         [[3, 3, None, None]])
+        assert_one(session, "UPDATE {} SET s = 30 WHERE a = 3 IF s IN (10,20,30)".format(table_name), [False])
+
+        assert_one(session, "SELECT * FROM {} WHERE a = 3".format(table_name), [3, 3, None, None])
 
         for operator in [">", "<", ">=", "<=", "="]:
-            res = session.execute("UPDATE {} SET s = 50 WHERE a = 5 IF s {} 3".format(table_name, operator))
-            self.assertEqual(rows_to_list(res),
-                             [[False]])
-            res = session.execute("SELECT * FROM {} WHERE a = 5".format(table_name))
-            self.assertEqual(rows_to_list(res),
-                             [[5, 5, None, None]])
+            assert_one(session, "UPDATE {} SET s = 50 WHERE a = 5 IF s {} 3".format(table_name, operator), [False])
+
+            assert_one(session, "SELECT * FROM {} WHERE a = 5".format(table_name), [5, 5, None, None])
 
     @since('2.1')
     def conditional_updates_on_static_columns_with_non_existing_values_test(self):
@@ -920,69 +879,47 @@ class LWTTester(CQLTester):
 
         self._validate_non_existing_or_null_values(table_name, session)
 
-        res = session.execute("UPDATE {} SET s = 30 WHERE a = 3 IF s IN (10,20,30)".format(table_name))
-        self.assertEqual(rows_to_list(res),
-                         [[False]])
-        res = session.execute("SELECT * FROM {} WHERE a = 3".format(table_name))
-        self.assertEqual(rows_to_list(res),
-                         [])
+        assert_one(session, "UPDATE {} SET s = 30 WHERE a = 3 IF s IN (10,20,30)".format(table_name), [False])
+
+        assert_none(session, "SELECT * FROM {} WHERE a = 3".format(table_name))
 
         for operator in [">", "<", ">=", "<=", "="]:
-            res = session.execute("UPDATE {} SET s = 50 WHERE a = 5 IF s {} 3".format(table_name, operator))
-            self.assertEqual(rows_to_list(res),
-                             [[False]])
-            res = session.execute("SELECT * FROM {} WHERE a = 5".format(table_name))
-            self.assertEqual(rows_to_list(res),
-                             [])
+            assert_one(session, "UPDATE {} SET s = 50 WHERE a = 5 IF s {} 3".format(table_name, operator), [False])
+
+            assert_none(session, "SELECT * FROM {} WHERE a = 5".format(table_name))
 
     def _validate_non_existing_or_null_values_batch(self, table_name, session):
-        res = session.execute("""
+        assert_one(session, """
             BEGIN BATCH
                 INSERT INTO {table_name} (a, b, d) values (2, 2, 'a');
                 UPDATE {table_name} SET s = 2 WHERE a = 2 IF s = null;
-            APPLY BATCH""".format(table_name=table_name))
-        self.assertEqual(rows_to_list(res),
-                         [[True]])
+            APPLY BATCH""".format(table_name=table_name), [True])
 
-        res = session.execute("SELECT * FROM {table_name} WHERE a = 2".format(table_name=table_name))
-        self.assertEqual(rows_to_list(res),
-                         [[2, 2, 2, "a"]])
+        assert_one(session, "SELECT * FROM {table_name} WHERE a = 2".format(table_name=table_name), [2, 2, 2, "a"])
 
-        res = session.execute("""
+        assert_one(session, """
             BEGIN BATCH
                 INSERT INTO {table_name} (a, b, s, d) values (4, 4, 4, 'a')
                 UPDATE {table_name} SET s = 5 WHERE a = 4 IF s = null;
-            APPLY BATCH""".format(table_name=table_name))
-        self.assertEqual(rows_to_list(res),
-                         [[True]])
+            APPLY BATCH""".format(table_name=table_name), [True])
 
-        res = session.execute("SELECT * FROM {table_name} WHERE a = 4".format(table_name=table_name))
-        self.assertEqual(rows_to_list(res),
-                         [[4, 4, 5, "a"]])
+        assert_one(session, "SELECT * FROM {table_name} WHERE a = 4".format(table_name=table_name), [4, 4, 5, "a"])
 
-        res = session.execute("""
+        assert_one(session, """
             BEGIN BATCH
                 INSERT INTO {table_name} (a, b, s, d) values (5, 5, 5, 'a')
                 UPDATE {table_name} SET s = 6 WHERE a = 5 IF s IN (1,2,null)
-            APPLY BATCH""".format(table_name=table_name))
-        self.assertEqual(rows_to_list(res),
-                         [[True]])
+            APPLY BATCH""".format(table_name=table_name), [True])
 
-        res = session.execute("SELECT * FROM {table_name} WHERE a = 5".format(table_name=table_name))
-        self.assertEqual(rows_to_list(res),
-                         [[5, 5, 6, "a"]])
+        assert_one(session, "SELECT * FROM {table_name} WHERE a = 5".format(table_name=table_name), [5, 5, 6, "a"])
 
-        res = session.execute("""
+        assert_one(session, """
             BEGIN BATCH
                 INSERT INTO {table_name} (a, b, s, d) values (7, 7, 7, 'a')
                 UPDATE {table_name} SET s = 8 WHERE a = 7 IF s != 7;
-            APPLY BATCH""".format(table_name=table_name))
-        self.assertEqual(rows_to_list(res),
-                         [[True]])
+            APPLY BATCH""".format(table_name=table_name), [True])
 
-        res = session.execute("SELECT * FROM {table_name} WHERE a = 7".format(table_name=table_name))
-        self.assertEqual(rows_to_list(res),
-                         [[7, 7, 8, "a"]])
+        assert_one(session, "SELECT * FROM {table_name} WHERE a = 7".format(table_name=table_name), [7, 7, 8, "a"])
 
     @since('2.1')
     def conditional_updates_on_static_columns_with_null_values_batch_test(self):
@@ -999,28 +936,21 @@ class LWTTester(CQLTester):
         self._validate_non_existing_or_null_values_batch(table_name, session)
 
         for operator in [">", "<", ">=", "<=", "="]:
-            res = session.execute("""
+            assert_one(session, """
                 BEGIN BATCH
                     INSERT INTO {table_name} (a, b, s, d) values (3, 3, 40, 'a')
                     UPDATE {table_name} SET s = 30 WHERE a = 3 IF s {operator} 5;
-                APPLY BATCH""".format(table_name=table_name, operator=operator))
-            self.assertEqual(rows_to_list(res),
-                             [[False]])
+                APPLY BATCH""".format(table_name=table_name, operator=operator), [False])
 
-            res = session.execute("SELECT * FROM {table_name} WHERE a = 3".format(table_name=table_name))
-            self.assertEqual(rows_to_list(res),
-                             [[3, 3, None, None]])
+            assert_one(session, "SELECT * FROM {table_name} WHERE a = 3".format(table_name=table_name), [3, 3, None, None])
 
-        res = session.execute("""
+        assert_one(session, """
                 BEGIN BATCH
                     INSERT INTO {table_name} (a, b, s, d) values (6, 6, 70, 'a')
                     UPDATE {table_name} SET s = 60 WHERE a = 6 IF s IN (1,2,3)
-                APPLY BATCH""".format(table_name=table_name))
-        self.assertEqual(rows_to_list(res),
-                         [[False]])
-        res = session.execute("SELECT * FROM {table_name} WHERE a = 6".format(table_name=table_name))
-        self.assertEqual(rows_to_list(res),
-                         [[6, 6, None, None]])
+                APPLY BATCH""".format(table_name=table_name), [False])
+
+        assert_one(session, "SELECT * FROM {table_name} WHERE a = 6".format(table_name=table_name), [6, 6, None, None])
 
     def _conditional_deletes_on_static_columns_with_null_values_test(self, is_2_x):
         """
@@ -1036,52 +966,32 @@ class LWTTester(CQLTester):
         for i in range(1, 6):
             session.execute("INSERT INTO {} (a, b, s1, s2, v) VALUES ({}, {}, {}, null, {})".format(table_name, i, i, i, i))
 
-        res = session.execute("DELETE s1 FROM {} WHERE a = 1 IF s2 = null".format(table_name))
-        self.assertEqual(rows_to_list(res),
-                         [[True]])
+        assert_one(session, "DELETE s1 FROM {} WHERE a = 1 IF s2 = null".format(table_name), [True])
 
-        res = session.execute("SELECT * FROM {} WHERE a = 1".format(table_name))
-        self.assertEqual(rows_to_list(res),
-                         [[1, 1, None, None, 1]])
-
-        res = session.execute("DELETE s1 FROM {} WHERE a = 2 IF s2 IN (10,20,30)".format(table_name))
+        assert_one(session, "SELECT * FROM {} WHERE a = 1".format(table_name), [1, 1, None, None, 1])
 
         if is_2_x:
-            self.assertEqual(rows_to_list(res), [[False, None]])
+            assert_one(session, "DELETE s1 FROM {} WHERE a = 2 IF s2 IN (10,20,30)".format(table_name), [False, None])
         else:
-            self.assertEqual(rows_to_list(res), [[False]])
+            assert_one(session, "DELETE s1 FROM {} WHERE a = 2 IF s2 IN (10,20,30)".format(table_name), [False])
 
-        res = session.execute("SELECT * FROM {} WHERE a = 2".format(table_name))
-        self.assertEqual(rows_to_list(res),
-                         [[2, 2, 2, None, 2]])
+        assert_one(session, "SELECT * FROM {} WHERE a = 2".format(table_name), [2, 2, 2, None, 2])
 
-        res = session.execute("DELETE s1 FROM {} WHERE a = 3 IF s2 IN (null,20,30)".format(table_name))
-        self.assertEqual(rows_to_list(res),
-                         [[True]])
+        assert_one(session, "DELETE s1 FROM {} WHERE a = 3 IF s2 IN (null,20,30)".format(table_name), [True])
 
-        res = session.execute("SELECT * FROM {} WHERE a = 3".format(table_name))
-        self.assertEqual(rows_to_list(res),
-                         [[3, 3, None, None, 3]])
+        assert_one(session, "SELECT * FROM {} WHERE a = 3".format(table_name), [3, 3, None, None, 3])
 
-        res = session.execute("DELETE s1 FROM {} WHERE a = 4 IF s2 != 4".format(table_name))
-        self.assertEqual(rows_to_list(res),
-                         [[True]])
+        assert_one(session, "DELETE s1 FROM {} WHERE a = 4 IF s2 != 4".format(table_name), [True])
 
-        res = session.execute("SELECT * FROM {} WHERE a = 4".format(table_name))
-        self.assertEqual(rows_to_list(res),
-                         [[4, 4, None, None, 4]])
+        assert_one(session, "SELECT * FROM {} WHERE a = 4".format(table_name), [4, 4, None, None, 4])
 
         for operator in [">", "<", ">=", "<=", "="]:
-            res = session.execute("DELETE s1 FROM {} WHERE a = 5 IF s2 {} 3".format(table_name, operator))
             if is_2_x:
-                self.assertEqual(rows_to_list(res),
-                                 [[False, None]])
+                assert_one(session, "DELETE s1 FROM {} WHERE a = 5 IF s2 {} 3".format(table_name, operator), [False, None])
             else:
-                self.assertEqual(rows_to_list(res),
-                                 [[False]])
-            res = session.execute("SELECT * FROM {} WHERE a = 5".format(table_name))
-            self.assertEqual(rows_to_list(res),
-                             [[5, 5, 5, None, 5]])
+                assert_one(session, "DELETE s1 FROM {} WHERE a = 5 IF s2 {} 3".format(table_name, operator), [False])
+
+            assert_one(session, "SELECT * FROM {} WHERE a = 5".format(table_name), [5, 5, 5, None, 5])
 
     @since('2.1', max_version='3.0')
     def conditional_deletes_on_static_columns_with_null_values_test(self):
@@ -1100,71 +1010,51 @@ class LWTTester(CQLTester):
             CREATE TABLE {} (a int, b int, s1 int static, s2 int static, v int, PRIMARY KEY (a, b))
         """.format(table_name))
 
-        res = session.execute("""
+        assert_one(session, """
              BEGIN BATCH
                  INSERT INTO {table_name} (a, b, s1, v) values (2, 2, 2, 2);
                  DELETE s1 FROM {table_name} WHERE a = 2 IF s2 = null;
-             APPLY BATCH""".format(table_name=table_name))
-        self.assertEqual(rows_to_list(res),
-                         [[True]])
+             APPLY BATCH""".format(table_name=table_name), [True])
 
-        res = session.execute("SELECT * FROM {} WHERE a = 2".format(table_name))
-        self.assertEqual(rows_to_list(res),
-                         [[2, 2, None, None, 2]])
+        assert_one(session, "SELECT * FROM {} WHERE a = 2".format(table_name), [2, 2, None, None, 2])
 
         for operator in [">", "<", ">=", "<=", "="]:
-            res = session.execute("""
+            assert_one(session, """
                 BEGIN BATCH
                     INSERT INTO {table_name} (a, b, s1, v) values (3, 3, 3, 3);
                     DELETE s1 FROM {table_name} WHERE a = 3 IF s2 {operator} 5;
-                APPLY BATCH""".format(table_name=table_name, operator=operator))
-            self.assertEqual(rows_to_list(res),
-                             [[False]])
+                APPLY BATCH""".format(table_name=table_name, operator=operator), [False])
 
-            res = session.execute("SELECT * FROM {} WHERE a = 3".format(table_name))
-            self.assertEqual(rows_to_list(res), [])
+            assert_none(session, "SELECT * FROM {} WHERE a = 3".format(table_name))
 
-        res = session.execute("""
+        assert_one(session, """
              BEGIN BATCH
                  INSERT INTO {table_name} (a, b, s1, v) values (6, 6, 6, 6);
                  DELETE s1 FROM {table_name} WHERE a = 6 IF s2 IN (1,2,3);
-             APPLY BATCH""".format(table_name=table_name))
-        self.assertEqual(rows_to_list(res),
-                         [[False]])
-        res = session.execute("SELECT * FROM {} WHERE a = 6".format(table_name))
-        self.assertEqual(rows_to_list(res), [])
+             APPLY BATCH""".format(table_name=table_name), [False])
 
-        res = session.execute("""
+        assert_none(session, "SELECT * FROM {} WHERE a = 6".format(table_name))
+
+        assert_one(session, """
              BEGIN BATCH
                  INSERT INTO {table_name} (a, b, s1, v) values (4, 4, 4, 4);
                  DELETE s1 FROM {table_name} WHERE a = 4 IF s2 = null;
-             APPLY BATCH""".format(table_name=table_name))
-        self.assertEqual(rows_to_list(res),
-                         [[True]])
+             APPLY BATCH""".format(table_name=table_name), [True])
 
-        res = session.execute("SELECT * FROM {} WHERE a = 4".format(table_name))
-        self.assertEqual(rows_to_list(res),
-                         [[4, 4, None, None, 4]])
+        assert_one(session, "SELECT * FROM {} WHERE a = 4".format(table_name), [4, 4, None, None, 4])
 
-        res = session.execute("""
+        assert_one(session, """
             BEGIN BATCH
                 INSERT INTO {table_name} (a, b, s1, v) VALUES (5, 5, 5, 5);
                 DELETE s1 FROM {table_name} WHERE a = 5 IF s1 IN (1,2,null);
-            APPLY BATCH""".format(table_name=table_name))
-        self.assertEqual(rows_to_list(res),
-                         [[True]])
-        res = session.execute("SELECT * FROM {} WHERE a = 5".format(table_name))
-        self.assertEqual(rows_to_list(res),
-                         [[5, 5, None, None, 5]])
+            APPLY BATCH""".format(table_name=table_name), [True])
 
-        res = session.execute("""
+        assert_one(session, "SELECT * FROM {} WHERE a = 5".format(table_name), [5, 5, None, None, 5])
+
+        assert_one(session, """
             BEGIN BATCH
                 INSERT INTO {table_name} (a, b, s1, v) values (7, 7, 7, 7);
                 DELETE s1 FROM {table_name} WHERE a = 7 IF s2 != 7;
-            APPLY BATCH""".format(table_name=table_name))
-        self.assertEqual(rows_to_list(res),
-                         [[True]])
+            APPLY BATCH""".format(table_name=table_name), [True])
 
-        res = session.execute("SELECT * FROM {} WHERE a = 7".format(table_name))
-        self.assertEqual(rows_to_list(res),
-                         [[7, 7, None, None, 7]])
+        assert_one(session, "SELECT * FROM {} WHERE a = 7".format(table_name), [7, 7, None, None, 7])

@@ -5,6 +5,7 @@ from cassandra import ConsistencyLevel as CL
 
 from upgrade_base import UPGRADE_TEST_RUN, UpgradeTester
 from upgrade_manifest import build_upgrade_pairs
+from nose.tools import assert_not_in
 
 
 class TestForRegressions(UpgradeTester):
@@ -59,7 +60,7 @@ class TestForRegressions(UpgradeTester):
 
 for path in build_upgrade_pairs():
     gen_class_name = TestForRegressions.__name__ + path.name
-    assert gen_class_name not in globals(), gen_class_name
+    assert_not_in(gen_class_name, globals())
     spec = {'UPGRADE_PATH': path,
             '__test__': UPGRADE_TEST_RUN}
     globals()[gen_class_name] = type(gen_class_name, (TestForRegressions,), spec)

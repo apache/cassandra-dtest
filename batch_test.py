@@ -5,7 +5,7 @@ from unittest import skipIf
 from cassandra import ConsistencyLevel, Timeout, Unavailable
 from cassandra.query import SimpleStatement
 
-from assertions import assert_invalid, assert_one, assert_unavailable
+from assertions import assert_invalid, assert_one, assert_unavailable, assert_all
 from dtest import CASSANDRA_DIR, Tester, debug
 from tools import since
 
@@ -34,8 +34,7 @@ class TestBatch(Tester):
             UPDATE clicks SET total = total + 1 WHERE userid = 2 and url = 'http://baz.com'
             APPLY BATCH
         """)
-        rows = session.execute("SELECT total FROM clicks")
-        assert [list(rows[0]), list(rows[1]), list(rows[2])] == [[1], [1], [1]], rows
+        assert_all(session, "SELECT total FROM clicks", [[1], [1], [1]])
 
     def counter_batch_rejects_regular_mutations_test(self):
         """ Test that counter batch rejects non-counter mutations """
@@ -60,9 +59,7 @@ class TestBatch(Tester):
             INSERT INTO users (id, firstname, lastname) VALUES (1, 'Will', 'Turner')
             APPLY BATCH
         """)
-        rows = session.execute("SELECT * FROM users")
-        res = sorted(rows)
-        assert [list(res[0]), list(res[1])] == [[0, u'Jack', u'Sparrow'], [1, u'Will', u'Turner']], res
+        assert_all(session, "SELECT * FROM users", [[1, u'Will', u'Turner'], [0, u'Jack', u'Sparrow']])
 
     @since('3.0')
     def logged_batch_gcgs_below_threshold_single_table_test(self):
@@ -151,9 +148,7 @@ class TestBatch(Tester):
             INSERT INTO users (id, firstname, lastname) VALUES (2, 'Elizabeth', 'Swann')
             APPLY BATCH
         """)
-        rows = session.execute("SELECT * FROM users")
-        res = sorted(rows)
-        assert [list(res[0]), list(res[1])] == [[0, u'Jack', u'Sparrow'], [2, u'Elizabeth', u'Swann']], res
+        assert_all(session, "SELECT * FROM users", [[0, u'Jack', u'Sparrow'], [2, u'Elizabeth', u'Swann']])
 
     def unlogged_batch_rejects_counter_mutations_test(self):
         """ Test that unlogged batch rejects counter mutations """
@@ -191,7 +186,7 @@ class TestBatch(Tester):
             APPLY BATCH
         """, consistency_level=ConsistencyLevel.ANY)
         session.execute(query)
-        assert True
+        assert_all(session, "SELECT * FROM users", [[1, u'Will', u'Turner'], [0, u'Jack', u'Sparrow']])
 
     def acknowledged_by_batchlog_not_set_when_batchlog_write_fails_test(self):
         """ Test that acknowledged_by_batchlog is False if batchlog can't be written """
@@ -226,9 +221,8 @@ class TestBatch(Tester):
             INSERT INTO users (id, firstname, lastname) VALUES (1, 'Will', 'Turner')
             APPLY BATCH
         """)
-        rows = session.execute("SELECT id, writetime(firstname), writetime(lastname) FROM users")
-        res = sorted(rows)
-        assert [list(res[0]), list(res[1])] == [[0, 1111111111111111, 1111111111111111], [1, 1111111111111111, 1111111111111111]], res
+        query = "SELECT id, writetime(firstname), writetime(lastname) FROM users"
+        assert_all(session, query, [[1, 1111111111111111, 1111111111111111], [0, 1111111111111111, 1111111111111111]])
 
     def only_one_timestamp_is_valid_test(self):
         """ Test that TIMESTAMP must not be used in the statements within the batch. """
@@ -249,9 +243,9 @@ class TestBatch(Tester):
             INSERT INTO users (id, firstname, lastname) VALUES (1, 'Will', 'Turner') USING TIMESTAMP 1111111111111112
             APPLY BATCH
         """)
-        rows = session.execute("SELECT id, writetime(firstname), writetime(lastname) FROM users")
-        res = sorted(rows)
-        assert [list(res[0]), list(res[1])] == [[0, 1111111111111111, 1111111111111111], [1, 1111111111111112, 1111111111111112]], res
+
+        query = "SELECT id, writetime(firstname), writetime(lastname) FROM users"
+        assert_all(session, query, [[1, 1111111111111112, 1111111111111112], [0, 1111111111111111, 1111111111111111]])
 
     def multi_table_batch_for_10554_test(self):
         """ Test a batch on 2 tables having different columns, restarting the node afterwards, to reproduce CASSANDRA-10554 """

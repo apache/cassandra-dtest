@@ -2,17 +2,17 @@ import Queue
 import sys
 import threading
 import time
-import traceback
 from collections import OrderedDict
 from copy import deepcopy
 
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
 
-from assertions import assert_none, assert_unavailable
-from dtest import DISABLE_VNODES, Tester, debug
+from assertions import assert_none, assert_unavailable, assert_length_equal
+from dtest import DISABLE_VNODES, Tester, debug, MultiError
 from tools import (create_c1c2_table, insert_c1c2, insert_columns,
                    known_failure, query_c1c2, rows_to_list, since)
+from nose.tools import assert_greater_equal
 
 
 class TestHelper(Tester):
@@ -141,29 +141,29 @@ class TestHelper(Tester):
             ) WITH COMPACT STORAGE""")
 
     def insert_user(self, session, userid, age, consistency, serial_consistency=None):
-        text = "INSERT INTO users (userid, firstname, lastname, age) VALUES (%d, 'first%d', 'last%d', %d) %s" \
-            % (userid, userid, userid, age, "IF NOT EXISTS" if serial_consistency else "")
+        text = "INSERT INTO users (userid, firstname, lastname, age) VALUES ({}, 'first{}', 'last{}', {}) {}"\
+            .format(userid, userid, userid, age, "IF NOT EXISTS" if serial_consistency else "")
         statement = SimpleStatement(text, consistency_level=consistency, serial_consistency_level=serial_consistency)
         session.execute(statement)
 
     def update_user(self, session, userid, age, consistency, serial_consistency=None, prev_age=None):
-        text = "UPDATE users SET age = %d WHERE userid = %d" % (age, userid)
+        text = "UPDATE users SET age = {} WHERE userid = {}".format(age, userid)
         if serial_consistency and prev_age:
-            text = text + " IF age = %d" % (prev_age)
+            text = text + " IF age = {}".format(prev_age)
         statement = SimpleStatement(text, consistency_level=consistency, serial_consistency_level=serial_consistency)
         session.execute(statement)
 
     def delete_user(self, session, userid, consistency):
-        statement = SimpleStatement("DELETE FROM users where userid = %d" % (userid,), consistency_level=consistency)
+        statement = SimpleStatement("DELETE FROM users where userid = {}".format(userid), consistency_level=consistency)
         session.execute(statement)
 
     def query_user(self, session, userid, age, consistency, check_ret=True):
-        statement = SimpleStatement("SELECT userid, age FROM users where userid = %d" % (userid,), consistency_level=consistency)
+        statement = SimpleStatement("SELECT userid, age FROM users where userid = {}".format(userid), consistency_level=consistency)
         res = session.execute(statement)
         expected = [[userid, age]] if age else []
         ret = rows_to_list(res) == expected
         if check_ret:
-            assert ret, "Got %s from %s, expected %s at %s" % (rows_to_list(res), session.cluster.contact_points, expected, self._name(consistency))
+            self.assertTrue(ret, "Got {} from {}, expected {} at {}".format(rows_to_list(res), session.cluster.contact_points, expected, self._name(consistency)))
         return ret
 
     def create_counters_table(self, session):
@@ -175,20 +175,21 @@ class TestHelper(Tester):
         """)
 
     def update_counter(self, session, id, consistency, serial_consistency=None):
-        text = "UPDATE counters SET c = c + 1 WHERE id = %d" % (id,)
+        text = "UPDATE counters SET c = c + 1 WHERE id = {}".format(id)
         statement = SimpleStatement(text, consistency_level=consistency, serial_consistency_level=serial_consistency)
         session.execute(statement)
         return statement
 
     def query_counter(self, session, id, val, consistency, check_ret=True):
-        statement = SimpleStatement("SELECT * from counters WHERE id = %d" % (id,), consistency_level=consistency)
+        statement = SimpleStatement("SELECT * from counters WHERE id = {}".format(id), consistency_level=consistency)
         res = session.execute(statement)
         ret = rows_to_list(res)
         if check_ret:
-            assert ret[0][1] == val, "Got %s from %s, expected %s at %s" % (ret[0][1],
-                                                                            session.cluster.contact_points,
-                                                                            val,
-                                                                            self._name(consistency))
+            self.assertEqual(ret[0][1], val, "Got {} from {}, expected {} at {}".format(ret[0][1],
+                                                                                        session.cluster.contact_points,
+                                                                                        val,
+                                                                                        self._name(consistency)))
+
         return ret[0][1] if ret else 0
 
     def read_counter(self, session, id, consistency):
@@ -196,7 +197,7 @@ class TestHelper(Tester):
         Return the current counter value. If we find no value we return zero
         because after the next update the counter will become one.
         """
-        statement = SimpleStatement("SELECT c from counters WHERE id = %d" % (id,), consistency_level=consistency)
+        statement = SimpleStatement("SELECT c from counters WHERE id = {}".format(id), consistency_level=consistency)
         ret = rows_to_list(session.execute(statement))
         return ret[0][0] if ret else 0
 
@@ -217,7 +218,7 @@ class TestAvailability(TestHelper):
 
         num_alive = nodes
         for node in xrange(nodes):
-            debug('Testing node %d in single dc with %d nodes alive' % (node, num_alive,))
+            debug('Testing node {} in single dc with {} nodes alive'.format(node, num_alive))
             session = self.patient_exclusive_cql_connection(cluster.nodelist()[node], self.ksname)
             for combination in combinations:
                 self._test_insert_query_from_node(session, 0, [rf], [num_alive], *combination)
@@ -238,9 +239,9 @@ class TestAvailability(TestHelper):
         rf_factors = rf.values()
 
         for i in xrange(0, len(nodes)):  # for each dc
-            self.log('Testing dc %d with rf %d and %s nodes alive' % (i, rf_factors[i], nodes_alive))
+            self.log('Testing dc {} with rf {} and {} nodes alive'.format(i, rf_factors[i], nodes_alive))
             for n in xrange(nodes[i]):  # for each node in this dc
-                self.log('Testing node %d in dc %d with %s nodes alive' % (n, i, nodes_alive))
+                self.log('Testing node {} in dc {} with {} nodes alive'.format(n, i, nodes_alive))
                 node = n + sum(nodes[:i])
                 session = self.patient_exclusive_cql_connection(cluster.nodelist()[node], self.ksname)
                 for combination in combinations:
@@ -396,8 +397,8 @@ class TestAccuracy(TestHelper):
             self.read_cl = read_cl
             self.serial_cl = serial_cl
 
-            outer.log('Testing accuracy with WRITE/READ/SERIAL consistency set to %s/%s/%s (keys : %d to %d)'
-                      % (outer._name(write_cl), outer._name(read_cl), outer._name(serial_cl), start, end - 1))
+            outer.log('Testing accuracy with WRITE/READ/SERIAL consistency set to {}/{}/{} (keys : {} to {})'
+                      .format(outer._name(write_cl), outer._name(read_cl), outer._name(serial_cl), start, end - 1))
 
         def get_num_nodes(self, idx):
             """
@@ -447,9 +448,8 @@ class TestAccuracy(TestHelper):
                 for s in sessions:
                     if outer.query_user(s, n, val, read_cl, check_ret=strong_consistency):
                         num += 1
-                assert num >= write_nodes, \
-                    "Failed to read value from sufficient number of nodes, required %d but  got %d - [%d, %s]" \
-                    % (write_nodes, num, n, val)
+                assert_greater_equal(num, write_nodes, "Failed to read value from sufficient number of nodes, required {} but got {} - [{}, {}]"
+                                     .format(write_nodes, num, n, val))
 
             for n in xrange(start, end):
                 age = 30
@@ -485,9 +485,8 @@ class TestAccuracy(TestHelper):
                 results = []
                 for s in sessions:
                     results.append(outer.query_counter(s, n, val, read_cl, check_ret=strong_consistency))
-                assert results.count(val) >= write_nodes, \
-                    "Failed to read value from sufficient number of nodes, required %d nodes to have a counter " \
-                    "value of %s at key %d, instead got these values: %s" % (write_nodes, val, n, results)
+                assert_greater_equal(results.count(val), write_nodes, "Failed to read value from sufficient number of nodes, required {} nodes to have a counter "
+                                     "value of {} at key {}, instead got these values: {}".format(write_nodes, val, n, results))
 
             for n in xrange(start, end):
                 c = outer.read_counter(sessions[0], n, ConsistencyLevel.ALL)
@@ -537,10 +536,8 @@ class TestAccuracy(TestHelper):
                 break
 
         if not exceptions_queue.empty():
-            err_type, err, err_traceback = exceptions_queue.get()
-            debug("Failed with exception {}: {}".format(err_type, err.message))
-            traceback.print_exception(err_type, err, err_traceback)
-            assert False, err.message
+            _, exceptions, tracebacks = zip(*exceptions_queue.queue)
+            raise MultiError(exceptions=exceptions, tracebacks=tracebacks)
 
     def test_simple_strategy_users(self):
         """
@@ -785,10 +782,11 @@ class TestConsistency(Tester):
             query = SimpleStatement('SELECT c, v FROM cf WHERE key=\'k0\' LIMIT 3', consistency_level=ConsistencyLevel.QUORUM)
             rows = list(session.execute(query))
             res = rows
-            assert len(res) == 3, 'Expecting 3 values, got %d (%s)' % (len(res), str(res))
+            assert_length_equal(res, 3)
+
             # value 0, 1 and 2 have been deleted
             for i in xrange(1, 4):
-                assert res[i - 1][1] == 'value%d' % (i + 2), 'Expecting value%d, got %s (%s)' % (i + 2, res[i - 1][1], str(res))
+                self.assertEqual(res[i - 1][1], 'value{}'.format(i + 2), 'Expecting value{}, got {} ({})'.format(i + 2, res[i - 1][1], str(res)))
 
             truncate_statement = SimpleStatement('TRUNCATE cf', consistency_level=ConsistencyLevel.QUORUM)
             session.execute(truncate_statement)
@@ -824,9 +822,7 @@ class TestConsistency(Tester):
         # Query first column
         session = self.patient_cql_connection(node1, 'ks')
 
-        query = SimpleStatement('SELECT c, v FROM cf WHERE key=\'k0\' LIMIT 1', consistency_level=ConsistencyLevel.QUORUM)
-        res = list(session.execute(query))
-        assert len(res) == 0, res
+        assert_none(session, "SELECT c, v FROM cf WHERE key=\'k0\' LIMIT 1", cl=ConsistencyLevel.QUORUM)
 
     def short_read_quorum_delete_test(self):
         """
@@ -935,10 +931,11 @@ class TestConsistency(Tester):
             query = SimpleStatement('SELECT c, v FROM cf WHERE key=\'k0\' ORDER BY c DESC LIMIT 3', consistency_level=ConsistencyLevel.QUORUM)
             rows = list(session.execute(query))
             res = rows
-            assert len(res) == 3, 'Expecting 3 values, got %d (%s)' % (len(res), str(res))
+            assert_length_equal(res, 3)
+
             # value 6, 7 and 8 have been deleted
             for i in xrange(0, 3):
-                assert res[i][1] == 'value%d' % (5 - i), 'Expecting value%d, got %s (%s)' % (5 - i, res[i][1], str(res))
+                self.assertEqual(res[i][1], 'value%d' % (5 - i), 'Expecting value {}, got {} ({})'.format(5 - i, res[i][1], str(res)))
 
             session.execute('TRUNCATE cf')
 
