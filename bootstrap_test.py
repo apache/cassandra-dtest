@@ -255,10 +255,7 @@ class TestBootstrap(Tester):
         node3 = new_node(cluster)
         # keep timeout low so that test won't hang
         node3.set_configuration_options(values={'streaming_socket_timeout_in_ms': 1000})
-        try:
-            node3.start(wait_other_notice=False)
-        except NodeError:
-            pass  # node doesn't start as expected
+        node3.start(wait_other_notice=False, wait_for_binary_proto=True)
         t.join()
 
         # wait for node3 ready to query
