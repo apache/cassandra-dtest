@@ -3,6 +3,7 @@ from __future__ import with_statement
 import ConfigParser
 import copy
 import errno
+import glob
 import logging
 import os
 import pprint
@@ -17,7 +18,6 @@ import threading
 import time
 import traceback
 import types
-import glob
 from collections import OrderedDict
 from unittest import TestCase
 
@@ -316,6 +316,10 @@ class Tester(TestCase):
         self.var_debug(cluster)
         self.var_trace(cluster)
 
+    def _cleanup_last_test_dir(self):
+        if os.path.exists(LAST_TEST_DIR):
+            os.remove(LAST_TEST_DIR)
+
     def _cleanup_cluster(self):
         if SILENCE_DRIVER_ON_SHUTDOWN:
             # driver logging is very verbose when nodes start going down -- bump up the level
@@ -331,22 +335,24 @@ class Tester(TestCase):
                 self.cluster.stop(gently=True)
 
             # Cleanup everything:
-            debug("removing ccm cluster " + self.cluster.name + " at: " + self.test_path)
-            self.cluster.remove()
+            try:
+                self.stop_active_log_watch()
+            finally:
+                debug("removing ccm cluster {name} at: {path}".format(name=self.cluster.name, path=self.test_path))
+                self.cluster.remove()
 
-            debug("clearing ssl stores from [{0}] directory".format(self.test_path))
-            for filename in ('keystore.jks', 'truststore.jks', 'ccm_node.cer'):
-                try:
-                    os.remove(os.path.join(self.test_path, filename))
-                except OSError as e:
-                    # once we port to py3, which has better reporting for exceptions raised while
-                    # handling other excpetions, we should just assert e.errno == errno.ENOENT
-                    if e.errno != errno.ENOENT:  # ENOENT = no such file or directory
-                        raise
+                debug("clearing ssl stores from [{0}] directory".format(self.test_path))
+                for filename in ('keystore.jks', 'truststore.jks', 'ccm_node.cer'):
+                    try:
+                        os.remove(os.path.join(self.test_path, filename))
+                    except OSError as e:
+                        # once we port to py3, which has better reporting for exceptions raised while
+                        # handling other excpetions, we should just assert e.errno == errno.ENOENT
+                        if e.errno != errno.ENOENT:  # ENOENT = no such file or directory
+                            raise
 
-            os.rmdir(self.test_path)
-        if os.path.exists(LAST_TEST_DIR):
-            os.remove(LAST_TEST_DIR)
+                os.rmdir(self.test_path)
+                self._cleanup_last_test_dir()
 
     def set_node_to_current_version(self, node):
         version = os.environ.get('CASSANDRA_VERSION')
@@ -442,16 +448,39 @@ class Tester(TestCase):
         Calls into ccm to start actively watching logs.
 
         In the event that errors are seen in logs, ccm will call back to _log_error_handler.
+
+        When the cluster is no longer in use, stop_active_log_watch should be called to end log watching.
+        (otherwise a 'daemon' thread will (needlessly) run until the process exits).
         """
         # log watching happens in another thread, but we want it to halt the main
         # thread's execution, which we have to do by registering a signal handler
         signal.signal(signal.SIGINT, self._catch_interrupt)
-        self.cluster.actively_watch_logs_for_error(self._log_error_handler, interval=0.25)
+        self._log_watch_thread = self.cluster.actively_watch_logs_for_error(self._log_error_handler, interval=0.25)
+
+    def stop_active_log_watch(self):
+        """
+        Joins the log watching thread, which will then exit.
+        Should be called after each test, ideally after nodes are stopped but before cluster files are removed.
+
+        Can be called multiple times without error.
+        If not called, log watching thread will remain running until the parent process exits.
+
+        Returns True if the log watching thread was stopped, otherwise False.
+        """
+        try:
+            self._log_watch_thread
+        except AttributeError:
+            # no thread apparently, so nothing to stop
+            # may happen when allow_log_errors is True, since in that case we don't init a logging thread
+            return False
+        else:
+            self._log_watch_thread.join(timeout=60)
+            return True
 
     def _log_error_handler(self, errordata):
         """
         Callback handler used in conjunction with begin_active_log_watch.
-        When called prepares exception instance, then will indirectly
+        When called, prepares exception instance, then will indirectly
         cause _catch_interrupt to be called, which can raise the exception in the main
         program thread.
 
