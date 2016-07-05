@@ -161,6 +161,9 @@ class TestArchiveCommitlog(SnapshotTester):
         """
         self.run_archive_commitlog(restore_point_in_time=False, archive_active_commitlogs=True)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12139',
+                   flaky=True)
     def dont_test_archive_commitlog(self):
         """
         Run the archive commitlog test, but forget to add the restore commands
@@ -274,6 +277,8 @@ class TestArchiveCommitlog(SnapshotTester):
             # is not one of the active commit logs:
             commitlog_dir = os.path.join(node1.get_path(), 'commitlogs')
             debug("node1 commitlog dir: " + commitlog_dir)
+            debug("node1 commitlog dir contents: " + str(os.listdir(commitlog_dir)))
+            debug("tmp_commitlog contents: " + str(os.listdir(tmp_commitlog)))
 
             self.assertNotEqual(set(os.listdir(tmp_commitlog)) - set(os.listdir(commitlog_dir)),
                                 set())

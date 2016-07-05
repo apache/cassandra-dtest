@@ -9,7 +9,7 @@ from tools import rows_to_list, since, known_failure
 class TestJson(Tester):
 
     @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11975',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11952',
                    flaky=False
                    )
     def json_tools_test(self):

@@ -24,6 +24,9 @@ class TestIncRepair(Tester):
         ]
         Tester.__init__(self, *args, **kwargs)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12135',
+                   flaky=True)
     def sstable_marking_test(self):
         """
         * Launch a three node cluster

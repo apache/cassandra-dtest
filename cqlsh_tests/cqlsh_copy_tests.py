@@ -2329,6 +2329,9 @@ class CqlshCopyTest(Tester):
     def test_round_trip_murmur3(self):
         self._test_round_trip(nodes=3, partitioner="murmur3")
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12136',
+                   flaky=True)
     @freshCluster()
     def test_round_trip_random(self):
         self._test_round_trip(nodes=3, partitioner="random")

@@ -37,12 +37,9 @@ def _repair_options(version, ks='', cf=None, sequential=True):
         opts += [cf]
     return opts
 
-LEGACY_SSTABLES_JVM_ARGS = ["-Dcassandra.streamdes.initial_mem_buffer_size=1",
-                            "-Dcassandra.streamdes.max_mem_buffer_size=5",
-                            "-Dcassandra.streamdes.max_spill_file_size=16"]
 
-
-class TestRepair(Tester):
+class BaseRepairTest(Tester):
+    __test__ = False
 
     def check_rows_on_node(self, node_to_check, rows, found=None, missings=None, restart=True):
         """
@@ -65,7 +62,7 @@ class TestRepair(Tester):
                 stopped_nodes.append(node)
                 node.stop(wait_other_notice=True)
 
-        session = self.patient_cql_connection(node_to_check, 'ks')
+        session = self.patient_exclusive_cql_connection(node_to_check, 'ks')
         result = list(session.execute("SELECT * FROM cf LIMIT {}".format(rows * 2)))
         self.assertEqual(len(result), rows)
 
@@ -80,6 +77,75 @@ class TestRepair(Tester):
         if restart:
             for node in stopped_nodes:
                 node.start(wait_other_notice=True)
+
+    def _populate_cluster(self, start=True):
+        cluster = self.cluster
+
+        # Disable hinted handoff and set batch commit log so this doesn't
+        # interfere with the test (this must be after the populate)
+        cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
+        cluster.set_batch_commitlog(enabled=True)
+        debug("Starting cluster..")
+        cluster.populate(3).start()
+        node1, node2, node3 = cluster.nodelist()
+
+        session = self.patient_cql_connection(node1)
+        self.create_ks(session, 'ks', 3)
+        self.create_cf(session, 'cf', read_repair=0.0, columns={'c1': 'text', 'c2': 'text'})
+
+        # Insert 1000 keys, kill node 3, insert 1 key, restart node 3, insert 1000 more keys
+        debug("Inserting data...")
+        insert_c1c2(session, n=1000, consistency=ConsistencyLevel.ALL)
+        node3.flush()
+        node3.stop(wait_other_notice=True)
+        insert_c1c2(session, keys=(1000, ), consistency=ConsistencyLevel.TWO)
+        node3.start(wait_other_notice=True, wait_for_binary_proto=True)
+        insert_c1c2(session, keys=range(1001, 2001), consistency=ConsistencyLevel.ALL)
+
+        cluster.flush()
+
+    def _repair_and_verify(self, sequential=True):
+        cluster = self.cluster
+        node1, node2, node3 = cluster.nodelist()
+
+        # Verify that node3 has only 2000 keys
+        debug("Checking data on node3...")
+        self.check_rows_on_node(node3, 2000, missings=[1000])
+
+        # Verify that node1 has 2001 keys
+        debug("Checking data on node1...")
+        self.check_rows_on_node(node1, 2001, found=[1000])
+
+        # Verify that node2 has 2001 keys
+        debug("Checking data on node2...")
+        self.check_rows_on_node(node2, 2001, found=[1000])
+
+        time.sleep(10)  # see CASSANDRA-4373
+        # Run repair
+        start = time.time()
+        debug("starting repair...")
+        node1.repair(_repair_options(self.cluster.version(), ks='ks', sequential=sequential))
+        debug("Repair time: {end}".format(end=time.time() - start))
+
+        # Validate that only one range was transfered
+        out_of_sync_logs = node1.grep_log("/([0-9.]+) and /([0-9.]+) have ([0-9]+) range\(s\) out of sync")
+
+        self.assertEqual(len(out_of_sync_logs), 2, "Lines matching: " + str([elt[0] for elt in out_of_sync_logs]))
+
+        valid_out_of_sync_pairs = [{node1.address(), node3.address()},
+                                   {node2.address(), node3.address()}]
+
+        for line, m in out_of_sync_logs:
+            num_out_of_sync_ranges, out_of_sync_nodes = m.group(3), {m.group(1), m.group(2)}
+            self.assertEqual(int(num_out_of_sync_ranges), 1, "Expecting 1 range out of sync for {}, but saw {}".format(out_of_sync_nodes, line))
+            self.assertIn(out_of_sync_nodes, valid_out_of_sync_pairs, str(out_of_sync_nodes))
+
+        # Check node3 now has the key
+        self.check_rows_on_node(node3, 2001, found=[1000], restart=False)
+
+
+class TestRepair(BaseRepairTest):
+    __test__ = True
 
     @since('2.2.1')
     def no_anticompaction_after_dclocal_repair_test(self):
@@ -196,31 +262,6 @@ class TestRepair(Tester):
         """
         self._empty_vs_gcable_no_repair(sequential=False)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12057',
-                   flaky=False)
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12065',
-                   flaky=True,
-                   notes='windows')
-    @since('3.0')
-    def repair_after_upgrade_test(self):
-        """
-        @jira_ticket CASSANDRA-10990
-        """
-        default_install_dir = self.cluster.get_install_dir()
-        cluster = self.cluster
-        cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
-        cluster.set_batch_commitlog(enabled=True)
-
-        # Forcing cluster version on purpose
-        debug("Starting cluster..")
-        cluster.set_install_dir(version="2.1.9")
-        self._populate_cluster()
-
-        self._do_upgrade(default_install_dir)
-        self._repair_and_verify(True)
-
     @no_vnodes()
     def simple_repair_order_preserving_test(self):
         """
@@ -228,32 +269,6 @@ class TestRepair(Tester):
         @jira_ticket CASSANDRA-5220
         """
         self._simple_repair(order_preserving_partitioner=True)
-
-    def _populate_cluster(self, start=True):
-        cluster = self.cluster
-
-        # Disable hinted handoff and set batch commit log so this doesn't
-        # interfere with the test (this must be after the populate)
-        cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
-        cluster.set_batch_commitlog(enabled=True)
-        debug("Starting cluster..")
-        cluster.populate(3).start()
-        node1, node2, node3 = cluster.nodelist()
-
-        session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'ks', 3)
-        self.create_cf(session, 'cf', read_repair=0.0, columns={'c1': 'text', 'c2': 'text'})
-
-        # Insert 1000 keys, kill node 3, insert 1 key, restart node 3, insert 1000 more keys
-        debug("Inserting data...")
-        insert_c1c2(session, n=1000, consistency=ConsistencyLevel.ALL)
-        node3.flush()
-        node3.stop(wait_other_notice=True)
-        insert_c1c2(session, keys=(1000, ), consistency=ConsistencyLevel.TWO)
-        node3.start(wait_other_notice=True, wait_for_binary_proto=True)
-        insert_c1c2(session, keys=range(1001, 2001), consistency=ConsistencyLevel.ALL)
-
-        cluster.flush()
 
     def _simple_repair(self, order_preserving_partitioner=False, sequential=True):
         """
@@ -279,45 +294,6 @@ class TestRepair(Tester):
 
         self._populate_cluster()
         self._repair_and_verify(sequential)
-
-    def _repair_and_verify(self, sequential=True):
-        cluster = self.cluster
-        node1, node2, node3 = cluster.nodelist()
-
-        # Verify that node3 has only 2000 keys
-        debug("Checking data on node3...")
-        self.check_rows_on_node(node3, 2000, missings=[1000])
-
-        # Verify that node1 has 2001 keys
-        debug("Checking data on node1...")
-        self.check_rows_on_node(node1, 2001, found=[1000])
-
-        # Verify that node2 has 2001 keys
-        debug("Checking data on node2...")
-        self.check_rows_on_node(node2, 2001, found=[1000])
-
-        time.sleep(10)  # see CASSANDRA-4373
-        # Run repair
-        start = time.time()
-        debug("starting repair...")
-        node1.repair(_repair_options(self.cluster.version(), ks='ks', sequential=sequential))
-        debug("Repair time: {end}".format(end=time.time() - start))
-
-        # Validate that only one range was transfered
-        out_of_sync_logs = node1.grep_log("/([0-9.]+) and /([0-9.]+) have ([0-9]+) range\(s\) out of sync")
-
-        self.assertEqual(len(out_of_sync_logs), 2, "Lines matching: " + str([elt[0] for elt in out_of_sync_logs]))
-
-        valid_out_of_sync_pairs = [{node1.address(), node3.address()},
-                                   {node2.address(), node3.address()}]
-
-        for line, m in out_of_sync_logs:
-            num_out_of_sync_ranges, out_of_sync_nodes = m.group(3), {m.group(1), m.group(2)}
-            self.assertEqual(int(num_out_of_sync_ranges), 1, "Expecting 1 range out of sync for {}, but saw {}".format(out_of_sync_nodes, line))
-            self.assertIn(out_of_sync_nodes, valid_out_of_sync_pairs, str(out_of_sync_nodes))
-
-        # Check node3 now has the key
-        self.check_rows_on_node(node3, 2001, found=[1000], restart=False)
 
     def _empty_vs_gcable_no_repair(self, sequential):
         """
@@ -432,6 +408,9 @@ class TestRepair(Tester):
         # Check node2 now has the key
         self.check_rows_on_node(node2, 2001, found=[1000], restart=False)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12134',
+                   flaky=True)
     def dc_repair_test(self):
         """
         * Set up a multi DC cluster
@@ -787,20 +766,6 @@ class TestRepair(Tester):
         node3.stop(wait_other_notice=True)
         (stdout, stderr) = node2.stress(['read', 'n=1M', 'no-warmup', '-rate', 'threads=30', '-node', node2.address()], capture_output=True)
         self.assertTrue(len(stderr) == 0, stderr)
-
-    def _do_upgrade(self, default_install_dir):
-        cluster = self.cluster
-
-        for node in cluster.nodelist():
-            debug("Upgrading %s" % node.name)
-            if node.is_running():
-                node.flush()
-                time.sleep(1)
-                node.stop(wait_other_notice=True)
-            node.set_install_dir(install_dir=default_install_dir)
-            node.start(wait_other_notice=True, wait_for_binary_proto=True)
-            cursor = self.patient_cql_connection(node)
-        cluster.set_install_dir(default_install_dir)
 
 RepairTableContents = namedtuple('RepairTableContents',
                                  ['parent_repair_history', 'repair_history'])

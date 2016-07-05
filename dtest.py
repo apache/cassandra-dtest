@@ -3,6 +3,7 @@ from __future__ import with_statement
 import ConfigParser
 import copy
 import errno
+import glob
 import logging
 import os
 import pprint
@@ -17,7 +18,6 @@ import threading
 import time
 import traceback
 import types
-import glob
 from collections import OrderedDict
 from unittest import TestCase
 import unittest.case
@@ -316,16 +316,19 @@ class Tester(TestCase):
         Calls into ccm to start actively watching logs.
 
         In the event that errors are seen in logs, ccm will call back to _log_error_handler.
+
+        When the cluster is no longer in use, stop_active_log_watch should be called to end log watching.
+        (otherwise a 'daemon' thread will (needlessly) run until the process exits).
         """
         # log watching happens in another thread, but we want it to halt the main
         # thread's execution, which we have to do by registering a signal handler
         signal.signal(signal.SIGINT, self._catch_interrupt)
-        self.cluster.actively_watch_logs_for_error(self._log_error_handler, interval=0.25)
+        self._log_watch_thread = self.cluster.actively_watch_logs_for_error(self._log_error_handler, interval=0.25)
 
     def _log_error_handler(self, errordata):
         """
         Callback handler used in conjunction with begin_active_log_watch.
-        When called prepares exception instance, then will indirectly
+        When called, prepares exception instance, then will indirectly
         cause _catch_interrupt to be called, which can raise the exception in the main
         program thread.
 
@@ -576,7 +579,7 @@ class Tester(TestCase):
             query += ' AND compression = {}'
 
         if read_repair is not None:
-            query = '%s AND read_repair_chance=%f' % (query, read_repair)
+            query = '%s AND read_repair_chance=%f AND dclocal_read_repair_chance=%f' % (query, read_repair, read_repair)
         if gc_grace is not None:
             query = '%s AND gc_grace_seconds=%d' % (query, gc_grace)
         if speculative_retry is not None:
@@ -641,7 +644,8 @@ class Tester(TestCase):
             except Exception as e:
                 print "Error saving log:", str(e)
             finally:
-                cleanup_cluster(self.cluster, self.test_path)
+                log_watch_thread = getattr(self, '_log_watch_thread', None)
+                cleanup_cluster(self.cluster, self.test_path, log_watch_thread)
 
     def check_logs_for_errors(self):
         for node in self.cluster.nodelist():
@@ -814,7 +818,7 @@ def create_ccm_cluster(test_path, name):
     return cluster
 
 
-def cleanup_cluster(cluster, test_path):
+def cleanup_cluster(cluster, test_path, log_watch_thread=None):
     if SILENCE_DRIVER_ON_SHUTDOWN:
         # driver logging is very verbose when nodes start going down -- bump up the level
         logging.getLogger('cassandra').setLevel(logging.CRITICAL)
@@ -829,22 +833,41 @@ def cleanup_cluster(cluster, test_path):
             cluster.stop(gently=True)
 
         # Cleanup everything:
-        debug("removing ccm cluster " + cluster.name + " at: " + test_path)
-        cluster.remove()
+        try:
+            if log_watch_thread:
+                stop_active_log_watch(log_watch_thread)
+        finally:
+            debug("removing ccm cluster {name} at: {path}".format(name=cluster.name, path=test_path))
+            cluster.remove()
 
-        debug("clearing ssl stores from [{0}] directory".format(test_path))
-        for filename in ('keystore.jks', 'truststore.jks', 'ccm_node.cer'):
-            try:
-                os.remove(os.path.join(test_path, filename))
-            except OSError as e:
-                # once we port to py3, which has better reporting for exceptions raised while
-                # handling other excpetions, we should just assert e.errno == errno.ENOENT
-                if e.errno != errno.ENOENT:  # ENOENT = no such file or directory
-                    raise
+            debug("clearing ssl stores from [{0}] directory".format(test_path))
+            for filename in ('keystore.jks', 'truststore.jks', 'ccm_node.cer'):
+                try:
+                    os.remove(os.path.join(test_path, filename))
+                except OSError as e:
+                    # once we port to py3, which has better reporting for exceptions raised while
+                    # handling other excpetions, we should just assert e.errno == errno.ENOENT
+                    if e.errno != errno.ENOENT:  # ENOENT = no such file or directory
+                        raise
 
-        os.rmdir(test_path)
+            os.rmdir(test_path)
+            cleanup_last_test_dir()
+
+
+def cleanup_last_test_dir():
     if os.path.exists(LAST_TEST_DIR):
         os.remove(LAST_TEST_DIR)
+
+
+def stop_active_log_watch(log_watch_thread):
+    """
+    Joins the log watching thread, which will then exit.
+    Should be called after each test, ideally after nodes are stopped but before cluster files are removed.
+
+    Can be called multiple times without error.
+    If not called, log watching thread will remain running until the parent process exits.
+    """
+    log_watch_thread.join(timeout=60)
 
 
 def maybe_cleanup_cluster_from_last_test_file():
