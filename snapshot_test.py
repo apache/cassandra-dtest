@@ -7,7 +7,7 @@ import time
 
 from cassandra.concurrent import execute_concurrent_with_args
 
-from dtest import Tester, debug, create_ccm_cluster, cleanup_cluster
+from dtest import Tester, debug, create_ccm_cluster, cleanup_cluster, get_test_path
 from tools import known_failure, replace_in_file, safe_mkdtemp
 
 
@@ -290,6 +290,7 @@ class TestArchiveCommitlog(SnapshotTester):
             cluster.stop()
             self.copy_logs(self.cluster, name=self.id().split(".")[0] + "_pre-restore")
             cleanup_cluster(self.cluster, self.test_path)
+            self.test_path = get_test_path()
             cluster = self.cluster = create_ccm_cluster(self.test_path, name='test')
             cluster.populate(1)
             node1, = cluster.nodelist()
