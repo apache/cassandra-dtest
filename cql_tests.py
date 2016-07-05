@@ -738,10 +738,6 @@ class AbortedQueriesTester(CQLTester):
         assert_unavailable(lambda c: debug(c.execute(statement, [50])), session)
         node.watch_log_for("operations timed out", from_mark=mark, timeout=60)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11898',
-                   flaky=True
-                   )
     def materialized_view_test(self):
         """
         Check that a materialized view query times out:
