@@ -16,10 +16,6 @@ class TestReadRepair(Tester):
         self.cluster.populate(3).start(wait_for_binary_proto=True)
 
     @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12122',
-                   flaky=False,
-                   notes='[[1, 1, None]] not found in [[[1, 1]], [[1, None]]]')
-    @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11266',
                    flaky=False,
                    notes='windows')
@@ -74,7 +70,7 @@ class TestReadRepair(Tester):
             session = self.patient_exclusive_cql_connection(n)
             res = rows_to_list(session.execute(cl_one_stmt))
             # Column a must be 1 everywhere, and column b must be either 1 or None everywhere
-            self.assertIn(res, [[[1, 1]], [[1, None]]])
+            self.assertIn(res[0][:2], [[1, 1], [1, None]])
 
         # Now query at ALL but selecting all columns
         query = "SELECT * FROM alter_rf_test.t1 WHERE k=1"
