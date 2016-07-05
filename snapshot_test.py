@@ -274,6 +274,8 @@ class TestArchiveCommitlog(SnapshotTester):
             # is not one of the active commit logs:
             commitlog_dir = os.path.join(node1.get_path(), 'commitlogs')
             debug("node1 commitlog dir: " + commitlog_dir)
+            debug("node1 commitlog dir contents: " + str(os.listdir(commitlog_dir)))
+            debug("tmp_commitlog contents: " + str(os.listdir(tmp_commitlog)))
 
             self.assertNotEqual(set(os.listdir(tmp_commitlog)) - set(os.listdir(commitlog_dir)),
                                 set())
