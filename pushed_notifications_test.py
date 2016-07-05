@@ -182,9 +182,6 @@ class TestPushedNotifications(Tester):
             self.assertEquals("UP", notifications[1]["change_type"])
             waiter.clear_notifications()
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11702',
-                   flaky=True)
     def restart_node_localhost_test(self):
         """
         Test that we don't get client notifications when rpc_address is set to localhost.
