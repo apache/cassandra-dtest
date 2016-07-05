@@ -5,7 +5,7 @@ from cassandra import ConsistencyLevel
 from ccmlib.node import NodetoolError
 
 from dtest import Tester
-from tools import insert_c1c2, known_failure, query_c1c2
+from tools import insert_c1c2, known_failure, query_c1c2, since
 
 
 class TestRebuild(Tester):
@@ -109,9 +109,7 @@ class TestRebuild(Tester):
         for i in xrange(0, keys):
             query_c1c2(session, i, ConsistencyLevel.ALL)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12111',
-                   flaky=False)
+    @since('3.6')
     def rebuild_ranges_test(self):
         """
         @jira_ticket CASSANDRA-10406
