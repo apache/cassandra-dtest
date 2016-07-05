@@ -2404,11 +2404,11 @@ class CqlshCopyTest(Tester):
         def create_records():
             if not profile:
                 debug('Running stress without any user profile')
-                self.node1.stress(['write', 'n={}'.format(num_operations), 'no-warmup', '-rate', 'threads=50'])
+                self.node1.stress(['write', 'n={} cl=ALL'.format(num_operations), 'no-warmup', '-rate', 'threads=50'])
             else:
                 debug('Running stress with user profile {}'.format(profile))
                 self.node1.stress(['user', 'profile={}'.format(profile), 'ops(insert=1)',
-                                   'n={}'.format(num_operations), 'no-warmup', '-rate', 'threads=50'])
+                                   'n={} cl=ALL'.format(num_operations), 'no-warmup', '-rate', 'threads=50'])
 
             if skip_count_checks:
                 return num_operations
@@ -2501,9 +2501,9 @@ class CqlshCopyTest(Tester):
     def test_bulk_round_trip_blogposts_with_max_connections(self):
         """
         Same as test_bulk_round_trip_blogposts but limit the maximum number of concurrent connections a host will
-        accept to simulate a failed connection to a replica that is up. Here we are interested in testing COPY TO
-        where we should have at most worker_processes * nodes connections plus 1 (the cqlsh connection). For COPY
-        FROM the driver handles retries. We use only 2 worker processes to make sure it suceeds.
+        accept to simulate a failed connection to a replica that is up. Here we are interested in testing COPY TO,
+        where we should have at most worker_processes * nodes connections + 1 connections, the +1 is the cqlsh
+        connection. For COPY FROM the driver handles retries, we use only 2 worker processes to make sure it succeeds.
 
         @jira_ticket CASSANDRA-10938
         """

@@ -477,7 +477,7 @@ UPDATE varcharmaptable SET varcharvarintmap['Vitrum edere possum, mihi non nocet
 
         cmd = u'''create keyspace "ä" WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'};'''
         cmd = cmd.encode('utf8')
-        output, err = node1.run_cqlsh(cmds=cmd, return_output=True)
+        output, err = node1.run_cqlsh(cmds=cmd, return_output=True, cqlsh_options=['--debug'])
 
         err = err.decode('utf8')
         self.assertIn(u'"ä" is not a valid keyspace name', err)
@@ -856,7 +856,26 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
                 PRIMARY KEY (id, col)
                 """
 
-        if LooseVersion(self.cluster.version()) >= LooseVersion('3.0'):
+        if LooseVersion(self.cluster.version()) >= LooseVersion('3.9'):
+            ret += """
+        ) WITH CLUSTERING ORDER BY (col ASC)
+            AND bloom_filter_fp_chance = 0.01
+            AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
+            AND cdc = false
+            AND comment = ''
+            AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32', 'min_threshold': '4'}
+            AND compression = {'chunk_length_in_kb': '64', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+            AND crc_check_chance = 1.0
+            AND dclocal_read_repair_chance = 0.1
+            AND default_time_to_live = 0
+            AND gc_grace_seconds = 864000
+            AND max_index_interval = 2048
+            AND memtable_flush_period_in_ms = 0
+            AND min_index_interval = 128
+            AND read_repair_chance = 0.0
+            AND speculative_retry = '99PERCENTILE';
+        """
+        elif LooseVersion(self.cluster.version()) >= LooseVersion('3.0'):
             ret += """
         ) WITH CLUSTERING ORDER BY (col ASC)
             AND bloom_filter_fp_chance = 0.01
@@ -904,7 +923,30 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
             return ret + "\n" + col_idx_def
 
     def get_users_table_output(self):
-        if LooseVersion(self.cluster.version()) >= LooseVersion('3.0'):
+        if LooseVersion(self.cluster.version()) >= LooseVersion('3.9'):
+            return """
+        CREATE TABLE test.users (
+            userid text PRIMARY KEY,
+            age int,
+            firstname text,
+            lastname text
+        ) WITH bloom_filter_fp_chance = 0.01
+            AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
+            AND cdc = false
+            AND comment = ''
+            AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32', 'min_threshold': '4'}
+            AND compression = {'chunk_length_in_kb': '64', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+            AND crc_check_chance = 1.0
+            AND dclocal_read_repair_chance = 0.1
+            AND default_time_to_live = 0
+            AND gc_grace_seconds = 864000
+            AND max_index_interval = 2048
+            AND memtable_flush_period_in_ms = 0
+            AND min_index_interval = 128
+            AND read_repair_chance = 0.0
+            AND speculative_retry = '99PERCENTILE';
+        """ + self.get_index_output('myindex', 'test', 'users', 'age')
+        elif LooseVersion(self.cluster.version()) >= LooseVersion('3.0'):
             return """
         CREATE TABLE test.users (
             userid text PRIMARY KEY,
@@ -952,7 +994,32 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         return "CREATE INDEX {} ON {}.{} ({});".format(index, ks, table, col)
 
     def get_users_by_state_mv_output(self):
-        return """
+        if LooseVersion(self.cluster.version()) >= LooseVersion('3.9'):
+            return """
+                CREATE MATERIALIZED VIEW test.users_by_state AS
+                SELECT *
+                FROM test.users
+                WHERE state IS NOT NULL AND username IS NOT NULL
+                PRIMARY KEY (state, username)
+                WITH CLUSTERING ORDER BY (username ASC)
+                AND bloom_filter_fp_chance = 0.01
+                AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
+                AND cdc = false
+                AND comment = ''
+                AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32', 'min_threshold': '4'}
+                AND compression = {'chunk_length_in_kb': '64', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+                AND crc_check_chance = 1.0
+                AND dclocal_read_repair_chance = 0.1
+                AND default_time_to_live = 0
+                AND gc_grace_seconds = 864000
+                AND max_index_interval = 2048
+                AND memtable_flush_period_in_ms = 0
+                AND min_index_interval = 128
+                AND read_repair_chance = 0.0
+                AND speculative_retry = '99PERCENTILE';
+               """
+        else:
+            return """
                 CREATE MATERIALIZED VIEW test.users_by_state AS
                 SELECT *
                 FROM test.users
@@ -1411,27 +1478,15 @@ Tracing session:""")
         node1, node2, node3 = self.cluster.nodelist()
         node2.stop(wait_other_notice=True)
 
-        # set request timeout explicitly to force error on schema disagreement before PYTHON-458 is ready (CASSANDRA-10686)
         stdout, stderr = self.run_cqlsh(node1, cmds="""
               CREATE KEYSPACE training WITH replication={'class':'SimpleStrategy','replication_factor':1};
-              DESCRIBE KEYSPACES""", cqlsh_options=['--request-timeout=6'])
+              DESCRIBE KEYSPACES""")
         self.assertIn("training", stdout)
-        self.assertIn("Warning: schema version mismatch detected, which might be caused by DOWN nodes; "
-                      "if this is not the case, check the schema versions of your nodes in system.local "
-                      "and system.peers.",
-                      stderr)
-        self.assertIn("OperationTimedOut: errors={}, last_host=127.0.0.1", stderr)
 
-        # set request timeout explicitly to force error on schema disagreement before PYTHON-458 is ready (CASSANDRA-10686)
         stdout, stderr = self.run_cqlsh(node1, """USE training;
                                                   CREATE TABLE mytable (id int, val text, PRIMARY KEY (id));
-                                                  describe tables""", cqlsh_options=['--request-timeout=6'])
+                                                  describe tables""")
         self.assertIn("mytable", stdout)
-        self.assertIn("Warning: schema version mismatch detected, which might be caused by DOWN nodes; "
-                      "if this is not the case, check the schema versions of your nodes in system.local "
-                      "and system.peers.",
-                      stderr)
-        self.assertIn("OperationTimedOut: errors={}, last_host=127.0.0.1", stderr)
 
     def test_describe_round_trip(self):
         """
