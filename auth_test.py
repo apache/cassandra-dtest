@@ -1,6 +1,7 @@
 import re
 import time
 from collections import namedtuple
+from distutils.version import LooseVersion
 
 from cassandra import AuthenticationFailed, InvalidRequest, Unauthorized
 from cassandra.cluster import NoHostAvailable
@@ -1103,7 +1104,7 @@ class TestAuthRoles(Tester):
         mike.execute("CREATE ROLE role1 WITH PASSWORD = '11111' AND LOGIN = false")
 
         # require ALTER on ALL ROLES or a SPECIFIC ROLE to modify
-        self.assert_unauthenticated('role1 is not permitted to log in', 'role1', '11111')
+        self.assert_login_not_allowed('role1', '11111')
         cassandra.execute("GRANT ALTER on ROLE role1 TO klaus")
         klaus.execute("ALTER ROLE role1 WITH LOGIN = true")
         mike.execute("ALTER ROLE role1 WITH PASSWORD = '22222'")
@@ -1802,30 +1803,29 @@ class TestAuthRoles(Tester):
         # unquoted identifiers and unreserved keyword do not preserve case
         # count
         cassandra.execute("CREATE ROLE ROLE1 WITH PASSWORD = '12345' AND LOGIN = true")
-        self.assert_unauthenticated("Username and/or password are incorrect", 'ROLE1', '12345')
-        self.get_session(user='role1', password='12345')
+        self.assert_unauthenticated('ROLE1', '12345')
 
         cassandra.execute("CREATE ROLE COUNT WITH PASSWORD = '12345' AND LOGIN = true")
-        self.assert_unauthenticated("Username and/or password are incorrect", 'COUNT', '12345')
+        self.assert_unauthenticated('COUNT', '12345')
         self.get_session(user='count', password='12345')
 
         # string literals and quoted names do preserve case
         cassandra.execute("CREATE ROLE 'ROLE2' WITH PASSWORD = '12345' AND LOGIN = true")
         self.get_session(user='ROLE2', password='12345')
-        self.assert_unauthenticated("Username and/or password are incorrect", 'Role2', '12345')
+        self.assert_unauthenticated('Role2', '12345')
 
         cassandra.execute("""CREATE ROLE "ROLE3" WITH PASSWORD = '12345' AND LOGIN = true""")
         self.get_session(user='ROLE3', password='12345')
-        self.assert_unauthenticated("Username and/or password are incorrect", 'Role3', '12345')
+        self.assert_unauthenticated('Role3', '12345')
 
         # when using legacy USER syntax, both unquoted identifiers and string literals preserve case
         cassandra.execute("CREATE USER USER1 WITH PASSWORD '12345'")
         self.get_session(user='USER1', password='12345')
-        self.assert_unauthenticated("Username and/or password are incorrect", 'User1', '12345')
+        self.assert_unauthenticated('User1', '12345')
 
         cassandra.execute("CREATE USER 'USER2' WITH PASSWORD '12345'")
         self.get_session(user='USER2', password='12345')
-        self.assert_unauthenticated("Username and/or password are incorrect", 'User2', '12345')
+        self.assert_unauthenticated('User2', '12345')
 
     def role_requires_login_privilege_to_authenticate_test(self):
         """
@@ -1844,7 +1844,7 @@ class TestAuthRoles(Tester):
 
         cassandra.execute("ALTER ROLE mike WITH LOGIN = false")
         assert_one(cassandra, "LIST ROLES OF mike", ["mike", False, False, {}])
-        self.assert_unauthenticated('mike is not permitted to log in', 'mike', '12345')
+        self.assert_login_not_allowed('mike', '12345')
 
         cassandra.execute("ALTER ROLE mike WITH LOGIN = true")
         assert_one(cassandra, "LIST ROLES OF mike", ["mike", False, True, {}])
@@ -1868,7 +1868,7 @@ class TestAuthRoles(Tester):
                                                      ["with_login", False, True, {}]])
         assert_one(cassandra, "LIST ROLES OF with_login", ["with_login", False, True, {}])
 
-        self.assert_unauthenticated("mike is not permitted to log in", "mike", "12345")
+        self.assert_login_not_allowed("mike", "12345")
 
     def role_requires_password_to_login_test(self):
         """
@@ -1882,7 +1882,10 @@ class TestAuthRoles(Tester):
         self.prepare()
         cassandra = self.get_session(user='cassandra', password='cassandra')
         cassandra.execute("CREATE ROLE mike WITH SUPERUSER = false AND LOGIN = true")
-        self.assert_unauthenticated("Username and/or password are incorrect", 'mike', None)
+        if self.cluster.cassandra_version() >= '3.8':
+            self.assert_unauthenticated('mike', None)
+        else:
+            self.assert_unauthenticated('mike', None)
         cassandra.execute("ALTER ROLE mike WITH PASSWORD = '12345'")
         self.get_session(user='mike', password='12345')
 
@@ -2494,14 +2497,34 @@ class TestAuthRoles(Tester):
         session.execute("CREATE KEYSPACE ks WITH REPLICATION = {'class':'SimpleStrategy', 'replication_factor':1}")
         session.execute("CREATE TABLE ks.t1 (k int PRIMARY KEY, v int)")
 
-    def assert_unauthenticated(self, message, user, password):
+    def assert_unauthenticated(self, user, password):
         with self.assertRaises(NoHostAvailable) as response:
             node = self.cluster.nodelist()[0]
             self.cql_connection(node, user=user, password=password)
         host, error = response.exception.errors.popitem()
-        pattern = 'Failed to authenticate to %s: Error from server: code=0100 \[Bad credentials\] message="%s"' % (host, message)
-        assert isinstance(error, AuthenticationFailed), "Expected AuthenticationFailed, got %s" % error
-        assert re.search(pattern, error.message), "Expected: %s, actual: %s" % (pattern, error.message)
+
+        message = "Provided username {user} and/or password are incorrect".format(user=user)\
+            if LooseVersion(node.cluster.version()) >= LooseVersion('3.10') \
+            else "Username and/or password are incorrect"
+        pattern = 'Failed to authenticate to {host}: Error from server: code=0100 ' \
+                  '\[Bad credentials\] message="{message}"'.format(host=host, message=message)
+
+        assert isinstance(error, AuthenticationFailed), "Expected AuthenticationFailed, got {error}".format(error=error)
+        assert re.search(pattern, error.message), \
+            "Expected: {expected}, actual: {actual}".format(expected=pattern, actual=error.message)
+
+    def assert_login_not_allowed(self, user, password):
+        with self.assertRaises(NoHostAvailable) as response:
+            node = self.cluster.nodelist()[0]
+            self.cql_connection(node, user=user, password=password)
+        host, error = response.exception.errors.popitem()
+
+        pattern = 'Failed to authenticate to {host}: Error from server: code=0100 ' \
+                  '\[Bad credentials\] message="{user} is not permitted to log in"'.format(host=host, user=user)
+
+        assert isinstance(error, AuthenticationFailed), "Expected AuthenticationFailed, got {error}".format(error=error)
+        assert re.search(pattern, error.message), \
+            "Expected: {expected}, actual: {actual}".format(expected=pattern, actual=error.message)
 
     def get_session(self, node_idx=0, user=None, password=None):
         """
