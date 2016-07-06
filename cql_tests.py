@@ -52,8 +52,6 @@ class CQLTester(Tester):
 
         session = self.patient_cql_connection(node1, protocol_version=protocol_version, user=user, password=password)
         if create_keyspace:
-            if self._preserve_cluster:
-                session.execute("DROP KEYSPACE IF EXISTS ks")
             self.create_ks(session, 'ks', rf)
         return session
 

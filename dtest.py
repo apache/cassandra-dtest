@@ -20,6 +20,8 @@ import traceback
 import types
 from collections import OrderedDict
 from unittest import TestCase
+import unittest.case
+from utils.funcutils import merge_dicts
 
 import ccmlib.repository
 from cassandra import ConsistencyLevel
@@ -260,99 +262,13 @@ class Runner(threading.Thread):
 
 class Tester(TestCase):
 
+    maxDiff = None
+
     def __init__(self, *argv, **kwargs):
         # if False, then scan the log of each node for errors after every test.
-        if not hasattr(self, '_preserve_cluster'):
-            self._preserve_cluster = False
         self.allow_log_errors = False
         self.cluster_options = kwargs.pop('cluster_options', None)
         super(Tester, self).__init__(*argv, **kwargs)
-
-    def _get_cluster(self, name='test'):
-        if self._preserve_cluster and hasattr(self, 'cluster'):
-            return self.cluster
-        self.test_path = tempfile.mkdtemp(prefix='dtest-')
-        # ccm on cygwin needs absolute path to directory - it crosses from cygwin space into
-        # regular Windows space on wmic calls which will otherwise break pathing
-        if sys.platform == "cygwin":
-            self.test_path = subprocess.Popen(["cygpath", "-m", self.test_path], stdout=subprocess.PIPE, stderr=subprocess.STDOUT).communicate()[0].rstrip()
-        debug("cluster ccm directory: " + self.test_path)
-        version = os.environ.get('CASSANDRA_VERSION')
-        cdir = CASSANDRA_DIR
-
-        if version:
-            cluster = Cluster(self.test_path, name, cassandra_version=version)
-        else:
-            cluster = Cluster(self.test_path, name, cassandra_dir=cdir)
-
-        if DISABLE_VNODES:
-            cluster.set_configuration_options(values={'num_tokens': None})
-        else:
-            cluster.set_configuration_options(values={'initial_token': None, 'num_tokens': NUM_TOKENS})
-
-        if OFFHEAP_MEMTABLES:
-            cluster.set_configuration_options(values={'memtable_allocation_type': 'offheap_objects'})
-
-        cluster.set_datadir_count(DATADIR_COUNT)
-        cluster.set_environment_variable('CASSANDRA_LIBJEMALLOC', CASSANDRA_LIBJEMALLOC)
-
-        return cluster
-
-    def var_debug(self, cluster):
-        if os.environ.get('DEBUG', 'no').lower() not in ('no', 'false', 'yes', 'true'):
-            classes_to_debug = os.environ.get('DEBUG').split(":")
-            cluster.set_log_level('DEBUG', None if len(classes_to_debug) == 0 else classes_to_debug)
-
-    def var_trace(self, cluster):
-        if os.environ.get('TRACE', 'no').lower() not in ('no', 'false', 'yes', 'true'):
-            classes_to_trace = os.environ.get('TRACE').split(":")
-            cluster.set_log_level('TRACE', None if len(classes_to_trace) == 0 else classes_to_trace)
-
-    def modify_log(self, cluster):
-        if DEBUG:
-            cluster.set_log_level("DEBUG")
-        if TRACE:
-            cluster.set_log_level("TRACE")
-        self.var_debug(cluster)
-        self.var_trace(cluster)
-
-    def _cleanup_last_test_dir(self):
-        if os.path.exists(LAST_TEST_DIR):
-            os.remove(LAST_TEST_DIR)
-
-    def _cleanup_cluster(self):
-        if SILENCE_DRIVER_ON_SHUTDOWN:
-            # driver logging is very verbose when nodes start going down -- bump up the level
-            logging.getLogger('cassandra').setLevel(logging.CRITICAL)
-
-        if KEEP_TEST_DIR:
-            self.cluster.stop(gently=RECORD_COVERAGE)
-        else:
-            # when recording coverage the jvm has to exit normally
-            # or the coverage information is not written by the jacoco agent
-            # otherwise we can just kill the process
-            if RECORD_COVERAGE:
-                self.cluster.stop(gently=True)
-
-            # Cleanup everything:
-            try:
-                self.stop_active_log_watch()
-            finally:
-                debug("removing ccm cluster {name} at: {path}".format(name=self.cluster.name, path=self.test_path))
-                self.cluster.remove()
-
-                debug("clearing ssl stores from [{0}] directory".format(self.test_path))
-                for filename in ('keystore.jks', 'truststore.jks', 'ccm_node.cer'):
-                    try:
-                        os.remove(os.path.join(self.test_path, filename))
-                    except OSError as e:
-                        # once we port to py3, which has better reporting for exceptions raised while
-                        # handling other excpetions, we should just assert e.errno == errno.ENOENT
-                        if e.errno != errno.ENOENT:  # ENOENT = no such file or directory
-                            raise
-
-                os.rmdir(self.test_path)
-                self._cleanup_last_test_dir()
 
     def set_node_to_current_version(self, node):
         version = os.environ.get('CASSANDRA_VERSION')
@@ -364,84 +280,36 @@ class Tester(TestCase):
             node.set_install_dir(install_dir=cdir)
 
     def init_config(self):
-        raise NotImplementedError()
-
-    def init_default_config(self):
-        # the failure detector can be quite slow in such tests with quick start/stop
-        self.cluster.set_configuration_options(values={'phi_convict_threshold': 5})
-
-        timeout = 10000
-        if self.cluster_options is not None:
-            self.cluster.set_configuration_options(values=self.cluster_options)
-        else:
-            self.cluster.set_configuration_options(values={
-                'read_request_timeout_in_ms': timeout,
-                'range_request_timeout_in_ms': timeout,
-                'write_request_timeout_in_ms': timeout,
-                'truncate_request_timeout_in_ms': timeout,
-                'request_timeout_in_ms': timeout
-            })
-
-        debug("Done setting configuration options:\n" + pprint.pformat(self.cluster._config_options, indent=4))
+        init_default_config(self.cluster, self.cluster_options)
 
     def setUp(self):
+        self.set_current_tst_name()
+        kill_windows_cassandra_procs()
+        maybe_cleanup_cluster_from_last_test_file()
+
+        self.test_path = get_test_path()
+        self.cluster = create_ccm_cluster(self.test_path, name='test')
+
+        self.maybe_begin_active_log_watch()
+        maybe_setup_jacoco(self.test_path)
+
+        self.init_config()
+        write_last_test_file(self.test_path, self.cluster)
+
+        set_log_levels(self.cluster)
+        self.connections = []
+        self.runners = []
+
+    # this is intentionally spelled 'tst' instead of 'test' to avoid
+    # making unittest think it's a test method
+    def set_current_tst_name(self):
         global CURRENT_TEST
         CURRENT_TEST = self.id() + self._testMethodName
 
-        # On Windows, forcefully terminate any leftover previously running cassandra processes. This is a temporary
-        # workaround until we can determine the cause of intermittent hung-open tests and file-handles.
-        if is_win():
-            try:
-                import psutil
-                for proc in psutil.process_iter():
-                    try:
-                        pinfo = proc.as_dict(attrs=['pid', 'name', 'cmdline'])
-                    except psutil.NoSuchProcess:
-                        pass
-                    else:
-                        if (pinfo['name'] == 'java.exe' and '-Dcassandra' in pinfo['cmdline']):
-                            print 'Found running cassandra process with pid: ' + str(pinfo['pid']) + '. Killing.'
-                            psutil.Process(pinfo['pid']).kill()
-            except ImportError:
-                debug("WARN: psutil not installed. Cannot detect and kill running cassandra processes - you may see cascading dtest failures.")
-
-        # cleaning up if a previous execution didn't trigger tearDown (which
-        # can happen if it is interrupted by KeyboardInterrupt)
-        # TODO: move that part to a generic fixture
-        if os.path.exists(LAST_TEST_DIR):
-            with open(LAST_TEST_DIR) as f:
-                self.test_path = f.readline().strip('\n')
-                name = f.readline()
-            try:
-                self.cluster = ClusterFactory.load(self.test_path, name)
-                # Avoid waiting too long for node to be marked down
-                if not self._preserve_cluster:
-                    self._cleanup_cluster()
-            except IOError:
-                # after a restart, /tmp will be emptied so we'll get an IOError when loading the old cluster here
-                pass
-
-        self.cluster = self._get_cluster()
+    def maybe_begin_active_log_watch(self):
         if ENABLE_ACTIVE_LOG_WATCHING:
             if not self.allow_log_errors:
                 self.begin_active_log_watch()
-        if RECORD_COVERAGE:
-            self.__setup_jacoco()
-
-        try:
-            self.init_config()
-        except NotImplementedError:
-            debug("Custom init_config not found. Setting defaults.")
-            self.init_default_config()
-
-        with open(LAST_TEST_DIR, 'w') as f:
-            f.write(self.test_path + '\n')
-            f.write(self.cluster.name)
-
-        self.modify_log(self.cluster)
-        self.connections = []
-        self.runners = []
-        self.maxDiff = None
 
     def begin_active_log_watch(self):
         """
@@ -456,26 +324,6 @@ class Tester(TestCase):
         # thread's execution, which we have to do by registering a signal handler
         signal.signal(signal.SIGINT, self._catch_interrupt)
         self._log_watch_thread = self.cluster.actively_watch_logs_for_error(self._log_error_handler, interval=0.25)
-
-    def stop_active_log_watch(self):
-        """
-        Joins the log watching thread, which will then exit.
-        Should be called after each test, ideally after nodes are stopped but before cluster files are removed.
-
-        Can be called multiple times without error.
-        If not called, log watching thread will remain running until the parent process exits.
-
-        Returns True if the log watching thread was stopped, otherwise False.
-        """
-        try:
-            self._log_watch_thread
-        except AttributeError:
-            # no thread apparently, so nothing to stop
-            # may happen when allow_log_errors is True, since in that case we don't init a logging thread
-            return False
-        else:
-            self._log_watch_thread.join(timeout=60)
-            return True
 
     def _log_error_handler(self, errordata):
         """
@@ -546,7 +394,7 @@ class Tester(TestCase):
             # looks like this was just a plain CTRL-C event
             raise KeyboardInterrupt()
 
-    def copy_logs(self, directory=None, name=None):
+    def copy_logs(self, cluster, directory=None, name=None):
         """Copy the current cluster's log files somewhere, by default to LOG_SAVED_DIR with a name of 'last'"""
         if directory is None:
             directory = LOG_SAVED_DIR
@@ -556,7 +404,8 @@ class Tester(TestCase):
             name = os.path.join(directory, name)
         if not os.path.exists(directory):
             os.mkdir(directory)
-        logs = [(node.name, node.logfilename(), node.debuglogfilename(), node.gclogfilename(), node.compactionlogfilename()) for node in self.cluster.nodes.values()]
+        logs = [(node.name, node.logfilename(), node.debuglogfilename(), node.gclogfilename(), node.compactionlogfilename())
+                for node in self.cluster.nodes.values()]
         if len(logs) is not 0:
             basedir = str(int(time.time() * 1000)) + '_' + self.id()
             logdir = os.path.join(directory, basedir)
@@ -782,29 +631,30 @@ class Tester(TestCase):
             except:
                 pass
 
-        failed = sys.exc_info() != (None, None, None)
+        failed = did_fail()
         try:
-            for node in self.cluster.nodelist():
-                if not self.allow_log_errors:
-                    errors = list(self.__filter_errors(
-                        ['\n'.join(msg) for msg in node.grep_log_for_errors()]))
-                    if len(errors) is not 0:
-                        failed = True
-                        for error in errors:
-                            print_("Unexpected error in {node_name} log, error: \n{error}".format(node_name=node.name, error=error))
-                        raise AssertionError('Unexpected error in log, see stdout')
+            if not self.allow_log_errors and self.check_logs_for_errors():
+                failed = True
+                raise AssertionError('Unexpected error in log, see stdout')
         finally:
             try:
+                # save the logs for inspection
                 if failed or KEEP_LOGS:
-                    # means the test failed. Save the logs for inspection.
-                    self.copy_logs()
+                    self.copy_logs(self.cluster)
             except Exception as e:
                 print "Error saving log:", str(e)
             finally:
-                if not self._preserve_cluster:
-                    self._cleanup_cluster()
-                elif self._preserve_cluster and failed:
-                    self._cleanup_cluster()
+                log_watch_thread = getattr(self, '_log_watch_thread', None)
+                cleanup_cluster(self.cluster, self.test_path, log_watch_thread)
+
+    def check_logs_for_errors(self):
+        for node in self.cluster.nodelist():
+            errors = list(self.__filter_errors(
+                ['\n'.join(msg) for msg in node.grep_log_for_errors()]))
+            if len(errors) is not 0:
+                for error in errors:
+                    print_("Unexpected error in {node_name} log, error: \n{error}".format(node_name=node.name, error=error))
+                return True
 
     def go(self, func):
         runner = Runner(func)
@@ -815,30 +665,6 @@ class Tester(TestCase):
     def skip(self, msg):
         if not NO_SKIP:
             raise SkipTest(msg)
-
-    def __setup_jacoco(self, cluster_name='test'):
-        """Setup JaCoCo code coverage support"""
-        # use explicit agent and execfile locations
-        # or look for a cassandra build if they are not specified
-        cdir = CASSANDRA_DIR
-
-        agent_location = os.environ.get('JACOCO_AGENT_JAR', os.path.join(cdir, 'build/lib/jars/jacocoagent.jar'))
-        jacoco_execfile = os.environ.get('JACOCO_EXECFILE', os.path.join(cdir, 'build/jacoco/jacoco.exec'))
-
-        if os.path.isfile(agent_location):
-            debug("Jacoco agent found at {}".format(agent_location))
-            with open(os.path.join(
-                    self.test_path, cluster_name, 'cassandra.in.sh'), 'w') as f:
-
-                f.write('JVM_OPTS="$JVM_OPTS -javaagent:{jar_path}=destfile={exec_file}"'
-                        .format(jar_path=agent_location, exec_file=jacoco_execfile))
-
-                if os.path.isfile(jacoco_execfile):
-                    debug("Jacoco execfile found at {}, execution data will be appended".format(jacoco_execfile))
-                else:
-                    debug("Jacoco execfile will be created at {}".format(jacoco_execfile))
-        else:
-            debug("Jacoco agent not found or is not file. Execution will not be recorded.")
 
     def __filter_errors(self, errors):
         """Filter errors, removing those that match self.ignore_log_patterns"""
@@ -934,6 +760,309 @@ class Tester(TestCase):
             stdout, stderr = p.communicate()
             debug(stdout)
             debug(stderr)
+
+
+def kill_windows_cassandra_procs():
+    # On Windows, forcefully terminate any leftover previously running cassandra processes. This is a temporary
+    # workaround until we can determine the cause of intermittent hung-open tests and file-handles.
+    if is_win():
+        try:
+            import psutil
+            for proc in psutil.process_iter():
+                try:
+                    pinfo = proc.as_dict(attrs=['pid', 'name', 'cmdline'])
+                except psutil.NoSuchProcess:
+                    pass
+                else:
+                    if (pinfo['name'] == 'java.exe' and '-Dcassandra' in pinfo['cmdline']):
+                        print 'Found running cassandra process with pid: ' + str(pinfo['pid']) + '. Killing.'
+                        psutil.Process(pinfo['pid']).kill()
+        except ImportError:
+            debug("WARN: psutil not installed. Cannot detect and kill "
+                  "running cassandra processes - you may see cascading dtest failures.")
+
+
+def get_test_path():
+    test_path = tempfile.mkdtemp(prefix='dtest-')
+
+    # ccm on cygwin needs absolute path to directory - it crosses from cygwin space into
+    # regular Windows space on wmic calls which will otherwise break pathing
+    if sys.platform == "cygwin":
+        process = subprocess.Popen(["cygpath", "-m", test_path], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        test_path = process.communicate()[0].rstrip()
+
+    return test_path
+
+
+def create_ccm_cluster(test_path, name):
+    debug("cluster ccm directory: " + test_path)
+    version = os.environ.get('CASSANDRA_VERSION')
+    cdir = CASSANDRA_DIR
+
+    if version:
+        cluster = Cluster(test_path, name, cassandra_version=version)
+    else:
+        cluster = Cluster(test_path, name, cassandra_dir=cdir)
+
+    if DISABLE_VNODES:
+        cluster.set_configuration_options(values={'num_tokens': None})
+    else:
+        cluster.set_configuration_options(values={'initial_token': None, 'num_tokens': NUM_TOKENS})
+
+    if OFFHEAP_MEMTABLES:
+        cluster.set_configuration_options(values={'memtable_allocation_type': 'offheap_objects'})
+
+    cluster.set_datadir_count(DATADIR_COUNT)
+    cluster.set_environment_variable('CASSANDRA_LIBJEMALLOC', CASSANDRA_LIBJEMALLOC)
+
+    return cluster
+
+
+def cleanup_cluster(cluster, test_path, log_watch_thread=None):
+    if SILENCE_DRIVER_ON_SHUTDOWN:
+        # driver logging is very verbose when nodes start going down -- bump up the level
+        logging.getLogger('cassandra').setLevel(logging.CRITICAL)
+
+    if KEEP_TEST_DIR:
+        cluster.stop(gently=RECORD_COVERAGE)
+    else:
+        # when recording coverage the jvm has to exit normally
+        # or the coverage information is not written by the jacoco agent
+        # otherwise we can just kill the process
+        if RECORD_COVERAGE:
+            cluster.stop(gently=True)
+
+        # Cleanup everything:
+        try:
+            if log_watch_thread:
+                stop_active_log_watch(log_watch_thread)
+        finally:
+            debug("removing ccm cluster {name} at: {path}".format(name=cluster.name, path=test_path))
+            cluster.remove()
+
+            debug("clearing ssl stores from [{0}] directory".format(test_path))
+            for filename in ('keystore.jks', 'truststore.jks', 'ccm_node.cer'):
+                try:
+                    os.remove(os.path.join(test_path, filename))
+                except OSError as e:
+                    # once we port to py3, which has better reporting for exceptions raised while
+                    # handling other excpetions, we should just assert e.errno == errno.ENOENT
+                    if e.errno != errno.ENOENT:  # ENOENT = no such file or directory
+                        raise
+
+            os.rmdir(test_path)
+            cleanup_last_test_dir()
+
+
+def cleanup_last_test_dir():
+    if os.path.exists(LAST_TEST_DIR):
+        os.remove(LAST_TEST_DIR)
+
+
+def stop_active_log_watch(log_watch_thread):
+    """
+    Joins the log watching thread, which will then exit.
+    Should be called after each test, ideally after nodes are stopped but before cluster files are removed.
+
+    Can be called multiple times without error.
+    If not called, log watching thread will remain running until the parent process exits.
+    """
+    log_watch_thread.join(timeout=60)
+
+
+def maybe_cleanup_cluster_from_last_test_file():
+    # cleaning up if a previous execution didn't trigger tearDown (which
+    # can happen if it is interrupted by KeyboardInterrupt)
+    if os.path.exists(LAST_TEST_DIR):
+        with open(LAST_TEST_DIR) as f:
+            test_path = f.readline().strip('\n')
+            name = f.readline()
+        try:
+            cluster = ClusterFactory.load(test_path, name)
+            # Avoid waiting too long for node to be marked down
+            cleanup_cluster(cluster, test_path)
+        except IOError:
+            # after a restart, /tmp will be emptied so we'll get an IOError when loading the old cluster here
+            pass
+
+
+def init_default_config(cluster, cluster_options):
+    # the failure detector can be quite slow in such tests with quick start/stop
+    phi_values = {'phi_convict_threshold': 5}
+
+    timeout = 10000
+    if cluster_options is not None:
+        values = merge_dicts(cluster_options, phi_values)
+    else:
+        values = merge_dicts(phi_values, {
+            'read_request_timeout_in_ms': timeout,
+            'range_request_timeout_in_ms': timeout,
+            'write_request_timeout_in_ms': timeout,
+            'truncate_request_timeout_in_ms': timeout,
+            'request_timeout_in_ms': timeout
+        })
+
+    cluster.set_configuration_options(values)
+    debug("Done setting configuration options:\n" + pprint.pformat(cluster._config_options, indent=4))
+
+
+def write_last_test_file(test_path, cluster):
+    with open(LAST_TEST_DIR, 'w') as f:
+        f.write(test_path + '\n')
+        f.write(cluster.name)
+
+
+def set_log_levels(cluster):
+    if DEBUG:
+        cluster.set_log_level("DEBUG")
+    if TRACE:
+        cluster.set_log_level("TRACE")
+
+    if os.environ.get('DEBUG', 'no').lower() not in ('no', 'false', 'yes', 'true'):
+        classes_to_debug = os.environ.get('DEBUG').split(":")
+        cluster.set_log_level('DEBUG', None if len(classes_to_debug) == 0 else classes_to_debug)
+
+    if os.environ.get('TRACE', 'no').lower() not in ('no', 'false', 'yes', 'true'):
+        classes_to_trace = os.environ.get('TRACE').split(":")
+        cluster.set_log_level('TRACE', None if len(classes_to_trace) == 0 else classes_to_trace)
+
+
+def maybe_setup_jacoco(test_path, cluster_name='test'):
+    """Setup JaCoCo code coverage support"""
+
+    if not RECORD_COVERAGE:
+        return
+
+    # use explicit agent and execfile locations
+    # or look for a cassandra build if they are not specified
+    cdir = CASSANDRA_DIR
+
+    agent_location = os.environ.get('JACOCO_AGENT_JAR', os.path.join(cdir, 'build/lib/jars/jacocoagent.jar'))
+    jacoco_execfile = os.environ.get('JACOCO_EXECFILE', os.path.join(cdir, 'build/jacoco/jacoco.exec'))
+
+    if os.path.isfile(agent_location):
+        debug("Jacoco agent found at {}".format(agent_location))
+        with open(os.path.join(
+                test_path, cluster_name, 'cassandra.in.sh'), 'w') as f:
+
+            f.write('JVM_OPTS="$JVM_OPTS -javaagent:{jar_path}=destfile={exec_file}"'
+                    .format(jar_path=agent_location, exec_file=jacoco_execfile))
+
+            if os.path.isfile(jacoco_execfile):
+                debug("Jacoco execfile found at {}, execution data will be appended".format(jacoco_execfile))
+            else:
+                debug("Jacoco execfile will be created at {}".format(jacoco_execfile))
+    else:
+        debug("Jacoco agent not found or is not file. Execution will not be recorded.")
+
+
+def did_fail():
+    if sys.exc_info() == (None, None, None):
+        return False
+
+    exc_class, _, _ = sys.exc_info()
+    return not issubclass(exc_class, unittest.case.SkipTest)
+
+
+class ReusableClusterTester(Tester):
+    """
+    A Tester designed for reusing the same cluster across multiple
+    test methods.  This makes test suites with many small tests run
+    much, much faster.  However, there are a couple of downsides:
+
+    First, test setup and teardown must be diligent about cleaning
+    up any data or schema elements that may interfere with other
+    tests.
+
+    Second, errors triggered by one test method may cascade
+    into other test failures.  In an attempt to limit this, the
+    cluster will be restarted if a test fails or an exception is
+    caught.  However, there may still be undetected problems in
+    Cassandra that cause cascading failures.
+    """
+
+    test_path = None
+    cluster = None
+    cluster_options = None
+
+    @classmethod
+    def setUpClass(cls):
+        kill_windows_cassandra_procs()
+        maybe_cleanup_cluster_from_last_test_file()
+        cls.initialize_cluster()
+
+    def setUp(self):
+        self.set_current_tst_name()
+        self.connections = []
+
+        # TODO enable active log watching
+        # This needs to happen in setUp() and not setUpClass() so that individual
+        # test methods can set allow_log_errors and so that error handling
+        # only fails a single test method instead of the entire class.
+        # The problem with this is that ccm doesn't yet support stopping the
+        # active log watcher -- it runs until the cluster is destroyed.  Since
+        # we reuse the same cluster, this doesn't work for us.
+
+    def tearDown(self):
+        # test_is_ending prevents active log watching from being able to interrupt the test
+        self.test_is_ending = True
+
+        failed = did_fail()
+        try:
+            if not self.allow_log_errors and self.check_logs_for_errors():
+                failed = True
+                raise AssertionError('Unexpected error in log, see stdout')
+        finally:
+            try:
+                # save the logs for inspection
+                if failed or KEEP_LOGS:
+                    self.copy_logs(self.cluster)
+            except Exception as e:
+                print "Error saving log:", str(e)
+            finally:
+                reset_environment_vars()
+                if failed:
+                    cleanup_cluster(self.cluster, self.test_path)
+                    kill_windows_cassandra_procs()
+                    self.initialize_cluster()
+
+    @classmethod
+    def initialize_cluster(cls):
+        """
+        This method is responsible for initializing and configuring a ccm
+        cluster for the next set of tests.  This can be called for two
+        different reasons:
+         * A class of tests is starting
+         * A test method failed/errored, so the cluster has been wiped
+
+        Subclasses that require custom initialization should generally
+        do so by overriding post_initialize_cluster().
+        """
+        cls.test_path = get_test_path()
+        cls.cluster = create_ccm_cluster(cls.test_path, name='test')
+        cls.init_config()
+
+        maybe_setup_jacoco(cls.test_path)
+        cls.init_config()
+        write_last_test_file(cls.test_path, cls.cluster)
+        set_log_levels(cls.cluster)
+
+        cls.post_initialize_cluster()
+
+    @classmethod
+    def post_initialize_cluster(cls):
+        """
+        This method is called after the ccm cluster has been created
+        and default config options have been applied.  Any custom
+        initialization for a test class should generally be done
+        here in order to correctly handle cluster restarts after
+        test method failures.
+        """
+        pass
+
+    @classmethod
+    def init_config(cls):
+        init_default_config(cls.cluster, cls.cluster_options)
 
 
 def canReuseCluster(Tester):

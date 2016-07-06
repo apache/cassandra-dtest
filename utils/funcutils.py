@@ -27,3 +27,14 @@ class get_rate_limited_function(object):
             limit=self.limit,
             last_called=self.last_called,
         )
+
+
+def merge_dicts(*dict_args):
+    """
+    Given any number of dicts, shallow copy and merge into a new dict,
+    precedence goes to key value pairs in latter dicts.
+    """
+    result = {}
+    for dictionary in dict_args:
+        result.update(dictionary)
+    return result
