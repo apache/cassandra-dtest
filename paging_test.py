@@ -685,9 +685,6 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         assert_invalid(session, "select * from paging_test where col_1=1 and col_2 IN (1, 2) order by col_3 desc;", expected=InvalidRequest)
         assert_invalid(session, "select * from paging_test where col_2 IN (1, 2) and col_1=1 order by col_3 desc;", expected=InvalidRequest)
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12068',
-                   flaky=True)
     @since('2.0.6')
     def static_columns_paging_test(self):
         """
