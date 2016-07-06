@@ -161,9 +161,6 @@ class TestArchiveCommitlog(SnapshotTester):
         """
         self.run_archive_commitlog(restore_point_in_time=False, archive_active_commitlogs=True)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12139',
-                   flaky=True)
     def dont_test_archive_commitlog(self):
         """
         Run the archive commitlog test, but forget to add the restore commands
