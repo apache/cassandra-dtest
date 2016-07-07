@@ -1085,31 +1085,47 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
             for j in xrange(10):
                 session.execute("UPDATE test SET cnt = cnt + {} WHERE a={} AND b={} AND c={}".format(j + 2, i, j, j + 1))
 
+        self.longMessage = True
         for page_size in (2, 3, 4, 5, 7, 10, 20):
             session.default_fetch_size = page_size
+            page_size_error_msg = "Query failed with page size {}".format(page_size)
 
             # single partition
-            assert_all(session, "SELECT * FROM test WHERE a = 4 AND b > 3 AND c > 3 AND cnt > 8 ALLOW FILTERING", [[4, 7, 8, 9],
-                                                                                                                   [4, 8, 9, 10],
-                                                                                                                   [4, 9, 10, 11]])
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a = 4 AND b > 3 AND c > 3 AND cnt > 8 ALLOW FILTERING"))
+            self.assertEqual(res, [[4, 7, 8, 91],
+                                   [4, 8, 9, 10],
+                                   [4, 9, 10, 11]],
+                             page_size_error_msg)
 
-            assert_all(session, "SELECT * FROM test WHERE a = 4 AND b > 3 AND c > 3 AND cnt >= 8 ALLOW FILTERING", [[4, 6, 7, 8],
-                                                                                                                    [4, 7, 8, 9],
-                                                                                                                    [4, 8, 9, 10],
-                                                                                                                    [4, 9, 10, 11]])
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a = 4 AND b > 3 AND c > 3 AND cnt >= 8 ALLOW FILTERING"))
+            self.assertEqual(res, [[4, 6, 7, 8],
+                                   [4, 7, 8, 9],
+                                   [4, 8, 9, 10],
+                                   [4, 9, 10, 11]],
+                             page_size_error_msg)
 
-            assert_all(session, "SELECT * FROM test WHERE a = 4 AND b > 3 AND c > 3 AND cnt >= 8 AND cnt < 10 ALLOW FILTERING", [[4, 6, 7, 8],
-                                                                                                                                 [4, 7, 8, 9]])
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a = 4 AND b > 3 AND c > 3 AND cnt >= 8 AND cnt < 10 ALLOW FILTERING"))
+            self.assertEqual(res, [[4, 6, 7, 8],
+                                   [4, 7, 8, 9]],
+                             page_size_error_msg)
 
-            assert_all(session, "SELECT * FROM test WHERE a = 4 AND b > 3 AND c > 3 AND cnt >= 8 AND cnt <= 10 ALLOW FILTERING", [[4, 6, 7, 8],
-                                                                                                                                  [4, 7, 8, 9],
-                                                                                                                                  [4, 8, 9, 10]])
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a = 4 AND b > 3 AND c > 3 AND cnt >= 8 AND cnt <= 10 ALLOW FILTERING"))
+            self.assertEqual(res, [[4, 6, 7, 8],
+                                   [4, 7, 8, 9],
+                                   [4, 8, 9, 10]],
+                             page_size_error_msg)
 
-            assert_all(session, "SELECT * FROM test WHERE cnt = 5 ALLOW FILTERING", [[1, 3, 4, 5], [0, 3, 4, 5], [2, 3, 4, 5], [4, 3, 4, 5], [3, 3, 4, 5]])
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE cnt = 5 ALLOW FILTERING"))
+            self.assertEqualIgnoreOrder(res, [[0, 3, 4, 5],
+                                              [1, 3, 4, 5],
+                                              [2, 3, 4, 5],
+                                              [3, 3, 4, 5],
+                                              [4, 3, 4, 5]])
 
-            assert_all(session, "SELECT * FROM test WHERE a IN (1,2,3) AND cnt = 5 ALLOW FILTERING", [[1, 3, 4, 5],
-                                                                                                      [2, 3, 4, 5],
-                                                                                                      [3, 3, 4, 5]])
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a IN (1,2,3) AND cnt = 5 ALLOW FILTERING"))
+            self.assertEqualIgnoreOrder(res, [[1, 3, 4, 5],
+                                              [2, 3, 4, 5],
+                                              [3, 3, 4, 5]])
 
     @known_failure(failure_source='cassandra',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12025',
