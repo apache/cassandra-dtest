@@ -392,9 +392,6 @@ class TestCompaction(Tester):
         time.sleep(2)
         self.assertTrue(len(node.grep_log('Compacting.+to_disable', filename=log_file)) > 0, 'Found no log items for {0}'.format(self.strategy))
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12072',
-                   flaky=True)
     def disable_autocompaction_alter_test(self):
         """
         Make sure we can enable compaction using an alter-statement

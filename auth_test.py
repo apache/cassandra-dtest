@@ -1179,9 +1179,6 @@ class TestAuthRoles(Tester):
                                        cassandra,
                                        "LIST ALL PERMISSIONS")
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12072',
-                   flaky=True)
     def create_and_grant_roles_with_superuser_status_test(self):
         """
         * Launch a one node cluster
@@ -1680,9 +1677,6 @@ class TestAuthRoles(Tester):
                             "LIST ALL PERMISSIONS OF john",
                             "You are not authorized to view john's permissions")
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12072',
-                   flaky=True)
     def role_caching_authenticated_user_test(self):
         """
         This test is to show that the role caching in AuthenticatedUser
@@ -2235,9 +2229,6 @@ class TestAuthRoles(Tester):
         cassandra.execute("DROP FUNCTION ks.plus_one(int)")
         self.assert_no_permissions(cassandra, "LIST ALL PERMISSIONS OF mike")
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12072',
-                   flaky=True)
     def drop_keyspace_cleans_up_function_level_permissions_test(self):
         """
         * Launch a one node cluster
@@ -2261,9 +2252,6 @@ class TestAuthRoles(Tester):
         cassandra.execute("DROP KEYSPACE ks")
         self.assert_no_permissions(cassandra, "LIST ALL PERMISSIONS OF mike")
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12072',
-                   flaky=True)
     def udf_permissions_in_selection_test(self):
         """
         Verify EXECUTE permission works in a SELECT when UDF is one of the columns requested
@@ -2318,9 +2306,6 @@ class TestAuthRoles(Tester):
         cassandra.execute("GRANT EXECUTE ON FUNCTION ks.plus_one(int) TO mike")
         return mike.execute(cql)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12072',
-                   flaky=True)
     def inheritence_of_udf_permissions_test(self):
         """
         * Launch a one node cluster
@@ -2384,9 +2369,6 @@ class TestAuthRoles(Tester):
                        "Altering permissions on builtin functions is not supported",
                        InvalidRequest)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12072',
-                   flaky=True)
     def disallow_grant_execute_on_non_function_resources_test(self):
         """
         * Launch a one node cluster

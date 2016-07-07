@@ -431,9 +431,6 @@ class CqlshCopyTest(Tester):
 
         self.assertCsvResultEqual(tempfile.name, results, 'testlist')
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12072',
-                   flaky=True)
     def test_tuple_data(self):
         """
         Tests the COPY TO command with the tuple datatype by:
@@ -820,9 +817,6 @@ class CqlshCopyTest(Tester):
         self.assertItemsEqual(self.result_to_csv_rows(exported_results, cql_type_names, time_format=format),
                               self.result_to_csv_rows(imported_results, cql_type_names, time_format=format))
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12059',
-                   flaky=True)
     @since('3.2')
     def test_reading_with_ttl(self):
         """
@@ -1063,9 +1057,6 @@ class CqlshCopyTest(Tester):
 
         self.assertItemsEqual(csv_values, result)
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12072',
-                   flaky=True)
     def test_reading_max_parse_errors(self):
         """
         Test that importing a csv file is aborted when we reach the maximum number of parse errors:
@@ -1425,9 +1416,6 @@ class CqlshCopyTest(Tester):
 
         assert_csvs_items_equal(tempfile.name, reference_file.name)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12067',
-                   flaky=True)
     def test_explicit_column_order_reading(self):
         """
         Test that COPY can write to a CSV file when the order of columns is
@@ -1625,9 +1613,6 @@ class CqlshCopyTest(Tester):
                 self.assertFalse(err)
                 self.assertCsvResultEqual(tempfile.name, results, 'testvalidate')
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12072',
-                   flaky=True)
     @since('2.2')
     def test_read_wrong_column_names(self):
         """
@@ -1773,9 +1758,6 @@ class CqlshCopyTest(Tester):
         _test(True)
         _test(False)
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12072',
-                   flaky=True)
     def test_boolstyle_round_trip(self):
         """
         Test that a CSV file with booleans in a different style successfully round-trips
@@ -2019,9 +2001,6 @@ class CqlshCopyTest(Tester):
                                ['3', '1943-06-19 11:21:01.124+0000']],
                               csv_results)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12061',
-                   flaky=True)
     @since('3.6')
     def test_round_trip_with_different_number_precision(self):
         """
@@ -2076,9 +2055,6 @@ class CqlshCopyTest(Tester):
         do_test(5, 12)
         do_test(5, 15)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12072',
-                   flaky=True)
     def test_round_trip_with_num_processes(self):
         """
         Test exporting a large number of rows into a csv file with a fixed number of child processes.
