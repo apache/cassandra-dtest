@@ -369,6 +369,9 @@ class TestScrub(TestHelper):
         cluster = self.cluster
         cluster.populate(1).start()
         node1 = cluster.nodelist()[0]
+        # we don't want automatic minor compaction because we want to block on
+        # compactions
+        node1.nodetool('disableautocompaction')
 
         session = self.patient_cql_connection(node1)
         self.create_ks(session, KEYSPACE, 1)
