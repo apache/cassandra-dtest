@@ -228,6 +228,9 @@ class TestCommitLog(Tester):
         res = list(session.execute("SELECT * FROM Test.mytable"))
         self.assertEqual(num_rows, len(res), res)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12165',
+                   flaky=True)
     def test_commitlog_replay_on_startup(self):
         """
         Test commit log replay

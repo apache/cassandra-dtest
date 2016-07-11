@@ -92,6 +92,9 @@ class TestCqlTracing(Tester):
         self.assertIn('Request complete ', out)
         self.assertIn(" Frodo |  Baggins", out)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12159',
+                   flaky=True)
     def tracing_simple_test(self):
         """
         Test tracing using the default tracing class. See trace().

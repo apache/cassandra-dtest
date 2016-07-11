@@ -1915,6 +1915,9 @@ class CqlLoginTest(Tester):
         self.assertEqual([x for x in cqlsh_stdout.split() if x], ['ks1table', 'ks1table'])
         self.assertEqual(cqlsh_stderr, '')
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12163',
+                   flaky=True)
     def test_login_rejects_bad_pass(self):
         self.create_ks(self.session, 'ks1', 1)
         self.create_cf(self.session, 'ks1table')
@@ -1960,6 +1963,9 @@ class CqlLoginTest(Tester):
                       "cqlsh stderr output: {}".format(expected_error,
                                                        '\n'.join(err_lines)))
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12163',
+                   flaky=True)
     def test_login_allows_bad_pass_and_continued_use(self):
         self.create_ks(self.session, 'ks1', 1)
         self.create_cf(self.session, 'ks1table')
