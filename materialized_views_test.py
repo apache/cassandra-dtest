@@ -381,6 +381,9 @@ class TestMaterializedViews(Tester):
 
         self._add_dc_after_mv_test(1)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12164',
+                   flaky=True)
     def add_dc_after_mv_network_replication_test(self):
         """
         @jira_ticket CASSANDRA-10634

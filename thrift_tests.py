@@ -1497,6 +1497,9 @@ class TestMutations(ThriftTester):
             slice = client.get_slice('key1', ColumnParent('Super1', 'sc2'), p, ConsistencyLevel.ONE)
             assert len(slice) == n, "expected %s results; found %s" % (n, slice)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12158',
+                   flaky=True)
     def test_describe_keyspace(self):
         kspaces = client.describe_keyspaces()
         if self.cluster.version() >= '3.0':

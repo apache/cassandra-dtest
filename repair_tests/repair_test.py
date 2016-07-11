@@ -234,6 +234,10 @@ class TestRepair(BaseRepairTest):
         for node in cluster.nodelist():
             self.assertTrue("Starting anticompaction")
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12162',
+                   flaky=True,
+                   notes='windows')
     def simple_sequential_repair_test(self):
         """
         Calls simple repair test with a sequential repair
