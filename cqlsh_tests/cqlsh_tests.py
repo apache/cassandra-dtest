@@ -1398,6 +1398,9 @@ Tracing session:""")
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11999',
                    flaky=True)
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10884',
+                   flaky=True)
     def test_refresh_schema_on_timeout_error(self):
         """
         @jira_ticket CASSANDRA-9689
