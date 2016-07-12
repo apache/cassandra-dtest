@@ -31,12 +31,10 @@ class TestWideRows(Tester):
     def test_wide_rows(self):
         self.write_wide_rows()
 
-    def write_wide_rows(self, version=None):
+    def write_wide_rows(self):
         cluster = self.cluster
-        if version:
-            self.cluster.set_install_dir(version=version)
         cluster.populate(1).start()
-        (node1,) = cluster.nodelist()
+        node1 = cluster.nodelist()[0]
 
         session = self.patient_cql_connection(node1)
         start_time = datetime.datetime.now()
@@ -52,8 +50,7 @@ class TestWideRows(Tester):
                 date_str = (date + datetime.timedelta(day)).strftime("%Y-%m-%d")
                 client = random.choice(clients)
                 msg = random.choice(status_messages)
-                query = "UPDATE user_events SET value = '{msg:%s, client:%s}' WHERE userid='%s' and event='%s';" \
-                        % (msg, client, user, date_str)
+                query = "UPDATE user_events SET value = '{msg:%s, client:%s}' WHERE userid='%s' and event='%s';" % (msg, client, user, date_str)
                 # debug(query)
                 session.execute(query)
 
