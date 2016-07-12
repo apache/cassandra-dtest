@@ -1,3 +1,5 @@
+from distutils.version import LooseVersion
+
 from ccmlib.node import NodetoolError
 
 from dtest import Tester
@@ -30,10 +32,10 @@ class TestJMXAuth(Tester):
         session.execute("GRANT DESCRIBE ON ALL MBEANS TO jmx_user")
         session.execute("CREATE ROLE test WITH LOGIN=true and PASSWORD='abc123'")
 
-        with self.assertRaisesRegexp(NodetoolError, 'Username and/or password are incorrect'):
+        with self.assertRaisesRegexp(NodetoolError, self.authentication_fail_message(node, 'baduser')):
             node.nodetool('-u baduser -pw abc123 gossipinfo')
 
-        with self.assertRaisesRegexp(NodetoolError, 'Username and/or password are incorrect'):
+        with self.assertRaisesRegexp(NodetoolError, self.authentication_fail_message(node, 'test')):
             node.nodetool('-u test -pw badpassword gossipinfo')
 
         with self.assertRaisesRegexp(NodetoolError, "Required key 'username' is missing"):
@@ -63,3 +65,8 @@ class TestJMXAuth(Tester):
         apply_jmx_authentication(node)
         node.start()
         node.watch_log_for('Created default superuser')
+
+    def authentication_fail_message(self, node, username):
+        return "Provided username {user} and/or password are incorrect".format(user=username) \
+            if LooseVersion(node.cluster.version()) >= LooseVersion('3.10') \
+            else "Username and/or password are incorrect"
