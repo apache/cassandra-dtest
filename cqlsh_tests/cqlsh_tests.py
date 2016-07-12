@@ -1903,8 +1903,8 @@ class CqlLoginTest(Tester):
 
     def assert_login_not_allowed(self, user, input):
         message = ("Provided username {user} and/or password are incorrect".format(user=user)
-            if LooseVersion(self.cluster.version()) >= LooseVersion('3.10')
-            else "Username and/or password are incorrect")
+                   if LooseVersion(self.cluster.version()) >= LooseVersion('3.10')
+                   else "Username and/or password are incorrect")
 
         self.assertEqual([message in x for x in input.split("\n") if x], [True])
 
