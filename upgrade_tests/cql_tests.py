@@ -239,7 +239,7 @@ class TestCQL(UpgradeTester):
                        ['192.168.0.3', None, 42])
 
             assert_one(cursor, "SELECT ip, port, time FROM connections WHERE userid = f47ac10b-58cc-4372-a567-0e02b2c3d479 AND ip = '192.168.0.4'",
-                       ['192.168.0.3', None, 42])
+                       ['192.168.0.4', None, 42])
 
             # Deletion
             cursor.execute("DELETE time FROM connections WHERE userid = 550e8400-e29b-41d4-a716-446655440000 AND ip = '192.168.0.2' AND port = 80")
@@ -746,13 +746,13 @@ class TestCQL(UpgradeTester):
             cursor.execute("INSERT INTO test(my_id, col1, value) VALUES ( 'key3', 2, 'b')")
             cursor.execute("INSERT INTO test(my_id, col1, value) VALUES ( 'key4', 4, 'd')")
 
-            query = SimpleStatement("SELECT col1 FROM test WHERE my_id in('key1', 'key2', 'key3') ORDER BY col1")
+            query = "SELECT col1 FROM test WHERE my_id in('key1', 'key2', 'key3') ORDER BY col1"
             assert_all(cursor, query, [[1], [2], [3]])
 
-            query = SimpleStatement("SELECT col1, my_id FROM test WHERE my_id in('key1', 'key2', 'key3') ORDER BY col1")
+            query = "SELECT col1, my_id FROM test WHERE my_id in('key1', 'key2', 'key3') ORDER BY col1"
             assert_all(cursor, query, [[1, 'key1'], [2, 'key3'], [3, 'key2']])
 
-            query = SimpleStatement("SELECT my_id, col1 FROM test WHERE my_id in('key1', 'key2', 'key3') ORDER BY col1")
+            query = "SELECT my_id, col1 FROM test WHERE my_id in('key1', 'key2', 'key3') ORDER BY col1"
             assert_all(cursor, query, [['key1', 1], ['key3', 2], ['key2', 3]])
 
     def reversed_comparator_test(self):
@@ -1060,7 +1060,7 @@ class TestCQL(UpgradeTester):
             assert_invalid(cursor, "SELECT k, c, writetime(k) FROM test")
 
             res = cursor.execute("SELECT k, d, writetime(d) FROM test WHERE k = 1")
-            assert_one(cursor, "SELECT k, d, writetime(d) FROM test WHERE k = 1", [[1, None, None]])
+            assert_one(cursor, "SELECT k, d, writetime(d) FROM test WHERE k = 1", [1, None, None])
 
     def no_range_ghost_test(self):
         cursor = self.prepare()
@@ -1090,11 +1090,11 @@ class TestCQL(UpgradeTester):
             for k in range(0, 5):
                 cursor.execute("INSERT INTO test (k, v) VALUES (%d, 0)" % k)
 
-            assert_all(cursor, "SELECT k FROM test", [[k] for k in range(0, 5)])
+            assert_all(cursor, "SELECT k FROM test", [[k] for k in range(0, 5)], ignore_order=True)
 
             cursor.execute("DELETE FROM test WHERE k=2")
 
-            assert_all(cursor, "SELECT k FROM test", [[k] for k in range(0, 5) if k is not 2])
+            assert_all(cursor, "SELECT k FROM test", [[k] for k in range(0, 5) if k is not 2], ignore_order=True)
 
             # Example from #3505
             cursor.execute("USE ks1")
@@ -1297,7 +1297,7 @@ class TestCQL(UpgradeTester):
 
             time.sleep(.01)
 
-            cursor.execute(q % "tags = { 'm', 'n' }")
+            cursor.execute(q.format("tags = { 'm', 'n' }"))
 
             assert_all(cursor, "SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'", [[set(['m', 'n'])]])
 
@@ -1682,7 +1682,7 @@ class TestCQL(UpgradeTester):
 
             cursor.default_fetch_size = None
 
-            assert_all(cursor, "SELECT * FROM test", [[i, i] for i in range(10)])
+            assert_all(cursor, "SELECT * FROM test", [[i, i] for i in range(10)], ignore_order=True)
 
     def date_test(self):
         """ Check dates are correctly recognized and validated """
@@ -2283,7 +2283,7 @@ class TestCQL(UpgradeTester):
             cursor.execute("INSERT INTO test (k, l1, l2) VALUES (0, [1, 2, 3], [4, 5, 6])")
             cursor.execute("UPDATE test SET l2[1] = 42, l1[1] = 24  WHERE k = 0")
 
-            assert_all(cursor, "SELECT l1, l2 FROM test WHERE k = 0", [[1, 24, 3], [4, 42, 6]])
+            assert_one(cursor, "SELECT l1, l2 FROM test WHERE k = 0", [[1, 24, 3], [4, 42, 6]])
 
     @freshCluster()
     def composite_index_collections_test(self):
@@ -2302,7 +2302,7 @@ class TestCQL(UpgradeTester):
         cursor.execute("CREATE INDEX ON blogs(author)")
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
-            debug("Querying {} node".wait_for_schema_agreement("upgraded" if is_upgraded else "old"))
+            debug("Querying {} node".format("upgraded" if is_upgraded else "old"))
             cursor.execute("TRUNCATE blogs")
 
             req = "INSERT INTO blogs (blog_id, time1, time2, author, content) VALUES (%d, %d, %d, '%s', %s)"
@@ -2460,7 +2460,7 @@ class TestCQL(UpgradeTester):
             cursor.execute("TRUNCATE zipcodes")
 
             for d in data:
-                cursor.execute("INSERT INTO zipcodes (group, zipcode, state, fips_regions, city) VALUES ('{}', '{}', '{}', {}, '{}')".format(d))
+                cursor.execute("INSERT INTO zipcodes (group, zipcode, state, fips_regions, city) VALUES ('%s', '%s', '%s', %s, '%s')" % d)
 
             res = list(cursor.execute("select zipcode from zipcodes"))
             assert_length_equal(res, 16)
@@ -2670,10 +2670,10 @@ class TestCQL(UpgradeTester):
             debug("Querying for individual keys retrieved {c} results".format(c=read_count))
             self.assertEqual(read_count, 100)
             # now a range slice, again all 100 rows should be retrievable
-            res = cursor.execute("SELECT * FROM t1")
-            read_count = len(rows_to_list(res))
+            res = rows_to_list(cursor.execute("SELECT * FROM t1"))
+            read_count = len(res)
             debug("Range request retrieved {c} rows".format(c=read_count))
-            assert_length_equal(read_count, 100)
+            assert_length_equal(res, 100)
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
             debug("Querying {state} node".format(state="upgraded" if is_upgraded else "old"))
@@ -2896,8 +2896,7 @@ class TestCQL(UpgradeTester):
             cursor.execute("TRUNCATE test")
 
             cursor.execute("INSERT INTO test (k, b) VALUES (0, 0x)")
-            query = "INSERT INTO test (k, b) VALUES (0, 0x)"
-            assert_one(cursor, query, [0, ''])
+            assert_one(cursor, "SELECT * FROM test", [0, ''])
 
     def rename_test(self):
         cursor = self.prepare(start_rpc=True)
@@ -3201,7 +3200,7 @@ class TestCQL(UpgradeTester):
                         cursor.execute("INSERT INTO %s (k1, k2, v) VALUES (%d, %d, %d)" % (table, i, j, i + j))
 
             def assert_nothing_changed(table):
-                assert_all(cursor, "SELECT * FROM {}".format(table), [[0, 0, 0], [0, 1, 1], [1, 0, 1], [1, 1, 2]])
+                assert_all(cursor, "SELECT * FROM {}".format(table), [[1, 0, 1], [1, 1, 2], [0, 0, 0], [0, 1, 1]])
 
             # Inserts a few rows to make sure we don't actually query something
             fill("test")
@@ -3473,7 +3472,7 @@ class TestCQL(UpgradeTester):
             """.format(id=userID_1)
 
             assert_one(cursor, stmt, ['Paul'])
-            assert_one(cursor, "SELECT name.firstname FROM users WHERE id = {id}", ['Paul'])
+            assert_one(cursor, "SELECT name.firstname FROM users WHERE id = {id}".format(id=userID_1), ['Paul'])
 
             stmt = """
                   UPDATE users
@@ -4140,7 +4139,6 @@ class TestCQL(UpgradeTester):
             assert_length_equal(rows, 2)
             self.assertEqual((0, 0, 'b'), rows[0])
             self.assertEqual((0, 0, 'c'), rows[1])
-            assert_all(cursor, )
 
     def in_with_desc_order_test(self):
         cursor = self.prepare()
@@ -4203,7 +4201,6 @@ class TestCQL(UpgradeTester):
             results = list(cursor.execute("SELECT writetime(v) FROM test WHERE k IN (1, 0) ORDER BY c1 ASC"))
             # since we don't know the write times, just assert that the order matches the order we expect
             self.assertEqual(results, list(sorted(results)))
-            assert_all(cursor, )
 
     def cas_and_compact_test(self):
         """ Test for CAS with compact storage table, and #6813 in particular """
@@ -4522,7 +4519,7 @@ class TestCQL(UpgradeTester):
             cursor.execute("TRUNCATE frozentmap")
 
             for frozen in (False, True):
-                debug("Testing {]} maps".format("frozen" if frozen else "normal"))
+                debug("Testing {} maps".format("frozen" if frozen else "normal"))
 
                 table = "frozentmap" if frozen else "tmap"
                 cursor.execute("INSERT INTO %s(k, m) VALUES (0, {'foo' : 'bar'})" % (table,))
@@ -4640,7 +4637,7 @@ class TestCQL(UpgradeTester):
                 debug("Testing {} maps".format("frozen" if frozen else "normal"))
 
                 table = "frozentmap" if frozen else "tmap"
-                cursor.execute("INSERT INTO {}(k, m) VALUES (0, {'foo' : 'bar'})".format(table))
+                cursor.execute("INSERT INTO %s (k, m) VALUES (0, {'foo' : 'bar'})" % table)
 
                 def check_applies(condition):
                     assert_one(cursor, "UPDATE %s SET m = {'foo': 'bar'} WHERE k=0 IF %s" % (table, condition), [True])
@@ -4660,7 +4657,7 @@ class TestCQL(UpgradeTester):
                 check_applies("m['foo'] < 'zzz' AND m['foo'] > 'aaa'")
 
                 def check_does_not_apply(condition):
-                    assert_one(cursor, "UPDATE {} SET m = {'foo': 'bar'} WHERE k=0 IF {}".format(table, condition), [False, {'foo': 'bar'}])
+                    assert_one(cursor, "UPDATE %s SET m = {'foo': 'bar'} WHERE k=0 IF %s" % (table, condition), [False, {'foo': 'bar'}])
                     assert_one(cursor, "SELECT * FROM {}".format(table), [0, {'foo': 'bar'}], cl=ConsistencyLevel.SERIAL)
 
                 check_does_not_apply("m['foo'] < 'aaa'")
@@ -4674,7 +4671,7 @@ class TestCQL(UpgradeTester):
                 check_does_not_apply("m['foo'] != null AND m['foo'] = null")
 
                 def check_invalid(condition, expected=InvalidRequest):
-                    assert_invalid(cursor, "UPDATE {} SET m = {'foo': 'bar'} WHERE k=0 IF {}".format(table, condition), expected=expected)
+                    assert_invalid(cursor, "UPDATE %s SET m = {'foo': 'bar'} WHERE k=0 IF %s" % (table, condition), expected=expected)
                     assert_one(cursor, "SELECT * FROM {}".format(table), [0, {'foo': 'bar'}])
 
                 check_invalid("m['foo'] < null")
