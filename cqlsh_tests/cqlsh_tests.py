@@ -1901,6 +1901,13 @@ class CqlLoginTest(Tester):
         self.node1.watch_log_for('Created default superuser')
         self.session = self.patient_cql_connection(self.node1, user='cassandra', password='cassandra')
 
+    def assert_login_not_allowed(self, user, input):
+        message = ("Provided username {user} and/or password are incorrect".format(user=user)
+            if LooseVersion(self.cluster.version()) >= LooseVersion('3.10')
+            else "Username and/or password are incorrect")
+
+        self.assertEqual([message in x for x in input.split("\n") if x], [True])
+
     def test_login_keeps_keyspace(self):
         self.create_ks(self.session, 'ks1', 1)
         self.create_cf(self.session, 'ks1table')
@@ -1918,9 +1925,6 @@ class CqlLoginTest(Tester):
         self.assertEqual([x for x in cqlsh_stdout.split() if x], ['ks1table', 'ks1table'])
         self.assertEqual(cqlsh_stderr, '')
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12163',
-                   flaky=True)
     def test_login_rejects_bad_pass(self):
         self.create_ks(self.session, 'ks1', 1)
         self.create_cf(self.session, 'ks1table')
@@ -1932,7 +1936,8 @@ class CqlLoginTest(Tester):
             ''',
             return_output=True,
             cqlsh_options=['-u', 'cassandra', '-p', 'cassandra'])
-        self.assertEqual(['''Username and/or password are incorrect''' in x for x in cqlsh_stderr.split("\n") if x], [True])
+
+        self.assert_login_not_allowed('user1', cqlsh_stderr)
 
     def test_login_authenticates_correct_user(self):
         self.create_ks(self.session, 'ks1', 1)
@@ -1966,9 +1971,6 @@ class CqlLoginTest(Tester):
                       "cqlsh stderr output: {}".format(expected_error,
                                                        '\n'.join(err_lines)))
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12163',
-                   flaky=True)
     def test_login_allows_bad_pass_and_continued_use(self):
         self.create_ks(self.session, 'ks1', 1)
         self.create_cf(self.session, 'ks1table')
@@ -1983,4 +1985,4 @@ class CqlLoginTest(Tester):
             return_output=True,
             cqlsh_options=['-u', 'cassandra', '-p', 'cassandra'])
         self.assertEqual([x for x in cqlsh_stdout.split() if x], ['ks1table'])
-        self.assertEqual(['''Username and/or password are incorrect''' in x for x in cqlsh_stderr.split("\n") if x], [True])
+        self.assert_login_not_allowed('user1', cqlsh_stderr)
