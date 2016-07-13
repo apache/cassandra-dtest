@@ -1497,10 +1497,12 @@ class TestMutations(ThriftTester):
             slice = client.get_slice('key1', ColumnParent('Super1', 'sc2'), p, ConsistencyLevel.ONE)
             assert len(slice) == n, "expected %s results; found %s" % (n, slice)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12158',
-                   flaky=True)
     def test_describe_keyspace(self):
+        try:
+            client.system_drop_keyspace("ValidKsForUpdate")
+        except InvalidRequestException:
+            pass  # The keyspace doesn't exit, because this test was run in isolation.
+
         kspaces = client.describe_keyspaces()
         if self.cluster.version() >= '3.0':
             assert len(kspaces) == 7, [x.name for x in kspaces]  # ['Keyspace2', 'Keyspace1', 'system', 'system_traces', 'system_auth', 'system_distributed', 'system_schema']
