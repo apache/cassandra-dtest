@@ -571,7 +571,7 @@ class TestCQL(UpgradeTester):
             for x in range(0, 10):
                 cursor.execute("INSERT INTO test1 (k, c, v) VALUES (0, %i, %i)" % (x, x))
 
-                assert_all(cursor, "SELECT v FROM test1 WHERE k = 0 AND c IN (5, 2, 8)", [[2], [5], [8]])
+            assert_all(cursor, "SELECT v FROM test1 WHERE k = 0 AND c IN (5, 2, 8)", [[2], [5], [8]])
 
             # Inserts
             for x in range(0, 10):
