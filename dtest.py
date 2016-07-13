@@ -1105,7 +1105,7 @@ class MultiError(Exception):
 
         for (exc, tb) in zip(self.exceptions, self.tracebacks):
             output += str(exc)
-            output += tb + "\n"
+            output += str(tb) + "\n"
 
         output += "****************************** END MultiError ******************************"
 

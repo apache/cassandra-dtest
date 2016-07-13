@@ -5,7 +5,7 @@ import time
 from collections import OrderedDict
 from copy import deepcopy
 
-from cassandra import ConsistencyLevel
+from cassandra import ConsistencyLevel, consistency_value_to_name
 from cassandra.query import SimpleStatement
 
 from assertions import assert_none, assert_unavailable, assert_length_equal
@@ -24,22 +24,6 @@ class TestHelper(Tester):
     def log(self, message):
         with self.lock:
             debug(message)
-
-    def _name(self, cl):
-        return {
-            None: '-',
-            ConsistencyLevel.ANY: 'ANY',
-            ConsistencyLevel.ONE: 'ONE',
-            ConsistencyLevel.TWO: 'TWO',
-            ConsistencyLevel.THREE: 'THREE',
-            ConsistencyLevel.QUORUM: 'QUORUM',
-            ConsistencyLevel.ALL: 'ALL',
-            ConsistencyLevel.LOCAL_QUORUM: 'LOCAL_QUORUM',
-            ConsistencyLevel.EACH_QUORUM: 'EACH_QUORUM',
-            ConsistencyLevel.SERIAL: 'SERIAL',
-            ConsistencyLevel.LOCAL_SERIAL: 'LOCAL_SERIAL',
-            ConsistencyLevel.LOCAL_ONE: 'LOCAL_ONE',
-        }[cl]
 
     def _is_local(self, cl):
         return (cl == ConsistencyLevel.LOCAL_QUORUM or
@@ -163,7 +147,7 @@ class TestHelper(Tester):
         expected = [[userid, age]] if age else []
         ret = rows_to_list(res) == expected
         if check_ret:
-            self.assertTrue(ret, "Got {} from {}, expected {} at {}".format(rows_to_list(res), session.cluster.contact_points, expected, self._name(consistency)))
+            self.assertTrue(ret, "Got {} from {}, expected {} at {}".format(rows_to_list(res), session.cluster.contact_points, expected, consistency_value_to_name(consistency)))
         return ret
 
     def create_counters_table(self, session):
@@ -188,8 +172,7 @@ class TestHelper(Tester):
             self.assertEqual(ret[0][1], val, "Got {} from {}, expected {} at {}".format(ret[0][1],
                                                                                         session.cluster.contact_points,
                                                                                         val,
-                                                                                        self._name(consistency)))
-
+                                                                                        consistency_value_to_name(consistency)))
         return ret[0][1] if ret else 0
 
     def read_counter(self, session, id, consistency):
@@ -255,7 +238,7 @@ class TestAvailability(TestHelper):
         Test availability for read and write via the session passed in as a prameter.
         """
         self.log("Connected to %s for %s/%s/%s" %
-                 (session.cluster.contact_points, self._name(write_cl), self._name(read_cl), self._name(serial_cl)))
+                 (session.cluster.contact_points, consistency_value_to_name(write_cl), consistency_value_to_name(read_cl), consistency_value_to_name(serial_cl)))
 
         start = 0
         end = 100
@@ -396,7 +379,7 @@ class TestAccuracy(TestHelper):
             self.serial_cl = serial_cl
 
             outer.log('Testing accuracy with WRITE/READ/SERIAL consistency set to {}/{}/{} (keys : {} to {})'
-                      .format(outer._name(write_cl), outer._name(read_cl), outer._name(serial_cl), start, end - 1))
+                      .format(consistency_value_to_name(write_cl), consistency_value_to_name(read_cl), consistency_value_to_name(serial_cl), start, end - 1))
 
         def get_num_nodes(self, idx):
             """
@@ -483,6 +466,7 @@ class TestAccuracy(TestHelper):
                 results = []
                 for s in sessions:
                     results.append(outer.query_counter(s, n, val, read_cl, check_ret=strong_consistency))
+
                 assert_greater_equal(results.count(val), write_nodes, "Failed to read value from sufficient number of nodes, required {} nodes to have a counter "
                                      "value of {} at key {}, instead got these values: {}".format(write_nodes, val, n, results))
 
