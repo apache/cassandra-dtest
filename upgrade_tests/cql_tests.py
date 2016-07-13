@@ -110,6 +110,9 @@ class TestCQL(UpgradeTester):
                                 "Only the first 65535 elements will be returned to the client. "
                                 "Please see http://cassandra.apache.org/doc/cql3/CQL.html#collections for more details.")
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12193',
+                   flaky=False)
     def noncomposite_static_cf_test(self):
         """ Test non-composite static CF syntax """
         cursor = self.prepare()
@@ -1505,6 +1508,9 @@ class TestCQL(UpgradeTester):
     @known_failure(failure_source='cassandra',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12123',
                    flaky=False)
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12191',
+                   flaky=False)
     def cql3_non_compound_range_tombstones_test(self):
         """
         Checks that 3.0 serializes RangeTombstoneLists correctly
@@ -2617,6 +2623,9 @@ class TestCQL(UpgradeTester):
             cursor.execute("INSERT INTO test(k, d, f) VALUES (1, 3.E10, -23.44E-3)")
             cursor.execute("INSERT INTO test(k, d, f) VALUES (2, 3, -2)")
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12194',
+                   flaky=False)
     def compact_metadata_test(self):
         """ Test regression from #5189 """
         cursor = self.prepare()
@@ -3645,6 +3654,9 @@ class TestCQL(UpgradeTester):
             assert_all(cursor, "SELECT k, v FROM test WHERE m CONTAINS 2", [[0, 1]])
             assert_none(cursor, "SELECT k, v FROM test  WHERE m CONTAINS 4")
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12192',
+                   flaky=False)
     @since('2.1')
     def map_keys_indexing_test(self):
         """
