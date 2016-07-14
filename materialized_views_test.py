@@ -298,9 +298,6 @@ class TestMaterializedViews(Tester):
             "Expecting {} materialized view, got {}".format(1, len(result))
         )
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11698',
-                   flaky=True)
     def clustering_column_test(self):
         """Test that we can use clustering columns as primary key for a materialized view"""
 
@@ -315,6 +312,8 @@ class TestMaterializedViews(Tester):
         session.execute(("CREATE MATERIALIZED VIEW users_by_state_birth_year "
                          "AS SELECT * FROM users WHERE state IS NOT NULL AND birth_year IS NOT NULL "
                          "AND username IS NOT NULL PRIMARY KEY (state, birth_year, username)"))
+
+        session.cluster.control_connection.wait_for_schema_agreement()
 
         self._insert_data(session)
 
