@@ -103,7 +103,7 @@ class TestRebuild(Tester):
         # but occasionally it wins the race with the one in the secondary thread,
         # so we check that one succeeded and the other failed
         self.assertEqual(self.rebuild_errors, 1,
-                         msg='concurrent rebuild should not be allowed, but one rebuild command should have succeeded.')
+                         msg='rebuild errors should be 1, but found {}. Concurrent rebuild should not be allowed, but one rebuild command should have succeeded.'.format(self.rebuild_errors))
 
         # check data
         for i in xrange(0, keys):
