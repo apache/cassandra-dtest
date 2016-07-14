@@ -755,7 +755,8 @@ class TestMaterializedViews(Tester):
         # Set initial values TS=0, verify
         session.execute(SimpleStatement("INSERT INTO t (id, v, v2, v3) VALUES (1, 1, 'a', 3.0) USING TIMESTAMP 0",
                                         consistency_level=ConsistencyLevel.ALL))
-
+        self._replay_batchlogs()
+        
         assert_one(
             session,
             "SELECT * FROM t_by_v WHERE v = 1",
@@ -764,6 +765,7 @@ class TestMaterializedViews(Tester):
 
         session.execute(SimpleStatement("INSERT INTO t (id, v2) VALUES (1, 'b') USING TIMESTAMP 1",
                                         consistency_level=ConsistencyLevel.ALL))
+        self._replay_batchlogs()
 
         assert_one(
             session,
@@ -774,6 +776,7 @@ class TestMaterializedViews(Tester):
         # change v's value and TS=3, tombstones v=1 and adds v=0 record
         session.execute(SimpleStatement("UPDATE t USING TIMESTAMP 3 SET v = 0 WHERE id = 1",
                                         consistency_level=ConsistencyLevel.ALL))
+        self._replay_batchlogs()
 
         assert_none(session, "SELECT * FROM t_by_v WHERE v = 1")
 
@@ -782,6 +785,7 @@ class TestMaterializedViews(Tester):
 
         session.execute(SimpleStatement("UPDATE t USING TIMESTAMP 4 SET v = 1 WHERE id = 1",
                                         consistency_level=ConsistencyLevel.QUORUM))
+        self._replay_batchlogs()
 
         assert_one(
             session,
@@ -790,6 +794,7 @@ class TestMaterializedViews(Tester):
         )
 
         node2.start(wait_other_notice=True, wait_for_binary_proto=True)
+        self._replay_batchlogs()
 
         # We should get a digest mismatch
         query = SimpleStatement("SELECT * FROM t_by_v WHERE v = 1",
