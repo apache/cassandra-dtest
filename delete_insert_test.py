@@ -4,6 +4,7 @@ import uuid
 
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
+from nose.tools import assert_equal
 
 from dtest import Tester
 
@@ -68,7 +69,7 @@ class DeleteInsertTest(Tester):
                 session = self.connection
                 query = SimpleStatement("SELECT * FROM delete_insert_search_test.test WHERE group = 'group2'", consistency_level=ConsistencyLevel.LOCAL_QUORUM)
                 rows = session.execute(query)
-                self.assertEqual(len(list(rows)), len(deleted), "Expecting the length of {} to be equal to the length of {}.".format(list(rows), deleted))
+                assert_equal(len(list(rows)), len(deleted), "Expecting the length of {} to be equal to the length of {}.".format(list(rows), deleted))
 
         threads = []
         for x in range(20):
