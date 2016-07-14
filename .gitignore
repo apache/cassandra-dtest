@@ -1,7 +1,12 @@
+# PyCharm
+.idea/
+*.iws
+*.ipr
+*.iml
+
 *.pyc
 logs
 last_test_dir
 upgrade
-*.iml
 html/
 doxygen/doxypy-0.4.2/
