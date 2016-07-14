@@ -362,7 +362,7 @@ class TestAvailability(TestHelper):
 
 class TestAccuracy(TestHelper):
     """
-    Test that we can consistently read back what we wrote depending on the write and read consitency levels.
+    Test that we can consistently read back what we wrote depending on the write and read consistency levels.
     """
 
     class Validation:
@@ -542,7 +542,7 @@ class TestAccuracy(TestHelper):
             (ConsistencyLevel.ONE, ConsistencyLevel.ONE),
             (ConsistencyLevel.ONE, ConsistencyLevel.TWO),
             (ConsistencyLevel.TWO, ConsistencyLevel.ONE),
-            # These are multi-DC consitency levels that should default to quorum calls
+            # These are multi-DC consistency levels that should default to quorum calls
             (ConsistencyLevel.EACH_QUORUM, ConsistencyLevel.LOCAL_QUORUM),
             (ConsistencyLevel.LOCAL_QUORUM, ConsistencyLevel.LOCAL_QUORUM),
             (ConsistencyLevel.QUORUM, ConsistencyLevel.SERIAL, ConsistencyLevel.SERIAL),
@@ -552,9 +552,6 @@ class TestAccuracy(TestHelper):
         self.log("Testing single dc, users")
         self._run_test_function_in_parallel(TestAccuracy.Validation.validate_users, [self.nodes], [self.rf], combinations)
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12096',
-                   flaky=True)
     @since("3.0")
     def test_simple_strategy_each_quorum_users(self):
         """
@@ -648,7 +645,7 @@ class TestAccuracy(TestHelper):
             (ConsistencyLevel.ONE, ConsistencyLevel.ONE),
             (ConsistencyLevel.ONE, ConsistencyLevel.TWO),
             (ConsistencyLevel.TWO, ConsistencyLevel.ONE),
-            # These are multi-DC consitency levels that should default to quorum calls
+            # These are multi-DC consistency levels that should default to quorum calls
             (ConsistencyLevel.EACH_QUORUM, ConsistencyLevel.LOCAL_QUORUM),
             (ConsistencyLevel.LOCAL_QUORUM, ConsistencyLevel.LOCAL_QUORUM),
         ]
