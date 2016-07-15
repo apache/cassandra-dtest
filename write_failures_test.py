@@ -5,7 +5,7 @@ from cassandra import ConsistencyLevel, WriteFailure, WriteTimeout
 from dtest import Tester
 from thrift_bindings.v22 import ttypes as thrift_types
 from thrift_tests import get_thrift_client
-from tools import since
+from tools import since, known_failure
 
 KEYSPACE = "foo"
 
@@ -108,6 +108,9 @@ class TestWriteFailures(Tester):
         self.protocol_version = 4
         self._perform_cql_statement("INSERT INTO mytable (key, value) VALUES ('key1', 'Value 1')")
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12213',
+                   flaky=True)
     def test_mutation_any(self):
         """
         A WriteFailure is not received at consistency level ANY
@@ -165,6 +168,9 @@ class TestWriteFailures(Tester):
         """
         self._perform_cql_statement("INSERT INTO mytable (key, value) VALUES ('key1', 'Value 1') IF NOT EXISTS")
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12213',
+                   flaky=True)
     def test_paxos_any(self):
         """
         A light transaction at consistency level ANY does not receive a WriteFailure
