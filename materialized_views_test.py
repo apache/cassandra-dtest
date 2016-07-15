@@ -756,7 +756,6 @@ class TestMaterializedViews(Tester):
         session.execute(SimpleStatement("INSERT INTO t (id, v, v2, v3) VALUES (1, 1, 'a', 3.0) USING TIMESTAMP 0",
                                         consistency_level=ConsistencyLevel.ALL))
         self._replay_batchlogs()
-        
         assert_one(
             session,
             "SELECT * FROM t_by_v WHERE v = 1",
@@ -1385,7 +1384,7 @@ def thread_session(ip, queue, start, end, rows, num_partitions):
             ret = execute_query(session, select_gi, i)
             queue.put_nowait(ret)
     except Exception as e:
-        print str(e)
+        print(str(e))
         queue.close()
 
 
@@ -1448,7 +1447,7 @@ class TestMaterializedViewsConsistency(Tester):
                 name = type(exc).__name__
                 self.exception_type[name] += 1
             except Exception as e:
-                print traceback.format_exception_only(type(e), e)
+                print(traceback.format_exception_only(type(e), e))
 
         # Success callback for async requests
         def success_callback(row):
