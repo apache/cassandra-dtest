@@ -213,6 +213,7 @@ class ReplicationTest(Tester):
         session.execute('CREATE TABLE test.test (id int PRIMARY KEY, value text)', trace=False)
 
         for key, token in murmur3_hashes.items():
+            debug('murmur3 hash key={key},token={token}'.format(key=key, token=token))
             query = SimpleStatement("INSERT INTO test (id, value) VALUES ({}, 'asdf')".format(key), consistency_level=ConsistencyLevel.ALL)
             future = session.execute_async(query, trace=True)
             future.result()
