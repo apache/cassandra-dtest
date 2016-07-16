@@ -278,3 +278,26 @@ class TestCounters(Tester):
         session.execute("ALTER TABLE counter_bug drop c")
 
         assert_invalid(session, "ALTER TABLE counter_bug add c counter", "Cannot re-add previously dropped counter column c")
+
+    def compact_counter_cluster_test(self):
+        cluster = self.cluster
+        cluster.populate(3).start()
+        node1 = cluster.nodelist()[0]
+        session = self.patient_cql_connection(node1)
+        self.create_ks(session, 'counter_tests', 1)
+
+        session.execute("""
+            CREATE TABLE IF NOT EXISTS counter_cs (
+                key bigint PRIMARY KEY,
+                data counter
+            ) WITH COMPACT STORAGE
+            """)
+        #  WITH COMPACT STORAGE
+
+        for outer in range(0, 5):
+            for idx in range(0, 5):
+                session.execute("UPDATE counter_cs SET data = data + 1 WHERE key = {k}".format(k=idx))
+
+        for idx in range(0,  5):
+            row = list(session.execute("SELECT data from counter_cs where key = {k}".format(k=idx)))
+            self.assertEqual(rows_to_list(row)[0][0], 5)
