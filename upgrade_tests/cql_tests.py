@@ -110,9 +110,6 @@ class TestCQL(UpgradeTester):
                                 "Only the first 65535 elements will be returned to the client. "
                                 "Please see http://cassandra.apache.org/doc/cql3/CQL.html#collections for more details.")
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12193',
-                   flaky=False)
     def noncomposite_static_cf_test(self):
         """ Test non-composite static CF syntax """
         cursor = self.prepare()
@@ -1505,9 +1502,6 @@ class TestCQL(UpgradeTester):
 
             assert_one(cursor, "SELECT * FROM test", [2, 4, 8])
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12123',
-                   flaky=False)
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12191',
                    flaky=False)
