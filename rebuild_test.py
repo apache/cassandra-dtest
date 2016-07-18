@@ -91,10 +91,7 @@ class TestRebuild(Tester):
         # concurrent rebuild should not be allowed (CASSANDRA-9119)
         # (following sleep is needed to avoid conflict in 'nodetool()' method setting up env.)
         time.sleep(.1)
-        try:
-            node2.nodetool('rebuild dc1')
-        except NodetoolError:
-            self.rebuild_errors += 1
+        rebuild()
 
         cmd1.join()
 
