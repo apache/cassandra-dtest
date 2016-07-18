@@ -84,6 +84,8 @@ class TestRebuild(Tester):
             except NodetoolError as e:
                 if 'Node is still rebuilding' in e.message:
                     self.rebuild_errors += 1
+                else:
+                    raise e
 
         cmd1 = Thread(target=rebuild)
         cmd1.start()
