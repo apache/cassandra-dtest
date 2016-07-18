@@ -1502,9 +1502,6 @@ class TestCQL(UpgradeTester):
 
             assert_one(cursor, "SELECT * FROM test", [2, 4, 8])
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12191',
-                   flaky=False)
     def cql3_non_compound_range_tombstones_test(self):
         """
         Checks that 3.0 serializes RangeTombstoneLists correctly
