@@ -2,7 +2,7 @@ import os
 import socket
 
 from dtest import Tester, debug
-from tools import known_failure, since
+from tools import since
 
 
 @since('2.2.5')
@@ -15,9 +15,6 @@ class TestGossipingPropertyFileSnitch(Tester):
         s.connect((address, port))
         s.close()
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12099',
-                   flaky=True)
     def test_prefer_local_reconnect_on_listen_address(self):
         """
         @jira_ticket CASSANDRA-9748
