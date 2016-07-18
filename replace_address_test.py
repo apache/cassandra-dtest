@@ -1,15 +1,17 @@
 import os
 from itertools import chain
 from shutil import rmtree
-from time import sleep
+import tempfile
 
 from cassandra import ConsistencyLevel, ReadTimeout, Unavailable
 from cassandra.query import SimpleStatement
 from ccmlib.node import Node, NodeError
 
-from assertions import assert_one
 from dtest import DISABLE_VNODES, Tester, debug
-from tools import InterruptBootstrap, known_failure, since
+from tools import InterruptBootstrap, known_failure, since, new_node, rows_to_list
+
+from bootstrap_test import assert_bootstrap_state
+from assertions import assert_not_running, assert_all
 
 
 class NodeUnavailable(Exception):
@@ -65,12 +67,12 @@ class TestReplaceAddress(Tester):
         node1, node2, node3 = cluster.nodelist()
 
         if DISABLE_VNODES:
-            numNodes = 1
+            num_tokens = 1
         else:
             # a little hacky but grep_log returns the whole line...
-            numNodes = int(node3.get_conf_option('num_tokens'))
+            num_tokens = int(node3.get_conf_option('num_tokens'))
 
-        debug(numNodes)
+        debug("testing with num_tokens: {}".format(num_tokens))
 
         debug("Inserting Data...")
         node1.stress(['write', 'n=10K', 'no-warmup', '-schema', 'replication(factor=3)'])
@@ -79,7 +81,7 @@ class TestReplaceAddress(Tester):
         session.default_timeout = 45
         stress_table = 'keyspace1.standard1'
         query = SimpleStatement('select * from %s LIMIT 1' % stress_table, consistency_level=ConsistencyLevel.THREE)
-        initialData = list(session.execute(query))
+        initial_data = rows_to_list(session.execute(query))
 
         # stop node, query should not work with consistency 3
         debug("Stopping node 3.")
@@ -95,31 +97,37 @@ class TestReplaceAddress(Tester):
 
         # replace node 3 with node 4
         debug("Starting node 4 to replace node 3")
-
-        node4 = Node('node4', cluster, True, ('127.0.0.4', 9160), ('127.0.0.4', 7000), '7400', '0', None, binary_interface=('127.0.0.4', 9042))
+        node4 = Node('node4', cluster=cluster, auto_bootstrap=True, thrift_interface=('127.0.0.4', 9160),
+                     storage_interface=('127.0.0.4', 7000), jmx_port='7400', remote_debug_port='0',
+                     initial_token=None, binary_interface=('127.0.0.4', 9042))
         cluster.add(node4, False)
         node4.start(replace_address='127.0.0.3', wait_for_binary_proto=True)
 
-        # query should work again
-        debug("Verifying querying works again.")
-        query = SimpleStatement('select * from %s LIMIT 1' % stress_table, consistency_level=ConsistencyLevel.THREE)
-        finalData = list(session.execute(query))
-        self.assertListEqual(initialData, finalData)
-
         debug("Verifying tokens migrated sucessfully")
-        movedTokensList = node4.grep_log("Token .* changing ownership from /127.0.0.3 to /127.0.0.4")
-        debug(movedTokensList[0])
-        self.assertEqual(len(movedTokensList), numNodes)
+        moved_tokens = node4.grep_log("Token .* changing ownership from /127.0.0.3 to /127.0.0.4")
+        debug("number of moved tokens: {}".format(len(moved_tokens)))
+        self.assertEqual(len(moved_tokens), num_tokens)
 
         # check that restarting node 3 doesn't work
         debug("Try to restart node 3 (should fail)")
         node3.start(wait_other_notice=False)
-        checkCollision = node1.grep_log("between /127.0.0.3 and /127.0.0.4; /127.0.0.4 is the new owner")
-        debug(checkCollision)
-        self.assertEqual(len(checkCollision), 1)
+        collision_log = node1.grep_log("between /127.0.0.3 and /127.0.0.4; /127.0.0.4 is the new owner")
+        debug(collision_log)
+        self.assertEqual(len(collision_log), 1)
+        node3.stop(gently=False)
+
+        # query should work again
+        debug("Stopping old nodes")
+        node1.stop(gently=False, wait_other_notice=True)
+        node2.stop(gently=False, wait_other_notice=True)
+
+        debug("Verifying data on new node.")
+        session = self.patient_exclusive_cql_connection(node4)
+        assert_all(session, 'SELECT * from {} LIMIT 1'.format(stress_table),
+                   expected=initial_data,
+                   cl=ConsistencyLevel.ONE)
 
     def replace_active_node_test(self):
-
         debug("Starting cluster with 3 nodes.")
         cluster = self.cluster
         cluster.populate(3).start()
@@ -127,13 +135,15 @@ class TestReplaceAddress(Tester):
 
         # replace active node 3 with node 4
         debug("Starting node 4 to replace active node 3")
-        node4 = Node('node4', cluster, True, ('127.0.0.4', 9160), ('127.0.0.4', 7000), '7400', '0', None, binary_interface=('127.0.0.4', 9042))
+        node4 = Node('node4', cluster=cluster, auto_bootstrap=True, thrift_interface=('127.0.0.4', 9160),
+                     storage_interface=('127.0.0.4', 7000), jmx_port='7400', remote_debug_port='0',
+                     initial_token=None, binary_interface=('127.0.0.4', 9042))
         cluster.add(node4, False)
 
         mark = node4.mark_log()
         node4.start(replace_address='127.0.0.3', wait_other_notice=False)
         node4.watch_log_for("java.lang.UnsupportedOperationException: Cannot replace a live node...", from_mark=mark)
-        self.check_not_running(node4)
+        assert_not_running(node4)
 
     def replace_nonexistent_node_test(self):
         debug("Starting cluster with 3 nodes.")
@@ -142,22 +152,16 @@ class TestReplaceAddress(Tester):
         node1, node2, node3 = cluster.nodelist()
 
         debug('Start node 4 and replace an address with no node')
-        node4 = Node('node4', cluster, True, ('127.0.0.4', 9160), ('127.0.0.4', 7000), '7400', '0', None, binary_interface=('127.0.0.4', 9042))
+        node4 = Node('node4', cluster=cluster, auto_bootstrap=True, thrift_interface=('127.0.0.4', 9160),
+                     storage_interface=('127.0.0.4', 7000), jmx_port='7400', remote_debug_port='0',
+                     initial_token=None, binary_interface=('127.0.0.4', 9042))
         cluster.add(node4, False)
 
         # try to replace an unassigned ip address
         mark = node4.mark_log()
         node4.start(replace_address='127.0.0.5', wait_other_notice=False)
         node4.watch_log_for("java.lang.RuntimeException: Cannot replace_address /127.0.0.5 because it doesn't exist in gossip", from_mark=mark)
-        self.check_not_running(node4)
-
-    def check_not_running(self, node):
-        attempts = 0
-        while node.is_running() and attempts < 10:
-            sleep(1)
-            attempts = attempts + 1
-
-        self.assertFalse(node.is_running())
+        assert_not_running(node4)
 
     def replace_first_boot_test(self):
         debug("Starting cluster with 3 nodes.")
@@ -166,12 +170,12 @@ class TestReplaceAddress(Tester):
         node1, node2, node3 = cluster.nodelist()
 
         if DISABLE_VNODES:
-            numNodes = 1
+            num_tokens = 1
         else:
             # a little hacky but grep_log returns the whole line...
-            numNodes = int(node3.get_conf_option('num_tokens'))
+            num_tokens = int(node3.get_conf_option('num_tokens'))
 
-        debug(numNodes)
+        debug("testing with num_tokens: {}".format(num_tokens))
 
         debug("Inserting Data...")
         node1.stress(['write', 'n=10K', 'no-warmup', '-schema', 'replication(factor=3)'])
@@ -179,7 +183,7 @@ class TestReplaceAddress(Tester):
         session = self.patient_cql_connection(node1)
         stress_table = 'keyspace1.standard1'
         query = SimpleStatement('select * from %s LIMIT 1' % stress_table, consistency_level=ConsistencyLevel.THREE)
-        initialData = list(session.execute(query))
+        initial_data = rows_to_list(session.execute(query))
 
         # stop node, query should not work with consistency 3
         debug("Stopping node 3.")
@@ -194,40 +198,44 @@ class TestReplaceAddress(Tester):
 
         # replace node 3 with node 4
         debug("Starting node 4 to replace node 3")
-        node4 = Node('node4', cluster, True, ('127.0.0.4', 9160), ('127.0.0.4', 7000), '7400', '0', None, binary_interface=('127.0.0.4', 9042))
+        node4 = Node('node4', cluster=cluster, auto_bootstrap=True, thrift_interface=('127.0.0.4', 9160),
+                     storage_interface=('127.0.0.4', 7000), jmx_port='7400', remote_debug_port='0',
+                     initial_token=None, binary_interface=('127.0.0.4', 9042))
         cluster.add(node4, False)
         node4.start(jvm_args=["-Dcassandra.replace_address_first_boot=127.0.0.3"], wait_for_binary_proto=True)
 
-        # query should work again
-        debug("Verifying querying works again.")
-        finalData = list(session.execute(query))
-        self.assertListEqual(initialData, finalData)
-
         debug("Verifying tokens migrated sucessfully")
-        movedTokensList = node4.grep_log("Token .* changing ownership from /127.0.0.3 to /127.0.0.4")
-        debug(movedTokensList[0])
-        self.assertEqual(len(movedTokensList), numNodes)
+        moved_tokens = node4.grep_log("Token .* changing ownership from /127.0.0.3 to /127.0.0.4")
+        debug("number of moved tokens: {}".format(len(moved_tokens)))
+        self.assertEqual(len(moved_tokens), num_tokens)
 
         # check that restarting node 3 doesn't work
         debug("Try to restart node 3 (should fail)")
         node3.start(wait_other_notice=False)
-        checkCollision = node1.grep_log("between /127.0.0.3 and /127.0.0.4; /127.0.0.4 is the new owner")
-        debug(checkCollision)
-        self.assertEqual(len(checkCollision), 1)
+        collision_log = node1.grep_log("between /127.0.0.3 and /127.0.0.4; /127.0.0.4 is the new owner")
+        debug(collision_log)
+        self.assertEqual(len(collision_log), 1)
 
         # restart node4 (if error's might have to change num_tokens)
         node4.stop(gently=False)
         node4.start(wait_for_binary_proto=True, wait_other_notice=False)
 
-        debug("Verifying querying works again.")
-        finalData = list(session.execute(query))
-        self.assertListEqual(initialData, finalData)
-
         # we redo this check because restarting node should not result in tokens being moved again, ie number should be same
         debug("Verifying tokens migrated sucessfully")
-        movedTokensList = node4.grep_log("Token .* changing ownership from /127.0.0.3 to /127.0.0.4")
-        debug(movedTokensList[0])
-        self.assertEqual(len(movedTokensList), numNodes)
+        moved_tokens = node4.grep_log("Token .* changing ownership from /127.0.0.3 to /127.0.0.4")
+        debug("number of moved tokens: {}".format(len(moved_tokens)))
+        self.assertEqual(len(moved_tokens), num_tokens)
+
+        # query should work again
+        debug("Stopping old nodes")
+        node1.stop(gently=False, wait_other_notice=True)
+        node2.stop(gently=False, wait_other_notice=True)
+
+        debug("Verifying data on new node.")
+        session = self.patient_exclusive_cql_connection(node4)
+        assert_all(session, 'SELECT * from {} LIMIT 1'.format(stress_table),
+                   expected=initial_data,
+                   cl=ConsistencyLevel.ONE)
 
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11691',
@@ -297,6 +305,7 @@ class TestReplaceAddress(Tester):
         debug('Starting cluster with 3 nodes.')
         cluster = self.cluster
         cluster.populate(3)
+        cluster.set_batch_commitlog(enabled=True)
         node1, node2, node3 = cluster.nodelist()
         cluster.seeds.remove(node3)
         NUM_TOKENS = os.environ.get('NUM_TOKENS', '256')
@@ -308,10 +317,12 @@ class TestReplaceAddress(Tester):
 
         debug('Inserting Data...')
         node1.stress(['write', 'n=10K', 'no-warmup', '-schema', 'replication(factor=3)'])
+        cluster.flush()
 
         session = self.patient_cql_connection(node1)
-        query = SimpleStatement('select * from keyspace1.standard1 LIMIT 1', consistency_level=ConsistencyLevel.THREE)
-        initialData = list(session.execute(query))
+        stress_table = 'keyspace1.standard1'
+        query = SimpleStatement('select * from {} LIMIT 1'.format(stress_table), consistency_level=ConsistencyLevel.THREE)
+        initial_data = rows_to_list(session.execute(query))
 
         for set_allow_unsafe_flag in [False, True]:
             debug('Stopping node 3.')
@@ -335,9 +346,15 @@ class TestReplaceAddress(Tester):
                 debug('Starting node3 with auto_bootstrap = false and replace_address = 127.0.0.3 and allow_unsafe_replace = true')
                 node3.start(replace_address='127.0.0.3', wait_for_binary_proto=True, jvm_args=['-Dcassandra.allow_unsafe_replace=true'])
                 # query should work again
-                debug('Verifying querying works again.')
-                finalData = list(session.execute(query))
-                self.assertListEqual(initialData, finalData)
+                debug("Stopping old nodes")
+                node1.stop(gently=False, wait_other_notice=True)
+                node2.stop(gently=False, wait_other_notice=True)
+
+                debug("Verifying data on new node.")
+                session = self.patient_exclusive_cql_connection(node3)
+                assert_all(session, 'SELECT * from {} LIMIT 1'.format(stress_table),
+                           expected=initial_data,
+                           cl=ConsistencyLevel.ONE)
             else:
                 debug('Starting node 3 with auto_bootstrap = false and replace_address = 127.0.0.3')
                 node3.start(replace_address='127.0.0.3', wait_other_notice=False)
@@ -366,7 +383,7 @@ class TestReplaceAddress(Tester):
         session = self.patient_cql_connection(node1)
         stress_table = 'keyspace1.standard1'
         query = SimpleStatement('select * from %s LIMIT 1' % stress_table, consistency_level=ConsistencyLevel.THREE)
-        initialData = list(session.execute(query))
+        initial_data = rows_to_list(session.execute(query))
 
         node3.stop(gently=False)
 
@@ -375,7 +392,9 @@ class TestReplaceAddress(Tester):
         t.start()
         # replace node 3 with node 4
         debug("Starting node 4 to replace node 3")
-        node4 = Node('node4', cluster, True, ('127.0.0.4', 9160), ('127.0.0.4', 7000), '7400', '0', None, binary_interface=('127.0.0.4', 9042))
+        node4 = Node('node4', cluster=cluster, auto_bootstrap=True, thrift_interface=('127.0.0.4', 9160),
+                     storage_interface=('127.0.0.4', 7000), jmx_port='7400', remote_debug_port='0',
+                     initial_token=None, binary_interface=('127.0.0.4', 9042))
         # keep timeout low so that test won't hang
         node4.set_configuration_options(values={'streaming_socket_timeout_in_ms': 1000})
         cluster.add(node4, False)
@@ -394,14 +413,18 @@ class TestReplaceAddress(Tester):
         node4.watch_log_for("Listening for thrift clients...")
 
         # check if 2nd bootstrap succeeded
-        session = self.exclusive_cql_connection(node4)
-        queryTwo = "SELECT bootstrapped FROM system.local WHERE key='local'"
-        assert_one(session, queryTwo, ['COMPLETED'])
+        assert_bootstrap_state(self, node4, 'COMPLETED')
 
         # query should work again
-        debug("Verifying querying works again.")
-        finalData = list(session.execute(query))
-        self.assertListEqual(initialData, finalData)
+        debug("Stopping old nodes")
+        node1.stop(gently=False, wait_other_notice=True)
+        node2.stop(gently=False, wait_other_notice=True)
+
+        debug("Verifying data on new node.")
+        session = self.patient_exclusive_cql_connection(node4)
+        assert_all(session, 'SELECT * from {} LIMIT 1'.format(stress_table),
+                   expected=initial_data,
+                   cl=ConsistencyLevel.ONE)
 
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11835')
@@ -418,7 +441,7 @@ class TestReplaceAddress(Tester):
         session = self.patient_cql_connection(node1)
         stress_table = 'keyspace1.standard1'
         query = SimpleStatement('select * from %s LIMIT 1' % stress_table, consistency_level=ConsistencyLevel.THREE)
-        initialData = list(session.execute(query))
+        initial_data = rows_to_list(session.execute(query))
 
         node3.stop(gently=False)
 
@@ -427,7 +450,10 @@ class TestReplaceAddress(Tester):
         t.start()
         # replace node 3 with node 4
         debug("Starting node 4 to replace node 3")
-        node4 = Node('node4', cluster, True, ('127.0.0.4', 9160), ('127.0.0.4', 7000), '7400', '0', None, binary_interface=('127.0.0.4', 9042))
+        node4 = Node('node4', cluster=cluster, auto_bootstrap=True, thrift_interface=('127.0.0.4', 9160),
+                     storage_interface=('127.0.0.4', 7000), jmx_port='7400', remote_debug_port='0',
+                     initial_token=None, binary_interface=('127.0.0.4', 9042))
+
         # keep timeout low so that test won't hang
         node4.set_configuration_options(values={'streaming_socket_timeout_in_ms': 1000})
         cluster.add(node4, False)
@@ -451,11 +477,130 @@ class TestReplaceAddress(Tester):
         node4.watch_log_for("Listening for thrift clients...", from_mark=mark)
 
         # check if 2nd bootstrap succeeded
-        session = self.exclusive_cql_connection(node4)
-        queryTwo = "SELECT bootstrapped FROM system.local WHERE key='local'"
-        assert_one(session, queryTwo, ['COMPLETED'])
+        assert_bootstrap_state(self, node4, 'COMPLETED')
 
         # query should work again
-        debug("Verifying querying works again.")
-        finalData = list(session.execute(query))
-        self.assertListEqual(initialData, finalData)
+        debug("Stopping old nodes")
+        node1.stop(gently=False, wait_other_notice=True)
+        node2.stop(gently=False, wait_other_notice=True)
+
+        debug("Verifying data on new node.")
+        session = self.patient_exclusive_cql_connection(node4)
+        assert_all(session, 'SELECT * from {} LIMIT 1'.format(stress_table),
+                   expected=initial_data,
+                   cl=ConsistencyLevel.ONE)
+
+    def replace_with_insufficient_replicas_test(self):
+        """
+        Test that replace fails when there are insufficient replicas
+        @jira_ticket CASSANDRA-11848
+        """
+        debug("Starting cluster with 3 nodes.")
+        cluster = self.cluster
+        cluster.populate(3).start()
+        node1, node2, node3 = cluster.nodelist()
+
+        if DISABLE_VNODES:
+            num_tokens = 1
+        else:
+            # a little hacky but grep_log returns the whole line...
+            num_tokens = int(node3.get_conf_option('num_tokens'))
+
+        debug("testing with num_tokens: {}".format(num_tokens))
+
+        debug("Inserting Data...")
+        node1.stress(['write', 'n=10K', 'no-warmup', '-schema', 'replication(factor=2)'])
+
+        # stop node to replace
+        debug("Stopping node to replace.")
+        node3.stop(wait_other_notice=True)
+
+        # stop other replica
+        debug("Stopping node2 (other replica)")
+        node2.stop(wait_other_notice=True)
+
+        # replace node 3 with node 4
+        debug("Starting node 4 to replace node 3")
+
+        node4 = Node('node4', cluster=cluster, auto_bootstrap=True, thrift_interface=('127.0.0.4', 9160),
+                     storage_interface=('127.0.0.4', 7000), jmx_port='7400', remote_debug_port='0',
+                     initial_token=None, binary_interface=('127.0.0.4', 9042))
+        cluster.add(node4, False)
+        node4.start(replace_address='127.0.0.3', wait_for_binary_proto=False, wait_other_notice=False)
+
+        # replace should fail due to insufficient replicas
+        node4.watch_log_for("Unable to find sufficient sources for streaming range")
+        assert_not_running(node4)
+
+    def multi_dc_replace_with_rf1_test(self):
+        """
+        Test that multi-dc replace works when rf=1 on each dc
+        """
+        cluster = self.cluster
+        cluster.populate([1, 1])
+        cluster.start()
+        node1, node2 = cluster.nodelist()
+
+        node1 = cluster.nodes['node1']
+        yaml_config = """
+        # Create the keyspace and table
+        keyspace: keyspace1
+        keyspace_definition: |
+          CREATE KEYSPACE keyspace1 WITH replication = {'class': 'NetworkTopologyStrategy', 'dc1': 1, 'dc2': 1};
+        table: users
+        table_definition:
+          CREATE TABLE users (
+            username text,
+            first_name text,
+            last_name text,
+            email text,
+            PRIMARY KEY(username)
+          ) WITH compaction = {'class':'SizeTieredCompactionStrategy'};
+        insert:
+          partitions: fixed(1)
+          batchtype: UNLOGGED
+        queries:
+          read:
+            cql: select * from users where username = ?
+            fields: samerow
+        """
+        with tempfile.NamedTemporaryFile(mode='w+') as stress_config:
+            stress_config.write(yaml_config)
+            stress_config.flush()
+            node1.stress(['user', 'profile=' + stress_config.name, 'n=10k', 'no-warmup',
+                          'ops(insert=1)', '-rate', 'threads=50'])
+
+        session = self.patient_cql_connection(node1)
+
+        # change system_auth keyspace to 2 (default is 1) to avoid
+        # "Unable to find sufficient sources for streaming" warning
+        if cluster.cassandra_version() >= '2.2.0':
+            session.execute("""
+                ALTER KEYSPACE system_auth
+                    WITH replication = {'class':'SimpleStrategy', 'replication_factor':2};
+            """)
+
+        # Save initial data
+        stress_table = 'keyspace1.users'
+        query = SimpleStatement('select * from %s LIMIT 1' % stress_table, consistency_level=ConsistencyLevel.TWO)
+        initial_data = rows_to_list(session.execute(query))
+
+        # stop node to replace
+        debug("Stopping node to replace.")
+        node2.stop(wait_other_notice=True)
+
+        node3 = new_node(cluster, data_center='dc2')
+        node3.start(replace_address='127.0.0.2', wait_for_binary_proto=True)
+
+        assert_bootstrap_state(self, node3, 'COMPLETED')
+
+        # Check that keyspace was replicated from dc1 to dc2
+        self.assertFalse(node3.grep_log("Unable to find sufficient sources for streaming range"))
+
+        # query should work again with node1 stopped
+        node1.stop(wait_other_notice=True)
+        debug("Verifying data on new node.")
+        session = self.patient_exclusive_cql_connection(node3)
+        assert_all(session, 'SELECT * from {} LIMIT 1'.format(stress_table),
+                   expected=initial_data,
+                   cl=ConsistencyLevel.LOCAL_ONE)

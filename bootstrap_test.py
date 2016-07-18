@@ -11,18 +11,27 @@ from cassandra import ConsistencyLevel
 from cassandra.concurrent import execute_concurrent_with_args
 from ccmlib.node import NodeError
 
-from assertions import assert_almost_equal, assert_one
+from assertions import assert_almost_equal, assert_one, assert_not_running
 from dtest import Tester, debug
 from tools import (InterruptBootstrap, KillOnBootstrap, known_failure,
                    new_node, no_vnodes, query_c1c2, since)
 
 
-class TestBootstrap(Tester):
+def assert_bootstrap_state(tester, node, expected_bootstrap_state):
+    """
+    Assert that a node is on a given bootstrap state
+    @param tester The dtest.Tester object to fetch the exclusive connection to the node
+    @param node The node to check bootstrap state
+    @param expected_bootstrap_state Bootstrap state to expect
 
-    def check_bootstrap_state(self, node, expected_state):
-        session = self.patient_exclusive_cql_connection(node)
-        rows = session.execute("SELECT bootstrapped FROM system.local WHERE key='local'")
-        self.assertEqual(rows[0][0], expected_state)
+    Examples:
+    assert_bootstrap_state(self, node3, 'COMPLETED')
+    """
+    session = tester.exclusive_cql_connection(node)
+    assert_one(session, "SELECT bootstrapped FROM system.local WHERE key='local'", [expected_bootstrap_state])
+
+
+class TestBootstrap(Tester):
 
     def __init__(self, *args, **kwargs):
         kwargs['cluster_options'] = {'start_rpc': 'true'}
@@ -93,7 +102,7 @@ class TestBootstrap(Tester):
         assert_almost_equal(size1, size2, error=0.3)
         assert_almost_equal(float(initial_size - empty_size), 2 * (size1 - float(empty_size)))
 
-        self.check_bootstrap_state(node2, 'COMPLETED')
+        assert_bootstrap_state(self, node2, 'COMPLETED')
 
     @no_vnodes()
     def simple_bootstrap_test(self):
@@ -113,7 +122,8 @@ class TestBootstrap(Tester):
             node2.start(jvm_args=["-Dcassandra.write_survey=true"], wait_for_binary_proto=True)
 
             self.assertTrue(len(node2.grep_log('Startup complete, but write survey mode is active, not becoming an active ring member.')))
-            self.check_bootstrap_state(node2, 'IN_PROGRESS')
+            assert_bootstrap_state(self, node2, 'IN_PROGRESS')
+
             node2.nodetool("join")
             self.assertTrue(len(node2.grep_log('Leaving write survey mode and joining ring at operator request')))
             return node2
@@ -135,7 +145,7 @@ class TestBootstrap(Tester):
         node3 = new_node(cluster)
         node3.start(wait_for_binary_proto=True, wait_other_notice=True)
 
-        self.check_bootstrap_state(node3, 'COMPLETED')
+        assert_bootstrap_state(self, node3, 'COMPLETED')
 
     def read_from_bootstrapped_node_test(self):
         """
@@ -147,7 +157,7 @@ class TestBootstrap(Tester):
         cluster.start()
 
         node1 = cluster.nodes['node1']
-        node1.stress(['write', 'n=10K', '-rate', 'threads=8'])
+        node1.stress(['write', 'n=10K', 'no-warmup', '-rate', 'threads=8', '-schema', 'replication(factor=2)'])
 
         session = self.patient_cql_connection(node1)
         stress_table = 'keyspace1.standard1'
@@ -160,6 +170,66 @@ class TestBootstrap(Tester):
         new_rows = list(session.execute("SELECT * FROM %s" % (stress_table,)))
         self.assertEquals(original_rows, new_rows)
 
+    def consistent_range_movement_true_with_one_replica_down_should_fail_test(self):
+        self._bootstrap_test_with_replica_down(True)
+
+    def consistent_range_movement_false_with_one_replica_down_should_succeed_test(self):
+        self._bootstrap_test_with_replica_down(False)
+
+    def consistent_range_movement_false_with_two_replicas_down_should_fail_test(self):
+        self._bootstrap_test_with_replica_down(False, stop_two_replicas=True)
+
+    def consistent_range_movement_true_with_ks_rf1_should_fail_test(self):
+        self._bootstrap_test_with_replica_down(True, rf=1)
+
+    def consistent_range_movement_true_with_ks_rf1_should_succeed_test(self):
+        self._bootstrap_test_with_replica_down(False, rf=1)
+
+    def _bootstrap_test_with_replica_down(self, consistent_range_movement,
+                                          stop_two_replicas=False, rf=2):
+        """
+        Test to guarantee bootstrap will not succeed when there are insufficient replicas
+        @jira_ticket CASSANDRA-11848
+        """
+        cluster = self.cluster
+        cluster.populate(3)
+        cluster.start()
+        node1, node2, node3 = cluster.nodelist()
+
+        node1.stress(['write', 'n=10K', 'no-warmup', '-rate', 'threads=8', '-schema', 'replication(factor={})'.format(rf)])
+
+        # change system_auth keyspace to 2 (default is 1) to avoid
+        # "Unable to find sufficient sources for streaming" warning
+        if cluster.cassandra_version() >= '2.2.0':
+            session = self.patient_cql_connection(node1)
+            session.execute("""
+                ALTER KEYSPACE system_auth
+                    WITH replication = {'class':'SimpleStrategy', 'replication_factor':2};
+            """)
+
+        # Stop remaining nodes
+        node2.stop(wait_other_notice=True)
+        if stop_two_replicas:
+            node3.stop(wait_other_notice=True)
+
+        successful_bootstrap_expected = not consistent_range_movement and not stop_two_replicas
+
+        node4 = new_node(cluster)
+        node4.start(wait_for_binary_proto=successful_bootstrap_expected, wait_other_notice=successful_bootstrap_expected,
+                    jvm_args=["-Dcassandra.consistent.rangemovement={}".format(consistent_range_movement)])
+
+        if successful_bootstrap_expected:
+            if not consistent_range_movement and rf == 1:
+                node4.watch_log_for("Unable to find sufficient sources for streaming range")
+            self.assertTrue(node4.is_running())
+            assert_bootstrap_state(self, node4, 'COMPLETED')
+        else:
+            if consistent_range_movement:
+                node4.watch_log_for("A node required to move the data consistently is down")
+            else:
+                node4.watch_log_for("Unable to find sufficient sources for streaming range")
+            assert_not_running(node4)
+
     @known_failure(failure_source='cassandra',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11414',
                    flaky=True)
@@ -170,10 +240,11 @@ class TestBootstrap(Tester):
         """
 
         cluster = self.cluster
+        cluster.set_configuration_options(values={'stream_throughput_outbound_megabits_per_sec': 1})
         cluster.populate(2).start(wait_other_notice=True)
 
         node1 = cluster.nodes['node1']
-        node1.stress(['write', 'n=100K', 'cl=TWO', '-schema', 'replication(factor=2)', '-rate', 'threads=50'])
+        node1.stress(['write', 'n=100K', 'no-warmup', 'cl=TWO', '-schema', 'replication(factor=2)', '-rate', 'threads=50'])
         cluster.flush()
 
         # kill node1 in the middle of streaming to let it fail
@@ -182,36 +253,30 @@ class TestBootstrap(Tester):
 
         # start bootstrapping node3 and wait for streaming
         node3 = new_node(cluster)
-        node3.set_configuration_options(values={'stream_throughput_outbound_megabits_per_sec': 1})
         # keep timeout low so that test won't hang
         node3.set_configuration_options(values={'streaming_socket_timeout_in_ms': 1000})
-        try:
-            node3.start(wait_other_notice=False)
-        except NodeError:
-            pass  # node doesn't start as expected
+        node3.start(wait_other_notice=False, wait_for_binary_proto=True)
         t.join()
 
         # wait for node3 ready to query
         node3.watch_log_for("Starting listening for CQL clients")
         mark = node3.mark_log()
         # check if node3 is still in bootstrap mode
-        session = self.patient_exclusive_cql_connection(node3)
-        rows = list(session.execute("SELECT bootstrapped FROM system.local WHERE key='local'"))
-        self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0][0], 'IN_PROGRESS')
+        assert_bootstrap_state(self, node3, 'IN_PROGRESS')
+
         # bring back node1 and invoke nodetool bootstrap to resume bootstrapping
         node1.start(wait_other_notice=True)
         node3.nodetool('bootstrap resume')
 
         node3.watch_log_for("Resume complete", from_mark=mark)
-        self.check_bootstrap_state(node3, 'COMPLETED')
+        assert_bootstrap_state(self, node3, 'COMPLETED')
 
         # cleanup to guarantee each node will only have sstables of its ranges
         cluster.cleanup()
 
         debug("Check data is present")
         # Let's check stream bootstrap completely transferred data
-        stdout, stderr = node3.stress(['read', 'n=100k', "no-warmup", '-schema',
+        stdout, stderr = node3.stress(['read', 'n=100k', 'no-warmup', '-schema',
                                        'replication(factor=2)', '-rate', 'threads=8'],
                                       capture_output=True)
 
@@ -253,7 +318,7 @@ class TestBootstrap(Tester):
         node3.watch_log_for("Listening for thrift clients...", from_mark=mark)
 
         # check if 2nd bootstrap succeeded
-        self.check_bootstrap_state(node3, 'COMPLETED')
+        assert_bootstrap_state(self, node3, 'COMPLETED')
 
     def manual_bootstrap_test(self):
         """
@@ -265,7 +330,7 @@ class TestBootstrap(Tester):
         cluster.populate(2).start(wait_other_notice=True)
         (node1, node2) = cluster.nodelist()
 
-        node1.stress(['write', 'n=1K', '-schema', 'replication(factor=2)',
+        node1.stress(['write', 'n=1K', 'no-warmup', '-schema', 'replication(factor=2)',
                       '-rate', 'threads=1', '-pop', 'dist=UNIFORM(1..1000)'])
 
         session = self.patient_exclusive_cql_connection(node2)
@@ -315,11 +380,11 @@ class TestBootstrap(Tester):
             cql: select * from users where username = ?
             fields: samerow
         """
-        stress_config = tempfile.NamedTemporaryFile(mode='w+', delete=False)
-        stress_config.write(yaml_config)
-        stress_config.close()
-        node1.stress(['user', 'profile=' + stress_config.name, 'n=2000000',
-                      'ops(insert=1)', '-rate', 'threads=50'])
+        with tempfile.NamedTemporaryFile(mode='w+') as stress_config:
+            stress_config.write(yaml_config)
+            stress_config.flush()
+            node1.stress(['user', 'profile=' + stress_config.name, 'n=2M', 'no-warmup',
+                          'ops(insert=1)', '-rate', 'threads=50'])
 
         node3 = new_node(cluster, data_center='dc2')
         node3.start(no_wait=True)
@@ -327,12 +392,10 @@ class TestBootstrap(Tester):
 
         with tempfile.TemporaryFile(mode='w+') as tmpfile:
             node1.stress(['user', 'profile=' + stress_config.name, 'ops(insert=1)',
-                          'n=500K', 'cl=LOCAL_QUORUM',
+                          'n=500K', 'no-warmup', 'cl=LOCAL_QUORUM',
                           '-rate', 'threads=5',
                           '-errors', 'retries=2'],
                          stdout=tmpfile, stderr=subprocess.STDOUT)
-            os.unlink(stress_config.name)
-
             tmpfile.seek(0)
             output = tmpfile.read()
 
@@ -370,7 +433,7 @@ class TestBootstrap(Tester):
 
         # write some data
         node1 = cluster.nodelist()[0]
-        node1.stress(['write', 'n=10K', '-rate', 'threads=8'])
+        node1.stress(['write', 'n=10K', 'no-warmup', '-rate', 'threads=8'])
 
         session = self.patient_cql_connection(node1)
         original_rows = list(session.execute("SELECT * FROM {}".format(stress_table,)))
@@ -407,7 +470,7 @@ class TestBootstrap(Tester):
 
         # write some data
         node1 = cluster.nodelist()[0]
-        node1.stress(['write', 'n=10K', '-rate', 'threads=8'])
+        node1.stress(['write', 'n=10K', 'no-warmup', '-rate', 'threads=8'])
 
         session = self.patient_cql_connection(node1)
         original_rows = list(session.execute("SELECT * FROM {}".format(stress_table,)))
@@ -478,13 +541,14 @@ class TestBootstrap(Tester):
         """
         cluster = self.cluster
         cluster.populate(1)
+        cluster.set_configuration_options(values={'stream_throughput_outbound_megabits_per_sec': 1})
         cluster.start(wait_for_binary_proto=True)
 
         stress_table = 'keyspace1.standard1'
 
         # write some data, enough for the bootstrap to fail later on
         node1 = cluster.nodelist()[0]
-        node1.stress(['write', 'n=100K', '-rate', 'threads=8'])
+        node1.stress(['write', 'n=100K', 'no-warmup', '-rate', 'threads=8'])
         node1.flush()
 
         session = self.patient_cql_connection(node1)
@@ -492,7 +556,6 @@ class TestBootstrap(Tester):
 
         # Add a new node, bootstrap=True ensures that it is not a seed
         node2 = new_node(cluster, bootstrap=True)
-        node2.set_configuration_options(values={'stream_throughput_outbound_megabits_per_sec': 1})
 
         # kill node2 in the middle of bootstrap
         t = KillOnBootstrap(node2)
@@ -533,7 +596,7 @@ class TestBootstrap(Tester):
 
         node1, = cluster.nodelist()
 
-        node1.stress(['write', 'n=500K', '-schema', 'replication(factor=1)',
+        node1.stress(['write', 'n=500K', 'no-warmup', '-schema', 'replication(factor=1)',
                       '-rate', 'threads=10'])
 
         node2 = new_node(cluster)
@@ -567,7 +630,7 @@ class TestBootstrap(Tester):
         cluster.start(wait_for_binary_proto=True)
         node1, = cluster.nodelist()
         for x in xrange(0, 5):
-            node1.stress(['write', 'n=100k', '-schema', 'compaction(strategy=SizeTieredCompactionStrategy,enabled=false)', 'replication(factor=1)', '-rate', 'threads=10'])
+            node1.stress(['write', 'n=100k', 'no-warmup', '-schema', 'compaction(strategy=SizeTieredCompactionStrategy,enabled=false)', 'replication(factor=1)', '-rate', 'threads=10'])
             node1.flush()
         node2 = new_node(cluster)
         node2.start(wait_for_binary_proto=True, wait_other_notice=True)
