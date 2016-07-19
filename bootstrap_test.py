@@ -182,6 +182,9 @@ class TestBootstrap(Tester):
     def consistent_range_movement_true_with_ks_rf1_should_fail_test(self):
         self._bootstrap_test_with_replica_down(True, rf=1)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12235',
+                   flaky=True)
     def consistent_range_movement_true_with_ks_rf1_should_succeed_test(self):
         self._bootstrap_test_with_replica_down(False, rf=1)
 
