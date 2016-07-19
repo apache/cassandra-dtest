@@ -221,6 +221,9 @@ class BaseSStableLoaderTest(Tester):
 class TestSSTableGenerationAndLoading(BaseSStableLoaderTest):
     __test__ = True
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12234',
+                   flaky=True)
     def sstableloader_uppercase_keyspace_name_test(self):
         """
         Make sure sstableloader works with upper case keyspace
