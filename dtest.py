@@ -792,6 +792,8 @@ def get_test_path():
         test_path = process.communicate()[0].rstrip()
 
     return test_path
+# nose will discover this as a test, so we manually make it not a test
+get_test_path.__test__ = False
 
 
 def create_ccm_cluster(test_path, name):
