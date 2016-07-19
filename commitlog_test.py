@@ -229,7 +229,7 @@ class TestCommitLog(Tester):
         self.assertEqual(num_rows, len(res), res)
 
     @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12165',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12213',
                    flaky=True)
     def test_commitlog_replay_on_startup(self):
         """
