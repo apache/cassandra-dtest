@@ -707,7 +707,7 @@ class Tester(TestCase):
     def shortDescription(self):
         return None
 
-    def wait_for_any_log(self, nodes, pattern, timeout):
+    def wait_for_any_log(self, nodes, pattern, timeout, filename='system.log'):
         """
         Look for a pattern in the system.log of any in a given list
         of nodes.
@@ -722,13 +722,13 @@ class Tester(TestCase):
         """
         for _ in range(timeout):
             for node in nodes:
-                found = node.grep_log(pattern)
+                found = node.grep_log(pattern, filename=filename)
                 if found:
                     return node
             time.sleep(1)
 
         raise TimeoutError(time.strftime("%d %b %Y %H:%M:%S", time.gmtime()) +
-                           " Unable to find :" + pattern + " in any node log within " + str(timeout) + "s")
+                           " Unable to find: " + pattern + " in any node log within " + str(timeout) + "s")
 
     def get_jfr_jvm_args(self):
         """

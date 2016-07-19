@@ -112,9 +112,6 @@ class TestSecondaryIndexes(Tester):
             result = list(session.execute("SELECT * FROM ks.cf WHERE b='1' LIMIT %d;" % (limit,)))
             self.assertEqual(limit, len(result))
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11729',
-                   flaky=True)
     def test_6924_dropping_ks(self):
         """
         @jira_ticket CASSANDRA-6924
@@ -132,6 +129,13 @@ class TestSecondaryIndexes(Tester):
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
         session = self.patient_cql_connection(node1)
+
+        # We have to wait up to RING_DELAY + 1 seconds for the MV Builder task
+        # to complete, to prevent schema concurrency issues with the drop
+        # keyspace calls that come later. See CASSANDRA-11729.
+        if self.cluster.version() > '3.0':
+            self.wait_for_any_log(self.cluster.nodelist(), 'Completed submission of build tasks for any materialized views',
+                                  timeout=35, filename='debug.log')
 
         # This only occurs when dropping and recreating with
         # the same name, so loop through this test a few times:
