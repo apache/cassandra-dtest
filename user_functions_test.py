@@ -6,7 +6,7 @@ from cassandra import FunctionFailure
 
 from assertions import assert_invalid, assert_none, assert_one
 from dtest import CASSANDRA_VERSION_FROM_BUILD, Tester, debug
-from tools import since, known_failure
+from tools import since
 
 
 @since('2.2')
@@ -32,9 +32,6 @@ class TestUserFunctions(Tester):
             self.create_ks(session, 'ks', rf)
         return session
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11951',
-                   flaky=True)
     def test_migration(self):
         """ Test migration of user functions """
         cluster = self.cluster
@@ -46,36 +43,39 @@ class TestUserFunctions(Tester):
         node3 = cluster.nodelist()[2]
         time.sleep(0.2)
 
-        session1 = self.patient_exclusive_cql_connection(node1)
-        session2 = self.patient_exclusive_cql_connection(node2)
-        session3 = self.patient_exclusive_cql_connection(node3)
-        self.create_ks(session1, 'ks', 1)
-        session2.execute("use ks")
-        session3.execute("use ks")
+        # The latter three sessions use a whitelist policy, and then don't wait for schema agreement
+        # So we create `schema_wait_session` to use for schema agreement blocking, and DDL changes
+        schema_wait_session = self.patient_cql_connection(node1)
+        self.create_ks(schema_wait_session, 'ks', 1)
+        schema_wait_session.cluster.control_connection.wait_for_schema_agreement()
 
-        session1.execute("""
+        node1_session = self.patient_exclusive_cql_connection(node1, keyspace='ks')
+        node2_session = self.patient_exclusive_cql_connection(node2, keyspace='ks')
+        node3_session = self.patient_exclusive_cql_connection(node3, keyspace='ks')
+
+        schema_wait_session.execute("""
             CREATE TABLE udf_kv (
                 key    int primary key,
                 value  double
             );
         """)
-        time.sleep(1)
+        schema_wait_session.cluster.control_connection.wait_for_schema_agreement()
 
-        session1.execute("INSERT INTO udf_kv (key, value) VALUES (%d, %d)" % (1, 1))
-        session1.execute("INSERT INTO udf_kv (key, value) VALUES (%d, %d)" % (2, 2))
-        session1.execute("INSERT INTO udf_kv (key, value) VALUES (%d, %d)" % (3, 3))
+        node1_session.execute("INSERT INTO udf_kv (key, value) VALUES ({}, {})".format(1, 1))
+        node1_session.execute("INSERT INTO udf_kv (key, value) VALUES ({}, {})".format(2, 2))
+        node1_session.execute("INSERT INTO udf_kv (key, value) VALUES ({}, {})".format(3, 3))
 
-        session1.execute("""
+        node1_session.execute("""
             create or replace function x_sin ( input double ) called on null input
             returns double language java as 'if (input==null) return null;
             return Double.valueOf(Math.sin(input.doubleValue()));'
             """)
-        session2.execute("""
+        node2_session.execute("""
             create or replace function x_cos ( input double ) called on null input
             returns double language java as 'if (input==null) return null;
             return Double.valueOf(Math.cos(input.doubleValue()));'
             """)
-        session3.execute("""
+        node3_session.execute("""
             create or replace function x_tan ( input double ) called on null input
             returns double language java as 'if (input==null) return null;
             return Double.valueOf(Math.tan(input.doubleValue()));'
@@ -83,15 +83,15 @@ class TestUserFunctions(Tester):
 
         time.sleep(1)
 
-        assert_one(session1,
+        assert_one(node1_session,
                    "SELECT key, value, x_sin(value), x_cos(value), x_tan(value) FROM ks.udf_kv where key = %d" % 1,
                    [1, 1.0, 0.8414709848078965, 0.5403023058681398, 1.5574077246549023])
 
-        assert_one(session2,
+        assert_one(node2_session,
                    "SELECT key, value, x_sin(value), x_cos(value), x_tan(value) FROM ks.udf_kv where key = %d" % 2,
                    [2, 2.0, math.sin(2.0), math.cos(2.0), math.tan(2.0)])
 
-        assert_one(session3,
+        assert_one(node3_session,
                    "SELECT key, value, x_sin(value), x_cos(value), x_tan(value) FROM ks.udf_kv where key = %d" % 3,
                    [3, 3.0, math.sin(3.0), math.cos(3.0), math.tan(3.0)])
 
@@ -103,20 +103,20 @@ class TestUserFunctions(Tester):
                        "Unknown function 'sin'")
 
         # try giving existing function bad input, should error
-        assert_invalid(session1,
+        assert_invalid(node1_session,
                        "SELECT key, value, x_sin(key), foo_cos(KEYy), foo_tan(key) FROM ks.udf_kv where key = 1",
                        "Type error: key cannot be passed as argument 0 of function ks.x_sin of type double")
 
-        session2.execute("drop function x_sin")
-        session3.execute("drop function x_cos")
-        session1.execute("drop function x_tan")
+        node2_session.execute("drop function x_sin")
+        node3_session.execute("drop function x_cos")
+        node1_session.execute("drop function x_tan")
 
-        assert_invalid(session1, "SELECT key, value, sin(value), cos(value), tan(value) FROM udf_kv where key = 1")
-        assert_invalid(session2, "SELECT key, value, sin(value), cos(value), tan(value) FROM udf_kv where key = 1")
-        assert_invalid(session3, "SELECT key, value, sin(value), cos(value), tan(value) FROM udf_kv where key = 1")
+        assert_invalid(node1_session, "SELECT key, value, sin(value), cos(value), tan(value) FROM udf_kv where key = 1")
+        assert_invalid(node2_session, "SELECT key, value, sin(value), cos(value), tan(value) FROM udf_kv where key = 1")
+        assert_invalid(node3_session, "SELECT key, value, sin(value), cos(value), tan(value) FROM udf_kv where key = 1")
 
         # try creating function returning the wrong type, should error
-        assert_invalid(session1,
+        assert_invalid(node1_session,
                        "CREATE FUNCTION bad_sin ( input double ) CALLED ON NULL INPUT RETURNS uuid LANGUAGE java AS 'return Math.sin(input);';",
                        "Type mismatch: cannot convert from double to UUID")
 
