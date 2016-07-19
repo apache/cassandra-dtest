@@ -203,25 +203,29 @@ def retry_till_success(fun, *args, **kwargs):
 
 class FlakyRetryPolicy(RetryPolicy):
     """
-    A retry policy that retries 5 times
+    A retry policy that retries 5 times by default, but can be configured to
+    retry more times.
     """
 
+    def __init__(self, max_retries=5):
+        self.max_retries = max_retries
+
     def on_read_timeout(self, *args, **kwargs):
-        if kwargs['retry_num'] < 5:
+        if kwargs['retry_num'] < self.max_retries:
             debug("Retrying read after timeout. Attempt #" + str(kwargs['retry_num']))
             return (self.RETRY, None)
         else:
             return (self.RETHROW, None)
 
     def on_write_timeout(self, *args, **kwargs):
-        if kwargs['retry_num'] < 5:
+        if kwargs['retry_num'] < self.max_retries:
             debug("Retrying write after timeout. Attempt #" + str(kwargs['retry_num']))
             return (self.RETRY, None)
         else:
             return (self.RETHROW, None)
 
     def on_unavailable(self, *args, **kwargs):
-        if kwargs['retry_num'] < 5:
+        if kwargs['retry_num'] < self.max_retries:
             debug("Retrying request after UE. Attempt #" + str(kwargs['retry_num']))
             return (self.RETRY, None)
         else:
