@@ -41,7 +41,8 @@ class TestOfflineTools(Tester):
 
         # now test by generating keyspace but not flushing sstables
         cluster.start(wait_for_binary_proto=True)
-        node1.stress(['write', 'n=100', 'no-warmup', '-schema', 'replication(factor=1)'])
+        node1.stress(['write', 'n=100', 'no-warmup', '-schema', 'replication(factor=1)',
+                      '-rate', 'threads=8'])
         cluster.stop(gently=False)
 
         (output, error, rc) = node1.run_sstablelevelreset("keyspace1", "standard1", output=True)
@@ -53,7 +54,8 @@ class TestOfflineTools(Tester):
         cluster.start(wait_for_binary_proto=True)
         session = self.patient_cql_connection(node1)
         session.execute("ALTER TABLE keyspace1.standard1 with compaction={'class': 'LeveledCompactionStrategy', 'sstable_size_in_mb':1};")
-        node1.stress(['write', 'n=1K', 'no-warmup', '-schema', 'replication(factor=1)'])
+        node1.stress(['write', 'n=1K', 'no-warmup', '-schema', 'replication(factor=1)',
+                      '-rate', 'threads=8'])
         node1.flush()
         cluster.stop(gently=False)
 
@@ -64,7 +66,8 @@ class TestOfflineTools(Tester):
 
         # test by loading large amount data so we have multiple levels and checking all levels are 0 at end
         cluster.start(wait_for_binary_proto=True)
-        node1.stress(['write', 'n=50K', 'no-warmup', '-rate', 'threads=20', '-schema', 'replication(factor=1)'])
+        node1.stress(['write', 'n=50K', 'no-warmup', '-rate', 'threads=20', '-schema', 'replication(factor=1)',
+                      '-rate', 'threads=8'])
         cluster.flush()
         self.wait_for_compactions(node1)
         cluster.stop()
@@ -95,9 +98,6 @@ class TestOfflineTools(Tester):
             if pattern.search(output):
                 break
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11998',
-                   flaky=True)
     def sstableofflinerelevel_test(self):
         """
         Generate sstables of varying levels.
@@ -125,7 +125,8 @@ class TestOfflineTools(Tester):
 
         node1.stress(['write', 'n=1', 'no-warmup',
                       '-schema', 'replication(factor=1)',
-                      '-col', 'n=FIXED(10)', 'SIZE=FIXED(1024)'])
+                      '-col', 'n=FIXED(10)', 'SIZE=FIXED(1024)',
+                      '-rate', 'threads=8'])
 
         cluster.stop(gently=False)
 
@@ -142,7 +143,8 @@ class TestOfflineTools(Tester):
 
         node1.stress(['write', 'n=1K', 'no-warmup',
                       '-schema', 'replication(factor=1)',
-                      '-col', 'n=FIXED(10)', 'SIZE=FIXED(1024)'])
+                      '-col', 'n=FIXED(10)', 'SIZE=FIXED(1024)',
+                      '-rate', 'threads=8'])
 
         node1.flush()
         cluster.stop()
@@ -154,10 +156,11 @@ class TestOfflineTools(Tester):
         cluster.start(wait_for_binary_proto=True)
         # test by loading large amount data so we have multiple sstables
         # must write enough to create more than just L1 sstables
-        keys = 2 * cluster.data_dir_count
+        keys = 8 * cluster.data_dir_count
         node1.stress(['write', 'n={0}K'.format(keys), 'no-warmup',
                       '-schema', 'replication(factor=1)',
-                      '-col', 'n=FIXED(10)', 'SIZE=FIXED(1024)'])
+                      '-col', 'n=FIXED(10)', 'SIZE=FIXED(1024)',
+                      '-rate', 'threads=8'])
 
         node1.flush()
         debug("Waiting for compactions to finish")
@@ -214,14 +217,17 @@ class TestOfflineTools(Tester):
         self.assertEqual(rc, 1, msg=str(rc))
 
         # test on nonexistent sstables:
-        node1.stress(['write', 'n=100', 'no-warmup', '-schema', 'replication(factor=3)'])
+        node1.stress(['write', 'n=100', 'no-warmup', '-schema', 'replication(factor=3)',
+                      '-rate', 'threads=8'])
         (out, err, rc) = node1.run_sstableverify("keyspace1", "standard1", output=True)
         self.assertEqual(rc, 0, msg=str(rc))
 
         # Generate multiple sstables and test works properly in the simple case
-        node1.stress(['write', 'n=100K', 'no-warmup', '-schema', 'replication(factor=3)'])
+        node1.stress(['write', 'n=100K', 'no-warmup', '-schema', 'replication(factor=3)',
+                      '-rate', 'threads=8'])
         node1.flush()
-        node1.stress(['write', 'n=100K', 'no-warmup', '-schema', 'replication(factor=3)'])
+        node1.stress(['write', 'n=100K', 'no-warmup', '-schema', 'replication(factor=3)',
+                      '-rate', 'threads=8'])
         node1.flush()
         cluster.stop()
 
