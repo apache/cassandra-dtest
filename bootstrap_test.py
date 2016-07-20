@@ -12,7 +12,7 @@ from cassandra.concurrent import execute_concurrent_with_args
 from ccmlib.node import NodeError
 
 from assertions import assert_almost_equal, assert_one, assert_not_running
-from dtest import Tester, debug
+from dtest import Tester, debug, DISABLE_VNODES
 from tools import (InterruptBootstrap, KillOnBootstrap, known_failure,
                    new_node, no_vnodes, query_c1c2, since)
 
@@ -27,7 +27,7 @@ def assert_bootstrap_state(tester, node, expected_bootstrap_state):
     Examples:
     assert_bootstrap_state(self, node3, 'COMPLETED')
     """
-    session = tester.exclusive_cql_connection(node)
+    session = tester.patient_exclusive_cql_connection(node)
     assert_one(session, "SELECT bootstrapped FROM system.local WHERE key='local'", [expected_bootstrap_state])
 
 
@@ -170,34 +170,39 @@ class TestBootstrap(Tester):
         new_rows = list(session.execute("SELECT * FROM %s" % (stress_table,)))
         self.assertEquals(original_rows, new_rows)
 
-    def consistent_range_movement_true_with_one_replica_down_should_fail_test(self):
+    def consistent_range_movement_true_with_replica_down_should_fail_test(self):
         self._bootstrap_test_with_replica_down(True)
 
-    def consistent_range_movement_false_with_one_replica_down_should_succeed_test(self):
+    def consistent_range_movement_false_with_replica_down_should_succeed_test(self):
         self._bootstrap_test_with_replica_down(False)
 
-    def consistent_range_movement_false_with_two_replicas_down_should_fail_test(self):
-        self._bootstrap_test_with_replica_down(False, stop_two_replicas=True)
-
-    def consistent_range_movement_true_with_ks_rf1_should_fail_test(self):
+    def consistent_range_movement_true_with_rf1_should_fail_test(self):
         self._bootstrap_test_with_replica_down(True, rf=1)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12235',
-                   flaky=True)
-    def consistent_range_movement_true_with_ks_rf1_should_succeed_test(self):
+    def consistent_range_movement_false_with_rf1_should_succeed_test(self):
         self._bootstrap_test_with_replica_down(False, rf=1)
 
-    def _bootstrap_test_with_replica_down(self, consistent_range_movement,
-                                          stop_two_replicas=False, rf=2):
+    def _bootstrap_test_with_replica_down(self, consistent_range_movement, rf=2):
         """
-        Test to guarantee bootstrap will not succeed when there are insufficient replicas
+        Test to check consistent bootstrap will not succeed when there are insufficient replicas
         @jira_ticket CASSANDRA-11848
         """
         cluster = self.cluster
-        cluster.populate(3)
+
+        cluster.populate(2)
+        node1, node2 = cluster.nodelist()
+
+        node3_token = None
+        # Make token assignment deterministic
+        if DISABLE_VNODES:
+            cluster.set_configuration_options(values={'num_tokens': 1})
+            tokens = cluster.balanced_tokens(3)
+            debug("non-vnode tokens: %r" % (tokens,))
+            node1.set_configuration_options(values={'initial_token': tokens[0]})
+            node2.set_configuration_options(values={'initial_token': tokens[2]})
+            node3_token = tokens[1]  # Add node 3 between node1 and node2
+
         cluster.start()
-        node1, node2, node3 = cluster.nodelist()
 
         node1.stress(['write', 'n=10K', 'no-warmup', '-rate', 'threads=8', '-schema', 'replication(factor={})'.format(rf)])
 
@@ -210,28 +215,27 @@ class TestBootstrap(Tester):
                     WITH replication = {'class':'SimpleStrategy', 'replication_factor':2};
             """)
 
-        # Stop remaining nodes
+        # Stop node2, so node3 will not be able to perform consistent range movement
         node2.stop(wait_other_notice=True)
-        if stop_two_replicas:
-            node3.stop(wait_other_notice=True)
 
-        successful_bootstrap_expected = not consistent_range_movement and not stop_two_replicas
+        successful_bootstrap_expected = not consistent_range_movement
 
-        node4 = new_node(cluster)
-        node4.start(wait_for_binary_proto=successful_bootstrap_expected, wait_other_notice=successful_bootstrap_expected,
+        node3 = new_node(cluster, token=node3_token)
+        node3.start(wait_for_binary_proto=successful_bootstrap_expected, wait_other_notice=successful_bootstrap_expected,
                     jvm_args=["-Dcassandra.consistent.rangemovement={}".format(consistent_range_movement)])
 
         if successful_bootstrap_expected:
+            # with rf=1 and cassandra.consistent.rangemovement=false, missing sources are ignored
             if not consistent_range_movement and rf == 1:
-                node4.watch_log_for("Unable to find sufficient sources for streaming range")
-            self.assertTrue(node4.is_running())
-            assert_bootstrap_state(self, node4, 'COMPLETED')
+                node3.watch_log_for("Unable to find sufficient sources for streaming range")
+            self.assertTrue(node3.is_running())
+            assert_bootstrap_state(self, node3, 'COMPLETED')
         else:
             if consistent_range_movement:
-                node4.watch_log_for("A node required to move the data consistently is down")
+                node3.watch_log_for("A node required to move the data consistently is down")
             else:
-                node4.watch_log_for("Unable to find sufficient sources for streaming range")
-            assert_not_running(node4)
+                node3.watch_log_for("Unable to find sufficient sources for streaming range")
+            assert_not_running(node3)
 
     @known_failure(failure_source='cassandra',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11414',
