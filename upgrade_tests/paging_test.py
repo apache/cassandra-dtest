@@ -555,6 +555,8 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
 
             run_scenarios(scenarios, handle_scenario, deferred_exceptions=(AssertionError,))
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12249')
     def test_with_allow_filtering(self):
         cursor = self.prepare()
         cursor.execute("CREATE TABLE paging_test ( id int, value text, PRIMARY KEY (id, value) )")
@@ -607,6 +609,8 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
 
 class TestPagingData(BasePagingTester, PageAssertionMixin):
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12249')
     def basic_paging_test(self):
         """
         A simple paging test that is easy to debug.
@@ -656,6 +660,8 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
                     self.assertEqual(len(expected), len(results))
                     self.assertEqual(expected, results)
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12249')
     def basic_compound_paging_test(self):
         cursor = self.prepare()
 
@@ -806,6 +812,8 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
             self.assertEqual(pf.num_results_all(), [400, 200])
             self.assertEqualIgnoreOrder(expected_data, pf.all_data())
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12249')
     @known_failure(failure_source='cassandra',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11195',
                    flaky=True,
@@ -1039,6 +1047,8 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
                     if "s2" in selector:
                         self.assertEqual([42] * 10, [r.s2 for r in results])
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12249')
     @since('2.0')
     def test_paging_using_secondary_indexes_with_static_cols(self):
         cursor = self.prepare()
