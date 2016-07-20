@@ -54,6 +54,78 @@ def make_mbean(package, type, **kwargs):
     return rv
 
 
+def enable_jmx_ssl(node,
+                   require_client_auth=False,
+                   disable_user_auth=True,
+                   keystore=None,
+                   keystore_password=None,
+                   truststore=None,
+                   truststore_password=None):
+    """
+    Sets up a node (currently via the cassandra-env file) to use SSL for JMX connections
+    """
+    # mandatory replacements when enabling SSL
+    replacement_list = [
+        ('\$env:JVM_OPTS="\$env:JVM_OPTS -Dcassandra.jmx.local.port=$JMX_PORT")',
+         '#$env:JVM_OPTS="$env:JVM_OPTS -Dcassandra.jmx.local.port=$JMX_PORT"'),
+        ('#\$env:JVM_OPTS="\$env:JVM_OPTS -Dcom.sun.management.jmxremote.port=$JMX_PORT"',
+         '$env:JVM_OPTS="$env:JVM_OPTS -Dcom.sun.management.jmxremote.port=$JMX_PORT"'),
+        ('#\$env:JVM_OPTS="\$env:JVM_OPTS -Dcom.sun.management.jmxremote.ssl=true"',
+         '$env:JVM_OPTS="$env:JVM_OPTS -Dcom.sun.management.jmxremote.ssl=true"')
+    ] if common.is_win() else [
+        ('LOCAL_JMX=yes', 'LOCAL_JMX=no'),
+        ('#JVM_OPTS="\$JVM_OPTS -Dcom.sun.management.jmxremote.ssl=true"',
+         'JVM_OPTS="$JVM_OPTS -Dcom.sun.management.jmxremote.ssl=true"'),
+        ('JVM_OPTS="\$JVM_OPTS -Dcom.sun.management.jmxremote.rmi.port=\$JMX_PORT"',
+         '#JVM_OPTS="$JVM_OPTS -Dcom.sun.management.jmxremote.rmi.port=$JMX_PORT"')
+    ]
+
+    if require_client_auth:
+        if common.is_win():
+            replacement_list.append(('#\$env:JVM_OPTS="\$env:JVM_OPTS -Dcom.sun.management.jmxremote.ssl.need.client.auth=true"',
+                                    '$env:JVM_OPTS="$env:JVM_OPTS -Dcom.sun.management.jmxremote.ssl.need.client.auth=true"'))
+        else:
+            replacement_list.append(('#JVM_OPTS="\$JVM_OPTS -Dcom.sun.management.jmxremote.ssl.need.client.auth=true"',
+                                     'JVM_OPTS="$JVM_OPTS -Dcom.sun.management.jmxremote.ssl.need.client.auth=true"'))
+
+    if keystore:
+        if common.is_win():
+            replacement_list.append(('#\$env:JVM_OPTS="\$env:JVM_OPTS -Djavax.net.ssl.keyStore=C:/keystore"',
+                                    '$env:JVM_OPTS="$env:JVM_OPTS -Djavax.net.ssl.keyStore={path}"'.format(path=keystore)))
+        else:
+            replacement_list.append(('#JVM_OPTS="\$JVM_OPTS -Djavax.net.ssl.keyStore=/path/to/keystore"',
+                                     'JVM_OPTS="$JVM_OPTS -Djavax.net.ssl.keyStore={path}"'.format(path=keystore)))
+    if keystore_password:
+        if common.is_win():
+            replacement_list.append(('#\$env:JVM_OPTS="\$env:JVM_OPTS -Djavax.net.ssl.keyStorePassword=<keystore-password>"',
+                                    '$env:JVM_OPTS="$env:JVM_OPTS -Djavax.net.ssl.keyStorePassword={password}"'.format(password=keystore_password)))
+        else:
+            replacement_list.append(('#JVM_OPTS="\$JVM_OPTS -Djavax.net.ssl.keyStorePassword=<keystore-password>"',
+                                     'JVM_OPTS="$JVM_OPTS -Djavax.net.ssl.keyStorePassword={password}"'.format(password=keystore_password)))
+    if truststore:
+        if common.is_win():
+            replacement_list.append(('#\$env:JVM_OPTS="\$env:JVM_OPTS -Djavax.net.ssl.trustStore=C:/truststore"',
+                                    '$env:JVM_OPTS="$env:JVM_OPTS -Djavax.net.ssl.trustStore={path}"'.format(path=truststore)))
+        else:
+            replacement_list.append(('#JVM_OPTS="\$JVM_OPTS -Djavax.net.ssl.trustStore=/path/to/truststore"',
+                                     'JVM_OPTS="$JVM_OPTS -Djavax.net.ssl.trustStore={path}"'.format(path=truststore)))
+    if truststore_password:
+        if common.is_win():
+            replacement_list.append(('#\$env:JVM_OPTS="\$env:JVM_OPTS -Djavax.net.ssl.trustStorePassword=<truststore-password>"',
+                                     '$env:JVM_OPTS="$env:JVM_OPTS -Djavax.net.ssl.trustStorePassword={password}"'.format(password=truststore_password)))
+        else:
+            replacement_list.append(('#JVM_OPTS="\$JVM_OPTS -Djavax.net.ssl.trustStorePassword=<truststore-password>"',
+                                     'JVM_OPTS="$JVM_OPTS -Djavax.net.ssl.trustStorePassword={password}"'.format(password=truststore_password)))
+
+    # switches off user authentication, distinct from validation of client certificates (i.e. require_client_auth)
+    if disable_user_auth:
+        if not common.is_win():
+            replacement_list.append(('JVM_OPTS="\$JVM_OPTS -Dcom.sun.management.jmxremote.authenticate=true"',
+                                     'JVM_OPTS="$JVM_OPTS -Dcom.sun.management.jmxremote.authenticate=false"'))
+
+    common.replaces_in_file(node.envfilename(), replacement_list)
+
+
 def apply_jmx_authentication(node):
     replacement_list = [
         ('JVM_OPTS="\$JVM_OPTS -Dcom.sun.management.jmxremote.authenticate=false"',

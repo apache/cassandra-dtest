@@ -1,3 +1,4 @@
+import os
 import re
 import time
 
@@ -5,8 +6,8 @@ import ccmlib.common
 from ccmlib.node import NodetoolError
 
 from dtest import Tester, debug
-from jmxutils import JolokiaAgent, make_mbean, remove_perf_disable_shared_mem
-from tools import known_failure, since
+from jmxutils import JolokiaAgent, enable_jmx_ssl, make_mbean, remove_perf_disable_shared_mem
+from tools import known_failure, since, generate_ssl_stores
 
 
 class TestJMX(Tester):
@@ -186,3 +187,78 @@ class TestJMX(Tester):
 
         self.assertGreater(endpoint2Phi, 0.0)
         self.assertLess(endpoint2Phi, max_phi)
+
+
+@since('3.9')
+class TestJMXSSL(Tester):
+
+    keystore_password = 'cassandra'
+    truststore_password = 'cassandra'
+
+    def truststore(self):
+        return os.path.join(self.test_path, 'truststore.jks')
+
+    def keystore(self):
+        return os.path.join(self.test_path, 'keystore.jks')
+
+    def jmx_connection_test(self):
+        """
+        Check connecting with a JMX client (via nodetool) where SSL is enabled for JMX
+        @jira_ticket CASSANDRA-12109
+        """
+        cluster = self._populateCluster(require_client_auth=False)
+        node = cluster.nodelist()[0]
+        cluster.start()
+
+        self.assert_insecure_connection_rejected(node)
+
+        node.nodetool("info --ssl -Djavax.net.ssl.trustStore={ts} -Djavax.net.ssl.trustStorePassword={ts_pwd}"
+                      .format(ts=self.truststore(), ts_pwd=self.truststore_password))
+
+    def require_client_auth_test(self):
+        """
+        Check connecting with a JMX client (via nodetool) where SSL is enabled and
+        client certificate auth is also configured
+        @jira_ticket CASSANDRA-12109
+        """
+        cluster = self._populateCluster(require_client_auth=True)
+        node = cluster.nodelist()[0]
+        cluster.start()
+
+        self.assert_insecure_connection_rejected(node)
+
+        # specifying only the truststore containing the server cert should fail
+        with self.assertRaisesRegexp(NodetoolError, ".*SSLHandshakeException.*"):
+            node.nodetool("info --ssl -Djavax.net.ssl.trustStore={ts} -Djavax.net.ssl.trustStorePassword={ts_pwd}"
+                          .format(ts=self.truststore(), ts_pwd=self.truststore_password))
+
+        # when both truststore and a keystore containing the client key are supplied, connection should succeed
+        node.nodetool("info --ssl -Djavax.net.ssl.trustStore={ts} -Djavax.net.ssl.trustStorePassword={ts_pwd} -Djavax.net.ssl.keyStore={ks} -Djavax.net.ssl.keyStorePassword={ks_pwd}"
+                      .format(ts=self.truststore(), ts_pwd=self.truststore_password, ks=self.keystore(), ks_pwd=self.keystore_password))
+
+    def assert_insecure_connection_rejected(self, node):
+        """
+        Attempts to connect to JMX (via nodetool) without any client side ssl parameters, expecting failure
+        """
+        with self.assertRaises(NodetoolError):
+            node.nodetool("info")
+
+    def _populateCluster(self, require_client_auth=False):
+        cluster = self.cluster
+        cluster.populate(1)
+
+        generate_ssl_stores(self.test_path)
+        if require_client_auth:
+            ts = self.truststore()
+            ts_pwd = self.truststore_password
+        else:
+            ts = None
+            ts_pwd = None
+
+        enable_jmx_ssl(cluster.nodelist()[0],
+                       require_client_auth=require_client_auth,
+                       keystore=self.keystore(),
+                       keystore_password=self.keystore_password,
+                       truststore=ts,
+                       truststore_password=ts_pwd)
+        return cluster
