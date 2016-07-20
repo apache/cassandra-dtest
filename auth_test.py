@@ -10,6 +10,7 @@ from cassandra.protocol import SyntaxException
 from assertions import (assert_all, assert_invalid, assert_one,
                         assert_unauthorized)
 from dtest import CASSANDRA_VERSION_FROM_BUILD, Tester, debug
+from jmxutils import JolokiaAgent, make_mbean, remove_perf_disable_shared_mem
 from tools import known_failure, since
 
 
@@ -919,6 +920,49 @@ class TestAuth(Tester):
         cathy = self.get_session(user='cathy', password='12345')
         assert_unauthorized(cathy, "SELECT * FROM ks.cf", "User cathy has no SELECT permission on <table ks.cf> or any of its parents")
         philip.execute("SELECT * FROM ks.cf")
+
+    @since('3.10')
+    def auth_metrics_test(self):
+        """
+        Success and failure metrics were added to the authentication procedure
+        so as to estimate the percentage of authentication attempts that failed.
+        @jira_ticket CASSANDRA-10635
+        """
+
+        cluster = self.cluster
+        config = {'authenticator': 'org.apache.cassandra.auth.PasswordAuthenticator',
+                  'authorizer': 'org.apache.cassandra.auth.CassandraAuthorizer',
+                  'permissions_validity_in_ms': 0}
+        self.cluster.set_configuration_options(values=config)
+        cluster.set_datadir_count(1)
+        cluster.populate(1)
+        [node] = cluster.nodelist()
+        remove_perf_disable_shared_mem(node)
+        cluster.start(wait_for_binary_proto=True)
+
+        with JolokiaAgent(node) as jmx:
+            success = jmx.read_attribute(
+                make_mbean('metrics', type='Client', name='AuthSuccess'), 'Count')
+            failure = jmx.read_attribute(
+                make_mbean('metrics', type='Client', name='AuthFailure'), 'Count')
+
+            self.assertEqual(0, success)
+            self.assertEqual(0, failure)
+
+            try:
+                self.get_session(user='cassandra', password='wrong_password')
+            except NoHostAvailable as e:
+                self.assertIsInstance(e.errors.values()[0], AuthenticationFailed)
+
+            self.get_session(user='cassandra', password='cassandra')
+
+            success = jmx.read_attribute(
+                make_mbean('metrics', type='Client', name='AuthSuccess'), 'Count')
+            failure = jmx.read_attribute(
+                make_mbean('metrics', type='Client', name='AuthFailure'), 'Count')
+
+            self.assertGreater(success, 0)
+            self.assertGreater(failure, 0)
 
     def prepare(self, nodes=1, permissions_validity=0):
         """
