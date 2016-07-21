@@ -6,7 +6,7 @@ from cassandra import FunctionFailure
 
 from assertions import assert_invalid, assert_none, assert_one
 from dtest import CASSANDRA_VERSION_FROM_BUILD, Tester, debug
-from tools import known_failure, since
+from tools import since
 
 
 @since('2.2')
@@ -81,7 +81,7 @@ class TestUserFunctions(Tester):
             return Double.valueOf(Math.tan(input.doubleValue()));'
             """)
 
-        time.sleep(1)
+        schema_wait_session.cluster.control_connection.wait_for_schema_agreement()
 
         assert_one(node1_session,
                    "SELECT key, value, x_sin(value), x_cos(value), x_tan(value) FROM ks.udf_kv where key = %d" % 1,
@@ -110,6 +110,8 @@ class TestUserFunctions(Tester):
         node2_session.execute("drop function x_sin")
         node3_session.execute("drop function x_cos")
         node1_session.execute("drop function x_tan")
+
+        schema_wait_session.cluster.control_connection.wait_for_schema_agreement()
 
         assert_invalid(node1_session, "SELECT key, value, sin(value), cos(value), tan(value) FROM udf_kv where key = 1")
         assert_invalid(node2_session, "SELECT key, value, sin(value), cos(value), tan(value) FROM udf_kv where key = 1")
