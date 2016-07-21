@@ -6,7 +6,7 @@ from cassandra import FunctionFailure
 
 from assertions import assert_invalid, assert_none, assert_one
 from dtest import CASSANDRA_VERSION_FROM_BUILD, Tester, debug
-from tools import since
+from tools import known_failure, since
 
 
 @since('2.2')
@@ -209,6 +209,9 @@ class TestUserFunctions(Tester):
 
         assert_invalid(session, "create aggregate aggthree(int) sfunc test stype int finalfunc aggtwo")
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12262',
+                   flaky=True)
     def udf_with_udt_test(self):
         """
         Test UDFs that operate on non-frozen UDTs.
