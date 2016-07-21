@@ -109,6 +109,7 @@ class TestHelper(Tester):
     def create_tables(self, session):
         self.create_users_table(session)
         self.create_counters_table(session)
+        session.cluster.control_connection.wait_for_schema_agreement(wait_time=60)
 
     def truncate_tables(self, session):
         statement = SimpleStatement("TRUNCATE users", ConsistencyLevel.ALL)
@@ -207,7 +208,7 @@ class TestAvailability(TestHelper):
                 self._test_insert_query_from_node(session, 0, [rf], [num_alive], *combination)
 
             self.cluster.nodelist()[node].stop()
-            num_alive = num_alive - 1
+            num_alive -= 1
 
     def _test_network_topology_strategy(self, combinations):
         """
@@ -231,11 +232,11 @@ class TestAvailability(TestHelper):
                     self._test_insert_query_from_node(session, i, rf_factors, nodes_alive, *combination)
 
                 self.cluster.nodelist()[node].stop(wait_other_notice=True)
-                nodes_alive[i] = nodes_alive[i] - 1
+                nodes_alive[i] -= 1
 
     def _test_insert_query_from_node(self, session, dc_idx, rf_factors, num_nodes_alive, write_cl, read_cl, serial_cl=None, check_ret=True):
         """
-        Test availability for read and write via the session passed in as a prameter.
+        Test availability for read and write via the session passed in as a parameter.
         """
         self.log("Connected to %s for %s/%s/%s" %
                  (session.cluster.contact_points, consistency_value_to_name(write_cl), consistency_value_to_name(read_cl), consistency_value_to_name(serial_cl)))
@@ -337,14 +338,11 @@ class TestAvailability(TestHelper):
 
         self._test_network_topology_strategy(combinations)
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11950',
-                   flaky=True)
     @since("3.0")
     def test_network_topology_strategy_each_quorum(self):
         """
         @jira_ticket CASSANDRA-10584
-        Test for a single datacenter, using network topology strategy, only
+        Test for multiple datacenters, using network topology strategy, only
         the each quorum reads.
         """
         self.nodes = [3, 3, 3]
