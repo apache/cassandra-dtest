@@ -179,6 +179,9 @@ class TestWriteFailures(Tester):
         self.expected_expt = None
         self._perform_cql_statement("INSERT INTO mytable (key, value) VALUES ('key1', 'Value 1') IF NOT EXISTS")
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12261',
+                   flaky=True)
     def test_thrift(self):
         """
         A thrift client receives a TimedOutException
