@@ -5202,7 +5202,9 @@ class TestCQL(UpgradeTester):
         )
         start = time.time()
         while True:
-            if all(list(session.execute(index_query)) for session in check_for_index_sessions):
+            results = [list(session.execute(index_query)) for session in check_for_index_sessions]
+            debug(results)
+            if all(results):
                 break
 
             if time.time() - start > 10.0:
