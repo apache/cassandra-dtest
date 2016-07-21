@@ -5172,9 +5172,6 @@ class TestCQL(UpgradeTester):
 
             assert_none(cursor, "select * from space1.table1 where a=1 and b=1")
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12250',
-                   flaky=True)
     def bug_5732_test(self):
         cursor = self.prepare(use_cache=True)
 
@@ -5194,21 +5191,26 @@ class TestCQL(UpgradeTester):
         cursor.execute("CREATE INDEX testindex on test(v)")
 
         # wait for the index to be fully built
+        check_for_index_sessions = tuple(self.patient_exclusive_cql_connection(node) for node in self.cluster.nodelist())
+        index_query = (
+            """SELECT * FROM system_schema.indexes WHERE keyspace_name = 'ks' AND table_name = 'test' AND index_name = 'testindex'"""
+            if self.node_version_above('3.0') else
+            """SELECT * FROM system."IndexInfo" WHERE table_name = 'ks' AND index_name = 'test.testindex'"""
+        )
         start = time.time()
         while True:
-            if self.node_version_above('3.0'):
-                results = cursor.execute("""SELECT * FROM system_schema.indexes WHERE keyspace_name = 'ks' AND table_name = 'test' AND index_name = 'testindex'""")
-            else:
-                results = cursor.execute("""SELECT * FROM system."IndexInfo" WHERE table_name = 'ks' AND index_name = 'test.testindex'""")
-            if results:
+            results = [list(session.execute(index_query)) for session in check_for_index_sessions]
+            debug(results)
+            if all(results):
                 break
 
             if time.time() - start > 10.0:
-                if self.node_version_above('3.0'):
-                    results = list(cursor.execute('SELECT * FROM system_schema.indexes'))
-                else:
-                    results = list(cursor.execute('SELECT * FROM system."IndexInfo"'))
-                raise Exception("Failed to build secondary index within ten seconds: %s" % (results,))
+                failure_info_query = (
+                    'SELECT * FROM system_schema.indexes'
+                    if self.node_version_above('3.0') else
+                    'SELECT * FROM system."IndexInfo"'
+                )
+                raise Exception("Failed to build secondary index within ten seconds: %s" % (list(cursor.execute(failure_info_query))))
             time.sleep(0.1)
 
         assert_all(cursor, "SELECT k FROM test WHERE v = 0", [[0]])
