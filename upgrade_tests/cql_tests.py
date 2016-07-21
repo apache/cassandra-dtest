@@ -5194,6 +5194,7 @@ class TestCQL(UpgradeTester):
         cursor.execute("CREATE INDEX testindex on test(v)")
 
         # wait for the index to be fully built
+        check_for_index_sessions = tuple(self.patient_exclusive_cql_connection(node) for node in self.cluster.nodelist())
         index_query = (
             """SELECT * FROM system_schema.indexes WHERE keyspace_name = 'ks' AND table_name = 'test' AND index_name = 'testindex'"""
             if self.node_version_above('3.0') else
@@ -5201,7 +5202,7 @@ class TestCQL(UpgradeTester):
         )
         start = time.time()
         while True:
-            if cursor.execute(index_query):
+            if all(list(session.execute(index_query)) for session in check_for_index_sessions):
                 break
 
             if time.time() - start > 10.0:
