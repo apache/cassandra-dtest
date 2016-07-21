@@ -374,6 +374,9 @@ class TestMaterializedViews(Tester):
         for i in xrange(1000, 1100):
             assert_one(session, "SELECT * FROM t_by_v WHERE v = {}".format(-i), [-i, i])
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12267',
+                   flaky=True)
     def add_dc_after_mv_simple_replication_test(self):
         """
         @jira_ticket CASSANDRA-10634
