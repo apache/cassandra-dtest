@@ -5206,11 +5206,12 @@ class TestCQL(UpgradeTester):
                 break
 
             if time.time() - start > 10.0:
-                if self.node_version_above('3.0'):
-                    results = list(cursor.execute('SELECT * FROM system_schema.indexes'))
-                else:
-                    results = list(cursor.execute('SELECT * FROM system."IndexInfo"'))
-                raise Exception("Failed to build secondary index within ten seconds: %s" % (results,))
+                failure_info_query = (
+                    'SELECT * FROM system_schema.indexes'
+                    if self.node_version_above('3.0') else
+                    'SELECT * FROM system."IndexInfo"'
+                )
+                raise Exception("Failed to build secondary index within ten seconds: %s" % (list(cursor.execute(failure_info_query))))
             time.sleep(0.1)
 
         assert_all(cursor, "SELECT k FROM test WHERE v = 0", [[0]])
