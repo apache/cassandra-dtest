@@ -1462,30 +1462,28 @@ Tracing session:""")
         stdout, stderr = self.run_cqlsh(node1, cmds='USE system', cqlsh_options=['--debug', '--connect-timeout=10'])
         self.assertTrue("Using connect timeout: 10 seconds" in stderr)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11999',
-                   flaky=True)
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10884',
-                   flaky=True)
-    def test_refresh_schema_on_timeout_error(self):
+    def test_update_schema_with_down_node(self):
         """
+        Test that issuing a DML statement after a DDL statement will work with a down node
         @jira_ticket CASSANDRA-9689
         """
         self.cluster.populate(3)
-        self.cluster.start(wait_for_binary_proto=True)
+        self.cluster.start(wait_for_binary_proto=True, wait_other_notice=True)
 
         node1, node2, node3 = self.cluster.nodelist()
         node2.stop(wait_other_notice=True)
 
+        # --request-timeout option needed on 2.1 due to CASSANDRA-10686
+        cqlsh_opts = [] if LooseVersion(self.cluster.version()) >= LooseVersion('2.2') else ['--request-timeout=6']
+
         stdout, stderr = self.run_cqlsh(node1, cmds="""
               CREATE KEYSPACE training WITH replication={'class':'SimpleStrategy','replication_factor':1};
-              DESCRIBE KEYSPACES""")
+              DESCRIBE KEYSPACES""", cqlsh_options=cqlsh_opts)
         self.assertIn("training", stdout)
 
         stdout, stderr = self.run_cqlsh(node1, """USE training;
                                                   CREATE TABLE mytable (id int, val text, PRIMARY KEY (id));
-                                                  describe tables""")
+                                                  describe tables""", cqlsh_options=cqlsh_opts)
         self.assertIn("mytable", stdout)
 
     def test_describe_round_trip(self):
