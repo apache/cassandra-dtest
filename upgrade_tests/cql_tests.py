@@ -5194,12 +5194,14 @@ class TestCQL(UpgradeTester):
         cursor.execute("CREATE INDEX testindex on test(v)")
 
         # wait for the index to be fully built
+        index_query = (
+            """SELECT * FROM system_schema.indexes WHERE keyspace_name = 'ks' AND table_name = 'test' AND index_name = 'testindex'"""
+            if self.node_version_above('3.0') else
+            """SELECT * FROM system."IndexInfo" WHERE table_name = 'ks' AND index_name = 'test.testindex'"""
+        )
         start = time.time()
         while True:
-            if self.node_version_above('3.0'):
-                results = cursor.execute("""SELECT * FROM system_schema.indexes WHERE keyspace_name = 'ks' AND table_name = 'test' AND index_name = 'testindex'""")
-            else:
-                results = cursor.execute("""SELECT * FROM system."IndexInfo" WHERE table_name = 'ks' AND index_name = 'test.testindex'""")
+            results = cursor.execute(index_query)
             if results:
                 break
 
