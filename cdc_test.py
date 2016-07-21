@@ -204,6 +204,29 @@ class TestCDC(Tester):
     provides a view of the commitlog on tables for which it is enabled.
     """
 
+    def _create_temp_dir(self, dir_name, verbose=True):
+        """
+        Create a directory that will be deleted when this test class is torn
+        down.
+        """
+        if verbose:
+            debug('creating ' + dir_name)
+        try:
+            os.mkdir(dir_name)
+        except OSError as e:
+            if e.errno != errno.EEXIST:
+                debug(dir_name + ' already exists. removing and recreating.')
+                shutil.rmtree(dir_name)
+                os.mkdir(dir_name)
+            else:
+                raise e
+
+        def debug_and_rmtree():
+            shutil.rmtree(dir_name)
+            debug(dir_name + ' removed')
+
+        self.addCleanup(debug_and_rmtree)
+
     def prepare(self, ks_name,
                 table_name=None, cdc_enabled_table=None,
                 gc_grace_seconds=None,
@@ -420,19 +443,92 @@ class TestCDC(Tester):
         session.cluster.shutdown()
         self.assertEqual(pre_non_cdc_write_cdc_raw_segments, _get_cdc_raw_files(node.get_path()))
 
-    # TODO: add tests to determine that CDC data is correctly flushed to
-    # cdc_raw and not discarded. Our basic goal is to write dataset A to CDC
-    # tables and dataset B to non-CDC tables, flush, then check that a superset
-    # of data A is available to a client in cdc_raw. We can do this by:
-    #   - writing a mixed CDC/non-CDC dataset, tracking all data that should be
-    #     exposed via CDC,
-    #   - flushing,
-    #   - saving off the contents of cdc_raw,
-    #   - shutting down the cluster,
-    #   - starting a new cluster,
-    #   - initializing schema as necessary,
-    #   - shutting down the new cluster,
-    #   - moving the saved cdc_raw contents to commitlog directories,
-    #   - starting the new cluster to commitlog replay, then
-    #   - asserting all data that should have been exposed via CDC is in the
-    #     table(s) that have been written to tables in the new cluster.
+    def _init_new_loading_node(self, ks_name, create_stmt):
+        loading_node = Node(
+            name='node2',
+            cluster=self.cluster,
+            auto_bootstrap=False,
+            thrift_interface=('127.0.0.2', 9160),
+            storage_interface=('127.0.0.2', 7000),
+            jmx_port='7400',
+            remote_debug_port='0',
+            initial_token=None,
+            binary_interface=('127.0.0.2', 9042)
+        )
+        debug('adding node')
+        self.cluster.add(loading_node, is_seed=True)
+        debug('starting new node')
+        loading_node.start(wait_for_binary_proto=True)
+        debug('recreating ks and table')
+        loading_session = self.patient_exclusive_cql_connection(loading_node)
+        self.create_ks(loading_session, ks_name, rf=1)
+        debug('creating new table')
+        loading_session.execute(create_stmt)
+        debug('stopping new node')
+        loading_node.stop()
+        loading_session.cluster.shutdown()
+        return loading_node
+
+    def test_cdc_data_available_in_cdc_raw(self):
+        ks_name = 'ks'
+        # First, create a new node just for data generation.
+        generation_node, generation_session = self.prepare(ks_name=ks_name)
+
+        cdc_table_info = TableInfo(
+            ks_name=ks_name, table_name='cdc_tab',
+            column_spec=_16_uuid_column_spec,
+            insert_stmt=_get_16_uuid_insert_stmt(ks_name, 'cdc_tab'),
+            options={
+                'cdc': 'true',
+                # give table an explicit id so when we create it again it's the
+                # same table and we can replay into it
+                'id': uuid.uuid4()
+            }
+        )
+        generation_session.execute(cdc_table_info.create_stmt)
+
+        # insert 10000 rows
+        inserted_rows = _insert_rows(generation_session, cdc_table_info.name, cdc_table_info.insert_stmt, repeat((), 10000))
+
+        # drain the node to guarantee all cl segements will be recycled
+        debug('draining')
+        generation_node.drain()
+        debug('stopping')
+        # stop the node and clean up all sessions attached to it
+        generation_node.stop()
+        generation_session.cluster.shutdown()
+
+        # create a new node to use for cdc_raw cl segment replay
+        loading_node = self._init_new_loading_node(ks_name, cdc_table_info.create_stmt)
+
+        # move cdc_raw contents to commitlog directories, then start the
+        # node again to trigger commitlog replay, which should replay the
+        # cdc_raw files we moved to commitlogs into memtables.
+        debug('moving cdc_raw and restarting node')
+        _move_contents(
+            os.path.join(generation_node.get_path(), 'cdc_raw'),
+            os.path.join(loading_node.get_path(), 'commitlogs')
+        )
+        loading_node.start(wait_for_binary_proto=True)
+        debug('node successfully started; waiting on log replay')
+        loading_node.grep_log('Log replay complete')
+        debug('log replay complete')
+
+        # final assertions
+        validation_session = self.patient_exclusive_cql_connection(loading_node)
+        data_in_cdc_table_after_restart = rows_to_list(
+            validation_session.execute('SELECT * FROM ' + cdc_table_info.name)
+        )
+        debug('found {cdc} values in CDC table'.format(
+            cdc=len(data_in_cdc_table_after_restart)
+        ))
+        # Then we assert that the CDC data that we expect to be there is there.
+        # All data that was in CDC tables should have been copied to cdc_raw,
+        # then used in commitlog replay, so it should be back in the cluster.
+        self.assertEqual(
+            inserted_rows,
+            data_in_cdc_table_after_restart,
+            # The message on failure is too long, since cdc_data is thousands
+            # of items, so we print something else here
+            msg='not all expected data selected'
+        )
