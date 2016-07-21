@@ -59,7 +59,7 @@ class TestRebuild(Tester):
             query_c1c2(session, i, ConsistencyLevel.ALL)
         session.shutdown()
 
-        # Bootstraping a new node in dc2 with auto_bootstrap: false
+        # Bootstrapping a new node in dc2 with auto_bootstrap: false
         node2 = cluster.create_node('node2', False,
                                     ('127.0.0.2', 9160),
                                     ('127.0.0.2', 7000),
