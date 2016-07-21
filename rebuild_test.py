@@ -76,6 +76,8 @@ class TestRebuild(Tester):
         session.execute('USE ks')
 
         self.rebuild_errors = 0
+        # make it possible for thread to raise errors
+        self.thread_exc_info = None
 
         # rebuild dc2 from dc1
         def rebuild():
@@ -87,15 +89,33 @@ class TestRebuild(Tester):
                 else:
                     raise e
 
-        cmd1 = Thread(target=rebuild)
+        def call_and_register_exc_info_on_exception(func):
+            """
+            Closes over self to catch any exceptions raised by func and
+            register them at self.thread_exc_info
+            Based on http://stackoverflow.com/a/1854263
+            """
+            try:
+                func()
+            except Exception:
+                import sys
+                self.thread_exc_info = sys.exc_info()
+
+        cmd1 = Thread(target=call_and_register_exc_info_on_exception(rebuild))
         cmd1.start()
 
         # concurrent rebuild should not be allowed (CASSANDRA-9119)
         # (following sleep is needed to avoid conflict in 'nodetool()' method setting up env.)
         time.sleep(.1)
+        # we don't need to manually raise exeptions here -- already handled
         rebuild()
 
         cmd1.join()
+
+        # manually raise exception from cmd1 thread
+        # see http://stackoverflow.com/a/1854263
+        if self.thread_exc_info is not None:
+            raise self.thread_exc_info[1], None, self.thread_exc_info[2]
 
         # exactly 1 of the two nodetool calls should fail
         # usually it will be the one in the main thread,
