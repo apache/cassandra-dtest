@@ -5201,8 +5201,7 @@ class TestCQL(UpgradeTester):
         )
         start = time.time()
         while True:
-            results = cursor.execute(index_query)
-            if results:
+            if cursor.execute(index_query):
                 break
 
             if time.time() - start > 10.0:
