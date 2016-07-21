@@ -209,9 +209,6 @@ class TestUserFunctions(Tester):
 
         assert_invalid(session, "create aggregate aggthree(int) sfunc test stype int finalfunc aggtwo")
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12262',
-                   flaky=True)
     def udf_with_udt_test(self):
         """
         Test UDFs that operate on non-frozen UDTs.
