@@ -44,9 +44,6 @@ class TestCounters(Tester):
                 self.assertEqual(res[c][1], i + 1, "Expecting counter {} = {}, got {}".format(c, i + 1, res[c][0]))
 
     @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12161',
-                   flaky=True)
-    @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12160',
                    flaky=True)
     def upgrade_test(self):
