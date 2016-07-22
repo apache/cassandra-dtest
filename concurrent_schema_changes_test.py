@@ -110,16 +110,16 @@ class TestConcurrentSchemaChanges(Tester):
 
         # alter column family
         query = """
-            ALTER COLUMNFAMILY cf_%s
+            ALTER COLUMNFAMILY cf_{}
             ADD col4 text;
-        """ % namespace
+        """.format(namespace)
         session.execute(query)
 
         # add index
-        session.execute("CREATE INDEX index2_%s ON cf_%s(col3)" % (namespace, namespace))
+        session.execute("CREATE INDEX index2_{} ON cf_{}(col3)".format(namespace, namespace))
 
         # remove an index
-        session.execute("DROP INDEX index_%s" % namespace)
+        session.execute("DROP INDEX index_{}".format(namespace))
 
     def validate_schema_consistent(self, node):
         """ Makes sure that there is only one schema """
