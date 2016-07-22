@@ -98,6 +98,10 @@ class TestOfflineTools(Tester):
             if pattern.search(output):
                 break
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12275',
+                   flaky=False,
+                   notes='windows')
     def sstableofflinerelevel_test(self):
         """
         Generate sstables of varying levels.

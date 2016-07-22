@@ -532,6 +532,10 @@ class TestReplaceAddress(Tester):
         node4.watch_log_for("Unable to find sufficient sources for streaming range")
         assert_not_running(node4)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12276',
+                   flaky=False,
+                   notes='windows')
     def multi_dc_replace_with_rf1_test(self):
         """
         Test that multi-dc replace works when rf=1 on each dc
