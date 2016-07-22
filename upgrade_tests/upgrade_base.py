@@ -8,8 +8,6 @@ from ccmlib.common import get_version_from_build, is_win
 
 from dtest import DEBUG, Tester, debug
 
-UPGRADE_TEST_RUN = os.environ.get('UPGRADE_TEST_RUN', '').lower() in {'true', 'yes'}
-
 
 def switch_jdks(major_version_int):
     """
@@ -30,7 +28,6 @@ def switch_jdks(major_version_int):
         os.environ['JAVA_HOME'] = os.environ[new_java_home]
 
 
-@skipIf(not UPGRADE_TEST_RUN, 'set UPGRADE_TEST_RUN=true to run upgrade tests')
 @skipIf(sys.platform == 'win32', 'Skip upgrade tests on Windows')
 class UpgradeTester(Tester):
     """

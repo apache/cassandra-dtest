@@ -1,20 +1,19 @@
 import itertools
 import time
 import uuid
-from unittest import SkipTest
+from unittest import SkipTest, skipUnless
 
 from cassandra import ConsistencyLevel as CL
 from cassandra import InvalidRequest, ReadFailure, ReadTimeout
 from cassandra.query import SimpleStatement, dict_factory, named_tuple_factory
+from nose.tools import assert_not_in
 
 from assertions import assert_exception
 from datahelp import create_rows, flatten_into_set, parse_data_into_dicts
-from dtest import debug, run_scenarios
+from dtest import RUN_STATIC_UPGRADE_MATRIX, debug, run_scenarios
 from tools import known_failure, rows_to_list, since
-from upgrade_base import UPGRADE_TEST_RUN, UpgradeTester
+from upgrade_base import UpgradeTester
 from upgrade_manifest import build_upgrade_pairs
-
-from nose.tools import assert_not_in
 
 
 def assert_read_timeout_or_failure(session, query):
@@ -1731,7 +1730,7 @@ topology_specs = [
      'RF': 1},
 ]
 
-specs = [dict(s, UPGRADE_PATH=p, __test__=UPGRADE_TEST_RUN)
+specs = [dict(s, UPGRADE_PATH=p, __test__=True)
          for s, p in itertools.product(topology_specs, build_upgrade_pairs())]
 
 for klaus in BasePagingTester.__subclasses__():
@@ -1741,4 +1740,6 @@ for klaus in BasePagingTester.__subclasses__():
                                                             pathname=spec['UPGRADE_PATH'].name)
         gen_class_name = klaus.__name__ + suffix
         assert_not_in(gen_class_name, globals())
-        globals()[gen_class_name] = type(gen_class_name, (klaus,), spec)
+
+        upgrade_applies_to_env = RUN_STATIC_UPGRADE_MATRIX or spec['UPGRADE_PATH'].upgrade_meta.matches_current_env_version_family
+        globals()[gen_class_name] = skipUnless(upgrade_applies_to_env, 'test not applicable to env.')(type(gen_class_name, (klaus,), spec))

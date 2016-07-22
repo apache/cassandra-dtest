@@ -18,10 +18,10 @@ import threading
 import time
 import traceback
 import types
-from collections import OrderedDict
-from unittest import TestCase
 import unittest.case
-from utils.funcutils import merge_dicts
+from collections import OrderedDict
+from subprocess import CalledProcessError
+from unittest import TestCase
 
 import ccmlib.repository
 from cassandra import ConsistencyLevel
@@ -40,6 +40,7 @@ from plugins.dtestconfig import _CONFIG as CONFIG
 # We don't want test files to know about the plugins module, so we import
 # constants here and re-export them.
 from plugins.dtestconfig import GlobalConfigObject
+from utils.funcutils import merge_dicts
 
 LOG_SAVED_DIR = "logs"
 try:
@@ -72,6 +73,7 @@ SILENCE_DRIVER_ON_SHUTDOWN = os.environ.get('SILENCE_DRIVER_ON_SHUTDOWN', 'true'
 IGNORE_REQUIRE = os.environ.get('IGNORE_REQUIRE', '').lower() in ('yes', 'true')
 DATADIR_COUNT = os.environ.get('DATADIR_COUNT', '3')
 ENABLE_ACTIVE_LOG_WATCHING = os.environ.get('ENABLE_ACTIVE_LOG_WATCHING', '').lower() in ('yes', 'true')
+RUN_STATIC_UPGRADE_MATRIX = os.environ.get('RUN_STATIC_UPGRADE_MATRIX', '').lower() in ('yes', 'true')
 
 # devault values for configuration from configuration plugin
 _default_config = GlobalConfigObject(
@@ -100,6 +102,23 @@ LOG = logging.getLogger('dtest')
 # set python-driver log level to INFO by default for dtest
 logging.getLogger('cassandra').setLevel(logging.INFO)
 
+
+def get_sha(repo_dir):
+    try:
+        output = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=repo_dir).strip()
+        prefix = 'git:'
+        if os.environ.get('LOCAL_GIT_REPO') is not None:
+            prefix = 'local:'
+        return "{}{}".format(prefix, output)
+    except CalledProcessError, e:
+        if re.search('Not a git repository', e.message) is not None:
+            # we tried to get a sha, but repo_dir isn't a git repo. No big deal, must just be working from a non-git install.
+            return None
+        else:
+            # git call failed for some unknown reason
+            raise
+
+
 # There are times when we want to know the C* version we're testing against
 # before we call Tester.setUp. In the general case, we can't know that -- the
 # test method could use any version it wants for self.cluster. However, we can
@@ -113,8 +132,10 @@ if _cassandra_version_slug:
     # fetch but don't build the specified C* version
     ccm_repo_cache_dir, _ = ccmlib.repository.setup(_cassandra_version_slug)
     CASSANDRA_VERSION_FROM_BUILD = get_version_from_build(ccm_repo_cache_dir)
+    CASSANDRA_GITREF = get_sha(ccm_repo_cache_dir)  # will be set None when not a git repo
 else:
     CASSANDRA_VERSION_FROM_BUILD = get_version_from_build(CASSANDRA_DIR)
+    CASSANDRA_GITREF = get_sha(CASSANDRA_DIR)
 
 
 # Determine the location of the libjemalloc jar so that we can specify it

@@ -1,12 +1,10 @@
-import time
 import os
+import time
 
 from assertions import assert_all, assert_none, assert_one
 from dtest import Tester, debug
-from tools import since, new_node
 from sstable_generation_loading_test import BaseSStableLoaderTest
-from unittest import skipIf
-from upgrade_base import UPGRADE_TEST_RUN
+from tools import new_node, since
 
 LEGACY_SSTABLES_JVM_ARGS = ["-Dcassandra.streamdes.initial_mem_buffer_size=1",
                             "-Dcassandra.streamdes.max_mem_buffer_size=5",
@@ -14,7 +12,6 @@ LEGACY_SSTABLES_JVM_ARGS = ["-Dcassandra.streamdes.initial_mem_buffer_size=1",
 
 
 @since('3.0')
-@skipIf(not UPGRADE_TEST_RUN, 'set UPGRADE_TEST_RUN=true to run upgrade tests')
 class TestStorageEngineUpgrade(Tester):
 
     def setUp(self, bootstrap=False, jvm_args=None):
@@ -390,7 +387,6 @@ class TestBootstrapAfterUpgrade(TestStorageEngineUpgrade):
 
 
 @since('3.0')
-@skipIf(not UPGRADE_TEST_RUN, 'set UPGRADE_TEST_RUN=true to run upgrade tests')
 class TestLoadKaSStables(BaseSStableLoaderTest):
     __test__ = True
     upgrade_from = '2.1.6'
@@ -398,7 +394,6 @@ class TestLoadKaSStables(BaseSStableLoaderTest):
 
 
 @since('3.0')
-@skipIf(not UPGRADE_TEST_RUN, 'set UPGRADE_TEST_RUN=true to run upgrade tests')
 class TestLoadKaCompactSStables(BaseSStableLoaderTest):
     __test__ = True
     upgrade_from = '2.1.6'
@@ -407,7 +402,6 @@ class TestLoadKaCompactSStables(BaseSStableLoaderTest):
 
 
 @since('3.0')
-@skipIf(not UPGRADE_TEST_RUN, 'set UPGRADE_TEST_RUN=true to run upgrade tests')
 class TestLoadLaSStables(BaseSStableLoaderTest):
     __test__ = True
     upgrade_from = '2.2.4'
@@ -415,7 +409,6 @@ class TestLoadLaSStables(BaseSStableLoaderTest):
 
 
 @since('3.0')
-@skipIf(not UPGRADE_TEST_RUN, 'set UPGRADE_TEST_RUN=true to run upgrade tests')
 class TestLoadLaCompactSStables(BaseSStableLoaderTest):
     __test__ = True
     upgrade_from = '2.2.4'

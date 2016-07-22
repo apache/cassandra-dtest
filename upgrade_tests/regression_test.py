@@ -1,11 +1,14 @@
 """
 Home for upgrade-related tests that don't fit in with the core upgrade testing in dtest.upgrade_through_versions
 """
-from cassandra import ConsistencyLevel as CL
+from unittest import skipUnless
 
-from upgrade_base import UPGRADE_TEST_RUN, UpgradeTester
-from upgrade_manifest import build_upgrade_pairs
+from cassandra import ConsistencyLevel as CL
 from nose.tools import assert_not_in
+
+from dtest import RUN_STATIC_UPGRADE_MATRIX
+from upgrade_base import UpgradeTester
+from upgrade_manifest import build_upgrade_pairs
 
 
 class TestForRegressions(UpgradeTester):
@@ -62,5 +65,7 @@ for path in build_upgrade_pairs():
     gen_class_name = TestForRegressions.__name__ + path.name
     assert_not_in(gen_class_name, globals())
     spec = {'UPGRADE_PATH': path,
-            '__test__': UPGRADE_TEST_RUN}
-    globals()[gen_class_name] = type(gen_class_name, (TestForRegressions,), spec)
+            '__test__': True}
+
+    upgrade_applies_to_env = RUN_STATIC_UPGRADE_MATRIX or path.upgrade_meta.matches_current_env_version_family
+    globals()[gen_class_name] = skipUnless(upgrade_applies_to_env, 'test not applicable to env.')(type(gen_class_name, (TestForRegressions,), spec))

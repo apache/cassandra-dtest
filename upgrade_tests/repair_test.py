@@ -1,10 +1,8 @@
 import time
 
 from dtest import debug
-from tools import since
 from repair_tests.repair_test import BaseRepairTest
-from unittest import skipIf
-from upgrade_base import UPGRADE_TEST_RUN
+from tools import since
 
 LEGACY_SSTABLES_JVM_ARGS = ["-Dcassandra.streamdes.initial_mem_buffer_size=1",
                             "-Dcassandra.streamdes.max_mem_buffer_size=5",
@@ -12,7 +10,6 @@ LEGACY_SSTABLES_JVM_ARGS = ["-Dcassandra.streamdes.initial_mem_buffer_size=1",
 
 
 @since('3.0')
-@skipIf(not UPGRADE_TEST_RUN, 'set UPGRADE_TEST_RUN=true to run upgrade tests')
 class TestUpgradeRepair(BaseRepairTest):
     __test__ = True
 

@@ -6,8 +6,9 @@ import random
 import struct
 import time
 from collections import OrderedDict
-from uuid import UUID, uuid4
 from distutils.version import LooseVersion
+from unittest import skipUnless
+from uuid import UUID, uuid4
 
 from cassandra import ConsistencyLevel, InvalidRequest
 from cassandra.concurrent import execute_concurrent_with_args
@@ -17,16 +18,18 @@ from cassandra.util import sortedset
 from nose.exc import SkipTest
 from nose.tools import assert_not_in
 
-from assertions import assert_all, assert_invalid, assert_none, assert_one, assert_length_equal, assert_row_count
-from dtest import debug, freshCluster
+from assertions import (assert_all, assert_invalid, assert_length_equal,
+                        assert_none, assert_one, assert_row_count)
+from dtest import RUN_STATIC_UPGRADE_MATRIX, debug, freshCluster
 from thrift_bindings.v22.ttypes import \
     ConsistencyLevel as ThriftConsistencyLevel
-from thrift_bindings.v22.ttypes import (CfDef, Column, ColumnOrSuperColumn,
-                                        Mutation, ColumnDef, SliceRange, Deletion,
-                                        SlicePredicate, ColumnParent)
+from thrift_bindings.v22.ttypes import (CfDef, Column, ColumnDef,
+                                        ColumnOrSuperColumn, ColumnParent,
+                                        Deletion, Mutation, SlicePredicate,
+                                        SliceRange)
 from thrift_tests import get_thrift_client
 from tools import known_failure, require, rows_to_list, since
-from upgrade_base import UPGRADE_TEST_RUN, UpgradeTester
+from upgrade_base import UpgradeTester
 from upgrade_manifest import build_upgrade_pairs
 
 
@@ -5249,7 +5252,7 @@ topology_specs = [
     {'NODES': 2,
      'RF': 1},
 ]
-specs = [dict(s, UPGRADE_PATH=p, __test__=UPGRADE_TEST_RUN)
+specs = [dict(s, UPGRADE_PATH=p, __test__=True)
          for s, p in itertools.product(topology_specs, build_upgrade_pairs())]
 
 for spec in specs:
@@ -5258,4 +5261,6 @@ for spec in specs:
                                                         pathname=spec['UPGRADE_PATH'].name)
     gen_class_name = TestCQL.__name__ + suffix
     assert_not_in(gen_class_name, globals())
-    globals()[gen_class_name] = type(gen_class_name, (TestCQL,), spec)
+
+    upgrade_applies_to_env = RUN_STATIC_UPGRADE_MATRIX or spec['UPGRADE_PATH'].upgrade_meta.matches_current_env_version_family
+    globals()[gen_class_name] = skipUnless(upgrade_applies_to_env, 'test not applicable to env.')(type(gen_class_name, (TestCQL,), spec))

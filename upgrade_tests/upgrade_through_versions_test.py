@@ -8,18 +8,19 @@ import uuid
 from collections import defaultdict, namedtuple
 from multiprocessing import Process, Queue
 from Queue import Empty, Full
+from unittest import skipUnless
 
 import psutil
 from cassandra import ConsistencyLevel, WriteTimeout
 from cassandra.query import SimpleStatement
 from six import print_
 
-from dtest import Tester, debug
+from dtest import RUN_STATIC_UPGRADE_MATRIX, Tester, debug
 from tools import generate_ssl_stores, known_failure, new_node
-from upgrade_base import UPGRADE_TEST_RUN, switch_jdks
+from upgrade_base import switch_jdks
 from upgrade_manifest import (build_upgrade_pairs, current_2_0_x,
                               current_2_1_x, current_2_2_x, current_3_0_x,
-                              head_trunk, indev_2_2_x, next_2_2_x)
+                              indev_2_2_x, indev_3_x)
 
 
 def data_writer(tester, to_verify_queue, verification_done_queue, rewrite_probability=0):
@@ -778,15 +779,18 @@ def create_upgrade_class(clsname, version_metas, protocol_version,
     parent_class_names = [cls.__name__ for cls in parent_classes]
 
     print_("Creating test class {} ".format(clsname))
-    print_("  for C* versions: {} ".format(version_metas))
+    print_("  for C* versions:\n{} ".format(pprint.pformat(version_metas)))
     print_("  using protocol: v{}, and parent classes: {}".format(protocol_version, parent_class_names))
     print_("  to run these tests alone, use `nosetests {}.py:{}`".format(__name__, clsname))
 
-    newcls = type(
-        clsname,
-        parent_classes,
-        {'test_version_metas': version_metas, '__test__': UPGRADE_TEST_RUN, 'protocol_version': protocol_version, 'extra_config': extra_config}
-    )
+    upgrade_applies_to_env = RUN_STATIC_UPGRADE_MATRIX or version_metas[-1].matches_current_env_version_family
+
+    newcls = skipUnless(upgrade_applies_to_env, 'test not applicable to env.')(
+        type(
+            clsname,
+            parent_classes,
+            {'test_version_metas': version_metas, '__test__': True, 'protocol_version': protocol_version, 'extra_config': extra_config}
+        ))
 
     if clsname in globals():
         raise RuntimeError("Class by name already exists!")
@@ -806,13 +810,6 @@ MULTI_UPGRADES = (
                  extra_config=(
                      ('partitioner', 'org.apache.cassandra.dht.RandomPartitioner'),
                  )),
-    MultiUpgrade(name='ProtoV1Upgrade_AllVersions_EndsAt_next_2_2_x',
-                 version_metas=[current_2_0_x, current_2_1_x, next_2_2_x], protocol_version=1, extra_config=None),
-    MultiUpgrade(name='ProtoV1Upgrade_AllVersions_RandomPartitioner_EndsAt_indev_2_2_x',
-                 version_metas=[current_2_0_x, current_2_1_x, next_2_2_x], protocol_version=1,
-                 extra_config=(
-                     ('partitioner', 'org.apache.cassandra.dht.RandomPartitioner'),
-                 )),
 
     # Proto v2 upgrades (v2 is supported on 2.0, 2.1, 2.2)
     MultiUpgrade(name='ProtoV2Upgrade_AllVersions_EndsAt_indev_2_2_x',
@@ -822,37 +819,40 @@ MULTI_UPGRADES = (
                  extra_config=(
                      ('partitioner', 'org.apache.cassandra.dht.RandomPartitioner'),
                  )),
-    MultiUpgrade(name='ProtoV2Upgrade_AllVersions_EndsAt_next_2_2x',
-                 version_metas=[current_2_0_x, current_2_1_x, next_2_2_x], protocol_version=2, extra_config=None),
-    MultiUpgrade(name='ProtoV2Upgrade_AllVersions_RandomPartitioner_EndsAt_next_2_2_x',
-                 version_metas=[current_2_0_x, current_2_1_x, next_2_2_x], protocol_version=2,
-                 extra_config=(
-                     ('partitioner', 'org.apache.cassandra.dht.RandomPartitioner'),
-                 )),
 
     # Proto v3 upgrades (v3 is supported on 2.1, 2.2, 3.0, 3.1, trunk)
     MultiUpgrade(name='ProtoV3Upgrade_AllVersions_EndsAt_Trunk_HEAD',
-                 version_metas=[current_2_1_x, current_2_2_x, current_3_0_x, head_trunk], protocol_version=3, extra_config=None),
+                 version_metas=[current_2_1_x, current_2_2_x, current_3_0_x, indev_3_x], protocol_version=3, extra_config=None),
     MultiUpgrade(name='ProtoV3Upgrade_AllVersions_RandomPartitioner_EndsAt_Trunk_HEAD',
-                 version_metas=[current_2_1_x, current_2_2_x, current_3_0_x, head_trunk], protocol_version=3,
+                 version_metas=[current_2_1_x, current_2_2_x, current_3_0_x, indev_3_x], protocol_version=3,
                  extra_config=(
                      ('partitioner', 'org.apache.cassandra.dht.RandomPartitioner'),
                  )),
 
     # Proto v4 upgrades (v4 is supported on 2.2, 3.0, 3.1, trunk)
     MultiUpgrade(name='ProtoV4Upgrade_AllVersions_EndsAt_Trunk_HEAD',
-                 version_metas=[current_2_2_x, current_3_0_x, head_trunk], protocol_version=4, extra_config=None),
+                 version_metas=[current_2_2_x, current_3_0_x, indev_3_x], protocol_version=4, extra_config=None),
     MultiUpgrade(name='ProtoV4Upgrade_AllVersions_RandomPartitioner_EndsAt_Trunk_HEAD',
-                 version_metas=[current_2_2_x, current_3_0_x, head_trunk], protocol_version=4,
+                 version_metas=[current_2_2_x, current_3_0_x, indev_3_x], protocol_version=4,
                  extra_config=(
                      ('partitioner', 'org.apache.cassandra.dht.RandomPartitioner'),
                  )),
 )
 
 for upgrade in MULTI_UPGRADES:
-    # if any version_metas are None, this means they are verions not to be tested currently
+    # if any version_metas are None, this means they are versions not to be tested currently
     if all(upgrade.version_metas):
-        create_upgrade_class(upgrade.name, [m for m in upgrade.version_metas], protocol_version=upgrade.protocol_version, extra_config=upgrade.extra_config)
+        metas = upgrade.version_metas
+
+        if not RUN_STATIC_UPGRADE_MATRIX:
+            if metas[-1].matches_current_env_version_family:
+                # looks like this test should actually run in the current env, so let's set the final version to match the env exactly
+                oldmeta = metas[-1]
+                newmeta = oldmeta.clone_with_local_env_version()
+                debug("{} appears applicable to current env. Overriding final test version from {} to {}".format(upgrade.name, oldmeta.version, newmeta.version))
+                metas[-1] = newmeta
+
+        create_upgrade_class(upgrade.name, [m for m in metas], protocol_version=upgrade.protocol_version, extra_config=upgrade.extra_config)
 
 
 for pair in build_upgrade_pairs():
@@ -861,17 +861,4 @@ for pair in build_upgrade_pairs():
         [pair.starting_meta, pair.upgrade_meta],
         protocol_version=pair.starting_meta.max_proto_v,
         bootstrap_test=True
-    )
-
-
-# FOR CUSTOM/LOCAL UPGRADE PATH TESTING:
-#    Define UPGRADE_PATH in your env as a comma-separated list of versions
-#    Versions can be any format CCM works with, including: git:cassandra-2.1, 2.1.12, local:somebranch, etc.
-#    Set your desired protocol version in your env's PROTOCOL_VERSION
-if os.environ.get('UPGRADE_PATH'):
-    create_upgrade_class(
-        'UserDefinedUpgradeTest',
-        os.environ.get('UPGRADE_PATH').split(','),
-        bootstrap_test=True,
-        protocol_version=int(os.environ.get('PROTOCOL_VERSION', 3))
     )
