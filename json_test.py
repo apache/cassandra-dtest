@@ -10,7 +10,7 @@ from ccmlib import common
 from ccmlib.common import is_win
 
 from dtest import Tester
-from tools import since
+from tools import known_failure, since
 
 
 def build_doc_context(tester, test_name, prepare=True, connection=None, nodes=None):
@@ -1233,6 +1233,9 @@ class JsonFullRowInsertSelect(Tester):
         """
         run_func_docstring(tester=self, test_func=self.simple_schema_test)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12291',
+                   flaky=True)
     def pkey_requirement_test(self):
         """
         Create schema:
