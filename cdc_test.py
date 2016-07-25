@@ -16,7 +16,7 @@ from ccmlib.node import Node
 from nose.tools import assert_equal, assert_less_equal
 
 from dtest import Tester, debug
-from tools import rows_to_list, since
+from tools import rows_to_list, since, known_failure
 from utils.fileutils import size_of_files_in_dir
 from utils.funcutils import get_rate_limited_function
 
@@ -114,7 +114,7 @@ def _write_to_cdc_WriteFailure(session, insert_stmt):
                       if not success and not isinstance(result, WriteFailure)])
         # Finally, if we find a WriteFailure, that means we've inserted all
         # the CDC data we can and so we flip error_found to exit the loop.
-        if any(type(result) == WriteFailure for (_, result) in batch_results):
+        if any(isinstance(result, WriteFailure) for (_, result) in batch_results):
             debug("write failed (presumably because we've overrun "
                   'designated CDC commitlog space) after '
                   'loading {r} rows in {s:.2f}s'.format(
@@ -469,6 +469,9 @@ class TestCDC(Tester):
         loading_session.cluster.shutdown()
         return loading_node
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12286',
+                   flaky=False)
     def test_cdc_data_available_in_cdc_raw(self):
         ks_name = 'ks'
         # First, create a new node just for data generation.
