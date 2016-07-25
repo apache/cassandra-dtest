@@ -17,6 +17,10 @@ class TestOfflineTools(Tester):
     ignore_log_patterns = ["Unable to initialize MemoryMeter"]
 
     @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12287',
+                   flaky=False,
+                   notes='3.9')
+    @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11235',
                    flaky=False,
                    notes='windows')
