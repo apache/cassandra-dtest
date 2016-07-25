@@ -114,7 +114,7 @@ def _write_to_cdc_WriteFailure(session, insert_stmt):
                       if not success and not isinstance(result, WriteFailure)])
         # Finally, if we find a WriteFailure, that means we've inserted all
         # the CDC data we can and so we flip error_found to exit the loop.
-        if any(type(result) == WriteFailure for (_, result) in batch_results):
+        if any(isinstance(result, WriteFailure) for (_, result) in batch_results):
             debug("write failed (presumably because we've overrun "
                   'designated CDC commitlog space) after '
                   'loading {r} rows in {s:.2f}s'.format(
