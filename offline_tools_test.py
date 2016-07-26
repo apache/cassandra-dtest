@@ -175,11 +175,17 @@ class TestOfflineTools(Tester):
 
         # Let's reset all sstables to L0
         debug("Getting initial levels")
-        initial_levels = self.get_levels(node1.run_sstablemetadata(keyspace="keyspace1", column_families=["standard1"]))
+        initial_levels = list(self.get_levels(node1.run_sstablemetadata(keyspace="keyspace1", column_families=["standard1"])))
+        self.assertNotEqual([], initial_levels)
+        debug('initial_levels:')
+        debug(initial_levels)
         debug("Running sstablelevelreset")
         (output, error, rc) = node1.run_sstablelevelreset("keyspace1", "standard1", output=True)
         debug("Getting final levels")
-        final_levels = self.get_levels(node1.run_sstablemetadata(keyspace="keyspace1", column_families=["standard1"]))
+        final_levels = list(self.get_levels(node1.run_sstablemetadata(keyspace="keyspace1", column_families=["standard1"])))
+        self.assertNotEqual([], final_levels)
+        debug('final levels:')
+        debug(final_levels)
 
         # let's make sure there was at least 3 levels (L0, L1 and L2)
         self.assertGreater(max(initial_levels), 1)
