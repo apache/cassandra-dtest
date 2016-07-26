@@ -458,13 +458,11 @@ UPDATE varcharmaptable SET varcharvarintmap['Vitrum edere possum, mihi non nocet
         self.assertIn(u'Invalid syntax', err)
         self.assertIn(u'ä', err)
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11895',
-                   flaky=False)
     @known_failure(failure_source='test',
                    jira_url='https://datastax.jira.com/browse/CSTAR-574',
                    flaky=False,
                    notes='Offheap and Windows jobs ONLY')
+    @since('2.2')
     def test_unicode_invalid_request_error(self):
         """
         Ensure that invalid request errors involving unicode are handled correctly.
