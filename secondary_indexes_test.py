@@ -440,9 +440,6 @@ class TestSecondaryIndexes(Tester):
                            [("127.0.0.1", 1, 200), ("127.0.0.2", 1, 200), ("127.0.0.3", 1, 200)],
                            retry_on_failure)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12288',
-                   flaky=True)
     @skipIf(DISABLE_VNODES, "Test should only run with vnodes")
     def test_query_indexes_with_vnodes(self):
         """
@@ -458,6 +455,19 @@ class TestSecondaryIndexes(Tester):
         session.execute("CREATE INDEX keys_index ON ks.compact_table (b);")
         session.execute("CREATE TABLE ks.regular_table (a int PRIMARY KEY, b int)")
         session.execute("CREATE INDEX composites_index on ks.regular_table (b)")
+
+        def index_is_built(table_name, idx_name):
+            index_query = (
+                """SELECT * FROM system_schema.indexes WHERE keyspace_name = 'ks' AND table_name = '{}' AND index_name = '{}'""".format(table_name, idx_name)
+                if self.cluster.version() > '3.0' else
+                """SELECT * FROM system."IndexInfo" WHERE table_name = 'ks' AND index_name = '{}.{}'""".format(table_name, idx_name)
+            )
+            return len(list(session.execute(index_query))) == 1
+
+        start = time.time()
+        while not index_is_built('regular_table', 'composites_index') and time.time() + 10 < start:
+            debug("waiting for index to build")
+            time.sleep(1)
 
         insert_args = [(i, i % 2) for i in xrange(100)]
         execute_concurrent_with_args(session,
