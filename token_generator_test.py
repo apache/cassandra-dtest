@@ -1,5 +1,6 @@
 # coding: utf-8
 
+import os
 import re
 import subprocess
 import time
@@ -8,16 +9,20 @@ from cassandra.util import sortedset
 from ccmlib import common
 
 from dtest import Tester, debug
-from tools import rows_to_list
+from tools import rows_to_list, since
 
 
-class TokenGenerator(Tester):
+@since('2.0.16', max_version='3.0.0')
+class TestTokenGenerator(Tester):
     """
     Basic tools/bin/token-generator test.
+    Token-generator was removed in CASSANDRA-5261
+    @jira_ticket CASSANDRA-5261
+    @jira_ticket CASSANDRA-9300
     """
 
     def call_token_generator(self, install_dir, randomPart, nodes):
-        executable = install_dir + "/tools/bin/token-generator"
+        executable = os.path.join(install_dir, 'tools', 'bin', 'token-generator')
         if common.is_win():
             executable += ".bat"
 
@@ -32,7 +37,7 @@ class TokenGenerator(Tester):
         for n in nodes:
             args.append(str(n))
 
-        debug('Invoking %s' % (args,))
+        debug('Invoking {}'.format(args))
         token_gen_output = subprocess.check_output(args)
         lines = token_gen_output.split("\n")
         dc_tokens = None
