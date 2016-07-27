@@ -1391,6 +1391,9 @@ CREATE TABLE datetime_checks.values (
 
 Tracing session:""")
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12315',
+                   flaky=True)
     @since('2.2')
     def test_client_warnings(self):
         """
