@@ -8,7 +8,7 @@ import time
 from cassandra.util import sortedset
 from ccmlib import common
 
-from dtest import Tester, debug
+from dtest import Tester, debug, DISABLE_VNODES
 from tools import rows_to_list, since
 
 
@@ -79,7 +79,8 @@ class TestTokenGenerator(Tester):
 
         # remove these from cluster options - otherwise node's config would be overridden with cluster._config_options_
         cluster._config_options.__delitem__('num_tokens')
-        cluster._config_options.__delitem__('initial_token')
+        if not DISABLE_VNODES:
+            cluster._config_options.__delitem__('initial_token')
 
         self.assertTrue(not cluster.nodelist(), "nodelist() already initialized")
         cluster.populate(nodes, use_vnodes=False, tokens=generated_tokens[0]).start(wait_for_binary_proto=True)
