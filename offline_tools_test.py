@@ -16,10 +16,6 @@ class TestOfflineTools(Tester):
     # in the classpath
     ignore_log_patterns = ["Unable to initialize MemoryMeter"]
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11235',
-                   flaky=False,
-                   notes='windows')
     def sstablelevelreset_test(self):
         """
         Insert data and call sstablelevelreset on a series of
@@ -405,9 +401,11 @@ class TestOfflineTools(Tester):
         self.assertEqual(dumped_row, '1')
 
     def _check_stderr_error(self, error):
+        acceptable = ["Max sstable size of", "Consider adding more capacity", "JNA link failure", "Class JavaLaunchHelper is implemented in both"]
+
         if len(error) > 0:
             for line in error.splitlines():
-                self.assertTrue("Max sstable size of" in line or "Consider adding more capacity" in line or "Class JavaLaunchHelper is implemented in both" in line or "JNA link failure" in line,
+                self.assertTrue(any([msg in line for msg in acceptable]),
                                 'Found line \n\n"{line}"\n\n in error\n\n{error}'.format(line=line, error=error))
 
     def _get_final_sstables(self, node, ks, table):
