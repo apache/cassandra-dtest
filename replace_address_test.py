@@ -490,6 +490,9 @@ class TestReplaceAddress(Tester):
                    expected=initial_data,
                    cl=ConsistencyLevel.ONE)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12313',
+                   flaky=True)
     def replace_with_insufficient_replicas_test(self):
         """
         Test that replace fails when there are insufficient replicas
