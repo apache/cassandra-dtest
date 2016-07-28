@@ -298,6 +298,6 @@ class TestCounters(Tester):
             for idx in range(0, 5):
                 session.execute("UPDATE counter_cs SET data = data + 1 WHERE key = {k}".format(k=idx))
 
-        for idx in range(0,  5):
+        for idx in range(0, 5):
             row = list(session.execute("SELECT data from counter_cs where key = {k}".format(k=idx)))
             self.assertEqual(rows_to_list(row)[0][0], 5)
