@@ -76,7 +76,6 @@ class TestCounters(Tester):
             upd = "UPDATE counterTable SET c = c + 1 WHERE k = %d;"
             batch = " ".join(["BEGIN COUNTER BATCH"] + [upd % x for x in keys] + ["APPLY BATCH;"])
 
-            kmap = {"k%d" % i: i for i in keys}
             for i in range(0, updates):
                 query = SimpleStatement(batch, consistency_level=ConsistencyLevel.QUORUM)
                 session.execute(query)
