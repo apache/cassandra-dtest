@@ -112,6 +112,9 @@ class TestHintedHandoffConfig(Tester):
 
         self._do_hinted_handoff(node1, node2, False)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12341',
+                   flaky=True)
     def hintedhandoff_enabled_test(self):
         """
         Test global hinted handoff enabled

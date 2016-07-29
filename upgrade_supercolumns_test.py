@@ -10,7 +10,7 @@ from thrift_bindings.v22.ttypes import (CfDef, Column, ColumnOrSuperColumn,
                                         Mutation, SlicePredicate, SliceRange,
                                         SuperColumn, TimedOutException)
 from thrift_tests import get_thrift_client
-from tools import RerunTestException, requires_rerun, since
+from tools import RerunTestException, requires_rerun, since, known_failure
 
 
 @since('2.0', max_version='2.1.x')
@@ -138,6 +138,9 @@ class TestSCUpgrade(Tester):
         self.assertEqual('c%d' % j, column.name)
         self.assertEqual('v', column.value)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12340',
+                   flaky=True)
     @flaky(max_runs=3, rerun_filter=requires_rerun)
     def upgrade_with_counters_test(self):
         cluster = self.cluster
