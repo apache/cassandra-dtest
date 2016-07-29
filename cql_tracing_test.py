@@ -3,7 +3,7 @@
 from distutils.version import LooseVersion
 
 from dtest import Tester, debug
-from tools import known_failure, since
+from tools import since
 
 
 class TestCqlTracing(Tester):
@@ -19,6 +19,8 @@ class TestCqlTracing(Tester):
     def prepare(self, create_keyspace=True, nodes=3, rf=3, protocol_version=3, jvm_args=None, **kwargs):
         if jvm_args is None:
             jvm_args = []
+
+        jvm_args.append('-Dcassandra.wait_for_tracing_events_timeout_secs=15')
 
         cluster = self.cluster
         cluster.populate(nodes).start(wait_for_binary_proto=True, jvm_args=jvm_args)
@@ -92,9 +94,6 @@ class TestCqlTracing(Tester):
         self.assertIn('Request complete ', out)
         self.assertIn(" Frodo |  Baggins", out)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11465',
-                   flaky=True)
     def tracing_simple_test(self):
         """
         Test tracing using the default tracing class. See trace().
@@ -104,9 +103,6 @@ class TestCqlTracing(Tester):
         session = self.prepare()
         self.trace(session)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11465',
-                   flaky=True)
     @since('3.4')
     def tracing_unknown_impl_test(self):
         """
@@ -133,9 +129,6 @@ class TestCqlTracing(Tester):
         err = errs[0][0]
         self.assertIn(expected_error, err)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11465',
-                   flaky=True)
     @since('3.4')
     def tracing_default_impl_test(self):
         """
