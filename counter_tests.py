@@ -279,6 +279,8 @@ class TestCounters(Tester):
         assert_invalid(session, "ALTER TABLE counter_bug add c counter", "Cannot re-add previously dropped counter column c")
 
     def compact_counter_cluster_test(self):
+        """ Test for bug of #12219 """
+
         cluster = self.cluster
         cluster.populate(3).start()
         node1 = cluster.nodelist()[0]
@@ -291,7 +293,6 @@ class TestCounters(Tester):
                 data counter
             ) WITH COMPACT STORAGE
             """)
-        #  WITH COMPACT STORAGE
 
         for outer in range(0, 5):
             for idx in range(0, 5):
