@@ -254,6 +254,9 @@ class TestScrubIndexes(TestHelper):
         users = self.query_users(session)
         self.assertEqual(initial_users, users)
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12337',
+                   flaky=True)
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11236',
                    flaky=False,
