@@ -407,7 +407,7 @@ class TestOfflineTools(Tester):
     def _check_stderr_error(self, error):
         if len(error) > 0:
             for line in error.splitlines():
-                self.assertTrue("Max sstable size of" in line or "Consider adding more capacity" in line,
+                self.assertTrue("Max sstable size of" in line or "Consider adding more capacity" in line or "Class JavaLaunchHelper is implemented in both" in line or "JNA link failure" in line,
                                 'Found line \n\n"{line}"\n\n in error\n\n{error}'.format(line=line, error=error))
 
     def _get_final_sstables(self, node, ks, table):
