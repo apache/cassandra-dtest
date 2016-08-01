@@ -78,21 +78,55 @@ class TestRebuild(Tester):
         session.execute("ALTER KEYSPACE system_auth WITH REPLICATION = {'class':'NetworkTopologyStrategy', 'dc1':1, 'dc2':1};")
         session.execute('USE ks')
 
-        # rebuild dc2 from dc1 in background
-        mark = node2.mark_log()
-        node2.nodetool('rebuild dc1', False, False)
+        self.rebuild_errors = 0
+        # make it possible for thread to raise errors
+        self.thread_exc_info = None
+
+        # rebuild dc2 from dc1
+        def rebuild():
+            try:
+                node2.nodetool('rebuild dc1')
+            except NodetoolError as e:
+                if 'Node is still rebuilding' in e.message:
+                    self.rebuild_errors += 1
+                else:
+                    raise e
+
+        def call_and_register_exc_info_on_exception(func):
+            """
+            Closes over self to catch any exceptions raised by func and
+            register them at self.thread_exc_info
+            Based on http://stackoverflow.com/a/1854263
+            """
+            try:
+                func()
+            except Exception:
+                import sys
+                self.thread_exc_info = sys.exc_info()
+
+        cmd1 = Thread(target=call_and_register_exc_info_on_exception(rebuild))
+        cmd1.start()
 
         # concurrent rebuild should not be allowed (CASSANDRA-9119)
         # (following sleep is needed to avoid conflict in 'nodetool()' method setting up env.)
         time.sleep(.1)
-        # exactly 1 of the two nodetool calls should fail
-        try:
-            node2.nodetool('rebuild dc1')
-        except NodetoolError as e:
-            self.assertTrue('Node is still rebuilding' in e.message)
+        # we don't need to manually raise exeptions here -- already handled
+        rebuild()
 
-        # wait for stream to end
-        node2.watch_log_for('All sessions completed', from_mark=mark)
+        cmd1.join()
+
+        # manually raise exception from cmd1 thread
+        # see http://stackoverflow.com/a/1854263
+        if self.thread_exc_info is not None:
+            raise self.thread_exc_info[1], None, self.thread_exc_info[2]
+
+        # exactly 1 of the two nodetool calls should fail
+        # usually it will be the one in the main thread,
+        # but occasionally it wins the race with the one in the secondary thread,
+        # so we check that one succeeded and the other failed
+        self.assertEqual(self.rebuild_errors, 1,
+                         msg='rebuild errors should be 1, but found {}. Concurrent rebuild should not be allowed, but one rebuild command should have succeeded.'.format(self.rebuild_errors))
+
         # check data
         for i in xrange(0, keys):
             query_c1c2(session, i, ConsistencyLevel.ALL)
