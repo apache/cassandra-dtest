@@ -5,9 +5,9 @@ import uuid
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
 
-from assertions import assert_invalid, assert_one, assert_length_equal
+from assertions import assert_invalid, assert_length_equal, assert_one
 from dtest import Tester
-from tools import known_failure, rows_to_list, since
+from tools import rows_to_list, since
 
 
 class TestCounters(Tester):
@@ -43,9 +43,6 @@ class TestCounters(Tester):
                 self.assertEqual(len(res[c]), 2, "Expecting key and counter for counter {}, got {}".format(c, str(res[c])))
                 self.assertEqual(res[c][1], i + 1, "Expecting counter {} = {}, got {}".format(c, i + 1, res[c][0]))
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12160',
-                   flaky=True)
     def upgrade_test(self):
         """ Test for bug of #4436 """
 
