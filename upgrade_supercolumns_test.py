@@ -11,7 +11,7 @@ from thrift_bindings.v22.ttypes import (CfDef, Column, ColumnOrSuperColumn,
                                         Mutation, SlicePredicate, SliceRange,
                                         SuperColumn, TimedOutException)
 from thrift_tests import get_thrift_client
-from tools import RerunTestException, requires_rerun, since, known_failure
+from tools import RerunTestException, known_failure, requires_rerun, since
 
 
 @since('2.0', max_version='2.1.x')
