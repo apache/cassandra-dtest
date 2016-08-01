@@ -1,4 +1,5 @@
 import time
+from threading import Thread
 
 from cassandra import ConsistencyLevel
 from ccmlib.node import NodetoolError
