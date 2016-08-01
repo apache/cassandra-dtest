@@ -92,19 +92,24 @@ class TestRebuild(Tester):
                 else:
                     raise e
 
-        def call_and_register_exc_info_on_exception(func):
-            """
-            Closes over self to catch any exceptions raised by func and
-            register them at self.thread_exc_info
-            Based on http://stackoverflow.com/a/1854263
-            """
-            try:
-                func()
-            except Exception:
-                import sys
-                self.thread_exc_info = sys.exc_info()
+        class Runner(Thread):
+            def __init__(self, func):
+                Thread.__init__(self)
+                self.func = func
 
-        cmd1 = Thread(target=call_and_register_exc_info_on_exception(rebuild))
+            def run(self):
+                """
+                Closes over self to catch any exceptions raised by func and
+                register them at self.thread_exc_info
+                Based on http://stackoverflow.com/a/1854263
+                """
+                try:
+                    self.func()
+                except Exception:
+                    import sys
+                    self.thread_exc_info = sys.exc_info()
+
+        cmd1 = Runner(rebuild)
         cmd1.start()
 
         # concurrent rebuild should not be allowed (CASSANDRA-9119)
