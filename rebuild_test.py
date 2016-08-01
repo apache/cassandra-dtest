@@ -87,7 +87,6 @@ class TestRebuild(Tester):
         # exactly 1 of the two nodetool calls should fail
         try:
             node2.nodetool('rebuild dc1')
-            self.fail("second rebuild should fail")
         except NodetoolError as e:
             self.assertTrue('Node is still rebuilding' in e.message)
 
