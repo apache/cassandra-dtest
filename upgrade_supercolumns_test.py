@@ -1,8 +1,9 @@
 import time
+from distutils.version import LooseVersion
 
 from flaky import flaky
 
-from dtest import Tester, debug
+from dtest import CASSANDRA_VERSION_FROM_BUILD, Tester, debug
 from thrift_bindings.v22.ttypes import \
     ConsistencyLevel as ThriftConsistencyLevel
 from thrift_bindings.v22.ttypes import (CfDef, Column, ColumnOrSuperColumn,
@@ -27,6 +28,14 @@ class TestSCUpgrade(Tester):
             # and when it does, it gets replayed and everything is fine.
             r'Can\'t send migration request: node.*is down',
         ]
+        if LooseVersion(CASSANDRA_VERSION_FROM_BUILD) < '2.2':
+            _known_teardown_race_error = (
+                'ScheduledThreadPoolExecutor$ScheduledFutureTask@[0-9a-f]+ '
+                'rejected from org.apache.cassandra.concurrent.DebuggableScheduledThreadPoolExecutor'
+            )
+            # don't alter ignore_log_patterns on the class, just the obj for this test
+            self.ignore_log_patterns += [_known_teardown_race_error]
+
         Tester.__init__(self, *args, **kwargs)
 
     def upgrade_with_index_creation_test(self):
