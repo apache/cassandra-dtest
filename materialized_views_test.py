@@ -375,7 +375,7 @@ class TestMaterializedViews(Tester):
             assert_one(session, "SELECT * FROM t_by_v WHERE v = {}".format(-i), [-i, i])
 
     @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12267',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12140',
                    flaky=True)
     def add_dc_after_mv_simple_replication_test(self):
         """
@@ -387,7 +387,7 @@ class TestMaterializedViews(Tester):
         self._add_dc_after_mv_test(1)
 
     @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12164',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12140',
                    flaky=True)
     def add_dc_after_mv_network_replication_test(self):
         """
@@ -399,7 +399,7 @@ class TestMaterializedViews(Tester):
         self._add_dc_after_mv_test({'dc1': 1, 'dc2': 1})
 
     @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12164',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12140',
                    flaky=True)
     def add_node_after_mv_test(self):
         """
