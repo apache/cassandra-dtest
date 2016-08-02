@@ -9,6 +9,7 @@ from assertions import assert_one
 from dtest import Tester, debug
 from tools import known_failure
 
+
 # WARNING: sstableloader tests should be added to TestSSTableGenerationAndLoading (below),
 # and not to BaseSStableLoaderTest (which is shared with upgrade tests)
 
@@ -224,9 +225,6 @@ class BaseSStableLoaderTest(Tester):
 class TestSSTableGenerationAndLoading(BaseSStableLoaderTest):
     __test__ = True
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12234',
-                   flaky=True)
     def sstableloader_uppercase_keyspace_name_test(self):
         """
         Make sure sstableloader works with upper case keyspace
