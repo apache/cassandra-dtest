@@ -4,7 +4,8 @@ import time
 from cassandra import ConsistencyLevel
 
 from dtest import DISABLE_VNODES, Tester
-from tools import create_c1c2_table, known_failure, insert_c1c2, no_vnodes, query_c1c2, since
+from tools import (create_c1c2_table, insert_c1c2, known_failure, no_vnodes,
+                   query_c1c2, since)
 
 
 @since('3.0')
@@ -112,9 +113,6 @@ class TestHintedHandoffConfig(Tester):
 
         self._do_hinted_handoff(node1, node2, False)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12341',
-                   flaky=True)
     def hintedhandoff_enabled_test(self):
         """
         Test global hinted handoff enabled
