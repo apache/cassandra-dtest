@@ -79,8 +79,6 @@ class TestRebuild(Tester):
         session.execute('USE ks')
 
         self.rebuild_errors = 0
-        # make it possible for thread to raise errors
-        self.thread_exc_info = None
 
         # rebuild dc2 from dc1
         def rebuild():
@@ -96,6 +94,7 @@ class TestRebuild(Tester):
             def __init__(self, func):
                 Thread.__init__(self)
                 self.func = func
+                self.thread_exc_info = None
 
             def run(self):
                 """
@@ -122,8 +121,8 @@ class TestRebuild(Tester):
 
         # manually raise exception from cmd1 thread
         # see http://stackoverflow.com/a/1854263
-        if self.thread_exc_info is not None:
-            raise self.thread_exc_info[1], None, self.thread_exc_info[2]
+        if cmd1.thread_exc_info is not None:
+            raise cmd1.thread_exc_info[1], None, cmd1.thread_exc_info[2]
 
         # exactly 1 of the two nodetool calls should fail
         # usually it will be the one in the main thread,
