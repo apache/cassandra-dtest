@@ -1,10 +1,11 @@
 import time
+from threading import Thread
 
 from cassandra import ConsistencyLevel
 from ccmlib.node import NodetoolError
 
 from dtest import Tester
-from tools import insert_c1c2, known_failure, query_c1c2, since
+from tools import insert_c1c2, query_c1c2, since
 
 
 class TestRebuild(Tester):
@@ -23,9 +24,6 @@ class TestRebuild(Tester):
         ]
         Tester.__init__(self, *args, **kwargs)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11687',
-                   flaky=True)
     def simple_rebuild_test(self):
         """
         @jira_ticket CASSANDRA-9119
@@ -51,11 +49,11 @@ class TestRebuild(Tester):
         session = self.patient_exclusive_cql_connection(node1)
         self.create_ks(session, 'ks', {'dc1': 1})
         self.create_cf(session, 'cf', columns={'c1': 'text', 'c2': 'text'})
-        insert_c1c2(session, n=keys, consistency=ConsistencyLevel.ALL)
+        insert_c1c2(session, n=keys, consistency=ConsistencyLevel.LOCAL_ONE)
 
         # check data
         for i in xrange(0, keys):
-            query_c1c2(session, i, ConsistencyLevel.ALL)
+            query_c1c2(session, i, ConsistencyLevel.LOCAL_ONE)
         session.shutdown()
 
         # Bootstrapping a new node in dc2 with auto_bootstrap: false
@@ -77,25 +75,62 @@ class TestRebuild(Tester):
         session.execute("ALTER KEYSPACE system_auth WITH REPLICATION = {'class':'NetworkTopologyStrategy', 'dc1':1, 'dc2':1};")
         session.execute('USE ks')
 
-        # rebuild dc2 from dc1 in background
-        mark = node2.mark_log()
-        node2.nodetool('rebuild dc1', False, False)
+        self.rebuild_errors = 0
+
+        # rebuild dc2 from dc1
+        def rebuild():
+            try:
+                node2.nodetool('rebuild dc1')
+            except NodetoolError as e:
+                if 'Node is still rebuilding' in e.message:
+                    self.rebuild_errors += 1
+                else:
+                    raise e
+
+        class Runner(Thread):
+            def __init__(self, func):
+                Thread.__init__(self)
+                self.func = func
+                self.thread_exc_info = None
+
+            def run(self):
+                """
+                Closes over self to catch any exceptions raised by func and
+                register them at self.thread_exc_info
+                Based on http://stackoverflow.com/a/1854263
+                """
+                try:
+                    self.func()
+                except Exception:
+                    import sys
+                    self.thread_exc_info = sys.exc_info()
+
+        cmd1 = Runner(rebuild)
+        cmd1.start()
 
         # concurrent rebuild should not be allowed (CASSANDRA-9119)
         # (following sleep is needed to avoid conflict in 'nodetool()' method setting up env.)
         time.sleep(.1)
-        # exactly 1 of the two nodetool calls should fail
-        try:
-            node2.nodetool('rebuild dc1')
-            self.fail("second rebuild should fail")
-        except NodetoolError as e:
-            self.assertTrue('Node is still rebuilding' in e.message)
+        # we don't need to manually raise exeptions here -- already handled
+        rebuild()
 
-        # wait for stream to end
-        node2.watch_log_for('All sessions completed', from_mark=mark)
+        cmd1.join()
+
+        # manually raise exception from cmd1 thread
+        # see http://stackoverflow.com/a/1854263
+        if cmd1.thread_exc_info is not None:
+            raise cmd1.thread_exc_info[1], None, cmd1.thread_exc_info[2]
+
+        # exactly 1 of the two nodetool calls should fail
+        # usually it will be the one in the main thread,
+        # but occasionally it wins the race with the one in the secondary thread,
+        # so we check that one succeeded and the other failed
+        self.assertEqual(self.rebuild_errors, 1,
+                         msg='rebuild errors should be 1, but found {}. Concurrent rebuild should not be allowed, but one rebuild command should have succeeded.'.format(self.rebuild_errors))
+
         # check data
         for i in xrange(0, keys):
-            query_c1c2(session, i, ConsistencyLevel.ALL)
+            query_c1c2(session, i, ConsistencyLevel.LOCAL_ONE)
 
     @since('3.6')
     def rebuild_ranges_test(self):
