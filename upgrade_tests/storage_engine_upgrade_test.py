@@ -382,6 +382,7 @@ class TestStorageEngineUpgrade(Tester):
 
 @since('3.0')
 class TestBootstrapAfterUpgrade(TestStorageEngineUpgrade):
+
     def setUp(self):
         super(TestBootstrapAfterUpgrade, self).setUp(bootstrap=True, jvm_args=LEGACY_SSTABLES_JVM_ARGS)
 
