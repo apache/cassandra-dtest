@@ -1350,6 +1350,9 @@ class TestCQL(UpgradeTester):
             cursor.execute(q % "m = {}")
             assert_all(cursor, "SELECT m FROM user WHERE fn='Bilbo' AND ln='Baggins'", [])
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12363',
+                   flaky=True)
     def list_test(self):
         cursor = self.prepare()
 
@@ -1968,6 +1971,9 @@ class TestCQL(UpgradeTester):
             query = "SELECT blog_id, timestamp FROM test WHERE author = 'bob'"
             assert_all(cursor, query, [[1, 0], [1, 3], [0, 0]])
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12364',
+                   flaky=True)
     def refuse_in_with_indexes_test(self):
         """ Test for the validation bug of #4709 """
 
@@ -3949,6 +3955,9 @@ class TestCQL(UpgradeTester):
             # We don't support that
             assert_invalid(cursor, "SELECT s FROM test WHERE v = 1")
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12364',
+                   flaky=True)
     @since('2.1')
     def static_columns_with_distinct_test(self):
         cursor = self.prepare()

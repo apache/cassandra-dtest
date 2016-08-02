@@ -1171,6 +1171,9 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
             expected_data.append({u'id': 2, u'mytext': u'foo'})
             self.assertEqualIgnoreOrder(pf.all_data(), expected_data)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12362',
+                   flaky=True)
     def test_row_TTL_expiry_during_paging(self):
         cursor = self.prepare()
         cursor.execute("CREATE TABLE paging_test ( id int, mytext text, PRIMARY KEY (id, mytext) )")
@@ -1217,6 +1220,9 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
             self.assertEqual(pf.pagecount(), 3)
             self.assertEqual(pf.num_results_all(), [300, 300, 200])
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12364',
+                   flaky=True)
     def test_cell_TTL_expiry_during_paging(self):
         cursor = self.prepare()
         cursor.execute("""
