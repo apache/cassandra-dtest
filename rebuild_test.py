@@ -24,9 +24,6 @@ class TestRebuild(Tester):
         ]
         Tester.__init__(self, *args, **kwargs)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11687',
-                   flaky=True)
     def simple_rebuild_test(self):
         """
         @jira_ticket CASSANDRA-9119
@@ -52,11 +49,11 @@ class TestRebuild(Tester):
         session = self.patient_exclusive_cql_connection(node1)
         self.create_ks(session, 'ks', {'dc1': 1})
         self.create_cf(session, 'cf', columns={'c1': 'text', 'c2': 'text'})
-        insert_c1c2(session, n=keys, consistency=ConsistencyLevel.ALL)
+        insert_c1c2(session, n=keys, consistency=ConsistencyLevel.LOCAL_ONE)
 
         # check data
         for i in xrange(0, keys):
-            query_c1c2(session, i, ConsistencyLevel.ALL)
+            query_c1c2(session, i, ConsistencyLevel.LOCAL_ONE)
         session.shutdown()
 
         # Bootstrapping a new node in dc2 with auto_bootstrap: false
@@ -133,7 +130,7 @@ class TestRebuild(Tester):
 
         # check data
         for i in xrange(0, keys):
-            query_c1c2(session, i, ConsistencyLevel.ALL)
+            query_c1c2(session, i, ConsistencyLevel.LOCAL_ONE)
 
     @since('3.6')
     def rebuild_ranges_test(self):
