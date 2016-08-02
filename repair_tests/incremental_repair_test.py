@@ -24,9 +24,6 @@ class TestIncRepair(Tester):
         ]
         Tester.__init__(self, *args, **kwargs)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12264',
-                   flaky=True)
     def sstable_marking_test(self):
         """
         * Launch a three node cluster
@@ -49,8 +46,13 @@ class TestIncRepair(Tester):
         node2.flush()
 
         node3.start(wait_other_notice=True)
-        time.sleep(3)
-
+        if node3.get_cassandra_version() < '2.2':
+            log_file = 'system.log'
+        else:
+            log_file = 'debug.log'
+        node3.watch_log_for("Initializing keyspace1.standard1", filename=log_file)
+        # wait for things to settle before starting repair
+        time.sleep(1)
         if cluster.version() >= "2.2":
             node3.repair()
         else:
