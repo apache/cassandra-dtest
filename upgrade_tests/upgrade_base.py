@@ -49,6 +49,7 @@ class UpgradeTester(Tester):
         super(UpgradeTester, self).__init__(*args, **kwargs)
 
     def setUp(self):
+        self.validate_class_config()
         debug("Upgrade test beginning, setting CASSANDRA_VERSION to {}, and jdk to {}. (Prior values will be restored after test)."
               .format(self.UPGRADE_PATH.starting_version, self.UPGRADE_PATH.starting_meta.java_version))
         switch_jdks(self.UPGRADE_PATH.starting_meta.java_version)
@@ -197,3 +198,14 @@ class UpgradeTester(Tester):
         if is_win() and self.cluster.version() <= '2.2':
             self.cluster.nodelist()[1].mark_log_for_errors()
         super(UpgradeTester, self).tearDown()
+
+    def validate_class_config(self):
+        # check that an upgrade path is specified
+        subclasses = self.__class__.__subclasses__()
+        no_upgrade_path_error = (
+            'No upgrade path specified. {klaus} may not be configured to run as a test.'.format(klaus=self.__class__) +
+            (' Did you mean to run one of its subclasses, such as {sub}?'.format(sub=subclasses[0])
+             if subclasses else
+             '')
+        )
+        self.assertIsNotNone(self.UPGRADE_PATH, no_upgrade_path_error)
