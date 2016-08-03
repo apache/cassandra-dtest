@@ -25,7 +25,15 @@ class TestReadRepair(Tester):
         Test that querying only a subset of all the columns in a row doesn't confuse read-repair to avoid
         the problem described in CASSANDRA-10655.
         """
+        self._test_read_repair()
 
+    def test_read_repair_chance(self):
+        """
+        @jira_ticket CASSANDRA-12368
+        """
+        self._test_read_repair(cl_all=False)
+
+    def _test_read_repair(self, cl_all=True):
         session = self.patient_cql_connection(self.cluster.nodelist()[0])
         session.execute("""CREATE KEYSPACE alter_rf_test
                            WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};""")
@@ -53,12 +61,23 @@ class TestReadRepair(Tester):
         debug("Changing RF from 1 to 3")
         session.execute("""ALTER KEYSPACE alter_rf_test
                            WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 3};""")
-        cl_all_stmt = SimpleStatement("SELECT a FROM alter_rf_test.t1 WHERE k=1",
-                                      consistency_level=ConsistencyLevel.ALL)
+
+        if not cl_all:
+            debug("Setting table read repair chance to 1")
+            session.execute("""ALTER TABLE alter_rf_test.t1 WITH read_repair_chance = 1;""")
+
+        cl = ConsistencyLevel.ALL if cl_all else ConsistencyLevel.ONE
+
         debug("Executing SELECT on non-initial replica to trigger read repair " + non_replicas[0].name)
         read_repair_session = self.patient_exclusive_cql_connection(non_replicas[0])
-        # result of the CL ALL query contains only the selected column
-        assert_one(read_repair_session, "SELECT a FROM alter_rf_test.t1 WHERE k=1", [1], cl=ConsistencyLevel.ALL)
+
+        if cl_all:
+            # result of the read repair query at cl=ALL contains only the selected column
+            assert_one(read_repair_session, "SELECT a FROM alter_rf_test.t1 WHERE k=1", [1], cl=cl)
+        else:
+            # With background read repair at CL=ONE, result may or may not be correct
+            stmt = SimpleStatement("SELECT a FROM alter_rf_test.t1 WHERE k=1", consistency_level=cl)
+            session.execute(stmt)
 
         # Check the results of the read repair by querying each replica again at CL ONE
         debug("Re-running SELECTs at CL ONE to verify read repair")
@@ -69,11 +88,18 @@ class TestReadRepair(Tester):
             # Column a must be 1 everywhere, and column b must be either 1 or None everywhere
             self.assertIn(res[0][:2], [[1, 1], [1, None]])
 
-        # Now query at ALL but selecting all columns
+        # Now query selecting all columns
         query = "SELECT * FROM alter_rf_test.t1 WHERE k=1"
         debug("Executing SELECT on non-initial replica to trigger read repair " + non_replicas[0].name)
         read_repair_session = self.patient_exclusive_cql_connection(non_replicas[0])
-        assert_one(session, query, [1, 1, 1], cl=ConsistencyLevel.ALL)
+
+        if cl_all:
+            # result of the read repair query at cl=ALL should contain all columns
+            assert_one(session, query, [1, 1, 1], cl=cl)
+        else:
+            # With background read repair at CL=ONE, result may or may not be correct
+            stmt = SimpleStatement(query, consistency_level=cl)
+            session.execute(stmt)
 
         # Check all replica is fully up to date
         debug("Re-running SELECTs at CL ONE to verify read repair")
