@@ -73,10 +73,7 @@ will often need to modify them in some fashion at some later point:
 
 * cql
 
-        cd ~/git/cstar
-        git clone https://code.google.com/a/apache-extras.org/p/cassandra-dbapi2/
-        sudo pip install -e cassandra-dbapi2
-        This is needed for a few legacy tests, and for cql over thrift
+        sudo pip install cql
 
 * cassandra-dtest
 
