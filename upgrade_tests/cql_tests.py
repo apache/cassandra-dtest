@@ -1350,9 +1350,6 @@ class TestCQL(UpgradeTester):
             cursor.execute(q % "m = {}")
             assert_all(cursor, "SELECT m FROM user WHERE fn='Bilbo' AND ln='Baggins'", [])
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12363',
-                   flaky=True)
     def list_test(self):
         cursor = self.prepare()
 
