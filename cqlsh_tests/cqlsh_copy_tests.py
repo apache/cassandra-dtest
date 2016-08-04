@@ -1278,6 +1278,9 @@ class CqlshCopyTest(Tester):
 
         os.unlink(err_file.name)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12382',
+                   flaky=True)
     def test_reading_with_multiple_files(self):
         """
         Test importing multiple CSV files
