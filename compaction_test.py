@@ -79,7 +79,7 @@ class TestCompaction(Tester):
         node1.flush()
 
         table_name = 'standard1'
-        output = node1.nodetool('cfstats', True)[0]
+        output = node1.nodetool('cfstats').stdout
         if output.find(table_name) != -1:
             output = output[output.find(table_name):]
             output = output[output.find("Space used (live)"):]
@@ -90,7 +90,7 @@ class TestCompaction(Tester):
 
         block_on_compaction_log(node1)
 
-        output = node1.nodetool('cfstats', True)[0]
+        output = node1.nodetool('cfstats').stdout
         if output.find(table_name) != -1:
             output = output[output.find(table_name):]
             output = output[output.find("Space used (live)"):]
@@ -133,7 +133,7 @@ class TestCompaction(Tester):
         node1.wait_for_compactions()
 
         table_name = 'standard1'
-        output = node1.nodetool('cfstats', True)[0]
+        output = node1.nodetool('cfstats').stdout
         output = output[output.find(table_name):]
         output = output[output.find("Bloom filter space used"):]
         bfSize = int(output[output.find(":") + 1:output.find("\n")].strip())

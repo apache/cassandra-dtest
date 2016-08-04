@@ -167,17 +167,15 @@ class TestCqlsh(Tester):
             insert into testsubsecond (id, subid, value) VALUES (1, '1943-06-19 11:21:01.123+0000', 'abc');
             insert into testsubsecond (id, subid, value) VALUES (2, '1943-06-19 11:21:01+0000', 'def')""")
 
-        output, err = node1.run_cqlsh(cmds="use simple; SELECT * FROM testsubsecond "
-                                           "WHERE id = 1 AND subid = '1943-06-19 11:21:01.123+0000'",
-                                      return_output=True)
+        output, err, _ = node1.run_cqlsh(cmds="use simple; SELECT * FROM testsubsecond "
+                                         "WHERE id = 1 AND subid = '1943-06-19 11:21:01.123+0000'")
 
         debug(output)
         self.assertIn("1943-06-19 11:21:01.123000+0000", output)
         self.assertNotIn("1943-06-19 11:21:01.000000+0000", output)
 
-        output, err = node1.run_cqlsh(cmds="use simple; SELECT * FROM testsubsecond "
-                                           "WHERE id = 2 AND subid = '1943-06-19 11:21:01+0000'",
-                                      return_output=True)
+        output, err, _ = node1.run_cqlsh(cmds="use simple; SELECT * FROM testsubsecond "
+                                         "WHERE id = 2 AND subid = '1943-06-19 11:21:01+0000'")
 
         debug(output)
         self.assertIn("1943-06-19 11:21:01.000000+0000", output)
@@ -453,7 +451,7 @@ UPDATE varcharmaptable SET varcharvarintmap['Vitrum edere possum, mihi non nocet
 
         node1, = self.cluster.nodelist()
 
-        output, err = node1.run_cqlsh(cmds=u"ä;".encode('utf8'), return_output=True)
+        output, err, _ = node1.run_cqlsh(cmds=u"ä;".encode('utf8'))
         err = err.decode('utf8')
         self.assertIn(u'Invalid syntax', err)
         self.assertIn(u'ä', err)
@@ -475,7 +473,7 @@ UPDATE varcharmaptable SET varcharvarintmap['Vitrum edere possum, mihi non nocet
 
         cmd = u'''create keyspace "ä" WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'};'''
         cmd = cmd.encode('utf8')
-        output, err = node1.run_cqlsh(cmds=cmd, return_output=True, cqlsh_options=['--debug'])
+        output, err, _ = node1.run_cqlsh(cmds=cmd, cqlsh_options=["--debug"])
 
         err = err.decode('utf8')
         self.assertIn(u'"ä" is not a valid keyspace name', err)
@@ -1677,8 +1675,7 @@ class CqlshSmokeTest(Tester):
         self.create_ks(self.session, 'ks', 1)
         self.create_cf(self.session, 'test', key_type='uuid', columns={'i': 'int'})
 
-        out, err = self.node1.run_cqlsh("INSERT INTO ks.test (key) VALUES (uuid())",
-                                        return_output=True)
+        out, err, _ = self.node1.run_cqlsh("INSERT INTO ks.test (key) VALUES (uuid())")
         self.assertEqual(err, "")
 
         result = list(self.session.execute("SELECT key FROM ks.test"))
@@ -1686,8 +1683,7 @@ class CqlshSmokeTest(Tester):
         self.assertEqual(len(result[0]), 1)
         self.assertIsInstance(result[0][0], UUID)
 
-        out, err = self.node1.run_cqlsh("INSERT INTO ks.test (key) VALUES (uuid())",
-                                        return_output=True)
+        out, err, _ = self.node1.run_cqlsh("INSERT INTO ks.test (key) VALUES (uuid())")
         self.assertEqual(err, "")
 
         result = list(self.session.execute("SELECT key FROM ks.test"))
@@ -1710,8 +1706,7 @@ class CqlshSmokeTest(Tester):
              *
              * comment */
             """)
-        out, err = self.node1.run_cqlsh("DESCRIBE KEYSPACE ks; // post-line comment",
-                                        return_output=True)
+        out, err, _ = self.node1.run_cqlsh("DESCRIBE KEYSPACE ks; // post-line comment")
         self.assertEqual(err, "")
         self.assertTrue(out.strip().startswith("CREATE KEYSPACE ks"))
 
@@ -1734,8 +1729,7 @@ class CqlshSmokeTest(Tester):
         assert_all(self.session, "SELECT key, c, v FROM test",
                    [[u'a', u'a', u'a']])
 
-        out, err = self.node1.run_cqlsh("SELECT key, c, v FROM ks.test",
-                                        return_output=True)
+        out, err, _ = self.node1.run_cqlsh("SELECT key, c, v FROM ks.test")
         out_lines = [x.strip() for x in out.split("\n")]
 
         # there should be only 1 row returned & it should contain the inserted values
@@ -1867,21 +1861,19 @@ class CqlshSmokeTest(Tester):
         self.create_ks(self.session, 'ks2', 1)
         self.create_cf(self.session, 'ks2table')
 
-        ks1_stdout, ks1_stderr = self.node1.run_cqlsh(
+        ks1_stdout, ks1_stderr, _ = self.node1.run_cqlsh(
             '''
             USE ks1;
             DESCRIBE TABLES;
-            ''',
-            return_output=True)
+            ''')
         self.assertEqual([x for x in ks1_stdout.split() if x], ['ks1table'])
         self.assertEqual(ks1_stderr, '')
 
-        ks2_stdout, ks2_stderr = self.node1.run_cqlsh(
+        ks2_stdout, ks2_stderr, _ = self.node1.run_cqlsh(
             '''
             USE ks2;
             DESCRIBE TABLES;
-            ''',
-            return_output=True)
+            ''')
         self.assertEqual([x for x in ks2_stdout.split() if x], ['ks2table'])
         self.assertEqual(ks2_stderr, '')
 
@@ -1964,14 +1956,13 @@ class CqlLoginTest(Tester):
         self.create_cf(self.session, 'ks1table')
         self.session.execute("CREATE USER user1 WITH PASSWORD 'changeme';")
 
-        cqlsh_stdout, cqlsh_stderr = self.node1.run_cqlsh(
+        cqlsh_stdout, cqlsh_stderr, _ = self.node1.run_cqlsh(
             '''
             USE ks1;
             DESCRIBE TABLES;
             LOGIN user1 'changeme';
             DESCRIBE TABLES;
             ''',
-            return_output=True,
             cqlsh_options=['-u', 'cassandra', '-p', 'cassandra'])
         self.assertEqual([x for x in cqlsh_stdout.split() if x], ['ks1table', 'ks1table'])
         self.assertEqual(cqlsh_stderr, '')
@@ -1981,11 +1972,10 @@ class CqlLoginTest(Tester):
         self.create_cf(self.session, 'ks1table')
         self.session.execute("CREATE USER user1 WITH PASSWORD 'changeme';")
 
-        cqlsh_stdout, cqlsh_stderr = self.node1.run_cqlsh(
+        cqlsh_stdout, cqlsh_stderr, _ = self.node1.run_cqlsh(
             '''
             LOGIN user1 'badpass';
             ''',
-            return_output=True,
             cqlsh_options=['-u', 'cassandra', '-p', 'cassandra'])
 
         self.assert_login_not_allowed('user1', cqlsh_stderr)
@@ -2008,9 +1998,8 @@ class CqlLoginTest(Tester):
                     '''
             expected_error = 'Only superusers are allowed to perform CREATE USER queries'
 
-        cqlsh_stdout, cqlsh_stderr = self.node1.run_cqlsh(
+        cqlsh_stdout, cqlsh_stderr, _ = self.node1.run_cqlsh(
             query,
-            return_output=True,
             cqlsh_options=['-u', 'cassandra', '-p', 'cassandra'])
 
         err_lines = cqlsh_stderr.splitlines()
@@ -2027,13 +2016,12 @@ class CqlLoginTest(Tester):
         self.create_cf(self.session, 'ks1table')
         self.session.execute("CREATE USER user1 WITH PASSWORD 'changeme';")
 
-        cqlsh_stdout, cqlsh_stderr = self.node1.run_cqlsh(
+        cqlsh_stdout, cqlsh_stderr, _ = self.node1.run_cqlsh(
             '''
             LOGIN user1 'badpass';
             USE ks1;
             DESCRIBE TABLES;
             ''',
-            return_output=True,
             cqlsh_options=['-u', 'cassandra', '-p', 'cassandra'])
         self.assertEqual([x for x in cqlsh_stdout.split() if x], ['ks1table'])
         self.assert_login_not_allowed('user1', cqlsh_stderr)

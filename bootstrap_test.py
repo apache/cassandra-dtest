@@ -2,7 +2,6 @@ import os
 import random
 import re
 import shutil
-import subprocess
 import tempfile
 import threading
 import time
@@ -283,9 +282,8 @@ class TestBootstrap(Tester):
 
         debug("Check data is present")
         # Let's check stream bootstrap completely transferred data
-        stdout, stderr = node3.stress(['read', 'n=100k', 'no-warmup', '-schema',
-                                       'replication(factor=2)', '-rate', 'threads=8'],
-                                      capture_output=True)
+
+        stdout, stderr, _ = node3.stress(['read', 'n=100k', 'no-warmup', '-schema', 'replication(factor=2)', '-rate', 'threads=8'])
 
         if stdout is not None:
             self.assertNotIn("FAILURE", stdout)
@@ -397,18 +395,14 @@ class TestBootstrap(Tester):
         node3.start(no_wait=True)
         time.sleep(3)
 
-        with tempfile.TemporaryFile(mode='w+') as tmpfile:
-            node1.stress(['user', 'profile=' + stress_config.name, 'ops(insert=1)',
-                          'n=500K', 'no-warmup', 'cl=LOCAL_QUORUM',
-                          '-rate', 'threads=5',
-                          '-errors', 'retries=2'],
-                         stdout=tmpfile, stderr=subprocess.STDOUT)
-            tmpfile.seek(0)
-            output = tmpfile.read()
+        out, err, _ = node1.stress(['user', 'profile=' + stress_config.name, 'ops(insert=1)',
+                                    'n=500K', 'no-warmup', 'cl=LOCAL_QUORUM',
+                                    '-rate', 'threads=5',
+                                    '-errors', 'retries=2'])
 
-        debug(output)
+        debug(out)
         regex = re.compile("Operation.+error inserting key.+Exception")
-        failure = regex.search(output)
+        failure = regex.search(out)
         self.assertIsNone(failure, "Error during stress while bootstrapping")
 
     @known_failure(failure_source='test',

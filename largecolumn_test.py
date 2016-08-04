@@ -22,9 +22,9 @@ class TestLargeColumn(Tester):
             except ValueError:
                 return False
 
-        output = node.nodetool("gcstats", capture_output=True)
+        output, err, _ = node.nodetool("gcstats")
         debug(output)
-        output = output[0].split("\n")
+        output = output.split("\n")
         self.assertRegexpMatches(output[0].strip(), 'Interval')
         fields = output[1].split()
         self.assertGreaterEqual(len(fields), 6, "Expected output from nodetool gcstats has at least six fields. However, fields is: {}".format(fields))
@@ -64,7 +64,7 @@ class TestLargeColumn(Tester):
         LARGE_COLUMN_SIZE = 1024 * 1024 * 63
         self.stress_with_col_size(cluster, node1, LARGE_COLUMN_SIZE)
 
-        output = node1.nodetool("gcstats", capture_output=True)
+        output, err, _ = node1.nodetool("gcstats")
         afterStress = self.directbytes(node1)
         debug("After stress {0}".format(afterStress))
 

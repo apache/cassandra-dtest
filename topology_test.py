@@ -3,7 +3,7 @@ import time
 from threading import Thread
 
 from cassandra import ConsistencyLevel
-from ccmlib.node import NodetoolError, TimeoutError
+from ccmlib.node import ToolError, TimeoutError
 
 from assertions import assert_almost_equal
 from dtest import Tester
@@ -250,7 +250,7 @@ class TestTopology(Tester):
         self.assertFalse(null_status_pattern.search(out))
 
     def show_status(self, node):
-        out, err = node.nodetool('status')
+        out, _, _ = node.nodetool('status')
         debug("Status as reported by node {}".format(node.address()))
         debug(out)
         return out
@@ -266,10 +266,10 @@ class DecommissionInParallel(Thread):
         node = self.node
         mark = node.mark_log()
         try:
-            out, err = node.nodetool("decommission")
+            out, err, _ = node.nodetool("decommission")
             node.watch_log_for("DECOMMISSIONED", from_mark=mark)
             debug(out)
             debug(err)
-        except NodetoolError as e:
+        except ToolError as e:
             debug("Decommission failed with exception: " + str(e))
             pass

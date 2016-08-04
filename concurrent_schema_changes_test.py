@@ -125,7 +125,7 @@ class TestConcurrentSchemaChanges(Tester):
         """ Makes sure that there is only one schema """
         debug("validate_schema_consistent() " + node.name)
 
-        response = node.nodetool('describecluster', True)[0]
+        response = node.nodetool('describecluster').stdout
         schemas = response.split('Schema versions:')[1].strip()
         num_schemas = len(re.findall('\[.*?\]', schemas))
         self.assertEqual(num_schemas, 1, "There were multiple schema versions: {}".format(pprint.pformat(schemas)))

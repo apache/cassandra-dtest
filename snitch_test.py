@@ -79,7 +79,7 @@ class TestGossipingPropertyFileSnitch(Tester):
         new_rows = list(session.execute("SELECT * FROM {}".format(stress_table)))
         self.assertEquals(original_rows, new_rows)
 
-        out, err = node1.nodetool('gossipinfo')
+        out, err, _ = node1.nodetool('gossipinfo')
         self.assertEqual(0, len(err), err)
         debug(out)
 

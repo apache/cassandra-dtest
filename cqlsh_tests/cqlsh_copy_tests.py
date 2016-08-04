@@ -549,7 +549,8 @@ class CqlshCopyTest(Tester):
         if indicator:
             cmds += " WITH NULL = '{d}'".format(d=indicator)
         debug(cmds)
-        self.node1.run_cqlsh(cmds=cmds, show_output=True, cqlsh_options=['--debug'])
+        out, _, _ = self.node1.run_cqlsh(cmds=cmds, cqlsh_options=['--debug'])
+        debug(out)
 
         results = list(self.session.execute("SELECT * FROM ks.testnullindicator"))
         results_with_null_indicator = [[indicator if value is None else value for value in row] for row in results]
@@ -566,7 +567,7 @@ class CqlshCopyTest(Tester):
                 cmds += ' {} {} = {}'.format('WITH' if first else 'AND', k, v)
                 first = False
         debug(cmds)
-        self.node1.run_cqlsh(cmds=cmds, show_output=True, cqlsh_options=['--debug'])
+        self.node1.run_cqlsh(cmds=cmds, cqlsh_options=['--debug'])
 
         results_imported = list(self.session.execute("SELECT * FROM ks.testnullindicator"))
         self.assertEquals(results, results_imported)
@@ -629,7 +630,7 @@ class CqlshCopyTest(Tester):
 
         debug('Importing from csv file: {name}'.format(name=tempfile.name))
         cmds = "COPY ks.testnullvalsincollections FROM '{name}'".format(name=tempfile.name)
-        out, err = self.node1.run_cqlsh(cmds=cmds, cqlsh_options=['--debug'], return_output=True)
+        out, err, _ = self.node1.run_cqlsh(cmds=cmds, cqlsh_options=['--debug'])
         debug(out)
         debug(err)
         self.assertIn("ParseError - Failed to parse [1,,3] : Empty values are not allowed", err)
@@ -702,7 +703,7 @@ class CqlshCopyTest(Tester):
                 cmds += " AND {} = {}".format(opt, val)
 
         debug("Running {}".format(cmds))
-        self.node1.run_cqlsh(cmds=cmds, show_output=True, cqlsh_options=['--debug'])
+        self.node1.run_cqlsh(cmds=cmds, cqlsh_options=['--debug'])
 
         result = self.session.execute("SELECT * FROM testcounter")
         self.assertItemsEqual(data, rows_to_list(result))
@@ -945,8 +946,8 @@ class CqlshCopyTest(Tester):
         def do_test(skip_cols, expected_results):
             self.session.execute('TRUNCATE ks.testskipcols')
             debug("Importing csv file {} with skipcols '{}'".format(tempfile, skip_cols))
-            out, err = self.node1.run_cqlsh(cmds="COPY ks.testskipcols FROM '{}' WITH SKIPCOLS = '{}'"
-                                            .format(tempfile.name, skip_cols), return_output=True, cqlsh_options=['--debug'])
+            out, err, _ = self.node1.run_cqlsh(cmds="COPY ks.testskipcols FROM '{}' WITH SKIPCOLS = '{}'"
+                                               .format(tempfile.name, skip_cols), cqlsh_options=['--debug'])
             debug(out)
             self.assertItemsEqual(expected_results, rows_to_list(self.session.execute("SELECT * FROM ks.testskipcols")))
 
@@ -993,8 +994,8 @@ class CqlshCopyTest(Tester):
 
         def do_test(skip_cols, expected_results):
             debug("Importing csv file {} with skipcols '{}'".format(tempfile, skip_cols))
-            out, err = self.node1.run_cqlsh(cmds="COPY ks.testskipcols FROM '{}' WITH SKIPCOLS = '{}'"
-                                            .format(tempfile.name, skip_cols), return_output=True)
+            out, err, _ = self.node1.run_cqlsh(cmds="COPY ks.testskipcols FROM '{}' WITH SKIPCOLS = '{}'"
+                                               .format(tempfile.name, skip_cols))
             debug(out)
             self.assertItemsEqual(expected_results, rows_to_list(self.session.execute("SELECT * FROM ks.testskipcols")))
 
@@ -1091,9 +1092,8 @@ class CqlshCopyTest(Tester):
                     writer.writerow({'a': i, 'b': 0, 'c': 2.0})  # valid
 
         debug("Importing csv file {} with {} max parse errors".format(tempfile.name, max_parse_errors))
-        out, err = self.node1.run_cqlsh(cmds="COPY ks.testmaxparseerrors FROM '{}' WITH MAXPARSEERRORS='{}'"
-                                        .format(tempfile.name, max_parse_errors),
-                                        return_output=True, cqlsh_options=['--debug'])
+        out, err, _ = self.node1.run_cqlsh(cmds="COPY ks.testmaxparseerrors FROM '{}' WITH MAXPARSEERRORS='{}'"
+                                           .format(tempfile.name, max_parse_errors), cqlsh_options=['--debug'])
 
         self.assertIn('Exceeded maximum number of parse errors {}'.format(max_parse_errors), err)
         num_rows_imported = rows_to_list(self.session.execute("SELECT COUNT(*) FROM ks.testmaxparseerrors"))[0][0]
@@ -1143,10 +1143,9 @@ class CqlshCopyTest(Tester):
             debug("Importing csv file {} with {} max insert errors and chunk size {}"
                   .format(tempfile.name, max_insert_errors, chunk_size))
             # Note: we use one attempt because each attempt counts as a failure
-            out, err = self.node1.run_cqlsh(cmds="COPY ks.testmaxinserterrors FROM '{}' WITH MAXINSERTERRORS='{}' "
-                                                 "AND CHUNKSIZE='{}' AND MAXATTEMPTS='1'"
-                                            .format(tempfile.name, max_insert_errors, chunk_size),
-                                            return_output=True, cqlsh_options=['--debug'])
+            out, err, _ = self.node1.run_cqlsh(cmds="COPY ks.testmaxinserterrors FROM '{}' WITH MAXINSERTERRORS='{}' "
+                                               "AND CHUNKSIZE='{}' AND MAXATTEMPTS='1'"
+                                               .format(tempfile.name, max_insert_errors, chunk_size), cqlsh_options=['--debug'])
 
             num_rows_imported = rows_to_list(self.session.execute("SELECT COUNT(*) FROM ks.testmaxinserterrors"))[0][0]
             debug("Imported {}".format(num_rows_imported))
@@ -1603,7 +1602,7 @@ class CqlshCopyTest(Tester):
             write_rows_to_csv(tempfile.name, data)
 
             cmd = """COPY ks.testvalidate (a, b, c) FROM '{name}'""".format(name=tempfile.name)
-            out, err = self.node1.run_cqlsh(cmd, return_output=True)
+            out, err, _ = self.node1.run_cqlsh(cmd)
             results = list(self.session.execute("SELECT * FROM testvalidate"))
 
             if expected_err:
@@ -1639,7 +1638,7 @@ class CqlshCopyTest(Tester):
         write_rows_to_csv(tempfile.name, [[1, 1, 1]])
 
         cmd = """COPY ks.testwrongcolumns (a, b, d) FROM '{}'""".format(tempfile.name)
-        out, err = self.node1.run_cqlsh(cmd, return_output=True)
+        out, err, _ = self.node1.run_cqlsh(cmd)
         debug(out)
         debug(err)
         results = list(self.session.execute("SELECT * FROM testwrongcolumns"))
@@ -1670,8 +1669,7 @@ class CqlshCopyTest(Tester):
             tempfile = self.get_temp_file()
             debug('Exporting to csv file: {name}'.format(name=tempfile.name))
             self.node1.run_cqlsh(cmds="COPY ks.testdatatype TO '{}' WITH PREPAREDSTATEMENTS = {}"
-                                 .format(tempfile.name, prepared_statements),
-                                 show_output=True, cqlsh_options=['--debug'])
+                                 .format(tempfile.name, prepared_statements), cqlsh_options=['--debug'])
 
             results = list(self.session.execute("SELECT * FROM testdatatype"))
             self.assertCsvResultEqual(tempfile.name, results, 'testdatatype')
@@ -1705,8 +1703,7 @@ class CqlshCopyTest(Tester):
         def _test(prepared_statements):
             debug('Importing from csv file: {name}'.format(name=tempfile.name))
             self.node1.run_cqlsh(cmds="COPY ks.testdatatype FROM '{}' WITH PREPAREDSTATEMENTS = {}"
-                                 .format(tempfile.name, prepared_statements),
-                                 show_output=True, cqlsh_options=['--debug'])
+                                 .format(tempfile.name, prepared_statements), cqlsh_options=['--debug'])
 
             results = list(self.session.execute("SELECT * FROM testdatatype"))
 
@@ -1739,8 +1736,7 @@ class CqlshCopyTest(Tester):
 
         tempfile = self.get_temp_file()
         debug('Exporting to csv file: {name}'.format(name=tempfile.name))
-        self.node1.run_cqlsh(cmds="COPY ks.testdatatype TO '{}'".format(tempfile.name),
-                             show_output=True, cqlsh_options=['--debug'])
+        self.node1.run_cqlsh(cmds="COPY ks.testdatatype TO '{}'".format(tempfile.name), cqlsh_options=['--debug'])
 
         exported_results = list(self.session.execute("SELECT * FROM testdatatype"))
 
@@ -1748,8 +1744,7 @@ class CqlshCopyTest(Tester):
             self.session.execute('TRUNCATE ks.testdatatype')
 
             self.node1.run_cqlsh(cmds="COPY ks.testdatatype FROM '{}' WITH PREPAREDSTATEMENTS = {}"
-                                 .format(tempfile.name, prepared_statements),
-                                 show_output=True, cqlsh_options=['--debug'])
+                                 .format(tempfile.name, prepared_statements), cqlsh_options=['--debug'])
 
             imported_results = list(self.session.execute("SELECT * FROM testdatatype"))
 
@@ -1775,8 +1770,8 @@ class CqlshCopyTest(Tester):
         """
         def do_round_trip(trueval, falseval, invalid=False):
             debug('Exporting to csv file: {} with bool style {},{}'.format(tempfile.name, trueval, falseval))
-            _, err = self.node1.run_cqlsh(cmds="COPY ks.testbooleans TO '{}' WITH BOOLSTYLE='{}, {}'"
-                                          .format(tempfile.name, trueval, falseval), return_output=True)
+            _, err, _ = self.node1.run_cqlsh(cmds="COPY ks.testbooleans TO '{}' WITH BOOLSTYLE='{}, {}'"
+                                             .format(tempfile.name, trueval, falseval))
             if invalid:
                 expected_err = "Invalid boolean styles [{}, {}]".format(
                     ', '.join(["'{}'".format(s.strip()) for s in trueval.split(',')]),
@@ -2072,18 +2067,16 @@ class CqlshCopyTest(Tester):
 
         tempfile = self.get_temp_file()
         debug('Exporting to csv file: {}'.format(tempfile.name))
-        out, _ = self.node1.run_cqlsh(cmds="COPY {} TO '{}' WITH NUMPROCESSES='{}'"
-                                      .format(stress_table, tempfile.name, num_processes),
-                                      return_output=True)
+        out, _, _ = self.node1.run_cqlsh(cmds="COPY {} TO '{}' WITH NUMPROCESSES='{}'"
+                                         .format(stress_table, tempfile.name, num_processes))
         debug(out)
         self.assertIn('Using {} child processes'.format(num_processes), out)
         self.assertEqual(num_records, len(open(tempfile.name).readlines()))
 
         self.session.execute("TRUNCATE {}".format(stress_table))
         debug('Importing from csv file: {}'.format(tempfile.name))
-        out, _ = self.node1.run_cqlsh(cmds="COPY {} FROM '{}' WITH NUMPROCESSES='{}'"
-                                      .format(stress_table, tempfile.name, num_processes),
-                                      return_output=True)
+        out, _, _ = self.node1.run_cqlsh(cmds="COPY {} FROM '{}' WITH NUMPROCESSES='{}'"
+                                         .format(stress_table, tempfile.name, num_processes))
         debug(out)
         self.assertIn('Using {} child processes'.format(num_processes), out)
         self.assertEqual([[num_records]], rows_to_list(self.session.execute("SELECT COUNT(*) FROM {}"
@@ -2194,7 +2187,7 @@ class CqlshCopyTest(Tester):
                 cqlsh_options.append('--cqlshrc={}'.format(config_file))
 
             debug('{} with options {}'.format(cmd, cqlsh_options))
-            out, _ = self.node1.run_cqlsh(cmds=cmd, return_output=True, cqlsh_options=cqlsh_options)
+            out, _, _ = self.node1.run_cqlsh(cmds=cmd, cqlsh_options=cqlsh_options)
             debug(out)
             check_options(out, expected_options)
 
@@ -2250,8 +2243,7 @@ class CqlshCopyTest(Tester):
         write_rows_to_csv(tempfile.name, data)
 
         debug('Importing from csv file: {name}'.format(name=tempfile.name))
-        out, err = self.node1.run_cqlsh("COPY ks.testcolumns FROM '{name}'".format(name=tempfile.name),
-                                        return_output=True)
+        out, err, _ = self.node1.run_cqlsh("COPY ks.testcolumns FROM '{name}'".format(name=tempfile.name))
 
         self.assertFalse(self.session.execute("SELECT * FROM testcolumns"))
         self.assertIn('Failed to import', err)
@@ -2286,7 +2278,7 @@ class CqlshCopyTest(Tester):
 
         tempfile = self.get_temp_file()
         debug('Exporting to csv file: {}'.format(tempfile.name))
-        out = self.node1.run_cqlsh(cmds="COPY ks.testcopyto TO '{}'".format(tempfile.name), return_output=True)
+        out, err, _ = self.node1.run_cqlsh(cmds="COPY ks.testcopyto TO '{}'".format(tempfile.name))
         debug(out)
 
         # check all records were exported
@@ -2295,7 +2287,7 @@ class CqlshCopyTest(Tester):
         # import the CSV file with COPY FROM
         self.session.execute("TRUNCATE ks.testcopyto")
         debug('Importing from csv file: {}'.format(tempfile.name))
-        out = self.node1.run_cqlsh(cmds="COPY ks.testcopyto FROM '{}'".format(tempfile.name), return_output=True)
+        out, err, _ = self.node1.run_cqlsh(cmds="COPY ks.testcopyto FROM '{}'".format(tempfile.name))
         debug(out)
 
         new_results = list(self.session.execute("SELECT * FROM testcopyto"))
@@ -2429,8 +2421,7 @@ class CqlshCopyTest(Tester):
             if copy_to_options:
                 copy_to_cmd += ' WITH ' + ' AND '.join('{} = {}'.format(k, v) for k, v in copy_to_options.iteritems())
             debug(copy_to_cmd)
-            ret.append(self.node1.run_cqlsh(cmds=copy_to_cmd, show_output=True,
-                                            return_output=True, cqlsh_options=['--debug']))
+            ret.append(self.node1.run_cqlsh(cmds=copy_to_cmd, cqlsh_options=['--debug']))
             debug("COPY TO took {} to export {} records".format(datetime.datetime.now() - start, num_records))
 
         def run_copy_from(filename):
@@ -2440,8 +2431,7 @@ class CqlshCopyTest(Tester):
             if copy_from_options:
                 copy_from_cmd += ' WITH ' + ' AND '.join('{} = {}'.format(k, v) for k, v in copy_from_options.iteritems())
             debug(copy_from_cmd)
-            ret.append(self.node1.run_cqlsh(cmds=copy_from_cmd, show_output=True,
-                                            return_output=True, cqlsh_options=['--debug']))
+            ret.append(self.node1.run_cqlsh(cmds=copy_from_cmd, cqlsh_options=['--debug']))
             debug("COPY FROM took {} to import {} records".format(datetime.datetime.now() - start, num_records))
 
         num_records = create_records()
@@ -2559,8 +2549,8 @@ class CqlshCopyTest(Tester):
         ret = self._test_bulk_round_trip(nodes=3, partitioner="murmur3", num_operations=100000)
         if LooseVersion(self.cluster.version()) >= LooseVersion('3.6'):
             debug('Checking that number of cores detected is correct')
-            for out, _ in ret:
-                self.assertIn("Detected 1 core", out)
+            for out in ret:
+                self.assertIn("Detected 1 core", out[0])
 
     @freshCluster()
     @since('3.0.5')
@@ -2626,9 +2616,8 @@ class CqlshCopyTest(Tester):
 
         debug('Exporting to csv file: {} with {} and 3 max attempts'
               .format(tempfile.name, os.environ['CQLSH_COPY_TEST_FAILURES']))
-        out, err = self.node1.run_cqlsh(cmds="COPY {} TO '{}' WITH MAXATTEMPTS='3'"
-                                        .format(stress_table, tempfile.name),
-                                        return_output=True)
+        out, err, _ = self.node1.run_cqlsh(cmds="COPY {} TO '{}' WITH MAXATTEMPTS='3'"
+                                           .format(stress_table, tempfile.name))
         debug(out)
         debug(err)
 
@@ -2657,9 +2646,8 @@ class CqlshCopyTest(Tester):
         os.environ['CQLSH_COPY_TEST_FAILURES'] = json.dumps(failures)
         debug('Exporting to csv file: {} with {} and 5 max attemps'
               .format(tempfile.name, os.environ['CQLSH_COPY_TEST_FAILURES']))
-        out, err = self.node1.run_cqlsh(cmds="COPY {} TO '{}' WITH MAXATTEMPTS='5'"
-                                        .format(stress_table, tempfile.name),
-                                        return_output=True)
+        out, err, _ = self.node1.run_cqlsh(cmds="COPY {} TO '{}' WITH MAXATTEMPTS='5'"
+                                           .format(stress_table, tempfile.name))
         debug(out)
         debug(err)
 
@@ -2689,9 +2677,8 @@ class CqlshCopyTest(Tester):
 
         debug('Exporting to csv file: {} with {}'
               .format(tempfile.name, os.environ['CQLSH_COPY_TEST_FAILURES']))
-        out, err = self.node1.run_cqlsh(cmds="COPY {} TO '{}'"
-                                        .format(stress_table, tempfile.name),
-                                        return_output=True)
+        out, err, _ = self.node1.run_cqlsh(cmds="COPY {} TO '{}'"
+                                           .format(stress_table, tempfile.name))
         debug(out)
         debug(err)
 
@@ -2726,8 +2713,8 @@ class CqlshCopyTest(Tester):
         failures = {'failing_batch': {'id': 30, 'failures': 5}}
         os.environ['CQLSH_COPY_TEST_FAILURES'] = json.dumps(failures)
         debug('Importing from csv file {} with {}'.format(tempfile.name, os.environ['CQLSH_COPY_TEST_FAILURES']))
-        out, err = self.node1.run_cqlsh(cmds="COPY {} FROM '{}' WITH CHUNKSIZE='1' AND MAXATTEMPTS='3'"
-                                        .format(stress_table, tempfile.name), return_output=True)
+        out, err, _ = self.node1.run_cqlsh(cmds="COPY {} FROM '{}' WITH CHUNKSIZE='1' AND MAXATTEMPTS='3'"
+                                           .format(stress_table, tempfile.name))
         debug(out)
         debug(err)
 
@@ -2766,8 +2753,8 @@ class CqlshCopyTest(Tester):
         failures = {'failing_batch': {'id': 3, 'failures': 3}}
         os.environ['CQLSH_COPY_TEST_FAILURES'] = json.dumps(failures)
         debug('Importing from csv file {} with {}'.format(tempfile.name, os.environ['CQLSH_COPY_TEST_FAILURES']))
-        out, err = self.node1.run_cqlsh(cmds="COPY {} FROM '{}' WITH CHUNKSIZE=100 AND MAXATTEMPTS=5 AND INGESTRATE=101"
-                                        .format(stress_table, tempfile.name), return_output=True)
+        out, err, _ = self.node1.run_cqlsh(cmds="COPY {} FROM '{}' WITH CHUNKSIZE=100 AND MAXATTEMPTS=5 AND INGESTRATE=101"
+                                           .format(stress_table, tempfile.name))
         debug(out)
         debug(err)
 
@@ -2802,8 +2789,8 @@ class CqlshCopyTest(Tester):
         failures = {'exit_batch': {'id': 30}}
         os.environ['CQLSH_COPY_TEST_FAILURES'] = json.dumps(failures)
         debug('Importing from csv file {} with {}'.format(tempfile.name, os.environ['CQLSH_COPY_TEST_FAILURES']))
-        out, err = self.node1.run_cqlsh(cmds="COPY {} FROM '{}' WITH CHUNKSIZE='1'"
-                                        .format(stress_table, tempfile.name), return_output=True)
+        out, err, _ = self.node1.run_cqlsh(cmds="COPY {} FROM '{}' WITH CHUNKSIZE='1'"
+                                           .format(stress_table, tempfile.name))
         debug(out)
         debug(err)
 
@@ -2835,15 +2822,13 @@ class CqlshCopyTest(Tester):
 
         tempfile = self.get_temp_file()
         debug('Exporting to csv file {} to generate a file'.format(tempfile.name))
-        self.node1.run_cqlsh(cmds="COPY {} TO '{}'".format(stress_ks_table_name, tempfile.name),
-                             show_output=True, cqlsh_options=['--debug'])
+        self.node1.run_cqlsh(cmds="COPY {} TO '{}'".format(stress_ks_table_name, tempfile.name), cqlsh_options=['--debug'])
 
         # Import using prepared statements (the default) and verify
         self.session.execute("TRUNCATE {}".format(stress_ks_table_name))
 
         debug('Importing from csv file {}'.format(tempfile.name))
-        self.node1.run_cqlsh(cmds="COPY {} FROM '{}' WITH MAXBATCHSIZE=1".format(stress_ks_table_name, tempfile.name),
-                             show_output=True, cqlsh_options=['--debug'])
+        self.node1.run_cqlsh(cmds="COPY {} FROM '{}' WITH MAXBATCHSIZE=1".format(stress_ks_table_name, tempfile.name), cqlsh_options=['--debug'])
 
         results = list(self.session.execute("SELECT * FROM {}".format(stress_ks_table_name)))
         self.assertCsvResultEqual(tempfile.name, results, stress_table_name)
@@ -2853,8 +2838,7 @@ class CqlshCopyTest(Tester):
 
         debug('Importing from csv file with MAXBATCHSIZE=1 {}'.format(tempfile.name))
         self.node1.run_cqlsh(cmds="COPY {} FROM '{}' WITH MAXBATCHSIZE=1 AND PREPAREDSTATEMENTS=FALSE"
-                             .format(stress_ks_table_name, tempfile.name),
-                             show_output=True, cqlsh_options=['--debug'])
+                             .format(stress_ks_table_name, tempfile.name), cqlsh_options=['--debug'])
 
         results = list(self.session.execute("SELECT * FROM {}".format(stress_ks_table_name)))
         self.assertCsvResultEqual(tempfile.name, results, stress_table_name)
@@ -2899,7 +2883,7 @@ class CqlshCopyTest(Tester):
             cmds = "COPY ks.testspecialcharsinudt FROM '{}' WITH PREPAREDSTATEMENTS = {}"\
                 .format(tempfile.name, preparedStatements)
             debug(cmds)
-            self.node1.run_cqlsh(cmds=cmds, show_output=True, cqlsh_options=['--debug'])
+            self.node1.run_cqlsh(cmds=cmds, cqlsh_options=['--debug'])
 
             results = list(self.session.execute("SELECT * FROM testspecialcharsinudt"))
             debug(results)

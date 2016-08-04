@@ -41,7 +41,7 @@ class TestPendingRangeMovements(Tester):
         mark = node1.mark_log()
 
         # Move a node
-        node1.nodetool('move {}'.format(token), capture_output=False, wait=False)
+        node1.nodetool('move {}'.format(token))
 
         # Watch the log so we know when the node is moving
         node1.watch_log_for('Moving .* to {}'.format(token), timeout=10, from_mark=mark)
@@ -58,7 +58,7 @@ class TestPendingRangeMovements(Tester):
         node1.stop(gently=False, wait_other_notice=True)
 
         # Verify other nodes believe this is Down/Moving
-        out, err = node2.nodetool('ring')
+        out, _, _ = node2.nodetool('ring')
         debug("Nodetool Ring output: {}".format(out))
         self.assertRegexpMatches(out, '127\.0\.0\.1.*?Down.*?Moving')
 

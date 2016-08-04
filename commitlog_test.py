@@ -3,7 +3,6 @@ import glob
 import os
 import stat
 import struct
-import subprocess
 import time
 from distutils.version import LooseVersion
 
@@ -158,8 +157,8 @@ class TestCommitLog(Tester):
 
         self._change_commitlog_perms(0)
 
-        with open(os.devnull, 'w') as devnull:
-            self.node1.stress(['write', 'n=1M', 'no-warmup', '-col', 'size=FIXED(1000)', '-rate', 'threads=25'], stdout=devnull, stderr=subprocess.STDOUT)
+        # Use stress_process to skip internal error handling in ccm. Grep node logs for specific errors in test method.
+        self.node1.stress_process(['write', 'n=1M', 'no-warmup', '-col', 'size=FIXED(1000)', '-rate', 'threads=25']).communicate()
 
     @since('3.0.7')
     def test_mv_lock_contention_during_replay(self):

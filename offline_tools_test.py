@@ -5,6 +5,7 @@ import re
 import subprocess
 
 from ccmlib import common
+from ccmlib.node import ToolError
 
 from dtest import Tester, debug
 from tools import known_failure, since
@@ -30,10 +31,12 @@ class TestOfflineTools(Tester):
 
         # test by trying to run on nonexistent keyspace
         cluster.stop(gently=False)
-        (output, error, rc) = node1.run_sstablelevelreset("keyspace1", "standard1", output=True)
-        self.assertIn("ColumnFamily not found: keyspace1/standard1", error)
-        # this should return exit code 1
-        self.assertEqual(rc, 1, msg=str(rc))
+        try:
+            node1.run_sstablelevelreset("keyspace1", "standard1")
+        except ToolError as e:
+            self.assertIn("ColumnFamily not found: keyspace1/standard1", e.message)
+            # this should return exit code 1
+            self.assertEqual(e.exit_status, 1, "Expected sstablelevelreset to have a return code of 1, but instead return code was {}".format(e.exit_status))
 
         # now test by generating keyspace but not flushing sstables
         cluster.start(wait_for_binary_proto=True)
@@ -41,7 +44,7 @@ class TestOfflineTools(Tester):
                       '-rate', 'threads=8'])
         cluster.stop(gently=False)
 
-        (output, error, rc) = node1.run_sstablelevelreset("keyspace1", "standard1", output=True)
+        output, error, rc = node1.run_sstablelevelreset("keyspace1", "standard1")
         self._check_stderr_error(error)
         self.assertIn("Found no sstables, did you give the correct keyspace", output)
         self.assertEqual(rc, 0, msg=str(rc))
@@ -55,7 +58,7 @@ class TestOfflineTools(Tester):
         node1.flush()
         cluster.stop(gently=False)
 
-        (output, error, rc) = node1.run_sstablelevelreset("keyspace1", "standard1", output=True)
+        output, error, rc = node1.run_sstablelevelreset("keyspace1", "standard1")
         self._check_stderr_error(error)
         self.assertIn("since it is already on level 0", output)
         self.assertEqual(rc, 0, msg=str(rc))
@@ -69,7 +72,7 @@ class TestOfflineTools(Tester):
         cluster.stop()
 
         initial_levels = self.get_levels(node1.run_sstablemetadata(keyspace="keyspace1", column_families=["standard1"]))
-        (output, error, rc) = node1.run_sstablelevelreset("keyspace1", "standard1", output=True)
+        _, error, rc = node1.run_sstablelevelreset("keyspace1", "standard1")
         final_levels = self.get_levels(node1.run_sstablemetadata(keyspace="keyspace1", column_families=["standard1"]))
         self._check_stderr_error(error)
         self.assertEqual(rc, 0, msg=str(rc))
@@ -90,7 +93,7 @@ class TestOfflineTools(Tester):
     def wait_for_compactions(self, node):
         pattern = re.compile("pending tasks: 0")
         while True:
-            output, err = node.nodetool("compactionstats", capture_output=True)
+            output, err, _ = node.nodetool("compactionstats")
             if pattern.search(output):
                 break
 
@@ -115,7 +118,7 @@ class TestOfflineTools(Tester):
         # NOTE - As of now this does not return when it encounters Exception and causes test to hang, temporarily commented out
         # test by trying to run on nonexistent keyspace
         # cluster.stop(gently=False)
-        # (output, error, rc) = node1.run_sstableofflinerelevel("keyspace1", "standard1", output=True)
+        # output, error, rc = node1.run_sstableofflinerelevel("keyspace1", "standard1", output=True)
         # self.assertTrue("java.lang.IllegalArgumentException: Unknown keyspace/columnFamily keyspace1.standard1" in error)
         # # this should return exit code 1
         # self.assertEqual(rc, 1, msg=str(rc))
@@ -129,11 +132,11 @@ class TestOfflineTools(Tester):
                       '-rate', 'threads=8'])
 
         cluster.stop(gently=False)
-
-        (output, error, rc) = node1.run_sstableofflinerelevel("keyspace1", "standard1", output=True)
-
-        self.assertIn("No sstables to relevel for keyspace1.standard1", output)
-        self.assertEqual(rc, 1, msg=str(rc))
+        try:
+            output, error, _ = node1.run_sstableofflinerelevel("keyspace1", "standard1")
+        except ToolError as e:
+            self.assertIn("No sstables to relevel for keyspace1.standard1", e.stdout)
+            self.assertEqual(e.exit_status, 1, msg=str(e.exit_status))
 
         # test by flushing (sstable should be level 0)
         cluster.start(wait_for_binary_proto=True)
@@ -149,7 +152,7 @@ class TestOfflineTools(Tester):
         node1.flush()
         cluster.stop()
 
-        (output, error, rc) = node1.run_sstableofflinerelevel("keyspace1", "standard1", output=True)
+        output, _, rc = node1.run_sstableofflinerelevel("keyspace1", "standard1")
         self.assertIn("L0=1", output)
         self.assertEqual(rc, 0, msg=str(rc))
 
@@ -176,7 +179,7 @@ class TestOfflineTools(Tester):
         debug('initial_levels:')
         debug(initial_levels)
         debug("Running sstablelevelreset")
-        (output, error, rc) = node1.run_sstablelevelreset("keyspace1", "standard1", output=True)
+        node1.run_sstablelevelreset("keyspace1", "standard1")
         debug("Getting final levels")
         final_levels = list(self.get_levels(node1.run_sstablemetadata(keyspace="keyspace1", column_families=["standard1"])))
         self.assertNotEqual([], final_levels)
@@ -192,7 +195,7 @@ class TestOfflineTools(Tester):
         debug("Getting initial levels")
         initial_levels = self.get_levels(node1.run_sstablemetadata(keyspace="keyspace1", column_families=["standard1"]))
         debug("Running sstableofflinerelevel")
-        (output, error, rc) = node1.run_sstableofflinerelevel("keyspace1", "standard1", output=True)
+        output, error, _ = node1.run_sstableofflinerelevel("keyspace1", "standard1")
         debug("Getting final levels")
         final_levels = self.get_levels(node1.run_sstablemetadata(keyspace="keyspace1", column_families=["standard1"]))
 
@@ -218,14 +221,16 @@ class TestOfflineTools(Tester):
         node1, node2, node3 = cluster.nodelist()
 
         # test on nonexistent keyspace
-        (out, err, rc) = node1.run_sstableverify("keyspace1", "standard1", output=True)
-        self.assertIn("Unknown keyspace/table keyspace1.standard1", err)
-        self.assertEqual(rc, 1, msg=str(rc))
+        try:
+            (out, err, rc) = node1.run_sstableverify("keyspace1", "standard1")
+        except ToolError as e:
+            self.assertIn("Unknown keyspace/table keyspace1.standard1", e.message)
+            self.assertEqual(e.exit_status, 1, msg=str(e.exit_status))
 
         # test on nonexistent sstables:
         node1.stress(['write', 'n=100', 'no-warmup', '-schema', 'replication(factor=3)',
                       '-rate', 'threads=8'])
-        (out, err, rc) = node1.run_sstableverify("keyspace1", "standard1", output=True)
+        (out, err, rc) = node1.run_sstableverify("keyspace1", "standard1")
         self.assertEqual(rc, 0, msg=str(rc))
 
         # Generate multiple sstables and test works properly in the simple case
@@ -237,7 +242,7 @@ class TestOfflineTools(Tester):
         node1.flush()
         cluster.stop()
 
-        (out, error, rc) = node1.run_sstableverify("keyspace1", "standard1", output=True)
+        (out, error, rc) = node1.run_sstableverify("keyspace1", "standard1")
 
         self.assertEqual(rc, 0, msg=str(rc))
 
@@ -279,13 +284,14 @@ class TestOfflineTools(Tester):
             out.write(sstabledata)
 
         # use verbose to get some coverage on it
-        (out, error, rc) = node1.run_sstableverify("keyspace1", "standard1", options=['-v'], output=True)
+        try:
+            (out, error, rc) = node1.run_sstableverify("keyspace1", "standard1", options=['-v'])
+        except ToolError as e:
+            # Process sstableverify output to normalize paths in string to Python casing as above
+            error = re.sub("(?<=Corrupted: ).*", lambda match: os.path.normcase(match.group(0)), e.message)
 
-        # Process sstableverify output to normalize paths in string to Python casing as above
-        error = re.sub("(?<=Corrupted: ).*", lambda match: os.path.normcase(match.group(0)), error)
-
-        self.assertIn("Corrupted: " + sstable1, error)
-        self.assertEqual(rc, 1, msg=str(rc))
+            self.assertIn("Corrupted: " + sstable1, error)
+            self.assertEqual(e.exit_status, 1, msg=str(e.exit_status))
 
     def sstableexpiredblockers_test(self):
         cluster = self.cluster
@@ -301,7 +307,7 @@ class TestOfflineTools(Tester):
         node1.flush()
         session.execute("delete from ks.cf where key = 3")
         node1.flush()
-        [(out, error, rc)] = node1.run_sstableexpiredblockers(keyspace="ks", column_family="cf")
+        out, error, _ = node1.run_sstableexpiredblockers(keyspace="ks", column_family="cf")
         self.assertIn("blocks 2 expired sstables from getting dropped", out)
 
     def sstableupgrade_test(self):
@@ -353,14 +359,14 @@ class TestOfflineTools(Tester):
         cluster.start(wait_for_binary_proto=True)
         node1.flush()
         cluster.stop()
-        [(out, error, rc)] = node1.run_sstableupgrade(keyspace='ks', column_family='cf')
+        (out, error, rc) = node1.run_sstableupgrade(keyspace='ks', column_family='cf')
         debug(out)
         debug(error)
         debug('Upgraded ks.cf sstable: {}'.format(node1.get_sstables(keyspace='ks', column_family='cf')))
         self.assertIn('Found 1 sstables that need upgrading.', out)
 
         # Check that sstableupgrade finds no upgrade needed on current version.
-        [(out, error, rc)] = node1.run_sstableupgrade(keyspace='ks', column_family='cf')
+        (out, error, rc) = node1.run_sstableupgrade(keyspace='ks', column_family='cf')
         debug(out)
         debug(error)
         self.assertIn('Found 0 sstables that need upgrading.', out)

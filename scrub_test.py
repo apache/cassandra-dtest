@@ -100,7 +100,7 @@ class TestHelper(Tester):
         Launch a nodetool command and check the result is empty (no error)
         """
         node1 = self.cluster.nodelist()[0]
-        response = node1.nodetool(cmd, capture_output=True)[0]
+        response = node1.nodetool(cmd).stdout
         if not common.is_win():  # nodetool always prints out on windows
             assert_length_equal(response, 0)  # nodetool does not print anything unless there is an error
 
