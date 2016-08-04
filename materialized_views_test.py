@@ -987,6 +987,8 @@ class TestMaterializedViews(Tester):
                 [i, i, 'a', 3.0]
             )
 
+        debug('Close connection to node1')
+        session.cluster.shutdown()
         debug('Shutdown node1, node4 and node5')
         node1.stop()
         node4.stop()
