@@ -162,7 +162,7 @@ class TestReadRepair(Tester):
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12375',
                    flaky=True)
-    @since('2.2')
+    @since('3.0')
     def test_gcable_tombstone_resurrection_on_range_slice_query(self):
         """
         @jira_ticket CASSANDRA-11427
