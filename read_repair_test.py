@@ -159,9 +159,6 @@ class TestReadRepair(Tester):
             self.assertNotIn("Adding to cf memtable", activity)
             self.assertNotIn("Acquiring switchLock read lock", activity)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12375',
-                   flaky=True)
     @since('3.0')
     def test_gcable_tombstone_resurrection_on_range_slice_query(self):
         """
