@@ -3133,9 +3133,6 @@ class TestCQL(UpgradeTester):
             assert_all(cursor, "SELECT * FROM test", [[0], [1], [-1]])
             assert_invalid(cursor, "SELECT * FROM test WHERE k >= -1 AND k < 1;")
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12124',
-                   flaky=False)
     def select_with_alias_test(self):
         cursor = self.prepare()
         cursor.execute('CREATE TABLE users (id int PRIMARY KEY, name text)')
@@ -3172,11 +3169,16 @@ class TestCQL(UpgradeTester):
             self.assertEqual('id_blob', res[0]._fields[0])
             self.assertEqual('\x00\x00\x00\x00', res[0].id_blob)
 
+            if self.get_node_version(is_upgraded) <= '3.8':
+                error_msg = "Aliases aren't allowed in the where clause"
+            else:
+                error_msg = "Undefined column name"
+
             # test that select throws a meaningful exception for aliases in where clause
-            assert_invalid(cursor, 'SELECT id AS user_id, name AS user_name FROM users WHERE user_id = 0', matching="Aliases aren't allowed in the where clause")
+            assert_invalid(cursor, 'SELECT id AS user_id, name AS user_name FROM users WHERE user_id = 0', matching=error_msg)
 
             # test that select throws a meaningful exception for aliases in order by clause
-            assert_invalid(cursor, 'SELECT id AS user_id, name AS user_name FROM users WHERE id IN (0) ORDER BY user_name', matching="Aliases are not allowed in order by clause")
+            assert_invalid(cursor, 'SELECT id AS user_id, name AS user_name FROM users WHERE id IN (0) ORDER BY user_name', matching=error_msg)
 
     def nonpure_function_collection_test(self):
         """ Test for bug #5795 """
