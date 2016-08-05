@@ -126,8 +126,12 @@ class PageFetcher(object):
         while time.time() < expiry:
             if self.requested_pages == (self.retrieved_pages + self.retrieved_empty_pages):
                 return self
+            # small wait so we don't need excess cpu to keep checking
+            time.sleep(0.1)
 
-        raise RuntimeError("Requested pages were not delivered before timeout.")
+        raise RuntimeError(
+            "Requested pages were not delivered before timeout." +
+            "Requested: {}; retrieved: {}; empty retrieved: {}".format(self.requested_pages, self.retrieved_pages, self.retrieved_empty_pages))
 
     def pagecount(self):
         """
