@@ -499,7 +499,7 @@ class Tester(TestCase):
 
         cluster = PyCluster([node_ip], auth_provider=auth_provider, compression=compression,
                             protocol_version=protocol_version, load_balancing_policy=load_balancing_policy, default_retry_policy=FlakyRetryPolicy(),
-                            port=port, ssl_options=ssl_opts, connect_timeout=10)
+                            port=port, ssl_options=ssl_opts, connect_timeout=10, allow_beta_protocol_version=True)
         session = cluster.connect()
 
         # temporarily increase client-side timeout to 1m to determine
