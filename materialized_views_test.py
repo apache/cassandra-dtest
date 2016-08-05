@@ -793,7 +793,6 @@ class TestMaterializedViews(Tester):
         )
 
         node2.start(wait_other_notice=True, wait_for_binary_proto=True)
-        self._replay_batchlogs()
 
         # We should get a digest mismatch
         query = SimpleStatement("SELECT * FROM t_by_v WHERE v = 1",
