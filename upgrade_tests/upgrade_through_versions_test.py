@@ -265,9 +265,6 @@ class UpgradeTester(Tester):
                 values=dict(self.extra_config)
             )
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12376',
-                   flaky=True)
     def parallel_upgrade_test(self):
         """
         Test upgrading cluster all at once (requires cluster downtime).
