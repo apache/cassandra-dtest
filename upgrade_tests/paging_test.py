@@ -1176,6 +1176,9 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
             self.assertEqualIgnoreOrder(pf.all_data(), expected_data)
 
     @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12400',
+                   flaky=False)
+    @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12362',
                    flaky=True)
     def test_row_TTL_expiry_during_paging(self):

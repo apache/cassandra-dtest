@@ -41,6 +41,9 @@ class TestCqlsh(Tester):
             os.unlink(self.tempfile.name)
         super(TestCqlsh, self).tearDown()
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12398',
+                   flaky=True)
     @since('2.1.9')
     def test_pep8_compliance(self):
         """
