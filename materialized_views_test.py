@@ -728,9 +728,6 @@ class TestMaterializedViews(Tester):
                 cl=ConsistencyLevel.ALL
             )
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12097',
-                   flaky=True)
     def view_tombstone_test(self):
         """
         Test that a materialized views properly tombstone
