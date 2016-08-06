@@ -769,7 +769,7 @@ class TestRepair(BaseRepairTest):
         t3.join()
         node1.stop(wait_other_notice=True)
         node3.stop(wait_other_notice=True)
-        _, stderr, _ = node2.stress(['read', 'n=1M', 'no-warmup', '-rate', 'threads=30', '-node', node2.address()])
+        _, stderr, _ = node2.stress(['read', 'n=1M', 'no-warmup', '-rate', 'threads=30'])
         self.assertTrue(len(stderr) == 0, stderr)
 
 RepairTableContents = namedtuple('RepairTableContents',
