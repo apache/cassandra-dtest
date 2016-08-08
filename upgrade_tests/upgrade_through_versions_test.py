@@ -450,7 +450,7 @@ class UpgradeTester(Tester):
             debug('Starting %s on new version (%s)' % (node.name, version_meta.version))
             # Setup log4j / logback again (necessary moving from 2.0 -> 2.1):
             node.set_log_level("INFO")
-            node.start(wait_other_notice=True, wait_for_binary_proto=True)
+            node.start(wait_other_notice=240, wait_for_binary_proto=True)
             node.nodetool('upgradesstables -a')
 
     def _log_current_ver(self, current_version_meta):
@@ -686,7 +686,7 @@ class BootstrapMixin(object):
         # Check we can bootstrap a new node on the upgraded cluster:
         debug("Adding a node to the cluster")
         nnode = new_node(self.cluster, remote_debug_port=str(2000 + len(self.cluster.nodes)))
-        nnode.start(use_jna=True, wait_other_notice=True, wait_for_binary_proto=True)
+        nnode.start(use_jna=True, wait_other_notice=240, wait_for_binary_proto=True)
         self._write_values()
         self._increment_counters()
         self._check_values()
@@ -697,7 +697,7 @@ class BootstrapMixin(object):
         debug("Adding a node to the cluster")
         nnode = new_node(self.cluster, remote_debug_port=str(2000 + len(self.cluster.nodes)), data_center='dc2')
 
-        nnode.start(use_jna=True, wait_other_notice=True, wait_for_binary_proto=True)
+        nnode.start(use_jna=True, wait_other_notice=240, wait_for_binary_proto=True)
         self._write_values()
         self._increment_counters()
         self._check_values()
