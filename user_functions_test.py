@@ -68,17 +68,17 @@ class TestUserFunctions(Tester):
         node1_session.execute("INSERT INTO udf_kv (key, value) VALUES ({}, {})".format(2, 2))
         node1_session.execute("INSERT INTO udf_kv (key, value) VALUES ({}, {})".format(3, 3))
 
-        node1_session.execute("""
+        schema_wait_session.execute("""
             create or replace function x_sin ( input double ) called on null input
             returns double language java as 'if (input==null) return null;
             return Double.valueOf(Math.sin(input.doubleValue()));'
             """)
-        node2_session.execute("""
+        schema_wait_session.execute("""
             create or replace function x_cos ( input double ) called on null input
             returns double language java as 'if (input==null) return null;
             return Double.valueOf(Math.cos(input.doubleValue()));'
             """)
-        node3_session.execute("""
+        schema_wait_session.execute("""
             create or replace function x_tan ( input double ) called on null input
             returns double language java as 'if (input==null) return null;
             return Double.valueOf(Math.tan(input.doubleValue()));'
