@@ -130,7 +130,7 @@ class PageFetcher(object):
             time.sleep(0.1)
 
         raise RuntimeError(
-            "Requested pages were not delivered before timeout." +
+            "Requested pages were not delivered before timeout. " +
             "Requested: {}; retrieved: {}; empty retrieved: {}".format(self.requested_pages, self.retrieved_pages, self.retrieved_empty_pages))
 
     def pagecount(self):
