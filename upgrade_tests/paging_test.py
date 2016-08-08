@@ -194,8 +194,8 @@ class BasePagingTester(UpgradeTester):
         start_on, upgrade_to = self.UPGRADE_PATH.starting_meta, self.UPGRADE_PATH.upgrade_meta
         if 'protocol_version' not in kwargs.keys():
             # Due to CASSANDRA-10880, we need to use proto v3 (instead of v4) when it's a mixed cluster of 2.2.x and 3.0.x nodes.
-            if start_on.family == '2.2.x' and upgrade_to.family == '3.0.x':
-                debug("Protocol version set to v3, due to 2.2.x and 3.0.x mixed version cluster.")
+            if start_on.family in ('2.1.x', '2.2.x') and upgrade_to.family == '3.0.x':
+                debug("Protocol version set to v3, due to 2.1.x/2.2.x and 3.0.x mixed version cluster.")
                 kwargs['protocol_version'] = 3
 
         cursor = UpgradeTester.prepare(self, *args, **kwargs)
