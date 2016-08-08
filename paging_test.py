@@ -2282,6 +2282,374 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
                                                                                                                        [3, 6, 4, 7],
                                                                                                                        [3, 5, 4, 6]])
 
+    @since('3.8')
+    def test_paging_with_filtering_on_partition_key(self):
+        """
+        test allow filtering on partition key
+        @jira_ticket CASSANDRA-11031
+        """
+
+        session = self.prepare()
+        self.create_ks(session, 'test_paging_with_filtering_on_pk', 2)
+        session.execute("CREATE TABLE test (a int, b int, s int static, c int, d int, primary key (a, b))")
+        session.row_factory = tuple_factory
+
+        for i in xrange(5):
+            session.execute("INSERT INTO test (a, s) VALUES ({}, {})".format(i, i))
+            # Lets a row with only static values
+            if i != 2:
+                for j in xrange(4):
+                    session.execute("INSERT INTO test (a, b, c, d) VALUES ({}, {}, {}, {})".format(i, j, j, i + j))
+
+        for page_size in (2, 3, 4, 5, 7, 10):
+            session.default_fetch_size = page_size
+
+            # Range queries
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a < 5 AND c = 2 ALLOW FILTERING"))
+            self.assertEqual(res, [[1, 2, 1, 2, 3],
+                                   [0, 2, 0, 2, 2],
+                                   [4, 2, 4, 2, 6],
+                                   [3, 2, 3, 2, 5]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a > 0 AND c > 1 AND c <= 2 ALLOW FILTERING"))
+            self.assertEqual(res, [[1, 2, 1, 2, 3],
+                                   [4, 2, 4, 2, 6],
+                                   [3, 2, 3, 2, 5]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a >= 2 AND c = 2 AND d > 4 ALLOW FILTERING"))
+            self.assertEqual(res, [[4, 2, 4, 2, 6],
+                                   [3, 2, 3, 2, 5]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a >= 2 AND c = 2 AND s > 1 ALLOW FILTERING"))
+            self.assertEqual(res, [[4, 2, 4, 2, 6],
+                                   [3, 2, 3, 2, 5]])
+
+            # Range queries with LIMIT
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a <= 1 AND c = 2 LIMIT 2 ALLOW FILTERING"))
+            self.assertEqual(res, [[1, 2, 1, 2, 3],
+                                   [0, 2, 0, 2, 2]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a <= 1 AND c = 2 AND s >= 1 LIMIT 2 ALLOW FILTERING"))
+            self.assertEqual(res, [[1, 2, 1, 2, 3]])
+
+            # Range query with DISTINCT
+            res = rows_to_list(session.execute("SELECT DISTINCT a, s FROM test WHERE a >= 2 AND s >= 1 ALLOW FILTERING"))
+            self.assertEqual(res, [[4, 4],
+                                   [3, 3]])
+
+            # Range query with DISTINCT and LIMIT
+            res = rows_to_list(session.execute("SELECT DISTINCT a, s FROM test WHERE a <= 3 AND s >= 1 LIMIT 2 ALLOW FILTERING"))
+            self.assertEqual(res, [[1, 1],
+                                   [3, 3]])
+
+            # Single partition queries
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a <= 0 AND c >= 1 ALLOW FILTERING"))
+            self.assertEqual(res, [[0, 1, 0, 1, 1],
+                                   [0, 2, 0, 2, 2],
+                                   [0, 3, 0, 3, 3]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a < 1 AND c >= 1 AND c <=2 ALLOW FILTERING"))
+            self.assertEqual(res, [[0, 1, 0, 1, 1],
+                                   [0, 2, 0, 2, 2]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a >= 0 AND c >= 1 AND d = 1 ALLOW FILTERING"))
+            self.assertEqual(res, [[0, 1, 0, 1, 1]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a >= 3 AND c >= 1 AND s > 1 ALLOW FILTERING"))
+            self.assertEqual(res, [[4, 1, 4, 1, 5],
+                                   [4, 2, 4, 2, 6],
+                                   [4, 3, 4, 3, 7],
+                                   [3, 1, 3, 1, 4],
+                                   [3, 2, 3, 2, 5],
+                                   [3, 3, 3, 3, 6]])
+
+            # Single partition queries with LIMIT
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a < 1 AND c >= 1 LIMIT 2 ALLOW FILTERING"))
+            self.assertEqual(res, [[0, 1, 0, 1, 1],
+                                   [0, 2, 0, 2, 2]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a >= 3 AND c >= 1 AND s > 1 LIMIT 2 ALLOW FILTERING"))
+            self.assertEqual(res, [[4, 1, 4, 1, 5],
+                                   [4, 2, 4, 2, 6]])
+
+            #  Single partition query with DISTINCT
+            res = rows_to_list(session.execute("SELECT DISTINCT a, s FROM test WHERE a > 2 AND s >= 1 ALLOW FILTERING"))
+            self.assertEqual(res, [[4, 4],
+                                   [3, 3]])
+
+            # Single partition query with ORDER BY
+            assert_invalid(session, "SELECT * FROM test WHERE a <= 0 AND c >= 1 ORDER BY b DESC ALLOW FILTERING", expected=InvalidRequest)
+
+            # Single partition query with ORDER BY and LIMIT
+            assert_invalid(session, "SELECT * FROM test WHERE a <= 0 AND c >= 1 ORDER BY b DESC LIMIT 2 ALLOW FILTERING", expected=InvalidRequest)
+
+    def _test_paging_with_filtering_on_partition_key_on_counter_columns(self, session, with_compact_storage):
+        if with_compact_storage:
+            self.create_ks(session, 'test_flt_counter_columns_compact_storage', 2)
+            session.execute("CREATE TABLE test (a int, b int, c int, cnt counter, PRIMARY KEY (a, b, c)) WITH COMPACT STORAGE")
+        else:
+            self.create_ks(session, 'test_flt_counter_columns', 2)
+            session.execute("CREATE TABLE test (a int, b int, c int, cnt counter, PRIMARY KEY (a, b, c))")
+
+        for i in xrange(5):
+            for j in xrange(10):
+                session.execute("UPDATE test SET cnt = cnt + {} WHERE a={} AND b={} AND c={}".format(j + 2, i, j, j + 1))
+
+        for page_size in (2, 3, 4, 5, 7, 10, 20):
+            session.default_fetch_size = page_size
+
+            # single partition
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a > 3 AND b > 3 AND c > 3 AND cnt > 8 ALLOW FILTERING"))
+            self.assertEqual(res, [[4, 7, 8, 9],
+                                   [4, 8, 9, 10],
+                                   [4, 9, 10, 11]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a >= 4 AND b > 3 AND c > 3 AND cnt >= 8 ALLOW FILTERING"))
+            self.assertEqual(res, [[4, 6, 7, 8],
+                                   [4, 7, 8, 9],
+                                   [4, 8, 9, 10],
+                                   [4, 9, 10, 11]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a < 1 AND b > 3 AND c > 3 AND cnt >= 8 AND cnt < 10 ALLOW FILTERING"))
+            self.assertEqual(res, [[0, 6, 7, 8],
+                                   [0, 7, 8, 9]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a > 3 AND b > 3 AND c > 3 AND cnt >= 8 AND cnt <= 10 ALLOW FILTERING"))
+            self.assertEqual(res, [[4, 6, 7, 8],
+                                   [4, 7, 8, 9],
+                                   [4, 8, 9, 10]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a > 1 AND cnt = 5 ALLOW FILTERING"))
+            self.assertEqualIgnoreOrder(res, [[2, 3, 4, 5],
+                                              [3, 3, 4, 5],
+                                              [4, 3, 4, 5]])
+
+    @since('3.8')
+    def test_paging_with_filtering_on_partition_key_on_counter_columns(self):
+        """
+        test paging, when filtering on partition key on counter columns
+        @jira_ticket CASSANDRA-11031
+        """
+
+        session = self.prepare()
+        session.row_factory = tuple_factory
+
+        self._test_paging_with_filtering_on_partition_key_on_counter_columns(session, False)
+        self._test_paging_with_filtering_on_partition_key_on_counter_columns(session, True)
+
+    def _test_paging_with_filtering_on_partition_key_on_clustering_columns(self, session, with_compact_storage):
+        if with_compact_storage:
+            self.create_ks(session, 'test_flt_pk_clustering_columns_compact_storage', 2)
+            session.execute("CREATE TABLE test (a int, b int, c int, d int, PRIMARY KEY ((a, b), c)) WITH COMPACT STORAGE")
+        else:
+            self.create_ks(session, 'test_flt_pk_clustering_columns', 2)
+            session.execute("CREATE TABLE test (a int, b int, c int, d int, PRIMARY KEY ((a, b), c))")
+
+        session.row_factory = tuple_factory
+
+        for i in xrange(5):
+            for j in xrange(10):
+                session.execute("INSERT INTO test (a,b,c,d) VALUES ({},{},{},{})".format(i, j, j + 1, j + 2))
+
+        for page_size in (2, 3, 4, 5, 7, 10, 20):
+            session.default_fetch_size = page_size
+
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a = 4 AND b > 3 AND c > 3 ALLOW FILTERING"))
+            self.assertEqual(res, [[4, 8, 9, 10],
+                                   [4, 6, 7, 8],
+                                   [4, 7, 8, 9],
+                                   [4, 5, 6, 7],
+                                   [4, 9, 10, 11],
+                                   [4, 4, 5, 6]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a = 4 AND b > 3 AND c > 3 LIMIT 4 ALLOW FILTERING"))
+            self.assertEqual(res, [[4, 8, 9, 10],
+                                   [4, 6, 7, 8],
+                                   [4, 7, 8, 9],
+                                   [4, 5, 6, 7]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a = 4 AND b > 3 AND c > 3 ALLOW FILTERING"))
+            self.assertEqual(res, [[4, 8, 9, 10],
+                                   [4, 6, 7, 8],
+                                   [4, 7, 8, 9],
+                                   [4, 5, 6, 7],
+                                   [4, 9, 10, 11],
+                                   [4, 4, 5, 6]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a > 3 AND b > 3 AND c > 3 ALLOW FILTERING"))
+            self.assertEqual(res, [[4, 8, 9, 10],
+                                   [4, 6, 7, 8],
+                                   [4, 7, 8, 9],
+                                   [4, 5, 6, 7],
+                                   [4, 9, 10, 11],
+                                   [4, 4, 5, 6]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a < 1 AND b > 3 AND c > 3 LIMIT 4 ALLOW FILTERING"))
+            self.assertEqual(res, [[0, 6, 7, 8],
+                                   [0, 5, 6, 7],
+                                   [0, 8, 9, 10],
+                                   [0, 9, 10, 11]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a < 1 AND b < 3 AND c >= 3 ALLOW FILTERING"))
+            self.assertEqual(res, [[0, 2, 3, 4]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a > 0 AND b > 7 AND c > 9 ALLOW FILTERING"))
+            self.assertEqualIgnoreOrder(res, [[4, 9, 10, 11],
+                                              [2, 9, 10, 11],
+                                              [1, 9, 10, 11],
+                                              [3, 9, 10, 11]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a < 1 AND c > 9 ALLOW FILTERING"))
+            self.assertEqualIgnoreOrder(res, [[0, 9, 10, 11]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE b > 4 AND b < 6 AND c > 3 ALLOW FILTERING"))
+            self.assertEqualIgnoreOrder(res, [[2, 5, 6, 7],
+                                              [0, 5, 6, 7],
+                                              [1, 5, 6, 7],
+                                              [3, 5, 6, 7],
+                                              [4, 5, 6, 7]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE d = 5 ALLOW FILTERING"))
+            self.assertEqualIgnoreOrder(res, [[0, 3, 4, 5],
+                                              [3, 3, 4, 5],
+                                              [1, 3, 4, 5],
+                                              [2, 3, 4, 5],
+                                              [4, 3, 4, 5]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a > 0 AND b = 4 AND c >=5 ALLOW FILTERING"))
+            self.assertEqualIgnoreOrder(res, [[3, 4, 5, 6],
+                                              [2, 4, 5, 6],
+                                              [1, 4, 5, 6],
+                                              [4, 4, 5, 6]])
+
+    @since('3.8')
+    def test_paging_with_filtering_on_partition_key_on_clustering_columns(self):
+        """
+        test paging, when filtering on partition key clustering columns
+        @jira_ticket CASSANDRA-11031
+        """
+
+        session = self.prepare()
+        self._test_paging_with_filtering_on_partition_key_on_clustering_columns(session, False)
+        self._test_paging_with_filtering_on_partition_key_on_clustering_columns(session, True)
+
+    @since('3.8')
+    def test_paging_with_filtering_on_partition_key_on_clustering_columns_with_contains(self):
+        """
+        test paging, when filtering on partition key and clustering columns (frozen collections) with CONTAINS statement
+        @jira_ticket CASSANDRA-11031
+        """
+
+        session = self.prepare()
+        self.create_ks(session, 'test_paging_flt_pk_clustering_clm_contains', 2)
+        session.execute("CREATE TABLE test_list (a int, b int, c frozen<list<int>>, d int, PRIMARY KEY (a, b, c))")
+        session.execute("CREATE TABLE test_map (a int, b int, c frozen<map<int, int>>, d int, PRIMARY KEY (a, b, c))")
+        session.row_factory = tuple_factory
+
+        for i in xrange(5):
+            for j in xrange(10):
+                session.execute("INSERT INTO test_list (a,b,c,d) VALUES ({},{},[{}, {}],{})".format(i, j, j + 1, j + 2, j + 3, j + 4))
+                session.execute("INSERT INTO test_map (a,b,c,d) VALUES ({},{},{{ {}: {} }},{})".format(i, j, j + 1, j + 2, j + 3, j + 4))
+
+        for page_size in (2, 3, 4, 5, 7, 10, 20):
+            session.default_fetch_size = page_size
+
+            res = rows_to_list(session.execute("SELECT * FROM test_list WHERE a >= 3 AND c CONTAINS 11 ALLOW FILTERING"))
+            self.assertEqualIgnoreOrder(res, [[3, 9, [10, 11], 12],
+                                              [4, 9, [10, 11], 12]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test_map WHERE a <= 4 AND c CONTAINS KEY 10 ALLOW FILTERING"))
+            self.assertEqualIgnoreOrder(res, [[0, 9, {10: 11}, 12],
+                                              [1, 9, {10: 11}, 12],
+                                              [2, 9, {10: 11}, 12],
+                                              [3, 9, {10: 11}, 12],
+                                              [4, 9, {10: 11}, 12]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test_list WHERE a >= 0 AND c CONTAINS 2 AND c CONTAINS 3 ALLOW FILTERING"))
+            self.assertEqualIgnoreOrder(res, [[0, 1, [2, 3], 4],
+                                              [1, 1, [2, 3], 4],
+                                              [2, 1, [2, 3], 4],
+                                              [3, 1, [2, 3], 4],
+                                              [4, 1, [2, 3], 4]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test_map WHERE a >= 3 AND c CONTAINS KEY 2 AND c CONTAINS 3 ALLOW FILTERING"))
+            self.assertEqualIgnoreOrder(res, [[3, 1, {2: 3}, 4],
+                                              [4, 1, {2: 3}, 4]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test_list WHERE a < 5 AND c CONTAINS 2 AND d = 4 ALLOW FILTERING"))
+            self.assertEqualIgnoreOrder(res, [[0, 1, [2, 3], 4],
+                                              [1, 1, [2, 3], 4],
+                                              [2, 1, [2, 3], 4],
+                                              [3, 1, [2, 3], 4],
+                                              [4, 1, [2, 3], 4]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test_map WHERE a > -1 AND c CONTAINS KEY 2 AND d = 4 ALLOW FILTERING"))
+            self.assertEqualIgnoreOrder(res, [[0, 1, {2: 3}, 4],
+                                              [1, 1, {2: 3}, 4],
+                                              [2, 1, {2: 3}, 4],
+                                              [3, 1, {2: 3}, 4],
+                                              [4, 1, {2: 3}, 4]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test_list WHERE a < 4 AND c CONTAINS 2 AND d = 4 ALLOW FILTERING"))
+            self.assertEqualIgnoreOrder(res, [[0, 1, [2, 3], 4],
+                                              [1, 1, [2, 3], 4],
+                                              [2, 1, [2, 3], 4],
+                                              [3, 1, [2, 3], 4]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test_map WHERE a >= 0 AND c CONTAINS KEY 2 AND d = 4 ALLOW FILTERING"))
+            self.assertEqualIgnoreOrder(res, [[0, 1, {2: 3}, 4],
+                                              [1, 1, {2: 3}, 4],
+                                              [2, 1, {2: 3}, 4],
+                                              [3, 1, {2: 3}, 4],
+                                              [4, 1, {2: 3}, 4]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test_list WHERE a <= 2 AND c CONTAINS 2 AND d < 4 ALLOW FILTERING"))
+            self.assertEqualIgnoreOrder(res, [[0, 0, [1, 2], 3],
+                                              [1, 0, [1, 2], 3],
+                                              [2, 0, [1, 2], 3]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test_map WHERE a >= -1 AND c CONTAINS KEY 1 AND d < 4 ALLOW FILTERING"))
+            self.assertEqualIgnoreOrder(res, [[0, 0, {1: 2}, 3],
+                                              [1, 0, {1: 2}, 3],
+                                              [2, 0, {1: 2}, 3],
+                                              [3, 0, {1: 2}, 3],
+                                              [4, 0, {1: 2}, 3]])
+
+    @since('3.8')
+    def test_paging_with_filtering_on_partition_key_on_static_columns(self):
+        """
+        test paging, when filtering on partition key, on static columns
+        @jira_ticket CASSANDRA-11031
+        """
+
+        session = self.prepare()
+        self.create_ks(session, 'test_paging_filtering_on_pk_static_columns', 2)
+        session.execute("CREATE TABLE test (a int, b int, s int static, d int, PRIMARY KEY (a, b))")
+        session.row_factory = tuple_factory
+
+        for i in xrange(5):
+            for j in xrange(10):
+                session.execute("INSERT INTO test (a,b,s,d) VALUES ({},{},{},{})".format(i, j, i + 1, j + 1))
+
+        for page_size in (2, 3, 4, 5, 7, 10, 20):
+            session.default_fetch_size = page_size
+
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a <= 2 AND s > 1 AND b > 8 ALLOW FILTERING"))
+            self.assertEqualIgnoreOrder(res, [[1, 9, 2, 10],
+                                              [2, 9, 3, 10]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE a > 3 AND s > 1 AND b > 5 AND b < 7 ALLOW FILTERING"))
+            self.assertEqualIgnoreOrder(res, [[4, 6, 5, 7]])
+
+            res = rows_to_list(session.execute("SELECT * FROM test WHERE s > 1 AND a > 3 AND b > 4 ALLOW FILTERING"))
+            self.assertEqual(res, [[4, 5, 5, 6],
+                                   [4, 6, 5, 7],
+                                   [4, 7, 5, 8],
+                                   [4, 8, 5, 9],
+                                   [4, 9, 5, 10]])
+
+            assert_invalid(session, "SELECT * FROM test WHERE s > 1 AND a < 2 AND b > 4 ORDER BY b DESC ALLOW FILTERING", expected=InvalidRequest)
+
     @since('2.1.14')
     def test_paging_on_compact_table_with_tombstone_on_first_column(self):
         """
