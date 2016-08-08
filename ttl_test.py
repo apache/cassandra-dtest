@@ -8,7 +8,7 @@ from cassandra.util import sortedset
 from assertions import (assert_all, assert_almost_equal, assert_none,
                         assert_row_count, assert_unavailable)
 from dtest import Tester
-from tools import since
+from tools import known_failure, since
 
 
 @since('2.0')
@@ -398,6 +398,8 @@ class TestDistributedTTL(Tester):
 
         assert_none(session1, "SELECT * FROM ttl_table;", cl=ConsistencyLevel.ALL)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12414')
     def ttl_is_respected_on_delayed_replication_test(self):
         """ Test that ttl is respected on delayed replication """
 
