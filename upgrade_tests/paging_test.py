@@ -781,6 +781,8 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
             self.assertEqualIgnoreOrder(pf.all_data(), expected_data)
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12249')
     def test_paging_using_secondary_indexes(self):
         cursor = self.prepare()
         cursor.execute("CREATE TABLE paging_test ( id int, mybool boolean, sometext text, PRIMARY KEY (id, sometext) )")
