@@ -352,9 +352,6 @@ class TestBootstrap(Tester):
         current_rows = list(session.execute("SELECT * FROM %s" % stress_table))
         self.assertEquals(original_rows, current_rows)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12393',
-                   flaky=False)
     def local_quorum_bootstrap_test(self):
         """
         Test that CL local_quorum works while a node is bootstrapping.
@@ -394,14 +391,14 @@ class TestBootstrap(Tester):
             node1.stress(['user', 'profile=' + stress_config.name, 'n=2M', 'no-warmup',
                           'ops(insert=1)', '-rate', 'threads=50'])
 
-        node3 = new_node(cluster, data_center='dc2')
-        node3.start(no_wait=True)
-        time.sleep(3)
+            node3 = new_node(cluster, data_center='dc2')
+            node3.start(no_wait=True)
+            time.sleep(3)
 
-        out, err, _ = node1.stress(['user', 'profile=' + stress_config.name, 'ops(insert=1)',
-                                    'n=500K', 'no-warmup', 'cl=LOCAL_QUORUM',
-                                    '-rate', 'threads=5',
-                                    '-errors', 'retries=2'])
+            out, err, _ = node1.stress(['user', 'profile=' + stress_config.name, 'ops(insert=1)',
+                                        'n=500K', 'no-warmup', 'cl=LOCAL_QUORUM',
+                                        '-rate', 'threads=5',
+                                        '-errors', 'retries=2'])
 
         debug(out)
         regex = re.compile("Operation.+error inserting key.+Exception")
