@@ -3183,6 +3183,9 @@ class TestCQL(UpgradeTester):
             # test that select throws a meaningful exception for aliases in where clause
             assert_invalid(cursor, 'SELECT id AS user_id, name AS user_name FROM users WHERE user_id = 0', matching=error_msg)
 
+            if self.get_node_version(is_upgraded) <= '3.8':
+                error_msg = "Aliases are not allowed in order by clause"
+
             # test that select throws a meaningful exception for aliases in order by clause
             assert_invalid(cursor, 'SELECT id AS user_id, name AS user_name FROM users WHERE id IN (0) ORDER BY user_name', matching=error_msg)
 
