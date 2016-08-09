@@ -1,9 +1,7 @@
 # coding: utf-8
 
-from distutils.version import LooseVersion
-
 from dtest import Tester, debug
-from tools import known_failure, since
+from tools import since
 
 
 class TestCqlTracing(Tester):
@@ -84,22 +82,21 @@ class TestCqlTracing(Tester):
                                       'FROM ks.users WHERE userid = 550e8400-e29b-41d4-a716-446655440000')
         debug(out)
         self.assertIn('Tracing session: ', out)
-        # Restricted to 2.2+ due to flakiness on 2.1.  See CASSANDRA-11598 for details.
-        if LooseVersion(self.cluster.version()) >= LooseVersion('2.2'):
-            self.assertIn(' 127.0.0.1 ', out)
-            self.assertIn(' 127.0.0.2 ', out)
-            self.assertIn(' 127.0.0.3 ', out)
+
+        self.assertIn(' 127.0.0.1 ', out)
+        self.assertIn(' 127.0.0.2 ', out)
+        self.assertIn(' 127.0.0.3 ', out)
         self.assertIn('Request complete ', out)
         self.assertIn(" Frodo |  Baggins", out)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12407',
-                   flaky=True)
+    @since('2.2')
     def tracing_simple_test(self):
         """
         Test tracing using the default tracing class. See trace().
 
         @jira_ticket CASSANDRA-10392
+        @jira_ticket CASSANDRA-11598
+        # Restricted to 2.2+ due to flakiness on 2.1.  See CASSANDRA-11598 and CASSANDRA-12407 for details.
         """
         session = self.prepare()
         self.trace(session)
