@@ -9,6 +9,7 @@ from cassandra.query import (SimpleStatement, dict_factory,
 
 from assertions import assert_invalid, assert_all, assert_one, assert_length_equal
 from datahelp import create_rows, flatten_into_set, parse_data_into_dicts
+from distutils.version import LooseVersion
 from dtest import debug, Tester, run_scenarios
 from tools import known_failure, rows_to_list, since
 
@@ -182,10 +183,12 @@ class PageAssertionMixin(object):
 class BasePagingTester(Tester):
 
     def prepare(self):
+        supports_v5_protocol = LooseVersion(self.cluster.version()) >= LooseVersion('3.10')
+        protocol_version = 5 if supports_v5_protocol else None
         cluster = self.cluster
         cluster.populate(3).start(wait_for_binary_proto=True)
         node1 = cluster.nodelist()[0]
-        session = self.patient_cql_connection(node1)
+        session = self.patient_cql_connection(node1, protocol_version=protocol_version)
         session.row_factory = dict_factory
         session.default_consistency_level = CL.QUORUM
         return session
@@ -2171,6 +2174,9 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
 
     def test_failure_threshold_deletions(self):
         """Test that paging throws a failure in case of tombstone threshold """
+
+        supports_v5_protocol = LooseVersion(self.cluster.version()) >= LooseVersion('3.10')
+
         self.allow_log_errors = True
         self.cluster.set_configuration_options(
             values={'tombstone_failure_threshold': 500}
@@ -2188,9 +2194,18 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
                 consistency_level=CL.ALL
             ))
 
-        assert_invalid(self.session,
-                       SimpleStatement("select * from paging_test", fetch_size=1000, consistency_level=CL.ALL, retry_policy=FallthroughRetryPolicy()),
-                       expected=ReadTimeout if self.cluster.version() < '2.2' else ReadFailure)
+        try:
+            self.session.execute(SimpleStatement("select * from paging_test", fetch_size=1000, consistency_level=CL.ALL, retry_policy=FallthroughRetryPolicy()))
+        except ReadTimeout as exc:
+            self.assertTrue(self.cluster.version() < '2.2')
+        except ReadFailure as exc:
+            if supports_v5_protocol:
+                self.assertIsNotNone(exc.error_code_map)
+                self.assertEqual(0x0001, exc.error_code_map.values()[0])
+        except Exception:
+            raise
+        else:
+            self.fail('Expected ReadFailure or ReadTimeout, depending on the cluster version')
 
         if self.cluster.version() < "3.0":
             failure_msg = ("Scanned over.* tombstones in test_paging_size."

@@ -2,6 +2,7 @@ import uuid
 
 from cassandra import ConsistencyLevel, WriteFailure, WriteTimeout
 
+from distutils.version import LooseVersion
 from dtest import Tester
 from thrift_bindings.v22 import ttypes as thrift_types
 from thrift_tests import get_thrift_client
@@ -31,8 +32,9 @@ class TestWriteFailures(Tester):
             "MigrationStage"           # This occurs sometimes due to node down (because of restart)
         ]
 
+        self.supports_v5_protocol = LooseVersion(self.cluster.version()) >= LooseVersion('3.10')
         self.expected_expt = WriteFailure
-        self.protocol_version = 4
+        self.protocol_version = 5 if self.supports_v5_protocol else 4
         self.replication_factor = 3
         self.consistency_level = ConsistencyLevel.ALL
         self.failing_nodes = [1, 2]
@@ -80,8 +82,24 @@ class TestWriteFailures(Tester):
         if self.expected_expt is None:
             session.execute(statement)
         else:
-            with self.assertRaises(self.expected_expt):
+            with self.assertRaises(self.expected_expt) as cm:
                 session.execute(statement)
+            return cm.exception
+
+    def _assert_error_code_map_exists_with_code(self, exception, expected_code):
+        """
+        Asserts that the given exception contains an error code map
+        where at least one node responded with some expected code.
+        This is meant for testing failure exceptions on protocol v5.
+        """
+        self.assertIsNotNone(exception)
+        self.assertIsNotNone(exception.error_code_map)
+        expected_code_found = False
+        for error_code in exception.error_code_map.values():
+            if error_code == expected_code:
+                expected_code_found = True
+                break
+        self.assertTrue(expected_code_found, "The error code map did not contain " + str(expected_code))
 
     @since('2.2', max_version='2.2.x')
     def test_mutation_v2(self):
@@ -111,6 +129,15 @@ class TestWriteFailures(Tester):
         self.protocol_version = 4
         self._perform_cql_statement("INSERT INTO mytable (key, value) VALUES ('key1', 'Value 1')")
 
+    def test_mutation_v5(self):
+        """
+        A failed mutation at v5 receives a WriteFailure with an error code map containing error code 0x0000
+        """
+        self.expected_expt = WriteFailure
+        self.protocol_version = 5
+        exc = self._perform_cql_statement("INSERT INTO mytable (key, value) VALUES ('key1', 'Value 1')")
+        self._assert_error_code_map_exists_with_code(exc, 0x0000)
+
     def test_mutation_any(self):
         """
         A WriteFailure is not received at consistency level ANY
@@ -128,7 +155,9 @@ class TestWriteFailures(Tester):
         """
         self.consistency_level = ConsistencyLevel.ONE
         self.failing_nodes = [0, 1, 2]
-        self._perform_cql_statement("INSERT INTO mytable (key, value) VALUES ('key1', 'Value 1')")
+        exc = self._perform_cql_statement("INSERT INTO mytable (key, value) VALUES ('key1', 'Value 1')")
+        if self.supports_v5_protocol:
+            self._assert_error_code_map_exists_with_code(exc, 0x0000)
 
     def test_mutation_quorum(self):
         """
@@ -144,29 +173,35 @@ class TestWriteFailures(Tester):
         """
         A failed batch receives a WriteFailure
         """
-        self._perform_cql_statement("""
+        exc = self._perform_cql_statement("""
             BEGIN BATCH
             INSERT INTO mytable (key, value) VALUES ('key2', 'Value 2') USING TIMESTAMP 1111111111111111
             INSERT INTO mytable (key, value) VALUES ('key3', 'Value 3') USING TIMESTAMP 1111111111111112
             APPLY BATCH
         """)
+        if self.supports_v5_protocol:
+            self._assert_error_code_map_exists_with_code(exc, 0x0000)
 
     def test_counter(self):
         """
         A failed counter mutation receives a WriteFailure
         """
         _id = str(uuid.uuid4())
-        self._perform_cql_statement("""
+        exc = self._perform_cql_statement("""
             UPDATE countertable
                 SET value = value + 1
                 where key = {uuid}
         """.format(uuid=_id))
+        if self.supports_v5_protocol:
+            self._assert_error_code_map_exists_with_code(exc, 0x0000)
 
     def test_paxos(self):
         """
         A light transaction receives a WriteFailure
         """
-        self._perform_cql_statement("INSERT INTO mytable (key, value) VALUES ('key1', 'Value 1') IF NOT EXISTS")
+        exc = self._perform_cql_statement("INSERT INTO mytable (key, value) VALUES ('key1', 'Value 1') IF NOT EXISTS")
+        if self.supports_v5_protocol:
+            self._assert_error_code_map_exists_with_code(exc, 0x0000)
 
     @known_failure(failure_source='cassandra',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12213',
