@@ -1,9 +1,6 @@
 import os
-import subprocess
 import time
 from distutils import dir_util
-
-from ccmlib import common as ccmcommon
 
 from assertions import assert_one
 from dtest import Tester, debug
@@ -175,20 +172,12 @@ class BaseSStableLoaderTest(Tester):
 
         debug("Calling sstableloader")
         # call sstableloader to re-load each cf.
-        cdir = node1.get_install_dir()
-        sstableloader = os.path.join(cdir, 'bin', ccmcommon.platform_binary('sstableloader'))
-        env = ccmcommon.make_cassandra_env(cdir, node1.get_path())
-        host = node1.address()
         for x in xrange(0, cluster.data_dir_count):
             sstablecopy_dir = os.path.join(node1.get_path(), 'data{0}_copy'.format(x), ks.strip('"'))
             for cf_dir in os.listdir(sstablecopy_dir):
                 full_cf_dir = os.path.join(sstablecopy_dir, cf_dir)
                 if os.path.isdir(full_cf_dir):
-                    cmd_args = [sstableloader, '--nodes', host, full_cf_dir]
-                    p = subprocess.Popen(cmd_args, env=env)
-                    exit_status = p.wait()
-                    self.assertEqual(0, exit_status,
-                                     "sstableloader exited with a non-zero status: {}".format(exit_status))
+                    node1.bulkload([full_cf_dir])
 
         def read_and_validate_data(session):
             for i in range(NUM_KEYS):
