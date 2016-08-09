@@ -100,9 +100,6 @@ class TestCompaction(Tester):
         # allow 5% size increase - if we have few sstables it is not impossible that live size increases *slightly* after compaction
         self.assertLess(finalValue, initialValue * 1.05)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12323',
-                   flaky=True)
     def bloomfilter_size_test(self):
         """
         @jira_ticket CASSANDRA-11344
@@ -138,10 +135,16 @@ class TestCompaction(Tester):
         output = output[output.find("Bloom filter space used"):]
         bfSize = int(output[output.find(":") + 1:output.find("\n")].strip())
 
+        # in some rare cases we can end up with more than one sstable per data directory with
+        # non-lcs strategies (see CASSANDRA-12323)
+        if not hasattr(self, 'strategy') or self.strategy == "LeveledCompactionStrategy":
+            size_factor = 1
+        else:
+            size_factor = len(node1.get_sstables('keyspace1', 'standard1')) / len(node1.data_directories())
         debug("bloom filter size is: {}".format(bfSize))
-
-        self.assertGreaterEqual(bfSize, min_bf_size)
-        self.assertLessEqual(bfSize, max_bf_size)
+        debug("size factor = {}".format(size_factor))
+        self.assertGreaterEqual(bfSize, size_factor * min_bf_size)
+        self.assertLessEqual(bfSize, size_factor * max_bf_size)
 
     def sstable_deletion_test(self):
         """
