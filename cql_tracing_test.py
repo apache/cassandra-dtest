@@ -3,7 +3,7 @@
 from distutils.version import LooseVersion
 
 from dtest import Tester, debug
-from tools import since
+from tools import known_failure, since
 
 
 class TestCqlTracing(Tester):
