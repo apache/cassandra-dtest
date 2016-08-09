@@ -17,6 +17,7 @@ from assertions import (assert_all, assert_crc_check_chance_equal,
                         assert_invalid, assert_none, assert_one,
                         assert_unavailable)
 from dtest import Tester, debug
+from nose.plugins.attrib import attr
 from tools import known_failure, new_node, require, since
 
 # CASSANDRA-10978. Migration wait (in seconds) to use in bootstrapping tests. Needed to handle
@@ -952,6 +953,7 @@ class TestMaterializedViews(Tester):
                 [i, i, 'a', 3.0]
             )
 
+    @attr("resource-intensive")
     def complex_repair_test(self):
         """
         Test that a materialized view are consistent after a more complex repair.

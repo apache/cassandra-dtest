@@ -16,6 +16,7 @@ from cassandra.query import SimpleStatement
 from six import print_
 
 from dtest import RUN_STATIC_UPGRADE_MATRIX, Tester, debug
+from nose.plugins.attrib import attr
 from tools import generate_ssl_stores, known_failure, new_node
 from upgrade_base import switch_jdks
 from upgrade_manifest import (build_upgrade_pairs, current_2_0_x,
@@ -220,6 +221,7 @@ def counter_checker(tester, to_verify_queue, verification_done_queue):
                 pass
 
 
+@attr("resource-intensive")
 class UpgradeTester(Tester):
     """
     Upgrades a 3-node Murmur3Partitioner cluster through versions specified in test_version_metas.

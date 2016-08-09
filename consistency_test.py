@@ -13,6 +13,7 @@ from dtest import DISABLE_VNODES, Tester, debug, MultiError
 from tools import (create_c1c2_table, insert_c1c2, insert_columns,
                    known_failure, query_c1c2, rows_to_list, since)
 from nose.tools import assert_greater_equal
+from nose.plugins.attrib import attr
 
 
 class TestHelper(Tester):
@@ -307,6 +308,7 @@ class TestAvailability(TestHelper):
 
         self._test_simple_strategy(combinations)
 
+    @attr("resource-intensive")
     def test_network_topology_strategy(self):
         """
         Test for multiple datacenters, using network topology replication strategy.
@@ -338,6 +340,7 @@ class TestAvailability(TestHelper):
 
         self._test_network_topology_strategy(combinations)
 
+    @attr("resource-intensive")
     @since("3.0")
     def test_network_topology_strategy_each_quorum(self):
         """
@@ -519,6 +522,7 @@ class TestAccuracy(TestHelper):
             _, exceptions, tracebacks = zip(*exceptions_queue.queue)
             raise MultiError(exceptions=exceptions, tracebacks=tracebacks)
 
+    @attr("resource-intensive")
     def test_simple_strategy_users(self):
         """
         Test for a single datacenter, users table, only the each quorum reads.
@@ -550,6 +554,7 @@ class TestAccuracy(TestHelper):
         self.log("Testing single dc, users")
         self._run_test_function_in_parallel(TestAccuracy.Validation.validate_users, [self.nodes], [self.rf], combinations)
 
+    @attr("resource-intensive")
     @since("3.0")
     def test_simple_strategy_each_quorum_users(self):
         """
@@ -567,6 +572,7 @@ class TestAccuracy(TestHelper):
         self.log("Testing single dc, users, each quorum reads")
         self._run_test_function_in_parallel(TestAccuracy.Validation.validate_users, [self.nodes], [self.rf], combinations)
 
+    @attr("resource-intensive")
     def test_network_topology_strategy_users(self):
         """
         Test for multiple datacenters, users table.
@@ -602,6 +608,7 @@ class TestAccuracy(TestHelper):
         self.log("Testing multiple dcs, users")
         self._run_test_function_in_parallel(TestAccuracy.Validation.validate_users, self.nodes, self.rf.values(), combinations),
 
+    @attr("resource-intensive")
     @since("3.0")
     def test_network_topology_strategy_each_quorum_users(self):
         """
@@ -669,6 +676,7 @@ class TestAccuracy(TestHelper):
         self.log("Testing single dc, counters, each quorum reads")
         self._run_test_function_in_parallel(TestAccuracy.Validation.validate_counters, [self.nodes], [self.rf], combinations)
 
+    @attr("resource-intensive")
     @known_failure(failure_source='cassandra',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12093',
                    flaky=True)
@@ -702,6 +710,7 @@ class TestAccuracy(TestHelper):
         self.log("Testing multiple dcs, counters")
         self._run_test_function_in_parallel(TestAccuracy.Validation.validate_counters, self.nodes, self.rf.values(), combinations),
 
+    @attr("resource-intensive")
     @known_failure(failure_source='cassandra',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12094',
                    flaky=True)
