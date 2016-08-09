@@ -267,6 +267,46 @@ class TestRepair(BaseRepairTest):
         """
         self._empty_vs_gcable_no_repair(sequential=False)
 
+    def range_tombstone_digest_sequential_repair_test(self):
+        """
+        Calls range_tombstone_digest with a sequential repair
+        """
+        self._range_tombstone_digest(sequential=True)
+
+    def range_tombstone_digest_parallel_repair_test(self):
+        """
+        Calls range_tombstone_digest with a parallel repair
+        """
+        self._range_tombstone_digest(sequential=False)
+
+    @since('2.1')
+    def shadowed_cell_digest_sequential_repair_test(self):
+        """
+        Calls _cell_shadowed_by_range_tombstone with sequential repair
+        """
+        self._cell_shadowed_by_range_tombstone(sequential=True)
+
+    @since('2.1')
+    def shadowed_cell_digest_parallel_repair_test(self):
+        """
+        Calls _cell_shadowed_by_range_tombstone with parallel repair
+        """
+        self._cell_shadowed_by_range_tombstone(sequential=False)
+
+    @since('3.0')
+    def shadowed_range_tombstone_digest_sequential_repair_test(self):
+        """
+        Calls _range_tombstone_shadowed_by_range_tombstone with sequential repair
+        """
+        self._range_tombstone_shadowed_by_range_tombstone(sequential=True)
+
+    @since('3.0')
+    def shadowed_range_tombstone_digest_parallel_repair_test(self):
+        """
+        Calls _range_tombstone_shadowed_by_range_tombstone with parallel repair
+        """
+        self._range_tombstone_shadowed_by_range_tombstone(sequential=False)
+
     @no_vnodes()
     def simple_repair_order_preserving_test(self):
         """
@@ -384,6 +424,82 @@ class TestRepair(BaseRepairTest):
         # check log for actual repair for non gcable data
         out_of_sync_logs = node2.grep_log("/([0-9.]+) and /([0-9.]+) have ([0-9]+) range\(s\) out of sync for cf2")
         self.assertGreater(len(out_of_sync_logs), 0, "Non GC-able data should be repaired")
+
+    def _range_tombstone_digest(self, sequential):
+        """
+        multiple range tombstones for same partition and interval must not create a digest mismatch as long
+        as the most recent tombstone is present.
+        @jira_ticket cassandra-11349.
+        """
+
+        def withsession(session, node1):
+            session.execute("delete from table1 where c1 = 'a' and c2 = 'b'")
+            node1.flush()
+            # recreate same tombstone (will be flushed by repair, so we end up with 2x on node1 and 1x on node2)
+            session.execute("delete from table1 where c1 = 'a' and c2 = 'b'")
+
+        self._repair_digest(sequential, withsession)
+
+    def _cell_shadowed_by_range_tombstone(self, sequential):
+        """
+        Cells shadowed by range tombstones must not effect repairs (given tombstones are present on all nodes)
+        @jira_ticket CASSANDRA-11349.
+        """
+
+        def withSession(session, node1):
+            session.execute("INSERT INTO table1 (c1, c2, c3, c4) VALUES ('a', 'b', 'c', 1)")
+            node1.flush()
+            session.execute("DELETE FROM table1 WHERE c1 = 'a' AND c2 = 'b'")
+
+        self._repair_digest(sequential, withSession)
+
+    def _range_tombstone_shadowed_by_range_tombstone(self, sequential):
+        """
+        Range tombstones shadowed by other range tombstones must not effect repairs
+        @jira_ticket CASSANDRA-11349.
+        """
+
+        def withSession(session, node1):
+            session.execute("DELETE FROM table1 WHERE c1 = 'a' AND c2 = 'b' AND c3 = 'c'")
+            node1.flush()
+            session.execute("DELETE FROM table1 WHERE c1 = 'a' AND c2 = 'b'")
+            node1.flush()
+            session.execute("DELETE FROM table1 WHERE c1 = 'a' AND c2 = 'b' AND c3 = 'd'")
+            node1.flush()
+            session.execute("DELETE FROM table1 WHERE c1 = 'a' AND c2 = 'b' AND c3 = 'a'")
+
+        self._repair_digest(sequential, withSession)
+
+    def _repair_digest(self, sequential, populate):
+        cluster = self.cluster
+        cluster.populate(2)
+        cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
+        cluster.set_batch_commitlog(enabled=True)
+        cluster.start()
+        node1, node2 = cluster.nodelist()
+
+        session = self.patient_cql_connection(node1)
+        # create keyspace with RF=2 to be able to be repaired
+        self.create_ks(session, 'ks', 2)
+        query = """
+            CREATE TABLE IF NOT EXISTS table1 (
+                c1 text,
+                c2 text,
+                c3 text,
+                c4 float,
+                PRIMARY KEY (c1, c2, c3)
+            )
+            WITH compaction = {'class': 'SizeTieredCompactionStrategy', 'enabled': 'false'};
+        """
+        session.execute(query)
+
+        populate(session, node1)
+
+        node2.repair(_repair_options(self.cluster.version(), ks='ks', sequential=sequential))
+
+        # check log for no repair happened for gcable data
+        out_of_sync_logs = node2.grep_log("/([0-9.]+) and /([0-9.]+) have ([0-9]+) range\(s\) out of sync for table1")
+        self.assertEqual(len(out_of_sync_logs), 0, "Digest mismatch for range tombstone: {}".format(str([elt[0] for elt in out_of_sync_logs])))
 
     def local_dc_repair_test(self):
         """
