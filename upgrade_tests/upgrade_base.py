@@ -2,11 +2,12 @@ import os
 import sys
 import time
 from abc import ABCMeta
+from distutils.version import LooseVersion
 from unittest import skipIf
 
 from ccmlib.common import get_version_from_build, is_win
 
-from dtest import DEBUG, Tester, debug
+from dtest import CASSANDRA_VERSION_FROM_BUILD, DEBUG, Tester, debug
 
 
 def switch_jdks(major_version_int):
@@ -41,8 +42,18 @@ class UpgradeTester(Tester):
     __metaclass__ = ABCMeta
     NODES, RF, __test__, CL, UPGRADE_PATH = 2, 1, False, None, None
 
+    # known non-critical bug during teardown:
+    # https://issues.apache.org/jira/browse/CASSANDRA-12340
+    if LooseVersion(CASSANDRA_VERSION_FROM_BUILD) < '2.2':
+        _known_teardown_race_error = (
+            'ScheduledThreadPoolExecutor$ScheduledFutureTask@[0-9a-f]+ '
+            'rejected from org.apache.cassandra.concurrent.DebuggableScheduledThreadPoolExecutor'
+        )
+        # don't alter ignore_log_patterns on the class, just the obj for this test
+        ignore_log_patterns = [_known_teardown_race_error]
+
     def __init__(self, *args, **kwargs):
-        self.ignore_log_patterns = [
+        self.ignore_log_patterns = self.ignore_log_patterns[:] + [
             # Normal occurance. See CASSANDRA-12026. Likely won't be needed after C* 4.0.
             r'Unknown column cdc during deserialization',
         ]
