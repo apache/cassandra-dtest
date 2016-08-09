@@ -77,7 +77,7 @@ class TestHelper(Tester):
         nodes = self.nodes
         rf = self.rf
 
-        cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
+        cluster.set_configuration_options(values={'hinted_handoff_enabled': False, 'dynamic_snitch': False})
         cluster.populate(nodes)
 
         if isinstance(nodes, int):
@@ -125,7 +125,9 @@ class TestHelper(Tester):
                 firstname text,
                 lastname text,
                 age int
-            ) WITH COMPACT STORAGE""")
+            ) WITH COMPACT STORAGE
+              AND dclocal_read_repair_chance = 0 AND read_repair_chance = 0
+              AND speculative_retry =  'NONE'""")
 
     def insert_user(self, session, userid, age, consistency, serial_consistency=None):
         text = "INSERT INTO users (userid, firstname, lastname, age) VALUES ({}, 'first{}', 'last{}', {}) {}"\
@@ -158,7 +160,8 @@ class TestHelper(Tester):
             CREATE TABLE counters (
                 id int PRIMARY KEY,
                 c counter
-            )
+            ) WITH dclocal_read_repair_chance = 0 AND read_repair_chance = 0
+              AND speculative_retry =  'NONE'
         """)
 
     def update_counter(self, session, id, consistency, serial_consistency=None):
@@ -169,23 +172,13 @@ class TestHelper(Tester):
 
     def query_counter(self, session, id, val, consistency, check_ret=True):
         statement = SimpleStatement("SELECT * from counters WHERE id = {}".format(id), consistency_level=consistency)
-        res = session.execute(statement)
-        ret = rows_to_list(res)
+        ret = rows_to_list(session.execute(statement))
         if check_ret:
             self.assertEqual(ret[0][1], val, "Got {} from {}, expected {} at {}".format(ret[0][1],
                                                                                         session.cluster.contact_points,
                                                                                         val,
                                                                                         consistency_value_to_name(consistency)))
         return ret[0][1] if ret else 0
-
-    def read_counter(self, session, id, consistency):
-        """
-        Return the current counter value. If we find no value we return zero
-        because after the next update the counter will become one.
-        """
-        statement = SimpleStatement("SELECT c from counters WHERE id = {}".format(id), consistency_level=consistency)
-        ret = rows_to_list(session.execute(statement))
-        return ret[0][0] if ret else 0
 
 
 class TestAvailability(TestHelper):
@@ -469,17 +462,20 @@ class TestAccuracy(TestHelper):
                 for s in sessions:
                     results.append(outer.query_counter(s, n, val, read_cl, check_ret=strong_consistency))
 
-                assert_greater_equal(results.count(val), write_nodes, "Failed to read value from sufficient number of nodes, required {} nodes to have a counter "
-                                     "value of {} at key {}, instead got these values: {}".format(write_nodes, val, n, results))
+                assert_greater_equal(results.count(val), write_nodes,
+                                     "Failed to read value from sufficient number of nodes, required {} nodes to have a"
+                                     " counter value of {} at key {}, instead got these values: {}"
+                                     .format(write_nodes, val, n, results))
 
             for n in xrange(start, end):
-                c = outer.read_counter(sessions[0], n, ConsistencyLevel.ALL)
+                c = 1
                 for s in range(0, len(sessions)):
-                    c += 1
                     outer.update_counter(sessions[s], n, write_cl, serial_cl)
                     check_all_sessions(s, n, c)
-                    # Make sure all nodes are on the same page since a counter update requires a read
-                    c = outer.query_counter(sessions[0], n, c, ConsistencyLevel.ALL)
+                    # Update the counter again at CL ALL to make sure all nodes are on the same page
+                    # since a counter update requires a read
+                    outer.update_counter(sessions[s], n, ConsistencyLevel.ALL)
+                    c += 2  # the counter was updated twice
 
     def _run_test_function_in_parallel(self, valid_fcn, nodes, rf_factors, combinations):
         """
@@ -628,9 +624,6 @@ class TestAccuracy(TestHelper):
         self.log("Testing multiple dcs, users, each quorum reads")
         self._run_test_function_in_parallel(TestAccuracy.Validation.validate_users, self.nodes, self.rf.values(), combinations)
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12092',
-                   flaky=True)
     def test_simple_strategy_counters(self):
         """
         Test for a single datacenter, counters table.
