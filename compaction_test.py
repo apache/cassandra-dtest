@@ -143,7 +143,12 @@ class TestCompaction(Tester):
         if not hasattr(self, 'strategy') or self.strategy == "LeveledCompactionStrategy":
             size_factor = 1
         else:
-            size_factor = len(node1.get_sstables('keyspace1', 'standard1')) / len(node1.data_directories())
+            sstable_count = len(node1.get_sstables('keyspace1', 'standard1'))
+            dir_count = len(node1.data_directories())
+            debug("sstable_count is: {}".format(sstable_count))
+            debug("dir_count is: {}".format(dir_count))
+            size_factor = sstable_count / float(dir_count)
+
         debug("bloom filter size is: {}".format(bfSize))
         debug("size factor = {}".format(size_factor))
         self.assertGreaterEqual(bfSize, size_factor * min_bf_size)
