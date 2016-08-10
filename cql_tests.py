@@ -10,7 +10,7 @@ from cassandra.policies import FallthroughRetryPolicy
 from cassandra.protocol import ProtocolException
 from cassandra.query import SimpleStatement
 
-from assertions import assert_invalid, assert_one, assert_unavailable, assert_none, assert_all
+from assertions import assert_invalid, assert_one, assert_unavailable, assert_none, assert_all, assert_length_equal
 from dtest import Tester, canReuseCluster, freshCluster
 from thrift_bindings.v22.ttypes import \
     ConsistencyLevel as ThriftConsistencyLevel
@@ -784,6 +784,191 @@ class AbortedQueriesTester(CQLTester):
                                     retry_policy=FallthroughRetryPolicy())
         assert_unavailable(lambda c: debug(c.execute(statement)), session)
         node2.watch_log_for("operations timed out", from_mark=mark, timeout=60)
+
+
+class SlowQueryTester(CQLTester):
+    """
+    Test slow query logging.
+
+    @jira_ticket CASSANDRA-12403
+    """
+    def local_query_test(self):
+        """
+        Check that a query running locally on the coordinator is reported as slow:
+
+        - start a one node cluster with slow_query_log_timeout_in_ms set to a small value
+          and read_request_timeout_in_ms set to a large value (to ensure the query is not aborted) and
+          read_iteration_delay set to a value big enough for the query to exceed slow_query_log_timeout_in_ms
+          (this will cause read queries to take longer than the slow query timeout)
+        - CREATE and INSERT into a table
+        - SELECT * from the table using a retry policy that never retries, and check that the slow
+          query log messages are present in the logs
+
+        @jira_ticket CASSANDRA-12403
+        """
+        cluster = self.cluster
+        cluster.set_configuration_options(values={'slow_query_log_timeout_in_ms': 30,
+                                                  'read_request_timeout_in_ms': 60000})
+
+        # cassandra.test.read_iteration_delay_ms causes the state tracking read iterators
+        # introduced by CASSANDRA-7392 to pause by the specified amount of milliseconds during each
+        # iteration of non system queries, so that these queries take much longer to complete,
+        # see ReadCommand.withStateTracking()
+        cluster.populate(1).start(wait_for_binary_proto=True,
+                                  jvm_args=["-Dcassandra.monitoring_check_interval_ms=50",
+                                            "-Dcassandra.test.read_iteration_delay_ms=50"])
+        node = cluster.nodelist()[0]
+        session = self.patient_cql_connection(node)
+
+        self.create_ks(session, 'ks', 1)
+        session.execute("""
+            CREATE TABLE test1 (
+                id int PRIMARY KEY,
+                val text
+            );
+        """)
+
+        for i in range(100):
+            session.execute("INSERT INTO test1 (id, val) VALUES ({}, 'foo')".format(i))
+
+        mark = node.mark_log(filename='system.log')
+        debug_mark = node.mark_log(filename='debug.log')
+
+        session.execute(SimpleStatement("SELECT * from test1",
+                                        consistency_level=ConsistencyLevel.ONE,
+                                        retry_policy=FallthroughRetryPolicy()))
+
+        session.execute(SimpleStatement("SELECT * from test1 where id = 1",
+                                        consistency_level=ConsistencyLevel.ONE,
+                                        retry_policy=FallthroughRetryPolicy()))
+
+        session.execute(SimpleStatement("SELECT * from test1 where id = 1",
+                                        consistency_level=ConsistencyLevel.ONE,
+                                        retry_policy=FallthroughRetryPolicy()))
+
+        session.execute(SimpleStatement("SELECT * from test1 where token(id) > 0",
+                                        consistency_level=ConsistencyLevel.ONE,
+                                        retry_policy=FallthroughRetryPolicy()))
+
+        node.watch_log_for("operations were slow", from_mark=mark, filename='system.log', timeout=60)
+        node.watch_log_for("SELECT \* FROM ks.test1", from_mark=debug_mark, filename='debug.log', timeout=60)
+
+    def remote_query_test(self):
+        """
+        Check that a query running on a node other than the coordinator is reported as slow:
+
+        - populate the cluster with 2 nodes
+        - start one node without having it join the ring
+        - start the other one node with slow_query_log_timeout_in_ms set to a small value
+          and read_request_timeout_in_ms set to a large value (to ensure the query is not aborted) and
+          read_iteration_delay set to a value big enough for the query to exceed slow_query_log_timeout_in_ms
+          (this will cause read queries to take longer than the slow query timeout)
+        - CREATE a table
+        - INSERT 5000 rows on a session on the node that is not a member of the ring
+        - run SELECT statements and check that the slow query messages are present in the logs
+
+        @jira_ticket CASSANDRA-12403
+        """
+        cluster = self.cluster
+        cluster.set_configuration_options(values={'slow_query_log_timeout_in_ms': 30,
+                                                  'read_request_timeout_in_ms': 60000})
+
+        cluster.populate(2)
+        node1, node2 = cluster.nodelist()
+
+        node1.start(wait_for_binary_proto=True, join_ring=False)  # ensure other node executes queries
+        node2.start(wait_for_binary_proto=True,
+                    jvm_args=["-Dcassandra.monitoring_check_interval_ms=50",
+                              "-Dcassandra.test.read_iteration_delay_ms=50"])  # see above for explanation
+
+        session = self.patient_exclusive_cql_connection(node1)
+
+        self.create_ks(session, 'ks', 1)
+        session.execute("""
+            CREATE TABLE test2 (
+                id int,
+                col int,
+                val text,
+                PRIMARY KEY(id, col)
+            );
+        """)
+
+        for i, j in itertools.product(range(100), range(10)):
+            session.execute("INSERT INTO test2 (id, col, val) VALUES ({}, {}, 'foo')".format(i, j))
+
+        mark = node2.mark_log(filename='system.log')
+        debug_mark = node2.mark_log(filename='debug.log')
+
+        session.execute(SimpleStatement("SELECT * from test2",
+                                        consistency_level=ConsistencyLevel.ONE,
+                                        retry_policy=FallthroughRetryPolicy()))
+
+        session.execute(SimpleStatement("SELECT * from test2 where id = 1",
+                                        consistency_level=ConsistencyLevel.ONE,
+                                        retry_policy=FallthroughRetryPolicy()))
+
+        session.execute(SimpleStatement("SELECT * from test2 where id = 1",
+                                        consistency_level=ConsistencyLevel.ONE,
+                                        retry_policy=FallthroughRetryPolicy()))
+
+        session.execute(SimpleStatement("SELECT * from test2 where token(id) > 0",
+                                        consistency_level=ConsistencyLevel.ONE,
+                                        retry_policy=FallthroughRetryPolicy()))
+
+        node2.watch_log_for("operations were slow", from_mark=mark, filename='system.log', timeout=60)
+        node2.watch_log_for("SELECT \* FROM ks.test2", from_mark=debug_mark, filename='debug.log', timeout=60)
+
+    def disable_slow_query_log_test(self):
+        """
+        Check that a query is NOT reported as slow if slow query logging is disabled.
+
+        - start a one node cluster with slow_query_log_timeout_in_ms set to 0 milliseconds
+          (this will disable slow query logging), read_request_timeout_in_ms set to a large value
+          (to ensure queries are not aborted) and read_iteration_delay set to 30 milliseconds
+          (this will cause read queries to take longer than usual)
+        - CREATE and INSERT into a table
+        - SELECT * from the table using a retry policy that never retries, and check that the slow
+          query log messages are present in the logs
+
+        @jira_ticket CASSANDRA-12403
+        """
+        cluster = self.cluster
+        cluster.set_configuration_options(values={'slow_query_log_timeout_in_ms': 0,
+                                                  'read_request_timeout_in_ms': 60000})
+
+        # cassandra.test.read_iteration_delay_ms causes the state tracking read iterators
+        # introduced by CASSANDRA-7392 to pause by the specified amount of milliseconds during each
+        # iteration of non system queries, so that these queries take much longer to complete,
+        # see ReadCommand.withStateTracking()
+        cluster.populate(1).start(wait_for_binary_proto=True,
+                                  jvm_args=["-Dcassandra.monitoring_check_interval_ms=50",
+                                            "-Dcassandra.test.read_iteration_delay_ms=50"])
+        node = cluster.nodelist()[0]
+        session = self.patient_cql_connection(node)
+
+        self.create_ks(session, 'ks', 1)
+        session.execute("""
+            CREATE TABLE test1 (
+                id int PRIMARY KEY,
+                val text
+            );
+        """)
+
+        for i in range(100):
+            session.execute("INSERT INTO test1 (id, val) VALUES ({}, 'foo')".format(i))
+
+        session.execute(SimpleStatement("SELECT * from test1",
+                                        consistency_level=ConsistencyLevel.ONE,
+                                        retry_policy=FallthroughRetryPolicy()))
+
+        time.sleep(1)  # do our best to ensure logs had a chance to appear
+
+        self._check_logs(node, "operations were slow", 'system.log', 0)
+        self._check_logs(node, "SELECT \* FROM ks.test2", 'debug.log', 0)
+
+    def _check_logs(self, node, pattern, filename, num_expected):
+        ret = node.grep_log(pattern, filename=filename)
+        assert_length_equal(ret, num_expected)
 
 
 @canReuseCluster
