@@ -1,5 +1,5 @@
-git+https://github.com/datastax/python-driver.git@cassandra-test
-git+https://github.com/pcmanus/ccm.git
+-e git+https://github.com/datastax/python-driver.git@cassandra-test#egg=cassandra-driver
+-e git+https://github.com/pcmanus/ccm.git@master#egg=ccm
 cql
 decorator
 docopt
