@@ -308,6 +308,9 @@ class TestAvailability(TestHelper):
 
         self._test_simple_strategy(combinations)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12427',
+                   flaky=True)
     @attr("resource-intensive")
     def test_network_topology_strategy(self):
         """
