@@ -53,6 +53,11 @@ class UpgradeTester(Tester):
         ignore_log_patterns = [_known_teardown_race_error]
 
     def __init__(self, *args, **kwargs):
+        try:
+            self.ignore_log_patterns
+        except AttributeError:
+            self.ignore_log_patterns = []
+
         self.ignore_log_patterns = self.ignore_log_patterns[:] + [
             # Normal occurance. See CASSANDRA-12026. Likely won't be needed after C* 4.0.
             r'Unknown column cdc during deserialization',
