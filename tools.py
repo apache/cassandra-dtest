@@ -432,17 +432,6 @@ def safe_mkdtemp():
     return tmpdir.replace('\\', '/')
 
 
-class InterruptBootstrap(Thread):
-
-    def __init__(self, node):
-        Thread.__init__(self)
-        self.node = node
-
-    def run(self):
-        self.node.watch_log_for("Prepare completed")
-        self.node.stop(gently=False)
-
-
 class InterruptCompaction(Thread):
     """
     Interrupt compaction by killing a node as soon as
