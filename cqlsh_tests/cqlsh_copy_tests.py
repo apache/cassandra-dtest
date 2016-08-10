@@ -1004,6 +1004,9 @@ class CqlshCopyTest(Tester):
         do_test('b', [[1, 1, 2, 2, 2], [2, 1, 2, 2, 2]])
         do_test('e', [[1, 2, 3, 3, 2], [2, 2, 3, 3, 2]])
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12430',
+                   flaky=True)
     def test_writing_with_token_boundaries(self):
         """
         Test COPY TO with the begin and end tokens specified in the WITH option by:
