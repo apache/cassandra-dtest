@@ -3175,7 +3175,7 @@ class TestCQL(UpgradeTester):
             self.assertEqual('id_blob', res[0]._fields[0])
             self.assertEqual('\x00\x00\x00\x00', res[0].id_blob)
 
-            if self.get_node_version(is_upgraded) <= '3.8':
+            if self.get_node_version(is_upgraded) < '3.8':
                 error_msg = "Aliases aren't allowed in the where clause"
             else:
                 error_msg = "Undefined column name"
@@ -3183,7 +3183,7 @@ class TestCQL(UpgradeTester):
             # test that select throws a meaningful exception for aliases in where clause
             assert_invalid(cursor, 'SELECT id AS user_id, name AS user_name FROM users WHERE user_id = 0', matching=error_msg)
 
-            if self.get_node_version(is_upgraded) <= '3.8':
+            if self.get_node_version(is_upgraded) < '3.8':
                 error_msg = "Aliases are not allowed in order by clause"
 
             # test that select throws a meaningful exception for aliases in order by clause
