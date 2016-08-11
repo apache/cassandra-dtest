@@ -213,10 +213,6 @@ class TestTopology(Tester):
 
         self.assertFalse(node3.is_running())
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11611',
-                   flaky=True,
-                   notes='failed with a streaming error on windows')
     @since('3.0')
     def crash_during_decommission_test(self):
         """
@@ -226,6 +222,7 @@ class TestTopology(Tester):
         @jira_ticket CASSANDRA-10231
         """
         cluster = self.cluster
+        self.ignore_log_patterns = [r'Streaming error occurred']
         cluster.populate(3).start(wait_other_notice=True)
 
         node1, node2 = cluster.nodelist()[0:2]
@@ -233,6 +230,7 @@ class TestTopology(Tester):
         t = DecommissionInParallel(node1)
         t.start()
 
+        node1.watch_log_for("DECOMMISSIONING", filename='debug.log')
         null_status_pattern = re.compile(".N(?:\s*)127\.0\.0\.1(?:.*)null(?:\s*)rack1")
         while t.is_alive():
             out = self.show_status(node2)
