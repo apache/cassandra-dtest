@@ -858,6 +858,9 @@ class TestRepair(BaseRepairTest):
                           rows[0][0],
                           'Expected {} job threads in repair options. Instead we saw {}'.format(job_thread_count, rows[0][0]))
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12439',
+                   flaky=True)
     @no_vnodes()
     def test_multiple_concurrent_repairs(self):
         """
