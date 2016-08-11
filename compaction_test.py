@@ -147,7 +147,10 @@ class TestCompaction(Tester):
             dir_count = len(node1.data_directories())
             debug("sstable_count is: {}".format(sstable_count))
             debug("dir_count is: {}".format(dir_count))
-            size_factor = sstable_count / float(dir_count)
+            if node1.get_cassandra_version() < '3.2':
+                size_factor = sstable_count
+            else:
+                size_factor = sstable_count / float(dir_count)
 
         debug("bloom filter size is: {}".format(bfSize))
         debug("size factor = {}".format(size_factor))
