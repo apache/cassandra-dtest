@@ -3355,6 +3355,9 @@ class TestCQL(UpgradeTester):
             cursor.execute("INSERT INTO test(k) VALUES (0)")
             assert_one(cursor, "SELECT dateOf(t) FROM test WHERE k=0", [None])
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12442',
+                   flaky=False)
     @freshCluster()
     def cas_simple_test(self):
         # cursor = self.prepare(nodes=3, rf=3)
