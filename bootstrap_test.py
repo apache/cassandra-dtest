@@ -351,7 +351,8 @@ class TestBootstrap(Tester):
 
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12437',
-                   flaky=True)
+                   flaky=True,
+                   notes='Windows')
     def local_quorum_bootstrap_test(self):
         """
         Test that CL local_quorum works while a node is bootstrapping.
