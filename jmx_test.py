@@ -1,13 +1,14 @@
 import os
-import re
 import time
 
 import ccmlib.common
+import parse
 from ccmlib.node import ToolError
 
 from dtest import Tester, debug
-from jmxutils import JolokiaAgent, enable_jmx_ssl, make_mbean, remove_perf_disable_shared_mem
-from tools import known_failure, since, generate_ssl_stores
+from jmxutils import (JolokiaAgent, enable_jmx_ssl, make_mbean,
+                      remove_perf_disable_shared_mem)
+from tools import generate_ssl_stores, known_failure, since
 
 
 class TestJMX(Tester):
@@ -129,9 +130,9 @@ class TestJMX(Tester):
             time.sleep(2)
 
             updated_progress_string = jmx.read_attribute(compaction_manager, 'CompactionSummary')[0]
-
-            progress = int(re.search('standard1, (\d+)\/', progress_string).groups()[0])
-            updated_progress = int(re.search('standard1, (\d+)\/', updated_progress_string).groups()[0])
+            var = 'Compaction@{uuid}(keyspace1, standard1, {progress}/{total})bytes'
+            progress = int(parse.search(var, progress_string).named['progress'])
+            updated_progress = int(parse.search(var, updated_progress_string).named['progress'])
 
             debug(progress_string)
             debug(updated_progress_string)

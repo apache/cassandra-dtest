@@ -1,16 +1,17 @@
 import os
 import random
-import re
 import string
 import subprocess
 import tempfile
 import time
-
-from ccmlib import common
-from assertions import assert_none, assert_one, assert_length_equal
-from dtest import Tester, debug
 from distutils.version import LooseVersion
+
+import parse
+from ccmlib import common
 from nose.tools import assert_equal
+
+from assertions import assert_length_equal, assert_none, assert_one
+from dtest import Tester, debug
 from tools import known_failure, since
 
 
@@ -256,14 +257,15 @@ class TestCompaction(Tester):
 
         matches = block_on_compaction_log(node1)
         stringline = matches[0]
-        units = 'MB/s' if LooseVersion(cluster.version()) < LooseVersion('3.6') else '(K|M|G)iB/s'
-        throughput_pattern = re.compile('''.*           # it doesn't matter what the line starts with
-                                           =            # wait for an equals sign
-                                           ([\s\d\.]*)  # capture a decimal number, possibly surrounded by whitespace
-                                           {}.*         # followed by units
-                                        '''.format(units), re.X)
 
-        avgthroughput = re.match(throughput_pattern, stringline).group(1).strip()
+        throughput_pattern = '{}={avgthroughput:f}{units}/s'
+        m = parse.search(throughput_pattern, stringline)
+        avgthroughput = m.named['avgthroughput']
+        found_units = m.named['units']
+
+        units = ['MB'] if LooseVersion(cluster.version()) < LooseVersion('3.6') else ['KiB', 'MiB', 'GiB']
+        self.assertIn(found_units, units)
+
         debug(avgthroughput)
 
         # The throughput in the log is computed independantly from the throttling and on the output files while
