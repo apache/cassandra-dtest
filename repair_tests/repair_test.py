@@ -6,7 +6,6 @@ from unittest import skip
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
 
-from assertions import assert_length_equal
 from dtest import FlakyRetryPolicy, Tester, debug
 from tools import insert_c1c2, known_failure, no_vnodes, query_c1c2, since
 
