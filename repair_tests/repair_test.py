@@ -6,6 +6,7 @@ from unittest import skip
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
 
+from assertions import assert_one
 from dtest import Tester, debug, FlakyRetryPolicy
 from tools import insert_c1c2, known_failure, no_vnodes, query_c1c2, since
 
@@ -858,9 +859,6 @@ class TestRepair(BaseRepairTest):
                           rows[0][0],
                           'Expected {} job threads in repair options. Instead we saw {}'.format(job_thread_count, rows[0][0]))
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12439',
-                   flaky=True)
     @no_vnodes()
     def test_multiple_concurrent_repairs(self):
         """
@@ -885,8 +883,10 @@ class TestRepair(BaseRepairTest):
         t3.join()
         node1.stop(wait_other_notice=True)
         node3.stop(wait_other_notice=True)
-        _, stderr, _ = node2.stress(['read', 'n=1M', 'no-warmup', '-rate', 'threads=30'])
-        self.assertTrue(len(stderr) == 0, stderr)
+        _, _, rc = node2.stress(['read', 'n=1M', 'no-warmup', '-rate', 'threads=30'])
+        self.assertEqual(rc, 0)
+        session = self.patient_cql_connection(node2)
+        assert_one(session, "SELECT count(*) FROM keyspace1.standard1", [1000000])
 
 RepairTableContents = namedtuple('RepairTableContents',
                                  ['parent_repair_history', 'repair_history'])
