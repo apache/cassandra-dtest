@@ -6,8 +6,8 @@ from unittest import skip
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
 
-from assertions import assert_one
-from dtest import Tester, debug, FlakyRetryPolicy
+from assertions import assert_length_equal
+from dtest import FlakyRetryPolicy, Tester, debug
 from tools import insert_c1c2, known_failure, no_vnodes, query_c1c2, since
 
 
@@ -883,10 +883,8 @@ class TestRepair(BaseRepairTest):
         t3.join()
         node1.stop(wait_other_notice=True)
         node3.stop(wait_other_notice=True)
-        _, _, rc = node2.stress(['read', 'n=1M', 'no-warmup', '-rate', 'threads=30'])
+        _, _, rc = node2.stress(['read', 'n=1M', 'no-warmup', '-rate', 'threads=30'], whitelist=True)
         self.assertEqual(rc, 0)
-        session = self.patient_cql_connection(node2)
-        assert_one(session, "SELECT count(*) FROM keyspace1.standard1", [1000000])
 
 RepairTableContents = namedtuple('RepairTableContents',
                                  ['parent_repair_history', 'repair_history'])
