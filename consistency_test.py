@@ -878,6 +878,9 @@ class TestConsistency(Tester):
         node3.stop(wait_other_notice=True)
         assert_none(session, "SELECT * FROM t WHERE id = 0 LIMIT 1", cl=ConsistencyLevel.QUORUM)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12440',
+                   flaky=True)
     def readrepair_test(self):
         cluster = self.cluster
         cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
