@@ -6,6 +6,7 @@ import tempfile
 from cassandra import ConsistencyLevel, ReadTimeout, Unavailable
 from cassandra.query import SimpleStatement
 from ccmlib.node import Node, NodeError
+from nose.plugins.attrib import attr
 
 from dtest import DISABLE_VNODES, Tester, debug
 from tools import InterruptBootstrap, known_failure, since, new_node, rows_to_list
@@ -45,12 +46,14 @@ class TestReplaceAddress(Tester):
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11652',
                    flaky=True,
                    notes='windows')
+    @attr('resource-intensive')
     def replace_stopped_node_test(self):
         """
         Test that we can replace a node that is not shutdown gracefully.
         """
         self._replace_node_test(gently=False)
 
+    @attr('resource-intensive')
     def replace_shutdown_node_test(self):
         """
         @jira_ticket CASSANDRA-9871
@@ -130,6 +133,7 @@ class TestReplaceAddress(Tester):
                    expected=initial_data,
                    cl=ConsistencyLevel.ONE)
 
+    @attr('resource-intensive')
     def replace_active_node_test(self):
         debug("Starting cluster with 3 nodes.")
         cluster = self.cluster
@@ -148,6 +152,7 @@ class TestReplaceAddress(Tester):
         node4.watch_log_for("java.lang.UnsupportedOperationException: Cannot replace a live node...", from_mark=mark)
         assert_not_running(node4)
 
+    @attr('resource-intensive')
     def replace_nonexistent_node_test(self):
         debug("Starting cluster with 3 nodes.")
         cluster = self.cluster
@@ -166,6 +171,7 @@ class TestReplaceAddress(Tester):
         node4.watch_log_for("java.lang.RuntimeException: Cannot replace_address /127.0.0.5 because it doesn't exist in gossip", from_mark=mark)
         assert_not_running(node4)
 
+    @attr('resource-intensive')
     def replace_first_boot_test(self):
         debug("Starting cluster with 3 nodes.")
         cluster = self.cluster
@@ -369,6 +375,7 @@ class TestReplaceAddress(Tester):
                    flaky=True,
                    notes='windows')
     @since('2.2')
+    @attr('resource-intensive')
     def resumable_replace_test(self):
         """
         Test resumable bootstrap while replacing node. Feature introduced in
@@ -432,6 +439,7 @@ class TestReplaceAddress(Tester):
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11835')
     @since('2.2')
+    @attr('resource-intensive')
     def replace_with_reset_resume_state_test(self):
         """Test replace with resetting bootstrap progress"""
 
