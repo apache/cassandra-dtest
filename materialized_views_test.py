@@ -402,6 +402,9 @@ class TestMaterializedViews(Tester):
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12140',
                    flaky=True)
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12446',
+                   flaky=True)
     def add_node_after_mv_test(self):
         """
         @jira_ticket CASSANDRA-10978
