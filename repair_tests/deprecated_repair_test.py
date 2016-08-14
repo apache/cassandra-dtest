@@ -155,7 +155,7 @@ class TestDeprecatedRepairAPI(Tester):
         # wait for log to start
         node1.watch_log_for("Starting repair command")
         # get repair parameters from the log
-        l = node1.grep_log(("Starting repair command #1, repairing keyspace ks with repair options \(parallelism: (?P<parallelism>\w+), primary range: (?P<pr>\w+), "
+        l = node1.grep_log(("Starting repair command #1  \([^\)]+\), repairing keyspace ks with repair options \(parallelism: (?P<parallelism>\w+), primary range: (?P<pr>\w+), "
                             "incremental: (?P<incremental>\w+), job threads: (?P<jobs>\d+), ColumnFamilies: (?P<cfs>.+), dataCenters: (?P<dc>.+), "
                             "hosts: (?P<hosts>.+), # of ranges: (?P<ranges>\d+)(, pull repair: (?P<pullrepair>true|false))?\)"))
 
