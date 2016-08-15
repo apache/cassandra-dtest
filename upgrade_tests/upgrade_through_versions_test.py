@@ -13,10 +13,10 @@ from unittest import skipUnless
 import psutil
 from cassandra import ConsistencyLevel, WriteTimeout
 from cassandra.query import SimpleStatement
+from nose.plugins.attrib import attr
 from six import print_
 
 from dtest import RUN_STATIC_UPGRADE_MATRIX, Tester, debug
-from nose.plugins.attrib import attr
 from tools import generate_ssl_stores, known_failure, new_node
 from upgrade_base import switch_jdks
 from upgrade_manifest import (build_upgrade_pairs, current_2_0_x,
@@ -291,9 +291,6 @@ class UpgradeTester(Tester):
         """
         self.upgrade_scenario(internode_ssl=True)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12441',
-                   flaky=True)
     def rolling_upgrade_with_internode_ssl_test(self):
         """
         Rolling upgrade test using internode ssl.
