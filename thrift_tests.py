@@ -122,6 +122,26 @@ class ThriftTester(ReusableClusterTester):
             cls.client.system_add_keyspace(ks)
 
 
+def i64(n):
+    return _i64(n)
+
+
+def i32(n):
+    return _i32(n)
+
+
+def i16(n):
+    return _i16(n)
+
+
+def composite(item1, item2=None, eoc='\x00'):
+    packed = _i16(len(item1)) + item1 + eoc
+    if item2 is not None:
+        packed += _i16(len(item2)) + item2
+        packed += eoc
+    return packed
+
+
 def _i64(n):
     return struct.pack('>q', n)  # big endian = network order
 
@@ -2480,3 +2500,37 @@ class TestMutations(ThriftTester):
         i = 1
         client.insert(_i32(i), ColumnParent('cs1'), Column('v', _i32(i), 0), CL)
         _assert_column('cs1', _i32(i), 'v', _i32(i), 0)
+
+    def test_range_tombstone_eoc_0(self):
+        """
+        Insert a range tombstone with EOC=0 for a compact storage table. Insert 2 rows that
+        are just outside the range and check that they are present.
+
+        @jira_ticket CASSANDRA-12423
+        """
+        node1 = self.cluster.nodelist()[0]
+        session = self.patient_cql_connection(node1)
+
+        session.execute('USE "Keyspace1"')
+        session.execute("CREATE TABLE test (id INT, c1 TEXT, c2 TEXT, v INT, PRIMARY KEY (id, c1, c2)) "
+                        "with compact storage and compression = {'sstable_compression': ''};")
+
+        _set_keyspace('Keyspace1')
+
+        range_delete = {
+            _i32(1): {
+                'test': [Mutation(deletion=Deletion(2470761440040513,
+                                                    predicate=SlicePredicate(slice_range=SliceRange(
+                                                        start=composite('a'), finish=composite('asd')))))]
+            }
+        }
+
+        client.batch_mutate(range_delete, ConsistencyLevel.ONE)
+
+        session.execute("INSERT INTO test (id, c1, c2, v) VALUES (1, 'asd', '', 0) USING TIMESTAMP 1470761451368658")
+        session.execute("INSERT INTO test (id, c1, c2, v) VALUES (1, 'asd', 'asd', 0) USING TIMESTAMP 1470761449416613")
+
+        ret = list(session.execute('SELECT * FROM test'))
+        self.assertEquals(2, len(ret))
+
+        node1.nodetool('flush Keyspace1 test')

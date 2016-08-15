@@ -1,11 +1,14 @@
 import os
 import time
 
-from tools.assertions import assert_all, assert_none, assert_one
+from tools.assertions import assert_all, assert_none, assert_one, assert_length_equal
 from dtest import Tester, debug
 from sstable_generation_loading_test import BaseSStableLoaderTest
 from tools.decorators import since
 from tools.misc import new_node
+
+from thrift_bindings.v22.Cassandra import (ConsistencyLevel, Deletion, Mutation, SlicePredicate, SliceRange)
+from thrift_tests import i32, composite, get_thrift_client
 
 LEGACY_SSTABLES_JVM_ARGS = ["-Dcassandra.streamdes.initial_mem_buffer_size=1",
                             "-Dcassandra.streamdes.max_mem_buffer_size=5",
@@ -23,8 +26,11 @@ class TestStorageEngineUpgrade(Tester):
             jvm_args = []
         self.jvm_args = jvm_args
 
-    def _setup_cluster(self, create_keyspace=True):
+    def _setup_cluster(self, create_keyspace=True, cluster_options=None):
         cluster = self.cluster
+
+        if cluster_options:
+            cluster.set_configuration_options(cluster_options)
 
         # Forcing cluster version on purpose
         cluster.set_install_dir(version="2.1.9")
@@ -379,6 +385,40 @@ class TestStorageEngineUpgrade(Tester):
         self.cluster.compact()
 
         assert_one(session, "SELECT k FROM t", ['some_key'])
+
+    def upgrade_with_range_tombstone_eoc_0_test(self):
+        """
+        Check sstable upgrading when the sstable contains a range tombstone with EOC=0.
+
+        @jira_ticket CASSANDRA-12423
+        """
+        session = self._setup_cluster(cluster_options={'start_rpc': 'true'})
+
+        session.execute("CREATE TABLE rt (id INT, c1 TEXT, c2 TEXT, v INT, PRIMARY KEY (id, c1, c2)) "
+                        "with compact storage and compression = {'sstable_compression': ''};")
+
+        range_delete = {
+            i32(1): {
+                'rt': [Mutation(deletion=Deletion(2470761440040513,
+                                                  predicate=SlicePredicate(slice_range=SliceRange(
+                                                      start=composite('a', eoc='\x00'),
+                                                      finish=composite('asd', eoc='\x00')))))]
+            }
+        }
+
+        client = get_thrift_client()
+        client.transport.open()
+        client.set_keyspace('ks')
+        client.batch_mutate(range_delete, ConsistencyLevel.ONE)
+        client.transport.close()
+
+        session.execute("INSERT INTO rt (id, c1, c2, v) VALUES (1, 'asd', '', 0) USING TIMESTAMP 1470761451368658")
+        session.execute("INSERT INTO rt (id, c1, c2, v) VALUES (1, 'asd', 'asd', 0) USING TIMESTAMP 1470761449416613")
+
+        session = self._do_upgrade()
+
+        ret = list(session.execute('SELECT * FROM rt'))
+        assert_length_equal(ret, 2)
 
 
 @since('3.0')
