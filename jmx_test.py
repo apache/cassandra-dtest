@@ -13,10 +13,6 @@ from tools import generate_ssl_stores, known_failure, since
 
 class TestJMX(Tester):
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10915',
-                   flaky=False,
-                   notes='Fails on Windows, flaps on Linux')
     def netstats_test(self):
         """
         Check functioning of nodetool netstats, especially with restarts.
