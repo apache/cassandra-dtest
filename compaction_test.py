@@ -145,7 +145,7 @@ class TestCompaction(Tester):
             dir_count = len(node1.data_directories())
             debug("sstable_count is: {}".format(sstable_count))
             debug("dir_count is: {}".format(dir_count))
-            if node1.get_cassandra_version() < '3.2':
+            if LooseVersion(node1.get_cassandra_version()) < LooseVersion('3.2'):
                 size_factor = sstable_count
             else:
                 size_factor = sstable_count / float(dir_count)
