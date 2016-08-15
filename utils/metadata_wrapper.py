@@ -15,35 +15,6 @@ class UpdatingMetadataWrapperBase(object):
         return self._wrapped[idx]
 
 
-class UpdatingMetadataDictWrapper(UpdatingMetadataWrapperBase):
-    """
-    A dictionary-like object that, given a parent implementing the
-    UpdatingMetadataWrapperBase interface and the name of an attribute, updates
-    its parent before checking indexes or attributes on the object at the
-    attribute.
-    """
-    def __init__(self, parent, attr_name):
-        self._parent = parent
-        self._attr_name = attr_name
-
-    @property
-    def _wrapped(self):
-        return getattr(self._parent._wrapped, self._attr_name)
-
-    def __iter__(self):
-        for k in self._wrapped:
-            yield k
-
-    def __repr__(self):
-        return '{cls_name}(parent={parent}, attr_name={attr_name})'.format(
-            cls_name=self.__class__.__name__,
-            parent=repr(self._parent),
-            attr_name=self._attr_name)
-
-    def __str__(self):
-        return str(self._wrapped)
-
-
 class UpdatingTableMetadataWrapper(UpdatingMetadataWrapperBase):
     """
     A class that provides an interface to a table's metadata that is refreshed
