@@ -4,7 +4,7 @@ from threading import Thread
 from cassandra import ConsistencyLevel
 from ccmlib.node import ToolError
 
-from dtest import Tester
+from dtest import Tester, debug
 from tools import insert_c1c2, query_c1c2, since
 
 
@@ -131,6 +131,97 @@ class TestRebuild(Tester):
         # check data
         for i in xrange(0, keys):
             query_c1c2(session, i, ConsistencyLevel.LOCAL_ONE)
+
+    @since('2.2')
+    def resumable_rebuild_test(self):
+        """
+        @jira_ticket CASSANDRA-10810
+
+        Test rebuild operation is resumable
+        """
+        self.ignore_log_patterns = self.ignore_log_patterns[:] + [r'Error while rebuilding node',
+                                                                  r'Streaming error occurred on session with peer 127.0.0.3',
+                                                                  r'Remote peer 127.0.0.3 failed stream session']
+        cluster = self.cluster
+        cluster.set_configuration_options(values={'endpoint_snitch': 'org.apache.cassandra.locator.PropertyFileSnitch'})
+
+        # Create 2 nodes on dc1
+        node1 = cluster.create_node('node1', False,
+                                    ('127.0.0.1', 9160),
+                                    ('127.0.0.1', 7000),
+                                    '7100', '2000', None,
+                                    binary_interface=('127.0.0.1', 9042))
+        node2 = cluster.create_node('node2', False,
+                                    ('127.0.0.2', 9160),
+                                    ('127.0.0.2', 7000),
+                                    '7200', '2001', None,
+                                    binary_interface=('127.0.0.2', 9042))
+
+        cluster.add(node1, True, data_center='dc1')
+        cluster.add(node2, True, data_center='dc1')
+
+        node1.start(wait_for_binary_proto=True)
+        node2.start(wait_for_binary_proto=True)
+
+        # Insert data into node1 and node2
+        session = self.patient_exclusive_cql_connection(node1)
+        self.create_ks(session, 'ks', {'dc1': 1})
+        self.create_cf(session, 'cf', columns={'c1': 'text', 'c2': 'text'})
+        insert_c1c2(session, n=10000, consistency=ConsistencyLevel.ALL)
+        key = list(range(10000, 20000))
+        session = self.patient_exclusive_cql_connection(node2)
+        session.execute('USE ks')
+        insert_c1c2(session, keys=key, consistency=ConsistencyLevel.ALL)
+        session.shutdown()
+
+        # Create a new node3 on dc2
+        node3 = cluster.create_node('node3', False,
+                                    ('127.0.0.3', 9160),
+                                    ('127.0.0.3', 7000),
+                                    '7300', '2002', None,
+                                    binary_interface=('127.0.0.3', 9042),
+                                    byteman_port='8300')
+
+        cluster.add(node3, False, data_center='dc2')
+
+        node3.start(wait_other_notice=False, wait_for_binary_proto=True)
+
+        # Wait for snitch to be refreshed
+        time.sleep(5)
+
+        # Alter necessary keyspace for rebuild operation
+        session = self.patient_exclusive_cql_connection(node3)
+        session.execute("ALTER KEYSPACE ks WITH REPLICATION = {'class':'NetworkTopologyStrategy', 'dc1':1, 'dc2':1};")
+        session.execute("ALTER KEYSPACE system_auth WITH REPLICATION = {'class':'NetworkTopologyStrategy', 'dc1':1, 'dc2':1};")
+
+        # Path to byteman script which makes node2 throw an exception making rebuild fail
+        script = ['./rebuild_failure_inject.btm']
+        node3.byteman_submit(script)
+
+        # First rebuild must fail and data must be incomplete
+        with self.assertRaises(ToolError, msg='Unexpected: SUCCEED'):
+            debug('Executing first rebuild -> '),
+            node3.nodetool('rebuild dc1')
+        debug('Expected: FAILED')
+
+        session.execute('USE ks')
+        with self.assertRaises(AssertionError, msg='Unexpected: COMPLETE'):
+            debug('Checking data is complete -> '),
+            for i in xrange(0, 20000):
+                query_c1c2(session, i, ConsistencyLevel.LOCAL_ONE)
+        debug('Expected: INCOMPLETE')
+
+        debug('Executing second rebuild -> '),
+        node3.nodetool('rebuild dc1')
+        debug('Expected: SUCCEED')
+
+        # Check all streaming sessions completed, streamed ranges are skipped and verify streamed data
+        node3.watch_log_for('All sessions completed')
+        node3.watch_log_for('Skipping streaming those ranges.')
+        debug('Checking data is complete -> '),
+        for i in xrange(0, 20000):
+            query_c1c2(session, i, ConsistencyLevel.LOCAL_ONE)
+        debug('Expected: COMPLETE')
 
     @since('3.6')
     def rebuild_ranges_test(self):
