@@ -1035,7 +1035,8 @@ class CqlshCopyTest(Tester):
         execute_concurrent_with_args(self.session, insert_statement, [(str(i),) for i in xrange(num_records)])
 
         tempfile = self.get_temp_file()
-        debug('Exporting to csv file: {name}'.format(name=tempfile.name))
+        debug('Exporting tokens {} - {} for {} records to csv file: {}'.format(begin_token, end_token,
+                                                                               num_records, tempfile.name))
         cmds = "COPY ks.testtokens TO '{}'".format(tempfile.name)
         if begin_token and end_token:
             cmds += "WITH BEGINTOKEN = '{}' AND ENDTOKEN = '{}'".format(begin_token, end_token)
@@ -1044,7 +1045,10 @@ class CqlshCopyTest(Tester):
         elif end_token:
             cmds += "WITH ENDTOKEN = '{}'".format(end_token)
 
-        self.node1.run_cqlsh(cmds=cmds)
+        debug(cmds)
+        out, err, _ = self.node1.run_cqlsh(cmds=cmds, cqlsh_options=['--debug'])
+        debug(err)
+        debug(out)
 
         max_long = 2 ** 63 - 1
         min_long = -max_long - 1
