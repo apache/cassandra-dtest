@@ -10,7 +10,7 @@ from assertions import (assert_all, assert_invalid, assert_one,
                         assert_unauthorized)
 from dtest import CASSANDRA_VERSION_FROM_BUILD, Tester, debug
 from jmxutils import JolokiaAgent, make_mbean, remove_perf_disable_shared_mem
-from tools import since
+from tools import since, known_failure
 
 
 class TestAuth(Tester):
@@ -24,6 +24,9 @@ class TestAuth(Tester):
         ]
         Tester.__init__(self, *args, **kwargs)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12456',
+                   flaky=True)
     def system_auth_ks_is_alterable_test(self):
         """
         * Launch a three node cluster
