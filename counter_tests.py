@@ -276,7 +276,10 @@ class TestCounters(Tester):
         assert_invalid(session, "ALTER TABLE counter_bug add c counter", "Cannot re-add previously dropped counter column c")
 
     def compact_counter_cluster_test(self):
-        """ Test for bug of #12219 """
+        """
+        @jira_ticket CASSANDRA-12219
+        This test will fail on 3.0.0 - 3.0.8, and 3.1 - 3.8
+        """
 
         cluster = self.cluster
         cluster.populate(3).start()
