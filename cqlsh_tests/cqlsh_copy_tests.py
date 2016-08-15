@@ -2141,9 +2141,6 @@ class CqlshCopyTest(Tester):
 
         check_rate_file()
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12069',
-                   flaky=True)
     def test_copy_options_from_config_file(self):
         """
         Test that we can specify configuration options in a config file, optionally using multiple sections,
