@@ -1,0 +1,185 @@
+import inspect
+from collections import defaultdict
+from unittest import TestCase
+
+from mock import MagicMock, Mock
+
+from utils.metadata_wrapper import (UpdatingClusterMetadataWrapper,
+                                    UpdatingKeyspaceMetadataWrapper,
+                                    UpdatingMetadataWrapperBase,
+                                    UpdatingTableMetadataWrapper)
+
+
+class UpdatingMetadataWrapperBaseTest(TestCase):
+    def all_subclasses_known_test(self):
+        """
+        Test that all the subclasses of UpdatingMetadataWrapperBase are known
+        to this test suite. Basically, this will slap us on the wrist in the
+        future if we write more subclasses without writing tests for them.
+        """
+        self.assertEqual(
+            set(UpdatingMetadataWrapperBase.__subclasses__()),
+            {UpdatingTableMetadataWrapper, UpdatingKeyspaceMetadataWrapper,
+             UpdatingClusterMetadataWrapper}
+        )
+
+    def _each_subclass_instantiated_with_mock_args(self):
+        """
+        This returns an instantiated copy of each subclass of
+        UpdatingMetadataWrapperBase, passing a MagicMock for each argument on
+        initialization. This lets us test properties that should hold for all
+        subclasses.
+
+        I don't like having tests depend on this weird metaprogramming, but I'd
+        rather have this, which generates tests for any future subclasses, than
+        miss tests for them.
+        """
+        for klaus in UpdatingMetadataWrapperBase.__subclasses__():
+            # get length of argument list for class init
+            init_arg_len = len(inspect.getargspec(klaus.__init__)[0])
+            # args list is one shorter -- argspec includes self
+            init_args = [MagicMock() for _ in range(init_arg_len - 1)]
+            yield klaus(*init_args)
+
+    def all_subclasses_defer_getattr_test(self):
+        """
+        Each subclass should defer its attribute accesses to the wrapped
+        object.
+        """
+        for wrapper in self._each_subclass_instantiated_with_mock_args():
+            self.assertIs(wrapper.foo, wrapper._wrapped.foo)
+
+    def all_subclasses_defer_getitem_test(self):
+        """
+        Each subclass should defer its item accesses to the wrapped object.
+        """
+        for wrapper in self._each_subclass_instantiated_with_mock_args():
+            # _wrapped[X] should return the same value, and should be different
+            # from _wrapped[Y] for all Y
+            wrapper._wrapped.__getitem__.side_effect = hash
+            # check mocking correctness
+            self.assertNotEqual(wrapper['foo'], wrapper._wrapped['bar'])
+            self.assertEqual(wrapper['bar'], wrapper._wrapped['bar'])
+
+
+class UpdatingTableMetadataWrapperTest(TestCase):
+
+    def setUp(self):
+        self.cluster_mock = MagicMock()
+        self.ks_name_sentinel, self.table_name_sentinel = Mock(name='ks'), Mock(name='tab')
+        self.wrapper = UpdatingTableMetadataWrapper(
+            cluster=self.cluster_mock,
+            ks_name=self.ks_name_sentinel,
+            table_name=self.table_name_sentinel
+        )
+
+    def wrapped_access_calls_refresh_test(self):
+        """
+        Accessing the wrapped object should call the table-refreshing method on
+        the cluster.
+        """
+        self.cluster_mock.refresh_table_metadata.assert_not_called()
+        self.wrapper._wrapped
+        self.cluster_mock.refresh_table_metadata.assert_called_once_with(
+            self.ks_name_sentinel, self.table_name_sentinel
+        )
+
+    def wrapped_returns_table_metadata_test(self):
+        """
+        The wrapped object is accessed correctly from the internal cluster object.
+        """
+        # keyspaces[X] should return the same value, and should be different
+        # from keyspaces[Y] for all Y. use mocks so we can do the same for
+        # keyspaces[X].tables.
+        keyspaces_defaultdict = defaultdict(MagicMock)
+        self.cluster_mock.metadata.keyspaces.__getitem__.side_effect = lambda x: keyspaces_defaultdict[x]
+
+        # tables[X] should return the same value, and should be different from
+        # tables[Y] for all Y
+        keyspaces_defaultdict[self.ks_name_sentinel].tables.__getitem__.side_effect = hash
+
+        # check mocking correctness
+        self.assertNotEqual(
+            self.wrapper._wrapped,
+            self.cluster_mock.metadata.keyspaces[self.ks_name_sentinel].tables['foo']
+        )
+        # and this is the behavior we care about
+        self.assertEqual(
+            self.wrapper._wrapped,
+            self.cluster_mock.metadata.keyspaces[self.ks_name_sentinel].tables[self.table_name_sentinel]
+        )
+
+    def repr_test(self):
+        self.assertEqual(
+            repr(self.wrapper),
+            'UpdatingTableMetadataWrapper(cluster={}, ks_name={}, table_name={})'.format(
+                self.cluster_mock, self.ks_name_sentinel, self.table_name_sentinel
+            )
+        )
+
+
+class UpdatingKeyspaceMetadataWrapperTest(TestCase):
+
+    def setUp(self):
+        self.cluster_mock, self.ks_name_sentinel = MagicMock(), Mock(name='ks')
+        self.wrapper = UpdatingKeyspaceMetadataWrapper(
+            cluster=self.cluster_mock, ks_name=self.ks_name_sentinel
+        )
+
+    def wrapped_access_calls_refresh_test(self):
+        """
+        Accessing the wrapped object should call the keyspace-refreshing method
+        on the cluster.
+        """
+        self.cluster_mock.refresh_keyspace_metadata.assert_not_called()
+        self.wrapper._wrapped
+        self.cluster_mock.refresh_keyspace_metadata.assert_called_once_with(
+            self.ks_name_sentinel
+        )
+
+    def wrapped_returns_keyspace_metadata_test(self):
+        """
+        The wrapped object is accessed correctly from the internal cluster object.
+        """
+        # keyspaces[X] should return the same value, and should be different
+        # from keyspaces[Y] for all Y
+        self.cluster_mock.metadata.keyspaces.__getitem__.side_effect = hash
+        # check mocking correctness
+        self.assertNotEqual(self.wrapper._wrapped, self.cluster_mock.metadata.keyspaces['foo'])
+        self.assertEqual(self.wrapper._wrapped, self.cluster_mock.metadata.keyspaces[self.ks_name_sentinel])
+
+    def repr_test(self):
+        self.assertEqual(
+            repr(self.wrapper),
+            'UpdatingKeyspaceMetadataWrapper(cluster={}, ks_name={})'.format(
+                self.cluster_mock, self.ks_name_sentinel
+            )
+        )
+
+
+class UpdatingClusterMetadataWrapperTest(TestCase):
+
+    def setUp(self):
+        self.cluster_mock = MagicMock()
+        self.wrapper = UpdatingClusterMetadataWrapper(cluster=self.cluster_mock)
+
+    def wrapped_access_calls_refresh_test(self):
+        """
+        Accessing the wrapped object should call the schema-refreshing method
+        on the cluster.
+        """
+        self.cluster_mock.refresh_schema_metadata.assert_not_called()
+        self.wrapper._wrapped
+        self.cluster_mock.refresh_schema_metadata.assert_called_once_with()
+
+    def wrapped_returns_cluster_metadata_test(self):
+        """
+        The wrapped object is accessed correctly from the internal cluster object.
+        """
+        self.assertIs(self.wrapper._wrapped, self.cluster_mock.metadata)
+
+    def repr_test(self):
+        self.assertEqual(
+            repr(self.wrapper),
+            'UpdatingClusterMetadataWrapper(cluster={})'.format(self.cluster_mock)
+        )
