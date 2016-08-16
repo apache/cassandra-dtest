@@ -188,8 +188,10 @@ class BaseSStableLoaderTest(Tester):
                 full_cf_dir = os.path.join(sstablecopy_dir, cf_dir)
                 if os.path.isdir(full_cf_dir):
                     cmd_args = [sstableloader, '--nodes', host, full_cf_dir]
-                    p = subprocess.Popen(cmd_args, env=env)
+                    p = subprocess.Popen(cmd_args, stderr=subprocess.PIPE, stdout=subprocess.PIPE, env=env)
                     exit_status = p.wait()
+                    debug('stdout: {out}'.format(out=p.stdout))
+                    debug('stderr: {err}'.format(err=p.stderr))
                     self.assertEqual(0, exit_status,
                                      "sstableloader exited with a non-zero status: {}".format(exit_status))
 
