@@ -1,12 +1,15 @@
 from cassandra.query import SimpleStatement
 
 from dtest import TRACE, Tester, debug
-from tools import no_vnodes
+from tools import no_vnodes, known_failure
 
 
 @no_vnodes()
 class TestPendingRangeMovements(Tester):
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12468',
+                   flaky=True)
     def pending_range_test(self):
         """
         @jira_ticket CASSANDRA-10887
