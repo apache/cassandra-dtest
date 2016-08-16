@@ -297,6 +297,9 @@ class TestBatch(Tester):
         """
         self._logged_batch_compatibility_test(0, 1, 'git:cassandra-2.2', 2, 4)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12458',
+                   flaky=True)
     @since('3.0', max_version='3.0.x')
     @skipIf(sys.platform == 'win32', 'Windows production support only on 2.2+')
     def logged_batch_compatibility_2_test(self):
@@ -307,6 +310,9 @@ class TestBatch(Tester):
         """
         self._logged_batch_compatibility_test(0, 1, 'git:cassandra-2.1', 2, 3)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12458',
+                   flaky=True)
     @since('3.0', max_version='3.0.x')
     @skipIf(sys.platform == 'win32', 'Windows production support only on 2.2+')
     def logged_batch_compatibility_3_test(self):
@@ -326,6 +332,9 @@ class TestBatch(Tester):
         """
         self._logged_batch_compatibility_test(2, 2, 'git:cassandra-2.2', 1, 4)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12458',
+                   flaky=True)
     @since('3.0', max_version='3.0.x')
     @skipIf(sys.platform == 'win32', 'Windows production support only on 2.2+')
     def logged_batch_compatibility_5_test(self):
