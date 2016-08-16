@@ -2,7 +2,7 @@ import time
 
 from dtest import debug
 from repair_tests.repair_test import BaseRepairTest
-from tools import since
+from tools import since, known_failure
 
 LEGACY_SSTABLES_JVM_ARGS = ["-Dcassandra.streamdes.initial_mem_buffer_size=1",
                             "-Dcassandra.streamdes.max_mem_buffer_size=5",
@@ -13,6 +13,9 @@ LEGACY_SSTABLES_JVM_ARGS = ["-Dcassandra.streamdes.initial_mem_buffer_size=1",
 class TestUpgradeRepair(BaseRepairTest):
     __test__ = True
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12469',
+                   flaky=True)
     @since('3.0')
     def repair_after_upgrade_test(self):
         """
