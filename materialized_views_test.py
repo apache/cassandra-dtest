@@ -17,6 +17,7 @@ from assertions import (assert_all, assert_crc_check_chance_equal,
                         assert_invalid, assert_none, assert_one,
                         assert_unavailable)
 from dtest import Tester, debug
+from nose.plugins.attrib import attr
 from tools import known_failure, new_node, require, since
 
 # CASSANDRA-10978. Migration wait (in seconds) to use in bootstrapping tests. Needed to handle
@@ -374,6 +375,9 @@ class TestMaterializedViews(Tester):
         for i in xrange(1000, 1100):
             assert_one(session, "SELECT * FROM t_by_v WHERE v = {}".format(-i), [-i, i])
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12140',
+                   flaky=True)
     def add_dc_after_mv_simple_replication_test(self):
         """
         @jira_ticket CASSANDRA-10634
@@ -384,7 +388,7 @@ class TestMaterializedViews(Tester):
         self._add_dc_after_mv_test(1)
 
     @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12164',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12140',
                    flaky=True)
     def add_dc_after_mv_network_replication_test(self):
         """
@@ -396,7 +400,10 @@ class TestMaterializedViews(Tester):
         self._add_dc_after_mv_test({'dc1': 1, 'dc2': 1})
 
     @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12164',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12140',
+                   flaky=True)
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12446',
                    flaky=True)
     def add_node_after_mv_test(self):
         """
@@ -725,9 +732,6 @@ class TestMaterializedViews(Tester):
                 cl=ConsistencyLevel.ALL
             )
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12097',
-                   flaky=True)
     def view_tombstone_test(self):
         """
         Test that a materialized views properly tombstone
@@ -752,7 +756,7 @@ class TestMaterializedViews(Tester):
         # Set initial values TS=0, verify
         session.execute(SimpleStatement("INSERT INTO t (id, v, v2, v3) VALUES (1, 1, 'a', 3.0) USING TIMESTAMP 0",
                                         consistency_level=ConsistencyLevel.ALL))
-
+        self._replay_batchlogs()
         assert_one(
             session,
             "SELECT * FROM t_by_v WHERE v = 1",
@@ -761,6 +765,7 @@ class TestMaterializedViews(Tester):
 
         session.execute(SimpleStatement("INSERT INTO t (id, v2) VALUES (1, 'b') USING TIMESTAMP 1",
                                         consistency_level=ConsistencyLevel.ALL))
+        self._replay_batchlogs()
 
         assert_one(
             session,
@@ -771,6 +776,7 @@ class TestMaterializedViews(Tester):
         # change v's value and TS=3, tombstones v=1 and adds v=0 record
         session.execute(SimpleStatement("UPDATE t USING TIMESTAMP 3 SET v = 0 WHERE id = 1",
                                         consistency_level=ConsistencyLevel.ALL))
+        self._replay_batchlogs()
 
         assert_none(session, "SELECT * FROM t_by_v WHERE v = 1")
 
@@ -779,6 +785,7 @@ class TestMaterializedViews(Tester):
 
         session.execute(SimpleStatement("UPDATE t USING TIMESTAMP 4 SET v = 1 WHERE id = 1",
                                         consistency_level=ConsistencyLevel.QUORUM))
+        self._replay_batchlogs()
 
         assert_one(
             session,
@@ -949,9 +956,7 @@ class TestMaterializedViews(Tester):
                 [i, i, 'a', 3.0]
             )
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12176',
-                   flaky=True)
+    @attr("resource-intensive")
     def complex_repair_test(self):
         """
         Test that a materialized view are consistent after a more complex repair.
@@ -984,6 +989,8 @@ class TestMaterializedViews(Tester):
                 [i, i, 'a', 3.0]
             )
 
+        debug('Close connection to node1')
+        session.cluster.shutdown()
         debug('Shutdown node1, node4 and node5')
         node1.stop()
         node4.stop()

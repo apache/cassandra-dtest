@@ -5,9 +5,9 @@ import uuid
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
 
-from assertions import assert_invalid, assert_one, assert_length_equal
+from assertions import assert_invalid, assert_length_equal, assert_one
 from dtest import Tester
-from tools import known_failure, rows_to_list, since
+from tools import rows_to_list, since
 
 
 class TestCounters(Tester):
@@ -43,9 +43,6 @@ class TestCounters(Tester):
                 self.assertEqual(len(res[c]), 2, "Expecting key and counter for counter {}, got {}".format(c, str(res[c])))
                 self.assertEqual(res[c][1], i + 1, "Expecting counter {} = {}, got {}".format(c, i + 1, res[c][0]))
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12160',
-                   flaky=True)
     def upgrade_test(self):
         """ Test for bug of #4436 """
 
@@ -76,7 +73,6 @@ class TestCounters(Tester):
             upd = "UPDATE counterTable SET c = c + 1 WHERE k = %d;"
             batch = " ".join(["BEGIN COUNTER BATCH"] + [upd % x for x in keys] + ["APPLY BATCH;"])
 
-            kmap = {"k%d" % i: i for i in keys}
             for i in range(0, updates):
                 query = SimpleStatement(batch, consistency_level=ConsistencyLevel.QUORUM)
                 session.execute(query)
@@ -278,3 +274,30 @@ class TestCounters(Tester):
         session.execute("ALTER TABLE counter_bug drop c")
 
         assert_invalid(session, "ALTER TABLE counter_bug add c counter", "Cannot re-add previously dropped counter column c")
+
+    def compact_counter_cluster_test(self):
+        """
+        @jira_ticket CASSANDRA-12219
+        This test will fail on 3.0.0 - 3.0.8, and 3.1 - 3.8
+        """
+
+        cluster = self.cluster
+        cluster.populate(3).start()
+        node1 = cluster.nodelist()[0]
+        session = self.patient_cql_connection(node1)
+        self.create_ks(session, 'counter_tests', 1)
+
+        session.execute("""
+            CREATE TABLE IF NOT EXISTS counter_cs (
+                key bigint PRIMARY KEY,
+                data counter
+            ) WITH COMPACT STORAGE
+            """)
+
+        for outer in range(0, 5):
+            for idx in range(0, 5):
+                session.execute("UPDATE counter_cs SET data = data + 1 WHERE key = {k}".format(k=idx))
+
+        for idx in range(0, 5):
+            row = list(session.execute("SELECT data from counter_cs where key = {k}".format(k=idx)))
+            self.assertEqual(rows_to_list(row)[0][0], 5)

@@ -5,9 +5,10 @@ import subprocess
 import time
 import uuid
 
+import parse
 from ccmlib import common
-from assertions import assert_length_equal
 
+from assertions import assert_length_equal
 from dtest import Tester, debug
 from tools import known_failure, since
 
@@ -100,7 +101,7 @@ class TestHelper(Tester):
         Launch a nodetool command and check the result is empty (no error)
         """
         node1 = self.cluster.nodelist()[0]
-        response = node1.nodetool(cmd, capture_output=True)[0]
+        response = node1.nodetool(cmd).stdout
         if not common.is_win():  # nodetool always prints out on windows
             assert_length_equal(response, 0)  # nodetool does not print anything unless there is an error
 
@@ -169,7 +170,7 @@ class TestHelper(Tester):
         generations by that amount.
         """
         for table_or_index, table_sstables in sstables.items():
-            increment_by = len(set(re.match('.*(\d)[^0-9].*', s).group(1) for s in table_sstables))
+            increment_by = len(set(parse.search('{}-{increment_by}-{suffix}.{file_extention}', s).named['increment_by'] for s in table_sstables))
             sstables[table_or_index] = [self.increment_generation_by(s, increment_by) for s in table_sstables]
 
         debug('sstables after increment {}'.format(str(sstables)))
@@ -254,6 +255,9 @@ class TestScrubIndexes(TestHelper):
         users = self.query_users(session)
         self.assertEqual(initial_users, users)
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12337',
+                   flaky=True)
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11236',
                    flaky=False,

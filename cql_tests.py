@@ -451,6 +451,9 @@ class MiscellaneousCQLTester(CQLTester):
         with self.assertRaisesRegexp(ProtocolException, 'Cannot decode string as UTF8'):
             session.execute("insert into invalid_string_literals (k, c) VALUES (0, '\xc2\x01')")
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12361',
+                   flaky=True)
     def prepared_statement_invalidation_test(self):
         """
         @jira_ticket CASSANDRA-7910
@@ -621,10 +624,6 @@ class AbortedQueriesTester(CQLTester):
         assert_unavailable(lambda c: debug(c.execute(statement)), session)
         node.watch_log_for("operations timed out", from_mark=mark, timeout=60)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11909',
-                   flaky=True
-                   )
     def remote_query_test(self):
         """
         Check that a query running on a node other than the coordinator times out:

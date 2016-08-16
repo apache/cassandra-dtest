@@ -13,6 +13,7 @@ from unittest import skipUnless
 import psutil
 from cassandra import ConsistencyLevel, WriteTimeout
 from cassandra.query import SimpleStatement
+from nose.plugins.attrib import attr
 from six import print_
 
 from dtest import RUN_STATIC_UPGRADE_MATRIX, Tester, debug
@@ -220,6 +221,7 @@ def counter_checker(tester, to_verify_queue, verification_done_queue):
                 pass
 
 
+@attr("resource-intensive")
 class UpgradeTester(Tester):
     """
     Upgrades a 3-node Murmur3Partitioner cluster through versions specified in test_version_metas.
@@ -272,10 +274,10 @@ class UpgradeTester(Tester):
         self.upgrade_scenario()
 
     @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11393',
-                   flaky=True)
-    @known_failure(failure_source='cassandra',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11767',
+                   flaky=True)
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12444',
                    flaky=True)
     def rolling_upgrade_test(self):
         """
@@ -289,9 +291,6 @@ class UpgradeTester(Tester):
         """
         self.upgrade_scenario(internode_ssl=True)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12195',
-                   flaky=False)
     def rolling_upgrade_with_internode_ssl_test(self):
         """
         Rolling upgrade test using internode ssl.
@@ -453,7 +452,7 @@ class UpgradeTester(Tester):
             debug('Starting %s on new version (%s)' % (node.name, version_meta.version))
             # Setup log4j / logback again (necessary moving from 2.0 -> 2.1):
             node.set_log_level("INFO")
-            node.start(wait_other_notice=True, wait_for_binary_proto=True)
+            node.start(wait_other_notice=240, wait_for_binary_proto=True)
             node.nodetool('upgradesstables -a')
 
     def _log_current_ver(self, current_version_meta):
@@ -689,7 +688,7 @@ class BootstrapMixin(object):
         # Check we can bootstrap a new node on the upgraded cluster:
         debug("Adding a node to the cluster")
         nnode = new_node(self.cluster, remote_debug_port=str(2000 + len(self.cluster.nodes)))
-        nnode.start(use_jna=True, wait_other_notice=True, wait_for_binary_proto=True)
+        nnode.start(use_jna=True, wait_other_notice=240, wait_for_binary_proto=True)
         self._write_values()
         self._increment_counters()
         self._check_values()
@@ -700,15 +699,12 @@ class BootstrapMixin(object):
         debug("Adding a node to the cluster")
         nnode = new_node(self.cluster, remote_debug_port=str(2000 + len(self.cluster.nodes)), data_center='dc2')
 
-        nnode.start(use_jna=True, wait_other_notice=True, wait_for_binary_proto=True)
+        nnode.start(use_jna=True, wait_other_notice=240, wait_for_binary_proto=True)
         self._write_values()
         self._increment_counters()
         self._check_values()
         self._check_counters()
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12196',
-                   flaky=False)
     def bootstrap_test(self):
         # try and add a new node
         self.upgrade_scenario(after_upgrade_call=(self._bootstrap_new_node,))

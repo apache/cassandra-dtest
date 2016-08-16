@@ -1,9 +1,7 @@
 # coding: utf-8
 
-from distutils.version import LooseVersion
-
 from dtest import Tester, debug
-from tools import known_failure, since
+from tools import since
 
 
 class TestCqlTracing(Tester):
@@ -19,6 +17,8 @@ class TestCqlTracing(Tester):
     def prepare(self, create_keyspace=True, nodes=3, rf=3, protocol_version=3, jvm_args=None, **kwargs):
         if jvm_args is None:
             jvm_args = []
+
+        jvm_args.append('-Dcassandra.wait_for_tracing_events_timeout_secs=15')
 
         cluster = self.cluster
         cluster.populate(nodes).start(wait_for_binary_proto=True, jvm_args=jvm_args)
@@ -54,19 +54,18 @@ class TestCqlTracing(Tester):
             );
         """)
 
-        out, err = node1.run_cqlsh('TRACING ON', return_output=True)
+        out, err, _ = node1.run_cqlsh('TRACING ON')
         self.assertIn('Tracing is enabled', out)
 
-        out, err = node1.run_cqlsh('TRACING ON; SELECT * from system.peers', return_output=True)
+        out, err, _ = node1.run_cqlsh('TRACING ON; SELECT * from system.peers')
         self.assertIn('Tracing session: ', out)
         self.assertIn('Request complete ', out)
 
         # Inserts
-        out, err = node1.run_cqlsh(
+        out, err, _ = node1.run_cqlsh(
             "CONSISTENCY ALL; TRACING ON; "
             "INSERT INTO ks.users (userid, firstname, lastname, age) "
-            "VALUES (550e8400-e29b-41d4-a716-446655440000, 'Frodo', 'Baggins', 32)",
-            return_output=True)
+            "VALUES (550e8400-e29b-41d4-a716-446655440000, 'Frodo', 'Baggins', 32)")
         debug(out)
         self.assertIn('Tracing session: ', out)
 
@@ -78,35 +77,30 @@ class TestCqlTracing(Tester):
         self.assertIn('Request complete ', out)
 
         # Queries
-        out, err = node1.run_cqlsh('CONSISTENCY ALL; TRACING ON; '
-                                   'SELECT firstname, lastname '
-                                   'FROM ks.users WHERE userid = 550e8400-e29b-41d4-a716-446655440000',
-                                   return_output=True)
+        out, err, _ = node1.run_cqlsh('CONSISTENCY ALL; TRACING ON; '
+                                      'SELECT firstname, lastname '
+                                      'FROM ks.users WHERE userid = 550e8400-e29b-41d4-a716-446655440000')
         debug(out)
         self.assertIn('Tracing session: ', out)
-        # Restricted to 2.2+ due to flakiness on 2.1.  See CASSANDRA-11598 for details.
-        if LooseVersion(self.cluster.version()) >= LooseVersion('2.2'):
-            self.assertIn(' 127.0.0.1 ', out)
-            self.assertIn(' 127.0.0.2 ', out)
-            self.assertIn(' 127.0.0.3 ', out)
+
+        self.assertIn(' 127.0.0.1 ', out)
+        self.assertIn(' 127.0.0.2 ', out)
+        self.assertIn(' 127.0.0.3 ', out)
         self.assertIn('Request complete ', out)
         self.assertIn(" Frodo |  Baggins", out)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11465',
-                   flaky=True)
+    @since('2.2')
     def tracing_simple_test(self):
         """
         Test tracing using the default tracing class. See trace().
 
         @jira_ticket CASSANDRA-10392
+        @jira_ticket CASSANDRA-11598
+        # Restricted to 2.2+ due to flakiness on 2.1.  See CASSANDRA-11598 and CASSANDRA-12407 for details.
         """
         session = self.prepare()
         self.trace(session)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11465',
-                   flaky=True)
     @since('3.4')
     def tracing_unknown_impl_test(self):
         """
@@ -133,9 +127,6 @@ class TestCqlTracing(Tester):
         err = errs[0][0]
         self.assertIn(expected_error, err)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11465',
-                   flaky=True)
     @since('3.4')
     def tracing_default_impl_test(self):
         """

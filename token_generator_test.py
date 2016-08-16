@@ -1,14 +1,13 @@
 # coding: utf-8
-
 import os
-import re
 import subprocess
 import time
 
+import parse
 from cassandra.util import sortedset
 from ccmlib import common
 
-from dtest import Tester, debug, DISABLE_VNODES
+from dtest import DISABLE_VNODES, Tester, debug
 from tools import rows_to_list, since
 
 
@@ -27,7 +26,6 @@ class TestTokenGenerator(Tester):
             executable += ".bat"
 
         args = [executable]
-
         if randomPart is not None:
             if randomPart:
                 args.append("--random")
@@ -45,19 +43,19 @@ class TestTokenGenerator(Tester):
         for line in lines:
             if line.startswith("DC #"):
                 if dc_tokens is not None:
-                    self.assertGreater(dc_tokens.__len__(), 0, "dc_tokens is empty from token-generator %r" % args)
+                    self.assertGreater(dc_tokens.__len__(), 0, "dc_tokens is empty from token-generator {}".format(args))
                     generated_tokens.append(dc_tokens)
                 dc_tokens = []
             else:
-                if line.__len__() > 0:
-                    m = re.search("^  Node #(\d+): [ ]*([-]?\d+)$", line)
-                    self.assertIsNotNone(m, "Line \"%r\" does not match pattern from token-generator %r" % (line, args))
-                    node_num = int(m.group(1))
-                    node_token = int(m.group(2))
+                if line:
+                    m = parse.search('Node #{node_num:d}:{:s}{node_token:d}', line)
+                    self.assertIsNotNone(m, "Line \"{}\" does not match pattern from token-generator {}".format(line, args))
+                    node_num = int(m.named['node_num'])
+                    node_token = int(m.named['node_token'])
                     dc_tokens.append(node_token)
-                    self.assertEqual(node_num, dc_tokens.__len__(), "invalid token count from token-generator %r" % args)
-        self.assertIsNotNone(dc_tokens, "No tokens from token-generator %r" % args)
-        self.assertGreater(dc_tokens.__len__(), 0, "No tokens from token-generator %r" % args)
+                    self.assertEqual(node_num, dc_tokens.__len__(), "invalid token count from token-generator {}".format(args))
+        self.assertIsNotNone(dc_tokens, "No tokens from token-generator {}".format(args))
+        self.assertGreater(dc_tokens.__len__(), 0, "No tokens from token-generator {}".format(args))
         generated_tokens.append(dc_tokens)
 
         return generated_tokens
@@ -66,7 +64,6 @@ class TestTokenGenerator(Tester):
         cluster = self.cluster
 
         install_dir = cluster.get_install_dir()
-
         generated_tokens = self.call_token_generator(install_dir, randomPart, [nodes])
 
         if not randomPart:

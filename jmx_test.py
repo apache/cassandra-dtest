@@ -1,21 +1,22 @@
 import os
-import re
 import time
 
 import ccmlib.common
-from ccmlib.node import NodetoolError
+import parse
+from ccmlib.node import ToolError
 
 from dtest import Tester, debug
-from jmxutils import JolokiaAgent, enable_jmx_ssl, make_mbean, remove_perf_disable_shared_mem
-from tools import known_failure, since, generate_ssl_stores
+from jmxutils import (JolokiaAgent, enable_jmx_ssl, make_mbean,
+                      remove_perf_disable_shared_mem)
+from tools import generate_ssl_stores, known_failure, since
 
 
 class TestJMX(Tester):
 
     @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10915',
-                   flaky=False,
-                   notes='Fails on Windows, flaps on Linux')
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12467',
+                   flaky=True,
+                   notes='windows')
     def netstats_test(self):
         """
         Check functioning of nodetool netstats, especially with restarts.
@@ -30,7 +31,7 @@ class TestJMX(Tester):
         node1.flush()
         node1.stop(gently=False)
 
-        with self.assertRaisesRegexp(NodetoolError, "ConnectException: 'Connection refused'."):
+        with self.assertRaisesRegexp(ToolError, "ConnectException: 'Connection refused'."):
             node1.nodetool('netstats')
 
         # don't wait; we're testing for when nodetool is called on a node mid-startup
@@ -47,7 +48,7 @@ class TestJMX(Tester):
             except Exception as e:
                 self.assertNotIn('java.lang.reflect.UndeclaredThrowableException', str(e),
                                  'Netstats failed with UndeclaredThrowableException (CASSANDRA-8122)')
-                if not isinstance(e, NodetoolError):
+                if not isinstance(e, ToolError):
                     raise
                 else:
                     self.assertIn("ConnectException: 'Connection refused'.", str(e))
@@ -114,14 +115,13 @@ class TestJMX(Tester):
         node.flush()
         # Run a major compaction. This will be the compaction whose
         # progress we track.
-        node.nodetool('compact', capture_output=False, wait=False)
+        node.nodetool_process('compact')
         # We need to sleep here to give compaction time to start
         # Why not do something smarter? Because if the bug regresses,
         # we can't rely on jmx to tell us that compaction started.
         time.sleep(5)
 
         compaction_manager = make_mbean('db', type='CompactionManager')
-
         with JolokiaAgent(node) as jmx:
             progress_string = jmx.read_attribute(compaction_manager, 'CompactionSummary')[0]
 
@@ -130,9 +130,9 @@ class TestJMX(Tester):
             time.sleep(2)
 
             updated_progress_string = jmx.read_attribute(compaction_manager, 'CompactionSummary')[0]
-
-            progress = int(re.search('standard1, (\d+)\/', progress_string).groups()[0])
-            updated_progress = int(re.search('standard1, (\d+)\/', updated_progress_string).groups()[0])
+            var = 'Compaction@{uuid}(keyspace1, standard1, {progress}/{total})bytes'
+            progress = int(parse.search(var, progress_string).named['progress'])
+            updated_progress = int(parse.search(var, updated_progress_string).named['progress'])
 
             debug(progress_string)
             debug(updated_progress_string)
@@ -169,7 +169,7 @@ class TestJMX(Tester):
         cluster.populate(3).start(wait_for_binary_proto=True)
         node1, node2, node3 = cluster.nodelist()
 
-        phivalues = node1.nodetool("failuredetector")[0].splitlines()
+        phivalues = node1.nodetool("failuredetector").stdout.splitlines()
         endpoint1Values = phivalues[1].split()
         endpoint2Values = phivalues[2].split()
 
@@ -228,7 +228,7 @@ class TestJMXSSL(Tester):
         self.assert_insecure_connection_rejected(node)
 
         # specifying only the truststore containing the server cert should fail
-        with self.assertRaisesRegexp(NodetoolError, ".*SSLHandshakeException.*"):
+        with self.assertRaisesRegexp(ToolError, ".*SSLHandshakeException.*"):
             node.nodetool("info --ssl -Djavax.net.ssl.trustStore={ts} -Djavax.net.ssl.trustStorePassword={ts_pwd}"
                           .format(ts=self.truststore(), ts_pwd=self.truststore_password))
 
@@ -240,7 +240,7 @@ class TestJMXSSL(Tester):
         """
         Attempts to connect to JMX (via nodetool) without any client side ssl parameters, expecting failure
         """
-        with self.assertRaises(NodetoolError):
+        with self.assertRaises(ToolError):
             node.nodetool("info")
 
     def _populateCluster(self, require_client_auth=False):

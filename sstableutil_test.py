@@ -3,7 +3,7 @@ import os
 import subprocess
 
 from ccmlib import common
-from ccmlib.node import NodetoolError
+from ccmlib.node import ToolError
 
 from dtest import Tester, debug
 from tools import InterruptCompaction, since
@@ -71,7 +71,7 @@ class SSTableUtilTest(Tester):
         try:
             debug("Compacting...")
             node.compact()
-        except NodetoolError:
+        except ToolError:
             pass  # expected to fail
 
         t.join()

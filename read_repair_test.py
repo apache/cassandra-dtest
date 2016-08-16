@@ -87,7 +87,7 @@ class TestReadRepair(Tester):
 
     def identify_initial_placement(self, keyspace, table, key):
         nodes = self.cluster.nodelist()
-        out, err = nodes[0].nodetool("getendpoints alter_rf_test t1 1")
+        out, _, _ = nodes[0].nodetool("getendpoints alter_rf_test t1 1")
         address = out.split('\n')[-2]
         initial_replica = None
         non_replicas = []
@@ -159,7 +159,7 @@ class TestReadRepair(Tester):
             self.assertNotIn("Adding to cf memtable", activity)
             self.assertNotIn("Acquiring switchLock read lock", activity)
 
-    @since('2.2')
+    @since('3.0')
     def test_gcable_tombstone_resurrection_on_range_slice_query(self):
         """
         @jira_ticket CASSANDRA-11427

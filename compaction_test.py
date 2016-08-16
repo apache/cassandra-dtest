@@ -1,16 +1,17 @@
 import os
 import random
-import re
 import string
 import subprocess
 import tempfile
 import time
-
-from ccmlib import common
-from assertions import assert_none, assert_one, assert_length_equal
-from dtest import Tester, debug
 from distutils.version import LooseVersion
+
+import parse
+from ccmlib import common
 from nose.tools import assert_equal
+
+from assertions import assert_length_equal, assert_none, assert_one
+from dtest import Tester, debug
 from tools import known_failure, since
 
 
@@ -79,7 +80,7 @@ class TestCompaction(Tester):
         node1.flush()
 
         table_name = 'standard1'
-        output = node1.nodetool('cfstats', True)[0]
+        output = node1.nodetool('cfstats').stdout
         if output.find(table_name) != -1:
             output = output[output.find(table_name):]
             output = output[output.find("Space used (live)"):]
@@ -90,7 +91,7 @@ class TestCompaction(Tester):
 
         block_on_compaction_log(node1)
 
-        output = node1.nodetool('cfstats', True)[0]
+        output = node1.nodetool('cfstats').stdout
         if output.find(table_name) != -1:
             output = output[output.find(table_name):]
             output = output[output.find("Space used (live)"):]
@@ -100,9 +101,6 @@ class TestCompaction(Tester):
         # allow 5% size increase - if we have few sstables it is not impossible that live size increases *slightly* after compaction
         self.assertLess(finalValue, initialValue * 1.05)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12323',
-                   flaky=True)
     def bloomfilter_size_test(self):
         """
         @jira_ticket CASSANDRA-11344
@@ -133,15 +131,29 @@ class TestCompaction(Tester):
         node1.wait_for_compactions()
 
         table_name = 'standard1'
-        output = node1.nodetool('cfstats', True)[0]
+        output = node1.nodetool('cfstats').stdout
         output = output[output.find(table_name):]
         output = output[output.find("Bloom filter space used"):]
         bfSize = int(output[output.find(":") + 1:output.find("\n")].strip())
 
-        debug("bloom filter size is: {}".format(bfSize))
+        # in some rare cases we can end up with more than one sstable per data directory with
+        # non-lcs strategies (see CASSANDRA-12323)
+        if not hasattr(self, 'strategy') or self.strategy == "LeveledCompactionStrategy":
+            size_factor = 1
+        else:
+            sstable_count = len(node1.get_sstables('keyspace1', 'standard1'))
+            dir_count = len(node1.data_directories())
+            debug("sstable_count is: {}".format(sstable_count))
+            debug("dir_count is: {}".format(dir_count))
+            if LooseVersion(node1.get_cassandra_version()) < LooseVersion('3.2'):
+                size_factor = sstable_count
+            else:
+                size_factor = sstable_count / float(dir_count)
 
-        self.assertGreaterEqual(bfSize, min_bf_size)
-        self.assertLessEqual(bfSize, max_bf_size)
+        debug("bloom filter size is: {}".format(bfSize))
+        debug("size factor = {}".format(size_factor))
+        self.assertGreaterEqual(bfSize, size_factor * min_bf_size)
+        self.assertLessEqual(bfSize, size_factor * max_bf_size)
 
     def sstable_deletion_test(self):
         """
@@ -245,14 +257,15 @@ class TestCompaction(Tester):
 
         matches = block_on_compaction_log(node1)
         stringline = matches[0]
-        units = 'MB/s' if LooseVersion(cluster.version()) < LooseVersion('3.6') else '(K|M|G)iB/s'
-        throughput_pattern = re.compile('''.*           # it doesn't matter what the line starts with
-                                           =            # wait for an equals sign
-                                           ([\s\d\.]*)  # capture a decimal number, possibly surrounded by whitespace
-                                           {}.*         # followed by units
-                                        '''.format(units), re.X)
 
-        avgthroughput = re.match(throughput_pattern, stringline).group(1).strip()
+        throughput_pattern = '{}={avgthroughput:f}{units}/s'
+        m = parse.search(throughput_pattern, stringline)
+        avgthroughput = m.named['avgthroughput']
+        found_units = m.named['units']
+
+        units = ['MB'] if LooseVersion(cluster.version()) < LooseVersion('3.6') else ['KiB', 'MiB', 'GiB']
+        self.assertIn(found_units, units)
+
         debug(avgthroughput)
 
         # The throughput in the log is computed independantly from the throttling and on the output files while

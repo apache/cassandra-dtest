@@ -126,8 +126,12 @@ class PageFetcher(object):
         while time.time() < expiry:
             if self.requested_pages == (self.retrieved_pages + self.retrieved_empty_pages):
                 return self
+            # small wait so we don't need excess cpu to keep checking
+            time.sleep(0.1)
 
-        raise RuntimeError("Requested pages were not delivered before timeout.")
+        raise RuntimeError(
+            "Requested pages were not delivered before timeout. " +
+            "Requested: {}; retrieved: {}; empty retrieved: {}".format(self.requested_pages, self.retrieved_pages, self.retrieved_empty_pages))
 
     def pagecount(self):
         """
@@ -187,6 +191,13 @@ class PageAssertionMixin(object):
 class BasePagingTester(UpgradeTester):
 
     def prepare(self, *args, **kwargs):
+        start_on, upgrade_to = self.UPGRADE_PATH.starting_meta, self.UPGRADE_PATH.upgrade_meta
+        if 'protocol_version' not in kwargs.keys():
+            # Due to CASSANDRA-10880, we need to use proto v3 (instead of v4) when it's a mixed cluster of 2.2.x and 3.0.x nodes.
+            if start_on.family in ('2.1.x', '2.2.x') and upgrade_to.family == '3.0.x':
+                debug("Protocol version set to v3, due to 2.1.x/2.2.x and 3.0.x mixed version cluster.")
+                kwargs['protocol_version'] = 3
+
         cursor = UpgradeTester.prepare(self, *args, **kwargs)
         cursor.row_factory = dict_factory
         return cursor
@@ -770,6 +781,8 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
             self.assertEqualIgnoreOrder(pf.all_data(), expected_data)
 
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12249')
     def test_paging_using_secondary_indexes(self):
         cursor = self.prepare()
         cursor.execute("CREATE TABLE paging_test ( id int, mybool boolean, sometext text, PRIMARY KEY (id, sometext) )")
@@ -1171,6 +1184,12 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
             expected_data.append({u'id': 2, u'mytext': u'foo'})
             self.assertEqualIgnoreOrder(pf.all_data(), expected_data)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12400',
+                   flaky=False)
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12362',
+                   flaky=True)
     def test_row_TTL_expiry_during_paging(self):
         cursor = self.prepare()
         cursor.execute("CREATE TABLE paging_test ( id int, mytext text, PRIMARY KEY (id, mytext) )")
@@ -1217,6 +1236,9 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
             self.assertEqual(pf.pagecount(), 3)
             self.assertEqual(pf.num_results_all(), [300, 300, 200])
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12364',
+                   flaky=True)
     def test_cell_TTL_expiry_during_paging(self):
         cursor = self.prepare()
         cursor.execute("""

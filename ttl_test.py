@@ -7,7 +7,7 @@ from cassandra.util import sortedset
 
 from assertions import (assert_all, assert_almost_equal, assert_none,
                         assert_row_count, assert_unavailable)
-from dtest import Tester
+from dtest import Tester, debug
 from tools import since
 
 
@@ -434,9 +434,12 @@ class TestDistributedTTL(Tester):
         )
 
         # Check that the TTL on both server are the same
-        ttl_session1 = self.session1.execute('SELECT ttl(col1) FROM ttl_table;')
-        ttl_session2 = session2.execute('SELECT ttl(col1) FROM ttl_table;')
-        self.assertLessEqual(abs(ttl_session1[0][0] - ttl_session2[0][0]), 1)
+        ttl_1 = self.session1.execute('SELECT ttl(col1) FROM ttl_table;')[0][0]
+        ttl_2 = session2.execute('SELECT ttl(col1) FROM ttl_table;')[0][0]
+
+        debug("ttl_1 is {}:".format(ttl_1))
+        debug("ttl_2 is {}:".format(ttl_2))
+        self.assertLessEqual(abs(ttl_1 - ttl_2), 1)
 
     def ttl_is_respected_on_repair_test(self):
         """ Test that ttl is respected on repair """

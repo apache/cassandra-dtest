@@ -2,7 +2,6 @@ import os
 import random
 import re
 import shutil
-import subprocess
 import tempfile
 import threading
 import time
@@ -11,8 +10,8 @@ from cassandra import ConsistencyLevel
 from cassandra.concurrent import execute_concurrent_with_args
 from ccmlib.node import NodeError
 
-from assertions import assert_almost_equal, assert_one, assert_not_running
-from dtest import Tester, debug, DISABLE_VNODES
+from assertions import assert_almost_equal, assert_not_running, assert_one
+from dtest import DISABLE_VNODES, Tester, debug
 from tools import (InterruptBootstrap, KillOnBootstrap, known_failure,
                    new_node, no_vnodes, query_c1c2, since)
 
@@ -237,9 +236,6 @@ class TestBootstrap(Tester):
                 node3.watch_log_for("Unable to find sufficient sources for streaming range")
             assert_not_running(node3)
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11414',
-                   flaky=True)
     @since('2.2')
     def resumable_bootstrap_test(self):
         """
@@ -247,23 +243,22 @@ class TestBootstrap(Tester):
         """
 
         cluster = self.cluster
-        cluster.set_configuration_options(values={'stream_throughput_outbound_megabits_per_sec': 1})
-        cluster.populate(2).start(wait_other_notice=True)
+        cluster.populate(2)
 
         node1 = cluster.nodes['node1']
-        node1.stress(['write', 'n=100K', 'no-warmup', 'cl=TWO', '-schema', 'replication(factor=2)', '-rate', 'threads=50'])
-        cluster.flush()
+        # set up byteman
+        node1.byteman_port = '8100'
+        node1.import_config_files()
 
-        # kill node1 in the middle of streaming to let it fail
-        t = InterruptBootstrap(node1)
-        t.start()
+        cluster.start(wait_other_notice=True)
+        # kill stream to node3 in the middle of streaming to let it fail
+        node1.byteman_submit(['./stream_failure.btm'])
+        node1.stress(['write', 'n=1K', 'no-warmup', 'cl=TWO', '-schema', 'replication(factor=2)', '-rate', 'threads=50'])
+        cluster.flush()
 
         # start bootstrapping node3 and wait for streaming
         node3 = new_node(cluster)
-        # keep timeout low so that test won't hang
-        node3.set_configuration_options(values={'streaming_socket_timeout_in_ms': 1000})
         node3.start(wait_other_notice=False, wait_for_binary_proto=True)
-        t.join()
 
         # wait for node3 ready to query
         node3.watch_log_for("Starting listening for CQL clients")
@@ -272,7 +267,6 @@ class TestBootstrap(Tester):
         assert_bootstrap_state(self, node3, 'IN_PROGRESS')
 
         # bring back node1 and invoke nodetool bootstrap to resume bootstrapping
-        node1.start(wait_other_notice=True)
         node3.nodetool('bootstrap resume')
 
         node3.watch_log_for("Resume complete", from_mark=mark)
@@ -283,9 +277,7 @@ class TestBootstrap(Tester):
 
         debug("Check data is present")
         # Let's check stream bootstrap completely transferred data
-        stdout, stderr = node3.stress(['read', 'n=100k', 'no-warmup', '-schema',
-                                       'replication(factor=2)', '-rate', 'threads=8'],
-                                      capture_output=True)
+        stdout, stderr, _ = node3.stress(['read', 'n=1k', 'no-warmup', '-schema', 'replication(factor=2)', '-rate', 'threads=8'])
 
         if stdout is not None:
             self.assertNotIn("FAILURE", stdout)
@@ -354,6 +346,10 @@ class TestBootstrap(Tester):
         current_rows = list(session.execute("SELECT * FROM %s" % stress_table))
         self.assertEquals(original_rows, current_rows)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12437',
+                   flaky=True,
+                   notes='Windows')
     def local_quorum_bootstrap_test(self):
         """
         Test that CL local_quorum works while a node is bootstrapping.
@@ -393,22 +389,18 @@ class TestBootstrap(Tester):
             node1.stress(['user', 'profile=' + stress_config.name, 'n=2M', 'no-warmup',
                           'ops(insert=1)', '-rate', 'threads=50'])
 
-        node3 = new_node(cluster, data_center='dc2')
-        node3.start(no_wait=True)
-        time.sleep(3)
+            node3 = new_node(cluster, data_center='dc2')
+            node3.start(no_wait=True)
+            time.sleep(3)
 
-        with tempfile.TemporaryFile(mode='w+') as tmpfile:
-            node1.stress(['user', 'profile=' + stress_config.name, 'ops(insert=1)',
-                          'n=500K', 'no-warmup', 'cl=LOCAL_QUORUM',
-                          '-rate', 'threads=5',
-                          '-errors', 'retries=2'],
-                         stdout=tmpfile, stderr=subprocess.STDOUT)
-            tmpfile.seek(0)
-            output = tmpfile.read()
+            out, err, _ = node1.stress(['user', 'profile=' + stress_config.name, 'ops(insert=1)',
+                                        'n=500K', 'no-warmup', 'cl=LOCAL_QUORUM',
+                                        '-rate', 'threads=5',
+                                        '-errors', 'retries=2'])
 
-        debug(output)
+        debug(out)
         regex = re.compile("Operation.+error inserting key.+Exception")
-        failure = regex.search(output)
+        failure = regex.search(out)
         self.assertIsNone(failure, "Error during stress while bootstrapping")
 
     @known_failure(failure_source='test',

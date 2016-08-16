@@ -1,6 +1,6 @@
 import os
 
-from ccmlib.node import NodetoolError
+from ccmlib.node import ToolError
 
 from dtest import Tester, debug
 from tools import since
@@ -14,7 +14,7 @@ class TestNodetool(Tester):
 
         Running a decommission after a drain should generate
         an unsupported operation message and exit with an error
-        code (which we receive as a NodetoolError exception).
+        code (which we receive as a ToolError exception).
         """
         cluster = self.cluster
         cluster.populate([3]).start()
@@ -25,7 +25,7 @@ class TestNodetool(Tester):
         try:
             node.decommission()
             self.assertFalse("Expected nodetool error")
-        except NodetoolError as e:
+        except ToolError as e:
             self.assertEqual('', e.stderr)
             self.assertTrue('Unsupported operation' in e.stdout)
 
@@ -48,7 +48,7 @@ class TestNodetool(Tester):
         cluster.start(wait_for_binary_proto=True)
 
         for i, node in enumerate(cluster.nodelist()):
-            out, err = node.nodetool('info')
+            out, err, _ = node.nodetool('info')
             self.assertEqual(0, len(err), err)
             debug(out)
             for line in out.split(os.linesep):
@@ -76,19 +76,19 @@ class TestNodetool(Tester):
 
         # read all of the timeouts, make sure we get a sane response
         for timeout_type in types:
-            out, err = node.nodetool('gettimeout {}'.format(timeout_type))
+            out, err, _ = node.nodetool('gettimeout {}'.format(timeout_type))
             self.assertEqual(0, len(err), err)
             debug(out)
             self.assertRegexpMatches(out, r'.* \d+ ms')
 
         # set all of the timeouts to 123
         for timeout_type in types:
-            _, err = node.nodetool('settimeout {} 123'.format(timeout_type))
+            _, err, _ = node.nodetool('settimeout {} 123'.format(timeout_type))
             self.assertEqual(0, len(err), err)
 
         # verify that they're all reported as 123
         for timeout_type in types:
-            out, err = node.nodetool('gettimeout {}'.format(timeout_type))
+            out, err, _ = node.nodetool('gettimeout {}'.format(timeout_type))
             self.assertEqual(0, len(err), err)
             debug(out)
             self.assertRegexpMatches(out, r'.* 123 ms')
@@ -111,7 +111,7 @@ class TestNodetool(Tester):
         notice_message = r'effective ownership information is meaningless'
 
         # Do a first try without any keypace, we shouldn't have the notice
-        out, err = node.nodetool('status')
+        out, err, _ = node.nodetool('status')
         self.assertEqual(0, len(err), err)
         self.assertNotRegexpMatches(out, notice_message)
 
@@ -119,20 +119,20 @@ class TestNodetool(Tester):
         session.execute("CREATE KEYSPACE ks1 WITH replication = { 'class':'SimpleStrategy', 'replication_factor':1}")
 
         # With 1 keyspace, we should still not get the notice
-        out, err = node.nodetool('status')
+        out, err, _ = node.nodetool('status')
         self.assertEqual(0, len(err), err)
         self.assertNotRegexpMatches(out, notice_message)
 
         session.execute("CREATE KEYSPACE ks2 WITH replication = { 'class':'SimpleStrategy', 'replication_factor':1}")
 
         # With 2 keyspaces with the same settings, we should not get the notice
-        out, err = node.nodetool('status')
+        out, err, _ = node.nodetool('status')
         self.assertEqual(0, len(err), err)
         self.assertNotRegexpMatches(out, notice_message)
 
         session.execute("CREATE KEYSPACE ks3 WITH replication = { 'class':'SimpleStrategy', 'replication_factor':3}")
 
         # With a keyspace without the same replication factor, we should get the notice
-        out, err = node.nodetool('status')
+        out, err, _ = node.nodetool('status')
         self.assertEqual(0, len(err), err)
         self.assertRegexpMatches(out, notice_message)

@@ -3,7 +3,7 @@ import time
 from threading import Thread
 
 from cassandra import ConsistencyLevel
-from ccmlib.node import NodetoolError, TimeoutError
+from ccmlib.node import ToolError, TimeoutError
 
 from assertions import assert_almost_equal
 from dtest import Tester
@@ -29,6 +29,9 @@ class TestTopology(Tester):
 
         node1.stop(gently=False)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12428',
+                   flaky=True)
     def simple_decommission_test(self):
         """
         @jira_ticket CASSANDRA-9912
@@ -210,10 +213,6 @@ class TestTopology(Tester):
 
         self.assertFalse(node3.is_running())
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11611',
-                   flaky=True,
-                   notes='failed with a streaming error on windows')
     @since('3.0')
     def crash_during_decommission_test(self):
         """
@@ -223,6 +222,7 @@ class TestTopology(Tester):
         @jira_ticket CASSANDRA-10231
         """
         cluster = self.cluster
+        self.ignore_log_patterns = [r'Streaming error occurred']
         cluster.populate(3).start(wait_other_notice=True)
 
         node1, node2 = cluster.nodelist()[0:2]
@@ -230,6 +230,7 @@ class TestTopology(Tester):
         t = DecommissionInParallel(node1)
         t.start()
 
+        node1.watch_log_for("DECOMMISSIONING", filename='debug.log')
         null_status_pattern = re.compile(".N(?:\s*)127\.0\.0\.1(?:.*)null(?:\s*)rack1")
         while t.is_alive():
             out = self.show_status(node2)
@@ -250,7 +251,7 @@ class TestTopology(Tester):
         self.assertFalse(null_status_pattern.search(out))
 
     def show_status(self, node):
-        out, err = node.nodetool('status')
+        out, _, _ = node.nodetool('status')
         debug("Status as reported by node {}".format(node.address()))
         debug(out)
         return out
@@ -266,10 +267,10 @@ class DecommissionInParallel(Thread):
         node = self.node
         mark = node.mark_log()
         try:
-            out, err = node.nodetool("decommission")
+            out, err, _ = node.nodetool("decommission")
             node.watch_log_for("DECOMMISSIONED", from_mark=mark)
             debug(out)
             debug(err)
-        except NodetoolError as e:
+        except ToolError as e:
             debug("Decommission failed with exception: " + str(e))
             pass

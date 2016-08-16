@@ -4,7 +4,8 @@ import time
 from cassandra import ConsistencyLevel
 
 from dtest import DISABLE_VNODES, Tester
-from tools import create_c1c2_table, known_failure, insert_c1c2, no_vnodes, query_c1c2, since
+from tools import (create_c1c2_table, insert_c1c2, known_failure, no_vnodes,
+                   query_c1c2, since)
 
 
 @since('3.0')
@@ -37,7 +38,7 @@ class TestHintedHandoffConfig(Tester):
         """
         Launch a nodetool command and check there is no error, return the result
         """
-        out, err = node.nodetool(cmd, capture_output=True)
+        out, err, _ = node.nodetool(cmd)
         self.assertEqual('', err)
         return out
 

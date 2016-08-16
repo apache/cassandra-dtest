@@ -82,6 +82,9 @@ class TestPushedNotifications(Tester):
     """
     Tests for pushed native protocol notification from Cassandra.
     """
+    @known_failure(failure_source='cassandra',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12406',
+                   flaky=True)
     @no_vnodes()
     def move_single_node_test(self):
         """

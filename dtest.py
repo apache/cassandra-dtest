@@ -23,6 +23,7 @@ from collections import OrderedDict
 from subprocess import CalledProcessError
 from unittest import TestCase
 
+import cassandra
 import ccmlib.repository
 from cassandra import ConsistencyLevel
 from cassandra.auth import PlainTextAuthProvider
@@ -204,6 +205,8 @@ def debug(msg):
     LOG.debug(msg, extra={"current_test": CURRENT_TEST})
     if PRINT_DEBUG:
         print msg
+
+debug("Python driver version in use: {}".format(cassandra.__version__))
 
 
 def retry_till_success(fun, *args, **kwargs):

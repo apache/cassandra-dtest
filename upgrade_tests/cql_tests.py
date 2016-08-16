@@ -1390,6 +1390,9 @@ class TestCQL(UpgradeTester):
             cursor.execute(q % "tags = tags - [ 'bar' ]")
             assert_one(cursor, "SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'", [['m', 'n', 'c', 'c']])
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12399',
+                   flaky=False)
     def multi_collection_test(self):
         cursor = self.prepare()
 
@@ -1968,6 +1971,9 @@ class TestCQL(UpgradeTester):
             query = "SELECT blog_id, timestamp FROM test WHERE author = 'bob'"
             assert_all(cursor, query, [[1, 0], [1, 3], [0, 0]])
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12364',
+                   flaky=True)
     def refuse_in_with_indexes_test(self):
         """ Test for the validation bug of #4709 """
 
@@ -2266,6 +2272,9 @@ class TestCQL(UpgradeTester):
             query = "SELECT * FROM test WHERE k = 0 LIMIT 1;"
             assert_one(cursor, query, [0, 0, 2, 2])
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12401',
+                   flaky=False)
     def multi_list_set_test(self):
         cursor = self.prepare()
 
@@ -3130,9 +3139,6 @@ class TestCQL(UpgradeTester):
             assert_all(cursor, "SELECT * FROM test", [[0], [1], [-1]])
             assert_invalid(cursor, "SELECT * FROM test WHERE k >= -1 AND k < 1;")
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12124',
-                   flaky=False)
     def select_with_alias_test(self):
         cursor = self.prepare()
         cursor.execute('CREATE TABLE users (id int PRIMARY KEY, name text)')
@@ -3169,11 +3175,19 @@ class TestCQL(UpgradeTester):
             self.assertEqual('id_blob', res[0]._fields[0])
             self.assertEqual('\x00\x00\x00\x00', res[0].id_blob)
 
+            if LooseVersion(self.get_node_version(is_upgraded)) < LooseVersion('3.8'):
+                error_msg = "Aliases aren't allowed in the where clause"
+            else:
+                error_msg = "Undefined column name"
+
             # test that select throws a meaningful exception for aliases in where clause
-            assert_invalid(cursor, 'SELECT id AS user_id, name AS user_name FROM users WHERE user_id = 0', matching="Aliases aren't allowed in the where clause")
+            assert_invalid(cursor, 'SELECT id AS user_id, name AS user_name FROM users WHERE user_id = 0', matching=error_msg)
+
+            if LooseVersion(self.get_node_version(is_upgraded)) < LooseVersion('3.8'):
+                error_msg = "Aliases are not allowed in order by clause"
 
             # test that select throws a meaningful exception for aliases in order by clause
-            assert_invalid(cursor, 'SELECT id AS user_id, name AS user_name FROM users WHERE id IN (0) ORDER BY user_name', matching="Aliases are not allowed in order by clause")
+            assert_invalid(cursor, 'SELECT id AS user_id, name AS user_name FROM users WHERE id IN (0) ORDER BY user_name', matching=error_msg)
 
     def nonpure_function_collection_test(self):
         """ Test for bug #5795 """
@@ -3341,6 +3355,9 @@ class TestCQL(UpgradeTester):
             cursor.execute("INSERT INTO test(k) VALUES (0)")
             assert_one(cursor, "SELECT dateOf(t) FROM test WHERE k=0", [None])
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12260',
+                   flaky=False)
     @freshCluster()
     def cas_simple_test(self):
         # cursor = self.prepare(nodes=3, rf=3)
@@ -3648,9 +3665,6 @@ class TestCQL(UpgradeTester):
             assert_all(cursor, "SELECT k, v FROM test WHERE m CONTAINS 2", [[0, 1]])
             assert_none(cursor, "SELECT k, v FROM test  WHERE m CONTAINS 4")
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12192',
-                   flaky=False)
     @since('2.1')
     def map_keys_indexing_test(self):
         """
@@ -3684,17 +3698,6 @@ class TestCQL(UpgradeTester):
             assert_all(cursor, "SELECT k, v FROM test WHERE k = 0 AND m CONTAINS KEY 'a'", [[0, 0], [0, 1]])
             assert_all(cursor, "SELECT k, v FROM test WHERE m CONTAINS KEY 'c'", [[0, 2]])
             assert_none(cursor, "SELECT k, v FROM test WHERE m CONTAINS KEY 'd'")
-
-            # since 3.0, multiple indexes per-column are supported, so we can
-            # create a value index even though we already have one on the keys
-            # note: creating the second index would be legal before upgrade if
-            # the starting version is >= 3.0, we only attempt it on the upgraded
-            # node to avoid "duplicate index definition" errors
-            if is_upgraded:
-                if self.get_node_version(is_upgraded) >= '3.0':
-                    cursor.execute("CREATE INDEX ON test(m)")
-                else:
-                    assert_invalid(cursor, "CREATE INDEX on test(m)")
 
     def nan_infinity_test(self):
         cursor = self.prepare()
@@ -3949,6 +3952,9 @@ class TestCQL(UpgradeTester):
             # We don't support that
             assert_invalid(cursor, "SELECT s FROM test WHERE v = 1")
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12364',
+                   flaky=True)
     @since('2.1')
     def static_columns_with_distinct_test(self):
         cursor = self.prepare()
@@ -5175,6 +5181,9 @@ class TestCQL(UpgradeTester):
 
             assert_none(cursor, "select * from space1.table1 where a=1 and b=1")
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12457',
+                   flaky=True)
     def bug_5732_test(self):
         cursor = self.prepare(use_cache=True)
 

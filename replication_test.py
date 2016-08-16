@@ -7,6 +7,7 @@ from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
 
 from dtest import PRINT_DEBUG, DtestTimeoutError, Tester, debug
+from nose.plugins.attrib import attr
 from tools import known_failure, no_vnodes, since
 
 TRACE_DETERMINE_REPLICAS = re.compile('Determining replicas for mutation')
@@ -234,6 +235,7 @@ class ReplicationTest(Tester):
             # acknowledged the write:
             self.assertEqual(stats['nodes_sent_write'], stats['nodes_responded_write'])
 
+    @attr("resource-intensive")
     def network_topology_test(self):
         """
         Test the NetworkTopologyStrategy on a 2DC 3:3 node cluster
@@ -313,7 +315,7 @@ class SnitchConfigurationUpdateTest(Tester):
         expected_count = sum([int(r) for d, r in rf.iteritems() if d != 'class'])
         for node in nodes:
             cmd = "getendpoints {} {} dummy".format(ks, table)
-            out, err = node.nodetool(cmd)
+            out, err, _ = node.nodetool(cmd)
 
             if len(err.strip()) > 0:
                 debug("Error running 'nodetool {}': {}".format(cmd, err))
@@ -332,7 +334,7 @@ class SnitchConfigurationUpdateTest(Tester):
         for i, node in enumerate(nodes):
             wait_expire = time.time() + 120
             while time.time() < wait_expire:
-                out, err = node.nodetool("status")
+                out, err, _ = node.nodetool("status")
 
                 debug(out)
                 if len(err.strip()) > 0:
@@ -394,6 +396,7 @@ class SnitchConfigurationUpdateTest(Tester):
                                        final_racks=["rack0", "rack1", "rack2"],
                                        nodes_to_shutdown=[0, 2])
 
+    @attr("resource-intensive")
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11439',
                    flaky=False,
@@ -414,6 +417,7 @@ class SnitchConfigurationUpdateTest(Tester):
                                        final_racks=["rack1", "rack1", "rack1", "rack1", "rack1", "rack1"],
                                        nodes_to_shutdown=[0, 2, 3, 5])
 
+    @attr("resource-intensive")
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11439',
                    flaky=False,
