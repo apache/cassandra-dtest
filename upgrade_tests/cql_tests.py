@@ -3665,9 +3665,6 @@ class TestCQL(UpgradeTester):
             assert_all(cursor, "SELECT k, v FROM test WHERE m CONTAINS 2", [[0, 1]])
             assert_none(cursor, "SELECT k, v FROM test  WHERE m CONTAINS 4")
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12192',
-                   flaky=False)
     @since('2.1')
     def map_keys_indexing_test(self):
         """
@@ -3701,17 +3698,6 @@ class TestCQL(UpgradeTester):
             assert_all(cursor, "SELECT k, v FROM test WHERE k = 0 AND m CONTAINS KEY 'a'", [[0, 0], [0, 1]])
             assert_all(cursor, "SELECT k, v FROM test WHERE m CONTAINS KEY 'c'", [[0, 2]])
             assert_none(cursor, "SELECT k, v FROM test WHERE m CONTAINS KEY 'd'")
-
-            # since 3.0, multiple indexes per-column are supported, so we can
-            # create a value index even though we already have one on the keys
-            # note: creating the second index would be legal before upgrade if
-            # the starting version is >= 3.0, we only attempt it on the upgraded
-            # node to avoid "duplicate index definition" errors
-            if is_upgraded:
-                if self.get_node_version(is_upgraded) >= '3.0':
-                    cursor.execute("CREATE INDEX ON test(m)")
-                else:
-                    assert_invalid(cursor, "CREATE INDEX on test(m)")
 
     def nan_infinity_test(self):
         cursor = self.prepare()
