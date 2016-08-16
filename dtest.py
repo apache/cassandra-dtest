@@ -503,7 +503,7 @@ class Tester(TestCase):
         cluster = PyCluster([node_ip], auth_provider=auth_provider, compression=compression,
                             protocol_version=protocol_version, load_balancing_policy=load_balancing_policy, default_retry_policy=FlakyRetryPolicy(),
                             port=port, ssl_options=ssl_opts, connect_timeout=10)
-        session = cluster.connect()
+        session = cluster.connect(wait_for_all_pools=True)
 
         # temporarily increase client-side timeout to 1m to determine
         # if the cluster is simply responding slowly to requests
