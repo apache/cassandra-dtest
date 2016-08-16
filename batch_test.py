@@ -295,7 +295,7 @@ class TestBatch(Tester):
 
         Here we have one 3.0 node and two 2.2 nodes and we send the batch request to the 3.0 node.
         """
-        self._logged_batch_compatibility_test(0, 1, 'git:cassandra-2.2', 2)
+        self._logged_batch_compatibility_test(0, 1, 'git:cassandra-2.2', 2, 4)
 
     @since('3.0', max_version='3.0.x')
     @skipIf(sys.platform == 'win32', 'Windows production support only on 2.2+')
@@ -305,7 +305,7 @@ class TestBatch(Tester):
 
         Here we have one 3.0 node and two 2.1 nodes and we send the batch request to the 3.0 node.
         """
-        self._logged_batch_compatibility_test(0, 1, 'git:cassandra-2.1', 2)
+        self._logged_batch_compatibility_test(0, 1, 'git:cassandra-2.1', 2, 3)
 
     @since('3.0', max_version='3.0.x')
     @skipIf(sys.platform == 'win32', 'Windows production support only on 2.2+')
@@ -315,7 +315,7 @@ class TestBatch(Tester):
 
         Here we have two 3.0 nodes and one 2.1 node and we send the batch request to the 3.0 node.
         """
-        self._logged_batch_compatibility_test(0, 2, 'git:cassandra-2.1', 1)
+        self._logged_batch_compatibility_test(0, 2, 'git:cassandra-2.1', 1, 3)
 
     @since('3.0', max_version='3.0.x')
     def logged_batch_compatibility_4_test(self):
@@ -324,7 +324,7 @@ class TestBatch(Tester):
 
         Here we have two 3.0 nodes and one 2.2 node and we send the batch request to the 2.2 node.
         """
-        self._logged_batch_compatibility_test(2, 2, 'git:cassandra-2.2', 1)
+        self._logged_batch_compatibility_test(2, 2, 'git:cassandra-2.2', 1, 4)
 
     @since('3.0', max_version='3.0.x')
     @skipIf(sys.platform == 'win32', 'Windows production support only on 2.2+')
@@ -334,10 +334,10 @@ class TestBatch(Tester):
 
         Here we have two 3.0 nodes and one 2.1 node and we send the batch request to the 2.1 node.
         """
-        self._logged_batch_compatibility_test(2, 2, 'git:cassandra-2.1', 1)
+        self._logged_batch_compatibility_test(2, 2, 'git:cassandra-2.1', 1, 3)
 
-    def _logged_batch_compatibility_test(self, coordinator_idx, current_nodes, previous_version, previous_nodes):
-        session = self.prepare_mixed(coordinator_idx, current_nodes, previous_version, previous_nodes)
+    def _logged_batch_compatibility_test(self, coordinator_idx, current_nodes, previous_version, previous_nodes, protocol_version):
+        session = self.prepare_mixed(coordinator_idx, current_nodes, previous_version, previous_nodes, protocol_version=protocol_version)
         query = SimpleStatement("""
             BEGIN BATCH
             INSERT INTO users (id, firstname, lastname) VALUES (0, 'Jack', 'Sparrow')
@@ -369,7 +369,7 @@ class TestBatch(Tester):
         else:
             assert False, "Expecting TimedOutException but no exception was raised"
 
-    def prepare(self, nodes=1, compression=True, version=None):
+    def prepare(self, nodes=1, compression=True, version=None, protocol_version=None):
         if not self.cluster.nodelist():
             self.cluster.populate(nodes)
             if version:
@@ -380,7 +380,7 @@ class TestBatch(Tester):
             self.cluster.start(wait_other_notice=True)
 
         node1 = self.cluster.nodelist()[0]
-        session = self.patient_cql_connection(node1)
+        session = self.patient_cql_connection(node1, protocol_version=protocol_version)
         self.create_schema(session, nodes)
         return session
 
@@ -408,20 +408,20 @@ class TestBatch(Tester):
 
         time.sleep(.5)
 
-    def prepare_mixed(self, coordinator_idx, current_nodes, previous_version, previous_nodes, compression=True):
+    def prepare_mixed(self, coordinator_idx, current_nodes, previous_version, previous_nodes, compression=True, protocol_version=None):
 
         debug("Testing with {} node(s) at version '{}', {} node(s) at current version"
               .format(previous_nodes, previous_version, current_nodes))
 
         # start a cluster using the previous version
-        self.prepare(previous_nodes + current_nodes, compression, previous_version)
+        self.prepare(previous_nodes + current_nodes, compression, previous_version, protocol_version=protocol_version)
 
-        # then upgrade the current nodes to the current version but not hte previous nodes
+        # then upgrade the current nodes to the current version but not the previous nodes
         for i in xrange(current_nodes):
             node = self.cluster.nodelist()[i]
             self.upgrade_node(node)
 
-        session = self.patient_exclusive_cql_connection(self.cluster.nodelist()[coordinator_idx])
+        session = self.patient_exclusive_cql_connection(self.cluster.nodelist()[coordinator_idx], protocol_version=protocol_version)
         session.execute('USE ks')
         return session
 
