@@ -104,6 +104,13 @@ LOG = logging.getLogger('dtest')
 logging.getLogger('cassandra').setLevel(logging.INFO)
 
 
+def index_is_built(node, session, keyspace, table_name, idx_name):
+    # checks if an index has been built
+    full_idx_name = idx_name if node.version() > '3.0' else '{}.{}'.format(table_name, idx_name)
+    index_query = """SELECT * FROM system."IndexInfo" WHERE table_name = '{}' AND index_name = '{}'""".format(keyspace, full_idx_name)
+    return len(list(session.execute(index_query))) == 1
+
+
 def get_sha(repo_dir):
     try:
         output = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=repo_dir).strip()
@@ -111,7 +118,7 @@ def get_sha(repo_dir):
         if os.environ.get('LOCAL_GIT_REPO') is not None:
             prefix = 'local:'
         return "{}{}".format(prefix, output)
-    except CalledProcessError, e:
+    except CalledProcessError as e:
         if re.search('Not a git repository', e.message) is not None:
             # we tried to get a sha, but repo_dir isn't a git repo. No big deal, must just be working from a non-git install.
             return None

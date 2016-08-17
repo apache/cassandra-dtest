@@ -12,7 +12,8 @@ from cassandra.protocol import ConfigurationException
 from cassandra.query import BatchStatement, SimpleStatement
 
 from assertions import assert_invalid, assert_one, assert_row_count
-from dtest import DISABLE_VNODES, OFFHEAP_MEMTABLES, Tester, debug
+from dtest import (DISABLE_VNODES, OFFHEAP_MEMTABLES, Tester, debug,
+                   index_is_built)
 from tools import known_failure, rows_to_list, since
 
 
@@ -291,14 +292,9 @@ class TestSecondaryIndexes(Tester):
         node1.stress(['write', 'n=50K', 'no-warmup'])
         session.execute("use keyspace1;")
         lookup_value = session.execute('select "C0" from standard1 limit 1')[0].C0
-        session.execute('CREATE INDEX ix_c0 ON standard1("C0");')
+        session.execute('CREATE INDEX ix_c0 ON standard1("C0");')\
 
-        def index_is_built():
-            return len(list(session.execute(
-                """SELECT * FROM system."IndexInfo"
-                   WHERE table_name ='keyspace1' AND index_name='ix_c0'"""))) == 1
-
-        while not index_is_built():
+        while not index_is_built(node1, session, 'keyspace1', 'standard1', 'ix_c0'):
             debug("waiting for index to build")
             time.sleep(1)
 
@@ -314,7 +310,7 @@ class TestSecondaryIndexes(Tester):
             index_sstables_dirs.append(index_sstables_dir)
 
         node1.nodetool("rebuild_index keyspace1 standard1 ix_c0")
-        while not index_is_built():
+        while not index_is_built(node1, session, 'keyspace1', 'standard1', 'ix_c0'):
             debug("waiting for index to rebuild")
             time.sleep(1)
 
@@ -456,18 +452,11 @@ class TestSecondaryIndexes(Tester):
         session.execute("CREATE TABLE ks.regular_table (a int PRIMARY KEY, b int)")
         session.execute("CREATE INDEX composites_index on ks.regular_table (b)")
 
-        def index_is_built(table_name, idx_name):
-            index_query = (
-                """SELECT * FROM system_schema.indexes WHERE keyspace_name = 'ks' AND table_name = '{}' AND index_name = '{}'""".format(table_name, idx_name)
-                if self.cluster.version() > '3.0' else
-                """SELECT * FROM system."IndexInfo" WHERE table_name = 'ks' AND index_name = '{}.{}'""".format(table_name, idx_name)
-            )
-            return len(list(session.execute(index_query))) == 1
-
         start = time.time()
-        while not index_is_built('regular_table', 'composites_index') and time.time() + 10 < start:
-            debug("waiting for index to build")
-            time.sleep(1)
+        for node in cluster.nodelist():
+            while not index_is_built(node, session, 'ks', 'regular_table', 'composites_index') and time.time() + 10 < start:
+                debug("waiting for index to build")
+                time.sleep(1)
 
         insert_args = [(i, i % 2) for i in xrange(100)]
         execute_concurrent_with_args(session,
@@ -924,14 +913,7 @@ class TestSecondaryIndexesOnCollections(Tester):
             stmt = "CREATE INDEX user_uuids_values on map_index_search.users (uuids);"
             session.execute(stmt)
 
-        def index_is_built():
-            index_name = 'user_uuids_values'
-            if self.cluster.version() < '3.0':
-                index_name = 'users.' + index_name
-            return len(list(session.execute("""SELECT * FROM system."IndexInfo"
-                   WHERE table_name ='map_index_search' AND index_name='{0}'""".format(index_name)))) == 1
-
-        while not index_is_built():
+        while not index_is_built(node1, session, 'map_index_search', 'users', 'user_uuids_values'):
             debug("waiting for index to build")
             time.sleep(1)
 
