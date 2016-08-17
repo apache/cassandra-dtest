@@ -1055,6 +1055,9 @@ class TestMaterializedViews(Tester):
                 cl=ConsistencyLevel.QUORUM
             )
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12475',
+                   flaky=True)
     def really_complex_repair_test(self):
         """
         Test that a materialized view are consistent after a more complex repair.
