@@ -20,7 +20,6 @@ from thrift_tests import get_thrift_client
 from tools import debug, since, known_failure
 from utils.metadata_wrapper import (UpdatingClusterMetadataWrapper,
                                     UpdatingKeyspaceMetadataWrapper,
-                                    UpdatingMetadataDictWrapper,
                                     UpdatingTableMetadataWrapper)
 
 
@@ -193,22 +192,24 @@ class StorageProxyCQLTester(CQLTester):
         # TODO is this even necessary given the existence of the auth_tests?
         """
         session = self.prepare()
+        # even though we only ever use the user_types attribute of this object,
+        # we have to access it each time, because attribute access is how the
+        # value is updated
         ks_meta = UpdatingKeyspaceMetadataWrapper(session.cluster, ks_name='ks')
-        types_meta = UpdatingMetadataDictWrapper(parent=ks_meta, attr_name='user_types')
 
         session.execute("CREATE TYPE address_t (street text, city text, zip_code int)")
-        self.assertIn('address_t', types_meta)
+        self.assertIn('address_t', ks_meta.user_types)
 
         session.execute("CREATE TABLE test4 (id int PRIMARY KEY, address frozen<address_t>)")
 
         session.execute("ALTER TYPE address_t ADD phones set<text>")
-        self.assertIn('phones', types_meta['address_t'].field_names)
+        self.assertIn('phones', ks_meta.user_types['address_t'].field_names)
 
         # drop the table so we can safely drop the type it uses
         session.execute("DROP TABLE test4")
 
         session.execute("DROP TYPE address_t")
-        self.assertNotIn('address_t', types_meta)
+        self.assertNotIn('address_t', ks_meta.user_types)
 
     def user_test(self):
         """
