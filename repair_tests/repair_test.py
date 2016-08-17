@@ -721,6 +721,43 @@ class TestRepair(BaseRepairTest):
 
         self._parameterized_range_repair(repair_opts=['-pr'])
 
+    @since('3.10')
+    @no_vnodes()
+    def pull_repair_test(self):
+        """
+        Test repair using the --pull option
+        @jira_ticket CASSANDRA-9876
+        * Launch a three node cluster
+        * Insert some data at RF 2
+        * Shut down node2, insert more data, restore node2
+        * Issue a pull repair on a range that only belongs to node1
+        * Verify that nodes 1 and 2, and only nodes 1+2, are repaired
+        * Verify that node1 only received data
+        * Verify that node2 only sent data
+        """
+        cluster = self.cluster
+        cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
+        cluster.set_batch_commitlog(enabled=True)
+        debug("Starting cluster..")
+        cluster.populate(3).start(wait_for_binary_proto=True)
+
+        node1, node2, node3 = cluster.nodelist()
+
+        node1_address = node1.network_interfaces['binary'][0]
+        node2_address = node2.network_interfaces['binary'][0]
+
+        self._parameterized_range_repair(repair_opts=['--pull', '--in-hosts', node1_address + ',' + node2_address, '-st', str(node3.initial_token), '-et', str(node1.initial_token)])
+
+        # Node 1 should only receive files (as we ran a pull repair on node1)
+        self.assertTrue(len(node1.grep_log("Receiving [1-9][0-9]* files")) > 0)
+        self.assertEqual(len(node1.grep_log("sending [1-9][0-9]* files")), 0)
+        self.assertTrue(len(node1.grep_log("sending 0 files")) > 0)
+
+        # Node 2 should only send files (as we ran a pull repair on node1)
+        self.assertEqual(len(node2.grep_log("Receiving [1-9][0-9]* files")), 0)
+        self.assertTrue(len(node2.grep_log("Receiving 0 files")) > 0)
+        self.assertTrue(len(node2.grep_log("sending [1-9][0-9]* files")) > 0)
+
     def _parameterized_range_repair(self, repair_opts):
         """
         @param repair_opts A list of strings which represent cli args to nodetool repair
