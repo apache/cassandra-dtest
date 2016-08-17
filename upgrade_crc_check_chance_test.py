@@ -1,6 +1,6 @@
 from assertions import assert_crc_check_chance_equal, assert_one
 from dtest import Tester, debug
-from tools import known_failure, since
+from tools import since
 
 
 @since('3.0')
@@ -16,9 +16,6 @@ class TestCrcCheckChanceUpgrade(Tester):
         ]
         Tester.__init__(self, *args, **kwargs)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11699',
-                   flaky=True)
     def crc_check_chance_upgrade_test(self):
         """
         Tests behavior of compression property crc_check_chance after upgrade to 3.0,

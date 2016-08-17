@@ -721,6 +721,43 @@ class TestRepair(BaseRepairTest):
 
         self._parameterized_range_repair(repair_opts=['-pr'])
 
+    @since('3.10')
+    @no_vnodes()
+    def pull_repair_test(self):
+        """
+        Test repair using the --pull option
+        @jira_ticket CASSANDRA-9876
+        * Launch a three node cluster
+        * Insert some data at RF 2
+        * Shut down node2, insert more data, restore node2
+        * Issue a pull repair on a range that only belongs to node1
+        * Verify that nodes 1 and 2, and only nodes 1+2, are repaired
+        * Verify that node1 only received data
+        * Verify that node2 only sent data
+        """
+        cluster = self.cluster
+        cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
+        cluster.set_batch_commitlog(enabled=True)
+        debug("Starting cluster..")
+        cluster.populate(3).start(wait_for_binary_proto=True)
+
+        node1, node2, node3 = cluster.nodelist()
+
+        node1_address = node1.network_interfaces['binary'][0]
+        node2_address = node2.network_interfaces['binary'][0]
+
+        self._parameterized_range_repair(repair_opts=['--pull', '--in-hosts', node1_address + ',' + node2_address, '-st', str(node3.initial_token), '-et', str(node1.initial_token)])
+
+        # Node 1 should only receive files (as we ran a pull repair on node1)
+        self.assertTrue(len(node1.grep_log("Receiving [1-9][0-9]* files")) > 0)
+        self.assertEqual(len(node1.grep_log("sending [1-9][0-9]* files")), 0)
+        self.assertTrue(len(node1.grep_log("sending 0 files")) > 0)
+
+        # Node 2 should only send files (as we ran a pull repair on node1)
+        self.assertEqual(len(node2.grep_log("Receiving [1-9][0-9]* files")), 0)
+        self.assertTrue(len(node2.grep_log("Receiving 0 files")) > 0)
+        self.assertTrue(len(node2.grep_log("sending [1-9][0-9]* files")) > 0)
+
     def _parameterized_range_repair(self, repair_opts):
         """
         @param repair_opts A list of strings which represent cli args to nodetool repair
@@ -884,6 +921,38 @@ class TestRepair(BaseRepairTest):
         node3.stop(wait_other_notice=True)
         _, _, rc = node2.stress(['read', 'n=1M', 'no-warmup', '-rate', 'threads=30'], whitelist=True)
         self.assertEqual(rc, 0)
+
+    def test_dead_coordinator(self):
+        """
+        @jira_ticket CASSANDRA-11824
+        Make sure parent repair session is cleared out if the repair coordinator dies
+        """
+        cluster = self.cluster
+        cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
+        cluster.populate(3).start(wait_for_binary_proto=True)
+        node1, node2, node3 = cluster.nodelist()
+        node1.stress(['write', 'n=100k', '-schema', 'replication(factor=3)', '-rate', 'threads=30'])
+        if cluster.version() >= "2.2":
+            t1 = threading.Thread(target=node1.repair)
+            t1.start()
+            node2.watch_log_for('Validating ValidationRequest', filename='debug.log')
+        else:
+            t1 = threading.Thread(target=node1.nodetool, args=('repair keyspace1 standard1 -inc -par',))
+            t1.start()
+            node1.watch_log_for('requesting merkle trees', filename='system.log')
+            time.sleep(2)
+
+        debug("stopping node1")
+        node1.stop(gently=False, wait_other_notice=True)
+        t1.join()
+        debug("starting node1 - first repair should have failed")
+        node1.start(wait_for_binary_proto=True, wait_other_notice=True)
+        debug("running second repair")
+        if cluster.version() >= "2.2":
+            node1.repair()
+        else:
+            node1.nodetool('repair keyspace1 standard1 -inc -par')
+
 
 RepairTableContents = namedtuple('RepairTableContents',
                                  ['parent_repair_history', 'repair_history'])
