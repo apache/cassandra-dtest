@@ -4,7 +4,7 @@ from distutils.version import LooseVersion
 
 from dtest import Tester, debug
 from jmxutils import JolokiaAgent, make_mbean, remove_perf_disable_shared_mem
-from tools import insert_c1c2, since, known_failure
+from tools import insert_c1c2, since
 
 
 @since("2.2")
@@ -15,9 +15,6 @@ class TestDeprecatedRepairAPI(Tester):
     Test if deprecated repair JMX API runs with expected parameters
     """
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12451',
-                   flaky=True)
     def force_repair_async_1_test(self):
         """
         test forceRepairAsync(String keyspace, boolean isSequential,
@@ -35,9 +32,6 @@ class TestDeprecatedRepairAPI(Tester):
         self.assertEqual(opt["hosts"], "[]", opt)
         self.assertEqual(opt["column_families"], "[cf]", opt)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12451',
-                   flaky=True)
     def force_repair_async_2_test(self):
         """
         test forceRepairAsync(String keyspace, int parallelismDegree,
@@ -55,9 +49,6 @@ class TestDeprecatedRepairAPI(Tester):
         self.assertEqual(opt["hosts"], "[]", opt)
         self.assertEqual(opt["column_families"], "[]", opt)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12451',
-                   flaky=True)
     def force_repair_async_3_test(self):
         """
         test forceRepairAsync(String keyspace, boolean isSequential,
@@ -74,9 +65,6 @@ class TestDeprecatedRepairAPI(Tester):
         self.assertEqual(opt["hosts"], "[]", opt)
         self.assertEqual(opt["column_families"], "[cf]", opt)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12451',
-                   flaky=True)
     def force_repair_range_async_1_test(self):
         """
         test forceRepairRangeAsync(String beginToken, String endToken,
@@ -96,9 +84,6 @@ class TestDeprecatedRepairAPI(Tester):
         self.assertEqual(opt["ranges"], "1", opt)
         self.assertEqual(opt["column_families"], "[cf]", opt)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12451',
-                   flaky=True)
     def force_repair_range_async_2_test(self):
         """
         test forceRepairRangeAsync(String beginToken, String endToken,
@@ -118,9 +103,6 @@ class TestDeprecatedRepairAPI(Tester):
         self.assertEqual(opt["ranges"], "1", opt)
         self.assertEqual(opt["column_families"], "[cf]", opt)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12451',
-                   flaky=True)
     def force_repair_range_async_3_test(self):
         """
         test forceRepairRangeAsync(String beginToken, String endToken,
