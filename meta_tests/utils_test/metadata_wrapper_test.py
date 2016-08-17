@@ -66,10 +66,12 @@ class UpdatingTableMetadataWrapperTest(TestCase):
     def setUp(self):
         self.cluster_mock = MagicMock()
         self.ks_name_sentinel, self.table_name_sentinel = Mock(name='ks'), Mock(name='tab')
+        self.max_schema_agreement_wait_sentinel = Mock(name='wait')
         self.wrapper = UpdatingTableMetadataWrapper(
             cluster=self.cluster_mock,
             ks_name=self.ks_name_sentinel,
-            table_name=self.table_name_sentinel
+            table_name=self.table_name_sentinel,
+            max_schema_agreement_wait=self.max_schema_agreement_wait_sentinel
         )
 
     def wrapped_access_calls_refresh_test(self):
@@ -80,7 +82,22 @@ class UpdatingTableMetadataWrapperTest(TestCase):
         self.cluster_mock.refresh_table_metadata.assert_not_called()
         self.wrapper._wrapped
         self.cluster_mock.refresh_table_metadata.assert_called_once_with(
-            self.ks_name_sentinel, self.table_name_sentinel
+            self.ks_name_sentinel,
+            self.table_name_sentinel,
+            max_schema_agreement_wait=self.max_schema_agreement_wait_sentinel
+        )
+
+    def default_wrapper_max_schema_agreement_wait_is_None_test(self):
+        wrapper = UpdatingTableMetadataWrapper(
+            cluster=self.cluster_mock,
+            ks_name=self.ks_name_sentinel,
+            table_name=self.table_name_sentinel
+        )
+        wrapper._wrapped
+        self.cluster_mock.refresh_table_metadata.assert_called_once_with(
+            self.ks_name_sentinel,
+            self.table_name_sentinel,
+            max_schema_agreement_wait=None
         )
 
     def wrapped_returns_table_metadata_test(self):
@@ -111,8 +128,9 @@ class UpdatingTableMetadataWrapperTest(TestCase):
     def repr_test(self):
         self.assertEqual(
             repr(self.wrapper),
-            'UpdatingTableMetadataWrapper(cluster={}, ks_name={}, table_name={})'.format(
-                self.cluster_mock, self.ks_name_sentinel, self.table_name_sentinel
+            'UpdatingTableMetadataWrapper(cluster={}, ks_name={}, table_name={}, max_schema_agreement_wait={})'.format(
+                self.cluster_mock, self.ks_name_sentinel,
+                self.table_name_sentinel, self.max_schema_agreement_wait_sentinel
             )
         )
 
@@ -121,8 +139,10 @@ class UpdatingKeyspaceMetadataWrapperTest(TestCase):
 
     def setUp(self):
         self.cluster_mock, self.ks_name_sentinel = MagicMock(), Mock(name='ks')
+        self.max_schema_agreement_wait_sentinel = Mock(name='wait')
         self.wrapper = UpdatingKeyspaceMetadataWrapper(
-            cluster=self.cluster_mock, ks_name=self.ks_name_sentinel
+            cluster=self.cluster_mock, ks_name=self.ks_name_sentinel,
+            max_schema_agreement_wait=self.max_schema_agreement_wait_sentinel
         )
 
     def wrapped_access_calls_refresh_test(self):
@@ -133,7 +153,19 @@ class UpdatingKeyspaceMetadataWrapperTest(TestCase):
         self.cluster_mock.refresh_keyspace_metadata.assert_not_called()
         self.wrapper._wrapped
         self.cluster_mock.refresh_keyspace_metadata.assert_called_once_with(
-            self.ks_name_sentinel
+            self.ks_name_sentinel,
+            max_schema_agreement_wait=self.max_schema_agreement_wait_sentinel
+        )
+
+    def default_wrapper_max_schema_agreement_wait_is_None_test(self):
+        wrapper = UpdatingKeyspaceMetadataWrapper(
+            cluster=self.cluster_mock,
+            ks_name=self.ks_name_sentinel
+        )
+        wrapper._wrapped
+        self.cluster_mock.refresh_keyspace_metadata.assert_called_once_with(
+            self.ks_name_sentinel,
+            max_schema_agreement_wait=None
         )
 
     def wrapped_returns_keyspace_metadata_test(self):
@@ -150,8 +182,8 @@ class UpdatingKeyspaceMetadataWrapperTest(TestCase):
     def repr_test(self):
         self.assertEqual(
             repr(self.wrapper),
-            'UpdatingKeyspaceMetadataWrapper(cluster={}, ks_name={})'.format(
-                self.cluster_mock, self.ks_name_sentinel
+            'UpdatingKeyspaceMetadataWrapper(cluster={}, ks_name={}, max_schema_agreement_wait={})'.format(
+                self.cluster_mock, self.ks_name_sentinel, self.max_schema_agreement_wait_sentinel
             )
         )
 
@@ -160,7 +192,11 @@ class UpdatingClusterMetadataWrapperTest(TestCase):
 
     def setUp(self):
         self.cluster_mock = MagicMock()
-        self.wrapper = UpdatingClusterMetadataWrapper(cluster=self.cluster_mock)
+        self.max_schema_agreement_wait_sentinel = Mock(name='wait')
+        self.wrapper = UpdatingClusterMetadataWrapper(
+            cluster=self.cluster_mock,
+            max_schema_agreement_wait=self.max_schema_agreement_wait_sentinel
+        )
 
     def wrapped_access_calls_refresh_test(self):
         """
@@ -169,7 +205,16 @@ class UpdatingClusterMetadataWrapperTest(TestCase):
         """
         self.cluster_mock.refresh_schema_metadata.assert_not_called()
         self.wrapper._wrapped
-        self.cluster_mock.refresh_schema_metadata.assert_called_once_with()
+        self.cluster_mock.refresh_schema_metadata.assert_called_once_with(
+            max_schema_agreement_wait=self.max_schema_agreement_wait_sentinel
+        )
+
+    def default_wrapper_max_schema_agreement_wait_is_None_test(self):
+        wrapper = UpdatingClusterMetadataWrapper(cluster=self.cluster_mock)
+        wrapper._wrapped
+        self.cluster_mock.refresh_schema_metadata.assert_called_once_with(
+            max_schema_agreement_wait=None
+        )
 
     def wrapped_returns_cluster_metadata_test(self):
         """
@@ -180,5 +225,8 @@ class UpdatingClusterMetadataWrapperTest(TestCase):
     def repr_test(self):
         self.assertEqual(
             repr(self.wrapper),
-            'UpdatingClusterMetadataWrapper(cluster={})'.format(self.cluster_mock)
+            'UpdatingClusterMetadataWrapper(cluster={}, max_schema_agreement_wait={})'.format(
+                self.cluster_mock,
+                self.max_schema_agreement_wait_sentinel
+            )
         )
