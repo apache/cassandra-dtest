@@ -43,8 +43,11 @@ class TestAuth(Tester):
         debug("nodes started")
 
         session = self.get_session(user='cassandra', password='cassandra')
-        auth_metadata = UpdatingKeyspaceMetadataWrapper(cluster=session.cluster,
-                                                        ks_name='system_auth')
+        auth_metadata = UpdatingKeyspaceMetadataWrapper(
+            cluster=session.cluster,
+            ks_name='system_auth',
+            max_schema_agreement_wait=30  # 3x the default of 10
+        )
         self.assertEquals(1, auth_metadata.replication_strategy.replication_factor)
 
         session.execute("""
