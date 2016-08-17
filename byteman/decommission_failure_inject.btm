@@ -1,0 +1,17 @@
+#
+# Inject decommission failure to fail streaming from 127.0.0.1
+#
+# Before start streaming files in `StreamSession#onInitializationComplete()` method,
+# interrupt streaming by throwing RuntimeException.
+#
+RULE inject decommission failure
+CLASS org.apache.cassandra.streaming.StreamSession
+METHOD onInitializationComplete
+AT INVOKE startStreamingFiles
+BIND peer = $0.peer
+# set flag to only run this rule once.
+IF peer.equals(InetAddress.getByName("127.0.0.1")) AND NOT flagged("done")
+DO
+   flag("done");
+   throw new java.lang.RuntimeException("Triggering network failure")
+ENDRULE

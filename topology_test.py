@@ -53,6 +53,96 @@ class TestTopology(Tester):
         # described in 9912. Do not remove it.
         time.sleep(10)
 
+    def concurrent_decommission_not_allowed_test(self):
+        """
+        Test concurrent decommission is not allowed
+        """
+        cluster = self.cluster
+        cluster.set_configuration_options(values={'stream_throughput_outbound_megabits_per_sec': 1})
+        cluster.populate(2).start(wait_other_notice=True)
+        node1, node2 = cluster.nodelist()
+
+        session = self.patient_cql_connection(node2)
+        self.create_ks(session, 'ks', 1)
+        self.create_cf(session, 'cf', columns={'c1': 'text', 'c2': 'text'})
+        insert_c1c2(session, n=10000, consistency=ConsistencyLevel.ALL)
+
+        mark = node2.mark_log()
+
+        def decommission():
+            node2.nodetool('decommission')
+
+        # Launch first decommission in a external thread
+        t = Thread(target=decommission)
+        t.start()
+
+        # Make sure first decommission is initialized before second decommission
+        node2.watch_log_for('DECOMMISSIONING', filename='debug.log')
+
+        # Launch a second decommission, should fail
+        with self.assertRaises(ToolError):
+            node2.nodetool('decommission')
+
+        # Check data is correctly forwarded to node1 after node2 is decommissioned
+        t.join()
+        node2.watch_log_for('DECOMMISSIONED', from_mark=mark)
+        session = self.patient_cql_connection(node1)
+        session.execute('USE ks')
+        for n in xrange(0, 10000):
+            query_c1c2(session, n, ConsistencyLevel.ONE)
+
+    @since('3.10')
+    def resumable_decommission_test(self):
+        """
+        @jira_ticket CASSANDRA-12008
+
+        Test decommission operation is resumable
+        """
+        self.ignore_log_patterns = [r'Streaming error occurred', r'Error while decommissioning node', r'Remote peer 127.0.0.2 failed stream session']
+        cluster = self.cluster
+        cluster.set_configuration_options(values={'stream_throughput_outbound_megabits_per_sec': 1})
+        cluster.populate(3, install_byteman=True).start(wait_other_notice=True)
+        node1, node2, node3 = cluster.nodelist()
+
+        session = self.patient_cql_connection(node2)
+        self.create_ks(session, 'ks', 2)
+        self.create_cf(session, 'cf', columns={'c1': 'text', 'c2': 'text'})
+        insert_c1c2(session, n=10000, consistency=ConsistencyLevel.ALL)
+
+        # Execute first rebuild, should fail
+        with self.assertRaises(ToolError):
+            script = ['./byteman/decommission_failure_inject.btm']
+            node2.byteman_submit(script)
+            node2.nodetool('decommission')
+
+        # Make sure previous ToolError is due to decommission
+        node2.watch_log_for('Error while decommissioning node')
+
+        # Decommission again
+        mark = node2.mark_log()
+        node2.nodetool('decommission')
+
+        # Check decommision is done and we skipped transfereed ranges
+        node2.watch_log_for('DECOMMISSIONED', from_mark=mark)
+        node2.grep_log("Skipping transferred range .* of keyspace ks, endpoint /127.0.0.3", filename='debug.log')
+
+        # Check data is correctly forwarded to node1 and node3
+        cluster.remove(node2)
+        node3.stop(gently=False)
+        session = self.patient_exclusive_cql_connection(node1)
+        session.execute('USE ks')
+        for i in xrange(0, 10000):
+            query_c1c2(session, i, ConsistencyLevel.ONE)
+        node1.stop(gently=False)
+        node3.start()
+        session.shutdown()
+        mark = node3.mark_log()
+        node3.watch_log_for('Starting listening for CQL clients', from_mark=mark)
+        session = self.patient_exclusive_cql_connection(node3)
+        session.execute('USE ks')
+        for i in xrange(0, 10000):
+            query_c1c2(session, i, ConsistencyLevel.ONE)
+
     @no_vnodes()
     def movement_test(self):
         cluster = self.cluster
