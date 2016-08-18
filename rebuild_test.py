@@ -5,7 +5,7 @@ from cassandra import ConsistencyLevel
 from ccmlib.node import ToolError
 
 from dtest import Tester, debug
-from tools import insert_c1c2, query_c1c2, since, known_failure
+from tools import insert_c1c2, query_c1c2, since
 
 
 class TestRebuild(Tester):
@@ -24,9 +24,6 @@ class TestRebuild(Tester):
         ]
         Tester.__init__(self, *args, **kwargs)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12480',
-                   flaky=True)
     def simple_rebuild_test(self):
         """
         @jira_ticket CASSANDRA-9119
