@@ -191,6 +191,9 @@ class TestArchiveCommitlog(SnapshotTester):
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11811',
                    flaky=False,
                    notes='Fails on windows.')
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12495',
+                   flaky=True)
     def test_archive_commitlog_point_in_time_with_active_commitlog_ln(self):
         """
         Test archive commit log with restore_point_in_time setting

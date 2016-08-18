@@ -303,6 +303,9 @@ class TestTopology(Tester):
 
         self.assertFalse(node3.is_running())
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12494',
+                   flaky=True)
     @since('3.0')
     def crash_during_decommission_test(self):
         """

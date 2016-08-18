@@ -824,8 +824,9 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
             self.assertEqual(pf.num_results_all(), [400, 200])
             self.assertEqualIgnoreOrder(expected_data, pf.all_data())
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12249')
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12491',
+                   flaky=True)
     @known_failure(failure_source='cassandra',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11195',
                    flaky=True,
