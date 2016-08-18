@@ -73,9 +73,12 @@ class TestRebuild(Tester):
         # alter keyspace to replicate to dc2
         session = self.patient_exclusive_cql_connection(node2)
         session.execute("ALTER KEYSPACE ks WITH REPLICATION = {'class':'NetworkTopologyStrategy', 'dc1':1, 'dc2':1};")
-        # alter system_auth -- rebuilding it no longer possible after
-        # CASSANDRA-11848 prevented local node from being considered a source
-        session.execute("ALTER KEYSPACE system_auth WITH REPLICATION = {'class':'NetworkTopologyStrategy', 'dc1':1, 'dc2':1};")
+        if self.cluster.version() >= '2.2':
+            # alter system_auth -- rebuilding it no longer possible after
+            # CASSANDRA-11848 prevented local node from being considered a source
+            # Only do this on 2.2+, because on 2.1, this keyspace only
+            # exists if auth is enabled, which it isn't in this test
+            session.execute("ALTER KEYSPACE system_auth WITH REPLICATION = {'class':'NetworkTopologyStrategy', 'dc1':1, 'dc2':1};")
         session.execute('USE ks')
 
         self.rebuild_errors = 0
