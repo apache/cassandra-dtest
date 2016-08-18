@@ -15,11 +15,13 @@ from tools.decorators import known_failure, since
 
 from bootstrap_test import assert_bootstrap_state
 
+
 class NodeUnavailable(Exception):
     pass
 
 
-class TestReplaceAddress(Tester):
+class BaseReplaceAddressTest(Tester):
+    __test__ = False
 
     def __init__(self, *args, **kwargs):
         kwargs['cluster_options'] = {'start_rpc': 'true'}
@@ -191,23 +193,51 @@ class TestReplaceAddress(Tester):
 
         return len(logs)
 
-    def _verify_restart_old_node_fails(self):
-        # check that restarting node 3 doesn't work
-        debug("Try to restart {} (should fail)".format(self.replaced_node.name))
-        self.replaced_node.start(wait_other_notice=False)
-        collision_log = self.query_node \
-                            .grep_log("Node /{} will complete replacement of /{} for tokens"
-                                      .format(self.replacement_node.address(),
-                                              self.replaced_node.address()))
-        self.assertEqual(len(collision_log), 1)
+    def _test_insert_data_during_replace(self, same_address, mixed_versions=False):
+        """
+        @jira_ticket CASSANDRA-8523
+        """
+        default_install_dir = self.cluster.get_install_dir()
+        self._setup(opts={'hinted_handoff_enabled': False}, mixed_versions=mixed_versions)
 
-        # replace node 3 with node 4
-        debug("Starting node 4 to replace node 3")
-        node4 = Node('node4', cluster=cluster, auto_bootstrap=True, thrift_interface=('127.0.0.4', 9160),
-                     storage_interface=('127.0.0.4', 7000), jmx_port='7400', remote_debug_port='0',
-                     initial_token=None, binary_interface=('127.0.0.4', 9042))
-        cluster.add(node4, False)
-        node4.start(jvm_args=["-Dcassandra.replace_address_first_boot=127.0.0.3"], wait_for_binary_proto=True)
+        self._insert_data(n='1k')
+        initial_data = self._fetch_initial_data()
+        self._stop_node_to_replace()
+
+        if mixed_versions:
+            debug("Upgrading all except {} to current version".format(self.query_node.address()))
+            self.cluster.set_install_dir(install_dir=default_install_dir)
+            for node in self.cluster.nodelist():
+                if node.is_running() and node != self.query_node:
+                    debug("Upgrading {} to current version".format(node.address()))
+                    node.stop(gently=True, wait_other_notice=True)
+                    node.start(wait_other_notice=True, wait_for_binary_proto=True)
+
+        # start node in current version on write survey mode
+        self._do_replace(same_address=same_address, extra_jvm_args=["-Dcassandra.write_survey=true"])
+
+        # Insert additional keys on query node
+        self._insert_data(n='2k', whitelist=True)
+
+        # If not same address or mixed versions, query node should forward writes to replacement node
+        # so we update initial data to reflect additional keys inserted during replace
+        if not same_address and not mixed_versions:
+            initial_data = self._fetch_initial_data(cl=ConsistencyLevel.TWO)
+
+        debug("Joining replaced node")
+        self.replacement_node.nodetool("join")
+
+        if not same_address:
+            for node in self.cluster.nodelist():
+                # if mixed version, query node is not upgraded so it will not print replacement log
+                if node.is_running() and (not mixed_versions or node != self.query_node):
+                    self._verify_replacement(node, same_address)
+
+        self._verify_data(initial_data)
+
+
+class TestReplaceAddress(BaseReplaceAddressTest):
+    __test__ = True
 
     @known_failure(failure_source='systemic',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11652',
@@ -382,6 +412,22 @@ class TestReplaceAddress(Tester):
                 self._do_replace(wait_for_binary_proto=False)
                 self.replacement_node.watch_log_for('To perform this operation, please restart with -Dcassandra.allow_unsafe_replace=true',
                                                     from_mark=mark, timeout=20)
+
+    @since('2.2')
+    def insert_data_during_replace_same_address_test(self):
+        """
+        Test that replacement node with same address DOES NOT receive writes during replacement
+        @jira_ticket CASSANDRA-8523
+        """
+        self._test_insert_data_during_replace(same_address=True)
+
+    @since('2.2')
+    def insert_data_during_replace_different_address_test(self):
+        """
+        Test that replacement node with different address DOES receive writes during replacement
+        @jira_ticket CASSANDRA-8523
+        """
+        self._test_insert_data_during_replace(same_address=False)
 
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12085',
