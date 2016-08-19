@@ -3129,7 +3129,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
         try:
             self.session.execute(SimpleStatement("select * from paging_test", fetch_size=1000, consistency_level=CL.ALL, retry_policy=FallthroughRetryPolicy()))
         except ReadTimeout as exc:
-            self.assertTrue(self.cluster.version() < '2.2')
+            self.assertTrue(LooseVersion(self.cluster.version()) < LooseVersion('2.2'))
         except ReadFailure as exc:
             if supports_v5_protocol:
                 self.assertIsNotNone(exc.error_code_map)
