@@ -292,9 +292,10 @@ class TestSecondaryIndexes(Tester):
         node1.stress(['write', 'n=50K', 'no-warmup'])
         session.execute("use keyspace1;")
         lookup_value = session.execute('select "C0" from standard1 limit 1')[0].C0
-        session.execute('CREATE INDEX ix_c0 ON standard1("C0");')\
+        session.execute('CREATE INDEX ix_c0 ON standard1("C0");')
 
-        while not index_is_built(node1, session, 'keyspace1', 'standard1', 'ix_c0'):
+        start = time.time()
+        while not index_is_built(node1, session, 'keyspace1', 'standard1', 'ix_c0') and time.time() < start + 30:
             debug("waiting for index to build")
             time.sleep(1)
 
@@ -310,7 +311,8 @@ class TestSecondaryIndexes(Tester):
             index_sstables_dirs.append(index_sstables_dir)
 
         node1.nodetool("rebuild_index keyspace1 standard1 ix_c0")
-        while not index_is_built(node1, session, 'keyspace1', 'standard1', 'ix_c0'):
+        start = time.time()
+        while not index_is_built(node1, session, 'keyspace1', 'standard1', 'ix_c0') and time.time() < start + 30:
             debug("waiting for index to rebuild")
             time.sleep(1)
 
@@ -913,7 +915,8 @@ class TestSecondaryIndexesOnCollections(Tester):
             stmt = "CREATE INDEX user_uuids_values on map_index_search.users (uuids);"
             session.execute(stmt)
 
-        while not index_is_built(node1, session, 'map_index_search', 'users', 'user_uuids_values'):
+        start = time.time()
+        while not index_is_built(node1, session, 'map_index_search', 'users', 'user_uuids_values') and time.time() < start + 30:
             debug("waiting for index to build")
             time.sleep(1)
 
