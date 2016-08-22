@@ -582,9 +582,6 @@ class AbortedQueriesTester(CQLTester):
     #      more than one value.
     """
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12514',
-                   flaky=False)
     def local_query_test(self):
         """
         Check that a query running on the local coordinator node times out:
@@ -628,9 +625,6 @@ class AbortedQueriesTester(CQLTester):
         assert_unavailable(lambda c: debug(c.execute(statement)), session)
         node.watch_log_for("operations timed out", from_mark=mark, timeout=60)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12515',
-                   flaky=False)
     def remote_query_test(self):
         """
         Check that a query running on a node other than the coordinator times out:
@@ -792,6 +786,7 @@ class AbortedQueriesTester(CQLTester):
         node2.watch_log_for("operations timed out", from_mark=mark, timeout=60)
 
 
+@since('3.10')
 class SlowQueryTester(CQLTester):
     """
     Test slow query logging.
