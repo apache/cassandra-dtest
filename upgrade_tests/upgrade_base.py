@@ -191,7 +191,7 @@ class UpgradeTester(Tester):
         return node1.version()
 
     def get_node_versions(self):
-        return [n.get_cassandra_version() for n in self.cluster.nodelist()]
+        return [LooseVersion(n.get_cassandra_version()) for n in self.cluster.nodelist()]
 
     def node_version_above(self, version):
         return min(self.get_node_versions()) >= version
@@ -201,7 +201,7 @@ class UpgradeTester(Tester):
         Used in places where is_upgraded was used to determine if the node version was >=2.2.
         """
         node_versions = self.get_node_versions()
-        self.assertLessEqual(len(set(node_versions)), 2)
+        self.assertLessEqual(len({v.vstring for v in node_versions}), 2)
         return max(node_versions) if is_upgraded else min(node_versions)
 
     def tearDown(self):

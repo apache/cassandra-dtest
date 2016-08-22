@@ -1539,7 +1539,7 @@ class TestCQL(UpgradeTester):
         for is_upgraded, session, node in self.do_upgrade(session, return_nodes=True):
             debug("Querying {} node".format("upgraded" if is_upgraded else "old"))
 
-            upgrade_to_version = LooseVersion(self.get_node_version(is_upgraded=True))
+            upgrade_to_version = self.get_node_version(is_upgraded=True)
             if LooseVersion('3.0.0') <= upgrade_to_version <= LooseVersion('3.0.6'):
                 self.skip('CASSANDRA-11930 was fixed in 3.0.7 and 3.7')
             elif LooseVersion('3.1') <= upgrade_to_version <= LooseVersion('3.6'):
@@ -3179,7 +3179,7 @@ class TestCQL(UpgradeTester):
 
             debug("Current node version is {}".format(self.get_node_version(is_upgraded)))
 
-            if LooseVersion(self.get_node_version(is_upgraded)) < LooseVersion('3.8'):
+            if self.get_node_version(is_upgraded) < LooseVersion('3.8'):
                 error_msg = "Aliases aren't allowed in the where clause"
             else:
                 error_msg = "Undefined column name"
@@ -3187,7 +3187,7 @@ class TestCQL(UpgradeTester):
             # test that select throws a meaningful exception for aliases in where clause
             assert_invalid(cursor, 'SELECT id AS user_id, name AS user_name FROM users WHERE user_id = 0', matching=error_msg)
 
-            if LooseVersion(self.get_node_version(is_upgraded)) < LooseVersion('3.8'):
+            if self.get_node_version(is_upgraded) < LooseVersion('3.8'):
                 error_msg = "Aliases are not allowed in order by clause"
 
             # test that select throws a meaningful exception for aliases in order by clause
