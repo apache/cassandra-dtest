@@ -13,7 +13,7 @@ from cassandra.query import BatchStatement, SimpleStatement
 
 from assertions import assert_invalid, assert_one, assert_row_count
 from dtest import (DISABLE_VNODES, OFFHEAP_MEMTABLES, Tester, debug,
-                   index_is_built)
+                   index_is_built, DtestTimeoutError)
 from tools import known_failure, rows_to_list, since
 
 
@@ -295,9 +295,13 @@ class TestSecondaryIndexes(Tester):
         session.execute('CREATE INDEX ix_c0 ON standard1("C0");')
 
         start = time.time()
-        while not index_is_built(node1, session, 'keyspace1', 'standard1', 'ix_c0') and time.time() < start + 30:
+        while time.time() < start + 30:
             debug("waiting for index to build")
             time.sleep(1)
+            if index_is_built(node1, session, 'keyspace1', 'standard1', 'ix_c0'):
+                break
+        else:
+            raise DtestTimeoutError()
 
         stmt = session.prepare('select * from standard1 where "C0" = ?')
         self.assertEqual(1, len(list(session.execute(stmt, [lookup_value]))))
@@ -312,9 +316,13 @@ class TestSecondaryIndexes(Tester):
 
         node1.nodetool("rebuild_index keyspace1 standard1 ix_c0")
         start = time.time()
-        while not index_is_built(node1, session, 'keyspace1', 'standard1', 'ix_c0') and time.time() < start + 30:
+        while time.time() < start + 30:
             debug("waiting for index to rebuild")
             time.sleep(1)
+            if index_is_built(node1, session, 'keyspace1', 'standard1', 'ix_c0'):
+                break
+        else:
+            raise DtestTimeoutError()
 
         after_files = []
         for index_sstables_dir in index_sstables_dirs:
@@ -454,11 +462,15 @@ class TestSecondaryIndexes(Tester):
         session.execute("CREATE TABLE ks.regular_table (a int PRIMARY KEY, b int)")
         session.execute("CREATE INDEX composites_index on ks.regular_table (b)")
 
-        start = time.time()
         for node in cluster.nodelist():
-            while not index_is_built(node, session, 'ks', 'regular_table', 'composites_index') and time.time() + 10 < start:
+            start = time.time()
+            while time.time() < start + 10:
                 debug("waiting for index to build")
                 time.sleep(1)
+                if index_is_built(node, session, 'ks', 'regular_table', 'composites_index'):
+                    break
+            else:
+                raise DtestTimeoutError()
 
         insert_args = [(i, i % 2) for i in xrange(100)]
         execute_concurrent_with_args(session,
@@ -916,9 +928,13 @@ class TestSecondaryIndexesOnCollections(Tester):
             session.execute(stmt)
 
         start = time.time()
-        while not index_is_built(node1, session, 'map_index_search', 'users', 'user_uuids_values') and time.time() < start + 30:
+        while time.time() < start + 30:
             debug("waiting for index to build")
             time.sleep(1)
+            if index_is_built(node1, session, 'map_index_search', 'users', 'user_uuids_values'):
+                break
+        else:
+            raise DtestTimeoutError()
 
         # shuffle the log in-place, and double-check a slice of records by querying the secondary index
         random.shuffle(log)
