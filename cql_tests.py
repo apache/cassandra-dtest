@@ -582,6 +582,9 @@ class AbortedQueriesTester(CQLTester):
     #      more than one value.
     """
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12514',
+                   flaky=False)
     def local_query_test(self):
         """
         Check that a query running on the local coordinator node times out:
