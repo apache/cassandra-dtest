@@ -3139,6 +3139,8 @@ class TestCQL(UpgradeTester):
             assert_all(cursor, "SELECT * FROM test", [[0], [1], [-1]])
             assert_invalid(cursor, "SELECT * FROM test WHERE k >= -1 AND k < 1;")
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12482')
     def select_with_alias_test(self):
         cursor = self.prepare()
         cursor.execute('CREATE TABLE users (id int PRIMARY KEY, name text)')
