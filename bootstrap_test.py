@@ -252,7 +252,7 @@ class TestBootstrap(Tester):
 
         cluster.start(wait_other_notice=True)
         # kill stream to node3 in the middle of streaming to let it fail
-        node1.byteman_submit(['./stream_failure.btm'])
+        node1.byteman_submit(['./byteman/stream_failure.btm'])
         node1.stress(['write', 'n=1K', 'no-warmup', 'cl=TWO', '-schema', 'replication(factor=2)', '-rate', 'threads=50'])
         cluster.flush()
 
