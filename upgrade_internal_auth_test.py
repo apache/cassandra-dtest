@@ -4,8 +4,9 @@ from cassandra import Unauthorized
 from ccmlib.common import is_win
 
 from assertions import assert_all, assert_invalid
-from dtest import Tester, debug
+from dtest import Tester, debug, OFFHEAP_MEMTABLES
 from tools import known_failure, since
+from unittest import skipIf
 
 
 @since('2.2')
@@ -41,6 +42,7 @@ class TestAuthUpgrade(Tester):
                    flaky=True,
                    notes='windows')
     @since('3.0')
+    @skipIf(OFFHEAP_MEMTABLES, 'offheap_objects are not available in 3.0')
     def upgrade_to_30_test(self):
         self.do_upgrade_with_internal_auth("git:cassandra-3.0")
 

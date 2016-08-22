@@ -1,6 +1,7 @@
 from assertions import assert_crc_check_chance_equal, assert_one
-from dtest import Tester, debug
+from dtest import Tester, debug, OFFHEAP_MEMTABLES
 from tools import since
+from unittest import skipIf
 
 
 @since('3.0')
@@ -16,6 +17,7 @@ class TestCrcCheckChanceUpgrade(Tester):
         ]
         Tester.__init__(self, *args, **kwargs)
 
+    @skipIf(OFFHEAP_MEMTABLES, 'offheap_objects are not available in 3.0')
     def crc_check_chance_upgrade_test(self):
         """
         Tests behavior of compression property crc_check_chance after upgrade to 3.0,

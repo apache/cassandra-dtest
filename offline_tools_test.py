@@ -101,6 +101,9 @@ class TestOfflineTools(Tester):
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12275',
                    flaky=False,
                    notes='windows')
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12519',
+                   flaky=True)
     def sstableofflinerelevel_test(self):
         """
         Generate sstables of varying levels.
