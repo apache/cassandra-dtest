@@ -79,7 +79,7 @@ class TestAuthUpgrade(Tester):
         session.execute("GRANT SELECT ON ks.cf2 TO michael")
 
         self.check_permissions(node1, False)
-        session.shutdown()
+        session.cluster.shutdown()
         # upgrade node1 to 2.2
         self.upgrade_to_version(target_version, node1)
         # run the permissions checking queries on the upgraded node
@@ -124,7 +124,7 @@ class TestAuthUpgrade(Tester):
                        [['michael', 'michael', '<table ks.cf1>', 'MODIFY'],
                         ['michael', 'michael', '<table ks.cf2>', 'SELECT']])
 
-        klaus.shutdown()
+        klaus.cluster.shutdown()
 
         michael = self.patient_exclusive_cql_connection(node, user='michael', password='54321')
         michael.execute('INSERT INTO ks.cf1 (id, val) VALUES (0,0)')
@@ -133,7 +133,7 @@ class TestAuthUpgrade(Tester):
                        'SELECT * FROM ks.cf1',
                        'User michael has no SELECT permission on <table ks.cf1> or any of its parents',
                        Unauthorized)
-        michael.shutdown()
+        michael.cluster.shutdown()
 
     def upgrade_to_version(self, tag, node):
         format_args = {'node': node.name, 'tag': tag}
