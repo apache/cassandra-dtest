@@ -9,7 +9,6 @@ from cassandra.query import SimpleStatement
 from ccmlib.node import TimeoutError, Node
 from nose.tools import timed
 
-from assertions import assert_invalid
 from dtest import Tester, debug
 from tools import known_failure, no_vnodes, since
 
@@ -330,6 +329,8 @@ class TestVariousNotifications(Tester):
         @jira_ticket CASSANDRA-7886
         """
 
+        have_v5_protocol = LooseVersion(self.cluster.version()) >= LooseVersion('3.10')
+
         self.allow_log_errors = True
         self.cluster.set_configuration_options(
             values={
@@ -340,7 +341,8 @@ class TestVariousNotifications(Tester):
         )
         self.cluster.populate(3).start()
         node1, node2, node3 = self.cluster.nodelist()
-        session = self.patient_cql_connection(node1)
+        proto_version = 5 if have_v5_protocol else None
+        session = self.patient_cql_connection(node1, protocol_version=proto_version)
 
         self.create_ks(session, 'test', 3)
         session.execute(
@@ -363,10 +365,17 @@ class TestVariousNotifications(Tester):
 
         @timed(25)
         def read_failure_query():
-            assert_invalid(
-                session, SimpleStatement("select * from test where id in (1,2,3,4,5)", consistency_level=CL.ALL),
-                expected=ReadFailure
-            )
+            try:
+                session.execute(SimpleStatement("select * from test where id in (1,2,3,4,5)", consistency_level=CL.ALL))
+            except ReadFailure as exc:
+                if have_v5_protocol:
+                    # at least one replica should have responded with a tombstone error
+                    self.assertIsNotNone(exc.error_code_map)
+                    self.assertEqual(0x0001, exc.error_code_map.values()[0])
+            except Exception:
+                raise
+            else:
+                self.fail('Expected ReadFailure')
 
         read_failure_query()
 
@@ -389,10 +398,17 @@ class TestVariousNotifications(Tester):
 
         @timed(35)
         def range_request_failure_query():
-            assert_invalid(
-                session, SimpleStatement("select * from test", consistency_level=CL.ALL),
-                expected=ReadFailure
-            )
+            try:
+                session.execute(SimpleStatement("select * from test", consistency_level=CL.ALL))
+            except ReadFailure as exc:
+                if have_v5_protocol:
+                    # at least one replica should have responded with a tombstone error
+                    self.assertIsNotNone(exc.error_code_map)
+                    self.assertEqual(0x0001, exc.error_code_map.values()[0])
+            except Exception:
+                raise
+            else:
+                self.fail('Expected ReadFailure')
 
         range_request_failure_query()
 
