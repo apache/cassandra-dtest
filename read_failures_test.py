@@ -1,8 +1,9 @@
 from cassandra import ConsistencyLevel, ReadFailure, ReadTimeout
 from cassandra.policies import FallthroughRetryPolicy
 from cassandra.query import SimpleStatement
+
 from dtest import Tester
-from tools import since
+from tools import known_failure, since
 
 KEYSPACE = "readfailures"
 
@@ -78,6 +79,9 @@ class TestReadFailures(Tester):
                 break
         self.assertTrue(expected_code_found, "The error code map did not contain " + str(expected_code))
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12531',
+                   flaky=False)
     @since('2.1')
     def test_tombstone_failure_v3(self):
         """
@@ -89,6 +93,9 @@ class TestReadFailures(Tester):
         self._insert_tombstones(session, 600)
         self._perform_cql_statement(session, "SELECT value FROM tombstonefailure")
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12531',
+                   flaky=False)
     @since('2.2')
     def test_tombstone_failure_v4(self):
         """
