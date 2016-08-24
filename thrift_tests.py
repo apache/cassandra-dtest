@@ -2181,13 +2181,6 @@ class TestMutations(ThriftTester):
         _set_keyspace('Keyspace1')
         self.truncate_all('StandardComposite')
 
-        def composite(item1, item2=None, eoc='\x00'):
-            packed = _i16(len(item1)) + item1 + eoc
-            if item2 is not None:
-                packed += _i16(len(item2)) + item2
-                packed += eoc
-            return packed
-
         for i in range(10):
             column_name = composite(str(i), str(i))
             column = Column(column_name, 'value', int(time.time() * 1000))
@@ -2205,6 +2198,67 @@ class TestMutations(ThriftTester):
             columns,
             [composite('0', '0'), composite('1', '1'), composite('2', '2'),
              composite('6', '6'), composite('7', '7'), composite('8', '8'), composite('9', '9')])
+
+    def test_range_deletion_eoc_0(self):
+        """
+        This test confirms that a range tombstone with a final EOC of 0
+        results in a exclusive deletion except for cells that exactly match the tombstone bound.
+
+        @jira_ticket CASSANDRA-12423
+
+        """
+        _set_keyspace('Keyspace1')
+        self.truncate_all('StandardComposite')
+
+        for i in range(10):
+            column_name = composite(str(i), str(i))
+            column = Column(column_name, 'value', int(time.time() * 1000))
+            client.insert('key1', ColumnParent('StandardComposite'), column, ConsistencyLevel.ONE)
+
+        # insert a partial cell name (just the first element of the composite)
+        column_name = composite('6', None, eoc='\x00')
+        column = Column(column_name, 'value', int(time.time() * 1000))
+        client.insert('key1', ColumnParent('StandardComposite'), column, ConsistencyLevel.ONE)
+
+        # sanity check the query
+        slice_predicate = SlicePredicate(slice_range=SliceRange('', '', False, 100))
+        results = client.get_slice('key1', ColumnParent('StandardComposite'), slice_predicate, ConsistencyLevel.ONE)
+        columns = [result.column.name for result in results]
+        self.assertEqual(
+            columns,
+            [composite('0', '0'), composite('1', '1'), composite('2', '2'), composite('3', '3'), composite('4', '4'), composite('5', '5'),
+             composite('6'),
+             composite('6', '6'),
+             composite('7', '7'), composite('8', '8'), composite('9', '9')])
+
+        # do a slice deletion with (6, ) as the end
+        delete_slice = SlicePredicate(slice_range=SliceRange(composite('3', eoc='\xff'), composite('6', '\x00'), False, 100))
+        mutations = [Mutation(deletion=Deletion(int(time.time() * 1000), predicate=delete_slice))]
+        keyed_mutations = {'key1': {'StandardComposite': mutations}}
+        client.batch_mutate(keyed_mutations, ConsistencyLevel.ONE)
+
+        # check the columns post-deletion, ('6', ) because it is an exact much but not (6, 6)
+        results = client.get_slice('key1', ColumnParent('StandardComposite'), slice_predicate, ConsistencyLevel.ONE)
+        columns = [result.column.name for result in results]
+        self.assertEqual(
+            columns,
+            [composite('0', '0'), composite('1', '1'), composite('2', '2'),
+             composite('6', '6'),
+             composite('7', '7'), composite('8', '8'), composite('9', '9')])
+
+        # do another slice deletion, but make the end (6, 6) this time
+        delete_slice = SlicePredicate(slice_range=SliceRange(composite('3', eoc='\xff'), composite('6', '6', '\x00'), False, 100))
+        mutations = [Mutation(deletion=Deletion(int(time.time() * 1000), predicate=delete_slice))]
+        keyed_mutations = {'key1': {'StandardComposite': mutations}}
+        client.batch_mutate(keyed_mutations, ConsistencyLevel.ONE)
+
+        # check the columns post-deletion, now (6, 6) is also gone
+        results = client.get_slice('key1', ColumnParent('StandardComposite'), slice_predicate, ConsistencyLevel.ONE)
+        columns = [result.column.name for result in results]
+        self.assertEqual(
+            columns,
+            [composite('0', '0'), composite('1', '1'), composite('2', '2'),
+             composite('7', '7'), composite('8', '8'), composite('9', '9')])
 
     def test_incr_decr_standard_slice(self):
         _set_keyspace('Keyspace1')
