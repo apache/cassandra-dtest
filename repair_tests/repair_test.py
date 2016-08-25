@@ -702,6 +702,57 @@ class TestRepair(BaseRepairTest):
         self._parameterized_range_repair(repair_opts=['-st', str(node3.initial_token), '-et', str(node1.initial_token)])
 
     @no_vnodes()
+    def token_range_repair_test_with_cf(self):
+        """
+        Test repair using the -st and -et, and -cf options
+        * Launch a three node cluster
+        * Insert some data at RF 2
+        * Shut down node2, insert more data, restore node2
+        * Issue a repair on a range that only belongs to node1 on the wrong cf
+        * Verify that the data did not get repaired
+        * Issue a repair on a range that belongs to the right cf
+        * Verify that the data was repaired
+        """
+        cluster = self.cluster
+        cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
+        cluster.set_batch_commitlog(enabled=True)
+        debug("Starting cluster..")
+        cluster.populate(3).start(wait_for_binary_proto=True)
+
+        node1, node2, node3 = cluster.nodelist()
+
+        # Insert data, kill node 2, insert more data, restart node 2, insert another set of data
+        debug("Inserting data...")
+        node1.stress(['write', 'n=1k', 'no-warmup', 'cl=ALL', '-schema', 'replication(factor=2)', '-rate', 'threads=30'])
+        node2.flush()
+        node2.stop(wait_other_notice=True)
+        node1.stress(['write', 'n=1K', 'no-warmup', 'cl=ONE', '-schema', 'replication(factor=2)', '-rate', 'threads=30', '-pop', 'seq=20..40K'])
+        node2.start(wait_for_binary_proto=True, wait_other_notice=True)
+        node1.stress(['write', 'n=1K', 'no-warmup', 'cl=ALL', '-schema', 'replication(factor=2)', '-rate', 'threads=30', '-pop', 'seq=40..60K'])
+        cluster.flush()
+
+        # Repair only the range node 1 owns on the wrong CF, assert everything is still broke
+        opts = ['-st', str(node3.initial_token), '-et', str(node1.initial_token), ]
+        opts += _repair_options(self.cluster.version(), ks='keyspace1', cf='counter1', sequential=False)
+        node1.repair(opts)
+        self.assertEqual(len(node1.grep_log('are consistent for standard1')), 0, "Nodes 1 and 2 should not be consistent.")
+        self.assertEqual(len(node3.grep_log('Repair command')), 0, "Node 3 should not have been involved in the repair.")
+        out_of_sync_logs = node1.grep_log("/([0-9.]+) and /([0-9.]+) have ([0-9]+) range\(s\) out of sync")
+        self.assertEqual(len(out_of_sync_logs), 0, "We repaired the wrong CF, so things should still be broke")
+
+        # Repair only the range node 1 owns on the right  CF, assert everything is fixed
+        opts = ['-st', str(node3.initial_token), '-et', str(node1.initial_token), ]
+        opts += _repair_options(self.cluster.version(), ks='keyspace1', cf='standard1', sequential=False)
+        node1.repair(opts)
+        self.assertEqual(len(node1.grep_log('are consistent for standard1')), 0, "Nodes 1 and 2 should not be consistent.")
+        self.assertEqual(len(node3.grep_log('Repair command')), 0, "Node 3 should not have been involved in the repair.")
+        out_of_sync_logs = node1.grep_log("/([0-9.]+) and /([0-9.]+) have ([0-9]+) range\(s\) out of sync")
+        _, matches = out_of_sync_logs[0]
+        out_of_sync_nodes = {matches.group(1), matches.group(2)}
+        valid_out_of_sync_pairs = [{node1.address(), node2.address()}]
+        self.assertIn(out_of_sync_nodes, valid_out_of_sync_pairs, str(out_of_sync_nodes))
+
+    @no_vnodes()
     def partitioner_range_repair_test(self):
         """
         Test repair using the -pr option
