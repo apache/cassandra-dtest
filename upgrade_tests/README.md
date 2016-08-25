@@ -1,12 +1,19 @@
 # Running Upgrade Tests
 
 #### Against a local version of Cassandra:
+These instructions will get upgrade tests running locally, upgrading to your local source code.
+Tests which are not relevant to your local cassandra version (in CASSANDRA_DIR) will be automatically skipped.
+This procedure closely mirrors how CI jobs are configured to run upgrade tests.
+
 - export CASSANDRA_DIR=/your/cassandra/location
 - export LOCAL_GIT_REPO=/your/cassandra/location/
 - run nosetests:
 > nosetests -vs upgrade_tests/
 - to preview tests names, use:
 > nosetests -v --collect-only upgrade_tests/
+
+#### Customizing the upgrade path
+In most cases the above instructions are what you probably need to do. However, in some instances you may need to further customize the upgrade paths being used, or point to non-local code. This simple (example pr)[https://github.com/riptano/cassandra-dtest/pull/1282] demonstrates the basic procedure for building custom upgrade paths; these paths will supercede the normal upgrade tests when run in this fashion.
 
 # How the tests work
 
