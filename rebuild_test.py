@@ -198,7 +198,7 @@ class TestRebuild(Tester):
         session.execute("ALTER KEYSPACE system_auth WITH REPLICATION = {'class':'NetworkTopologyStrategy', 'dc1':1, 'dc2':1};")
 
         # Path to byteman script which makes node2 throw an exception making rebuild fail
-        script = ['./rebuild_failure_inject.btm']
+        script = ['./byteman/rebuild_failure_inject.btm']
         node3.byteman_submit(script)
 
         # First rebuild must fail and data must be incomplete
