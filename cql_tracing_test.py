@@ -123,7 +123,7 @@ class TestCqlTracing(Tester):
         errs = self.cluster.nodelist()[0].grep_log_for_errors()
         debug('Errors after attempted trace with unknown tracing class: {errs}'.format(errs=errs))
         self.assertEqual(len(errs), 1)
-        self.assertEqual(len(errs[0]), 1)
+        self.assertTrue(len(errs[0]) > 0)
         err = errs[0][0]
         self.assertIn(expected_error, err)
 
@@ -152,7 +152,7 @@ class TestCqlTracing(Tester):
         errs = self.cluster.nodelist()[0].grep_log_for_errors()
         debug('Errors after attempted trace with default tracing class: {errs}'.format(errs=errs))
         self.assertEqual(len(errs), 1)
-        self.assertEqual(len(errs[0]), 1)
+        self.assertTrue(len(errs[0]) > 0)
         err = errs[0][0]
         self.assertIn(expected_error, err)
         # make sure it logged the error for the correct reason. this isn't
@@ -160,4 +160,4 @@ class TestCqlTracing(Tester):
         # periods for regexes.
         self.assertIn("Default constructor for Tracing class "
                       "'org.apache.cassandra.tracing.TracingImpl' is inaccessible.",
-                      err)
+                      errs[0][1])
