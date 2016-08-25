@@ -1,14 +1,11 @@
 import os
 import random
 import string
-import subprocess
 import tempfile
 import time
 from distutils.version import LooseVersion
 
 import parse
-from ccmlib import common
-from nose.tools import assert_equal
 
 from assertions import assert_length_equal, assert_none, assert_one
 from dtest import Tester, debug
@@ -488,34 +485,17 @@ class TestCompaction(Tester):
         stress_write(node1, keycount=500000)
         node1.nodetool('flush keyspace1 standard1')
 
-        sstable_files = ' '.join(get_sstable_data_files(node1, 'keyspace1', 'standard1'))
+        sstable_files = ' '.join(node1.get_sstable_data_files('keyspace1', 'standard1'))
         debug('Compacting {}'.format(sstable_files))
         node1.nodetool('compact --user-defined {}'.format(sstable_files))
 
-        sstable_files = get_sstable_data_files(node1, 'keyspace1', 'standard1')
+        sstable_files = node1.get_sstable_data_files('keyspace1', 'standard1')
         self.assertEquals(len(node1.data_directories()), len(sstable_files),
                           'Expected one sstable data file per node directory but got {}'.format(sstable_files))
 
     def skip_if_no_major_compaction(self):
         if self.cluster.version() < '2.2' and self.strategy == 'LeveledCompactionStrategy':
             self.skipTest('major compaction not implemented for LCS in this version of Cassandra')
-
-
-def get_sstable_data_files(node, ks, table):
-    """
-    Read sstable data files by using sstableutil, so we ignore temporary files
-    """
-    env = common.make_cassandra_env(node.get_install_cassandra_root(), node.get_node_cassandra_root())
-    args = [node.get_tool('sstableutil'), '--type', 'final', ks, table]
-
-    p = subprocess.Popen(args, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    stdout, stderr = p.communicate()
-
-    assert_equal(p.returncode, 0, "Error invoking sstableutil; returned {code}; {err}"
-                 .format(code=p.returncode, err=stderr))
-
-    ret = sorted(filter(lambda s: s.endswith('-Data.db'), stdout.splitlines()))
-    return ret
 
 
 def get_random_word(wordLen, population=string.ascii_letters + string.digits):
