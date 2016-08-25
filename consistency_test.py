@@ -56,6 +56,29 @@ class TestHelper(Tester):
             ConsistencyLevel.LOCAL_ONE: 1,
         }[cl]
 
+    def _get_num_nodes(self, idx, rf_factors, write_cl, read_cl):
+            """
+            Given a node index, identify to which data center we are connecting and return
+            number of nodes we write to, read from and whether R + W > N
+            """
+            nodes = [self.nodes] if isinstance(self.nodes, int) else self.nodes
+
+            dc = 0
+            for i in xrange(1, len(nodes)):
+                if idx < sum(nodes[:i]):
+                    break
+                dc += 1
+
+            if write_cl == ConsistencyLevel.EACH_QUORUM:
+                write_nodes = sum([self._required_nodes(write_cl, rf_factors, i) for i in range(0, len(nodes))])
+            else:
+                write_nodes = self._required_nodes(write_cl, rf_factors, dc)
+
+            read_nodes = self._required_nodes(read_cl, rf_factors, dc)
+            strong_consistency = read_nodes + write_nodes > sum(rf_factors)
+
+            return write_nodes, read_nodes, strong_consistency
+
     def _should_succeed(self, cl, rf_factors, num_nodes_alive, current):
         """
         Return true if the read or write operation should succeed based on
@@ -72,15 +95,23 @@ class TestHelper(Tester):
         else:
             return sum(num_nodes_alive) >= self._required_nodes(cl, rf_factors, current)
 
-    def _start_cluster(self, save_sessions=False):
+    def _start_cluster(self, save_sessions=False, requires_local_reads=False):
         cluster = self.cluster
         nodes = self.nodes
         rf = self.rf
 
-        cluster.set_configuration_options(values={'hinted_handoff_enabled': False, 'dynamic_snitch': False})
+        configuration_options = {'hinted_handoff_enabled': False}
+
+        # If we must read from the local replica first, then the dynamic snitch poses a problem
+        # because occasionally it may think that another replica is preferable even if the
+        # coordinator is a replica
+        if requires_local_reads:
+            configuration_options['dynamic_snitch'] = False
+
+        cluster.set_configuration_options(values=configuration_options)
         cluster.populate(nodes)
 
-        if isinstance(nodes, int):
+        if requires_local_reads and isinstance(nodes, int):
             # Changing the snitch to PropertyFileSnitch even in the
             # single dc tests ensures that StorageProxy sorts the replicas eligible
             # for reading by proximity to the local host, essentially picking the
@@ -100,7 +131,7 @@ class TestHelper(Tester):
         session = self.patient_exclusive_cql_connection(cluster.nodelist()[0])
 
         self.create_ks(session, self.ksname, rf)
-        self.create_tables(session)
+        self.create_tables(session, requires_local_reads)
 
         if save_sessions:
             self.sessions = []
@@ -108,9 +139,9 @@ class TestHelper(Tester):
             for node in cluster.nodelist()[1:]:
                 self.sessions.append(self.patient_exclusive_cql_connection(node, self.ksname))
 
-    def create_tables(self, session):
-        self.create_users_table(session)
-        self.create_counters_table(session)
+    def create_tables(self, session, requires_local_reads):
+        self.create_users_table(session, requires_local_reads)
+        self.create_counters_table(session, requires_local_reads)
         session.cluster.control_connection.wait_for_schema_agreement(wait_time=60)
 
     def truncate_tables(self, session):
@@ -119,15 +150,27 @@ class TestHelper(Tester):
         statement = SimpleStatement("TRUNCATE counters", ConsistencyLevel.ALL)
         session.execute(statement)
 
-    def create_users_table(self, session):
-        session.execute("""CREATE TABLE users (
+    def create_users_table(self, session, requires_local_reads):
+        create_cmd = """
+            CREATE TABLE users (
                 userid int PRIMARY KEY,
                 firstname text,
                 lastname text,
                 age int
-            ) WITH COMPACT STORAGE
-              AND dclocal_read_repair_chance = 0 AND read_repair_chance = 0
-              AND speculative_retry =  'NONE'""")
+            ) WITH COMPACT STORAGE"""
+
+        if requires_local_reads:
+            create_cmd += " AND " + self.get_local_reads_properties()
+
+        session.execute(create_cmd)
+
+    @staticmethod
+    def get_local_reads_properties():
+        """
+        If we must read from the local replica first, then we should disable read repair and
+        speculative retry, see CASSANDRA-12092
+        """
+        return " dclocal_read_repair_chance = 0 AND read_repair_chance = 0 AND speculative_retry =  'NONE'"
 
     def insert_user(self, session, userid, age, consistency, serial_consistency=None):
         text = "INSERT INTO users (userid, firstname, lastname, age) VALUES ({}, 'first{}', 'last{}', {}) {}"\
@@ -155,14 +198,17 @@ class TestHelper(Tester):
             self.assertTrue(ret, "Got {} from {}, expected {} at {}".format(rows_to_list(res), session.cluster.contact_points, expected, consistency_value_to_name(consistency)))
         return ret
 
-    def create_counters_table(self, session):
-        session.execute("""
+    def create_counters_table(self, session, requires_local_reads):
+        create_cmd = """
             CREATE TABLE counters (
                 id int PRIMARY KEY,
                 c counter
-            ) WITH dclocal_read_repair_chance = 0 AND read_repair_chance = 0
-              AND speculative_retry =  'NONE'
-        """)
+            )"""
+
+        if requires_local_reads:
+            create_cmd += " WITH " + self.get_local_reads_properties()
+
+        session.execute(create_cmd)
 
     def update_counter(self, session, id, consistency, serial_consistency=None):
         text = "UPDATE counters SET c = c + 1 WHERE id = {}".format(id)
@@ -377,31 +423,7 @@ class TestAccuracy(TestHelper):
                       .format(consistency_value_to_name(write_cl), consistency_value_to_name(read_cl), consistency_value_to_name(serial_cl), start, end - 1))
 
         def get_num_nodes(self, idx):
-            """
-            Given a node index, identify to which data center we are connecting and return
-            number of nodes we write to, read from and whether R + W > N
-            """
-            outer = self.outer
-            nodes = self.nodes
-            rf_factors = self.rf_factors
-            write_cl = self.write_cl
-            read_cl = self.read_cl
-
-            dc = 0
-            for i in xrange(1, len(nodes)):
-                if idx < sum(nodes[:i]):
-                    break
-                dc += 1
-
-            if write_cl == ConsistencyLevel.EACH_QUORUM:
-                write_nodes = sum([outer._required_nodes(write_cl, rf_factors, i) for i in range(0, len(nodes))])
-            else:
-                write_nodes = outer._required_nodes(write_cl, rf_factors, dc)
-
-            read_nodes = outer._required_nodes(read_cl, rf_factors, dc)
-            strong_consistency = read_nodes + write_nodes > sum(rf_factors)
-
-            return write_nodes, read_nodes, strong_consistency
+            return self.outer._get_num_nodes(idx, self.rf_factors, self.write_cl, self.read_cl)
 
         def validate_users(self):
             """
@@ -481,7 +503,21 @@ class TestAccuracy(TestHelper):
         """
         Run a test function in parallel.
         """
-        self._start_cluster(save_sessions=True)
+
+        requires_local_reads = False
+        for combination in combinations:
+            for i, _ in enumerate(nodes):
+                _, _, strong_consistency = self._get_num_nodes(i, rf_factors, combination[0], combination[1])
+                if not strong_consistency:
+                    # if at least one combination does not reach strong consistency, in order to validate weak
+                    # consistency we require local reads, see CASSANDRA-12092 for details.
+                    requires_local_reads = True
+                    break
+
+            if requires_local_reads:
+                break
+
+        self._start_cluster(save_sessions=True, requires_local_reads=requires_local_reads)
 
         input_queue = Queue.Queue()
         exceptions_queue = Queue.Queue()
