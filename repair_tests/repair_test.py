@@ -704,6 +704,8 @@ class TestRepair(BaseRepairTest):
     @no_vnodes()
     def token_range_repair_test_with_cf(self):
         """
+        @jira_ticket CASSANDRA-11866
+
         Test repair using the -st and -et, and -cf options
         * Launch a three node cluster
         * Insert some data at RF 2
