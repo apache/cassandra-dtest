@@ -13,7 +13,7 @@ This procedure closely mirrors how CI jobs are configured to run upgrade tests.
 > nosetests -v --collect-only upgrade_tests/
 
 #### Customizing the upgrade path
-In most cases the above instructions are what you probably need to do. However, in some instances you may need to further customize the upgrade paths being used, or point to non-local code. This simple (example pr)[https://github.com/riptano/cassandra-dtest/pull/1282] demonstrates the basic procedure for building custom upgrade paths; these paths will supercede the normal upgrade tests when run in this fashion.
+In most cases the above instructions are what you probably need to do. However, in some instances you may need to further customize the upgrade paths being used, or point to non-local code. This simple [example pr](https://github.com/riptano/cassandra-dtest/pull/1282) demonstrates the basic procedure for building custom upgrade paths; these paths will supercede the normal upgrade tests when run in this fashion.
 
 # How the tests work
 
