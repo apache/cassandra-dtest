@@ -6,7 +6,7 @@
 - run nosetests:
 > nosetests -vs upgrade_tests/
 - to preview tests names, use:
-> nosetests --collect-only upgrade_tests/
+> nosetests -v --collect-only upgrade_tests/
 
 # How the tests work
 
