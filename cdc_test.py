@@ -472,6 +472,9 @@ class TestCDC(Tester):
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12286',
                    flaky=False)
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12537',
+                   flaky=True)
     def test_cdc_data_available_in_cdc_raw(self):
         ks_name = 'ks'
         # First, create a new node just for data generation.
