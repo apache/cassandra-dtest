@@ -11,7 +11,7 @@ git diff riptano/master...HEAD -U0 | pep8 --ignore=E501 --diff
 pep8_style_check=$?
 
 # lint all files except json_test.py for line length errors
-git diff riptano/master...HEAD -U0 | pep8 --diff --exclude='json_test.py' --max-line-length=200
+git diff riptano/master...HEAD -U0 | pep8 --diff --exclude='json_test.py' --exclude='meta_tests/assertion_test.py' --max-line-length=200
 pep8_line_length=$?
 
 echo -e "\nflake8 exited with ${flake8_result}."

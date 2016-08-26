@@ -9,7 +9,7 @@ import parse
 from ccmlib import common
 
 from dtest import Tester, debug
-from tools.assertions import assert_length_equal
+from tools.assertions import assert_length_equal, assert_stderr_clean
 from tools.decorators import known_failure, since
 
 KEYSPACE = 'ks'
@@ -121,7 +121,7 @@ class TestHelper(Tester):
         # if we have less than 64G free space, we get this warning - ignore it
         if err and "Consider adding more capacity" not in err:
             debug(err)
-            self.fail('sstablescrub failed')
+            assert_stderr_clean(err)
 
     def perform_node_tool_cmd(self, cmd, table, indexes):
         """

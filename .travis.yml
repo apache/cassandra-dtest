@@ -16,5 +16,5 @@ script:
   # lint all files for everything but line length errors
   - git diff riptano/master...HEAD -U0 | pep8 --ignore=E501 --diff
   # lint all files except json_test.py for line length errors
-  - git diff riptano/master...HEAD -U0 | pep8 --diff --exclude='json_test.py' --max-line-length=200
+  - git diff riptano/master...HEAD -U0 | pep8 --diff --exclude='json_test.py' --exclude='meta_tests/assertion_test.py' --max-line-length=200
 sudo: false

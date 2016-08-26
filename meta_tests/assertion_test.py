@@ -1,14 +1,67 @@
+
+from unittest import TestCase
+
 from cassandra import AlreadyExists, InvalidRequest, Unauthorized, Unavailable
 from mock import Mock
 
-from tools.assertions import (assert_all, assert_almost_equal,
-                              assert_exception, assert_invalid,
-                              assert_length_equal, assert_none, assert_one,
-                              assert_row_count, assert_unauthorized,
-                              assert_unavailable)
+from assertions import (assert_all, assert_almost_equal, assert_exception,
+                        assert_invalid, assert_length_equal, assert_none,
+                        assert_one, assert_row_count, assert_stderr_clean,
+                        assert_unauthorized, assert_unavailable)
 
 
-class TestAssertionMethods():
+class TestAssertStderrClean(TestCase):
+
+    def test_empty_string(self):
+        err = ''
+        assert_stderr_clean(err)
+
+    def test_multiple_valid_errors(self):
+        err = """objc[65696]: Class JavaLaunchHelper is implemented in both /Library/Java/JavaVirtualMachines/jdk1.8.0_91.jdk/Contents/Home/bin/java and /Library/Java/JavaVirtualMachines/jdk1.8.0_91.jdk/Contents/Home/jre/lib/libinstrument.dylib. One of the two will be used. Which one is undefined.
+                 WARN  15:28:24,788 JNA link failure, one or more native method will be unavailable."""
+        assert_stderr_clean(err)
+
+    def test_valid_error(self):
+        err = ("objc[36358]: Class JavaLaunchHelper is implemented in both /Library/Java/JavaVirtualMachines/jdk1.8.0_91.jdk"
+               "/Contents/Home/bin/java and /Library/Java/JavaVirtualMachines/jdk1.8.0_91.jdk/Contents/Home/jre/lib/libinstrument.dylib."
+               "One of the two will be used. Which one is undefined.")
+        assert_stderr_clean(err)
+
+    def test_valid_error_with_whitespace(self):
+        err = """WARN  14:08:15,018 JNA link failure, one or more native method will be unavailable.objc[36358]: Class JavaLaunchHelper is implemented in both /Library/Java/JavaVirtualMachines/jdk1.8.0_91.jdk/Contents/Home/bin/java and /Library/Java/JavaVirtualMachines/jdk1.8.0_91.jdk/Contents/Home/jre/lib/libinstrument.dylib. One of the two will be used. Which one is undefined.
+                 """
+        assert_stderr_clean(err)
+
+    def test_invalid_error(self):
+        err = "This string is no good and should fail."
+        with self.assertRaises(AssertionError):
+            assert_stderr_clean(err)
+
+    def test_valid_and_invalid_errors_same_line(self):
+        err = ("This string is no good and should fail.objc[36358]: Class JavaLaunchHelper is implemented in both /Library/Java/JavaVirtualMachines/jdk1.8.0_91.jdk"
+               "/Contents/Home/bin/java and /Library/Java/JavaVirtualMachines/jdk1.8.0_91.jdk/Contents/Home/jre/lib/libinstrument.dylib."
+               "One of the two will be used. Which one is undefined.")
+        with self.assertRaises(AssertionError):
+            assert_stderr_clean(err)
+
+    def test_invalid_error_after_valid_error(self):
+        err = """objc[36358]: Class JavaLaunchHelper is implemented in both /Library/Java/JavaVirtualMachines/jdk1.8.0_91.jdk
+               /Contents/Home/bin/java and /Library/Java/JavaVirtualMachines/jdk1.8.0_91.jdk/Contents/Home/jre/lib/libinstrument.dylib.
+               One of the two will be used. Which one is undefined.
+               This string is no good and should fail."""
+        with self.assertRaises(AssertionError):
+            assert_stderr_clean(err)
+
+    def test_invalid_error_before_valid_errors(self):
+        err = """This string is not good and should fail. WARN  14:08:15,018 JNA link failure, one or more native method will be unavailable.objc[36358]:
+                 Class JavaLaunchHelper is implemented in both /Library/Java/JavaVirtualMachines/jdk1.8.0_91.jdk/Contents/Home/bin/java
+                 and /Library/Java/JavaVirtualMachines/jdk1.8.0_91.jdk/Contents/Home/jre/lib/libinstrument.dylib. One of the two will be used. Which one is undefined.
+                 """
+        with self.assertRaises(AssertionError):
+            assert_stderr_clean(err)
+
+
+class TestAssertionMethods(TestCase):
 
     def assertions_test(self):
         # assert_exception_test

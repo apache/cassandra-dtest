@@ -1,9 +1,12 @@
+
+import re
 from time import sleep
 
 from cassandra import (InvalidRequest, ReadFailure, ReadTimeout, Unauthorized,
                        Unavailable, WriteFailure, WriteTimeout)
 from cassandra.query import SimpleStatement
-from nose.tools import assert_equal, assert_false, assert_regexp_matches
+from nose.tools import (assert_equal, assert_false, assert_regexp_matches,
+                        assert_true)
 
 
 """
@@ -261,3 +264,20 @@ def assert_not_running(node):
 
 def assert_read_timeout_or_failure(session, query):
     assert_exception(session, query, expected=(ReadTimeout, ReadFailure))
+
+
+def assert_stderr_clean(err, acceptable_errors=None):
+    """
+    Assert that stderr is empty or that it only contains harmless messages
+    @param err The stderr to clean
+    @param acceptable_errors A list that if used, the user chooses what
+                             messages are to be acceptable in stderr.
+    """
+    if acceptable_errors is None:
+        acceptable_errors = ["WARN.*JNA link failure.*unavailable.",
+                             "objc.*Class JavaLaunchHelper.*?Which one is undefined."]
+
+    regex_str = "^({}|\s*|\n)*$".format("|".join(acceptable_errors))
+    match = re.search(regex_str, err)
+
+    assert_true(match, "Attempted to check that stderr was empty. Instead, stderr is {}, but the regex used to check against stderr is {}".format(err, regex_str))
