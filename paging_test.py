@@ -2471,6 +2471,9 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
         self.assertEqual(pf.pagecount(), 3)
         self.assertEqual(pf.num_results_all(), [300, 300, 200])
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12556',
+                   flaky=True)
     def test_cell_TTL_expiry_during_paging(self):
         session = self.prepare()
         self.create_ks(session, 'test_paging_size', 2)
