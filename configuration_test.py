@@ -4,7 +4,8 @@ import parse
 from cassandra.concurrent import execute_concurrent_with_args
 
 from dtest import Tester, debug
-from jmxutils import JolokiaAgent, make_mbean, remove_perf_disable_shared_mem
+from tools.jmxutils import (JolokiaAgent, make_mbean,
+                            remove_perf_disable_shared_mem)
 
 
 class TestConfiguration(Tester):

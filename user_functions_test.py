@@ -4,9 +4,9 @@ from distutils.version import LooseVersion
 
 from cassandra import FunctionFailure
 
-from assertions import assert_invalid, assert_none, assert_one
+from tools.assertions import assert_invalid, assert_none, assert_one
 from dtest import CASSANDRA_VERSION_FROM_BUILD, Tester, debug
-from tools import since
+from tools.decorators import since
 
 
 @since('2.2')

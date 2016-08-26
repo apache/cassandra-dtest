@@ -5,7 +5,8 @@ from cassandra import ConsistencyLevel
 from ccmlib.node import ToolError
 
 from dtest import Tester, debug
-from tools import insert_c1c2, query_c1c2, since
+from tools.data import insert_c1c2, query_c1c2
+from tools.decorators import since
 
 
 class TestRebuild(Tester):

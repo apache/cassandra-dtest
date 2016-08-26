@@ -2,7 +2,8 @@ import os
 import tempfile
 
 from dtest import Tester, debug
-from tools import rows_to_list, since, known_failure
+from tools.data import rows_to_list
+from tools.decorators import known_failure, since
 
 
 @since('0', '2.2.X')

@@ -3,7 +3,7 @@ from cassandra.policies import FallthroughRetryPolicy
 from cassandra.query import SimpleStatement
 
 from dtest import Tester
-from tools import known_failure, since
+from tools.decorators import known_failure, since
 
 KEYSPACE = "readfailures"
 

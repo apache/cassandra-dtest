@@ -1,7 +1,7 @@
 # coding: utf-8
 
 from dtest import Tester, debug
-from tools import since
+from tools.decorators import since
 
 
 class TestCqlTracing(Tester):

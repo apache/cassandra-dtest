@@ -11,10 +11,11 @@ from cassandra.concurrent import (execute_concurrent,
 from cassandra.protocol import ConfigurationException
 from cassandra.query import BatchStatement, SimpleStatement
 
-from assertions import assert_invalid, assert_one, assert_row_count
-from dtest import (DISABLE_VNODES, OFFHEAP_MEMTABLES, Tester, debug,
-                   index_is_built, DtestTimeoutError)
-from tools import known_failure, rows_to_list, since
+from dtest import (DISABLE_VNODES, OFFHEAP_MEMTABLES, DtestTimeoutError,
+                   Tester, debug, index_is_built)
+from tools.assertions import assert_invalid, assert_one, assert_row_count
+from tools.data import rows_to_list
+from tools.decorators import known_failure, since
 
 
 class TestSecondaryIndexes(Tester):

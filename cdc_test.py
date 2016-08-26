@@ -16,9 +16,10 @@ from ccmlib.node import Node
 from nose.tools import assert_equal, assert_less_equal
 
 from dtest import Tester, debug
-from tools import rows_to_list, since, known_failure
-from utils.fileutils import size_of_files_in_dir
-from utils.funcutils import get_rate_limited_function
+from tools.data import rows_to_list
+from tools.decorators import known_failure, since
+from tools.files import size_of_files_in_dir
+from tools.funcutils import get_rate_limited_function
 
 _16_uuid_column_spec = (
     'a uuid PRIMARY KEY, b uuid, c uuid, d uuid, e uuid, f uuid, g uuid, '

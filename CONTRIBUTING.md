@@ -78,7 +78,7 @@ In some cases, we organize our test files by putting them in directories. If you
 
 ## Assertions
 
-- When possible, you should use the assert functions from [`assertions.py`](https://github.com/riptano/cassandra-dtest/blob/master/assertions.py).
+- When possible, you should use the assert functions from [`tools/assertions.py`](https://github.com/riptano/cassandra-dtest/blob/master/tools/assertions.py).
 - When none of these are applicable, use python's built in [unittest assertions](https://docs.python.org/2/library/unittest.html#assert-methods).
 - Naked assert statements should never be used, e.g. `assert True`
 
@@ -104,7 +104,7 @@ In some cases, we organize our test files by putting them in directories. If you
 - Readability and Reusability
     - Are any data structures built by looping that could be succinctly created in a comprehension
     - Is there repeated logic that could be factored out and given a descriptive name?
-        - Does that repeated logic belong somewhere other than this particular test? Possible appropriate locations include the `tools` or `assertions` modules, or `ccm`.
+        - Does that repeated logic belong somewhere other than this particular test? Possible appropriate locations include the modules in `tools/`, or `ccm`.
     - If there is no assertion in the test, should there be? If not, is the statement that would fail under a regression commented to indicate that?
     - Is it possible for an uninitiated reader to understand what Casssandra behavior is being tested for?
         - If not, could the code be rewritten so it is?

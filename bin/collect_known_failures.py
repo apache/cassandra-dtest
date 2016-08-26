@@ -1,6 +1,6 @@
 """
 A script that runs the tests with --collect-only, but instead of just printing
-the tests' names, prints the information added by the tools.known_failure
+the tests' names, prints the information added by the tools.decorators.known_failure
 decorator.
 
 This is basically a wrapper around the `nosetests` command, so it takes the

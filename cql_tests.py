@@ -10,15 +10,16 @@ from cassandra.policies import FallthroughRetryPolicy
 from cassandra.protocol import ProtocolException
 from cassandra.query import SimpleStatement
 
-from assertions import assert_invalid, assert_one, assert_unavailable, assert_none, assert_all, assert_length_equal
-from dtest import Tester, canReuseCluster, freshCluster
+from dtest import Tester, canReuseCluster, debug, freshCluster
 from thrift_bindings.v22.ttypes import \
     ConsistencyLevel as ThriftConsistencyLevel
 from thrift_bindings.v22.ttypes import (CfDef, Column, ColumnOrSuperColumn,
                                         Mutation)
 from thrift_tests import get_thrift_client
-from tools import debug, since, known_failure
-from utils.metadata_wrapper import (UpdatingClusterMetadataWrapper,
+from tools.assertions import (assert_all, assert_invalid, assert_length_equal,
+                              assert_none, assert_one, assert_unavailable)
+from tools.decorators import known_failure, since
+from tools.metadata_wrapper import (UpdatingClusterMetadataWrapper,
                                     UpdatingKeyspaceMetadataWrapper,
                                     UpdatingTableMetadataWrapper)
 

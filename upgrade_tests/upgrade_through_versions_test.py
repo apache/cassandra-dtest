@@ -17,7 +17,8 @@ from nose.plugins.attrib import attr
 from six import print_
 
 from dtest import RUN_STATIC_UPGRADE_MATRIX, Tester, debug
-from tools import generate_ssl_stores, known_failure, new_node
+from tools.decorators import known_failure
+from tools.misc import generate_ssl_stores, new_node
 from upgrade_base import switch_jdks
 from upgrade_manifest import (build_upgrade_pairs, current_2_0_x,
                               current_2_1_x, current_2_2_x, current_3_0_x,

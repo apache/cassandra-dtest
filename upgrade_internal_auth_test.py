@@ -1,12 +1,12 @@
 import time
+from unittest import skipIf
 
 from cassandra import Unauthorized
 from ccmlib.common import is_win
 
-from assertions import assert_all, assert_invalid
-from dtest import Tester, debug, OFFHEAP_MEMTABLES
-from tools import known_failure, since
-from unittest import skipIf
+from dtest import OFFHEAP_MEMTABLES, Tester, debug
+from tools.assertions import assert_all, assert_invalid
+from tools.decorators import known_failure, since
 
 
 @since('2.2')

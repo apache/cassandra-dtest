@@ -8,7 +8,7 @@ from ccmlib import common
 from ccmlib.node import ToolError
 
 from dtest import Tester, debug
-from tools import known_failure, since
+from tools.decorators import known_failure, since
 
 
 class TestOfflineTools(Tester):

@@ -7,8 +7,9 @@ from thrift.protocol import TBinaryProtocol
 from thrift.Thrift import TApplicationException
 from thrift.transport import TSocket, TTransport
 
-from assertions import assert_none, assert_one
-from dtest import DISABLE_VNODES, NUM_TOKENS, ReusableClusterTester, debug, init_default_config
+from tools.assertions import assert_none, assert_one
+from dtest import (DISABLE_VNODES, NUM_TOKENS, ReusableClusterTester, debug,
+                   init_default_config)
 from thrift_bindings.v22 import Cassandra
 from thrift_bindings.v22.Cassandra import (CfDef, Column, ColumnDef,
                                            ColumnOrSuperColumn, ColumnParent,
@@ -21,7 +22,7 @@ from thrift_bindings.v22.Cassandra import (CfDef, Column, ColumnDef,
                                            Mutation, NotFoundException,
                                            SlicePredicate, SliceRange,
                                            SuperColumn)
-from tools import since, known_failure
+from tools.decorators import known_failure, since
 
 
 def get_thrift_client(host='127.0.0.1', port=9160):

@@ -1,10 +1,11 @@
 import os
 import time
 
-from assertions import assert_all, assert_none, assert_one
+from tools.assertions import assert_all, assert_none, assert_one
 from dtest import Tester, debug
 from sstable_generation_loading_test import BaseSStableLoaderTest
-from tools import new_node, since
+from tools.decorators import since
+from tools.misc import new_node
 
 LEGACY_SSTABLES_JVM_ARGS = ["-Dcassandra.streamdes.initial_mem_buffer_size=1",
                             "-Dcassandra.streamdes.max_mem_buffer_size=5",

@@ -2,7 +2,7 @@ import time
 
 from cassandra.concurrent import execute_concurrent_with_args
 
-from assertions import assert_invalid, assert_all, assert_one
+from tools.assertions import assert_invalid, assert_all, assert_one
 from dtest import Tester
 
 

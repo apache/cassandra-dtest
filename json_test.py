@@ -10,7 +10,7 @@ from ccmlib import common
 from ccmlib.common import is_win
 
 from dtest import Tester
-from tools import since
+from tools.decorators import since
 
 
 def build_doc_context(tester, test_name, prepare=True, connection=None, nodes=None):

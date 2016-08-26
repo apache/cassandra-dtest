@@ -1,7 +1,8 @@
-from assertions import assert_crc_check_chance_equal, assert_one
-from dtest import Tester, debug, OFFHEAP_MEMTABLES
-from tools import since
 from unittest import skipIf
+
+from dtest import OFFHEAP_MEMTABLES, Tester, debug
+from tools.assertions import assert_crc_check_chance_equal, assert_one
+from tools.decorators import since
 
 
 @since('3.0')

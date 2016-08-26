@@ -3,7 +3,7 @@ import time
 from unittest import skip
 
 from dtest import Tester
-from tools import known_failure
+from tools.decorators import known_failure
 
 
 class TestMetadata(Tester):

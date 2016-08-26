@@ -7,13 +7,14 @@ from copy import deepcopy
 
 from cassandra import ConsistencyLevel, consistency_value_to_name
 from cassandra.query import SimpleStatement
-
-from assertions import assert_none, assert_unavailable, assert_length_equal
-from dtest import DISABLE_VNODES, Tester, debug, MultiError
-from tools import (create_c1c2_table, insert_c1c2, insert_columns,
-                   known_failure, query_c1c2, rows_to_list, since)
-from nose.tools import assert_greater_equal
 from nose.plugins.attrib import attr
+from nose.tools import assert_greater_equal
+
+from tools.assertions import assert_length_equal, assert_none, assert_unavailable
+from dtest import DISABLE_VNODES, MultiError, Tester, debug
+from tools.data import (create_c1c2_table, insert_c1c2, insert_columns,
+                        query_c1c2, rows_to_list)
+from tools.decorators import known_failure, since
 
 
 class TestHelper(Tester):

@@ -6,10 +6,10 @@ import time
 import unittest
 
 import pycassa
-
 from dtest import DEFAULT_DIR, Tester, debug
-from jmxutils import JolokiaAgent, make_mbean, remove_perf_disable_shared_mem
-from tools import known_failure
+from tools.decorators import known_failure
+from tools.jmxutils import (JolokiaAgent, make_mbean,
+                            remove_perf_disable_shared_mem)
 
 JNA_PATH = '/usr/share/java/jna.jar'
 ATTACK_JAR = 'lib/cassandra-attack.jar'

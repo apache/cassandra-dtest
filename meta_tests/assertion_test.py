@@ -1,8 +1,11 @@
-from cassandra import AlreadyExists, Unavailable, InvalidRequest, Unauthorized
+from cassandra import AlreadyExists, InvalidRequest, Unauthorized, Unavailable
 from mock import Mock
-from assertions import (assert_one, assert_none, assert_exception, assert_unavailable,
-                        assert_invalid, assert_unauthorized, assert_all, assert_almost_equal,
-                        assert_length_equal, assert_row_count)
+
+from tools.assertions import (assert_all, assert_almost_equal,
+                              assert_exception, assert_invalid,
+                              assert_length_equal, assert_none, assert_one,
+                              assert_row_count, assert_unauthorized,
+                              assert_unavailable)
 
 
 class TestAssertionMethods():

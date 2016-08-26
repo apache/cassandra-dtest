@@ -1,8 +1,9 @@
 from cassandra import ConsistencyLevel
 
 from dtest import Tester, debug
-from tools import (create_c1c2_table, insert_c1c2, new_node, no_vnodes,
-                   query_c1c2)
+from tools.data import create_c1c2_table, insert_c1c2, query_c1c2
+from tools.decorators import no_vnodes
+from tools.misc import new_node
 
 
 class TestBootstrapConsistency(Tester):

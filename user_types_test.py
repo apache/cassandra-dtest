@@ -4,9 +4,9 @@ import uuid
 from cassandra import ConsistencyLevel, Unauthorized
 from cassandra.query import SimpleStatement
 
-from assertions import assert_invalid
+from tools.assertions import assert_invalid
 from dtest import Tester
-from tools import since
+from tools.decorators import since
 
 
 def listify(item):

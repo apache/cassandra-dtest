@@ -1,3 +1,26 @@
+"""
+This module is a data-creation utility which allows creating data using markdown-style tables.
+
+For example, this 'data' string specifies data to be created in 5 rows.
+            data = "
+                |id| value          |
+                |--+----------------|
+                |1 |testing         |
+                |2 |and more testing|
+                |3 |and more testing|
+                |4 |and more testing|
+                |5 |and more testing|
+                "
+
+To take the markdown-stye string above and insert data, call create_rows:
+
+expected_data = create_rows(data, cursor, 'paging_test', cl=CL.ALL, format_funcs={'id': int, 'value': unicode})
+
+create_rows returns a data structure which represents what the data _should_ be like in the database.
+It's meant to be used in tests when comparing expected to actual data, for validation.
+
+For more examples reference paging_test.py
+"""
 import re
 
 from cassandra.concurrent import execute_concurrent_with_args

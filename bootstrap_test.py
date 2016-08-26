@@ -10,10 +10,12 @@ from cassandra import ConsistencyLevel
 from cassandra.concurrent import execute_concurrent_with_args
 from ccmlib.node import NodeError
 
-from assertions import assert_almost_equal, assert_not_running, assert_one
+from tools.assertions import assert_almost_equal, assert_not_running, assert_one
 from dtest import DISABLE_VNODES, Tester, debug
-from tools import (InterruptBootstrap, KillOnBootstrap, known_failure,
-                   new_node, no_vnodes, query_c1c2, since)
+from tools.data import query_c1c2
+from tools.decorators import known_failure, no_vnodes, since
+from tools.intervention import InterruptBootstrap, KillOnBootstrap
+from tools.misc import new_node
 
 
 def assert_bootstrap_state(tester, node, expected_bootstrap_state):

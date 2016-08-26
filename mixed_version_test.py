@@ -2,7 +2,7 @@ from cassandra import ConsistencyLevel, OperationTimedOut, ReadTimeout
 from cassandra.query import SimpleStatement
 
 from dtest import Tester, debug
-from tools import since
+from tools.decorators import since
 
 
 class TestSchemaChanges(Tester):

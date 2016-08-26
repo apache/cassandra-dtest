@@ -2,7 +2,7 @@ import os
 import socket
 
 from dtest import Tester, debug
-from tools import since
+from tools.decorators import since
 
 
 @since('2.2.5')

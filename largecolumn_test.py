@@ -1,5 +1,5 @@
 from dtest import Tester, debug
-from tools import known_failure, since
+from tools.decorators import known_failure, since
 
 
 @since('2.2')

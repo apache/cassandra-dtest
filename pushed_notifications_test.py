@@ -6,11 +6,11 @@ from threading import Event
 from cassandra import ConsistencyLevel as CL
 from cassandra import ReadFailure
 from cassandra.query import SimpleStatement
-from ccmlib.node import TimeoutError, Node
+from ccmlib.node import Node, TimeoutError
 from nose.tools import timed
 
 from dtest import Tester, debug
-from tools import known_failure, no_vnodes, since
+from tools.decorators import known_failure, no_vnodes, since
 
 
 class NotificationWaiter(object):

@@ -10,7 +10,7 @@ from cassandra.concurrent import execute_concurrent
 from ccmlib.node import Node
 
 from dtest import Tester, debug
-from tools import known_failure, require, since
+from tools.decorators import known_failure, require, since
 
 
 def wait(delay=2):

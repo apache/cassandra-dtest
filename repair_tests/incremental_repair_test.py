@@ -9,9 +9,10 @@ from ccmlib.common import is_win
 from ccmlib.node import Node
 from nose.plugins.attrib import attr
 
-from assertions import assert_almost_equal, assert_one
+from tools.assertions import assert_almost_equal, assert_one
 from dtest import Tester, debug
-from tools import insert_c1c2, known_failure, since
+from tools.data import insert_c1c2
+from tools.decorators import known_failure, since
 
 
 class TestIncRepair(Tester):

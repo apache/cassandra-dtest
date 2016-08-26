@@ -4,10 +4,11 @@ from cassandra import ConsistencyLevel
 from thrift.protocol import TBinaryProtocol
 from thrift.transport import TSocket, TTransport
 
-import tools as tools
 from dtest import Tester
-from tools import (create_c1c2_table, known_failure, no_vnodes,
-                   retry_till_success)
+from tools.data import (create_c1c2_table, insert_c1c2, insert_columns, putget,
+                        query_c1c2, query_columns, range_putget)
+from tools.decorators import known_failure, no_vnodes
+from tools.misc import retry_till_success
 
 
 class TestPutGet(Tester):
@@ -40,7 +41,7 @@ class TestPutGet(Tester):
         self.create_ks(session, 'ks', 3)
         self.create_cf(session, 'cf', compression=compression)
 
-        tools.putget(cluster, session)
+        putget(cluster, session)
 
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11251',
@@ -58,9 +59,9 @@ class TestPutGet(Tester):
         create_c1c2_table(self, session)
 
         # insert and get at CL.QUORUM (since RF=2, node1 won't have all key locally)
-        tools.insert_c1c2(session, n=1000, consistency=ConsistencyLevel.QUORUM)
+        insert_c1c2(session, n=1000, consistency=ConsistencyLevel.QUORUM)
         for n in xrange(0, 1000):
-            tools.query_c1c2(session, n, ConsistencyLevel.QUORUM)
+            query_c1c2(session, n, ConsistencyLevel.QUORUM)
 
     def rangeputget_test(self):
         """ Simple put/get on ranges of rows, hitting multiple sstables """
@@ -74,7 +75,7 @@ class TestPutGet(Tester):
         self.create_ks(session, 'ks', 2)
         self.create_cf(session, 'cf')
 
-        tools.range_putget(cluster, session)
+        range_putget(cluster, session)
 
     def wide_row_test(self):
         """ Test wide row slices """
@@ -90,11 +91,11 @@ class TestPutGet(Tester):
         key = 'wide'
 
         for x in xrange(1, 5001):
-            tools.insert_columns(self, session, key, 100, offset=x - 1)
+            insert_columns(self, session, key, 100, offset=x - 1)
 
         for size in (10, 100, 1000):
             for x in xrange(1, (50001 - size) / size):
-                tools.query_columns(self, session, key, size, offset=x * size - 1)
+                query_columns(self, session, key, size, offset=x * size - 1)
 
     @no_vnodes()
     def wide_slice_test(self):

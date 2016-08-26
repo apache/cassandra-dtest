@@ -5,10 +5,10 @@ from unittest import skipIf
 from cassandra import ConsistencyLevel, Timeout, Unavailable
 from cassandra.query import SimpleStatement
 
-from assertions import (assert_all, assert_invalid, assert_one,
-                        assert_unavailable)
 from dtest import CASSANDRA_DIR, Tester, debug
-from tools import known_failure, since
+from tools.assertions import (assert_all, assert_invalid, assert_one,
+                              assert_unavailable)
+from tools.decorators import known_failure, since
 
 
 class TestBatch(Tester):

@@ -1,7 +1,7 @@
 import datetime
 import random
 
-from assertions import assert_length_equal
+from tools.assertions import assert_length_equal
 from dtest import Tester, debug
 
 status_messages = (

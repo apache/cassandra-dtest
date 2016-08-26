@@ -5,7 +5,7 @@ import time
 
 import sslkeytool
 from dtest import Tester
-from tools import since, known_failure
+from tools.decorators import known_failure, since
 
 _LOG_ERR_SIG = "^javax.net.ssl.SSLHandshakeException: sun.security.validator.ValidatorException: Certificate signature validation failed$"
 _LOG_ERR_IP = "^javax.net.ssl.SSLHandshakeException: java.security.cert.CertificateException: No subject alternative names matching IP address [0-9.]+ found$"

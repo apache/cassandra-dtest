@@ -2,7 +2,7 @@ from cassandra.query import SimpleStatement
 from nose.plugins.attrib import attr
 
 from dtest import TRACE, Tester, debug
-from tools import no_vnodes
+from tools.decorators import no_vnodes
 
 
 @no_vnodes()

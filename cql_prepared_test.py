@@ -1,7 +1,7 @@
 import time
 
 from dtest import Tester
-from tools import since
+from tools.decorators import since
 
 
 @since("1.2")

@@ -5,9 +5,10 @@ import uuid
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
 
-from assertions import assert_invalid, assert_length_equal, assert_one
+from tools.assertions import assert_invalid, assert_length_equal, assert_one
 from dtest import Tester
-from tools import rows_to_list, since
+from tools.data import rows_to_list
+from tools.decorators import since
 
 
 class TestCounters(Tester):

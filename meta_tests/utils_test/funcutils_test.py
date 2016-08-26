@@ -1,9 +1,8 @@
-from unittest import TestCase
 from time import sleep, time
+from unittest import TestCase
 
 from mock import Mock, call
-
-from utils import funcutils
+from tools import funcutils
 
 
 class Testget_rate_limited_function(TestCase):

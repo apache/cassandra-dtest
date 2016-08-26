@@ -1,7 +1,8 @@
 from __future__ import division
 
 from dtest import Tester
-from tools import rows_to_list, since
+from tools.data import rows_to_list
+from tools.decorators import since
 
 
 @since('3.0')

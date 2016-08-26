@@ -3,12 +3,12 @@ import time
 from threading import Thread
 
 from cassandra import ConsistencyLevel
-from ccmlib.node import ToolError, TimeoutError
+from ccmlib.node import TimeoutError, ToolError
 
-from assertions import assert_almost_equal
-from dtest import Tester
-from tools import (debug, insert_c1c2, known_failure, no_vnodes, query_c1c2,
-                   since)
+from tools.assertions import assert_almost_equal
+from dtest import Tester, debug
+from tools.data import insert_c1c2, query_c1c2
+from tools.decorators import known_failure, no_vnodes, since
 
 
 class TestTopology(Tester):

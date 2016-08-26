@@ -1,6 +1,6 @@
 import time
 
-from assertions import assert_invalid
+from tools.assertions import assert_invalid
 from dtest import Tester
 
 

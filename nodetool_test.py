@@ -3,7 +3,7 @@ import os
 from ccmlib.node import ToolError
 
 from dtest import Tester, debug
-from tools import since
+from tools.decorators import since
 
 
 class TestNodetool(Tester):

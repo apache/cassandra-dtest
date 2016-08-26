@@ -5,10 +5,10 @@ from collections import defaultdict
 
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
+from nose.plugins.attrib import attr
 
 from dtest import PRINT_DEBUG, DtestTimeoutError, Tester, debug
-from nose.plugins.attrib import attr
-from tools import known_failure, no_vnodes, since
+from tools.decorators import known_failure, no_vnodes, since
 
 TRACE_DETERMINE_REPLICAS = re.compile('Determining replicas for mutation')
 TRACE_SEND_MESSAGE = re.compile('Sending (?:MUTATION|REQUEST_RESPONSE) message to /([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)')

@@ -3,9 +3,10 @@ import time
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
 
-from assertions import assert_one
+from tools.assertions import assert_one
 from dtest import PRINT_DEBUG, Tester, debug
-from tools import known_failure, rows_to_list, since
+from tools.data import rows_to_list
+from tools.decorators import known_failure, since
 
 
 class TestReadRepair(Tester):

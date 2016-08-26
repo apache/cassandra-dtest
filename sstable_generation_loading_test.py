@@ -5,9 +5,9 @@ from distutils import dir_util
 
 from ccmlib import common as ccmcommon
 
-from assertions import assert_one
+from tools.assertions import assert_one
 from dtest import Tester, debug
-from tools import known_failure
+from tools.decorators import known_failure
 
 
 # WARNING: sstableloader tests should be added to TestSSTableGenerationAndLoading (below),

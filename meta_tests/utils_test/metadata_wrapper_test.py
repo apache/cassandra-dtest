@@ -3,8 +3,7 @@ from collections import defaultdict
 from unittest import TestCase
 
 from mock import MagicMock, Mock
-
-from utils.metadata_wrapper import (UpdatingClusterMetadataWrapper,
+from tools.metadata_wrapper import (UpdatingClusterMetadataWrapper,
                                     UpdatingKeyspaceMetadataWrapper,
                                     UpdatingMetadataWrapperBase,
                                     UpdatingTableMetadataWrapper)

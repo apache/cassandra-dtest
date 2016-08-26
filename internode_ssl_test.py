@@ -1,5 +1,7 @@
 from dtest import Tester, debug
-from tools import generate_ssl_stores, known_failure, putget
+from tools.data import putget
+from tools.decorators import known_failure
+from tools.misc import generate_ssl_stores
 
 
 class TestInternodeSSL(Tester):

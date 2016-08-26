@@ -41,7 +41,7 @@ from plugins.dtestconfig import _CONFIG as CONFIG
 # We don't want test files to know about the plugins module, so we import
 # constants here and re-export them.
 from plugins.dtestconfig import GlobalConfigObject
-from utils.funcutils import merge_dicts
+from tools.funcutils import merge_dicts
 
 LOG_SAVED_DIR = "logs"
 try:

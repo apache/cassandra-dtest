@@ -7,7 +7,8 @@ from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
 
 from dtest import FlakyRetryPolicy, Tester, debug
-from tools import insert_c1c2, known_failure, no_vnodes, query_c1c2, since
+from tools.data import insert_c1c2, query_c1c2
+from tools.decorators import known_failure, no_vnodes, since
 
 
 def _repair_options(version, ks='', cf=None, sequential=True):

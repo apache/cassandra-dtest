@@ -1,8 +1,10 @@
 import time
 
 from dtest import Tester
-from jmxutils import JolokiaAgent, make_mbean, remove_perf_disable_shared_mem
-from tools import known_failure, rows_to_list
+from tools.data import rows_to_list
+from tools.decorators import known_failure
+from tools.jmxutils import (JolokiaAgent, make_mbean,
+                            remove_perf_disable_shared_mem)
 
 
 class TestDeletion(Tester):

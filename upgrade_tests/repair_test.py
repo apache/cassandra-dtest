@@ -2,7 +2,7 @@ import time
 
 from dtest import debug
 from repair_tests.repair_test import BaseRepairTest
-from tools import since
+from tools.decorators import since
 
 LEGACY_SSTABLES_JVM_ARGS = ["-Dcassandra.streamdes.initial_mem_buffer_size=1",
                             "-Dcassandra.streamdes.max_mem_buffer_size=5",

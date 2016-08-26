@@ -7,9 +7,9 @@ from distutils.version import LooseVersion
 
 import parse
 
-from assertions import assert_length_equal, assert_none, assert_one
 from dtest import Tester, debug
-from tools import known_failure, since
+from tools.assertions import assert_length_equal, assert_none, assert_one
+from tools.decorators import known_failure, since
 
 
 class TestCompaction(Tester):

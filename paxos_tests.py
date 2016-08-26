@@ -6,9 +6,9 @@ from threading import Thread
 from cassandra import ConsistencyLevel, WriteTimeout
 from cassandra.query import SimpleStatement
 
-from assertions import assert_unavailable
+from tools.assertions import assert_unavailable
 from dtest import Tester
-from tools import no_vnodes, since
+from tools.decorators import no_vnodes, since
 
 
 @since('2.0.6')

@@ -6,7 +6,7 @@ from distutils.version import LooseVersion
 from dtest import Tester
 from thrift_bindings.v22 import ttypes as thrift_types
 from thrift_tests import get_thrift_client
-from tools import since, known_failure
+from tools.decorators import known_failure, since
 
 KEYSPACE = "foo"
 
