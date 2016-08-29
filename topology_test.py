@@ -303,9 +303,6 @@ class TestTopology(Tester):
 
         self.assertFalse(node3.is_running())
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12494',
-                   flaky=True)
     @since('3.0')
     def crash_during_decommission_test(self):
         """
@@ -315,7 +312,7 @@ class TestTopology(Tester):
         @jira_ticket CASSANDRA-10231
         """
         cluster = self.cluster
-        self.ignore_log_patterns = [r'Streaming error occurred']
+        self.ignore_log_patterns = [r'Streaming error occurred', 'Stream failed']
         cluster.populate(3).start(wait_other_notice=True)
 
         node1, node2 = cluster.nodelist()[0:2]
