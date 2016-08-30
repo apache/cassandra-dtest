@@ -763,7 +763,7 @@ class Tester(TestCase):
             time.sleep(1)
 
         raise TimeoutError(time.strftime("%d %b %Y %H:%M:%S", time.gmtime()) +
-                           " Unable to find: " + pattern + " in any node log within " + str(timeout) + "s")
+                           " Unable to find: " + repr(pattern) + " in any node log within " + str(timeout) + "s")
 
     def get_jfr_jvm_args(self):
         """
