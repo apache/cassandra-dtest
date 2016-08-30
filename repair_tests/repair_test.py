@@ -9,6 +9,8 @@ from cassandra.query import SimpleStatement
 from dtest import FlakyRetryPolicy, Tester, debug
 from tools.data import insert_c1c2, query_c1c2
 from tools.decorators import known_failure, no_vnodes, since
+from threading import Thread
+from ccmlib.node import ToolError
 
 
 def _repair_options(version, ks='', cf=None, sequential=True):
@@ -176,6 +178,46 @@ class TestRepair(BaseRepairTest):
         # and no nodes should do anticompaction:
         for node in cluster.nodelist():
             self.assertFalse(node.grep_log("Starting anticompaction"))
+
+    def nonexistent_table_repair_test(self):
+        """
+        * Check that repairing a non-existant table fails
+        @jira_ticket CASSANDRA-12279
+        """
+        self.ignore_log_patterns = [r'Unknown keyspace/cf pair']
+        cluster = self.cluster
+        debug('Starting nodes')
+        cluster.populate(2).start(wait_for_binary_proto=True)
+        node1, _ = cluster.nodelist()
+        debug('Creating keyspace and tables')
+        node1.stress(stress_options=['write', 'n=1', 'no-warmup',
+                                     'cl=ONE', '-schema', 'replication(factor=2)',
+                                     '-rate', 'threads=1'])
+        debug('Repairing non-existent table')
+
+        def repair_non_existent_table():
+            global nodetool_error
+            try:
+                node1.nodetool('repair keyspace1 standard2')
+            except Exception, e:
+                nodetool_error = e
+
+        # Launch in a external thread so it does not hang process
+        t = Thread(target=repair_non_existent_table)
+        t.start()
+
+        t.join(timeout=60)
+        self.assertFalse(t.isAlive(), 'Repair thread on inexistent table is still running')
+
+        if self.cluster.version() >= '2.2':
+            node1.watch_log_for("Unknown keyspace/cf pair", timeout=60)
+        # Repair only finishes with error status after CASSANDRA-12508 on 3.0+
+        if self.cluster.version() >= '3.0':
+            self.assertTrue('nodetool_error' in globals() and isinstance(nodetool_error, ToolError),
+                            'Repair thread on inexistent table did not throw exception')
+            debug(nodetool_error.message)
+            self.assertTrue('Unknown keyspace/cf pair' in nodetool_error.message,
+                            'Repair thread on inexistent table did not detect inexistent table.')
 
     @since('2.2.1')
     def no_anticompaction_after_hostspecific_repair_test(self):
