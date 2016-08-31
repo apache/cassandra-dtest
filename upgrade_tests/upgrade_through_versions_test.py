@@ -275,7 +275,7 @@ class UpgradeTester(Tester):
         self.upgrade_scenario()
 
     @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11767',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12457',
                    flaky=True)
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12444',
