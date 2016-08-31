@@ -2,7 +2,7 @@ import Queue
 import sys
 import threading
 import time
-from collections import OrderedDict
+from collections import OrderedDict, namedtuple
 from copy import deepcopy
 
 from cassandra import ConsistencyLevel, consistency_value_to_name
@@ -15,6 +15,8 @@ from dtest import DISABLE_VNODES, MultiError, Tester, debug
 from tools.data import (create_c1c2_table, insert_c1c2, insert_columns,
                         query_c1c2, rows_to_list)
 from tools.decorators import known_failure, since
+
+ExpectedConsistency = namedtuple('ExpectedConsistency', ('num_write_nodes', 'num_read_nodes', 'is_strong'))
 
 
 class TestHelper(Tester):
@@ -56,6 +58,38 @@ class TestHelper(Tester):
             ConsistencyLevel.LOCAL_ONE: 1,
         }[cl]
 
+    def get_expected_consistency(self, idx, rf_factors, write_cl, read_cl):
+            """
+            Given a node index, identify to which data center we are connecting and return
+            the expected consistency: number of nodes we write to, read from, and whether
+            we should have strong consistency, that is whether R + W > N
+            """
+            nodes = [self.nodes] if isinstance(self.nodes, int) else self.nodes
+
+            def get_data_center():
+                """
+                :return: the data center corresponding to this node
+                """
+                dc = 0
+                for i in xrange(1, len(nodes)):
+                    if idx < sum(nodes[:i]):
+                        break
+                    dc += 1
+                return dc
+
+            data_center = get_data_center()
+            if write_cl == ConsistencyLevel.EACH_QUORUM:
+                write_nodes = sum([self._required_nodes(write_cl, rf_factors, i) for i in range(0, len(nodes))])
+            else:
+                write_nodes = self._required_nodes(write_cl, rf_factors, data_center)
+
+            read_nodes = self._required_nodes(read_cl, rf_factors, data_center)
+            is_strong = read_nodes + write_nodes > sum(rf_factors)
+
+            return ExpectedConsistency(num_write_nodes=write_nodes,
+                                       num_read_nodes=read_nodes,
+                                       is_strong=is_strong)
+
     def _should_succeed(self, cl, rf_factors, num_nodes_alive, current):
         """
         Return true if the read or write operation should succeed based on
@@ -72,15 +106,23 @@ class TestHelper(Tester):
         else:
             return sum(num_nodes_alive) >= self._required_nodes(cl, rf_factors, current)
 
-    def _start_cluster(self, save_sessions=False):
+    def _start_cluster(self, save_sessions=False, requires_local_reads=False):
         cluster = self.cluster
         nodes = self.nodes
         rf = self.rf
 
-        cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
+        configuration_options = {'hinted_handoff_enabled': False}
+
+        # If we must read from the local replica first, then the dynamic snitch poses a problem
+        # because occasionally it may think that another replica is preferable even if the
+        # coordinator is a replica
+        if requires_local_reads:
+            configuration_options['dynamic_snitch'] = False
+
+        cluster.set_configuration_options(values=configuration_options)
         cluster.populate(nodes)
 
-        if isinstance(nodes, int):
+        if requires_local_reads and isinstance(nodes, int):
             # Changing the snitch to PropertyFileSnitch even in the
             # single dc tests ensures that StorageProxy sorts the replicas eligible
             # for reading by proximity to the local host, essentially picking the
@@ -100,7 +142,7 @@ class TestHelper(Tester):
         session = self.patient_exclusive_cql_connection(cluster.nodelist()[0])
 
         self.create_ks(session, self.ksname, rf)
-        self.create_tables(session)
+        self.create_tables(session, requires_local_reads)
 
         if save_sessions:
             self.sessions = []
@@ -108,9 +150,9 @@ class TestHelper(Tester):
             for node in cluster.nodelist()[1:]:
                 self.sessions.append(self.patient_exclusive_cql_connection(node, self.ksname))
 
-    def create_tables(self, session):
-        self.create_users_table(session)
-        self.create_counters_table(session)
+    def create_tables(self, session, requires_local_reads):
+        self.create_users_table(session, requires_local_reads)
+        self.create_counters_table(session, requires_local_reads)
         session.cluster.control_connection.wait_for_schema_agreement(wait_time=60)
 
     def truncate_tables(self, session):
@@ -119,13 +161,27 @@ class TestHelper(Tester):
         statement = SimpleStatement("TRUNCATE counters", ConsistencyLevel.ALL)
         session.execute(statement)
 
-    def create_users_table(self, session):
-        session.execute("""CREATE TABLE users (
+    def create_users_table(self, session, requires_local_reads):
+        create_cmd = """
+            CREATE TABLE users (
                 userid int PRIMARY KEY,
                 firstname text,
                 lastname text,
                 age int
-            ) WITH COMPACT STORAGE""")
+            ) WITH COMPACT STORAGE"""
+
+        if requires_local_reads:
+            create_cmd += " AND " + self.get_local_reads_properties()
+
+        session.execute(create_cmd)
+
+    @staticmethod
+    def get_local_reads_properties():
+        """
+        If we must read from the local replica first, then we should disable read repair and
+        speculative retry, see CASSANDRA-12092
+        """
+        return " dclocal_read_repair_chance = 0 AND read_repair_chance = 0 AND speculative_retry =  'NONE'"
 
     def insert_user(self, session, userid, age, consistency, serial_consistency=None):
         text = "INSERT INTO users (userid, firstname, lastname, age) VALUES ({}, 'first{}', 'last{}', {}) {}"\
@@ -153,13 +209,17 @@ class TestHelper(Tester):
             self.assertTrue(ret, "Got {} from {}, expected {} at {}".format(rows_to_list(res), session.cluster.contact_points, expected, consistency_value_to_name(consistency)))
         return ret
 
-    def create_counters_table(self, session):
-        session.execute("""
+    def create_counters_table(self, session, requires_local_reads):
+        create_cmd = """
             CREATE TABLE counters (
                 id int PRIMARY KEY,
                 c counter
-            )
-        """)
+            )"""
+
+        if requires_local_reads:
+            create_cmd += " WITH " + self.get_local_reads_properties()
+
+        session.execute(create_cmd)
 
     def update_counter(self, session, id, consistency, serial_consistency=None):
         text = "UPDATE counters SET c = c + 1 WHERE id = {}".format(id)
@@ -169,23 +229,13 @@ class TestHelper(Tester):
 
     def query_counter(self, session, id, val, consistency, check_ret=True):
         statement = SimpleStatement("SELECT * from counters WHERE id = {}".format(id), consistency_level=consistency)
-        res = session.execute(statement)
-        ret = rows_to_list(res)
+        ret = rows_to_list(session.execute(statement))
         if check_ret:
             self.assertEqual(ret[0][1], val, "Got {} from {}, expected {} at {}".format(ret[0][1],
                                                                                         session.cluster.contact_points,
                                                                                         val,
                                                                                         consistency_value_to_name(consistency)))
         return ret[0][1] if ret else 0
-
-    def read_counter(self, session, id, consistency):
-        """
-        Return the current counter value. If we find no value we return zero
-        because after the next update the counter will become one.
-        """
-        statement = SimpleStatement("SELECT c from counters WHERE id = {}".format(id), consistency_level=consistency)
-        ret = rows_to_list(session.execute(statement))
-        return ret[0][0] if ret else 0
 
 
 class TestAvailability(TestHelper):
@@ -383,32 +433,8 @@ class TestAccuracy(TestHelper):
             outer.log('Testing accuracy with WRITE/READ/SERIAL consistency set to {}/{}/{} (keys : {} to {})'
                       .format(consistency_value_to_name(write_cl), consistency_value_to_name(read_cl), consistency_value_to_name(serial_cl), start, end - 1))
 
-        def get_num_nodes(self, idx):
-            """
-            Given a node index, identify to which data center we are connecting and return
-            number of nodes we write to, read from and whether R + W > N
-            """
-            outer = self.outer
-            nodes = self.nodes
-            rf_factors = self.rf_factors
-            write_cl = self.write_cl
-            read_cl = self.read_cl
-
-            dc = 0
-            for i in xrange(1, len(nodes)):
-                if idx < sum(nodes[:i]):
-                    break
-                dc += 1
-
-            if write_cl == ConsistencyLevel.EACH_QUORUM:
-                write_nodes = sum([outer._required_nodes(write_cl, rf_factors, i) for i in range(0, len(nodes))])
-            else:
-                write_nodes = outer._required_nodes(write_cl, rf_factors, dc)
-
-            read_nodes = outer._required_nodes(read_cl, rf_factors, dc)
-            strong_consistency = read_nodes + write_nodes > sum(rf_factors)
-
-            return write_nodes, read_nodes, strong_consistency
+        def get_expected_consistency(self, idx):
+            return self.outer.get_expected_consistency(idx, self.rf_factors, self.write_cl, self.read_cl)
 
         def validate_users(self):
             """
@@ -426,13 +452,15 @@ class TestAccuracy(TestHelper):
             serial_cl = self.serial_cl
 
             def check_all_sessions(idx, n, val):
-                write_nodes, read_nodes, strong_consistency = self.get_num_nodes(idx)
+                expected_consistency = self.get_expected_consistency(idx)
                 num = 0
                 for s in sessions:
-                    if outer.query_user(s, n, val, read_cl, check_ret=strong_consistency):
+                    if outer.query_user(s, n, val, read_cl, check_ret=expected_consistency.is_strong):
                         num += 1
-                assert_greater_equal(num, write_nodes, "Failed to read value from sufficient number of nodes, required {} but got {} - [{}, {}]"
-                                     .format(write_nodes, num, n, val))
+                assert_greater_equal(num, expected_consistency.num_write_nodes,
+                                     "Failed to read value from sufficient number of nodes,"
+                                     " required {} but got {} - [{}, {}]"
+                                     .format(expected_consistency.num_write_nodes, num, n, val))
 
             for n in xrange(start, end):
                 age = 30
@@ -464,28 +492,45 @@ class TestAccuracy(TestHelper):
             serial_cl = self.serial_cl
 
             def check_all_sessions(idx, n, val):
-                write_nodes, read_nodes, strong_consistency = self.get_num_nodes(idx)
+                expected_consistency = self.get_expected_consistency(idx)
                 results = []
                 for s in sessions:
-                    results.append(outer.query_counter(s, n, val, read_cl, check_ret=strong_consistency))
+                    results.append(outer.query_counter(s, n, val, read_cl, check_ret=expected_consistency.is_strong))
 
-                assert_greater_equal(results.count(val), write_nodes, "Failed to read value from sufficient number of nodes, required {} nodes to have a counter "
-                                     "value of {} at key {}, instead got these values: {}".format(write_nodes, val, n, results))
+                assert_greater_equal(results.count(val), expected_consistency.num_write_nodes,
+                                     "Failed to read value from sufficient number of nodes, required {} nodes to have a"
+                                     " counter value of {} at key {}, instead got these values: {}"
+                                     .format(expected_consistency.num_write_nodes, val, n, results))
 
             for n in xrange(start, end):
-                c = outer.read_counter(sessions[0], n, ConsistencyLevel.ALL)
+                c = 1
                 for s in range(0, len(sessions)):
-                    c += 1
                     outer.update_counter(sessions[s], n, write_cl, serial_cl)
                     check_all_sessions(s, n, c)
-                    # Make sure all nodes are on the same page since a counter update requires a read
-                    c = outer.query_counter(sessions[0], n, c, ConsistencyLevel.ALL)
+                    # Update the counter again at CL ALL to make sure all nodes are on the same page
+                    # since a counter update requires a read
+                    outer.update_counter(sessions[s], n, ConsistencyLevel.ALL)
+                    c += 2  # the counter was updated twice
 
     def _run_test_function_in_parallel(self, valid_fcn, nodes, rf_factors, combinations):
         """
         Run a test function in parallel.
         """
-        self._start_cluster(save_sessions=True)
+
+        requires_local_reads = False
+        for combination in combinations:
+            for i, _ in enumerate(nodes):
+                expected_consistency = self.get_expected_consistency(i, rf_factors, combination[0], combination[1])
+                if not expected_consistency.is_strong:
+                    # if at least one combination does not reach strong consistency, in order to validate weak
+                    # consistency we require local reads, see CASSANDRA-12092 for details.
+                    requires_local_reads = True
+                    break
+
+            if requires_local_reads:
+                break
+
+        self._start_cluster(save_sessions=True, requires_local_reads=requires_local_reads)
 
         input_queue = Queue.Queue()
         exceptions_queue = Queue.Queue()
@@ -628,9 +673,6 @@ class TestAccuracy(TestHelper):
         self.log("Testing multiple dcs, users, each quorum reads")
         self._run_test_function_in_parallel(TestAccuracy.Validation.validate_users, self.nodes, self.rf.values(), combinations)
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12092',
-                   flaky=True)
     def test_simple_strategy_counters(self):
         """
         Test for a single datacenter, counters table.
