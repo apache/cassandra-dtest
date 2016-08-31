@@ -2,7 +2,7 @@ import Queue
 import sys
 import threading
 import time
-from collections import OrderedDict
+from collections import OrderedDict, namedtuple
 from copy import deepcopy
 
 from cassandra import ConsistencyLevel, consistency_value_to_name
@@ -15,6 +15,8 @@ from dtest import DISABLE_VNODES, MultiError, Tester, debug
 from tools.data import (create_c1c2_table, insert_c1c2, insert_columns,
                         query_c1c2, rows_to_list)
 from tools.decorators import known_failure, since
+
+ExpectedConsistency = namedtuple('ExpectedConsistency', ('num_write_nodes', 'num_read_nodes', 'is_strong'))
 
 
 class TestHelper(Tester):
@@ -56,28 +58,37 @@ class TestHelper(Tester):
             ConsistencyLevel.LOCAL_ONE: 1,
         }[cl]
 
-    def _get_num_nodes(self, idx, rf_factors, write_cl, read_cl):
+    def get_expected_consistency(self, idx, rf_factors, write_cl, read_cl):
             """
             Given a node index, identify to which data center we are connecting and return
-            number of nodes we write to, read from and whether R + W > N
+            the expected consistency: number of nodes we write to, read from, and whether
+            we should have strong consistency, that is whether R + W > N
             """
             nodes = [self.nodes] if isinstance(self.nodes, int) else self.nodes
 
-            dc = 0
-            for i in xrange(1, len(nodes)):
-                if idx < sum(nodes[:i]):
-                    break
-                dc += 1
+            def get_data_center():
+                """
+                :return: the data center corresponding to this node
+                """
+                dc = 0
+                for i in xrange(1, len(nodes)):
+                    if idx < sum(nodes[:i]):
+                        break
+                    dc += 1
+                return dc
 
+            data_center = get_data_center()
             if write_cl == ConsistencyLevel.EACH_QUORUM:
                 write_nodes = sum([self._required_nodes(write_cl, rf_factors, i) for i in range(0, len(nodes))])
             else:
-                write_nodes = self._required_nodes(write_cl, rf_factors, dc)
+                write_nodes = self._required_nodes(write_cl, rf_factors, data_center)
 
-            read_nodes = self._required_nodes(read_cl, rf_factors, dc)
-            strong_consistency = read_nodes + write_nodes > sum(rf_factors)
+            read_nodes = self._required_nodes(read_cl, rf_factors, data_center)
+            is_strong = read_nodes + write_nodes > sum(rf_factors)
 
-            return write_nodes, read_nodes, strong_consistency
+            return ExpectedConsistency(num_write_nodes=write_nodes,
+                                       num_read_nodes=read_nodes,
+                                       is_strong=is_strong)
 
     def _should_succeed(self, cl, rf_factors, num_nodes_alive, current):
         """
@@ -422,8 +433,8 @@ class TestAccuracy(TestHelper):
             outer.log('Testing accuracy with WRITE/READ/SERIAL consistency set to {}/{}/{} (keys : {} to {})'
                       .format(consistency_value_to_name(write_cl), consistency_value_to_name(read_cl), consistency_value_to_name(serial_cl), start, end - 1))
 
-        def get_num_nodes(self, idx):
-            return self.outer._get_num_nodes(idx, self.rf_factors, self.write_cl, self.read_cl)
+        def get_expected_consistency(self, idx):
+            return self.outer.get_expected_consistency(idx, self.rf_factors, self.write_cl, self.read_cl)
 
         def validate_users(self):
             """
@@ -441,13 +452,15 @@ class TestAccuracy(TestHelper):
             serial_cl = self.serial_cl
 
             def check_all_sessions(idx, n, val):
-                write_nodes, read_nodes, strong_consistency = self.get_num_nodes(idx)
+                expected_consistency = self.get_expected_consistency(idx)
                 num = 0
                 for s in sessions:
-                    if outer.query_user(s, n, val, read_cl, check_ret=strong_consistency):
+                    if outer.query_user(s, n, val, read_cl, check_ret=expected_consistency.is_strong):
                         num += 1
-                assert_greater_equal(num, write_nodes, "Failed to read value from sufficient number of nodes, required {} but got {} - [{}, {}]"
-                                     .format(write_nodes, num, n, val))
+                assert_greater_equal(num, expected_consistency.num_write_nodes,
+                                     "Failed to read value from sufficient number of nodes,"
+                                     " required {} but got {} - [{}, {}]"
+                                     .format(expected_consistency.num_write_nodes, num, n, val))
 
             for n in xrange(start, end):
                 age = 30
@@ -479,15 +492,15 @@ class TestAccuracy(TestHelper):
             serial_cl = self.serial_cl
 
             def check_all_sessions(idx, n, val):
-                write_nodes, read_nodes, strong_consistency = self.get_num_nodes(idx)
+                expected_consistency = self.get_expected_consistency(idx)
                 results = []
                 for s in sessions:
-                    results.append(outer.query_counter(s, n, val, read_cl, check_ret=strong_consistency))
+                    results.append(outer.query_counter(s, n, val, read_cl, check_ret=expected_consistency.is_strong))
 
-                assert_greater_equal(results.count(val), write_nodes,
+                assert_greater_equal(results.count(val), expected_consistency.num_write_nodes,
                                      "Failed to read value from sufficient number of nodes, required {} nodes to have a"
                                      " counter value of {} at key {}, instead got these values: {}"
-                                     .format(write_nodes, val, n, results))
+                                     .format(expected_consistency.num_write_nodes, val, n, results))
 
             for n in xrange(start, end):
                 c = 1
@@ -507,8 +520,8 @@ class TestAccuracy(TestHelper):
         requires_local_reads = False
         for combination in combinations:
             for i, _ in enumerate(nodes):
-                _, _, strong_consistency = self._get_num_nodes(i, rf_factors, combination[0], combination[1])
-                if not strong_consistency:
+                expected_consistency = self.get_expected_consistency(i, rf_factors, combination[0], combination[1])
+                if not expected_consistency.is_strong:
                     # if at least one combination does not reach strong consistency, in order to validate weak
                     # consistency we require local reads, see CASSANDRA-12092 for details.
                     requires_local_reads = True
