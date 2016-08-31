@@ -471,7 +471,7 @@ class TestCDC(Tester):
         return loading_node
 
     @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12286',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11811',
                    flaky=False)
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12537',
