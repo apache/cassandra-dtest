@@ -10,7 +10,7 @@ from cassandra import ConsistencyLevel
 from cassandra.concurrent import execute_concurrent_with_args
 from ccmlib.node import NodeError
 
-from tools.assertions import assert_almost_equal, assert_not_running, assert_one
+from tools.assertions import assert_almost_equal, assert_not_running, assert_one, assert_stderr_clean
 from dtest import DISABLE_VNODES, Tester, debug
 from tools.data import query_c1c2
 from tools.decorators import known_failure, no_vnodes, since
@@ -401,6 +401,7 @@ class TestBootstrap(Tester):
                                         '-errors', 'retries=2'])
 
         debug(out)
+        assert_stderr_clean(err)
         regex = re.compile("Operation.+error inserting key.+Exception")
         failure = regex.search(out)
         self.assertIsNone(failure, "Error during stress while bootstrapping")
