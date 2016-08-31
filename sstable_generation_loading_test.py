@@ -36,7 +36,7 @@ class BaseSStableLoaderTest(Tester):
                        compact_storage=self.compact)
 
     @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11896',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11897',
                    flaky=True,
                    notes='windows')
     def sstableloader_compression_none_to_none_test(self):
@@ -49,14 +49,14 @@ class BaseSStableLoaderTest(Tester):
         self.load_sstable_with_configuration(None, 'Snappy')
 
     @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11896',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11897',
                    flaky=True,
                    notes='windows')
     def sstableloader_compression_none_to_deflate_test(self):
         self.load_sstable_with_configuration(None, 'Deflate')
 
     @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11896',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11897',
                    flaky=True,
                    notes='windows')
     def sstableloader_compression_snappy_to_none_test(self):
@@ -69,7 +69,7 @@ class BaseSStableLoaderTest(Tester):
         self.load_sstable_with_configuration('Snappy', 'Snappy')
 
     @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11896',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11897',
                    flaky=True,
                    notes='windows')
     def sstableloader_compression_snappy_to_deflate_test(self):
