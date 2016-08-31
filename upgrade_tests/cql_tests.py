@@ -4239,9 +4239,6 @@ class TestCQL(UpgradeTester):
 
             assert_one(cursor, "INSERT INTO lock(partition, key, owner) VALUES ('a', 'c', 'x') IF NOT EXISTS", [True])
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12251',
-                   flaky=True)
     @since('2.1.1')
     def whole_list_conditional_test(self):
         cursor = self.prepare()
