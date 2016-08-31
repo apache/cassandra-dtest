@@ -32,7 +32,8 @@ def assert_bootstrap_state(tester, node, expected_bootstrap_state):
     assert_one(session, "SELECT bootstrapped FROM system.local WHERE key='local'", [expected_bootstrap_state])
 
 
-class TestBootstrap(Tester):
+class BaseBootstrapTest(Tester):
+    __test__ = False
 
     def __init__(self, *args, **kwargs):
         kwargs['cluster_options'] = {'start_rpc': 'true'}
@@ -49,7 +50,16 @@ class TestBootstrap(Tester):
         Tester.__init__(self, *args, **kwargs)
         self.allow_log_errors = True
 
-    def _base_bootstrap_test(self, bootstrap):
+    def _base_bootstrap_test(self, bootstrap=None, bootstrap_from_version=None):
+        def default_bootstrap(cluster, token):
+            node2 = new_node(cluster)
+            node2.set_configuration_options(values={'initial_token': token})
+            node2.start(wait_for_binary_proto=True)
+            return node2
+
+        if bootstrap is None:
+            bootstrap = default_bootstrap
+
         cluster = self.cluster
         tokens = cluster.balanced_tokens(2)
         cluster.set_configuration_options(values={'num_tokens': 1})
@@ -61,6 +71,9 @@ class TestBootstrap(Tester):
         # Create a single node cluster
         cluster.populate(1)
         node1 = cluster.nodelist()[0]
+        if bootstrap_from_version:
+            debug("starting source node on version {}".format(bootstrap_from_version))
+            node1.set_install_dir(version=bootstrap_from_version)
         node1.set_configuration_options(values={'initial_token': tokens[0]})
         cluster.start(wait_other_notice=True)
 
@@ -84,7 +97,7 @@ class TestBootstrap(Tester):
         # get any error
         reader = self.go(lambda _: query_c1c2(session, random.randint(0, keys - 1), ConsistencyLevel.ONE))
 
-        # Bootstrapping a new node
+        # Bootstrapping a new node in the current version
         node2 = bootstrap(cluster, tokens[1])
         node2.compact()
 
@@ -104,16 +117,15 @@ class TestBootstrap(Tester):
         assert_almost_equal(float(initial_size - empty_size), 2 * (size1 - float(empty_size)))
 
         assert_bootstrap_state(self, node2, 'COMPLETED')
+        if bootstrap_from_version:
+            self.assertTrue(node2.grep_log('does not support keep-alive', filename='debug.log'))
+
+
+class TestBootstrap(BaseBootstrapTest):
 
     @no_vnodes()
     def simple_bootstrap_test(self):
-        def bootstrap(cluster, token):
-            node2 = new_node(cluster)
-            node2.set_configuration_options(values={'initial_token': token})
-            node2.start(wait_for_binary_proto=True)
-            return node2
-
-        self._base_bootstrap_test(bootstrap)
+        self._base_bootstrap_test()
 
     @no_vnodes()
     def bootstrap_on_write_survey_test(self):
@@ -130,6 +142,45 @@ class TestBootstrap(Tester):
             return node2
 
         self._base_bootstrap_test(bootstrap_on_write_survey_and_join)
+
+    @since('3.10')
+    @no_vnodes()
+    def simple_bootstrap_test_small_keepalive_period(self):
+        """
+        @jira_ticket CASSANDRA-11841
+        Test that bootstrap completes if it takes longer than streaming_socket_timeout_in_ms or
+        2*streaming_keep_alive_period_in_secs to receive a single sstable
+        """
+        cluster = self.cluster
+        cluster.set_configuration_options(values={'stream_throughput_outbound_megabits_per_sec': 1,
+                                                  'streaming_socket_timeout_in_ms': 1000,
+                                                  'streaming_keep_alive_period_in_secs': 1})
+
+        # Create a single node cluster
+        cluster.populate(1)
+        node1 = cluster.nodelist()[0]
+        cluster.start(wait_other_notice=True)
+
+        # Create more than one sstable larger than 1MB
+        node1.stress(['write', 'n=50K', '-rate', 'threads=8', '-schema',
+                      'compaction(strategy=SizeTieredCompactionStrategy, enabled=false)'])
+        cluster.flush()
+        node1.stress(['write', 'n=50K', '-rate', 'threads=8', '-schema',
+                      'compaction(strategy=SizeTieredCompactionStrategy, enabled=false)'])
+        cluster.flush()
+        self.assertGreater(node1.get_sstables("keyspace1", "standard1"), 1)
+
+        # Bootstraping a new node with very small streaming_socket_timeout_in_ms
+        node2 = new_node(cluster)
+        node2.start(wait_for_binary_proto=True)
+
+        # Shouldn't fail due to streaming socket timeout timeout
+        assert_bootstrap_state(self, node2, 'COMPLETED')
+
+        for node in cluster.nodelist():
+            self.assertTrue(node.grep_log('Scheduling keep-alive task with 1s period.', filename='debug.log'))
+            self.assertTrue(node.grep_log('Sending keep-alive', filename='debug.log'))
+            self.assertTrue(node.grep_log('Received keep-alive', filename='debug.log'))
 
     def simple_bootstrap_test_nodata(self):
         """
