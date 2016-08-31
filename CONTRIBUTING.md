@@ -82,6 +82,10 @@ In some cases, we organize our test files by putting them in directories. If you
 - When none of these are applicable, use python's built in [unittest assertions](https://docs.python.org/2/library/unittest.html#assert-methods).
 - Naked assert statements should never be used, e.g. `assert True`
 
+## Byteman Files
+
+Any and all byteman (.btm) files should be saved in the cassandra-dtest/byteman/ directory.
+
 ## Summary: Review Checklist
 
 - Correctness
