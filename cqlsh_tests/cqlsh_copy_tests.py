@@ -1282,9 +1282,6 @@ class CqlshCopyTest(Tester):
 
         os.unlink(err_file.name)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12382',
-                   flaky=True)
     def test_reading_with_multiple_files(self):
         """
         Test importing multiple CSV files
@@ -1547,9 +1544,6 @@ class CqlshCopyTest(Tester):
 
             assert_csvs_items_equal(tempfile.name, reference_file.name)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12070',
-                   flaky=True)
     def test_data_validation_on_read_template(self):
         """
         Test that reading from CSV files fails when there is a type mismatch
@@ -2417,8 +2411,10 @@ class CqlshCopyTest(Tester):
             copy_to_cmd = "CONSISTENCY ALL; COPY {} TO '{}'".format(stress_table, filename.name)
             if copy_to_options:
                 copy_to_cmd += ' WITH ' + ' AND '.join('{} = {}'.format(k, v) for k, v in copy_to_options.iteritems())
-            debug(copy_to_cmd)
-            ret.append(self.node1.run_cqlsh(cmds=copy_to_cmd, cqlsh_options=['--debug']))
+            debug('Running {}'.format(copy_to_cmd))
+            result = self.node1.run_cqlsh(cmds=copy_to_cmd, cqlsh_options=['--debug'])
+            debug('Output:\n{}'.format(result[0]))  # show stdout of copy cmd
+            ret.append(result)
             debug("COPY TO took {} to export {} records".format(datetime.datetime.now() - start, num_records))
 
         def run_copy_from(filename):
@@ -2427,8 +2423,10 @@ class CqlshCopyTest(Tester):
             copy_from_cmd = "COPY {} FROM '{}'".format(stress_table, filename.name)
             if copy_from_options:
                 copy_from_cmd += ' WITH ' + ' AND '.join('{} = {}'.format(k, v) for k, v in copy_from_options.iteritems())
-            debug(copy_from_cmd)
-            ret.append(self.node1.run_cqlsh(cmds=copy_from_cmd, cqlsh_options=['--debug']))
+            debug('Running {}'.format(copy_from_cmd))
+            result = self.node1.run_cqlsh(cmds=copy_from_cmd, cqlsh_options=['--debug'])
+            debug('Output:\n{}'.format(result[0]))  # show stdout of copy cmd
+            ret.append(result)
             debug("COPY FROM took {} to import {} records".format(datetime.datetime.now() - start, num_records))
 
         num_records = create_records()
@@ -2464,9 +2462,6 @@ class CqlshCopyTest(Tester):
         """
         self._test_bulk_round_trip(nodes=3, partitioner="murmur3", num_operations=100000)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12479',
-                   flaky=False)
     def test_bulk_round_trip_non_prepared_statements(self):
         """
         Test bulk import with default stress import (one row per operation) and without
@@ -2475,7 +2470,8 @@ class CqlshCopyTest(Tester):
         @jira_ticket CASSANDRA-11053
         """
         self._test_bulk_round_trip(nodes=3, partitioner="murmur3", num_operations=100000,
-                                   copy_from_options={'PREPAREDSTATEMENTS': False})
+                                   copy_from_options={'PREPAREDSTATEMENTS': False},
+                                   copy_to_options={'PAGETIMEOUT': 60, 'PAGESIZE': 1000})
 
     @freshCluster()
     def test_bulk_round_trip_blogposts(self):
