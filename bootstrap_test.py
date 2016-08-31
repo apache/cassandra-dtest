@@ -367,7 +367,7 @@ class TestBootstrap(BaseBootstrapTest):
         # check if we reset bootstrap state
         node3.watch_log_for("Resetting bootstrap progress to start fresh", from_mark=mark)
         # wait for node3 ready to query
-        node3.watch_log_for("Listening for thrift clients...", from_mark=mark)
+        node3.wait_for_thrift_interface(from_mark=mark)
 
         # check if 2nd bootstrap succeeded
         assert_bootstrap_state(self, node3, 'COMPLETED')
