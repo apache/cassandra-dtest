@@ -18,7 +18,7 @@ from thrift_bindings.v22.ttypes import (CfDef, Column, ColumnOrSuperColumn,
 from thrift_tests import get_thrift_client
 from tools.assertions import (assert_all, assert_invalid, assert_length_equal,
                               assert_none, assert_one, assert_unavailable)
-from tools.decorators import known_failure, since
+from tools.decorators import since
 from tools.metadata_wrapper import (UpdatingClusterMetadataWrapper,
                                     UpdatingKeyspaceMetadataWrapper,
                                     UpdatingTableMetadataWrapper)
@@ -453,9 +453,6 @@ class MiscellaneousCQLTester(CQLTester):
         with self.assertRaisesRegexp(ProtocolException, 'Cannot decode string as UTF8'):
             session.execute("insert into invalid_string_literals (k, c) VALUES (0, '\xc2\x01')")
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12361',
-                   flaky=True)
     def prepared_statement_invalidation_test(self):
         """
         @jira_ticket CASSANDRA-7910

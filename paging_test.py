@@ -1900,9 +1900,6 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
                                               [2, 3, 4, 5],
                                               [3, 3, 4, 5]])
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12025',
-                   flaky=True)
     @since('3.6')
     def test_paging_with_filtering_on_counter_columns(self):
         """

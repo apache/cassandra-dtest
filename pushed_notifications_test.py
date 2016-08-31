@@ -151,10 +151,6 @@ class TestPushedNotifications(Tester):
             notifications = waiter.wait_for_notifications(30.0)
             self.assertEquals(1 if waiter.node is node1 else 0, len(notifications), notifications)
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11360',
-                   flaky=True,
-                   notes='2 different failures on 2.1 offheap memtables jobs. Fails on main 2.1 as well')
     def restart_node_test(self):
         """
         @jira_ticket CASSANDRA-7816

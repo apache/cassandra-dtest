@@ -364,9 +364,6 @@ class TestSecondaryIndexes(Tester):
         rows = list(session.execute("SELECT * FROM tbl WHERE c0 = 'a' AND c1 = 'b' ALLOW FILTERING;"))
         self.assertEqual(2, len(rows))
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12098',
-                   flaky=True)
     @since('3.0')
     def test_only_coordinator_chooses_index_for_query(self):
         """

@@ -41,9 +41,6 @@ class TestReplaceAddress(Tester):
         Tester.__init__(self, *args, **kwargs)
         self.allow_log_errors = True
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12415',
-                   flaky=True)
     @known_failure(failure_source='systemic',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11652',
                    flaky=True,

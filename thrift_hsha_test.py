@@ -7,7 +7,6 @@ import unittest
 
 import pycassa
 from dtest import DEFAULT_DIR, Tester, debug
-from tools.decorators import known_failure
 from tools.jmxutils import (JolokiaAgent, make_mbean,
                             remove_perf_disable_shared_mem)
 
@@ -76,9 +75,6 @@ class ThriftHSHATest(Tester):
                 num_clients = jmx.read_attribute(connected_thrift_clients, "Value")
                 self.assertEqual(int(num_clients), 0, "There are still open Thrift connections after stopping service")
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12369',
-                   flaky=True)
     @unittest.skipIf(not os.path.exists(ATTACK_JAR), "No attack jar found")
     @unittest.skipIf(not os.path.exists(JNA_PATH), "No JNA jar found")
     def test_6285(self):
