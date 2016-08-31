@@ -1,7 +1,7 @@
 # coding: utf-8
 
 from dtest import Tester, debug
-from tools.decorators import since
+from tools.decorators import since, known_failure
 
 
 class TestCqlTracing(Tester):
@@ -127,6 +127,9 @@ class TestCqlTracing(Tester):
         err = errs[0][0]
         self.assertIn(expected_error, err)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12579',
+                   flaky=True)
     @since('3.4')
     def tracing_default_impl_test(self):
         """

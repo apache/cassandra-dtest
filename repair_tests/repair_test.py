@@ -179,6 +179,9 @@ class TestRepair(BaseRepairTest):
         for node in cluster.nodelist():
             self.assertFalse(node.grep_log("Starting anticompaction"))
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12578',
+                   flaky=True)
     def nonexistent_table_repair_test(self):
         """
         * Check that repairing a non-existant table fails
