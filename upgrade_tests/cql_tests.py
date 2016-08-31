@@ -2627,9 +2627,6 @@ class TestCQL(UpgradeTester):
             cursor.execute("INSERT INTO test(k, d, f) VALUES (1, 3.E10, -23.44E-3)")
             cursor.execute("INSERT INTO test(k, d, f) VALUES (2, 3, -2)")
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12194',
-                   flaky=False)
     def compact_metadata_test(self):
         """ Test regression from #5189 """
         cursor = self.prepare()
