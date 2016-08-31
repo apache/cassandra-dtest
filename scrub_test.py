@@ -362,10 +362,6 @@ class TestScrub(TestHelper):
         return ret
 
     @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11446',
-                   flaky=True,
-                   notes='trunk offheap')
-    @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11284',
                    flaky=True,
                    notes='windows')
