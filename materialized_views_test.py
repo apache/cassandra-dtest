@@ -379,9 +379,7 @@ class TestMaterializedViews(Tester):
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12140',
                    flaky=True)
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12577',
-                   flaky=True)
+    @attr('resource-intensive')
     def add_dc_after_mv_simple_replication_test(self):
         """
         @jira_ticket CASSANDRA-10634
@@ -394,9 +392,7 @@ class TestMaterializedViews(Tester):
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12140',
                    flaky=True)
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12577',
-                   flaky=True)
+    @attr('resource-intensive')
     def add_dc_after_mv_network_replication_test(self):
         """
         @jira_ticket CASSANDRA-10634
