@@ -2,17 +2,12 @@ import time
 
 from dtest import Tester
 from tools.data import rows_to_list
-from tools.decorators import known_failure
 from tools.jmxutils import (JolokiaAgent, make_mbean,
                             remove_perf_disable_shared_mem)
 
 
 class TestDeletion(Tester):
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11364',
-                   flaky=True,
-                   notes='flaked with "unable to connect" on 3.0')
     def gc_test(self):
         """
         Test that tombstone purging doesn't bring back deleted data by writing
