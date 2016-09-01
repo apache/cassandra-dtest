@@ -1,16 +1,20 @@
+# See python driver docs: futures and six have to be installed before
+# cythonizing the driver, perhaps only on old pips.
+# http://datastax.github.io/python-driver/installation.html#cython-based-extensions
+futures
+six
 -e git+https://github.com/datastax/python-driver.git@cassandra-test#egg=cassandra-driver
+
 -e git+https://github.com/pcmanus/ccm.git@master#egg=ccm
 cql
 decorator
 docopt
 enum34
 flaky
-futures
 mock
 nose
 nose-test-select
 parse
 psutil
 pycassa
-six
 thrift
