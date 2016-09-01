@@ -3,8 +3,8 @@ import os.path
 import shutil
 import time
 
-import sslkeytool
 from dtest import Tester
+from tools import sslkeygen
 from tools.decorators import known_failure, since
 
 _LOG_ERR_SIG = "^javax.net.ssl.SSLHandshakeException: sun.security.validator.ValidatorException: Certificate signature validation failed$"
@@ -18,8 +18,8 @@ class TestNodeToNodeSSLEncryption(Tester):
     def ssl_enabled_test(self):
         """Should be able to start with valid ssl options"""
 
-        credNode1 = sslkeytool.generate_credentials("127.0.0.1")
-        credNode2 = sslkeytool.generate_credentials("127.0.0.2", credNode1.cakeystore, credNode1.cacert)
+        credNode1 = sslkeygen.generate_credentials("127.0.0.1")
+        credNode2 = sslkeygen.generate_credentials("127.0.0.2", credNode1.cakeystore, credNode1.cacert)
 
         self.setup_nodes(credNode1, credNode2)
         self.cluster.start()
@@ -28,8 +28,8 @@ class TestNodeToNodeSSLEncryption(Tester):
     def ssl_wrong_hostname_no_validation_test(self):
         """Should be able to start with valid ssl options"""
 
-        credNode1 = sslkeytool.generate_credentials("127.0.0.80")
-        credNode2 = sslkeytool.generate_credentials("127.0.0.81", credNode1.cakeystore, credNode1.cacert)
+        credNode1 = sslkeygen.generate_credentials("127.0.0.80")
+        credNode2 = sslkeygen.generate_credentials("127.0.0.81", credNode1.cakeystore, credNode1.cacert)
 
         self.setup_nodes(credNode1, credNode2, endpointVerification=False)
         self.cluster.start()
@@ -43,8 +43,8 @@ class TestNodeToNodeSSLEncryption(Tester):
     def ssl_wrong_hostname_with_validation_test(self):
         """Should be able to start with valid ssl options"""
 
-        credNode1 = sslkeytool.generate_credentials("127.0.0.80")
-        credNode2 = sslkeytool.generate_credentials("127.0.0.81", credNode1.cakeystore, credNode1.cacert)
+        credNode1 = sslkeygen.generate_credentials("127.0.0.80")
+        credNode2 = sslkeygen.generate_credentials("127.0.0.81", credNode1.cakeystore, credNode1.cacert)
 
         self.setup_nodes(credNode1, credNode2, endpointVerification=True)
 
@@ -67,8 +67,8 @@ class TestNodeToNodeSSLEncryption(Tester):
     def ca_mismatch_test(self):
         """CA mismatch should cause nodes to fail to connect"""
 
-        credNode1 = sslkeytool.generate_credentials("127.0.0.1")
-        credNode2 = sslkeytool.generate_credentials("127.0.0.2")  # mismatching CA!
+        credNode1 = sslkeygen.generate_credentials("127.0.0.1")
+        credNode2 = sslkeygen.generate_credentials("127.0.0.2")  # mismatching CA!
 
         self.setup_nodes(credNode1, credNode2)
 
