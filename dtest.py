@@ -41,6 +41,7 @@ from plugins.dtestconfig import _CONFIG as CONFIG
 # We don't want test files to know about the plugins module, so we import
 # constants here and re-export them.
 from plugins.dtestconfig import GlobalConfigObject
+from tools.context import log_filter
 from tools.funcutils import merge_dicts
 
 LOG_SAVED_DIR = "logs"
@@ -70,7 +71,6 @@ OFFHEAP_MEMTABLES = os.environ.get('OFFHEAP_MEMTABLES', '').lower() in ('yes', '
 NUM_TOKENS = os.environ.get('NUM_TOKENS', '256')
 RECORD_COVERAGE = os.environ.get('RECORD_COVERAGE', '').lower() in ('yes', 'true')
 REUSE_CLUSTER = os.environ.get('REUSE_CLUSTER', '').lower() in ('yes', 'true')
-SILENCE_DRIVER_ON_SHUTDOWN = os.environ.get('SILENCE_DRIVER_ON_SHUTDOWN', 'true').lower() in ('yes', 'true')
 IGNORE_REQUIRE = os.environ.get('IGNORE_REQUIRE', '').lower() in ('yes', 'true')
 DATADIR_COUNT = os.environ.get('DATADIR_COUNT', '3')
 ENABLE_ACTIVE_LOG_WATCHING = os.environ.get('ENABLE_ACTIVE_LOG_WATCHING', '').lower() in ('yes', 'true')
@@ -168,27 +168,6 @@ def find_libjemalloc():
         return ""
 
 CASSANDRA_LIBJEMALLOC = find_libjemalloc()
-
-
-class expect_control_connection_failures(object):
-    """
-    We're just using a class here as a one-off object with a filter method, for
-    use as a filter object in the driver logger. It's frustrating that we can't
-    just pass in a function, but we need an object with a .filter method. Oh
-    well, I guess that's what old stdlib libraries are like.
-    """
-    @staticmethod
-    def filter(record):
-        expected_strings = [
-            'Control connection failed to connect, shutting down Cluster:',
-            '[control connection] Error connecting to '
-        ]
-        for s in expected_strings:
-            if s in record.msg or s in record.name:
-                return False
-        return True
-
-
 # copy the initial environment variables so we can reset them later:
 initial_environment = copy.deepcopy(os.environ)
 
@@ -536,8 +515,8 @@ class Tester(TestCase):
         if is_win():
             timeout *= 2
 
-        logging.getLogger('cassandra.cluster').addFilter(expect_control_connection_failures)
-        try:
+        expected_log_lines = ('Control connection failed to connect, shutting down Cluster:', '[control connection] Error connecting to ')
+        with log_filter('cassandra.cluster', expected_log_lines):
             session = retry_till_success(
                 self.cql_connection,
                 node,
@@ -551,8 +530,6 @@ class Tester(TestCase):
                 ssl_opts=ssl_opts,
                 bypassed_exception=NoHostAvailable
             )
-        finally:
-            logging.getLogger('cassandra.cluster').removeFilter(expect_control_connection_failures)
 
         return session
 
@@ -856,39 +833,36 @@ def create_ccm_cluster(test_path, name):
 
 
 def cleanup_cluster(cluster, test_path, log_watch_thread=None):
-    if SILENCE_DRIVER_ON_SHUTDOWN:
-        # driver logging is very verbose when nodes start going down -- bump up the level
-        logging.getLogger('cassandra').setLevel(logging.CRITICAL)
+    with log_filter('cassandra'):  # quiet noise from driver when nodes start going down
+        if KEEP_TEST_DIR:
+            cluster.stop(gently=RECORD_COVERAGE)
+        else:
+            # when recording coverage the jvm has to exit normally
+            # or the coverage information is not written by the jacoco agent
+            # otherwise we can just kill the process
+            if RECORD_COVERAGE:
+                cluster.stop(gently=True)
 
-    if KEEP_TEST_DIR:
-        cluster.stop(gently=RECORD_COVERAGE)
-    else:
-        # when recording coverage the jvm has to exit normally
-        # or the coverage information is not written by the jacoco agent
-        # otherwise we can just kill the process
-        if RECORD_COVERAGE:
-            cluster.stop(gently=True)
+            # Cleanup everything:
+            try:
+                if log_watch_thread:
+                    stop_active_log_watch(log_watch_thread)
+            finally:
+                debug("removing ccm cluster {name} at: {path}".format(name=cluster.name, path=test_path))
+                cluster.remove()
 
-        # Cleanup everything:
-        try:
-            if log_watch_thread:
-                stop_active_log_watch(log_watch_thread)
-        finally:
-            debug("removing ccm cluster {name} at: {path}".format(name=cluster.name, path=test_path))
-            cluster.remove()
+                debug("clearing ssl stores from [{0}] directory".format(test_path))
+                for filename in ('keystore.jks', 'truststore.jks', 'ccm_node.cer'):
+                    try:
+                        os.remove(os.path.join(test_path, filename))
+                    except OSError as e:
+                        # once we port to py3, which has better reporting for exceptions raised while
+                        # handling other excpetions, we should just assert e.errno == errno.ENOENT
+                        if e.errno != errno.ENOENT:  # ENOENT = no such file or directory
+                            raise
 
-            debug("clearing ssl stores from [{0}] directory".format(test_path))
-            for filename in ('keystore.jks', 'truststore.jks', 'ccm_node.cer'):
-                try:
-                    os.remove(os.path.join(test_path, filename))
-                except OSError as e:
-                    # once we port to py3, which has better reporting for exceptions raised while
-                    # handling other excpetions, we should just assert e.errno == errno.ENOENT
-                    if e.errno != errno.ENOENT:  # ENOENT = no such file or directory
-                        raise
-
-            os.rmdir(test_path)
-            cleanup_last_test_dir()
+                os.rmdir(test_path)
+                cleanup_last_test_dir()
 
 
 def cleanup_last_test_dir():
