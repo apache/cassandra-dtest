@@ -13,6 +13,9 @@ class TestInternodeSSL(Tester):
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11689',
                    flaky=True,
                    notes='failed on trunk')
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12600',
+                   flaky=True)
     def putget_with_internode_ssl_test(self):
         """
         Simple putget test with internode ssl enabled
