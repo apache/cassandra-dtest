@@ -1549,7 +1549,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
             # Grep each node in the cluster for aborted query logs
             self.cluster.timed_grep_nodes_for_patterns(LogPatternToVersion({"2.2": r"Scanned over.* tombstones in ks.paging_test.* query aborted",
                                                                             "3.0": r"Scanned over.* tombstones during query 'SELECT \* FROM ks.paging_test.* query aborted"}),
-                                                       timeout=50)
+                                                       timeout_seconds=50)
 
 
 topology_specs = [
