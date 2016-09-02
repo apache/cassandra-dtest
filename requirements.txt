@@ -15,6 +15,7 @@ mock
 nose
 nose-test-select
 parse
+pep8
 psutil
 pycassa
 thrift
