@@ -1,12 +1,13 @@
 import re
 import time
 from threading import Thread
+from unittest import skip
 
 from cassandra import ConsistencyLevel
 from ccmlib.node import TimeoutError, ToolError
 
-from tools.assertions import assert_almost_equal
 from dtest import Tester, debug
+from tools.assertions import assert_almost_equal
 from tools.data import insert_c1c2, query_c1c2
 from tools.decorators import known_failure, no_vnodes, since
 
@@ -53,6 +54,7 @@ class TestTopology(Tester):
         # described in 9912. Do not remove it.
         time.sleep(10)
 
+    @skip('Hangs on CI for 2.1')
     def concurrent_decommission_not_allowed_test(self):
         """
         Test concurrent decommission is not allowed
