@@ -104,13 +104,6 @@ LOG = logging.getLogger('dtest')
 logging.getLogger('cassandra').setLevel(logging.INFO)
 
 
-def index_is_built(node, session, keyspace, table_name, idx_name):
-    # checks if an index has been built
-    full_idx_name = idx_name if node.get_cassandra_version() > '3.0' else '{}.{}'.format(table_name, idx_name)
-    index_query = """SELECT * FROM system."IndexInfo" WHERE table_name = '{}' AND index_name = '{}'""".format(keyspace, full_idx_name)
-    return len(list(session.execute(index_query))) == 1
-
-
 def get_sha(repo_dir):
     try:
         output = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=repo_dir).strip()
