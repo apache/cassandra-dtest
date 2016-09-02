@@ -1,5 +1,5 @@
 from bootstrap_test import BaseBootstrapTest
-from tools import since, no_vnodes
+from tools.decorators import since, no_vnodes
 
 
 class TestBootstrapUpgrade(BaseBootstrapTest):
