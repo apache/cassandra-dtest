@@ -39,6 +39,9 @@ class TestSCUpgrade(Tester):
 
         Tester.__init__(self, *args, **kwargs)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12616',
+                   flaky=True)
     def upgrade_with_index_creation_test(self):
         cluster = self.cluster
 
@@ -150,6 +153,9 @@ class TestSCUpgrade(Tester):
 
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12340',
+                   flaky=True)
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12616',
                    flaky=True)
     @flaky(max_runs=3, rerun_filter=requires_rerun)
     def upgrade_with_counters_test(self):
