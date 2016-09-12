@@ -650,10 +650,6 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12491',
                    flaky=True)
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11195',
-                   flaky=True,
-                   notes='so far only observed on 2-node clusters w/ RF=1')
     @since('2.0.6')
     def static_columns_paging_test(self):
         """
