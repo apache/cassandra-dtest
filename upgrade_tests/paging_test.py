@@ -6,11 +6,10 @@ from unittest import SkipTest, skipUnless
 from cassandra import ConsistencyLevel as CL
 from cassandra import InvalidRequest
 from cassandra.query import SimpleStatement, dict_factory, named_tuple_factory
-from ccmlib.node import TimeoutError
+from ccmlib.common import LogPatternToVersion
 from nose.tools import assert_not_in
 
 from dtest import RUN_STATIC_UPGRADE_MATRIX, debug, run_scenarios
-from distutils.version import LooseVersion
 from tools.assertions import assert_read_timeout_or_failure
 from tools.data import rows_to_list
 from tools.datahelp import create_rows, flatten_into_set, parse_data_into_dicts
@@ -1547,23 +1546,10 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
             stmt = SimpleStatement("select * from paging_test", fetch_size=1000, consistency_level=CL.ALL)
             assert_read_timeout_or_failure(cursor, stmt)
 
-            self._grep_for_aborted_query_patterns(nodes, 50)
-
-    def _grep_for_aborted_query_patterns(self, nodes, timeout):
-        old_pattern = r"Scanned over.* tombstones in ks.paging_test.* query aborted"
-        new_pattern = r"Scanned over.* tombstones during query 'SELECT \* FROM ks.paging_test.* query aborted"
-
-        end_time = time.time() + timeout
-        while True:
-            if time.time() > end_time:
-                raise TimeoutError(time.strftime("%d %b %Y %H:%M:%S", time.gmtime()) +
-                                   " Unable to find: " + old_pattern + "or " + new_pattern + "in any node log within " + str(50) + "s")
-            for node in nodes:
-                pattern = old_pattern if LooseVersion(node.get_cassandra_version()) < LooseVersion('3.0') else new_pattern
-
-                if node.grep_log(pattern, "system.log"):
-                    return True
-            time.sleep(1)
+            # Grep each node in the cluster for aborted query logs
+            self.cluster.timed_grep_nodes_for_patterns(LogPatternToVersion({"2.2": r"Scanned over.* tombstones in ks.paging_test.* query aborted",
+                                                                            "3.0": r"Scanned over.* tombstones during query 'SELECT \* FROM ks.paging_test.* query aborted"}),
+                                                       timeout_seconds=50)
 
 
 topology_specs = [
