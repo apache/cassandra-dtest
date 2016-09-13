@@ -8,7 +8,7 @@ from cassandra.query import SimpleStatement
 from dtest import CASSANDRA_DIR, Tester, debug
 from tools.assertions import (assert_all, assert_invalid, assert_one,
                               assert_unavailable)
-from tools.decorators import known_failure, since
+from tools.decorators import since
 
 
 class TestBatch(Tester):
@@ -176,9 +176,6 @@ class TestBatch(Tester):
             APPLY BATCH
         """)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12383',
-                   flaky=True)
     def logged_batch_doesnt_throw_uae_test(self):
         """ Test that logged batch DOES NOT throw UAE if there are at least 2 live nodes """
         session = self.prepare(nodes=3)
