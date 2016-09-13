@@ -2,18 +2,18 @@ import os
 import tempfile
 from itertools import chain
 from shutil import rmtree
+from unittest import skipIf
 
 from cassandra import ConsistencyLevel, ReadTimeout, Unavailable
 from cassandra.query import SimpleStatement
 from ccmlib.node import Node
 from nose.plugins.attrib import attr
 
-from dtest import DISABLE_VNODES, Tester, debug
-from tools.assertions import assert_not_running, assert_all
+from bootstrap_test import assert_bootstrap_state
+from dtest import CASSANDRA_VERSION_FROM_BUILD, DISABLE_VNODES, Tester, debug
+from tools.assertions import assert_all, assert_not_running
 from tools.data import rows_to_list
 from tools.decorators import known_failure, since
-
-from bootstrap_test import assert_bootstrap_state
 
 
 class NodeUnavailable(Exception):
@@ -413,9 +413,7 @@ class TestReplaceAddress(BaseReplaceAddressTest):
                 self.replacement_node.watch_log_for('To perform this operation, please restart with -Dcassandra.allow_unsafe_replace=true',
                                                     from_mark=mark, timeout=20)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12636',
-                   flaky=True)
+    @skipIf(CASSANDRA_VERSION_FROM_BUILD == '3.9', "Test doesn't run on 3.9")
     @since('2.2')
     def insert_data_during_replace_same_address_test(self):
         """
@@ -424,9 +422,7 @@ class TestReplaceAddress(BaseReplaceAddressTest):
         """
         self._test_insert_data_during_replace(same_address=True)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12635',
-                   flaky=True)
+    @skipIf(CASSANDRA_VERSION_FROM_BUILD == '3.9', "Test doesn't run on 3.9")
     @since('2.2')
     def insert_data_during_replace_different_address_test(self):
         """
