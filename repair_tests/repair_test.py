@@ -1,16 +1,16 @@
 import threading
 import time
 from collections import namedtuple
-from unittest import skip
+from threading import Thread
+from unittest import skip, skipIf
 
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
+from ccmlib.node import ToolError
 
-from dtest import FlakyRetryPolicy, Tester, debug
+from dtest import CASSANDRA_VERSION_FROM_BUILD, FlakyRetryPolicy, Tester, debug
 from tools.data import insert_c1c2, query_c1c2
 from tools.decorators import known_failure, no_vnodes, since
-from threading import Thread
-from ccmlib.node import ToolError
 
 
 def _repair_options(version, ks='', cf=None, sequential=True):
@@ -179,9 +179,7 @@ class TestRepair(BaseRepairTest):
         for node in cluster.nodelist():
             self.assertFalse(node.grep_log("Starting anticompaction"))
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12578',
-                   flaky=True)
+    @skipIf(CASSANDRA_VERSION_FROM_BUILD == '3.9', "Test doesn't run on 3.9")
     def nonexistent_table_repair_test(self):
         """
         * Check that repairing a non-existent table fails

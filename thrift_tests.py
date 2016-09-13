@@ -2,14 +2,14 @@ import re
 import struct
 import time
 import uuid
+from unittest import skipIf
 
 from thrift.protocol import TBinaryProtocol
 from thrift.Thrift import TApplicationException
 from thrift.transport import TSocket, TTransport
 
-from tools.assertions import assert_none, assert_one
-from dtest import (DISABLE_VNODES, NUM_TOKENS, ReusableClusterTester, debug,
-                   init_default_config)
+from dtest import (CASSANDRA_VERSION_FROM_BUILD, DISABLE_VNODES, NUM_TOKENS,
+                   ReusableClusterTester, debug, init_default_config)
 from thrift_bindings.v22 import Cassandra
 from thrift_bindings.v22.Cassandra import (CfDef, Column, ColumnDef,
                                            ColumnOrSuperColumn, ColumnParent,
@@ -22,6 +22,7 @@ from thrift_bindings.v22.Cassandra import (CfDef, Column, ColumnDef,
                                            Mutation, NotFoundException,
                                            SlicePredicate, SliceRange,
                                            SuperColumn)
+from tools.assertions import assert_none, assert_one
 from tools.decorators import known_failure, since
 
 
@@ -2199,6 +2200,7 @@ class TestMutations(ThriftTester):
             [composite('0', '0'), composite('1', '1'), composite('2', '2'),
              composite('6', '6'), composite('7', '7'), composite('8', '8'), composite('9', '9')])
 
+    @skipIf(CASSANDRA_VERSION_FROM_BUILD == '3.9', "Test doesn't run on 3.9")
     def test_range_deletion_eoc_0(self):
         """
         This test confirms that a range tombstone with a final EOC of 0
@@ -2555,9 +2557,7 @@ class TestMutations(ThriftTester):
         client.insert(_i32(i), ColumnParent('cs1'), Column('v', _i32(i), 0), CL)
         _assert_column('cs1', _i32(i), 'v', _i32(i), 0)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12634',
-                   flaky=True)
+    @skipIf(CASSANDRA_VERSION_FROM_BUILD == '3.9', "Test doesn't run on 3.9")
     def test_range_tombstone_eoc_0(self):
         """
         Insert a range tombstone with EOC=0 for a compact storage table. Insert 2 rows that
