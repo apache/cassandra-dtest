@@ -1119,6 +1119,9 @@ class TestRepairDataSystemTable(Tester):
         for table_name, table_contents in repair_tables_dict.items():
             self.assertFalse(table_contents, '{} is non-empty'.format(table_name))
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12640',
+                   flaky=True)
     def repair_parent_table_test(self):
         """
         Test that `system_distributed.parent_repair_history` is properly populated
