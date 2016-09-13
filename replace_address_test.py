@@ -413,6 +413,9 @@ class TestReplaceAddress(BaseReplaceAddressTest):
                 self.replacement_node.watch_log_for('To perform this operation, please restart with -Dcassandra.allow_unsafe_replace=true',
                                                     from_mark=mark, timeout=20)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12636',
+                   flaky=True)
     @since('2.2')
     def insert_data_during_replace_same_address_test(self):
         """
@@ -421,6 +424,9 @@ class TestReplaceAddress(BaseReplaceAddressTest):
         """
         self._test_insert_data_during_replace(same_address=True)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12635',
+                   flaky=True)
     @since('2.2')
     def insert_data_during_replace_different_address_test(self):
         """

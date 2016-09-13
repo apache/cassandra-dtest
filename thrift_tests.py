@@ -2555,6 +2555,9 @@ class TestMutations(ThriftTester):
         client.insert(_i32(i), ColumnParent('cs1'), Column('v', _i32(i), 0), CL)
         _assert_column('cs1', _i32(i), 'v', _i32(i), 0)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12634',
+                   flaky=True)
     def test_range_tombstone_eoc_0(self):
         """
         Insert a range tombstone with EOC=0 for a compact storage table. Insert 2 rows that

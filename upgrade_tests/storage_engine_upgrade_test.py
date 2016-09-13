@@ -4,7 +4,7 @@ import time
 from tools.assertions import assert_all, assert_none, assert_one, assert_length_equal
 from dtest import Tester, debug
 from sstable_generation_loading_test import BaseSStableLoaderTest
-from tools.decorators import since
+from tools.decorators import known_failure, since
 from tools.misc import new_node
 
 from thrift_bindings.v22.Cassandra import (ConsistencyLevel, Deletion, Mutation, SlicePredicate, SliceRange)
@@ -386,6 +386,9 @@ class TestStorageEngineUpgrade(Tester):
 
         assert_one(session, "SELECT k FROM t", ['some_key'])
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12637',
+                   flaky=True)
     def upgrade_with_range_tombstone_eoc_0_test(self):
         """
         Check sstable upgrading when the sstable contains a range tombstone with EOC=0.
