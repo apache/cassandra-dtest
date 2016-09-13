@@ -184,7 +184,7 @@ class TestRepair(BaseRepairTest):
                    flaky=True)
     def nonexistent_table_repair_test(self):
         """
-        * Check that repairing a non-existant table fails
+        * Check that repairing a non-existent table fails
         @jira_ticket CASSANDRA-12279
         """
         self.ignore_log_patterns = [r'Unknown keyspace/cf pair']
