@@ -5,12 +5,13 @@ import re
 import time
 from random import randrange
 from threading import Thread
+from unittest import skip
 
 from cassandra.concurrent import execute_concurrent
 from ccmlib.node import Node
 
 from dtest import Tester, debug
-from tools.decorators import known_failure, require, since
+from tools.decorators import known_failure, since
 
 
 def wait(delay=2):
@@ -23,7 +24,7 @@ def wait(delay=2):
 @known_failure(failure_source='cassandra',
                jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10699',
                flaky=True)
-@require(10699)
+@skip('awaiting CASSANDRA-10699')
 class TestConcurrentSchemaChanges(Tester):
 
     def __init__(self, *argv, **kwargs):

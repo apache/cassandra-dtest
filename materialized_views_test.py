@@ -5,20 +5,20 @@ import time
 import traceback
 from functools import partial
 from multiprocessing import Process, Queue
-from unittest import skipIf
+from unittest import skip, skipIf
 
 from cassandra import ConsistencyLevel
 from cassandra.cluster import Cluster
 from cassandra.query import SimpleStatement
+# TODO add in requirements.txt
+from enum import Enum  # Remove when switching to py3
 from nose.plugins.attrib import attr
 
 from dtest import Tester, debug
-# TODO add in requirements.txt
-from enum import Enum  # Remove when switching to py3
 from tools.assertions import (assert_all, assert_crc_check_chance_equal,
                               assert_invalid, assert_none, assert_one,
                               assert_unavailable)
-from tools.decorators import known_failure, require, since
+from tools.decorators import known_failure, since
 from tools.misc import new_node
 
 # CASSANDRA-10978. Migration wait (in seconds) to use in bootstrapping tests. Needed to handle
@@ -1478,7 +1478,7 @@ class TestMaterializedViewsConsistency(Tester):
     @known_failure(failure_source='cassandra',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11290',
                    flaky=True)
-    @require(11290)
+    @skip('awaiting CASSANDRA-11290')
     def single_partition_consistent_reads_after_write_test(self):
         """
         Tests consistency of multiple writes to a single partition
