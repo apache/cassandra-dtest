@@ -5,13 +5,11 @@ from math import floor
 from os.path import getsize
 
 from dtest import Tester, debug
+from tools.misc import ImmutableMapping
 
 
 class TestSSTableSplit(Tester):
-
-    def __init__(self, *args, **kwargs):
-        kwargs['cluster_options'] = {'start_rpc': 'true'}
-        Tester.__init__(self, *args, **kwargs)
+    cluster_options = ImmutableMapping({'start_rpc': 'true'})
 
     def split_test(self):
         """

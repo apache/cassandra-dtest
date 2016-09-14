@@ -10,12 +10,13 @@ from cassandra import ConsistencyLevel
 from cassandra.concurrent import execute_concurrent_with_args
 from ccmlib.node import NodeError
 
-from tools.assertions import assert_almost_equal, assert_not_running, assert_one, assert_stderr_clean
 from dtest import DISABLE_VNODES, Tester, debug
+from tools.assertions import (assert_almost_equal, assert_not_running,
+                              assert_one, assert_stderr_clean)
 from tools.data import query_c1c2
 from tools.decorators import known_failure, no_vnodes, since
 from tools.intervention import InterruptBootstrap, KillOnBootstrap
-from tools.misc import new_node
+from tools.misc import ImmutableMapping, new_node
 
 
 def assert_bootstrap_state(tester, node, expected_bootstrap_state):
@@ -35,20 +36,17 @@ def assert_bootstrap_state(tester, node, expected_bootstrap_state):
 class BaseBootstrapTest(Tester):
     __test__ = False
 
-    def __init__(self, *args, **kwargs):
-        kwargs['cluster_options'] = {'start_rpc': 'true'}
-        # Ignore these log patterns:
-        self.ignore_log_patterns = [
-            # This one occurs when trying to send the migration to a
-            # node that hasn't started yet, and when it does, it gets
-            # replayed and everything is fine.
-            r'Can\'t send migration request: node.*is down',
-            # ignore streaming error during bootstrap
-            r'Exception encountered during startup',
-            r'Streaming error occurred'
-        ]
-        Tester.__init__(self, *args, **kwargs)
-        self.allow_log_errors = True
+    allow_log_errors = True
+    cluster_options = ImmutableMapping({'start_rpc': 'true'})
+    ignore_log_patterns = (
+        # This one occurs when trying to send the migration to a
+        # node that hasn't started yet, and when it does, it gets
+        # replayed and everything is fine.
+        r'Can\'t send migration request: node.*is down',
+        # ignore streaming error during bootstrap
+        r'Exception encountered during startup',
+        r'Streaming error occurred'
+    )
 
     def _base_bootstrap_test(self, bootstrap=None, bootstrap_from_version=None):
         def default_bootstrap(cluster, token):

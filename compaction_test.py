@@ -10,15 +10,13 @@ import parse
 from dtest import Tester, debug
 from tools.assertions import assert_length_equal, assert_none, assert_one
 from tools.decorators import known_failure, since
+from tools.misc import ImmutableMapping
 
 
 class TestCompaction(Tester):
 
     __test__ = False
-
-    def __init__(self, *args, **kwargs):
-        kwargs['cluster_options'] = {'start_rpc': 'true'}
-        Tester.__init__(self, *args, **kwargs)
+    cluster_options = ImmutableMapping({'start_rpc': 'true'})
 
     def setUp(self):
         Tester.setUp(self)

@@ -4,13 +4,11 @@ from unittest import skip
 
 from dtest import Tester
 from tools.decorators import known_failure
+from tools.misc import ImmutableMapping
 
 
 class TestMetadata(Tester):
-
-    def __init__(self, *args, **kwargs):
-        kwargs['cluster_options'] = {'start_rpc': 'true'}
-        Tester.__init__(self, *args, **kwargs)
+    cluster_options = ImmutableMapping({'start_rpc': 'true'})
 
     def force_compact(self):
         cluster = self.cluster

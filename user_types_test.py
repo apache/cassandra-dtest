@@ -4,8 +4,8 @@ import uuid
 from cassandra import ConsistencyLevel, Unauthorized
 from cassandra.query import SimpleStatement
 
-from tools.assertions import assert_invalid
 from dtest import Tester
+from tools.assertions import assert_invalid
 from tools.decorators import known_failure, since
 
 
@@ -22,10 +22,6 @@ def listify(item):
 
 
 class TestUserTypes(Tester):
-
-    def __init__(self, *args, **kwargs):
-        Tester.__init__(self, *args, **kwargs)
-
     def assertUnauthorized(self, session, query, message):
         with self.assertRaises(Unauthorized) as cm:
             session.execute(query)

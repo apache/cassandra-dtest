@@ -7,24 +7,19 @@ from ccmlib.common import is_win
 from dtest import OFFHEAP_MEMTABLES, Tester, debug
 from tools.assertions import assert_all, assert_invalid
 from tools.decorators import known_failure, since
+from tools.misc import ImmutableMapping
 
 
 @since('2.2')
 class TestAuthUpgrade(Tester):
-
-    def __init__(self, *args, **kwargs):
-        # Ignore these log patterns:
-        self.ignore_log_patterns = [
-            # This one occurs if we do a non-rolling upgrade, the node
-            # it's trying to send the migration to hasn't started yet,
-            # and when it does, it gets replayed and everything is fine.
-            r'Can\'t send migration request: node.*is down',
-        ]
-
-        # Force cluster options that are common among versions:
-        kwargs['cluster_options'] = {'authenticator': 'PasswordAuthenticator',
-                                     'authorizer': 'CassandraAuthorizer'}
-        Tester.__init__(self, *args, **kwargs)
+    cluster_options = ImmutableMapping({'authenticator': 'PasswordAuthenticator',
+                                        'authorizer': 'CassandraAuthorizer'})
+    ignore_log_patterns = (
+        # This one occurs if we do a non-rolling upgrade, the node
+        # it's trying to send the migration to hasn't started yet,
+        # and when it does, it gets replayed and everything is fine.
+        r'Can\'t send migration request: node.*is down',
+    )
 
     @known_failure(failure_source='cassandra',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11469',

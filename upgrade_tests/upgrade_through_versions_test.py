@@ -231,20 +231,19 @@ class UpgradeTester(Tester):
     subprocs = None  # holds any subprocesses, for status checking and cleanup
     extra_config = None  # holds a non-mutable structure that can be cast as dict()
     __test__ = False  # this is a base class only
+    ignore_log_patterns = (
+        # This one occurs if we do a non-rolling upgrade, the node
+        # it's trying to send the migration to hasn't started yet,
+        # and when it does, it gets replayed and everything is fine.
+        r'Can\'t send migration request: node.*is down',
+        r'RejectedExecutionException.*ThreadPoolExecutor has shut down',
+        # Occurs due to test/ccm writing topo on down nodes
+        r'Cannot update data center or rack from.*for live host',
+        # Normal occurance. See CASSANDRA-12026. Likely won't be needed after C* 4.0.
+        r'Unknown column cdc during deserialization',
+    )
 
     def __init__(self, *args, **kwargs):
-        # Ignore these log patterns:
-        self.ignore_log_patterns = [
-            # This one occurs if we do a non-rolling upgrade, the node
-            # it's trying to send the migration to hasn't started yet,
-            # and when it does, it gets replayed and everything is fine.
-            r'Can\'t send migration request: node.*is down',
-            r'RejectedExecutionException.*ThreadPoolExecutor has shut down',
-            # Occurs due to test/ccm writing topo on down nodes
-            r'Cannot update data center or rack from.*for live host',
-            # Normal occurance. See CASSANDRA-12026. Likely won't be needed after C* 4.0.
-            r'Unknown column cdc during deserialization',
-        ]
         self.subprocs = []
         Tester.__init__(self, *args, **kwargs)
 

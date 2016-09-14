@@ -12,18 +12,17 @@ from tools.assertions import (assert_all, assert_invalid, assert_one,
 from tools.decorators import known_failure, since
 from tools.jmxutils import (JolokiaAgent, make_mbean,
                             remove_perf_disable_shared_mem)
+from tools.misc import ImmutableMapping
 
 
 class TestAuth(Tester):
 
-    def __init__(self, *args, **kwargs):
-        self.ignore_log_patterns = [
-            # This one occurs if we do a non-rolling upgrade, the node
-            # it's trying to send the migration to hasn't started yet,
-            # and when it does, it gets replayed and everything is fine.
-            r'Can\'t send migration request: node.*is down',
-        ]
-        Tester.__init__(self, *args, **kwargs)
+    ignore_log_patterns = (
+        # This one occurs if we do a non-rolling upgrade, the node
+        # it's trying to send the migration to hasn't started yet,
+        # and when it does, it gets replayed and everything is fine.
+        r'Can\'t send migration request: node.*is down',
+    )
 
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12456',
@@ -1040,14 +1039,11 @@ class TestAuthRoles(Tester):
     """
     @jira_ticket CASSANDRA-7653
     """
-
-    def __init__(self, *args, **kwargs):
-        if CASSANDRA_VERSION_FROM_BUILD >= '3.0':
-            kwargs['cluster_options'] = {'enable_user_defined_functions': 'true',
-                                         'enable_scripted_user_defined_functions': 'true'}
-        else:
-            kwargs['cluster_options'] = {'enable_user_defined_functions': 'true'}
-        Tester.__init__(self, *args, **kwargs)
+    if CASSANDRA_VERSION_FROM_BUILD >= '3.0':
+        cluster_options = ImmutableMapping({'enable_user_defined_functions': 'true',
+                                            'enable_scripted_user_defined_functions': 'true'})
+    else:
+        cluster_options = ImmutableMapping({'enable_user_defined_functions': 'true'})
 
     def create_drop_role_test(self):
         """

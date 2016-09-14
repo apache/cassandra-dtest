@@ -5,9 +5,10 @@ from distutils import dir_util
 
 from ccmlib import common as ccmcommon
 
-from tools.assertions import assert_one
 from dtest import Tester, debug
+from tools.assertions import assert_one
 from tools.decorators import known_failure
+from tools.misc import ImmutableMapping
 
 
 # WARNING: sstableloader tests should be added to TestSSTableGenerationAndLoading (below),
@@ -20,14 +21,9 @@ class BaseSStableLoaderTest(Tester):
     __test__ = False
     upgrade_from = None
     compact = False
-    jvm_args = None
-
-    def __init__(self, *argv, **kwargs):
-        if self.jvm_args is None:
-            self.jvm_args = []
-        kwargs['cluster_options'] = {'start_rpc': True}
-        Tester.__init__(self, *argv, **kwargs)
-        self.allow_log_errors = True
+    jvm_args = ()
+    allow_log_errors = True
+    cluster_options = ImmutableMapping({'start_rpc': True})
 
     def create_schema(self, session, ks, compression):
         self.create_ks(session, ks, rf=2)
@@ -130,8 +126,8 @@ class BaseSStableLoaderTest(Tester):
             default_install_dir = self.cluster.get_install_dir()
             # Forcing cluster version on purpose
             cluster.set_install_dir(version=self.upgrade_from)
-        debug("Using jvm_args=%s" % self.jvm_args)
-        cluster.populate(2).start(jvm_args=self.jvm_args)
+        debug("Using jvm_args={}".format(self.jvm_args))
+        cluster.populate(2).start(jvm_args=list(self.jvm_args))
         node1, node2 = cluster.nodelist()
         time.sleep(.5)
 
@@ -168,7 +164,7 @@ class BaseSStableLoaderTest(Tester):
             # Return to previous version
             cluster.set_install_dir(install_dir=default_install_dir)
 
-        cluster.start(jvm_args=self.jvm_args)
+        cluster.start(jvm_args=list(self.jvm_args))
         time.sleep(5)  # let gossip figure out what is going on
 
         debug("re-creating the keyspace and column families.")

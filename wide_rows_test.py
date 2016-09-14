@@ -1,8 +1,8 @@
 import datetime
 import random
 
-from tools.assertions import assert_length_equal
 from dtest import Tester, debug
+from tools.assertions import assert_length_equal
 
 status_messages = (
     "I''m going to the Cassandra Summit in June!",
@@ -24,10 +24,6 @@ clients = (
 
 
 class TestWideRows(Tester):
-
-    def __init__(self, *args, **kwargs):
-        Tester.__init__(self, *args, **kwargs)
-
     def test_wide_rows(self):
         self.write_wide_rows()
 

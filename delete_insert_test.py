@@ -13,13 +13,9 @@ class DeleteInsertTest(Tester):
     """
     Examines scenarios around deleting data and adding data back with the same key
     """
-
-    def __init__(self, *args, **kwargs):
-        Tester.__init__(self, *args, **kwargs)
-
-        # Generate 1000 rows in memory so we can re-use the same ones over again:
-        self.groups = ['group1', 'group2', 'group3', 'group4']
-        self.rows = [(str(uuid.uuid1()), x, random.choice(self.groups)) for x in range(1000)]
+    # Generate 1000 rows in memory so we can re-use the same ones over again:
+    groups = ['group1', 'group2', 'group3', 'group4']
+    rows = [(str(uuid.uuid1()), x, random.choice(groups)) for x in range(1000)]
 
     def create_ddl(self, session, rf={'dc1': 2, 'dc2': 2}):
         self.create_ks(session, 'delete_insert_search_test', rf)

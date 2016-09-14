@@ -8,14 +8,11 @@ from dtest import Tester
 from tools.data import (create_c1c2_table, insert_c1c2, insert_columns, putget,
                         query_c1c2, query_columns, range_putget)
 from tools.decorators import known_failure, no_vnodes
-from tools.misc import retry_till_success
+from tools.misc import ImmutableMapping, retry_till_success
 
 
 class TestPutGet(Tester):
-
-    def __init__(self, *args, **kwargs):
-        kwargs['cluster_options'] = {'start_rpc': 'true'}
-        Tester.__init__(self, *args, **kwargs)
+    cluster_options = ImmutableMapping({'start_rpc': 'true'})
 
     def putget_test(self):
         """ Simple put/get on a single row, hitting multiple sstables """

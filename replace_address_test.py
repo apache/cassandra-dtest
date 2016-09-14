@@ -14,6 +14,7 @@ from dtest import CASSANDRA_VERSION_FROM_BUILD, DISABLE_VNODES, Tester, debug
 from tools.assertions import assert_all, assert_not_running
 from tools.data import rows_to_list
 from tools.decorators import known_failure, since
+from tools.misc import ImmutableMapping
 
 
 class NodeUnavailable(Exception):
@@ -22,22 +23,18 @@ class NodeUnavailable(Exception):
 
 class BaseReplaceAddressTest(Tester):
     __test__ = False
-
-    def __init__(self, *args, **kwargs):
-        kwargs['cluster_options'] = {'start_rpc': 'true'}
-        self.replacement_node = None
-        # Ignore these log patterns:
-        self.ignore_log_patterns = [
-            # This one occurs when trying to send the migration to a
-            # node that hasn't started yet, and when it does, it gets
-            # replayed and everything is fine.
-            r'Can\'t send migration request: node.*is down',
-            r'Migration task failed to complete',  # 10978
-            # ignore streaming error during bootstrap
-            r'Streaming error occurred',
-            r'failed stream session'
-        ]
-        Tester.__init__(self, *args, **kwargs)
+    replacement_node = None
+    cluster_options = ImmutableMapping({'start_rpc': 'true'})
+    ignore_log_patterns = (
+        # This one occurs when trying to send the migration to a
+        # node that hasn't started yet, and when it does, it gets
+        # replayed and everything is fine.
+        r'Can\'t send migration request: node.*is down',
+        r'Migration task failed to complete',  # 10978
+        # ignore streaming error during bootstrap
+        r'Streaming error occurred',
+        r'failed stream session'
+    )
 
     def _setup(self, n=3, opts=None, enable_byteman=False, mixed_versions=False):
         debug("Starting cluster with {} nodes.".format(n))

@@ -4,21 +4,19 @@ from distutils.version import LooseVersion
 
 from cassandra import FunctionFailure
 
-from tools.assertions import assert_invalid, assert_none, assert_one
 from dtest import CASSANDRA_VERSION_FROM_BUILD, Tester, debug
+from tools.assertions import assert_invalid, assert_none, assert_one
 from tools.decorators import since
+from tools.misc import ImmutableMapping
 
 
 @since('2.2')
 class TestUserFunctions(Tester):
-
-    def __init__(self, *args, **kwargs):
-        if CASSANDRA_VERSION_FROM_BUILD >= '3.0':
-            kwargs['cluster_options'] = {'enable_user_defined_functions': 'true',
-                                         'enable_scripted_user_defined_functions': 'true'}
-        else:
-            kwargs['cluster_options'] = {'enable_user_defined_functions': 'true'}
-        Tester.__init__(self, *args, **kwargs)
+    if CASSANDRA_VERSION_FROM_BUILD >= '3.0':
+        cluster_options = ImmutableMapping({'enable_user_defined_functions': 'true',
+                                            'enable_scripted_user_defined_functions': 'true'})
+    else:
+        cluster_options = ImmutableMapping({'enable_user_defined_functions': 'true'})
 
     def prepare(self, create_keyspace=True, nodes=1, rf=1):
         cluster = self.cluster

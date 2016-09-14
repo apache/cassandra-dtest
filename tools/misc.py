@@ -1,6 +1,7 @@
 import os
 import subprocess
 import time
+from collections import Mapping
 
 from ccmlib.node import Node
 
@@ -67,3 +68,25 @@ def generate_ssl_stores(base_dir, passphrase='cassandra'):
     subprocess.check_call(['keytool', '-import', '-file', os.path.join(base_dir, 'ccm_node.cer'),
                            '-alias', 'ccm_node', '-keystore', os.path.join(base_dir, 'truststore.jks'),
                            '-storepass', passphrase, '-noprompt'])
+
+
+class ImmutableMapping(Mapping):
+    """
+    Convenience class for when you want an immutable-ish map.
+
+    Useful at class level to prevent mutability problems (such as a method altering the class level mutable)
+    """
+    def __init__(self, init_dict):
+        self._data = init_dict.copy()
+
+    def __getitem__(self, key):
+        return self._data[key]
+
+    def __iter__(self):
+        return iter(self._data)
+
+    def __len__(self):
+        return len(self._data)
+
+    def __repr__(self):
+        return '{cls}({data})'.format(cls=self.__class__.__name__, data=self._data)

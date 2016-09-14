@@ -9,21 +9,16 @@ from ccmlib.common import is_win
 from ccmlib.node import Node
 from nose.plugins.attrib import attr
 
-from tools.assertions import assert_almost_equal, assert_one
 from dtest import Tester, debug
+from tools.assertions import assert_almost_equal, assert_one
 from tools.data import insert_c1c2
 from tools.decorators import known_failure, since
+from tools.misc import ImmutableMapping
 
 
 class TestIncRepair(Tester):
-
-    def __init__(self, *args, **kwargs):
-        kwargs['cluster_options'] = {'start_rpc': 'true'}
-        # Ignore these log patterns:
-        self.ignore_log_patterns = [
-            r'Can\'t send migration request: node.*is down',
-        ]
-        Tester.__init__(self, *args, **kwargs)
+    cluster_options = ImmutableMapping({'start_rpc': 'true'})
+    ignore_log_patterns = (r'Can\'t send migration request: node.*is down',)
 
     def sstable_marking_test(self):
         """

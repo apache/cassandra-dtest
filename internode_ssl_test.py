@@ -5,10 +5,6 @@ from tools.misc import generate_ssl_stores
 
 
 class TestInternodeSSL(Tester):
-
-    def __init__(self, *args, **kwargs):
-        Tester.__init__(self, *args, **kwargs)
-
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11689',
                    flaky=True,

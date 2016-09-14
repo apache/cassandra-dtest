@@ -11,6 +11,7 @@ from dtest import (Tester, cleanup_cluster, create_ccm_cluster, debug,
                    get_test_path)
 from tools.decorators import known_failure
 from tools.files import replace_in_file, safe_mkdtemp
+from tools.misc import ImmutableMapping
 
 
 class SnapshotTester(Tester):
@@ -107,10 +108,7 @@ class TestSnapshot(SnapshotTester):
 
 
 class TestArchiveCommitlog(SnapshotTester):
-
-    def __init__(self, *args, **kwargs):
-        kwargs['cluster_options'] = {'commitlog_segment_size_in_mb': 1}
-        SnapshotTester.__init__(self, *args, **kwargs)
+    cluster_options = ImmutableMapping({'commitlog_segment_size_in_mb': 1})
 
     def make_snapshot(self, node, ks, cf, name):
         debug("Making snapshot....")

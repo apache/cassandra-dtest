@@ -485,10 +485,6 @@ class TestSecondaryIndexes(Tester):
 
 
 class TestSecondaryIndexesOnCollections(Tester):
-
-    def __init__(self, *args, **kwargs):
-        Tester.__init__(self, *args, **kwargs)
-
     def test_tuple_indexes(self):
         """
         Checks that secondary indexes on tuples work for querying

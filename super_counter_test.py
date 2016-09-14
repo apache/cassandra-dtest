@@ -2,9 +2,9 @@ import time
 
 from cql.cassandra.ttypes import (CfDef, ColumnParent, ColumnPath,
                                   ConsistencyLevel, CounterColumn)
-
 from dtest import Tester, debug
 from thrift_tests import get_thrift_client
+from tools.misc import ImmutableMapping
 
 
 class TestSuperCounterClusterRestart(Tester):
@@ -12,10 +12,7 @@ class TestSuperCounterClusterRestart(Tester):
     This test is part of this issue:
     https://issues.apache.org/jira/browse/CASSANDRA-3821
     """
-
-    def __init__(self, *args, **kwargs):
-        kwargs['cluster_options'] = {'start_rpc': 'true'}
-        Tester.__init__(self, *args, **kwargs)
+    cluster_options = ImmutableMapping({'start_rpc': 'true'})
 
     def functional_test(self):
         NUM_SUBCOLS = 100

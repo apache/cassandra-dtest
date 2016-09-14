@@ -16,17 +16,15 @@ from dtest import Tester, debug
 from tools.assertions import assert_almost_equal, assert_none, assert_one
 from tools.data import rows_to_list
 from tools.decorators import known_failure, since
+from tools.misc import ImmutableMapping
 
 
 class TestCommitLog(Tester):
     """
     CommitLog Tests
     """
-
-    def __init__(self, *argv, **kwargs):
-        kwargs['cluster_options'] = {'start_rpc': 'true'}
-        super(TestCommitLog, self).__init__(*argv, **kwargs)
-        self.allow_log_errors = True
+    cluster_options = ImmutableMapping({'start_rpc': 'true'})
+    allow_log_errors = True
 
     def setUp(self):
         super(TestCommitLog, self).setUp()

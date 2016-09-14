@@ -6,6 +6,7 @@ import time
 import unittest
 
 import pycassa
+
 from dtest import DEFAULT_DIR, Tester, debug
 from tools.jmxutils import (JolokiaAgent, make_mbean,
                             remove_perf_disable_shared_mem)
@@ -27,10 +28,6 @@ except KeyError:
 
 
 class ThriftHSHATest(Tester):
-
-    def __init__(self, *args, **kwargs):
-        Tester.__init__(self, *args, **kwargs)
-
     def test_closing_connections(self):
         """
         @jira_ticket CASSANDRA-6546
