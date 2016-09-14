@@ -7,6 +7,7 @@ from unittest import skip, skipIf
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
 from ccmlib.node import ToolError
+from nose.plugins.attrib import attr
 
 from dtest import CASSANDRA_VERSION_FROM_BUILD, FlakyRetryPolicy, Tester, debug
 from tools.data import insert_c1c2, query_c1c2
@@ -1056,6 +1057,7 @@ RepairTableContents = namedtuple('RepairTableContents',
 
 
 @since('2.2')
+@attr("resource-intensive")
 class TestRepairDataSystemTable(Tester):
     """
     @jira_ticket CASSANDRA-5839
@@ -1117,9 +1119,6 @@ class TestRepairDataSystemTable(Tester):
         for table_name, table_contents in repair_tables_dict.items():
             self.assertFalse(table_contents, '{} is non-empty'.format(table_name))
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12640',
-                   flaky=True)
     def repair_parent_table_test(self):
         """
         Test that `system_distributed.parent_repair_history` is properly populated
