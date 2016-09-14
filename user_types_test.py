@@ -6,7 +6,7 @@ from cassandra.query import SimpleStatement
 
 from dtest import Tester
 from tools.assertions import assert_invalid
-from tools.decorators import known_failure, since
+from tools.decorators import since
 
 
 def listify(item):
@@ -329,9 +329,6 @@ class TestUserTypes(Tester):
             items = rows[0][0]
             self.assertEqual(listify(items), [[u'stuff3', [u'one_2_other', u'two_2_other']], [u'stuff4', [u'one_3_other', u'two_3_other']]])
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12639',
-                   flaky=True)
     def test_type_as_part_of_pkey(self):
         """Tests user types as part of a composite pkey"""
         # make sure we can define a table with a user type as part of the pkey
