@@ -1,4 +1,3 @@
-import os
 import time
 from collections import Counter
 from re import findall
@@ -54,17 +53,8 @@ class TestIncRepair(Tester):
         else:
             node3.nodetool("repair -par -inc")
 
-        with open('sstables.txt', 'w') as f:
-            node1.run_sstablemetadata(output_file=f, keyspace='keyspace1')
-            node2.run_sstablemetadata(output_file=f, keyspace='keyspace1')
-            node3.run_sstablemetadata(output_file=f, keyspace='keyspace1')
-
-        with open("sstables.txt", 'r') as r:
-            output = r.read().replace('\n', '')
-
-        self.assertNotIn('Repaired at: 0', output)
-
-        os.remove('sstables.txt')
+        for out in (node.run_sstablemetadata(keyspace='keyspace1').stdout for node in cluster.nodelist()):
+            self.assertNotIn('Repaired at: 0', out)
 
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11268',
@@ -177,14 +167,10 @@ class TestIncRepair(Tester):
         node2.run_sstablerepairedset(keyspace='keyspace1')
         node2.start(wait_for_binary_proto=True)
 
-        with open('initial.txt', 'w') as f:
-            node2.run_sstablemetadata(output_file=f, keyspace='keyspace1')
-            node1.run_sstablemetadata(output_file=f, keyspace='keyspace1')
+        initialOut1 = node1.run_sstablemetadata(keyspace='keyspace1').stdout
+        initialOut2 = node2.run_sstablemetadata(keyspace='keyspace1').stdout
 
-        with open('initial.txt', 'r') as r:
-            initialoutput = r.read()
-
-        matches = findall('(?<=Repaired at:).*', initialoutput)
+        matches = findall('(?<=Repaired at:).*', '\n'.join([initialOut1, initialOut2]))
         debug("Repair timestamps are: {}".format(matches))
 
         uniquematches = set(matches)
@@ -194,7 +180,7 @@ class TestIncRepair(Tester):
 
         self.assertGreaterEqual(max(matchcount), 1, matchcount)
 
-        self.assertIn('Repaired at: 0', initialoutput)
+        self.assertIn('Repaired at: 0', '\n'.join([initialOut1, initialOut2]))
 
         node1.stop()
         node2.stress(['write', 'n=15K', 'no-warmup', '-schema', 'replication(factor=2)'])
@@ -206,14 +192,10 @@ class TestIncRepair(Tester):
         else:
             node1.nodetool("repair -par -inc")
 
-        with open('final.txt', 'w') as h:
-            node1.run_sstablemetadata(output_file=h, keyspace='keyspace1')
-            node2.run_sstablemetadata(output_file=h, keyspace='keyspace1')
+        finalOut1 = node1.run_sstablemetadata(keyspace='keyspace1').stdout
+        finalOut2 = node2.run_sstablemetadata(keyspace='keyspace1').stdout
 
-        with open('final.txt', 'r') as r:
-            finaloutput = r.read()
-
-        matches = findall('(?<=Repaired at:).*', finaloutput)
+        matches = findall('(?<=Repaired at:).*', '\n'.join([finalOut1, finalOut2]))
 
         debug(matches)
 
@@ -224,10 +206,7 @@ class TestIncRepair(Tester):
 
         self.assertGreaterEqual(max(matchcount), 2)
 
-        self.assertNotIn('Repaired at: 0', finaloutput)
-
-        os.remove('initial.txt')
-        os.remove('final.txt')
+        self.assertNotIn('Repaired at: 0', '\n'.join([finalOut1, finalOut2]))
 
     def compaction_test(self):
         """
@@ -384,15 +363,5 @@ class TestIncRepair(Tester):
         debug("Repairing node 4")
         node4.nodetool("repair {}".format(repair_options))
 
-        with open("final.txt", "w") as h:
-            node1.run_sstablemetadata(output_file=h, keyspace='keyspace1')
-            node2.run_sstablemetadata(output_file=h, keyspace='keyspace1')
-            node3.run_sstablemetadata(output_file=h, keyspace='keyspace1')
-            node4.run_sstablemetadata(output_file=h, keyspace='keyspace1')
-
-        with open("final.txt", "r") as r:
-            output = r.read()
-
-        self.assertNotIn('Repaired at: 0', output)
-
-        os.remove('final.txt')
+        for out in (node.run_sstablemetadata(keyspace='keyspace1').stdout for node in cluster.nodelist()):
+            self.assertNotIn('Repaired at: 0', out)
