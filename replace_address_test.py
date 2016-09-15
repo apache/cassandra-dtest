@@ -460,7 +460,7 @@ class TestReplaceAddress(BaseReplaceAddressTest):
         self._test_restart_failed_replace(mode='wipe')
 
     def _test_restart_failed_replace(self, mode):
-        self.ignore_log_patterns.append(r'Error while waiting on bootstrap to complete')
+        self.ignore_log_patterns = list(self.ignore_log_patterns) + [r'Error while waiting on bootstrap to complete']
         self._setup(n=3, enable_byteman=True)
         self._insert_data(n="1k")
 
