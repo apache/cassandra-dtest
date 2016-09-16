@@ -13,6 +13,7 @@ from tools.decorators import known_failure, since
 from tools.jmxutils import (JolokiaAgent, make_mbean,
                             remove_perf_disable_shared_mem)
 from tools.misc import ImmutableMapping
+from tools.metadata_wrapper import UpdatingKeyspaceMetadataWrapper
 
 
 class TestAuth(Tester):
@@ -42,16 +43,16 @@ class TestAuth(Tester):
         debug("nodes started")
 
         session = self.get_session(user='cassandra', password='cassandra')
-        self.assertEquals(1, session.cluster.metadata.keyspaces['system_auth'].replication_strategy.replication_factor)
+        auth_metadata = UpdatingKeyspaceMetadataWrapper(cluster=session.cluster,
+                                                        ks_name='system_auth')
+        self.assertEquals(1, auth_metadata.replication_strategy.replication_factor)
 
         session.execute("""
             ALTER KEYSPACE system_auth
                 WITH replication = {'class':'SimpleStrategy', 'replication_factor':3};
         """)
-        # The driver schema metadata API is async. Force a hard refresh here, before we check that the alter succeeded.
-        session.cluster.refresh_schema_metadata()
 
-        self.assertEquals(3, session.cluster.metadata.keyspaces['system_auth'].replication_strategy.replication_factor)
+        self.assertEquals(3, auth_metadata.replication_strategy.replication_factor)
 
         # Run repair to workaround read repair issues caused by CASSANDRA-10655
         debug("Repairing before altering RF")
@@ -67,8 +68,11 @@ class TestAuth(Tester):
         for i in range(3):
             debug('Checking node: {i}'.format(i=i))
             node = self.cluster.nodelist()[i]
-            session = self.patient_exclusive_cql_connection(node, user='cassandra', password='cassandra')
-            self.assertEquals(3, session.cluster.metadata.keyspaces['system_auth'].replication_strategy.replication_factor)
+            exclusive_auth_metadata = UpdatingKeyspaceMetadataWrapper(
+                cluster=self.patient_exclusive_cql_connection(node, user='cassandra', password='cassandra').cluster,
+                ks_name='system_auth'
+            )
+            self.assertEquals(3, exclusive_auth_metadata.replication_strategy.replication_factor)
 
     def login_test(self):
         """
