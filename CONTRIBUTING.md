@@ -22,6 +22,8 @@ We do not enforce **import** sorting, but if you choose to organize imports by s
 Please use `session`, and not `cursor` when naming your connection variables, to match the style preferred by the DataStax Python Driver, which is how these tests
 connect to C*.
 
+All version objects being passed from CCM are now LooseVersion objects, instead of strings. Those can still be safely compared to strings, so there is no need to do `version < LooseVersion('3.10')`.
+
 ## Doxygen Docstrings
 
 We are now colocating our test plans directly with the source code. We have decided to do so in a manner compatible with Doxygen, to turn the test plans into easily navigated HTML. Please view the following list of tags, as well as an example test. While this full list of tags is available for use, there is no need to use every tag for a given test. The **description** and **since** fields should be included, but most others should only be used when **appropriate**. The test plan will live in a comment block below the test method declaration.
