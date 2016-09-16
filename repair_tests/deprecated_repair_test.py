@@ -139,7 +139,7 @@ class TestDeprecatedRepairAPI(Tester):
         node1, node2 = cluster.nodelist()
         remove_perf_disable_shared_mem(node1)
         cluster.start()
-        supports_pull_repair = LooseVersion(cluster.version()) >= LooseVersion('3.10')
+        supports_pull_repair = cluster.version() >= LooseVersion('3.10')
 
         session = self.patient_cql_connection(node1)
         self.create_ks(session, 'ks', 2)

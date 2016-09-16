@@ -32,7 +32,7 @@ class TestWriteFailures(Tester):
             "MigrationStage"           # This occurs sometimes due to node down (because of restart)
         ]
 
-        self.supports_v5_protocol = LooseVersion(self.cluster.version()) >= LooseVersion('3.10')
+        self.supports_v5_protocol = self.cluster.version() >= LooseVersion('3.10')
         self.expected_expt = WriteFailure
         self.protocol_version = 5 if self.supports_v5_protocol else 4
         self.replication_factor = 3

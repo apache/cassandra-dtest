@@ -124,7 +124,7 @@ class TestCqlTracing(Tester):
         errs = self.cluster.nodelist()[0].grep_log_for_errors()
         debug('Errors after attempted trace with unknown tracing class: {errs}'.format(errs=errs))
         self.assertEqual(len(errs), 1)
-        if LooseVersion(self.cluster.version()) >= LooseVersion('3.10'):
+        if self.cluster.version() >= LooseVersion('3.10'):
             # See CASSANDRA-11706 and PR #1281
             self.assertTrue(len(errs[0]) > 0)
         else:
@@ -157,7 +157,7 @@ class TestCqlTracing(Tester):
         errs = self.cluster.nodelist()[0].grep_log_for_errors()
         debug('Errors after attempted trace with default tracing class: {errs}'.format(errs=errs))
         self.assertEqual(len(errs), 1)
-        if LooseVersion(self.cluster.version()) >= LooseVersion('3.10'):
+        if self.cluster.version() >= LooseVersion('3.10'):
             # See CASSANDRA-11706 and PR #1281
             self.assertTrue(len(errs[0]) > 0)
         else:
@@ -168,7 +168,7 @@ class TestCqlTracing(Tester):
         # part of the expected error to avoid having to escape parens and
         # periods for regexes.
 
-        if LooseVersion(self.cluster.version()) >= LooseVersion('3.10'):
+        if self.cluster.version() >= LooseVersion('3.10'):
             # See CASSANDRA-11706 and PR #1281
             check_for_errs_in = errs[0][1]
         else:

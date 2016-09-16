@@ -2526,7 +2526,7 @@ class TestAuthRoles(Tester):
         host, error = response.exception.errors.popitem()
 
         message = "Provided username {user} and/or password are incorrect".format(user=user)\
-            if LooseVersion(node.cluster.version()) >= LooseVersion('3.10') \
+            if node.cluster.version() >= LooseVersion('3.10') \
             else "Username and/or password are incorrect"
         pattern = 'Failed to authenticate to {host}: Error from server: code=0100 ' \
                   '[Bad credentials] message="{message}"'.format(host=host, message=message)

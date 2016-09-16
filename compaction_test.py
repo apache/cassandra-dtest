@@ -142,7 +142,7 @@ class TestCompaction(Tester):
             dir_count = len(node1.data_directories())
             debug("sstable_count is: {}".format(sstable_count))
             debug("dir_count is: {}".format(dir_count))
-            if LooseVersion(node1.get_cassandra_version()) < LooseVersion('3.2'):
+            if node1.get_cassandra_version() < LooseVersion('3.2'):
                 size_factor = sstable_count
             else:
                 size_factor = sstable_count / float(dir_count)
@@ -214,7 +214,7 @@ class TestCompaction(Tester):
         time.sleep(40)
         expired_sstables = node1.get_sstables('ks', 'cf')
         expected_sstable_count = 1
-        if LooseVersion(self.cluster.version()) > LooseVersion('3.1'):
+        if self.cluster.version() > LooseVersion('3.1'):
             expected_sstable_count = cluster.data_dir_count
         self.assertEqual(len(expired_sstables), expected_sstable_count)
         # write a new sstable to make DTCS check for expired sstables:
@@ -270,7 +270,7 @@ class TestCompaction(Tester):
         avgthroughput = m.named['avgthroughput']
         found_units = m.named['units']
 
-        units = ['MB'] if LooseVersion(cluster.version()) < LooseVersion('3.6') else ['KiB', 'MiB', 'GiB']
+        units = ['MB'] if cluster.version() < LooseVersion('3.6') else ['KiB', 'MiB', 'GiB']
         self.assertIn(found_units, units)
 
         debug(avgthroughput)
@@ -350,7 +350,7 @@ class TestCompaction(Tester):
 
         node.nodetool('compact ks large')
         verb = 'Writing' if self.cluster.version() > '2.2' else 'Compacting'
-        sizematcher = '\d+ bytes' if LooseVersion(self.cluster.version()) < LooseVersion('3.6') else '\d+\.\d{3}(K|M|G)iB'
+        sizematcher = '\d+ bytes' if self.cluster.version() < LooseVersion('3.6') else '\d+\.\d{3}(K|M|G)iB'
         node.watch_log_for('{} large partition ks/large:user \({}\)'.format(verb, sizematcher), from_mark=mark, timeout=180)
 
         ret = list(session.execute("SELECT properties from ks.large where userid = 'user'"))

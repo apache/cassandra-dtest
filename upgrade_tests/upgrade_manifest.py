@@ -1,5 +1,4 @@
 from collections import namedtuple
-from distutils.version import LooseVersion
 
 from dtest import (CASSANDRA_GITREF, CASSANDRA_VERSION_FROM_BUILD,
                    RUN_STATIC_UPGRADE_MATRIX, debug)
@@ -13,7 +12,7 @@ def _get_version_family():
     """
     Detects the version family (line) using dtest.py:CASSANDRA_VERSION_FROM_BUILD
     """
-    current_version = LooseVersion(CASSANDRA_VERSION_FROM_BUILD)
+    current_version = CASSANDRA_VERSION_FROM_BUILD
 
     version_family = 'unknown'
     if current_version.vstring.startswith('2.0'):

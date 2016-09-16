@@ -355,7 +355,7 @@ class CqlshCopyTest(Tester):
                 return format_value_default(nullval, colormap=NO_COLOR_MAP)
 
             # CASSANDRA-11255 increased COPY TO DOUBLE PRECISION TO 12
-            if cql_type_name == 'double' and LooseVersion(self.cluster.version()) >= LooseVersion('3.6'):
+            if cql_type_name == 'double' and self.cluster.version() >= LooseVersion('3.6'):
                 float_precision = 12
             else:
                 float_precision = 5
@@ -1897,8 +1897,8 @@ class CqlshCopyTest(Tester):
 
             # comma as thousands sep and dot as decimal sep
             # the precision for double values was increased from 5 to 12 in 3.6, see CASSANDRA-11255
-            double_val_1 = '5.12346' if LooseVersion(self.cluster.version()) < LooseVersion('3.6') else '5.12345678'
-            double_val_2 = '123,456,789.56' if LooseVersion(self.cluster.version()) < LooseVersion('3.6') else '123,456,789.560000002384'
+            double_val_1 = '5.12346' if self.cluster.version() < LooseVersion('3.6') else '5.12345678'
+            double_val_2 = '123,456,789.56' if self.cluster.version() < LooseVersion('3.6') else '123,456,789.560000002384'
             expected_vals_usual = [
                 ['0', '10', '10', '10', '10', '10', '10', '10', '10'],
                 ['1', '127', '255', '1,000', '1,000', '1,000', '5.5', '5.5', double_val_1],
@@ -1911,8 +1911,8 @@ class CqlshCopyTest(Tester):
             ]
 
             # dot as thousands sep and comma as decimal sep
-            double_val_1 = '5,12346' if LooseVersion(self.cluster.version()) < LooseVersion('3.6') else '5,12345678'
-            double_val_2 = '123.456.789,56' if LooseVersion(self.cluster.version()) < LooseVersion('3.6') else '123.456.789,560000002384'
+            double_val_1 = '5,12346' if self.cluster.version() < LooseVersion('3.6') else '5,12345678'
+            double_val_2 = '123.456.789,56' if self.cluster.version() < LooseVersion('3.6') else '123.456.789,560000002384'
             expected_vals_inverted = [
                 ['0', '10', '10', '10', '10', '10', '10', '10', '10'],
                 ['1', '127', '255', '1.000', '1.000', '1.000', '5,5', '5,5', double_val_1],
@@ -2540,7 +2540,7 @@ class CqlshCopyTest(Tester):
         """
         os.environ['CQLSH_COPY_TEST_NUM_CORES'] = '1'
         ret = self._test_bulk_round_trip(nodes=3, partitioner="murmur3", num_operations=100000)
-        if LooseVersion(self.cluster.version()) >= LooseVersion('3.6'):
+        if self.cluster.version() >= LooseVersion('3.6'):
             debug('Checking that number of cores detected is correct')
             for out in ret:
                 self.assertIn("Detected 1 core", out[0])

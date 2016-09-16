@@ -2,7 +2,6 @@ import os
 import sys
 import time
 from abc import ABCMeta
-from distutils.version import LooseVersion
 from unittest import skipIf
 
 from ccmlib.common import get_version_from_build, is_win
@@ -44,7 +43,7 @@ class UpgradeTester(Tester):
 
     # known non-critical bug during teardown:
     # https://issues.apache.org/jira/browse/CASSANDRA-12340
-    if LooseVersion(CASSANDRA_VERSION_FROM_BUILD) < '2.2':
+    if CASSANDRA_VERSION_FROM_BUILD < '2.2':
         _known_teardown_race_error = (
             'ScheduledThreadPoolExecutor$ScheduledFutureTask@[0-9a-f]+ '
             'rejected from org.apache.cassandra.concurrent.DebuggableScheduledThreadPoolExecutor'
@@ -189,10 +188,10 @@ class UpgradeTester(Tester):
 
     def get_version(self):
         node1 = self.cluster.nodelist()[0]
-        return node1.version()
+        return node1.get_cassandra_version()
 
     def get_node_versions(self):
-        return [LooseVersion(n.get_cassandra_version()) for n in self.cluster.nodelist()]
+        return [n.get_cassandra_version() for n in self.cluster.nodelist()]
 
     def node_version_above(self, version):
         return min(self.get_node_versions()) >= version

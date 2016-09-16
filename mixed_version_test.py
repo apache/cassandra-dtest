@@ -20,9 +20,9 @@ class TestSchemaChanges(Tester):
 
         node1, node2 = cluster.nodelist()
         original_version = node1.get_cassandra_version()
-        if original_version.startswith('2.0'):
+        if original_version.vstring.startswith('2.0'):
             upgraded_version = 'git:cassandra-2.1'
-        elif original_version.startswith('2.1'):
+        elif original_version.vstring.startswith('2.1'):
             upgraded_version = 'git:cassandra-2.2'
         else:
             self.skip("This test is only designed to work with 2.0 and 2.1 right now")

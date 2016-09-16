@@ -20,7 +20,7 @@ from tools.paging import PageAssertionMixin, PageFetcher
 class BasePagingTester(Tester):
 
     def prepare(self):
-        supports_v5_protocol = LooseVersion(self.cluster.version()) >= LooseVersion('3.10')
+        supports_v5_protocol = self.cluster.version() >= LooseVersion('3.10')
         protocol_version = 5 if supports_v5_protocol else None
         cluster = self.cluster
         cluster.populate(3).start(wait_for_binary_proto=True)
@@ -3340,7 +3340,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
     def test_failure_threshold_deletions(self):
         """Test that paging throws a failure in case of tombstone threshold """
 
-        supports_v5_protocol = LooseVersion(self.cluster.version()) >= LooseVersion('3.10')
+        supports_v5_protocol = self.cluster.version() >= LooseVersion('3.10')
 
         self.allow_log_errors = True
         self.cluster.set_configuration_options(
@@ -3362,7 +3362,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
         try:
             self.session.execute(SimpleStatement("select * from paging_test", fetch_size=1000, consistency_level=CL.ALL, retry_policy=FallthroughRetryPolicy()))
         except ReadTimeout as exc:
-            self.assertTrue(LooseVersion(self.cluster.version()) < LooseVersion('2.2'))
+            self.assertTrue(self.cluster.version() < LooseVersion('2.2'))
         except ReadFailure as exc:
             if supports_v5_protocol:
                 self.assertIsNotNone(exc.error_code_map)

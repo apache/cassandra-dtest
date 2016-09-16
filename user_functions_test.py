@@ -219,7 +219,7 @@ class TestUserFunctions(Tester):
         session.execute("create type test (a text, b int);")
         session.execute("create function funk(udt test) called on null input returns int language java as 'return Integer.valueOf(udt.getInt(\"b\"));';")
 
-        if LooseVersion(self.cluster.version()) >= LooseVersion('3.6'):
+        if self.cluster.version() >= LooseVersion('3.6'):
             frozen_vals = (False, True)
         else:
             frozen_vals = (True,)

@@ -143,7 +143,7 @@ class TestCqlsh(Tester):
 
         output, err = self.run_cqlsh(node1, 'use simple; SELECT * FROM simpledate')
 
-        if LooseVersion(self.cluster.version()) >= LooseVersion('3.4'):
+        if self.cluster.version() >= LooseVersion('3.4'):
             self.assertIn("2143-04-19 11:21:01.000000+0000", output)
             self.assertIn("1943-04-19 11:21:01.000000+0000", output)
         else:
@@ -853,7 +853,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
                 PRIMARY KEY (id, col)
                 """
 
-        if LooseVersion(self.cluster.version()) >= LooseVersion('3.9'):
+        if self.cluster.version() >= LooseVersion('3.9'):
             ret += """
         ) WITH CLUSTERING ORDER BY (col ASC)
             AND bloom_filter_fp_chance = 0.01
@@ -871,7 +871,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
             AND read_repair_chance = 0.0
             AND speculative_retry = '99PERCENTILE';
         """
-        elif LooseVersion(self.cluster.version()) >= LooseVersion('3.0'):
+        elif self.cluster.version() >= LooseVersion('3.0'):
             ret += """
         ) WITH CLUSTERING ORDER BY (col ASC)
             AND bloom_filter_fp_chance = 0.01
@@ -911,7 +911,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
 
         if has_val_idx:
             val_idx_def = self.get_index_output('test_val_idx', 'test', 'test', 'val')
-            if LooseVersion(self.cluster.version()) >= LooseVersion('2.2'):
+            if self.cluster.version() >= LooseVersion('2.2'):
                 return ret + "\n" + val_idx_def + "\n" + col_idx_def
             else:
                 return ret + "\n" + col_idx_def + "\n" + val_idx_def
@@ -919,7 +919,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
             return ret + "\n" + col_idx_def
 
     def get_users_table_output(self):
-        if LooseVersion(self.cluster.version()) >= LooseVersion('3.9'):
+        if self.cluster.version() >= LooseVersion('3.9'):
             return """
         CREATE TABLE test.users (
             userid text PRIMARY KEY,
@@ -941,7 +941,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
             AND read_repair_chance = 0.0
             AND speculative_retry = '99PERCENTILE';
         """ + self.get_index_output('myindex', 'test', 'users', 'age')
-        elif LooseVersion(self.cluster.version()) >= LooseVersion('3.0'):
+        elif self.cluster.version() >= LooseVersion('3.0'):
             return """
         CREATE TABLE test.users (
             userid text PRIMARY KEY,
@@ -989,7 +989,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         return "CREATE INDEX {} ON {}.{} ({});".format(index, ks, table, col)
 
     def get_users_by_state_mv_output(self):
-        if LooseVersion(self.cluster.version()) >= LooseVersion('3.9'):
+        if self.cluster.version() >= LooseVersion('3.9'):
             return """
                 CREATE MATERIALIZED VIEW test.users_by_state AS
                 SELECT *
@@ -1468,7 +1468,7 @@ Tracing session:""")
         node2.stop(wait_other_notice=True)
 
         # --request-timeout option needed on 2.1 due to CASSANDRA-10686
-        cqlsh_opts = [] if LooseVersion(self.cluster.version()) >= LooseVersion('2.2') else ['--request-timeout=6']
+        cqlsh_opts = [] if self.cluster.version() >= LooseVersion('2.2') else ['--request-timeout=6']
 
         stdout, stderr = self.run_cqlsh(node1, cmds="""
               CREATE KEYSPACE training WITH replication={'class':'SimpleStrategy','replication_factor':1};
@@ -1640,7 +1640,7 @@ Tracing session:""")
         env = common.make_cassandra_env(cdir, node.get_path())
         env['LANG'] = 'en_US.UTF-8'
         env.update(env_vars)
-        if LooseVersion(self.cluster.version()) >= LooseVersion('2.1'):
+        if self.cluster.version() >= LooseVersion('2.1'):
             host = node.network_interfaces['binary'][0]
             port = node.network_interfaces['binary'][1]
         else:
@@ -1944,7 +1944,7 @@ class CqlLoginTest(Tester):
 
     def assert_login_not_allowed(self, user, input):
         message = ("Provided username {user} and/or password are incorrect".format(user=user)
-                   if LooseVersion(self.cluster.version()) >= LooseVersion('3.10')
+                   if self.cluster.version() >= LooseVersion('3.10')
                    else "Username and/or password are incorrect")
 
         self.assertEqual([message in x for x in input.split("\n") if x], [True])

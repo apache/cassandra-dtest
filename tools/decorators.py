@@ -28,7 +28,7 @@ class since(object):
         @functools.wraps(cls.setUp)
         def wrapped_setUp(obj, *args, **kwargs):
             orig_setUp(obj, *args, **kwargs)
-            version = LooseVersion(obj.cluster.version())
+            version = obj.cluster.version()
             msg = self._skip_msg(version)
             if msg:
                 obj.skip(msg)
@@ -39,7 +39,7 @@ class since(object):
     def _wrap_function(self, f):
         @functools.wraps(f)
         def wrapped(obj):
-            version = LooseVersion(obj.cluster.version())
+            version = obj.cluster.version()
             msg = self._skip_msg(version)
             if msg:
                 obj.skip(msg)

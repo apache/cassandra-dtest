@@ -70,7 +70,7 @@ def build_doc_context(tester, test_name, prepare=True, connection=None, nodes=No
         # avoid having multiple versions of these tests since it would be a bit messy to change the docstrings
         env['CQLSH_DEFAULT_TIMESTAMP_FORMAT'] = '%Y-%m-%d %H:%M:%S%z'
 
-        if LooseVersion(tester.cluster.version()) >= LooseVersion('2.1'):
+        if tester.cluster.version() >= LooseVersion('2.1'):
             host = nodes[0].network_interfaces['binary'][0]
             port = nodes[0].network_interfaces['binary'][1]
         else:

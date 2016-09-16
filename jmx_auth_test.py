@@ -65,5 +65,4 @@ class TestJMXAuth(Tester):
 
     def authentication_fail_message(self, node, username):
         return "Provided username {user} and/or password are incorrect".format(user=username) \
-            if LooseVersion(node.cluster.version()) >= LooseVersion('3.10') \
-            else "Username and/or password are incorrect"
+            if node.cluster.version() >= LooseVersion('3.10') else "Username and/or password are incorrect"

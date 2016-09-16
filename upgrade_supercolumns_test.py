@@ -1,5 +1,4 @@
 import time
-from distutils.version import LooseVersion
 
 from flaky import flaky
 
@@ -29,7 +28,7 @@ class TestSCUpgrade(Tester):
             # and when it does, it gets replayed and everything is fine.
             r'Can\'t send migration request: node.*is down',
         ]
-        if LooseVersion(CASSANDRA_VERSION_FROM_BUILD) < '2.2':
+        if CASSANDRA_VERSION_FROM_BUILD < '2.2':
             _known_teardown_race_error = (
                 'ScheduledThreadPoolExecutor$ScheduledFutureTask@[0-9a-f]+ '
                 'rejected from org.apache.cassandra.concurrent.DebuggableScheduledThreadPoolExecutor'

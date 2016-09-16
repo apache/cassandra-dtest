@@ -167,7 +167,7 @@ class TestCommitLog(Tester):
         @jira_ticket CASSANDRA-11891
         """
 
-        cluster_ver = LooseVersion(self.cluster.version())
+        cluster_ver = self.cluster.version()
         if LooseVersion('3.1') <= cluster_ver < LooseVersion('3.7'):
             self.skipTest("Fixed in 3.0.7 and 3.7")
 
