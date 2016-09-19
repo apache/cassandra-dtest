@@ -11,8 +11,8 @@ class TestJson(Tester):
 
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11952',
-                   flaky=False
-                   )
+                   flaky=False,
+                   notes='windows')
     def json_tools_test(self):
 
         debug("Starting cluster...")
@@ -20,7 +20,7 @@ class TestJson(Tester):
         cluster.set_batch_commitlog(enabled=True)
         cluster.populate(1).start()
 
-        debug("Version: " + cluster.version())
+        debug("Version: " + cluster.version().vstring)
 
         debug("Getting CQLSH...")
         [node1] = cluster.nodelist()
