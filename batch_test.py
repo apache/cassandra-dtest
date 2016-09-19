@@ -189,7 +189,8 @@ class TestBatch(Tester):
         session.execute(query)
 
         self.cluster.nodelist()[-1].start(wait_other_notice=True)
-        assert_all(session, "SELECT * FROM users", [[1, u'Will', u'Turner'], [0, u'Jack', u'Sparrow']])
+        assert_all(session, "SELECT * FROM users", [[1, u'Will', u'Turner'], [0, u'Jack', u'Sparrow']],
+                   cl=ConsistencyLevel.ALL)
 
     def acknowledged_by_batchlog_not_set_when_batchlog_write_fails_test(self):
         """ Test that acknowledged_by_batchlog is False if batchlog can't be written """
