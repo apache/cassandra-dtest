@@ -2120,6 +2120,9 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
                                                                                                                        [3, 5, 4, 6]])
 
     @since('3.10')
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12666',
+                   flaky=False)
     def test_paging_with_filtering_on_partition_key(self):
         """
         test allow filtering on partition key
@@ -2292,6 +2295,9 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
                                               [3, 3, 4, 5],
                                               [4, 3, 4, 5]])
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12666',
+                   flaky=False)
     @since('3.10')
     def test_paging_with_filtering_on_partition_key_on_counter_columns(self):
         """
@@ -2390,6 +2396,9 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
                                               [1, 4, 5, 6],
                                               [4, 4, 5, 6]])
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12666',
+                   flaky=False)
     @since('3.10')
     def test_paging_with_filtering_on_partition_key_on_clustering_columns(self):
         """
@@ -2401,6 +2410,9 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         self._test_paging_with_filtering_on_partition_key_on_clustering_columns(session, False)
         self._test_paging_with_filtering_on_partition_key_on_clustering_columns(session, True)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12666',
+                   flaky=False)
     @since('3.10')
     def test_paging_with_filtering_on_partition_key_on_clustering_columns_with_contains(self):
         """
