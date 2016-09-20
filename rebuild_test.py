@@ -195,8 +195,8 @@ class TestRebuild(Tester):
         session.execute("ALTER KEYSPACE ks WITH REPLICATION = {'class':'NetworkTopologyStrategy', 'dc1':1, 'dc2':1};")
         session.execute("ALTER KEYSPACE system_auth WITH REPLICATION = {'class':'NetworkTopologyStrategy', 'dc1':1, 'dc2':1};")
 
-        # Path to byteman script which makes node2 throw an exception making rebuild fail
-        script = ['./byteman/rebuild_failure_inject.btm']
+        # Path to byteman script which makes the streaming to node2 throw an exception, making rebuild fail
+        script = ['./byteman/inject_failure_streaming_to_node2.btm']
         node3.byteman_submit(script)
 
         # First rebuild must fail and data must be incomplete

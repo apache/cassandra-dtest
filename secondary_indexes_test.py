@@ -12,10 +12,11 @@ from cassandra.protocol import ConfigurationException
 from cassandra.query import BatchStatement, SimpleStatement
 
 from dtest import (DISABLE_VNODES, OFFHEAP_MEMTABLES, DtestTimeoutError,
-                   Tester, debug)
-from tools.assertions import assert_invalid, assert_one, assert_row_count
+                   Tester, debug, CASSANDRA_VERSION_FROM_BUILD)
+from tools.assertions import assert_bootstrap_state, assert_invalid, assert_one, assert_row_count
 from tools.data import index_is_built, rows_to_list
 from tools.decorators import known_failure, since
+from tools.misc import new_node
 
 
 class TestSecondaryIndexes(Tester):
@@ -1014,3 +1015,101 @@ class TestUpgradeSecondaryIndexes(Tester):
             node.set_log_level("INFO")
             node.start(wait_other_notice=True)
             # node.nodetool('upgradesstables -a')
+
+
+@skipIf(CASSANDRA_VERSION_FROM_BUILD == '3.9', "Test doesn't run on 3.9")
+@since('3.10')
+class TestPreJoinCallback(Tester):
+
+    def __init__(self, *args, **kwargs):
+        # Ignore these log patterns:
+        self.ignore_log_patterns = [
+            # ignore all streaming errors during bootstrap
+            r'Exception encountered during startup',
+            r'Streaming error occurred',
+            r'\[Stream.*\] Streaming error occurred',
+            r'\[Stream.*\] Remote peer 127.0.0.\d failed stream session',
+            r'Error while waiting on bootstrap to complete. Bootstrap will have to be restarted.'
+        ]
+        Tester.__init__(self, *args, **kwargs)
+
+    def _base_test(self, joinFn):
+        cluster = self.cluster
+        tokens = cluster.balanced_tokens(2)
+        cluster.set_configuration_options(values={'num_tokens': 1})
+
+        # Create a single node cluster
+        cluster.populate(1)
+        node1 = cluster.nodelist()[0]
+        node1.set_configuration_options(values={'initial_token': tokens[0]})
+        cluster.start(wait_other_notice=True)
+
+        # Create a table with 2i
+        session = self.patient_cql_connection(node1)
+        self.create_ks(session, 'ks', 1)
+        self.create_cf(session, 'cf', columns={'c1': 'text', 'c2': 'text'})
+        session.execute("CREATE INDEX c2_idx ON cf (c2);")
+
+        keys = 10000
+        insert_statement = session.prepare("INSERT INTO ks.cf (key, c1, c2) VALUES (?, 'value1', 'value2')")
+        execute_concurrent_with_args(session, insert_statement, [['k%d' % k] for k in range(keys)])
+
+        # Run the join function to test
+        joinFn(cluster, tokens[1])
+
+    def bootstrap_test(self):
+        def bootstrap(cluster, token):
+            node2 = new_node(cluster)
+            node2.set_configuration_options(values={'initial_token': token})
+            node2.start(wait_for_binary_proto=True)
+            self.assertTrue(node2.grep_log('Executing pre-join post-bootstrap tasks'))
+
+        self._base_test(bootstrap)
+
+    def resume_test(self):
+        def resume(cluster, token):
+            node1 = cluster.nodes['node1']
+            # set up byteman on node1 to inject a failure when streaming to node2
+            node1.stop(wait=True)
+            node1.byteman_port = '8100'
+            node1.import_config_files()
+            node1.start(wait_for_binary_proto=True)
+            node1.byteman_submit(['./byteman/inject_failure_streaming_to_node2.btm'])
+
+            node2 = new_node(cluster)
+            node2.set_configuration_options(values={'initial_token': token, 'streaming_socket_timeout_in_ms': 1000})
+            node2.start(wait_other_notice=False, wait_for_binary_proto=True)
+            assert_bootstrap_state(self, node2, 'IN_PROGRESS')
+
+            node2.nodetool("bootstrap resume")
+            assert_bootstrap_state(self, node2, 'COMPLETED')
+            self.assertTrue(node2.grep_log('Executing pre-join post-bootstrap tasks'))
+
+        self._base_test(resume)
+
+    def manual_join_test(self):
+        def manual_join(cluster, token):
+            node2 = new_node(cluster)
+            node2.set_configuration_options(values={'initial_token': token})
+            node2.start(join_ring=False, wait_for_binary_proto=True, wait_other_notice=240)
+            self.assertTrue(node2.grep_log('Not joining ring as requested'))
+            self.assertFalse(node2.grep_log('Executing pre-join'))
+
+            node2.nodetool("join")
+            self.assertTrue(node2.grep_log('Executing pre-join post-bootstrap tasks'))
+
+        self._base_test(manual_join)
+
+    def write_survey_test(self):
+        def write_survey_and_join(cluster, token):
+            node2 = new_node(cluster)
+            node2.set_configuration_options(values={'initial_token': token})
+            node2.start(jvm_args=["-Dcassandra.write_survey=true"], wait_for_binary_proto=True)
+            self.assertTrue(node2.grep_log('Startup complete, but write survey mode is active, not becoming an active ring member.'))
+            self.assertFalse(node2.grep_log('Executing pre-join'))
+
+            node2.nodetool("join")
+            self.assertTrue(node2.grep_log('Leaving write survey mode and joining ring at operator request'))
+            self.assertTrue(node2.grep_log('Executing pre-join post-bootstrap tasks'))
+
+        self._base_test(write_survey_and_join)

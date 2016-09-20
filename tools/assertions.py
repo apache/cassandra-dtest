@@ -281,3 +281,17 @@ def assert_stderr_clean(err, acceptable_errors=None):
     match = re.search(regex_str, err)
 
     assert_true(match, "Attempted to check that stderr was empty. Instead, stderr is {}, but the regex used to check against stderr is {}".format(err, regex_str))
+
+
+def assert_bootstrap_state(tester, node, expected_bootstrap_state):
+    """
+    Assert that a node is on a given bootstrap state
+    @param tester The dtest.Tester object to fetch the exclusive connection to the node
+    @param node The node to check bootstrap state
+    @param expected_bootstrap_state Bootstrap state to expect
+
+    Examples:
+    assert_bootstrap_state(self, node3, 'COMPLETED')
+    """
+    session = tester.patient_exclusive_cql_connection(node)
+    assert_one(session, "SELECT bootstrapped FROM system.local WHERE key='local'", [expected_bootstrap_state])

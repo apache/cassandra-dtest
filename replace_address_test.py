@@ -9,9 +9,8 @@ from cassandra.query import SimpleStatement
 from ccmlib.node import Node
 from nose.plugins.attrib import attr
 
-from bootstrap_test import assert_bootstrap_state
 from dtest import CASSANDRA_VERSION_FROM_BUILD, DISABLE_VNODES, Tester, debug
-from tools.assertions import assert_all, assert_not_running
+from tools.assertions import assert_bootstrap_state, assert_all, assert_not_running
 from tools.data import rows_to_list
 from tools.decorators import known_failure, since
 from tools.misc import ImmutableMapping
