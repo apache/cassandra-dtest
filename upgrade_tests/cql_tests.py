@@ -2953,6 +2953,9 @@ class TestCQL(UpgradeTester):
 
             cursor.execute("SELECT dateOf(t) FROM test")
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12679',
+                   flaky=True)
     def conditional_update_test(self):
         cursor = self.prepare()
 
