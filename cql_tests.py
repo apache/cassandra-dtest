@@ -11,6 +11,7 @@ from cassandra.protocol import ProtocolException
 from cassandra.query import SimpleStatement
 
 from dtest import Tester, canReuseCluster, debug, freshCluster
+from distutils.version import LooseVersion
 from thrift_bindings.v22.ttypes import \
     ConsistencyLevel as ThriftConsistencyLevel
 from thrift_bindings.v22.ttypes import (CfDef, Column, ColumnOrSuperColumn,
@@ -1173,12 +1174,14 @@ class LWTTester(CQLTester):
 
         self._validate_non_existing_or_null_values(table_name, session)
 
-        assert_one(session, "UPDATE {} SET s = 30 WHERE a = 3 IF s IN (10,20,30)".format(table_name), [False])
+        assert_one(session, "UPDATE {} SET s = 30 WHERE a = 3 IF s IN (10,20,30)".format(table_name),
+                   [False, None] if (self.cluster.version() > LooseVersion('3.0')) else [False])
 
         assert_one(session, "SELECT * FROM {} WHERE a = 3".format(table_name), [3, 3, None, None])
 
         for operator in [">", "<", ">=", "<=", "="]:
-            assert_one(session, "UPDATE {} SET s = 50 WHERE a = 5 IF s {} 3".format(table_name, operator), [False])
+            assert_one(session, "UPDATE {} SET s = 50 WHERE a = 5 IF s {} 3".format(table_name, operator),
+                       [False, None] if (self.cluster.version() > LooseVersion('3.0')) else [False])
 
             assert_one(session, "SELECT * FROM {} WHERE a = 5".format(table_name), [5, 5, None, None])
 
@@ -1254,7 +1257,8 @@ class LWTTester(CQLTester):
                 BEGIN BATCH
                     INSERT INTO {table_name} (a, b, s, d) values (3, 3, 40, 'a')
                     UPDATE {table_name} SET s = 30 WHERE a = 3 IF s {operator} 5;
-                APPLY BATCH""".format(table_name=table_name, operator=operator), [False])
+                APPLY BATCH""".format(table_name=table_name, operator=operator),
+                       [False, 3, 3, None] if (self.cluster.version() > LooseVersion('3.0')) else [False])
 
             assert_one(session, "SELECT * FROM {table_name} WHERE a = 3".format(table_name=table_name), [3, 3, None, None])
 
@@ -1262,14 +1266,12 @@ class LWTTester(CQLTester):
                 BEGIN BATCH
                     INSERT INTO {table_name} (a, b, s, d) values (6, 6, 70, 'a')
                     UPDATE {table_name} SET s = 60 WHERE a = 6 IF s IN (1,2,3)
-                APPLY BATCH""".format(table_name=table_name), [False])
+                APPLY BATCH""".format(table_name=table_name),
+                   [False, 6, 6, None] if (self.cluster.version() > LooseVersion('3.0')) else [False])
 
         assert_one(session, "SELECT * FROM {table_name} WHERE a = 6".format(table_name=table_name), [6, 6, None, None])
 
-    def _conditional_deletes_on_static_columns_with_null_values_test(self, is_2_x):
-        """
-        2.x and 3.x are returning failed LWTs in slightly different format.
-        """
+    def conditional_deletes_on_static_columns_with_null_values_test(self):
         session = self.prepare(3)
 
         table_name = "conditional_deletes_on_static_with_null"
@@ -1284,10 +1286,7 @@ class LWTTester(CQLTester):
 
         assert_one(session, "SELECT * FROM {} WHERE a = 1".format(table_name), [1, 1, None, None, 1])
 
-        if is_2_x:
-            assert_one(session, "DELETE s1 FROM {} WHERE a = 2 IF s2 IN (10,20,30)".format(table_name), [False, None])
-        else:
-            assert_one(session, "DELETE s1 FROM {} WHERE a = 2 IF s2 IN (10,20,30)".format(table_name), [False])
+        assert_one(session, "DELETE s1 FROM {} WHERE a = 2 IF s2 IN (10,20,30)".format(table_name), [False, None])
 
         assert_one(session, "SELECT * FROM {} WHERE a = 2".format(table_name), [2, 2, 2, None, 2])
 
@@ -1300,20 +1299,8 @@ class LWTTester(CQLTester):
         assert_one(session, "SELECT * FROM {} WHERE a = 4".format(table_name), [4, 4, None, None, 4])
 
         for operator in [">", "<", ">=", "<=", "="]:
-            if is_2_x:
-                assert_one(session, "DELETE s1 FROM {} WHERE a = 5 IF s2 {} 3".format(table_name, operator), [False, None])
-            else:
-                assert_one(session, "DELETE s1 FROM {} WHERE a = 5 IF s2 {} 3".format(table_name, operator), [False])
-
+            assert_one(session, "DELETE s1 FROM {} WHERE a = 5 IF s2 {} 3".format(table_name, operator), [False, None])
             assert_one(session, "SELECT * FROM {} WHERE a = 5".format(table_name), [5, 5, 5, None, 5])
-
-    @since('2.1', max_version='3.0')
-    def conditional_deletes_on_static_columns_with_null_values_test(self):
-        self._conditional_deletes_on_static_columns_with_null_values_test(True)
-
-    @since('3.0')
-    def conditional_deletes_on_static_columns_with_null_values_test(self):
-        self._conditional_deletes_on_static_columns_with_null_values_test(False)
 
     @since('2.1')
     def conditional_deletes_on_static_columns_with_null_values_batch_test(self):
