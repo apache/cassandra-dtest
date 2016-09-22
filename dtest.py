@@ -108,8 +108,9 @@ def get_sha(repo_dir):
     try:
         output = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=repo_dir).strip()
         prefix = 'git:'
-        if os.environ.get('LOCAL_GIT_REPO') is not None:
-            prefix = 'local:'
+        local_repo_location = os.environ.get('LOCAL_GIT_REPO')
+        if local_repo_location is not None:
+            prefix = 'local:{}:'.format(local_repo_location)  # local: slugs take the form 'local:/some/path/to/cassandra/:branch_name_or_sha'
         return "{}{}".format(prefix, output)
     except CalledProcessError as e:
         if re.search('Not a git repository', e.message) is not None:

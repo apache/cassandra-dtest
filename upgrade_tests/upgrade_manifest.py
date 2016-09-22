@@ -103,9 +103,10 @@ MANIFEST = {
 # Local env and custom path testing instructions. Use these steps to REPLACE the normal upgrade test cases with your own.
 # 1) Add a VersionMeta for each version you wish to test (see examples below). Update the name, family, version, and protocol restrictions as needed. Use a unique name for each VersionMeta.
 # 2) Update OVERRIDE_MANIFEST (see example below).
-# 3) If using ccm local: slugs, make sure you have LOCAL_GIT_REPO defined in your env. This is the path to your git repo.
+# 3) If you want to test using local code, set the version attribute using local slugs in the format 'local:/path/to/cassandra/:branch_name'
 # 4) Run the tests!
 #      To run all, use 'nosetests -v upgrade_tests/'. To run specific tests, use 'nosetests -vs --collect-only' to preview the test names, then run nosetests using the desired test name.
+#      Note that nosetests outputs test names in a format that needs to be tweaked a bit before they will run from the command line.
 custom_1 = VersionMeta(name='custom_branch_1', family='2.1.x', variant='indev', version='local:some_branch', min_proto_v=3, max_proto_v=4, java_versions=(7, 8))
 custom_2 = VersionMeta(name='custom_branch_2', family='2.2.x', variant='indev', version='git:trunk', min_proto_v=3, max_proto_v=4, java_versions=(7, 8))
 custom_3 = VersionMeta(name='custom_branch_3', family='3.0.x', variant='indev', version='git:cassandra-3.5', min_proto_v=3, max_proto_v=4, java_versions=(7, 8))
