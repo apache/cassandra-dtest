@@ -151,9 +151,6 @@ class TestPushedNotifications(Tester):
             notifications = waiter.wait_for_notifications(30.0)
             self.assertEquals(1 if waiter.node is node1 else 0, len(notifications), notifications)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12678',
-                   flaky=True)
     def restart_node_test(self):
         """
         @jira_ticket CASSANDRA-7816
@@ -185,9 +182,13 @@ class TestPushedNotifications(Tester):
             for notification in notifications:
                 self.assertEquals(self.get_ip_from_node(node2), notification["address"][0])
             self.assertEquals("DOWN", notifications[0]["change_type"])
-            self.assertEquals("UP", notifications[1]["change_type"])
-            if version < '2.2':
-                self.assertEquals("NEW_NODE", notifications[2]["change_type"])
+            if version >= '2.2':
+                self.assertEquals("UP", notifications[1]["change_type"])
+            else:
+                # pre 2.2, we'll receive both a NEW_NODE and an UP notification,
+                # but the order is not guaranteed
+                self.assertEquals({"NEW_NODE", "UP"}, set(map(lambda n: n["change_type"], notifications[1:])))
+
             waiter.clear_notifications()
 
     def restart_node_localhost_test(self):
