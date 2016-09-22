@@ -4,6 +4,7 @@ from cassandra import ConsistencyLevel
 from ccmlib.common import is_win
 
 from dtest import Tester, debug
+from tools.assertions import assert_length_equal
 from tools.data import insert_c1c2
 from tools.decorators import since
 from tools.jmxutils import (JolokiaAgent, make_mbean,
@@ -155,11 +156,12 @@ class TestDeprecatedRepairAPI(Tester):
         # wait for log to start
         node1.watch_log_for("Starting repair command")
         # get repair parameters from the log
-        l = node1.grep_log(("Starting repair command #1, repairing keyspace ks with repair options \(parallelism: (?P<parallelism>\w+), primary range: (?P<pr>\w+), "
+        l = node1.grep_log(("Starting repair command #1" + (" \([^\)]+\)" if cluster.version() >= LooseVersion("3.10") else "") +
+                            ", repairing keyspace ks with repair options \(parallelism: (?P<parallelism>\w+), primary range: (?P<pr>\w+), "
                             "incremental: (?P<incremental>\w+), job threads: (?P<jobs>\d+), ColumnFamilies: (?P<cfs>.+), dataCenters: (?P<dc>.+), "
                             "hosts: (?P<hosts>.+), # of ranges: (?P<ranges>\d+)(, pull repair: (?P<pullrepair>true|false))?\)"))
 
-        self.assertEqual(len(l), 1)
+        assert_length_equal(l, 1)
         line, m = l[0]
 
         if supports_pull_repair:
