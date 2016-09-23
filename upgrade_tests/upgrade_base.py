@@ -58,8 +58,6 @@ class UpgradeTester(Tester):
             self.ignore_log_patterns = []
 
         self.ignore_log_patterns = self.ignore_log_patterns[:] + [
-            # Normal occurance. See CASSANDRA-12026. Likely won't be needed after C* 4.0.
-            r'Unknown column cdc during deserialization',
             r'RejectedExecutionException.*ThreadPoolExecutor has shut down',  # see  CASSANDRA-12364
         ]
         super(UpgradeTester, self).__init__(*args, **kwargs)
