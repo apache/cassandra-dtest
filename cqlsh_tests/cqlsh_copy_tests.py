@@ -101,10 +101,16 @@ class CqlshCopyTest(Tester):
             for err_file in glob.glob(pattern):
                 os.unlink(err_file)
 
-    def prepare(self, nodes=1, partitioner="murmur3", configuration_options=None, tokens=None):
+    def prepare(self, nodes=1, partitioner="murmur3", configuration_options=None, tokens=None, auth_enabled=False):
         p = PARTITIONERS[partitioner]
         if not self.cluster.nodelist():
             self.cluster.set_partitioner(p)
+            if auth_enabled:
+                if configuration_options is None:
+                    configuration_options = {'authenticator': 'org.apache.cassandra.auth.PasswordAuthenticator'}
+                else:
+                    configuration_options['authenticator'] = 'org.apache.cassandra.auth.PasswordAuthenticator'
+
             if configuration_options:
                 self.cluster.set_configuration_options(values=configuration_options)
             self.cluster.populate(nodes, tokens=tokens).start(wait_for_binary_proto=True)
@@ -114,7 +120,12 @@ class CqlshCopyTest(Tester):
             self.assertIsNone(configuration_options)
 
         self.node1 = self.cluster.nodelist()[0]
-        self.session = self.patient_cql_connection(self.node1)
+
+        if auth_enabled:
+            self.node1.watch_log_for('Created default superuser')
+            self.session = self.patient_cql_connection(self.node1, user='cassandra', password='cassandra')
+        else:
+            self.session = self.patient_cql_connection(self.node1)
 
         self.session.execute('DROP KEYSPACE IF EXISTS ks')
         self.ks = 'ks'
@@ -143,15 +154,23 @@ class CqlshCopyTest(Tester):
 
         return cqlshrc
 
-    def run_cqlsh(self, cmds=None, cqlsh_options=None, debug=True):
+    def run_cqlsh(self, cmds=None, cqlsh_options=None, use_debug=True, skip_cqlshrc=False, auth_enabled=False):
         """
         Run cqlsh on node1 adding the debug and cqlshrc to the clqsh options, unless the caller
         has specified its own options.
         """
         if cqlsh_options is None:
-            cqlsh_options = ['--cqlshrc={}'.format(self.cqlshrc)]
-            if debug:
-                cqlsh_options.append('--debug')
+            cqlsh_options = []
+
+        if not skip_cqlshrc:
+            cqlsh_options.append('--cqlshrc={}'.format(self.cqlshrc))
+
+        if use_debug:
+            cqlsh_options.append('--debug')
+
+        if auth_enabled:
+            cqlsh_options.append('--username=cassandra')
+            cqlsh_options.append('--password=cassandra')
 
         return self.node1.run_cqlsh(cmds=cmds, cqlsh_options=cqlsh_options)
 
@@ -1631,7 +1650,7 @@ class CqlshCopyTest(Tester):
             cmd = """COPY ks.testvalidate (a, b, c) FROM '{name}'""".format(name=tempfile.name)
             # We want to assert that there is no error when we don't expect one but cqlsh prints
             # some debug messages to stderr, hence we must turn debug off
-            out, err, _ = self.run_cqlsh(cmd, debug=False)
+            out, err, _ = self.run_cqlsh(cmd, use_debug=False)
             results = list(self.session.execute("SELECT * FROM testvalidate"))
 
             if expected_err:
@@ -2208,12 +2227,12 @@ class CqlshCopyTest(Tester):
             if not use_default:
                 cmd += " WITH CONFIGFILE = '{}'".format(config_file)
 
-            cqlsh_options = ['--debug']
+            cqlsh_options = []
             if use_default:
                 cqlsh_options.append('--cqlshrc={}'.format(config_file))
 
             debug('{} with options {}'.format(cmd, cqlsh_options))
-            out, _, _ = self.run_cqlsh(cmds=cmd, cqlsh_options=cqlsh_options)
+            out, _, _ = self.run_cqlsh(cmds=cmd, cqlsh_options=cqlsh_options, skip_cqlshrc=True)
             debug(out)
             check_options(out, expected_options)
 
@@ -2920,3 +2939,71 @@ class CqlshCopyTest(Tester):
 
         _test(True)
         _test(False)
+
+    @freshCluster()
+    @since('2.2')
+    def test_round_trip_with_authentication(self):
+        """
+        Test that COPY works when authentication is enabled and when invoked via the SOURCE command
+        or the --file cqlsh option.
+
+        @jira_ticket CASSANDRA-12642
+        """
+        self.prepare(auth_enabled=True)
+        self.session.execute('CREATE TABLE ks.testauth (a int PRIMARY KEY, b text)')
+
+        num_records = 10
+        for i in xrange(num_records):
+            self.session.execute("INSERT INTO ks.testauth (a,b) VALUES ({}, 'abc')".format(i))
+
+        tempfile = self.get_temp_file()
+
+        # do an ordinary COPY TO AND FROM roundtrip
+        debug('Exporting to csv file: {}'.format(tempfile.name))
+        ret = self.run_cqlsh(cmds="COPY ks.testauth TO '{}'".format(tempfile.name), auth_enabled=True)
+        self.assertEqual(num_records, len(open(tempfile.name).readlines()),
+                         msg="Failed to export {} rows\nSTDOUT:\n{}\nSTDERR:\n{}\n"
+                         .format(num_records, ret.stderr, ret.stdout))
+
+        self.session.execute("TRUNCATE testauth")
+        debug('Importing from csv file: {}'.format(tempfile.name))
+        ret = self.run_cqlsh(cmds="COPY ks.testauth FROM '{}'".format(tempfile.name), auth_enabled=True)
+        self.assertEqual([[num_records]], rows_to_list(self.session.execute("SELECT COUNT(*) FROM ks.testauth")),
+                         msg="Failed to import {} rows\nSTDOUT:\n{}\nSTDERR:\n{}\n"
+                         .format(num_records, ret.stderr, ret.stdout))
+
+        # do another COPY TO AND FROM roundtrip but invoke copy via the source command
+        copy_to_cql = self.get_temp_file()
+        with open(copy_to_cql.name, 'w') as f:
+            f.write("COPY ks.testauth TO '{}';".format(tempfile.name))
+
+        copy_from_cql = self.get_temp_file()
+        with open(copy_from_cql.name, 'w') as f:
+            f.write("COPY ks.testauth FROM '{}';".format(tempfile.name))
+
+        debug('Exporting to csv file {} via source of {}'.format(tempfile.name, copy_to_cql.name))
+        ret = self.run_cqlsh(cmds="SOURCE '{}'".format(copy_to_cql.name), auth_enabled=True)
+        self.assertEqual(num_records, len(open(tempfile.name).readlines()),
+                         msg="Failed to export {} rows\nSTDOUT:\n{}\nSTDERR:\n{}\n"
+                         .format(num_records, ret.stderr, ret.stdout))
+
+        self.session.execute("TRUNCATE testauth")
+        debug('Importing from csv file {} via source of {}'.format(tempfile.name, copy_from_cql.name))
+        ret = self.run_cqlsh(cmds="SOURCE '{}'".format(copy_from_cql.name), auth_enabled=True)
+        self.assertEqual([[num_records]], rows_to_list(self.session.execute("SELECT COUNT(*) FROM ks.testauth")),
+                         msg="Failed to import {} rows\nSTDOUT:\n{}\nSTDERR:\n{}\n"
+                         .format(num_records, ret.stderr, ret.stdout))
+
+        # do another COPY TO AND FROM roundtrip but invoke copy via the -f cqlsh option
+        debug('Exporting to csv file {} via --file={}'.format(tempfile.name, copy_to_cql.name))
+        ret = self.run_cqlsh(cmds='', cqlsh_options=['--file={}'.format(copy_to_cql.name)], auth_enabled=True)
+        self.assertEqual(num_records, len(open(tempfile.name).readlines()),
+                         msg="Failed to export {} rows\nSTDOUT:\n{}\nSTDERR:\n{}\n"
+                         .format(num_records, ret.stderr, ret.stdout))
+
+        self.session.execute("TRUNCATE testauth")
+        debug('Importing from csv file {} via --file={}'.format(tempfile.name, copy_from_cql.name))
+        ret = self.run_cqlsh(cmds='', cqlsh_options=['--file={}'.format(copy_from_cql.name)], auth_enabled=True)
+        self.assertEqual([[num_records]], rows_to_list(self.session.execute("SELECT COUNT(*) FROM ks.testauth")),
+                         msg="Failed to import {} rows\nSTDOUT:\n{}\nSTDERR:\n{}\n"
+                         .format(num_records, ret.stderr, ret.stdout))
