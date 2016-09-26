@@ -1108,7 +1108,6 @@ class LWTTester(CQLTester):
     @jira_ticket CASSANDRA-9842
     """
 
-    @since('2.1')
     def lwt_with_static_columns_test(self):
         session = self.prepare(nodes=3)
 
@@ -1156,7 +1155,6 @@ class LWTTester(CQLTester):
 
         assert_one(session, "SELECT a, s, d FROM {} WHERE a = 4".format(table_name), [4, 4, None])
 
-    @since('2.1')
     def conditional_updates_on_static_columns_with_null_values_test(self):
         session = self.prepare(nodes=3)
 
@@ -1181,7 +1179,6 @@ class LWTTester(CQLTester):
 
             assert_one(session, "SELECT * FROM {} WHERE a = 5".format(table_name), [5, 5, None, None])
 
-    @since('2.1')
     def conditional_updates_on_static_columns_with_non_existing_values_test(self):
         session = self.prepare(nodes=3)
 
@@ -1234,7 +1231,6 @@ class LWTTester(CQLTester):
 
         assert_one(session, "SELECT * FROM {table_name} WHERE a = 7".format(table_name=table_name), [7, 7, 8, "a"])
 
-    @since('2.1')
     def conditional_updates_on_static_columns_with_null_values_batch_test(self):
         session = self.prepare(nodes=3)
 
@@ -1298,7 +1294,6 @@ class LWTTester(CQLTester):
             assert_one(session, "DELETE s1 FROM {} WHERE a = 5 IF s2 {} 3".format(table_name, operator), [False, None])
             assert_one(session, "SELECT * FROM {} WHERE a = 5".format(table_name), [5, 5, 5, None, 5])
 
-    @since('2.1')
     def conditional_deletes_on_static_columns_with_null_values_batch_test(self):
         session = self.prepare(nodes=3)
 
