@@ -98,6 +98,9 @@ class TestCompaction(Tester):
         # allow 5% size increase - if we have few sstables it is not impossible that live size increases *slightly* after compaction
         self.assertLess(finalValue, initialValue * 1.05)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12711',
+                   flaky=True)
     def bloomfilter_size_test(self):
         """
         @jira_ticket CASSANDRA-11344
