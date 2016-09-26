@@ -14,7 +14,7 @@ from cassandra.query import SimpleStatement
 from enum import Enum  # Remove when switching to py3
 from nose.plugins.attrib import attr
 
-from dtest import Tester, debug
+from dtest import Tester, debug, get_ip_from_node
 from tools.assertions import (assert_all, assert_crc_check_chance_equal,
                               assert_invalid, assert_none, assert_one,
                               assert_unavailable)
@@ -1581,7 +1581,7 @@ class TestMaterializedViewsConsistency(Tester):
             else:
                 end = lower + (eachProcess * (i + 1))
             q = Queue()
-            node_ip = self.get_ip_from_node(node2)
+            node_ip = get_ip_from_node(node2)
             p = Process(target=thread_session, args=(node_ip, q, start, end, self.rows, num_partitions))
             p.start()
             queues[i] = q

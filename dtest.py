@@ -456,7 +456,7 @@ class Tester(TestCase):
     def exclusive_cql_connection(self, node, keyspace=None, user=None,
                                  password=None, compression=True, protocol_version=None, port=None, ssl_opts=None):
 
-        node_ip = self.get_ip_from_node(node)
+        node_ip = get_ip_from_node(node)
         wlrr = WhiteListRoundRobinPolicy([node_ip])
 
         return self._create_session(node, keyspace, user, password, compression,
@@ -464,15 +464,15 @@ class Tester(TestCase):
 
     def _create_session(self, node, keyspace, user, password, compression, protocol_version, load_balancing_policy=None,
                         port=None, ssl_opts=None):
-        node_ip = self.get_ip_from_node(node)
+        node_ip = get_ip_from_node(node)
         if not port:
-            port = self.get_port_from_node(node)
+            port = get_port_from_node(node)
 
         if protocol_version is None:
             protocol_version = self.get_eager_protocol_version(self.cluster.version())
 
         if user is not None:
-            auth_provider = self.get_auth_provider(user=user, password=password)
+            auth_provider = get_auth_provider(user=user, password=password)
         else:
             auth_provider = None
 
@@ -679,32 +679,6 @@ class Tester(TestCase):
             else:
                 yield e
 
-    def get_ip_from_node(self, node):
-        if node.network_interfaces['binary']:
-            node_ip = node.network_interfaces['binary'][0]
-        else:
-            node_ip = node.network_interfaces['thrift'][0]
-        return node_ip
-
-    def get_port_from_node(self, node):
-        """
-        Return the port that this node is listening on.
-        We only use this to connect the native driver,
-        so we only care about the binary port.
-        """
-        try:
-            return node.network_interfaces['binary'][1]
-        except Exception:
-            raise RuntimeError("No network interface defined on this node object. {}".format(node.network_interfaces))
-
-    def get_auth_provider(self, user, password):
-        return PlainTextAuthProvider(username=user, password=password)
-
-    def make_auth(self, user, password):
-        def private_auth(node_ip):
-            return {'username': user, 'password': password}
-        return private_auth
-
     # Disable docstrings printing in nosetest output
     def shortDescription(self):
         return None
@@ -762,6 +736,36 @@ class Tester(TestCase):
             stdout, stderr = p.communicate()
             debug(stdout)
             debug(stderr)
+
+
+def get_auth_provider(user, password):
+    return PlainTextAuthProvider(username=user, password=password)
+
+
+def make_auth(user, password):
+    def private_auth(node_ip):
+        return {'username': user, 'password': password}
+    return private_auth
+
+
+def get_port_from_node(node):
+    """
+    Return the port that this node is listening on.
+    We only use this to connect the native driver,
+    so we only care about the binary port.
+    """
+    try:
+        return node.network_interfaces['binary'][1]
+    except Exception:
+        raise RuntimeError("No network interface defined on this node object. {}".format(node.network_interfaces))
+
+
+def get_ip_from_node(node):
+    if node.network_interfaces['binary']:
+        node_ip = node.network_interfaces['binary'][0]
+    else:
+        node_ip = node.network_interfaces['thrift'][0]
+    return node_ip
 
 
 def kill_windows_cassandra_procs():
