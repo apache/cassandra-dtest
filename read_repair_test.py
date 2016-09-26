@@ -4,7 +4,7 @@ from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
 
 from tools.assertions import assert_one
-from dtest import PRINT_DEBUG, Tester, debug
+from dtest import PRINT_DEBUG, Tester, debug, create_ks
 from tools.data import rows_to_list
 from tools.decorators import known_failure, since
 
@@ -173,7 +173,7 @@ class TestReadRepair(Tester):
         node1, node2, _ = self.cluster.nodelist()
 
         session1 = self.patient_cql_connection(node1)
-        self.create_ks(session1, 'gcts', 3)
+        create_ks(session1, 'gcts', 3)
         query = """
             CREATE TABLE gcts.cf1 (
                 key text,

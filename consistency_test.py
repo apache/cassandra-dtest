@@ -11,7 +11,7 @@ from nose.plugins.attrib import attr
 from nose.tools import assert_greater_equal
 
 from tools.assertions import assert_length_equal, assert_none, assert_unavailable
-from dtest import DISABLE_VNODES, MultiError, Tester, debug
+from dtest import DISABLE_VNODES, MultiError, Tester, debug, create_ks, create_cf
 from tools.data import (create_c1c2_table, insert_c1c2, insert_columns,
                         query_c1c2, rows_to_list)
 from tools.decorators import known_failure, since
@@ -141,7 +141,7 @@ class TestHelper(Tester):
         self.ksname = 'mytestks'
         session = self.patient_exclusive_cql_connection(cluster.nodelist()[0])
 
-        self.create_ks(session, self.ksname, rf)
+        create_ks(session, self.ksname, rf)
         self.create_tables(session, requires_local_reads)
 
         if save_sessions:
@@ -799,8 +799,8 @@ class TestConsistency(Tester):
         node1, node2, node3 = cluster.nodelist()
 
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'ks', 3)
-        self.create_cf(session, 'cf', read_repair=0.0)
+        create_ks(session, 'ks', 3)
+        create_cf(session, 'cf', read_repair=0.0)
 
         normal_key = 'normal'
         reversed_key = 'reversed'
@@ -859,8 +859,8 @@ class TestConsistency(Tester):
         node1, node2 = cluster.nodelist()
 
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'ks', 3)
-        self.create_cf(session, 'cf', read_repair=0.0)
+        create_ks(session, 'ks', 3)
+        create_cf(session, 'cf', read_repair=0.0)
         # insert 2 columns in one row
         insert_columns(self, session, 0, 2)
 
@@ -895,7 +895,7 @@ class TestConsistency(Tester):
         node1, node2, node3 = cluster.nodelist()
 
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'ks', 3)
+        create_ks(session, 'ks', 3)
 
         session.execute("CREATE TABLE t (id int, v int, PRIMARY KEY(id, v)) WITH read_repair_chance = 0.0")
         # we write 1 and 2 in a partition: all nodes get it.
@@ -933,7 +933,7 @@ class TestConsistency(Tester):
         node1, node2 = cluster.nodelist()
 
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'ks', 2)
+        create_ks(session, 'ks', 2)
         create_c1c2_table(self, session, read_repair=1.0)
 
         node2.stop(wait_other_notice=True)
@@ -968,7 +968,7 @@ class TestConsistency(Tester):
 
         debug("Set to talk to node 2")
         session = self.patient_cql_connection(node2)
-        self.create_ks(session, 'ks', RF)
+        create_ks(session, 'ks', RF)
         create_c1c2_table(self, session)
 
         debug("Generating some data")

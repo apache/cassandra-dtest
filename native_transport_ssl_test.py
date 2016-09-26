@@ -3,7 +3,7 @@ import os
 from cassandra import ConsistencyLevel
 from cassandra.cluster import NoHostAvailable
 
-from dtest import Tester
+from dtest import Tester, create_ks, create_cf
 from tools.data import putget
 from tools.decorators import since
 from tools.misc import generate_ssl_stores
@@ -129,6 +129,6 @@ class NativeTransportSSL(Tester):
         return cluster
 
     def _putget(self, cluster, session, ks='ks', cf='cf'):
-        self.create_ks(session, ks, 1)
-        self.create_cf(session, cf, compression=None)
+        create_ks(session, ks, 1)
+        create_cf(session, cf, compression=None)
         putget(cluster, session, cl=ConsistencyLevel.ONE)

@@ -25,7 +25,7 @@ from cqlsh_tools import (DummyColorMap, assert_csvs_items_equal, csv_rows,
                          monkeypatch_driver, random_list, unmonkeypatch_driver,
                          write_rows_to_csv)
 from dtest import (DISABLE_VNODES, Tester, canReuseCluster, debug,
-                   freshCluster, warning)
+                   freshCluster, warning, create_ks)
 from tools.data import rows_to_list
 from tools.decorators import known_failure, since
 from tools.metadata_wrapper import (UpdatingClusterMetadataWrapper,
@@ -129,7 +129,7 @@ class CqlshCopyTest(Tester):
 
         self.session.execute('DROP KEYSPACE IF EXISTS ks')
         self.ks = 'ks'
-        self.create_ks(self.session, self.ks, 1)
+        create_ks(self.session, self.ks, 1)
         self.cqlshrc = self.create_default_cqlsh_properties()
 
     def create_default_cqlsh_properties(self):

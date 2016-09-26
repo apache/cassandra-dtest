@@ -1,5 +1,6 @@
 import os
 
+from dtest import create_ks
 from scrub_test import TestHelper
 from tools.assertions import assert_crc_check_chance_equal
 from tools.decorators import since
@@ -28,7 +29,7 @@ class TestCompression(TestHelper):
         [node] = cluster.nodelist()
 
         session = self.patient_cql_connection(node)
-        self.create_ks(session, 'ks', 1)
+        create_ks(session, 'ks', 1)
         session.execute("create table disabled_compression_table (id uuid PRIMARY KEY ) WITH compression = {'enabled': false};")
         session.cluster.refresh_schema_metadata()
         meta = session.cluster.metadata.keyspaces['ks'].tables['disabled_compression_table']
@@ -58,7 +59,7 @@ class TestCompression(TestHelper):
         [node] = cluster.nodelist()
 
         session = self.patient_cql_connection(node)
-        self.create_ks(session, 'ks', 1)
+        create_ks(session, 'ks', 1)
         session.execute("""
             create table compression_opts_table
                 (id uuid PRIMARY KEY )
@@ -119,7 +120,7 @@ class TestCompression(TestHelper):
         [node] = cluster.nodelist()
 
         session = self.patient_cql_connection(node)
-        self.create_ks(session, 'ks', 1)
+        create_ks(session, 'ks', 1)
         session.execute("""
             create table start_enabled_compression_table
                 (id uuid PRIMARY KEY )
@@ -150,7 +151,7 @@ class TestCompression(TestHelper):
         [node] = cluster.nodelist()
 
         session = self.patient_cql_connection(node)
-        self.create_ks(session, 'ks', 1)
+        create_ks(session, 'ks', 1)
         session.execute("create table start_disabled_compression_table (id uuid PRIMARY KEY ) WITH compression = {'enabled': false};")
         meta = session.cluster.metadata.keyspaces['ks'].tables['start_disabled_compression_table']
         self.assertEqual('false', meta.options['compression']['enabled'])

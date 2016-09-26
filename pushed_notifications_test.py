@@ -9,7 +9,7 @@ from cassandra.query import SimpleStatement
 from ccmlib.node import Node, TimeoutError
 from nose.tools import timed
 
-from dtest import Tester, debug, get_ip_from_node
+from dtest import Tester, debug, get_ip_from_node, create_ks
 from tools.decorators import known_failure, no_vnodes, since
 
 
@@ -291,7 +291,7 @@ class TestPushedNotifications(Tester):
         session = self.patient_cql_connection(node1)
         waiter = NotificationWaiter(self, node2, ["SCHEMA_CHANGE"], keyspace='ks')
 
-        self.create_ks(session, 'ks', 3)
+        create_ks(session, 'ks', 3)
         session.execute("create TABLE t (k int PRIMARY KEY , v int)")
         session.execute("alter TABLE t add v1 int;")
 
@@ -344,7 +344,7 @@ class TestVariousNotifications(Tester):
         proto_version = 5 if have_v5_protocol else None
         session = self.patient_cql_connection(node1, protocol_version=proto_version)
 
-        self.create_ks(session, 'test', 3)
+        create_ks(session, 'test', 3)
         session.execute(
             "CREATE TABLE test ( "
             "id int, mytext text, col1 int, col2 int, col3 int, "

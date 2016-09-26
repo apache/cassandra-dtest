@@ -1,7 +1,7 @@
 import datetime
 import random
 
-from dtest import Tester, debug
+from dtest import Tester, debug, create_ks
 from tools.assertions import assert_length_equal
 
 status_messages = (
@@ -34,7 +34,7 @@ class TestWideRows(Tester):
 
         session = self.patient_cql_connection(node1)
         start_time = datetime.datetime.now()
-        self.create_ks(session, 'wide_rows', 1)
+        create_ks(session, 'wide_rows', 1)
         # Simple timeline:  user -> {date: value, ...}
         debug('Create Table....')
         session.execute('CREATE TABLE user_events (userid text, event timestamp, value text, PRIMARY KEY (userid, event));')
@@ -72,7 +72,7 @@ class TestWideRows(Tester):
         (node1,) = cluster.nodelist()
         cluster.set_configuration_options(values={'column_index_size_in_kb': 1})  # reduce this value to force column index creation
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'wide_rows', 1)
+        create_ks(session, 'wide_rows', 1)
 
         create_table_query = 'CREATE TABLE test_table (row varchar, name varchar, value int, PRIMARY KEY (row, name));'
         session.execute(create_table_query)

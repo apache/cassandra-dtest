@@ -12,7 +12,7 @@ from ccmlib.common import is_win
 from ccmlib.node import Node, TimeoutError
 from parse import parse
 
-from dtest import Tester, debug
+from dtest import Tester, debug, create_ks
 from tools.assertions import assert_almost_equal, assert_none, assert_one
 from tools.data import rows_to_list
 from tools.decorators import known_failure, since
@@ -51,7 +51,7 @@ class TestCommitLog(Tester):
         self.session1 = self.patient_cql_connection(self.node1)
         if create_test_keyspace:
             self.session1.execute("DROP KEYSPACE IF EXISTS ks;")
-            self.create_ks(self.session1, 'ks', 1)
+            create_ks(self.session1, 'ks', 1)
             self.session1.execute("DROP TABLE IF EXISTS test;")
             query = """
               CREATE TABLE test (
@@ -177,7 +177,7 @@ class TestCommitLog(Tester):
         session = self.patient_cql_connection(node1)
 
         debug("Creating schema")
-        self.create_ks(session, 'Test', 1)
+        create_ks(session, 'Test', 1)
         session.execute("""
             CREATE TABLE mytable (
                 a int,
@@ -239,7 +239,7 @@ class TestCommitLog(Tester):
 
         debug("Insert data")
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'Test', 1)
+        create_ks(session, 'Test', 1)
         session.execute("""
             CREATE TABLE users (
                 user_name varchar PRIMARY KEY,
@@ -472,7 +472,7 @@ class TestCommitLog(Tester):
         self.cluster.start()
 
         cursor = self.patient_cql_connection(self.cluster.nodelist()[0])
-        self.create_ks(cursor, 'ks', 1)
+        create_ks(cursor, 'ks', 1)
         cursor.execute("CREATE TABLE ks.tbl (k INT PRIMARY KEY, v INT)")
 
         for i in range(10):
@@ -552,7 +552,7 @@ class TestCommitLog(Tester):
         self.cluster.start()
 
         cursor = self.patient_cql_connection(self.cluster.nodelist()[0])
-        self.create_ks(cursor, 'ks1', 1)
+        create_ks(cursor, 'ks1', 1)
         cursor.execute("CREATE TABLE ks1.tbl (k INT PRIMARY KEY, v INT)")
 
         for i in range(10):

@@ -8,7 +8,7 @@ import uuid
 import parse
 from ccmlib import common
 
-from dtest import Tester, debug
+from dtest import Tester, debug, create_ks, create_cf
 from tools.assertions import assert_length_equal, assert_stderr_clean
 from tools.decorators import known_failure, since
 
@@ -184,7 +184,7 @@ class TestScrubIndexes(TestHelper):
 
     def create_users(self, session):
         columns = {"password": "varchar", "gender": "varchar", "session_token": "varchar", "state": "varchar", "birth_year": "bigint"}
-        self.create_cf(session, 'users', columns=columns)
+        create_cf(session, 'users', columns=columns)
 
         session.execute("CREATE INDEX gender_idx ON users (gender)")
         session.execute("CREATE INDEX state_idx ON users (state)")
@@ -222,7 +222,7 @@ class TestScrubIndexes(TestHelper):
         node1 = cluster.nodelist()[0]
 
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, KEYSPACE, 1)
+        create_ks(session, KEYSPACE, 1)
 
         self.create_users(session)
         self.update_users(session)
@@ -268,7 +268,7 @@ class TestScrubIndexes(TestHelper):
         node1 = cluster.nodelist()[0]
 
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, KEYSPACE, 1)
+        create_ks(session, KEYSPACE, 1)
 
         self.create_users(session)
         self.update_users(session)
@@ -299,7 +299,7 @@ class TestScrubIndexes(TestHelper):
         node1 = cluster.nodelist()[0]
 
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, KEYSPACE, 1)
+        create_ks(session, KEYSPACE, 1)
 
         session.execute("CREATE TABLE users (user_id uuid PRIMARY KEY, email text, uuids list<uuid>)")
         session.execute("CREATE INDEX user_uuids_idx on users (uuids)")
@@ -340,7 +340,7 @@ class TestScrub(TestHelper):
 
     def create_users(self, session):
         columns = {"password": "varchar", "gender": "varchar", "session_token": "varchar", "state": "varchar", "birth_year": "bigint"}
-        self.create_cf(session, 'users', columns=columns)
+        create_cf(session, 'users', columns=columns)
 
     def update_users(self, session):
         session.execute("INSERT INTO users (KEY, password, gender, state, birth_year) VALUES ('user1', 'ch@ngem3a', 'f', 'TX', 1978)")
@@ -374,7 +374,7 @@ class TestScrub(TestHelper):
         node1.nodetool('disableautocompaction')
 
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, KEYSPACE, 1)
+        create_ks(session, KEYSPACE, 1)
 
         self.create_users(session)
         self.update_users(session)
@@ -417,7 +417,7 @@ class TestScrub(TestHelper):
         node1 = cluster.nodelist()[0]
 
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, KEYSPACE, 1)
+        create_ks(session, KEYSPACE, 1)
 
         self.create_users(session)
         self.update_users(session)
@@ -448,7 +448,7 @@ class TestScrub(TestHelper):
         node1 = cluster.nodelist()[0]
 
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, KEYSPACE, 1)
+        create_ks(session, KEYSPACE, 1)
 
         self.create_users(session)
         self.update_users(session)

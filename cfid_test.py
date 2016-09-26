@@ -1,6 +1,6 @@
 import os
 
-from dtest import Tester
+from dtest import Tester, create_ks, create_cf
 
 
 class TestCFID(Tester):
@@ -13,10 +13,10 @@ class TestCFID(Tester):
         [node1] = cluster.nodelist()
 
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'ks', 1)
+        create_ks(session, 'ks', 1)
 
         for x in range(0, 5):
-            self.create_cf(session, 'cf', gc_grace=0, key_type='int', columns={'c1': 'int'})
+            create_cf(session, 'cf', gc_grace=0, key_type='int', columns={'c1': 'int'})
             session.execute('insert into cf (key, c1) values (1,1)')
             session.execute('insert into cf (key, c1) values (2,1)')
             node1.flush()

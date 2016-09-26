@@ -1,7 +1,7 @@
 from cassandra.query import SimpleStatement
 from nose.plugins.attrib import attr
 
-from dtest import TRACE, Tester, debug
+from dtest import TRACE, Tester, debug, create_ks
 from tools.decorators import no_vnodes
 
 
@@ -24,7 +24,7 @@ class TestPendingRangeMovements(Tester):
 
         # Set up RF=3 keyspace
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'ks', 3)
+        create_ks(session, 'ks', 3)
 
         session.execute("CREATE TABLE users (login text PRIMARY KEY, email text, name text, login_count int)")
 

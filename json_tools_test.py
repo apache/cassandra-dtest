@@ -1,7 +1,7 @@
 import os
 import tempfile
 
-from dtest import Tester, debug
+from dtest import Tester, debug, create_ks
 from tools.data import rows_to_list
 from tools.decorators import known_failure, since
 
@@ -27,7 +27,7 @@ class TestJson(Tester):
         session = self.patient_cql_connection(node1)
 
         debug("Inserting data...")
-        self.create_ks(session, 'Test', 1)
+        create_ks(session, 'Test', 1)
 
         session.execute("""
             CREATE TABLE users (
@@ -69,7 +69,7 @@ class TestJson(Tester):
 
         debug("Inserting data...")
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'Test', 1)
+        create_ks(session, 'Test', 1)
 
         session.execute("""
             CREATE TABLE users (

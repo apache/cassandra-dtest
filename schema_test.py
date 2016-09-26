@@ -3,7 +3,7 @@ import time
 from cassandra.concurrent import execute_concurrent_with_args
 
 from tools.assertions import assert_invalid, assert_all, assert_one
-from dtest import Tester
+from dtest import Tester, create_ks
 
 
 class TestSchema(Tester):
@@ -16,7 +16,7 @@ class TestSchema(Tester):
         cluster.populate(1).start()
         node1, = cluster.nodelist()
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'ks', 1)
+        create_ks(session, 'ks', 1)
         session.execute("use ks;")
         session.execute("create table tbl_o_churn (id int primary key, c0 text, c1 text) "
                         "WITH compaction = {'class': 'SizeTieredCompactionStrategy', 'min_threshold': 1024, 'max_threshold': 1024 };")
@@ -146,5 +146,5 @@ class TestSchema(Tester):
         time.sleep(.5)
         nodes = cluster.nodelist()
         session = self.patient_cql_connection(nodes[0])
-        self.create_ks(session, 'ks', 1)
+        create_ks(session, 'ks', 1)
         return session

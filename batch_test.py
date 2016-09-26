@@ -5,7 +5,7 @@ from unittest import skipIf
 from cassandra import ConsistencyLevel, Timeout, Unavailable
 from cassandra.query import SimpleStatement
 
-from dtest import CASSANDRA_DIR, Tester, debug
+from dtest import CASSANDRA_DIR, Tester, debug, create_ks
 from tools.assertions import (assert_all, assert_invalid, assert_one,
                               assert_unavailable)
 from tools.decorators import since
@@ -383,7 +383,7 @@ class TestBatch(Tester):
 
     def create_schema(self, session, rf):
         debug('Creating schema...')
-        self.create_ks(session, 'ks', rf)
+        create_ks(session, 'ks', rf)
 
         session.execute("""
             CREATE TABLE clicks (

@@ -12,7 +12,7 @@ from cassandra.protocol import ConfigurationException
 from cassandra.query import BatchStatement, SimpleStatement
 
 from dtest import (DISABLE_VNODES, OFFHEAP_MEMTABLES, DtestTimeoutError,
-                   Tester, debug, CASSANDRA_VERSION_FROM_BUILD)
+                   Tester, debug, CASSANDRA_VERSION_FROM_BUILD, create_ks, create_cf)
 from tools.assertions import assert_bootstrap_state, assert_invalid, assert_one, assert_row_count
 from tools.data import index_is_built, rows_to_list
 from tools.decorators import known_failure, since
@@ -30,10 +30,10 @@ class TestSecondaryIndexes(Tester):
         [node1] = cluster.nodelist()
 
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'ks', 1)
+        create_ks(session, 'ks', 1)
 
         columns = {"password": "varchar", "gender": "varchar", "session_token": "varchar", "state": "varchar", "birth_year": "bigint"}
-        self.create_cf(session, 'users', columns=columns)
+        create_cf(session, 'users', columns=columns)
 
         # insert data
         session.execute("INSERT INTO users (KEY, password, gender, state, birth_year) VALUES ('user1', 'ch@ngem3a', 'f', 'TX', 1968);")
@@ -149,7 +149,7 @@ class TestSecondaryIndexes(Tester):
             except ConfigurationException:
                 pass
 
-            self.create_ks(session, 'ks', 1)
+            create_ks(session, 'ks', 1)
             session.execute("CREATE TABLE ks.cf (key text PRIMARY KEY, col1 text);")
             session.execute("CREATE INDEX on ks.cf (col1);")
 
@@ -176,7 +176,7 @@ class TestSecondaryIndexes(Tester):
         node1, node2, node3 = cluster.nodelist()
         session = self.patient_cql_connection(node1)
 
-        self.create_ks(session, 'ks', 1)
+        create_ks(session, 'ks', 1)
 
         # This only occurs when dropping and recreating with
         # the same name, so loop through this test a few times:
@@ -212,7 +212,7 @@ class TestSecondaryIndexes(Tester):
         node1 = cluster.nodelist()[0]
         session = self.patient_cql_connection(node1)
 
-        self.create_ks(session, 'ks', 1)
+        create_ks(session, 'ks', 1)
 
         self.insert_row_with_oversize_value("CREATE TABLE %s(a int, b int, c text, PRIMARY KEY (a))",
                                             "CREATE INDEX ON %s(c)",
@@ -494,7 +494,7 @@ class TestSecondaryIndexesOnCollections(Tester):
         cluster.populate(1).start()
         [node1] = cluster.nodelist()
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'tuple_index_test', 1)
+        create_ks(session, 'tuple_index_test', 1)
         session.execute("use tuple_index_test")
         session.execute("""
             CREATE TABLE simple_with_tuple (
@@ -581,7 +581,7 @@ class TestSecondaryIndexesOnCollections(Tester):
         cluster.populate(1).start()
         [node1] = cluster.nodelist()
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'list_index_search', 1)
+        create_ks(session, 'list_index_search', 1)
 
         stmt = ("CREATE TABLE list_index_search.users ("
                 "user_id uuid PRIMARY KEY,"
@@ -671,7 +671,7 @@ class TestSecondaryIndexesOnCollections(Tester):
         cluster.populate(1).start()
         [node1] = cluster.nodelist()
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'set_index_search', 1)
+        create_ks(session, 'set_index_search', 1)
 
         stmt = ("CREATE TABLE set_index_search.users ("
                 "user_id uuid PRIMARY KEY,"
@@ -761,7 +761,7 @@ class TestSecondaryIndexesOnCollections(Tester):
         cluster.populate(1).start()
         [node1] = cluster.nodelist()
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'map_double_index', 1)
+        create_ks(session, 'map_double_index', 1)
         session.execute("""
                 CREATE TABLE map_tbl (
                     id uuid primary key,
@@ -816,7 +816,7 @@ class TestSecondaryIndexesOnCollections(Tester):
         cluster.populate(1).start()
         [node1] = cluster.nodelist()
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'map_index_search', 1)
+        create_ks(session, 'map_index_search', 1)
 
         stmt = ("CREATE TABLE map_index_search.users ("
                 "user_id uuid PRIMARY KEY,"
@@ -970,7 +970,7 @@ class TestUpgradeSecondaryIndexes(Tester):
 
         [node1] = cluster.nodelist()
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'index_upgrade', 1)
+        create_ks(session, 'index_upgrade', 1)
         session.execute("CREATE TABLE index_upgrade.table1 (k int PRIMARY KEY, v int)")
         session.execute("CREATE INDEX ON index_upgrade.table1(v)")
         session.execute("INSERT INTO index_upgrade.table1 (k,v) VALUES (0,0)")
@@ -1046,8 +1046,8 @@ class TestPreJoinCallback(Tester):
 
         # Create a table with 2i
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'ks', 1)
-        self.create_cf(session, 'cf', columns={'c1': 'text', 'c2': 'text'})
+        create_ks(session, 'ks', 1)
+        create_cf(session, 'cf', columns={'c1': 'text', 'c2': 'text'})
         session.execute("CREATE INDEX c2_idx ON cf (c2);")
 
         keys = 10000

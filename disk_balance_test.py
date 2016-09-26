@@ -1,7 +1,7 @@
 import os
 import os.path
 
-from dtest import DISABLE_VNODES, Tester
+from dtest import DISABLE_VNODES, Tester, create_ks
 from tools.assertions import assert_almost_equal
 from tools.data import create_c1c2_table, insert_c1c2, query_c1c2
 from tools.decorators import since
@@ -74,7 +74,7 @@ class TestDiskBalance(Tester):
         cluster.start(wait_for_binary_proto=True)
 
         session = self.patient_cql_connection(node)
-        self.create_ks(session, 'ks', 1)
+        create_ks(session, 'ks', 1)
         create_c1c2_table(self, session)
         insert_c1c2(session, n=10000)
         node.flush()

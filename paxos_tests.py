@@ -7,7 +7,7 @@ from cassandra import ConsistencyLevel, WriteTimeout
 from cassandra.query import SimpleStatement
 
 from tools.assertions import assert_unavailable
-from dtest import Tester
+from dtest import Tester, create_ks
 from tools.decorators import no_vnodes, since
 
 
@@ -29,7 +29,7 @@ class TestPaxos(Tester):
 
         session = self.patient_cql_connection(node1)
         if create_keyspace:
-            self.create_ks(session, 'ks', rf)
+            create_ks(session, 'ks', rf)
         return session
 
     def replica_availability_test(self):

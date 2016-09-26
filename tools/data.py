@@ -6,10 +6,11 @@ from cassandra.query import SimpleStatement
 from nose.tools import assert_equal, assert_true
 
 import assertions
+from dtest import create_cf
 
 
 def create_c1c2_table(tester, session, read_repair=None):
-    tester.create_cf(session, 'cf', columns={'c1': 'text', 'c2': 'text'}, read_repair=read_repair)
+    create_cf(session, 'cf', columns={'c1': 'text', 'c2': 'text'}, read_repair=read_repair)
 
 
 def insert_c1c2(session, keys=None, n=None, consistency=ConsistencyLevel.QUORUM):

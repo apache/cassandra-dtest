@@ -8,7 +8,7 @@ from cassandra.policies import FallthroughRetryPolicy
 from cassandra.query import (SimpleStatement, dict_factory,
                              named_tuple_factory, tuple_factory)
 
-from dtest import Tester, debug, run_scenarios
+from dtest import Tester, debug, run_scenarios, create_ks
 from tools.assertions import (assert_all, assert_invalid, assert_length_equal,
                               assert_one)
 from tools.data import rows_to_list
@@ -43,7 +43,7 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
         No errors when a page is requested and query has no results.
         """
         session = self.prepare()
-        self.create_ks(session, 'test_paging_size', 2)
+        create_ks(session, 'test_paging_size', 2)
         session.execute("CREATE TABLE paging_test ( id int PRIMARY KEY, value text )")
 
         # run a query that has no results and make sure it's exhausted
@@ -58,7 +58,7 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
 
     def test_with_less_results_than_page_size(self):
         session = self.prepare()
-        self.create_ks(session, 'test_paging_size', 2)
+        create_ks(session, 'test_paging_size', 2)
         session.execute("CREATE TABLE paging_test ( id int PRIMARY KEY, value text )")
 
         data = """
@@ -83,7 +83,7 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
 
     def test_with_more_results_than_page_size(self):
         session = self.prepare()
-        self.create_ks(session, 'test_paging_size', 2)
+        create_ks(session, 'test_paging_size', 2)
         session.execute("CREATE TABLE paging_test ( id int PRIMARY KEY, value text )")
 
         data = """
@@ -115,7 +115,7 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
 
     def test_with_equal_results_to_page_size(self):
         session = self.prepare()
-        self.create_ks(session, 'test_paging_size', 2)
+        create_ks(session, 'test_paging_size', 2)
         session.execute("CREATE TABLE paging_test ( id int PRIMARY KEY, value text )")
 
         data = """
@@ -146,7 +146,7 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
         If the page size isn't sent then the default fetch size is used.
         """
         session = self.prepare()
-        self.create_ks(session, 'test_paging_size', 2)
+        create_ks(session, 'test_paging_size', 2)
         session.execute("CREATE TABLE paging_test ( id uuid PRIMARY KEY, value text )")
 
         def random_txt(text):
@@ -183,7 +183,7 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
         (Spanning multiple partitions won't though, by design. See CASSANDRA-6722).
         """
         session = self.prepare()
-        self.create_ks(session, 'test_paging', 2)
+        create_ks(session, 'test_paging', 2)
         session.execute(
             """
             CREATE TABLE paging_test (
@@ -232,7 +232,7 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
         Paging over a single partition with ordering and a reversed clustering order.
         """
         session = self.prepare()
-        self.create_ks(session, 'test_paging', 2)
+        create_ks(session, 'test_paging', 2)
         session.execute(
             """
             CREATE TABLE paging_test (
@@ -287,7 +287,7 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
 
     def test_with_limit(self):
         session = self.prepare()
-        self.create_ks(session, 'test_paging_size', 2)
+        create_ks(session, 'test_paging_size', 2)
         session.execute("CREATE TABLE paging_test ( id int, value text, PRIMARY KEY (id, value) )")
 
         def random_txt(text):
@@ -370,7 +370,7 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
 
     def test_with_allow_filtering(self):
         session = self.prepare()
-        self.create_ks(session, 'test_paging_size', 2)
+        create_ks(session, 'test_paging_size', 2)
         session.execute("CREATE TABLE paging_test ( id int, value text, PRIMARY KEY (id, value) )")
 
         data = """
@@ -421,7 +421,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
     def test_paging_a_single_wide_row(self):
         session = self.prepare()
-        self.create_ks(session, 'test_paging_size', 2)
+        create_ks(session, 'test_paging_size', 2)
         session.execute("CREATE TABLE paging_test ( id int, value text, PRIMARY KEY (id, value) )")
 
         def random_txt(text):
@@ -451,7 +451,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
                    notes='windows')
     def test_paging_across_multi_wide_rows(self):
         session = self.prepare()
-        self.create_ks(session, 'test_paging_size', 2)
+        create_ks(session, 'test_paging_size', 2)
         session.execute("CREATE TABLE paging_test ( id int, value text, PRIMARY KEY (id, value) )")
 
         def random_txt(text):
@@ -482,7 +482,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
                    notes='windows')
     def test_paging_using_secondary_indexes(self):
         session = self.prepare()
-        self.create_ks(session, 'test_paging_size', 2)
+        create_ks(session, 'test_paging_size', 2)
         session.execute("CREATE TABLE paging_test ( id int, mybool boolean, sometext text, PRIMARY KEY (id, sometext) )")
         session.execute("CREATE INDEX ON paging_test(mybool)")
 
@@ -520,7 +520,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
     def test_paging_with_in_orderby_and_two_partition_keys(self):
         session = self.prepare()
-        self.create_ks(session, 'test_paging_size', 2)
+        create_ks(session, 'test_paging_size', 2)
         session.execute("CREATE TABLE paging_test (col_1 int, col_2 int, col_3 int, PRIMARY KEY ((col_1, col_2), col_3))")
 
         assert_invalid(session, "select * from paging_test where col_1=1 and col_2 IN (1, 2) order by col_3 desc;", expected=InvalidRequest)
@@ -533,7 +533,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         """
 
         session = self.prepare()
-        self.create_ks(session, 'test_paging_with_group_by', 2)
+        create_ks(session, 'test_paging_with_group_by', 2)
         session.execute("CREATE TABLE test (a int, b int, c int, d int, e int, primary key (a, b, c, d))")
         session.row_factory = tuple_factory
 
@@ -877,7 +877,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         """
 
         session = self.prepare()
-        self.create_ks(session, 'group_by_with_range_name_query_paging_test', 2)
+        create_ks(session, 'group_by_with_range_name_query_paging_test', 2)
         session.execute("CREATE TABLE test (a int, b int, c int, d int, primary key (a, b, c))")
 
         session.row_factory = tuple_factory
@@ -955,7 +955,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         @jira_ticket CASSANDRA-10707
         """
         session = self.prepare()
-        self.create_ks(session, 'test_paging_with_group_by_and_static_columns', 2)
+        create_ks(session, 'test_paging_with_group_by_and_static_columns', 2)
         session.execute("CREATE TABLE test (a int, b int, c int, s int static, d int, primary key (a, b, c))")
         session.row_factory = tuple_factory
 
@@ -1466,7 +1466,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         """
 
         session = self.prepare()
-        self.create_ks(session, 'test_paging_static_cols', 2)
+        create_ks(session, 'test_paging_static_cols', 2)
         session.execute("CREATE TABLE test (a int, b int, c int, s1 int static, s2 int static, PRIMARY KEY (a, b))")
         session.row_factory = named_tuple_factory
 
@@ -1668,7 +1668,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
     @since('2.0.6')
     def test_paging_using_secondary_indexes_with_static_cols(self):
         session = self.prepare()
-        self.create_ks(session, 'test_paging_size', 2)
+        create_ks(session, 'test_paging_size', 2)
         session.execute("CREATE TABLE paging_test ( id int, s1 int static, s2 int static, mybool boolean, sometext text, PRIMARY KEY (id, sometext) )")
         session.execute("CREATE INDEX ON paging_test(mybool)")
 
@@ -1710,7 +1710,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         """
 
         session = self.prepare()
-        self.create_ks(session, 'test_paging_static_cols', 2)
+        create_ks(session, 'test_paging_static_cols', 2)
         session.execute("CREATE TABLE test (a int, b int, c int, s int static, PRIMARY KEY (a, b))")
         session.row_factory = named_tuple_factory
 
@@ -1731,7 +1731,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         """
 
         session = self.prepare()
-        self.create_ks(session, 'test_paging_with_filtering', 2)
+        create_ks(session, 'test_paging_with_filtering', 2)
         session.execute("CREATE TABLE test (a int, b int, s int static, c int, d int, primary key (a, b))")
         session.row_factory = tuple_factory
 
@@ -1848,10 +1848,10 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
     def _test_paging_with_filtering_on_counter_columns(self, session, with_compact_storage):
         if with_compact_storage:
-            self.create_ks(session, 'test_flt_counter_columns_compact_storage', 2)
+            create_ks(session, 'test_flt_counter_columns_compact_storage', 2)
             session.execute("CREATE TABLE test (a int, b int, c int, cnt counter, PRIMARY KEY (a, b, c)) WITH COMPACT STORAGE")
         else:
-            self.create_ks(session, 'test_flt_counter_columns', 2)
+            create_ks(session, 'test_flt_counter_columns', 2)
             session.execute("CREATE TABLE test (a int, b int, c int, cnt counter, PRIMARY KEY (a, b, c))")
 
         for i in xrange(5):
@@ -1915,10 +1915,10 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
     def _test_paging_with_filtering_on_clustering_columns(self, session, with_compact_storage):
         if with_compact_storage:
-            self.create_ks(session, 'test_flt_clustering_columns_compact_storage', 2)
+            create_ks(session, 'test_flt_clustering_columns_compact_storage', 2)
             session.execute("CREATE TABLE test (a int, b int, c int, d int, PRIMARY KEY (a, b, c)) WITH COMPACT STORAGE")
         else:
-            self.create_ks(session, 'test_flt_clustering_columns', 2)
+            create_ks(session, 'test_flt_clustering_columns', 2)
             session.execute("CREATE TABLE test (a int, b int, c int, d int, PRIMARY KEY (a, b, c))")
 
         session.row_factory = tuple_factory
@@ -2005,7 +2005,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         """
 
         session = self.prepare()
-        self.create_ks(session, 'test_paging_flt_clustering_clm_contains', 2)
+        create_ks(session, 'test_paging_flt_clustering_clm_contains', 2)
         session.execute("CREATE TABLE test_list (a int, b int, c frozen<list<int>>, d int, PRIMARY KEY (a, b, c))")
         session.execute("CREATE TABLE test_map (a int, b int, c frozen<map<int, int>>, d int, PRIMARY KEY (a, b, c))")
         session.row_factory = tuple_factory
@@ -2086,7 +2086,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         """
 
         session = self.prepare()
-        self.create_ks(session, 'test_paging_with_filtering_on_static_columns', 2)
+        create_ks(session, 'test_paging_with_filtering_on_static_columns', 2)
         session.execute("CREATE TABLE test (a int, b int, s int static, d int, PRIMARY KEY (a, b))")
         session.row_factory = tuple_factory
 
@@ -2130,7 +2130,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         """
 
         session = self.prepare()
-        self.create_ks(session, 'test_paging_with_filtering_on_pk', 2)
+        create_ks(session, 'test_paging_with_filtering_on_pk', 2)
         session.execute("CREATE TABLE test (a int, b int, s int static, c int, d int, primary key (a, b))")
         session.row_factory = tuple_factory
 
@@ -2233,7 +2233,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         """
 
         session = self.prepare()
-        self.create_ks(session, 'test_paging_with_filtering_on_pk_with_limit', 2)
+        create_ks(session, 'test_paging_with_filtering_on_pk_with_limit', 2)
         session.execute("CREATE TABLE test (a int, b int, c int, s int static, d int, primary key ((a, b), c))")
         session.row_factory = tuple_factory
 
@@ -2256,10 +2256,10 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
     def _test_paging_with_filtering_on_partition_key_on_counter_columns(self, session, with_compact_storage):
         if with_compact_storage:
-            self.create_ks(session, 'test_flt_counter_columns_compact_storage', 2)
+            create_ks(session, 'test_flt_counter_columns_compact_storage', 2)
             session.execute("CREATE TABLE test (a int, b int, c int, cnt counter, PRIMARY KEY (a, b, c)) WITH COMPACT STORAGE")
         else:
-            self.create_ks(session, 'test_flt_counter_columns', 2)
+            create_ks(session, 'test_flt_counter_columns', 2)
             session.execute("CREATE TABLE test (a int, b int, c int, cnt counter, PRIMARY KEY (a, b, c))")
 
         for i in xrange(5):
@@ -2313,10 +2313,10 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
     def _test_paging_with_filtering_on_partition_key_on_clustering_columns(self, session, with_compact_storage):
         if with_compact_storage:
-            self.create_ks(session, 'test_flt_pk_clustering_columns_compact_storage', 2)
+            create_ks(session, 'test_flt_pk_clustering_columns_compact_storage', 2)
             session.execute("CREATE TABLE test (a int, b int, c int, d int, PRIMARY KEY ((a, b), c)) WITH COMPACT STORAGE")
         else:
-            self.create_ks(session, 'test_flt_pk_clustering_columns', 2)
+            create_ks(session, 'test_flt_pk_clustering_columns', 2)
             session.execute("CREATE TABLE test (a int, b int, c int, d int, PRIMARY KEY ((a, b), c))")
 
         session.row_factory = tuple_factory
@@ -2421,7 +2421,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         """
 
         session = self.prepare()
-        self.create_ks(session, 'test_paging_flt_pk_clustering_clm_contains', 2)
+        create_ks(session, 'test_paging_flt_pk_clustering_clm_contains', 2)
         session.execute("CREATE TABLE test_list (a int, b int, c frozen<list<int>>, d int, PRIMARY KEY (a, b, c))")
         session.execute("CREATE TABLE test_map (a int, b int, c frozen<map<int, int>>, d int, PRIMARY KEY (a, b, c))")
         session.row_factory = tuple_factory
@@ -2503,7 +2503,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         """
 
         session = self.prepare()
-        self.create_ks(session, 'test_paging_filtering_on_pk_static_columns', 2)
+        create_ks(session, 'test_paging_filtering_on_pk_static_columns', 2)
         session.execute("CREATE TABLE test (a int, b int, s int static, d int, PRIMARY KEY (a, b))")
         session.row_factory = tuple_factory
 
@@ -2538,7 +2538,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         """
 
         session = self.prepare()
-        self.create_ks(session, 'test_paging_on_compact_table_with_tombstone', 2)
+        create_ks(session, 'test_paging_on_compact_table_with_tombstone', 2)
         session.execute("CREATE TABLE test (a int primary key, b int, c int) WITH COMPACT STORAGE")
         session.row_factory = tuple_factory
 
@@ -2562,7 +2562,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         """
 
         session = self.prepare()
-        self.create_ks(session, 'test_paging_with_no_clustering_columns', 2)
+        create_ks(session, 'test_paging_with_no_clustering_columns', 2)
         session.execute("CREATE TABLE test (a int primary key, b int)")
         session.execute("CREATE TABLE test_compact (a int primary key, b int) WITH COMPACT STORAGE")
         session.row_factory = tuple_factory
@@ -2629,7 +2629,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         @jira_ticket CASSANDRA-11535
         """
         session = self.prepare()
-        self.create_ks(session, 'test_paging_with_per_partition_limit', 2)
+        create_ks(session, 'test_paging_with_per_partition_limit', 2)
         session.execute("CREATE TABLE test (a int, b int, c int, PRIMARY KEY (a, b))")
         session.row_factory = tuple_factory
 
@@ -2712,7 +2712,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         """
 
         session = self.prepare()
-        self.create_ks(session, 'test_paging_for_range_name_queries', 2)
+        create_ks(session, 'test_paging_for_range_name_queries', 2)
         session.execute("CREATE TABLE test (a int, b int, c int, d int, PRIMARY KEY(a, b, c))")
         session.execute("CREATE TABLE test_compact (a int, b int, c int, d int, PRIMARY KEY(a, b, c)) WITH COMPACT STORAGE")
         session.row_factory = tuple_factory
@@ -2768,7 +2768,7 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
 
     def test_data_change_impacting_earlier_page(self):
         session = self.prepare()
-        self.create_ks(session, 'test_paging_size', 2)
+        create_ks(session, 'test_paging_size', 2)
         session.execute("CREATE TABLE paging_test ( id int, mytext text, PRIMARY KEY (id, mytext) )")
 
         def random_txt(text):
@@ -2802,7 +2802,7 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
 
     def test_data_change_impacting_later_page(self):
         session = self.prepare()
-        self.create_ks(session, 'test_paging_size', 2)
+        create_ks(session, 'test_paging_size', 2)
         session.execute("CREATE TABLE paging_test ( id int, mytext text, PRIMARY KEY (id, mytext) )")
 
         def random_txt(text):
@@ -2837,7 +2837,7 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
 
     def test_row_TTL_expiry_during_paging(self):
         session = self.prepare()
-        self.create_ks(session, 'test_paging_size', 2)
+        create_ks(session, 'test_paging_size', 2)
         session.execute("CREATE TABLE paging_test ( id int, mytext text, PRIMARY KEY (id, mytext) )")
 
         def random_txt(text):
@@ -2881,7 +2881,7 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
 
     def test_cell_TTL_expiry_during_paging(self):
         session = self.prepare()
-        self.create_ks(session, 'test_paging_size', 2)
+        create_ks(session, 'test_paging_size', 2)
         session.execute("""
             CREATE TABLE paging_test (
                 id int,
@@ -2949,7 +2949,7 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
         session = self.cql_connection(node1)
-        self.create_ks(session, 'test_paging_size', 1)
+        create_ks(session, 'test_paging_size', 1)
         session.execute("CREATE TABLE paging_test ( id uuid, mytext text, PRIMARY KEY (id, mytext) )")
 
         def make_uuid(text):
@@ -2990,7 +2990,7 @@ class TestPagingQueryIsolation(BasePagingTester, PageAssertionMixin):
         Interleave some paged queries and make sure nothing bad happens.
         """
         session = self.prepare()
-        self.create_ks(session, 'test_paging_size', 2)
+        create_ks(session, 'test_paging_size', 2)
         session.execute("CREATE TABLE paging_test ( id int, mytext text, PRIMARY KEY (id, mytext) )")
 
         def random_txt(text):
@@ -3075,7 +3075,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
 
     def setup_data(self):
 
-        self.create_ks(self.session, 'test_paging_size', 2)
+        create_ks(self.session, 'test_paging_size', 2)
         self.session.execute("CREATE TABLE paging_test ( "
                              "id int, mytext text, col1 int, col2 int, col3 int, "
                              "PRIMARY KEY (id, mytext) )")
@@ -3400,7 +3400,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
         @jira_ticket CASSANDRA-10010
         """
         self.session = self.prepare()
-        self.create_ks(self.session, 'test_paging_size', 2)
+        create_ks(self.session, 'test_paging_size', 2)
         self.session.execute("CREATE TABLE paging_test ( "
                              "k int, s int static, c int, v int, "
                              "PRIMARY KEY (k, c) )")

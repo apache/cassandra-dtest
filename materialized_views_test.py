@@ -14,7 +14,7 @@ from cassandra.query import SimpleStatement
 from enum import Enum  # Remove when switching to py3
 from nose.plugins.attrib import attr
 
-from dtest import Tester, debug, get_ip_from_node
+from dtest import Tester, debug, get_ip_from_node, create_ks
 from tools.assertions import (assert_all, assert_crc_check_chance_equal,
                               assert_invalid, assert_none, assert_one,
                               assert_unavailable)
@@ -45,7 +45,7 @@ class TestMaterializedViews(Tester):
         node1 = cluster.nodelist()[0]
 
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'ks', rf)
+        create_ks(session, 'ks', rf)
 
         if user_table:
             session.execute(

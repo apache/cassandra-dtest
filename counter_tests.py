@@ -6,7 +6,7 @@ from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
 
 from tools.assertions import assert_invalid, assert_length_equal, assert_one
-from dtest import Tester
+from dtest import Tester, create_ks, create_cf
 from tools.data import rows_to_list
 from tools.decorators import since
 
@@ -21,8 +21,8 @@ class TestCounters(Tester):
         nodes = cluster.nodelist()
 
         session = self.patient_cql_connection(nodes[0])
-        self.create_ks(session, 'ks', 3)
-        self.create_cf(session, 'cf', validation="CounterColumnType", columns={'c': 'counter'})
+        create_ks(session, 'ks', 3)
+        create_cf(session, 'cf', validation="CounterColumnType", columns={'c': 'counter'})
 
         sessions = [self.patient_cql_connection(node, 'ks') for node in nodes]
         nb_increment = 50
@@ -53,7 +53,7 @@ class TestCounters(Tester):
         nodes = cluster.nodelist()
 
         session = self.patient_cql_connection(nodes[0])
-        self.create_ks(session, 'ks', 2)
+        create_ks(session, 'ks', 2)
 
         query = """
             CREATE TABLE counterTable (
@@ -118,7 +118,7 @@ class TestCounters(Tester):
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'counter_tests', 3)
+        create_ks(session, 'counter_tests', 3)
 
         stmt = """
               CREATE TABLE counter_table (
@@ -199,7 +199,7 @@ class TestCounters(Tester):
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'counter_tests', 3)
+        create_ks(session, 'counter_tests', 3)
 
         session.execute("""
             CREATE TABLE counter_table (
@@ -236,7 +236,7 @@ class TestCounters(Tester):
         cluster.populate(1).start()
         node1 = cluster.nodelist()[0]
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'counter_tests', 1)
+        create_ks(session, 'counter_tests', 1)
 
         session.execute("""
             CREATE TABLE compact_counter_table (
@@ -262,7 +262,7 @@ class TestCounters(Tester):
         cluster.populate(1).start()
         node1, = cluster.nodelist()
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'counter_tests', 1)
+        create_ks(session, 'counter_tests', 1)
 
         session.execute("CREATE TABLE counter_bug (t int, c counter, primary key(t))")
 
@@ -286,7 +286,7 @@ class TestCounters(Tester):
         cluster.populate(3).start()
         node1 = cluster.nodelist()[0]
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'counter_tests', 1)
+        create_ks(session, 'counter_tests', 1)
 
         session.execute("""
             CREATE TABLE IF NOT EXISTS counter_cs (

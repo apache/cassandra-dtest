@@ -3,7 +3,7 @@ import time
 
 from cassandra import ConsistencyLevel
 
-from dtest import DISABLE_VNODES, Tester
+from dtest import DISABLE_VNODES, Tester, create_ks
 from tools.data import create_c1c2_table, insert_c1c2, query_c1c2
 from tools.decorators import known_failure, no_vnodes, since
 
@@ -48,7 +48,7 @@ class TestHintedHandoffConfig(Tester):
         will store hints only when hinted handoff is enabled
         """
         session = self.patient_exclusive_cql_connection(node1)
-        self.create_ks(session, 'ks', 2)
+        create_ks(session, 'ks', 2)
         create_c1c2_table(self, session)
 
         node2.stop(wait_other_notice=True)
@@ -176,7 +176,7 @@ class TestHintedHandoff(Tester):
         self.cluster.populate(4).start(wait_for_binary_proto=True)
         [node1, node2, node3, node4] = self.cluster.nodelist()
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'ks', 2)
+        create_ks(session, 'ks', 2)
         create_c1c2_table(self, session)
         node4.stop(wait_other_notice=True)
         insert_c1c2(session, n=100, consistency=ConsistencyLevel.ONE)

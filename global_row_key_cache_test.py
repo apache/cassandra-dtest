@@ -2,7 +2,7 @@ import time
 
 from cassandra.concurrent import execute_concurrent_with_args
 
-from dtest import Tester, debug
+from dtest import Tester, debug, create_ks
 
 
 class TestGlobalRowKeyCache(Tester):
@@ -30,7 +30,7 @@ class TestGlobalRowKeyCache(Tester):
                 cluster.start()
                 session = self.patient_cql_connection(node1)
 
-                self.create_ks(session, keyspace_name, rf=3)
+                create_ks(session, keyspace_name, rf=3)
 
                 session.set_keyspace(keyspace_name)
                 session.execute("CREATE TABLE test (k int PRIMARY KEY, v1 int, v2 int)")

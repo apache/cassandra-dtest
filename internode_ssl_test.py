@@ -1,4 +1,4 @@
-from dtest import Tester, debug
+from dtest import Tester, debug, create_ks, create_cf
 from tools.data import putget
 from tools.decorators import known_failure
 from tools.misc import generate_ssl_stores
@@ -40,6 +40,6 @@ class TestInternodeSSL(Tester):
         cluster.populate(3).start()
 
         session = self.patient_cql_connection(cluster.nodelist()[0])
-        self.create_ks(session, 'ks', 3)
-        self.create_cf(session, 'cf', compression=None)
+        create_ks(session, 'ks', 3)
+        create_cf(session, 'cf', compression=None)
         putget(cluster, session)

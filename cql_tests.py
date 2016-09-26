@@ -10,7 +10,7 @@ from cassandra.policies import FallthroughRetryPolicy
 from cassandra.protocol import ProtocolException
 from cassandra.query import SimpleStatement
 
-from dtest import ReusableClusterTester, debug, Tester
+from dtest import ReusableClusterTester, debug, Tester, create_ks
 from distutils.version import LooseVersion
 from thrift_bindings.v22.ttypes import \
     ConsistencyLevel as ThriftConsistencyLevel
@@ -53,7 +53,7 @@ class CQLTester(Tester):
 
         session = self.patient_cql_connection(node1, protocol_version=protocol_version, user=user, password=password)
         if create_keyspace:
-            self.create_ks(session, 'ks', rf)
+            create_ks(session, 'ks', rf)
         return session
 
 
@@ -655,7 +655,7 @@ class MiscellaneousCQLTester(CQLTester):
         time.sleep(0.2)
 
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'ks', 1)
+        create_ks(session, 'ks', 1)
 
         session.execute("""
             CREATE TABLE test (
@@ -737,7 +737,7 @@ class AbortedQueriesTester(CQLTester):
         node = cluster.nodelist()[0]
         session = self.patient_cql_connection(node)
 
-        self.create_ks(session, 'ks', 1)
+        create_ks(session, 'ks', 1)
         session.execute("""
             CREATE TABLE test1 (
                 id int PRIMARY KEY,
@@ -785,7 +785,7 @@ class AbortedQueriesTester(CQLTester):
 
         session = self.patient_exclusive_cql_connection(node1)
 
-        self.create_ks(session, 'ks', 1)
+        create_ks(session, 'ks', 1)
         session.execute("""
             CREATE TABLE test2 (
                 id int,
@@ -845,7 +845,7 @@ class AbortedQueriesTester(CQLTester):
         node = cluster.nodelist()[0]
         session = self.patient_cql_connection(node)
 
-        self.create_ks(session, 'ks', 1)
+        create_ks(session, 'ks', 1)
         session.execute("""
             CREATE TABLE test3 (
                 id int PRIMARY KEY,
@@ -893,7 +893,7 @@ class AbortedQueriesTester(CQLTester):
 
         session = self.patient_exclusive_cql_connection(node1)
 
-        self.create_ks(session, 'ks', 1)
+        create_ks(session, 'ks', 1)
         session.execute("""
             CREATE TABLE test4 (
                 id int PRIMARY KEY,
@@ -951,7 +951,7 @@ class SlowQueryTester(CQLTester):
         node = cluster.nodelist()[0]
         session = self.patient_cql_connection(node)
 
-        self.create_ks(session, 'ks', 1)
+        create_ks(session, 'ks', 1)
         session.execute("""
             CREATE TABLE test1 (
                 id int PRIMARY KEY,
@@ -1014,7 +1014,7 @@ class SlowQueryTester(CQLTester):
 
         session = self.patient_exclusive_cql_connection(node1)
 
-        self.create_ks(session, 'ks', 1)
+        create_ks(session, 'ks', 1)
         session.execute("""
             CREATE TABLE test2 (
                 id int,
@@ -1077,7 +1077,7 @@ class SlowQueryTester(CQLTester):
         node = cluster.nodelist()[0]
         session = self.patient_cql_connection(node)
 
-        self.create_ks(session, 'ks', 1)
+        create_ks(session, 'ks', 1)
         session.execute("""
             CREATE TABLE test1 (
                 id int PRIMARY KEY,

@@ -3,7 +3,7 @@ import os
 import parse
 from cassandra.concurrent import execute_concurrent_with_args
 
-from dtest import Tester, debug
+from dtest import Tester, debug, create_ks
 from tools.jmxutils import (JolokiaAgent, make_mbean,
                             remove_perf_disable_shared_mem)
 
@@ -17,7 +17,7 @@ class TestConfiguration(Tester):
         cluster.populate(1).start()
         node = cluster.nodelist()[0]
         session = self.patient_cql_connection(node)
-        self.create_ks(session, 'ks', 1)
+        create_ks(session, 'ks', 1)
 
         create_table_query = "CREATE TABLE test_table (row varchar, name varchar, value int, PRIMARY KEY (row, name));"
         alter_chunk_len_query = "ALTER TABLE test_table WITH compression = {{'sstable_compression' : 'SnappyCompressor', 'chunk_length_kb' : {chunk_length}}};"

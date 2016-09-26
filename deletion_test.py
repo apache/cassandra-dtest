@@ -1,6 +1,6 @@
 import time
 
-from dtest import Tester
+from dtest import Tester, create_ks, create_cf
 from tools.data import rows_to_list
 from tools.jmxutils import (JolokiaAgent, make_mbean,
                             remove_perf_disable_shared_mem)
@@ -22,8 +22,8 @@ class TestDeletion(Tester):
 
         time.sleep(.5)
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'ks', 1)
-        self.create_cf(session, 'cf', gc_grace=0, key_type='int', columns={'c1': 'int'})
+        create_ks(session, 'ks', 1)
+        create_cf(session, 'cf', gc_grace=0, key_type='int', columns={'c1': 'int'})
 
         session.execute('insert into cf (key, c1) values (1,1)')
         session.execute('insert into cf (key, c1) values (2,1)')
@@ -54,7 +54,7 @@ class TestDeletion(Tester):
         self.cluster.start(wait_for_binary_proto=True)
         [node1] = self.cluster.nodelist()
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'ks', 1)
+        create_ks(session, 'ks', 1)
         session.execute('CREATE TABLE test (i int PRIMARY KEY)')
 
         stmt = session.prepare('DELETE FROM test where i = ?')

@@ -1,7 +1,7 @@
 import time
 
 from tools.assertions import assert_invalid
-from dtest import Tester
+from dtest import Tester, create_ks
 
 
 class TestUDTEncoding(Tester):
@@ -15,7 +15,7 @@ class TestUDTEncoding(Tester):
 
         time.sleep(.5)
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'ks', 3)
+        create_ks(session, 'ks', 3)
 
         # create udt and insert correctly (should be successful)
         session.execute('CREATE TYPE address (city text,zip int);')

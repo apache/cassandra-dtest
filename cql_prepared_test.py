@@ -1,6 +1,6 @@
 import time
 
-from dtest import Tester
+from dtest import Tester, create_ks
 from tools.decorators import since
 
 
@@ -15,7 +15,7 @@ class TestCQL(Tester):
         time.sleep(0.2)
 
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'ks', 1)
+        create_ks(session, 'ks', 1)
         return session
 
     def batch_preparation_test(self):

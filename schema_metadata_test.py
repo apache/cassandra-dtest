@@ -3,7 +3,7 @@ from uuid import uuid4
 
 from nose.tools import assert_equal, assert_in
 
-from dtest import Tester, debug
+from dtest import Tester, debug, create_ks
 from tools.decorators import since
 
 
@@ -509,7 +509,7 @@ class TestSchemaMetadata(Tester):
         cluster.populate(1).start()
 
         self.session = self.patient_cql_connection(cluster.nodelist()[0])
-        self.create_ks(self.session, 'ks', 1)
+        create_ks(self.session, 'ks', 1)
 
     def _keyspace_meta(self, keyspace_name="ks"):
         self.session.cluster.refresh_schema_metadata()
