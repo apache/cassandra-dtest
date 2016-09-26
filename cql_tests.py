@@ -1102,14 +1102,28 @@ class SlowQueryTester(CQLTester):
         assert_length_equal(ret, num_expected)
 
 
-class LWTTester(CQLTester):
+class LWTTester(ReusableClusterTester):
     """
     Validate CQL queries for LWTs for static columns for null and non-existing rows
     @jira_ticket CASSANDRA-9842
     """
 
+    @classmethod
+    def post_initialize_cluster(cls):
+        cluster = cls.cluster
+        cluster.populate(3)
+        cluster.start(wait_for_binary_proto=True)
+
+    def get_lwttester_session(self):
+        node1 = self.cluster.nodelist()[0]
+        session = self.patient_cql_connection(node1)
+        session.execute("""CREATE KEYSPACE IF NOT EXISTS ks WITH REPLICATION={'class':'SimpleStrategy',
+            'replication_factor':1}""")
+        session.execute("USE ks")
+        return session
+
     def lwt_with_static_columns_test(self):
-        session = self.prepare(nodes=3)
+        session = self.get_lwttester_session()
 
         session.execute("""
             CREATE TABLE lwt_with_static (a int, b int, s int static, d text, PRIMARY KEY (a, b))
@@ -1156,7 +1170,7 @@ class LWTTester(CQLTester):
         assert_one(session, "SELECT a, s, d FROM {} WHERE a = 4".format(table_name), [4, 4, None])
 
     def conditional_updates_on_static_columns_with_null_values_test(self):
-        session = self.prepare(nodes=3)
+        session = self.get_lwttester_session()
 
         table_name = "conditional_updates_on_static_columns_with_null"
         session.execute("""
@@ -1180,7 +1194,7 @@ class LWTTester(CQLTester):
             assert_one(session, "SELECT * FROM {} WHERE a = 5".format(table_name), [5, 5, None, None])
 
     def conditional_updates_on_static_columns_with_non_existing_values_test(self):
-        session = self.prepare(nodes=3)
+        session = self.get_lwttester_session()
 
         table_name = "conditional_updates_on_static_columns_with_ne"
         session.execute("""
@@ -1232,7 +1246,7 @@ class LWTTester(CQLTester):
         assert_one(session, "SELECT * FROM {table_name} WHERE a = 7".format(table_name=table_name), [7, 7, 8, "a"])
 
     def conditional_updates_on_static_columns_with_null_values_batch_test(self):
-        session = self.prepare(nodes=3)
+        session = self.get_lwttester_session()
 
         table_name = "lwt_on_static_columns_with_null_batch"
         session.execute("""
@@ -1264,7 +1278,7 @@ class LWTTester(CQLTester):
         assert_one(session, "SELECT * FROM {table_name} WHERE a = 6".format(table_name=table_name), [6, 6, None, None])
 
     def conditional_deletes_on_static_columns_with_null_values_test(self):
-        session = self.prepare(nodes=3)
+        session = self.get_lwttester_session()
 
         table_name = "conditional_deletes_on_static_with_null"
         session.execute("""
@@ -1295,7 +1309,7 @@ class LWTTester(CQLTester):
             assert_one(session, "SELECT * FROM {} WHERE a = 5".format(table_name), [5, 5, 5, None, 5])
 
     def conditional_deletes_on_static_columns_with_null_values_batch_test(self):
-        session = self.prepare(nodes=3)
+        session = self.get_lwttester_session()
 
         table_name = "conditional_deletes_on_static_with_null_batch"
         session.execute("""
