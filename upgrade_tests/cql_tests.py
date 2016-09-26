@@ -2953,9 +2953,6 @@ class TestCQL(UpgradeTester):
 
             cursor.execute("SELECT dateOf(t) FROM test")
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12679',
-                   flaky=True)
     def conditional_update_test(self):
         cursor = self.prepare()
 
@@ -3026,7 +3023,7 @@ class TestCQL(UpgradeTester):
             # Shouldn't apply
             assert_one(cursor, "UPDATE test SET v1 = 3, v2 = 'bar' WHERE k = 0 IF EXISTS", [False])
 
-            if self.get_version() > "2.1.1":
+            if self.get_node_version(is_upgraded) > "2.1.1":
                 # Should apply
                 assert_one(cursor, "DELETE FROM test WHERE k = 0 IF v1 IN (null)", [True])
 
@@ -3109,7 +3106,7 @@ class TestCQL(UpgradeTester):
             assert_one(cursor, "DELETE FROM test2 WHERE k='k' AND i=0 IF EXISTS", [False])
 
             # CASSANDRA-6430
-            v = self.get_version()
+            v = self.get_node_version(is_upgraded)
             if v >= "2.1.1" or v < "2.1" and v >= "2.0.11":
                 assert_invalid(cursor, "DELETE FROM test2 WHERE k = 'k' IF EXISTS")
                 assert_invalid(cursor, "DELETE FROM test2 WHERE k = 'k' IF v = 'foo'")
@@ -4610,7 +4607,7 @@ class TestCQL(UpgradeTester):
                 assert_one(cursor, "DELETE FROM %s WHERE k=0 IF m['foo'] = 'bar'" % (table,), [True])
                 assert_none(cursor, "SELECT * FROM %s" % (table,), cl=ConsistencyLevel.SERIAL)
 
-                if self.get_version() > "2.1.1":
+                if self.get_node_version(is_upgraded) > "2.1.1":
                     cursor.execute("INSERT INTO %s(k, m) VALUES (1, null)" % (table,))
                     if frozen:
                         assert_invalid(cursor, "UPDATE %s set m['foo'] = 'bar', m['bar'] = 'foo' WHERE k = 1 IF m['foo'] IN ('blah', null)" % (table,))
