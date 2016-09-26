@@ -10,7 +10,7 @@ from cassandra.policies import FallthroughRetryPolicy
 from cassandra.protocol import ProtocolException
 from cassandra.query import SimpleStatement
 
-from dtest import Tester, canReuseCluster, debug, freshCluster
+from dtest import ReusableClusterTester, debug, Tester
 from distutils.version import LooseVersion
 from thrift_bindings.v22.ttypes import \
     ConsistencyLevel as ThriftConsistencyLevel
@@ -57,7 +57,6 @@ class CQLTester(Tester):
         return session
 
 
-@canReuseCluster
 class StorageProxyCQLTester(CQLTester):
     """
     Each CQL statement is exercised at least once in order to
@@ -449,7 +448,6 @@ class StorageProxyCQLTester(CQLTester):
         session.execute(query)
 
 
-@canReuseCluster
 class MiscellaneousCQLTester(CQLTester):
     """
     CQL tests that cannot be performed as Java unit tests, see CASSANDRA-9160.
@@ -637,7 +635,6 @@ class MiscellaneousCQLTester(CQLTester):
         result = session.execute(explicit_prepared.bind(None))
         self.assertEqual(result, [(0, 0, 0, None)])
 
-    @freshCluster()
     def range_slice_test(self):
         """
         Regression test for CASSANDRA-1337:
@@ -1105,7 +1102,6 @@ class SlowQueryTester(CQLTester):
         assert_length_equal(ret, num_expected)
 
 
-@canReuseCluster
 class LWTTester(CQLTester):
     """
     Validate CQL queries for LWTs for static columns for null and non-existing rows
