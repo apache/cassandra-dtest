@@ -15,7 +15,7 @@ from cassandra.concurrent import (execute_concurrent,
 from ccmlib.node import Node
 from nose.tools import assert_equal, assert_less_equal
 
-from dtest import Tester, debug, create_ks
+from dtest import Tester, create_ks, debug
 from tools.data import rows_to_list
 from tools.decorators import known_failure, since
 from tools.files import size_of_files_in_dir
