@@ -95,7 +95,7 @@ class StorageProxyCQLTester(CQLTester):
         self.assertIsInstance(ks_meta.replication_strategy, SimpleStrategy)
 
         session.execute("ALTER KEYSPACE ks WITH replication = "
-                        "{ 'class' : 'NetworkTopologyStrategy', 'dc1' : 1 } "
+                        "{ 'class' : 'NetworkTopologyStrategy', 'datacenter1' : 1 } "
                         "AND DURABLE_WRITES = false")
         self.assertFalse(ks_meta.durable_writes)
         self.assertIsInstance(ks_meta.replication_strategy, NetworkTopologyStrategy)
