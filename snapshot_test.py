@@ -11,6 +11,7 @@ from dtest import (Tester, cleanup_cluster, create_ccm_cluster, create_ks,
                    debug, get_test_path)
 from tools.decorators import known_failure
 from tools.files import replace_in_file, safe_mkdtemp
+from tools.hacks import advance_to_next_cl_segment
 from tools.misc import ImmutableMapping
 
 
@@ -223,6 +224,15 @@ class TestArchiveCommitlog(SnapshotTester):
 
         session = self.patient_cql_connection(node1)
         create_ks(session, 'ks', 1)
+
+        # Write until we get a new CL segment. This avoids replaying
+        # initialization mutations from startup into system tables when
+        # restoring snapshots. See CASSANDRA-11811.
+        advance_to_next_cl_segment(
+            session=session,
+            commitlog_dir=os.path.join(node1.get_path(), 'commitlogs')
+        )
+
         session.execute('CREATE TABLE ks.cf ( key bigint PRIMARY KEY, val text);')
         debug("Writing first 30,000 rows...")
         self.insert_rows(session, 0, 30000)

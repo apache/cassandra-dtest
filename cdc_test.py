@@ -20,6 +20,7 @@ from tools.data import rows_to_list
 from tools.decorators import known_failure, since
 from tools.files import size_of_files_in_dir
 from tools.funcutils import get_rate_limited_function
+from tools.hacks import advance_to_next_cl_segment
 
 _16_uuid_column_spec = (
     'a uuid PRIMARY KEY, b uuid, c uuid, d uuid, e uuid, f uuid, g uuid, '
@@ -489,6 +490,15 @@ class TestCDC(Tester):
                 'id': uuid.uuid4()
             }
         )
+
+        # Write until we get a new CL segment to avoid replaying initialization
+        # mutations from this node's startup into system tables in the other
+        # node. See CASSANDRA-11811.
+        advance_to_next_cl_segment(
+            session=generation_session,
+            commitlog_dir=os.path.join(generation_node.get_path(), 'commitlogs')
+        )
+
         generation_session.execute(cdc_table_info.create_stmt)
 
         # insert 10000 rows
