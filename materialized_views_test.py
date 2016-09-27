@@ -61,6 +61,31 @@ class TestMaterializedViews(Tester):
 
         return session
 
+    def _settle_nodes(self):
+        debug("Settling all nodes")
+        stage_match = re.compile("(?P<name>\S+)\s+(?P<active>\d+)\s+(?P<pending>\d+)\s+(?P<completed>\d+)\s+(?P<blocked>\d+)\s+(?P<alltimeblocked>\d+)")
+
+        def _settled_stages(node):
+            (stdout, stderr, rc) = node.nodetool("tpstats")
+            lines = re.split("\n+", stdout)
+            for line in lines:
+                match = stage_match.match(line)
+                if match is not None:
+                    active = int(match.group('active'))
+                    pending = int(match.group('pending'))
+                    if active != 0 or pending != 0:
+                        debug("%s - pool %s still has %d active and %d pending" % (node.name, match.group("name"), active, pending))
+                        return False
+            return True
+
+        for node in self.cluster.nodelist():
+            if node.is_running():
+                node.nodetool("replaybatchlog")
+                attempts = 50  # 100 milliseconds per attempt, so 5 seconds total
+                while attempts > 0 and not self._settled_stages(node):
+                    time.sleep(0.1)
+                    attempts -= 1
+
     def _insert_data(self, session):
         # insert data
         insert_stmt = "INSERT INTO users (username, password, gender, state, birth_year) VALUES "
@@ -68,6 +93,7 @@ class TestMaterializedViews(Tester):
         session.execute(insert_stmt + "('user2', 'ch@ngem3b', 'm', 'CA', 1971);")
         session.execute(insert_stmt + "('user3', 'ch@ngem3c', 'f', 'FL', 1978);")
         session.execute(insert_stmt + "('user4', 'ch@ngem3d', 'm', 'TX', 1974);")
+        self._settle_nodes()
 
     def _replay_batchlogs(self):
         debug("Replaying batchlog on all nodes")
@@ -321,9 +347,6 @@ class TestMaterializedViews(Tester):
             "Expecting {} materialized view, got {}".format(1, len(result))
         )
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12225',
-                   flaky=True)
     def clustering_column_test(self):
         """Test that we can use clustering columns as primary key for a materialized view"""
 
