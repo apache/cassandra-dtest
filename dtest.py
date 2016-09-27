@@ -433,21 +433,6 @@ class Tester(TestCase):
             if not is_win():
                 os.symlink(basedir, name)
 
-    def get_eager_protocol_version(self, cassandra_version):
-        """
-        Returns the highest protocol version accepted
-        by the given C* version
-        """
-        if cassandra_version >= '2.2':
-            protocol_version = 4
-        elif cassandra_version >= '2.1':
-            protocol_version = 3
-        elif cassandra_version >= '2.0':
-            protocol_version = 2
-        else:
-            protocol_version = 1
-        return protocol_version
-
     def cql_connection(self, node, keyspace=None, user=None,
                        password=None, compression=True, protocol_version=None, port=None, ssl_opts=None):
 
@@ -470,7 +455,7 @@ class Tester(TestCase):
             port = get_port_from_node(node)
 
         if protocol_version is None:
-            protocol_version = self.get_eager_protocol_version(self.cluster.version())
+            protocol_version = get_eager_protocol_version(node.cluster.version())
 
         if user is not None:
             auth_provider = get_auth_provider(user=user, password=password)
@@ -692,6 +677,23 @@ class Tester(TestCase):
             stdout, stderr = p.communicate()
             debug(stdout)
             debug(stderr)
+
+
+def get_eager_protocol_version(cassandra_version):
+    """
+    Returns the highest protocol version accepted
+    by the given C* version
+    """
+    if cassandra_version >= '2.2':
+        protocol_version = 4
+    elif cassandra_version >= '2.1':
+        protocol_version = 3
+    elif cassandra_version >= '2.0':
+        protocol_version = 2
+    else:
+        protocol_version = 1
+    return protocol_version
+
 
 # We default to UTF8Type because it's simpler to use in tests
 def create_cf(session, name, key_type="varchar", speculative_retry=None, read_repair=None, compression=None,
