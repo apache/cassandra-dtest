@@ -9,7 +9,7 @@ from cassandra.query import SimpleStatement
 from ccmlib.node import Node, TimeoutError
 from nose.tools import timed
 
-from dtest import Tester, debug
+from dtest import Tester, debug, get_ip_from_node, create_ks
 from tools.decorators import known_failure, no_vnodes, since
 
 
@@ -114,7 +114,7 @@ class TestPushedNotifications(Tester):
             change_type = notification["change_type"]
             address, port = notification["address"]
             self.assertEquals("MOVED_NODE", change_type)
-            self.assertEquals(self.get_ip_from_node(node1), address)
+            self.assertEquals(get_ip_from_node(node1), address)
 
     @no_vnodes()
     def move_single_node_localhost_test(self):
@@ -180,7 +180,7 @@ class TestPushedNotifications(Tester):
             notifications = waiter.wait_for_notifications(timeout=60.0, num_notifications=expected_notifications)
             self.assertEquals(expected_notifications, len(notifications), notifications)
             for notification in notifications:
-                self.assertEquals(self.get_ip_from_node(node2), notification["address"][0])
+                self.assertEquals(get_ip_from_node(node2), notification["address"][0])
             self.assertEquals("DOWN", notifications[0]["change_type"])
             if version >= '2.2':
                 self.assertEquals("UP", notifications[1]["change_type"])
@@ -245,7 +245,7 @@ class TestPushedNotifications(Tester):
         notifications = waiter.wait_for_notifications(timeout=60.0, num_notifications=2)
         self.assertEquals(2, len(notifications), notifications)
         for notification in notifications:
-            self.assertEquals(self.get_ip_from_node(node2), notification["address"][0])
+            self.assertEquals(get_ip_from_node(node2), notification["address"][0])
             self.assertEquals("NEW_NODE", notifications[0]["change_type"])
             self.assertEquals("UP", notifications[1]["change_type"])
 
@@ -257,7 +257,7 @@ class TestPushedNotifications(Tester):
         notifications = waiter.wait_for_notifications(timeout=60.0, num_notifications=2)
         self.assertEquals(2, len(notifications), notifications)
         for notification in notifications:
-            self.assertEquals(self.get_ip_from_node(node2), notification["address"][0])
+            self.assertEquals(get_ip_from_node(node2), notification["address"][0])
             self.assertEquals("REMOVED_NODE", notifications[0]["change_type"])
             self.assertEquals("DOWN", notifications[1]["change_type"])
 
@@ -291,7 +291,7 @@ class TestPushedNotifications(Tester):
         session = self.patient_cql_connection(node1)
         waiter = NotificationWaiter(self, node2, ["SCHEMA_CHANGE"], keyspace='ks')
 
-        self.create_ks(session, 'ks', 3)
+        create_ks(session, 'ks', 3)
         session.execute("create TABLE t (k int PRIMARY KEY , v int)")
         session.execute("alter TABLE t add v1 int;")
 
@@ -344,7 +344,7 @@ class TestVariousNotifications(Tester):
         proto_version = 5 if have_v5_protocol else None
         session = self.patient_cql_connection(node1, protocol_version=proto_version)
 
-        self.create_ks(session, 'test', 3)
+        create_ks(session, 'test', 3)
         session.execute(
             "CREATE TABLE test ( "
             "id int, mytext text, col1 int, col2 int, col3 int, "

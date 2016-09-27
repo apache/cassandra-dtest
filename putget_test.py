@@ -4,7 +4,7 @@ from cassandra import ConsistencyLevel
 from thrift.protocol import TBinaryProtocol
 from thrift.transport import TSocket, TTransport
 
-from dtest import Tester
+from dtest import Tester, create_ks, create_cf
 from tools.data import (create_c1c2_table, insert_c1c2, insert_columns, putget,
                         query_c1c2, query_columns, range_putget)
 from tools.decorators import known_failure, no_vnodes
@@ -35,8 +35,8 @@ class TestPutGet(Tester):
         node1, node2, node3 = cluster.nodelist()
 
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'ks', 3)
-        self.create_cf(session, 'cf', compression=compression)
+        create_ks(session, 'ks', 3)
+        create_cf(session, 'cf', compression=compression)
 
         putget(cluster, session)
 
@@ -52,7 +52,7 @@ class TestPutGet(Tester):
         node1, node2, node3 = cluster.nodelist()
 
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'ks', 2)
+        create_ks(session, 'ks', 2)
         create_c1c2_table(self, session)
 
         # insert and get at CL.QUORUM (since RF=2, node1 won't have all key locally)
@@ -69,8 +69,8 @@ class TestPutGet(Tester):
         node1, node2, node3 = cluster.nodelist()
 
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'ks', 2)
-        self.create_cf(session, 'cf')
+        create_ks(session, 'ks', 2)
+        create_cf(session, 'cf')
 
         range_putget(cluster, session)
 
@@ -82,8 +82,8 @@ class TestPutGet(Tester):
         node1, node2, node3 = cluster.nodelist()
 
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'ks', 1)
-        self.create_cf(session, 'cf')
+        create_ks(session, 'ks', 1)
+        create_cf(session, 'cf')
 
         key = 'wide'
 
@@ -130,7 +130,7 @@ class TestPutGet(Tester):
         cluster.start()
         time.sleep(.5)
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'ks', 1)
+        create_ks(session, 'ks', 1)
 
         query = """
             CREATE TABLE test (

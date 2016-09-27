@@ -5,7 +5,7 @@ from distutils import dir_util
 
 from ccmlib import common as ccmcommon
 
-from dtest import Tester, debug
+from dtest import Tester, debug, create_ks, create_cf
 from tools.assertions import assert_one
 from tools.decorators import known_failure
 from tools.misc import ImmutableMapping
@@ -26,10 +26,10 @@ class BaseSStableLoaderTest(Tester):
     cluster_options = ImmutableMapping({'start_rpc': True})
 
     def create_schema(self, session, ks, compression):
-        self.create_ks(session, ks, rf=2)
-        self.create_cf(session, "standard1", compression=compression, compact_storage=self.compact)
-        self.create_cf(session, "counter1", compression=compression, columns={'v': 'counter'},
-                       compact_storage=self.compact)
+        create_ks(session, ks, rf=2)
+        create_cf(session, "standard1", compression=compression, compact_storage=self.compact)
+        create_cf(session, "counter1", compression=compression, columns={'v': 'counter'},
+                  compact_storage=self.compact)
 
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11897',
@@ -250,8 +250,8 @@ class TestSSTableGenerationAndLoading(BaseSStableLoaderTest):
         time.sleep(.5)
 
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'ks', 1)
-        self.create_cf(session, 'cf', compression="Deflate")
+        create_ks(session, 'ks', 1)
+        create_cf(session, 'cf', compression="Deflate")
 
         # make unique column names, and values that are incompressible
         for col in xrange(10):

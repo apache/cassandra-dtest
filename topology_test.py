@@ -6,7 +6,7 @@ from unittest import skip
 from cassandra import ConsistencyLevel
 from ccmlib.node import TimeoutError, ToolError
 
-from dtest import Tester, debug
+from dtest import Tester, debug, create_ks, create_cf
 from tools.assertions import assert_almost_equal
 from tools.data import insert_c1c2, query_c1c2
 from tools.decorators import known_failure, no_vnodes, since
@@ -65,8 +65,8 @@ class TestTopology(Tester):
         node1, node2 = cluster.nodelist()
 
         session = self.patient_cql_connection(node2)
-        self.create_ks(session, 'ks', 1)
-        self.create_cf(session, 'cf', columns={'c1': 'text', 'c2': 'text'})
+        create_ks(session, 'ks', 1)
+        create_cf(session, 'cf', columns={'c1': 'text', 'c2': 'text'})
         insert_c1c2(session, n=10000, consistency=ConsistencyLevel.ALL)
 
         mark = node2.mark_log()
@@ -107,8 +107,8 @@ class TestTopology(Tester):
         node1, node2, node3 = cluster.nodelist()
 
         session = self.patient_cql_connection(node2)
-        self.create_ks(session, 'ks', 2)
-        self.create_cf(session, 'cf', columns={'c1': 'text', 'c2': 'text'})
+        create_ks(session, 'ks', 2)
+        create_cf(session, 'cf', columns={'c1': 'text', 'c2': 'text'})
         insert_c1c2(session, n=10000, consistency=ConsistencyLevel.ALL)
 
         # Execute first rebuild, should fail
@@ -154,8 +154,8 @@ class TestTopology(Tester):
         node1, node2, node3 = cluster.nodelist()
 
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'ks', 1)
-        self.create_cf(session, 'cf', columns={'c1': 'text', 'c2': 'text'})
+        create_ks(session, 'ks', 1)
+        create_cf(session, 'cf', columns={'c1': 'text', 'c2': 'text'})
 
         insert_c1c2(session, n=30000, consistency=ConsistencyLevel.ONE)
 
@@ -198,8 +198,8 @@ class TestTopology(Tester):
         node1, node2, node3, node4 = cluster.nodelist()
 
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'ks', 2)
-        self.create_cf(session, 'cf', columns={'c1': 'text', 'c2': 'text'})
+        create_ks(session, 'ks', 2)
+        create_cf(session, 'cf', columns={'c1': 'text', 'c2': 'text'})
 
         insert_c1c2(session, n=30000, consistency=ConsistencyLevel.QUORUM)
 
@@ -235,8 +235,8 @@ class TestTopology(Tester):
         time.sleep(0.2)
 
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'ks', 1)
-        self.create_cf(session, 'cf', columns={'c1': 'text', 'c2': 'text'})
+        create_ks(session, 'ks', 1)
+        create_cf(session, 'cf', columns={'c1': 'text', 'c2': 'text'})
 
         insert_c1c2(session, n=10000, consistency=ConsistencyLevel.ONE)
 

@@ -10,7 +10,7 @@ from cassandra import ConsistencyLevel
 from cassandra.concurrent import execute_concurrent_with_args
 from ccmlib.node import NodeError
 
-from dtest import DISABLE_VNODES, Tester, debug
+from dtest import DISABLE_VNODES, Tester, debug, create_ks, create_cf
 from tools.assertions import (assert_almost_equal, assert_bootstrap_state, assert_not_running,
                               assert_one, assert_stderr_clean)
 from tools.data import query_c1c2
@@ -62,8 +62,8 @@ class BaseBootstrapTest(Tester):
         cluster.start(wait_other_notice=True)
 
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'ks', 1)
-        self.create_cf(session, 'cf', columns={'c1': 'text', 'c2': 'text'})
+        create_ks(session, 'ks', 1)
+        create_cf(session, 'cf', columns={'c1': 'text', 'c2': 'text'})
 
         # record the size before inserting any of our own data
         empty_size = node1.data_size()

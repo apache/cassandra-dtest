@@ -7,7 +7,7 @@ from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
 from nose.plugins.attrib import attr
 
-from dtest import PRINT_DEBUG, DtestTimeoutError, Tester, debug
+from dtest import PRINT_DEBUG, DtestTimeoutError, Tester, debug, create_ks
 from tools.decorators import known_failure, no_vnodes, since
 
 TRACE_DETERMINE_REPLICAS = re.compile('Determining replicas for mutation')
@@ -210,7 +210,7 @@ class ReplicationTest(Tester):
         session.default_consistency_level = ConsistencyLevel.ALL
 
         replication_factor = 3
-        self.create_ks(session, 'test', replication_factor)
+        create_ks(session, 'test', replication_factor)
         session.execute('CREATE TABLE test.test (id int PRIMARY KEY, value text)', trace=False)
 
         for key, token in murmur3_hashes.items():
@@ -247,7 +247,7 @@ class ReplicationTest(Tester):
         session = self.patient_exclusive_cql_connection(node1)
 
         replication_factor = {'dc1': 2, 'dc2': 2}
-        self.create_ks(session, 'test', replication_factor)
+        create_ks(session, 'test', replication_factor)
         session.execute('CREATE TABLE test.test (id int PRIMARY KEY, value text)', trace=False)
         session.default_consistency_level = ConsistencyLevel.ALL
 

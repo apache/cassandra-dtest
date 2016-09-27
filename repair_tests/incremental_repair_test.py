@@ -8,7 +8,7 @@ from ccmlib.common import is_win
 from ccmlib.node import Node
 from nose.plugins.attrib import attr
 
-from dtest import Tester, debug
+from dtest import Tester, debug, create_ks, create_cf
 from tools.assertions import assert_almost_equal, assert_one
 from tools.data import insert_c1c2
 from tools.decorators import known_failure, since
@@ -83,8 +83,8 @@ class TestIncRepair(Tester):
         node1, node2, node3 = cluster.nodelist()
 
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'ks', 3)
-        self.create_cf(session, 'cf', read_repair=0.0, columns={'c1': 'text', 'c2': 'text'})
+        create_ks(session, 'ks', 3)
+        create_cf(session, 'cf', read_repair=0.0, columns={'c1': 'text', 'c2': 'text'})
 
         debug("insert data")
 
@@ -228,7 +228,7 @@ class TestIncRepair(Tester):
         node1, node2, node3 = cluster.nodelist()
 
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'ks', 3)
+        create_ks(session, 'ks', 3)
         session.execute("create table tab(key int PRIMARY KEY, val int);")
 
         node3.stop()

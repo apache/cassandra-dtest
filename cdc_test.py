@@ -15,7 +15,7 @@ from cassandra.concurrent import (execute_concurrent,
 from ccmlib.node import Node
 from nose.tools import assert_equal, assert_less_equal
 
-from dtest import Tester, debug
+from dtest import Tester, debug, create_ks
 from tools.data import rows_to_list
 from tools.decorators import known_failure, since
 from tools.files import size_of_files_in_dir
@@ -255,7 +255,7 @@ class TestCDC(Tester):
         self.cluster.start(wait_for_binary_proto=True)
         node = self.cluster.nodelist()[0]
         session = self.patient_cql_connection(node)
-        self.create_ks(session, ks_name, rf=1)
+        create_ks(session, ks_name, rf=1)
 
         if table_name is not None:
             self.assertIsNotNone(cdc_enabled_table, 'if creating a table in prepare, must specify whether or not CDC is enabled on it')
@@ -462,7 +462,7 @@ class TestCDC(Tester):
         loading_node.start(wait_for_binary_proto=True)
         debug('recreating ks and table')
         loading_session = self.patient_exclusive_cql_connection(loading_node)
-        self.create_ks(loading_session, ks_name, rf=1)
+        create_ks(loading_session, ks_name, rf=1)
         debug('creating new table')
         loading_session.execute(create_stmt)
         debug('stopping new node')

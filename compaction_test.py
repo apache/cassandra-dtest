@@ -7,7 +7,7 @@ from distutils.version import LooseVersion
 
 import parse
 
-from dtest import Tester, debug
+from dtest import Tester, debug, create_ks
 from tools.assertions import assert_length_equal, assert_none, assert_one
 from tools.decorators import known_failure, since
 from tools.misc import ImmutableMapping
@@ -34,7 +34,7 @@ class TestCompaction(Tester):
         [node1] = cluster.nodelist()
 
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'ks', 1)
+        create_ks(session, 'ks', 1)
 
         session.execute("create table ks.cf (key int PRIMARY KEY, val int) with compaction = {'class':'" + self.strategy + "'} and gc_grace_seconds = 30;")
 
@@ -166,7 +166,7 @@ class TestCompaction(Tester):
         cluster.populate(1).start(wait_for_binary_proto=True)
         [node1] = cluster.nodelist()
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'ks', 1)
+        create_ks(session, 'ks', 1)
         session.execute("create table cf (key int PRIMARY KEY, val int) with gc_grace_seconds = 0 and compaction= {'class':'" + self.strategy + "'}")
 
         for x in range(0, 100):
@@ -205,7 +205,7 @@ class TestCompaction(Tester):
         cluster.populate(1).start(wait_for_binary_proto=True)
         [node1] = cluster.nodelist()
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'ks', 1)
+        create_ks(session, 'ks', 1)
         # max sstable age is 0.5 minute:
         session.execute("""create table cf (key int PRIMARY KEY, val int) with gc_grace_seconds = 0
             and compaction= {'class':'DateTieredCompactionStrategy', 'max_sstable_age_days':0.00035, 'min_threshold':2}""")
@@ -301,7 +301,7 @@ class TestCompaction(Tester):
 
             for strat in strategies:
                 session = self.patient_cql_connection(node1)
-                self.create_ks(session, 'ks', 1)
+                create_ks(session, 'ks', 1)
 
                 session.execute("create table ks.cf (key int PRIMARY KEY, val int) with gc_grace_seconds = 0 and compaction= {'class':'" + self.strategy + "'};")
 
@@ -337,7 +337,7 @@ class TestCompaction(Tester):
         [node] = cluster.nodelist()
 
         session = self.patient_cql_connection(node)
-        self.create_ks(session, 'ks', 1)
+        create_ks(session, 'ks', 1)
 
         mark = node.mark_log()
         strlen = (1024 * 1024) / 100
@@ -368,7 +368,7 @@ class TestCompaction(Tester):
         cluster.populate(1).start(wait_for_binary_proto=True)
         [node] = cluster.nodelist()
         session = self.patient_cql_connection(node)
-        self.create_ks(session, 'ks', 1)
+        create_ks(session, 'ks', 1)
         session.execute('CREATE TABLE to_disable (id int PRIMARY KEY, d TEXT) WITH compaction = {{\'class\':\'{0}\'}}'.format(self.strategy))
         node.nodetool('disableautocompaction ks to_disable')
         for i in range(1000):
@@ -393,7 +393,7 @@ class TestCompaction(Tester):
         cluster.populate(1).start(wait_for_binary_proto=True)
         [node] = cluster.nodelist()
         session = self.patient_cql_connection(node)
-        self.create_ks(session, 'ks', 1)
+        create_ks(session, 'ks', 1)
         session.execute('CREATE TABLE to_disable (id int PRIMARY KEY, d TEXT) WITH compaction = {{\'class\':\'{0}\', \'enabled\':\'false\'}}'.format(self.strategy))
         for i in range(1000):
             session.execute('insert into to_disable (id, d) values ({0}, \'{1}\')'.format(i, 'hello' * 100))
@@ -426,7 +426,7 @@ class TestCompaction(Tester):
         cluster.populate(1).start(wait_for_binary_proto=True)
         [node] = cluster.nodelist()
         session = self.patient_cql_connection(node)
-        self.create_ks(session, 'ks', 1)
+        create_ks(session, 'ks', 1)
         session.execute('CREATE TABLE to_disable (id int PRIMARY KEY, d TEXT) WITH compaction = {{\'class\':\'{0}\'}}'.format(self.strategy))
         session.execute('ALTER TABLE to_disable WITH compaction = {{\'class\':\'{0}\', \'enabled\':\'false\'}}'.format(self.strategy))
         for i in range(1000):
@@ -454,7 +454,7 @@ class TestCompaction(Tester):
         cluster.populate(1).start(wait_for_binary_proto=True)
         [node] = cluster.nodelist()
         session = self.patient_cql_connection(node)
-        self.create_ks(session, 'ks', 1)
+        create_ks(session, 'ks', 1)
         session.execute('CREATE TABLE to_disable (id int PRIMARY KEY, d TEXT) WITH compaction = {{\'class\':\'{0}\'}}'.format(self.strategy))
         node.nodetool('disableautocompaction ks to_disable')
         for i in range(1000):

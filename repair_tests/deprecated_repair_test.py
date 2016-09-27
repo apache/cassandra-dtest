@@ -3,7 +3,7 @@ from distutils.version import LooseVersion
 from cassandra import ConsistencyLevel
 from ccmlib.common import is_win
 
-from dtest import Tester, debug
+from dtest import Tester, debug, create_ks, create_cf
 from tools.assertions import assert_length_equal
 from tools.data import insert_c1c2
 from tools.decorators import since
@@ -143,8 +143,8 @@ class TestDeprecatedRepairAPI(Tester):
         supports_pull_repair = cluster.version() >= LooseVersion('3.10')
 
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'ks', 2)
-        self.create_cf(session, 'cf', read_repair=0.0, columns={'c1': 'text', 'c2': 'text'})
+        create_ks(session, 'ks', 2)
+        create_cf(session, 'cf', read_repair=0.0, columns={'c1': 'text', 'c2': 'text'})
 
         insert_c1c2(session, n=1000, consistency=ConsistencyLevel.ALL)
 

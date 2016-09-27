@@ -6,7 +6,7 @@ from unittest import skipIf
 
 from ccmlib.common import get_version_from_build, is_win
 
-from dtest import CASSANDRA_VERSION_FROM_BUILD, DEBUG, Tester, debug
+from dtest import CASSANDRA_VERSION_FROM_BUILD, DEBUG, Tester, debug, create_ks
 
 
 def switch_jdks(major_version_int):
@@ -106,7 +106,7 @@ class UpgradeTester(Tester):
 
         session = self.patient_cql_connection(node1, protocol_version=protocol_version)
         if create_keyspace:
-            self.create_ks(session, 'ks', rf)
+            create_ks(session, 'ks', rf)
 
         if cl:
             session.default_consistency_level = cl

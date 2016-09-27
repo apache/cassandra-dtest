@@ -1,7 +1,7 @@
 # coding: utf-8
 from distutils.version import LooseVersion
 
-from dtest import Tester, debug
+from dtest import Tester, debug, create_ks
 from tools.decorators import since
 
 
@@ -28,7 +28,7 @@ class TestCqlTracing(Tester):
 
         session = self.patient_cql_connection(node1, protocol_version=protocol_version)
         if create_keyspace:
-            self.create_ks(session, 'ks', rf)
+            create_ks(session, 'ks', rf)
         return session
 
     def trace(self, session):

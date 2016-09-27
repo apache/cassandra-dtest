@@ -35,6 +35,7 @@ from ccmlib.cluster_factory import ClusterFactory
 from ccmlib.common import get_version_from_build, is_win
 from ccmlib.node import TimeoutError
 from nose.exc import SkipTest
+from nose.tools import assert_greater_equal
 from six import print_
 
 from plugins.dtestconfig import _CONFIG as CONFIG
@@ -432,21 +433,6 @@ class Tester(TestCase):
             if not is_win():
                 os.symlink(basedir, name)
 
-    def get_eager_protocol_version(self, cassandra_version):
-        """
-        Returns the highest protocol version accepted
-        by the given C* version
-        """
-        if cassandra_version >= '2.2':
-            protocol_version = 4
-        elif cassandra_version >= '2.1':
-            protocol_version = 3
-        elif cassandra_version >= '2.0':
-            protocol_version = 2
-        else:
-            protocol_version = 1
-        return protocol_version
-
     def cql_connection(self, node, keyspace=None, user=None,
                        password=None, compression=True, protocol_version=None, port=None, ssl_opts=None):
 
@@ -456,7 +442,7 @@ class Tester(TestCase):
     def exclusive_cql_connection(self, node, keyspace=None, user=None,
                                  password=None, compression=True, protocol_version=None, port=None, ssl_opts=None):
 
-        node_ip = self.get_ip_from_node(node)
+        node_ip = get_ip_from_node(node)
         wlrr = WhiteListRoundRobinPolicy([node_ip])
 
         return self._create_session(node, keyspace, user, password, compression,
@@ -464,15 +450,15 @@ class Tester(TestCase):
 
     def _create_session(self, node, keyspace, user, password, compression, protocol_version, load_balancing_policy=None,
                         port=None, ssl_opts=None):
-        node_ip = self.get_ip_from_node(node)
+        node_ip = get_ip_from_node(node)
         if not port:
-            port = self.get_port_from_node(node)
+            port = get_port_from_node(node)
 
         if protocol_version is None:
-            protocol_version = self.get_eager_protocol_version(self.cluster.version())
+            protocol_version = get_eager_protocol_version(node.cluster.version())
 
         if user is not None:
-            auth_provider = self.get_auth_provider(user=user, password=password)
+            auth_provider = get_auth_provider(user=user, password=password)
         else:
             auth_provider = None
 
@@ -547,51 +533,6 @@ class Tester(TestCase):
             ssl_opts=ssl_opts,
             bypassed_exception=NoHostAvailable
         )
-
-    def create_ks(self, session, name, rf):
-        query = 'CREATE KEYSPACE %s WITH replication={%s}'
-        if isinstance(rf, types.IntType):
-            # we assume simpleStrategy
-            session.execute(query % (name, "'class':'SimpleStrategy', 'replication_factor':%d" % rf))
-        else:
-            self.assertGreaterEqual(len(rf), 0, "At least one datacenter/rf pair is needed")
-            # we assume networkTopologyStrategy
-            options = (', ').join(['\'%s\':%d' % (d, r) for d, r in rf.iteritems()])
-            session.execute(query % (name, "'class':'NetworkTopologyStrategy', %s" % options))
-        session.execute('USE {}'.format(name))
-
-    # We default to UTF8Type because it's simpler to use in tests
-    def create_cf(self, session, name, key_type="varchar", speculative_retry=None, read_repair=None, compression=None,
-                  gc_grace=None, columns=None, validation="UTF8Type", compact_storage=False):
-
-        additional_columns = ""
-        if columns is not None:
-            for k, v in columns.items():
-                additional_columns = "{}, {} {}".format(additional_columns, k, v)
-
-        if additional_columns == "":
-            query = 'CREATE COLUMNFAMILY %s (key %s, c varchar, v varchar, PRIMARY KEY(key, c)) WITH comment=\'test cf\'' % (name, key_type)
-        else:
-            query = 'CREATE COLUMNFAMILY %s (key %s PRIMARY KEY%s) WITH comment=\'test cf\'' % (name, key_type, additional_columns)
-
-        if compression is not None:
-            query = '%s AND compression = { \'sstable_compression\': \'%sCompressor\' }' % (query, compression)
-        else:
-            # if a compression option is omitted, C* will default to lz4 compression
-            query += ' AND compression = {}'
-
-        if read_repair is not None:
-            query = '%s AND read_repair_chance=%f AND dclocal_read_repair_chance=%f' % (query, read_repair, read_repair)
-        if gc_grace is not None:
-            query = '%s AND gc_grace_seconds=%d' % (query, gc_grace)
-        if speculative_retry is not None:
-            query = '%s AND speculative_retry=\'%s\'' % (query, speculative_retry)
-
-        if compact_storage:
-            query += ' AND COMPACT STORAGE'
-
-        session.execute(query)
-        time.sleep(0.2)
 
     @classmethod
     def tearDownClass(cls):
@@ -679,32 +620,6 @@ class Tester(TestCase):
             else:
                 yield e
 
-    def get_ip_from_node(self, node):
-        if node.network_interfaces['binary']:
-            node_ip = node.network_interfaces['binary'][0]
-        else:
-            node_ip = node.network_interfaces['thrift'][0]
-        return node_ip
-
-    def get_port_from_node(self, node):
-        """
-        Return the port that this node is listening on.
-        We only use this to connect the native driver,
-        so we only care about the binary port.
-        """
-        try:
-            return node.network_interfaces['binary'][1]
-        except Exception:
-            raise RuntimeError("No network interface defined on this node object. {}".format(node.network_interfaces))
-
-    def get_auth_provider(self, user, password):
-        return PlainTextAuthProvider(username=user, password=password)
-
-    def make_auth(self, user, password):
-        def private_auth(node_ip):
-            return {'username': user, 'password': password}
-        return private_auth
-
     # Disable docstrings printing in nosetest output
     def shortDescription(self):
         return None
@@ -762,6 +677,99 @@ class Tester(TestCase):
             stdout, stderr = p.communicate()
             debug(stdout)
             debug(stderr)
+
+
+def get_eager_protocol_version(cassandra_version):
+    """
+    Returns the highest protocol version accepted
+    by the given C* version
+    """
+    if cassandra_version >= '2.2':
+        protocol_version = 4
+    elif cassandra_version >= '2.1':
+        protocol_version = 3
+    elif cassandra_version >= '2.0':
+        protocol_version = 2
+    else:
+        protocol_version = 1
+    return protocol_version
+
+
+# We default to UTF8Type because it's simpler to use in tests
+def create_cf(session, name, key_type="varchar", speculative_retry=None, read_repair=None, compression=None,
+              gc_grace=None, columns=None, validation="UTF8Type", compact_storage=False):
+
+    additional_columns = ""
+    if columns is not None:
+        for k, v in columns.items():
+            additional_columns = "{}, {} {}".format(additional_columns, k, v)
+
+    if additional_columns == "":
+        query = 'CREATE COLUMNFAMILY %s (key %s, c varchar, v varchar, PRIMARY KEY(key, c)) WITH comment=\'test cf\'' % (name, key_type)
+    else:
+        query = 'CREATE COLUMNFAMILY %s (key %s PRIMARY KEY%s) WITH comment=\'test cf\'' % (name, key_type, additional_columns)
+
+    if compression is not None:
+        query = '%s AND compression = { \'sstable_compression\': \'%sCompressor\' }' % (query, compression)
+    else:
+        # if a compression option is omitted, C* will default to lz4 compression
+        query += ' AND compression = {}'
+
+    if read_repair is not None:
+        query = '%s AND read_repair_chance=%f AND dclocal_read_repair_chance=%f' % (query, read_repair, read_repair)
+    if gc_grace is not None:
+        query = '%s AND gc_grace_seconds=%d' % (query, gc_grace)
+    if speculative_retry is not None:
+        query = '%s AND speculative_retry=\'%s\'' % (query, speculative_retry)
+
+    if compact_storage:
+        query += ' AND COMPACT STORAGE'
+
+    session.execute(query)
+    time.sleep(0.2)
+
+
+def create_ks(session, name, rf):
+    query = 'CREATE KEYSPACE %s WITH replication={%s}'
+    if isinstance(rf, types.IntType):
+        # we assume simpleStrategy
+        session.execute(query % (name, "'class':'SimpleStrategy', 'replication_factor':%d" % rf))
+    else:
+        assert_greater_equal(len(rf), 0, "At least one datacenter/rf pair is needed")
+        # we assume networkTopologyStrategy
+        options = (', ').join(['\'%s\':%d' % (d, r) for d, r in rf.iteritems()])
+        session.execute(query % (name, "'class':'NetworkTopologyStrategy', %s" % options))
+    session.execute('USE {}'.format(name))
+
+
+def get_auth_provider(user, password):
+    return PlainTextAuthProvider(username=user, password=password)
+
+
+def make_auth(user, password):
+    def private_auth(node_ip):
+        return {'username': user, 'password': password}
+    return private_auth
+
+
+def get_port_from_node(node):
+    """
+    Return the port that this node is listening on.
+    We only use this to connect the native driver,
+    so we only care about the binary port.
+    """
+    try:
+        return node.network_interfaces['binary'][1]
+    except Exception:
+        raise RuntimeError("No network interface defined on this node object. {}".format(node.network_interfaces))
+
+
+def get_ip_from_node(node):
+    if node.network_interfaces['binary']:
+        node_ip = node.network_interfaces['binary'][0]
+    else:
+        node_ip = node.network_interfaces['thrift'][0]
+    return node_ip
 
 
 def kill_windows_cassandra_procs():

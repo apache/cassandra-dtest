@@ -5,7 +5,7 @@ from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
 from cassandra.util import sortedset
 
-from dtest import Tester, debug
+from dtest import Tester, debug, create_ks
 from tools.assertions import (assert_all, assert_almost_equal, assert_none,
                               assert_row_count, assert_unavailable)
 from tools.decorators import since
@@ -20,7 +20,7 @@ class TestTTL(Tester):
         self.cluster.populate(1).start()
         [node1] = self.cluster.nodelist()
         self.session1 = self.patient_cql_connection(node1)
-        self.create_ks(self.session1, 'ks', 1)
+        create_ks(self.session1, 'ks', 1)
 
     def prepare(self, default_time_to_live=None):
         self.session1.execute("DROP TABLE IF EXISTS ttl_table;")
@@ -349,7 +349,7 @@ class TestDistributedTTL(Tester):
         self.cluster.populate(2).start()
         [self.node1, self.node2] = self.cluster.nodelist()
         self.session1 = self.patient_cql_connection(self.node1)
-        self.create_ks(self.session1, 'ks', 2)
+        create_ks(self.session1, 'ks', 2)
 
     def prepare(self, default_time_to_live=None):
         self.session1.execute("DROP TABLE IF EXISTS ttl_table;")

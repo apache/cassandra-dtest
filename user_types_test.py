@@ -4,7 +4,7 @@ import uuid
 from cassandra import ConsistencyLevel, Unauthorized
 from cassandra.query import SimpleStatement
 
-from dtest import Tester
+from dtest import Tester, create_ks
 from tools.assertions import assert_invalid
 from tools.decorators import since
 
@@ -39,7 +39,7 @@ class TestUserTypes(Tester):
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'user_type_dropping', 2)
+        create_ks(session, 'user_type_dropping', 2)
         session.default_consistency_level = ConsistencyLevel.LOCAL_QUORUM
 
         stmt = """
@@ -102,7 +102,7 @@ class TestUserTypes(Tester):
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'nested_user_type_dropping', 2)
+        create_ks(session, 'nested_user_type_dropping', 2)
         session.default_consistency_level = ConsistencyLevel.LOCAL_QUORUM
 
         stmt = """
@@ -152,7 +152,7 @@ class TestUserTypes(Tester):
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
         session = self.cql_connection(node1)
-        self.create_ks(session, 'user_type_enforcement', 2)
+        create_ks(session, 'user_type_enforcement', 2)
         session.default_consistency_level = ConsistencyLevel.LOCAL_QUORUM
 
         stmt = """
@@ -201,7 +201,7 @@ class TestUserTypes(Tester):
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'user_types', 2)
+        create_ks(session, 'user_types', 2)
         session.default_consistency_level = ConsistencyLevel.LOCAL_QUORUM
 
         stmt = """
@@ -337,7 +337,7 @@ class TestUserTypes(Tester):
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'user_type_pkeys', 2)
+        create_ks(session, 'user_type_pkeys', 2)
         session.default_consistency_level = ConsistencyLevel.LOCAL_QUORUM
 
         stmt = """
@@ -399,7 +399,7 @@ class TestUserTypes(Tester):
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'user_type_indexing', 2)
+        create_ks(session, 'user_type_indexing', 2)
         session.default_consistency_level = ConsistencyLevel.LOCAL_QUORUM
 
         stmt = """
@@ -534,8 +534,8 @@ class TestUserTypes(Tester):
         superuser_session = self.patient_cql_connection(node1, user='cassandra', password='cassandra')
         superuser_session.execute("create user ks1_user with password 'cassandra' nosuperuser;")
         superuser_session.execute("create user ks2_user with password 'cassandra' nosuperuser;")
-        self.create_ks(superuser_session, 'ks1', 2)
-        self.create_ks(superuser_session, 'ks2', 2)
+        create_ks(superuser_session, 'ks1', 2)
+        create_ks(superuser_session, 'ks2', 2)
         superuser_session.execute("grant all permissions on keyspace ks1 to ks1_user;")
         superuser_session.execute("grant all permissions on keyspace ks2 to ks2_user;")
 
@@ -582,7 +582,7 @@ class TestUserTypes(Tester):
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'user_types', 2)
+        create_ks(session, 'user_types', 2)
         session.default_consistency_level = ConsistencyLevel.LOCAL_QUORUM
 
         stmt = """
@@ -627,7 +627,7 @@ class TestUserTypes(Tester):
         cluster.populate(1).start()
         [node1] = cluster.nodelist()
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'user_types', 1)
+        create_ks(session, 'user_types', 1)
 
         stmt = """
             USE user_types
@@ -649,7 +649,7 @@ class TestUserTypes(Tester):
         cluster.populate(3).start(wait_for_binary_proto=True)
         node1, node2, node3 = cluster.nodelist()
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'user_type_pkeys', 2)
+        create_ks(session, 'user_type_pkeys', 2)
         session.default_consistency_level = ConsistencyLevel.LOCAL_QUORUM
 
         stmt = """
@@ -698,7 +698,7 @@ class TestUserTypes(Tester):
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'user_types', 1)
+        create_ks(session, 'user_types', 1)
         session.default_consistency_level = ConsistencyLevel.LOCAL_QUORUM
 
         # Check we can create non-frozen table
@@ -775,13 +775,13 @@ class TestUserTypes(Tester):
         cluster.populate(1).start()
         node1 = cluster.nodelist()[0]
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'user_types', 1)
+        create_ks(session, 'user_types', 1)
 
         # create a user defined type in a keyspace
         session.execute("CREATE TYPE udt (first text, second int, third int)")
 
         # ensure we cannot use a udt from another keyspace
-        self.create_ks(session, 'user_ks', 1)
+        create_ks(session, 'user_ks', 1)
         assert_invalid(
             session,
             "CREATE TABLE t (id int PRIMARY KEY, v frozen<user_types.udt>)",

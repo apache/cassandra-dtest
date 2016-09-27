@@ -8,7 +8,7 @@ import time
 from cassandra.concurrent import execute_concurrent_with_args
 
 from dtest import (Tester, cleanup_cluster, create_ccm_cluster, debug,
-                   get_test_path)
+                   get_test_path, create_ks)
 from tools.decorators import known_failure
 from tools.files import replace_in_file, safe_mkdtemp
 from tools.misc import ImmutableMapping
@@ -17,7 +17,7 @@ from tools.misc import ImmutableMapping
 class SnapshotTester(Tester):
 
     def create_schema(self, session):
-        self.create_ks(session, 'ks', 1)
+        create_ks(session, 'ks', 1)
         session.execute('CREATE TABLE ks.cf ( key int PRIMARY KEY, val text);')
 
     def insert_rows(self, session, start, end):
@@ -222,7 +222,7 @@ class TestArchiveCommitlog(SnapshotTester):
         cluster.start()
 
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'ks', 1)
+        create_ks(session, 'ks', 1)
         session.execute('CREATE TABLE ks.cf ( key bigint PRIMARY KEY, val text);')
         debug("Writing first 30,000 rows...")
         self.insert_rows(session, 0, 30000)
@@ -415,7 +415,7 @@ class TestArchiveCommitlog(SnapshotTester):
 
         debug("Creating initial connection")
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'ks', 1)
+        create_ks(session, 'ks', 1)
         session.execute('CREATE TABLE ks.cf ( key bigint PRIMARY KEY, val text);')
         debug("Writing 30,000 rows...")
         self.insert_rows(session, 0, 60000)

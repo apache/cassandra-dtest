@@ -4,7 +4,7 @@ from threading import Thread
 from cassandra import ConsistencyLevel
 from ccmlib.node import ToolError
 
-from dtest import Tester, debug
+from dtest import Tester, debug, create_ks, create_cf
 from tools.data import insert_c1c2, query_c1c2
 from tools.decorators import since
 from tools.misc import ImmutableMapping
@@ -45,8 +45,8 @@ class TestRebuild(Tester):
 
         # populate data in dc1
         session = self.patient_exclusive_cql_connection(node1)
-        self.create_ks(session, 'ks', {'dc1': 1})
-        self.create_cf(session, 'cf', columns={'c1': 'text', 'c2': 'text'})
+        create_ks(session, 'ks', {'dc1': 1})
+        create_cf(session, 'cf', columns={'c1': 'text', 'c2': 'text'})
         insert_c1c2(session, n=keys, consistency=ConsistencyLevel.LOCAL_ONE)
 
         # check data
@@ -166,8 +166,8 @@ class TestRebuild(Tester):
 
         # Insert data into node1 and node2
         session = self.patient_exclusive_cql_connection(node1)
-        self.create_ks(session, 'ks', {'dc1': 1})
-        self.create_cf(session, 'cf', columns={'c1': 'text', 'c2': 'text'})
+        create_ks(session, 'ks', {'dc1': 1})
+        create_cf(session, 'cf', columns={'c1': 'text', 'c2': 'text'})
         insert_c1c2(session, n=10000, consistency=ConsistencyLevel.ALL)
         key = list(range(10000, 20000))
         session = self.patient_exclusive_cql_connection(node2)
@@ -250,12 +250,12 @@ class TestRebuild(Tester):
         # populate data in dc1
         session = self.patient_exclusive_cql_connection(node1)
         # ks1 will be rebuilt in node2
-        self.create_ks(session, 'ks1', {'dc1': 1})
-        self.create_cf(session, 'cf', columns={'c1': 'text', 'c2': 'text'})
+        create_ks(session, 'ks1', {'dc1': 1})
+        create_cf(session, 'cf', columns={'c1': 'text', 'c2': 'text'})
         insert_c1c2(session, n=keys, consistency=ConsistencyLevel.ALL)
         # ks2 will not be rebuilt in node2
-        self.create_ks(session, 'ks2', {'dc1': 1})
-        self.create_cf(session, 'cf', columns={'c1': 'text', 'c2': 'text'})
+        create_ks(session, 'ks2', {'dc1': 1})
+        create_cf(session, 'cf', columns={'c1': 'text', 'c2': 'text'})
         insert_c1c2(session, n=keys, consistency=ConsistencyLevel.ALL)
         session.shutdown()
 

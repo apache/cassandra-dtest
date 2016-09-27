@@ -9,7 +9,7 @@ from cassandra.query import SimpleStatement
 from ccmlib.node import ToolError
 from nose.plugins.attrib import attr
 
-from dtest import CASSANDRA_VERSION_FROM_BUILD, FlakyRetryPolicy, Tester, debug
+from dtest import CASSANDRA_VERSION_FROM_BUILD, FlakyRetryPolicy, Tester, debug, create_ks, create_cf
 from tools.data import insert_c1c2, query_c1c2
 from tools.decorators import known_failure, no_vnodes, since
 
@@ -95,8 +95,8 @@ class BaseRepairTest(Tester):
 
         session = self.patient_cql_connection(node1)
         session.cluster.default_retry_policy = FlakyRetryPolicy(max_retries=15)
-        self.create_ks(session, 'ks', 3)
-        self.create_cf(session, 'cf', read_repair=0.0, columns={'c1': 'text', 'c2': 'text'})
+        create_ks(session, 'ks', 3)
+        create_cf(session, 'cf', read_repair=0.0, columns={'c1': 'text', 'c2': 'text'})
 
         # Insert 1000 keys, kill node 3, insert 1 key, restart node 3, insert 1000 more keys
         debug("Inserting data...")
@@ -400,7 +400,7 @@ class TestRepair(BaseRepairTest):
 
         session = self.patient_cql_connection(node1)
         # create keyspace with RF=2 to be able to be repaired
-        self.create_ks(session, 'ks', 2)
+        create_ks(session, 'ks', 2)
         # we create two tables, one has low gc grace seconds so that the data
         # can be dropped during test (but we don't actually drop them).
         # the other has default gc.
@@ -525,7 +525,7 @@ class TestRepair(BaseRepairTest):
 
         session = self.patient_cql_connection(node1)
         # create keyspace with RF=2 to be able to be repaired
-        self.create_ks(session, 'ks', 2)
+        create_ks(session, 'ks', 2)
         query = """
             CREATE TABLE IF NOT EXISTS table1 (
                 c1 text,
@@ -663,7 +663,7 @@ class TestRepair(BaseRepairTest):
         session = self.patient_cql_connection(node1)
         session.execute("CREATE KEYSPACE ks WITH replication = {'class': 'NetworkTopologyStrategy', 'dc1': 2, 'dc2': 1, 'dc3':1}")
         session.execute("USE ks")
-        self.create_cf(session, 'cf', read_repair=0.0, columns={'c1': 'text', 'c2': 'text'})
+        create_cf(session, 'cf', read_repair=0.0, columns={'c1': 'text', 'c2': 'text'})
 
         # Insert 1000 keys, kill node 2, insert 1 key, restart node 2, insert 1000 more keys
         debug("Inserting data...")

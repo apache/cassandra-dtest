@@ -2,7 +2,7 @@ import time
 
 from cql.cassandra.ttypes import (CfDef, ColumnParent, ColumnPath,
                                   ConsistencyLevel, CounterColumn)
-from dtest import Tester, debug
+from dtest import Tester, debug, create_ks
 from thrift_tests import get_thrift_client
 from tools.misc import ImmutableMapping
 
@@ -24,7 +24,7 @@ class TestSuperCounterClusterRestart(Tester):
 
         time.sleep(.5)
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'ks', 3)
+        create_ks(session, 'ks', 3)
         time.sleep(1)  # wait for propagation
 
         # create the columnfamily using thrift

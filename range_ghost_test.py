@@ -1,7 +1,7 @@
 import time
 
 from tools.assertions import assert_length_equal
-from dtest import Tester
+from dtest import Tester, create_ks, create_cf
 
 
 class TestRangeGhosts(Tester):
@@ -14,8 +14,8 @@ class TestRangeGhosts(Tester):
 
         time.sleep(.5)
         session = self.cql_connection(node1)
-        self.create_ks(session, 'ks', 1)
-        self.create_cf(session, 'cf', gc_grace=0, columns={'c': 'text'})
+        create_ks(session, 'ks', 1)
+        create_cf(session, 'cf', gc_grace=0, columns={'c': 'text'})
 
         rows = 1000
 

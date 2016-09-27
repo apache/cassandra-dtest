@@ -17,7 +17,7 @@ from cassandra.query import BatchStatement, BatchType
 from ccmlib import common
 
 from cqlsh_tools import monkeypatch_driver, unmonkeypatch_driver
-from dtest import Tester, debug
+from dtest import Tester, debug, create_ks, create_cf
 from tools.assertions import assert_all, assert_none
 from tools.data import create_c1c2_table, insert_c1c2, rows_to_list
 from tools.decorators import known_failure, since
@@ -567,7 +567,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
 
         session = self.patient_cql_connection(node1)
 
-        self.create_ks(session, 'ks', 1)
+        create_ks(session, 'ks', 1)
         create_c1c2_table(self, session)
 
         insert_c1c2(session, n=100)
@@ -587,7 +587,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         node1, = self.cluster.nodelist()
         session = self.patient_cql_connection(node1)
 
-        self.create_ks(session, 'ks', 1)
+        create_ks(session, 'ks', 1)
         session.execute("""
             CREATE TYPE address (
             street text,
@@ -775,7 +775,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         self.cluster.start(wait_for_binary_proto=True)
         node, = self.cluster.nodelist()
         session = self.patient_cql_connection(node)
-        self.create_ks(session, 'ks', 1)
+        create_ks(session, 'ks', 1)
         session.execute("CREATE TABLE tab (key int PRIMARY KEY ) "
                         "WITH compaction = {'class': 'SizeTieredCompactionStrategy',"
                         "'min_threshold': 10, 'max_threshold': 100 }")
@@ -793,7 +793,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         self.cluster.start(wait_for_binary_proto=True)
         node, = self.cluster.nodelist()
         session = self.patient_cql_connection(node)
-        self.create_ks(session, 'ks', 1)
+        create_ks(session, 'ks', 1)
         session.execute("CREATE TABLE map (key int PRIMARY KEY, val text)")
         describe_cmd = 'USE ks; DESCRIBE map'
         out, err = self.run_cqlsh(node, describe_cmd)
@@ -1064,7 +1064,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         node1, = self.cluster.nodelist()
 
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'ks', 1)
+        create_ks(session, 'ks', 1)
         session.execute("""
             CREATE TABLE testcopyto (
                 a int,
@@ -1499,7 +1499,7 @@ Tracing session:""")
         node1, = self.cluster.nodelist()
         session = self.patient_cql_connection(node1)
 
-        self.create_ks(session, 'test_ks', 1)
+        create_ks(session, 'test_ks', 1)
         session.execute("CREATE TABLE lcs_describe (key int PRIMARY KEY) WITH compaction = "
                         "{'class': 'LeveledCompactionStrategy'}")
         describe_out, describe_err = self.run_cqlsh(node1, 'DESCRIBE TABLE test_ks.lcs_describe')
@@ -1527,7 +1527,7 @@ Tracing session:""")
         node1, = self.cluster.nodelist()
         session = self.patient_cql_connection(node1)
 
-        self.create_ks(session, 'test', 1)
+        create_ks(session, 'test', 1)
 
         session.execute("""CREATE TABLE test.users (username varchar, password varchar, gender varchar,
                 session_token varchar, state varchar, birth_year bigint, PRIMARY KEY (username))""")
@@ -1670,8 +1670,8 @@ class CqlshSmokeTest(Tester):
         """
         the `uuid()` function can generate UUIDs from cqlsh.
         """
-        self.create_ks(self.session, 'ks', 1)
-        self.create_cf(self.session, 'test', key_type='uuid', columns={'i': 'int'})
+        create_ks(self.session, 'ks', 1)
+        create_cf(self.session, 'test', key_type='uuid', columns={'i': 'int'})
 
         out, err, _ = self.node1.run_cqlsh("INSERT INTO ks.test (key) VALUES (uuid())")
         self.assertEqual(err, "")
@@ -1693,8 +1693,8 @@ class CqlshSmokeTest(Tester):
         self.assertNotEqual(result[0][0], result[1][0])
 
     def test_commented_lines(self):
-        self.create_ks(self.session, 'ks', 1)
-        self.create_cf(self.session, 'test')
+        create_ks(self.session, 'ks', 1)
+        create_cf(self.session, 'test')
 
         self.node1.run_cqlsh(
             """
@@ -1709,8 +1709,8 @@ class CqlshSmokeTest(Tester):
         self.assertTrue(out.strip().startswith("CREATE KEYSPACE ks"))
 
     def test_colons_in_string_literals(self):
-        self.create_ks(self.session, 'ks', 1)
-        self.create_cf(self.session, 'test', columns={'i': 'int'})
+        create_ks(self.session, 'ks', 1)
+        create_cf(self.session, 'test', columns={'i': 'int'})
 
         self.node1.run_cqlsh(
             """
@@ -1720,8 +1720,8 @@ class CqlshSmokeTest(Tester):
                    [[u'Cassandra:TheMovie']])
 
     def test_select(self):
-        self.create_ks(self.session, 'ks', 1)
-        self.create_cf(self.session, 'test')
+        create_ks(self.session, 'ks', 1)
+        create_cf(self.session, 'test')
 
         self.session.execute("INSERT INTO ks.test (key, c, v) VALUES ('a', 'a', 'a')")
         assert_all(self.session, "SELECT key, c, v FROM test",
@@ -1736,15 +1736,15 @@ class CqlshSmokeTest(Tester):
         self.assertEqual(err, '')
 
     def test_insert(self):
-        self.create_ks(self.session, 'ks', 1)
-        self.create_cf(self.session, 'test')
+        create_ks(self.session, 'ks', 1)
+        create_cf(self.session, 'test')
 
         self.node1.run_cqlsh("INSERT INTO ks.test (key, c, v) VALUES ('a', 'a', 'a')")
         assert_all(self.session, "SELECT key, c, v FROM test", [[u"a", u"a", u"a"]])
 
     def test_update(self):
-        self.create_ks(self.session, 'ks', 1)
-        self.create_cf(self.session, 'test')
+        create_ks(self.session, 'ks', 1)
+        create_cf(self.session, 'test')
 
         self.session.execute("INSERT INTO test (key, c, v) VALUES ('a', 'a', 'a')")
         assert_all(self.session, "SELECT key, c, v FROM test", [[u"a", u"a", u"a"]])
@@ -1752,8 +1752,8 @@ class CqlshSmokeTest(Tester):
         assert_all(self.session, "SELECT key, c, v FROM test", [[u"a", u"a", u"b"]])
 
     def test_delete(self):
-        self.create_ks(self.session, 'ks', 1)
-        self.create_cf(self.session, 'test', columns={'i': 'int'})
+        create_ks(self.session, 'ks', 1)
+        create_cf(self.session, 'test', columns={'i': 'int'})
 
         self.session.execute("INSERT INTO test (key) VALUES ('a')")
         self.session.execute("INSERT INTO test (key) VALUES ('b')")
@@ -1769,8 +1769,8 @@ class CqlshSmokeTest(Tester):
                    [[u'a'], [u'e'], [u'd'], [u'b']])
 
     def test_batch(self):
-        self.create_ks(self.session, 'ks', 1)
-        self.create_cf(self.session, 'test', columns={'i': 'int'})
+        create_ks(self.session, 'ks', 1)
+        create_cf(self.session, 'test', columns={'i': 'int'})
         # run batch statement (inserts are fine)
         self.node1.run_cqlsh(
             '''
@@ -1791,7 +1791,7 @@ class CqlshSmokeTest(Tester):
         self.assertIn(u'created', self.get_keyspace_names())
 
     def test_drop_keyspace(self):
-        self.create_ks(self.session, 'ks', 1)
+        create_ks(self.session, 'ks', 1)
         self.assertIn(u'ks', self.get_keyspace_names())
 
         self.node1.run_cqlsh('DROP KEYSPACE ks')
@@ -1799,14 +1799,14 @@ class CqlshSmokeTest(Tester):
         self.assertNotIn(u'ks', self.get_keyspace_names())
 
     def test_create_table(self):
-        self.create_ks(self.session, 'ks', 1)
+        create_ks(self.session, 'ks', 1)
 
         self.node1.run_cqlsh('CREATE TABLE ks.test (i int PRIMARY KEY);')
         self.assertEquals(self.get_tables_in_keyspace('ks'), [u'test'])
 
     def test_drop_table(self):
-        self.create_ks(self.session, 'ks', 1)
-        self.create_cf(self.session, 'test')
+        create_ks(self.session, 'ks', 1)
+        create_cf(self.session, 'test')
 
         assert_none(self.session, 'SELECT key FROM test')
 
@@ -1816,8 +1816,8 @@ class CqlshSmokeTest(Tester):
         self.assertEqual(0, len(self.session.cluster.metadata.keyspaces['ks'].tables))
 
     def test_truncate(self):
-        self.create_ks(self.session, 'ks', 1)
-        self.create_cf(self.session, 'test', columns={'i': 'int'})
+        create_ks(self.session, 'ks', 1)
+        create_cf(self.session, 'test', columns={'i': 'int'})
 
         self.session.execute("INSERT INTO test (key) VALUES ('a')")
         self.session.execute("INSERT INTO test (key) VALUES ('b')")
@@ -1831,8 +1831,8 @@ class CqlshSmokeTest(Tester):
         self.assertEqual([], rows_to_list(self.session.execute('SELECT * from test')))
 
     def test_alter_table(self):
-        self.create_ks(self.session, 'ks', 1, )
-        self.create_cf(self.session, 'test', columns={'i': 'ascii'})
+        create_ks(self.session, 'ks', 1, )
+        create_cf(self.session, 'test', columns={'i': 'ascii'})
 
         def get_ks_columns():
             table = self.session.cluster.metadata.keyspaces['ks'].tables['test']
@@ -1854,10 +1854,10 @@ class CqlshSmokeTest(Tester):
 
     def test_use_keyspace(self):
         # ks1 contains ks1table, ks2 contains ks2table
-        self.create_ks(self.session, 'ks1', 1)
-        self.create_cf(self.session, 'ks1table')
-        self.create_ks(self.session, 'ks2', 1)
-        self.create_cf(self.session, 'ks2table')
+        create_ks(self.session, 'ks1', 1)
+        create_cf(self.session, 'ks1table')
+        create_ks(self.session, 'ks2', 1)
+        create_cf(self.session, 'ks2table')
 
         ks1_stdout, ks1_stderr, _ = self.node1.run_cqlsh(
             '''
@@ -1877,8 +1877,8 @@ class CqlshSmokeTest(Tester):
 
     # DROP INDEX statement fails in 2.0 (see CASSANDRA-9247)
     def test_drop_index(self):
-        self.create_ks(self.session, 'ks', 1)
-        self.create_cf(self.session, 'test', columns={'i': 'int'})
+        create_ks(self.session, 'ks', 1)
+        create_cf(self.session, 'test', columns={'i': 'int'})
 
         # create a statement that will only work if there's an index on i
         requires_index = 'SELECT * from test WHERE i = 5'
@@ -1899,8 +1899,8 @@ class CqlshSmokeTest(Tester):
 
     # DROP INDEX statement fails in 2.0 (see CASSANDRA-9247)
     def test_create_index(self):
-        self.create_ks(self.session, 'ks', 1)
-        self.create_cf(self.session, 'test', columns={'i': 'int'})
+        create_ks(self.session, 'ks', 1)
+        create_cf(self.session, 'test', columns={'i': 'int'})
 
         # create a statement that will only work if there's an index on i
         requires_index = 'SELECT * from test WHERE i = 5;'
@@ -1950,8 +1950,8 @@ class CqlLoginTest(Tester):
         self.assertEqual([message in x for x in input.split("\n") if x], [True])
 
     def test_login_keeps_keyspace(self):
-        self.create_ks(self.session, 'ks1', 1)
-        self.create_cf(self.session, 'ks1table')
+        create_ks(self.session, 'ks1', 1)
+        create_cf(self.session, 'ks1table')
         self.session.execute("CREATE USER user1 WITH PASSWORD 'changeme';")
 
         cqlsh_stdout, cqlsh_stderr, _ = self.node1.run_cqlsh(
@@ -1966,8 +1966,8 @@ class CqlLoginTest(Tester):
         self.assertEqual(cqlsh_stderr, '')
 
     def test_login_rejects_bad_pass(self):
-        self.create_ks(self.session, 'ks1', 1)
-        self.create_cf(self.session, 'ks1table')
+        create_ks(self.session, 'ks1', 1)
+        create_cf(self.session, 'ks1table')
         self.session.execute("CREATE USER user1 WITH PASSWORD 'changeme';")
 
         cqlsh_stdout, cqlsh_stderr, _ = self.node1.run_cqlsh(
@@ -1979,8 +1979,8 @@ class CqlLoginTest(Tester):
         self.assert_login_not_allowed('user1', cqlsh_stderr)
 
     def test_login_authenticates_correct_user(self):
-        self.create_ks(self.session, 'ks1', 1)
-        self.create_cf(self.session, 'ks1table')
+        create_ks(self.session, 'ks1', 1)
+        create_cf(self.session, 'ks1table')
         self.session.execute("CREATE USER user1 WITH PASSWORD 'changeme';")
 
         if self.cluster.version() >= '2.2':
@@ -2010,8 +2010,8 @@ class CqlLoginTest(Tester):
                                                        '\n'.join(err_lines)))
 
     def test_login_allows_bad_pass_and_continued_use(self):
-        self.create_ks(self.session, 'ks1', 1)
-        self.create_cf(self.session, 'ks1table')
+        create_ks(self.session, 'ks1', 1)
+        create_cf(self.session, 'ks1table')
         self.session.execute("CREATE USER user1 WITH PASSWORD 'changeme';")
 
         cqlsh_stdout, cqlsh_stderr, _ = self.node1.run_cqlsh(

@@ -10,7 +10,7 @@ from cassandra.policies import FallthroughRetryPolicy
 from cassandra.protocol import ProtocolException
 from cassandra.query import SimpleStatement
 
-from dtest import Tester, canReuseCluster, debug, freshCluster
+from dtest import ReusableClusterTester, debug, Tester, create_ks
 from distutils.version import LooseVersion
 from thrift_bindings.v22.ttypes import \
     ConsistencyLevel as ThriftConsistencyLevel
@@ -53,11 +53,10 @@ class CQLTester(Tester):
 
         session = self.patient_cql_connection(node1, protocol_version=protocol_version, user=user, password=password)
         if create_keyspace:
-            self.create_ks(session, 'ks', rf)
+            create_ks(session, 'ks', rf)
         return session
 
 
-@canReuseCluster
 class StorageProxyCQLTester(CQLTester):
     """
     Each CQL statement is exercised at least once in order to
@@ -449,7 +448,6 @@ class StorageProxyCQLTester(CQLTester):
         session.execute(query)
 
 
-@canReuseCluster
 class MiscellaneousCQLTester(CQLTester):
     """
     CQL tests that cannot be performed as Java unit tests, see CASSANDRA-9160.
@@ -637,7 +635,6 @@ class MiscellaneousCQLTester(CQLTester):
         result = session.execute(explicit_prepared.bind(None))
         self.assertEqual(result, [(0, 0, 0, None)])
 
-    @freshCluster()
     def range_slice_test(self):
         """
         Regression test for CASSANDRA-1337:
@@ -658,7 +655,7 @@ class MiscellaneousCQLTester(CQLTester):
         time.sleep(0.2)
 
         session = self.patient_cql_connection(node1)
-        self.create_ks(session, 'ks', 1)
+        create_ks(session, 'ks', 1)
 
         session.execute("""
             CREATE TABLE test (
@@ -740,7 +737,7 @@ class AbortedQueriesTester(CQLTester):
         node = cluster.nodelist()[0]
         session = self.patient_cql_connection(node)
 
-        self.create_ks(session, 'ks', 1)
+        create_ks(session, 'ks', 1)
         session.execute("""
             CREATE TABLE test1 (
                 id int PRIMARY KEY,
@@ -788,7 +785,7 @@ class AbortedQueriesTester(CQLTester):
 
         session = self.patient_exclusive_cql_connection(node1)
 
-        self.create_ks(session, 'ks', 1)
+        create_ks(session, 'ks', 1)
         session.execute("""
             CREATE TABLE test2 (
                 id int,
@@ -848,7 +845,7 @@ class AbortedQueriesTester(CQLTester):
         node = cluster.nodelist()[0]
         session = self.patient_cql_connection(node)
 
-        self.create_ks(session, 'ks', 1)
+        create_ks(session, 'ks', 1)
         session.execute("""
             CREATE TABLE test3 (
                 id int PRIMARY KEY,
@@ -896,7 +893,7 @@ class AbortedQueriesTester(CQLTester):
 
         session = self.patient_exclusive_cql_connection(node1)
 
-        self.create_ks(session, 'ks', 1)
+        create_ks(session, 'ks', 1)
         session.execute("""
             CREATE TABLE test4 (
                 id int PRIMARY KEY,
@@ -954,7 +951,7 @@ class SlowQueryTester(CQLTester):
         node = cluster.nodelist()[0]
         session = self.patient_cql_connection(node)
 
-        self.create_ks(session, 'ks', 1)
+        create_ks(session, 'ks', 1)
         session.execute("""
             CREATE TABLE test1 (
                 id int PRIMARY KEY,
@@ -1017,7 +1014,7 @@ class SlowQueryTester(CQLTester):
 
         session = self.patient_exclusive_cql_connection(node1)
 
-        self.create_ks(session, 'ks', 1)
+        create_ks(session, 'ks', 1)
         session.execute("""
             CREATE TABLE test2 (
                 id int,
@@ -1080,7 +1077,7 @@ class SlowQueryTester(CQLTester):
         node = cluster.nodelist()[0]
         session = self.patient_cql_connection(node)
 
-        self.create_ks(session, 'ks', 1)
+        create_ks(session, 'ks', 1)
         session.execute("""
             CREATE TABLE test1 (
                 id int PRIMARY KEY,
@@ -1105,16 +1102,28 @@ class SlowQueryTester(CQLTester):
         assert_length_equal(ret, num_expected)
 
 
-@canReuseCluster
-class LWTTester(CQLTester):
+class LWTTester(ReusableClusterTester):
     """
     Validate CQL queries for LWTs for static columns for null and non-existing rows
     @jira_ticket CASSANDRA-9842
     """
 
-    @since('2.1')
+    @classmethod
+    def post_initialize_cluster(cls):
+        cluster = cls.cluster
+        cluster.populate(3)
+        cluster.start(wait_for_binary_proto=True)
+
+    def get_lwttester_session(self):
+        node1 = self.cluster.nodelist()[0]
+        session = self.patient_cql_connection(node1)
+        session.execute("""CREATE KEYSPACE IF NOT EXISTS ks WITH REPLICATION={'class':'SimpleStrategy',
+            'replication_factor':1}""")
+        session.execute("USE ks")
+        return session
+
     def lwt_with_static_columns_test(self):
-        session = self.prepare(nodes=3)
+        session = self.get_lwttester_session()
 
         session.execute("""
             CREATE TABLE lwt_with_static (a int, b int, s int static, d text, PRIMARY KEY (a, b))
@@ -1160,9 +1169,8 @@ class LWTTester(CQLTester):
 
         assert_one(session, "SELECT a, s, d FROM {} WHERE a = 4".format(table_name), [4, 4, None])
 
-    @since('2.1')
     def conditional_updates_on_static_columns_with_null_values_test(self):
-        session = self.prepare(nodes=3)
+        session = self.get_lwttester_session()
 
         table_name = "conditional_updates_on_static_columns_with_null"
         session.execute("""
@@ -1185,9 +1193,8 @@ class LWTTester(CQLTester):
 
             assert_one(session, "SELECT * FROM {} WHERE a = 5".format(table_name), [5, 5, None, None])
 
-    @since('2.1')
     def conditional_updates_on_static_columns_with_non_existing_values_test(self):
-        session = self.prepare(nodes=3)
+        session = self.get_lwttester_session()
 
         table_name = "conditional_updates_on_static_columns_with_ne"
         session.execute("""
@@ -1238,9 +1245,8 @@ class LWTTester(CQLTester):
 
         assert_one(session, "SELECT * FROM {table_name} WHERE a = 7".format(table_name=table_name), [7, 7, 8, "a"])
 
-    @since('2.1')
     def conditional_updates_on_static_columns_with_null_values_batch_test(self):
-        session = self.prepare(nodes=3)
+        session = self.get_lwttester_session()
 
         table_name = "lwt_on_static_columns_with_null_batch"
         session.execute("""
@@ -1272,7 +1278,7 @@ class LWTTester(CQLTester):
         assert_one(session, "SELECT * FROM {table_name} WHERE a = 6".format(table_name=table_name), [6, 6, None, None])
 
     def conditional_deletes_on_static_columns_with_null_values_test(self):
-        session = self.prepare(nodes=3)
+        session = self.get_lwttester_session()
 
         table_name = "conditional_deletes_on_static_with_null"
         session.execute("""
@@ -1302,9 +1308,8 @@ class LWTTester(CQLTester):
             assert_one(session, "DELETE s1 FROM {} WHERE a = 5 IF s2 {} 3".format(table_name, operator), [False, None])
             assert_one(session, "SELECT * FROM {} WHERE a = 5".format(table_name), [5, 5, 5, None, 5])
 
-    @since('2.1')
     def conditional_deletes_on_static_columns_with_null_values_batch_test(self):
-        session = self.prepare(nodes=3)
+        session = self.get_lwttester_session()
 
         table_name = "conditional_deletes_on_static_with_null_batch"
         session.execute("""
