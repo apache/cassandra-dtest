@@ -1114,7 +1114,7 @@ class LWTTester(CQLTester):
 
     @since('2.1')
     def lwt_with_static_columns_test(self):
-        session = self.prepare(3)
+        session = self.prepare(nodes=3)
 
         session.execute("""
             CREATE TABLE lwt_with_static (a int, b int, s int static, d text, PRIMARY KEY (a, b))
@@ -1162,7 +1162,7 @@ class LWTTester(CQLTester):
 
     @since('2.1')
     def conditional_updates_on_static_columns_with_null_values_test(self):
-        session = self.prepare(3)
+        session = self.prepare(nodes=3)
 
         table_name = "conditional_updates_on_static_columns_with_null"
         session.execute("""
@@ -1187,7 +1187,7 @@ class LWTTester(CQLTester):
 
     @since('2.1')
     def conditional_updates_on_static_columns_with_non_existing_values_test(self):
-        session = self.prepare(3)
+        session = self.prepare(nodes=3)
 
         table_name = "conditional_updates_on_static_columns_with_ne"
         session.execute("""
@@ -1240,7 +1240,7 @@ class LWTTester(CQLTester):
 
     @since('2.1')
     def conditional_updates_on_static_columns_with_null_values_batch_test(self):
-        session = self.prepare(3)
+        session = self.prepare(nodes=3)
 
         table_name = "lwt_on_static_columns_with_null_batch"
         session.execute("""
@@ -1272,7 +1272,7 @@ class LWTTester(CQLTester):
         assert_one(session, "SELECT * FROM {table_name} WHERE a = 6".format(table_name=table_name), [6, 6, None, None])
 
     def conditional_deletes_on_static_columns_with_null_values_test(self):
-        session = self.prepare(3)
+        session = self.prepare(nodes=3)
 
         table_name = "conditional_deletes_on_static_with_null"
         session.execute("""
@@ -1304,7 +1304,7 @@ class LWTTester(CQLTester):
 
     @since('2.1')
     def conditional_deletes_on_static_columns_with_null_values_batch_test(self):
-        session = self.prepare(3)
+        session = self.prepare(nodes=3)
 
         table_name = "conditional_deletes_on_static_with_null_batch"
         session.execute("""
