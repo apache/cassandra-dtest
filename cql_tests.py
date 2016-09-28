@@ -19,7 +19,7 @@ from thrift_bindings.v22.ttypes import (CfDef, Column, ColumnOrSuperColumn,
 from thrift_tests import get_thrift_client
 from tools.assertions import (assert_all, assert_invalid, assert_length_equal,
                               assert_none, assert_one, assert_unavailable)
-from tools.decorators import since
+from tools.decorators import known_failure, since
 from tools.metadata_wrapper import (UpdatingClusterMetadataWrapper,
                                     UpdatingKeyspaceMetadataWrapper,
                                     UpdatingTableMetadataWrapper)
@@ -1169,6 +1169,9 @@ class LWTTester(ReusableClusterTester):
 
         assert_one(session, "SELECT a, s, d FROM {} WHERE a = 4".format(table_name), [4, 4, None])
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12724',
+                   flaky=True)
     def conditional_updates_on_static_columns_with_null_values_test(self):
         session = self.get_lwttester_session()
 

@@ -334,6 +334,9 @@ class TestIncRepair(Tester):
         expected_load_size = 4.5  # In GB
         assert_almost_equal(load_size, expected_load_size, error=0.25)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12725',
+                   flaky=True)
     def sstable_marking_test_not_intersecting_all_ranges(self):
         """
         @jira_ticket CASSANDRA-10299

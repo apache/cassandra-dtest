@@ -325,6 +325,9 @@ class TestCQL(UpgradeTester):
 
             assert_one(cursor, "SELECT * FROM clicks WHERE token(userid) > token(2) LIMIT 1", [3, 'http://foo.com', 42])
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12721',
+                   flaky=True)
     def limit_multiget_test(self):
         """ Validate LIMIT option for 'multiget' in SELECT statements """
         cursor = self.prepare()
@@ -4158,6 +4161,9 @@ class TestCQL(UpgradeTester):
             assert_all(cursor, "SELECT * FROM test WHERE k=0 AND c1 = 0 AND c2 IN (0, 2) ORDER BY c1 DESC", [[0, 0, 2], [0, 0, 0]])
 
     @since('2.1')
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12722',
+                   flaky=True)
     def in_order_by_without_selecting_test(self):
         """
         Test that columns don't need to be selected for ORDER BY when there is a IN
