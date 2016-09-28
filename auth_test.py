@@ -2280,19 +2280,22 @@ class TestAuthRoles(Tester):
         """
         * Launch a one node cluster
         * Connect as the default superuser
-        * Create a new role, 'mike', and a UDF
-        * Grant mike permissions to the UDF
-        * Drop the keyspace containing the UDF
+        * Create a new role, 'mike', a UDF and a UDA which uses for its state function
+        * Grant mike permissions to the UDF & UDA
+        * Drop the keyspace containing the UDF & UDA
         * Verify mike has no permissions
         """
         self.prepare()
         cassandra = self.get_session(user='cassandra', password='cassandra')
         self.setup_table(cassandra)
         cassandra.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND LOGIN = true")
-        cassandra.execute("CREATE FUNCTION ks.plus_one ( input int ) CALLED ON NULL INPUT RETURNS int LANGUAGE javascript AS 'input + 1'")
-        cassandra.execute("GRANT EXECUTE ON FUNCTION ks.plus_one(int) TO mike")
+        cassandra.execute("CREATE FUNCTION ks.state_func (a int, b int) CALLED ON NULL INPUT RETURNS int LANGUAGE javascript AS 'a + b'")
+        cassandra.execute("CREATE AGGREGATE ks.agg_func (int) SFUNC state_func STYPE int")
+        cassandra.execute("GRANT EXECUTE ON FUNCTION ks.state_func(int, int) TO mike")
+        cassandra.execute("GRANT EXECUTE ON FUNCTION ks.agg_func(int) TO mike")
 
-        self.assert_permissions_listed([("mike", "<function ks.plus_one(int)>", "EXECUTE")],
+        self.assert_permissions_listed([("mike", "<function ks.state_func(int, int)>", "EXECUTE"),
+                                        ("mike", "<function ks.agg_func(int)>", "EXECUTE")],
                                        cassandra,
                                        "LIST ALL PERMISSIONS OF mike")
         # drop the keyspace
@@ -2451,8 +2454,9 @@ class TestAuthRoles(Tester):
         * Launch a one node cluster
         * Connect as the default superuser
         * Create a new role, 'mike'
-        * Create two aggregate functions
-        * Verify all UDF permissions also apply to aggregates
+        * Create two UDFs, and use them as the state & final functions in a UDA
+        * Verify all UDF permissions also apply to UDAs
+        * Drop the UDA and ensure that the granted permissions are removed
         """
         self.prepare()
         cassandra = self.get_session(user='cassandra', password='cassandra')
@@ -2505,6 +2509,16 @@ class TestAuthRoles(Tester):
 
         # mike *does* have execute permission on the aggregate function, as its creator
         assert_one(mike, execute_aggregate_cql, [3])
+
+        # check that dropping the aggregate removes all of mike's permissions on it
+        # note: after dropping, we have to list *all* of mike's permissions and check
+        # that they don't contain any for the aggregate as we can no longer use the
+        # function name in the LIST statement
+        agg_perms = list(cassandra.execute("LIST ALL PERMISSIONS ON FUNCTION ks.simple_aggregate(int) OF mike NORECURSIVE"))
+        cassandra.execute("DROP AGGREGATE ks.simple_aggregate(int)")
+        all_perms = list(cassandra.execute("LIST ALL PERMISSIONS OF mike"))
+        for p in agg_perms:
+            self.assertFalse(p in all_perms, msg="Perm {p} found, but should be removed".format(p=p))
 
     def ignore_invalid_roles_test(self):
         """
