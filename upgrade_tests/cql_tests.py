@@ -1388,9 +1388,6 @@ class TestCQL(UpgradeTester):
             cursor.execute(q % "tags = tags - [ 'bar' ]")
             assert_one(cursor, "SELECT tags FROM user WHERE fn='Bilbo' AND ln='Baggins'", [['m', 'n', 'c', 'c']])
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12399',
-                   flaky=False)
     def multi_collection_test(self):
         cursor = self.prepare()
 
@@ -2267,9 +2264,6 @@ class TestCQL(UpgradeTester):
             query = "SELECT * FROM test WHERE k = 0 LIMIT 1;"
             assert_one(cursor, query, [0, 0, 2, 2])
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12401',
-                   flaky=False)
     def multi_list_set_test(self):
         cursor = self.prepare()
 
