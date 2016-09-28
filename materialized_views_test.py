@@ -82,7 +82,7 @@ class TestMaterializedViews(Tester):
             if node.is_running():
                 node.nodetool("replaybatchlog")
                 attempts = 50  # 100 milliseconds per attempt, so 5 seconds total
-                while attempts > 0 and not self._settled_stages(node):
+                while attempts > 0 and not _settled_stages(node):
                     time.sleep(0.1)
                     attempts -= 1
 
