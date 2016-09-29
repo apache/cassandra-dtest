@@ -486,6 +486,119 @@ class TestMaterializedViews(Tester):
         for i in xrange(1000, 1100):
             assert_one(session, "SELECT * FROM t_by_v WHERE v = {}".format(-i), [-i, i])
 
+    @attr('resource-intensive')
+    def add_node_after_wide_mv_with_range_deletions_test(self):
+        """
+        @jira_ticket CASSANDRA-11670
+
+        Test that materialized views work with wide materialized views as expected when adding a node.
+        """
+
+        session = self.prepare()
+
+        session.execute("CREATE TABLE t (id int, v int, PRIMARY KEY (id, v)) WITH compaction = { 'class': 'SizeTieredCompactionStrategy', 'enabled': 'false' }")
+        session.execute(("CREATE MATERIALIZED VIEW t_by_v AS SELECT * FROM t "
+                         "WHERE v IS NOT NULL AND id IS NOT NULL PRIMARY KEY (v, id)"))
+
+        for i in xrange(10):
+            for j in xrange(100):
+                session.execute("INSERT INTO t (id, v) VALUES ({id}, {v})".format(id=i, v=j))
+
+        self.cluster.flush()
+
+        for i in xrange(10):
+            for j in xrange(100):
+                assert_one(session, "SELECT * FROM t WHERE id = {} and v = {}".format(i, j), [i, j])
+                assert_one(session, "SELECT * FROM t_by_v WHERE id = {} and v = {}".format(i, j), [j, i])
+
+        for i in xrange(10):
+            for j in xrange(100):
+                if j % 10 == 0:
+                    session.execute("DELETE FROM t WHERE id = {} AND v >= {} and v < {}".format(i, j, j + 2))
+
+        self.cluster.flush()
+
+        for i in xrange(10):
+            for j in xrange(100):
+                if j % 10 == 0 or (j - 1) % 10 == 0:
+                    assert_none(session, "SELECT * FROM t WHERE id = {} and v = {}".format(i, j))
+                    assert_none(session, "SELECT * FROM t_by_v WHERE id = {} and v = {}".format(i, j))
+                else:
+                    assert_one(session, "SELECT * FROM t WHERE id = {} and v = {}".format(i, j), [i, j])
+                    assert_one(session, "SELECT * FROM t_by_v WHERE id = {} and v = {}".format(i, j), [j, i])
+
+        node4 = new_node(self.cluster)
+        node4.set_configuration_options(values={'max_mutation_size_in_kb': 20})  # CASSANDRA-11670
+        debug("Start join at {}".format(time.strftime("%H:%M:%S")))
+        node4.start(wait_for_binary_proto=True, jvm_args=["-Dcassandra.migration_task_wait_in_seconds={}".format(MIGRATION_WAIT)])
+
+        session2 = self.patient_exclusive_cql_connection(node4)
+
+        for i in xrange(10):
+            for j in xrange(100):
+                if j % 10 == 0 or (j - 1) % 10 == 0:
+                    assert_none(session2, "SELECT * FROM ks.t WHERE id = {} and v = {}".format(i, j))
+                    assert_none(session2, "SELECT * FROM ks.t_by_v WHERE id = {} and v = {}".format(i, j))
+                else:
+                    assert_one(session2, "SELECT * FROM ks.t WHERE id = {} and v = {}".format(i, j), [i, j])
+                    assert_one(session2, "SELECT * FROM ks.t_by_v WHERE id = {} and v = {}".format(i, j), [j, i])
+
+        for i in xrange(10):
+            for j in xrange(100, 110):
+                session.execute("INSERT INTO t (id, v) VALUES ({id}, {v})".format(id=i, v=j))
+
+        for i in xrange(10):
+            for j in xrange(110):
+                if j < 100 and (j % 10 == 0 or (j - 1) % 10 == 0):
+                    assert_none(session2, "SELECT * FROM ks.t WHERE id = {} and v = {}".format(i, j))
+                    assert_none(session2, "SELECT * FROM ks.t_by_v WHERE id = {} and v = {}".format(i, j))
+                else:
+                    assert_one(session2, "SELECT * FROM ks.t WHERE id = {} and v = {}".format(i, j), [i, j])
+                    assert_one(session2, "SELECT * FROM ks.t_by_v WHERE id = {} and v = {}".format(i, j), [j, i])
+
+    @attr('resource-intensive')
+    def add_node_after_very_wide_mv_test(self):
+        """
+        @jira_ticket CASSANDRA-11670
+
+        Test that materialized views work with very wide materialized views as expected when adding a node.
+        """
+
+        session = self.prepare()
+
+        session.execute("CREATE TABLE t (id int, v int, PRIMARY KEY (id, v))")
+        session.execute(("CREATE MATERIALIZED VIEW t_by_v AS SELECT * FROM t "
+                         "WHERE v IS NOT NULL AND id IS NOT NULL PRIMARY KEY (v, id)"))
+
+        for i in xrange(5):
+            for j in xrange(5000):
+                session.execute("INSERT INTO t (id, v) VALUES ({id}, {v})".format(id=i, v=j))
+
+        self.cluster.flush()
+
+        for i in xrange(5):
+            for j in xrange(5000):
+                assert_one(session, "SELECT * FROM t_by_v WHERE id = {} and v = {}".format(i, j), [j, i])
+
+        node4 = new_node(self.cluster)
+        node4.set_configuration_options(values={'max_mutation_size_in_kb': 20})  # CASSANDRA-11670
+        debug("Start join at {}".format(time.strftime("%H:%M:%S")))
+        node4.start(wait_for_binary_proto=True, jvm_args=["-Dcassandra.migration_task_wait_in_seconds={}".format(MIGRATION_WAIT)])
+
+        session2 = self.patient_exclusive_cql_connection(node4)
+
+        for i in xrange(5):
+            for j in xrange(5000):
+                assert_one(session2, "SELECT * FROM ks.t_by_v WHERE id = {} and v = {}".format(i, j), [j, i])
+
+        for i in xrange(5):
+            for j in xrange(5100):
+                session.execute("INSERT INTO t (id, v) VALUES ({id}, {v})".format(id=i, v=j))
+
+        for i in xrange(5):
+            for j in xrange(5100):
+                assert_one(session, "SELECT * FROM t_by_v WHERE id = {} and v = {}".format(i, j), [j, i])
+
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12140',
                    flaky=True)
