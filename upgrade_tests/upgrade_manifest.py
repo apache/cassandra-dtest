@@ -74,7 +74,7 @@ indev_3_0_x = VersionMeta(name='indev_3_0_x', family='3.0.x', variant='indev', v
 current_3_0_x = VersionMeta(name='current_3_0_x', family='3.0.x', variant='current', version='3.0.9', min_proto_v=3, max_proto_v=4, java_versions=(8,))
 
 indev_3_x = VersionMeta(name='indev_3_x', family='3.x', variant='indev', version='git:trunk', min_proto_v=3, max_proto_v=4, java_versions=(8,))
-current_3_x = VersionMeta(name='current_3_x', family='3.x', variant='current', version='3.7', min_proto_v=3, max_proto_v=4, java_versions=(8,))
+current_3_x = VersionMeta(name='current_3_x', family='3.x', variant='current', version='3.9', min_proto_v=3, max_proto_v=4, java_versions=(8,))
 
 
 # MANIFEST maps a VersionMeta representing a line/variant to a list of other VersionMeta's representing supported upgrades
