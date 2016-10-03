@@ -241,6 +241,7 @@ class TestArchiveCommitlog(SnapshotTester):
 
         # Delete all commitlog backups so far:
         for f in glob.glob(tmp_commitlog + "/*"):
+            debug('Removing {}'.format(f))
             os.remove(f)
 
         snapshot_dirs = self.make_snapshot(node1, 'ks', 'cf', 'basic')
@@ -279,6 +280,9 @@ class TestArchiveCommitlog(SnapshotTester):
             # Record when the third set of inserts finished:
             insert_cutoff_times.append(time.gmtime())
 
+            # Flush so we get an accurate view of commitlogs
+            node1.flush()
+
             rows = session.execute('SELECT count(*) from ks.cf')
             # Make sure we have the same amount of rows as when we snapshotted:
             self.assertEqual(rows[0][0], 65000)
@@ -296,13 +300,12 @@ class TestArchiveCommitlog(SnapshotTester):
             cluster.flush()
             cluster.compact()
             node1.drain()
-            if archive_active_commitlogs:
-                # restart the node which causes the active commitlogs to be archived
-                node1.stop()
-                node1.start(wait_for_binary_proto=True)
 
             # Destroy the cluster
             cluster.stop()
+            debug("node1 commitlog dir contents after stopping: " + str(os.listdir(commitlog_dir)))
+            debug("tmp_commitlog contents after stopping: " + str(os.listdir(tmp_commitlog)))
+
             self.copy_logs(self.cluster, name=self.id().split(".")[0] + "_pre-restore")
             cleanup_cluster(self.cluster, self.test_path)
             self.test_path = get_test_path()

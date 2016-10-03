@@ -59,7 +59,7 @@ def advance_to_next_cl_segment(session, commitlog_dir,
     start = time.time()
     stop_time = start + timeout
     rate_limited_debug = get_rate_limited_function(_debug, 5)
-    _debug('attempting to write until we start writing to new CL segments')
+    _debug('attempting to write until we start writing to new CL segments: {}'.format(initial_cl_files))
 
     while _files_in(commitlog_dir) <= initial_cl_files:
         elapsed = time.time() - start
@@ -75,3 +75,5 @@ def advance_to_next_cl_segment(session, commitlog_dir,
             concurrency=500,
             raise_on_first_error=True,
         )
+
+    _debug('present commitlog segments: {}'.format(_files_in(commitlog_dir)))
