@@ -452,9 +452,6 @@ class TestReplaceAddress(BaseReplaceAddressTest):
 
     @since('2.2')
     @attr('resource-intensive')
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12656',
-                   flaky=True)
     def restart_failed_replace_test(self):
         """
         Test that if a node fails to replace, it can join the cluster even if the data is wiped.
