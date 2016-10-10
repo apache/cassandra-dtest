@@ -140,6 +140,36 @@ class TestSchema(Tester):
         session.execute("USE ks")
         assert_one(session, "SELECT * FROM t", [0, 0])
 
+    def drop_static_column_and_restart_test(self):
+        """
+        Dropping a static column caused an sstable corrupt exception after restarting, here
+        we test that we can drop a static column and restart safely.
+
+        @jira_ticket CASSANDRA-12582
+        """
+        session = self.prepare()
+
+        session.execute("USE ks")
+        session.execute("CREATE TABLE ts (id1 int, id2 int, id3 int static, val text, PRIMARY KEY (id1, id2))")
+
+        session.execute("INSERT INTO ts (id1, id2, id3, val) VALUES (1, 1, 0, 'v1')")
+        session.execute("INSERT INTO ts (id1, id2, id3, val) VALUES (1, 2, 0, 'v2')")
+        session.execute("INSERT INTO ts (id1, id2, id3, val) VALUES (2, 1, 1, 'v3')")
+
+        self.cluster.nodelist()[0].nodetool('flush ks ts')
+        assert_all(session, "SELECT * FROM ts", [[1, 1, 0, 'v1'], [1, 2, 0, 'v2'], [2, 1, 1, 'v3']])
+
+        session.execute("alter table ts drop id3")
+        assert_all(session, "SELECT * FROM ts", [[1, 1, 'v1'], [1, 2, 'v2'], [2, 1, 'v3']])
+
+        self.cluster.stop()
+        self.cluster.start()
+
+        session = self.patient_cql_connection(self.cluster.nodelist()[0])
+
+        session.execute("USE ks")
+        assert_all(session, "SELECT * FROM ts", [[1, 1, 'v1'], [1, 2, 'v2'], [2, 1, 'v3']])
+
     def prepare(self):
         cluster = self.cluster
         cluster.populate(1).start()
