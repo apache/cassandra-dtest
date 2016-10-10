@@ -68,16 +68,14 @@ def known_failure(failure_source, jira_url, flaky=False, notes=''):
     'systemic'.
 
     To run all known failures, use the functionality provided by the nosetests
-    attrib plugin, using the known_failure and known_flaky attributes:
+    attrib plugin, using the known_failure attributes:
 
         # only run tests that are known to fail
         $ nosetests -a known_failure
         # only run tests that are not known to fail
         $ nosetests -a !known_failure
         # only run tests that fail because of cassandra bugs
-        $ nosetests -a known_failure=cassandra
-        # only run tests that fail because of cassandra bugs, but are not flaky
-        $ nosetests -a known_failure=cassandra -a !known_flaky
+        $ nosetests -A "'cassandra' in [d['failure_source'] for d in known_failure]"
 
     Known limitations: a given test may only be tagged once and still work as
     expected with the attrib plugin machinery; if you decorate a test with
@@ -90,11 +88,17 @@ def known_failure(failure_source, jira_url, flaky=False, notes=''):
         assert_in(failure_source, valid_failure_sources)
         assert_is_instance(flaky, bool)
 
-        tagged_func = attr(known_failure=failure_source,
-                           jira_url=jira_url)(f)
-        if flaky:
-            tagged_func = attr('known_flaky')(tagged_func)
+        try:
+            existing_failure_annotations = f.known_failure
+        except AttributeError:
+            existing_failure_annotations = []
 
-        tagged_func = attr(failure_notes=notes)(tagged_func)
+        new_annotation = [{'failure_source': failure_source, 'jira_url': jira_url, 'notes': notes, 'flaky': flaky}]
+
+        failure_annotations = existing_failure_annotations + new_annotation
+
+        tagged_func = attr(known_failure=failure_annotations)(f)
+
         return tagged_func
+
     return wrapper
