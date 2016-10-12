@@ -4164,6 +4164,9 @@ class TestCQL(UpgradeTester):
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12722',
                    flaky=True)
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12780',
+                   flaky=True)
     def in_order_by_without_selecting_test(self):
         """
         Test that columns don't need to be selected for ORDER BY when there is a IN
