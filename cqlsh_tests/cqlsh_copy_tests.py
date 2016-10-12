@@ -2465,6 +2465,7 @@ class CqlshCopyTest(Tester):
             debug('Running {}'.format(copy_to_cmd))
             result = self.run_cqlsh(cmds=copy_to_cmd)
             debug('Output:\n{}'.format(result[0]))  # show stdout of copy cmd
+            debug('Errors:\n{}'.format(result[1]))  # show stderr of copy cmd
             ret.append(result)
             debug("COPY TO took {} to export {} records".format(datetime.datetime.now() - start, num_records))
 
@@ -2477,6 +2478,7 @@ class CqlshCopyTest(Tester):
             debug('Running {}'.format(copy_from_cmd))
             result = self.run_cqlsh(cmds=copy_from_cmd)
             debug('Output:\n{}'.format(result[0]))  # show stdout of copy cmd
+            debug('Errors:\n{}'.format(result[1]))  # show stderr of copy cmd
             ret.append(result)
             debug("COPY FROM took {} to import {} records".format(datetime.datetime.now() - start, num_records))
 
@@ -2643,7 +2645,7 @@ class CqlshCopyTest(Tester):
     def test_copy_to_with_more_failures_than_max_attempts(self):
         """
         Test exporting rows with failure injection by setting the environment variable CQLSH_COPY_TEST_FAILURES,
-        which is used by ExportProcess in pylib/copy.py to deviate its behavior from performing normal queries.
+        which is used by ExportProcess in pylib/copyutil.py to deviate its behavior from performing normal queries.
         Here we set a token range that will fail more times than the maximum number of attempts, therefore
         we expect this COPY TO job to fail.
 
@@ -2674,7 +2676,7 @@ class CqlshCopyTest(Tester):
     def test_copy_to_with_fewer_failures_than_max_attempts(self):
         """
         Test exporting rows with failure injection by setting the environment variable CQLSH_COPY_TEST_FAILURES,
-        which is used by ExportProcess in pylib/copy.py to deviate its behavior from performing normal queries.
+        which is used by ExportProcess in pylib/copyutil.py to deviate its behavior from performing normal queries.
         Here we set a token range that will fail fewer times than the maximum number of attempts, therefore
         we expect this COPY TO job to succeed.
 
@@ -2704,7 +2706,7 @@ class CqlshCopyTest(Tester):
     def test_copy_to_with_child_process_crashing(self):
         """
         Test exporting rows with failure injection by setting the environment variable CQLSH_COPY_TEST_FAILURES,
-        which is used by ExportProcess in pylib/copy.py to deviate its behavior from performing normal queries.
+        which is used by ExportProcess in pylib/copyutil.py to deviate its behavior from performing normal queries.
         Here we set a token range that will cause a child process processing this range to exit, therefore
         we expect this COPY TO job to fail.
 
@@ -2734,7 +2736,7 @@ class CqlshCopyTest(Tester):
     def test_copy_from_with_more_failures_than_max_attempts(self):
         """
         Test importing rows with failure injection by setting the environment variable CQLSH_COPY_TEST_FAILURES,
-        which is used by ImportProcess in pylib/copy.py to deviate its behavior from performing normal queries.
+        which is used by ImportProcess in pylib/copyutil.py to deviate its behavior from performing normal queries.
         To ensure unique batch ids we must also set the chunk size to one.
 
         We set a batch id that will cause a batch to fail more times than the maximum number of attempts,
@@ -2771,7 +2773,7 @@ class CqlshCopyTest(Tester):
     def test_copy_from_with_fewer_failures_than_max_attempts(self):
         """
         Test importing rows with failure injection by setting the environment variable CQLSH_COPY_TEST_FAILURES,
-        which is used by ImportProcess in pylib/copy.py to deviate its behavior from performing normal queries.
+        which is used by ImportProcess in pylib/copyutil.py to deviate its behavior from performing normal queries.
         To ensure unique batch ids we must also set the chunk size to one.
 
         We set a batch id that will cause a batch to fail fewer times than the maximum number of attempts,
@@ -2811,7 +2813,7 @@ class CqlshCopyTest(Tester):
     def test_copy_from_with_child_process_crashing(self):
         """
         Test importing rows with failure injection by setting the environment variable CQLSH_COPY_TEST_FAILURES,
-        which is used by ImportProcess in pylib/copy.py to deviate its behavior from performing normal queries.
+        which is used by ImportProcess in pylib/copyutil.py to deviate its behavior from performing normal queries.
         To ensure unique batch ids we must also set the chunk size to one.
 
         We set a batch id that will cause a child process to exit, therefore we expect this COPY TO job to fail.
@@ -2842,6 +2844,44 @@ class CqlshCopyTest(Tester):
         self.assertIn('1 child process(es) died unexpectedly, aborting', err)
         num_records_imported = rows_to_list(self.session.execute("SELECT COUNT(*) FROM {}".format(stress_table)))[0][0]
         self.assertTrue(num_records_imported < num_records)
+
+    @since('3.0')
+    def test_copy_from_with_unacked_batches(self):
+        """
+        Test importing rows with failure injection by setting the environment variable CQLSH_COPY_TEST_FAILURES,
+        which is used by ImportProcess in pylib/copyutil.py to deviate its behavior from performing normal queries.
+        To ensure unique batch ids we must also set the chunk size to one.
+
+        We set a batch id that will not be sent to the server, which will cause the parent process to miss
+        acknowledged batches from child processes, we expect this COPY TO job to fail after a pause of 'childtimeout'
+        seconds, currently 30 seconds.
+
+        @jira_ticket CASSANDRA-12740
+        """
+        num_records = 1000
+        self.prepare(nodes=1)
+
+        debug('Running stress')
+        stress_table = 'keyspace1.standard1'
+        self.node1.stress(['write', 'n={}'.format(num_records), 'no-warmup', '-rate', 'threads=50'])
+
+        tempfile = self.get_temp_file()
+        debug('Exporting to csv file {} to generate a file'.format(tempfile.name))
+        self.run_cqlsh(cmds="COPY {} TO '{}'".format(stress_table, tempfile.name))
+
+        self.session.execute("TRUNCATE {}".format(stress_table))
+
+        failures = {'unsent_batch': {'id': 30}}
+        os.environ['CQLSH_COPY_TEST_FAILURES'] = json.dumps(failures)
+        debug('Importing from csv file {} with {}'.format(tempfile.name, os.environ['CQLSH_COPY_TEST_FAILURES']))
+        out, err, _ = self.run_cqlsh(cmds="COPY {} FROM '{}' WITH CHUNKSIZE=1 AND CHILDTIMEOUT=30 AND REQUESTTIMEOUT=15"
+                                     .format(stress_table, tempfile.name))
+        debug(out)
+        debug(err)
+
+        self.assertIn('No records inserted in 30 seconds, aborting', err)
+        num_records_imported = rows_to_list(self.session.execute("SELECT COUNT(*) FROM {}".format(stress_table)))[0][0]
+        self.assertLess(num_records_imported, num_records)
 
     @since('2.2.5')
     @freshCluster()
