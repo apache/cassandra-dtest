@@ -8,6 +8,7 @@ from thrift.protocol import TBinaryProtocol
 from thrift.Thrift import TApplicationException
 from thrift.transport import TSocket, TTransport
 
+from tools.assertions import assert_length_equal
 from dtest import (CASSANDRA_VERSION_FROM_BUILD, DISABLE_VNODES, NUM_TOKENS,
                    ReusableClusterTester, debug, init_default_config)
 from thrift_bindings.v22 import Cassandra
@@ -22,7 +23,7 @@ from thrift_bindings.v22.Cassandra import (CfDef, Column, ColumnDef,
                                            Mutation, NotFoundException,
                                            SlicePredicate, SliceRange,
                                            SuperColumn)
-from tools.assertions import assert_none, assert_one
+from tools.assertions import assert_all, assert_none, assert_one
 from tools.decorators import since
 
 
@@ -1237,6 +1238,73 @@ class TestMutations(ThriftTester):
         assert get_range_slice(client, ColumnParent('Standard1'), SlicePredicate(column_names=['c1', 'c1']), '', '', 1000, ConsistencyLevel.ONE) == []
         _insert_simple()
         assert get_range_slice(client, ColumnParent('Super1'), SlicePredicate(column_names=['c1', 'c1']), '', '', 1000, ConsistencyLevel.ONE) == []
+
+    @since('2.1')
+    def test_super_cql_read_compatibility(self):
+        _set_keyspace('Keyspace1')
+        self.truncate_all('Super1')
+
+        _insert_super("key1")
+        _insert_super("key2")
+
+        node1 = self.cluster.nodelist()[0]
+        session = self.patient_cql_connection(node1)
+
+        session.execute('USE "Keyspace1"')
+
+        assert_all(session, "SELECT * FROM \"Super1\"",
+                   [["key1", "sc1", 4, "value4"],
+                    ["key1", "sc2", 5, "value5"],
+                    ["key1", "sc2", 6, "value6"],
+                    ["key2", "sc1", 4, "value4"],
+                    ["key2", "sc2", 5, "value5"],
+                    ["key2", "sc2", 6, "value6"]])
+
+        assert_all(session, "SELECT * FROM \"Super1\" WHERE key=textAsBlob('key1')",
+                   [["key1", "sc1", 4, "value4"],
+                    ["key1", "sc2", 5, "value5"],
+                    ["key1", "sc2", 6, "value6"]])
+
+        assert_all(session, "SELECT * FROM \"Super1\" WHERE key=textAsBlob('key1') AND column1=textAsBlob('sc2')",
+                   [["key1", "sc2", 5, "value5"],
+                    ["key1", "sc2", 6, "value6"]])
+
+        assert_all(session, "SELECT * FROM \"Super1\" WHERE key=textAsBlob('key1') AND column1=textAsBlob('sc2') AND column2 = 5",
+                   [["key1", "sc2", 5, "value5"]])
+
+        assert_all(session, "SELECT * FROM \"Super1\" WHERE key = textAsBlob('key1') AND column1 = textAsBlob('sc2')",
+                   [["key1", "sc2", 5, "value5"],
+                    ["key1", "sc2", 6, "value6"]])
+
+        assert_all(session, "SELECT column2, value FROM \"Super1\" WHERE key = textAsBlob('key1') AND column1 = textAsBlob('sc2')",
+                   [[5, "value5"],
+                    [6, "value6"]])
+
+    @since('2.1')
+    def test_super_cql_write_compatibility(self):
+        _set_keyspace('Keyspace1')
+        self.truncate_all('Super1')
+
+        node1 = self.cluster.nodelist()[0]
+        session = self.patient_cql_connection(node1)
+
+        session.execute('USE "Keyspace1"')
+
+        query = "INSERT INTO \"Super1\" (key, column1, column2, value) VALUES (textAsBlob(%s), textAsBlob(%s), %s, textAsBlob(%s)) USING TIMESTAMP 1234"
+        session.execute(query, ("key1", "sc1", 4, "value4"))
+        session.execute(query, ("key1", "sc2", 5, "value5"))
+        session.execute(query, ("key1", "sc2", 6, "value6"))
+        session.execute(query, ("key2", "sc1", 4, "value4"))
+        session.execute(query, ("key2", "sc2", 5, "value5"))
+        session.execute(query, ("key2", "sc2", 6, "value6"))
+
+        p = SlicePredicate(slice_range=SliceRange('sc1', 'sc2', False, 2))
+        result = client.get_slice('key1', ColumnParent('Super1'), p, ConsistencyLevel.ONE)
+        assert_length_equal(result, 2)
+        self.assertEqual(result[0].super_column.name, 'sc1')
+        self.assertEqual(result[0].super_column.columns[0], Column(_i64(4), 'value4', 1234))
+        self.assertEqual(result[1].super_column.name, 'sc2')
+        self.assertEqual(result[1].super_column.columns, [Column(_i64(5), 'value5', 1234), Column(_i64(6), 'value6', 1234)])
 
     def test_range_with_remove(self):
         _set_keyspace('Keyspace1')
