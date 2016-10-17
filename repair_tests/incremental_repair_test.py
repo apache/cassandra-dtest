@@ -337,6 +337,7 @@ class TestIncRepair(Tester):
     @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12725',
                    flaky=True)
+    @attr('resource-intensive')
     def sstable_marking_test_not_intersecting_all_ranges(self):
         """
         @jira_ticket CASSANDRA-10299
