@@ -154,7 +154,8 @@ class CqlshCopyTest(Tester):
 
         return cqlshrc
 
-    def run_cqlsh(self, cmds=None, cqlsh_options=None, use_debug=True, skip_cqlshrc=False, auth_enabled=False):
+    def run_cqlsh(self, cmds=None, cqlsh_options=None, use_debug=True, skip_cqlshrc=False,
+                  auth_enabled=False, show_output=False):
         """
         Run cqlsh on node1 adding the debug and cqlshrc to the clqsh options, unless the caller
         has specified its own options.
@@ -172,7 +173,12 @@ class CqlshCopyTest(Tester):
             cqlsh_options.append('--username=cassandra')
             cqlsh_options.append('--password=cassandra')
 
-        return self.node1.run_cqlsh(cmds=cmds, cqlsh_options=cqlsh_options)
+        ret = self.node1.run_cqlsh(cmds=cmds, cqlsh_options=cqlsh_options)
+        if show_output:
+            debug('Output:\n{}'.format(ret[0]))  # show stdout of copy cmd
+            debug('Errors:\n{}'.format(ret[1]))  # show stderr of copy cmd
+
+        return ret
 
     @property
     def default_time_format(self):
@@ -2148,7 +2154,8 @@ class CqlshCopyTest(Tester):
             # frequency is every 100 milliseconds this should be the number of lines written in 1 second)
             # and that the last line indicates all rows were processed
             lines = [line.rstrip('\n') for line in open(ratefile.name)]
-            self.assertTrue(len(lines) >= 10, "Expected at least 10 lines but got {} lines".format(len(lines)))
+            debug(lines)
+            self.assertLessEqual(10, len(lines), "Expected at least 10 lines but got {} lines".format(len(lines)))
             self.assertTrue(lines[-1].startswith('Processed: {} rows;'.format(num_rows)))
 
         self.prepare()
@@ -2158,7 +2165,8 @@ class CqlshCopyTest(Tester):
 
         debug('Exporting to csv file: {}'.format(tempfile.name))
         self.run_cqlsh(cmds="COPY {} TO '{}' WITH RATEFILE='{}' AND REPORTFREQUENCY='{}'"
-                       .format(stress_table, tempfile.name, ratefile.name, report_frequency))
+                       .format(stress_table, tempfile.name, ratefile.name, report_frequency),
+                       show_output=True)
 
         # check all records were exported
         self.assertEqual(num_rows, len(open(tempfile.name).readlines()))
@@ -2171,7 +2179,8 @@ class CqlshCopyTest(Tester):
 
         debug('Importing from csv file: {}'.format(tempfile.name))
         self.run_cqlsh(cmds="COPY {} FROM '{}' WITH RATEFILE='{}' AND REPORTFREQUENCY='{}'"
-                       .format(stress_table, tempfile.name, ratefile.name, report_frequency))
+                       .format(stress_table, tempfile.name, ratefile.name, report_frequency),
+                       show_output=True)
 
         # check all records were imported
         self.assertEqual([[num_rows]], rows_to_list(self.session.execute("SELECT COUNT(*) FROM {}"
@@ -2463,9 +2472,7 @@ class CqlshCopyTest(Tester):
             if copy_to_options:
                 copy_to_cmd += ' WITH ' + ' AND '.join('{} = {}'.format(k, v) for k, v in copy_to_options.iteritems())
             debug('Running {}'.format(copy_to_cmd))
-            result = self.run_cqlsh(cmds=copy_to_cmd)
-            debug('Output:\n{}'.format(result[0]))  # show stdout of copy cmd
-            debug('Errors:\n{}'.format(result[1]))  # show stderr of copy cmd
+            result = self.run_cqlsh(cmds=copy_to_cmd, show_output=True)
             ret.append(result)
             debug("COPY TO took {} to export {} records".format(datetime.datetime.now() - start, num_records))
 
@@ -2476,9 +2483,7 @@ class CqlshCopyTest(Tester):
             if copy_from_options:
                 copy_from_cmd += ' WITH ' + ' AND '.join('{} = {}'.format(k, v) for k, v in copy_from_options.iteritems())
             debug('Running {}'.format(copy_from_cmd))
-            result = self.run_cqlsh(cmds=copy_from_cmd)
-            debug('Output:\n{}'.format(result[0]))  # show stdout of copy cmd
-            debug('Errors:\n{}'.format(result[1]))  # show stderr of copy cmd
+            result = self.run_cqlsh(cmds=copy_from_cmd, show_output=True)
             ret.append(result)
             debug("COPY FROM took {} to import {} records".format(datetime.datetime.now() - start, num_records))
 
