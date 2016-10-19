@@ -4,17 +4,17 @@ from distutils.version import LooseVersion
 
 from cassandra import AuthenticationFailed, InvalidRequest, Unauthorized
 from cassandra.cluster import NoHostAvailable
-from cassandra.protocol import SyntaxException, ServerError
+from cassandra.protocol import ServerError, SyntaxException
 
 from dtest import CASSANDRA_VERSION_FROM_BUILD, Tester, debug
-from tools.assertions import (assert_all, assert_invalid, assert_one,
-                              assert_unauthorized, assert_exception,
-                              assert_length_equal)
+from tools.assertions import (assert_all, assert_exception, assert_invalid,
+                              assert_length_equal, assert_one,
+                              assert_unauthorized)
 from tools.decorators import known_failure, since
 from tools.jmxutils import (JolokiaAgent, make_mbean,
                             remove_perf_disable_shared_mem)
-from tools.misc import ImmutableMapping
 from tools.metadata_wrapper import UpdatingKeyspaceMetadataWrapper
+from tools.misc import ImmutableMapping
 
 
 class TestAuth(Tester):
