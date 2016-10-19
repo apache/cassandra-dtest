@@ -2193,6 +2193,9 @@ class TestCQL(UpgradeTester):
 
             assert_one(cursor, "SELECT l FROM test WHERE k = 1", [[3, 2, 1]])
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12809',
+                   flaky=True)
     def boolean_test(self):
         cursor = self.prepare()
 
