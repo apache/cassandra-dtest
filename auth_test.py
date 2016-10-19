@@ -201,7 +201,7 @@ class TestAuth(Tester):
 
         bob = self.get_session(user='bob', password='12345')
         rows = list(bob.execute("LIST USERS"))
-        assert_length_equal(2, len(rows))
+        assert_length_equal(rows, 2)
 
         session.execute("UPDATE system_auth.roles SET is_superuser=null WHERE role='bob'")
 
