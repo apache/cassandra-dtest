@@ -4,11 +4,12 @@ from distutils.version import LooseVersion
 
 from cassandra import AuthenticationFailed, InvalidRequest, Unauthorized
 from cassandra.cluster import NoHostAvailable
-from cassandra.protocol import SyntaxException
+from cassandra.protocol import SyntaxException, ServerError
 
 from dtest import CASSANDRA_VERSION_FROM_BUILD, Tester, debug
 from tools.assertions import (assert_all, assert_invalid, assert_one,
-                              assert_unauthorized)
+                              assert_unauthorized, assert_exception,
+                              assert_length_equal)
 from tools.decorators import known_failure, since
 from tools.jmxutils import (JolokiaAgent, make_mbean,
                             remove_perf_disable_shared_mem)
@@ -180,6 +181,36 @@ class TestAuth(Tester):
         self.assertTrue(users['bob'])
         self.assertFalse(users['cathy'])
         self.assertTrue(users['dave'])
+
+    @since('2.2')
+    def handle_corrupt_role_data_test(self):
+        """
+        * Launch a one node cluster
+        * Connect as the default superuser
+        * Create a new role
+        * Confirm that there exists 2 users
+        * Manually corrupt / delete the is_superuser cell of that role
+        * Confirm that listing users shows an invalid request
+        * Confirm that corrupted user can no longer login
+        @jira_ticket CASSANDRA-12700
+        """
+        self.prepare()
+
+        session = self.get_session(user='cassandra', password='cassandra')
+        session.execute("CREATE USER bob WITH PASSWORD '12345' SUPERUSER")
+
+        bob = self.get_session(user='bob', password='12345')
+        rows = list(bob.execute("LIST USERS"))
+        assert_length_equal(2, len(rows))
+
+        session.execute("UPDATE system_auth.roles SET is_superuser=null WHERE role='bob'")
+
+        self.ignore_log_patterns = list(self.ignore_log_patterns) + [r'Invalid metadata has been detected for role bob']
+        assert_exception(session, "LIST USERS", "Invalid metadata has been detected for role", expected=(ServerError))
+        try:
+            self.get_session(user='bob', password='12345')
+        except NoHostAvailable as e:
+            self.assertIsInstance(e.errors.values()[0], AuthenticationFailed)
 
     def user_cant_drop_themselves_test(self):
         """
