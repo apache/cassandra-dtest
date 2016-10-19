@@ -1,5 +1,6 @@
 import os
 import random
+import re
 import string
 import tempfile
 import time
@@ -506,9 +507,61 @@ class TestCompaction(Tester):
         self.assertEquals(len(node1.data_directories()), len(sstable_files),
                           'Expected one sstable data file per node directory but got {}'.format(sstable_files))
 
+    @since('3.10')
+    def fanout_size_test(self):
+        """
+        @jira_ticket CASSANDRA-11550
+        """
+        cluster = self.cluster
+        cluster.populate(1).start(wait_for_binary_proto=True)
+        [node1] = cluster.nodelist()
+
+        stress_write(node1, keycount=1)
+        node1.nodetool('disableautocompaction')
+
+        session = self.patient_cql_connection(node1)
+        debug("Altering compaction strategy to LCS")
+        session.execute("ALTER TABLE keyspace1.standard1 with compaction={'class': 'LeveledCompactionStrategy', 'sstable_size_in_mb':1, 'fanout_size':10};")
+
+        stress_write(node1, keycount=500000)
+        node1.nodetool('flush keyspace1 standard1')
+
+        # trigger the compaction
+        node1.compact()
+
+        # check the sstable count in each level
+        table_name = 'standard1'
+        output = grep_sstables_in_each_level(node1, table_name)
+
+        # [0, ?/10, ?, 0, 0, 0...]
+        p = re.compile(r'0,\s(\d+)/10,.*')
+        m = p.search(output)
+        self.assertEqual(10 * len(node1.data_directories()), int(m.group(1)))
+
+        debug("Altering the fanout_size")
+        session.execute("ALTER TABLE keyspace1.standard1 with compaction={'class': 'LeveledCompactionStrategy', 'sstable_size_in_mb':1, 'fanout_size':5};")
+
+        # trigger the compaction
+        node1.compact()
+        # check the sstable count in each level again
+        output = grep_sstables_in_each_level(node1, table_name)
+
+        # [0, ?/5, ?/25, ?, 0, 0...]
+        p = re.compile(r'0,\s(\d+)/5,\s(\d+)/25,.*')
+        m = p.search(output)
+        self.assertEqual(5 * len(node1.data_directories()), int(m.group(1)))
+        self.assertEqual(25 * len(node1.data_directories()), int(m.group(2)))
+
     def skip_if_no_major_compaction(self):
         if self.cluster.version() < '2.2' and self.strategy == 'LeveledCompactionStrategy':
             self.skipTest('major compaction not implemented for LCS in this version of Cassandra')
+
+
+def grep_sstables_in_each_level(node, table_name):
+    output = node.nodetool('cfstats').stdout
+    output = output[output.find(table_name):]
+    output = output[output.find("SSTables in each level"):]
+    return output[output.find(":") + 1:output.find("\n")].strip()
 
 
 def get_random_word(wordLen, population=string.ascii_letters + string.digits):
