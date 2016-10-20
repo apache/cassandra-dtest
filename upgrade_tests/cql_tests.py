@@ -325,9 +325,6 @@ class TestCQL(UpgradeTester):
 
             assert_one(cursor, "SELECT * FROM clicks WHERE token(userid) > token(2) LIMIT 1", [3, 'http://foo.com', 42])
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12721',
-                   flaky=True)
     def limit_multiget_test(self):
         """ Validate LIMIT option for 'multiget' in SELECT statements """
         cursor = self.prepare()
@@ -351,10 +348,10 @@ class TestCQL(UpgradeTester):
                     cursor.execute("INSERT INTO clicks (userid, url, time) VALUES ({}, 'http://foo.{}', 42)".format(id, tld))
 
             # Check that we do limit the output to 1 *and* that we respect query
-            # order of keys (even though 48 is after 2)
+            # order of keys (even though 48 is after 2) prior to 2.1.17
 
-            if self.get_node_version(is_upgraded) >= '2.2':
-                # the coordinator is the upgraded 2.2+ node
+            if self.get_node_version(is_upgraded) >= '2.1.17':
+                # the coordinator is the upgraded 2.2+ node or a node with CASSSANDRA-12420
                 assert_one(cursor, "SELECT * FROM clicks WHERE userid IN (48, 2) LIMIT 1", [2, 'http://foo.com', 42])
 
             else:
@@ -4164,12 +4161,6 @@ class TestCQL(UpgradeTester):
             assert_all(cursor, "SELECT * FROM test WHERE k=0 AND c1 = 0 AND c2 IN (0, 2) ORDER BY c1 DESC", [[0, 0, 2], [0, 0, 0]])
 
     @since('2.1')
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12722',
-                   flaky=True)
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12780',
-                   flaky=True)
     def in_order_by_without_selecting_test(self):
         """
         Test that columns don't need to be selected for ORDER BY when there is a IN
@@ -4198,8 +4189,9 @@ class TestCQL(UpgradeTester):
             assert_all(cursor, "SELECT v FROM test WHERE k=0 AND c1 = 0 AND c2 IN (2, 0)", [[0], [2]])
             assert_all(cursor, "SELECT v FROM test WHERE k=0 AND c1 = 0 AND c2 IN (2, 0) ORDER BY c1 ASC", [[0], [2]])
             assert_all(cursor, "SELECT v FROM test WHERE k=0 AND c1 = 0 AND c2 IN (2, 0) ORDER BY c1 DESC", [[2], [0]])
-            if self.get_node_version(is_upgraded) >= '2.2':
-                # the coordinator is the upgraded 2.2+ node
+
+            if self.get_node_version(is_upgraded) >= '2.1.17':
+                # the coordinator is the upgraded 2.2+ node or a node with CASSSANDRA-12420
                 assert_all(cursor, "SELECT v FROM test WHERE k IN (1, 0)", [[0], [1], [2], [3], [4], [5]])
             else:
                 # the coordinator is the non-upgraded 2.1 node
