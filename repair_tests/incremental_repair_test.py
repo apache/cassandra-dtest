@@ -334,9 +334,6 @@ class TestIncRepair(Tester):
         expected_load_size = 4.5  # In GB
         assert_almost_equal(load_size, expected_load_size, error=0.25)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12725',
-                   flaky=True)
     @attr('resource-intensive')
     def sstable_marking_test_not_intersecting_all_ranges(self):
         """
@@ -367,5 +364,5 @@ class TestIncRepair(Tester):
         debug("Repairing node 4")
         node4.nodetool("repair {}".format(repair_options))
 
-        for out in (node.run_sstablemetadata(keyspace='keyspace1').stdout for node in cluster.nodelist()):
+        for out in (node.run_sstablemetadata(keyspace='keyspace1').stdout for node in cluster.nodelist() if len(node.get_sstables('keyspace1', 'standard1')) > 0):
             self.assertNotIn('Repaired at: 0', out)
