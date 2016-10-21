@@ -327,6 +327,9 @@ class TestCompaction(Tester):
                 time.sleep(5)
                 cluster.start(wait_for_binary_proto=True)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12119',
+                   flaky=True)
     def large_compaction_warning_test(self):
         """
         @jira_ticket CASSANDRA-9643
@@ -508,6 +511,9 @@ class TestCompaction(Tester):
                           'Expected one sstable data file per node directory but got {}'.format(sstable_files))
 
     @since('3.10')
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12822',
+                   flaky=True)
     def fanout_size_test(self):
         """
         @jira_ticket CASSANDRA-11550
