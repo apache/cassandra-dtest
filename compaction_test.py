@@ -511,13 +511,13 @@ class TestCompaction(Tester):
                           'Expected one sstable data file per node directory but got {}'.format(sstable_files))
 
     @since('3.10')
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12822',
-                   flaky=True)
     def fanout_size_test(self):
         """
         @jira_ticket CASSANDRA-11550
         """
+        if not hasattr(self, 'strategy') or self.strategy != 'LeveledCompactionStrategy':
+            self.skipTest('Not implemented unless LeveledCompactionStrategy is used')
+
         cluster = self.cluster
         cluster.populate(1).start(wait_for_binary_proto=True)
         [node1] = cluster.nodelist()
@@ -529,7 +529,7 @@ class TestCompaction(Tester):
         debug("Altering compaction strategy to LCS")
         session.execute("ALTER TABLE keyspace1.standard1 with compaction={'class': 'LeveledCompactionStrategy', 'sstable_size_in_mb':1, 'fanout_size':10};")
 
-        stress_write(node1, keycount=500000)
+        stress_write(node1, keycount=1000000)
         node1.nodetool('flush keyspace1 standard1')
 
         # trigger the compaction
