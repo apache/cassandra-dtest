@@ -8,6 +8,7 @@ import unittest
 import pycassa
 
 from dtest import DEFAULT_DIR, Tester, debug, create_ks
+from tools.decorators import known_failure
 from tools.jmxutils import (JolokiaAgent, make_mbean,
                             remove_perf_disable_shared_mem)
 
@@ -28,6 +29,7 @@ except KeyError:
 
 
 class ThriftHSHATest(Tester):
+
     def test_closing_connections(self):
         """
         @jira_ticket CASSANDRA-6546
@@ -74,6 +76,9 @@ class ThriftHSHATest(Tester):
 
     @unittest.skipIf(not os.path.exists(ATTACK_JAR), "No attack jar found")
     @unittest.skipIf(not os.path.exists(JNA_PATH), "No JNA jar found")
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12843',
+                   flaky=True)
     def test_6285(self):
         """
         @jira_ticket CASSANDRA-6285
