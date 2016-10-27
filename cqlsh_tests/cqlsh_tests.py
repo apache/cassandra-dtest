@@ -688,6 +688,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
                 CREATE KEYSPACE test WITH REPLICATION = {'class' : 'SimpleStrategy', 'replication_factor' : 1};
                 CREATE TABLE test.users ( userid text PRIMARY KEY, firstname text, lastname text, age int);
                 CREATE INDEX myindex ON test.users (age);
+                CREATE INDEX "QuotedNameIndex" on test.users (firstName);
                 CREATE TABLE test.test (id int, col int, val text, PRIMARY KEY(id, col));
                 CREATE INDEX ON test.test (col);
                 CREATE INDEX ON test.test (val)
@@ -738,7 +739,8 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         self.execute(cql='DESCRIBE test.myindex', expected_err="'myindex' not found in keyspace 'test'")
         self.execute(cql="""
                 CREATE TABLE test.users ( userid text PRIMARY KEY, firstname text, lastname text, age int);
-                CREATE INDEX myindex ON test.users (age)
+                CREATE INDEX myindex ON test.users (age);
+                CREATE INDEX "QuotedNameIndex" on test.users (firstname)
                 """)
         self.execute(cql="DESCRIBE test.users", expected_output=self.get_users_table_output())
         self.execute(cql='DESCRIBE test.myindex', expected_output=self.get_index_output('myindex', 'test', 'users', 'age'))
@@ -748,6 +750,10 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         self.execute(cql='DESCRIBE test.myindex', expected_err="'myindex' not found in keyspace 'test'")
         self.execute(cql='CREATE INDEX myindex ON test.users (age)')
         self.execute(cql='DESCRIBE INDEX test.myindex', expected_output=self.get_index_output('myindex', 'test', 'users', 'age'))
+        self.execute(cql='DROP INDEX test."QuotedNameIndex"')
+        self.execute(cql='DESCRIBE test."QuotedNameIndex"', expected_err="'QuotedNameIndex' not found in keyspace 'test'")
+        self.execute(cql='CREATE INDEX "QuotedNameIndex" ON test.users (firstname)')
+        self.execute(cql='DESCRIBE INDEX test."QuotedNameIndex"', expected_output=self.get_index_output('"QuotedNameIndex"', 'test', 'users', 'firstname'))
 
         # Alter table. Renaming indexed columns is not allowed, and since 3.0 neither is dropping them
         # Prior to 3.0 the index would have been automatically dropped, but now we need to explicitly do that.
@@ -929,7 +935,8 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
             AND min_index_interval = 128
             AND read_repair_chance = 0.0
             AND speculative_retry = '99PERCENTILE';
-        """ + self.get_index_output('myindex', 'test', 'users', 'age')
+        """ + self.get_index_output('"QuotedNameIndex"', 'test', 'users', 'firstname') \
+                   + "\n" + self.get_index_output('myindex', 'test', 'users', 'age')
         elif self.cluster.version() >= LooseVersion('3.0'):
             return """
         CREATE TABLE test.users (
@@ -951,7 +958,8 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
             AND min_index_interval = 128
             AND read_repair_chance = 0.0
             AND speculative_retry = '99PERCENTILE';
-        """ + self.get_index_output('myindex', 'test', 'users', 'age')
+        """ + self.get_index_output('"QuotedNameIndex"', 'test', 'users', 'firstname') \
+                   + "\n" + self.get_index_output('myindex', 'test', 'users', 'age')
         else:
             return """
         CREATE TABLE test.users (
@@ -972,7 +980,8 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
             AND min_index_interval = 128
             AND read_repair_chance = 0.0
             AND speculative_retry = '99.0PERCENTILE';
-        """ + self.get_index_output('myindex', 'test', 'users', 'age')
+        """ + self.get_index_output('"QuotedNameIndex"', 'test', 'users', 'firstname') \
+                   + "\n" + self.get_index_output('myindex', 'test', 'users', 'age')
 
     def get_index_output(self, index, ks, table, col):
         return "CREATE INDEX {} ON {}.{} ({});".format(index, ks, table, col)
