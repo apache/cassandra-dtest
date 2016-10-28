@@ -606,6 +606,9 @@ class SnitchConfigurationUpdateTest(Tester):
         # nodes have joined racks, check endpoint counts again
         self.check_endpoint_count('testing', 'rf_test', cluster.nodelist(), rf)
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12856',
+                   flaky=True)
     def test_cannot_restart_with_different_rack(self):
         """
         @jira_ticket CASSANDRA-10242

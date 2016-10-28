@@ -151,9 +151,6 @@ class TestSCUpgrade(Tester):
         self.assertEqual('v', column.value)
 
     @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12340',
-                   flaky=True)
-    @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12616',
                    flaky=True)
     @flaky(max_runs=3, rerun_filter=requires_rerun)
