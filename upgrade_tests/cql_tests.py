@@ -5168,7 +5168,7 @@ class TestCQL(UpgradeTester):
             assert_none(cursor, "select * from space1.table1 where a=1 and b=1")
 
     @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12457',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12866',
                    flaky=True)
     def bug_5732_test(self):
         cursor = self.prepare(use_cache=True)
