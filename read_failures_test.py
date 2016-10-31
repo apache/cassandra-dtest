@@ -3,7 +3,7 @@ from cassandra.policies import FallthroughRetryPolicy
 from cassandra.query import SimpleStatement
 
 from dtest import Tester
-from tools.decorators import known_failure, since
+from tools.decorators import since
 
 KEYSPACE = "readfailures"
 
@@ -42,13 +42,13 @@ class TestReadFailures(Tester):
             WITH replication = { 'class': 'SimpleStrategy', 'replication_factor': '%s' }
             """ % (KEYSPACE, self.replication_factor))
         session.set_keyspace(KEYSPACE)
-        session.execute("CREATE TABLE IF NOT EXISTS tombstonefailure (id int PRIMARY KEY, value text)")
+        session.execute("CREATE TABLE IF NOT EXISTS tombstonefailure (id int, c int, value text, primary key(id, c))")
 
         return session
 
     def _insert_tombstones(self, session, number_of_tombstones):
         for num_id in range(number_of_tombstones):
-            session.execute(SimpleStatement("DELETE value FROM tombstonefailure WHERE id = {}".format(num_id),
+            session.execute(SimpleStatement("DELETE value FROM tombstonefailure WHERE id = 0 and c = {}".format(num_id),
                                             consistency_level=self.consistency_level, retry_policy=FallthroughRetryPolicy()))
 
     def _perform_cql_statement(self, session, text_statement):
@@ -77,9 +77,6 @@ class TestReadFailures(Tester):
                 break
         self.assertTrue(expected_code_found, "The error code map did not contain " + str(expected_code))
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12531',
-                   flaky=False)
     @since('2.1')
     def test_tombstone_failure_v3(self):
         """
@@ -91,9 +88,6 @@ class TestReadFailures(Tester):
         self._insert_tombstones(session, 600)
         self._perform_cql_statement(session, "SELECT value FROM tombstonefailure")
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12531',
-                   flaky=False)
     @since('2.2')
     def test_tombstone_failure_v4(self):
         """
