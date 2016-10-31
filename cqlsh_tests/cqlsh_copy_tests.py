@@ -3047,3 +3047,40 @@ class CqlshCopyTest(Tester):
         self.assertEqual([[num_records]], rows_to_list(self.session.execute("SELECT COUNT(*) FROM ks.testauth")),
                          msg="Failed to import {} rows\nSTDOUT:\n{}\nSTDERR:\n{}\n"
                          .format(num_records, ret.stderr, ret.stdout))
+
+    @since('2.2')
+    def test_reading_pk_timestamps_with_counters(self):
+        """
+        When using counters we don't need to convert any value except for partition keys,
+        and this test ensures that we can parse timestamps when they are in the partition key
+        and the table contains a counter value.
+
+        @jira_ticket CASSANDRA-12863
+        """
+        self.prepare()
+        self.session.execute("""
+            CREATE TABLE test_pk_timestamps_with_counters
+            (columnname text, day timestamp,
+            israndom boolean, columnvalue text, counter counter,
+            PRIMARY KEY ((columnname, day, israndom), columnvalue)
+            )""")
+
+        records = ['origins|2016-10-01 00:00:00+0000|False|ACTUAL|6\n',
+                   'origins|2016-10-01 00:00:00+0000|False|ADGMOB|4\n',
+                   'origins|2016-10-01 00:00:00+0000|False|ANONPM|4\n',
+                   'origins|2016-10-01 00:00:00+0000|False|CSRT2L|76\n',
+                   'origins|2016-10-01 00:00:00+0000|False|DIAGOP|18\n',
+                   'origins|2016-10-01 00:00:00+0000|False|E-SOFT|17\n',
+                   'origins|2016-10-01 00:00:00+0000|False|E-TASK|10\n']
+
+        tempfile = self.get_temp_file()
+        with open(tempfile.name, 'w') as f:
+            f.writelines(records)
+
+        debug('Importing from csv file: {name}'.format(name=tempfile.name))
+        cmds = "COPY ks.test_pk_timestamps_with_counters FROM '{name}' WITH delimiter = '|'".format(name=tempfile.name)
+        self.run_cqlsh(cmds=cmds)
+
+        res = rows_to_list(self.session.execute("SELECT COUNT(*) FROM ks.test_pk_timestamps_with_counters"))[0][0]
+        self.assertEqual(len(records), res,
+                         msg="Failed to import one or more rows, expected {} but got {}".format(len(records), res))
