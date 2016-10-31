@@ -8,11 +8,13 @@ from multiprocessing import Process, Queue
 from unittest import skip, skipIf
 
 from cassandra import ConsistencyLevel
+from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.cluster import Cluster
 from cassandra.query import SimpleStatement
 # TODO add in requirements.txt
 from enum import Enum  # Remove when switching to py3
 from nose.plugins.attrib import attr
+from nose.tools import (assert_equal)
 
 from dtest import Tester, debug, get_ip_from_node, create_ks
 from tools.assertions import (assert_all, assert_crc_check_chance_equal,
@@ -20,6 +22,7 @@ from tools.assertions import (assert_all, assert_crc_check_chance_equal,
                               assert_unavailable)
 from tools.decorators import known_failure, since
 from tools.misc import new_node
+from tools.jmxutils import (JolokiaAgent, make_mbean, remove_perf_disable_shared_mem)
 
 # CASSANDRA-10978. Migration wait (in seconds) to use in bootstrapping tests. Needed to handle
 # pathological case of flushing schema keyspace for multiple data directories. See CASSANDRA-6696
@@ -1736,3 +1739,73 @@ class TestMaterializedViewsConsistency(Tester):
         self._print_read_status(upper)
         sys.stdout.write("\n")
         sys.stdout.flush()
+
+
+@since('3.0')
+class TestMaterializedViewsLockcontention(Tester):
+    """
+    Test materialized views lock contention.
+    @jira_ticket CASSANDRA-12689
+    @since 3.0
+    """
+
+    def _prepare_cluster(self):
+        self.cluster.populate(1)
+
+        self.cluster.set_configuration_options(values={
+            'start_rpc': True,
+            'concurrent_materialized_view_writes': 1,
+            'concurrent_writes': 1,
+        })
+        self.nodes = self.cluster.nodes.values()
+        for node in self.nodes:
+            remove_perf_disable_shared_mem(node)
+
+        self.cluster.start(wait_for_binary_proto=True, jvm_args=[
+            "-Dcassandra.test.fail_mv_locks_count=64"
+        ])
+
+        session = self.patient_exclusive_cql_connection(self.nodes[0], protocol_version=5)
+
+        keyspace = "locktest"
+        session.execute("""
+                CREATE KEYSPACE IF NOT EXISTS {}
+                WITH replication = {{ 'class': 'SimpleStrategy', 'replication_factor': '1' }}
+                """.format(keyspace))
+        session.set_keyspace(keyspace)
+
+        session.execute(
+            "CREATE TABLE IF NOT EXISTS test (int1 int, int2 int, date timestamp, PRIMARY KEY (int1, int2))")
+        session.execute("""CREATE MATERIALIZED VIEW test_sorted_mv AS
+        SELECT int1, date, int2
+        FROM test
+        WHERE int1 IS NOT NULL AND date IS NOT NULL AND int2 IS NOT NULL
+        PRIMARY KEY (int1, date, int2)
+        WITH CLUSTERING ORDER BY (date DESC, int1 DESC)""")
+
+        return session
+
+    @since('3.0')
+    def test_mutations_dontblock(self):
+        session = self._prepare_cluster()
+        records = 100
+        records2 = 100
+        params = []
+        for x in xrange(records):
+            for y in xrange(records2):
+                params.append([x, y])
+
+        execute_concurrent_with_args(
+            session,
+            session.prepare('INSERT INTO test (int1, int2, date) VALUES (?, ?, toTimestamp(now()))'),
+            params
+        )
+
+        assert_one(session, "SELECT count(*) FROM test WHERE int1 = 1", [records2])
+
+        for node in self.nodes:
+            with JolokiaAgent(node) as jmx:
+                mutationStagePending = jmx.read_attribute(
+                    make_mbean('metrics', type="ThreadPools", path='request', scope='MutationStage', name='PendingTasks'), "Value"
+                )
+                assert_equal(0, mutationStagePending, "Pending mutations: {}".format(mutationStagePending))
