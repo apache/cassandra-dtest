@@ -189,6 +189,9 @@ class TestMaterializedViews(Tester):
         for i in xrange(1000):
             assert_one(session, "SELECT * FROM t_by_v WHERE v = {}".format(i), [i, i])
 
+    @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12874',
+                   flaky=True)
     def populate_mv_after_insert_wide_rows_test(self):
         """Test that a view is OK when created with existing data with wide rows"""
 
