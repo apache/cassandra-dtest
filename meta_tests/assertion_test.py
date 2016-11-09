@@ -106,3 +106,10 @@ class TestAssertionMethods(TestCase):
         # assert_length_equal_test
         check = [1, 2, 3, 4]
         assert_length_equal(check, 4)
+
+    def test_almost_equal_expect_pass(self):
+        assert_almost_equal(1, 1.1, 1.3, error=.31)
+
+    def test_almost_equal_expect_failure(self):
+        with self.assertRaises(AssertionError):
+            assert_almost_equal(1, 1.3, error=.1)
