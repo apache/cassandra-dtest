@@ -3,6 +3,7 @@ from unittest import skipIf
 
 from cassandra import Unauthorized
 from ccmlib.common import is_win
+from ccmlib.node import Node
 
 from dtest import OFFHEAP_MEMTABLES, Tester, debug
 from tools.assertions import assert_all, assert_invalid
@@ -40,6 +41,55 @@ class TestAuthUpgrade(Tester):
     @skipIf(OFFHEAP_MEMTABLES, 'offheap_objects are not available in 3.0')
     def upgrade_to_30_test(self):
         self.do_upgrade_with_internal_auth("git:cassandra-3.0")
+
+    def test_upgrade_legacy_table(self):
+        """
+        Upgrade with bringing up the legacy tables after the newer nodes (without legacy tables)
+        were started.
+
+        @jira_ticket CASSANDRA-12813
+        """
+
+        cluster = self.cluster
+
+        # Forcing cluster version on purpose
+        cluster.set_install_dir(version="2.1.16")
+
+        node3 = Node('node3', cluster, False, ('127.0.0.3', 9160), ('127.0.0.3', 7000),
+                     '7400', '2000', None, binary_interface=('127.0.0.3', 9042))
+        cluster.add(node3, False)
+        node3.start()
+
+        time.sleep(15)
+
+        node3.drain()
+        node3.watch_log_for("DRAINED")
+        node3.stop(gently=True)
+
+        # Ignore errors before upgrade on Windows
+        if is_win():
+            node3.mark_log_for_errors()
+
+        self.set_node_to_current_version(node3)
+
+        # Populate the two nodes with newer version, they will get started without
+        # legacy tables. Legacy tables will get replicated later.
+        cluster.populate(2)
+
+        node1, node2, node3 = cluster.nodelist()
+        self.set_node_to_current_version(node1)
+        self.set_node_to_current_version(node2)
+
+        node1.start(wait_for_binary_proto=True)
+        node2.start(wait_for_binary_proto=True)
+        node3.start()
+
+        node1.watch_log_for('Initializing system_auth.credentials')
+        node1.watch_log_for('Initializing system_auth.permissions')
+        node1.watch_log_for('Initializing system_auth.users')
+
+        # Should succeed. Will throw an NPE on pre-12813 code.
+        self.patient_cql_connection(node1, user='cassandra', password='cassandra')
 
     def do_upgrade_with_internal_auth(self, target_version):
         """
