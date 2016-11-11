@@ -60,7 +60,7 @@ class TestAuthUpgrade(Tester):
         cluster.add(node3, False)
         node3.start()
 
-        time.sleep(15)
+        node3.watch_log_for('Created default superuser')
 
         node3.drain()
         node3.watch_log_for("DRAINED")
@@ -84,9 +84,10 @@ class TestAuthUpgrade(Tester):
         node2.start(wait_for_binary_proto=True)
         node3.start()
 
-        node1.watch_log_for('Initializing system_auth.credentials')
-        node1.watch_log_for('Initializing system_auth.permissions')
-        node1.watch_log_for('Initializing system_auth.users')
+        for node in [node1, node2]:
+            node.watch_log_for('Initializing system_auth.credentials')
+            node.watch_log_for('Initializing system_auth.permissions')
+            node.watch_log_for('Initializing system_auth.users')
 
         # Should succeed. Will throw an NPE on pre-12813 code.
         self.patient_cql_connection(node1, user='cassandra', password='cassandra')
