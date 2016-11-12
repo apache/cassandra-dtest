@@ -54,43 +54,54 @@ class TestAuthUpgrade(Tester):
 
         # Forcing cluster version on purpose
         cluster.set_install_dir(version="2.1.16")
-
-        node3 = Node('node3', cluster, False, ('127.0.0.3', 9160), ('127.0.0.3', 7000),
-                     '7400', '2000', None, binary_interface=('127.0.0.3', 9042))
-        cluster.add(node3, False)
-        node3.start()
-
-        node3.watch_log_for('Created default superuser')
-
-        node3.drain()
-        node3.watch_log_for("DRAINED")
-        node3.stop(gently=True)
-
-        # Ignore errors before upgrade on Windows
-        if is_win():
-            node3.mark_log_for_errors()
-
-        self.set_node_to_current_version(node3)
-
-        # Populate the two nodes with newer version, they will get started without
-        # legacy tables. Legacy tables will get replicated later.
-        cluster.populate(2)
+        cluster.populate(3).start()
 
         node1, node2, node3 = cluster.nodelist()
-        self.set_node_to_current_version(node1)
-        self.set_node_to_current_version(node2)
 
-        node1.start(wait_for_binary_proto=True)
+        # Wait for default user to get created on one of the nodes
+        time.sleep(15)
+
+        # Upgrade to current version
+        for node in [node1, node2, node3]:
+            node.drain()
+            node.watch_log_for("DRAINED")
+            node.stop(gently=True)
+            self.set_node_to_current_version(node)
+
+        cluster.start()
+
+        # Make sure the system_auth table will get replicated to the node that we're going to replace
+        session = self.patient_cql_connection(node1, user='cassandra', password='cassandra')
+        session.execute("ALTER KEYSPACE system_auth WITH REPLICATION = { 'class' : 'SimpleStrategy', 'replication_factor' : 3 };")
+        cluster.repair()
+
+        cluster.stop()
+
+        # Replace the node
+        cluster.seeds.remove(node1)
+        cluster.remove(node1)
+
+        replacement_address = node1.address()
+        replacement_node = Node('replacement', cluster=self.cluster, auto_bootstrap=True,
+                                thrift_interface=(replacement_address, 9160), storage_interface=(replacement_address, 7000),
+                                jmx_port='7400', remote_debug_port='0', initial_token=None, binary_interface=(replacement_address, 9042))
+        self.set_node_to_current_version(replacement_node)
+
+        cluster.add(replacement_node, True)
+        replacement_node.start(wait_for_binary_proto=True)
+
         node2.start(wait_for_binary_proto=True)
-        node3.start()
+        node3.start(wait_for_binary_proto=True)
 
-        for node in [node1, node2]:
-            node.watch_log_for('Initializing system_auth.credentials')
-            node.watch_log_for('Initializing system_auth.permissions')
-            node.watch_log_for('Initializing system_auth.users')
+        replacement_node.watch_log_for('Initializing system_auth.credentials')
+        replacement_node.watch_log_for('Initializing system_auth.permissions')
+        replacement_node.watch_log_for('Initializing system_auth.users')
+
+        cluster.repair()
+        replacement_node.watch_log_for('Repair command')
 
         # Should succeed. Will throw an NPE on pre-12813 code.
-        self.patient_cql_connection(node1, user='cassandra', password='cassandra')
+        self.patient_cql_connection(replacement_node, user='cassandra', password='cassandra')
 
     def do_upgrade_with_internal_auth(self, target_version):
         """
