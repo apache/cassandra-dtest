@@ -162,6 +162,7 @@ def find_libjemalloc():
         print "Failed to run script to prelocate libjemalloc ({}): {}".format(script, exc)
         return ""
 
+
 CASSANDRA_LIBJEMALLOC = find_libjemalloc()
 # copy the initial environment variables so we can reset them later:
 initial_environment = copy.deepcopy(os.environ)
@@ -186,6 +187,7 @@ def debug(msg):
     LOG.debug(msg, extra={"current_test": CURRENT_TEST})
     if PRINT_DEBUG:
         print msg
+
 
 debug("Python driver version in use: {}".format(cassandra.__version__))
 
@@ -802,6 +804,8 @@ def get_test_path():
         test_path = process.communicate()[0].rstrip()
 
     return test_path
+
+
 # nose will discover this as a test, so we manually make it not a test
 get_test_path.__test__ = False
 

@@ -1059,6 +1059,7 @@ def data_resource_creator_permissions(creator, resource):
             permissions.append((creator, '<all functions in %s>' % keyspace, perm))
     return permissions
 
+
 # First value is the role name
 # Second value is superuser status
 # Third value is login status
