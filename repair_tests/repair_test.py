@@ -1054,6 +1054,110 @@ class TestRepair(BaseRepairTest):
         else:
             node1.nodetool('repair keyspace1 standard1 -inc -par')
 
+    @since('2.2')
+    def test_dead_sync_initiator(self):
+        """
+        @jira_ticket CASSANDRA-12901
+        """
+        self._test_failure_during_repair(phase='sync', initiator=True)
+
+    @since('2.2')
+    def test_dead_sync_participant(self):
+        """
+        @jira_ticket CASSANDRA-12901
+        """
+        self._test_failure_during_repair(phase='sync', initiator=False,)
+
+    @since('2.2')
+    def test_failure_during_anticompaction(self):
+        """
+        @jira_ticket CASSANDRA-12901
+        """
+        self._test_failure_during_repair(phase='anticompaction',)
+
+    @since('2.2')
+    def test_failure_during_validation(self):
+        """
+        @jira_ticket CASSANDRA-12901
+        """
+        self._test_failure_during_repair(phase='validation')
+
+    def _test_failure_during_repair(self, phase, initiator=False):
+        cluster = self.cluster
+        # We are not interested in specific errors, but
+        # that the repair session finishes on node failure without hanging
+        self.ignore_log_patterns = [
+            "Endpoint .* died",
+            "Streaming error occurred",
+            "StreamReceiveTask",
+            "Stream failed",
+            "Session completed with the following error",
+            "Repair session .* for range .* failed with error"
+        ]
+
+        # Disable hinted handoff and set batch commit log so this doesn't
+        # interfere with the test (this must be after the populate)
+        cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
+        cluster.set_batch_commitlog(enabled=True)
+        debug("Setting up cluster..")
+        cluster.populate(3)
+        node1, node2, node3 = cluster.nodelist()
+
+        node_to_kill = node2 if (phase == 'sync' and initiator) else node3
+        debug("Setting up byteman on {}".format(node_to_kill.name))
+        # set up byteman
+        node_to_kill.byteman_port = '8100'
+        node_to_kill.import_config_files()
+
+        debug("Starting cluster..")
+        cluster.start(wait_other_notice=True)
+
+        debug("stopping node3")
+        node3.stop(gently=False, wait_other_notice=True)
+
+        debug("inserting data while node3 is down")
+        node1.stress(stress_options=['write', 'n=1k',
+                                     'no-warmup', 'cl=ONE',
+                                     '-schema', 'replication(factor=3)',
+                                     '-rate', 'threads=10'])
+
+        debug("bring back node3")
+        node3.start(wait_other_notice=True, wait_for_binary_proto=True)
+
+        script = 'stream_sleep.btm' if phase == 'sync' else 'repair_{}_sleep.btm'.format(phase)
+        debug("Submitting byteman script to {}".format(node_to_kill.name))
+        # Sleep on anticompaction/stream so there will be time for node to be killed
+        node_to_kill.byteman_submit(['./byteman/{}'.format(script)])
+
+        def node1_repair():
+            global nodetool_error
+            try:
+                node1.nodetool('repair keyspace1 standard1')
+            except Exception, e:
+                nodetool_error = e
+
+        debug("repair node1")
+        # Launch in a external thread so it does not hang process
+        t = Thread(target=node1_repair)
+        t.start()
+
+        debug("Will kill {} in middle of {}".format(node_to_kill.name, phase))
+        msg_to_wait = 'streaming plan for Repair'
+        if phase == 'anticompaction':
+            msg_to_wait = 'Got anticompaction request'
+        elif phase == 'validation':
+            msg_to_wait = 'Validating'
+        node_to_kill.watch_log_for(msg_to_wait, filename='debug.log')
+        node_to_kill.stop(gently=False, wait_other_notice=True)
+
+        debug("Killed {}, now waiting repair to finish".format(node_to_kill.name))
+        t.join(timeout=60)
+        self.assertFalse(t.isAlive(), 'Repair still running after sync {} was killed'
+                                      .format("initiator" if initiator else "participant"))
+
+        node1.watch_log_for('Endpoint .* died', timeout=60)
+        node1.watch_log_for('Repair command .* finished', timeout=60)
+
 
 RepairTableContents = namedtuple('RepairTableContents',
                                  ['parent_repair_history', 'repair_history'])

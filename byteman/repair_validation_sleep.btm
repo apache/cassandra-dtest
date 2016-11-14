@@ -1,0 +1,13 @@
+#
+# Sleep 60s during validation compaction
+#
+RULE sleep 60s on validation
+CLASS org.apache.cassandra.db.compaction.CompactionManager
+METHOD doValidationCompaction
+AT ENTRY
+# set flag to only run this rule once.
+IF NOT flagged("done")
+DO
+   flag("done");
+   Thread.sleep(60000)
+ENDRULE

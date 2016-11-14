@@ -1,0 +1,13 @@
+#
+# Sleep 60s during streaming session
+#
+RULE sleep 60s on stream session
+CLASS org.apache.cassandra.streaming.StreamSession
+METHOD messageReceived
+AT ENTRY
+# set flag to only run this rule once.
+IF NOT flagged("done")
+DO
+   flag("done");
+   Thread.sleep(60000)
+ENDRULE
