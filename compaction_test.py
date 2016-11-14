@@ -327,9 +327,6 @@ class TestCompaction(Tester):
                 time.sleep(5)
                 cluster.start(wait_for_binary_proto=True)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12119',
-                   flaky=True)
     def large_compaction_warning_test(self):
         """
         @jira_ticket CASSANDRA-9643
@@ -358,7 +355,7 @@ class TestCompaction(Tester):
         node.nodetool('compact ks large')
         verb = 'Writing' if self.cluster.version() > '2.2' else 'Compacting'
         sizematcher = '\d+ bytes' if self.cluster.version() < LooseVersion('3.6') else '\d+\.\d{3}(K|M|G)iB'
-        node.watch_log_for('{} large partition ks/large:user \({}\)'.format(verb, sizematcher), from_mark=mark, timeout=180)
+        node.watch_log_for('{} large partition ks/large:user \({}'.format(verb, sizematcher), from_mark=mark, timeout=180)
 
         ret = list(session.execute("SELECT properties from ks.large where userid = 'user'"))
         assert_length_equal(ret, 1)
