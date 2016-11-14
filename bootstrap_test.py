@@ -17,6 +17,7 @@ from tools.data import query_c1c2
 from tools.decorators import known_failure, no_vnodes, since
 from tools.intervention import InterruptBootstrap, KillOnBootstrap
 from tools.misc import ImmutableMapping, new_node
+from tools.misc import generate_ssl_stores
 
 
 class BaseBootstrapTest(Tester):
@@ -34,7 +35,8 @@ class BaseBootstrapTest(Tester):
         r'Streaming error occurred'
     )
 
-    def _base_bootstrap_test(self, bootstrap=None, bootstrap_from_version=None):
+    def _base_bootstrap_test(self, bootstrap=None, bootstrap_from_version=None,
+                             enable_ssl=None):
         def default_bootstrap(cluster, token):
             node2 = new_node(cluster)
             node2.set_configuration_options(values={'initial_token': token})
@@ -45,6 +47,12 @@ class BaseBootstrapTest(Tester):
             bootstrap = default_bootstrap
 
         cluster = self.cluster
+
+        if enable_ssl:
+            debug("***using internode ssl***")
+            generate_ssl_stores(self.test_path)
+            cluster.enable_internode_ssl(self.test_path)
+
         tokens = cluster.balanced_tokens(2)
         cluster.set_configuration_options(values={'num_tokens': 1})
 
@@ -107,6 +115,10 @@ class BaseBootstrapTest(Tester):
 
 class TestBootstrap(BaseBootstrapTest):
     __test__ = True
+
+    @no_vnodes()
+    def simple_bootstrap_test_with_ssl(self):
+        self._base_bootstrap_test(enable_ssl=True)
 
     @no_vnodes()
     def simple_bootstrap_test(self):
