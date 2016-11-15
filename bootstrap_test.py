@@ -106,6 +106,7 @@ class BaseBootstrapTest(Tester):
 
 
 class TestBootstrap(BaseBootstrapTest):
+    __test__ = True
 
     @no_vnodes()
     def simple_bootstrap_test(self):
