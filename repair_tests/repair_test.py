@@ -281,6 +281,9 @@ class TestRepair(BaseRepairTest):
             self.assertTrue("Starting anticompaction")
 
     @known_failure(failure_source='test',
+                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12904',
+                   flaky=True)
+    @known_failure(failure_source='test',
                    jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12162',
                    flaky=True,
                    notes='windows')
