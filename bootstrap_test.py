@@ -623,10 +623,8 @@ class TestBootstrap(BaseBootstrapTest):
         @jira_ticket CASSANDRA-9484
         """
 
-        bootstrap_error = ("Other bootstrapping/leaving/moving nodes detected,"
-                           " cannot bootstrap while cassandra.consistent.rangemovement is true")
-
-        self.ignore_log_patterns.append(bootstrap_error)
+        bootstrap_error = "Other bootstrapping/leaving/moving nodes detected," \
+                          " cannot bootstrap while cassandra.consistent.rangemovement is true"
 
         cluster = self.cluster
         cluster.populate(1)
@@ -641,13 +639,15 @@ class TestBootstrap(BaseBootstrapTest):
         node2.start(wait_other_notice=True)
 
         node3 = new_node(cluster, remote_debug_port='2003')
-        process = node3.start(wait_other_notice=False)
-        stdout, stderr = process.communicate()
-        self.assertIn(bootstrap_error, stderr, msg=stderr)
-        time.sleep(.5)
-        self.assertFalse(node3.is_running(), msg="Two nodes bootstrapped simultaneously")
+        try:
+            node3.start(wait_other_notice=False, verbose=False)
+        except NodeError:
+            pass  # node doesn't start as expected
 
+        time.sleep(.5)
         node2.watch_log_for("Starting listening for CQL clients")
+
+        node3.grep_log(bootstrap_error)
 
         session = self.patient_exclusive_cql_connection(node2)
 
