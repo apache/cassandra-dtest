@@ -647,7 +647,7 @@ class TestBootstrap(BaseBootstrapTest):
         time.sleep(.5)
         node2.watch_log_for("Starting listening for CQL clients")
 
-        node3.grep_log(bootstrap_error)
+        node3.watch_log_for(bootstrap_error)
 
         session = self.patient_exclusive_cql_connection(node2)
 
