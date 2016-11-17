@@ -5,6 +5,7 @@ from unittest import skip
 
 from cassandra import ConsistencyLevel
 from ccmlib.node import TimeoutError, ToolError
+from nose.plugins.attrib import attr
 
 from dtest import Tester, debug, create_ks, create_cf
 from tools.assertions import assert_almost_equal
@@ -346,6 +347,7 @@ class TestTopology(Tester):
         self.assertFalse(null_status_pattern.search(out))
 
     @since('3.10')
+    @attr('resource-intensive')
     def stop_decommission_too_few_replicas_multi_dc_test(self):
         """
         Decommission should fail when it would result in the number of live replicas being less than
@@ -358,7 +360,6 @@ class TestTopology(Tester):
         node1, node2, node3, node4 = self.cluster.nodelist()
         session = self.patient_cql_connection(node2)
         create_ks(session, 'ks', {'dc1': 2, 'dc2': 2})
-        nodetool_error = None
         with self.assertRaises(ToolError):
             node4.nodetool('decommission')
 
