@@ -345,6 +345,32 @@ class TestTopology(Tester):
         out = self.show_status(node2)
         self.assertFalse(null_status_pattern.search(out))
 
+    @since('3.10')
+    def stop_decommission_too_few_replicas_multi_dc_test(self):
+        """
+        Decommission should fail when it would result in the number of live replicas being less than
+        the replication factor. --force should bypass this requirement.
+        @jira_ticket CASSANDRA-12510
+        @expected_errors ToolError when # nodes will drop below configured replicas in NTS/SimpleStrategy
+        """
+        cluster = self.cluster
+        cluster.populate([2, 2]).start(wait_for_binary_proto=True)
+        node1, node2, node3, node4 = self.cluster.nodelist()
+        session = self.patient_cql_connection(node2)
+        create_ks(session, 'ks', {'dc1': 2, 'dc2': 2})
+        nodetool_error = None
+        with self.assertRaises(ToolError):
+            node4.nodetool('decommission')
+
+        session.execute('DROP KEYSPACE ks')
+        create_ks(session, 'ks2', 4)
+        with self.assertRaises(ToolError):
+            node4.nodetool('decommission')
+
+        node4.nodetool('decommission --force')
+        decommissioned = node4.watch_log_for("DECOMMISSIONED", timeout=120)
+        self.assertTrue(decommissioned, "Node failed to decommission when passed --force")
+
     def show_status(self, node):
         out, _, _ = node.nodetool('status')
         debug("Status as reported by node {}".format(node.address()))
