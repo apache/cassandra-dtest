@@ -168,7 +168,7 @@ class TestBatch(Tester):
         """ Test that logged batch throws UAE if there aren't enough live nodes """
         session = self.prepare(nodes=3)
         [node.stop(wait_other_notice=True) for node in self.cluster.nodelist()[1:]]
-        session.consistency_level = 'ONE'
+        session.consistency_level = ConsistencyLevel.ONE
         assert_unavailable(session.execute, """
             BEGIN BATCH
             INSERT INTO users (id, firstname, lastname) VALUES (0, 'Jack', 'Sparrow')
@@ -185,10 +185,10 @@ class TestBatch(Tester):
             INSERT INTO users (id, firstname, lastname) VALUES (0, 'Jack', 'Sparrow')
             INSERT INTO users (id, firstname, lastname) VALUES (1, 'Will', 'Turner')
             APPLY BATCH
-        """, consistency_level=ConsistencyLevel.ANY)
+        """, consistency_level=ConsistencyLevel.ONE)
         session.execute(query)
 
-        self.cluster.nodelist()[-1].start(wait_other_notice=True)
+        self.cluster.nodelist()[-1].start(wait_for_binary_proto=True, wait_other_notice=True)
         assert_all(session, "SELECT * FROM users", [[1, u'Will', u'Turner'], [0, u'Jack', u'Sparrow']],
                    cl=ConsistencyLevel.ALL)
 
