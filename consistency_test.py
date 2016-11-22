@@ -940,7 +940,7 @@ class TestConsistency(Tester):
 
         insert_c1c2(session, n=10000, consistency=ConsistencyLevel.ONE)
 
-        node2.start(wait_other_notice=True)
+        node2.start(wait_for_binary_proto=True, wait_other_notice=True)
 
         # query everything to cause RR
         for n in xrange(0, 10000):
