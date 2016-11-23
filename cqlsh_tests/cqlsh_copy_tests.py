@@ -4,6 +4,7 @@ import datetime
 import glob
 import json
 import os
+import re
 import sys
 import time
 from collections import namedtuple
@@ -155,7 +156,7 @@ class CqlshCopyTest(Tester):
         return cqlshrc
 
     def run_cqlsh(self, cmds=None, cqlsh_options=None, use_debug=True, skip_cqlshrc=False,
-                  auth_enabled=False, show_output=True):
+                  auth_enabled=False, show_output=True, retry_on_request_timeout=True):
         """
         Run cqlsh on node1 adding the debug and cqlshrc to the clqsh options, unless the caller
         has specified its own options.
@@ -173,7 +174,18 @@ class CqlshCopyTest(Tester):
             cqlsh_options.append('--username=cassandra')
             cqlsh_options.append('--password=cassandra')
 
-        ret = self.node1.run_cqlsh(cmds=cmds, cqlsh_options=cqlsh_options)
+        if retry_on_request_timeout:
+            num_attempts = 0
+            while num_attempts < 5:
+                ret = self.node1.run_cqlsh(cmds=cmds, cqlsh_options=cqlsh_options)
+
+                if not re.search(r"Client request timeout", ret[0]):
+                    break
+
+                num_attempts += 1
+        else:
+            ret = self.node1.run_cqlsh(cmds=cmds, cqlsh_options=cqlsh_options)
+
         if show_output:
             debug('Output:\n{}'.format(ret[0]))  # show stdout of copy cmd
             debug('Errors:\n{}'.format(ret[1]))  # show stderr of copy cmd
