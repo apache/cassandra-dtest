@@ -1,6 +1,9 @@
 import time
 from collections import namedtuple
+from datetime import datetime, timedelta
 from distutils.version import LooseVersion
+
+from nose.tools import assert_regexp_matches
 
 from cassandra import AuthenticationFailed, InvalidRequest, Unauthorized
 from cassandra.cluster import NoHostAvailable
@@ -787,12 +790,35 @@ class TestAuth(Tester):
 
         assert_unauthorized(cathy, "SELECT * FROM ks.cf", "User cathy has no SELECT permission on <table ks.cf> or any of its parents")
 
-        # grant SELECT to cathy
-        cassandra.execute("GRANT SELECT ON ks.cf TO cathy")
-        # should still fail after 1 second.
-        time.sleep(1.0)
-        for c in cathys:
-            assert_unauthorized(c, "SELECT * FROM ks.cf", "User cathy has no SELECT permission on <table ks.cf> or any of its parents")
+        def check_caching(attempt=0):
+            attempt += 1
+            if attempt > 3:
+                self.fail("Unable to verify cache expiry in 3 attempts, failing")
+
+            debug("Attempting to verify cache expiry, attempt #{i}".format(i=attempt))
+            # grant SELECT to cathy
+            cassandra.execute("GRANT SELECT ON ks.cf TO cathy")
+            grant_time = datetime.now()
+            # selects should still fail after 1 second, but if execution was
+            # delayed for some reason such that the cache expired, retry
+            time.sleep(1.0)
+            for c in cathys:
+                try:
+                    c.execute("SELECT * FROM ks.cf")
+                    # this should still fail, but if the cache has expired while we paused, try again
+                    delta = datetime.now() - grant_time
+                    if delta > timedelta(seconds=2):
+                        # try again
+                        cassandra.execute("REVOKE SELECT ON ks.cf FROM cathy")
+                        time.sleep(2.5)
+                        check_caching(attempt)
+                    else:
+                        # legit failure
+                        self.fail("Expecting query to raise an exception, but nothing was raised.")
+                except Unauthorized as e:
+                    assert_regexp_matches(str(e), "User cathy has no SELECT permission on <table ks.cf> or any of its parents")
+
+        check_caching()
 
         # wait until the cache definitely expires and retry - should succeed now
         time.sleep(1.5)
