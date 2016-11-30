@@ -11,7 +11,7 @@ from nose.plugins.attrib import attr
 from dtest import Tester, debug, create_ks, create_cf
 from tools.assertions import assert_almost_equal, assert_one
 from tools.data import insert_c1c2
-from tools.decorators import known_failure, since
+from tools.decorators import since
 from tools.misc import ImmutableMapping
 
 
@@ -56,10 +56,6 @@ class TestIncRepair(Tester):
         for out in (node.run_sstablemetadata(keyspace='keyspace1').stdout for node in cluster.nodelist()):
             self.assertNotIn('Repaired at: 0', out)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11268',
-                   flaky=True,
-                   notes='windows')
     def multiple_repair_test(self):
         """
         * Launch a three node cluster

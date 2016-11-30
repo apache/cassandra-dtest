@@ -15,7 +15,7 @@ from dtest import (DISABLE_VNODES, OFFHEAP_MEMTABLES, DtestTimeoutError,
                    Tester, debug, CASSANDRA_VERSION_FROM_BUILD, create_ks, create_cf)
 from tools.assertions import assert_bootstrap_state, assert_invalid, assert_one, assert_row_count
 from tools.data import index_is_built, rows_to_list
-from tools.decorators import known_failure, since
+from tools.decorators import since
 from tools.misc import new_node
 
 
@@ -803,10 +803,6 @@ class TestSecondaryIndexesOnCollections(Tester):
         session.cluster.refresh_schema_metadata()
         self.assertEqual(0, len(session.cluster.metadata.keyspaces["map_double_index"].indexes))
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11879',
-                   flaky=True,
-                   notes='Windows')
     @skipIf(OFFHEAP_MEMTABLES, 'Hangs with offheap memtables')
     def test_map_indexes(self):
         """

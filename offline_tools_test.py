@@ -8,7 +8,7 @@ from ccmlib import common
 from ccmlib.node import ToolError
 
 from dtest import Tester, debug, create_ks
-from tools.decorators import known_failure, since
+from tools.decorators import since
 
 
 class TestOfflineTools(Tester):
@@ -97,19 +97,6 @@ class TestOfflineTools(Tester):
             if pattern.search(output):
                 break
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12275',
-                   flaky=False,
-                   notes='windows')
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12519',
-                   flaky=True)
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12617',
-                   flaky=True)
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12797',
-                   flaky=True)
     def sstableofflinerelevel_test(self):
         """
         Generate sstables of varying levels.

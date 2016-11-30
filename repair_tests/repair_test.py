@@ -11,7 +11,7 @@ from nose.plugins.attrib import attr
 
 from dtest import CASSANDRA_VERSION_FROM_BUILD, FlakyRetryPolicy, Tester, debug, create_ks, create_cf
 from tools.data import insert_c1c2, query_c1c2
-from tools.decorators import known_failure, no_vnodes, since
+from tools.decorators import no_vnodes, since
 
 
 def _repair_options(version, ks='', cf=None, sequential=True):
@@ -280,23 +280,12 @@ class TestRepair(BaseRepairTest):
         for node in cluster.nodelist():
             self.assertTrue("Starting anticompaction")
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12904',
-                   flaky=True)
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12162',
-                   flaky=True,
-                   notes='windows')
     def simple_sequential_repair_test(self):
         """
         Calls simple repair test with a sequential repair
         """
         self._simple_repair(sequential=True)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11247',
-                   flaky=True,
-                   notes='windows')
     def simple_parallel_repair_test(self):
         """
         Calls simple repair test with a parallel repair
@@ -607,10 +596,6 @@ class TestRepair(BaseRepairTest):
         # Check node2 now has the key
         self.check_rows_on_node(node2, 2001, found=[1000], restart=False)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11605',
-                   flaky=True,
-                   notes='flaky on Windows')
     def dc_parallel_repair_test(self):
         """
         * Set up a multi DC cluster
@@ -944,10 +929,6 @@ class TestRepair(BaseRepairTest):
                       rows[0][0],
                       'Expected {} job threads in repair options. Instead we saw {}'.format(job_thread_count, rows[0][0]))
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11836',
-                   flaky=True,
-                   notes='Windows')
     @since('2.2')
     def thread_count_repair_test(self):
         """
@@ -1239,10 +1220,6 @@ class TestRepairDataSystemTable(Tester):
         parent_repair_history, _ = self.repair_table_contents(node=self.node1, include_system_keyspaces=False)
         self.assertTrue(len(parent_repair_history))
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11298',
-                   flaky=True,
-                   notes='windows')
     def repair_table_test(self):
         """
         Test that `system_distributed.repair_history` is properly populated

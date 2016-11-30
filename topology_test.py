@@ -9,7 +9,7 @@ from ccmlib.node import TimeoutError, ToolError
 from dtest import Tester, debug, create_ks, create_cf
 from tools.assertions import assert_almost_equal
 from tools.data import insert_c1c2, query_c1c2
-from tools.decorators import known_failure, no_vnodes, since
+from tools.decorators import no_vnodes, since
 
 
 class TestTopology(Tester):
@@ -30,9 +30,6 @@ class TestTopology(Tester):
 
         node1.stop(gently=False)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12428',
-                   flaky=True)
     def simple_decommission_test(self):
         """
         @jira_ticket CASSANDRA-9912
@@ -251,9 +248,6 @@ class TestTopology(Tester):
         for n in xrange(0, 10000):
             query_c1c2(session, n, ConsistencyLevel.ONE)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12260',
-                   flaky=True)
     @since('3.0')
     @no_vnodes()
     def decommissioned_node_cant_rejoin_test(self):
@@ -306,9 +300,6 @@ class TestTopology(Tester):
         self.assertFalse(node3.is_running())
 
     @since('3.0')
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12823',
-                   flaky=True)
     def crash_during_decommission_test(self):
         """
         If a node crashes whilst another node is being decommissioned,

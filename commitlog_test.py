@@ -15,7 +15,7 @@ from parse import parse
 from dtest import Tester, debug, create_ks
 from tools.assertions import assert_almost_equal, assert_none, assert_one
 from tools.data import rows_to_list
-from tools.decorators import known_failure, since
+from tools.decorators import since
 from tools.misc import ImmutableMapping
 
 
@@ -226,9 +226,6 @@ class TestCommitLog(Tester):
         res = list(session.execute("SELECT * FROM Test.mytable"))
         self.assertEqual(num_rows, len(res), res)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12213',
-                   flaky=True)
     def test_commitlog_replay_on_startup(self):
         """
         Test commit log replay
@@ -314,10 +311,6 @@ class TestCommitLog(Tester):
         """
         self._segment_size_test(5, compressed=True)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11248',
-                   flaky=True,
-                   notes='windows')
     def stop_failure_policy_test(self):
         """
         Test the stop commitlog failure policy (default one)
@@ -342,10 +335,6 @@ class TestCommitLog(Tester):
               "SELECT * FROM test;"
             """)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11248',
-                   flaky=True,
-                   notes='windows')
     def stop_commit_failure_policy_test(self):
         """
         Test the stop_commit commitlog failure policy
@@ -379,10 +368,6 @@ class TestCommitLog(Tester):
             [2, 2]
         )
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11245',
-                   flaky=False,
-                   notes='windows')
     def die_failure_policy_test(self):
         """
         Test the die commitlog failure policy
@@ -397,10 +382,6 @@ class TestCommitLog(Tester):
         self.assertTrue(failure, "Cannot find the commitlog failure message in logs")
         self.assertFalse(self.node1.is_running(), "Node1 should not be running")
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11242',
-                   flaky=True,
-                   notes='windows')
     def ignore_failure_policy_test(self):
         """
         Test the ignore commitlog failure policy
@@ -450,10 +431,6 @@ class TestCommitLog(Tester):
             [2, 2]
         )
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11285',
-                   flaky=True,
-                   notes='windows')
     @since('2.2')
     def test_bad_crc(self):
         """
@@ -528,10 +505,6 @@ class TestCommitLog(Tester):
             node.wait_for_binary_interface(from_mark=mark, timeout=20)
         self.assertFalse(node.is_running())
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11276',
-                   flaky=True,
-                   notes='windows')
     @since('2.2')
     def test_compression_error(self):
         """

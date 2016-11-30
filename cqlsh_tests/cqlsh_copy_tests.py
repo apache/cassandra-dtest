@@ -28,7 +28,7 @@ from cqlsh_tools import (DummyColorMap, assert_csvs_items_equal, csv_rows,
 from dtest import (DISABLE_VNODES, Tester, canReuseCluster, debug,
                    freshCluster, warning, create_ks)
 from tools.data import rows_to_list
-from tools.decorators import known_failure, since
+from tools.decorators import since
 from tools.metadata_wrapper import (UpdatingClusterMetadataWrapper,
                                     UpdatingTableMetadataWrapper)
 
@@ -2612,9 +2612,6 @@ class CqlshCopyTest(Tester):
             for out in ret:
                 self.assertIn("Detected 1 core", out[0])
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12939',
-                   flaky=True)
     @freshCluster()
     @since('3.0.5')
     def test_bulk_round_trip_with_backoff(self):

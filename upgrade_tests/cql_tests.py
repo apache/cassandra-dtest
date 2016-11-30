@@ -29,7 +29,7 @@ from thrift_tests import get_thrift_client
 from tools.assertions import (assert_all, assert_invalid, assert_length_equal,
                               assert_none, assert_one, assert_row_count)
 from tools.data import rows_to_list
-from tools.decorators import known_failure, since
+from tools.decorators import since
 from upgrade_base import UpgradeTester
 from upgrade_manifest import build_upgrade_pairs
 
@@ -2190,9 +2190,6 @@ class TestCQL(UpgradeTester):
 
             assert_one(cursor, "SELECT l FROM test WHERE k = 1", [[3, 2, 1]])
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12809',
-                   flaky=True)
     def boolean_test(self):
         cursor = self.prepare()
 
@@ -3298,9 +3295,6 @@ class TestCQL(UpgradeTester):
             assert_invalid(cursor, 'SELECT DISTINCT pk0 FROM regular', matching="queries must request all the partition key columns")
             assert_invalid(cursor, 'SELECT DISTINCT pk0, pk1, ck0 FROM regular', matching="queries must only request partition key columns")
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11126',
-                   flaky=False)
     def select_distinct_with_deletions_test(self):
         cursor = self.prepare()
         cursor.execute('CREATE TABLE t1 (k int PRIMARY KEY, c int, v int)')
@@ -3346,9 +3340,6 @@ class TestCQL(UpgradeTester):
             cursor.execute("INSERT INTO test(k) VALUES (0)")
             assert_one(cursor, "SELECT dateOf(t) FROM test WHERE k=0", [None])
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12260',
-                   flaky=False)
     @freshCluster()
     def cas_simple_test(self):
         # cursor = self.prepare(nodes=3, rf=3)
@@ -5167,9 +5158,6 @@ class TestCQL(UpgradeTester):
 
             assert_none(cursor, "select * from space1.table1 where a=1 and b=1")
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12866',
-                   flaky=True)
     def bug_5732_test(self):
         cursor = self.prepare(use_cache=True)
 

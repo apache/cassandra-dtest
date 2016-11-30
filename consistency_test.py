@@ -14,7 +14,7 @@ from tools.assertions import assert_length_equal, assert_none, assert_unavailabl
 from dtest import DISABLE_VNODES, MultiError, Tester, debug, create_ks, create_cf
 from tools.data import (create_c1c2_table, insert_c1c2, insert_columns,
                         query_c1c2, rows_to_list)
-from tools.decorators import known_failure, since
+from tools.decorators import since
 
 ExpectedConsistency = namedtuple('ExpectedConsistency', ('num_write_nodes', 'num_read_nodes', 'is_strong'))
 
@@ -720,9 +720,6 @@ class TestAccuracy(TestHelper):
         self._run_test_function_in_parallel(TestAccuracy.Validation.validate_counters, [self.nodes], [self.rf], combinations)
 
     @attr("resource-intensive")
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12093',
-                   flaky=True)
     def test_network_topology_strategy_counters(self):
         """
         Test for multiple datacenters, counters table.
@@ -754,9 +751,6 @@ class TestAccuracy(TestHelper):
         self._run_test_function_in_parallel(TestAccuracy.Validation.validate_counters, self.nodes, self.rf.values(), combinations),
 
     @attr("resource-intensive")
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12094',
-                   flaky=True)
     @since("3.0")
     def test_network_topology_strategy_each_quorum_counters(self):
         """
@@ -778,12 +772,6 @@ class TestAccuracy(TestHelper):
 
 class TestConsistency(Tester):
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12475',
-                   flaky=True)
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12141',
-                   flaky=True)
     def short_read_test(self):
         """
         @jira_ticket CASSANDRA-9460

@@ -3,16 +3,12 @@ import tempfile
 
 from dtest import Tester, debug, create_ks
 from tools.data import rows_to_list
-from tools.decorators import known_failure, since
+from tools.decorators import since
 
 
 @since('0', '2.2.X')
 class TestJson(Tester):
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11952',
-                   flaky=False,
-                   notes='windows')
     def json_tools_test(self):
 
         debug("Starting cluster...")

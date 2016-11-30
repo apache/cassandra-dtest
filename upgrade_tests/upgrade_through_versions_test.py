@@ -17,7 +17,6 @@ from nose.plugins.attrib import attr
 from six import print_
 
 from dtest import RUN_STATIC_UPGRADE_MATRIX, Tester, debug
-from tools.decorators import known_failure
 from tools.misc import generate_ssl_stores, new_node
 from upgrade_base import switch_jdks
 from upgrade_manifest import (build_upgrade_pairs, current_2_0_x,
@@ -273,12 +272,6 @@ class UpgradeTester(Tester):
         """
         self.upgrade_scenario()
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12457',
-                   flaky=True)
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12444',
-                   flaky=True)
     def rolling_upgrade_test(self):
         """
         Test rolling upgrade of the cluster, so we have mixed versions part way through.
@@ -291,9 +284,6 @@ class UpgradeTester(Tester):
         """
         self.upgrade_scenario(internode_ssl=True)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12798',
-                   flaky=True)
     def rolling_upgrade_with_internode_ssl_test(self):
         """
         Rolling upgrade test using internode ssl.
@@ -709,9 +699,6 @@ class BootstrapMixin(object):
         # try and add a new node
         self.upgrade_scenario(after_upgrade_call=(self._bootstrap_new_node,))
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12711',
-                   flaky=True)
     def bootstrap_multidc_test(self):
         # try and add a new node
         # multi dc, 2 nodes in each dc

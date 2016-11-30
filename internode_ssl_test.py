@@ -1,14 +1,10 @@
 from dtest import Tester, debug, create_ks, create_cf
 from tools.data import putget
-from tools.decorators import known_failure
 from tools.misc import generate_ssl_stores
 
 
 class TestInternodeSSL(Tester):
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11689',
-                   flaky=True,
-                   notes='failed on trunk')
+
     def putget_with_internode_ssl_test(self):
         """
         Simple putget test with internode ssl enabled
@@ -17,10 +13,6 @@ class TestInternodeSSL(Tester):
         """
         self.__putget_with_internode_ssl_test('all')
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11689',
-                   flaky=True,
-                   notes='failed on trunk')
     def putget_with_internode_ssl_without_compression_test(self):
         """
         Simple putget test with internode ssl enabled

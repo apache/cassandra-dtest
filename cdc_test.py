@@ -17,7 +17,7 @@ from nose.tools import assert_equal, assert_less_equal
 
 from dtest import Tester, create_ks, debug
 from tools.data import rows_to_list
-from tools.decorators import known_failure, since
+from tools.decorators import since
 from tools.files import size_of_files_in_dir
 from tools.funcutils import get_rate_limited_function
 from tools.hacks import advance_to_next_cl_segment
@@ -471,9 +471,6 @@ class TestCDC(Tester):
         loading_session.cluster.shutdown()
         return loading_node
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11811',
-                   flaky=False)
     def test_cdc_data_available_in_cdc_raw(self):
         ks_name = 'ks'
         # First, create a new node just for data generation.

@@ -106,7 +106,6 @@ Any and all byteman (.btm) files should be saved in the cassandra-dtest/byteman/
     - Are changed tests' documentation updated?
     - Is Cassandra's desired behavior described in the documentation if it's not immediately readable in the test?
     - Does the documentation include all appropriate Doxygen annotations, in particular `@jira_ticket`?
-    - If the test is supposed to fail, is it appropriately tagged with `@known_failure`?
 - Readability and Reusability
     - Are any data structures built by looping that could be succinctly created in a comprehension
     - Is there repeated logic that could be factored out and given a descriptive name?

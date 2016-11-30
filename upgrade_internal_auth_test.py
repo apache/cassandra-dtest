@@ -7,7 +7,7 @@ from ccmlib.node import Node
 
 from dtest import OFFHEAP_MEMTABLES, Tester, debug
 from tools.assertions import assert_all, assert_invalid
-from tools.decorators import known_failure, since
+from tools.decorators import since
 from tools.misc import ImmutableMapping
 
 
@@ -22,21 +22,9 @@ class TestAuthUpgrade(Tester):
         r'Can\'t send migration request: node.*is down',
     )
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11469',
-                   flaky=True,
-                   notes='Fails ~30% of the time.')
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11250',
-                   flaky=True,
-                   notes='windows')
     def upgrade_to_22_test(self):
         self.do_upgrade_with_internal_auth("git:cassandra-2.2")
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11267',
-                   flaky=True,
-                   notes='windows')
     @since('3.0')
     @skipIf(OFFHEAP_MEMTABLES, 'offheap_objects are not available in 3.0')
     def upgrade_to_30_test(self):

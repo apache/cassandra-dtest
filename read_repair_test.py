@@ -6,7 +6,7 @@ from cassandra.query import SimpleStatement
 from tools.assertions import assert_one
 from dtest import PRINT_DEBUG, Tester, debug, create_ks
 from tools.data import rows_to_list
-from tools.decorators import known_failure, since
+from tools.decorators import since
 
 
 class TestReadRepair(Tester):
@@ -16,10 +16,6 @@ class TestReadRepair(Tester):
         self.cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
         self.cluster.populate(3).start(wait_for_binary_proto=True)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11266',
-                   flaky=False,
-                   notes='windows')
     @since('3.0')
     def alter_rf_and_run_read_repair_test(self):
         """
@@ -102,10 +98,6 @@ class TestReadRepair(Tester):
 
         return initial_replica, non_replicas
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11252',
-                   flaky=True,
-                   notes='windows')
     @since('2.0')
     def range_slice_query_with_tombstones_test(self):
         """

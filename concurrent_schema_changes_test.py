@@ -11,7 +11,7 @@ from cassandra.concurrent import execute_concurrent
 from ccmlib.node import Node
 
 from dtest import Tester, debug, create_ks
-from tools.decorators import known_failure, since
+from tools.decorators import since
 from tools.misc import ImmutableMapping
 
 
@@ -22,9 +22,6 @@ def wait(delay=2):
     time.sleep(delay)
 
 
-@known_failure(failure_source='cassandra',
-               jira_url='https://issues.apache.org/jira/browse/CASSANDRA-10699',
-               flaky=True)
 @skip('awaiting CASSANDRA-10699')
 class TestConcurrentSchemaChanges(Tester):
     cluster_options = ImmutableMapping({'start_rpc': 'true'})

@@ -23,7 +23,7 @@ from thrift_bindings.v22.Cassandra import (CfDef, Column, ColumnDef,
                                            SlicePredicate, SliceRange,
                                            SuperColumn)
 from tools.assertions import assert_none, assert_one
-from tools.decorators import known_failure, since
+from tools.decorators import since
 
 
 def get_thrift_client(host='127.0.0.1', port=9160):
@@ -1294,10 +1294,6 @@ class TestMutations(ThriftTester):
         _insert_super_range()
         _verify_super_range()
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12000',
-                   flaky=True,
-                   notes='Fails on windows')
     def test_get_range_slices_tokens(self):
         _set_keyspace('Keyspace2')
         self.truncate_all('Super3')

@@ -6,7 +6,7 @@ from distutils.version import LooseVersion
 from dtest import Tester
 from thrift_bindings.v22 import ttypes as thrift_types
 from thrift_tests import get_thrift_client
-from tools.decorators import known_failure, since
+from tools.decorators import since
 
 KEYSPACE = "foo"
 
@@ -110,9 +110,6 @@ class TestWriteFailures(Tester):
         self.protocol_version = 2
         self._perform_cql_statement("INSERT INTO mytable (key, value) VALUES ('key1', 'Value 1')")
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12213',
-                   flaky=True)
     def test_mutation_v3(self):
         """
         A failed mutation at v3 receives a WriteTimeout
@@ -204,9 +201,6 @@ class TestWriteFailures(Tester):
         if self.supports_v5_protocol:
             self._assert_error_code_map_exists_with_code(exc, 0x0000)
 
-    @known_failure(failure_source='cassandra',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12213',
-                   flaky=True)
     def test_paxos_any(self):
         """
         A light transaction at consistency level ANY does not receive a WriteFailure

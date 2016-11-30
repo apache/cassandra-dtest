@@ -20,7 +20,7 @@ from cqlsh_tools import monkeypatch_driver, unmonkeypatch_driver
 from dtest import Tester, debug, create_ks, create_cf
 from tools.assertions import assert_all, assert_none
 from tools.data import create_c1c2_table, insert_c1c2, rows_to_list
-from tools.decorators import known_failure, since
+from tools.decorators import since
 
 
 class TestCqlsh(Tester):
@@ -39,9 +39,6 @@ class TestCqlsh(Tester):
             os.unlink(self.tempfile.name)
         super(TestCqlsh, self).tearDown()
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12599',
-                   flaky=True)
     @since('2.1.9')
     def test_pep8_compliance(self):
         """
@@ -437,10 +434,6 @@ UPDATE varcharmaptable SET varcharvarintmap['Vitrum edere possum, mihi non nocet
 
         self.verify_glass(node1)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://datastax.jira.com/browse/CSTAR-574',
-                   flaky=False,
-                   notes='Offheap and Windows jobs ONLY')
     def test_unicode_syntax_error(self):
         """
         Ensure that syntax errors involving unicode are handled correctly.
@@ -457,10 +450,6 @@ UPDATE varcharmaptable SET varcharvarintmap['Vitrum edere possum, mihi non nocet
         self.assertIn(u'Invalid syntax', err)
         self.assertIn(u'ä', err)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://datastax.jira.com/browse/CSTAR-574',
-                   flaky=False,
-                   notes='Offheap and Windows jobs ONLY')
     @since('2.2')
     def test_unicode_invalid_request_error(self):
         """

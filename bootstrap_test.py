@@ -14,7 +14,7 @@ from dtest import DISABLE_VNODES, Tester, debug, create_ks, create_cf
 from tools.assertions import (assert_almost_equal, assert_bootstrap_state, assert_not_running,
                               assert_one, assert_stderr_clean)
 from tools.data import query_c1c2
-from tools.decorators import known_failure, no_vnodes, since
+from tools.decorators import no_vnodes, since
 from tools.intervention import InterruptBootstrap, KillOnBootstrap
 from tools.misc import ImmutableMapping, new_node
 
@@ -384,10 +384,6 @@ class TestBootstrap(BaseBootstrapTest):
         current_rows = list(session.execute("SELECT * FROM %s" % stress_table))
         self.assertEquals(original_rows, current_rows)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12437',
-                   flaky=True,
-                   notes='Windows')
     def local_quorum_bootstrap_test(self):
         """
         Test that CL local_quorum works while a node is bootstrapping.
@@ -442,17 +438,9 @@ class TestBootstrap(BaseBootstrapTest):
         failure = regex.search(out)
         self.assertIsNone(failure, "Error during stress while bootstrapping")
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11281',
-                   flaky=True,
-                   notes='windows')
     def shutdown_wiped_node_cannot_join_test(self):
         self._wiped_node_cannot_join_test(gently=True)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11281',
-                   flaky=True,
-                   notes='windows')
     def killed_wiped_node_cannot_join_test(self):
         self._wiped_node_cannot_join_test(gently=False)
 
@@ -491,10 +479,6 @@ class TestBootstrap(BaseBootstrapTest):
         node4.start(no_wait=True, wait_other_notice=False)
         node4.watch_log_for("A node with address /127.0.0.4 already exists, cancelling join", from_mark=mark)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11281',
-                   flaky=True,
-                   notes='windows')
     def decommissioned_wiped_node_can_join_test(self):
         """
         @jira_ticket CASSANDRA-9765
@@ -529,10 +513,6 @@ class TestBootstrap(BaseBootstrapTest):
         node4.start(wait_other_notice=True)
         node4.watch_log_for("JOINING:", from_mark=mark)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11281',
-                   flaky=True,
-                   notes='windows')
     def decommissioned_wiped_node_can_gossip_to_single_seed_test(self):
         """
         @jira_ticket CASSANDRA-8072
@@ -568,10 +548,6 @@ class TestBootstrap(BaseBootstrapTest):
         node2.start(wait_other_notice=False)
         node2.watch_log_for("JOINING:", from_mark=mark)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-11281',
-                   flaky=True,
-                   notes='windows, one fail on linux no-vnode 2.2')
     def failed_bootstrap_wiped_node_can_join_test(self):
         """
         @jira_ticket CASSANDRA-9765

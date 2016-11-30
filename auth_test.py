@@ -13,7 +13,7 @@ from dtest import CASSANDRA_VERSION_FROM_BUILD, Tester, debug
 from tools.assertions import (assert_all, assert_exception, assert_invalid,
                               assert_length_equal, assert_one,
                               assert_unauthorized)
-from tools.decorators import known_failure, since
+from tools.decorators import since
 from tools.jmxutils import (JolokiaAgent, make_mbean,
                             remove_perf_disable_shared_mem)
 from tools.metadata_wrapper import UpdatingKeyspaceMetadataWrapper
@@ -29,9 +29,6 @@ class TestAuth(Tester):
         r'Can\'t send migration request: node.*is down',
     )
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12456',
-                   flaky=True)
     def system_auth_ks_is_alterable_test(self):
         """
         * Launch a three node cluster
@@ -2381,9 +2378,6 @@ class TestAuthRoles(Tester):
         """
         self.verify_udf_permissions("INSERT INTO ks.t1 (k, v) VALUES (1, ks.plus_one(1))")
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12833',
-                   flaky=True)
     def udf_permissions_in_update_test(self):
         """
         Verify EXECUTE permission works in an UPDATE when UDF is in the SET and WHERE clauses

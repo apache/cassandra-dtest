@@ -13,7 +13,7 @@ from dtest import RUN_STATIC_UPGRADE_MATRIX, debug, run_scenarios
 from tools.assertions import assert_read_timeout_or_failure
 from tools.data import rows_to_list
 from tools.datahelp import create_rows, flatten_into_set, parse_data_into_dicts
-from tools.decorators import known_failure, since
+from tools.decorators import since
 from tools.paging import PageAssertionMixin, PageFetcher
 from upgrade_base import UpgradeTester
 from upgrade_manifest import build_upgrade_pairs
@@ -647,9 +647,6 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
             self.assertEqual(pf.num_results_all(), [400, 200])
             self.assertEqualIgnoreOrder(expected_data, pf.all_data())
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12491',
-                   flaky=True)
     @since('2.0.6')
     def static_columns_paging_test(self):
         """
@@ -1002,12 +999,6 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
             expected_data.append({u'id': 2, u'mytext': u'foo'})
             self.assertEqualIgnoreOrder(pf.all_data(), expected_data)
 
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12400',
-                   flaky=False)
-    @known_failure(failure_source='test',
-                   jira_url='https://issues.apache.org/jira/browse/CASSANDRA-12362',
-                   flaky=True)
     def test_row_TTL_expiry_during_paging(self):
         cursor = self.prepare()
         cursor.execute("CREATE TABLE paging_test ( id int, mytext text, PRIMARY KEY (id, mytext) )")
