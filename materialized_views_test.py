@@ -470,6 +470,13 @@ class TestMaterializedViews(Tester):
 
         session2 = self.patient_exclusive_cql_connection(node4)
 
+        """
+        @jira_ticket CASSANDRA-12984
+
+        Assert that MVs are marked as build after bootstrap. Otherwise newly streamed MVs will be built again
+        """
+        assert_one(session2, "SELECT count(*) FROM system.built_views WHERE keyspace_name = 'ks' AND view_name = 't_by_v'", [1])
+
         for i in xrange(1000):
             assert_one(session2, "SELECT * FROM ks.t_by_v WHERE v = {}".format(-i), [-i, i])
 
