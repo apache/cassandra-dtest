@@ -22,7 +22,6 @@ class BaseSStableLoaderTest(Tester):
     compact = False
     jvm_args = ()
     allow_log_errors = True
-    cluster_options = ImmutableMapping({'start_rpc': True})
 
     def create_schema(self, session, ks, compression):
         create_ks(session, ks, rf=2)

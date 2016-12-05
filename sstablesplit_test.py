@@ -9,7 +9,6 @@ from tools.misc import ImmutableMapping
 
 
 class TestSSTableSplit(Tester):
-    cluster_options = ImmutableMapping({'start_rpc': 'true'})
 
     def split_test(self):
         """

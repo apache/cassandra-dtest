@@ -16,7 +16,6 @@ from tools.misc import ImmutableMapping
 
 
 class TestIncRepair(Tester):
-    cluster_options = ImmutableMapping({'start_rpc': 'true'})
     ignore_log_patterns = (r'Can\'t send migration request: node.*is down',)
 
     def sstable_marking_test(self):

@@ -23,7 +23,6 @@ class TestCommitLog(Tester):
     """
     CommitLog Tests
     """
-    cluster_options = ImmutableMapping({'start_rpc': 'true'})
     allow_log_errors = True
 
     def setUp(self):

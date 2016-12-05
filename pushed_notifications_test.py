@@ -236,7 +236,7 @@ class TestPushedNotifications(Tester):
         waiter.clear_notifications()
 
         debug("Adding second node...")
-        node2 = Node('node2', self.cluster, True, ('127.0.0.2', 9160), ('127.0.0.2', 7000), '7200', '0', None, ('127.0.0.2', 9042))
+        node2 = Node('node2', self.cluster, True, None, ('127.0.0.2', 7000), '7200', '0', None, binary_interface=('127.0.0.2', 9042))
         self.cluster.add(node2, False)
         node2.start(wait_other_notice=True)
         debug("Waiting for notifications from {}".format(waiter.address))
@@ -268,8 +268,9 @@ class TestPushedNotifications(Tester):
         i = 0
         for node in cluster.nodelist():
             debug('Set 127.0.0.1 to prevent IPv6 java prefs, set rpc_address: localhost in cassandra.yaml')
-            node.network_interfaces['thrift'] = ('127.0.0.1', node.network_interfaces['thrift'][1] + i)
-            node.network_interfaces['binary'] = ('127.0.0.1', node.network_interfaces['thrift'][1] + 1)
+            if cluster.version() < '4':
+                node.network_interfaces['thrift'] = ('127.0.0.1', node.network_interfaces['thrift'][1] + i)
+            node.network_interfaces['binary'] = ('127.0.0.1', node.network_interfaces['binary'][1] + i)
             node.import_config_files()  # this regenerates the yaml file and sets 'rpc_address' to the 'thrift' address
             node.set_configuration_options(values={'rpc_address': 'localhost'})
             debug(node.show())

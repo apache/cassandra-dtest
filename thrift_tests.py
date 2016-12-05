@@ -44,6 +44,7 @@ def pid():
     return int(open(pid_fname).read())
 
 
+@since('2.0', max_version='4')
 class ThriftTester(ReusableClusterTester):
     client = None
     extra_args = []
@@ -342,6 +343,7 @@ def _big_multi_slice(key='abc'):
 _MULTI_SLICE_COLUMNS = [Column('a', '1', 0), Column('b', '2', 0), Column('c', '3', 0), Column('e', '5', 0), Column('f', '6', 0)]
 
 
+@since('2.0', max_version='4')
 class TestMutations(ThriftTester):
 
     def truncate_all(self, *table_names):

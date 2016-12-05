@@ -445,12 +445,12 @@ class TestCDC(Tester):
         session.cluster.shutdown()
         self.assertEqual(pre_non_cdc_write_cdc_raw_segments, _get_cdc_raw_files(node.get_path()))
 
-    def _init_new_loading_node(self, ks_name, create_stmt):
+    def _init_new_loading_node(self, ks_name, create_stmt, use_thrift=False):
         loading_node = Node(
             name='node2',
             cluster=self.cluster,
             auto_bootstrap=False,
-            thrift_interface=('127.0.0.2', 9160),
+            thrift_interface=('127.0.0.2', 9160) if use_thrift else None,
             storage_interface=('127.0.0.2', 7000),
             jmx_port='7400',
             remote_debug_port='0',
@@ -510,7 +510,7 @@ class TestCDC(Tester):
         generation_session.cluster.shutdown()
 
         # create a new node to use for cdc_raw cl segment replay
-        loading_node = self._init_new_loading_node(ks_name, cdc_table_info.create_stmt)
+        loading_node = self._init_new_loading_node(ks_name, cdc_table_info.create_stmt, self.cluster.version() < '4')
 
         # move cdc_raw contents to commitlog directories, then start the
         # node again to trigger commitlog replay, which should replay the

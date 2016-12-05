@@ -7,8 +7,10 @@ from thrift_bindings.v22.ttypes import (CfDef, Column, ColumnOrSuperColumn,
                                         SuperColumn)
 from thrift_tests import get_thrift_client
 from tools.misc import ImmutableMapping
+from tools.decorators import since
 
 
+@since('2.0', max_version='4')
 class TestSCCache(Tester):
     cluster_options = ImmutableMapping({'start_rpc': 'true'})
 

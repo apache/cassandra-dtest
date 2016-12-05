@@ -7,7 +7,7 @@ from thrift.transport import TSocket, TTransport
 from dtest import Tester, create_ks, create_cf
 from tools.data import (create_c1c2_table, insert_c1c2, insert_columns, putget,
                         query_c1c2, query_columns, range_putget)
-from tools.decorators import no_vnodes
+from tools.decorators import no_vnodes, since
 from tools.misc import ImmutableMapping, retry_till_success
 
 
@@ -91,6 +91,7 @@ class TestPutGet(Tester):
                 query_columns(self, session, key, size, offset=x * size - 1)
 
     @no_vnodes()
+    @since('2.0', max_version='4')
     def wide_slice_test(self):
         """
         Check slicing a wide row.

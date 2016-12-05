@@ -11,6 +11,9 @@ from dtest import DEFAULT_DIR, Tester, debug, create_ks
 from tools.jmxutils import (JolokiaAgent, make_mbean,
                             remove_perf_disable_shared_mem)
 
+from tools.decorators import since
+
+
 JNA_PATH = '/usr/share/java/jna.jar'
 ATTACK_JAR = 'lib/cassandra-attack.jar'
 
@@ -26,7 +29,7 @@ except KeyError:
         JNA_IN_LIB = glob.glob('%s/lib/jna-*.jar' % DEFAULT_DIR)
         JNA_PATH = JNA_IN_LIB[0]
 
-
+@since('2.0', max_version='4')
 class ThriftHSHATest(Tester):
 
     def test_closing_connections(self):

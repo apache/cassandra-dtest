@@ -25,7 +25,6 @@ def _normcase_all(xs):
 
 @since('3.0')
 class SSTableUtilTest(Tester):
-    cluster_options = ImmutableMapping({'start_rpc': 'true'})
 
     def compaction_test(self):
         """
