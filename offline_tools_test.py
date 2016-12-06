@@ -306,6 +306,11 @@ class TestOfflineTools(Tester):
         out, error, _ = node1.run_sstableexpiredblockers(keyspace="ks", column_family="cf")
         self.assertIn("blocks 2 expired sstables from getting dropped", out)
 
+    # 4.0 removes back compatibility with pre-3.0 versions, so testing upgradesstables for
+    # paths from those versions to 4.0 is invalid (and can only fail). There isn't currently
+    # any difference between the 3.0 and 4.0 sstable format though, but when the version is
+    # bumped for 4.0, remove the max_version & add a case for testing a 3.0 -> 4.0 upgrade
+    @since('2.2', max_version='3.X')
     def sstableupgrade_test(self):
         """
         Test that sstableupgrade functions properly offline on a same-version Cassandra sstable, a

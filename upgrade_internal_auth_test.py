@@ -30,6 +30,7 @@ class TestAuthUpgrade(Tester):
     def upgrade_to_30_test(self):
         self.do_upgrade_with_internal_auth("git:cassandra-3.0")
 
+    @since('2.2', max_version='3.X')
     def test_upgrade_legacy_table(self):
         """
         Upgrade with bringing up the legacy tables after the newer nodes (without legacy tables)
