@@ -36,7 +36,10 @@ class TestStorageEngineUpgrade(Tester):
             cluster.set_configuration_options(cluster_options)
 
         # Forcing cluster version on purpose
-        cluster.set_install_dir(version="2.1.9")
+        if CASSANDRA_VERSION_FROM_BUILD >= '4':
+            cluster.set_install_dir(version="git:cassandra-3.0")
+        else:
+            cluster.set_install_dir(version="git:cassandra-2.1")
         cluster.populate(1).start()
 
         node1 = cluster.nodelist()[0]
