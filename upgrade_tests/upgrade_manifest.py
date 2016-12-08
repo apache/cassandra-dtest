@@ -23,11 +23,13 @@ def _get_version_family():
         version_family = '2.2.x'
     elif current_version.vstring.startswith('3.0'):
         version_family = '3.0.x'
-    elif current_version > '3.0':
+    elif '3.1' <= current_version < '4.0':
         version_family = '3.x'
-    elif current_version >= '4.0':
+    elif '4.0' <= current_version < '4.1':
+        version_family = 'trunk'
+    else:
         # when this occurs, it's time to update this manifest a bit!
-        raise RuntimeError("4.0 not yet supported on upgrade tests!")
+        raise RuntimeError("4.1+ not yet supported on upgrade tests!")
 
     return version_family
 
@@ -76,6 +78,8 @@ current_3_0_x = VersionMeta(name='current_3_0_x', family='3.0.x', variant='curre
 indev_3_x = VersionMeta(name='indev_3_x', family='3.x', variant='indev', version='git:cassandra-3.X', min_proto_v=3, max_proto_v=4, java_versions=(8,))
 current_3_x = VersionMeta(name='current_3_x', family='3.x', variant='current', version='3.9', min_proto_v=3, max_proto_v=4, java_versions=(8,))
 
+indev_trunk = VersionMeta(name='indev_trunk', family='trunk', variant='indev', version='git:trunk', min_proto_v=3, max_proto_v=4, java_versions=(8,))
+
 
 # MANIFEST maps a VersionMeta representing a line/variant to a list of other VersionMeta's representing supported upgrades
 # Note on versions: 2.0 must upgrade to 2.1. Once at 2.1 or newer, upgrade is supported to any later version, including trunk (for now).
@@ -95,9 +99,10 @@ MANIFEST = {
     current_2_2_x: [indev_2_2_x, indev_3_0_x, current_3_0_x, indev_3_x, current_3_x],
 
     indev_3_0_x: [indev_3_x, current_3_x],
-    current_3_0_x: [indev_3_0_x, indev_3_x, current_3_x],
+    current_3_0_x: [indev_3_0_x, indev_3_x, current_3_x, indev_trunk],
 
-    current_3_x: [indev_3_x],
+    current_3_x: [indev_3_x, indev_trunk],
+    indev_3_x: [indev_trunk]
 }
 
 # Local env and custom path testing instructions. Use these steps to REPLACE the normal upgrade test cases with your own.
