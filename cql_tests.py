@@ -1367,3 +1367,18 @@ class LWTTester(ReusableClusterTester):
             APPLY BATCH""".format(table_name=table_name), [True])
 
         assert_one(session, "SELECT * FROM {} WHERE a = 7".format(table_name), [7, 7, None, None, 7])
+
+    def lwt_with_empty_resultset(self):
+        """
+        LWT with unset row.
+        @jira_ticket CASSANDRA-12694
+        """
+        session = self.get_lwttester_session()
+
+        session.execute("""
+            CREATE TABLE test (pk text, v1 int, v2 text, PRIMARY KEY (pk));
+        """)
+        session.execute("update test set v1 = 100 where pk = 'test1';")
+        node1 = self.cluster.nodelist()[0]
+        self.cluster.flush()
+        assert_one(session, "UPDATE test SET v1 = 100 WHERE pk = 'test1' IF v2 = null;", [True])
