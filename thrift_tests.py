@@ -57,6 +57,11 @@ class ThriftTester(ReusableClusterTester):
         super(ThriftTester, cls).setUpClass()
 
     def setUp(self):
+        # This is called before the @since annotation has had time to take
+        # effect and we don't want to even try connecting on thrift in 4.0
+        if self.cluster.version() >= '4':
+            return
+
         ReusableClusterTester.setUp(self)
 
         # this is ugly, but the whole test module is written against a global client
@@ -65,12 +70,23 @@ class ThriftTester(ReusableClusterTester):
         client.transport.open()
 
     def tearDown(self):
+        # This is called before the @since annotation has had time to take
+        # effect and we don't want to even try connecting on thrift in 4.0
+        if self.cluster.version() >= '4':
+            return
+
         client.transport.close()
         ReusableClusterTester.tearDown(self)
 
     @classmethod
     def post_initialize_cluster(cls):
         cluster = cls.cluster
+
+        # This is called before the @since annotation has had time to take
+        # effect and we don't want to even try connecting on thrift in 4.0
+        if cluster.version() >= '4':
+            return
+
         cluster.populate(1)
         node1, = cluster.nodelist()
 
