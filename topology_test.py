@@ -346,7 +346,7 @@ class TestTopology(Tester):
         out = self.show_status(node2)
         self.assertFalse(null_status_pattern.search(out))
 
-    @since('3.10')
+    @since('3.12')
     @attr('resource-intensive')
     def stop_decommission_too_few_replicas_multi_dc_test(self):
         """
@@ -359,6 +359,7 @@ class TestTopology(Tester):
         cluster.populate([2, 2]).start(wait_for_binary_proto=True)
         node1, node2, node3, node4 = self.cluster.nodelist()
         session = self.patient_cql_connection(node2)
+        session.execute("ALTER KEYSPACE system_distributed WITH REPLICATION = {'class':'SimpleStrategy', 'replication_factor':'2'};")
         create_ks(session, 'ks', {'dc1': 2, 'dc2': 2})
         with self.assertRaises(ToolError):
             node4.nodetool('decommission')
