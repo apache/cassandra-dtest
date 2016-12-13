@@ -44,6 +44,10 @@ class TestTopology(Tester):
         cluster.start(wait_for_binary_proto=True, jvm_args=["-Dcassandra.size_recorder_interval=1"])
         node1, node2, node3 = cluster.nodelist()
 
+        session = self.patient_cql_connection(node1)
+        # reduce system_distributed RF to 2 so we don't require forceful decommission
+        session.execute("ALTER KEYSPACE system_distributed WITH REPLICATION = {'class':'SimpleStrategy', 'replication_factor':'2'};")
+
         # write some data
         node1.stress(['write', 'n=10K', 'no-warmup', '-rate', 'threads=8'])
 
@@ -108,6 +112,8 @@ class TestTopology(Tester):
         node1, node2, node3 = cluster.nodelist()
 
         session = self.patient_cql_connection(node2)
+        # reduce system_distributed RF to 2 so we don't require forceful decommission
+        session.execute("ALTER KEYSPACE system_distributed WITH REPLICATION = {'class':'SimpleStrategy', 'replication_factor':'2'};")
         create_ks(session, 'ks', 2)
         create_cf(session, 'cf', columns={'c1': 'text', 'c2': 'text'})
         insert_c1c2(session, n=10000, consistency=ConsistencyLevel.ALL)

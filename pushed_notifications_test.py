@@ -240,6 +240,11 @@ class TestPushedNotifications(Tester):
         waiter.wait_for_notifications(timeout=30, num_notifications=2)
         waiter.clear_notifications()
 
+        session = self.patient_cql_connection(node1)
+        # reduce system_distributed RF to 2 so we don't require forceful decommission
+        session.execute("ALTER KEYSPACE system_distributed WITH REPLICATION = {'class':'SimpleStrategy', 'replication_factor':'1'};")
+        session.execute("ALTER KEYSPACE system_traces WITH REPLICATION = {'class':'SimpleStrategy', 'replication_factor':'1'};")
+
         debug("Adding second node...")
         node2 = Node('node2', self.cluster, True, ('127.0.0.2', 9160), ('127.0.0.2', 7000), '7200', '0', None, ('127.0.0.2', 9042))
         self.cluster.add(node2, False)
