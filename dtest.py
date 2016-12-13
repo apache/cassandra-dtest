@@ -915,7 +915,6 @@ def init_default_config(cluster, cluster_options):
             'request_timeout_in_ms': timeout
         })
 
-
     # No more thrift in 4.0, and start_rpc doesn't exists anymore
     if cluster.version() >= '4' and 'start_rpc' in values:
         del values['start_rpc']

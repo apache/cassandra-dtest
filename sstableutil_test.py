@@ -8,7 +8,6 @@ from ccmlib.node import ToolError
 from dtest import Tester, debug
 from tools.decorators import since
 from tools.intervention import InterruptCompaction
-from tools.misc import ImmutableMapping
 
 # These must match the stress schema names
 KeyspaceName = 'keyspace1'

@@ -16,7 +16,6 @@ from dtest import Tester, debug, create_ks
 from tools.assertions import assert_almost_equal, assert_none, assert_one
 from tools.data import rows_to_list
 from tools.decorators import since
-from tools.misc import ImmutableMapping
 
 
 class TestCommitLog(Tester):

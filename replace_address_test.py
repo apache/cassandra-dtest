@@ -13,7 +13,6 @@ from dtest import CASSANDRA_VERSION_FROM_BUILD, DISABLE_VNODES, Tester, debug
 from tools.assertions import assert_bootstrap_state, assert_all, assert_not_running
 from tools.data import rows_to_list
 from tools.decorators import since
-from tools.misc import ImmutableMapping
 
 
 class NodeUnavailable(Exception):

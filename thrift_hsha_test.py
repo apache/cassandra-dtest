@@ -29,6 +29,7 @@ except KeyError:
         JNA_IN_LIB = glob.glob('%s/lib/jna-*.jar' % DEFAULT_DIR)
         JNA_PATH = JNA_IN_LIB[0]
 
+
 @since('2.0', max_version='4')
 class ThriftHSHATest(Tester):
 

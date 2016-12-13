@@ -12,7 +12,6 @@ from dtest import Tester, debug, create_ks, create_cf
 from tools.assertions import assert_almost_equal, assert_one
 from tools.data import insert_c1c2
 from tools.decorators import since
-from tools.misc import ImmutableMapping
 
 
 class TestIncRepair(Tester):

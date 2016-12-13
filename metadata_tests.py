@@ -3,7 +3,6 @@ import time
 from unittest import skip
 
 from dtest import Tester
-from tools.misc import ImmutableMapping
 
 
 class TestMetadata(Tester):

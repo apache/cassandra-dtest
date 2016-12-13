@@ -7,7 +7,6 @@ from ccmlib import common as ccmcommon
 
 from dtest import Tester, debug, create_ks, create_cf
 from tools.assertions import assert_one
-from tools.misc import ImmutableMapping
 
 
 # WARNING: sstableloader tests should be added to TestSSTableGenerationAndLoading (below),

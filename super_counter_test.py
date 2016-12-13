@@ -8,6 +8,7 @@ from tools.misc import ImmutableMapping
 
 from tools.decorators import since
 
+
 @since('2.0', max_version='4')
 class TestSuperCounterClusterRestart(Tester):
     """
