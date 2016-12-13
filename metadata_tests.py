@@ -3,11 +3,9 @@ import time
 from unittest import skip
 
 from dtest import Tester
-from tools.misc import ImmutableMapping
 
 
 class TestMetadata(Tester):
-    cluster_options = ImmutableMapping({'start_rpc': 'true'})
 
     def force_compact(self):
         cluster = self.cluster

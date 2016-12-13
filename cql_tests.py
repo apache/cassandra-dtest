@@ -494,6 +494,7 @@ class MiscellaneousCQLTester(CQLTester):
                             "Only the first 65535 elements will be returned to the client. Please see "
                             "http://cassandra.apache.org/doc/cql3/CQL.html#collections for more details.")
 
+    @since('2.0', max_version='4')
     def cql3_insert_thrift_test(self):
         """
         Check that we can insert from thrift into a CQL3 table:
@@ -531,6 +532,7 @@ class MiscellaneousCQLTester(CQLTester):
 
         assert_one(session, "SELECT * FROM test", [2, 4, 8])
 
+    @since('2.0', max_version='4')
     def rename_test(self):
         """
         Check that a thrift-created table can be renamed via CQL:

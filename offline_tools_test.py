@@ -335,9 +335,13 @@ class TestOfflineTools(Tester):
             debug('Test version: {} - installing git:cassandra-2.1'.format(testversion))
             cluster.set_install_dir(version='git:cassandra-2.1')
         # As of 3.5, sstable format 'ma' from 3.0 is still the latest - install 2.2 to upgrade from
-        else:
+        elif testversion < '4.0':
             debug('Test version: {} - installing git:cassandra-2.2'.format(testversion))
             cluster.set_install_dir(version='git:cassandra-2.2')
+        # From 4.0, one can only upgrade from 3.0
+        else:
+            debug('Test version: {} - installing git:cassandra-3.0'.format(testversion))
+            cluster.set_install_dir(version='git:cassandra-3.0')
 
         # Start up last major version, write out an sstable to upgrade, and stop node
         cluster.populate(1).start(wait_for_binary_proto=True)
@@ -360,11 +364,18 @@ class TestOfflineTools(Tester):
         cluster.start(wait_for_binary_proto=True)
         node1.flush()
         cluster.stop()
-        (out, error, rc) = node1.run_sstableupgrade(keyspace='ks', column_family='cf')
-        debug(out)
-        debug(error)
-        debug('Upgraded ks.cf sstable: {}'.format(node1.get_sstables(keyspace='ks', column_family='cf')))
-        self.assertIn('Found 1 sstables that need upgrading.', out)
+
+        # A bit hacky, but we can only upgrade to 4.0 from 3.0, but both use the
+        # same sstable major format currently, so there is no upgrading to do.
+        # So on 4.0, we only test that sstable upgrade detect there is no
+        # upgrade. We'll removed that test if 4.0 introduce a major sstable
+        # change before it's release.
+        if testversion < '4.0':
+            (out, error, rc) = node1.run_sstableupgrade(keyspace='ks', column_family='cf')
+            debug(out)
+            debug(error)
+            debug('Upgraded ks.cf sstable: {}'.format(node1.get_sstables(keyspace='ks', column_family='cf')))
+            self.assertIn('Found 1 sstables that need upgrading.', out)
 
         # Check that sstableupgrade finds no upgrade needed on current version.
         (out, error, rc) = node1.run_sstableupgrade(keyspace='ks', column_family='cf')

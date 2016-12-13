@@ -44,6 +44,7 @@ def pid():
     return int(open(pid_fname).read())
 
 
+@since('2.0', max_version='4')
 class ThriftTester(ReusableClusterTester):
     client = None
     extra_args = []
@@ -56,6 +57,11 @@ class ThriftTester(ReusableClusterTester):
         super(ThriftTester, cls).setUpClass()
 
     def setUp(self):
+        # This is called before the @since annotation has had time to take
+        # effect and we don't want to even try connecting on thrift in 4.0
+        if self.cluster.version() >= '4':
+            return
+
         ReusableClusterTester.setUp(self)
 
         # this is ugly, but the whole test module is written against a global client
@@ -64,12 +70,23 @@ class ThriftTester(ReusableClusterTester):
         client.transport.open()
 
     def tearDown(self):
+        # This is called before the @since annotation has had time to take
+        # effect and we don't want to even try connecting on thrift in 4.0
+        if self.cluster.version() >= '4':
+            return
+
         client.transport.close()
         ReusableClusterTester.tearDown(self)
 
     @classmethod
     def post_initialize_cluster(cls):
         cluster = cls.cluster
+
+        # This is called before the @since annotation has had time to take
+        # effect and we don't want to even try connecting on thrift in 4.0
+        if cluster.version() >= '4':
+            return
+
         cluster.populate(1)
         node1, = cluster.nodelist()
 
@@ -342,6 +359,7 @@ def _big_multi_slice(key='abc'):
 _MULTI_SLICE_COLUMNS = [Column('a', '1', 0), Column('b', '2', 0), Column('c', '3', 0), Column('e', '5', 0), Column('f', '6', 0)]
 
 
+@since('2.0', max_version='4')
 class TestMutations(ThriftTester):
 
     def truncate_all(self, *table_names):

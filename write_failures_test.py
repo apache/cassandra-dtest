@@ -209,6 +209,7 @@ class TestWriteFailures(Tester):
         self.expected_expt = None
         self._perform_cql_statement("INSERT INTO mytable (key, value) VALUES ('key1', 'Value 1') IF NOT EXISTS")
 
+    @since('2.0', max_version='4')
     def test_thrift(self):
         """
         A thrift client receives a TimedOutException

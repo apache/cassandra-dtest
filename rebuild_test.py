@@ -7,11 +7,9 @@ from ccmlib.node import ToolError
 from dtest import Tester, debug, create_ks, create_cf
 from tools.data import insert_c1c2, query_c1c2
 from tools.decorators import since, no_vnodes
-from tools.misc import ImmutableMapping
 
 
 class TestRebuild(Tester):
-    cluster_options = ImmutableMapping({'start_rpc': 'true'})
     ignore_log_patterns = (
         # This one occurs when trying to send the migration to a
         # node that hasn't started yet, and when it does, it gets
@@ -34,7 +32,7 @@ class TestRebuild(Tester):
         cluster = self.cluster
         cluster.set_configuration_options(values={'endpoint_snitch': 'org.apache.cassandra.locator.PropertyFileSnitch'})
         node1 = cluster.create_node('node1', False,
-                                    ('127.0.0.1', 9160),
+                                    None,
                                     ('127.0.0.1', 7000),
                                     '7100', '2000', None,
                                     binary_interface=('127.0.0.1', 9042))

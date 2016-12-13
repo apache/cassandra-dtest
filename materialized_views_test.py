@@ -1727,7 +1727,6 @@ class TestMaterializedViewsLockcontention(Tester):
         self.cluster.populate(1)
 
         self.cluster.set_configuration_options(values={
-            'start_rpc': True,
             'concurrent_materialized_view_writes': 1,
             'concurrent_writes': 1,
         })

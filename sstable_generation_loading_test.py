@@ -7,7 +7,6 @@ from ccmlib import common as ccmcommon
 
 from dtest import Tester, debug, create_ks, create_cf
 from tools.assertions import assert_one
-from tools.misc import ImmutableMapping
 
 
 # WARNING: sstableloader tests should be added to TestSSTableGenerationAndLoading (below),
@@ -22,7 +21,6 @@ class BaseSStableLoaderTest(Tester):
     compact = False
     jvm_args = ()
     allow_log_errors = True
-    cluster_options = ImmutableMapping({'start_rpc': True})
 
     def create_schema(self, session, ks, compression):
         create_ks(session, ks, rf=2)

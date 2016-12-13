@@ -11,13 +11,11 @@ import parse
 from dtest import Tester, debug, create_ks
 from tools.assertions import assert_length_equal, assert_none, assert_one
 from tools.decorators import since
-from tools.misc import ImmutableMapping
 
 
 class TestCompaction(Tester):
 
     __test__ = False
-    cluster_options = ImmutableMapping({'start_rpc': 'true'})
 
     def setUp(self):
         Tester.setUp(self)

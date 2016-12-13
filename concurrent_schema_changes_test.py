@@ -12,7 +12,6 @@ from ccmlib.node import Node
 
 from dtest import Tester, debug, create_ks
 from tools.decorators import since
-from tools.misc import ImmutableMapping
 
 
 def wait(delay=2):
@@ -24,7 +23,6 @@ def wait(delay=2):
 
 @skip('awaiting CASSANDRA-10699')
 class TestConcurrentSchemaChanges(Tester):
-    cluster_options = ImmutableMapping({'start_rpc': 'true'})
     allow_log_errors = True
 
     def prepare_for_changes(self, session, namespace='ns1'):

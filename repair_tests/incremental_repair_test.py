@@ -12,11 +12,9 @@ from dtest import Tester, debug, create_ks, create_cf
 from tools.assertions import assert_almost_equal, assert_one
 from tools.data import insert_c1c2
 from tools.decorators import since
-from tools.misc import ImmutableMapping
 
 
 class TestIncRepair(Tester):
-    cluster_options = ImmutableMapping({'start_rpc': 'true'})
     ignore_log_patterns = (r'Can\'t send migration request: node.*is down',)
 
     def sstable_marking_test(self):

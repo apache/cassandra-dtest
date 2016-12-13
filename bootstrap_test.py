@@ -16,7 +16,7 @@ from tools.assertions import (assert_almost_equal, assert_bootstrap_state, asser
 from tools.data import query_c1c2
 from tools.decorators import no_vnodes, since
 from tools.intervention import InterruptBootstrap, KillOnBootstrap
-from tools.misc import ImmutableMapping, new_node
+from tools.misc import new_node
 from tools.misc import generate_ssl_stores
 
 
@@ -24,7 +24,6 @@ class BaseBootstrapTest(Tester):
     __test__ = False
 
     allow_log_errors = True
-    cluster_options = ImmutableMapping({'start_rpc': 'true'})
     ignore_log_patterns = (
         # This one occurs when trying to send the migration to a
         # node that hasn't started yet, and when it does, it gets
@@ -364,7 +363,7 @@ class TestBootstrap(BaseBootstrapTest):
         # check if we reset bootstrap state
         node3.watch_log_for("Resetting bootstrap progress to start fresh", from_mark=mark)
         # wait for node3 ready to query
-        node3.wait_for_thrift_interface(from_mark=mark)
+        node3.wait_for_binary_interface(from_mark=mark)
 
         # check if 2nd bootstrap succeeded
         assert_bootstrap_state(self, node3, 'COMPLETED')

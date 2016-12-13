@@ -13,7 +13,6 @@ from dtest import CASSANDRA_VERSION_FROM_BUILD, DISABLE_VNODES, Tester, debug
 from tools.assertions import assert_bootstrap_state, assert_all, assert_not_running
 from tools.data import rows_to_list
 from tools.decorators import since
-from tools.misc import ImmutableMapping
 
 
 class NodeUnavailable(Exception):
@@ -23,7 +22,6 @@ class NodeUnavailable(Exception):
 class BaseReplaceAddressTest(Tester):
     __test__ = False
     replacement_node = None
-    cluster_options = ImmutableMapping({'start_rpc': 'true'})
     ignore_log_patterns = (
         # This one occurs when trying to send the migration to a
         # node that hasn't started yet, and when it does, it gets
@@ -87,7 +85,7 @@ class BaseReplaceAddressTest(Tester):
 
             debug("Starting replacement node {} with jvm_option '{}={}'".format(replacement_address, jvm_option, replace_address))
             self.replacement_node = Node('replacement', cluster=self.cluster, auto_bootstrap=True,
-                                         thrift_interface=(replacement_address, 9160), storage_interface=(replacement_address, 7000),
+                                         thrift_interface=None, storage_interface=(replacement_address, 7000),
                                          jmx_port='7400', remote_debug_port='0', initial_token=None, binary_interface=(replacement_address, 9042))
             if opts is not None:
                 debug("Setting options on replacement node: {}".format(opts))
