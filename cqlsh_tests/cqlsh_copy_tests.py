@@ -3096,3 +3096,52 @@ class CqlshCopyTest(Tester):
         res = rows_to_list(self.session.execute("SELECT COUNT(*) FROM ks.test_pk_timestamps_with_counters"))[0][0]
         self.assertEqual(len(records), res,
                          msg="Failed to import one or more rows, expected {} but got {}".format(len(records), res))
+
+    def test_copy_from_with_wrong_order_or_missing_UDT_fields(self):
+        """
+        Test that we can import a user defined type even when the sub-fields
+        in the csv are specified in the wrong order or some fields are missing.
+
+        @jira_ticket CASSANDRA-12959
+        """
+        self.prepare()
+
+        self.session.execute('CREATE TYPE udt_with_multiple_fields (val1 text, val2 frozen<set<text>>)')
+        self.session.execute('CREATE TABLE testwrongorderinudt (a int PRIMARY KEY, b frozen<udt_with_multiple_fields>)')
+
+        class MyType(namedtuple('MyType', ('val1', 'val2'))):
+            __slots__ = ()
+
+            def __repr__(self):
+                return "{{val1: '{}', val2: '{}'}}"\
+                    .format(self.val1 if self.val1 else '',
+                            self.val2 if self.val2 else '')
+
+        self.session.cluster.register_user_type('ks', 'udt_with_multiple_fields', MyType)
+
+        tempfile = self.get_temp_file()
+
+        with open(tempfile.name, 'w') as f:
+            f.write('1,"{val2: {\'val2_1\', \'val2_2\'}, val1: \'val1\'}"\n')
+            f.write('2,"{val2: {\'val2_1\', \'val2_2\'}}"\n')
+            f.write('3,"{val1: \'val1\'}"\n')
+
+        def _test(preparedStatements):
+            self.session.execute('TRUNCATE testwrongorderinudt')
+            debug('Importing from csv file: {name}'.format(name=tempfile.name))
+            cmds = "COPY ks.testwrongorderinudt FROM '{}' WITH PREPAREDSTATEMENTS = {}"\
+                .format(tempfile.name, preparedStatements)
+            debug(cmds)
+            self.run_cqlsh(cmds=cmds)
+
+            results = rows_to_list(self.session.execute("SELECT * FROM testwrongorderinudt where a = 1"))
+            self.assertEquals(MyType('val1', SortedSet(['val2_1', 'val2_2'])), results[0][1])
+
+            results = rows_to_list(self.session.execute("SELECT * FROM testwrongorderinudt where a = 2"))
+            self.assertEquals(MyType(None, SortedSet(['val2_1', 'val2_2'])), results[0][1])
+
+            results = rows_to_list(self.session.execute("SELECT * FROM testwrongorderinudt where a = 3"))
+            self.assertEquals(MyType('val1', None), results[0][1])
+
+        _test(True)
+        _test(False)
