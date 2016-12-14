@@ -1040,6 +1040,16 @@ class TestMaterializedViews(Tester):
             )
 
     def base_replica_repair_test(self):
+        self._base_replica_repair_test()
+
+    def base_replica_repair_with_contention_test(self):
+        """
+        Test repair does not fail when there is MV lock contention
+        @jira_ticket CASSANDRA-12905
+        """
+        self._base_replica_repair_test(fail_mv_lock=True)
+
+    def _base_replica_repair_test(self, fail_mv_lock=False):
         """
         Test that a materialized view are consistent after the repair of the base replica.
         """
@@ -1074,8 +1084,17 @@ class TestMaterializedViews(Tester):
         node1.stop(wait_other_notice=True)
         debug('Delete node1 data')
         node1.clear(clear_all=True)
-        debug('Restarting node1')
-        node1.start(wait_other_notice=True, wait_for_binary_proto=True)
+
+        jvm_args = []
+        # CASSANDRA-10134
+        if self.cluster.version() >= LooseVersion('3.10'):
+            jvm_args = ['-Dcassandra.allow_unsafe_replace=true', '-Dcassandra.replace_address={}'.format(node1.address())]
+        if fail_mv_lock:
+            jvm_args.append("-Dcassandra.test.fail_mv_locks_count=1000")
+            # this should not make Keyspace.apply throw WTE on failure to acquire lock
+            node1.set_configuration_options(values={'write_request_timeout_in_ms': 100})
+        debug('Restarting node1 with jvm_args={}'.format(jvm_args))
+        node1.start(wait_other_notice=True, wait_for_binary_proto=True, jvm_args=jvm_args)
         debug('Shutdown node2 and node3')
         node2.stop(wait_other_notice=True)
         node3.stop(wait_other_notice=True)
@@ -1095,6 +1114,7 @@ class TestMaterializedViews(Tester):
         node3.start(wait_other_notice=True, wait_for_binary_proto=True)
 
         # Just repair the base replica
+        debug('Starting repair on node1')
         node1.nodetool("repair ks t")
 
         debug('Verify data with cl=ALL')
