@@ -10,7 +10,7 @@ METHOD startStreamingFiles
 AT ENTRY
 BIND peer = $0.peer
 # set flag to only run this rule once.
-IF peer.equals(InetAddress.getByName("127.0.0.2")) AND NOT flagged("done")
+IF peer.equals(org.apache.cassandra.locator.InetAddressAndPort.getByName("127.0.0.2")) AND NOT flagged("done")
 DO
    flag("done");
    throw new java.lang.RuntimeException("Triggering network failure")

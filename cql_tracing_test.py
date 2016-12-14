@@ -78,9 +78,9 @@ class TestCqlTracing(Tester):
         debug(out)
         self.assertIn('Tracing session: ', out)
 
-        self.assertIn('/127.0.0.1', out)
-        self.assertIn('/127.0.0.2', out)
-        self.assertIn('/127.0.0.3', out)
+        self.assertIn(node1.address_for_current_version_slashy(), out)
+        self.assertIn(self.cluster.nodelist()[1].address_for_current_version_slashy(), out)
+        self.assertIn(self.cluster.nodelist()[2].address_for_current_version_slashy(), out)
 
         self.assertIn('Parsing INSERT INTO ks.users ', out)
         self.assertIn('Request complete ', out)

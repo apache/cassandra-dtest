@@ -197,7 +197,7 @@ class TestTopology(Tester):
 
         Test decommission operation is resumable
         """
-        self.ignore_log_patterns = [r'Streaming error occurred', r'Error while decommissioning node', r'Remote peer 127.0.0.2 failed stream session']
+        self.ignore_log_patterns = [r'Streaming error occurred', r'Error while decommissioning node', r'Remote peer 127.0.0.2 failed stream session', r'Remote peer 127.0.0.2:7000 failed stream session']
         cluster = self.cluster
         cluster.set_configuration_options(values={'stream_throughput_outbound_megabits_per_sec': 1})
         cluster.populate(3, install_byteman=True).start(wait_other_notice=True)
@@ -228,7 +228,7 @@ class TestTopology(Tester):
 
         # Check decommision is done and we skipped transfereed ranges
         node2.watch_log_for('DECOMMISSIONED', from_mark=mark)
-        node2.grep_log("Skipping transferred range .* of keyspace ks, endpoint /127.0.0.3", filename='debug.log')
+        node2.grep_log("Skipping transferred range .* of keyspace ks, endpoint {}".format(node2.address_for_current_version_slashy()), filename='debug.log')
 
         # Check data is correctly forwarded to node1 and node3
         cluster.remove(node2)
@@ -264,17 +264,17 @@ class TestTopology(Tester):
         cluster.flush()
 
         # Move nodes to balance the cluster
-        def move_node(node, token, ip):
+        def move_node(node, token):
             mark = node.mark_log()
             node.move(token)  # can't assume 0 is balanced with m3p
-            node.watch_log_for('{} state jump to NORMAL'.format(ip), from_mark=mark, timeout=180)
+            node.watch_log_for('{} state jump to NORMAL'.format(node.address_for_current_version()), from_mark=mark, timeout=180)
             time.sleep(3)
 
         balancing_tokens = cluster.balanced_tokens(3)
 
-        move_node(node1, balancing_tokens[0], '127.0.0.1')
-        move_node(node2, balancing_tokens[1], '127.0.0.2')
-        move_node(node3, balancing_tokens[2], '127.0.0.3')
+        move_node(node1, balancing_tokens[0])
+        move_node(node2, balancing_tokens[1])
+        move_node(node3, balancing_tokens[2])
 
         time.sleep(1)
 

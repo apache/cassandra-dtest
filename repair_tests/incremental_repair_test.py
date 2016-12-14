@@ -132,6 +132,7 @@ class TestIncRepair(Tester):
         # table, that all nodes are listed as participants, and that all sstables are
         # (still) marked pending repair
         expected_participants = {n.address() for n in cluster.nodelist()}
+        expected_participants_wp = {n.address_and_port() for n in cluster.nodelist()}
         recorded_pending_ids = set()
         for node in cluster.nodelist():
             session = self.patient_exclusive_cql_connection(node)
@@ -139,6 +140,8 @@ class TestIncRepair(Tester):
             self.assertEqual(len(results), 1)
             result = results[0]
             self.assertEqual(set(result.participants), expected_participants)
+            if hasattr(result, "participants_wp"):
+                self.assertEqual(set(result.participants_wp), expected_participants_wp)
             self.assertEqual(result.state, ConsistentState.FINALIZED, "4=FINALIZED")
             pending_id = result.parent_id
             self.assertAllPendingRepairSSTables(node, 'ks', pending_id)
@@ -168,9 +171,10 @@ class TestIncRepair(Tester):
         for node in self.cluster.nodelist():
             session = self.patient_exclusive_cql_connection(node)
             session.execute("INSERT INTO system.repairs "
-                            "(parent_id, cfids, coordinator, last_update, participants, ranges, repaired_at, started_at, state) "
-                            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
-                            [session_id, {cfid}, node1.address(), now, {n.address() for n in self.cluster.nodelist()},
+                            "(parent_id, cfids, coordinator, coordinator_port, last_update, participants, participants_wp, ranges, repaired_at, started_at, state) "
+                            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                            [session_id, {cfid}, node1.address(), 7000, now, {n.address() for n in self.cluster.nodelist()},
+                             {str(n.address()) + ":7000" for n in self.cluster.nodelist()},
                              ranges, now, now, ConsistentState.REPAIRING])  # 2=REPAIRING
 
         time.sleep(1)

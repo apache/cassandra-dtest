@@ -22,6 +22,7 @@ class TestGossipingPropertyFileSnitch(Tester):
         s.connect((address, port))
         s.close()
 
+
     def test_prefer_local_reconnect_on_listen_address(self):
         """
         @jira_ticket CASSANDRA-9748
@@ -35,14 +36,28 @@ class TestGossipingPropertyFileSnitch(Tester):
         NODE1_LISTEN_ADDRESS = '127.0.0.1'
         NODE1_BROADCAST_ADDRESS = '127.0.0.3'
 
+        NODE1_LISTEN_FMT_ADDRESS = '/127.0.0.1'
+        NODE1_BROADCAST_FMT_ADDRESS = '/127.0.0.3'
+
+        NODE1_40_LISTEN_ADDRESS = '127.0.0.1:7000'
+        NODE1_40_BROADCAST_ADDRESS = '127.0.0.3:7000'
+
         NODE2_LISTEN_ADDRESS = '127.0.0.2'
         NODE2_BROADCAST_ADDRESS = '127.0.0.4'
+
+        NODE2_LISTEN_FMT_ADDRESS = '/127.0.0.2'
+        NODE2_BROADCAST_FMT_ADDRESS = '/127.0.0.4'
+
+        NODE2_40_LISTEN_ADDRESS = '127.0.0.2:7000'
+        NODE2_40_BROADCAST_ADDRESS = '127.0.0.4:7000'
 
         STORAGE_PORT = 7000
 
         cluster = self.cluster
         cluster.populate(2)
         node1, node2 = cluster.nodelist()
+
+        running40 = node1.get_base_cassandra_version() >= 4.0
 
         cluster.seeds = [NODE1_BROADCAST_ADDRESS]
         cluster.set_configuration_options(values={'endpoint_snitch': 'org.apache.cassandra.locator.GossipingPropertyFileSnitch',
@@ -58,8 +73,8 @@ class TestGossipingPropertyFileSnitch(Tester):
                 snitch_file.write("prefer_local=true" + os.linesep)
 
         node1.start(wait_for_binary_proto=True)
-        node1.watch_log_for("Starting Messaging Service on /{}:{}".format(NODE1_LISTEN_ADDRESS, STORAGE_PORT), timeout=60)
-        node1.watch_log_for("Starting Messaging Service on /{}:{}".format(NODE1_BROADCAST_ADDRESS, STORAGE_PORT), timeout=60)
+        node1.watch_log_for("Starting Messaging Service on {}:{}".format(NODE1_40_LISTEN_ADDRESS[:-5] if running40 else NODE1_LISTEN_FMT_ADDRESS, STORAGE_PORT), timeout=60)
+        node1.watch_log_for("Starting Messaging Service on {}:{}".format(NODE1_40_BROADCAST_ADDRESS[:-5] if running40 else NODE1_BROADCAST_FMT_ADDRESS, STORAGE_PORT), timeout=60)
         self._test_connect(NODE1_LISTEN_ADDRESS, STORAGE_PORT)
         self._test_connect(NODE1_BROADCAST_ADDRESS, STORAGE_PORT)
 
@@ -71,16 +86,19 @@ class TestGossipingPropertyFileSnitch(Tester):
         original_rows = list(session.execute("SELECT * FROM {}".format(stress_table)))
 
         node2.start(wait_for_binary_proto=True, wait_other_notice=False)
-        node2.watch_log_for("Starting Messaging Service on /{}:{}".format(NODE2_LISTEN_ADDRESS, STORAGE_PORT), timeout=60)
-        node2.watch_log_for("Starting Messaging Service on /{}:{}".format(NODE2_BROADCAST_ADDRESS, STORAGE_PORT), timeout=60)
+        node2.watch_log_for("Starting Messaging Service on {}:{}".format(NODE2_40_LISTEN_ADDRESS[:-5] if running40 else NODE2_LISTEN_FMT_ADDRESS, STORAGE_PORT), timeout=60)
+        node2.watch_log_for("Starting Messaging Service on {}:{}".format(NODE2_40_BROADCAST_ADDRESS[:-5] if running40 else NODE2_BROADCAST_FMT_ADDRESS, STORAGE_PORT), timeout=60)
         self._test_connect(NODE2_LISTEN_ADDRESS, STORAGE_PORT)
         self._test_connect(NODE2_BROADCAST_ADDRESS, STORAGE_PORT)
 
         # Intiated -> Initiated typo was fixed in 3.10
-        node1.watch_log_for("Ini?tiated reconnect to an Internal IP /{} for the /{}".format(NODE2_LISTEN_ADDRESS,
-                                                                                            NODE2_BROADCAST_ADDRESS), filename='debug.log', timeout=60)
-        node2.watch_log_for("Ini?tiated reconnect to an Internal IP /{} for the /{}".format(NODE1_LISTEN_ADDRESS,
-                                                                                            NODE1_BROADCAST_ADDRESS), filename='debug.log', timeout=60)
+        reconnectFmtString = "Ini?tiated reconnect to an Internal IP {} for the {}"
+        if node1.get_base_cassandra_version() >= 3.10:
+            reconnectFmtString = "Initiated reconnect to an Internal IP {} for the {}"
+        node1.watch_log_for(reconnectFmtString.format(NODE2_40_LISTEN_ADDRESS if running40 else NODE2_LISTEN_FMT_ADDRESS,
+                                               NODE2_40_BROADCAST_ADDRESS if running40 else NODE2_BROADCAST_FMT_ADDRESS), filename='debug.log', timeout=60)
+        node2.watch_log_for(reconnectFmtString.format(NODE1_40_LISTEN_ADDRESS if running40 else NODE1_LISTEN_FMT_ADDRESS,
+                                               NODE1_40_BROADCAST_ADDRESS if running40 else NODE1_BROADCAST_FMT_ADDRESS), filename='debug.log', timeout=60)
 
         # read data from node2 just to make sure data and connectivity is OK
         session = self.patient_exclusive_cql_connection(node2)
@@ -92,10 +110,11 @@ class TestGossipingPropertyFileSnitch(Tester):
         debug(out)
 
         self.assertIn("/{}".format(NODE1_BROADCAST_ADDRESS), out)
-        self.assertIn("INTERNAL_IP:6:{}".format(NODE1_LISTEN_ADDRESS), out)
+        self.assertIn("INTERNAL_IP:{}:{}".format('9' if running40 else '6', NODE1_LISTEN_ADDRESS), out)
+        self.assertIn("INTERNAL_ADDRESS_AND_PORT:7:{}".format(NODE1_40_LISTEN_ADDRESS), out)
         self.assertIn("/{}".format(NODE2_BROADCAST_ADDRESS), out)
-        self.assertIn("INTERNAL_IP:6:{}".format(NODE2_LISTEN_ADDRESS), out)
-
+        self.assertIn("INTERNAL_IP:{}:{}".format('9' if running40 else '6', NODE2_LISTEN_ADDRESS), out)
+        self.assertIn("INTERNAL_ADDRESS_AND_PORT:7:{}".format(NODE1_40_LISTEN_ADDRESS), out)
 
 class TestDynamicEndpointSnitch(Tester):
     @attr('resource-intensive')

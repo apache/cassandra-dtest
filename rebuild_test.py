@@ -140,7 +140,9 @@ class TestRebuild(Tester):
         """
         self.ignore_log_patterns = list(self.ignore_log_patterns) + [r'Error while rebuilding node',
                                                                      r'Streaming error occurred on session with peer 127.0.0.3',
-                                                                     r'Remote peer 127.0.0.3 failed stream session']
+                                                                     r'Remote peer 127.0.0.3 failed stream session',
+                                                                     r'Streaming error occurred on session with peer 127.0.0.3:7000',
+                                                                     r'Remote peer 127.0.0.3:7000 failed stream session']
         cluster = self.cluster
         cluster.set_configuration_options(values={'endpoint_snitch': 'org.apache.cassandra.locator.PropertyFileSnitch'})
 
@@ -423,7 +425,7 @@ class TestRebuild(Tester):
         node3.nodetool('rebuild -ks ks1 -ts (%s,%s] -s %s' % (tokens[2], str(pow(2, 63) - 1), node2_address))
 
         # verify that node2 streamed to node3
-        log_matches = node2.grep_log('Session with /%s is complete' % node3_address)
+        log_matches = node2.grep_log('Session with %s is complete' % node3.address_for_current_version())
         self.assertTrue(len(log_matches) > 0)
 
         # verify that node1 did not participate

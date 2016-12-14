@@ -119,8 +119,8 @@ class TestSCUpgrade(Tester):
         cluster.remove(node=node1)
 
     def upgrade_super_columns_through_all_versions_test(self):
-        self._upgrade_super_columns_through_versions_test(upgrade_path=['git:cassandra-2.2', 'git:cassandra-3.0',
-                                                                        'git:cassandra-3.9', 'git:trunk'])
+        self._upgrade_super_columns_through_versions_test(upgrade_path=['git:cassandra-2.2', 'git:cassandra-3.X',
+                                                                        'git:trunk'])
 
     def upgrade_super_columns_through_limited_versions_test(self):
         self._upgrade_super_columns_through_versions_test(upgrade_path=['git:cassandra-3.0', 'git:trunk'])

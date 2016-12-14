@@ -35,7 +35,7 @@ class BaseReplaceAddressTest(Tester):
 
     def _setup(self, n=3, opts=None, enable_byteman=False, mixed_versions=False):
         debug("Starting cluster with {} nodes.".format(n))
-        self.cluster.populate(n)
+        self.cluster.populate(n, use_vnodes=not DISABLE_VNODES)
         if opts is not None:
             debug("Setting cluster options: {}".format(opts))
             self.cluster.set_configuration_options(opts)
@@ -148,14 +148,15 @@ class BaseReplaceAddressTest(Tester):
     def _verify_replacement(self, node, same_address):
         if not same_address:
             if self.cluster.cassandra_version() >= '2.2.7':
-                node.watch_log_for("Node /{} is replacing /{}"
-                                   .format(self.replacement_node.address(),
-                                           self.replaced_node.address()),
+                address_prefix = '' if self.cluster.cassandra_version() >= '4.0' else '/'
+                node.watch_log_for("Node {}{} is replacing {}{}"
+                                   .format(address_prefix, self.replacement_node.address_for_current_version(),
+                                           address_prefix, self.replaced_node.address_for_current_version()),
                                    timeout=60, filename='debug.log')
-                node.watch_log_for("Node /{} will complete replacement of /{} for tokens"
-                                   .format(self.replacement_node.address(),
-                                           self.replaced_node.address()), timeout=10)
-                node.watch_log_for("removing endpoint /{}".format(self.replaced_node.address()),
+                node.watch_log_for("Node {}{} will complete replacement of {}{} for tokens"
+                                   .format(address_prefix, self.replacement_node.address_for_current_version(),
+                                           address_prefix, self.replaced_node.address_for_current_version()), timeout=10)
+                node.watch_log_for("removing endpoint {}{}".format(address_prefix, self.replaced_node.address_for_current_version()),
                                    timeout=60, filename='debug.log')
             else:
                 node.watch_log_for("between /{} and /{}; /{} is the new owner"
