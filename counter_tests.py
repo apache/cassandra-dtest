@@ -90,8 +90,13 @@ class TestCounters(Tester):
         nodes = cluster.nodelist()
         # Have node 1 and 3 cheat a bit during the leader election for a counter mutation; note that cheating
         # takes place iff there is an actual chance for node 2 to be picked.
-        nodes[0].update_startup_byteman_script('./byteman/election_counter_leader_favor_node2.btm')
-        nodes[2].update_startup_byteman_script('./byteman/election_counter_leader_favor_node2.btm')
+        if cluster.version() < '4.0':
+            nodes[0].update_startup_byteman_script('./byteman/pre4.0/election_counter_leader_favor_node2.btm')
+            nodes[2].update_startup_byteman_script('./byteman/pre4.0/election_counter_leader_favor_node2.btm')
+        else:
+            nodes[0].update_startup_byteman_script('./byteman/4.0/election_counter_leader_favor_node2.btm')
+            nodes[2].update_startup_byteman_script('./byteman/4.0/election_counter_leader_favor_node2.btm')
+
         cluster.start(wait_for_binary_proto=True)
         session = self.patient_cql_connection(nodes[0])
         create_ks(session, 'ks', 3)

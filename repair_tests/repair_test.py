@@ -135,7 +135,7 @@ class BaseRepairTest(Tester):
         debug("Repair time: {end}".format(end=time.time() - start))
 
         # Validate that only one range was transfered
-        out_of_sync_logs = node1.grep_log("/([0-9.]+) and /([0-9.]+) have ([0-9]+) range\(s\) out of sync")
+        out_of_sync_logs = node1.grep_log("{} and {} have ([0-9]+) range\(s\) out of sync".format(cluster.address_regex(), cluster.address_regex()))
 
         self.assertEqual(len(out_of_sync_logs), 2, "Lines matching: " + str([elt[0] for elt in out_of_sync_logs]))
 
@@ -515,10 +515,10 @@ class TestRepair(BaseRepairTest):
                 self.assertEqual(len(filter(lambda x: len(x) != 0, res)), 0, res)
 
         # check log for no repair happened for gcable data
-        out_of_sync_logs = node2.grep_log("/([0-9.]+) and /([0-9.]+) have ([0-9]+) range\(s\) out of sync for cf1")
+        out_of_sync_logs = node2.grep_log("{} and {} have ([0-9]+) range\(s\) out of sync for cf1".format(cluster.address_regex(), cluster.address_regex()))
         self.assertEqual(len(out_of_sync_logs), 0, "GC-able data does not need to be repaired with empty data: " + str([elt[0] for elt in out_of_sync_logs]))
         # check log for actual repair for non gcable data
-        out_of_sync_logs = node2.grep_log("/([0-9.]+) and /([0-9.]+) have ([0-9]+) range\(s\) out of sync for cf2")
+        out_of_sync_logs = node2.grep_log("{} and {} have ([0-9]+) range\(s\) out of sync for cf2".format(cluster.address_regex(), cluster.address_regex()))
         self.assertGreater(len(out_of_sync_logs), 0, "Non GC-able data should be repaired")
 
     def _range_tombstone_digest(self, sequential):
@@ -594,7 +594,7 @@ class TestRepair(BaseRepairTest):
         node2.repair(_repair_options(self.cluster.version(), ks='ks', sequential=sequential))
 
         # check log for no repair happened for gcable data
-        out_of_sync_logs = node2.grep_log("/([0-9.]+) and /([0-9.]+) have ([0-9]+) range\(s\) out of sync for table1")
+        out_of_sync_logs = node2.grep_log("{} and {} have ([0-9]+) range\(s\) out of sync for table1".format(cluster.address_regex(), cluster.address_regex()))
         self.assertEqual(len(out_of_sync_logs), 0, "Digest mismatch for range tombstone: {}".format(str([elt[0] for elt in out_of_sync_logs])))
 
     def local_dc_repair_test(self):
@@ -613,7 +613,7 @@ class TestRepair(BaseRepairTest):
         node1.repair(opts)
 
         # Verify that only nodes in dc1 are involved in repair
-        out_of_sync_logs = node1.grep_log("/([0-9.]+) and /([0-9.]+) have ([0-9]+) range\(s\) out of sync")
+        out_of_sync_logs = node1.grep_log("{} and {} have ([0-9]+) range\(s\) out of sync".format(cluster.address_regex(), cluster.address_regex()))
         self.assertEqual(len(out_of_sync_logs), 1, "Lines matching: {}".format(len(out_of_sync_logs)))
 
         line, m = out_of_sync_logs[0]
@@ -642,7 +642,7 @@ class TestRepair(BaseRepairTest):
         node1.repair(opts)
 
         # Verify that only nodes in dc1 and dc2 are involved in repair
-        out_of_sync_logs = node1.grep_log("/([0-9.]+) and /([0-9.]+) have ([0-9]+) range\(s\) out of sync")
+        out_of_sync_logs = node1.grep_log("{} and {} have ([0-9]+) range\(s\) out of sync".format(cluster.address_regex(), cluster.address_regex()))
         self.assertEqual(len(out_of_sync_logs), 2, "Lines matching: " + str([elt[0] for elt in out_of_sync_logs]))
         valid_out_of_sync_pairs = [{node1.address(), node2.address()},
                                    {node2.address(), node3.address()}]
@@ -672,7 +672,7 @@ class TestRepair(BaseRepairTest):
         node1.repair(opts)
 
         # Verify that only nodes in dc1 and dc2 are involved in repair
-        out_of_sync_logs = node1.grep_log("/([0-9.]+) and /([0-9.]+) have ([0-9]+) range\(s\) out of sync")
+        out_of_sync_logs = node1.grep_log("{} and {} have ([0-9]+) range\(s\) out of sync".format(cluster.address_regex(), cluster.address_regex()))
         self.assertEqual(len(out_of_sync_logs), 2, "Lines matching: " + str([elt[0] for elt in out_of_sync_logs]))
         valid_out_of_sync_pairs = [{node1.address(), node2.address()},
                                    {node2.address(), node3.address()}]
@@ -831,7 +831,7 @@ class TestRepair(BaseRepairTest):
         node1.repair(opts)
         self.assertEqual(len(node1.grep_log('are consistent for standard1')), 0, "Nodes 1 and 2 should not be consistent.")
         self.assertEqual(len(node3.grep_log('Repair command')), 0, "Node 3 should not have been involved in the repair.")
-        out_of_sync_logs = node1.grep_log("/([0-9.]+) and /([0-9.]+) have ([0-9]+) range\(s\) out of sync")
+        out_of_sync_logs = node1.grep_log("{} and {} have ([0-9]+) range\(s\) out of sync".format(cluster.address_regex(), cluster.address_regex()))
         self.assertEqual(len(out_of_sync_logs), 0, "We repaired the wrong CF, so things should still be broke")
 
         # Repair only the range node 1 owns on the right  CF, assert everything is fixed
@@ -840,7 +840,7 @@ class TestRepair(BaseRepairTest):
         node1.repair(opts)
         self.assertEqual(len(node1.grep_log('are consistent for standard1')), 0, "Nodes 1 and 2 should not be consistent.")
         self.assertEqual(len(node3.grep_log('Repair command')), 0, "Node 3 should not have been involved in the repair.")
-        out_of_sync_logs = node1.grep_log("/([0-9.]+) and /([0-9.]+) have ([0-9]+) range\(s\) out of sync")
+        out_of_sync_logs = node1.grep_log("{} and {} have ([0-9]+) range\(s\) out of sync".format(cluster.address_regex(), cluster.address_regex()))
         _, matches = out_of_sync_logs[0]
         out_of_sync_nodes = {matches.group(1), matches.group(2)}
         valid_out_of_sync_pairs = [{node1.address(), node2.address()}]
@@ -937,7 +937,7 @@ class TestRepair(BaseRepairTest):
         self.assertEqual(len(node1.grep_log('are consistent for standard1')), 0, "Nodes 1 and 2 should not be consistent.")
         self.assertEqual(len(node3.grep_log('Repair command')), 0, "Node 3 should not have been involved in the repair.")
 
-        out_of_sync_logs = node1.grep_log("/([0-9.]+) and /([0-9.]+) have ([0-9]+) range\(s\) out of sync")
+        out_of_sync_logs = node1.grep_log("{} and {} have ([0-9]+) range\(s\) out of sync".format(cluster.address_regex(), cluster.address_regex()))
         _, matches = out_of_sync_logs[0]
         out_of_sync_nodes = {matches.group(1), matches.group(2)}
 

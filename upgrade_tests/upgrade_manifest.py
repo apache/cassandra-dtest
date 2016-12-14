@@ -74,6 +74,7 @@ current_2_2_x = VersionMeta(name='current_2_2_x', family='2.2.x', variant='curre
 
 indev_3_0_x = VersionMeta(name='indev_3_0_x', family='3.0.x', variant='indev', version='github:apache/cassandra-3.0', min_proto_v=3, max_proto_v=4, java_versions=(8,))
 current_3_0_x = VersionMeta(name='current_3_0_x', family='3.0.x', variant='current', version='3.0.12', min_proto_v=3, max_proto_v=4, java_versions=(8,))
+current_3_0_x = VersionMeta(name='current_3_0_x', family='3.0.x', variant='current', version='github:apache/cassandra-3.0', min_proto_v=3, max_proto_v=4, java_versions=(8,))
 
 indev_3_x = VersionMeta(name='indev_3_x', family='3.x', variant='indev', version='github:apache/cassandra-3.11', min_proto_v=3, max_proto_v=4, java_versions=(8,))
 current_3_x = VersionMeta(name='current_3_x', family='3.x', variant='current', version='3.10', min_proto_v=3, max_proto_v=4, java_versions=(8,))
@@ -89,19 +90,19 @@ indev_trunk = VersionMeta(name='indev_trunk', family='trunk', variant='indev', v
 #   3) Nodes upgraded to version B can read data stored by the predecessor version A, and from a data standpoint will function the same as if they always ran version B.
 #   4) If a new sstable format is present in version B, writes will occur in that format after upgrade. Running sstableupgrade on version B will proactively convert version A sstables to version B.
 MANIFEST = {
-    indev_2_0_x: [indev_2_1_x, current_2_1_x],
-    current_2_0_x: [indev_2_0_x, indev_2_1_x, current_2_1_x],
+    indev_2_0_x: [indev_2_1_x],
+#    current_2_0_x: [indev_2_0_x, indev_2_1_x, current_2_1_x],
 
-    indev_2_1_x: [indev_2_2_x, current_2_2_x, indev_3_0_x, current_3_0_x, indev_3_x, current_3_x],
-    current_2_1_x: [indev_2_1_x, indev_2_2_x, current_2_2_x, indev_3_0_x, current_3_0_x, indev_3_x, current_3_x],
+    indev_2_1_x: [indev_2_2_x, indev_3_0_x, indev_3_x],
+#    current_2_1_x: [indev_2_1_x, indev_2_2_x, current_2_2_x, indev_3_0_x, current_3_0_x, indev_3_x, current_3_x],
 
-    indev_2_2_x: [indev_3_0_x, current_3_0_x, indev_3_x, current_3_x],
-    current_2_2_x: [indev_2_2_x, indev_3_0_x, current_3_0_x, indev_3_x, current_3_x],
+    indev_2_2_x: [indev_3_0_x, indev_3_x],
+#    current_2_2_x: [indev_2_2_x, indev_3_0_x, current_3_0_x, indev_3_x, current_3_x],
 
-    indev_3_0_x: [indev_3_x, current_3_x],
-    current_3_0_x: [indev_3_0_x, indev_3_x, current_3_x, indev_trunk],
+    indev_3_0_x: [indev_3_x],
+#    current_3_0_x: [indev_3_0_x, indev_3_x, current_3_x, indev_trunk],
 
-    current_3_x: [indev_3_x, indev_trunk],
+#    current_3_x: [indev_3_x, indev_trunk],
     indev_3_x: [indev_trunk]
 }
 
@@ -143,8 +144,9 @@ def _is_targeted_variant_combo(origin_meta, destination_meta):
     if OVERRIDE_MANIFEST:
         return True
 
+    return True
     # is this an upgrade variant combination we care about?
-    return (origin_meta.variant == 'current' and destination_meta.variant == 'indev')
+    #return (origin_meta.variant == 'current' and destination_meta.variant == 'indev')
 
 
 def build_upgrade_pairs():

@@ -197,7 +197,7 @@ class TestTopology(Tester):
 
         Test decommission operation is resumable
         """
-        self.ignore_log_patterns = [r'Streaming error occurred', r'Error while decommissioning node', r'Remote peer 127.0.0.2 failed stream session']
+        self.ignore_log_patterns = [r'Streaming error occurred', r'Error while decommissioning node', r'Remote peer 127.0.0.2 failed stream session', r'Remote peer 127.0.0.2:7000 failed stream session']
         cluster = self.cluster
         cluster.set_configuration_options(values={'stream_throughput_outbound_megabits_per_sec': 1})
         cluster.populate(3, install_byteman=True).start(wait_other_notice=True)
@@ -228,7 +228,7 @@ class TestTopology(Tester):
 
         # Check decommision is done and we skipped transfereed ranges
         node2.watch_log_for('DECOMMISSIONED', from_mark=mark)
-        node2.grep_log("Skipping transferred range .* of keyspace ks, endpoint /127.0.0.3", filename='debug.log')
+        node2.grep_log("Skipping transferred range .* of keyspace ks, endpoint {}".format(node2.address_for_current_version_slashy()), filename='debug.log')
 
         # Check data is correctly forwarded to node1 and node3
         cluster.remove(node2)
