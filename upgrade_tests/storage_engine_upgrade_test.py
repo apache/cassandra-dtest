@@ -435,14 +435,14 @@ class TestBootstrapAfterUpgrade(TestStorageEngineUpgrade):
         super(TestBootstrapAfterUpgrade, self).setUp(bootstrap=True, jvm_args=LEGACY_SSTABLES_JVM_ARGS)
 
 
-@since('3.0')
+@since('3.0', max_version='4')
 class TestLoadKaSStables(BaseSStableLoaderTest):
     __test__ = True
     upgrade_from = '2.1.6'
     jvm_args = LEGACY_SSTABLES_JVM_ARGS
 
 
-@since('3.0')
+@since('3.0', max_version='4')
 class TestLoadKaCompactSStables(BaseSStableLoaderTest):
     __test__ = True
     upgrade_from = '2.1.6'
@@ -450,14 +450,14 @@ class TestLoadKaCompactSStables(BaseSStableLoaderTest):
     compact = True
 
 
-@since('3.0')
+@since('3.0', max_version='4')
 class TestLoadLaSStables(BaseSStableLoaderTest):
     __test__ = True
     upgrade_from = '2.2.4'
     jvm_args = LEGACY_SSTABLES_JVM_ARGS
 
 
-@since('3.0')
+@since('3.0', max_version='4')
 class TestLoadLaCompactSStables(BaseSStableLoaderTest):
     __test__ = True
     upgrade_from = '2.2.4'
