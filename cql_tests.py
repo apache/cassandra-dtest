@@ -577,7 +577,7 @@ class MiscellaneousCQLTester(CQLTester):
         # this should fail as normal, not with a ProtocolException
         assert_invalid(session, u"insert into invalid_string_literals (k, a) VALUES (0, '\u038E\u0394\u03B4\u03E0')")
 
-        session = self.cql_connection(self.cluster.nodelist()[0], keyspace='ks')
+        session = self.patient_cql_connection(self.cluster.nodelist()[0], keyspace='ks')
         session.execute("create table invalid_string_literals (k int primary key, a ascii, b text)")
 
         # this should still fail with an InvalidRequest
