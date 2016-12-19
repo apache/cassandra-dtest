@@ -392,7 +392,7 @@ class TestStorageEngineUpgrade(Tester):
 
         assert_one(session, "SELECT k FROM t", ['some_key'])
 
-    @skipIf(CASSANDRA_VERSION_FROM_BUILD == '3.9', "Test doesn't run on 3.9")
+    @since('3.0', max_version='4')
     def upgrade_with_range_tombstone_eoc_0_test(self):
         """
         Check sstable upgrading when the sstable contains a range tombstone with EOC=0.
