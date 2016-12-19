@@ -1470,6 +1470,7 @@ class TestCQL(UpgradeTester):
 
             assert_all(cursor, "SELECT * FROM test WHERE token(k1, k2) > " + str(-((2 ** 63) - 1)), [[0, 2, 2, 2], [0, 3, 3, 3], [0, 0, 0, 0], [0, 1, 1, 1]])
 
+    @since('2', max_version='4')
     def cql3_insert_thrift_test(self):
         """ Check that we can insert from thrift into a CQL3 table (#4377) """
         cursor = self.prepare(start_rpc=True)
@@ -1503,6 +1504,7 @@ class TestCQL(UpgradeTester):
 
             assert_one(cursor, "SELECT * FROM test", [2, 4, 8])
 
+    @since('2', max_version='4')
     def cql3_non_compound_range_tombstones_test(self):
         """
         Checks that 3.0 serializes RangeTombstoneLists correctly
@@ -2896,6 +2898,7 @@ class TestCQL(UpgradeTester):
             cursor.execute("INSERT INTO test (k, b) VALUES (0, 0x)")
             assert_one(cursor, "SELECT * FROM test", [0, ''])
 
+    @since('2', max_version='4')
     def rename_test(self):
         cursor = self.prepare(start_rpc=True)
 
