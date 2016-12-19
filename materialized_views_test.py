@@ -1093,10 +1093,9 @@ class TestMaterializedViews(Tester):
         node1.clear(clear_all=True)
 
         jvm_args = []
-        # CASSANDRA-10134
-        if self.cluster.version() >= LooseVersion('3.10'):
-            jvm_args = ['-Dcassandra.allow_unsafe_replace=true', '-Dcassandra.replace_address={}'.format(node1.address())]
         if fail_mv_lock:
+            if self.cluster.version() >= LooseVersion('3.10'):  # CASSANDRA-10134
+                jvm_args = ['-Dcassandra.allow_unsafe_replace=true', '-Dcassandra.replace_address={}'.format(node1.address())]
             jvm_args.append("-Dcassandra.test.fail_mv_locks_count=1000")
             # this should not make Keyspace.apply throw WTE on failure to acquire lock
             node1.set_configuration_options(values={'write_request_timeout_in_ms': 100})
