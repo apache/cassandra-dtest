@@ -1,6 +1,5 @@
 import os
 import time
-from unittest import skipIf
 
 from dtest import CASSANDRA_VERSION_FROM_BUILD, Tester, debug
 from sstable_generation_loading_test import BaseSStableLoaderTest
