@@ -3370,7 +3370,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
         else:
             failure_msg = ("Scanned over.* tombstones during query.* query aborted")
 
-        self.wait_for_any_log(self.cluster.nodelist(), failure_msg, 25)
+        self.cluster.wait_for_any_log(failure_msg, 25)
 
     @since('2.2.6')
     def test_deletion_with_distinct_paging(self):

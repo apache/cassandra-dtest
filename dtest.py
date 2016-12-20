@@ -33,7 +33,6 @@ from cassandra.policies import RetryPolicy, WhiteListRoundRobinPolicy
 from ccmlib.cluster import Cluster
 from ccmlib.cluster_factory import ClusterFactory
 from ccmlib.common import get_version_from_build, is_win
-from ccmlib.node import TimeoutError
 from nose.exc import SkipTest
 from nose.tools import assert_greater_equal
 from six import print_
@@ -625,29 +624,6 @@ class Tester(TestCase):
     # Disable docstrings printing in nosetest output
     def shortDescription(self):
         return None
-
-    def wait_for_any_log(self, nodes, pattern, timeout, filename='system.log'):
-        """
-        Look for a pattern in the system.log of any in a given list
-        of nodes.
-        @param nodes The list of nodes whose logs to scan
-        @param pattern The target pattern
-        @param timeout How long to wait for the pattern. Note that
-                        strictly speaking, timeout is not really a timeout,
-                        but a maximum number of attempts. This implies that
-                        the all the grepping takes no time at all, so it is
-                        somewhat inaccurate, but probably close enough.
-        @return The first node in whose log the pattern was found
-        """
-        for _ in range(timeout):
-            for node in nodes:
-                found = node.grep_log(pattern, filename=filename)
-                if found:
-                    return node
-            time.sleep(1)
-
-        raise TimeoutError(time.strftime("%d %b %Y %H:%M:%S", time.gmtime()) +
-                           " Unable to find: " + repr(pattern) + " in any node log within " + str(timeout) + "s")
 
     def get_jfr_jvm_args(self):
         """

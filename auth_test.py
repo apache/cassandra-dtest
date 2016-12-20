@@ -1039,7 +1039,7 @@ class TestAuth(Tester):
         self.cluster.set_configuration_options(values=config)
         self.cluster.populate(nodes).start()
 
-        n = self.wait_for_any_log(self.cluster.nodelist(), 'Created default superuser', 25)
+        n = self.cluster.wait_for_any_log('Created default superuser', 25)
         debug("Default role created by " + n.name)
 
     def get_session(self, node_idx=0, user=None, password=None):
@@ -2646,7 +2646,7 @@ class TestAuthRoles(Tester):
         self.cluster.set_configuration_options(values=config)
         self.cluster.populate(nodes).start(wait_for_binary_proto=True)
 
-        self.wait_for_any_log(self.cluster.nodelist(), 'Created default superuser', 25)
+        self.cluster.wait_for_any_log('Created default superuser', 25)
 
     def assert_permissions_listed(self, expected, session, query):
         rows = session.execute(query)
