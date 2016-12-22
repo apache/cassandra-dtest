@@ -3145,3 +3145,69 @@ class CqlshCopyTest(Tester):
 
         _test(True)
         _test(False)
+
+    @since('2.2')
+    def test_reading_text_pk_counters(self):
+        """
+        When using counters we don't need to convert any value except for partition keys,
+        and this test ensures that we can convert text related types into a binary partition key.
+
+        @jira_ticket CASSANDRA-12909
+        """
+        self.prepare()
+        self.session.execute("""
+           CREATE TABLE test_reading_text_pk_counters (
+                ascii_id ascii,
+                text_id text,
+                inet_id inet,
+                varchar_id varchar,
+                user_id timeuuid,
+                counter_id ascii,
+                count counter,
+                PRIMARY KEY ((ascii_id, text_id, inet_id, varchar_id, user_id), counter_id)
+            )""")
+
+        tempfile = self.get_temp_file()
+        with open(tempfile.name, 'w') as f:
+            f.write('text1,text2,127.0.0.1,text3,f7ce3ac0-a66e-11e6-b58e-4e29450fd577,SA,2\n')
+            f.write('text4,ヽ(´ー｀)ノ,127.0.0.2,text6,f7ce3ac0-a66e-11e6-b58e-4e29450fd577,SA,2\n')
+
+        debug('Importing from csv file: {name}'.format(name=tempfile.name))
+        cmds = "COPY ks.test_reading_text_pk_counters FROM '{name}'".format(name=tempfile.name)
+        self.run_cqlsh(cmds=cmds)
+
+        res = list(self.session.execute("SELECT * FROM ks.test_reading_text_pk_counters"))
+        self.assertCsvResultEqual(tempfile.name, res, 'test_reading_text_pk_counters')
+
+    @since('2.2')
+    def test_reading_text_pk_no_prepared_statements(self):
+        """
+        When using non-prepared statements we don't need to convert any value except for partition keys,
+        and this test ensures that we can convert text related types into a binary partition key.
+
+        @jira_ticket CASSANDRA-12909
+        """
+        self.prepare()
+        self.session.execute("""
+           CREATE TABLE test_reading_text_pk_no_prepared_statements (
+                ascii_id ascii,
+                text_id text,
+                inet_id inet,
+                varchar_id varchar,
+                user_id timeuuid,
+                val text,
+                PRIMARY KEY ((ascii_id, text_id, inet_id, varchar_id, user_id))
+            )""")
+
+        tempfile = self.get_temp_file()
+        with open(tempfile.name, 'w') as f:
+            f.write('text1,text2,127.0.0.1,text3,f7ce3ac0-a66e-11e6-b58e-4e29450fd577,SA\n')
+            f.write('text4,ヽ(´ー｀)ノ,127.0.0.2,text6,f7ce3ac0-a66e-11e6-b58e-4e29450fd577,SA\n')
+
+        debug('Importing from csv file: {name}'.format(name=tempfile.name))
+        cmds = "COPY ks.test_reading_text_pk_no_prepared_statements FROM '{name}' WITH PREPAREDSTATEMENTS=FALSE"\
+            .format(name=tempfile.name)
+        self.run_cqlsh(cmds=cmds)
+
+        res = list(self.session.execute("SELECT * FROM ks.test_reading_text_pk_no_prepared_statements"))
+        self.assertCsvResultEqual(tempfile.name, res, 'test_reading_text_pk_no_prepared_statements')
