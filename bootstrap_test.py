@@ -535,9 +535,15 @@ class TestBootstrap(BaseBootstrapTest):
         cluster.populate(1)
         cluster.start(wait_for_binary_proto=True)
 
+        node1 = cluster.nodelist()[0]
         # Add a new node, bootstrap=True ensures that it is not a seed
         node2 = new_node(cluster, bootstrap=True)
         node2.start(wait_for_binary_proto=True, wait_other_notice=True)
+
+        session = self.patient_cql_connection(node1)
+        # reduce system_distributed RF to 2 so we don't require forceful decommission
+        session.execute("ALTER KEYSPACE system_distributed WITH REPLICATION = {'class':'SimpleStrategy', 'replication_factor':'1'};")
+        session.execute("ALTER KEYSPACE system_traces WITH REPLICATION = {'class':'SimpleStrategy', 'replication_factor':'1'};")
 
         # Decommision the new node and kill it
         debug("Decommissioning & stopping node2")

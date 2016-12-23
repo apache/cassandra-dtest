@@ -5,6 +5,7 @@ from unittest import skip
 
 from cassandra import ConsistencyLevel
 from ccmlib.node import TimeoutError, ToolError
+from nose.plugins.attrib import attr
 
 from dtest import Tester, debug, create_ks, create_cf
 from tools.assertions import assert_almost_equal
@@ -39,6 +40,10 @@ class TestTopology(Tester):
         cluster.populate(3)
         cluster.start(wait_for_binary_proto=True, jvm_args=["-Dcassandra.size_recorder_interval=1"])
         node1, node2, node3 = cluster.nodelist()
+
+        session = self.patient_cql_connection(node1)
+        # reduce system_distributed RF to 2 so we don't require forceful decommission
+        session.execute("ALTER KEYSPACE system_distributed WITH REPLICATION = {'class':'SimpleStrategy', 'replication_factor':'2'};")
 
         # write some data
         node1.stress(['write', 'n=10K', 'no-warmup', '-rate', 'threads=8'])
@@ -104,6 +109,8 @@ class TestTopology(Tester):
         node1, node2, node3 = cluster.nodelist()
 
         session = self.patient_cql_connection(node2)
+        # reduce system_distributed RF to 2 so we don't require forceful decommission
+        session.execute("ALTER KEYSPACE system_distributed WITH REPLICATION = {'class':'SimpleStrategy', 'replication_factor':'2'};")
         create_ks(session, 'ks', 2)
         create_cf(session, 'cf', columns={'c1': 'text', 'c2': 'text'})
         insert_c1c2(session, n=10000, consistency=ConsistencyLevel.ALL)
@@ -335,6 +342,33 @@ class TestTopology(Tester):
         time.sleep(30)
         out = self.show_status(node2)
         self.assertFalse(null_status_pattern.search(out))
+
+    @since('3.12')
+    @attr('resource-intensive')
+    def stop_decommission_too_few_replicas_multi_dc_test(self):
+        """
+        Decommission should fail when it would result in the number of live replicas being less than
+        the replication factor. --force should bypass this requirement.
+        @jira_ticket CASSANDRA-12510
+        @expected_errors ToolError when # nodes will drop below configured replicas in NTS/SimpleStrategy
+        """
+        cluster = self.cluster
+        cluster.populate([2, 2]).start(wait_for_binary_proto=True)
+        node1, node2, node3, node4 = self.cluster.nodelist()
+        session = self.patient_cql_connection(node2)
+        session.execute("ALTER KEYSPACE system_distributed WITH REPLICATION = {'class':'SimpleStrategy', 'replication_factor':'2'};")
+        create_ks(session, 'ks', {'dc1': 2, 'dc2': 2})
+        with self.assertRaises(ToolError):
+            node4.nodetool('decommission')
+
+        session.execute('DROP KEYSPACE ks')
+        create_ks(session, 'ks2', 4)
+        with self.assertRaises(ToolError):
+            node4.nodetool('decommission')
+
+        node4.nodetool('decommission --force')
+        decommissioned = node4.watch_log_for("DECOMMISSIONED", timeout=120)
+        self.assertTrue(decommissioned, "Node failed to decommission when passed --force")
 
     def show_status(self, node):
         out, _, _ = node.nodetool('status')
