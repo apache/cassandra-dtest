@@ -9,7 +9,9 @@ LEGACY_SSTABLES_JVM_ARGS = ["-Dcassandra.streamdes.initial_mem_buffer_size=1",
                             "-Dcassandra.streamdes.max_spill_file_size=16"]
 
 
-@since('3.0')
+# We don't support directly upgrading from 2.2 to 4.0 so disabling this on 4.0.
+# TODO: we should probably not hardcode versions?
+@since('3.0', max_version='4')
 class TestUpgradeRepair(BaseRepairTest):
     __test__ = True
 

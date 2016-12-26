@@ -2842,6 +2842,8 @@ class TestCQL(UpgradeTester):
             query = "SELECT i, blobAsText(b) FROM test WHERE k = 0"
             assert_one(cursor, query, [3, 'foobar'])
 
+    # Fixed by CASSANDRA-12654 in 3.12
+    @since('2.0', max_version='3.12')
     def bug_5376_test(self):
         cursor = self.prepare()
 
