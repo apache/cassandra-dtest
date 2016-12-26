@@ -51,7 +51,7 @@ class TestSCUpgrade(Tester):
 
     def verify_with_thrift(self):
         # No more thrift in 4.0
-        if (self.cluster.version() >= '4')
+        if self.cluster.version() >= '4':
             return
 
         pool = ConnectionPool("supcols", pool_size=1)
@@ -108,7 +108,7 @@ class TestSCUpgrade(Tester):
         for version in upgrade_path:
             self.upgrade_to_version(version)
 
-            if (self.cluster.version() < '4')
+            if self.cluster.version() < '4':
                 node1.nodetool("enablethrift")
 
             session = self.patient_exclusive_cql_connection(node1)
