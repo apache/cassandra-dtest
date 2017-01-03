@@ -541,8 +541,11 @@ class TestBootstrap(BaseBootstrapTest):
         node2.start(wait_for_binary_proto=True, wait_other_notice=True)
 
         session = self.patient_cql_connection(node1)
-        # reduce system_distributed RF to 2 so we don't require forceful decommission
-        session.execute("ALTER KEYSPACE system_distributed WITH REPLICATION = {'class':'SimpleStrategy', 'replication_factor':'1'};")
+
+        if cluster.version() >= '2.2':
+            # reduce system_distributed RF to 2 so we don't require forceful decommission
+            session.execute("ALTER KEYSPACE system_distributed WITH REPLICATION = {'class':'SimpleStrategy', 'replication_factor':'1'};")
+
         session.execute("ALTER KEYSPACE system_traces WITH REPLICATION = {'class':'SimpleStrategy', 'replication_factor':'1'};")
 
         # Decommision the new node and kill it

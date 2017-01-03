@@ -42,8 +42,10 @@ class TestTopology(Tester):
         node1, node2, node3 = cluster.nodelist()
 
         session = self.patient_cql_connection(node1)
-        # reduce system_distributed RF to 2 so we don't require forceful decommission
-        session.execute("ALTER KEYSPACE system_distributed WITH REPLICATION = {'class':'SimpleStrategy', 'replication_factor':'2'};")
+
+        if cluster.version() >= '2.2':
+            # reduce system_distributed RF to 2 so we don't require forceful decommission
+            session.execute("ALTER KEYSPACE system_distributed WITH REPLICATION = {'class':'SimpleStrategy', 'replication_factor':'2'};")
 
         # write some data
         node1.stress(['write', 'n=10K', 'no-warmup', '-rate', 'threads=8'])
