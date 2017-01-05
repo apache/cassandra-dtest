@@ -78,7 +78,7 @@ class TestCQL(UpgradeTester):
 
             assert_all(cursor, "SELECT * FROM users", [[UUID('f47ac10b-58cc-4372-a567-0e02b2c3d479'), 37, None, None], [UUID('550e8400-e29b-41d4-a716-446655440000'), 36, None, None]])
 
-    @since('2.0', max_version='2.2.X')
+    @since('2.0', max_version='3')  # 3.0+ not compatible with protocol version 2
     def large_collection_errors_test(self):
         """ For large collections, make sure that we are printing warnings """
 
@@ -4108,14 +4108,11 @@ class TestCQL(UpgradeTester):
 
             assert_invalid(cursor, "SELECT v1, v2, v3 FROM test WHERE k = 0 AND (v1, v3) > (1, 0)")
 
-    @since('2.0', max_version='2.2.X')
+    @since('2.0', max_version='3')  # 3.0+ not compatible with protocol version 2
     def test_v2_protocol_IN_with_tuples(self):
         """
         @jira_ticket CASSANDRA-8062
         """
-        for version in self.get_node_versions():
-            if version >= '3.0':
-                raise SkipTest('version {} not compatible with protocol version 2'.format(version))
 
         cursor = self.prepare(protocol_version=2)
         cursor.execute("CREATE TABLE test (k int, c1 int, c2 text, PRIMARY KEY (k, c1, c2))")
