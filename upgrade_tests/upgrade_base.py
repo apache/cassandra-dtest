@@ -145,6 +145,13 @@ class UpgradeTester(Tester):
 
         # this is a bandaid; after refactoring, upgrades should account for protocol version
         new_version_from_build = get_version_from_build(node1.get_install_dir())
+
+        # Check if a since annotation with a max_version was set on this test.
+        # The since decorator can only check the starting version of the upgrade,
+        # so here we check to new version of the upgrade as well.
+        if hasattr(self, 'max_version') and new_version_from_build >= self.max_version:
+            self.skip("Skipping test, new version {} is equal to or higher than max version {}".format(new_version_from_build, self.max_version))
+
         if (new_version_from_build >= '3' and self.protocol_version is not None and self.protocol_version < 3):
             self.skip('Protocol version {} incompatible '
                       'with Cassandra version {}'.format(self.protocol_version, new_version_from_build))

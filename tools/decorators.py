@@ -27,6 +27,7 @@ class since(object):
 
         @functools.wraps(cls.setUp)
         def wrapped_setUp(obj, *args, **kwargs):
+            obj.max_version = self.max_version
             orig_setUp(obj, *args, **kwargs)
             version = obj.cluster.version()
             msg = self._skip_msg(version)
@@ -39,6 +40,7 @@ class since(object):
     def _wrap_function(self, f):
         @functools.wraps(f)
         def wrapped(obj):
+            obj.max_version = self.max_version
             version = obj.cluster.version()
             msg = self._skip_msg(version)
             if msg:
