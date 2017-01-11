@@ -2739,6 +2739,51 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
                                                                                                                               [3, 2, 1, 5],
                                                                                                                               [3, 2, 2, 5]])
 
+    @since('2.1')
+    def test_paging_with_empty_row_and_empty_static_columns(self):
+        """
+        test paging when the rows and the static columns are empty
+        @jira_ticket CASSANDRA-13017
+        """
+
+        session = self.prepare()
+        create_ks(session, 'test_paging_with_empty_rows_and_static_columns', 2)
+        session.execute("CREATE TABLE test (pk int, c int, v int, s int static, primary key(pk, c))")
+        session.row_factory = tuple_factory
+
+        for i in xrange(5):
+            for j in xrange(5):
+                session.execute("INSERT INTO test (pk, c) VALUES ({}, {})".format(i, j))
+
+        for page_size in (2, 3, 4, 5, 7, 10):
+            session.default_fetch_size = page_size
+
+            res = rows_to_list(session.execute("SELECT DISTINCT pk FROM test"))
+            self.assertEqual(res, [[1],
+                                   [0],
+                                   [2],
+                                   [4],
+                                   [3]])
+
+            res = rows_to_list(session.execute("SELECT DISTINCT pk FROM test LIMIT 4"))
+            self.assertEqual(res, [[1],
+                                   [0],
+                                   [2],
+                                   [4]])
+
+            res = rows_to_list(session.execute("SELECT DISTINCT pk, s FROM test"))
+            self.assertEqual(res, [[1, None],
+                                   [0, None],
+                                   [2, None],
+                                   [4, None],
+                                   [3, None]])
+
+            res = rows_to_list(session.execute("SELECT DISTINCT pk, s FROM test LIMIT 4"))
+            self.assertEqual(res, [[1, None],
+                                   [0, None],
+                                   [2, None],
+                                   [4, None]])
+
 
 @since('2.0')
 class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
