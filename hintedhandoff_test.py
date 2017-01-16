@@ -166,8 +166,8 @@ class TestHintedHandoff(Tester):
         insert_c1c2(session, n=100, consistency=ConsistencyLevel.ONE)
         node1.decommission()
         node4.start(wait_for_binary_proto=True)
-        node2.decommission()
-        node3.decommission()
+        node2.nodetool('decommission --force')
+        node3.nodetool('decommission --force')
         time.sleep(5)
         for x in xrange(0, 100):
             query_c1c2(session, x, ConsistencyLevel.ONE)
