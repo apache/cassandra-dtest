@@ -137,8 +137,13 @@ class TestDynamicEndpointSnitch(Tester):
         session.execute("CREATE TABLE snitchtestks.tbl1 (key int PRIMARY KEY) WITH speculative_retry = 'NONE' AND dclocal_read_repair_chance = 0.0")
         read_stmt = session.prepare("SELECT * FROM snitchtestks.tbl1 where key = ?")
         read_stmt.consistency_level = ConsistencyLevel.LOCAL_QUORUM
+        insert_stmt = session.prepare("INSERT INTO snitchtestks.tbl1 (key) VALUES (?)")
+        insert_stmt.consistency_level = ConsistencyLevel.ALL
         with JolokiaAgent(coordinator_node) as jmx:
             with JolokiaAgent(degraded_node) as bad_jmx:
+                for x in range(0, 300):
+                    session.execute(insert_stmt, [x])
+
                 cleared = False
                 # Wait for a snitch reset in case any earlier
                 # startup process populated cross-DC read timings
