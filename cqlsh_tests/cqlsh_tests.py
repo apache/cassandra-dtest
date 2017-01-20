@@ -682,7 +682,6 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         self.cluster.populate(1)
         self.cluster.start(wait_for_binary_proto=True)
         node1, = self.cluster.nodelist()
-
         self.execute(
             cql="""
                 CREATE KEYSPACE test WITH REPLICATION = {'class' : 'SimpleStrategy', 'replication_factor' : 1};
@@ -980,10 +979,20 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
             AND min_index_interval = 128
             AND read_repair_chance = 0.0
             AND speculative_retry = '99.0PERCENTILE';
-        """ + self.get_index_output('"QuotedNameIndex"', 'test', 'users', 'firstname') \
+        """ + self.get_index_output('QuotedNameIndex', 'test', 'users', 'firstname') \
                    + "\n" + self.get_index_output('myindex', 'test', 'users', 'age')
 
     def get_index_output(self, index, ks, table, col):
+        # a quoted index name (e.g. "FooIndex") is only correctly echoed by DESCRIBE
+        # from 3.0.11 & 3.10
+        if index[0] == '"' and index[-1] == '"':
+            version = self.cluster.version()
+            if version >= LooseVersion('3.10'):
+                pass
+            elif LooseVersion('3.1') > version >= LooseVersion('3.0.11'):
+                pass
+            else:
+                index = index[1:-1]
         return "CREATE INDEX {} ON {}.{} ({});".format(index, ks, table, col)
 
     def get_users_by_state_mv_output(self):
