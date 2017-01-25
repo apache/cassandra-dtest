@@ -468,10 +468,6 @@ class Tester(TestCase):
                             port=port, ssl_options=ssl_opts, connect_timeout=10, allow_beta_protocol_version=True)
         session = cluster.connect(wait_for_all_pools=True)
 
-        # temporarily increase client-side timeout to 1m to determine
-        # if the cluster is simply responding slowly to requests
-        session.default_timeout = 60.0
-
         if keyspace is not None:
             session.set_keyspace(keyspace)
 
