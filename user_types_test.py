@@ -38,9 +38,8 @@ class TestUserTypes(Tester):
         cluster = self.cluster
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
-        session = self.patient_cql_connection(node1)
+        session = self.patient_cql_connection(node1, consistency_level=ConsistencyLevel.LOCAL_QUORUM)
         create_ks(session, 'user_type_dropping', 2)
-        session.default_consistency_level = ConsistencyLevel.LOCAL_QUORUM
 
         stmt = """
               USE user_type_dropping
@@ -101,9 +100,8 @@ class TestUserTypes(Tester):
         cluster = self.cluster
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
-        session = self.patient_cql_connection(node1)
+        session = self.patient_cql_connection(node1, consistency_level=ConsistencyLevel.LOCAL_QUORUM)
         create_ks(session, 'nested_user_type_dropping', 2)
-        session.default_consistency_level = ConsistencyLevel.LOCAL_QUORUM
 
         stmt = """
               USE nested_user_type_dropping
@@ -151,9 +149,8 @@ class TestUserTypes(Tester):
         cluster = self.cluster
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
-        session = self.cql_connection(node1)
+        session = self.cql_connection(node1, consistency_level=ConsistencyLevel.LOCAL_QUORUM)
         create_ks(session, 'user_type_enforcement', 2)
-        session.default_consistency_level = ConsistencyLevel.LOCAL_QUORUM
 
         stmt = """
               USE user_type_enforcement
@@ -200,9 +197,8 @@ class TestUserTypes(Tester):
         cluster = self.cluster
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
-        session = self.patient_cql_connection(node1)
+        session = self.patient_cql_connection(node1, consistency_level=ConsistencyLevel.LOCAL_QUORUM)
         create_ks(session, 'user_types', 2)
-        session.default_consistency_level = ConsistencyLevel.LOCAL_QUORUM
 
         stmt = """
               USE user_types
@@ -336,9 +332,8 @@ class TestUserTypes(Tester):
         cluster = self.cluster
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
-        session = self.patient_cql_connection(node1)
+        session = self.patient_cql_connection(node1, consistency_level=ConsistencyLevel.LOCAL_QUORUM)
         create_ks(session, 'user_type_pkeys', 2)
-        session.default_consistency_level = ConsistencyLevel.LOCAL_QUORUM
 
         stmt = """
               CREATE TYPE t_person_name (
@@ -398,9 +393,8 @@ class TestUserTypes(Tester):
         cluster = self.cluster
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
-        session = self.patient_cql_connection(node1)
+        session = self.patient_cql_connection(node1, consistency_level=ConsistencyLevel.LOCAL_QUORUM)
         create_ks(session, 'user_type_indexing', 2)
-        session.default_consistency_level = ConsistencyLevel.LOCAL_QUORUM
 
         stmt = """
               CREATE TYPE t_person_name (
@@ -581,9 +575,8 @@ class TestUserTypes(Tester):
         cluster = self.cluster
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
-        session = self.patient_cql_connection(node1)
+        session = self.patient_cql_connection(node1, consistency_level=ConsistencyLevel.LOCAL_QUORUM)
         create_ks(session, 'user_types', 2)
-        session.default_consistency_level = ConsistencyLevel.LOCAL_QUORUM
 
         stmt = """
               USE user_types
@@ -648,9 +641,8 @@ class TestUserTypes(Tester):
         cluster = self.cluster
         cluster.populate(3).start(wait_for_binary_proto=True)
         node1, node2, node3 = cluster.nodelist()
-        session = self.patient_cql_connection(node1)
+        session = self.patient_cql_connection(node1, consistency_level=ConsistencyLevel.LOCAL_QUORUM)
         create_ks(session, 'user_type_pkeys', 2)
-        session.default_consistency_level = ConsistencyLevel.LOCAL_QUORUM
 
         stmt = """
               CREATE TYPE t_letterpair (
@@ -697,9 +689,8 @@ class TestUserTypes(Tester):
         cluster = self.cluster
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
-        session = self.patient_cql_connection(node1)
+        session = self.patient_cql_connection(node1, consistency_level=ConsistencyLevel.LOCAL_QUORUM)
         create_ks(session, 'user_types', 1)
-        session.default_consistency_level = ConsistencyLevel.LOCAL_QUORUM
 
         # Check we can create non-frozen table
         session.execute("CREATE TYPE udt (first ascii, second int, third int)")

@@ -93,8 +93,7 @@ class BaseRepairTest(Tester):
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
 
-        session = self.patient_cql_connection(node1)
-        session.cluster.default_retry_policy = FlakyRetryPolicy(max_retries=15)
+        session = self.patient_cql_connection(node1, retry_policy=FlakyRetryPolicy(max_retries=15))
         create_ks(session, 'ks', 3)
         create_cf(session, 'cf', read_repair=0.0, columns={'c1': 'text', 'c2': 'text'})
 

@@ -104,16 +104,16 @@ class UpgradeTester(Tester):
         node1 = cluster.nodelist()[0]
         time.sleep(0.2)
 
-        session = self.patient_cql_connection(node1, protocol_version=protocol_version)
+        if cl:
+            session = self.patient_cql_connection(node1, protocol_version=protocol_version, consistency_level=cl, **kwargs)
+        else:
+            session = self.patient_cql_connection(node1, protocol_version=protocol_version, **kwargs)
         if create_keyspace:
             create_ks(session, 'ks', rf)
 
-        if cl:
-            session.default_consistency_level = cl
-
         return session
 
-    def do_upgrade(self, session, return_nodes=False):
+    def do_upgrade(self, session, return_nodes=False, **kwargs):
         """
         Upgrades the first node in the cluster and returns a list of
         (is_upgraded, Session) tuples.  If `is_upgraded` is true, the
@@ -160,7 +160,10 @@ class UpgradeTester(Tester):
         node1.start(wait_for_binary_proto=True, wait_other_notice=True)
 
         sessions_and_meta = []
-        session = self.patient_exclusive_cql_connection(node1, protocol_version=self.protocol_version)
+        if self.CL:
+            session = self.patient_exclusive_cql_connection(node1, protocol_version=self.protocol_version, consistency_level=self.CL, **kwargs)
+        else:
+            session = self.patient_exclusive_cql_connection(node1, protocol_version=self.protocol_version, **kwargs)
         session.set_keyspace('ks')
 
         if return_nodes:
@@ -169,18 +172,13 @@ class UpgradeTester(Tester):
             sessions_and_meta.append((True, session))
 
         # open a second session with the node on the old version
-        session = self.patient_exclusive_cql_connection(node2, protocol_version=self.protocol_version)
+        session = self.patient_exclusive_cql_connection(node2, protocol_version=self.protocol_version, **kwargs)
         session.set_keyspace('ks')
 
         if return_nodes:
             sessions_and_meta.append((False, session, node2))
         else:
             sessions_and_meta.append((False, session))
-
-        if self.CL:
-            for session_and_meta in sessions_and_meta:
-                session = session_and_meta[1]
-                session.default_consistency_level = self.CL
 
         # Let the nodes settle briefly before yielding connections in turn (on the upgraded and non-upgraded alike)
         # CASSANDRA-11396 was the impetus for this change, wherein some apparent perf noise was preventing

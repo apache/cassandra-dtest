@@ -202,9 +202,8 @@ class ReplicationTest(Tester):
         """
         self.cluster.populate(3).start(wait_for_binary_proto=True, wait_other_notice=True)
         node1 = self.cluster.nodelist()[0]
-        session = self.patient_exclusive_cql_connection(node1)
+        session = self.patient_exclusive_cql_connection(node1, consistency_level=ConsistencyLevel.ALL)
         session.max_trace_wait = 120
-        session.default_consistency_level = ConsistencyLevel.ALL
 
         replication_factor = 3
         create_ks(session, 'test', replication_factor)
@@ -241,12 +240,11 @@ class ReplicationTest(Tester):
 
         node1 = self.cluster.nodelist()[0]
         ip_nodes = dict((node.address(), node) for node in self.cluster.nodelist())
-        session = self.patient_exclusive_cql_connection(node1)
+        session = self.patient_exclusive_cql_connection(node1, consistency_level=ConsistencyLevel.ALL)
 
         replication_factor = {'dc1': 2, 'dc2': 2}
         create_ks(session, 'test', replication_factor)
         session.execute('CREATE TABLE test.test (id int PRIMARY KEY, value text)', trace=False)
-        session.default_consistency_level = ConsistencyLevel.ALL
 
         forwarders_used = set()
 
