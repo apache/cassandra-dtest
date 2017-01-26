@@ -1819,6 +1819,7 @@ class CqlshSmokeTest(Tester):
         self.node1.run_cqlsh('TRUNCATE ks.test;')
         self.assertEqual([], rows_to_list(self.session.execute('SELECT * from test')))
 
+    @since('2.0', max_version='2.2')
     def test_alter_table(self):
         create_ks(self.session, 'ks', 1, )
         create_cf(self.session, 'test', columns={'i': 'ascii'})
