@@ -1,4 +1,4 @@
-from cassandra import ConsistencyLevel, ReadFailure, ReadTimeout
+from cassandra import ConsistencyLevel, ReadFailure, ReadTimeout, OperationTimedOut
 from cassandra.policies import FallthroughRetryPolicy
 from cassandra.query import SimpleStatement
 
@@ -83,10 +83,13 @@ class TestReadFailures(Tester):
         A failed read due to tombstones at v3 should result in a ReadTimeout
         """
         self.protocol_version = 3
-        self.expected_expt = ReadTimeout
+        self.expected_expt = OperationTimedOut
         session = self._prepare_cluster()
         self._insert_tombstones(session, 600)
-        self._perform_cql_statement(session, "SELECT value FROM tombstonefailure")
+        # ReadTimeout will be wrapped by OperationTimedOut and is contained in errors dict
+        exc = self._perform_cql_statement(session, "SELECT value FROM tombstonefailure")
+        self.assertEquals(1, len(exc.errors))
+        self.assertTrue(isinstance(exc.errors.values()[0], ReadTimeout))
 
     @since('2.2')
     def test_tombstone_failure_v4(self):
