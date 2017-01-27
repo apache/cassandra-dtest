@@ -3828,7 +3828,7 @@ class TestCQL(UpgradeTester):
                            UPDATE test SET v='barfoo' WHERE id=0 AND k='k2';
                            UPDATE test SET version=3 WHERE id=0 IF version=1;
                          APPLY BATCH
-                       """, [False, 0, None, 2])
+                       """, [False, 0, 'k1', 2])
 
             assert_one(cursor,
                        """
