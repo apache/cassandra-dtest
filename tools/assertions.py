@@ -275,7 +275,7 @@ def assert_stderr_clean(err, acceptable_errors=None):
     """
     if acceptable_errors is None:
         acceptable_errors = ["WARN.*JNA link failure.*unavailable.",
-                             "objc.*Class JavaLaunchHelper.*?Which one is undefined.123",
+                             "objc.*Class JavaLaunchHelper.*?Which one is undefined.",
                              # Stress tool JMX connection failure, see CASSANDRA-12437
                              "Failed to connect over JMX; not collecting these stats"]
 
