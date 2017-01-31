@@ -1,4 +1,4 @@
-from cassandra import ConsistencyLevel, ReadFailure, ReadTimeout, OperationTimedOut
+from cassandra import ConsistencyLevel, ReadFailure, ReadTimeout
 from cassandra.policies import FallthroughRetryPolicy
 from cassandra.query import SimpleStatement
 
@@ -52,14 +52,17 @@ class TestReadFailures(Tester):
                                             consistency_level=self.consistency_level, retry_policy=FallthroughRetryPolicy()))
 
     def _perform_cql_statement(self, session, text_statement):
-        statement = session.prepare(text_statement)
-        statement.consistency_level = self.consistency_level
+        statement = SimpleStatement(text_statement,
+                                    consistency_level=self.consistency_level,
+                                    retry_policy=FallthroughRetryPolicy())
 
         if self.expected_expt is None:
             session.execute(statement)
         else:
             with self.assertRaises(self.expected_expt) as cm:
-                session.execute(statement)
+                # On 2.1, we won't return the ReadTimeout from coordinator until actual timeout,
+                # so we need to up the default timeout of the driver session
+                session.execute(statement, timeout=15)
             return cm.exception
 
     def _assert_error_code_map_exists_with_code(self, exception, expected_code):
@@ -83,13 +86,10 @@ class TestReadFailures(Tester):
         A failed read due to tombstones at v3 should result in a ReadTimeout
         """
         self.protocol_version = 3
-        self.expected_expt = OperationTimedOut
+        self.expected_expt = ReadTimeout
         session = self._prepare_cluster()
         self._insert_tombstones(session, 600)
-        # ReadTimeout will be wrapped by OperationTimedOut and is contained in errors dict
-        exc = self._perform_cql_statement(session, "SELECT value FROM tombstonefailure")
-        self.assertEquals(1, len(exc.errors))
-        self.assertTrue(isinstance(exc.errors.values()[0], ReadTimeout))
+        self._perform_cql_statement(session, "SELECT value FROM tombstonefailure")
 
     @since('2.2')
     def test_tombstone_failure_v4(self):
