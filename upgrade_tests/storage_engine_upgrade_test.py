@@ -426,6 +426,21 @@ class TestStorageEngineUpgrade(Tester):
         ret = list(session.execute('SELECT * FROM rt'))
         assert_length_equal(ret, 2)
 
+    @since('3.0')
+    def upgrade_with_range_tombstone_ae_test(self):
+        """
+        Certain range tombstone pattern causes AssertionError when upgrade.
+        This test makes sure it won't happeen.
+
+        @jira_ticket CASSANDRA-12203
+        """
+        session = self._setup_cluster()
+        session.execute('CREATE TABLE test (k ascii, c1 ascii, c2 int, c3 int, val text, PRIMARY KEY (k, c1, c2, c3))')
+        session.execute("DELETE FROM ks.test WHERE k = 'a' AND c1 = 'a'")
+        session.execute("DELETE FROM ks.test WHERE k = 'a' AND c1 = 'a' AND c2 = 1")
+        session = self._do_upgrade()
+        assert_none(session, "SELECT k FROM test")
+
 
 @since('3.0')
 class TestBootstrapAfterUpgrade(TestStorageEngineUpgrade):
