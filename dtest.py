@@ -108,7 +108,7 @@ logging.getLogger('cassandra').setLevel(logging.INFO)
 def get_sha(repo_dir):
     try:
         output = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=repo_dir).strip()
-        prefix = 'git:'
+        prefix = 'github:apache/'
         local_repo_location = os.environ.get('LOCAL_GIT_REPO')
         if local_repo_location is not None:
             prefix = 'local:{}:'.format(local_repo_location)  # local: slugs take the form 'local:/some/path/to/cassandra/:branch_name_or_sha'
