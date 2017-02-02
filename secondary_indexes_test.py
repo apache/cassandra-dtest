@@ -21,7 +21,7 @@ from tools.misc import new_node
 
 class TestSecondaryIndexes(Tester):
 
-    def bug3367_test(self):
+    def data_created_before_index_not_returned_in_where_query_test(self):
         """
         @jira_ticket CASSANDRA-3367
         """

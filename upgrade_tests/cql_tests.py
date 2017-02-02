@@ -359,7 +359,9 @@ class TestCQL(UpgradeTester):
                 assert_one(cursor, "SELECT * FROM clicks WHERE userid IN (48, 2) LIMIT 1", [48, 'http://foo.com', 42])
 
     def simple_tuple_query_test(self):
-        """Covers CASSANDRA-8613"""
+        """
+        @jira_ticket CASSANDRA-8613
+        """
         cursor = self.prepare()
 
         cursor.execute("create table bard (a int, b int, c int, d int , e int, PRIMARY KEY (a, b, c, d, e))")
@@ -638,7 +640,10 @@ class TestCQL(UpgradeTester):
             assert_all(cursor, "SELECT v FROM test2 WHERE k = 0 ORDER BY c1", [[x] for x in range(8)])
 
     def more_order_by_test(self):
-        """ More ORDER BY checks (#4160) """
+        """
+        More ORDER BY checks
+        @jira_ticket CASSANDRA-4160
+        """
         cursor = self.prepare()
 
         cursor.execute("""
@@ -702,7 +707,10 @@ class TestCQL(UpgradeTester):
             assert_all(cursor, "SELECT number, number2 FROM test2 WHERE row='a' AND number <= 3 ORDER BY number DESC;", [[3, 1], [3, 0], [2, 1], [2, 0], [1, 0]])
 
     def order_by_validation_test(self):
-        """ Check we don't allow order by on row key (#4246) """
+        """
+        Check we don't allow order by on row key
+        @jira_ticket CASSANDRA-4246
+        """
         cursor = self.prepare()
 
         cursor.execute("""
@@ -726,7 +734,10 @@ class TestCQL(UpgradeTester):
             assert_invalid(cursor, "SELECT * FROM test ORDER BY k2")
 
     def order_by_with_in_test(self):
-        """ Check that order-by works with IN (#4327) """
+        """
+        Check that order-by works with IN
+        @jira_ticket CASSANDRA-4327
+        """
         cursor = self.prepare()
         cursor.execute("""
             CREATE TABLE test(
@@ -864,7 +875,10 @@ class TestCQL(UpgradeTester):
             assert_all(cursor, "SELECT id FROM users WHERE birth_year = 42", [['Tom'], ['Bob']])
 
     def deletion_test(self):
-        """ Test simple deletion and in particular check for #4193 bug """
+        """
+        Test simple deletion and in particular check for #4193 bug
+        @jira_ticket CASSANDRA-4193
+        """
 
         cursor = self.prepare()
 
@@ -1246,7 +1260,10 @@ class TestCQL(UpgradeTester):
             assert_length_equal(res, 3)
 
     def range_query_2ndary_test(self):
-        """ Test range queries with 2ndary indexes (#4257) """
+        """
+        Test range queries with 2ndary indexes
+        @jira_ticket CASSANDRA-4257
+        """
         cursor = self.prepare()
 
         cursor.execute("CREATE TABLE indextest (id int primary key, row int, setid int);")
@@ -1418,7 +1435,10 @@ class TestCQL(UpgradeTester):
             ]])
 
     def range_query_test(self):
-        """ Range test query from #4372 """
+        """
+        Range test query from #4372
+        @jira_ticket CASSANDRA-4372
+        """
         cursor = self.prepare()
 
         cursor.execute("CREATE TABLE test (a int, b int, c int, d int, e int, f text, PRIMARY KEY (a, b, c, d, e) )")
@@ -1472,7 +1492,10 @@ class TestCQL(UpgradeTester):
 
     @since('2', max_version='4')
     def cql3_insert_thrift_test(self):
-        """ Check that we can insert from thrift into a CQL3 table (#4377) """
+        """
+        Check that we can insert from thrift into a CQL3 table
+        @jira_ticket CASSANDRA-4377
+        """
         cursor = self.prepare(start_rpc=True)
 
         cursor.execute("""
@@ -1593,7 +1616,10 @@ class TestCQL(UpgradeTester):
                 self.assertEqual(struct.pack('>i', 1), cols['static1'])
 
     def row_existence_test(self):
-        """ Check the semantic of CQL row existence (part of #4361) """
+        """
+        Check the semantic of CQL row existence (part of #4361)
+        @jira_ticket CASSANDRA-4361
+        """
         cursor = self.prepare()
 
         cursor.execute("""
@@ -1630,7 +1656,10 @@ class TestCQL(UpgradeTester):
 
     @freshCluster()
     def only_pk_test(self):
-        """ Check table with only a PK (#4361) """
+        """
+        Check table with only a PK (part of #4361)
+        @jira_ticket CASSANDRA-4361
+        """
         cursor = self.prepare(ordered=True)
 
         cursor.execute("""
@@ -1704,7 +1733,10 @@ class TestCQL(UpgradeTester):
 
     @freshCluster()
     def range_slice_test(self):
-        """ Test a regression from #1337 """
+        """
+        Test a regression from #1337
+        @jira_ticket CASSANDRA-1337
+        """
 
         cursor = self.prepare()
 
@@ -1790,7 +1822,10 @@ class TestCQL(UpgradeTester):
 
     @freshCluster()
     def limit_bugs_test(self):
-        """ Test for LIMIT bugs from 4579 """
+        """
+        Test for LIMIT bugs from #4579
+        @jira_ticket CASSANDRA-4579
+        """
 
         cursor = self.prepare(ordered=True)
         cursor.execute("""
@@ -1845,7 +1880,11 @@ class TestCQL(UpgradeTester):
 
             assert_all(cursor, "SELECT * FROM testcf2 LIMIT 5;", [[1, 1, 1], [2, 2, 2], [3, 3, 3], [4, 4, 4]])
 
-    def bug_4532_test(self):
+    def npe_composite_table_slice_test(self):
+        """
+        Test for NPE when trying to select a slice from a composite table
+        @jira_ticket CASSANDRA-4532
+        """
 
         cursor = self.prepare()
         cursor.execute("""
@@ -1870,11 +1909,14 @@ class TestCQL(UpgradeTester):
             cursor.execute("INSERT INTO compositetest(status,ctime,key,nil) VALUES ('C',12345680,'key6','')")
 
             assert_invalid(cursor, "SELECT * FROM compositetest WHERE ctime>=12345679 AND key='key3' AND ctime<=12345680 LIMIT 3;")
-            assert_invalid(cursor, "SELECT * FROM compositetest WHERE ctime=12345679  AND key='key3' AND ctime<=12345680 LIMIT 3")
+            assert_invalid(cursor, "SELECT * FROM compositetest WHERE ctime=12345679  AND key='key3' AND ctime<=12345680 LIMIT 3;")
 
     @freshCluster()
     def order_by_multikey_test(self):
-        """ Test for #4612 bug and more generaly order by when multiple C* rows are queried """
+        """
+        Test for #4612 bug and more generally order by when multiple C* rows are queried
+        @jira_ticket CASSANDRA-4612
+        """
 
         cursor = self.prepare(ordered=True)
         cursor.execute("""
@@ -1969,7 +2011,10 @@ class TestCQL(UpgradeTester):
             assert_all(cursor, query, [[1, 0], [1, 3], [0, 0]])
 
     def refuse_in_with_indexes_test(self):
-        """ Test for the validation bug of #4709 """
+        """
+        Test for the validation bug of #4709
+        @jira_ticket CASSANDRA-4709
+        """
 
         cursor = self.prepare()
         cursor.execute("create table t1 (pk varchar primary key, col1 varchar, col2 varchar);")
@@ -1989,7 +2034,10 @@ class TestCQL(UpgradeTester):
             assert_invalid(cursor, "select * from t1 where col2 in ('bar1', 'bar2');")
 
     def reversed_compact_test(self):
-        """ Test for #4716 bug and more generally for good behavior of ordering"""
+        """
+        Test for #4716 bug and more generally for good behavior of ordering
+        @jira_ticket CASSANDRA-4716
+        """
 
         cursor = self.prepare()
         cursor.execute("""
@@ -2059,7 +2107,11 @@ class TestCQL(UpgradeTester):
             assert_all(cursor, query, [[6], [5], [4], [3], [2]])
 
     def reversed_compact_multikey_test(self):
-        """ Test for the bug from #4760 and #4759 """
+        """
+        Test for the bug from #4760 and #4759
+        @jira_ticket CASSANDRA-4760
+        @jira_ticket CASSANDRA-4759
+        """
 
         cursor = self.prepare()
         cursor.execute("""
@@ -2241,7 +2293,13 @@ class TestCQL(UpgradeTester):
             assert_invalid(cursor, "SELECT c1, c2 FROM test WHERE k = 'foo' ORDER BY c2 ASC")
             assert_invalid(cursor, "SELECT c1, c2 FROM test WHERE k = 'foo' ORDER BY c1 ASC, c2 ASC")
 
-    def bug_4882_test(self):
+    def returned_null_test(self):
+        """
+        Test for returned null.
+        StorageProxy short read protection hadn't been updated after the changes made by CASSANDRA-3647,
+        namely the fact that SliceQueryFilter groups columns by prefix before counting them.
+        @jira_ticket CASSANDRA-4882
+        """
         cursor = self.prepare()
 
         cursor.execute("""
@@ -2392,7 +2450,10 @@ class TestCQL(UpgradeTester):
             assert_invalid(cursor, "SELECT writetime(l) FROM test WHERE k = 0")
 
     def composite_partition_key_validation_test(self):
-        """ Test for bug from #5122 """
+        """
+        Test for bug from #5122
+        @jira_ticket CASSANDRA-5122
+        """
         cursor = self.prepare()
 
         cursor.execute("CREATE TABLE foo (a int, b text, c uuid, PRIMARY KEY ((a, b)));")
@@ -2521,7 +2582,9 @@ class TestCQL(UpgradeTester):
             assert_all(cursor, query, [[0, 0, 0], [0, 2, 2]])
 
     def large_clustering_in_test(self):
-        # Test for CASSANDRA-8410
+        """
+        @jira_ticket CASSANDRA-8410
+        """
         cursor = self.prepare()
 
         cursor.execute("""
@@ -2618,7 +2681,10 @@ class TestCQL(UpgradeTester):
             cursor.execute("INSERT INTO test(k, d, f) VALUES (2, 3, -2)")
 
     def compact_metadata_test(self):
-        """ Test regression from #5189 """
+        """
+        Test regression from #5189
+        @jira_ticket CASSANDRA-5189
+        """
         cursor = self.prepare()
 
         cursor.execute("""
@@ -2769,7 +2835,13 @@ class TestCQL(UpgradeTester):
 
             assert_all(cursor, "SELECT value FROM indexed WHERE pk0 = 5 AND pk1 = 0 AND ck0 = 1 AND ck2 = 3 ALLOW FILTERING", [[4]])
 
-    def bug_5240_test(self):
+    def end_of_component_as_end_key_test(self):
+        """
+        Test to make sure that an end-of-component is no longer being used as the end key of the range when
+        a secondary index is involved.
+        @jira_ticket CASSANDRA-5240
+        """
+
         cursor = self.prepare()
 
         cursor.execute("""
@@ -2844,7 +2916,12 @@ class TestCQL(UpgradeTester):
 
     # Fixed by CASSANDRA-12654 in 3.12
     @since('2.0', max_version='3.12')
-    def bug_5376_test(self):
+    def IN_clause_on_last_key_test(self):
+        """
+        Tests patch to improve validation by not throwing an assertion when using map, list, or set
+        with IN clauses on the last key.
+        @jira_ticket CASSANDRA-5376
+        """
         cursor = self.prepare()
 
         cursor.execute("""
@@ -2862,8 +2939,9 @@ class TestCQL(UpgradeTester):
             assert_invalid(cursor, "select * from test where key = 'foo' and c in (1,3,4);")
 
     def function_and_reverse_type_test(self):
-        """ Test for #5386 """
-
+        """
+        @jira_ticket CASSANDRA-5386
+        """
         cursor = self.prepare()
         cursor.execute("""
             CREATE TABLE test (
@@ -2878,7 +2956,11 @@ class TestCQL(UpgradeTester):
             debug("Querying {} node".format("upgraded" if is_upgraded else "old"))
             cursor.execute("INSERT INTO test (k, c, v) VALUES (0, now(), 0);")
 
-    def bug_5404_test(self):
+    def NPE_during_select_with_token_test(self):
+        """
+        Test for NPE during CQL3 select with token()
+        @jira_ticket CASSANDRA-5404
+        """
         cursor = self.prepare()
 
         cursor.execute("CREATE TABLE test (key text PRIMARY KEY)")
@@ -3183,8 +3265,9 @@ class TestCQL(UpgradeTester):
             assert_invalid(cursor, 'SELECT id AS user_id, name AS user_name FROM users WHERE id IN (0) ORDER BY user_name', matching=error_msg)
 
     def nonpure_function_collection_test(self):
-        """ Test for bug #5795 """
-
+        """
+        @jira_ticket CASSANDRA-5795
+        """
         cursor = self.prepare()
         cursor.execute("CREATE TABLE test (k int PRIMARY KEY, v list<timeuuid>)")
 
@@ -3241,7 +3324,9 @@ class TestCQL(UpgradeTester):
             assert_nothing_changed("test_compact")
 
     def collection_flush_test(self):
-        """ Test for 5805 bug """
+        """
+        @jira_ticket CASSANDRA-5805
+        """
         cursor = self.prepare()
 
         cursor.execute("CREATE TABLE test (k int PRIMARY KEY, s set<int>)")
@@ -3362,7 +3447,11 @@ class TestCQL(UpgradeTester):
                 assert_one(cursor, "UPDATE tkns SET consumed = TRUE WHERE tkn = {} IF consumed = FALSE;".format(i), [True], cl=ConsistencyLevel.QUORUM)
                 assert_one(cursor, "UPDATE tkns SET consumed = TRUE WHERE tkn = {} IF consumed = FALSE;".format(i), [False, True], cl=ConsistencyLevel.QUORUM)
 
-    def bug_6050_test(self):
+    def internal_application_error_on_select_test(self):
+        """
+        Test for 'Internal application error' on SELECT .. WHERE col1=val AND col2 IN (1,2)
+        @jira_ticket CASSANDRA-6050
+        """
         cursor = self.prepare()
 
         cursor.execute("""
@@ -3379,7 +3468,11 @@ class TestCQL(UpgradeTester):
             debug("Querying {} node".format("upgraded" if is_upgraded else "old"))
             assert_invalid(cursor, "SELECT * FROM test WHERE a = 3 AND b IN (1, 3)")
 
-    def bug_6069_test(self):
+    def store_sets_with_if_not_exists_test(self):
+        """
+        Test to fix bug where sets are not stored by INSERT with IF NOT EXISTS
+        @jira_ticket CASSANDRA-6069
+        """
         cursor = self.prepare()
 
         cursor.execute("""
@@ -3396,7 +3489,11 @@ class TestCQL(UpgradeTester):
             assert_one(cursor, "INSERT INTO test(k, s) VALUES (0, {1, 2, 3}) IF NOT EXISTS", [True])
             assert_one(cursor, "SELECT * FROM test", [0, {1, 2, 3}], cl=ConsistencyLevel.SERIAL)
 
-    def bug_6115_test(self):
+    def add_deletion_info_in_unsorted_column_test(self):
+        """
+        Test that UnsortedColumns.addAll(ColumnFamily) adds the deletion info of the CF in argument.
+        @jira_ticket CASSANDRA-6115
+        """
         cursor = self.prepare()
 
         cursor.execute("CREATE TABLE test (k int, v int, PRIMARY KEY (k, v))")
@@ -3526,7 +3623,11 @@ class TestCQL(UpgradeTester):
             # TODO: check result once we have an easy way to do it. For now we just check it doesn't crash
             cursor.execute("SELECT * FROM test")
 
-    def bug_6327_test(self):
+    def intersection_logic_returns_empty_result_test(self):
+        """
+        Test for bug in the column slice intersection logic where select with "in" clause wrongly returns empty result
+        @jira_ticket CASSANDRA-6327
+        """
         cursor = self.prepare()
 
         cursor.execute("""
@@ -3941,6 +4042,10 @@ class TestCQL(UpgradeTester):
 
     @since('2.1')
     def static_columns_with_distinct_test(self):
+        """
+        @jira_ticket CASSANDRA-8087
+        @jira_ticket CASSANDRA-8108
+        """
         cursor = self.prepare()
 
         cursor.execute("""
@@ -4040,7 +4145,10 @@ class TestCQL(UpgradeTester):
                 self.assertEqual(range(10), sorted([r[1] for r in rows]))
 
     def select_count_paging_test(self):
-        """ Test for the #6579 'select count' paging bug """
+        """
+        Test for the #6579 'select count' paging bug
+        @jira_ticket CASSANDRA-6579
+        """
 
         cursor = self.prepare()
         cursor.execute("create table test(field1 text, field2 timeuuid, field3 boolean, primary key(field1, field2));")
@@ -4077,7 +4185,6 @@ class TestCQL(UpgradeTester):
     def tuple_notation_test(self):
         """
         Test the syntax introduced in CASSANDRA-4851
-
         @jira_ticket CASSANDRA-4851
         """
         cursor = self.prepare()
@@ -4197,7 +4304,10 @@ class TestCQL(UpgradeTester):
             self.assertEqual(results, list(sorted(results)))
 
     def cas_and_compact_test(self):
-        """ Test for CAS with compact storage table, and #6813 in particular """
+        """
+        Test for CAS with compact storage table, and #6813 in particular
+        @jira_ticket CASSANDRA-6813
+        """
         cursor = self.prepare()
 
         cursor.execute("""
@@ -4337,7 +4447,10 @@ class TestCQL(UpgradeTester):
 
     @since('2.1.1')
     def expanded_list_item_conditional_test(self):
-        # expanded functionality from CASSANDRA-6839
+        """
+        expanded functionality from CASSANDRA-6839
+        @jira_ticket CASSANDRA-6839
+        """
 
         cursor = self.prepare()
 
@@ -4607,7 +4720,10 @@ class TestCQL(UpgradeTester):
 
     @since('2.1.1')
     def expanded_map_item_conditional_test(self):
-        # expanded functionality from CASSANDRA-6839
+        """
+        Expanded functionality from CASSANDRA-6839
+        @jira_ticket CASSANDRA-6839
+        """
         cursor = self.prepare()
 
         cursor.execute("""
@@ -4681,7 +4797,9 @@ class TestCQL(UpgradeTester):
 
     @since("2.1.1")
     def cas_and_list_index_test(self):
-        """ Test for 7499 test """
+        """
+        @jira_ticket CASSANDRA-7499
+        """
         cursor = self.prepare()
 
         cursor.execute("""
@@ -4706,7 +4824,10 @@ class TestCQL(UpgradeTester):
 
     @since("2.0")
     def static_with_limit_test(self):
-        """ Test LIMIT when static columns are present (#6956) """
+        """
+        Test LIMIT when static columns are present
+        @jira_ticket CASSANDRA-6956
+        """
         cursor = self.prepare()
 
         cursor.execute("""
@@ -4732,7 +4853,9 @@ class TestCQL(UpgradeTester):
 
     @since("2.0")
     def static_with_empty_clustering_test(self):
-        """ Test for bug of #7455 """
+        """
+        @jira_ticket CASSANDRA-7455
+        """
         cursor = self.prepare()
 
         cursor.execute("""
@@ -4756,7 +4879,9 @@ class TestCQL(UpgradeTester):
 
     @since("1.2")
     def limit_compact_table_test(self):
-        """ Check for #7052 bug """
+        """
+        @jira_ticket CASSANDRA-7052
+        """
         cursor = self.prepare()
 
         cursor.execute("""
@@ -4786,7 +4911,9 @@ class TestCQL(UpgradeTester):
             # assert_all(cursor, "SELECT * FROM test WHERE v > 1 AND v <= 3 LIMIT 6 ALLOW FILTERING", [[1, 2], [1, 3], [0, 2], [0, 3], [2, 2], [2, 3]])
 
     def key_index_with_reverse_clustering_test(self):
-        """ Test for #6950 bug """
+        """
+        @jira_ticket CASSANDRA-6950
+        """
         cursor = self.prepare()
 
         cursor.execute("""
@@ -4848,7 +4975,9 @@ class TestCQL(UpgradeTester):
             assert_invalid(cursor, "BEGIN COUNTER BATCH USING TIMESTAMP 3 UPDATE counters SET c = c + 1 WHERE k = 0; UPDATE counters SET c = c + 1 WHERE k = 0; APPLY BATCH")
 
     def clustering_order_in_test(self):
-        """Test for #7105 bug"""
+        """
+        @jira_ticket CASSANDRA-7105
+        """
         cursor = self.prepare()
 
         cursor.execute("""
@@ -4870,8 +4999,11 @@ class TestCQL(UpgradeTester):
             assert_one(cursor, "SELECT * FROM test WHERE a=1 AND b=2 AND c IN (3)", [1, 2, 3])
             assert_one(cursor, "SELECT * FROM test WHERE a=1 AND b=2 AND c IN (3, 4)", [1, 2, 3])
 
-    def bug7105_test(self):
-        """Test for #7105 bug"""
+    def end_of_component_uses_oecBound_test(self):
+        """
+        Test that eocBound is always used when deciding which end-of-component to set
+        @jira_ticket CASSANDRA-7105
+        """
         cursor = self.prepare()
 
         cursor.execute("""
@@ -4893,7 +5025,12 @@ class TestCQL(UpgradeTester):
 
             assert_one(cursor, "SELECT * FROM test WHERE a=1 AND b=2 ORDER BY b DESC", [1, 2, 3, 3])
 
-    def bug_6612_test(self):
+    def SIM_assertion_error_test(self):
+        """
+        Test for bogus logic in hasIndexFor when there is more than one searcher and that
+        all internal indexes are grouped properly in getIndexSearchersForQuery.
+        @jira_ticket CASSANDRA-6612
+        """
         cursor = self.prepare()
 
         cursor.execute("""
@@ -4938,7 +5075,9 @@ class TestCQL(UpgradeTester):
             assert_invalid(cursor, "INSERT INTO test(k, v) VALUES (0, blobAsInt(0x01))")
 
     def invalid_string_literals_test(self):
-        """ Test for CASSANDRA-8101 """
+        """
+        @jira_ticket CASSANDRA-8101
+        """
         cursor = self.prepare()
         cursor.execute("create table invalid_string_literals (k int primary key, a ascii, b text)")
 
@@ -5142,7 +5281,11 @@ class TestCQL(UpgradeTester):
 
             assert_all(cursor, "SELECT sizeof(v) FROM test", [[4], [4]])
 
-    def bug_8558_test(self):
+    def deleted_row_select_test(self):
+        """
+        Test to make sure deleted rows cannot still be selected out.
+        @jira_ticket CASSANDRA-8558
+        """
         cursor = self.prepare()
         node1 = self.cluster.nodelist()[0]
 
@@ -5160,7 +5303,11 @@ class TestCQL(UpgradeTester):
 
             assert_none(cursor, "select * from space1.table1 where a=1 and b=1")
 
-    def bug_5732_test(self):
+    def secondary_index_query_test(self):
+        """
+        Test for fix to bug where secondary index cannot be queried due to Column Family caching changes.
+        @jira_ticket CASSANDRA-5732
+        """
         cursor = self.prepare(use_cache=True)
 
         cursor.execute("""
@@ -5212,7 +5359,12 @@ class TestCQL(UpgradeTester):
             debug("Querying {} node".format("upgraded" if is_upgraded else "old"))
             assert_all(cursor, "SELECT k FROM ks.test WHERE v = 0", [[0]])
 
-    def bug_10652_test(self):
+    def tracing_prevents_startup_after_upgrading_test(self):
+        """
+        Test that after upgrading from 2.1 to 3.0, the system_traces.sessions table is properly upgraded to include
+        the client column.
+        @jira_ticket CASSANDRA-10652
+        """
         cursor = self.prepare()
 
         cursor.execute("CREATE KEYSPACE foo WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}")
