@@ -1713,7 +1713,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
     def test_select_in_clause_with_duplicate_keys(self):
         """
-        @jira_ticket CASSANDRA-12420.
+        @jira_ticket CASSANDRA-12420
         avoid duplicated result when key is duplicated in IN clause
         """
 
