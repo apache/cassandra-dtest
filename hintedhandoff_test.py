@@ -166,8 +166,11 @@ class TestHintedHandoff(Tester):
         insert_c1c2(session, n=100, consistency=ConsistencyLevel.ONE)
         node1.decommission()
         node4.start(wait_for_binary_proto=True)
-        node2.nodetool('decommission --force')
-        node3.nodetool('decommission --force')
+
+        force = True if self.cluster.version() >= '3.12' else False
+        node2.decommission(force=force)
+        node3.decommission(force=force)
+
         time.sleep(5)
         for x in xrange(0, 100):
             query_c1c2(session, x, ConsistencyLevel.ONE)

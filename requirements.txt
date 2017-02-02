@@ -4,8 +4,7 @@
 futures
 six
 -e git+https://github.com/datastax/python-driver.git@cassandra-test#egg=cassandra-driver
-
-ccm==2.4.9
+ccm==2.5.1
 cql
 decorator
 docopt
