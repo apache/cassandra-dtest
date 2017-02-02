@@ -3126,11 +3126,11 @@ class CqlshCopyTest(Tester):
             f.write('2,"{val2: {\'val2_1\', \'val2_2\'}}"\n')
             f.write('3,"{val1: \'val1\'}"\n')
 
-        def _test(preparedStatements):
+        def _test(prepared_statements):
             self.session.execute('TRUNCATE testwrongorderinudt')
             debug('Importing from csv file: {name}'.format(name=tempfile.name))
             cmds = "COPY ks.testwrongorderinudt FROM '{}' WITH PREPAREDSTATEMENTS = {}"\
-                .format(tempfile.name, preparedStatements)
+                .format(tempfile.name, prepared_statements)
             debug(cmds)
             self.run_cqlsh(cmds=cmds)
 
@@ -3211,3 +3211,45 @@ class CqlshCopyTest(Tester):
 
         res = list(self.session.execute("SELECT * FROM ks.test_reading_text_pk_no_prepared_statements"))
         self.assertCsvResultEqual(tempfile.name, res, 'test_reading_text_pk_no_prepared_statements')
+
+    @since('3.0')
+    def test_reading_empty_strings_for_different_types(self):
+        """
+        Users can use the NULL=<marker> option to force importing empty strings in the primary key
+        as long as the marker is set to something that indicates that the value should be safely skipped (typically
+        something not present in the csv). A problem was reported when trying to import a csv file with
+        many missing values, including strings and numbers, because the empty strings could not be converted
+        to numbers.
+
+        @jira_ticket CASSANDRA-12794
+        """
+        self.prepare()
+        self.session.execute("""
+           CREATE TABLE test_many_empty_strings (
+                a text,
+                b text,
+                c text,
+                d text,
+                o uuid,
+                 i1 bigint,
+                 i2 bigint,
+                 t text,
+                 i3 bigint,
+                 PRIMARY KEY ((a, b, c, d), o)
+            )""")
+
+        tempfile = self.get_temp_file()
+        with open(tempfile.name, 'w') as f:
+            f.write(',,,a1,645e7d3c-aef7-4e3c-b834-24b792cf2e55,,,,r1\n')
+
+        def _test(prepared_statements):
+            debug('Importing from csv file: {name}'.format(name=tempfile.name))
+            cmds = "COPY ks.test_many_empty_strings FROM '{}' WITH NULL='-' AND PREPAREDSTATEMENTS = {}"\
+                .format(tempfile.name, prepared_statements)
+            self.run_cqlsh(cmds=cmds)
+
+            res = list(self.session.execute("SELECT * FROM ks.test_many_empty_strings"))
+            self.assertCsvResultEqual(tempfile.name, res, 'test_many_empty_strings')
+
+        _test(True)
+        _test(False)
