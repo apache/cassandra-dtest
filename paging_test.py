@@ -1711,6 +1711,33 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         results = list(session.execute("SELECT * FROM test WHERE a IN (0, 1, 2, 3, 4)"))
         self.assertEqual([0, 1, 2, 3, 4], sorted([r.s for r in results]))
 
+    def test_select_in_clause_with_duplicate_keys(self):
+        """
+        @jira_ticket CASSANDRA-12420.
+        avoid duplicated result when key is duplicated in IN clause
+        """
+
+        session = self.prepare()
+        self.create_ks(session, 'test_paging_static_cols', 2)
+        session.execute("CREATE TABLE test (a int, b int, c int, v int, PRIMARY KEY ((a, b),c))")
+        session.row_factory = tuple_factory
+
+        for i in xrange(3):
+            for j in xrange(3):
+                for k in xrange(3):
+                    session.execute("INSERT INTO test (a, b, c, v) VALUES ({}, {}, {}, {})".format(i, j, k, k))
+
+        # based on partition key's token order instead of provided order and no duplication
+        for i in xrange(6):
+            session.default_fetch_size = i
+            results = rows_to_list(session.execute("SELECT * FROM test WHERE a = 1 AND b in (2, 2, 1, 1, 1)"))
+            self.assertEqual(results, [[1, 1, 0, 0],
+                                       [1, 1, 1, 1],
+                                       [1, 1, 2, 2],
+                                       [1, 2, 0, 0],
+                                       [1, 2, 1, 1],
+                                       [1, 2, 2, 2]])
+
     @since('3.0.0')
     def test_paging_with_filtering(self):
         """
