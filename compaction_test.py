@@ -269,15 +269,23 @@ class TestCompaction(Tester):
         avgthroughput = m.named['avgthroughput']
         found_units = m.named['units']
 
+        unit_conversion_dct = {
+            "MB": 1,
+            "MiB": 1,
+            "KiB": 1. / 1024,
+            "GiB": 1024
+        }
+
         units = ['MB'] if cluster.version() < LooseVersion('3.6') else ['KiB', 'MiB', 'GiB']
         self.assertIn(found_units, units)
 
         debug(avgthroughput)
+        avgthroughput_mb = unit_conversion_dct[found_units] * float(avgthroughput)
 
         # The throughput in the log is computed independantly from the throttling and on the output files while
         # throttling is on the input files, so while that throughput shouldn't be higher than the one set in
         # principle, a bit of wiggle room is expected
-        self.assertGreaterEqual(float(threshold) + 0.5, float(avgthroughput))
+        self.assertGreaterEqual(float(threshold) + 0.5, avgthroughput_mb)
 
     def compaction_strategy_switching_test(self):
         """Ensure that switching strategies does not result in problems.
