@@ -395,6 +395,11 @@ class TestOfflineTools(Tester):
         create_ks(session, 'ks', 1)
         session.execute('create table ks.cf (key int PRIMARY KEY, val int) with gc_grace_seconds=0')
         session.execute('insert into ks.cf (key, val) values (1,1)')
+
+        # delete a partition and then insert a row to test CASSANDRA-13177
+        session.execute('DELETE FROM ks.cf WHERE key = 2')
+        session.execute('INSERT INTO ks.cf (key, val) VALUES (2, 2)')
+
         node1.flush()
         cluster.stop()
         [(out, error, rc)] = node1.run_sstabledump(keyspace='ks', column_families=['cf'])
@@ -404,9 +409,17 @@ class TestOfflineTools(Tester):
         # Load the json output and check that it contains the inserted key=1
         s = json.loads(out)
         debug(s)
-        self.assertEqual(len(s), 1)
-        dumped_row = s[0]
-        self.assertEqual(dumped_row['partition']['key'], ['1'])
+        self.assertEqual(len(s), 2)
+
+        # order the rows so that we have key=1 first, then key=2
+        row0, row1 = s
+        (row0, row1) = (row0, row1) if row0['partition']['key'] == ['1'] else (row1, row0)
+
+        self.assertEqual(row0['partition']['key'], ['1'])
+
+        self.assertEqual(row1['partition']['key'], ['2'])
+        self.assertIsNotNone(row1['partition'].get('deletion_info'))
+        self.assertIsNotNone(row1.get('rows'))
 
         # Check that we only get the key back using the enumerate option
         [(out, error, rc)] = node1.run_sstabledump(keyspace='ks', column_families=['cf'], enumerate_keys=True)
@@ -414,9 +427,9 @@ class TestOfflineTools(Tester):
         debug(error)
         s = json.loads(out)
         debug(s)
-        self.assertEqual(len(s), 1)
-        dumped_row = s[0][0]
-        self.assertEqual(dumped_row, '1')
+        self.assertEqual(len(s), 2)
+        dumped_keys = set(row[0] for row in s)
+        self.assertEqual(set(['1', '2']), dumped_keys)
 
     def _check_stderr_error(self, error):
         acceptable = ["Max sstable size of", "Consider adding more capacity", "JNA link failure", "Class JavaLaunchHelper is implemented in both"]
