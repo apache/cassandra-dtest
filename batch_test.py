@@ -292,7 +292,7 @@ class TestBatch(Tester):
 
         Here we have one 3.0 node and two 2.2 nodes and we send the batch request to the 3.0 node.
         """
-        self._logged_batch_compatibility_test(0, 1, 'git:cassandra-2.2', 2, 4)
+        self._logged_batch_compatibility_test(0, 1, 'github:apache/cassandra-2.2', 2, 4)
 
     @since('3.0', max_version='3.0.x')
     @skipIf(sys.platform == 'win32', 'Windows production support only on 2.2+')
@@ -302,7 +302,7 @@ class TestBatch(Tester):
 
         Here we have one 3.0 node and two 2.1 nodes and we send the batch request to the 3.0 node.
         """
-        self._logged_batch_compatibility_test(0, 1, 'git:cassandra-2.1', 2, 3)
+        self._logged_batch_compatibility_test(0, 1, 'github:apache/cassandra-2.1', 2, 3)
 
     @since('3.0', max_version='3.0.x')
     @skipIf(sys.platform == 'win32', 'Windows production support only on 2.2+')
@@ -312,7 +312,7 @@ class TestBatch(Tester):
 
         Here we have two 3.0 nodes and one 2.1 node and we send the batch request to the 3.0 node.
         """
-        self._logged_batch_compatibility_test(0, 2, 'git:cassandra-2.1', 1, 3)
+        self._logged_batch_compatibility_test(0, 2, 'github:apache/cassandra-2.1', 1, 3)
 
     @since('3.0', max_version='3.0.x')
     def logged_batch_compatibility_4_test(self):
@@ -321,7 +321,7 @@ class TestBatch(Tester):
 
         Here we have two 3.0 nodes and one 2.2 node and we send the batch request to the 2.2 node.
         """
-        self._logged_batch_compatibility_test(2, 2, 'git:cassandra-2.2', 1, 4)
+        self._logged_batch_compatibility_test(2, 2, 'github:apache/cassandra-2.2', 1, 4)
 
     @since('3.0', max_version='3.0.x')
     @skipIf(sys.platform == 'win32', 'Windows production support only on 2.2+')
@@ -331,7 +331,7 @@ class TestBatch(Tester):
 
         Here we have two 3.0 nodes and one 2.1 node and we send the batch request to the 2.1 node.
         """
-        self._logged_batch_compatibility_test(2, 2, 'git:cassandra-2.1', 1, 3)
+        self._logged_batch_compatibility_test(2, 2, 'github:apache/cassandra-2.1', 1, 3)
 
     def _logged_batch_compatibility_test(self, coordinator_idx, current_nodes, previous_version, previous_nodes, protocol_version):
         session = self.prepare_mixed(coordinator_idx, current_nodes, previous_version, previous_nodes, protocol_version=protocol_version)
