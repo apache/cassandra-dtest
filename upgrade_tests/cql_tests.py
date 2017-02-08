@@ -3921,6 +3921,9 @@ class TestCQL(UpgradeTester):
             assert_one(cursor, "UPDATE test SET v='bar', version=2 WHERE id=0 AND k='k2' IF version = 1", [True])
             assert_all(cursor, "SELECT * FROM test", [[0, 'k1', 2, 'foo'], [0, 'k2', 2, 'bar']], ConsistencyLevel.SERIAL)
 
+            # CASSANDRA-12694 (committed in 3.0.11 and 3.10) changes the behavior below slightly.
+            version = self.get_node_version(is_upgraded)
+            has_12694 = (version >= '3.0.11' and version < '3.1') or (version >= '3.10')
             # Testing batches
             assert_one(cursor,
                        """
@@ -3929,7 +3932,7 @@ class TestCQL(UpgradeTester):
                            UPDATE test SET v='barfoo' WHERE id=0 AND k='k2';
                            UPDATE test SET version=3 WHERE id=0 IF version=1;
                          APPLY BATCH
-                       """, [False, 0, 'k1', 2])
+                       """, [False, 0, 'k1', 2] if has_12694 else [False, 0, None, 2])
 
             assert_one(cursor,
                        """
