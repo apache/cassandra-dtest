@@ -151,7 +151,7 @@ class BaseRepairTest(Tester):
 class TestRepair(BaseRepairTest):
     __test__ = True
 
-    @since('2.2.1')
+    @since('2.2.1', '4')
     def no_anticompaction_after_dclocal_repair_test(self):
         """
         * Launch a four node, two DC cluster
@@ -220,7 +220,7 @@ class TestRepair(BaseRepairTest):
             self.assertTrue('Unknown keyspace/cf pair' in nodetool_error.message,
                             'Repair thread on inexistent table did not detect inexistent table.')
 
-    @since('2.2.1')
+    @since('2.2.1', '4')
     def no_anticompaction_after_hostspecific_repair_test(self):
         """
         * Launch a four node, two DC cluster
@@ -241,7 +241,7 @@ class TestRepair(BaseRepairTest):
         for node in cluster.nodelist():
             self.assertFalse(node.grep_log("Starting anticompaction"))
 
-    @since('2.2.4')
+    @since('2.2.4', '4')
     def no_anticompaction_after_subrange_repair_test(self):
         """
         * Launch a three node, two DC cluster
@@ -262,7 +262,7 @@ class TestRepair(BaseRepairTest):
         for node in cluster.nodelist():
             self.assertFalse(node.grep_log("Starting anticompaction"))
 
-    @since('2.2.1')
+    @since('2.2.1', '4')
     def anticompaction_after_normal_repair_test(self):
         """
         * Launch a four node, two DC cluster
@@ -1048,7 +1048,7 @@ class TestRepair(BaseRepairTest):
         """
         self._test_failure_during_repair(phase='sync', initiator=False,)
 
-    @since('2.2')
+    @since('2.2', '4')
     def test_failure_during_anticompaction(self):
         """
         @jira_ticket CASSANDRA-12901
@@ -1096,6 +1096,7 @@ class TestRepair(BaseRepairTest):
         debug("stopping node3")
         node3.stop(gently=False, wait_other_notice=True)
 
+        self.patient_exclusive_cql_connection(node1)
         debug("inserting data while node3 is down")
         node1.stress(stress_options=['write', 'n=1k',
                                      'no-warmup', 'cl=ONE',
@@ -1136,7 +1137,10 @@ class TestRepair(BaseRepairTest):
         self.assertFalse(t.isAlive(), 'Repair still running after sync {} was killed'
                                       .format("initiator" if initiator else "participant"))
 
-        node1.watch_log_for('Endpoint .* died', timeout=60)
+        if cluster.version() < '4.0' or phase != 'sync':
+            # the log entry we're watching for in the sync task came from the
+            # anti compaction at the end of the repair, which has been removed in 4.0
+            node1.watch_log_for('Endpoint .* died', timeout=60)
         node1.watch_log_for('Repair command .* finished', timeout=60)
 
 

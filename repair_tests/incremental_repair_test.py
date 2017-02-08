@@ -1,11 +1,14 @@
 import time
-from collections import Counter
-from re import findall
+from datetime import datetime
+from collections import Counter, namedtuple
+from re import findall, compile
 from unittest import skip
+from uuid import UUID, uuid1
 
 from cassandra import ConsistencyLevel
+from cassandra.query import SimpleStatement
 from ccmlib.common import is_win
-from ccmlib.node import Node
+from ccmlib.node import Node, ToolError
 from nose.plugins.attrib import attr
 
 from dtest import Tester, debug, create_ks, create_cf
@@ -14,8 +17,277 @@ from tools.data import insert_c1c2
 from tools.decorators import since
 
 
+class ConsistentState(object):
+    PREPARING = 0
+    PREPARED = 1
+    REPAIRING = 2
+    FINALIZE_PROMISED = 3
+    FINALIZED = 4
+    FAILED = 5
+
+
 class TestIncRepair(Tester):
     ignore_log_patterns = (r'Can\'t send migration request: node.*is down',)
+
+    @classmethod
+    def _get_repaired_data(cls, node, keyspace):
+        _sstable_name = compile('SSTable: (.+)')
+        _repaired_at = compile('Repaired at: (\d+)')
+        _pending_repair = compile('Pending repair: (null|[a-f0-9\-]+)')
+        _sstable_data = namedtuple('_sstabledata', ('name', 'repaired', 'pending_id'))
+
+        out = node.run_sstablemetadata(keyspace=keyspace).stdout
+
+        def matches(pattern):
+            return filter(None, [pattern.match(l) for l in out.split('\n')])
+        names = [m.group(1) for m in matches(_sstable_name)]
+        repaired_times = [int(m.group(1)) for m in matches(_repaired_at)]
+
+        def uuid_or_none(s):
+            return None if s == 'null' else UUID(s)
+        pending_repairs = [uuid_or_none(m.group(1)) for m in matches(_pending_repair)]
+        assert names
+        assert repaired_times
+        assert pending_repairs
+        assert len(names) == len(repaired_times) == len(pending_repairs)
+        return [_sstable_data(*a) for a in zip(names, repaired_times, pending_repairs)]
+
+    def assertNoRepairedSSTables(self, node, keyspace):
+        """ Checks that no sstables are marked repaired, and none are marked pending repair """
+        data = self._get_repaired_data(node, keyspace)
+        self.assertTrue(all([t.repaired == 0 for t in data]), '{}'.format(data))
+        self.assertTrue(all([t.pending_id is None for t in data]))
+
+    def assertAllPendingRepairSSTables(self, node, keyspace, pending_id=None):
+        """ Checks that no sstables are marked repaired, and all are marked pending repair """
+        data = self._get_repaired_data(node, keyspace)
+        self.assertTrue(all([t.repaired == 0 for t in data]), '{}'.format(data))
+        if pending_id:
+            self.assertTrue(all([t.pending_id == pending_id for t in data]))
+        else:
+            self.assertTrue(all([t.pending_id is not None for t in data]))
+
+    def assertAllRepairedSSTables(self, node, keyspace):
+        """ Checks that all sstables are marked repaired, and none are marked pending repair """
+        data = self._get_repaired_data(node, keyspace)
+        self.assertTrue(all([t.repaired > 0 for t in data]), '{}'.format(data))
+        self.assertTrue(all([t.pending_id is None for t in data]), '{}'.format(data))
+
+    @since('4.0')
+    def consistent_repair_test(self):
+        cluster = self.cluster
+        cluster.set_configuration_options(values={'hinted_handoff_enabled': False, 'num_tokens': 1, 'commitlog_sync_period_in_ms': 500})
+        cluster.populate(3).start()
+        node1, node2, node3 = cluster.nodelist()
+
+        # make data inconsistent between nodes
+        session = self.patient_exclusive_cql_connection(node3)
+        session.execute("CREATE KEYSPACE ks WITH REPLICATION={'class':'SimpleStrategy', 'replication_factor': 3}")
+        session.execute("CREATE TABLE ks.tbl (k INT PRIMARY KEY, v INT)")
+        stmt = SimpleStatement("INSERT INTO ks.tbl (k,v) VALUES (%s, %s)")
+        stmt.consistency_level = ConsistencyLevel.ALL
+        for i in range(10):
+            session.execute(stmt, (i, i))
+        node3.flush()
+        time.sleep(1)
+        node3.stop(gently=False)
+        stmt.consistency_level = ConsistencyLevel.QUORUM
+
+        session = self.exclusive_cql_connection(node1)
+        for i in range(10):
+            session.execute(stmt, (i + 10, i + 10))
+        node1.flush()
+        time.sleep(1)
+        node1.stop(gently=False)
+        node3.start(wait_other_notice=True, wait_for_binary_proto=True)
+        session = self.exclusive_cql_connection(node2)
+        for i in range(10):
+            session.execute(stmt, (i + 20, i + 20))
+        node1.start(wait_other_notice=True, wait_for_binary_proto=True)
+
+        # flush and check that no sstables are marked repaired
+        for node in cluster.nodelist():
+            node.flush()
+            self.assertNoRepairedSSTables(node, 'ks')
+            session = self.patient_exclusive_cql_connection(node)
+            results = list(session.execute("SELECT * FROM system.repairs"))
+            self.assertEqual(len(results), 0, str(results))
+
+        # disable compaction so we can verify sstables are marked pending repair
+        for node in cluster.nodelist():
+            node.nodetool('disableautocompaction ks tbl')
+
+        node1.repair(options=['ks'])
+
+        # check that all participating nodes have the repair recorded in their system
+        # table, that all nodes are listed as participants, and that all sstables are
+        # (still) marked pending repair
+        expected_participants = {n.address() for n in cluster.nodelist()}
+        recorded_pending_ids = set()
+        for node in cluster.nodelist():
+            session = self.patient_exclusive_cql_connection(node)
+            results = list(session.execute("SELECT * FROM system.repairs"))
+            self.assertEqual(len(results), 1)
+            result = results[0]
+            self.assertEqual(set(result.participants), expected_participants)
+            self.assertEqual(result.state, ConsistentState.FINALIZED, "4=FINALIZED")
+            pending_id = result.parent_id
+            self.assertAllPendingRepairSSTables(node, 'ks', pending_id)
+            recorded_pending_ids.add(pending_id)
+
+        self.assertEqual(len(recorded_pending_ids), 1)
+
+        # sstables are compacted out of pending repair by a compaction
+        # task, we disabled compaction earlier in the test, so here we
+        # force the compaction and check that all sstables are promoted
+        for node in cluster.nodelist():
+            node.nodetool('compact ks tbl')
+            self.assertAllRepairedSSTables(node, 'ks')
+
+    def _make_fake_session(self, keyspace, table):
+        node1 = self.cluster.nodelist()[0]
+        session = self.patient_exclusive_cql_connection(node1)
+        session_id = uuid1()
+        cfid = list(session.execute("SELECT * FROM system_schema.tables WHERE keyspace_name='{}' AND table_name='{}'".format(keyspace, table)))[0].id
+        now = datetime.now()
+        # pulled from a repairs table
+        ranges = {'\x00\x00\x00\x08K\xc2\xed\\<\xd3{X\x00\x00\x00\x08r\x04\x89[j\x81\xc4\xe6',
+                  '\x00\x00\x00\x08r\x04\x89[j\x81\xc4\xe6\x00\x00\x00\x08\xd8\xcdo\x9e\xcbl\x83\xd4',
+                  '\x00\x00\x00\x08\xd8\xcdo\x9e\xcbl\x83\xd4\x00\x00\x00\x08K\xc2\xed\\<\xd3{X'}
+        ranges = {buffer(b) for b in ranges}
+
+        for node in self.cluster.nodelist():
+            session = self.patient_exclusive_cql_connection(node)
+            session.execute("INSERT INTO system.repairs "
+                            "(parent_id, cfids, coordinator, last_update, participants, ranges, repaired_at, started_at, state) "
+                            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                            [session_id, {cfid}, node1.address(), now, {n.address() for n in self.cluster.nodelist()},
+                             ranges, now, now, ConsistentState.REPAIRING])  # 2=REPAIRING
+
+        time.sleep(1)
+        for node in self.cluster.nodelist():
+            node.stop(gently=False)
+
+        for node in self.cluster.nodelist():
+            node.start()
+
+        return session_id
+
+    @since('4.0')
+    def manual_session_fail_test(self):
+        """ check manual failing of repair sessions via nodetool works properly """
+        cluster = self.cluster
+        cluster.set_configuration_options(values={'hinted_handoff_enabled': False, 'num_tokens': 1, 'commitlog_sync_period_in_ms': 500})
+        cluster.populate(3).start()
+        node1, node2, node3 = cluster.nodelist()
+
+        # make data inconsistent between nodes
+        session = self.patient_exclusive_cql_connection(node3)
+        session.execute("CREATE KEYSPACE ks WITH REPLICATION={'class':'SimpleStrategy', 'replication_factor': 3}")
+        session.execute("CREATE TABLE ks.tbl (k INT PRIMARY KEY, v INT)")
+
+        for node in self.cluster.nodelist():
+            out = node.nodetool('repair_admin')
+            self.assertIn("no sessions", out.stdout)
+
+        session_id = self._make_fake_session('ks', 'tbl')
+
+        for node in self.cluster.nodelist():
+            out = node.nodetool('repair_admin')
+            lines = out.stdout.split('\n')
+            self.assertGreater(len(lines), 1)
+            line = lines[1]
+            self.assertIn(str(session_id), line)
+            self.assertIn("REPAIRING", line)
+
+        node1.nodetool("repair_admin --cancel {}".format(session_id))
+
+        for node in self.cluster.nodelist():
+            out = node.nodetool('repair_admin --all')
+            lines = out.stdout.split('\n')
+            self.assertGreater(len(lines), 1)
+            line = lines[1]
+            self.assertIn(str(session_id), line)
+            self.assertIn("FAILED", line)
+
+    @since('4.0')
+    def manual_session_cancel_non_coordinator_failure_test(self):
+        """ check manual failing of repair sessions via a node other than the coordinator fails """
+        cluster = self.cluster
+        cluster.set_configuration_options(values={'hinted_handoff_enabled': False, 'num_tokens': 1, 'commitlog_sync_period_in_ms': 500})
+        cluster.populate(3).start()
+        node1, node2, node3 = cluster.nodelist()
+
+        # make data inconsistent between nodes
+        session = self.patient_exclusive_cql_connection(node3)
+        session.execute("CREATE KEYSPACE ks WITH REPLICATION={'class':'SimpleStrategy', 'replication_factor': 3}")
+        session.execute("CREATE TABLE ks.tbl (k INT PRIMARY KEY, v INT)")
+
+        for node in self.cluster.nodelist():
+            out = node.nodetool('repair_admin')
+            self.assertIn("no sessions", out.stdout)
+
+        session_id = self._make_fake_session('ks', 'tbl')
+
+        for node in self.cluster.nodelist():
+            out = node.nodetool('repair_admin')
+            lines = out.stdout.split('\n')
+            self.assertGreater(len(lines), 1)
+            line = lines[1]
+            self.assertIn(str(session_id), line)
+            self.assertIn("REPAIRING", line)
+
+        try:
+            node2.nodetool("repair_admin --cancel {}".format(session_id))
+            self.fail("cancel from a non coordinator should fail")
+        except ToolError:
+            pass  # expected
+
+        # nothing should have changed
+        for node in self.cluster.nodelist():
+            out = node.nodetool('repair_admin')
+            lines = out.stdout.split('\n')
+            self.assertGreater(len(lines), 1)
+            line = lines[1]
+            self.assertIn(str(session_id), line)
+            self.assertIn("REPAIRING", line)
+
+    @since('4.0')
+    def manual_session_force_cancel_test(self):
+        """ check manual failing of repair sessions via a non-coordinator works if the --force flag is set """
+        cluster = self.cluster
+        cluster.set_configuration_options(values={'hinted_handoff_enabled': False, 'num_tokens': 1, 'commitlog_sync_period_in_ms': 500})
+        cluster.populate(3).start()
+        node1, node2, node3 = cluster.nodelist()
+
+        # make data inconsistent between nodes
+        session = self.patient_exclusive_cql_connection(node3)
+        session.execute("CREATE KEYSPACE ks WITH REPLICATION={'class':'SimpleStrategy', 'replication_factor': 3}")
+        session.execute("CREATE TABLE ks.tbl (k INT PRIMARY KEY, v INT)")
+
+        for node in self.cluster.nodelist():
+            out = node.nodetool('repair_admin')
+            self.assertIn("no sessions", out.stdout)
+
+        session_id = self._make_fake_session('ks', 'tbl')
+
+        for node in self.cluster.nodelist():
+            out = node.nodetool('repair_admin')
+            lines = out.stdout.split('\n')
+            self.assertGreater(len(lines), 1)
+            line = lines[1]
+            self.assertIn(str(session_id), line)
+            self.assertIn("REPAIRING", line)
+
+        node2.nodetool("repair_admin --cancel {} --force".format(session_id))
+
+        for node in self.cluster.nodelist():
+            out = node.nodetool('repair_admin --all')
+            lines = out.stdout.split('\n')
+            self.assertGreater(len(lines), 1)
+            line = lines[1]
+            self.assertIn(str(session_id), line)
+            self.assertIn("FAILED", line)
 
     def sstable_marking_test(self):
         """
@@ -50,6 +322,11 @@ class TestIncRepair(Tester):
             node3.repair()
         else:
             node3.nodetool("repair -par -inc")
+
+        if cluster.version() >= '4.0':
+            # sstables are compacted out of pending repair by a compaction
+            for node in cluster.nodelist():
+                node.nodetool('compact keyspace1 standard1')
 
         for out in (node.run_sstablemetadata(keyspace='keyspace1').stdout for node in cluster.nodelist()):
             self.assertNotIn('Repaired at: 0', out)
@@ -185,6 +462,11 @@ class TestIncRepair(Tester):
             node1.repair()
         else:
             node1.nodetool("repair -par -inc")
+
+        if cluster.version() >= '4.0':
+            # sstables are compacted out of pending repair by a compaction
+            for node in cluster.nodelist():
+                node.nodetool('compact keyspace1 standard1')
 
         finalOut1 = node1.run_sstablemetadata(keyspace='keyspace1').stdout
         finalOut2 = node2.run_sstablemetadata(keyspace='keyspace1').stdout
