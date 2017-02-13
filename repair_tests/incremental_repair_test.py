@@ -640,5 +640,10 @@ class TestIncRepair(Tester):
         debug("Repairing node 4")
         node4.nodetool("repair {}".format(repair_options))
 
+        if cluster.version() >= '4.0':
+            # sstables are compacted out of pending repair by a compaction
+            for node in cluster.nodelist():
+                node.nodetool('compact keyspace1 standard1')
+
         for out in (node.run_sstablemetadata(keyspace='keyspace1').stdout for node in cluster.nodelist() if len(node.get_sstables('keyspace1', 'standard1')) > 0):
             self.assertNotIn('Repaired at: 0', out)
