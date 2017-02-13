@@ -172,7 +172,10 @@ class UpgradeTester(Tester):
             sessions_and_meta.append((True, session))
 
         # open a second session with the node on the old version
-        session = self.patient_exclusive_cql_connection(node2, protocol_version=self.protocol_version, **kwargs)
+        if self.CL:
+            session = self.patient_exclusive_cql_connection(node2, protocol_version=self.protocol_version, consistency_level=self.CL, **kwargs)
+        else:
+            session = self.patient_exclusive_cql_connection(node2, protocol_version=self.protocol_version, **kwargs)
         session.set_keyspace('ks')
 
         if return_nodes:
