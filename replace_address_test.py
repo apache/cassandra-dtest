@@ -111,13 +111,10 @@ class BaseReplaceAddressTest(Tester):
             self.replaced_node.stop(gently=gently, wait_other_notice=True)
 
         debug("Testing node stoppage (query should fail).")
-        with self.assertRaises(NodeUnavailable):
-            try:
-                session = self.patient_cql_connection(self.query_node)
-                query = SimpleStatement('select * from {}'.format(table), consistency_level=cl)
-                session.execute(query)
-            except (Unavailable, ReadTimeout):
-                raise NodeUnavailable("Node could not be queried.")
+        with self.assertRaises((Unavailable, ReadTimeout)):
+            session = self.patient_cql_connection(self.query_node)
+            query = SimpleStatement('select * from {}'.format(table), consistency_level=cl)
+            session.execute(query)
 
     def _insert_data(self, n='1k', rf=3, whitelist=False):
         debug("Inserting {} entries with rf={} with stress...".format(n, rf))
