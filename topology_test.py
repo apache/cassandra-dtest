@@ -8,7 +8,7 @@ from ccmlib.node import TimeoutError, ToolError
 from nose.plugins.attrib import attr
 
 from dtest import Tester, debug, create_ks, create_cf
-from tools.assertions import assert_almost_equal
+from tools.assertions import assert_almost_equal, assert_all, assert_none
 from tools.data import insert_c1c2, query_c1c2
 from tools.decorators import no_vnodes, since
 
@@ -30,6 +30,98 @@ class TestTopology(Tester):
         time.sleep(40)
 
         node1.stop(gently=False)
+
+    def size_estimates_multidc_test(self):
+        """
+        Test that primary ranges are correctly generated on
+        system.size_estimates for multi-dc, multi-ks scenario
+        @jira_ticket CASSANDRA-9639
+        """
+        debug("Creating cluster")
+        cluster = self.cluster
+        cluster.set_configuration_options(values={'num_tokens': 2})
+        cluster.populate([2, 1])
+        node1_1, node1_2, node2_1 = cluster.nodelist()
+
+        debug("Setting tokens")
+        node1_tokens, node2_tokens, node3_tokens = ['-6639341390736545756,-2688160409776496397',
+                                                    '-2506475074448728501,8473270337963525440',
+                                                    '-3736333188524231709,8673615181726552074']
+        node1_1.set_configuration_options(values={'initial_token': node1_tokens})
+        node1_2.set_configuration_options(values={'initial_token': node2_tokens})
+        node2_1.set_configuration_options(values={'initial_token': node3_tokens})
+        cluster.set_configuration_options(values={'num_tokens': 2})
+
+        debug("Starting cluster")
+        cluster.start()
+
+        out, _, _ = node1_1.nodetool('ring')
+        debug("Nodetool ring output {}".format(out))
+
+        debug("Creating keyspaces")
+        session = self.patient_cql_connection(node1_1)
+        create_ks(session, 'ks1', 3)
+        create_ks(session, 'ks2', {'dc1': 2})
+        create_cf(session, 'ks1.cf1', columns={'c1': 'text', 'c2': 'text'})
+        create_cf(session, 'ks2.cf2', columns={'c1': 'text', 'c2': 'text'})
+
+        debug("Refreshing size estimates")
+        node1_1.nodetool('refreshsizeestimates')
+        node1_2.nodetool('refreshsizeestimates')
+        node2_1.nodetool('refreshsizeestimates')
+
+        """
+        CREATE KEYSPACE ks1 WITH replication =
+            {'class': 'SimpleStrategy', 'replication_factor': '3'}
+        CREATE KEYSPACE ks2 WITH replication =
+            {'class': 'NetworkTopologyStrategy', 'dc1': '2'}  AND durable_writes = true;
+
+        Datacenter: dc1
+        ==========
+        Address     Token
+                    8473270337963525440
+        127.0.0.1   -6639341390736545756
+        127.0.0.1   -2688160409776496397
+        127.0.0.2   -2506475074448728501
+        127.0.0.2   8473270337963525440
+
+        Datacenter: dc2
+        ==========
+        Address     Token
+                    8673615181726552074
+        127.0.0.3   -3736333188524231709
+        127.0.0.3   8673615181726552074
+        """
+
+        debug("Checking node1_1 size_estimates primary ranges")
+        session = self.patient_exclusive_cql_connection(node1_1)
+        assert_all(session, "SELECT range_start, range_end FROM system.size_estimates "
+                            "WHERE keyspace_name = 'ks1'", [['-3736333188524231709', '-2688160409776496397'],
+                                                            ['-9223372036854775808', '-6639341390736545756'],
+                                                            ['8673615181726552074', '-9223372036854775808']])
+        assert_all(session, "SELECT range_start, range_end FROM system.size_estimates "
+                            "WHERE keyspace_name = 'ks2'", [['-3736333188524231709', '-2688160409776496397'],
+                                                            ['-6639341390736545756', '-3736333188524231709'],
+                                                            ['-9223372036854775808', '-6639341390736545756'],
+                                                            ['8473270337963525440', '8673615181726552074'],
+                                                            ['8673615181726552074', '-9223372036854775808']])
+
+        debug("Checking node1_2 size_estimates primary ranges")
+        session = self.patient_exclusive_cql_connection(node1_2)
+        assert_all(session, "SELECT range_start, range_end FROM system.size_estimates "
+                            "WHERE keyspace_name = 'ks1'", [['-2506475074448728501', '8473270337963525440'],
+                                                            ['-2688160409776496397', '-2506475074448728501']])
+        assert_all(session, "SELECT range_start, range_end FROM system.size_estimates "
+                            "WHERE keyspace_name = 'ks2'", [['-2506475074448728501', '8473270337963525440'],
+                                                            ['-2688160409776496397', '-2506475074448728501']])
+
+        debug("Checking node2_1 size_estimates primary ranges")
+        session = self.patient_exclusive_cql_connection(node2_1)
+        assert_all(session, "SELECT range_start, range_end FROM system.size_estimates "
+                            "WHERE keyspace_name = 'ks1'", [['-6639341390736545756', '-3736333188524231709'],
+                                                            ['8473270337963525440', '8673615181726552074']])
+        assert_none(session, "SELECT range_start, range_end FROM system.size_estimates "
+                             "WHERE keyspace_name = 'ks2'")
 
     def simple_decommission_test(self):
         """
