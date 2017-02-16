@@ -1717,10 +1717,9 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         avoid duplicated result when key is duplicated in IN clause
         """
 
-        session = self.prepare()
-        self.create_ks(session, 'test_paging_static_cols', 2)
+        session = self.prepare(row_factory=named_tuple_factory)
+        create_ks(session, 'test_paging_static_cols', 2)
         session.execute("CREATE TABLE test (a int, b int, c int, v int, PRIMARY KEY ((a, b),c))")
-        session.row_factory = tuple_factory
 
         for i in xrange(3):
             for j in xrange(3):
