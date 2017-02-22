@@ -3253,3 +3253,72 @@ class CqlshCopyTest(Tester):
 
         _test(True)
         _test(False)
+
+    @since('3.0')
+    def test_unusual_dates(self):
+        """
+        Test that we can export and import dates that are outside of the Python
+        usual range (before 1900 or after 9999). Python can support dates from 1
+        to 9999 but strftime has problems formatting dates before 1900.
+
+        Perform the following:
+
+        - create and populate a table,
+        - COPY that table to a CSV file,
+        - SELECT the contents of the table,
+        - TRUNCATE the table,
+        - COPY the written CSV file back into the table
+        - assert that the previously-SELECTed contents of the table match the
+        current contents of the table.
+        """
+        self.prepare()
+        self.session.execute("""
+                CREATE TABLE testunusualdates (
+                    a int PRIMARY KEY,
+                    b timestamp
+                )""")
+
+        args = [['1', '9999-12-31 23:59:59+0000'],
+                ['2', '10000-01-01 00:00:01+0000'],
+                ['3', '10000-01-01 00:00:01+0800'],
+                ['4', '10000-01-01 00:00:01-0800'],
+                ['5', '1900-01-01 00:00:00+0000'],
+                ['6', '1899-12-31 23:59:59+0000'],
+                ['7', '1899-12-31 23:59:59+0800'],
+                ['8', '1899-12-31 23:59:59-0800'],
+                ]
+
+        # the results that are expected to be returned by the SELECT * below, they are in UTC
+        expected_results = [
+            [1, datetime.datetime(9999, 12, 31, 23, 59, 59)],  # this is 253402300799000
+            [2, 253402300801000],  # nr. 1 + 2 seconds
+            [3, datetime.datetime(9999, 12, 31, 16, 0, 1)],
+            [4, 253402329601000],  # nr. 1 + 8 hours and 2 seconds
+            [5, datetime.datetime(1900, 1, 1, 0, 0)],
+            [6, datetime.datetime(1899, 12, 31, 23, 59, 59)],
+            [7, datetime.datetime(1899, 12, 31, 15, 59, 59)],
+            [8, datetime.datetime(1900, 1, 1, 7, 59, 59)],
+        ]
+
+        for a, b in args:
+            self.session.execute("INSERT INTO testunusualdates (a, b) VALUES ({}, '{}')".format(a, b))
+
+        results = list(self.session.execute("SELECT * FROM testunusualdates"))
+        self.assertItemsEqual(expected_results, rows_to_list(results))
+
+        tempfile = self.get_temp_file()
+        debug('Exporting to csv file: {}'.format(tempfile.name))
+        out, err, _ = self.run_cqlsh(cmds="COPY ks.testunusualdates TO '{}'".format(tempfile.name))
+        debug(out)
+
+        # check all records were exported
+        self.assertCsvResultEqual(tempfile.name, results, 'testunusualdates')
+
+        # import the CSV file with COPY FROM
+        self.session.execute("TRUNCATE ks.testunusualdates")
+        debug('Importing from csv file: {}'.format(tempfile.name))
+        out, err, _ = self.run_cqlsh(cmds="COPY ks.testunusualdates FROM '{}'".format(tempfile.name))
+        debug(out)
+
+        new_results = list(self.session.execute("SELECT * FROM testunusualdates"))
+        self.assertEquals(results, new_results)

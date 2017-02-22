@@ -50,17 +50,31 @@ def write_rows_to_csv(filename, data):
         csvfile.close
 
 
+def deserialize_date_fallback_int(byts, protocol_version):
+    timestamp_ms = cassandra.marshal.int64_unpack(byts)
+    try:
+        return cassandra.util.datetime_from_timestamp(timestamp_ms / 1000.0)
+    except OverflowError:
+        return timestamp_ms
+
+
 def monkeypatch_driver():
     """
     Monkeypatches the `cassandra` driver module in the same way
     that clqsh does. Returns a dictionary containing the original values of
     the monkeypatched names.
     """
-    cache = {'deserialize': cassandra.cqltypes.BytesType.deserialize,
+    cache = {'BytesType_deserialize': cassandra.cqltypes.BytesType.deserialize,
+             'DateType_deserialize': cassandra.cqltypes.DateType.deserialize,
              'support_empty_values': cassandra.cqltypes.CassandraType.support_empty_values}
 
     cassandra.cqltypes.BytesType.deserialize = staticmethod(lambda byts, protocol_version: bytearray(byts))
+    cassandra.cqltypes.DateType.deserialize = staticmethod(deserialize_date_fallback_int)
     cassandra.cqltypes.CassandraType.support_empty_values = True
+
+    if hasattr(cassandra, 'deserializers'):
+        cache['DesDateType'] = cassandra.deserializers.DesDateType
+        del cassandra.deserializers.DesDateType
 
     return cache
 
@@ -70,5 +84,9 @@ def unmonkeypatch_driver(cache):
     Given a dictionary that was used to cache parts of `cassandra` for
     monkeypatching, restore those values to the `cassandra` module.
     """
-    cassandra.cqltypes.BytesType.deserialize = staticmethod(cache['deserialize'])
+    cassandra.cqltypes.BytesType.deserialize = staticmethod(cache['BytesType_deserialize'])
+    cassandra.cqltypes.DateType.deserialize = staticmethod(cache['DateType_deserialize'])
     cassandra.cqltypes.CassandraType.support_empty_values = cache['support_empty_values']
+
+    if hasattr(cassandra, 'deserializers'):
+        cassandra.deserializers.DesDateType = cache['DesDateType']
