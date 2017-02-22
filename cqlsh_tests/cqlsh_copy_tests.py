@@ -3270,6 +3270,8 @@ class CqlshCopyTest(Tester):
         - COPY the written CSV file back into the table
         - assert that the previously-SELECTed contents of the table match the
         current contents of the table.
+
+        @jira_ticket CASSANDRA-13185
         """
         self.prepare()
         self.session.execute("""
@@ -3322,3 +3324,88 @@ class CqlshCopyTest(Tester):
 
         new_results = list(self.session.execute("SELECT * FROM testunusualdates"))
         self.assertEquals(results, new_results)
+
+    @since('3.0')
+    def test_importing_invalid_data_for_collections(self):
+        """
+        Test that no invalid data is imported for collections and that an appropriate error is reported.
+
+        @jira_ticket CASSANDRA-13071
+        """
+        self.prepare()
+
+        def _check(file_name, table_name, expected_results):
+            # import the CSV file with COPY FROM
+            debug('Importing from csv file: {}'.format(file_name))
+            out, err, _ = self.run_cqlsh(cmds="COPY ks.{} FROM '{}'".format(table_name, file_name))
+            debug(out)
+
+            self.assertIn('ParseError - Failed to parse', err)
+
+            results = rows_to_list(self.session.execute("SELECT * FROM {}".format(table_name)))
+            debug(results)
+            self.assertItemsEqual(expected_results, results)
+
+        def _test_invalid_data_for_sets():
+            debug('Testing invalid data for sets')
+            self.session.execute("""
+                            CREATE TABLE testinvaliddataforsets (
+                                key text,
+                                value frozen<set<text>>,
+                                PRIMARY KEY (key)
+                            )""")
+
+            tempfile = self.get_temp_file()
+            with open(tempfile.name, 'w') as f:
+                f.write('key1,"{\'test1\', \'test2\'}"\n')
+                f.write('key2,"{\'test1\', \'test2\']"\n')
+                f.write('key3,not_a_set\n')
+                f.write('key4,"not_a_set"\n')
+                f.write("key5,'not_a_set'\n")
+
+            expected_results = [['key1', SortedSet(['test1', 'test2'])]]
+            _check(tempfile.name, 'testinvaliddataforsets', expected_results)
+
+        def _test_invalid_data_for_lists():
+            debug('Testing invalid data for lists')
+            self.session.execute("""
+                            CREATE TABLE testinvaliddataforlists (
+                                key text,
+                                value list<text>,
+                                PRIMARY KEY (key)
+                            )""")
+
+            tempfile = self.get_temp_file()
+            with open(tempfile.name, 'w') as f:
+                f.write('key1,"[\'test1\', \'test2\']"\n')
+                f.write('key2,"[\'test1\', \'test2\'}"\n')
+                f.write('key3,not_a_list\n')
+                f.write('key4,"not_a_list"\n')
+                f.write("key5,'not_a_list'\n")
+
+            expected_results = [['key1', list(['test1', 'test2'])]]
+            _check(tempfile.name, 'testinvaliddataforlists', expected_results)
+
+        def _test_invalid_data_for_maps():
+            debug('Testing invalid data for maps')
+            self.session.execute("""
+                            CREATE TABLE testinvaliddataformaps (
+                                key text,
+                                value map<text, text>,
+                                PRIMARY KEY (key)
+                            )""")
+
+            tempfile = self.get_temp_file()
+            with open(tempfile.name, 'w') as f:
+                f.write('key1,"{\'key1\': \'test1\', \'key2\': \'test2\'}"\n')
+                f.write('key2,"{\'key1\': \'test1\', \'key2\': \'test2\']"\n')
+                f.write('key3,not_a_map\n')
+                f.write('key4,"not_a_map"\n')
+                f.write("key5,'not_a_map'\n")
+
+            expected_results = [['key1', dict([('key1', 'test1'), ('key2', 'test2')])]]
+            _check(tempfile.name, 'testinvaliddataformaps', expected_results)
+
+        _test_invalid_data_for_sets()
+        _test_invalid_data_for_lists()
+        _test_invalid_data_for_maps()
