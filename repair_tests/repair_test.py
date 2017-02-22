@@ -1,5 +1,6 @@
 import threading
 import time
+import re
 from collections import namedtuple
 from threading import Thread
 from unittest import skip, skipIf
@@ -261,6 +262,61 @@ class TestRepair(BaseRepairTest):
             self.assertTrue(node.grep_log("Not a global repair"))
         for node in cluster.nodelist():
             self.assertFalse(node.grep_log("Starting anticompaction"))
+
+    def _get_repaired_data(self, node, keyspace):
+        """
+        Based on incremental_repair_test.py:TestIncRepair implementation.
+        """
+        _sstable_name = re.compile('SSTable: (.+)')
+        _repaired_at = re.compile('Repaired at: (\d+)')
+        _sstable_data = namedtuple('_sstabledata', ('name', 'repaired'))
+
+        out = node.run_sstablemetadata(keyspace=keyspace).stdout
+
+        def matches(pattern):
+            return filter(None, [pattern.match(l) for l in out.split('\n')])
+
+        names = [m.group(1) for m in matches(_sstable_name)]
+        repaired_times = [int(m.group(1)) for m in matches(_repaired_at)]
+
+        self.assertTrue(names)
+        self.assertTrue(repaired_times)
+        return [_sstable_data(*a) for a in zip(names, repaired_times)]
+
+    @since('2.2.10', '4')
+    def no_anticompaction_of_already_repaired_test(self):
+        """
+        * Launch three node cluster and stress with RF2
+        * Do incremental repair to have all sstables flagged as repaired
+        * Stop node2, stress, start again and run full -pr repair
+        * Verify that none of the already repaired sstables have been anti-compacted again
+        @jira_ticket CASSANDRA-13153
+        """
+
+        cluster = self.cluster
+        debug("Starting cluster..")
+        cluster.populate(3).start(wait_for_binary_proto=True)
+        node1, node2, node3 = cluster.nodelist()
+        # we use RF to make sure to cover only a set of sub-ranges when doing -full -pr
+        node1.stress(stress_options=['write', 'n=50K', 'no-warmup', 'cl=ONE', '-schema', 'replication(factor=2)', '-rate', 'threads=50'])
+        # disable compaction to make sure that we won't create any new sstables with repairedAt 0
+        node1.nodetool('disableautocompaction keyspace1 standard1')
+        # Do incremental repair of all ranges. All sstables are expected for have repairedAt set afterwards.
+        node1.nodetool("repair keyspace1 standard1")
+        meta = self._get_repaired_data(node1, 'keyspace1')
+        repaired = set([m for m in meta if m.repaired > 0])
+        self.assertEquals(len(repaired), len(meta))
+
+        # stop node2, stress and start full repair to find out how synced ranges affect repairedAt values
+        node2.stop(wait_other_notice=True)
+        node1.stress(stress_options=['write', 'n=40K', 'no-warmup', 'cl=ONE', '-rate', 'threads=50'])
+        node2.start(wait_for_binary_proto=True, wait_other_notice=True)
+        node1.nodetool("repair -full -pr keyspace1 standard1")
+
+        meta = self._get_repaired_data(node1, 'keyspace1')
+        repairedAfterFull = set([m for m in meta if m.repaired > 0])
+        # already repaired sstables must remain untouched
+        self.assertEquals(repaired.intersection(repairedAfterFull), repaired)
 
     @since('2.2.1', '4')
     def anticompaction_after_normal_repair_test(self):
