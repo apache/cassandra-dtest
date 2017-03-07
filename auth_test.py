@@ -654,6 +654,39 @@ class TestAuth(Tester):
         rows = list(cathy.execute("TRUNCATE ks.cf"))
         self.assertItemsEqual(rows, [])
 
+    @since('2.2')
+    def grant_revoke_without_ks_specified_test(self):
+        """
+        * Launch a one node cluster
+        * Connect as the default superuser
+        * Create table ks.cf
+        * Create a new users, 'cathy' and 'bob', with no permissions
+        * Grant ALL on ks.cf to cathy
+        * As cathy, try granting SELECT on cf to bob, without specifying the ks; verify it fails
+        * As cathy, USE ks, try again, verify it works this time
+        """
+        self.prepare()
+
+        cassandra = self.get_session(user='cassandra', password='cassandra')
+
+        cassandra.execute("CREATE KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor':1}")
+        cassandra.execute("CREATE TABLE ks.cf (id int primary key, val int)")
+
+        cassandra.execute("CREATE USER cathy WITH PASSWORD '12345'")
+        cassandra.execute("CREATE USER bob WITH PASSWORD '12345'")
+
+        cassandra.execute("GRANT ALL ON ks.cf TO cathy")
+
+        cathy = self.get_session(user='cathy', password='12345')
+        bob = self.get_session(user='bob', password='12345')
+
+        assert_invalid(cathy, "GRANT SELECT ON cf TO bob", "No keyspace has been specified. USE a keyspace, or explicitly specify keyspace.tablename")
+        assert_unauthorized(bob, "SELECT * FROM ks.cf", "User bob has no SELECT permission on <table ks.cf> or any of its parents")
+
+        cathy.execute("USE ks")
+        cathy.execute("GRANT SELECT ON cf TO bob")
+        bob.execute("SELECT * FROM ks.cf")
+
     def grant_revoke_auth_test(self):
         """
         * Launch a one node cluster
