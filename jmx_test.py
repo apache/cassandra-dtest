@@ -28,7 +28,7 @@ class TestJMX(Tester):
         node1.flush()
         node1.stop(gently=False)
 
-        with self.assertRaisesRegexp(ToolError, "ConnectException: 'Connection refused'."):
+        with self.assertRaisesRegexp(ToolError, "ConnectException: 'Connection refused( \(Connection refused\))?'."):
             node1.nodetool('netstats')
 
         # don't wait; we're testing for when nodetool is called on a node mid-startup
@@ -48,7 +48,7 @@ class TestJMX(Tester):
                 if not isinstance(e, ToolError):
                     raise
                 else:
-                    self.assertIn("ConnectException: 'Connection refused'.", str(e))
+                    self.assertRegexpMatches(str(e), "ConnectException: 'Connection refused( \(Connection refused\))?'.")
 
         self.assertTrue(running, msg='node1 never started')
 
