@@ -11,7 +11,7 @@ from tools.jmxutils import (JolokiaAgent, make_mbean,
                             remove_perf_disable_shared_mem)
 
 
-@since("2.2")
+@since("2.2", max_version="4")
 class TestDeprecatedRepairAPI(Tester):
     """
     @jira_ticket CASSANDRA-9570
