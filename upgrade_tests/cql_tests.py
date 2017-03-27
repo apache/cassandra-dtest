@@ -5384,6 +5384,31 @@ class TestCQL(UpgradeTester):
 
             assert_one(cursor, "SELECT * FROM foo.bar", [0, 0])
 
+    @since('3.0')
+    def materialized_view_simple_test(self):
+        """
+        Test that creates and populate a simple materialized view.
+        @jira_ticket CASSANDRA-13382
+        """
+        cursor = self.prepare()
+
+        cursor.execute("CREATE KEYSPACE foo WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}")
+        cursor.execute("CREATE TABLE foo.test1 (k int, t int, v int, PRIMARY KEY(k, t))")
+
+        cursor.execute("""
+            CREATE MATERIALIZED VIEW foo.view1
+            AS SELECT * FROM foo.test1
+            WHERE v IS NOT NULL AND t IS NOT NULL
+            PRIMARY KEY (k, v, t)
+        """)
+
+        for i in range(0, 10):
+            cursor.execute("INSERT INTO foo.test1(k, t, v) VALUES (0, %d, %d)" % (i, 10 - i - 1))
+
+        for is_upgraded, cursor in self.do_upgrade(cursor):
+            debug("Querying {} node".format("upgraded" if is_upgraded else "old"))
+            assert_all(cursor, "SELECT v, t FROM foo.view1 WHERE k = 0", [[i, 10 - i - 1] for i in range(0, 10)])
+
 
 topology_specs = [
     {'NODES': 3,
