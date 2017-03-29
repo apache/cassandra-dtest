@@ -243,6 +243,7 @@ class CqlshCopyTest(Tester):
                 u frozen<list<list<address_type>>>,
                 v frozen<map<map<int,int>,set<text>>>,
                 w frozen<set<set<inet>>>,
+                x map<text, frozen<list<text>>>
             )''')
 
         default_time_format = self.default_time_format
@@ -337,7 +338,8 @@ class CqlshCopyTest(Tester):
                      # first set is contained in the second set or else they will not sort consistently
                      # and this will cause comparison problems when comparing with csv strings therefore failing
                      # some tests
-                     ImmutableSet([ImmutableSet(['127.0.0.1']), ImmutableSet(['127.0.0.1', '127.0.0.2'])])
+                     ImmutableSet([ImmutableSet(['127.0.0.1']), ImmutableSet(['127.0.0.1', '127.0.0.2'])]),
+                     {'key1': ['value1', 'value2']}  # map<text, frozen<list<text>>>
                      )
 
     @contextmanager
@@ -1727,8 +1729,8 @@ class CqlshCopyTest(Tester):
         self.all_datatypes_prepare()
 
         insert_statement = self.session.prepare(
-            """INSERT INTO testdatatype (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""")
+            """INSERT INTO testdatatype (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""")
         self.session.execute(insert_statement, self.data)
 
         def _test(prepared_statements):
@@ -1796,8 +1798,8 @@ class CqlshCopyTest(Tester):
         self.all_datatypes_prepare()
 
         insert_statement = self.session.prepare(
-            """INSERT INTO testdatatype (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""")
+            """INSERT INTO testdatatype (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""")
         self.session.execute(insert_statement, self.data)
 
         tempfile = self.get_temp_file()
