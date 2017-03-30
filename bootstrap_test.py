@@ -148,23 +148,28 @@ class TestBootstrap(BaseBootstrapTest):
         2*streaming_keep_alive_period_in_secs to receive a single sstable
         """
         cluster = self.cluster
-        cluster.set_configuration_options(values={'stream_throughput_outbound_megabits_per_sec': 1,
-                                                  'streaming_socket_timeout_in_ms': 1000,
-                                                  'streaming_keep_alive_period_in_secs': 1})
+        cluster.set_configuration_options(values={'streaming_socket_timeout_in_ms': 1000,
+                                                  'streaming_keep_alive_period_in_secs': 2})
 
         # Create a single node cluster
         cluster.populate(1)
         node1 = cluster.nodelist()[0]
+
+        debug("Setting up byteman on {}".format(node1.name))
+        # set up byteman
+        node1.byteman_port = '8100'
+        node1.import_config_files()
+
         cluster.start(wait_other_notice=True)
 
         # Create more than one sstable larger than 1MB
-        node1.stress(['write', 'n=50K', '-rate', 'threads=8', '-schema',
+        node1.stress(['write', 'n=1K', '-rate', 'threads=8', '-schema',
                       'compaction(strategy=SizeTieredCompactionStrategy, enabled=false)'])
         cluster.flush()
-        node1.stress(['write', 'n=50K', '-rate', 'threads=8', '-schema',
-                      'compaction(strategy=SizeTieredCompactionStrategy, enabled=false)'])
-        cluster.flush()
-        self.assertGreater(node1.get_sstables("keyspace1", "standard1"), 1)
+
+        debug("Submitting byteman script to {} to".format(node1.name))
+        # Sleep longer than streaming_socket_timeout_in_ms to make sure the node will not be killed
+        node1.byteman_submit(['./byteman/stream_5s_sleep.btm'])
 
         # Bootstraping a new node with very small streaming_socket_timeout_in_ms
         node2 = new_node(cluster)
@@ -174,7 +179,7 @@ class TestBootstrap(BaseBootstrapTest):
         assert_bootstrap_state(self, node2, 'COMPLETED')
 
         for node in cluster.nodelist():
-            self.assertTrue(node.grep_log('Scheduling keep-alive task with 1s period.', filename='debug.log'))
+            self.assertTrue(node.grep_log('Scheduling keep-alive task with 2s period.', filename='debug.log'))
             self.assertTrue(node.grep_log('Sending keep-alive', filename='debug.log'))
             self.assertTrue(node.grep_log('Received keep-alive', filename='debug.log'))
 
