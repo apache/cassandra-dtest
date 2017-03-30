@@ -67,13 +67,13 @@ indev_2_0_x = None  # None if release not likely
 current_2_0_x = VersionMeta(name='current_2_0_x', family='2.0.x', variant='current', version='2.0.17', min_proto_v=1, max_proto_v=2, java_versions=(7,))
 
 indev_2_1_x = VersionMeta(name='indev_2_1_x', family='2.1.x', variant='indev', version='github:apache/cassandra-2.1', min_proto_v=1, max_proto_v=3, java_versions=(7, 8))
-current_2_1_x = VersionMeta(name='current_2_1_x', family='2.1.x', variant='current', version='2.1.15', min_proto_v=1, max_proto_v=3, java_versions=(7, 8))
+current_2_1_x = VersionMeta(name='current_2_1_x', family='2.1.x', variant='current', version='2.1.17', min_proto_v=1, max_proto_v=3, java_versions=(7, 8))
 
 indev_2_2_x = VersionMeta(name='indev_2_2_x', family='2.2.x', variant='indev', version='github:apache/cassandra-2.2', min_proto_v=1, max_proto_v=4, java_versions=(7, 8))
-current_2_2_x = VersionMeta(name='current_2_2_x', family='2.2.x', variant='current', version='2.2.8', min_proto_v=1, max_proto_v=4, java_versions=(7, 8))
+current_2_2_x = VersionMeta(name='current_2_2_x', family='2.2.x', variant='current', version='2.2.9', min_proto_v=1, max_proto_v=4, java_versions=(7, 8))
 
 indev_3_0_x = VersionMeta(name='indev_3_0_x', family='3.0.x', variant='indev', version='github:apache/cassandra-3.0', min_proto_v=3, max_proto_v=4, java_versions=(8,))
-current_3_0_x = VersionMeta(name='current_3_0_x', family='3.0.x', variant='current', version='3.0.9', min_proto_v=3, max_proto_v=4, java_versions=(8,))
+current_3_0_x = VersionMeta(name='current_3_0_x', family='3.0.x', variant='current', version='3.0.12', min_proto_v=3, max_proto_v=4, java_versions=(8,))
 
 indev_3_x = VersionMeta(name='indev_3_x', family='3.x', variant='indev', version='github:apache/cassandra-3.11', min_proto_v=3, max_proto_v=4, java_versions=(8,))
 current_3_x = VersionMeta(name='current_3_x', family='3.x', variant='current', version='3.10', min_proto_v=3, max_proto_v=4, java_versions=(8,))
