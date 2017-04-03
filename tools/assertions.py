@@ -147,7 +147,7 @@ def assert_none(session, query, cl=None):
     assert list_res == [], "Expected nothing from {}, but got {}".format(query, list_res)
 
 
-def assert_all(session, query, expected, cl=None, ignore_order=False):
+def assert_all(session, query, expected, cl=None, ignore_order=False, timeout=None):
     """
     Assert query returns all expected items optionally in the correct order
     @param session Session in use
@@ -155,13 +155,14 @@ def assert_all(session, query, expected, cl=None, ignore_order=False):
     @param expected Expected results from query
     @param cl Optional Consistency Level setting. Default ONE
     @param ignore_order Optional boolean flag determining whether response is ordered
+    @param timeout Optional query timeout, in seconds
 
     Examples:
     assert_all(session, "LIST USERS", [['aleksey', False], ['cassandra', True]])
     assert_all(self.session1, "SELECT * FROM ttl_table;", [[1, 42, 1, 1]])
     """
     simple_query = SimpleStatement(query, consistency_level=cl)
-    res = session.execute(simple_query)
+    res = session.execute(simple_query) if timeout is None else session.execute(simple_query, timeout=timeout)
     list_res = _rows_to_list(res)
     if ignore_order:
         expected = sorted(expected)

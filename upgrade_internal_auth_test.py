@@ -145,9 +145,9 @@ class TestAuthUpgrade(Tester):
 
         # we should now be able to drop the old auth tables
         session = self.patient_cql_connection(node1, user='cassandra', password='cassandra')
-        session.execute('DROP TABLE system_auth.users')
-        session.execute('DROP TABLE system_auth.credentials')
-        session.execute('DROP TABLE system_auth.permissions')
+        session.execute('DROP TABLE system_auth.users', timeout=60)
+        session.execute('DROP TABLE system_auth.credentials', timeout=60)
+        session.execute('DROP TABLE system_auth.permissions', timeout=60)
         # and we should still be able to authenticate and check authorization
         self.check_permissions(node1, True)
         debug('Test completed successfully')
@@ -163,12 +163,14 @@ class TestAuthUpgrade(Tester):
             assert_all(klaus,
                        'LIST ALL PERMISSIONS',
                        [['michael', '<table ks.cf1>', 'MODIFY'],
-                        ['michael', '<table ks.cf2>', 'SELECT']])
+                        ['michael', '<table ks.cf2>', 'SELECT']],
+                       timeout=60)
         else:
             assert_all(klaus,
                        'LIST ALL PERMISSIONS',
                        [['michael', 'michael', '<table ks.cf1>', 'MODIFY'],
-                        ['michael', 'michael', '<table ks.cf2>', 'SELECT']])
+                        ['michael', 'michael', '<table ks.cf2>', 'SELECT']],
+                       timeout=60)
 
         klaus.cluster.shutdown()
 
