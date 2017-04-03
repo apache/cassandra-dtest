@@ -389,6 +389,8 @@ class TestOfflineTools(Tester):
         Test that sstabledump functions properly offline to output the contents of a table.
         """
         cluster = self.cluster
+        # disable JBOD conf since the test expects exactly one SSTable to be written.
+        cluster.set_datadir_count(1)
         cluster.populate(1).start(wait_for_binary_proto=True)
         [node1] = cluster.nodelist()
         session = self.patient_cql_connection(node1)
