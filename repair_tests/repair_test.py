@@ -295,6 +295,8 @@ class TestRepair(BaseRepairTest):
 
         cluster = self.cluster
         debug("Starting cluster..")
+        # disable JBOD conf since the test expects sstables to be on the same disk
+        cluster.set_datadir_count(1)
         cluster.populate(3).start(wait_for_binary_proto=True)
         node1, node2, node3 = cluster.nodelist()
         # we use RF to make sure to cover only a set of sub-ranges when doing -full -pr
