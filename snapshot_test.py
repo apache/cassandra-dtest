@@ -9,6 +9,7 @@ from cassandra.concurrent import execute_concurrent_with_args
 
 from dtest import (Tester, cleanup_cluster, create_ccm_cluster, create_ks,
                    debug, get_test_path)
+from tools.assertions import assert_one
 from tools.files import replace_in_file, safe_mkdtemp
 from tools.hacks import advance_to_next_cl_segment
 from tools.misc import ImmutableMapping
@@ -70,6 +71,13 @@ class SnapshotTester(Tester):
                     raise Exception("sstableloader command '%s' failed; exit status: %d'; stdout: %s; stderr: %s" %
                                     (" ".join(args), exit_status, stdout, stderr))
 
+    def restore_snapshot_schema(self, snapshot_dir, node, ks, cf):
+        debug("Restoring snapshot schema....")
+        for x in xrange(0, self.cluster.data_dir_count):
+            schema_path = os.path.join(snapshot_dir, str(x), ks, cf, 'schema.cql')
+            if os.path.exists(schema_path):
+                node.run_cqlsh(cmds="SOURCE '%s'" % schema_path)
+
 
 class TestSnapshot(SnapshotTester):
 
@@ -105,6 +113,41 @@ class TestSnapshot(SnapshotTester):
         shutil.rmtree(snapshot_dir)
 
         self.assertEqual(rows[0][0], 100)
+
+    def test_snapshot_and_restore_dropping_a_column(self):
+        """
+        @jira_ticket CASSANDRA-13276
+
+        Can't load snapshots of tables with dropped columns.
+        """
+        cluster = self.cluster
+        cluster.populate(1).start()
+        node1, = cluster.nodelist()
+        session = self.patient_cql_connection(node1)
+
+        # Create schema and insert some data
+        create_ks(session, 'ks', 1)
+        session.execute("CREATE TABLE ks.cf (k int PRIMARY KEY, a text, b text)")
+        session.execute("INSERT INTO ks.cf (k, a, b) VALUES (1, 'a', 'b')")
+        assert_one(session, "SELECT * FROM ks.cf", [1, "a", "b"])
+
+        # Drop a column
+        session.execute("ALTER TABLE ks.cf DROP b")
+        assert_one(session, "SELECT * FROM ks.cf", [1, "a"])
+
+        # Take a snapshot and drop the table
+        snapshot_dir = self.make_snapshot(node1, 'ks', 'cf', 'basic')
+        session.execute("DROP TABLE ks.cf")
+
+        # Restore schema and data from snapshot
+        self.restore_snapshot_schema(snapshot_dir, node1, 'ks', 'cf')
+        self.restore_snapshot(snapshot_dir, node1, 'ks', 'cf')
+        node1.nodetool('refresh ks cf')
+        assert_one(session, "SELECT * FROM ks.cf", [1, "a"])
+
+        # Clean up
+        debug("removing snapshot_dir: " + snapshot_dir)
+        shutil.rmtree(snapshot_dir)
 
 
 class TestArchiveCommitlog(SnapshotTester):
