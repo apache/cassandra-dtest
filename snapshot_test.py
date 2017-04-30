@@ -13,6 +13,7 @@ from tools.assertions import assert_one
 from tools.files import replace_in_file, safe_mkdtemp
 from tools.hacks import advance_to_next_cl_segment
 from tools.misc import ImmutableMapping
+from tools.decorators import since
 
 
 class SnapshotTester(Tester):
@@ -114,6 +115,7 @@ class TestSnapshot(SnapshotTester):
 
         self.assertEqual(rows[0][0], 100)
 
+    @since('3.11')
     def test_snapshot_and_restore_dropping_a_column(self):
         """
         @jira_ticket CASSANDRA-13276
