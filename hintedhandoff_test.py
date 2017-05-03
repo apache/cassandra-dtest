@@ -42,13 +42,13 @@ class TestHintedHandoffConfig(Tester):
         self.assertEqual('', err)
         return out
 
-    def _do_hinted_handoff(self, node1, node2, enabled):
+    def _do_hinted_handoff(self, node1, node2, enabled, keyspace='ks'):
         """
         Test that if we stop one node the other one
         will store hints only when hinted handoff is enabled
         """
         session = self.patient_exclusive_cql_connection(node1)
-        create_ks(session, 'ks', 2)
+        create_ks(session, keyspace, 2)
         create_c1c2_table(self, session)
 
         node2.stop(wait_other_notice=True)
@@ -64,7 +64,7 @@ class TestHintedHandoffConfig(Tester):
         node1.stop(wait_other_notice=True)
 
         # Check node2 for all the keys that should have been delivered via HH if enabled or not if not enabled
-        session = self.patient_exclusive_cql_connection(node2, keyspace='ks')
+        session = self.patient_exclusive_cql_connection(node2, keyspace=keyspace)
         for n in xrange(0, 100):
             if enabled:
                 query_c1c2(session, n, ConsistencyLevel.ONE)
@@ -120,6 +120,25 @@ class TestHintedHandoffConfig(Tester):
             self.assertEqual('Hinted handoff is running', res.rstrip())
 
         self._do_hinted_handoff(node1, node2, True)
+
+    def hintedhandoff_setmaxwindow_test(self):
+        """
+        Test global hinted handoff against max_hint_window_in_ms update via nodetool
+        """
+        node1, node2 = self._start_two_node_cluster({'hinted_handoff_enabled': True, "max_hint_window_in_ms": 300000})
+
+        for node in node1, node2:
+            res = self._launch_nodetool_cmd(node, 'statushandoff')
+            self.assertEqual('Hinted handoff is running', res.rstrip())
+
+        res = self._launch_nodetool_cmd(node, 'getmaxhintwindow')
+        self.assertEqual('Current max hint window: 300000 ms', res.rstrip())
+        self._do_hinted_handoff(node1, node2, True)
+        node1.start(wait_other_notice=True)
+        self._launch_nodetool_cmd(node, 'setmaxhintwindow 1')
+        res = self._launch_nodetool_cmd(node, 'getmaxhintwindow')
+        self.assertEqual('Current max hint window: 1 ms', res.rstrip())
+        self._do_hinted_handoff(node1, node2, False, keyspace='ks2')
 
     def hintedhandoff_dc_disabled_test(self):
         """
