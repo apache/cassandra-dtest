@@ -215,12 +215,18 @@ class TestStorageEngineUpgrade(Tester):
             assert_one(session, "SELECT * FROM t WHERE k = {}".format(n), [n, n + 1, n + 2, n + 3, n + 4])
 
     def upgrade_with_statics_test(self):
+        self.upgrade_with_statics(rows=10)
+
+    def upgrade_with_wide_partition_and_statics_test(self):
+        """ Checks we read old indexed sstables with statics by creating partitions larger than a single index block"""
+        self.upgrade_with_statics(rows=1000)
+
+    def upgrade_with_statics(self, rows):
         """
         Validates we can read legacy sstables with static columns.
         """
         PARTITIONS = 1
-        ROWS = 10
-
+        ROWS = rows
         session = self._setup_cluster()
 
         session.execute('CREATE TABLE t (k int, s1 int static, s2 int static, t int, v1 int, v2 int, PRIMARY KEY (k, t))')
