@@ -14,7 +14,8 @@ from nose.plugins.attrib import attr
 from dtest import Tester, debug, create_ks, create_cf
 from tools.assertions import assert_almost_equal, assert_one
 from tools.data import insert_c1c2
-from tools.decorators import since
+from tools.decorators import since, no_vnodes
+from tools.misc import new_node
 
 
 class ConsistentState(object):
@@ -647,3 +648,113 @@ class TestIncRepair(Tester):
 
         for out in (node.run_sstablemetadata(keyspace='keyspace1').stdout for node in cluster.nodelist() if len(node.get_sstables('keyspace1', 'standard1')) > 0):
             self.assertNotIn('Repaired at: 0', out)
+
+    @no_vnodes()
+    @since('4.0')
+    def move_test(self):
+        """ Test repaired data remains in sync after a move """
+        cluster = self.cluster
+        cluster.set_configuration_options(values={'hinted_handoff_enabled': False, 'commitlog_sync_period_in_ms': 500})
+        cluster.populate(4, tokens=[0, 2**32, 2**48, -(2**32)]).start()
+        node1, node2, node3, node4 = cluster.nodelist()
+
+        session = self.patient_exclusive_cql_connection(node3)
+        session.execute("CREATE KEYSPACE ks WITH REPLICATION={'class':'SimpleStrategy', 'replication_factor': 2}")
+        session.execute("CREATE TABLE ks.tbl (k INT PRIMARY KEY, v INT)")
+
+        # insert some data
+        stmt = SimpleStatement("INSERT INTO ks.tbl (k,v) VALUES (%s, %s)")
+        for i in range(1000):
+            session.execute(stmt, (i, i))
+
+        node1.repair(options=['ks'])
+
+        for i in range(1000):
+            v = i + 1000
+            session.execute(stmt, (v, v))
+
+        # everything should be in sync
+        for node in cluster.nodelist():
+            result = node.repair(options=['ks', '--validate'])
+            self.assertIn("Repaired data is in sync", result.stdout)
+
+        node2.nodetool('move {}'.format(2**16))
+
+        # everything should still be in sync
+        for node in cluster.nodelist():
+            result = node.repair(options=['ks', '--validate'])
+            self.assertIn("Repaired data is in sync", result.stdout)
+
+    @no_vnodes()
+    @since('4.0')
+    def decommission_test(self):
+        """ Test repaired data remains in sync after a decommission """
+        cluster = self.cluster
+        cluster.set_configuration_options(values={'hinted_handoff_enabled': False, 'commitlog_sync_period_in_ms': 500})
+        cluster.populate(4).start()
+        node1, node2, node3, node4 = cluster.nodelist()
+
+        session = self.patient_exclusive_cql_connection(node3)
+        session.execute("CREATE KEYSPACE ks WITH REPLICATION={'class':'SimpleStrategy', 'replication_factor': 2}")
+        session.execute("CREATE TABLE ks.tbl (k INT PRIMARY KEY, v INT)")
+
+        # insert some data
+        stmt = SimpleStatement("INSERT INTO ks.tbl (k,v) VALUES (%s, %s)")
+        for i in range(1000):
+            session.execute(stmt, (i, i))
+
+        node1.repair(options=['ks'])
+
+        for i in range(1000):
+            v = i + 1000
+            session.execute(stmt, (v, v))
+
+        # everything should be in sync
+        for node in cluster.nodelist():
+            result = node.repair(options=['ks', '--validate'])
+            self.assertIn("Repaired data is in sync", result.stdout)
+
+        node2.nodetool('decommission')
+
+        # everything should still be in sync
+        for node in [node1, node3, node4]:
+            result = node.repair(options=['ks', '--validate'])
+            self.assertIn("Repaired data is in sync", result.stdout)
+
+    @no_vnodes()
+    @since('4.0')
+    def bootstrap_test(self):
+        """ Test repaired data remains in sync after a bootstrap """
+        cluster = self.cluster
+        cluster.set_configuration_options(values={'hinted_handoff_enabled': False, 'commitlog_sync_period_in_ms': 500})
+        cluster.populate(3).start()
+        node1, node2, node3 = cluster.nodelist()
+
+        session = self.patient_exclusive_cql_connection(node3)
+        session.execute("CREATE KEYSPACE ks WITH REPLICATION={'class':'SimpleStrategy', 'replication_factor': 2}")
+        session.execute("CREATE TABLE ks.tbl (k INT PRIMARY KEY, v INT)")
+
+        # insert some data
+        stmt = SimpleStatement("INSERT INTO ks.tbl (k,v) VALUES (%s, %s)")
+        for i in range(1000):
+            session.execute(stmt, (i, i))
+
+        node1.repair(options=['ks'])
+
+        for i in range(1000):
+            v = i + 1000
+            session.execute(stmt, (v, v))
+
+        # everything should be in sync
+        for node in [node1, node2, node3]:
+            result = node.repair(options=['ks', '--validate'])
+            self.assertIn("Repaired data is in sync", result.stdout)
+
+        node4 = new_node(self.cluster)
+        node4.start(wait_for_binary_proto=True)
+
+        self.assertEqual(len(self.cluster.nodelist()), 4)
+        # everything should still be in sync
+        for node in self.cluster.nodelist():
+            result = node.repair(options=['ks', '--validate'])
+            self.assertIn("Repaired data is in sync", result.stdout)
