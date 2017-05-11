@@ -984,12 +984,12 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
 
     def get_index_output(self, index, ks, table, col):
         # a quoted index name (e.g. "FooIndex") is only correctly echoed by DESCRIBE
-        # from 3.0.11 & 3.10
+        # from 3.0.14 & 3.11
         if index[0] == '"' and index[-1] == '"':
             version = self.cluster.version()
-            if version >= LooseVersion('3.10'):
+            if version >= LooseVersion('3.11'):
                 pass
-            elif LooseVersion('3.1') > version >= LooseVersion('3.0.11'):
+            elif LooseVersion('3.1') > version >= LooseVersion('3.0.14'):
                 pass
             else:
                 index = index[1:-1]
