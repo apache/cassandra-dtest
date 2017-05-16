@@ -1,6 +1,7 @@
 import glob
 import os
 import subprocess
+import time
 
 from ccmlib import common
 from ccmlib.node import ToolError
@@ -40,6 +41,7 @@ class SSTableUtilTest(Tester):
         self.assertEqual(0, len(tmpfiles))
 
         node.compact()
+        time.sleep(5)
         finalfiles, tmpfiles = self._check_files(node, KeyspaceName, TableName)
         self.assertEqual(0, len(tmpfiles))
 
