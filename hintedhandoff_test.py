@@ -121,6 +121,7 @@ class TestHintedHandoffConfig(Tester):
 
         self._do_hinted_handoff(node1, node2, True)
 
+    @since('4.0')
     def hintedhandoff_setmaxwindow_test(self):
         """
         Test global hinted handoff against max_hint_window_in_ms update via nodetool
