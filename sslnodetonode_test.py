@@ -26,6 +26,18 @@ class TestNodeToNodeSSLEncryption(Tester):
         self.cluster.start()
         self.cql_connection(self.node1)
 
+    def ssl_correct_hostname_with_validation_test(self):
+        """Should be able to start with valid ssl options"""
+
+        credNode1 = sslkeygen.generate_credentials("127.0.0.1")
+        credNode2 = sslkeygen.generate_credentials("127.0.0.2", credNode1.cakeystore, credNode1.cacert)
+
+        self.setup_nodes(credNode1, credNode2, endpointVerification=True)
+        self.allow_log_errors = False
+        self.cluster.start()
+        time.sleep(2)
+        self.cql_connection(self.node1)
+
     def ssl_wrong_hostname_no_validation_test(self):
         """Should be able to start with valid ssl options"""
 
