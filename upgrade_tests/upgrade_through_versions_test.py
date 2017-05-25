@@ -342,7 +342,7 @@ class UpgradeTester(Tester):
                     # possibly "speed past" in an overly fast upgrade test
                     time.sleep(60)
 
-                    self.upgrade_to_version(version_meta, partial=True, nodes=(node,))
+                    self.upgrade_to_version(version_meta, partial=True, nodes=(node,), internode_ssl=internode_ssl)
 
                     self._check_on_subprocs(self.subprocs)
                     debug('Successfully upgraded %d of %d nodes to %s' %
@@ -364,7 +364,7 @@ class UpgradeTester(Tester):
                 self._write_values()
                 self._increment_counters()
 
-                self.upgrade_to_version(version_meta)
+                self.upgrade_to_version(version_meta, internode_ssl=internode_ssl)
                 self.cluster.set_install_dir(version=version_meta.version)
 
                 self._check_values()
@@ -410,7 +410,7 @@ class UpgradeTester(Tester):
                     debug("Error terminating subprocess. There could be a lingering process.")
                     pass
 
-    def upgrade_to_version(self, version_meta, partial=False, nodes=None):
+    def upgrade_to_version(self, version_meta, partial=False, nodes=None, internode_ssl=False):
         """
         Upgrade Nodes - if *partial* is True, only upgrade those nodes
         that are specified by *nodes*, otherwise ignore *nodes* specified
@@ -431,6 +431,8 @@ class UpgradeTester(Tester):
         for node in nodes:
             node.set_install_dir(version=version_meta.version)
             debug("Set new cassandra dir for %s: %s" % (node.name, node.get_install_dir()))
+            if internode_ssl and version_meta.version >= '4.0':
+                node.set_configuration_options({'server_encryption_options': {'enabled': True, 'enable_legacy_ssl_storage_port': True}})
 
         # hacky? yes. We could probably extend ccm to allow this publicly.
         # the topology file needs to be written before any nodes are started

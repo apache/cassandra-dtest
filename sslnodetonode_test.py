@@ -31,7 +31,7 @@ class TestNodeToNodeSSLEncryption(Tester):
         credNode1 = sslkeygen.generate_credentials("127.0.0.1")
         credNode2 = sslkeygen.generate_credentials("127.0.0.2", credNode1.cakeystore, credNode1.cacert)
 
-        self.setup_nodes(credNode1, credNode2, endpointVerification=True)
+        self.setup_nodes(credNode1, credNode2, endpoint_verification=True)
         self.allow_log_errors = False
         self.cluster.start()
         time.sleep(2)
@@ -43,7 +43,7 @@ class TestNodeToNodeSSLEncryption(Tester):
         credNode1 = sslkeygen.generate_credentials("127.0.0.80")
         credNode2 = sslkeygen.generate_credentials("127.0.0.81", credNode1.cakeystore, credNode1.cacert)
 
-        self.setup_nodes(credNode1, credNode2, endpointVerification=False)
+        self.setup_nodes(credNode1, credNode2, endpoint_verification=False)
         self.cluster.start()
         time.sleep(2)
         self.cql_connection(self.node1)
@@ -54,7 +54,7 @@ class TestNodeToNodeSSLEncryption(Tester):
         credNode1 = sslkeygen.generate_credentials("127.0.0.80")
         credNode2 = sslkeygen.generate_credentials("127.0.0.81", credNode1.cakeystore, credNode1.cacert)
 
-        self.setup_nodes(credNode1, credNode2, endpointVerification=True)
+        self.setup_nodes(credNode1, credNode2, endpoint_verification=True)
 
         self.allow_log_errors = True
         self.cluster.start(no_wait=True)
@@ -66,7 +66,6 @@ class TestNodeToNodeSSLEncryption(Tester):
         self.assertTrue(found)
 
         self.cluster.stop()
-        self.assertTrue(found)
 
     def ssl_client_auth_required_fail_test(self):
         """peers need to perform mutual auth (cient auth required), but do not supply the local cert"""
@@ -117,15 +116,41 @@ class TestNodeToNodeSSLEncryption(Tester):
         self.cluster.stop()
         self.assertTrue(found)
 
+    def optional_outbound_tls_test(self):
+        """listen on TLS port, but optionally connect using TLS. this supports the upgrade case of starting with a non-encrypted cluster and then upgrading each node to use encryption."""
+        credNode1 = sslkeygen.generate_credentials("127.0.0.1")
+        credNode2 = sslkeygen.generate_credentials("127.0.0.2", credNode1.cakeystore, credNode1.cacert)
+
+        # first, start cluster without TLS (either listening or connecting
+        self.setup_nodes(credNode1, credNode2, internode_encryption='none', encryption_enabled=False)
+        self.cluster.start()
+        self.cql_connection(self.node1)
+
+        # next bounce the cluster to listen on both plain/secure sockets (do not connect secure port, yet, though)
+        self.bounce_node_with_updated_config(credNode1, self.node1, 'none', True, True)
+        self.bounce_node_with_updated_config(credNode2, self.node2, 'none', True, True)
+
+        # next connect with TLS for the outbound connections
+        self.bounce_node_with_updated_config(credNode1, self.node1, 'all', True, True)
+        self.bounce_node_with_updated_config(credNode2, self.node2, 'all', True, True)
+
+        # now shutdown the plaintext port
+        self.bounce_node_with_updated_config(credNode1, self.node1, 'all', True, False)
+        self.bounce_node_with_updated_config(credNode2, self.node2, 'all', True, False)
+        self.cluster.stop()
+
+    def bounce_node_with_updated_config(self, credentials, node, internode_encryption, encryption_enabled, encryption_optional):
+        node.stop()
+        self.copy_cred(credentials, node, internode_encryption, encryption_enabled, encryption_optional)
+        node.start(wait_for_binary_proto=True)
+
     def _grep_msg(self, node, *kwargs):
         tries = 30
         while tries > 0:
             try:
-                print("Checking logs for error")
                 for err in kwargs:
                     m = node.grep_log(err)
                     if m:
-                        print("Found log message: {}".format(m[0]))
                         return True
             except IOError:
                 pass  # log does not exists yet
@@ -134,33 +159,33 @@ class TestNodeToNodeSSLEncryption(Tester):
 
         return False
 
-    def setup_nodes(self, credentials1, credentials2, endpointVerification=False, client_auth=False):
-
+    def setup_nodes(self, credentials1, credentials2, endpoint_verification=False, client_auth=False, internode_encryption='all', encryption_enabled=True, encryption_optional=False):
         cluster = self.cluster
-
-        def copy_cred(credentials, node):
-            dir = node.get_conf_dir()
-            print("Copying credentials to node %s" % dir)
-            kspath = os.path.join(dir, 'keystore.jks')
-            tspath = os.path.join(dir, 'truststore.jks')
-            shutil.copyfile(credentials.keystore, kspath)
-            shutil.copyfile(credentials.cakeystore, tspath)
-
-            node.set_configuration_options(values={
-                'server_encryption_options': {
-                    'internode_encryption': 'all',
-                    'keystore': kspath,
-                    'keystore_password': 'cassandra',
-                    'truststore': tspath,
-                    'truststore_password': 'cassandra',
-                    'require_endpoint_verification': endpointVerification,
-                    'require_client_auth': client_auth
-                }
-            })
-
         cluster = cluster.populate(2)
         self.node1 = cluster.nodelist()[0]
-        copy_cred(credentials1, self.node1)
+        self.copy_cred(credentials1, self.node1, internode_encryption, encryption_enabled, encryption_optional, endpoint_verification, client_auth)
 
         self.node2 = cluster.nodelist()[1]
-        copy_cred(credentials2, self.node2)
+        self.copy_cred(credentials2, self.node2, internode_encryption, encryption_enabled, encryption_optional, endpoint_verification, client_auth)
+
+    def copy_cred(self, credentials, node, internode_encryption, encryption_enabled, encryption_optional, endpoint_verification=False, client_auth=False):
+        dir = node.get_conf_dir()
+        kspath = os.path.join(dir, 'keystore.jks')
+        tspath = os.path.join(dir, 'truststore.jks')
+        shutil.copyfile(credentials.keystore, kspath)
+        shutil.copyfile(credentials.cakeystore, tspath)
+
+        node.set_configuration_options(values={
+            'server_encryption_options': {
+                'enabled': encryption_enabled,
+                'optional': encryption_optional,
+                'internode_encryption': internode_encryption,
+                'keystore': kspath,
+                'keystore_password': 'cassandra',
+                'truststore': tspath,
+                'truststore_password': 'cassandra',
+                'require_endpoint_verification': endpoint_verification,
+                'require_client_auth': client_auth,
+            }
+        })
+        
