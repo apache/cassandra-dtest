@@ -6,7 +6,8 @@ from unittest import skipUnless
 from cassandra import ConsistencyLevel as CL
 from nose.tools import assert_not_in
 
-from dtest import RUN_STATIC_UPGRADE_MATRIX
+from dtest import RUN_STATIC_UPGRADE_MATRIX, debug
+from tools.decorators import since
 from tools.jmxutils import (JolokiaAgent, make_mbean)
 from upgrade_base import UpgradeTester
 from upgrade_manifest import build_upgrade_pairs
@@ -115,6 +116,45 @@ class TestForRegressions(UpgradeTester):
                 self.assertEquals(len(sstables_before), len(sstables_after))
                 checked = True
         self.assertTrue(checked)
+
+    @since('3.0.14', max_version='3.0.99')
+    def test_schema_agreement(self):
+        """
+        Test that nodes agree on the schema during an upgrade in the 3.0.x series.
+
+        Create a table before upgrading the cluster and wait for schema agreement.
+        Upgrade one node and create one more table, wait for schema agreement and check
+        the schema versions with nodetool describecluster.
+
+        We know that schemas will not necessarily agree from 2.1/2.2 to 3.0.x or from 3.0.x to 3.x
+        and upwards, so we only test the 3.0.x series for now. We start with 3.0.13 because
+        there is a problem in 3.0.13, see CASSANDRA-12213 and 13559.
+
+        @jira_ticket CASSANDRA-13559
+        """
+        session = self.prepare(nodes=5)
+        session.execute("CREATE TABLE schema_agreement_test_1 ( id int PRIMARY KEY, value text )")
+        session.cluster.control_connection.wait_for_schema_agreement(wait_time=30)
+
+        def validate_schema_agreement(n, is_upgr):
+            debug("querying node {} for schema information, upgraded: {}".format(n.name, is_upgr))
+
+            response = n.nodetool('describecluster').stdout
+            debug(response)
+            schemas = response.split('Schema versions:')[1].strip()
+            num_schemas = len(re.findall('\[.*?\]', schemas))
+            self.assertEqual(num_schemas, 1, "There were multiple schema versions during an upgrade: {}"
+                             .format(schemas))
+
+        for node in self.cluster.nodelist():
+            validate_schema_agreement(node, False)
+
+        for is_upgraded, session, node in self.do_upgrade(session, return_nodes=True):
+            validate_schema_agreement(node, is_upgraded)
+            if is_upgraded:
+                session.execute("CREATE TABLE schema_agreement_test_2 ( id int PRIMARY KEY, value text )")
+                session.cluster.control_connection.wait_for_schema_agreement(wait_time=30)
+                validate_schema_agreement(node, is_upgraded)
 
     def compact_sstable(self, node, sstable):
         mbean = make_mbean('db', type='CompactionManager')
