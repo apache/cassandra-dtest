@@ -23,12 +23,12 @@ class TestAuthUpgrade(Tester):
     )
 
     def upgrade_to_22_test(self):
-        self.do_upgrade_with_internal_auth("git:cassandra-2.2")
+        self.do_upgrade_with_internal_auth("github:apache/cassandra-2.2")
 
     @since('3.0')
     @skipIf(OFFHEAP_MEMTABLES, 'offheap_objects are not available in 3.0')
     def upgrade_to_30_test(self):
-        self.do_upgrade_with_internal_auth("git:cassandra-3.0")
+        self.do_upgrade_with_internal_auth("github:apache/cassandra-3.0")
 
     @since('2.2', max_version='3.X')
     def test_upgrade_legacy_table(self):
@@ -101,7 +101,7 @@ class TestAuthUpgrade(Tester):
         cluster = self.cluster
 
         # Forcing cluster version on purpose
-        cluster.set_install_dir(version="git:cassandra-2.1")
+        cluster.set_install_dir(version="github:apache/cassandra-2.1")
         cluster.populate(3).start()
 
         node1, node2, node3 = cluster.nodelist()

@@ -25,7 +25,7 @@ class TestCrcCheckChanceUpgrade(Tester):
         cluster = self.cluster
 
         # Forcing cluster version on purpose
-        cluster.set_install_dir(version="git:cassandra-2.2")
+        cluster.set_install_dir(version="github:apache/cassandra-2.2")
         cluster.populate(2).start()
 
         node1, node2 = cluster.nodelist()

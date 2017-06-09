@@ -329,19 +329,19 @@ class TestOfflineTools(Tester):
             # CCM doesn't handle this upgrade correctly and results in an error when flushing 2.1:
             #   Error opening zip file or JAR manifest missing : /home/mshuler/git/cassandra/lib/jamm-0.2.5.jar
             # The 2.1 installed jamm version is 0.3.0, but bin/cassandra.in.sh used by nodetool still has 0.2.5
-            # (when this is fixed in CCM issue #463, install version='git:cassandra-2.0' as below)
+            # (when this is fixed in CCM issue #463, install version='github:apache/cassandra-2.0' as below)
             self.skipTest('Skipping 2.1 test due to jamm.jar version upgrade problem in CCM node configuration.')
         elif testversion < '3.0':
-            debug('Test version: {} - installing git:cassandra-2.1'.format(testversion))
-            cluster.set_install_dir(version='git:cassandra-2.1')
+            debug('Test version: {} - installing github:apache/cassandra-2.1'.format(testversion))
+            cluster.set_install_dir(version='github:apache/cassandra-2.1')
         # As of 3.5, sstable format 'ma' from 3.0 is still the latest - install 2.2 to upgrade from
         elif testversion < '4.0':
-            debug('Test version: {} - installing git:cassandra-2.2'.format(testversion))
-            cluster.set_install_dir(version='git:cassandra-2.2')
+            debug('Test version: {} - installing github:apache/cassandra-2.2'.format(testversion))
+            cluster.set_install_dir(version='github:apache/cassandra-2.2')
         # From 4.0, one can only upgrade from 3.0
         else:
-            debug('Test version: {} - installing git:cassandra-3.0'.format(testversion))
-            cluster.set_install_dir(version='git:cassandra-3.0')
+            debug('Test version: {} - installing github:apache/cassandra-3.0'.format(testversion))
+            cluster.set_install_dir(version='github:apache/cassandra-3.0')
 
         # Start up last major version, write out an sstable to upgrade, and stop node
         cluster.populate(1).start(wait_for_binary_proto=True)
