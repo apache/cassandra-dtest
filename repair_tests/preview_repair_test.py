@@ -4,9 +4,10 @@ from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
 
 from dtest import Tester
-from tools.decorators import no_vnodes
+from tools.decorators import no_vnodes, since
 
 
+@since('4.0')
 class PreviewRepairTest(Tester):
 
     def assert_no_repair_history(self, session):
