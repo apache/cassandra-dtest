@@ -7,11 +7,10 @@ from dtest import Tester
 from tools import sslkeygen
 from tools.decorators import since
 
-_LOG_ERR_SIG = "^javax.net.ssl.SSLHandshakeException: sun.security.validator.ValidatorException: Certificate signature validation failed$"
-_LOG_ERR_IP = "^javax.net.ssl.SSLHandshakeException: java.security.cert.CertificateException: No subject alternative names matching IP address [0-9.]+ found$"
-_LOG_ERR_HOST = "^javax.net.ssl.SSLHandshakeException: java.security.cert.CertificateException: No name matching \S+ found$"
-_LOG_ERR_CERT = "^javax.net.ssl.SSLHandshakeException: Received fatal alert: certificate_unknown$"
-
+# as the error message logged will be different per netty ssl implementation (jdk vs openssl (libre vs boring vs ...)),
+# the best we can do is just look for a SSLHandshakeException
+_LOG_ERR_HANDSHAKE = "javax.net.ssl.SSLHandshakeException"
+_LOG_ERR_GENERAL = "javax.net.ssl.SSLException"
 
 @since('3.6')
 class TestNodeToNodeSSLEncryption(Tester):
@@ -60,10 +59,10 @@ class TestNodeToNodeSSLEncryption(Tester):
         self.allow_log_errors = True
         self.cluster.start(no_wait=True)
 
-        found = self._grep_msg(self.node1, _LOG_ERR_IP, _LOG_ERR_HOST)
+        found = self._grep_msg(self.node1, _LOG_ERR_HANDSHAKE, _LOG_ERR_GENERAL)
         self.assertTrue(found)
 
-        found = self._grep_msg(self.node2, _LOG_ERR_IP, _LOG_ERR_HOST)
+        found = self._grep_msg(self.node2, _LOG_ERR_HANDSHAKE, _LOG_ERR_GENERAL)
         self.assertTrue(found)
 
         self.cluster.stop()
@@ -81,10 +80,10 @@ class TestNodeToNodeSSLEncryption(Tester):
         self.cluster.start(no_wait=True)
         time.sleep(2)
 
-        found = self._grep_msg(self.node1, _LOG_ERR_CERT)
+        found = self._grep_msg(self.node1, _LOG_ERR_HANDSHAKE, _LOG_ERR_GENERAL)
         self.assertTrue(found)
 
-        found = self._grep_msg(self.node2, _LOG_ERR_CERT)
+        found = self._grep_msg(self.node2, _LOG_ERR_HANDSHAKE, _LOG_ERR_GENERAL)
         self.assertTrue(found)
 
         self.cluster.stop()
@@ -114,7 +113,7 @@ class TestNodeToNodeSSLEncryption(Tester):
         self.allow_log_errors = True
         self.cluster.start(no_wait=True)
 
-        found = self._grep_msg(self.node1, _LOG_ERR_SIG)
+        found = self._grep_msg(self.node1, _LOG_ERR_HANDSHAKE)
         self.cluster.stop()
         self.assertTrue(found)
 

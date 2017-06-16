@@ -1190,10 +1190,19 @@ class TestPreJoinCallback(Tester):
             node1.byteman_port = '8100'
             node1.import_config_files()
             node1.start(wait_for_binary_proto=True)
-            node1.byteman_submit(['./byteman/inject_failure_streaming_to_node2.btm'])
+
+            if cluster.version() < '4.0':
+                node1.byteman_submit(['./byteman/pre4.0/inject_failure_streaming_to_node2.btm'])
+            else:
+                node1.byteman_submit(['./byteman/4.0/inject_failure_streaming_to_node2.btm'])
 
             node2 = new_node(cluster)
-            node2.set_configuration_options(values={'initial_token': token, 'streaming_socket_timeout_in_ms': 1000})
+
+            yaml_opts = {'initial_token': token}
+            if cluster.version() < '4.0':
+                yaml_opts['streaming_socket_timeout_in_ms'] = 1000
+
+            node2.set_configuration_options(values=yaml_opts)
             node2.start(wait_other_notice=False, wait_for_binary_proto=True)
             assert_bootstrap_state(self, node2, 'IN_PROGRESS')
 

@@ -1,0 +1,17 @@
+#
+# Inject streaming failure
+#
+# Before start streaming files in `StreamSession#prepare()` method,
+# interrupt streaming by throwing RuntimeException.
+#
+RULE inject stream failure
+CLASS org.apache.cassandra.streaming.StreamSession
+METHOD startStreamingFiles
+AT ENTRY
+BIND peer = $0.peer
+# set flag to only run this rule once.
+IF peer.equals(InetAddress.getByName("127.0.0.2")) AND NOT flagged("done")
+DO
+   flag("done");
+   throw new java.lang.RuntimeException("Triggering network failure")
+ENDRULE

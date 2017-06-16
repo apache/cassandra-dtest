@@ -30,7 +30,7 @@ class NativeTransportSSL(Tester):
         except NoHostAvailable:
             pass
 
-        self.assertGreater(len(node1.grep_log("^io.netty.handler.ssl.NotSslRecordException.*")), 0, "Missing SSL handshake exception while connecting with non-SSL enabled client")
+        self.assertGreater(len(node1.grep_log("io.netty.handler.ssl.NotSslRecordException.*")), 0, "Missing SSL handshake exception while connecting with non-SSL enabled client")
 
         # enabled ssl on the client and try again (this should work)
         session = self.patient_cql_connection(node1, ssl_opts={'ca_certs': os.path.join(self.test_path, 'ccm_node.cer')})

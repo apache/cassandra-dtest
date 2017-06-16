@@ -194,7 +194,10 @@ class TestRebuild(Tester):
         session.execute("ALTER KEYSPACE system_auth WITH REPLICATION = {'class':'NetworkTopologyStrategy', 'dc1':1, 'dc2':1};")
 
         # Path to byteman script which makes the streaming to node2 throw an exception, making rebuild fail
-        script = ['./byteman/inject_failure_streaming_to_node2.btm']
+        if cluster.version() < '4.0':
+            script = ['./byteman/pre4.0/inject_failure_streaming_to_node2.btm']
+        else:
+            script = ['./byteman/4.0/inject_failure_streaming_to_node2.btm']
         node3.byteman_submit(script)
 
         # First rebuild must fail and data must be incomplete

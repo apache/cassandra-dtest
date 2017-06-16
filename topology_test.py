@@ -212,7 +212,10 @@ class TestTopology(Tester):
 
         # Execute first rebuild, should fail
         with self.assertRaises(ToolError):
-            script = ['./byteman/decommission_failure_inject.btm']
+            if cluster.version() >= '4.0':
+                script = ['./byteman/4.0/decommission_failure_inject.btm']
+            else:
+                script = ['./byteman/pre4.0/decommission_failure_inject.btm']
             node2.byteman_submit(script)
             node2.nodetool('decommission')
 

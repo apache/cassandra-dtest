@@ -445,10 +445,14 @@ class TestReplaceAddress(BaseReplaceAddressTest):
         self._stop_node_to_replace()
 
         debug("Submitting byteman script to make stream fail")
-        self.query_node.byteman_submit(['./byteman/stream_failure.btm'])
 
-        self._do_replace(jvm_option='replace_address_first_boot',
-                         opts={'streaming_socket_timeout_in_ms': 1000})
+        if self.cluster.version() < '4.0':
+            self.query_node.byteman_submit(['./byteman/pre4.0/stream_failure.btm'])
+            self._do_replace(jvm_option='replace_address_first_boot',
+                             opts={'streaming_socket_timeout_in_ms': 1000})
+        else:
+            self.query_node.byteman_submit(['./byteman/4.0/stream_failure.btm'])
+            self._do_replace(jvm_option='replace_address_first_boot')
 
         # Make sure bootstrap did not complete successfully
         assert_bootstrap_state(self, self.replacement_node, 'IN_PROGRESS')
