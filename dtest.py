@@ -71,7 +71,6 @@ PRINT_DEBUG = os.environ.get('PRINT_DEBUG', '').lower() in ('yes', 'true')
 OFFHEAP_MEMTABLES = os.environ.get('OFFHEAP_MEMTABLES', '').lower() in ('yes', 'true')
 NUM_TOKENS = os.environ.get('NUM_TOKENS', '256')
 RECORD_COVERAGE = os.environ.get('RECORD_COVERAGE', '').lower() in ('yes', 'true')
-REUSE_CLUSTER = os.environ.get('REUSE_CLUSTER', '').lower() in ('yes', 'true')
 IGNORE_REQUIRE = os.environ.get('IGNORE_REQUIRE', '').lower() in ('yes', 'true')
 DATADIR_COUNT = os.environ.get('DATADIR_COUNT', '3')
 ENABLE_ACTIVE_LOG_WATCHING = os.environ.get('ENABLE_ACTIVE_LOG_WATCHING', '').lower() in ('yes', 'true')
@@ -1067,30 +1066,6 @@ class ReusableClusterTester(Tester):
     @classmethod
     def init_config(cls):
         init_default_config(cls.cluster, cls.cluster_options)
-
-
-def canReuseCluster(Tester):
-    orig_init = Tester.__init__
-    # make copy of original __init__, so we can call it without recursion
-
-    def __init__(self, *args, **kwargs):
-        self._preserve_cluster = REUSE_CLUSTER
-        orig_init(self, *args, **kwargs)  # call the original __init__
-
-    Tester.__init__ = __init__  # set the class' __init__ to the new one
-    return Tester
-
-
-class freshCluster():
-
-    def __call__(self, f):
-        def wrapped(obj):
-            obj._preserve_cluster = False
-            obj.setUp()
-            f(obj)
-        wrapped.__name__ = f.__name__
-        wrapped.__doc__ = f.__doc__
-        return wrapped
 
 
 class MultiError(Exception):

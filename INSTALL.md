@@ -129,10 +129,6 @@ will often need to modify them in some fashion at some later point:
          cd ~/git/cstar/cassandra-dtest
          PRINT_DEBUG=true nosetests -x -s -v putget_test.py
 
-* To reuse cassandra clusters when possible, set the environment variable REUSE_CLUSTER
-
-        REUSE_CLUSTER=true nosetests -s -v cql_tests.py
-
 * Some tests will not run with vnodes enabled (you'll see a "SKIP: Test disabled for vnodes" message in that case). Use the provided runner script instead:
 
         ./run_dtests.py --vnodes false --nose-options "-x -s -v" topology_test.py:TestTopology.movement_test

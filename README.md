@@ -43,8 +43,7 @@ environment variable (that still will have precedence if given though).
 Existing tests are probably the best place to start to look at how to write
 tests.
 
-Each test spawns a new fresh cluster and tears it down after the test, unless
-`REUSE_CLUSTER` is set to true. Then some tests will share cassandra instances. If a
+Each test spawns a new fresh cluster and tears it down after the test. If a
 test fails, the logs for the node are saved in a `logs/<timestamp>` directory
 for analysis (it's not perfect but has been good enough so far, I'm open to
 better suggestions).
