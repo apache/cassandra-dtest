@@ -31,6 +31,7 @@ class TestTopology(Tester):
 
         node1.stop(gently=False)
 
+    @since('3.0.11')
     def size_estimates_multidc_test(self):
         """
         Test that primary ranges are correctly generated on
