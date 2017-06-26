@@ -13,13 +13,23 @@ from cassandra.query import BatchStatement, SimpleStatement
 
 from dtest import (DISABLE_VNODES, OFFHEAP_MEMTABLES, DtestTimeoutError,
                    Tester, debug, CASSANDRA_VERSION_FROM_BUILD, create_ks, create_cf)
-from tools.assertions import assert_bootstrap_state, assert_invalid, assert_one, assert_row_count
+from tools.assertions import assert_bootstrap_state, assert_invalid, assert_none, assert_one, assert_row_count
 from tools.data import index_is_built, rows_to_list
 from tools.decorators import since
 from tools.misc import new_node
 
 
 class TestSecondaryIndexes(Tester):
+
+    @staticmethod
+    def _index_sstables_files(node, keyspace, table, index):
+        files = []
+        for data_dir in node.data_directories():
+            data_dir = os.path.join(data_dir, keyspace)
+            base_tbl_dir = os.path.join(data_dir, [s for s in os.listdir(data_dir) if s.startswith(table)][0])
+            index_sstables_dir = os.path.join(base_tbl_dir, '.' + index)
+            files.extend(os.listdir(index_sstables_dir))
+        return set(files)
 
     def data_created_before_index_not_returned_in_where_query_test(self):
         """
@@ -307,14 +317,7 @@ class TestSecondaryIndexes(Tester):
 
         stmt = session.prepare('select * from standard1 where "C0" = ?')
         self.assertEqual(1, len(list(session.execute(stmt, [lookup_value]))))
-        before_files = []
-        index_sstables_dirs = []
-        for data_dir in node1.data_directories():
-            data_dir = os.path.join(data_dir, 'keyspace1')
-            base_tbl_dir = os.path.join(data_dir, [s for s in os.listdir(data_dir) if s.startswith("standard1")][0])
-            index_sstables_dir = os.path.join(base_tbl_dir, '.ix_c0')
-            before_files.extend(os.listdir(index_sstables_dir))
-            index_sstables_dirs.append(index_sstables_dir)
+        before_files = self._index_sstables_files(node1, 'keyspace1', 'standard1', 'ix_c0')
 
         node1.nodetool("rebuild_index keyspace1 standard1 ix_c0")
         start = time.time()
@@ -326,14 +329,159 @@ class TestSecondaryIndexes(Tester):
         else:
             raise DtestTimeoutError()
 
-        after_files = []
-        for index_sstables_dir in index_sstables_dirs:
-            after_files.extend(os.listdir(index_sstables_dir))
-        self.assertNotEqual(set(before_files), set(after_files))
+        after_files = self._index_sstables_files(node1, 'keyspace1', 'standard1', 'ix_c0')
+        self.assertNotEqual(before_files, after_files)
         self.assertEqual(1, len(list(session.execute(stmt, [lookup_value]))))
 
         # verify that only the expected row is present in the build indexes table
         self.assertEqual(1, len(list(session.execute("""SELECT * FROM system."IndexInfo";"""))))
+
+    @since('4.0')
+    def test_failing_manual_rebuild_index(self):
+        """
+        @jira_ticket CASSANDRA-10130
+
+        Tests the management of index status during manual index rebuilding failures.
+        """
+
+        cluster = self.cluster
+        cluster.populate(1, install_byteman=True).start(wait_for_binary_proto=True)
+        node = cluster.nodelist()[0]
+
+        session = self.patient_cql_connection(node)
+        create_ks(session, 'k', 1)
+        session.execute("CREATE TABLE k.t (k int PRIMARY KEY, v int)")
+        session.execute("CREATE INDEX idx ON k.t(v)")
+        session.execute("INSERT INTO k.t(k, v) VALUES (0, 1)")
+        session.execute("INSERT INTO k.t(k, v) VALUES (2, 3)")
+
+        # Verify that the index is marked as built and it can answer queries
+        assert_one(session, """SELECT * FROM system."IndexInfo" WHERE table_name='k'""", ['k', 'idx'])
+        assert_one(session, "SELECT * FROM k.t WHERE v = 1", [0, 1])
+
+        # Simulate a failing index rebuild
+        before_files = self._index_sstables_files(node, 'k', 't', 'idx')
+        node.byteman_submit(['./byteman/index_build_failure.btm'])
+        with self.assertRaises(Exception):
+            node.nodetool("rebuild_index k t idx")
+        after_files = self._index_sstables_files(node, 'k', 't', 'idx')
+
+        # Verify that the index is not rebuilt, not marked as built, and it still can answer queries
+        self.assertEqual(before_files, after_files)
+        assert_none(session, """SELECT * FROM system."IndexInfo" WHERE table_name='k'""")
+        assert_one(session, "SELECT * FROM k.t WHERE v = 1", [0, 1])
+
+        # Restart the node to trigger the scheduled index rebuild
+        before_files = after_files
+        node.nodetool('drain')
+        node.stop()
+        cluster.start()
+        session = self.patient_cql_connection(node)
+        session.execute("USE k")
+        after_files = self._index_sstables_files(node, 'k', 't', 'idx')
+
+        # Verify that, the index is rebuilt, marked as built, and it can answer queries
+        self.assertNotEqual(before_files, after_files)
+        assert_one(session, """SELECT * FROM system."IndexInfo" WHERE table_name='k'""", ['k', 'idx'])
+        assert_one(session, "SELECT * FROM k.t WHERE v = 1", [0, 1])
+
+        # Simulate another failing index rebuild
+        before_files = self._index_sstables_files(node, 'k', 't', 'idx')
+        node.byteman_submit(['./byteman/index_build_failure.btm'])
+        with self.assertRaises(Exception):
+            node.nodetool("rebuild_index k t idx")
+        after_files = self._index_sstables_files(node, 'k', 't', 'idx')
+
+        # Verify that the index is not rebuilt, not marked as built, and it still can answer queries
+        self.assertEqual(before_files, after_files)
+        assert_none(session, """SELECT * FROM system."IndexInfo" WHERE table_name='k'""")
+        assert_one(session, "SELECT * FROM k.t WHERE v = 1", [0, 1])
+
+        # Successfully rebuild the index
+        before_files = after_files
+        node.nodetool("rebuild_index k t idx")
+        cluster.wait_for_compactions()
+        after_files = self._index_sstables_files(node, 'k', 't', 'idx')
+
+        # Verify that the index is rebuilt, marked as built, and it can answer queries
+        self.assertNotEqual(before_files, after_files)
+        assert_one(session, """SELECT * FROM system."IndexInfo" WHERE table_name='k'""", ['k', 'idx'])
+        assert_one(session, "SELECT * FROM k.t WHERE v = 1", [0, 1])
+
+    @since('4.0')
+    def test_drop_index_while_building(self):
+        """
+        asserts that indexes deleted before they have been completely build are invalidated and not built after restart
+        """
+        cluster = self.cluster
+        cluster.populate(1).start()
+        node = cluster.nodelist()[0]
+        session = self.patient_cql_connection(node)
+
+        # Create some thousands of rows to guarantee a long index building
+        node.stress(['write', 'n=50K', 'no-warmup'])
+        session.execute("USE keyspace1")
+
+        # Create an index and immediately drop it, without waiting for index building
+        session.execute('CREATE INDEX idx ON standard1("C0")')
+        session.execute('DROP INDEX idx')
+        cluster.wait_for_compactions()
+
+        # Check that the index is not marked as built nor queryable
+        assert_none(session, """SELECT * FROM system."IndexInfo" WHERE table_name='keyspace1'""")
+        assert_invalid(session,
+                       'SELECT * FROM standard1 WHERE "C0" = 0x00',
+                       'Cannot execute this query as it might involve data filtering')
+
+        # Restart the node to trigger any eventual unexpected index rebuild
+        node.nodetool('drain')
+        node.stop()
+        cluster.start()
+        session = self.patient_cql_connection(node)
+        session.execute("USE keyspace1")
+
+        # The index should remain not built nor queryable after restart
+        assert_none(session, """SELECT * FROM system."IndexInfo" WHERE table_name='keyspace1'""")
+        assert_invalid(session,
+                       'SELECT * FROM standard1 WHERE "C0" = 0x00',
+                       'Cannot execute this query as it might involve data filtering')
+
+    @since('4.0')
+    def test_index_is_not_always_rebuilt_at_start(self):
+        """
+        @jira_ticket CASSANDRA-10130
+
+        Tests the management of index status during manual index rebuilding failures.
+        """
+
+        cluster = self.cluster
+        cluster.populate(1, install_byteman=True).start(wait_for_binary_proto=True)
+        node = cluster.nodelist()[0]
+
+        session = self.patient_cql_connection(node)
+        create_ks(session, 'k', 1)
+        session.execute("CREATE TABLE k.t (k int PRIMARY KEY, v int)")
+        session.execute("CREATE INDEX idx ON k.t(v)")
+        session.execute("INSERT INTO k.t(k, v) VALUES (0, 1)")
+        session.execute("INSERT INTO k.t(k, v) VALUES (2, 3)")
+
+        # Verify that the index is marked as built and it can answer queries
+        assert_one(session, """SELECT * FROM system."IndexInfo" WHERE table_name='k'""", ['k', 'idx'])
+        assert_one(session, "SELECT * FROM k.t WHERE v = 1", [0, 1])
+
+        # Restart the node to trigger any eventual undesired index rebuild
+        before_files = self._index_sstables_files(node, 'k', 't', 'idx')
+        node.nodetool('drain')
+        node.stop()
+        cluster.start()
+        session = self.patient_cql_connection(node)
+        session.execute("USE k")
+        after_files = self._index_sstables_files(node, 'k', 't', 'idx')
+
+        # Verify that, the index is not rebuilt, marked as built, and it can answer queries
+        self.assertNotEqual(before_files, after_files)
+        assert_one(session, """SELECT * FROM system."IndexInfo" WHERE table_name='k'""", ['k', 'idx'])
+        assert_one(session, "SELECT * FROM k.t WHERE v = 1", [0, 1])
 
     def test_multi_index_filtering_query(self):
         """

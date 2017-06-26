@@ -1,0 +1,13 @@
+#
+# Sleep 5s during index update
+#
+RULE fail during index building
+CLASS org.apache.cassandra.db.compaction.CompactionManager
+METHOD submitIndexBuild
+AT ENTRY
+# set flag to only run this rule once.
+IF NOT flagged("done")
+DO
+   flag("done");
+   throw new java.lang.RuntimeException("Index building failure")
+ENDRULE

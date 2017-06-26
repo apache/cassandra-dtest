@@ -6,7 +6,8 @@ from distutils import dir_util
 from ccmlib import common as ccmcommon
 
 from dtest import Tester, debug, create_ks, create_cf
-from tools.assertions import assert_one
+from tools.assertions import assert_all, assert_none, assert_one
+from tools.decorators import since
 
 
 # WARNING: sstableloader tests should be added to TestSSTableGenerationAndLoading (below),
@@ -68,6 +69,34 @@ class BaseSStableLoaderTest(Tester):
 
         self.load_sstable_with_configuration(ks='"Keyspace1"', create_schema=create_schema_with_mv)
 
+    def copy_sstables(self, cluster, node):
+        for x in xrange(0, cluster.data_dir_count):
+            data_dir = os.path.join(node.get_path(), 'data{0}'.format(x))
+            copy_root = os.path.join(node.get_path(), 'data{0}_copy'.format(x))
+            for ddir in os.listdir(data_dir):
+                keyspace_dir = os.path.join(data_dir, ddir)
+                if os.path.isdir(keyspace_dir) and ddir != 'system':
+                    copy_dir = os.path.join(copy_root, ddir)
+                    dir_util.copy_tree(keyspace_dir, copy_dir)
+
+    def load_sstables(self, cluster, node, ks):
+        cdir = node.get_install_dir()
+        sstableloader = os.path.join(cdir, 'bin', ccmcommon.platform_binary('sstableloader'))
+        env = ccmcommon.make_cassandra_env(cdir, node.get_path())
+        host = node.address()
+        for x in xrange(0, cluster.data_dir_count):
+            sstablecopy_dir = os.path.join(node.get_path(), 'data{0}_copy'.format(x), ks.strip('"'))
+            for cf_dir in os.listdir(sstablecopy_dir):
+                full_cf_dir = os.path.join(sstablecopy_dir, cf_dir)
+                if os.path.isdir(full_cf_dir):
+                    cmd_args = [sstableloader, '--nodes', host, full_cf_dir]
+                    p = subprocess.Popen(cmd_args, stderr=subprocess.PIPE, stdout=subprocess.PIPE, env=env)
+                    exit_status = p.wait()
+                    debug('stdout: {out}'.format(out=p.stdout))
+                    debug('stderr: {err}'.format(err=p.stderr))
+                    self.assertEqual(0, exit_status,
+                                     "sstableloader exited with a non-zero status: {}".format(exit_status))
+
     def load_sstable_with_configuration(self, pre_compression=None, post_compression=None, ks="ks", create_schema=create_schema):
         """
         tests that the sstableloader works by using it to load data.
@@ -112,14 +141,7 @@ class BaseSStableLoaderTest(Tester):
 
         debug("Making a copy of the sstables")
         # make a copy of the sstables
-        for x in xrange(0, cluster.data_dir_count):
-            data_dir = os.path.join(node1.get_path(), 'data{0}'.format(x))
-            copy_root = os.path.join(node1.get_path(), 'data{0}_copy'.format(x))
-            for ddir in os.listdir(data_dir):
-                keyspace_dir = os.path.join(data_dir, ddir)
-                if os.path.isdir(keyspace_dir) and ddir != 'system':
-                    copy_dir = os.path.join(copy_root, ddir)
-                    dir_util.copy_tree(keyspace_dir, copy_dir)
+        self.copy_sstables(cluster, node1)
 
         debug("Wiping out the data and restarting cluster")
         # wipe out the node data.
@@ -140,22 +162,7 @@ class BaseSStableLoaderTest(Tester):
 
         debug("Calling sstableloader")
         # call sstableloader to re-load each cf.
-        cdir = node1.get_install_dir()
-        sstableloader = os.path.join(cdir, 'bin', ccmcommon.platform_binary('sstableloader'))
-        env = ccmcommon.make_cassandra_env(cdir, node1.get_path())
-        host = node1.address()
-        for x in xrange(0, cluster.data_dir_count):
-            sstablecopy_dir = os.path.join(node1.get_path(), 'data{0}_copy'.format(x), ks.strip('"'))
-            for cf_dir in os.listdir(sstablecopy_dir):
-                full_cf_dir = os.path.join(sstablecopy_dir, cf_dir)
-                if os.path.isdir(full_cf_dir):
-                    cmd_args = [sstableloader, '--nodes', host, full_cf_dir]
-                    p = subprocess.Popen(cmd_args, stderr=subprocess.PIPE, stdout=subprocess.PIPE, env=env)
-                    exit_status = p.wait()
-                    debug('stdout: {out}'.format(out=p.stdout))
-                    debug('stderr: {err}'.format(err=p.stderr))
-                    self.assertEqual(0, exit_status,
-                                     "sstableloader exited with a non-zero status: {}".format(exit_status))
+        self.load_sstables(cluster, node1, ks)
 
         def read_and_validate_data(session):
             for i in range(NUM_KEYS):
@@ -287,3 +294,68 @@ class TestSSTableGenerationAndLoading(BaseSStableLoaderTest):
                             "PRIMARY KEY (v)")
 
         self.load_sstable_with_configuration(ks='"Keyspace1"', create_schema=create_schema_with_mv)
+
+    @since('4.0')
+    def sstableloader_with_failing_2i_test(self):
+        """
+        @jira_ticket CASSANDRA-10130
+
+        Simulates an index building failure during SSTables load.
+        The table data should be loaded and the index should be marked for rebuilding during the next node start.
+        """
+        def create_schema_with_2i(session):
+            create_ks(session, 'k', 1)
+            session.execute("CREATE TABLE k.t (p int, c int, v int, PRIMARY KEY(p, c))")
+            session.execute("CREATE INDEX idx ON k.t(v)")
+
+        cluster = self.cluster
+        cluster.populate(1, install_byteman=True).start(wait_for_binary_proto=True)
+        node = cluster.nodelist()[0]
+
+        session = self.patient_cql_connection(node)
+        create_schema_with_2i(session)
+        session.execute("INSERT INTO k.t(p, c, v) VALUES (0, 1, 8)")
+
+        # Stop node and copy SSTables
+        node.nodetool('drain')
+        node.stop()
+        self.copy_sstables(cluster, node)
+
+        # Wipe out data and restart
+        cluster.clear()
+        cluster.start()
+
+        # Restore the schema
+        session = self.patient_cql_connection(node)
+        create_schema_with_2i(session)
+
+        # The table should exist and be empty, and the index should be empty and marked as built
+        assert_one(session, """SELECT * FROM system."IndexInfo" WHERE table_name='k'""", ['k', 'idx'])
+        assert_none(session, "SELECT * FROM k.t")
+        assert_none(session, "SELECT * FROM k.t WHERE v = 8")
+
+        # Add some additional data before loading the SSTable, to check that it will be still accessible
+        session.execute("INSERT INTO k.t(p, c, v) VALUES (0, 2, 8)")
+        assert_one(session, "SELECT * FROM k.t", [0, 2, 8])
+        assert_one(session, "SELECT * FROM k.t WHERE v = 8", [0, 2, 8])
+
+        # Load SSTables with a failure during index creation
+        node.byteman_submit(['./byteman/index_build_failure.btm'])
+        with self.assertRaises(Exception):
+            self.load_sstables(cluster, node, 'k')
+
+        # Check that the index isn't marked as built and the old SSTable data has been loaded but not indexed
+        assert_none(session, """SELECT * FROM system."IndexInfo" WHERE table_name='k'""")
+        assert_all(session, "SELECT * FROM k.t", [[0, 1, 8], [0, 2, 8]])
+        assert_one(session, "SELECT * FROM k.t WHERE v = 8", [0, 2, 8])
+
+        # Restart the node to trigger index rebuild
+        node.nodetool('drain')
+        node.stop()
+        cluster.start()
+        session = self.patient_cql_connection(node)
+
+        # Check that the index is marked as built and the index has been rebuilt
+        assert_one(session, """SELECT * FROM system."IndexInfo" WHERE table_name='k'""", ['k', 'idx'])
+        assert_all(session, "SELECT * FROM k.t", [[0, 1, 8], [0, 2, 8]])
+        assert_all(session, "SELECT * FROM k.t WHERE v = 8", [[0, 1, 8], [0, 2, 8]])
