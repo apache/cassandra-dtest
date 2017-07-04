@@ -285,51 +285,51 @@ class TestBatch(Tester):
         assert_one(session, "SELECT * FROM users", [0, 'Jack', 'Sparrow'])
         assert_one(session, "SELECT * FROM dogs", [0, 'Pluto'])
 
-    @since('3.0', max_version='3.0.x')
+    @since('3.0', max_version='3.x')
     def logged_batch_compatibility_1_test(self):
         """
         @jira_ticket CASSANDRA-9673, test that logged batches still work with a mixed version cluster.
 
-        Here we have one 3.0 node and two 2.2 nodes and we send the batch request to the 3.0 node.
+        Here we have one 3.0/3.x node and two 2.2 nodes and we send the batch request to the 3.0 node.
         """
         self._logged_batch_compatibility_test(0, 1, 'github:apache/cassandra-2.2', 2, 4)
 
-    @since('3.0', max_version='3.0.x')
+    @since('3.0', max_version='3.x')
     @skipIf(sys.platform == 'win32', 'Windows production support only on 2.2+')
     def logged_batch_compatibility_2_test(self):
         """
         @jira_ticket CASSANDRA-9673, test that logged batches still work with a mixed version cluster.
 
-        Here we have one 3.0 node and two 2.1 nodes and we send the batch request to the 3.0 node.
+        Here we have one 3.0/3.x node and two 2.1 nodes and we send the batch request to the 3.0 node.
         """
         self._logged_batch_compatibility_test(0, 1, 'github:apache/cassandra-2.1', 2, 3)
 
-    @since('3.0', max_version='3.0.x')
+    @since('3.0', max_version='3.x')
     @skipIf(sys.platform == 'win32', 'Windows production support only on 2.2+')
     def logged_batch_compatibility_3_test(self):
         """
         @jira_ticket CASSANDRA-9673, test that logged batches still work with a mixed version cluster.
 
-        Here we have two 3.0 nodes and one 2.1 node and we send the batch request to the 3.0 node.
+        Here we have two 3.0/3.x nodes and one 2.1 node and we send the batch request to the 3.0 node.
         """
         self._logged_batch_compatibility_test(0, 2, 'github:apache/cassandra-2.1', 1, 3)
 
-    @since('3.0', max_version='3.0.x')
+    @since('3.0', max_version='3.x')
     def logged_batch_compatibility_4_test(self):
         """
         @jira_ticket CASSANDRA-9673, test that logged batches still work with a mixed version cluster.
 
-        Here we have two 3.0 nodes and one 2.2 node and we send the batch request to the 2.2 node.
+        Here we have two 3.0/3.x nodes and one 2.2 node and we send the batch request to the 2.2 node.
         """
         self._logged_batch_compatibility_test(2, 2, 'github:apache/cassandra-2.2', 1, 4)
 
-    @since('3.0', max_version='3.0.x')
+    @since('3.0', max_version='3.x')
     @skipIf(sys.platform == 'win32', 'Windows production support only on 2.2+')
     def logged_batch_compatibility_5_test(self):
         """
         @jira_ticket CASSANDRA-9673, test that logged batches still work with a mixed version cluster.
 
-        Here we have two 3.0 nodes and one 2.1 node and we send the batch request to the 2.1 node.
+        Here we have two 3.0/3.x nodes and one 2.1 node and we send the batch request to the 2.1 node.
         """
         self._logged_batch_compatibility_test(2, 2, 'github:apache/cassandra-2.1', 1, 3)
 
