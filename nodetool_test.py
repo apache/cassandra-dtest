@@ -136,3 +136,25 @@ class TestNodetool(Tester):
         out, err, _ = node.nodetool('status')
         self.assertEqual(0, len(err), err)
         self.assertRegexpMatches(out, notice_message)
+
+    @since('4.0')
+    def test_set_get_batchlog_replay_throttle(self):
+        """
+        @jira_ticket CASSANDRA-13614
+
+        Test that batchlog replay throttle can be set and get through nodetool
+        """
+        cluster = self.cluster
+        cluster.populate(2)
+        node = cluster.nodelist()[0]
+        cluster.start()
+
+        # Test that nodetool help messages are displayed
+        self.assertTrue('Set batchlog replay throttle' in node.nodetool('help setbatchlogreplaythrottle').stdout)
+        self.assertTrue('Print batchlog replay throttle' in node.nodetool('help getbatchlogreplaythrottle').stdout)
+
+        # Set and get throttle with nodetool, ensuring that the rate change is logged
+        node.nodetool('setbatchlogreplaythrottle 2048')
+        self.assertTrue(len(node.grep_log('Updating batchlog replay throttle to 2048 KB/s, 1024 KB/s per endpoint',
+                                          filename='debug.log')) > 0)
+        self.assertTrue('Batchlog replay throttle: 2048 KB/s' in node.nodetool('getbatchlogreplaythrottle').stdout)
