@@ -225,7 +225,7 @@ class JolokiaAgent(object):
             print "Output was: %s" % (exc.output,)
             raise
 
-    def _query(self, body):
+    def _query(self, body, verbose=True):
         request_data = json.dumps(body)
         url = 'http://%s:8778/jolokia/' % (self.node.network_interfaces['binary'][0],)
         response = urlopen(url, data=request_data, timeout=10.0)
@@ -236,14 +236,14 @@ class JolokiaAgent(object):
         response = json.loads(raw_response)
         if response['status'] != 200:
             stacktrace = response.get('stacktrace')
-            if stacktrace:
+            if stacktrace and verbose:
                 print "Stacktrace from Jolokia error follows:"
                 for line in stacktrace.splitlines():
                     print line
             raise Exception("Jolokia agent returned non-200 status: %s" % (response,))
         return response
 
-    def read_attribute(self, mbean, attribute, path=None):
+    def read_attribute(self, mbean, attribute, path=None, verbose=True):
         """
         Reads a single JMX attribute.
 
@@ -260,10 +260,10 @@ class JolokiaAgent(object):
                 'attribute': attribute}
         if path:
             body['path'] = path
-        response = self._query(body)
+        response = self._query(body, verbose=verbose)
         return response['value']
 
-    def write_attribute(self, mbean, attribute, value, path=None):
+    def write_attribute(self, mbean, attribute, value, path=None, verbose=True):
         """
         Writes a values to a single JMX attribute.
 
@@ -284,7 +284,7 @@ class JolokiaAgent(object):
                 'value': value}
         if path:
             body['path'] = path
-        self._query(body)
+        self._query(body, verbose=verbose)
 
     def execute_method(self, mbean, operation, arguments=None):
         """
