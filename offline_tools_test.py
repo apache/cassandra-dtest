@@ -158,7 +158,7 @@ class TestOfflineTools(Tester):
         keys = 8 * cluster.data_dir_count
         node1.stress(['write', 'n={0}K'.format(keys), 'no-warmup',
                       '-schema', 'replication(factor=1)',
-                      '-col', 'n=FIXED(10)', 'SIZE=FIXED(1024)',
+                      '-col', 'n=FIXED(10)', 'SIZE=FIXED(1200)',
                       '-rate', 'threads=8'])
 
         node1.flush()
