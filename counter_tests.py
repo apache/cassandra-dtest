@@ -13,6 +13,67 @@ from tools.decorators import since
 
 class TestCounters(Tester):
 
+    @since('3.0', max_version='3.12')
+    def test_13691(self):
+        """
+        2.0 -> 2.1 -> 3.0 counters upgrade test
+        @jira_ticket CASSANDRA-13691
+        """
+        cluster = self.cluster
+        default_install_dir = cluster.get_install_dir()
+
+        #
+        # set up a 2.0 cluster with 3 nodes and set up schema
+        #
+
+        cluster.set_install_dir(version='2.0.17')
+        cluster.populate(3)
+        cluster.start()
+
+        node1, node2, node3 = cluster.nodelist()
+
+        session = self.patient_cql_connection(node1)
+        session.execute("""
+            CREATE KEYSPACE test
+                WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 3};
+            """)
+        session.execute("CREATE TABLE test.test (id int PRIMARY KEY, c counter);")
+
+        #
+        # generate some 2.0 counter columns with local shards
+        #
+
+        query = "UPDATE test.test SET c = c + 1 WHERE id = ?"
+        prepared = session.prepare(query)
+        for i in range(0, 1000):
+            session.execute(prepared, [i])
+
+        cluster.flush()
+        cluster.stop()
+
+        #
+        # upgrade cluster to 2.1
+        #
+
+        cluster.set_install_dir(version='2.1.17')
+        cluster.start();
+        cluster.nodetool("upgradesstables")
+
+        #
+        # upgrade node3 to current (3.0.x or 3.11.x)
+        #
+
+        node3.stop(wait_other_notice=True)
+        node3.set_install_dir(install_dir=default_install_dir)
+        node3.start(wait_other_notice=True)
+
+        #
+        # with a 2.1 coordinator, try to read the table with CL.ALL
+        #
+
+        session = self.patient_cql_connection(node1, consistency_level=ConsistencyLevel.ALL)
+        assert_one(session, "SELECT COUNT(*) FROM test.test", [1000])
+
     def simple_increment_test(self):
         """ Simple incrementation test (Created for #3465, that wasn't a bug) """
         cluster = self.cluster
