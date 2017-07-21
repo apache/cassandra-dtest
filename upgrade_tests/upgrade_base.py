@@ -7,7 +7,7 @@ from unittest import skipIf
 from ccmlib.common import get_version_from_build, is_win
 from tools.jmxutils import remove_perf_disable_shared_mem
 
-from dtest import CASSANDRA_VERSION_FROM_BUILD, DEBUG, Tester, debug, create_ks
+from dtest import CASSANDRA_VERSION_FROM_BUILD, TRACE, DEBUG, Tester, debug, create_ks
 
 
 def switch_jdks(major_version_int):
@@ -161,7 +161,7 @@ class UpgradeTester(Tester):
         if (new_version_from_build >= '3' and self.protocol_version is not None and self.protocol_version < 3):
             self.skip('Protocol version {} incompatible '
                       'with Cassandra version {}'.format(self.protocol_version, new_version_from_build))
-        node1.set_log_level("DEBUG" if DEBUG else "INFO")
+        node1.set_log_level("DEBUG" if DEBUG else "TRACE" if TRACE else "INFO")
         node1.set_configuration_options(values={'internode_compression': 'none'})
 
         if self.enable_for_jolokia:
