@@ -14,10 +14,9 @@ from cassandra.query import BatchStatement, SimpleStatement
 from dtest import (DISABLE_VNODES, OFFHEAP_MEMTABLES, DtestTimeoutError,
                    Tester, debug, CASSANDRA_VERSION_FROM_BUILD, create_ks, create_cf)
 from tools.assertions import assert_bootstrap_state, assert_invalid, assert_none, assert_one, assert_row_count
-from tools.data import index_is_built, rows_to_list
+from tools.data import block_until_index_is_built, index_is_built, rows_to_list
 from tools.decorators import since
 from tools.misc import new_node
-
 
 class TestSecondaryIndexes(Tester):
 
@@ -306,28 +305,14 @@ class TestSecondaryIndexes(Tester):
         lookup_value = session.execute('select "C0" from standard1 limit 1')[0].C0
         session.execute('CREATE INDEX ix_c0 ON standard1("C0");')
 
-        start = time.time()
-        while time.time() < start + 30:
-            debug("waiting for index to build")
-            time.sleep(1)
-            if index_is_built(node1, session, 'keyspace1', 'standard1', 'ix_c0'):
-                break
-        else:
-            raise DtestTimeoutError()
+        block_until_index_is_built(node1, session, 'keyspace1', 'standard1', 'ix_c0')
 
         stmt = session.prepare('select * from standard1 where "C0" = ?')
         self.assertEqual(1, len(list(session.execute(stmt, [lookup_value]))))
         before_files = self._index_sstables_files(node1, 'keyspace1', 'standard1', 'ix_c0')
 
         node1.nodetool("rebuild_index keyspace1 standard1 ix_c0")
-        start = time.time()
-        while time.time() < start + 30:
-            debug("waiting for index to rebuild")
-            time.sleep(1)
-            if index_is_built(node1, session, 'keyspace1', 'standard1', 'ix_c0'):
-                break
-        else:
-            raise DtestTimeoutError()
+        block_until_index_is_built(node1, session, 'keyspace1', 'standard1', 'ix_c0')
 
         after_files = self._index_sstables_files(node1, 'keyspace1', 'standard1', 'ix_c0')
         self.assertNotEqual(before_files, after_files)
@@ -447,39 +432,39 @@ class TestSecondaryIndexes(Tester):
                        'Cannot execute this query as it might involve data filtering')
 
     @since('4.0')
-    def test_index_is_not_always_rebuilt_at_start(self):
+    def test_index_is_not_rebuilt_at_restart(self):
         """
-        @jira_ticket CASSANDRA-10130
+        @jira_ticket CASSANDRA-13725
 
-        Tests the management of index status during manual index rebuilding failures.
+        Tests the index is not rebuilt at restart if already built.
         """
 
         cluster = self.cluster
-        cluster.populate(1, install_byteman=True).start(wait_for_binary_proto=True)
+        cluster.populate(1).start(wait_for_binary_proto=True)
         node = cluster.nodelist()[0]
 
         session = self.patient_cql_connection(node)
         create_ks(session, 'k', 1)
         session.execute("CREATE TABLE k.t (k int PRIMARY KEY, v int)")
-        session.execute("CREATE INDEX idx ON k.t(v)")
         session.execute("INSERT INTO k.t(k, v) VALUES (0, 1)")
-        session.execute("INSERT INTO k.t(k, v) VALUES (2, 3)")
 
-        # Verify that the index is marked as built and it can answer queries
+        debug("Create the index")
+        session.execute("CREATE INDEX idx ON k.t(v)")
+        block_until_index_is_built(node, session, 'k', 't', 'idx')
+        before_files = self._index_sstables_files(node, 'k', 't', 'idx')
+
+        debug("Verify the index is marked as built and it can be queried")
         assert_one(session, """SELECT * FROM system."IndexInfo" WHERE table_name='k'""", ['k', 'idx'])
         assert_one(session, "SELECT * FROM k.t WHERE v = 1", [0, 1])
 
-        # Restart the node to trigger any eventual undesired index rebuild
-        before_files = self._index_sstables_files(node, 'k', 't', 'idx')
-        node.nodetool('drain')
+        debug("Restart the node and verify the index build is not submitted")
         node.stop()
-        cluster.start()
-        session = self.patient_cql_connection(node)
-        session.execute("USE k")
+        node.start(wait_for_binary_proto=True)
         after_files = self._index_sstables_files(node, 'k', 't', 'idx')
+        self.assertEqual(before_files, after_files)
 
-        # Verify that, the index is not rebuilt, marked as built, and it can answer queries
-        self.assertNotEqual(before_files, after_files)
+        debug("Verify the index is still marked as built and it can be queried")
+        session = self.patient_cql_connection(node)
         assert_one(session, """SELECT * FROM system."IndexInfo" WHERE table_name='k'""", ['k', 'idx'])
         assert_one(session, "SELECT * FROM k.t WHERE v = 1", [0, 1])
 
@@ -610,14 +595,7 @@ class TestSecondaryIndexes(Tester):
         session.execute("CREATE INDEX composites_index on ks.regular_table (b)")
 
         for node in cluster.nodelist():
-            start = time.time()
-            while time.time() < start + 10:
-                debug("waiting for index to build")
-                time.sleep(1)
-                if index_is_built(node, session, 'ks', 'regular_table', 'composites_index'):
-                    break
-            else:
-                raise DtestTimeoutError()
+            block_until_index_is_built(node, session, 'ks', 'regular_table', 'composites_index')
 
         insert_args = [(i, i % 2) for i in xrange(100)]
         execute_concurrent_with_args(session,
@@ -1067,14 +1045,7 @@ class TestSecondaryIndexesOnCollections(Tester):
             stmt = "CREATE INDEX user_uuids_values on map_index_search.users (uuids);"
             session.execute(stmt)
 
-        start = time.time()
-        while time.time() < start + 30:
-            debug("waiting for index to build")
-            time.sleep(1)
-            if index_is_built(node1, session, 'map_index_search', 'users', 'user_uuids_values'):
-                break
-        else:
-            raise DtestTimeoutError()
+        block_until_index_is_built(node1, session, 'map_index_search', 'users', 'user_uuids_values')
 
         # shuffle the log in-place, and double-check a slice of records by querying the secondary index
         random.shuffle(log)

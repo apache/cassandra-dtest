@@ -6,7 +6,8 @@ from cassandra.query import SimpleStatement
 from nose.tools import assert_equal, assert_true
 
 import assertions
-from dtest import create_cf
+from dtest import debug, create_cf, DtestTimeoutError
+from tools.funcutils import get_rate_limited_function
 
 
 def create_c1c2_table(tester, session, read_repair=None):
@@ -149,3 +150,18 @@ def index_is_built(node, session, keyspace, table_name, idx_name):
     full_idx_name = idx_name if node.get_cassandra_version() > '3.0' else '{}.{}'.format(table_name, idx_name)
     index_query = """SELECT * FROM system."IndexInfo" WHERE table_name = '{}' AND index_name = '{}'""".format(keyspace, full_idx_name)
     return len(list(session.execute(index_query))) == 1
+
+def block_until_index_is_built(node, session, keyspace, table_name, idx_name):
+    """
+    Waits up to 30 seconds for a secondary index to be built, and raises
+    DtestTimeoutError if it is not.
+    """
+    start = time.time()
+    rate_limited_debug = get_rate_limited_function(debug, 5)
+    while time.time() < start + 30:
+        rate_limited_debug("waiting for index to build")
+        time.sleep(1)
+        if index_is_built(node, session, keyspace, table_name, idx_name):
+            break
+    else:
+        raise DtestTimeoutError()
