@@ -8,6 +8,7 @@ from multiprocessing import Process, Queue
 from unittest import skip, skipIf
 
 from cassandra import ConsistencyLevel
+from cassandra.cluster import NoHostAvailable
 from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.cluster import Cluster
 from cassandra.query import SimpleStatement
@@ -40,9 +41,9 @@ class TestMaterializedViews(Tester):
     @since 3.0
     """
 
-    def prepare(self, user_table=False, rf=1, options=None, nodes=3, **kwargs):
+    def prepare(self, user_table=False, rf=1, options=None, nodes=3, install_byteman=False, **kwargs):
         cluster = self.cluster
-        cluster.populate([nodes, 0])
+        cluster.populate([nodes, 0], install_byteman=install_byteman)
         if options:
             cluster.set_configuration_options(values=options)
         cluster.start()
@@ -771,6 +772,74 @@ class TestMaterializedViews(Tester):
             session,
             "SELECT * FROM users_by_state2 WHERE state = 'TX' AND username = 'user1'",
             ['TX', 'user1']
+        )
+
+    def rename_column_test(self):
+        """
+        Test that a materialized view created with a 'SELECT *' works as expected when renaming a column
+        @expected_result The column is also renamed in the view.
+        """
+
+        session = self.prepare(user_table=True)
+
+        self._insert_data(session)
+
+        assert_one(
+            session,
+            "SELECT * FROM users_by_state WHERE state = 'TX' AND username = 'user1'",
+            ['TX', 'user1', 1968, 'f', 'ch@ngem3a', None]
+        )
+
+        session.execute("ALTER TABLE users RENAME username TO user")
+
+        results = list(session.execute("SELECT * FROM users_by_state WHERE state = 'TX' AND user = 'user1'"))
+        self.assertEqual(len(results), 1)
+        self.assertTrue(hasattr(results[0], 'user'), 'Column "user" not found')
+        assert_one(
+            session,
+            "SELECT state, user, birth_year, gender FROM users_by_state WHERE state = 'TX' AND user = 'user1'",
+            ['TX', 'user1', 1968, 'f']
+        )
+
+    def rename_column_atomicity_test(self):
+        """
+        Test that column renaming is atomically done between a table and its materialized views
+        @jira_ticket CASSANDRA-12952
+        """
+
+        session = self.prepare(nodes=1, user_table=True, install_byteman=True)
+        node = self.cluster.nodelist()[0]
+
+        self._insert_data(session)
+
+        assert_one(
+            session,
+            "SELECT * FROM users_by_state WHERE state = 'TX' AND username = 'user1'",
+            ['TX', 'user1', 1968, 'f', 'ch@ngem3a', None]
+        )
+
+        # Rename a column with an injected byteman rule to kill the node after the first schema update
+        self.allow_log_errors = True
+        script_version = '4x' if self.cluster.version() >= '4' else '3x'
+        node.byteman_submit(['./byteman/merge_schema_failure_{}.btm'.format(script_version)])
+        with self.assertRaises(NoHostAvailable):
+            session.execute("ALTER TABLE users RENAME username TO user")
+
+        debug('Restarting node')
+        node.stop()
+        node.start(wait_for_binary_proto=True)
+        session = self.patient_cql_connection(node, consistency_level=ConsistencyLevel.ONE)
+
+        # Both the table and its view should have the new schema after restart
+        assert_one(
+            session,
+            "SELECT * FROM ks.users WHERE state = 'TX' AND user = 'user1' ALLOW FILTERING",
+            ['user1', 1968, 'f', 'ch@ngem3a', None, 'TX']
+        )
+        assert_one(
+            session,
+            "SELECT * FROM ks.users_by_state WHERE state = 'TX' AND user = 'user1'",
+            ['TX', 'user1', 1968, 'f', 'ch@ngem3a', None]
         )
 
     def lwt_test(self):

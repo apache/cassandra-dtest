@@ -1,0 +1,12 @@
+#
+# Inject node failure on merge schema exit.
+#
+RULE inject node failure on merge schema exit
+CLASS org.apache.cassandra.schema.SchemaKeyspace
+METHOD mergeSchema
+AT EXIT
+# set flag to only run this rule once.
+IF TRUE
+DO
+   System.exit(0)
+ENDRULE
