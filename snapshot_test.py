@@ -115,6 +115,40 @@ class TestSnapshot(SnapshotTester):
 
         self.assertEqual(rows[0][0], 100)
 
+    @since('3.0')
+    def test_snapshot_and_restore_drop_table_remove_dropped_column(self):
+        """
+        @jira_ticket CASSANDRA-13730
+
+        Dropping table should clear entries in dropped_column table
+        """
+        cluster = self.cluster
+        cluster.populate(1).start()
+        node1, = cluster.nodelist()
+        session = self.patient_cql_connection(node1)
+
+        # Create schema and insert some data
+        create_ks(session, 'ks', 1)
+        session.execute("CREATE TABLE ks.cf (k int PRIMARY KEY, a text, b text)")
+        session.execute("INSERT INTO ks.cf (k, a, b) VALUES (1, 'a', 'b')")
+        assert_one(session, "SELECT * FROM ks.cf", [1, "a", "b"])
+
+        # Take a snapshot and drop the column and then drop table
+        snapshot_dir = self.make_snapshot(node1, 'ks', 'cf', 'basic')
+        session.execute("ALTER TABLE ks.cf DROP b")
+        assert_one(session, "SELECT * FROM ks.cf", [1, "a"])
+        session.execute("DROP TABLE ks.cf")
+
+        # Restore schema and data from snapshot, data should be the same as input
+        self.restore_snapshot_schema(snapshot_dir, node1, 'ks', 'cf')
+        self.restore_snapshot(snapshot_dir, node1, 'ks', 'cf')
+        node1.nodetool('refresh ks cf')
+        assert_one(session, "SELECT * FROM ks.cf", [1, "a", "b"])
+
+        # Clean up
+        debug("removing snapshot_dir: " + snapshot_dir)
+        shutil.rmtree(snapshot_dir)
+
     @since('3.11')
     def test_snapshot_and_restore_dropping_a_column(self):
         """
