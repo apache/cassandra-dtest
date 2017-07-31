@@ -1,0 +1,11 @@
+#
+# Skip the finalization of a view build.
+#
+RULE skip the finalization of a view build
+CLASS org.apache.cassandra.db.view.ViewBuilder
+METHOD finish
+AT ENTRY
+IF TRUE
+DO
+   return
+ENDRULE

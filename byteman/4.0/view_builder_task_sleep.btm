@@ -1,0 +1,11 @@
+#
+# Slow down how fast a view builder task processes keys.
+#
+RULE slow down view builder task
+CLASS org.apache.cassandra.db.view.ViewBuilderTask
+METHOD buildKey
+AT ENTRY
+IF TRUE
+DO
+   Thread.sleep(50);
+ENDRULE

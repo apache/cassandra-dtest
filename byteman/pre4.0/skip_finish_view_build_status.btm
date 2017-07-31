@@ -1,0 +1,11 @@
+#
+# Skip the finalization of a view build.
+#
+RULE skip the finalization of a view build
+CLASS org.apache.cassandra.db.SystemKeyspace
+METHOD finishViewBuildStatus
+AT ENTRY
+IF TRUE
+DO
+   return
+ENDRULE

@@ -285,3 +285,33 @@ class TestNodetool(Tester):
         # try an insert with the new column again and validate it succeeds this time
         session.execute('INSERT INTO test.test (pk, ck, val) VALUES (0, 1, 2);')
         assert_all(session, 'SELECT pk, ck, val FROM test.test;', [[0, 1, 2]])
+
+    @since('4.0')
+    def test_set_get_concurrent_view_builders(self):
+        """
+        @jira_ticket CASSANDRA-12245
+
+        Test that the number of concurrent view builders can be set and get through nodetool
+        """
+        cluster = self.cluster
+        cluster.populate(2)
+        node = cluster.nodelist()[0]
+        cluster.start()
+
+        # Test that nodetool help messages are displayed
+        self.assertTrue('Set the number of concurrent view' in node.nodetool('help setconcurrentviewbuilders').stdout)
+        self.assertTrue('Get the number of concurrent view' in node.nodetool('help getconcurrentviewbuilders').stdout)
+
+        # Set and get throttle with nodetool, ensuring that the rate change is logged
+        node.nodetool('setconcurrentviewbuilders 4')
+        self.assertTrue('Current number of concurrent view builders in the system is: \n4'
+                        in node.nodetool('getconcurrentviewbuilders').stdout)
+
+        # Try to set an invalid zero value
+        try:
+            node.nodetool('setconcurrentviewbuilders 0')
+        except ToolError as e:
+            self.assertTrue('concurrent_view_builders should be great than 0.' in e.stdout)
+            self.assertTrue('Number of concurrent view builders should be greater than 0.', e.message)
+        else:
+            self.fail("Expected error when setting and invalid value")
