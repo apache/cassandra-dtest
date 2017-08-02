@@ -1532,6 +1532,41 @@ class TestMaterializedViews(Tester):
             session.execute("DROP MATERIALIZED VIEW mv")
             session.execute("DROP TABLE test")
 
+    def propagate_view_creation_over_non_existing_table(self):
+        """
+        The internal addition of a view over a non existing table should be ignored
+        @jira_ticket CASSANDRA-13737
+        """
+
+        cluster = self.cluster
+        cluster.populate(3)
+        cluster.start()
+        node1, node2, node3 = self.cluster.nodelist()
+        session = self.patient_cql_connection(node1, consistency_level=ConsistencyLevel.QUORUM)
+        create_ks(session, 'ks', 3)
+
+        session.execute('CREATE TABLE users (username varchar PRIMARY KEY, state varchar)')
+
+        # create a materialized view only in nodes 1 and 2
+        node3.stop(wait_other_notice=True)
+        session.execute(('CREATE MATERIALIZED VIEW users_by_state AS '
+                         'SELECT * FROM users WHERE state IS NOT NULL AND username IS NOT NULL '
+                         'PRIMARY KEY (state, username)'))
+
+        # drop the base table only in node 3
+        node1.stop(wait_other_notice=True)
+        node2.stop(wait_other_notice=True)
+        node3.start(wait_for_binary_proto=True)
+        session = self.patient_cql_connection(node3, consistency_level=ConsistencyLevel.QUORUM)
+        session.execute('DROP TABLE ks.users')
+
+        # restart the cluster
+        cluster.stop()
+        cluster.start()
+
+        # node3 should have received and ignored the creation of the MV over the dropped table
+        self.assertTrue(node3.grep_log('Not adding view users_by_state because the base table'))
+
 
 # For read verification
 class MutationPresence(Enum):
