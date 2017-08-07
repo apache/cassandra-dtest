@@ -772,6 +772,59 @@ class TestAccuracy(TestHelper):
 
 class TestConsistency(Tester):
 
+    @since('3.0')
+    def test_13747(self):
+        """
+        @jira_ticket CASSANDRA-13747
+        """
+        cluster = self.cluster
+
+        # disable hinted handoff and set batch commit log so this doesn't interfere with the test
+        cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
+        cluster.set_batch_commitlog(enabled=True)
+
+        cluster.populate(2).start(wait_other_notice=True)
+        node1, node2 = cluster.nodelist()
+
+        session = self.patient_cql_connection(node1)
+
+        query = "CREATE KEYSPACE IF NOT EXISTS test WITH replication = {'class': 'NetworkTopologyStrategy', 'datacenter1': 2};"
+        session.execute(query)
+
+        query = "CREATE TABLE IF NOT EXISTS test.test (id int PRIMARY KEY);"
+        session.execute(query)
+
+        #
+        # populate the table with 10 rows:
+        #
+
+        # -7509452495886106294 |  5
+        # -4069959284402364209 |  1 x
+        # -3799847372828181882 |  8
+        # -3485513579396041028 |  0 x
+        # -3248873570005575792 |  2
+        # -2729420104000364805 |  4 x
+        #  1634052884888577606 |  7
+        #  2705480034054113608 |  6 x
+        #  3728482343045213994 |  9
+        #  9010454139840013625 |  3 x
+
+        stmt = session.prepare("INSERT INTO test.test (id) VALUES (?);")
+        for id in range(0, 10):
+            session.execute(stmt, [id], ConsistencyLevel.ALL)
+
+        # with node2 down and hints disabled, delete every other row on node1
+        node2.stop(wait_other_notice=True)
+        session.execute("DELETE FROM test.test WHERE id IN (1, 0, 4, 6, 3);")
+
+        # with both nodes up, do a DISTINCT range query with CL.ALL;
+        # prior to CASSANDRA-13747 this would cause an assertion in short read protection code
+        node2.start(wait_other_notice=True)
+        stmt = SimpleStatement("SELECT DISTINCT token(id), id FROM test.test;",
+                               consistency_level = ConsistencyLevel.ALL)
+        result = list(session.execute(stmt))
+        assert_length_equal(result, 5)
+
     def short_read_test(self):
         """
         @jira_ticket CASSANDRA-9460
