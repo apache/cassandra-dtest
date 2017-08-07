@@ -228,7 +228,6 @@ class TestMaterializedViews(Tester):
 
         debug("wait that all batchlogs are replayed")
         self._replay_batchlogs()
-
         for i in xrange(5):
             for j in xrange(10000):
                 assert_one(session, "SELECT * FROM t_by_v WHERE id = {} AND v = {}".format(i, j), [j, i])
@@ -1064,8 +1063,8 @@ class TestMaterializedViews(Tester):
         # execution happening
 
         # Look for messages like:
-        #         Digest mismatch: org.apache.cassandra.service.DigestMismatchException: Mismatch for key DecoratedKey
-        regex = r"Digest mismatch: org.apache.cassandra.service.DigestMismatchException: Mismatch for key DecoratedKey"
+        #         Digest mismatch: Mismatch for key DecoratedKey
+        regex = r"Digest mismatch: Mismatch for key DecoratedKey"
         for event in trace.events:
             desc = event.description
             match = re.match(regex, desc)
