@@ -34,7 +34,7 @@ class TestIncRepair(Tester):
     def _get_repaired_data(cls, node, keyspace):
         _sstable_name = compile('SSTable: (.+)')
         _repaired_at = compile('Repaired at: (\d+)')
-        _pending_repair = compile('Pending repair: (null|[a-f0-9\-]+)')
+        _pending_repair = compile('Pending repair: (\-\-|null|[a-f0-9\-]+)')
         _sstable_data = namedtuple('_sstabledata', ('name', 'repaired', 'pending_id'))
 
         out = node.run_sstablemetadata(keyspace=keyspace).stdout
@@ -45,7 +45,7 @@ class TestIncRepair(Tester):
         repaired_times = [int(m.group(1)) for m in matches(_repaired_at)]
 
         def uuid_or_none(s):
-            return None if s == 'null' else UUID(s)
+            return None if s == 'null' or s == '--' else UUID(s)
         pending_repairs = [uuid_or_none(m.group(1)) for m in matches(_pending_repair)]
         assert names
         assert repaired_times
