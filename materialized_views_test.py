@@ -1063,8 +1063,9 @@ class TestMaterializedViews(Tester):
         # execution happening
 
         # Look for messages like:
-        #         Digest mismatch: Mismatch for key DecoratedKey
-        regex = r"Digest mismatch: Mismatch for key DecoratedKey"
+        #  4.0+        Digest mismatch: Mismatch for key DecoratedKey
+        # <4.0         Digest mismatch: org.apache.cassandra.service.DigestMismatchException: Mismatch for key DecoratedKey
+        regex = r"Digest mismatch: ([a-zA-Z.]+:\s)?Mismatch for key DecoratedKey"
         for event in trace.events:
             desc = event.description
             match = re.match(regex, desc)
