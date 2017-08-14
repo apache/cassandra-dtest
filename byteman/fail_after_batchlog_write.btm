@@ -1,0 +1,19 @@
+#
+# Inject node failure immediately after batchlog write.
+# Method signature required in 3.x to avoid pausing before legacy mutations sent
+#
+RULE skip writing batched mutations
+CLASS org.apache.cassandra.service.StorageProxy
+METHOD syncWriteBatchedMutations
+AT ENTRY
+IF TRUE
+DO return
+ENDRULE
+
+RULE skip removing from batchlog
+CLASS org.apache.cassandra.service.StorageProxy
+METHOD asyncRemoveFromBatchlog
+AT ENTRY
+IF TRUE
+DO return
+ENDRULE
