@@ -41,6 +41,7 @@ class TestAuth(Tester):
         @jira_ticket CASSANDRA-10655
         """
         self.prepare(nodes=3)
+        self.ignore_log_patterns = [r'org.apache.cassandra.exceptions.UnavailableException']
         debug("nodes started")
 
         session = self.get_session(user='cassandra', password='cassandra')
