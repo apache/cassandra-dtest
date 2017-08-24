@@ -2032,3 +2032,19 @@ class CqlLoginTest(Tester):
             cqlsh_options=['-u', 'cassandra', '-p', 'cassandra'])
         self.assertEqual([x for x in cqlsh_stdout.split() if x], ['ks1table'])
         self.assert_login_not_allowed('user1', cqlsh_stderr)
+
+    def test_list_roles_after_login(self):
+        """
+        @jira_ticket CASSANDRA-13640
+
+        Verifies that it is possible to list roles after a successful login.
+        """
+        out, err, _ = self.node1.run_cqlsh(
+            '''
+            CREATE ROLE super WITH superuser = true AND password = 'p' AND login = true;
+            LOGIN super 'p';
+            LIST ROLES;
+            ''',
+            cqlsh_options=['-u', 'cassandra', '-p', 'cassandra'])
+        self.assertTrue('super' in out)
+        self.assertEqual('', err)
