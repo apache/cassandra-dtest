@@ -1,0 +1,8 @@
+RULE Die before applying base mutation
+CLASS org.apache.cassandra.db.view.TableViews
+METHOD pushViewReplicaUpdates
+AT EXIT
+IF callerEquals("applyInternal")
+DO
+  throw new RuntimeException("Dummy failure");
+ENDRULE
