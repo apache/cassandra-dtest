@@ -150,7 +150,7 @@ class TestBootstrap(BaseBootstrapTest):
         cluster = self.cluster
         yaml_opts = {'streaming_keep_alive_period_in_secs': 2}
         if cluster.version() < '4.0':
-            yamp_opts['streaming_socket_timeout_in_ms'] = 1000
+            yaml_opts['streaming_socket_timeout_in_ms'] = 1000
         cluster.set_configuration_options(values=yaml_opts)
 
         # Create a single node cluster
