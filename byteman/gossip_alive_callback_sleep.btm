@@ -1,0 +1,13 @@
+#
+# Slow down how fast a node builds a view on the cluster by postponing when gossip settles.
+#
+# Note that this happens only if the node is known to be available.
+#
+RULE slow down falure detector
+CLASS org.apache.cassandra.gms.Gossiper
+METHOD realMarkAlive
+AT ENTRY
+IF TRUE
+DO
+   Thread.sleep(2000);
+ENDRULE

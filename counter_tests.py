@@ -74,6 +74,48 @@ class TestCounters(Tester):
         session = self.patient_cql_connection(node1, consistency_level=ConsistencyLevel.ALL)
         assert_one(session, "SELECT COUNT(*) FROM test.test", [1000])
 
+    def counter_leader_with_partial_view_test(self):
+        """
+        Test leader election with a starting node.
+
+        Testing that nodes do not elect as mutation leader a node with a partial view on the cluster.
+        Note that byteman rules can be syntax checked via the following command:
+            sh ./bin/bytemancheck.sh -cp ~/path_to/apache-cassandra-3.0.14-SNAPSHOT.jar ~/path_to/rule.btm
+
+        @jira_ticket CASSANDRA-13043
+        """
+        cluster = self.cluster
+
+        cluster.populate(3, use_vnodes=True, install_byteman=True)
+        nodes = cluster.nodelist()
+        # Have node 1 and 3 cheat a bit during the leader election for a counter mutation; note that cheating
+        # takes place iff there is an actual chance for node 2 to be picked.
+        nodes[0].update_startup_byteman_script('./byteman/election_counter_leader_favor_node2.btm')
+        nodes[2].update_startup_byteman_script('./byteman/election_counter_leader_favor_node2.btm')
+        cluster.start(wait_for_binary_proto=True)
+        session = self.patient_cql_connection(nodes[0])
+        create_ks(session, 'ks', 3)
+        create_cf(session, 'cf', validation="CounterColumnType", columns={'c': 'counter'})
+
+        # Now stop the node and restart but first install a rule to slow down how fast node 2 will update the list
+        # nodes that are alive
+        nodes[1].stop(wait=True, wait_other_notice=False)
+        nodes[1].update_startup_byteman_script('./byteman/gossip_alive_callback_sleep.btm')
+        nodes[1].start(no_wait=True, wait_other_notice=False)
+
+        # Until node 2 is fully alive try to force other nodes to pick him as mutation leader.
+        # If CASSANDRA-13043 is fixed, they will not. Otherwise they will do, but since we are slowing down how
+        # fast node 2 updates the list of nodes that are alive, it will just have a partial view on the cluster
+        # and thus will raise an 'UnavailableException' exception.
+        nb_attempts = 50000
+        for i in xrange(0, nb_attempts):
+            # Change the name of the counter for the sake of randomization
+            q = SimpleStatement(
+                query_string="UPDATE ks.cf SET c = c + 1 WHERE key = 'counter_%d'" % i,
+                consistency_level=ConsistencyLevel.QUORUM
+            )
+            session.execute(q)
+
     def simple_increment_test(self):
         """ Simple incrementation test (Created for #3465, that wasn't a bug) """
         cluster = self.cluster

@@ -1,0 +1,14 @@
+#
+# Cheat during the leader election for a counter mutation and favour node 2, 127.0.0.2
+#
+# Note that this happens only if the node is known to be available.
+#
+RULE election counter leader cheat
+CLASS org.apache.cassandra.service.StorageProxy
+METHOD findSuitableEndpoint
+AT EXIT
+BIND isthere:boolean = $localEndpoints.contains(java.net.InetAddress.getByName("127.0.0.2"));
+if isthere
+DO
+    return java.net.InetAddress.getByName("127.0.0.2");
+ENDRULE
