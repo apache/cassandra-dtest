@@ -383,6 +383,13 @@ class TestBatch(Tester):
         """
         session.execute(query)
 
+        # batchlog replay skips over all entries that are younger than
+        # 2 * write_request_timeout_in_ms ms: 1x timeout for all mutations to be written,
+        # and another 1x timeout for batch remove mutation to be received.
+        delay = 2 * coordinator.get_conf_option('write_request_timeout_in_ms') / 1000.0 + 1
+        debug('Sleeping for {}s for the batches to not be skipped'.format(delay))
+        time.sleep(delay)
+
         total_batches_replayed = 0
         blm = make_mbean('db', type='BatchlogManager')
 
