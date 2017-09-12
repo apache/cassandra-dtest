@@ -8,8 +8,8 @@ from cassandra.query import SimpleStatement
 
 
 """
-The assertion methods in this file are used to structure, execute, and test different queries and scenarios. 
-Use these anytime you are trying to check the content of a table, the row count of a table, if a query should 
+The assertion methods in this file are used to structure, execute, and test different queries and scenarios.
+Use these anytime you are trying to check the content of a table, the row count of a table, if a query should
 raise an exception, etc. These methods handle error messaging well, and will help discovering and treating bugs.
 
 An example:
@@ -147,6 +147,21 @@ def assert_none(session, query, cl=None):
     res = session.execute(simple_query)
     list_res = _rows_to_list(res)
     assert list_res == [], "Expected nothing from {}, but got {}".format(query, list_res)
+
+
+def assert_some(session, query, cl=None, execution_profile=None):
+    """
+    Assert query returns something
+    @param session Session to use
+    @param query Query to run
+    @param cl Optional Consistency Level setting. Default ONE
+     Examples:
+    assert_some(self.session1, "SELECT * FROM test where key=2;")
+    assert_some(cursor, "SELECT * FROM test WHERE k=2", cl=ConsistencyLevel.SERIAL)
+    """
+    res = _execute(session, query, cl=cl, execution_profile=execution_profile)
+    list_res = _rows_to_list(res)
+    assert list_res != [], "Expected something from {}, but got {}".format(query, list_res)
 
 
 def assert_all(session, query, expected, cl=None, ignore_order=False, timeout=None):

@@ -300,6 +300,26 @@ class TestNodetool(Tester):
         session.execute('INSERT INTO test.test (pk, ck, val) VALUES (0, 1, 2);')
         assert_all(session, 'SELECT pk, ck, val FROM test.test;', [[0, 1, 2]])
 
+    @since('3.0')
+    def test_refresh_size_estimates_clears_invalid_entries(self):
+        """
+        @jira_ticket CASSANDRA-14905
+         nodetool refreshsizeestimates should clear up entries for tables that no longer exist
+        """
+        cluster = self.cluster
+        cluster.populate(1)
+        node = cluster.nodelist()[0]
+        cluster.start()
+        session = self.patient_exclusive_cql_connection(node)
+        session.execute("USE system;")
+        # Valid keyspace but invalid table
+        session.execute("INSERT INTO size_estimates (keyspace_name, table_name, range_start, range_end, mean_partition_size, partitions_count) VALUES ('system_auth', 'bad_table', '-5', '5', 0, 0);")
+        # Invalid keyspace and table
+        session.execute("INSERT INTO size_estimates (keyspace_name, table_name, range_start, range_end, mean_partition_size, partitions_count) VALUES ('bad_keyspace', 'bad_table', '-5', '5', 0, 0);")
+        node.nodetool('refreshsizeestimates')
+        assert_none(session, "SELECT * FROM size_estimates WHERE keyspace_name='system_auth' AND table_name='bad_table'")
+        assert_none(session, "SELECT * FROM size_estimates WHERE keyspace_name='bad_keyspace'")
+
     @since('4.0')
     def test_set_get_concurrent_view_builders(self):
         """

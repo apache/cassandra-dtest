@@ -4,8 +4,8 @@ import logging
 
 from cassandra.concurrent import execute_concurrent_with_args
 
-from tools.assertions import assert_invalid, assert_all, assert_one
-from dtest import Tester, create_ks
+from tools.assertions import assert_invalid, assert_all, assert_one, assert_none, assert_some
+from dtest import Tester, create_ks, create_cf
 
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
@@ -175,6 +175,63 @@ class TestSchema(Tester):
 
         session.execute("USE ks")
         assert_all(session, "SELECT * FROM ts", [[1, 1, 'v1'], [1, 2, 'v2'], [2, 1, 'v3']])
+
+    @since('3.0')
+    def drop_table_reflected_in_size_estimates_test(self):
+        """
+        A dropped table should result in its entries being removed from size estimates, on both
+        nodes that are up and down at the time of the drop.
+
+        @jira_ticket CASSANDRA-14905
+        """
+        cluster = self.cluster
+        cluster.populate(2).start()
+        node1, node2 = cluster.nodelist()
+        session = self.patient_exclusive_cql_connection(node1)
+        create_ks(session, 'ks1', 2)
+        create_ks(session, 'ks2', 2)
+        create_cf(session, 'ks1.cf1', columns={'c1': 'text', 'c2': 'text'})
+        create_cf(session, 'ks2.cf1', columns={'c1': 'text', 'c2': 'text'})
+        create_cf(session, 'ks2.cf2', columns={'c1': 'text', 'c2': 'text'})
+
+        node1.nodetool('refreshsizeestimates')
+        node2.nodetool('refreshsizeestimates')
+        node2.stop()
+        session.execute('DROP TABLE ks2.cf1')
+        session.execute('DROP KEYSPACE ks1')
+        node2.start(wait_for_binary_proto=True)
+        session2 = self.patient_exclusive_cql_connection(node2)
+
+        session.cluster.control_connection.wait_for_schema_agreement()
+
+        assert_none(session, "SELECT * FROM system.size_estimates WHERE keyspace_name='ks1'")
+        assert_none(session, "SELECT * FROM system.size_estimates WHERE keyspace_name='ks2' AND table_name='cf1'")
+        assert_some(session, "SELECT * FROM system.size_estimates WHERE keyspace_name='ks2' AND table_name='cf2'")
+        assert_none(session2, "SELECT * FROM system.size_estimates WHERE keyspace_name='ks1'")
+        assert_none(session2, "SELECT * FROM system.size_estimates WHERE keyspace_name='ks2' AND table_name='cf1'")
+        assert_some(session, "SELECT * FROM system.size_estimates WHERE keyspace_name='ks2' AND table_name='cf2'")
+
+    @since('3.0')
+    def invalid_entries_removed_from_size_estimates_on_restart_test(self):
+        """
+        Entries for dropped tables/keyspaces should be cleared from size_estimates on restart.
+
+        @jira_ticket CASSANDRA-14905
+        """
+        cluster = self.cluster
+        cluster.populate(1).start()
+        node = cluster.nodelist()[0]
+        session = self.patient_cql_connection(node)
+        session.execute("USE system;")
+        session.execute("INSERT INTO size_estimates (keyspace_name, table_name, range_start, range_end, mean_partition_size, partitions_count) VALUES ( 'system_auth', 'bad_table', '-5', '5', 0, 0);")
+        # Invalid keyspace and table
+        session.execute("INSERT INTO size_estimates (keyspace_name, table_name, range_start, range_end, mean_partition_size, partitions_count) VALUES ( 'bad_keyspace', 'bad_table', '-5', '5', 0, 0);")
+        node.stop()
+        node.start()
+        session = self.patient_cql_connection(node)
+        assert_none(session, "SELECT * FROM system.size_estimates WHERE keyspace_name='system_auth' AND table_name='bad_table'")
+        assert_none(session, "SELECT * FROM system.size_estimates WHERE keyspace_name='bad_keyspace'")
+
 
     def prepare(self):
         cluster = self.cluster
