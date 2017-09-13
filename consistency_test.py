@@ -10,7 +10,8 @@ from cassandra.query import SimpleStatement
 from nose.plugins.attrib import attr
 from nose.tools import assert_greater_equal
 
-from tools.assertions import assert_length_equal, assert_none, assert_unavailable
+from tools.assertions import (assert_all, assert_length_equal, assert_none,
+                              assert_unavailable)
 from dtest import DISABLE_VNODES, MultiError, Tester, debug, create_ks, create_cf
 from tools.data import (create_c1c2_table, insert_c1c2, insert_columns,
                         query_c1c2, rows_to_list)
@@ -824,6 +825,73 @@ class TestConsistency(Tester):
                                consistency_level = ConsistencyLevel.ALL)
         result = list(session.execute(stmt))
         assert_length_equal(result, 5)
+
+    @since('3.0')
+    def test_12872(self):
+        """
+        @jira_ticket CASSANDRA-12872
+        """
+        cluster = self.cluster
+
+        # disable hinted handoff and set batch commit log so this doesn't interfere with the test
+        cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
+        cluster.set_batch_commitlog(enabled=True)
+
+        cluster.populate(2).start(wait_other_notice=True)
+        node1, node2 = cluster.nodelist()
+
+        session = self.patient_cql_connection(node1)
+
+        query = "CREATE KEYSPACE IF NOT EXISTS test WITH replication = {'class': 'NetworkTopologyStrategy', 'datacenter1': 2};"
+        session.execute(query)
+
+        query = "CREATE TABLE test.test (pk int, ck int, PRIMARY KEY (pk, ck));"
+        session.execute(query)
+
+        stmt = session.prepare("INSERT INTO test.test (pk, ck) VALUES (0, ?);")
+        for ck in range(0, 4):
+            session.execute(stmt, [ck], ConsistencyLevel.ALL)
+
+        # node1 |   up | 0 1 2 3
+        # node2 |   up | 0 1 2 3
+
+        node2.stop(wait_other_notice=True)
+
+        # node1 |   up | 0 1 2 3
+        # node2 | down | 0 1 2 3
+
+        session.execute('DELETE FROM test.test WHERE pk = 0 AND ck IN (1, 2, 3);')
+
+        # node1 |   up | 0 x x x
+        # node2 | down | 0 1 2 3
+
+        session.execute('INSERT INTO test.test (pk, ck) VALUES (0, 5);')
+
+        # node1 |   up | 0 x x x   5
+        # node2 | down | 0 1 2 3
+
+        node2.start(wait_other_notice=True)
+        node1.stop(wait_other_notice=True)
+
+        # node1 | down | 0 x x x   5
+        # node2 |   up | 0 1 2 3
+
+        session = self.patient_cql_connection(node2)
+
+        session.execute('INSERT INTO test.test (pk, ck) VALUES (0, 4);')
+
+        # node1 | down | 0 x x x   5
+        # node2 |   up | 0 1 2 3 4
+
+        node1.start(wait_other_notice=True)
+
+        # node1 |   up | 0 x x x   5
+        # node2 |   up | 0 1 2 3 4
+
+        assert_all(session,
+                   'SELECT ck FROM test.test WHERE pk = 0 LIMIT 2;',
+                   [[0], [4]],
+                   cl = ConsistencyLevel.ALL)
 
     def short_read_test(self):
         """
