@@ -2033,6 +2033,7 @@ class CqlLoginTest(Tester):
         self.assertEqual([x for x in cqlsh_stdout.split() if x], ['ks1table'])
         self.assert_login_not_allowed('user1', cqlsh_stderr)
 
+    @since('2.2')
     def test_list_roles_after_login(self):
         """
         @jira_ticket CASSANDRA-13640
