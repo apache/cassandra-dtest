@@ -1183,9 +1183,9 @@ class TestMaterializedViews(Tester):
         self.update_view(session, query, flush)
 
         debug('Starting node2')
-        node2.start(wait_other_notice=True)
+        node2.start(wait_other_notice=True, wait_for_binary_proto=True)
         debug('Starting node3')
-        node3.start(wait_other_notice=True)
+        node3.start(wait_other_notice=True, wait_for_binary_proto=True)
 
         # For k = 1 & a = 1, We should get a digest mismatch of tombstones and repaired
         query = SimpleStatement("SELECT * FROM mv WHERE k = 1 AND a = 1", consistency_level=ConsistencyLevel.ALL)
