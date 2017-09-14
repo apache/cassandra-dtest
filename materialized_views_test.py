@@ -1224,11 +1224,11 @@ class TestMaterializedViews(Tester):
         self.check_trace_events(result.get_query_trace(), False)
         self.assertEqual(0, len(result.current_rows))
 
-    @since('4.0')
+    @since('3.0')
     def test_base_column_in_view_pk_commutative_tombstone_with_flush(self):
         self._test_base_column_in_view_pk_commutative_tombstone_(flush=True)
 
-    @since('4.0')
+    @since('3.0')
     def test_base_column_in_view_pk_commutative_tombstone_without_flush(self):
         self._test_base_column_in_view_pk_commutative_tombstone_(flush=False)
 
@@ -1273,10 +1273,7 @@ class TestMaterializedViews(Tester):
         assert_one(session, "SELECT * FROM t", [1, 1, None, None])  # data deleted by row-tombstone@2 should not resurrect
 
         if flush:
-            for node in self.cluster.nodelist():
-                sstable_files = ' '.join(node.get_sstable_data_files('ks', 't_by_v'))
-                debug('Compacting {}'.format(sstable_files))
-                node.nodetool('compact --user-defined {}'.format(sstable_files))
+            self.cluster.compact()
             assert_one(session, "SELECT * FROM t_by_v", [1, 1, None, None])
             assert_one(session, "SELECT * FROM t", [1, 1, None, None])  # data deleted by row-tombstone@2 should not resurrect
 
