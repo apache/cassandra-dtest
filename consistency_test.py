@@ -774,6 +774,41 @@ class TestAccuracy(TestHelper):
 class TestConsistency(Tester):
 
     @since('3.0')
+    def test_13880(self):
+        """
+        @jira_ticket CASSANDRA-13880
+        """
+        cluster = self.cluster
+
+        # disable hinted handoff and set batch commit log so this doesn't interfere with the test
+        cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
+        cluster.set_batch_commitlog(enabled=True)
+
+        cluster.populate(2).start(wait_other_notice=True)
+        node1, node2 = cluster.nodelist()
+
+        session = self.patient_cql_connection(node1)
+
+        query = "CREATE KEYSPACE IF NOT EXISTS test WITH replication = {'class': 'NetworkTopologyStrategy', 'datacenter1': 2};"
+        session.execute(query)
+
+        query = "CREATE TABLE IF NOT EXISTS test.test (id int PRIMARY KEY);"
+        session.execute(query)
+
+        stmt = SimpleStatement("INSERT INTO test.test (id) VALUES (0);",
+                               consistency_level = ConsistencyLevel.ALL)
+        session.execute(stmt)
+
+        # with node2 down and hints disabled, delete the partition on node1
+        node2.stop(wait_other_notice=True)
+        session.execute("DELETE FROM test.test WHERE id = 0;");
+        node2.start(wait_other_notice=True)
+
+        # with both nodes up, do a CL.ALL query with per partition limit of 1;
+        # prior to CASSANDRA-13880 this would cause short read protection to loop forever
+        assert_none(session, "SELECT DISTINCT id FROM test.test WHERE id = 0;", cl=ConsistencyLevel.ALL)
+
+    @since('3.0')
     def test_13747(self):
         """
         @jira_ticket CASSANDRA-13747
