@@ -1225,6 +1225,62 @@ class TestMaterializedViews(Tester):
         self.assertEqual(0, len(result.current_rows))
 
     @since('3.0')
+    def test_expired_liveness_with_limit_rf1_nodes1(self):
+        self._test_expired_liveness_with_limit(rf=1, nodes=1)
+
+    @since('3.0')
+    def test_expired_liveness_with_limit_rf1_nodes3(self):
+        self._test_expired_liveness_with_limit(rf=1, nodes=3)
+
+    @since('3.0')
+    def test_expired_liveness_with_limit_rf3(self):
+        self._test_expired_liveness_with_limit(rf=3, nodes=3)
+
+    def _test_expired_liveness_with_limit(self, rf, nodes):
+        """
+        Test MV with expired liveness limit is properly handled
+
+        @jira_ticket CASSANDRA-13883
+        """
+        session = self.prepare(rf=rf, nodes=nodes, options={'hinted_handoff_enabled': False}, consistency_level=ConsistencyLevel.QUORUM)
+        node1 = self.cluster.nodelist()[0]
+
+        session.execute('USE ks')
+        session.execute("CREATE TABLE t (k int PRIMARY KEY, a int, b int)")
+        session.execute(("CREATE MATERIALIZED VIEW mv AS SELECT * FROM t "
+                         "WHERE k IS NOT NULL AND a IS NOT NULL PRIMARY KEY (k, a)"))
+        session.cluster.control_connection.wait_for_schema_agreement()
+
+        for k in xrange(100):
+            session.execute("INSERT INTO t (k, a, b) VALUES ({}, {}, {})".format(k, k, k))
+
+        # generate view row with expired liveness except for row 50 and 99
+        for k in xrange(100):
+            if k == 50 or k == 99:
+                continue
+            session.execute("DELETE a FROM t where k = {};".format(k))
+
+        # there should be 2 live data
+        assert_one(session, "SELECT k,a,b FROM mv limit 1", [50, 50, 50])
+        assert_all(session, "SELECT k,a,b FROM mv limit 2", [[50, 50, 50], [99, 99, 99]])
+        assert_all(session, "SELECT k,a,b FROM mv", [[50, 50, 50], [99, 99, 99]])
+
+        # verify IN
+        keys = xrange(100)
+        assert_one(session, "SELECT k,a,b FROM mv WHERE k in ({}) limit 1".format(', '.join(str(x) for x in keys)),
+                   [50, 50, 50])
+        assert_all(session, "SELECT k,a,b FROM mv WHERE k in ({}) limit 2".format(', '.join(str(x) for x in keys)),
+                   [[50, 50, 50], [99, 99, 99]])
+        assert_all(session, "SELECT k,a,b FROM mv WHERE k in ({})".format(', '.join(str(x) for x in keys)),
+                   [[50, 50, 50], [99, 99, 99]])
+
+        # verify fetch size
+        session.default_fetch_size = 1
+        assert_one(session, "SELECT k,a,b FROM mv limit 1", [50, 50, 50])
+        assert_all(session, "SELECT k,a,b FROM mv limit 2", [[50, 50, 50], [99, 99, 99]])
+        assert_all(session, "SELECT k,a,b FROM mv", [[50, 50, 50], [99, 99, 99]])
+
+    @since('3.0')
     def test_base_column_in_view_pk_commutative_tombstone_with_flush(self):
         self._test_base_column_in_view_pk_commutative_tombstone_(flush=True)
 
