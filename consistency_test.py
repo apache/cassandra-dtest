@@ -16,6 +16,7 @@ from dtest import DISABLE_VNODES, MultiError, Tester, debug, create_ks, create_c
 from tools.data import (create_c1c2_table, insert_c1c2, insert_columns,
                         query_c1c2, rows_to_list)
 from tools.decorators import since
+from tools.jmxutils import JolokiaAgent, make_mbean, remove_perf_disable_shared_mem
 
 ExpectedConsistency = namedtuple('ExpectedConsistency', ('num_write_nodes', 'num_read_nodes', 'is_strong'))
 
@@ -909,6 +910,75 @@ class TestConsistency(Tester):
                                consistency_level = ConsistencyLevel.ALL)
         result = list(session.execute(stmt))
         assert_length_equal(result, 5)
+
+    @since('3.0')
+    def test_13595(self):
+        """
+        @jira_ticket CASSANDRA-13595
+        """
+        cluster = self.cluster
+
+        # disable hinted handoff and set batch commit log so this doesn't interfere with the test
+        cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
+        cluster.set_batch_commitlog(enabled=True)
+
+        cluster.populate(2)
+        node1, node2 = cluster.nodelist()
+        remove_perf_disable_shared_mem(node1) # necessary for jmx
+        cluster.start(wait_other_notice=True)
+
+        session = self.patient_cql_connection(node1)
+
+        query = "CREATE KEYSPACE IF NOT EXISTS test WITH replication = {'class': 'NetworkTopologyStrategy', 'datacenter1': 2};"
+        session.execute(query)
+
+        query = 'CREATE TABLE IF NOT EXISTS test.test (id int PRIMARY KEY);'
+        session.execute(query)
+
+        # populate the table with 10 partitions,
+        # then delete a bunch of them on different nodes
+        # until we get the following pattern:
+
+        #                token | k | 1 | 2 |
+        # -7509452495886106294 | 5 | n | y |
+        # -4069959284402364209 | 1 | y | n |
+        # -3799847372828181882 | 8 | n | y |
+        # -3485513579396041028 | 0 | y | n |
+        # -3248873570005575792 | 2 | n | y |
+        # -2729420104000364805 | 4 | y | n |
+        #  1634052884888577606 | 7 | n | y |
+        #  2705480034054113608 | 6 | y | n |
+        #  3728482343045213994 | 9 | n | y |
+        #  9010454139840013625 | 3 | y | y |
+
+        stmt = session.prepare('INSERT INTO test.test (id) VALUES (?);')
+        for id in range(0, 10):
+            session.execute(stmt, [id], ConsistencyLevel.ALL)
+
+        # delete every other partition on node1 while node2 is down
+        node2.stop(wait_other_notice=True)
+        session.execute('DELETE FROM test.test WHERE id IN (5, 8, 2, 7, 9);')
+        node2.start(wait_other_notice=True, wait_for_binary_proto=True)
+
+        session = self.patient_cql_connection(node2)
+
+        # delete every other alternate partition on node2 while node1 is down
+        node1.stop(wait_other_notice=True)
+        session.execute('DELETE FROM test.test WHERE id IN (1, 0, 4, 6);')
+        node1.start(wait_other_notice=True, wait_for_binary_proto=True)
+
+        session = self.patient_exclusive_cql_connection(node1)
+
+        # until #13595 the query would incorrectly return [1]
+        assert_all(session,
+                   'SELECT id FROM test.test LIMIT 1;',
+                   [[3]],
+                   cl = ConsistencyLevel.ALL)
+
+        srp = make_mbean('metrics', type='Table', name='ShortReadProtectionRequests', keyspace='test', scope='test')
+        with JolokiaAgent(node1) as jmx:
+            # 4 srp requests for node1 and 5 for node2, total of 9
+            self.assertEqual(9, jmx.read_attribute(srp, 'Count'))
 
     @since('3.0')
     def test_12872(self):
