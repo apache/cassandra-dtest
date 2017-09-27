@@ -774,6 +774,55 @@ class TestAccuracy(TestHelper):
 class TestConsistency(Tester):
 
     @since('3.0')
+    def test_13911(self):
+        """
+        @jira_ticket CASSANDRA-13911
+        """
+        cluster = self.cluster
+
+        # disable hinted handoff and set batch commit log so this doesn't interfere with the test
+        cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
+        cluster.set_batch_commitlog(enabled=True)
+
+        cluster.populate(2).start(wait_other_notice=True)
+        node1, node2 = cluster.nodelist()
+
+        session = self.patient_cql_connection(node1)
+
+        query = "CREATE KEYSPACE test WITH replication = {'class': 'NetworkTopologyStrategy', 'datacenter1': 2};"
+        session.execute(query)
+
+        query = 'CREATE TABLE test.test (pk int, ck int, PRIMARY KEY (pk, ck));'
+        session.execute(query)
+
+        # with node2 down, insert row 0 on node1
+        #
+        # node1, partition 0 | 0
+        # node2, partition 0 |
+
+        node2.stop(wait_other_notice=True)
+        session.execute('INSERT INTO test.test (pk, ck) VALUES (0, 0);')
+        node2.start(wait_other_notice=True, wait_for_binary_proto=True)
+
+        # with node1 down, delete row 1 and 2 on node2
+        #
+        # node1, partition 0 | 0
+        # node2, partition 0 |   x x
+
+        session = self.patient_cql_connection(node2)
+
+        node1.stop(wait_other_notice=True)
+        session.execute('DELETE FROM test.test WHERE pk = 0 AND ck IN (1, 2);')
+        node1.start(wait_other_notice=True, wait_for_binary_proto=True)
+
+        # with both nodes up, do a CL.ALL query with per partition limit of 1;
+        # prior to CASSANDRA-13911 this would trigger an IllegalStateException
+        assert_all(session,
+                   'SELECT DISTINCT pk FROM test.test;',
+                   [[0]],
+                   cl=ConsistencyLevel.ALL)
+
+    @since('3.0')
     def test_13880(self):
         """
         @jira_ticket CASSANDRA-13880
