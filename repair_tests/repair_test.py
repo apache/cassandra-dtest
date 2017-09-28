@@ -1,3 +1,5 @@
+import os
+import os.path
 import threading
 import time
 import re
@@ -1060,6 +1062,24 @@ class TestRepair(BaseRepairTest):
         node3.stop(wait_other_notice=True)
         _, _, rc = node2.stress(['read', 'n=1M', 'no-warmup', '-rate', 'threads=30'], whitelist=True)
         self.assertEqual(rc, 0)
+
+    @since('4.0')
+    def test_wide_row_repair(self):
+        """
+        @jira_ticket CASSANDRA-13899
+        Make sure compressed vs uncompressed blocks are handled correctly when stream decompressing
+        """
+        cluster = self.cluster
+        cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
+        cluster.populate(2).start(wait_for_binary_proto=True)
+        node1, node2 = cluster.nodelist()
+        node2.stop(wait_other_notice=True)
+        profile_path = os.path.join(os.getcwd(), 'stress_profiles/repair_wide_rows.yaml')
+        print("yaml = " + profile_path)
+        node1.stress(['user', 'profile=' + profile_path, 'n=50', 'ops(insert=1)', 'no-warmup', '-rate', 'threads=8',
+                      '-insert', 'visits=FIXED(100K)', 'revisit=FIXED(100K)'])
+        node2.start(wait_for_binary_proto=True)
+        node2.repair()
 
     def test_dead_coordinator(self):
         """
