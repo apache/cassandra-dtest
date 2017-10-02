@@ -823,6 +823,133 @@ class TestConsistency(Tester):
                    [[0]],
                    cl=ConsistencyLevel.ALL)
 
+    @since('3.11')
+    def test_13911_rows_srp(self):
+        """
+        @jira_ticket CASSANDRA-13911
+
+        A regression test to prove that we can no longer rely on
+        !singleResultCounter.isDoneForPartition() to abort single
+        partition SRP early if a per partition limit is set.
+        """
+        cluster = self.cluster
+
+        # disable hinted handoff and set batch commit log so this doesn't interfere with the test
+        cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
+        cluster.set_batch_commitlog(enabled=True)
+
+        cluster.populate(2).start(wait_other_notice=True)
+        node1, node2 = cluster.nodelist()
+
+        session = self.patient_cql_connection(node1)
+
+        query = "CREATE KEYSPACE test WITH replication = {'class': 'NetworkTopologyStrategy', 'datacenter1': 2};"
+        session.execute(query)
+
+        query = 'CREATE TABLE test.test (pk int, ck int, PRIMARY KEY (pk, ck));'
+        session.execute(query)
+
+        # with node2 down
+        #
+        # node1, partition 0 | 0 1 - -
+        # node1, partition 2 | 0 x - -
+
+        node2.stop(wait_other_notice=True)
+        session.execute('INSERT INTO test.test (pk, ck) VALUES (0, 0) USING TIMESTAMP 42;')
+        session.execute('INSERT INTO test.test (pk, ck) VALUES (0, 1) USING TIMESTAMP 42;')
+        session.execute('INSERT INTO test.test (pk, ck) VALUES (2, 0) USING TIMESTAMP 42;')
+        session.execute('DELETE FROM test.test USING TIMESTAMP 42 WHERE pk = 2 AND ck = 1;')
+        node2.start(wait_other_notice=True, wait_for_binary_proto=True)
+
+        # with node1 down
+        #
+        # node2, partition 0 | - - 2 3
+        # node2, partition 2 | x 1 2 -
+
+        session = self.patient_cql_connection(node2)
+
+        node1.stop(wait_other_notice=True)
+        session.execute('INSERT INTO test.test (pk, ck) VALUES (0, 2) USING TIMESTAMP 42;')
+        session.execute('INSERT INTO test.test (pk, ck) VALUES (0, 3) USING TIMESTAMP 42;')
+        session.execute('DELETE FROM test.test USING TIMESTAMP 42 WHERE pk = 2 AND ck = 0;')
+        session.execute('INSERT INTO test.test (pk, ck) VALUES (2, 1) USING TIMESTAMP 42;')
+        session.execute('INSERT INTO test.test (pk, ck) VALUES (2, 2) USING TIMESTAMP 42;')
+        node1.start(wait_other_notice=True, wait_for_binary_proto=True)
+
+        # with both nodes up, do a CL.ALL query with per partition limit of 2 and limit of 3;
+        # without the change to if (!singleResultCounter.isDoneForPartition()) branch,
+        # the query would skip SRP on node2, partition 2, and incorrectly return just
+        # [[0, 0], [0, 1]]
+        assert_all(session,
+                   'SELECT pk, ck FROM test.test PER PARTITION LIMIT 2 LIMIT 3;',
+                   [[0, 0], [0, 1],
+                    [2, 2]],
+                   cl=ConsistencyLevel.ALL)
+
+    @since('3.11')
+    def test_13911_partitions_srp(self):
+        """
+        @jira_ticket CASSANDRA-13911
+
+        A regression test to prove that we can't rely on
+        !singleResultCounter.isDone() to abort ranged
+        partition SRP early if a per partition limit is set.
+        """
+        cluster = self.cluster
+
+        # disable hinted handoff and set batch commit log so this doesn't interfere with the test
+        cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
+        cluster.set_batch_commitlog(enabled=True)
+
+        cluster.populate(2).start(wait_other_notice=True)
+        node1, node2 = cluster.nodelist()
+
+        session = self.patient_cql_connection(node1)
+
+        query = "CREATE KEYSPACE test WITH replication = {'class': 'NetworkTopologyStrategy', 'datacenter1': 2};"
+        session.execute(query)
+
+        query = 'CREATE TABLE test.test (pk int, ck int, PRIMARY KEY (pk, ck));'
+        session.execute(query)
+
+        # with node2 down
+        #
+        # node1, partition 0 | 0 1 - -
+        # node1, partition 2 | x x - -
+
+        node2.stop(wait_other_notice=True)
+        session.execute('INSERT INTO test.test (pk, ck) VALUES (0, 0) USING TIMESTAMP 42;')
+        session.execute('INSERT INTO test.test (pk, ck) VALUES (0, 1) USING TIMESTAMP 42;')
+        session.execute('DELETE FROM test.test USING TIMESTAMP 42 WHERE pk = 2 AND ck IN  (0, 1);')
+        node2.start(wait_other_notice=True, wait_for_binary_proto=True)
+
+        # with node1 down
+        #
+        # node2, partition 0 | - - 2 3
+        # node2, partition 2 | 0 1 - -
+        # node2, partition 4 | 0 1 - -
+
+        session = self.patient_cql_connection(node2)
+
+        node1.stop(wait_other_notice=True)
+        session.execute('INSERT INTO test.test (pk, ck) VALUES (0, 2) USING TIMESTAMP 42;')
+        session.execute('INSERT INTO test.test (pk, ck) VALUES (0, 3) USING TIMESTAMP 42;')
+        session.execute('INSERT INTO test.test (pk, ck) VALUES (2, 0) USING TIMESTAMP 42;')
+        session.execute('INSERT INTO test.test (pk, ck) VALUES (2, 1) USING TIMESTAMP 42;')
+        session.execute('INSERT INTO test.test (pk, ck) VALUES (4, 0) USING TIMESTAMP 42;')
+        session.execute('INSERT INTO test.test (pk, ck) VALUES (4, 1) USING TIMESTAMP 42;')
+        node1.start(wait_other_notice=True, wait_for_binary_proto=True)
+
+        # with both nodes up, do a CL.ALL query with per partition limit of 2 and limit of 4;
+        # without the extra condition in if (!singleResultCounter.isDone()) branch,
+        # the query would skip partitions SRP on node2 at the end of partition 2,
+        # and incorrectly return just [[0, 0], [0, 1]]
+        assert_all(session,
+                   'SELECT pk, ck FROM test.test PER PARTITION LIMIT 2 LIMIT 4;',
+                   [[0, 0], [0, 1],
+                    [4, 0], [4, 1]],
+                   cl=ConsistencyLevel.ALL)
+
     @since('3.0')
     def test_13880(self):
         """
