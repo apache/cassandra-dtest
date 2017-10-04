@@ -1,9 +1,11 @@
 import os
-
+from cassandra import ConsistencyLevel
+from cassandra.query import SimpleStatement
 from ccmlib.node import ToolError
 
-from dtest import Tester, debug
+from dtest import Tester, debug, create_ks
 from tools.decorators import since
+from tools.assertions import assert_none
 
 
 class TestNodetool(Tester):
@@ -94,6 +96,72 @@ class TestNodetool(Tester):
             self.assertEqual(0, len(err), err)
             debug(out)
             self.assertRegexpMatches(out, r'.* 123 ms')
+
+    @since('2.2')
+    def test_cleanup_when_no_replica_with_index(self):
+        self._cleanup_when_no_replica(True)
+
+    @since('2.2')
+    def test_cleanup_when_no_replica_without_index(self):
+        self._cleanup_when_no_replica(False)
+
+    def _cleanup_when_no_replica(self, with_index=False):
+        """
+        @jira_ticket CASSANDRA-13526
+        Test nodetool cleanup KS to remove old data when new replicas in current node instead of directly returning success.
+        """
+        self.cluster.populate([1, 1]).start(wait_for_binary_proto=True, wait_other_notice=True)
+
+        node_dc1 = self.cluster.nodelist()[0]
+        node_dc2 = self.cluster.nodelist()[1]
+
+        # init schema with rf on both data centers
+        replication_factor = {'dc1': 1, 'dc2': 1}
+        session = self.patient_exclusive_cql_connection(node_dc1, consistency_level=ConsistencyLevel.ALL)
+        session_dc2 = self.patient_exclusive_cql_connection(node_dc2, consistency_level=ConsistencyLevel.LOCAL_ONE)
+        create_ks(session, 'ks', replication_factor)
+        session.execute('CREATE TABLE ks.cf (id int PRIMARY KEY, value text) with dclocal_read_repair_chance = 0 AND read_repair_chance = 0;', trace=False)
+        if with_index:
+            session.execute('CREATE INDEX value_by_key on ks.cf(value)', trace=False)
+
+        # populate data
+        for i in range(0, 100):
+            session.execute(SimpleStatement("INSERT INTO ks.cf(id, value) VALUES({}, 'value');".format(i), consistency_level=ConsistencyLevel.ALL))
+
+        # generate sstable
+        self.cluster.flush()
+
+        for node in self.cluster.nodelist():
+            self.assertNotEqual(0, len(node.get_sstables('ks', 'cf')))
+        if with_index:
+            self.assertEqual(len(list(session_dc2.execute("SELECT * FROM ks.cf WHERE value = 'value'"))), 100)
+
+        # alter rf to only dc1
+        session.execute("ALTER KEYSPACE ks WITH REPLICATION = {'class' : 'NetworkTopologyStrategy', 'dc1' : 1, 'dc2' : 0};")
+
+        # nodetool cleanup on dc2
+        node_dc2.nodetool("cleanup ks cf")
+        node_dc2.nodetool("compact ks cf")
+
+        # check local data on dc2
+        for node in self.cluster.nodelist():
+            if node.data_center == 'dc2':
+                self.assertEqual(0, len(node.get_sstables('ks', 'cf')))
+            else:
+                self.assertNotEqual(0, len(node.get_sstables('ks', 'cf')))
+
+        # dc1 data remains
+        statement = SimpleStatement("SELECT * FROM ks.cf", consistency_level=ConsistencyLevel.LOCAL_ONE)
+        self.assertEqual(len(list(session.execute(statement))), 100)
+        if with_index:
+            statement = SimpleStatement("SELECT * FROM ks.cf WHERE value = 'value'", consistency_level=ConsistencyLevel.LOCAL_ONE)
+            self.assertEqual(len(list(session.execute(statement))), 100)
+
+        # alter rf back to query dc2, no data, no index
+        session.execute("ALTER KEYSPACE ks WITH REPLICATION = {'class' : 'NetworkTopologyStrategy', 'dc1' : 0, 'dc2' : 1};")
+        assert_none(session_dc2, "SELECT * FROM ks.cf")
+        if with_index:
+            assert_none(session_dc2, "SELECT * FROM ks.cf WHERE value = 'value'")
 
     def test_meaningless_notice_in_status(self):
         """
