@@ -1,10 +1,10 @@
 import os
 
 from ccmlib.node import ToolError
-
 from dtest import Tester, debug
+from tools.assertions import assert_all, assert_invalid
 from tools.decorators import since
-
+from tools.jmxutils import JolokiaAgent, make_mbean, remove_perf_disable_shared_mem
 
 class TestNodetool(Tester):
 
@@ -160,3 +160,60 @@ class TestNodetool(Tester):
         self.assertTrue(len(node.grep_log('Updating batchlog replay throttle to 2048 KB/s, 1024 KB/s per endpoint',
                                           filename='debug.log')) > 0)
         self.assertTrue('Batchlog replay throttle: 2048 KB/s' in node.nodetool('getbatchlogreplaythrottle').stdout)
+
+    @since('3.0')
+    def test_reloadlocalschema(self):
+        """
+        @jira_ticket CASSANDRA-13954
+
+        Test that `nodetool reloadlocalschema` works as intended
+        """
+        cluster = self.cluster
+        cluster.populate(1)
+        node = cluster.nodelist()[0]
+        remove_perf_disable_shared_mem(node) # for jmx
+        cluster.start()
+
+        session = self.patient_cql_connection(node)
+
+        query = "CREATE KEYSPACE IF NOT EXISTS test WITH replication = {'class': 'NetworkTopologyStrategy', 'datacenter1': 2};"
+        session.execute(query)
+
+        query = 'CREATE TABLE test.test (pk int, ck int, PRIMARY KEY (pk, ck));'
+        session.execute(query)
+
+        ss = make_mbean('db', type='StorageService')
+
+        schema_version = ''
+
+        # get initial schema version
+        with JolokiaAgent(node) as jmx:
+            schema_version = jmx.read_attribute(ss, 'SchemaVersion')
+
+        # manually add a regular column 'val' to test.test
+        query = """
+            INSERT INTO system_schema.columns
+                (keyspace_name, table_name, column_name, clustering_order,
+                 column_name_bytes, kind, position, type)
+            VALUES
+                ('test', 'test', 'val', 'none',
+                 0x76616c, 'regular', -1, 'int');"""
+        session.execute(query)
+
+        # validate that schema version wasn't automatically updated
+        with JolokiaAgent(node) as jmx:
+            self.assertEqual(schema_version, jmx.read_attribute(ss, 'SchemaVersion'))
+
+        # make sure the new column wasn't automagically picked up
+        assert_invalid(session, 'INSERT INTO test.test (pk, ck, val) VALUES (0, 1, 2);')
+
+        # force the node to reload schema from disk
+        node.nodetool('reloadlocalschema')
+
+        # validate that schema version changed
+        with JolokiaAgent(node) as jmx:
+            self.assertNotEqual(schema_version, jmx.read_attribute(ss, 'SchemaVersion'))
+
+        # try an insert with the new column again and validate it succeeds this time
+        session.execute('INSERT INTO test.test (pk, ck, val) VALUES (0, 1, 2);')
+        assert_all(session, 'SELECT pk, ck, val FROM test.test;', [[0, 1, 2]])
