@@ -243,6 +243,18 @@ class JolokiaAgent(object):
             raise Exception("Jolokia agent returned non-200 status: %s" % (response,))
         return response
 
+    def has_mbean(self, mbean, verbose=True):
+        """
+        Check for the existence of an MBean
+
+        `mbean` should be the full name of an mbean.  See the mbean() utility
+        function for an easy way to create this.
+        """
+        body = {'type': 'search',
+                'mbean': mbean}
+        response = self._query(body, verbose=verbose)
+        return len(response['value']) > 0
+
     def read_attribute(self, mbean, attribute, path=None, verbose=True):
         """
         Reads a single JMX attribute.
