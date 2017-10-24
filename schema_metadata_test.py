@@ -655,10 +655,12 @@ class TestSchemaMetadata(Tester):
         establish_clustering_order_table(self.cluster.version(), self.session)
         verify_clustering_order_table(self.cluster.version(), self.cluster.version(), 'ks', self.session)
 
+    @since("2.0", max_version="3.X")  # Compact Storage
     def compact_storage_test(self):
         establish_compact_storage_table(self.cluster.version(), self.session)
         verify_compact_storage_table(self.cluster.version(), self.cluster.version(), 'ks', self.session)
 
+    @since("2.0", max_version="3.X")  # Compact Storage
     def compact_storage_composite_test(self):
         establish_compact_storage_composite_table(self.cluster.version(), self.session)
         verify_compact_storage_composite_table(self.cluster.version(), self.cluster.version(), 'ks', self.session)

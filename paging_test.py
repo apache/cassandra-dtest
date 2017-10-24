@@ -8,7 +8,7 @@ from cassandra.policies import FallthroughRetryPolicy
 from cassandra.query import (SimpleStatement, dict_factory,
                              named_tuple_factory, tuple_factory)
 
-from dtest import Tester, debug, run_scenarios, create_ks
+from dtest import Tester, debug, run_scenarios, create_ks, supports_v5_protocol
 from tools.assertions import (assert_all, assert_invalid, assert_length_equal,
                               assert_one)
 from tools.data import rows_to_list
@@ -20,8 +20,8 @@ from tools.paging import PageAssertionMixin, PageFetcher
 class BasePagingTester(Tester):
 
     def prepare(self, row_factory=dict_factory):
-        supports_v5_protocol = self.cluster.version() >= LooseVersion('3.10')
-        protocol_version = 5 if supports_v5_protocol else None
+        supports_v5 = supports_v5_protocol(self.cluster.version())
+        protocol_version = 5 if supports_v5 else None
         cluster = self.cluster
         cluster.populate(3).start(wait_for_binary_proto=True)
         node1 = cluster.nodelist()[0]
@@ -1920,8 +1920,17 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         """
 
         session = self.prepare(row_factory=tuple_factory)
-
         self._test_paging_with_filtering_on_counter_columns(session, False)
+
+    @since("3.6", max_version="3.X")  # Compact Storage
+    def test_paging_with_filtering_on_counter_columns_compact(self):
+        """
+        test paging, when filtering on counter columns with compact storage
+        @jira_ticket CASSANDRA-11629
+        """
+
+        session = self.prepare(row_factory=tuple_factory)
+
         self._test_paging_with_filtering_on_counter_columns(session, True)
 
     def _test_paging_with_filtering_on_clustering_columns(self, session, with_compact_storage):
@@ -2004,6 +2013,15 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
         session = self.prepare(row_factory=tuple_factory)
         self._test_paging_with_filtering_on_clustering_columns(session, False)
+
+    @since('3.6', max_version="3.X")  # Compact Storage
+    def test_paging_with_filtering_on_clustering_columns_compact(self):
+        """
+        test paging, when filtering on clustering columns with compact storage
+        @jira_ticket CASSANDRA-11310
+        """
+
+        session = self.prepare(row_factory=tuple_factory)
         self._test_paging_with_filtering_on_clustering_columns(session, True)
 
     @since('3.6')
@@ -2307,6 +2325,16 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         session = self.prepare(row_factory=tuple_factory)
 
         self._test_paging_with_filtering_on_partition_key_on_counter_columns(session, False)
+
+    @since('3.10', max_version="3.X")  # Compact Storage
+    def test_paging_with_filtering_on_partition_key_on_counter_columns_compact(self):
+        """
+        test paging, when filtering on partition key on counter columns with compact storage
+        @jira_ticket CASSANDRA-11031
+        """
+
+        session = self.prepare(row_factory=tuple_factory)
+
         self._test_paging_with_filtering_on_partition_key_on_counter_columns(session, True)
 
     def _test_paging_with_filtering_on_partition_key_on_clustering_columns(self, session, with_compact_storage):
@@ -2401,6 +2429,15 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
         session = self.prepare(row_factory=tuple_factory)
         self._test_paging_with_filtering_on_partition_key_on_clustering_columns(session, False)
+
+    @since('3.10', max_version="3.X")
+    def test_paging_with_filtering_on_partition_key_on_clustering_columns_compact(self):
+        """
+        test paging, when filtering on partition key clustering columns with compact storage
+        @jira_ticket CASSANDRA-11031
+        """
+
+        session = self.prepare(row_factory=tuple_factory)
         self._test_paging_with_filtering_on_partition_key_on_clustering_columns(session, True)
 
     @since('3.10')
@@ -2518,7 +2555,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
             assert_invalid(session, "SELECT * FROM test WHERE s > 1 AND a < 2 AND b > 4 ORDER BY b DESC ALLOW FILTERING", expected=InvalidRequest)
 
-    @since('2.1.14')
+    @since('2.1.14', max_version="3.X")  # Compact Storage
     def test_paging_on_compact_table_with_tombstone_on_first_column(self):
         """
         test paging, on  COMPACT tables without clustering columns, when the first column has a tombstone
@@ -2551,61 +2588,72 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         session = self.prepare(row_factory=tuple_factory)
         create_ks(session, 'test_paging_with_no_clustering_columns', 2)
         session.execute("CREATE TABLE test (a int primary key, b int)")
+        self._test_paging_with_no_clustering_columns('test', session)
+
+    @since("2.0", max_version="3.X")
+    def test_paging_with_no_clustering_columns_compact(self):
+        """
+        test paging for tables without clustering columns
+        @jira_ticket CASSANDRA-11208
+        """
+
+        session = self.prepare(row_factory=tuple_factory)
+        create_ks(session, 'test_paging_with_no_clustering_columns', 2)
         session.execute("CREATE TABLE test_compact (a int primary key, b int) WITH COMPACT STORAGE")
+        self._test_paging_with_no_clustering_columns('test_compact', session)
 
-        for table in ('test', 'test_compact'):
+    def _test_paging_with_no_clustering_columns(self, table, session):
+        for i in xrange(5):
+            session.execute("INSERT INTO {} (a, b) VALUES ({}, {})".format(table, i, i))
 
-            for i in xrange(5):
-                session.execute("INSERT INTO {} (a, b) VALUES ({}, {})".format(table, i, i))
+        for page_size in (2, 3, 4, 5, 7, 10):
+            session.default_fetch_size = page_size
 
-            for page_size in (2, 3, 4, 5, 7, 10):
-                session.default_fetch_size = page_size
+        # Range query
+        assert_all(session, "SELECT * FROM {}".format(table), [[1, 1],
+                                                               [0, 0],
+                                                               [2, 2],
+                                                               [4, 4],
+                                                               [3, 3]])
 
-                # Range query
-                assert_all(session, "SELECT * FROM {}".format(table), [[1, 1],
+        # Range query with LIMIT
+        assert_all(session, "SELECT * FROM {} LIMIT 3".format(table), [[1, 1],
                                                                        [0, 0],
-                                                                       [2, 2],
-                                                                       [4, 4],
-                                                                       [3, 3]])
+                                                                       [2, 2]])
 
-                # Range query with LIMIT
-                assert_all(session, "SELECT * FROM {} LIMIT 3".format(table), [[1, 1],
-                                                                               [0, 0],
-                                                                               [2, 2]])
+        # Range query with DISTINCT
+        assert_all(session, "SELECT DISTINCT a FROM {}".format(table), [[1],
+                                                                        [0],
+                                                                        [2],
+                                                                        [4],
+                                                                        [3]])
 
-                # Range query with DISTINCT
-                assert_all(session, "SELECT DISTINCT a FROM {}".format(table), [[1],
+        # Range query with DISTINCT and LIMIT
+        assert_all(session, "SELECT DISTINCT a FROM {} LIMIT 3".format(table), [[1],
                                                                                 [0],
-                                                                                [2],
-                                                                                [4],
-                                                                                [3]])
+                                                                                [2]])
 
-                # Range query with DISTINCT and LIMIT
-                assert_all(session, "SELECT DISTINCT a FROM {} LIMIT 3".format(table), [[1],
-                                                                                        [0],
-                                                                                        [2]])
+        # Multi-partition query
+        assert_all(session, "SELECT * FROM {} WHERE a IN (1, 2, 3, 4)".format(table), [[1, 1],
+                                                                                       [2, 2],
+                                                                                       [3, 3],
+                                                                                       [4, 4]])
 
-                # Multi-partition query
-                assert_all(session, "SELECT * FROM {} WHERE a IN (1, 2, 3, 4)".format(table), [[1, 1],
+        # Multi-partition query with LIMIT
+        assert_all(session, "SELECT * FROM {} WHERE a IN (1, 2, 3, 4) LIMIT 3".format(table), [[1, 1],
                                                                                                [2, 2],
-                                                                                               [3, 3],
-                                                                                               [4, 4]])
+                                                                                               [3, 3]])
 
-                # Multi-partition query with LIMIT
-                assert_all(session, "SELECT * FROM {} WHERE a IN (1, 2, 3, 4) LIMIT 3".format(table), [[1, 1],
-                                                                                                       [2, 2],
-                                                                                                       [3, 3]])
+        # Multi-partition query with DISTINCT
+        assert_all(session, "SELECT DISTINCT a FROM {} WHERE a IN (1, 2, 3, 4)".format(table), [[1],
+                                                                                                [2],
+                                                                                                [3],
+                                                                                                [4]])
 
-                # Multi-partition query with DISTINCT
-                assert_all(session, "SELECT DISTINCT a FROM {} WHERE a IN (1, 2, 3, 4)".format(table), [[1],
+        # Multi-partition query with DISTINCT and LIMIT
+        assert_all(session, "SELECT DISTINCT a FROM {} WHERE a IN (1, 2, 3, 4) LIMIT 3".format(table), [[1],
                                                                                                         [2],
-                                                                                                        [3],
-                                                                                                        [4]])
-
-                # Multi-partition query with DISTINCT and LIMIT
-                assert_all(session, "SELECT DISTINCT a FROM {} WHERE a IN (1, 2, 3, 4) LIMIT 3".format(table), [[1],
-                                                                                                                [2],
-                                                                                                                [3]])
+                                                                                                        [3]])
 
     @since('3.6')
     def test_per_partition_limit_paging(self):
@@ -2699,49 +2747,62 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         session = self.prepare(row_factory=tuple_factory)
         create_ks(session, 'test_paging_for_range_name_queries', 2)
         session.execute("CREATE TABLE test (a int, b int, c int, d int, PRIMARY KEY(a, b, c))")
+
+        self._test_paging_for_range_name_queries('test', session)
+
+    @since("2.0", max_version="3.X")  # Compact Storage
+    def test_paging_for_range_name_queries_compact(self):
+        """
+        test paging for range name queries with compact storage
+        @jira_ticket CASSANDRA-11669
+        """
+
+        session = self.prepare(row_factory=tuple_factory)
+        create_ks(session, 'test_paging_for_range_name_queries', 2)
         session.execute("CREATE TABLE test_compact (a int, b int, c int, d int, PRIMARY KEY(a, b, c)) WITH COMPACT STORAGE")
 
-        for table in ('test', 'test_compact'):
+        self._test_paging_for_range_name_queries('test_compact', session)
 
-            for i in xrange(4):
-                for j in xrange(4):
-                    for k in xrange(4):
-                        session.execute("INSERT INTO {} (a, b, c, d) VALUES ({}, {}, {}, {})".format(table, i, j, k, i + j))
+    def _test_paging_for_range_name_queries(self, table, session):
+        for i in xrange(4):
+            for j in xrange(4):
+                for k in xrange(4):
+                    session.execute("INSERT INTO {} (a, b, c, d) VALUES ({}, {}, {}, {})".format(table, i, j, k, i + j))
 
-            for page_size in (2, 3, 4, 5, 7, 10):
-                session.default_fetch_size = page_size
+        for page_size in (2, 3, 4, 5, 7, 10):
+            session.default_fetch_size = page_size
 
-                assert_all(session, "SELECT * FROM {} WHERE b = 1 AND c = 1  ALLOW FILTERING".format(table), [[1, 1, 1, 2],
-                                                                                                              [0, 1, 1, 1],
-                                                                                                              [2, 1, 1, 3],
-                                                                                                              [3, 1, 1, 4]])
+            assert_all(session, "SELECT * FROM {} WHERE b = 1 AND c = 1  ALLOW FILTERING".format(table), [[1, 1, 1, 2],
+                                                                                                          [0, 1, 1, 1],
+                                                                                                          [2, 1, 1, 3],
+                                                                                                          [3, 1, 1, 4]])
 
-                assert_all(session, "SELECT * FROM {} WHERE b = 1 AND c IN (1, 2) ALLOW FILTERING".format(table), [[1, 1, 1, 2],
-                                                                                                                   [1, 1, 2, 2],
-                                                                                                                   [0, 1, 1, 1],
-                                                                                                                   [0, 1, 2, 1],
-                                                                                                                   [2, 1, 1, 3],
-                                                                                                                   [2, 1, 2, 3],
-                                                                                                                   [3, 1, 1, 4],
-                                                                                                                   [3, 1, 2, 4]])
+            assert_all(session, "SELECT * FROM {} WHERE b = 1 AND c IN (1, 2) ALLOW FILTERING".format(table), [[1, 1, 1, 2],
+                                                                                                               [1, 1, 2, 2],
+                                                                                                               [0, 1, 1, 1],
+                                                                                                               [0, 1, 2, 1],
+                                                                                                               [2, 1, 1, 3],
+                                                                                                               [2, 1, 2, 3],
+                                                                                                               [3, 1, 1, 4],
+                                                                                                               [3, 1, 2, 4]])
 
-                if self.cluster.version() >= '2.2':
-                    assert_all(session, "SELECT * FROM {} WHERE b IN (1, 2) AND c IN (1, 2)  ALLOW FILTERING".format(table), [[1, 1, 1, 2],
-                                                                                                                              [1, 1, 2, 2],
-                                                                                                                              [1, 2, 1, 3],
-                                                                                                                              [1, 2, 2, 3],
-                                                                                                                              [0, 1, 1, 1],
-                                                                                                                              [0, 1, 2, 1],
-                                                                                                                              [0, 2, 1, 2],
-                                                                                                                              [0, 2, 2, 2],
-                                                                                                                              [2, 1, 1, 3],
-                                                                                                                              [2, 1, 2, 3],
-                                                                                                                              [2, 2, 1, 4],
-                                                                                                                              [2, 2, 2, 4],
-                                                                                                                              [3, 1, 1, 4],
-                                                                                                                              [3, 1, 2, 4],
-                                                                                                                              [3, 2, 1, 5],
-                                                                                                                              [3, 2, 2, 5]])
+            if self.cluster.version() >= '2.2':
+                assert_all(session, "SELECT * FROM {} WHERE b IN (1, 2) AND c IN (1, 2)  ALLOW FILTERING".format(table), [[1, 1, 1, 2],
+                                                                                                                          [1, 1, 2, 2],
+                                                                                                                          [1, 2, 1, 3],
+                                                                                                                          [1, 2, 2, 3],
+                                                                                                                          [0, 1, 1, 1],
+                                                                                                                          [0, 1, 2, 1],
+                                                                                                                          [0, 2, 1, 2],
+                                                                                                                          [0, 2, 2, 2],
+                                                                                                                          [2, 1, 1, 3],
+                                                                                                                          [2, 1, 2, 3],
+                                                                                                                          [2, 2, 1, 4],
+                                                                                                                          [2, 2, 2, 4],
+                                                                                                                          [3, 1, 1, 4],
+                                                                                                                          [3, 1, 2, 4],
+                                                                                                                          [3, 2, 1, 5],
+                                                                                                                          [3, 2, 2, 5]])
 
     @since('2.1')
     def test_paging_with_empty_row_and_empty_static_columns(self):

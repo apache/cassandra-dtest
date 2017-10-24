@@ -334,6 +334,7 @@ class TestCounters(Tester):
 
             self.assertEqual(v, count[0][0])
 
+    @since("2.0", max_version="3.X")
     def validate_empty_column_name_test(self):
         cluster = self.cluster
         cluster.populate(1).start()
@@ -379,6 +380,7 @@ class TestCounters(Tester):
 
         assert_invalid(session, "ALTER TABLE counter_bug add c counter", "Cannot re-add previously dropped counter column c")
 
+    @since("2.0", max_version="3.X") # Compact Storage
     def compact_counter_cluster_test(self):
         """
         @jira_ticket CASSANDRA-12219

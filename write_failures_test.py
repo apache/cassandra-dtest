@@ -3,7 +3,7 @@ import uuid
 from cassandra import ConsistencyLevel, WriteFailure, WriteTimeout
 
 from distutils.version import LooseVersion
-from dtest import Tester
+from dtest import Tester, supports_v5_protocol
 from thrift_bindings.v22 import ttypes as thrift_types
 from thrift_tests import get_thrift_client
 from tools.decorators import since
@@ -32,7 +32,7 @@ class TestWriteFailures(Tester):
             "MigrationStage"           # This occurs sometimes due to node down (because of restart)
         ]
 
-        self.supports_v5_protocol = self.cluster.version() >= LooseVersion('3.10')
+        self.supports_v5_protocol = supports_v5_protocol(self.cluster.version())
         self.expected_expt = WriteFailure
         self.protocol_version = 5 if self.supports_v5_protocol else 4
         self.replication_factor = 3
@@ -59,7 +59,7 @@ class TestWriteFailures(Tester):
             """ % (KEYSPACE, self.replication_factor))
         session.set_keyspace(KEYSPACE)
 
-        session.execute("CREATE TABLE IF NOT EXISTS mytable (key text PRIMARY KEY, value text) WITH COMPACT STORAGE")
+        session.execute("CREATE TABLE IF NOT EXISTS mytable (key text PRIMARY KEY, value text)")
         session.execute("CREATE TABLE IF NOT EXISTS countertable (key uuid PRIMARY KEY, value counter)")
 
         for idx in self.failing_nodes:

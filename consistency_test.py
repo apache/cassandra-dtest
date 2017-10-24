@@ -170,7 +170,7 @@ class TestHelper(Tester):
                 firstname text,
                 lastname text,
                 age int
-            ) WITH COMPACT STORAGE"""
+            )"""
 
         if requires_local_reads:
             create_cmd += " AND " + self.get_local_reads_properties()
