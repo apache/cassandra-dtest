@@ -356,6 +356,6 @@ class TestSSTableGenerationAndLoading(BaseSStableLoaderTest):
         session = self.patient_cql_connection(node)
 
         # Check that the index is marked as built and the index has been rebuilt
-        assert_one(session, """SELECT * FROM system."IndexInfo" WHERE table_name='k'""", ['k', 'idx'])
+        assert_one(session, """SELECT * FROM system."IndexInfo" WHERE table_name='k'""", ['k', 'idx', None])
         assert_all(session, "SELECT * FROM k.t", [[0, 1, 8], [0, 2, 8]])
         assert_all(session, "SELECT * FROM k.t WHERE v = 8", [[0, 1, 8], [0, 2, 8]])

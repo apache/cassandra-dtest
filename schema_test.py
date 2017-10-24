@@ -3,6 +3,7 @@ import time
 from cassandra.concurrent import execute_concurrent_with_args
 
 from tools.assertions import assert_invalid, assert_all, assert_one
+from tools.decorators import since
 from dtest import Tester, create_ks
 
 
@@ -49,6 +50,7 @@ class TestSchema(Tester):
                 self.assertEqual(row.c2, 'ddd')
                 self.assertFalse(hasattr(row, 'c0'))
 
+    @since("2.0", max_version="3.X")  # Compact Storage
     def drop_column_compact_test(self):
         session = self.prepare()
 

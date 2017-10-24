@@ -59,7 +59,7 @@ class TestWriteFailures(Tester):
             """ % (KEYSPACE, self.replication_factor))
         session.set_keyspace(KEYSPACE)
 
-        session.execute("CREATE TABLE IF NOT EXISTS mytable (key text PRIMARY KEY, value text) WITH COMPACT STORAGE")
+        session.execute("CREATE TABLE IF NOT EXISTS mytable (key text PRIMARY KEY, value text)")
         session.execute("CREATE TABLE IF NOT EXISTS countertable (key uuid PRIMARY KEY, value counter)")
 
         for idx in self.failing_nodes:

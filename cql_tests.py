@@ -19,6 +19,7 @@ from thrift_bindings.v22.ttypes import (CfDef, Column, ColumnOrSuperColumn,
 from thrift_tests import get_thrift_client
 from tools.assertions import (assert_all, assert_invalid, assert_length_equal,
                               assert_none, assert_one, assert_unavailable)
+from tools.data import rows_to_list
 from tools.decorators import since
 from tools.metadata_wrapper import (UpdatingClusterMetadataWrapper,
                                     UpdatingKeyspaceMetadataWrapper,
@@ -106,11 +107,8 @@ class StorageProxyCQLTester(CQLTester):
         """
         Smoke test that basic table operations work:
 
-        - create 2 tables, one with and one without COMPACT STORAGE
-        - ALTER the table without COMPACT STORAGE, adding a column
-
-        For each of those tables:
-
+        - create a table
+        - ALTER the table adding a column
         - insert 10 values
         - SELECT * and assert the values are there
         - TRUNCATE the table
@@ -125,8 +123,6 @@ class StorageProxyCQLTester(CQLTester):
 
         session.execute("CREATE TABLE test1 (k int PRIMARY KEY, v1 int)")
         self.assertIn('test1', ks_meta.tables)
-        session.execute("CREATE TABLE test2 (k int, c1 int, v1 int, PRIMARY KEY (k, c1)) WITH COMPACT STORAGE")
-        self.assertIn('test2', ks_meta.tables)
 
         t1_meta = UpdatingTableMetadataWrapper(session.cluster, ks_name='ks', table_name='test1')
 
@@ -135,21 +131,46 @@ class StorageProxyCQLTester(CQLTester):
 
         for i in range(0, 10):
             session.execute("INSERT INTO test1 (k, v1, v2) VALUES ({i}, {i}, {i})".format(i=i))
-            session.execute("INSERT INTO test2 (k, c1, v1) VALUES ({i}, {i}, {i})".format(i=i))
 
         assert_all(session, "SELECT * FROM test1", [[i, i, i] for i in range(0, 10)], ignore_order=True)
 
-        assert_all(session, "SELECT * FROM test2", [[i, i, i] for i in range(0, 10)], ignore_order=True)
-
         session.execute("TRUNCATE test1")
-        session.execute("TRUNCATE test2")
 
         assert_none(session, "SELECT * FROM test1")
 
-        assert_none(session, "SELECT * FROM test2")
-
         session.execute("DROP TABLE test1")
         self.assertNotIn('test1', ks_meta.tables)
+
+    @since("2.0", max_version="3.X")
+    def table_test_compact_storage(self):
+        """
+        Smoke test that basic table operations work:
+
+        - create a table with COMPACT STORAGE
+        - insert 10 values
+        - SELECT * and assert the values are there
+        - TRUNCATE the table
+        - SELECT * and assert there are no values
+        - DROP the table
+        - SELECT * and assert the statement raises an InvalidRequest
+        # TODO run SELECTs to make sure each statement works
+        """
+        session = self.prepare()
+
+        ks_meta = UpdatingKeyspaceMetadataWrapper(session.cluster, ks_name='ks')
+
+        session.execute("CREATE TABLE test2 (k int, c1 int, v1 int, PRIMARY KEY (k, c1)) WITH COMPACT STORAGE")
+        self.assertIn('test2', ks_meta.tables)
+
+        for i in range(0, 10):
+            session.execute("INSERT INTO test2 (k, c1, v1) VALUES ({i}, {i}, {i})".format(i=i))
+
+        assert_all(session, "SELECT * FROM test2", [[i, i, i] for i in range(0, 10)], ignore_order=True)
+
+        session.execute("TRUNCATE test2")
+
+        assert_none(session, "SELECT * FROM test2")
+
         session.execute("DROP TABLE test2")
         self.assertNotIn('test2', ks_meta.tables)
 
@@ -697,6 +718,50 @@ class MiscellaneousCQLTester(CQLTester):
         assert_all(session, "SELECT " +
                    ",".join(map(lambda i: "c_{}".format(i), range(width))) +
                    " FROM very_wide_table", [[i for i in range(width)]])
+
+    @since("3.11", max_version="3.X")
+    def drop_compact_storage_flag_test(self):
+        """
+        Test for CASSANDRA-10857, verifying the schema change
+        distribution across the other nodes.
+
+        """
+
+        cluster = self.cluster
+
+        cluster.populate(3).start()
+        node1, node2, node3 = cluster.nodelist()
+
+        session1 = self.patient_cql_connection(node1)
+        session2 = self.patient_cql_connection(node2)
+        session3 = self.patient_cql_connection(node3)
+        self.create_ks(session1, 'ks', 3)
+        sessions = [session1, session2, session3]
+
+        for session in sessions:
+            session.set_keyspace('ks')
+
+        session1.execute("""
+            CREATE TABLE test_drop_compact_storage (k int PRIMARY KEY, s1 int) WITH COMPACT STORAGE;
+        """)
+
+        session1.execute("INSERT INTO test_drop_compact_storage (k, s1) VALUES (1,1)")
+        session1.execute("INSERT INTO test_drop_compact_storage (k, s1) VALUES (2,2)")
+        session1.execute("INSERT INTO test_drop_compact_storage (k, s1) VALUES (3,3)")
+
+        for session in sessions:
+            res = session.execute("SELECT * from test_drop_compact_storage")
+            self.assertEqual(rows_to_list(res), [[1, 1],
+                                                 [2, 2],
+                                                 [3, 3]])
+
+        session1.execute("ALTER TABLE test_drop_compact_storage DROP COMPACT STORAGE")
+
+        for session in sessions:
+            assert_all(session, "SELECT * from test_drop_compact_storage",
+                       [[1, None, 1, None],
+                        [2, None, 2, None],
+                        [3, None, 3, None]])
 
 
 @since('3.2')
