@@ -276,6 +276,19 @@ class Tester:
         runner.start()
         return runner
 
+    def assert_log_had_msg(self, node, msg, timeout=600, **kwargs):
+        """
+        Wrapper for ccmlib.node.Node#watch_log_for to cause an assertion failure when a log message isn't found
+        within the timeout.
+        :param node: Node which logs we should watch
+        :param msg: String message we expect to see in the logs.
+        :param timeout: Seconds to wait for msg to appear
+        """
+        try:
+            node.watch_log_for(msg, timeout=timeout, **kwargs)
+        except TimeoutError:
+            pytest.fail("Log message was not seen within timeout:\n{0}".format(msg))
+
 def get_eager_protocol_version(cassandra_version):
     """
     Returns the highest protocol version accepted
