@@ -735,7 +735,7 @@ class MiscellaneousCQLTester(CQLTester):
         session1 = self.patient_cql_connection(node1)
         session2 = self.patient_cql_connection(node2)
         session3 = self.patient_cql_connection(node3)
-        self.create_ks(session1, 'ks', 3)
+        create_ks(session1, 'ks', 3)
         sessions = [session1, session2, session3]
 
         for session in sessions:

@@ -240,6 +240,12 @@ class TestSecondaryIndexes(Tester):
 
     @since("2.0", max_version="3.X")
     def test_8280_validate_indexed_values_compact(self):
+        cluster = self.cluster
+        cluster.populate(1).start()
+        node1 = cluster.nodelist()[0]
+        session = self.patient_cql_connection(node1)
+
+        create_ks(session, 'ks', 1)
         self.insert_row_with_oversize_value("CREATE TABLE %s(a int, b text, PRIMARY KEY (a)) WITH COMPACT STORAGE",
                                             "CREATE INDEX ON %s(b)",
                                             "INSERT INTO %s (a, b) VALUES (0, ?)",
@@ -343,7 +349,7 @@ class TestSecondaryIndexes(Tester):
         session.execute("INSERT INTO k.t(k, v) VALUES (2, 3)")
 
         # Verify that the index is marked as built and it can answer queries
-        assert_one(session, """SELECT * FROM system."IndexInfo" WHERE table_name='k'""", ['k', 'idx', None])
+        assert_one(session, """SELECT table_name, index_name FROM system."IndexInfo" WHERE table_name='k'""", ['k', 'idx'])
         assert_one(session, "SELECT * FROM k.t WHERE v = 1", [0, 1])
 
         # Simulate a failing index rebuild
@@ -369,7 +375,7 @@ class TestSecondaryIndexes(Tester):
 
         # Verify that, the index is rebuilt, marked as built, and it can answer queries
         self.assertNotEqual(before_files, after_files)
-        assert_one(session, """SELECT * FROM system."IndexInfo" WHERE table_name='k'""", ['k', 'idx', None])
+        assert_one(session, """SELECT table_name, index_name FROM system."IndexInfo" WHERE table_name='k'""", ['k', 'idx'])
         assert_one(session, "SELECT * FROM k.t WHERE v = 1", [0, 1])
 
         # Simulate another failing index rebuild
@@ -392,7 +398,7 @@ class TestSecondaryIndexes(Tester):
 
         # Verify that the index is rebuilt, marked as built, and it can answer queries
         self.assertNotEqual(before_files, after_files)
-        assert_one(session, """SELECT * FROM system."IndexInfo" WHERE table_name='k'""", ['k', 'idx', None])
+        assert_one(session, """SELECT table_name, index_name FROM system."IndexInfo" WHERE table_name='k'""", ['k', 'idx'])
         assert_one(session, "SELECT * FROM k.t WHERE v = 1", [0, 1])
 
     @since('4.0')
@@ -456,7 +462,7 @@ class TestSecondaryIndexes(Tester):
         before_files = self._index_sstables_files(node, 'k', 't', 'idx')
 
         debug("Verify the index is marked as built and it can be queried")
-        assert_one(session, """SELECT * FROM system."IndexInfo" WHERE table_name='k'""", ['k', 'idx', None])
+        assert_one(session, """SELECT table_name, index_name FROM system."IndexInfo" WHERE table_name='k'""", ['k', 'idx'])
         assert_one(session, "SELECT * FROM k.t WHERE v = 1", [0, 1])
 
         debug("Restart the node and verify the index build is not submitted")
@@ -467,7 +473,7 @@ class TestSecondaryIndexes(Tester):
 
         debug("Verify the index is still marked as built and it can be queried")
         session = self.patient_cql_connection(node)
-        assert_one(session, """SELECT * FROM system."IndexInfo" WHERE table_name='k'""", ['k', 'idx', None])
+        assert_one(session, """SELECT table_name, index_name FROM system."IndexInfo" WHERE table_name='k'""", ['k', 'idx'])
         assert_one(session, "SELECT * FROM k.t WHERE v = 1", [0, 1])
 
     def test_multi_index_filtering_query(self):

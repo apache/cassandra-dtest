@@ -163,7 +163,6 @@ class TestHelper(Tester):
         statement = SimpleStatement("TRUNCATE counters", ConsistencyLevel.ALL)
         session.execute(statement)
 
-    @since("2.0", max_version="3.X")
     def create_users_table(self, session, requires_local_reads):
         create_cmd = """
             CREATE TABLE users (

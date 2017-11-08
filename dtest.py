@@ -34,6 +34,7 @@ from cassandra.policies import RetryPolicy, WhiteListRoundRobinPolicy
 from ccmlib.cluster import Cluster
 from ccmlib.cluster_factory import ClusterFactory
 from ccmlib.common import get_version_from_build, is_win
+from distutils.version import LooseVersion
 from nose.exc import SkipTest
 from nose.tools import assert_greater_equal
 from six import print_
@@ -1125,3 +1126,6 @@ def run_scenarios(scenarios, handler, deferred_exceptions=tuple()):
 
     if errors:
         raise MultiError(errors, tracebacks)
+
+def supports_v5_protocol(cluster_version):
+    return cluster_version >= LooseVersion('4.0')
