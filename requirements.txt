@@ -15,7 +15,7 @@ mock
 nose
 nose-test-select
 parse
-pep8
+pycodestyle
 psutil
 pycassa
 thrift==0.9.3
