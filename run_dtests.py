@@ -23,9 +23,11 @@ example:
 from __future__ import print_function
 
 import subprocess
+import sys
+import os
 from collections import namedtuple
 from itertools import product
-from os import getcwd
+from os import getcwd, environ
 from tempfile import NamedTemporaryFile
 
 from docopt import docopt
@@ -212,9 +214,15 @@ if __name__ == '__main__':
         # How do we execute code in a new interpreter each time? Generate the
         # code as text, then shell out to a new interpreter.
         to_execute = (
-            'import nose\n'
-            'from plugins.dtestconfig import DtestConfigPlugin, GlobalConfigObject\n'
-            'nose.main(addplugins=[DtestConfigPlugin({config})])\n'
+            "import nose\n" +
+            "from plugins.dtestconfig import DtestConfigPlugin, GlobalConfigObject\n" +
+            "from plugins.dtestxunit import DTestXunit\n" +
+            "from plugins.dtesttag import DTestTag\n"  +
+            "from plugins.dtestcollect import DTestCollect\n" +
+            "import sys\n" +
+            "print sys.getrecursionlimit()\n" +
+            "print sys.setrecursionlimit(8000)\n" +
+            ("nose.main(addplugins=[DtestConfigPlugin({config}), DTestXunit(), DTestCollect(), DTestTag()])\n" if "TEST_TAG" in environ else "nose.main(addplugins=[DtestConfigPlugin({config}), DTestCollect(), DTestXunit()])\n")
         ).format(config=repr(config))
         temp = NamedTemporaryFile(dir=getcwd())
         debug('Writing the following to {}:'.format(temp.name))
@@ -228,7 +236,7 @@ if __name__ == '__main__':
         # command line are treated one way, args passed in as
         # nose.main(argv=...) are treated another. Compare with the options
         # -xsv for an example.
-        cmd_list = ['python', temp.name] + nose_argv
+        cmd_list = [sys.executable, temp.name] + nose_argv
         debug('subprocess.call-ing {cmd_list}'.format(cmd_list=cmd_list))
 
         if options['--dry-run']:
@@ -240,7 +248,7 @@ if __name__ == '__main__':
                 contents=contents
             ))
         else:
-            results.append(subprocess.call(cmd_list))
+            results.append(subprocess.call(cmd_list, env=os.environ.copy()))
         # separate the end of the last subprocess.call output from the
         # beginning of the next by printing a newline.
         print()
