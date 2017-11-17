@@ -55,7 +55,7 @@ JAVA7_HOME and JAVA8_HOME, respectively.
 Installation Instructions
 -------------------------
 
-See more detailed instructions in the included [INSTALL file](https://github.com/riptano/cassandra-dtest/blob/master/INSTALL.md).
+See more detailed instructions in the included [INSTALL file](https://github.com/apache/cassandra-dtest/blob/master/INSTALL.md).
 
 Writing Tests
 -------------
