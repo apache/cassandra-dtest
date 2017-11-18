@@ -96,7 +96,7 @@ CURRENT_TEST = ""
 
 logging.basicConfig(filename=os.path.join(LOG_SAVED_DIR, "dtest.log"),
                     filemode='w',
-                    format='%(asctime)s,%(msecs)d %(name)s %(current_test)s %(levelname)s %(message)s',
+                    format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
                     datefmt='%H:%M:%S',
                     level=logging.DEBUG)
 
@@ -178,13 +178,13 @@ def reset_environment_vars():
 
 
 def warning(msg):
-    LOG.warning(msg, extra={"current_test": CURRENT_TEST})
+    LOG.warning(CURRENT_TEST + ' - ' + msg)
     if PRINT_DEBUG:
         print "WARN: " + msg
 
 
 def debug(msg):
-    LOG.debug(msg, extra={"current_test": CURRENT_TEST})
+    LOG.debug(CURRENT_TEST + ' - ' + msg)
     if PRINT_DEBUG:
         print msg
 
@@ -317,7 +317,7 @@ class Tester(TestCase):
     # making unittest think it's a test method
     def set_current_tst_name(self):
         global CURRENT_TEST
-        CURRENT_TEST = self.id() + self._testMethodName
+        CURRENT_TEST = self.id()
 
     def maybe_begin_active_log_watch(self):
         if ENABLE_ACTIVE_LOG_WATCHING:
