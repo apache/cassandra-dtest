@@ -78,7 +78,7 @@ will often need to modify them in some fashion at some later point:
 * cassandra-dtest
 
         cd ~/git/cstar
-        git clone git://github.com/riptano/cassandra-dtest.git
+        git clone git://github.com/apache/cassandra-dtest.git
 
 * nose
 
