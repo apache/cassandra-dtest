@@ -2,6 +2,7 @@ import os
 import os.path
 import re
 
+from ccmlib.node import Node
 from dtest import DISABLE_VNODES, Tester, create_ks, debug
 from tools.assertions import assert_almost_equal
 from tools.data import create_c1c2_table, insert_c1c2, query_c1c2
@@ -44,6 +45,46 @@ class TestDiskBalance(Tester):
         cluster.flush()
         node5 = new_node(cluster)
         node5.start(wait_for_binary_proto=True)
+        self.assert_balanced(node5)
+
+
+    def disk_balance_replace_same_address_test(self):
+        self._test_disk_balance_replace(same_address=True)
+
+    def disk_balance_replace_different_address_test(self):
+        self._test_disk_balance_replace(same_address=False)
+
+    def _test_disk_balance_replace(self, same_address):
+        debug("Creating cluster")
+        cluster = self.cluster
+        if not DISABLE_VNODES:
+            cluster.set_configuration_options(values={'num_tokens': 256})
+        # apparently we have legitimate errors in the log when bootstrapping (see bootstrap_test.py)
+        self.allow_log_errors = True
+        cluster.populate(4).start(wait_for_binary_proto=True)
+        node1 = cluster.nodes['node1']
+
+        debug("Populating")
+        node1.stress(['write', 'n=50k', 'no-warmup', '-rate', 'threads=100', '-schema', 'replication(factor=3)', 'compaction(strategy=SizeTieredCompactionStrategy,enabled=false)'])
+        cluster.flush()
+
+        debug("Stopping and removing node2")
+        node2 = cluster.nodes['node2']
+        node2.stop(gently=False)
+        self.cluster.remove(node2)
+
+        node5_address = node2.address() if same_address else '127.0.0.5'
+        debug("Starting replacement node")
+        node5 = Node('node5', cluster=self.cluster, auto_bootstrap=True,
+                     thrift_interface=None, storage_interface=(node5_address, 7000),
+                     jmx_port='7500', remote_debug_port='0', initial_token=None,
+                     binary_interface=(node5_address, 9042))
+        self.cluster.add(node5, False)
+        node5.start(jvm_args=["-Dcassandra.replace_address_first_boot={}".format(node2.address())],
+                    wait_for_binary_proto=True,
+                    wait_other_notice=True)
+
+        debug("Checking replacement node is balanced")
         self.assert_balanced(node5)
 
     def disk_balance_decommission_test(self):
