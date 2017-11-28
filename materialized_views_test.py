@@ -992,6 +992,107 @@ class TestMaterializedViews(Tester):
             )
 
     @since('3.0')
+    def test_mv_with_default_ttl_with_flush(self):
+        self._test_mv_with_default_ttl(True)
+
+    @since('3.0')
+    def test_mv_with_default_ttl_without_flush(self):
+        self._test_mv_with_default_ttl(False)
+
+    def _test_mv_with_default_ttl(self, flush):
+        """
+        Verify mv with default_time_to_live can be deleted properly using expired livenessInfo
+        @jira_ticket CASSANDRA-14071
+        """
+        session = self.prepare(rf=3, nodes=3, options={'hinted_handoff_enabled': False}, consistency_level=ConsistencyLevel.QUORUM)
+        node1, node2, node3 = self.cluster.nodelist()
+        session.execute('USE ks')
+
+        debug("MV with same key and unselected columns")
+        session.execute("CREATE TABLE t2 (k int, a int, b int, c int, primary key(k, a)) with default_time_to_live=600")
+        session.execute(("CREATE MATERIALIZED VIEW mv2 AS SELECT k,a,b FROM t2 "
+                         "WHERE k IS NOT NULL AND a IS NOT NULL PRIMARY KEY (a, k)"))
+        session.cluster.control_connection.wait_for_schema_agreement()
+
+        self.update_view(session, "UPDATE t2 SET c=1 WHERE k=1 AND a=1;", flush)
+        assert_one(session, "SELECT k,a,b,c FROM t2", [1, 1, None, 1])
+        assert_one(session, "SELECT k,a,b FROM mv2", [1, 1, None])
+
+        self.update_view(session, "UPDATE t2 SET c=null WHERE k=1 AND a=1;", flush)
+        assert_none(session, "SELECT k,a,b,c FROM t2")
+        assert_none(session, "SELECT k,a,b FROM mv2")
+
+        self.update_view(session, "UPDATE t2 SET c=2 WHERE k=1 AND a=1;", flush)
+        assert_one(session, "SELECT k,a,b,c FROM t2", [1, 1, None, 2])
+        assert_one(session, "SELECT k,a,b FROM mv2", [1, 1, None])
+
+        self.update_view(session, "DELETE c FROM t2 WHERE k=1 AND a=1;", flush)
+        assert_none(session, "SELECT k,a,b,c FROM t2")
+        assert_none(session, "SELECT k,a,b FROM mv2")
+
+        if flush:
+            self.cluster.compact()
+            assert_none(session, "SELECT * FROM t2")
+            assert_none(session, "SELECT * FROM mv2")
+
+        # test with user-provided ttl
+        self.update_view(session, "INSERT INTO t2(k,a,b,c) VALUES(2,2,2,2) USING TTL 5", flush)
+        self.update_view(session, "UPDATE t2 USING TTL 100 SET c=1 WHERE k=2 AND a=2;", flush)
+        self.update_view(session, "UPDATE t2 USING TTL 50 SET c=2 WHERE k=2 AND a=2;", flush)
+        self.update_view(session, "DELETE c FROM t2 WHERE k=2 AND a=2;", flush)
+
+        time.sleep(5)
+
+        assert_none(session, "SELECT k,a,b,c FROM t2")
+        assert_none(session, "SELECT k,a,b FROM mv2")
+
+        if flush:
+            self.cluster.compact()
+            assert_none(session, "SELECT * FROM t2")
+            assert_none(session, "SELECT * FROM mv2")
+
+        debug("MV with extra key")
+        session.execute("CREATE TABLE t (k int PRIMARY KEY, a int, b int) with default_time_to_live=600")
+        session.execute(("CREATE MATERIALIZED VIEW mv AS SELECT * FROM t "
+                         "WHERE k IS NOT NULL AND a IS NOT NULL PRIMARY KEY (k, a)"))
+        session.cluster.control_connection.wait_for_schema_agreement()
+
+        self.update_view(session, "INSERT INTO t (k, a, b) VALUES (1, 1, 1);", flush)
+        assert_one(session, "SELECT * FROM t", [1, 1, 1])
+        assert_one(session, "SELECT * FROM mv", [1, 1, 1])
+
+        self.update_view(session, "INSERT INTO t (k, a, b) VALUES (1, 2, 1);", flush)
+        assert_one(session, "SELECT * FROM t", [1, 2, 1])
+        assert_one(session, "SELECT * FROM mv", [1, 2, 1])
+
+        self.update_view(session, "INSERT INTO t (k, a, b) VALUES (1, 3, 1);", flush)
+        assert_one(session, "SELECT * FROM t", [1, 3, 1])
+        assert_one(session, "SELECT * FROM mv", [1, 3, 1])
+
+        if flush:
+            self.cluster.compact()
+            assert_one(session, "SELECT * FROM t", [1, 3, 1])
+            assert_one(session, "SELECT * FROM mv", [1, 3, 1])
+
+        # user provided ttl
+        self.update_view(session, "UPDATE t USING TTL 50 SET a = 4 WHERE k = 1", flush)
+        assert_one(session, "SELECT * FROM t", [1, 4, 1])
+        assert_one(session, "SELECT * FROM mv", [1, 4, 1])
+
+        self.update_view(session, "UPDATE t USING TTL 40 SET a = 5 WHERE k = 1", flush)
+        assert_one(session, "SELECT * FROM t", [1, 5, 1])
+        assert_one(session, "SELECT * FROM mv", [1, 5, 1])
+
+        self.update_view(session, "UPDATE t USING TTL 30 SET a = 6 WHERE k = 1", flush)
+        assert_one(session, "SELECT * FROM t", [1, 6, 1])
+        assert_one(session, "SELECT * FROM mv", [1, 6, 1])
+
+        if flush:
+            self.cluster.compact()
+            assert_one(session, "SELECT * FROM t", [1, 6, 1])
+            assert_one(session, "SELECT * FROM mv", [1, 6, 1])
+
+    @since('3.0')
     def test_no_base_column_in_view_pk_complex_timestamp_with_flush(self):
         self._test_no_base_column_in_view_pk_complex_timestamp(flush=True)
 
