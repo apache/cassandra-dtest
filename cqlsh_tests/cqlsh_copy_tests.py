@@ -13,6 +13,7 @@ from decimal import Decimal
 from distutils.version import LooseVersion
 from functools import partial
 from tempfile import NamedTemporaryFile, gettempdir, template
+from unittest import skip
 from uuid import uuid1, uuid4
 
 from cassandra.cluster import ConsistencyLevel, SimpleStatement
@@ -2545,6 +2546,7 @@ class CqlshCopyTest(Tester):
                                    profile=os.path.join(os.path.dirname(os.path.realpath(__file__)), 'blogposts.yaml'),
                                    stress_table='stresscql.blogposts')
 
+    @skip('not a good candidate for dtest')
     def test_bulk_round_trip_blogposts_with_max_connections(self):
         """
         Same as test_bulk_round_trip_blogposts but limit the maximum number of concurrent connections a host will
