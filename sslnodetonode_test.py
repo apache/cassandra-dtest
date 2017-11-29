@@ -116,8 +116,12 @@ class TestNodeToNodeSSLEncryption(Tester):
         self.cluster.stop()
         self.assertTrue(found)
 
+    @since('4.0')
     def optional_outbound_tls_test(self):
-        """listen on TLS port, but optionally connect using TLS. this supports the upgrade case of starting with a non-encrypted cluster and then upgrading each node to use encryption."""
+        """listen on TLS port, but optionally connect using TLS. this supports the upgrade case of starting with a non-encrypted cluster and then upgrading each node to use encryption.
+
+        @jira_ticket CASSANDRA-10404
+        """
         credNode1 = sslkeygen.generate_credentials("127.0.0.1")
         credNode2 = sslkeygen.generate_credentials("127.0.0.2", credNode1.cakeystore, credNode1.cacert)
 
@@ -175,10 +179,7 @@ class TestNodeToNodeSSLEncryption(Tester):
         shutil.copyfile(credentials.keystore, kspath)
         shutil.copyfile(credentials.cakeystore, tspath)
 
-        node.set_configuration_options(values={
-            'server_encryption_options': {
-                'enabled': encryption_enabled,
-                'optional': encryption_optional,
+        server_enc_options = {
                 'internode_encryption': internode_encryption,
                 'keystore': kspath,
                 'keystore_password': 'cassandra',
@@ -187,5 +188,12 @@ class TestNodeToNodeSSLEncryption(Tester):
                 'require_endpoint_verification': endpoint_verification,
                 'require_client_auth': client_auth,
             }
+
+        if self.cluster.version() >= '4.0':
+            server_enc_options['enabled'] = encryption_enabled
+            server_enc_options['optional'] = encryption_optional
+        
+        node.set_configuration_options(values={
+            'server_encryption_options': server_enc_options
         })
         

@@ -71,7 +71,7 @@ def import_cert(dir, name, cert, keystore, opts=[]):
 
 
 def _exec_keytool(dir, keystore, opts):
-    args = ['keytool', '-keystore', keystore, '-storepass', 'cassandra'] + opts
+    args = ['keytool', '-keystore', keystore, '-storepass', 'cassandra', '-deststoretype', 'pkcs12'] + opts
     subprocess.check_call(args)
     return keystore
 
