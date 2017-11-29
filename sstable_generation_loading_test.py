@@ -330,7 +330,7 @@ class TestSSTableGenerationAndLoading(BaseSStableLoaderTest):
         create_schema_with_2i(session)
 
         # The table should exist and be empty, and the index should be empty and marked as built
-        assert_one(session, """SELECT * FROM system."IndexInfo" WHERE table_name='k'""", ['k', 'idx'])
+        assert_one(session, """SELECT * FROM system."IndexInfo" WHERE table_name='k'""", ['k', 'idx', None])
         assert_none(session, "SELECT * FROM k.t")
         assert_none(session, "SELECT * FROM k.t WHERE v = 8")
 
