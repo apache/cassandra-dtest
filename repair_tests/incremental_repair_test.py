@@ -171,9 +171,10 @@ class TestIncRepair(Tester):
         for node in self.cluster.nodelist():
             session = self.patient_exclusive_cql_connection(node)
             session.execute("INSERT INTO system.repairs "
-                            "(parent_id, cfids, coordinator, last_update, participants, ranges, repaired_at, started_at, state) "
-                            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
-                            [session_id, {cfid}, node1.address(), now, {n.address() for n in self.cluster.nodelist()},
+                            "(parent_id, cfids, coordinator, coordinator_port, last_update, participants, participants_wp, ranges, repaired_at, started_at, state) "
+                            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                            [session_id, {cfid}, node1.address(), 7000, now, {n.address() for n in self.cluster.nodelist()},
+                             {str(n.address()) + ":7000" for n in self.cluster.nodelist()},
                              ranges, now, now, ConsistentState.REPAIRING])  # 2=REPAIRING
 
         time.sleep(1)
