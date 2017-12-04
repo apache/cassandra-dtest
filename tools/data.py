@@ -151,6 +151,7 @@ def index_is_built(node, session, keyspace, table_name, idx_name):
     index_query = """SELECT * FROM system."IndexInfo" WHERE table_name = '{}' AND index_name = '{}'""".format(keyspace, full_idx_name)
     return len(list(session.execute(index_query))) == 1
 
+
 def block_until_index_is_built(node, session, keyspace, table_name, idx_name):
     """
     Waits up to 30 seconds for a secondary index to be built, and raises

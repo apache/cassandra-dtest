@@ -544,7 +544,7 @@ class TestAccuracy(TestHelper):
                     valid_fcn(v)
                 except Queue.Empty:
                     pass
-                except:
+                except Exception:
                     exceptions_queue.put(sys.exc_info())
 
         start = 0
@@ -973,12 +973,12 @@ class TestConsistency(Tester):
         session.execute(query)
 
         stmt = SimpleStatement("INSERT INTO test.test (id) VALUES (0);",
-                               consistency_level = ConsistencyLevel.ALL)
+                               consistency_level=ConsistencyLevel.ALL)
         session.execute(stmt)
 
         # with node2 down and hints disabled, delete the partition on node1
         node2.stop(wait_other_notice=True)
-        session.execute("DELETE FROM test.test WHERE id = 0;");
+        session.execute("DELETE FROM test.test WHERE id = 0;")
         node2.start(wait_other_notice=True)
 
         # with both nodes up, do a CL.ALL query with per partition limit of 1;
@@ -1034,7 +1034,7 @@ class TestConsistency(Tester):
         # prior to CASSANDRA-13747 this would cause an assertion in short read protection code
         node2.start(wait_other_notice=True)
         stmt = SimpleStatement("SELECT DISTINCT token(id), id FROM test.test;",
-                               consistency_level = ConsistencyLevel.ALL)
+                               consistency_level=ConsistencyLevel.ALL)
         result = list(session.execute(stmt))
         assert_length_equal(result, 5)
 
@@ -1051,7 +1051,7 @@ class TestConsistency(Tester):
 
         cluster.populate(2)
         node1, node2 = cluster.nodelist()
-        remove_perf_disable_shared_mem(node1) # necessary for jmx
+        remove_perf_disable_shared_mem(node1)  # necessary for jmx
         cluster.start(wait_other_notice=True)
 
         session = self.patient_cql_connection(node1)
@@ -1100,7 +1100,7 @@ class TestConsistency(Tester):
         assert_all(session,
                    'SELECT id FROM test.test LIMIT 1;',
                    [[3]],
-                   cl = ConsistencyLevel.ALL)
+                   cl=ConsistencyLevel.ALL)
 
         srp = make_mbean('metrics', type='Table', name='ShortReadProtectionRequests', keyspace='test', scope='test')
         with JolokiaAgent(node1) as jmx:
@@ -1172,7 +1172,7 @@ class TestConsistency(Tester):
         assert_all(session,
                    'SELECT ck FROM test.test WHERE pk = 0 LIMIT 2;',
                    [[0], [4]],
-                   cl = ConsistencyLevel.ALL)
+                   cl=ConsistencyLevel.ALL)
 
     def short_read_test(self):
         """

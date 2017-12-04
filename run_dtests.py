@@ -217,7 +217,7 @@ if __name__ == '__main__':
             "import nose\n" +
             "from plugins.dtestconfig import DtestConfigPlugin, GlobalConfigObject\n" +
             "from plugins.dtestxunit import DTestXunit\n" +
-            "from plugins.dtesttag import DTestTag\n"  +
+            "from plugins.dtesttag import DTestTag\n" +
             "from plugins.dtestcollect import DTestCollect\n" +
             "import sys\n" +
             "print sys.getrecursionlimit()\n" +

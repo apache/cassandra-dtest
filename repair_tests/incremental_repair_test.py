@@ -769,9 +769,9 @@ class TestIncRepair(Tester):
 
     @since('4.0')
     def force_test(self):
-        """ 
-        forcing an incremental repair should incrementally repair any nodes 
-        that are up, but should not promote the sstables to repaired 
+        """
+        forcing an incremental repair should incrementally repair any nodes
+        that are up, but should not promote the sstables to repaired
         """
         cluster = self.cluster
         cluster.set_configuration_options(values={'hinted_handoff_enabled': False, 'num_tokens': 1, 'commitlog_sync_period_in_ms': 500})
@@ -801,9 +801,9 @@ class TestIncRepair(Tester):
 
     @since('4.0')
     def hosts_test(self):
-        """ 
-        running an incremental repair with hosts specified should incrementally repair 
-        the given nodes, but should not promote the sstables to repaired 
+        """
+        running an incremental repair with hosts specified should incrementally repair
+        the given nodes, but should not promote the sstables to repaired
         """
         cluster = self.cluster
         cluster.set_configuration_options(values={'hinted_handoff_enabled': False, 'num_tokens': 1, 'commitlog_sync_period_in_ms': 500})
@@ -827,9 +827,9 @@ class TestIncRepair(Tester):
 
     @since('4.0')
     def subrange_test(self):
-        """ 
-        running an incremental repair with hosts specified should incrementally repair 
-        the given nodes, but should not promote the sstables to repaired 
+        """
+        running an incremental repair with hosts specified should incrementally repair
+        the given nodes, but should not promote the sstables to repaired
         """
         cluster = self.cluster
         cluster.set_configuration_options(values={'hinted_handoff_enabled': False,
@@ -852,7 +852,7 @@ class TestIncRepair(Tester):
             self.assertNoRepairedSSTables(node, 'ks')
 
         # only repair the partition k=0
-        token = Murmur3Token.from_key(str(bytearray([0,0,0,0])))
+        token = Murmur3Token.from_key(str(bytearray([0, 0, 0, 0])))
         # import ipdb; ipdb.set_trace()
         # run with force flag
         node1.repair(options=['ks', '-st', str(token.value - 1), '-et', str(token.value)])

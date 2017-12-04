@@ -1,9 +1,7 @@
-from collections import namedtuple
-
 from nose import plugins
-from pprint import pprint
 import os
 import inspect
+
 
 class DTestTag(plugins.Plugin):
     enabled = True  # if this plugin is loaded at all, we're using it
@@ -17,12 +15,12 @@ class DTestTag(plugins.Plugin):
 
     def nice_classname(self, obj):
         """Returns a nice name for class object or class instance.
-    
+
             >>> nice_classname(Exception()) # doctest: +ELLIPSIS
             '...Exception'
             >>> nice_classname(Exception) # doctest: +ELLIPSIS
             '...Exception'
-    
+
         """
         if inspect.isclass(obj):
             cls_name = obj.__name__

@@ -6,6 +6,7 @@ from tools.assertions import assert_all, assert_invalid
 from tools.decorators import since
 from tools.jmxutils import JolokiaAgent, make_mbean, remove_perf_disable_shared_mem
 
+
 class TestNodetool(Tester):
 
     def test_decommission_after_drain_is_invalid(self):
@@ -75,7 +76,7 @@ class TestNodetool(Tester):
                  'truncate', 'misc']
         if cluster.version() < '4.0':
             types.append('streamingsocket')
-    
+
         # read all of the timeouts, make sure we get a sane response
         for timeout_type in types:
             out, err, _ = node.nodetool('gettimeout {}'.format(timeout_type))
@@ -171,7 +172,7 @@ class TestNodetool(Tester):
         cluster = self.cluster
         cluster.populate(1)
         node = cluster.nodelist()[0]
-        remove_perf_disable_shared_mem(node) # for jmx
+        remove_perf_disable_shared_mem(node)  # for jmx
         cluster.start()
 
         session = self.patient_cql_connection(node)

@@ -20,10 +20,11 @@ from upgrade_manifest import build_upgrade_pairs
 
 def _create_dense_super_cf(name):
     return Cassandra.CfDef('ks', name, column_type='Super',
-                           key_validation_class='AsciiType',     # pk
-                           comparator_type='AsciiType',          # ck
-                           default_validation_class='AsciiType', # SC value
-                           subcomparator_type='LongType')        # SC key
+                           key_validation_class='AsciiType',        # pk
+                           comparator_type='AsciiType',             # ck
+                           default_validation_class='AsciiType',    # SC value
+                           subcomparator_type='LongType')           # SC key
+
 
 def _create_sparse_super_cf(name):
     cd1 = ColumnDef('col1', 'LongType', None, None)
@@ -33,6 +34,7 @@ def _create_sparse_super_cf(name):
                            key_validation_class='AsciiType',
                            comparator_type='AsciiType',
                            subcomparator_type='AsciiType')
+
 
 def _validate_sparse_cql(cursor, cf='sparse_super_1', column1=u'column1', col1=u'col1', col2=u'col2', key='key'):
     cursor.execute('use ks')

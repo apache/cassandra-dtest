@@ -40,10 +40,8 @@ Here is an abbreviated version of what an XML test report might look like::
 
 """
 import codecs
-import doctest
 import os
 import sys
-import traceback
 import re
 import inspect
 from StringIO import StringIO
@@ -59,13 +57,16 @@ CONTROL_CHARACTERS = re.compile(r"[\000-\010\013\014\016-\037]")
 
 TEST_ID = re.compile(r'^(.*?)(\(.*\))$')
 
+
 def xml_safe(value):
     """Replaces invalid XML characters with '?'."""
     return CONTROL_CHARACTERS.sub('?', value)
 
+
 def escape_cdata(cdata):
     """Escape a string for an XML CDATA section."""
     return xml_safe(cdata).replace(']]>', ']]>]]&gt;<![CDATA[')
+
 
 def id_split(idval):
     m = TEST_ID.match(idval)
@@ -73,13 +74,14 @@ def id_split(idval):
     if m:
         name, fargs = m.groups()
         head, tail = name.rsplit(".", 1)
-        retval = [head, tail+fargs]
+        retval = [head, tail + fargs]
     else:
         retval = idval.rsplit(".", 1)
     tag = os.getenv('TEST_TAG', '')
     if tag != '':
         retval[-1] = retval[-1] + "-" + tag
     return retval
+
 
 def nice_classname(obj):
     """Returns a nice name for class object or class instance.
@@ -104,6 +106,7 @@ def nice_classname(obj):
     else:
         return cls_name
 
+
 def exc_message(exc_info):
     """Return the exception's message."""
     exc = exc_info[1]
@@ -122,6 +125,7 @@ def exc_message(exc_info):
                 result = exc.args[0]
     result = force_unicode(result, 'UTF-8')
     return xml_safe(result)
+
 
 class Tee(object):
     def __init__(self, encoding, *args):
@@ -215,8 +219,8 @@ class DTestXunit(Plugin):
                                              self.encoding, 'replace')
         self.stats['encoding'] = self.encoding
         self.stats['testsuite_name'] = self.xunit_testsuite_name
-        self.stats['total'] = (self.stats['errors'] + self.stats['failures']
-                               + self.stats['passes'] + self.stats['skipped'])
+        self.stats['total'] = (self.stats['errors'] + self.stats['failures'] +
+                               self.stats['passes'] + self.stats['skipped'])
         self.error_report_file.write(
             u'<?xml version="1.0" encoding="%(encoding)s"?>'
             u'<testsuite name="%(testsuite_name)s" tests="%(total)d" '
@@ -265,16 +269,14 @@ class DTestXunit(Plugin):
         if self._currentStdout:
             value = self._currentStdout.getvalue()
             if value:
-                return '<system-out><![CDATA[%s]]></system-out>' % escape_cdata(
-                        value)
+                return '<system-out><![CDATA[%s]]></system-out>' % escape_cdata(value)
         return ''
 
     def _getCapturedStderr(self):
         if self._currentStderr:
             value = self._currentStderr.getvalue()
             if value:
-                return '<system-err><![CDATA[%s]]></system-err>' % escape_cdata(
-                        value)
+                return '<system-err><![CDATA[%s]]></system-err>' % escape_cdata(value)
         return ''
 
     def addError(self, test, err, capt=None):

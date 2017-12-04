@@ -1,14 +1,11 @@
-from collections import namedtuple
-
-from pprint import pprint
 import os
-import inspect
 from nose.plugins.base import Plugin
 from nose.case import Test
 import logging
 import unittest
 
 log = logging.getLogger(__name__)
+
 
 class DTestCollect(Plugin):
     """
@@ -41,6 +38,7 @@ class DTestCollect(Plugin):
         log.debug("Preparing test case %s", test)
         if not isinstance(test, Test):
             return
+
         def run(result):
             # We need to make these plugin calls because there won't be
             # a result proxy, due to using a stripped-down test suite
@@ -59,7 +57,8 @@ class DTestCollect(Plugin):
         else:
             tag = test.test._testMethodName + "-" + tag
         retval = "%s:%s.%s" % (test.test.__module__, test.test.__class__.__name__, tag)
-        return retval;
+        return retval
+
 
 class TestSuiteFactory:
     """

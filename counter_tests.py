@@ -56,7 +56,7 @@ class TestCounters(Tester):
         #
 
         cluster.set_install_dir(version='2.1.17')
-        cluster.start();
+        cluster.start()
         cluster.nodetool("upgradesstables")
 
         #
@@ -380,7 +380,7 @@ class TestCounters(Tester):
 
         assert_invalid(session, "ALTER TABLE counter_bug add c counter", "Cannot re-add previously dropped counter column c")
 
-    @since("2.0", max_version="3.X") # Compact Storage
+    @since("2.0", max_version="3.X")  # Compact Storage
     def compact_counter_cluster_test(self):
         """
         @jira_ticket CASSANDRA-12219
