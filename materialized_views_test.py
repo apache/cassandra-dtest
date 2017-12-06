@@ -109,7 +109,8 @@ class TestMaterializedViews(Tester):
 
         def _view_build_finished(node):
             s = self.patient_exclusive_cql_connection(node)
-            result = list(s.execute("SELECT * FROM system.views_builds_in_progress WHERE keyspace_name='%s' AND view_name='%s'" % (ks, view)))
+            view_build_table = 'view_builds_in_progress' if self.cluster.version() >= '4' else 'views_builds_in_progress'
+            result = list(s.execute("SELECT * FROM system.%s WHERE keyspace_name='%s' AND view_name='%s'" % (view_build_table, ks, view)))
             return len(result) == 0
 
         for node in self.cluster.nodelist():
