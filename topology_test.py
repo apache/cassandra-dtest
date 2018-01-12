@@ -283,8 +283,13 @@ class TestTopology(Tester):
         move_node(node3, balancing_tokens[2])
 
         time.sleep(1)
-
         cluster.cleanup()
+        for node in cluster.nodelist():
+            # after moving nodes we need to relocate any tokens in the wrong places, and after doing that
+            # we might have overlapping tokens on the disks, so run a major compaction to get balance even
+            if cluster.version() >= '3.2':
+                node.nodetool("relocatesstables")
+            node.nodetool("compact")
 
         # Check we can get all the keys
         for n in range(0, 30000):
@@ -292,10 +297,11 @@ class TestTopology(Tester):
 
         # Now the load should be basically even
         sizes = [node.data_size() for node in [node1, node2, node3]]
+        debug("sizes = %s" % sizes)
 
-        assert_almost_equal(sizes[0], sizes[1])
-        assert_almost_equal(sizes[0], sizes[2])
-        assert_almost_equal(sizes[1], sizes[2])
+        assert_almost_equal(sizes[0], sizes[1], error=0.05)
+        assert_almost_equal(sizes[0], sizes[2], error=0.05)
+        assert_almost_equal(sizes[1], sizes[2], error=0.05)
 
     @pytest.mark.no_vnodes
     def test_decommission(self):
