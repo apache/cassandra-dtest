@@ -1090,13 +1090,19 @@ class TestRepair(BaseRepairTest):
         cluster.populate(3).start(wait_for_binary_proto=True)
         node1, node2, node3 = cluster.nodelist()
         node1.stress(['write', 'n=100k', '-schema', 'replication(factor=3)', '-rate', 'threads=30'])
-        if cluster.version() >= "2.2":
-            t1 = threading.Thread(target=node1.repair)
-            t1.start()
+        def run_repair():
+            try:
+                if cluster.version() >= "2.2":
+                    node1.repair()
+                else:
+                    node1.nodetool('repair keyspace1 standard1 -inc -par')
+            except ToolError:
+                debug("got expected exception during repair, ignoring")
+        t1 = threading.Thread(target=run_repair)
+        t1.start()
+        if cluster.version() > "2.2":
             node2.watch_log_for('Validating ValidationRequest', filename='debug.log')
         else:
-            t1 = threading.Thread(target=node1.nodetool, args=('repair keyspace1 standard1 -inc -par',))
-            t1.start()
             node1.watch_log_for('requesting merkle trees', filename='system.log')
             time.sleep(2)
 
