@@ -424,7 +424,7 @@ class TestMaterializedViews(Tester):
         result = list(session.execute("SELECT * FROM ks.users_by_state_birth_year WHERE state='TX' AND birth_year=1968"))
         assert len(result) == 1, "Expecting {} users, got {}".format(1, len(result))
 
-    def _add_dc_after_mv_test(self, rf):
+    def _add_dc_after_mv_test(self, rf, nts):
         """
         @jira_ticket CASSANDRA-10978
 
@@ -456,9 +456,16 @@ class TestMaterializedViews(Tester):
 
         logger.debug("Bootstrapping new node in another dc")
         node5 = new_node(self.cluster, remote_debug_port='1414', data_center='dc2')
-        node5.start(jvm_args=["-Dcassandra.migration_task_wait_in_seconds={}".format(MIGRATION_WAIT)])
+        node5.start(jvm_args=["-Dcassandra.migration_task_wait_in_seconds={}".format(MIGRATION_WAIT)], wait_other_notice=True, wait_for_binary_proto=True)
+        if nts:
+            session.execute("alter keyspace ks with replication = {'class':'NetworkTopologyStrategy', 'dc1':1, 'dc2':1}")
+            session.execute("alter keyspace system_auth with replication = {'class':'NetworkTopologyStrategy', 'dc1':1, 'dc2':1}")
+            session.execute("alter keyspace system_traces with replication = {'class':'NetworkTopologyStrategy', 'dc1':1, 'dc2':1}")
+            node4.nodetool('rebuild dc1')
+            node5.nodetool('rebuild dc1')
 
-        session2 = self.patient_exclusive_cql_connection(node4)
+        cl = ConsistencyLevel.LOCAL_ONE if nts else ConsistencyLevel.ONE
+        session2 = self.patient_exclusive_cql_connection(node4, consistency_level=cl)
 
         logger.debug("Verifying data from new node in view")
         for i in range(1000):
@@ -480,7 +487,7 @@ class TestMaterializedViews(Tester):
         Test that materialized views work as expected when adding a datacenter with SimpleStrategy.
         """
 
-        self._add_dc_after_mv_test(1)
+        self._add_dc_after_mv_test(1, False)
 
     @pytest.mark.resource_intensive
     def test_add_dc_after_mv_network_replication(self):
@@ -490,7 +497,7 @@ class TestMaterializedViews(Tester):
         Test that materialized views work as expected when adding a datacenter with NetworkTopologyStrategy.
         """
 
-        self._add_dc_after_mv_test({'dc1': 1, 'dc2': 1})
+        self._add_dc_after_mv_test({'dc1': 1}, True)
 
     @pytest.mark.resource_intensive
     def test_add_node_after_mv(self):
