@@ -1414,19 +1414,19 @@ class TestMaterializedViews(Tester):
         assert_one(session, "SELECT * FROM t", [1, 1, 1, None, None, None])
         assert_one(session, "SELECT * FROM mv", [1, 1, 1, None])
 
-        # add selected with ttl=5
-        self.update_view(session, "UPDATE t USING TTL 10 SET a=1 WHERE k=1 AND c=1;", flush)
+        # add selected with ttl=20 (we apparently need a long ttl because the flushing etc that self.update_view does can take a long time)
+        self.update_view(session, "UPDATE t USING TTL 20 SET a=1 WHERE k=1 AND c=1;", flush)
         assert_one(session, "SELECT * FROM t", [1, 1, 1, None, None, None])
         assert_one(session, "SELECT * FROM mv", [1, 1, 1, None])
 
-        time.sleep(10)
+        time.sleep(20)
 
         # update unselected with ttl=10, view row should be alive
-        self.update_view(session, "UPDATE t USING TTL 10 SET f=1 WHERE k=1 AND c=1;", flush)
+        self.update_view(session, "UPDATE t USING TTL 20 SET f=1 WHERE k=1 AND c=1;", flush)
         assert_one(session, "SELECT * FROM t", [1, 1, None, None, None, 1])
         assert_one(session, "SELECT * FROM mv", [1, 1, None, None])
 
-        time.sleep(10)
+        time.sleep(20)
 
         # view row still alive due to base livenessInfo
         assert_none(session, "SELECT * FROM t")
