@@ -1,11 +1,18 @@
 import os
+import pytest
+import re
+import logging
+
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
 from ccmlib.node import ToolError
-from dtest import Tester, debug, create_ks
+
+from dtest import Tester, create_ks
 from tools.assertions import assert_all, assert_invalid, assert_none
-from tools.decorators import since
 from tools.jmxutils import JolokiaAgent, make_mbean, remove_perf_disable_shared_mem
+
+since = pytest.mark.since
+logger = logging.getLogger(__name__)
 
 
 class TestNodetool(Tester):
@@ -26,10 +33,10 @@ class TestNodetool(Tester):
 
         try:
             node.decommission()
-            self.assertFalse("Expected nodetool error")
+            assert not "Expected nodetool error"
         except ToolError as e:
-            self.assertEqual('', e.stderr)
-            self.assertTrue('Unsupported operation' in e.stdout)
+            assert '' == e.stderr
+            assert 'Unsupported operation' in e.stdout
 
     def test_correct_dc_rack_in_nodetool_info(self):
         """
@@ -51,16 +58,19 @@ class TestNodetool(Tester):
 
         for i, node in enumerate(cluster.nodelist()):
             out, err, _ = node.nodetool('info')
-            self.assertEqual(0, len(err), err)
-            debug(out)
-            for line in out.split(os.linesep):
+            assert 0 == len(err), err
+            out_str = out
+            if isinstance(out, (bytes, bytearray)):
+                out_str = out.decode("utf-8")
+            logger.debug(out_str)
+            for line in out_str.split(os.linesep):
                 if line.startswith('Data Center'):
-                    self.assertTrue(line.endswith(node.data_center),
-                                    "Expected dc {} for {} but got {}".format(node.data_center, node.address(), line.rsplit(None, 1)[-1]))
+                    assert line.endswith(node.data_center), \
+                        "Expected dc {} for {} but got {}".format(node.data_center, node.address(), line.rsplit(None, 1)[-1])
                 elif line.startswith('Rack'):
                     rack = "rack{}".format(i % 2)
-                    self.assertTrue(line.endswith(rack),
-                                    "Expected rack {} for {} but got {}".format(rack, node.address(), line.rsplit(None, 1)[-1]))
+                    assert line.endswith(rack), \
+                        "Expected rack {} for {} but got {}".format(rack, node.address(), line.rsplit(None, 1)[-1])
 
     @since('3.4')
     def test_nodetool_timeout_commands(self):
@@ -81,21 +91,21 @@ class TestNodetool(Tester):
         # read all of the timeouts, make sure we get a sane response
         for timeout_type in types:
             out, err, _ = node.nodetool('gettimeout {}'.format(timeout_type))
-            self.assertEqual(0, len(err), err)
-            debug(out)
-            self.assertRegexpMatches(out, r'.* \d+ ms')
+            assert 0 == len(err), err
+            logger.debug(out)
+            assert re.search(r'.* \d+ ms', out)
 
         # set all of the timeouts to 123
         for timeout_type in types:
             _, err, _ = node.nodetool('settimeout {} 123'.format(timeout_type))
-            self.assertEqual(0, len(err), err)
+            assert 0 == len(err), err
 
         # verify that they're all reported as 123
         for timeout_type in types:
             out, err, _ = node.nodetool('gettimeout {}'.format(timeout_type))
-            self.assertEqual(0, len(err), err)
-            debug(out)
-            self.assertRegexpMatches(out, r'.* 123 ms')
+            assert 0 == len(err), err
+            logger.debug(out)
+            assert re.search(r'.* 123 ms', out)
 
     @since('3.0')
     def test_cleanup_when_no_replica_with_index(self):
@@ -132,9 +142,9 @@ class TestNodetool(Tester):
         self.cluster.flush()
 
         for node in self.cluster.nodelist():
-            self.assertNotEqual(0, len(node.get_sstables('ks', 'cf')))
+            assert 0 != len(node.get_sstables('ks', 'cf'))
         if with_index:
-            self.assertEqual(len(list(session_dc2.execute("SELECT * FROM ks.cf WHERE value = 'value'"))), 100)
+            assert 100 == len(list(session_dc2.execute("SELECT * FROM ks.cf WHERE value = 'value'"))), 100
 
         # alter rf to only dc1
         session.execute("ALTER KEYSPACE ks WITH REPLICATION = {'class' : 'NetworkTopologyStrategy', 'dc1' : 1, 'dc2' : 0};")
@@ -146,16 +156,16 @@ class TestNodetool(Tester):
         # check local data on dc2
         for node in self.cluster.nodelist():
             if node.data_center == 'dc2':
-                self.assertEqual(0, len(node.get_sstables('ks', 'cf')))
+                assert 0 == len(node.get_sstables('ks', 'cf'))
             else:
-                self.assertNotEqual(0, len(node.get_sstables('ks', 'cf')))
+                assert 0 != len(node.get_sstables('ks', 'cf'))
 
         # dc1 data remains
         statement = SimpleStatement("SELECT * FROM ks.cf", consistency_level=ConsistencyLevel.LOCAL_ONE)
-        self.assertEqual(len(list(session.execute(statement))), 100)
+        assert 100 == len(list(session.execute(statement)))
         if with_index:
             statement = SimpleStatement("SELECT * FROM ks.cf WHERE value = 'value'", consistency_level=ConsistencyLevel.LOCAL_ONE)
-            self.assertEqual(len(list(session.execute(statement))), 100)
+            assert len(list(session.execute(statement))) == 100
 
         # alter rf back to query dc2, no data, no index
         session.execute("ALTER KEYSPACE ks WITH REPLICATION = {'class' : 'NetworkTopologyStrategy', 'dc1' : 0, 'dc2' : 1};")
@@ -182,30 +192,30 @@ class TestNodetool(Tester):
 
         # Do a first try without any keypace, we shouldn't have the notice
         out, err, _ = node.nodetool('status')
-        self.assertEqual(0, len(err), err)
-        self.assertNotRegexpMatches(out, notice_message)
+        assert 0 == len(err), err
+        assert not re.search(notice_message, out)
 
         session = self.patient_cql_connection(node)
         session.execute("CREATE KEYSPACE ks1 WITH replication = { 'class':'SimpleStrategy', 'replication_factor':1}")
 
         # With 1 keyspace, we should still not get the notice
         out, err, _ = node.nodetool('status')
-        self.assertEqual(0, len(err), err)
-        self.assertNotRegexpMatches(out, notice_message)
+        assert 0 == len(err), err
+        assert not re.search(notice_message, out)
 
         session.execute("CREATE KEYSPACE ks2 WITH replication = { 'class':'SimpleStrategy', 'replication_factor':1}")
 
         # With 2 keyspaces with the same settings, we should not get the notice
         out, err, _ = node.nodetool('status')
-        self.assertEqual(0, len(err), err)
-        self.assertNotRegexpMatches(out, notice_message)
+        assert 0 == len(err), err
+        assert not re.search(notice_message, out)
 
         session.execute("CREATE KEYSPACE ks3 WITH replication = { 'class':'SimpleStrategy', 'replication_factor':3}")
 
         # With a keyspace without the same replication factor, we should get the notice
         out, err, _ = node.nodetool('status')
-        self.assertEqual(0, len(err), err)
-        self.assertRegexpMatches(out, notice_message)
+        assert 0 == len(err), err
+        assert re.search(notice_message, out)
 
     @since('4.0')
     def test_set_get_batchlog_replay_throttle(self):
@@ -220,14 +230,14 @@ class TestNodetool(Tester):
         cluster.start()
 
         # Test that nodetool help messages are displayed
-        self.assertTrue('Set batchlog replay throttle' in node.nodetool('help setbatchlogreplaythrottle').stdout)
-        self.assertTrue('Print batchlog replay throttle' in node.nodetool('help getbatchlogreplaythrottle').stdout)
+        assert 'Set batchlog replay throttle' in node.nodetool('help setbatchlogreplaythrottle').stdout
+        assert 'Print batchlog replay throttle' in node.nodetool('help getbatchlogreplaythrottle').stdout
 
         # Set and get throttle with nodetool, ensuring that the rate change is logged
         node.nodetool('setbatchlogreplaythrottle 2048')
-        self.assertTrue(len(node.grep_log('Updating batchlog replay throttle to 2048 KB/s, 1024 KB/s per endpoint',
-                                          filename='debug.log')) > 0)
-        self.assertTrue('Batchlog replay throttle: 2048 KB/s' in node.nodetool('getbatchlogreplaythrottle').stdout)
+        assert len(node.grep_log('Updating batchlog replay throttle to 2048 KB/s, 1024 KB/s per endpoint',
+                                 filename='debug.log')) >= 0
+        assert 'Batchlog replay throttle: 2048 KB/s' in node.nodetool('getbatchlogreplaythrottle').stdout
 
     @since('3.0')
     def test_reloadlocalschema(self):
@@ -244,15 +254,14 @@ class TestNodetool(Tester):
 
         session = self.patient_cql_connection(node)
 
-        query = "CREATE KEYSPACE IF NOT EXISTS test WITH replication = {'class': 'NetworkTopologyStrategy', 'datacenter1': 2};"
+        query = "CREATE KEYSPACE IF NOT EXISTS test WITH replication " \
+                "= {'class': 'NetworkTopologyStrategy', 'datacenter1': 2};"
         session.execute(query)
 
         query = 'CREATE TABLE test.test (pk int, ck int, PRIMARY KEY (pk, ck));'
         session.execute(query)
 
         ss = make_mbean('db', type='StorageService')
-
-        schema_version = ''
 
         # get initial schema version
         with JolokiaAgent(node) as jmx:
@@ -270,7 +279,7 @@ class TestNodetool(Tester):
 
         # validate that schema version wasn't automatically updated
         with JolokiaAgent(node) as jmx:
-            self.assertEqual(schema_version, jmx.read_attribute(ss, 'SchemaVersion'))
+            assert schema_version == jmx.read_attribute(ss, 'SchemaVersion')
 
         # make sure the new column wasn't automagically picked up
         assert_invalid(session, 'INSERT INTO test.test (pk, ck, val) VALUES (0, 1, 2);')
@@ -280,7 +289,7 @@ class TestNodetool(Tester):
 
         # validate that schema version changed
         with JolokiaAgent(node) as jmx:
-            self.assertNotEqual(schema_version, jmx.read_attribute(ss, 'SchemaVersion'))
+            assert schema_version != jmx.read_attribute(ss, 'SchemaVersion')
 
         # try an insert with the new column again and validate it succeeds this time
         session.execute('INSERT INTO test.test (pk, ck, val) VALUES (0, 1, 2);')
@@ -299,19 +308,19 @@ class TestNodetool(Tester):
         cluster.start()
 
         # Test that nodetool help messages are displayed
-        self.assertTrue('Set the number of concurrent view' in node.nodetool('help setconcurrentviewbuilders').stdout)
-        self.assertTrue('Get the number of concurrent view' in node.nodetool('help getconcurrentviewbuilders').stdout)
+        assert 'Set the number of concurrent view' in node.nodetool('help setconcurrentviewbuilders').stdout
+        assert 'Get the number of concurrent view' in node.nodetool('help getconcurrentviewbuilders').stdout
 
         # Set and get throttle with nodetool, ensuring that the rate change is logged
         node.nodetool('setconcurrentviewbuilders 4')
-        self.assertTrue('Current number of concurrent view builders in the system is: \n4'
-                        in node.nodetool('getconcurrentviewbuilders').stdout)
+        assert 'Current number of concurrent view builders in the system is: \n4' \
+               in node.nodetool('getconcurrentviewbuilders').stdout
 
         # Try to set an invalid zero value
         try:
             node.nodetool('setconcurrentviewbuilders 0')
         except ToolError as e:
-            self.assertTrue('concurrent_view_builders should be great than 0.' in e.stdout)
-            self.assertTrue('Number of concurrent view builders should be greater than 0.', e.message)
+            assert 'concurrent_view_builders should be great than 0.' in e.stdout
+            assert 'Number of concurrent view builders should be greater than 0.', e.message
         else:
             self.fail("Expected error when setting and invalid value")

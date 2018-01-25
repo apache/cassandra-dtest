@@ -1,8 +1,11 @@
-from __future__ import division
+import pytest
+import logging
 
 from dtest import Tester
 from tools.data import rows_to_list
-from tools.decorators import since
+
+since = pytest.mark.since
+logger = logging.getLogger(__name__)
 
 
 @since('3.0')
@@ -13,7 +16,7 @@ class TestStressSparsenessRatio(Tester):
     Tests for the `row-population-ratio` parameter to `cassandra-stress`.
     """
 
-    def uniform_ratio_test(self):
+    def test_uniform_ratio(self):
         """
         Tests that the ratio-specifying string 'uniform(5..15)/50' results in
         ~80% of the values written being non-null.
@@ -22,7 +25,7 @@ class TestStressSparsenessRatio(Tester):
                                    expected_ratio=.8,
                                    delta=.1)
 
-    def fixed_ratio_test(self):
+    def test_fixed_ratio(self):
         """
         Tests that the string 'fixed(1)/3' results in ~1/3 of the values
         written being non-null.
@@ -50,4 +53,4 @@ class TestStressSparsenessRatio(Tester):
         num_nones = sum(row.count(None) for row in written)
         num_results = sum(len(row) for row in written)
 
-        self.assertAlmostEqual(float(num_nones) / num_results, expected_ratio, delta=delta)
+        assert abs(float(num_nones) / num_results - expected_ratio) <= delta

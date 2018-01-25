@@ -1,7 +1,11 @@
+import logging
+
 from collections import namedtuple
 
 from dtest import (CASSANDRA_GITREF, CASSANDRA_VERSION_FROM_BUILD,
-                   RUN_STATIC_UPGRADE_MATRIX, debug)
+                   RUN_STATIC_UPGRADE_MATRIX)
+
+logger = logging.getLogger(__name__)
 
 # UpgradePath's contain data about upgrade paths we wish to test
 # They also contain VersionMeta's for each version the path is testing
@@ -156,18 +160,18 @@ def build_upgrade_pairs():
     valid_upgrade_pairs = []
     manifest = OVERRIDE_MANIFEST or MANIFEST
 
-    for origin_meta, destination_metas in manifest.items():
+    for origin_meta, destination_metas in list(manifest.items()):
         for destination_meta in destination_metas:
             if not (origin_meta and destination_meta):  # None means we don't care about that version, which means we don't care about iterations involving it either
-                debug("skipping class creation as a version is undefined (this is normal), versions: {} and {}".format(origin_meta, destination_meta))
+                logger.debug("skipping class creation as a version is undefined (this is normal), versions: {} and {}".format(origin_meta, destination_meta))
                 continue
 
             if not _is_targeted_variant_combo(origin_meta, destination_meta):
-                debug("skipping class creation, no testing of '{}' to '{}' (for {} upgrade to {})".format(origin_meta.variant, destination_meta.variant, origin_meta.name, destination_meta.name))
+                logger.debug("skipping class creation, no testing of '{}' to '{}' (for {} upgrade to {})".format(origin_meta.variant, destination_meta.variant, origin_meta.name, destination_meta.name))
                 continue
 
             if not _have_common_proto(origin_meta, destination_meta):
-                debug("skipping class creation, no compatible protocol version between {} and {}".format(origin_meta.name, destination_meta.name))
+                logger.debug("skipping class creation, no compatible protocol version between {} and {}".format(origin_meta.name, destination_meta.name))
                 continue
 
             path_name = 'Upgrade_' + origin_meta.name + '_To_' + destination_meta.name
@@ -177,7 +181,7 @@ def build_upgrade_pairs():
                     # looks like this test should actually run in the current env, so let's set the final version to match the env exactly
                     oldmeta = destination_meta
                     newmeta = destination_meta.clone_with_local_env_version()
-                    debug("{} appears applicable to current env. Overriding final test version from {} to {}".format(path_name, oldmeta.version, newmeta.version))
+                    logger.debug("{} appears applicable to current env. Overriding final test version from {} to {}".format(path_name, oldmeta.version, newmeta.version))
                     destination_meta = newmeta
 
             valid_upgrade_pairs.append(

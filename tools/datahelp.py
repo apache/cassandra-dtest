@@ -35,13 +35,13 @@ def parse_headers_into_list(data):
     # throw out leading/trailing space and pipes
     # so we can split on the data without getting
     # extra empty fields
-    rows = map(strip, data.split('\n'))
+    rows = list(map(strip, data.split('\n')))
 
     # remove any remaining empty lines (i.e. '') from data
-    rows = filter(None, rows)
+    rows = [_f for _f in rows if _f]
 
     # separate headers from actual data and remove extra spaces from them
-    headers = [unicode(h.strip()) for h in rows.pop(0).split('|')]
+    headers = [str(h.strip()) for h in rows.pop(0).split('|')]
     return headers
 
 
@@ -77,10 +77,10 @@ def parse_row_into_dict(row, headers, format_funcs=None):
             )
         return multirows
 
-    row_map = dict(zip(headers, row_cells))
+    row_map = dict(list(zip(headers, row_cells)))
 
     if format_funcs:
-        for colname, value in row_map.items():
+        for colname, value in list(row_map.items()):
             func = format_funcs.get(colname)
 
             if func is not None:
@@ -110,10 +110,10 @@ def parse_data_into_dicts(data, format_funcs=None):
     # throw out leading/trailing space and pipes
     # so we can split on the data without getting
     # extra empty fields
-    rows = map(strip, data.split('\n'))
+    rows = list(map(strip, data.split('\n')))
 
     # remove any remaining empty/decoration lines (i.e. '') from data
-    rows = filter(row_describes_data, rows)
+    rows = list(filter(row_describes_data, rows))
 
     # remove headers
     headers = parse_headers_into_list(rows.pop(0))
@@ -149,13 +149,13 @@ def create_rows(data, session, table_name, cl=None, format_funcs=None, prefix=''
     # use the first dictionary to build a prepared statement for all
     prepared = session.prepare(
         "{prefix} INSERT INTO {table} ({cols}) values ({vals}) {postfix}".format(
-            prefix=prefix, table=table_name, cols=', '.join(dicts[0].keys()),
-            vals=', '.join('?' for k in dicts[0].keys()), postfix=postfix)
+            prefix=prefix, table=table_name, cols=', '.join(list(dicts[0].keys())),
+            vals=', '.join('?' for k in list(dicts[0].keys())), postfix=postfix)
     )
     if cl is not None:
         prepared.consistency_level = cl
 
-    query_results = execute_concurrent_with_args(session, prepared, [d.values() for d in dicts])
+    query_results = execute_concurrent_with_args(session, prepared, [list(d.values()) for d in dicts])
 
     for i, (status, result_or_exc) in enumerate(query_results):
         # should maybe check status here before appening to expected values

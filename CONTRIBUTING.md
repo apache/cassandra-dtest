@@ -46,7 +46,7 @@ Description       | Brief description of the test
 
 
 ```python
-def example_test(self):
+def test_example(self):
 """
 Demonstrates the expected syntax for a test plan. Parsed by Doxygen.
 @jira_ticket CASSANDRA-0000

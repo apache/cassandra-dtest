@@ -1,9 +1,13 @@
-# coding: utf-8
+import pytest
+import logging
+
 from distutils.version import LooseVersion
 
-from dtest import Tester, debug, create_ks
-from tools.decorators import since
+from dtest import Tester, create_ks
 from tools.jmxutils import make_mbean, JolokiaAgent, remove_perf_disable_shared_mem
+
+since = pytest.mark.since
+logger = logging.getLogger(__name__)
 
 
 class TestCqlTracing(Tester):
@@ -64,42 +68,42 @@ class TestCqlTracing(Tester):
         """)
 
         out, err, _ = node1.run_cqlsh('TRACING ON')
-        self.assertIn('Tracing is enabled', out)
+        assert 'Tracing is enabled' in out
 
         out, err, _ = node1.run_cqlsh('TRACING ON; SELECT * from system.peers')
-        self.assertIn('Tracing session: ', out)
-        self.assertIn('Request complete ', out)
+        assert 'Tracing session: ' in out
+        assert 'Request complete ' in out
 
         # Inserts
         out, err, _ = node1.run_cqlsh(
             "CONSISTENCY ALL; TRACING ON; "
             "INSERT INTO ks.users (userid, firstname, lastname, age) "
             "VALUES (550e8400-e29b-41d4-a716-446655440000, 'Frodo', 'Baggins', 32)")
-        debug(out)
-        self.assertIn('Tracing session: ', out)
+        logger.debug(out)
+        assert 'Tracing session: ' in out
 
-        self.assertIn(node1.address_for_current_version_slashy(), out)
-        self.assertIn(self.cluster.nodelist()[1].address_for_current_version_slashy(), out)
-        self.assertIn(self.cluster.nodelist()[2].address_for_current_version_slashy(), out)
+        assert node1.address_for_current_version_slashy() in out
+        assert self.cluster.nodelist()[1].address_for_current_version_slashy() in out
+        assert self.cluster.nodelist()[2].address_for_current_version_slashy() in out
 
-        self.assertIn('Parsing INSERT INTO ks.users ', out)
-        self.assertIn('Request complete ', out)
+        assert 'Parsing INSERT INTO ks.users ' in out
+        assert 'Request complete ' in out
 
         # Queries
         out, err, _ = node1.run_cqlsh('CONSISTENCY ALL; TRACING ON; '
                                       'SELECT firstname, lastname '
                                       'FROM ks.users WHERE userid = 550e8400-e29b-41d4-a716-446655440000')
-        debug(out)
-        self.assertIn('Tracing session: ', out)
+        logger.debug(out)
+        assert 'Tracing session: ' in out
 
-        self.assertIn(' 127.0.0.1 ', out)
-        self.assertIn(' 127.0.0.2 ', out)
-        self.assertIn(' 127.0.0.3 ', out)
-        self.assertIn('Request complete ', out)
-        self.assertIn(" Frodo |  Baggins", out)
+        assert ' 127.0.0.1 ' in out
+        assert ' 127.0.0.2 ' in out
+        assert ' 127.0.0.3 ' in out
+        assert 'Request complete ' in out
+        assert " Frodo |  Baggins" in out
 
     @since('2.2')
-    def tracing_simple_test(self):
+    def test_tracing_simple(self):
         """
         Test tracing using the default tracing class. See trace().
 
@@ -111,7 +115,7 @@ class TestCqlTracing(Tester):
         self.trace(session)
 
     @since('3.4')
-    def tracing_unknown_impl_test(self):
+    def test_tracing_unknown_impl(self):
         """
         Test that Cassandra logs an error, but keeps its default tracing
         behavior, when a nonexistent tracing class is specified.
@@ -125,23 +129,23 @@ class TestCqlTracing(Tester):
         @jira_ticket CASSANDRA-10392
         """
         expected_error = 'Cannot use class junk for tracing'
-        self.ignore_log_patterns = [expected_error]
+        self.fixture_dtest_setup.ignore_log_patterns = [expected_error]
         session = self.prepare(jvm_args=['-Dcassandra.custom_tracing_class=junk'])
         self.trace(session)
 
         errs = self.cluster.nodelist()[0].grep_log_for_errors()
-        debug('Errors after attempted trace with unknown tracing class: {errs}'.format(errs=errs))
-        self.assertEqual(len(errs), 1)
+        logger.debug('Errors after attempted trace with unknown tracing class: {errs}'.format(errs=errs))
+        assert len(errs) == 1
         if self.cluster.version() >= LooseVersion('3.10'):
             # See CASSANDRA-11706 and PR #1281
-            self.assertTrue(len(errs[0]) > 0)
+            assert len(errs[0]) > 0
         else:
-            self.assertEqual(len(errs[0]), 1)
+            assert len(errs[0]) == 1
         err = errs[0][0]
-        self.assertIn(expected_error, err)
+        assert expected_error in err
 
     @since('3.4')
-    def tracing_default_impl_test(self):
+    def test_tracing_default_impl(self):
         """
         Test that Cassandra logs an error, but keeps its default tracing
         behavior, when the default tracing class is specified.
@@ -158,20 +162,20 @@ class TestCqlTracing(Tester):
         @jira_ticket CASSANDRA-10392
         """
         expected_error = 'Cannot use class org.apache.cassandra.tracing.TracingImpl'
-        self.ignore_log_patterns = [expected_error]
+        self.fixture_dtest_setup.ignore_log_patterns = [expected_error]
         session = self.prepare(jvm_args=['-Dcassandra.custom_tracing_class=org.apache.cassandra.tracing.TracingImpl'])
         self.trace(session)
 
         errs = self.cluster.nodelist()[0].grep_log_for_errors()
-        debug('Errors after attempted trace with default tracing class: {errs}'.format(errs=errs))
-        self.assertEqual(len(errs), 1)
+        logger.debug('Errors after attempted trace with default tracing class: {errs}'.format(errs=errs))
+        assert len(errs) == 1
         if self.cluster.version() >= LooseVersion('3.10'):
             # See CASSANDRA-11706 and PR #1281
-            self.assertTrue(len(errs[0]) > 0)
+            assert len(errs[0]) > 0
         else:
-            self.assertEqual(len(errs[0]), 1)
+            assert len(errs[0]) == 1
         err = errs[0][0]
-        self.assertIn(expected_error, err)
+        assert expected_error in err
         # make sure it logged the error for the correct reason. this isn't
         # part of the expected error to avoid having to escape parens and
         # periods for regexes.
@@ -181,9 +185,8 @@ class TestCqlTracing(Tester):
             check_for_errs_in = errs[0][1]
         else:
             check_for_errs_in = err
-        self.assertIn("Default constructor for Tracing class "
-                      "'org.apache.cassandra.tracing.TracingImpl' is inaccessible.",
-                      check_for_errs_in)
+        assert "Default constructor for Tracing class 'org.apache.cassandra.tracing.TracingImpl' is inaccessible." \
+               in check_for_errs_in
 
     @since('3.0')
     def test_tracing_does_not_interfere_with_digest_calculation(self):
@@ -208,6 +211,6 @@ class TestCqlTracing(Tester):
             # If we are able to read the MBean attribute, assert that the count is 0
             if jmx.has_mbean(rr_count):
                 # expect 0 digest mismatches
-                self.assertEqual(0, jmx.read_attribute(rr_count, 'Count'))
+                assert 0 == jmx.read_attribute(rr_count, 'Count')
             else:
                 pass

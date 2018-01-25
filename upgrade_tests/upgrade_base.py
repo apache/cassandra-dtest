@@ -1,13 +1,17 @@
 import os
 import sys
 import time
+import pytest
+import logging
+
 from abc import ABCMeta
-from unittest import skipIf
 
 from ccmlib.common import get_version_from_build, is_win
 from tools.jmxutils import remove_perf_disable_shared_mem
 
-from dtest import CASSANDRA_VERSION_FROM_BUILD, TRACE, DEBUG, Tester, debug, create_ks
+from dtest import CASSANDRA_VERSION_FROM_BUILD, Tester, create_ks
+
+logger = logging.getLogger(__name__)
 
 
 def switch_jdks(major_version_int):
@@ -25,12 +29,13 @@ def switch_jdks(major_version_int):
     # don't change if the same version was requested
     current_java_home = os.environ.get('JAVA_HOME')
     if current_java_home != os.environ[new_java_home]:
-        debug("Switching jdk to version {} (JAVA_HOME is changing from {} to {})".format(major_version_int, current_java_home or 'undefined', os.environ[new_java_home]))
+        logger.debug("Switching jdk to version {} (JAVA_HOME is changing from {} to {})".format(major_version_int, current_java_home or 'undefined', os.environ[new_java_home]))
         os.environ['JAVA_HOME'] = os.environ[new_java_home]
 
 
-@skipIf(sys.platform == 'win32', 'Skip upgrade tests on Windows')
-class UpgradeTester(Tester):
+@pytest.mark.upgrade_test
+@pytest.mark.skipif(sys.platform == 'win32', reason='Skip upgrade tests on Windows')
+class UpgradeTester(Tester, metaclass=ABCMeta):
     """
     When run in 'normal' upgrade mode without specifying any version to run,
     this will test different upgrade paths depending on what version of C* you
@@ -38,35 +43,27 @@ class UpgradeTester(Tester):
     When run on 3.0, this will test the upgrade path to trunk. When run on
     versions above 3.0, this will test the upgrade path from 3.0 to HEAD.
     """
-    # make this an abc so we can get all subclasses with __subclasses__()
-    __metaclass__ = ABCMeta
     NODES, RF, __test__, CL, UPGRADE_PATH = 2, 1, False, None, None
 
-    # known non-critical bug during teardown:
-    # https://issues.apache.org/jira/browse/CASSANDRA-12340
-    if CASSANDRA_VERSION_FROM_BUILD < '2.2':
-        _known_teardown_race_error = (
-            'ScheduledThreadPoolExecutor$ScheduledFutureTask@[0-9a-f]+ '
-            'rejected from org.apache.cassandra.concurrent.DebuggableScheduledThreadPoolExecutor'
-        )
-        # don't alter ignore_log_patterns on the class, just the obj for this test
-        ignore_log_patterns = [_known_teardown_race_error]
+    @pytest.fixture(autouse=True)
+    def fixture_add_additional_log_patterns(self, fixture_dtest_setup):
+        # known non-critical bug during teardown:
+        # https://issues.apache.org/jira/browse/CASSANDRA-12340
+        if CASSANDRA_VERSION_FROM_BUILD < '2.2':
+            _known_teardown_race_error = (
+                'ScheduledThreadPoolExecutor$ScheduledFutureTask@[0-9a-f]+ '
+                'rejected from org.apache.cassandra.concurrent.DebuggableScheduledThreadPoolExecutor'
+            )
+            fixture_dtest_setup.ignore_log_patterns = fixture_dtest_setup.ignore_log_patterns \
+                                                      + [_known_teardown_race_error]
 
-    def __init__(self, *args, **kwargs):
-        try:
-            self.ignore_log_patterns
-        except AttributeError:
-            self.ignore_log_patterns = []
-
-        self.ignore_log_patterns = self.ignore_log_patterns[:] + [
+        fixture_dtest_setup.ignore_log_patterns = fixture_dtest_setup.ignore_log_patterns + [
             r'RejectedExecutionException.*ThreadPoolExecutor has shut down',  # see  CASSANDRA-12364
         ]
-        self.enable_for_jolokia = False
-        super(UpgradeTester, self).__init__(*args, **kwargs)
 
     def setUp(self):
         self.validate_class_config()
-        debug("Upgrade test beginning, setting CASSANDRA_VERSION to {}, and jdk to {}. (Prior values will be restored after test)."
+        logger.debug("Upgrade test beginning, setting CASSANDRA_VERSION to {}, and jdk to {}. (Prior values will be restored after test)."
               .format(self.UPGRADE_PATH.starting_version, self.UPGRADE_PATH.starting_meta.java_version))
         switch_jdks(self.UPGRADE_PATH.starting_meta.java_version)
         os.environ['CASSANDRA_VERSION'] = self.UPGRADE_PATH.starting_version
@@ -80,7 +77,7 @@ class UpgradeTester(Tester):
         cl = self.CL if cl is None else cl
         self.CL = cl  # store for later use in do_upgrade
 
-        self.assertGreaterEqual(nodes, 2, "backwards compatibility tests require at least two nodes")
+        assert nodes, 2 >= "backwards compatibility tests require at least two nodes"
 
         self.protocol_version = protocol_version
 
@@ -104,8 +101,8 @@ class UpgradeTester(Tester):
         cluster.populate(nodes)
         node1 = cluster.nodelist()[0]
         cluster.set_install_dir(version=self.UPGRADE_PATH.starting_version)
-        self.enable_for_jolokia = kwargs.pop('jolokia', False)
-        if self.enable_for_jolokia:
+        self.fixture_dtest_setup.enable_for_jolokia = kwargs.pop('jolokia', False)
+        if self.fixture_dtest_setup.enable_for_jolokia:
             remove_perf_disable_shared_mem(node1)
 
         cluster.start(wait_for_binary_proto=True)
@@ -147,7 +144,7 @@ class UpgradeTester(Tester):
         if is_win() and self.cluster.version() <= '2.2':
             node1.mark_log_for_errors()
 
-        debug('upgrading node1 to {}'.format(self.UPGRADE_PATH.upgrade_version))
+        logger.debug('upgrading node1 to {}'.format(self.UPGRADE_PATH.upgrade_version))
         switch_jdks(self.UPGRADE_PATH.upgrade_meta.java_version)
 
         node1.set_install_dir(version=self.UPGRADE_PATH.upgrade_version)
@@ -159,18 +156,19 @@ class UpgradeTester(Tester):
         # The since decorator can only check the starting version of the upgrade,
         # so here we check to new version of the upgrade as well.
         if hasattr(self, 'max_version') and self.max_version is not None and new_version_from_build >= self.max_version:
-            self.skip("Skipping test, new version {} is equal to or higher than max version {}".format(new_version_from_build, self.max_version))
+            pytest.skip("Skipping test, new version {} is equal to or higher than "
+                        "max version {}".format(new_version_from_build, self.max_version))
 
         if (new_version_from_build >= '3' and self.protocol_version is not None and self.protocol_version < 3):
-            self.skip('Protocol version {} incompatible '
-                      'with Cassandra version {}'.format(self.protocol_version, new_version_from_build))
-        node1.set_log_level("DEBUG" if DEBUG else "TRACE" if TRACE else "INFO")
+            pytest.skip('Protocol version {} incompatible '
+                        'with Cassandra version {}'.format(self.protocol_version, new_version_from_build))
+        node1.set_log_level(logging.getLevelName(logging.root.level))
         node1.set_configuration_options(values={'internode_compression': 'none'})
 
         if use_thrift:
             node1.set_configuration_options(values={'start_rpc': 'true'})
 
-        if self.enable_for_jolokia:
+        if self.fixture_dtest_setup.enable_for_jolokia:
             remove_perf_disable_shared_mem(node1)
 
         node1.start(wait_for_binary_proto=True, wait_other_notice=True)
@@ -223,7 +221,7 @@ class UpgradeTester(Tester):
         Used in places where is_upgraded was used to determine if the node version was >=2.2.
         """
         node_versions = self.get_node_versions()
-        self.assertLessEqual(len({v.vstring for v in node_versions}), 2)
+        assert len({v.vstring for v in node_versions}) <= 2
         return max(node_versions) if is_upgraded else min(node_versions)
 
     def tearDown(self):
@@ -246,4 +244,4 @@ class UpgradeTester(Tester):
              if subclasses else
              '')
         )
-        self.assertIsNotNone(self.UPGRADE_PATH, no_upgrade_path_error)
+        assert self.UPGRADE_PATH is not None, no_upgrade_path_error

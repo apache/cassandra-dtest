@@ -1,7 +1,11 @@
 import time
+import pytest
+import logging
 
 from dtest import Tester, create_ks
-from tools.decorators import since
+
+since = pytest.mark.since
+logger = logging.getLogger(__name__)
 
 
 @since("1.2")
@@ -18,7 +22,7 @@ class TestCQL(Tester):
         create_ks(session, 'ks', 1)
         return session
 
-    def batch_preparation_test(self):
+    def test_batch_preparation(self):
         """ Test preparation of batch statement (#4202) """
         session = self.prepare()
 

@@ -1,7 +1,8 @@
 import datetime
 import random
+import logging
 
-from dtest import Tester, debug, create_ks
+from dtest import Tester, create_ks
 from tools.assertions import assert_length_equal
 
 status_messages = (
@@ -22,6 +23,8 @@ clients = (
     "Emacs"
 )
 
+logger = logging.getLogger(__name__)
+
 
 class TestWideRows(Tester):
     def test_wide_rows(self):
@@ -36,29 +39,29 @@ class TestWideRows(Tester):
         start_time = datetime.datetime.now()
         create_ks(session, 'wide_rows', 1)
         # Simple timeline:  user -> {date: value, ...}
-        debug('Create Table....')
+        logger.debug('Create Table....')
         session.execute('CREATE TABLE user_events (userid text, event timestamp, value text, PRIMARY KEY (userid, event));')
         date = datetime.datetime.now()
         # Create a large timeline for each of a group of users:
         for user in ('ryan', 'cathy', 'mallen', 'joaquin', 'erin', 'ham'):
-            debug("Writing values for: %s" % user)
-            for day in xrange(5000):
+            logger.debug("Writing values for: %s" % user)
+            for day in range(5000):
                 date_str = (date + datetime.timedelta(day)).strftime("%Y-%m-%d")
                 client = random.choice(clients)
                 msg = random.choice(status_messages)
                 query = "UPDATE user_events SET value = '{msg:%s, client:%s}' WHERE userid='%s' and event='%s';" % (msg, client, user, date_str)
-                # debug(query)
+                # logger.debug(query)
                 session.execute(query)
 
-        # debug('Duration of test: %s' % (datetime.datetime.now() - start_time))
+        # logger.debug('Duration of test: %s' % (datetime.datetime.now() - start_time))
 
         # Pick out an update for a specific date:
         query = "SELECT value FROM user_events WHERE userid='ryan' and event='%s'" % \
                 (date + datetime.timedelta(10)).strftime("%Y-%m-%d")
         rows = session.execute(query)
         for value in rows:
-            debug(value)
-            self.assertGreater(len(value[0]), 0)
+            logger.debug(value)
+            assert len(value[0]) > 0
 
     def test_column_index_stress(self):
         """Write a large number of columns to a single row and set

@@ -1,15 +1,17 @@
-from __future__ import division
-
 import time
+import logging
+
 from math import floor
 from os.path import getsize
 
-from dtest import Tester, debug
+from dtest import Tester
+
+logger = logging.getLogger(__name__)
 
 
 class TestSSTableSplit(Tester):
 
-    def split_test(self):
+    def test_split(self):
         """
         Check that after running compaction, sstablessplit can succesfully split
         The resultant sstable.  Check that split is reversible and that data is readable
@@ -20,7 +22,7 @@ class TestSSTableSplit(Tester):
         node = cluster.nodelist()[0]
         version = cluster.version()
 
-        debug("Run stress to insert data")
+        logger.debug("Run stress to insert data")
 
         node.stress(['write', 'n=1000', 'no-warmup', '-rate', 'threads=50',
                      '-col', 'n=FIXED(10)', 'SIZE=FIXED(1024)'])
@@ -30,20 +32,20 @@ class TestSSTableSplit(Tester):
         self._do_compaction(node)
         self._do_split(node, version)
 
-        debug("Run stress to ensure data is readable")
+        logger.debug("Run stress to ensure data is readable")
         node.stress(['read', 'n=1000', '-rate', 'threads=25',
                      '-col', 'n=FIXED(10)', 'SIZE=FIXED(1024)'])
 
     def _do_compaction(self, node):
-        debug("Compact sstables.")
+        logger.debug("Compact sstables.")
         node.flush()
         node.compact()
         keyspace = 'keyspace1'
         sstables = node.get_sstables(keyspace, '')
-        debug("Number of sstables after compaction: %s" % len(sstables))
+        logger.debug("Number of sstables after compaction: %s" % len(sstables))
 
     def _do_split(self, node, version):
-        debug("Run sstablesplit")
+        logger.debug("Run sstablesplit")
         time.sleep(5.0)
         node.stop()
 
@@ -55,7 +57,7 @@ class TestSSTableSplit(Tester):
         # get the initial sstables and their total size
         origsstables = node.get_sstables(keyspace, '')
         origsstable_size = sum([getsize(sstable) for sstable in origsstables])
-        debug("Original sstable and sizes before split: {}".format([(name, getsize(name)) for name in origsstables]))
+        logger.debug("Original sstable and sizes before split: {}".format([(name, getsize(name)) for name in origsstables]))
 
         # calculate the expected number of sstables post-split
         expected_num_sstables = floor(origsstable_size / expected_sstable_size)
@@ -65,24 +67,24 @@ class TestSSTableSplit(Tester):
                                        no_snapshot=True, debug=True)
 
         for (out, error, rc) in result:
-            debug("stdout: {}".format(out))
-            debug("stderr: {}".format(error))
-            debug("rc: {}".format(rc))
+            logger.debug("stdout: {}".format(out))
+            logger.debug("stderr: {}".format(error))
+            logger.debug("rc: {}".format(rc))
 
         # get the sstables post-split and their total size
         sstables = node.get_sstables(keyspace, '')
-        debug("Number of sstables after split: %s. expected %s" % (len(sstables), expected_num_sstables))
-        self.assertLessEqual(expected_num_sstables, len(sstables) + 1)
-        self.assertLessEqual(1, len(sstables))
+        logger.debug("Number of sstables after split: %s. expected %s" % (len(sstables), expected_num_sstables))
+        assert expected_num_sstables <= len(sstables) + 1
+        assert 1 <= len(sstables)
 
         # make sure none of the tables are bigger than the max expected size
         sstable_sizes = [getsize(sstable) for sstable in sstables]
         # add a bit extra for overhead
-        self.assertLessEqual(max(sstable_sizes), expected_sstable_size + 512)
+        assert max(sstable_sizes) <= expected_sstable_size + 512
         # make sure node can start with changed sstables
         node.start(wait_for_binary_proto=True)
 
-    def single_file_split_test(self):
+    def test_single_file_split(self):
         """
         Covers CASSANDRA-8623
 
@@ -92,7 +94,7 @@ class TestSSTableSplit(Tester):
         cluster.populate(1).start(wait_for_binary_proto=True)
         node = cluster.nodelist()[0]
 
-        debug("Run stress to insert data")
+        logger.debug("Run stress to insert data")
         node.stress(['write', 'n=300', 'no-warmup', '-rate', 'threads=50',
                      '-col', 'n=FIXED(10)', 'SIZE=FIXED(1024)'])
 
@@ -101,9 +103,9 @@ class TestSSTableSplit(Tester):
         result = node.run_sstablesplit(keyspace='keyspace1', size=1, no_snapshot=True)
 
         for (stdout, stderr, rc) in result:
-            debug(stderr)
-            failure = stderr.find("java.lang.AssertionError: Data component is missing")
-            self.assertEqual(failure, -1, "Error during sstablesplit")
+            logger.debug(stderr.decode("utf-8"))
+            failure = stderr.decode("utf-8").find("java.lang.AssertionError: Data component is missing")
+            assert failure, -1 == "Error during sstablesplit"
 
         sstables = node.get_sstables('keyspace1', '')
-        self.assertGreaterEqual(len(sstables), 1, sstables)
+        assert len(sstables), 1 >= sstables

@@ -1,14 +1,17 @@
 import time
+import logging
 
 from dtest import Tester, create_ks, create_cf
 from tools.data import rows_to_list
 from tools.jmxutils import (JolokiaAgent, make_mbean,
                             remove_perf_disable_shared_mem)
 
+logger = logging.getLogger(__name__)
+
 
 class TestDeletion(Tester):
 
-    def gc_test(self):
+    def test_gc(self):
         """
         Test that tombstone purging doesn't bring back deleted data by writing
         2 rows to a table with gc_grace=0, deleting one of those rows, then
@@ -29,23 +32,20 @@ class TestDeletion(Tester):
         session.execute('insert into cf (key, c1) values (2,1)')
         node1.flush()
 
-        self.assertEqual(rows_to_list(session.execute('select * from cf;')),
-                         [[1, 1], [2, 1]])
+        assert rows_to_list(session.execute('select * from cf;')) == [[1, 1], [2, 1]]
 
         session.execute('delete from cf where key=1')
 
-        self.assertEqual(rows_to_list(session.execute('select * from cf;')),
-                         [[2, 1]])
+        assert rows_to_list(session.execute('select * from cf;')) == [[2, 1]]
 
         node1.flush()
         time.sleep(.5)
         node1.compact()
         time.sleep(.5)
 
-        self.assertEqual(rows_to_list(session.execute('select * from cf;')),
-                         [[2, 1]])
+        assert rows_to_list(session.execute('select * from cf;')) == [[2, 1]]
 
-    def tombstone_size_test(self):
+    def test_tombstone_size(self):
         self.cluster.populate(1)
         node1 = self.cluster.nodelist()[0]
 
@@ -61,8 +61,8 @@ class TestDeletion(Tester):
         for i in range(100):
             session.execute(stmt, [i])
 
-        self.assertEqual(memtable_count(node1, 'ks', 'test'), 100)
-        self.assertGreater(memtable_size(node1, 'ks', 'test'), 0)
+        assert memtable_count(node1, 'ks', 'test') == 100
+        assert memtable_size(node1, 'ks', 'test') > 0
 
 
 def memtable_size(node, keyspace, table):

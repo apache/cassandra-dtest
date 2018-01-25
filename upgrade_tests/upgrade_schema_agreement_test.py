@@ -1,8 +1,13 @@
 import re
 import time
+import pytest
+import logging
 
 from ccmlib.node import TimeoutError
-from dtest import Tester, debug
+from dtest import Tester
+
+since = pytest.mark.since
+logger = logging.getLogger(__name__)
 
 
 class TestSchemaAgreementUpgrade(Tester):
@@ -33,15 +38,14 @@ class TestSchemaAgreementUpgrade(Tester):
     # The number of seconds we wait for schema migration log entries to verify
     migration_check_time = 30
 
-    def __init__(self, *args, **kwargs):
-        self.ignore_log_patterns = [
+    @pytest.fixture(autouse=True)
+    def fixture_add_additional_log_patterns(self, fixture_dtest_setup):
+        fixture_dtest_setup.ignore_log_patterns = (
             # This one occurs if we do a non-rolling upgrade, the node
             # it's trying to send the migration to hasn't started yet,
             # and when it does, it gets replayed and everything is fine.
             r'Can\'t send migration request: node.*is down',
-        ]
-
-        Tester.__init__(self, *args, **kwargs)
+        )
 
     def _prepare(self, version, num_nodes=3):
         cluster = self.cluster
@@ -65,7 +69,7 @@ class TestSchemaAgreementUpgrade(Tester):
         expressions = [" - [pP]ulling schema from endpoint",
                        " - [Ss]ubmitting migration task",
                        " - [Pp]ulled schema from endpoint"]
-        debug("Inspecting log files of {}...".format([n.name for n in nodes]))
+        logger.debug("Inspecting log files of {}...".format([n.name for n in nodes]))
         all_matchings = ""
         for node in nodes:
             try:
@@ -73,11 +77,11 @@ class TestSchemaAgreementUpgrade(Tester):
                 all_matchings = all_matchings + "\n{}: {}".format(node.name, matchings)
             except TimeoutError:
                 # good
-                debug("  {}: log files don't show schema migration messages (good)".format(node.name))
+                logger.debug("  {}: log files don't show schema migration messages (good)".format(node.name))
         if all_matchings != "":
             msg = "Expected no schema migration log entries, but got:{}".format(all_matchings)
-            debug(msg)  # debug message for the validation test case (3.0 vs 3.11.1)
-            self.fail(msg)
+            logger.debug(msg)  # debug message for the validation test case (3.0 vs 3.11.1)
+            pytest.fail(msg)
 
     def _wait_for_status_normal(self, node, mark):
         # Wait until the node is in state NORMAL (otherwise we can expect
@@ -86,13 +90,13 @@ class TestSchemaAgreementUpgrade(Tester):
                            from_mark=mark, timeout=300, filename='debug.log')
 
     def _bounce_node(self, node):
-        debug("Bouncing {}...".format(node.name))
-        debug("  Stopping...")
+        logger.debug("Bouncing {}...".format(node.name))
+        logger.debug("  Stopping...")
         node.stop(wait_other_notice=False)  # intentionally set to wait_other_notice=False
         mark = node.mark_log(filename='debug.log')
-        debug("  Starting...")
+        logger.debug("  Starting...")
         node.start(wait_other_notice=False)  # intentionally set to wait_other_notice=False
-        debug("  Waiting for status NORMAL...")
+        logger.debug("  Waiting for status NORMAL...")
         self._wait_for_status_normal(node, mark)
 
     def _min_version(self, nodes):
@@ -103,7 +107,7 @@ class TestSchemaAgreementUpgrade(Tester):
         min_version = 99.9
         for node in nodes:
             short_version = node.get_base_cassandra_version()
-            debug("{} is on {} ({})".format(node.name, short_version, node.get_cassandra_version()))
+            logger.debug("{} is on {} ({})".format(node.name, short_version, node.get_cassandra_version()))
             if short_version < min_version:
                 min_version = short_version
         return min_version
@@ -131,29 +135,29 @@ class TestSchemaAgreementUpgrade(Tester):
         """
 
         # prepare the cluster with initial version from the upgrade path
-        debug('Starting upgrade test with {}'.format(upgrade_path[0][1]))
+        logger.debug('Starting upgrade test with {}'.format(upgrade_path[0][1]))
         cluster = self._prepare(version=upgrade_path[0][1])
 
         nodes = self.cluster.nodelist()
 
         # perform _rolling_ upgrades from one version to another
         for (gossip_log_with_product_version, version) in upgrade_path[1:]:
-            debug("")
-            debug("Upgrading cluster to {}".format(version))
+            logger.debug("")
+            logger.debug("Upgrading cluster to {}".format(version))
             cluster.set_install_dir(version=version)
 
             for node in nodes:
                 other_nodes = [n for n in nodes if n != node]
 
-                debug("")
-                debug("Stopping {} for upgrade...".format(node.name))
+                logger.debug("")
+                logger.debug("Stopping {} for upgrade...".format(node.name))
                 # needed to "patch" the config file (especially since 4.0) and get the correct version number
                 node.set_install_dir(version=version)
                 node.stop(wait_other_notice=False)  # intentionally set to wait_other_notice=False
 
                 # remember the logfile-mark when the node was upgraded
                 upgrade_log_mark = node.mark_log(filename='debug.log')
-                debug("Starting upgraded {}...".format(node.name))
+                logger.debug("Starting upgraded {}...".format(node.name))
                 node.start(wait_other_notice=False)  # intentionally set to wait_other_notice=False
 
                 # wait until the upgraded node is in status NORMAL
@@ -161,25 +165,25 @@ class TestSchemaAgreementUpgrade(Tester):
 
                 # If it's a 3.11.2 node, check that the correct schema version is announced
                 min_version = self._min_version(nodes)
-                debug("Minimum version: {}".format(min_version))
+                logger.debug("Minimum version: {}".format(min_version))
                 if gossip_log_with_product_version:
                     # 3.11.2 nodes (and only 3.11.2) indicate whether they announce
                     # a "3.0 compatible" or "real" "3.11" schema version.
                     watch_part = "Gossiping my {} schema version".format("3.0 compatible" if min_version == 3.0 else "3.11")
-                    debug("Inspecting log for '{}'...".format(watch_part))
+                    logger.debug("Inspecting log for '{}'...".format(watch_part))
                     matchings = node.watch_log_for(watch_part, from_mark=upgrade_log_mark, timeout=120, filename='debug.log')
-                    debug("  Found: {}".format(matchings))
+                    logger.debug("  Found: {}".format(matchings))
 
                 # Only log the schema information for debug purposes here. Primarily want to catch the
                 # schema migration race.
                 for n in nodes:
                     out, _, _ = n.nodetool("describecluster")
-                    debug("nodetool describecluster of {}:".format(n.name))
-                    debug(out)
+                    logger.debug("nodetool describecluster of {}:".format(n.name))
+                    logger.debug(out)
 
                 # We expect no schema migrations at this point.
                 self._set_verify_log_mark(other_nodes)
-                debug("  Sleep for {} seconds...".format(self.migration_check_time))
+                logger.debug("  Sleep for {} seconds...".format(self.migration_check_time))
                 time.sleep(self.migration_check_time)
                 self._expect_no_schema_migrations(other_nodes)
 
@@ -188,11 +192,11 @@ class TestSchemaAgreementUpgrade(Tester):
                 # the whole endpoint state to propagate - including the schema version, which, in theory,
                 # should trigger the race.
                 # It is expected, that the _other_ nodes do not try to pull the schema.
-                debug("")
-                debug("Try to trigger schema migration race by bouncing the upgraded node")
+                logger.debug("")
+                logger.debug("Try to trigger schema migration race by bouncing the upgraded node")
                 self._bounce_node(node)
                 self._set_verify_log_mark(other_nodes)
-                debug("  Sleep for {} seconds...".format(self.migration_check_time))
+                logger.debug("  Sleep for {} seconds...".format(self.migration_check_time))
                 time.sleep(self.migration_check_time)
                 self._expect_no_schema_migrations(other_nodes)
 
@@ -201,8 +205,8 @@ class TestSchemaAgreementUpgrade(Tester):
                 # only want to have one schema version.
                 for n in nodes:
                     out, _, _ = n.nodetool("describecluster")
-                    debug("nodetool describecluster of {}:".format(n.name))
-                    debug(out)
+                    logger.debug("nodetool describecluster of {}:".format(n.name))
+                    logger.debug(out)
                     versions = out.split('Schema versions:')[1].strip()
                     num_schemas = len(re.findall('\[.*?\]', versions))
                     self.assertEqual(num_schemas, 1, "Multiple schema versions detected on {}: {}".format(n.name, out))

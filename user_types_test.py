@@ -1,12 +1,19 @@
 import time
 import uuid
+import pytest
+import logging
+
+from flaky import flaky
 
 from cassandra import ConsistencyLevel, Unauthorized
 from cassandra.query import SimpleStatement
 
 from dtest import Tester, create_ks
 from tools.assertions import assert_invalid
-from tools.decorators import since
+from plugins.assert_tools import assert_regexp_matches
+
+since = pytest.mark.since
+logger = logging.getLogger(__name__)
 
 
 def listify(item):
@@ -23,13 +30,13 @@ def listify(item):
 
 class TestUserTypes(Tester):
     def assertUnauthorized(self, session, query, message):
-        with self.assertRaises(Unauthorized) as cm:
+        with pytest.raises(Unauthorized) as cm:
             session.execute(query)
-        self.assertRegexpMatches(cm.exception.message, message)
+            assert_regexp_matches(repr(cm._excinfo[1]), message)
 
     def assertNoTypes(self, session):
-        for keyspace in session.cluster.metadata.keyspaces.values():
-            self.assertEqual(0, len(keyspace.user_types))
+        for keyspace in list(session.cluster.metadata.keyspaces.values()):
+            assert 0 == len(keyspace.user_types)
 
     def test_type_dropping(self):
         """
@@ -190,7 +197,7 @@ class TestUserTypes(Tester):
               SELECT * FROM simple_table;
            """
         rows = list(session.execute(stmt))
-        self.assertEqual(0, len(rows))
+        assert 0 == len(rows)
 
     def test_nested_user_types(self):
         """Tests user types within user types"""
@@ -285,12 +292,12 @@ class TestUserTypes(Tester):
         rows = list(session.execute(stmt))
 
         primary_item, other_items, other_containers = rows[0]
-        self.assertEqual(listify(primary_item), [u'test', u'test2'])
-        self.assertEqual(listify(other_items), [u'stuff', [u'one', u'two']])
-        self.assertEqual(listify(other_containers), [[u'stuff2', [u'one_other', u'two_other']], [u'stuff3', [u'one_2_other', u'two_2_other']], [u'stuff4', [u'one_3_other', u'two_3_other']]])
+        assert listify(primary_item) == ['test', 'test2']
+        assert listify(other_items) == ['stuff', ['one', 'two']]
+        assert listify(other_containers) == [['stuff2', ['one_other', 'two_other']], ['stuff3', ['one_2_other', 'two_2_other']], ['stuff4', ['one_3_other', 'two_3_other']]]
 
         #  Generate some repetitive data and check it for it's contents:
-        for x in xrange(50):
+        for x in range(50):
 
             # Create row:
             _id = uuid.uuid4()
@@ -323,7 +330,7 @@ class TestUserTypes(Tester):
             rows = list(session.execute(stmt))
 
             items = rows[0][0]
-            self.assertEqual(listify(items), [[u'stuff3', [u'one_2_other', u'two_2_other']], [u'stuff4', [u'one_3_other', u'two_3_other']]])
+            assert listify(items) == [['stuff3', ['one_2_other', 'two_2_other']], ['stuff4', ['one_3_other', 'two_3_other']]]
 
     def test_type_as_part_of_pkey(self):
         """Tests user types as part of a composite pkey"""
@@ -382,9 +389,10 @@ class TestUserTypes(Tester):
         rows = session.execute(stmt)
 
         row_uuid, first_name, like = rows[0]
-        self.assertEqual(first_name, u'Nero')
-        self.assertEqual(like, u'arson')
+        assert first_name == 'Nero'
+        assert like == 'arson'
 
+    @flaky
     def test_type_secondary_indexing(self):
         """
         Confirm that user types are secondary-indexable
@@ -426,7 +434,7 @@ class TestUserTypes(Tester):
               SELECT * from person_likes where name = {first:'Nero', middle: 'Claudius Caesar Augustus', last: 'Germanicus'};
             """
         rows = list(session.execute(stmt))
-        self.assertEqual(0, len(rows))
+        assert 0 == len(rows)
 
         # add a row which doesn't specify data for the indexed column, and query again
         _id = uuid.uuid4()
@@ -441,7 +449,7 @@ class TestUserTypes(Tester):
             """
 
         rows = list(session.execute(stmt))
-        self.assertEqual(0, len(rows))
+        assert 0 == len(rows)
 
         # finally let's add a queryable row, and get it back using the index
         _id = uuid.uuid4()
@@ -460,9 +468,9 @@ class TestUserTypes(Tester):
 
         row_uuid, first_name, like = rows[0]
 
-        self.assertEqual(str(row_uuid), str(_id))
-        self.assertEqual(first_name, u'Nero')
-        self.assertEqual(like, u'arson')
+        assert str(row_uuid) == str(_id)
+        assert first_name == 'Nero'
+        assert like == 'arson'
 
         # rename a field in the type and make sure the index still works
         stmt = """
@@ -478,9 +486,9 @@ class TestUserTypes(Tester):
 
         row_uuid, first_name, like = rows[0]
 
-        self.assertEqual(str(row_uuid), str(_id))
-        self.assertEqual(first_name, u'Nero')
-        self.assertEqual(like, u'arson')
+        assert str(row_uuid) == str(_id)
+        assert first_name == 'Nero'
+        assert like == 'arson'
 
         # add another row to be sure the index is still adding new data
         _id = uuid.uuid4()
@@ -499,15 +507,15 @@ class TestUserTypes(Tester):
 
         row_uuid, first_name, like = rows[0]
 
-        self.assertEqual(str(row_uuid), str(_id))
-        self.assertEqual(first_name, u'Abraham')
-        self.assertEqual(like, u'preserving unions')
+        assert str(row_uuid) == str(_id)
+        assert first_name == 'Abraham'
+        assert like == 'preserving unions'
 
     def test_type_keyspace_permission_isolation(self):
         """
         Confirm permissions are respected for types in different keyspaces
         """
-        self.ignore_log_patterns = [
+        self.fixture_dtest_setup.ignore_log_patterns = [
             # I think this happens when permissions change and a node becomes temporarily unavailable
             # and it's probably ok to ignore on this test, as I can see the schema changes propogating
             # almost immediately after
@@ -609,10 +617,10 @@ class TestUserTypes(Tester):
         session.execute("INSERT INTO bucket (id, my_item) VALUES (1, {sub_one: 'test'})")
 
         rows = list(session.execute("SELECT my_item FROM bucket WHERE id=0"))
-        self.assertEqual(listify(rows[0]), [[u'test', None]])
+        assert listify(rows[0]) == [['test', None]]
 
         rows = list(session.execute("SELECT my_item FROM bucket WHERE id=1"))
-        self.assertEqual(listify(rows[0]), [[u'test', None]])
+        assert listify(rows[0]) == [['test', None]]
 
     def test_no_counters_in_user_types(self):
         # CASSANDRA-7672
@@ -665,7 +673,7 @@ class TestUserTypes(Tester):
 
         # create a bit of data and expect a natural order based on clustering user types
 
-        ids = range(1, 10)
+        ids = list(range(1, 10))
 
         for _id in ids:
             session.execute("INSERT INTO letters (id, letterpair) VALUES ({}, {{first:'a', second:'z'}})".format(_id))
@@ -678,10 +686,10 @@ class TestUserTypes(Tester):
         for _id in ids:
             res = list(session.execute("SELECT letterpair FROM letters where id = {}".format(_id)))
 
-            self.assertEqual(listify(res), [[[u'a', u'z']], [[u'c', u'a']], [[u'c', u'f']], [[u'c', u'z']], [[u'd', u'e']], [[u'z', u'a']]])
+            assert listify(res) == [[['a', 'z']], [['c', 'a']], [['c', 'f']], [['c', 'z']], [['d', 'e']], [['z', 'a']]]
 
     @since('3.6')
-    def udt_subfield_test(self):
+    def test_udt_subfield(self):
         """
         @jira_ticket CASSANDRA-7423
         @since 3.6
@@ -701,7 +709,7 @@ class TestUserTypes(Tester):
         session.execute("INSERT INTO t (id, v) VALUES (0, {third: 2, second: 1})")
         session.execute("UPDATE t set v.first = 'a' WHERE id=0")
         rows = list(session.execute("SELECT * FROM t WHERE id = 0"))
-        self.assertEqual(listify(rows), [[0, ['a', 1, 2]]])
+        assert listify(rows) == [[0, ['a', 1, 2]]]
 
         # Create a full udt
         # Update a subfield on the udt
@@ -709,13 +717,13 @@ class TestUserTypes(Tester):
         session.execute("INSERT INTO t (id, v) VALUES (0, {first: 'c', second: 3, third: 33})")
         session.execute("UPDATE t set v.second = 5 where id=0")
         rows = list(session.execute("SELECT * FROM t WHERE id=0"))
-        self.assertEqual(listify(rows), [[0, ['c', 5, 33]]])
+        assert listify(rows) == [[0, ['c', 5, 33]]]
 
         # Rewrite the entire udt
         # Read back
         session.execute("INSERT INTO t (id, v) VALUES (0, {first: 'alpha', second: 111, third: 100})")
         rows = list(session.execute("SELECT * FROM t WHERE id=0"))
-        self.assertEqual(listify(rows), [[0, ['alpha', 111, 100]]])
+        assert listify(rows) == [[0, ['alpha', 111, 100]]]
 
         # Send three subfield updates to udt
         # Read back
@@ -723,7 +731,7 @@ class TestUserTypes(Tester):
         session.execute("UPDATE t set v.first = 'delta' WHERE id=0")
         session.execute("UPDATE t set v.second = -10 WHERE id=0")
         rows = list(session.execute("SELECT * FROM t WHERE id=0"))
-        self.assertEqual(listify(rows), [[0, ['delta', -10, 100]]])
+        assert listify(rows) == [[0, ['delta', -10, 100]]]
 
         # Send conflicting updates serially to different nodes
         # Read back
@@ -736,7 +744,7 @@ class TestUserTypes(Tester):
         session3.execute("UPDATE user_types.t set v.third = 103 WHERE id=0")
         query = SimpleStatement("SELECT * FROM t WHERE id = 0", consistency_level=ConsistencyLevel.ALL)
         rows = list(session.execute(query))
-        self.assertEqual(listify(rows), [[0, ['delta', -10, 103]]])
+        assert listify(rows) == [[0, ['delta', -10, 103]]]
         session1.shutdown()
         session2.shutdown()
         session3.shutdown()
@@ -745,14 +753,14 @@ class TestUserTypes(Tester):
         session.execute("INSERT INTO t (id, v) VALUES (0, {first:'cass', second:3, third:0})")
         session.execute("UPDATE t SET v.first = null WHERE id = 0")
         rows = list(session.execute("SELECT * FROM t WHERE id=0"))
-        self.assertEqual(listify(rows), [[0, [None, 3, 0]]])
+        assert listify(rows) == [[0, [None, 3, 0]]]
 
         rows = list(session.execute("SELECT v.first FROM t WHERE id=0"))
-        self.assertEqual(listify(rows), [[None]])
+        assert listify(rows) == [[None]]
         rows = list(session.execute("SELECT v.second FROM t WHERE id=0"))
-        self.assertEqual(listify(rows), [[3]])
+        assert listify(rows) == [[3]]
         rows = list(session.execute("SELECT v.third FROM t WHERE id=0"))
-        self.assertEqual(listify(rows), [[0]])
+        assert listify(rows) == [[0]]
 
     @since('2.2')
     def test_user_type_isolation(self):
@@ -761,7 +769,6 @@ class TestUserTypes(Tester):
         @jira_ticket CASSANDRA-9409
         @since 2.2
         """
-
         cluster = self.cluster
         cluster.populate(1).start()
         node1 = cluster.nodelist()[0]

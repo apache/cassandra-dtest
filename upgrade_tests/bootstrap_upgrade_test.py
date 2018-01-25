@@ -1,9 +1,12 @@
-from bootstrap_test import BaseBootstrapTest
-from tools.decorators import since, no_vnodes
+import pytest
+
+from bootstrap_test import TestBootstrap
+
+since = pytest.mark.since
 
 
-class TestBootstrapUpgrade(BaseBootstrapTest):
-    __test__ = True
+@pytest.mark.upgrade_test
+class TestBootstrapUpgrade(TestBootstrap):
 
     """
     @jira_ticket CASSANDRA-11841
@@ -11,7 +14,7 @@ class TestBootstrapUpgrade(BaseBootstrapTest):
     In particular, we want to test that keep-alive is not sent
     to a node with version < 3.10
     """
-    @no_vnodes()
+    @pytest.mark.no_vnodes
     @since('3.10', max_version='3.99')
-    def simple_bootstrap_test_mixed_versions(self):
+    def test_simple_bootstrap_mixed_versions(self):
         self._base_bootstrap_test(bootstrap_from_version="3.5")

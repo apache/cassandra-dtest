@@ -1,9 +1,15 @@
-from dtest import Tester, debug
+import pytest
+import logging
+
+from dtest import Tester
 from tools.assertions import assert_all
-from tools.decorators import since
+
+since = pytest.mark.since
+logger = logging.getLogger(__name__)
 
 
-class CompatibilityFlagTest(Tester):
+@pytest.mark.upgrade_test
+class TestCompatibilityFlag(Tester):
     """
     Test 30 protocol compatibility flag
 
@@ -24,7 +30,7 @@ class CompatibilityFlagTest(Tester):
         node1.drain()
         node1.watch_log_for("DRAINED")
         node1.stop(wait_other_notice=False)
-        debug("Upgrading to current version")
+        logger.debug("Upgrading to current version")
         self.set_node_to_current_version(node1)
         node1.start(wait_for_binary_proto=True)
 
@@ -45,18 +51,17 @@ class CompatibilityFlagTest(Tester):
         node1.drain()
         node1.watch_log_for("DRAINED")
         node1.stop(wait_other_notice=False)
-        debug("Upgrading to current version")
+        logger.debug("Upgrading to current version")
         self.set_node_to_current_version(node1)
         node1.start(jvm_args=["-Dcassandra.force_3_0_protocol_version=true"], wait_for_binary_proto=True)
 
         session = self.patient_cql_connection(node1)
         self._run_test(session)
 
-    def _compatibility_flag_on_3014_test(self):
+    def test__compatibility_flag_on_3014(self):
         """
         Test compatibility between post-13004 nodes, one of which is in compatibility mode
         """
-
         cluster = self.cluster
         cluster.populate(2)
         node1, node2 = cluster.nodelist()
@@ -67,11 +72,10 @@ class CompatibilityFlagTest(Tester):
         session = self.patient_cql_connection(node1)
         self._run_test(session)
 
-    def _compatibility_flag_off_3014_test(self):
+    def test__compatibility_flag_off_3014(self):
         """
         Test compatibility between post-13004 nodes
         """
-
         cluster = self.cluster
         cluster.populate(2)
         node1, node2 = cluster.nodelist()
@@ -101,32 +105,32 @@ class CompatibilityFlagTest(Tester):
 
 
 @since('3.0.14', max_version='3.0.x')
-class CompatibilityFlag30XTest(CompatibilityFlagTest):
+class CompatibilityFlag30XTest(TestCompatibilityFlag):
 
-    def compatibility_flag_off_with_30_node_test(self):
+    def test_compatibility_flag_off_with_30_node(self):
         self._compatibility_flag_off_with_30_node_test('3.0.12')
 
-    def compatibility_flag_on_with_3_0_test(self):
+    def test_compatibility_flag_on_with_3_0(self):
         self._compatibility_flag_on_with_30_test('3.0.12')
 
-    def compatibility_flag_on_3014_test(self):
+    def test_compatibility_flag_on_3014(self):
         self._compatibility_flag_on_3014_test()
 
-    def compatibility_flag_off_3014_test(self):
+    def test_compatibility_flag_off_3014(self):
         self._compatibility_flag_off_3014_test()
 
 
 @since('3.11', max_version='4')
-class CompatibilityFlag3XTest(CompatibilityFlagTest):
+class CompatibilityFlag3XTest(TestCompatibilityFlag):
 
-    def compatibility_flag_off_with_30_node_test(self):
+    def test_compatibility_flag_off_with_30_node(self):
         self._compatibility_flag_off_with_30_node_test('3.10')
 
-    def compatibility_flag_on_with_3_0_test(self):
+    def test_compatibility_flag_on_with_3_0(self):
         self._compatibility_flag_on_with_30_test('3.10')
 
-    def compatibility_flag_on_3014_test(self):
+    def test_compatibility_flag_on_3014(self):
         self._compatibility_flag_on_3014_test()
 
-    def compatibility_flag_off_3014_test(self):
+    def test_compatibility_flag_off_3014(self):
         self._compatibility_flag_off_3014_test()

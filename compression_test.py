@@ -1,9 +1,13 @@
 import os
+import pytest
+import logging
 
 from dtest import create_ks
 from scrub_test import TestHelper
 from tools.assertions import assert_crc_check_chance_equal
-from tools.decorators import since
+
+since = pytest.mark.since
+logger = logging.getLogger(__name__)
 
 
 class TestCompression(TestHelper):
@@ -16,10 +20,10 @@ class TestCompression(TestHelper):
 
         with open(file, 'rb') as fh:
             file_start = fh.read(2)
-            return types.get(file_start.encode('hex'), 'UNKNOWN')
+            return types.get(file_start.hex(), 'UNKNOWN')
 
     @since("3.0")
-    def disable_compression_cql_test(self):
+    def test_disable_compression_cql(self):
         """
         @jira_ticket CASSANDRA-8384
         using new cql create table syntax to disable compression
@@ -33,7 +37,7 @@ class TestCompression(TestHelper):
         session.execute("create table disabled_compression_table (id uuid PRIMARY KEY ) WITH compression = {'enabled': false};")
         session.cluster.refresh_schema_metadata()
         meta = session.cluster.metadata.keyspaces['ks'].tables['disabled_compression_table']
-        self.assertEqual('false', meta.options['compression']['enabled'])
+        assert 'false' == meta.options['compression']['enabled']
 
         for n in range(0, 100):
             session.execute("insert into disabled_compression_table (id) values (uuid());")
@@ -44,12 +48,12 @@ class TestCompression(TestHelper):
         for sstable_path in sstable_paths:
             sstable = os.path.join(sstable_path, sstables['disabled_compression_table'][1])
             if os.path.exists(sstable):
-                self.assertEqual('NONE', self._get_compression_type(sstable))
+                assert 'NONE' == self._get_compression_type(sstable)
                 found = True
-        self.assertTrue(found)
+        assert found
 
     @since("3.0")
-    def compression_cql_options_test(self):
+    def test_compression_cql_options(self):
         """
         @jira_ticket CASSANDRA-8384
         using new cql create table syntax to configure compression
@@ -72,12 +76,12 @@ class TestCompression(TestHelper):
 
         session.cluster.refresh_schema_metadata()
         meta = session.cluster.metadata.keyspaces['ks'].tables['compression_opts_table']
-        self.assertEqual('org.apache.cassandra.io.compress.DeflateCompressor', meta.options['compression']['class'])
-        self.assertEqual('256', meta.options['compression']['chunk_length_in_kb'])
+        assert 'org.apache.cassandra.io.compress.DeflateCompressor' == meta.options['compression']['class']
+        assert '256' == meta.options['compression']['chunk_length_in_kb']
         assert_crc_check_chance_equal(session, "compression_opts_table", 0.25)
 
         warn = node.grep_log("The option crc_check_chance was deprecated as a compression option.")
-        self.assertEqual(len(warn), 0)
+        assert len(warn) == 0
         session.execute("""
             alter table compression_opts_table
                 WITH compression = {
@@ -87,13 +91,13 @@ class TestCompression(TestHelper):
                 }
             """)
         warn = node.grep_log("The option crc_check_chance was deprecated as a compression option.")
-        self.assertEqual(len(warn), 1)
+        assert len(warn) == 1
 
         # check metadata again after crc_check_chance_update
         session.cluster.refresh_schema_metadata()
         meta = session.cluster.metadata.keyspaces['ks'].tables['compression_opts_table']
-        self.assertEqual('org.apache.cassandra.io.compress.DeflateCompressor', meta.options['compression']['class'])
-        self.assertEqual('256', meta.options['compression']['chunk_length_in_kb'])
+        assert 'org.apache.cassandra.io.compress.DeflateCompressor' == meta.options['compression']['class']
+        assert '256' == meta.options['compression']['chunk_length_in_kb']
         assert_crc_check_chance_equal(session, "compression_opts_table", 0.6)
 
         for n in range(0, 100):
@@ -105,12 +109,12 @@ class TestCompression(TestHelper):
         for sstable_path in sstable_paths:
             sstable = os.path.join(sstable_path, sstables['compression_opts_table'][1])
             if os.path.exists(sstable):
-                self.assertEqual('DEFLATE', self._get_compression_type(sstable))
+                assert 'DEFLATE' == self._get_compression_type(sstable)
                 found = True
-        self.assertTrue(found)
+        assert found
 
     @since("3.0")
-    def compression_cql_disabled_with_alter_test(self):
+    def test_compression_cql_disabled_with_alter(self):
         """
         @jira_ticket CASSANDRA-8384
         starting with compression enabled then disabling it
@@ -131,17 +135,17 @@ class TestCompression(TestHelper):
                 AND crc_check_chance = 0.25;
             """)
         meta = session.cluster.metadata.keyspaces['ks'].tables['start_enabled_compression_table']
-        self.assertEqual('org.apache.cassandra.io.compress.SnappyCompressor', meta.options['compression']['class'])
-        self.assertEqual('256', meta.options['compression']['chunk_length_in_kb'])
+        assert 'org.apache.cassandra.io.compress.SnappyCompressor' == meta.options['compression']['class']
+        assert '256' == meta.options['compression']['chunk_length_in_kb']
         assert_crc_check_chance_equal(session, "start_enabled_compression_table", 0.25)
         session.execute("alter table start_enabled_compression_table with compression = {'enabled': false};")
 
         session.cluster.refresh_schema_metadata()
         meta = session.cluster.metadata.keyspaces['ks'].tables['start_enabled_compression_table']
-        self.assertEqual('false', meta.options['compression']['enabled'])
+        assert 'false' == meta.options['compression']['enabled']
 
     @since("3.0")
-    def compression_cql_enabled_with_alter_test(self):
+    def test_compression_cql_enabled_with_alter(self):
         """
         @jira_ticket CASSANDRA-8384
         starting with compression disabled and enabling it
@@ -154,7 +158,7 @@ class TestCompression(TestHelper):
         create_ks(session, 'ks', 1)
         session.execute("create table start_disabled_compression_table (id uuid PRIMARY KEY ) WITH compression = {'enabled': false};")
         meta = session.cluster.metadata.keyspaces['ks'].tables['start_disabled_compression_table']
-        self.assertEqual('false', meta.options['compression']['enabled'])
+        assert 'false' == meta.options['compression']['enabled']
         session.execute("""alter table start_disabled_compression_table
                                 WITH compression = {
                                         'class': 'SnappyCompressor',
@@ -163,6 +167,6 @@ class TestCompression(TestHelper):
 
         session.cluster.refresh_schema_metadata()
         meta = session.cluster.metadata.keyspaces['ks'].tables['start_disabled_compression_table']
-        self.assertEqual('org.apache.cassandra.io.compress.SnappyCompressor', meta.options['compression']['class'])
-        self.assertEqual('256', meta.options['compression']['chunk_length_in_kb'])
+        assert 'org.apache.cassandra.io.compress.SnappyCompressor' == meta.options['compression']['class']
+        assert '256' == meta.options['compression']['chunk_length_in_kb']
         assert_crc_check_chance_equal(session, "start_disabled_compression_table", 0.25)

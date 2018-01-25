@@ -1,13 +1,16 @@
 import time
+import logging
 
 from cassandra.concurrent import execute_concurrent_with_args
 
-from dtest import Tester, debug, create_ks
+from dtest import Tester, create_ks, create_cf_simple
+
+logger = logging.getLogger(__name__)
 
 
 class TestGlobalRowKeyCache(Tester):
 
-    def functional_test(self):
+    def test_functional(self):
         cluster = self.cluster
         cluster.populate(3)
         node1 = cluster.nodelist()[0]
@@ -15,7 +18,7 @@ class TestGlobalRowKeyCache(Tester):
         for keycache_size in (0, 10):
             for rowcache_size in (0, 10):
                 cluster.stop()
-                debug("Testing with keycache size of %d MB, rowcache size of %d MB " %
+                logger.debug("Testing with keycache size of %d MB, rowcache size of %d MB " %
                       (keycache_size, rowcache_size))
                 keyspace_name = 'ks_%d_%d' % (keycache_size, rowcache_size)
 
@@ -29,14 +32,15 @@ class TestGlobalRowKeyCache(Tester):
 
                 cluster.start()
                 session = self.patient_cql_connection(node1)
-
                 create_ks(session, keyspace_name, rf=3)
 
                 session.set_keyspace(keyspace_name)
-                session.execute("CREATE TABLE test (k int PRIMARY KEY, v1 int, v2 int)")
-                session.execute("CREATE TABLE test_clustering (k int, v1 int, v2 int, PRIMARY KEY (k, v1))")
-                session.execute("CREATE TABLE test_counter (k int PRIMARY KEY, v1 counter)")
-                session.execute("CREATE TABLE test_counter_clustering (k int, v1 int, v2 counter, PRIMARY KEY (k, v1))")
+                create_cf_simple(session, 'test', "CREATE TABLE test (k int PRIMARY KEY, v1 int, v2 int)")
+                create_cf_simple(session, 'test_clustering',
+                                 "CREATE TABLE test_clustering (k int, v1 int, v2 int, PRIMARY KEY (k, v1))")
+                create_cf_simple(session, 'test_counter', "CREATE TABLE test_counter (k int PRIMARY KEY, v1 counter)")
+                create_cf_simple(session, 'test_counter_clustering',
+                                 "CREATE TABLE test_counter_clustering (k int, v1 int, v2 counter, PRIMARY KEY (k, v1))")
 
                 # insert 100 rows into each table
                 for cf in ('test', 'test_clustering'):
@@ -87,12 +91,12 @@ class TestGlobalRowKeyCache(Tester):
                 session.shutdown()
 
                 # let the data be written to the row/key caches.
-                debug("Letting caches be saved to disk")
+                logger.debug("Letting caches be saved to disk")
                 time.sleep(10)
-                debug("Stopping cluster")
+                logger.debug("Stopping cluster")
                 cluster.stop()
                 time.sleep(1)
-                debug("Starting cluster")
+                logger.debug("Starting cluster")
                 cluster.start()
                 time.sleep(5)  # read the data back from row and key caches
 
@@ -108,38 +112,38 @@ class TestGlobalRowKeyCache(Tester):
             rows = list(session.execute("SELECT * FROM %s" % (cf,)))
 
             # one row gets deleted each validation round
-            self.assertEquals(100 - (validation_round + 1), len(rows))
+            assert 100 - (validation_round + 1) == len(rows)
 
             # adjust enumeration start to account for row deletions
             for i, row in enumerate(sorted(rows), start=(validation_round + 1)):
-                self.assertEquals(i, row.k)
-                self.assertEquals(i, row.v1)
+                assert i == row.k
+                assert i == row.v1
 
                 # updated rows will have different values
                 expected_value = validation_round if i < num_updates else i
-                self.assertEquals(expected_value, row.v2)
+                assert expected_value == row.v2
 
         # check values of counter tables
         rows = list(session.execute("SELECT * FROM test_counter"))
-        self.assertEquals(100, len(rows))
+        assert 100 == len(rows)
         for i, row in enumerate(sorted(rows)):
-            self.assertEquals(i, row.k)
+            assert i == row.k
 
             # updated rows will get incremented once each round
             expected_value = i
             if i < num_updates:
                 expected_value += validation_round + 1
 
-            self.assertEquals(expected_value, row.v1)
+            assert expected_value == row.v1
 
         rows = list(session.execute("SELECT * FROM test_counter_clustering"))
-        self.assertEquals(100, len(rows))
+        assert 100 == len(rows)
         for i, row in enumerate(sorted(rows)):
-            self.assertEquals(i, row.k)
-            self.assertEquals(i, row.v1)
+            assert i == row.k
+            assert i == row.v1
 
             expected_value = i
             if i < num_updates:
                 expected_value += validation_round + 1
 
-            self.assertEquals(expected_value, row.v2)
+            assert expected_value == row.v2

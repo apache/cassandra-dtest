@@ -1,12 +1,17 @@
 import os
+import logging
 
 from dtest import Tester, create_ks, create_cf
+
+logger = logging.getLogger(__name__)
 
 
 class TestCFID(Tester):
 
-    def cfid_test(self):
-        """ Test through adding/dropping cf's that the path to sstables for each cf are unique and formatted correctly """
+    def test_cfid(self):
+        """ Test through adding/dropping cf's that the path to sstables for each cf are unique
+        and formatted correctly
+        """
         cluster = self.cluster
 
         cluster.populate(1).start(wait_other_notice=True)
@@ -29,8 +34,8 @@ class TestCFID(Tester):
             self.fail("Path to sstables not valid.")
 
         # check that there are 5 unique directories
-        self.assertEqual(len(cfs), 5)
+        assert len(cfs) == 5
 
         # check that these are in fact column family directories
         for dire in cfs:
-            self.assertTrue(dire[0:2] == 'cf')
+            assert dire[0:2] == 'cf'

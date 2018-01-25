@@ -3,8 +3,9 @@ import os
 import re
 import sys
 import tempfile
+import logging
 
-from dtest import debug  # Depending on dtest is not good long-term.
+logger = logging.getLogger(__name__)
 
 
 def replace_in_file(filepath, search_replacements):
@@ -37,5 +38,5 @@ def size_of_files_in_dir(dir_name, verbose=True):
     """
     files = [os.path.join(dir_name, f) for f in os.listdir(dir_name)]
     if verbose:
-        debug('getting sizes of these files: {}'.format(files))
+        logger.debug('getting sizes of these files: {}'.format(files))
     return sum(os.path.getsize(f) for f in files)

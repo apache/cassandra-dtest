@@ -5,6 +5,8 @@ import stat
 import struct
 import time
 from distutils.version import LooseVersion
+import pytest
+import logging
 
 from cassandra import WriteTimeout
 from cassandra.cluster import NoHostAvailable, OperationTimedOut
@@ -12,28 +14,33 @@ from ccmlib.common import is_win
 from ccmlib.node import Node, TimeoutError
 from parse import parse
 
-from dtest import Tester, debug, create_ks
-from tools.assertions import assert_almost_equal, assert_none, assert_one
+from dtest import Tester, create_ks
+from tools.assertions import (assert_almost_equal, assert_none, assert_one, assert_lists_equal_ignoring_order)
 from tools.data import rows_to_list
-from tools.decorators import since
+
+since = pytest.mark.since
+logger = logging.getLogger(__name__)
 
 
 class TestCommitLog(Tester):
     """
     CommitLog Tests
     """
-    allow_log_errors = True
+    @pytest.fixture(autouse=True)
+    def fixture_add_additional_log_patterns(self, fixture_dtest_setup):
+        fixture_dtest_setup.allow_log_errors = True
 
-    def setUp(self):
-        super(TestCommitLog, self).setUp()
-        self.cluster.populate(1)
-        [self.node1] = self.cluster.nodelist()
+    @pytest.fixture(scope='function', autouse=True)
+    def fixture_set_cluster_settings(self, fixture_dtest_setup):
+        fixture_dtest_setup.cluster.populate(1)
+        [self.node1] = fixture_dtest_setup.cluster.nodelist()
 
-    def tearDown(self):
+        yield
+
         # Some of the tests change commitlog permissions to provoke failure
         # so this changes them back so we can delete them.
         self._change_commitlog_perms(stat.S_IWRITE | stat.S_IREAD | stat.S_IEXEC)
-        super(TestCommitLog, self).tearDown()
+
 
     def prepare(self, configuration=None, create_test_keyspace=True, **kwargs):
         if configuration is None:
@@ -41,7 +48,7 @@ class TestCommitLog(Tester):
         default_conf = {'commitlog_sync_period_in_ms': 1000}
 
         set_conf = dict(default_conf, **configuration)
-        debug('setting commitlog configuration with the following values: '
+        logger.debug('setting commitlog configuration with the following values: '
               '{set_conf} and the following kwargs: {kwargs}'.format(
                   set_conf=set_conf, kwargs=kwargs))
         self.cluster.set_configuration_options(values=set_conf, **kwargs)
@@ -61,15 +68,15 @@ class TestCommitLog(Tester):
 
     def _change_commitlog_perms(self, mod):
         for path in self._get_commitlog_paths():
-            debug('changing permissions to {perms} on {path}'.format(perms=oct(mod), path=path))
+            logger.debug('changing permissions to {perms} on {path}'.format(perms=oct(mod), path=path))
             os.chmod(path, mod)
             commitlogs = glob.glob(path + '/*')
 
             if commitlogs:
-                debug('changing permissions to {perms} on the following files:'
+                logger.debug('changing permissions to {perms} on the following files:'
                       '\n  {files}'.format(perms=oct(mod), files='\n  '.join(commitlogs)))
             else:
-                debug(self._change_commitlog_perms.__name__ + ' called on empty commitlog directory '
+                logger.debug(self._change_commitlog_perms.__name__ + ' called on empty commitlog directory '
                       '{path} with permissions {perms}'.format(path=path, perms=oct(mod)))
 
             for commitlog in commitlogs:
@@ -108,7 +115,7 @@ class TestCommitLog(Tester):
         time.sleep(1)
 
         commitlogs = self._get_commitlog_files()
-        self.assertGreater(len(commitlogs), 0, 'No commit log files were created')
+        assert len(commitlogs) > 0, 'No commit log files were created'
 
         # the most recently-written segment of the commitlog may be smaller
         # than the expected size, so we allow exactly one segment to be smaller
@@ -116,23 +123,23 @@ class TestCommitLog(Tester):
         for i, f in enumerate(commitlogs):
             size = os.path.getsize(f)
             size_in_mb = int(size / 1024 / 1024)
-            debug('segment file {} {}; smaller already found: {}'.format(f, size_in_mb, smaller_found))
+            logger.debug('segment file {} {}; smaller already found: {}'.format(f, size_in_mb, smaller_found))
             if size_in_mb < 1 or size < (segment_size * 0.1):
-                debug('segment file not yet used; moving to next file')
+                logger.debug('segment file not yet used; moving to next file')
                 continue  # commitlog not yet used
 
             try:
                 if compressed:
                     # if compression is used, we assume there will be at most a 50% compression ratio
-                    self.assertLess(size, segment_size)
-                    self.assertGreater(size, segment_size / 2)
+                    assert size < segment_size
+                    assert size > segment_size / 2
                 else:
                     # if no compression is used, the size will be close to what we expect
                     assert_almost_equal(size, segment_size, error=0.05)
             except AssertionError as e:
                 # the last segment may be smaller
                 if not smaller_found:
-                    self.assertLessEqual(size, segment_size)
+                    assert size <= segment_size
                     smaller_found = True
                 else:
                     raise e
@@ -141,7 +148,7 @@ class TestCommitLog(Tester):
         """
         Provoke the commitlog failure
         """
-        debug('Provoking commitlog failure')
+        logger.debug('Provoking commitlog failure')
         # Test things are ok at this point
         self.session1.execute("""
             INSERT INTO test (key, col1) VALUES (1, 1);
@@ -164,17 +171,16 @@ class TestCommitLog(Tester):
         replay due to MV lock contention.  Fixed in 3.0.7 and 3.7.
         @jira_ticket CASSANDRA-11891
         """
-
         cluster_ver = self.cluster.version()
         if LooseVersion('3.1') <= cluster_ver < LooseVersion('3.7'):
-            self.skipTest("Fixed in 3.0.7 and 3.7")
+            pytest.skip("Fixed in 3.0.7 and 3.7")
 
         node1 = self.node1
         node1.set_batch_commitlog(enabled=True)
         node1.start()
         session = self.patient_cql_connection(node1)
 
-        debug("Creating schema")
+        logger.debug("Creating schema")
         create_ks(session, 'Test', 1)
         session.execute("""
             CREATE TABLE mytable (
@@ -192,37 +198,37 @@ class TestCommitLog(Tester):
             PRIMARY KEY (a, b);
         """)
 
-        debug("Insert data")
+        logger.debug("Insert data")
         num_rows = 1024  # maximum number of mutations replayed at once by the commit log
-        for i in xrange(num_rows):
+        for i in range(num_rows):
             session.execute("INSERT INTO Test.mytable (a, b, c) VALUES (0, {i}, {i})".format(i=i))
 
         node1.stop(gently=False)
         node1.mark_log_for_errors()
 
-        debug("Verify commitlog was written before abrupt stop")
+        logger.debug("Verify commitlog was written before abrupt stop")
         commitlog_files = os.listdir(os.path.join(node1.get_path(), 'commitlogs'))
-        self.assertNotEqual([], commitlog_files)
+        assert [] != commitlog_files
 
         # set a short timeout to ensure lock contention will generally exceed this
         node1.set_configuration_options({'write_request_timeout_in_ms': 30})
-        debug("Starting node again")
+        logger.debug("Starting node again")
         node1.start()
 
-        debug("Verify commit log was replayed on startup")
+        logger.debug("Verify commit log was replayed on startup")
         start_time, replay_complete = time.time(), False
         while not replay_complete:
             matches = node1.grep_log(r".*WriteTimeoutException.*")
-            self.assertEqual([], matches)
+            assert [] == matches
 
             replay_complete = node1.grep_log("Log replay complete")
-            self.assertLess(time.time() - start_time, 120, "Did not finish commitlog replay within 120 seconds")
+            assert time.time() - start_time < 120, "Did not finish commitlog replay within 120 seconds"
 
-        debug("Reconnecting to node")
+        logger.debug("Reconnecting to node")
         session = self.patient_cql_connection(node1)
-        debug("Make query to ensure data is present")
+        logger.debug("Make query to ensure data is present")
         res = list(session.execute("SELECT * FROM Test.mytable"))
-        self.assertEqual(num_rows, len(res), res)
+        assert num_rows == len(res), res
 
     def test_commitlog_replay_on_startup(self):
         """
@@ -232,7 +238,7 @@ class TestCommitLog(Tester):
         node1.set_batch_commitlog(enabled=True)
         node1.start()
 
-        debug("Insert data")
+        logger.debug("Insert data")
         session = self.patient_cql_connection(node1)
         create_ks(session, 'Test', 1)
         session.execute("""
@@ -247,69 +253,67 @@ class TestCommitLog(Tester):
         session.execute("INSERT INTO Test. users (user_name, password, gender, state, birth_year) "
                         "VALUES('gandalf', 'p@$$', 'male', 'WA', 1955);")
 
-        debug("Verify data is present")
+        logger.debug("Verify data is present")
         session = self.patient_cql_connection(node1)
         res = session.execute("SELECT * FROM Test. users")
-        self.assertItemsEqual(rows_to_list(res),
-                              [[u'gandalf', 1955, u'male', u'p@$$', u'WA']])
+        assert rows_to_list(res) == [['gandalf', 1955, 'male', 'p@$$', 'WA']]
 
-        debug("Stop node abruptly")
+        logger.debug("Stop node abruptly")
         node1.stop(gently=False)
 
-        debug("Verify commitlog was written before abrupt stop")
+        logger.debug("Verify commitlog was written before abrupt stop")
         commitlog_dir = os.path.join(node1.get_path(), 'commitlogs')
         commitlog_files = os.listdir(commitlog_dir)
-        self.assertTrue(len(commitlog_files) > 0)
+        assert len(commitlog_files) > 0
 
-        debug("Verify no SSTables were flushed before abrupt stop")
-        self.assertEqual(0, len(node1.get_sstables('test', 'users')))
+        logger.debug("Verify no SSTables were flushed before abrupt stop")
+        assert 0 == len(node1.get_sstables('test', 'users'))
 
-        debug("Verify commit log was replayed on startup")
+        logger.debug("Verify commit log was replayed on startup")
         node1.start()
         node1.watch_log_for("Log replay complete")
         # Here we verify from the logs that some mutations were replayed
         replays = [match_tuple[0] for match_tuple in node1.grep_log(" \d+ replayed mutations")]
-        debug('The following log lines indicate that mutations were replayed: {msgs}'.format(msgs=replays))
+        logger.debug('The following log lines indicate that mutations were replayed: {msgs}'.format(msgs=replays))
         num_replayed_mutations = [
             parse('{} {num_mutations:d} replayed mutations{}', line).named['num_mutations']
             for line in replays
         ]
         # assert there were some lines where more than zero mutations were replayed
-        self.assertNotEqual([m for m in num_replayed_mutations if m > 0], [])
+        assert [m for m in num_replayed_mutations if m > 0] != []
 
-        debug("Make query and ensure data is present")
+        logger.debug("Make query and ensure data is present")
         session = self.patient_cql_connection(node1)
         res = session.execute("SELECT * FROM Test. users")
-        self.assertItemsEqual(rows_to_list(res),
-                              [[u'gandalf', 1955, u'male', u'p@$$', u'WA']])
+        assert_lists_equal_ignoring_order(rows_to_list(res), [['gandalf', 1955, 'male', 'p@$$', 'WA']])
 
-    def default_segment_size_test(self):
+    def test_default_segment_size(self):
         """
         Test default commitlog_segment_size_in_mb (32MB)
         """
         self._segment_size_test(32)
 
-    def small_segment_size_test(self):
+    def test_small_segment_size(self):
         """
         Test a small commitlog_segment_size_in_mb (5MB)
         """
         self._segment_size_test(5)
 
     @since('2.2')
-    def default_compressed_segment_size_test(self):
+    def test_default_compressed_segment_size(self):
         """
         Test default compressed commitlog_segment_size_in_mb (32MB)
         """
         self._segment_size_test(32, compressed=True)
 
     @since('2.2')
-    def small_compressed_segment_size_test(self):
+    def test_small_compressed_segment_size(self):
         """
         Test a small compressed commitlog_segment_size_in_mb (5MB)
         """
         self._segment_size_test(5, compressed=True)
 
-    def stop_failure_policy_test(self):
+    def test_stop_failure_policy(self):
         """
         Test the stop commitlog failure policy (default one)
         """
@@ -317,23 +321,23 @@ class TestCommitLog(Tester):
 
         self._provoke_commitlog_failure()
         failure = self.node1.grep_log("Failed .+ commit log segments. Commit disk failure policy is stop; terminating thread")
-        debug(failure)
-        self.assertTrue(failure, "Cannot find the commitlog failure message in logs")
-        self.assertTrue(self.node1.is_running(), "Node1 should still be running")
+        logger.debug(failure)
+        assert failure, "Cannot find the commitlog failure message in logs"
+        assert self.node1.is_running(), "Node1 should still be running"
 
         # Cannot write anymore after the failure
-        with self.assertRaises(NoHostAvailable):
+        with pytest.raises(NoHostAvailable):
             self.session1.execute("""
               INSERT INTO test (key, col1) VALUES (2, 2);
             """)
 
         # Should not be able to read neither
-        with self.assertRaises(NoHostAvailable):
+        with pytest.raises(NoHostAvailable):
             self.session1.execute("""
               "SELECT * FROM test;"
             """)
 
-    def stop_commit_failure_policy_test(self):
+    def test_stop_commit_failure_policy(self):
         """
         Test the stop_commit commitlog failure policy
         """
@@ -347,26 +351,26 @@ class TestCommitLog(Tester):
 
         self._provoke_commitlog_failure()
         failure = self.node1.grep_log("Failed .+ commit log segments. Commit disk failure policy is stop_commit; terminating thread")
-        debug(failure)
-        self.assertTrue(failure, "Cannot find the commitlog failure message in logs")
-        self.assertTrue(self.node1.is_running(), "Node1 should still be running")
+        logger.debug(failure)
+        assert failure, "Cannot find the commitlog failure message in logs"
+        assert self.node1.is_running(), "Node1 should still be running"
 
         # Cannot write anymore after the failure
-        debug('attempting to insert to node with failing commitlog; should fail')
-        with self.assertRaises((OperationTimedOut, WriteTimeout)):
+        logger.debug('attempting to insert to node with failing commitlog; should fail')
+        with pytest.raises((OperationTimedOut, WriteTimeout)):
             self.session1.execute("""
               INSERT INTO test (key, col1) VALUES (2, 2);
             """)
 
         # Should be able to read
-        debug('attempting to read from node with failing commitlog; should succeed')
+        logger.debug('attempting to read from node with failing commitlog; should succeed')
         assert_one(
             self.session1,
             "SELECT * FROM test where key=2;",
             [2, 2]
         )
 
-    def die_failure_policy_test(self):
+    def test_die_failure_policy(self):
         """
         Test the die commitlog failure policy
         """
@@ -376,11 +380,11 @@ class TestCommitLog(Tester):
 
         self._provoke_commitlog_failure()
         failure = self.node1.grep_log("ERROR \[COMMIT-LOG-ALLOCATOR\].+JVM state determined to be unstable.  Exiting forcefully")
-        debug(failure)
-        self.assertTrue(failure, "Cannot find the commitlog failure message in logs")
-        self.assertFalse(self.node1.is_running(), "Node1 should not be running")
+        logger.debug(failure)
+        assert failure, "Cannot find the commitlog failure message in logs"
+        assert not self.node1.is_running(), "Node1 should not be running"
 
-    def ignore_failure_policy_test(self):
+    def test_ignore_failure_policy(self):
         """
         Test the ignore commitlog failure policy
         """
@@ -390,8 +394,8 @@ class TestCommitLog(Tester):
 
         self._provoke_commitlog_failure()
         failure = self.node1.grep_log("ERROR \[COMMIT-LOG-ALLOCATOR\].+Failed .+ commit log segments")
-        self.assertTrue(failure, "Cannot find the commitlog failure message in logs")
-        self.assertTrue(self.node1.is_running(), "Node1 should still be running")
+        assert failure, "Cannot find the commitlog failure message in logs"
+        assert self.node1.is_running(), "Node1 should still be running"
 
         # on Windows, we can't delete the segments if they're chmod to 0 so they'll still be available for use by CLSM,
         # and we can still create new segments since os.chmod is limited to stat.S_IWRITE and stat.S_IREAD to set files
@@ -401,10 +405,10 @@ class TestCommitLog(Tester):
         if is_win():
             # We expect this to succeed
             self.session1.execute(query)
-            self.assertFalse(self.node1.grep_log("terminating thread"), "thread was terminated but CL error should have been ignored.")
-            self.assertTrue(self.node1.is_running(), "Node1 should still be running after an ignore error on CL")
+            assert not self.node1.grep_log("terminating thread"), "thread was terminated but CL error should have been ignored."
+            assert self.node1.is_running(), "Node1 should still be running after an ignore error on CL"
         else:
-            with self.assertRaises((OperationTimedOut, WriteTimeout)):
+            with pytest.raises((OperationTimedOut, WriteTimeout)):
                 self.session1.execute(query)
 
             # Should not exist
@@ -436,13 +440,11 @@ class TestCommitLog(Tester):
         and the commit_failure_policy is stop, C* shouldn't startup
         @jira_ticket CASSANDRA-9749
         """
-        if not hasattr(self, 'ignore_log_patterns'):
-            self.ignore_log_patterns = []
-
         expected_error = "Exiting due to error while processing commit log during initialization."
-        self.ignore_log_patterns.append(expected_error)
+        self.fixture_dtest_setup.ignore_log_patterns = list(self.fixture_dtest_setup.ignore_log_patterns) + [
+            expected_error]
         node = self.node1
-        self.assertIsInstance(node, Node)
+        assert isinstance(node, Node)
         node.set_configuration_options({'commit_failure_policy': 'stop', 'commitlog_sync_period_in_ms': 1000})
         self.cluster.start()
 
@@ -454,7 +456,7 @@ class TestCommitLog(Tester):
             cursor.execute("INSERT INTO ks.tbl (k, v) VALUES ({0}, {0})".format(i))
 
         results = list(cursor.execute("SELECT * FROM ks.tbl"))
-        self.assertEqual(len(results), 10)
+        assert len(results) == 10
 
         # with the commitlog_sync_period_in_ms set to 1000,
         # this sleep guarantees that the commitlog data is
@@ -469,14 +471,14 @@ class TestCommitLog(Tester):
             ks_dir = os.path.join(data_dir, 'ks')
             db_dir = os.listdir(ks_dir)[0]
             sstables = len([f for f in os.listdir(os.path.join(ks_dir, db_dir)) if f.endswith('.db')])
-            self.assertEqual(sstables, 0)
+            assert sstables == 0
 
         # modify the commit log crc values
         cl_dir = os.path.join(path, 'commitlogs')
-        self.assertTrue(len(os.listdir(cl_dir)) > 0)
+        assert len(os.listdir(cl_dir)) > 0
         for cl in os.listdir(cl_dir):
             # locate the CRC location
-            with open(os.path.join(cl_dir, cl), 'r') as f:
+            with open(os.path.join(cl_dir, cl), 'rb') as f:
                 f.seek(0)
                 version = struct.unpack('>i', f.read(4))[0]
                 crc_pos = 12
@@ -486,22 +488,22 @@ class TestCommitLog(Tester):
                     crc_pos += 2 + psize
 
             # rewrite it with crap
-            with open(os.path.join(cl_dir, cl), 'w') as f:
+            with open(os.path.join(cl_dir, cl), 'wb') as f:
                 f.seek(crc_pos)
                 f.write(struct.pack('>i', 123456))
 
             # verify said crap
-            with open(os.path.join(cl_dir, cl), 'r') as f:
+            with open(os.path.join(cl_dir, cl), 'rb') as f:
                 f.seek(crc_pos)
                 crc = struct.unpack('>i', f.read(4))[0]
-                self.assertEqual(crc, 123456)
+                assert crc == 123456
 
         mark = node.mark_log()
         node.start()
         node.watch_log_for(expected_error, from_mark=mark)
-        with self.assertRaises(TimeoutError):
+        with pytest.raises(TimeoutError):
             node.wait_for_binary_interface(from_mark=mark, timeout=20)
-        self.assertFalse(node.is_running())
+        assert not node.is_running()
 
     @since('2.2')
     def test_compression_error(self):
@@ -510,13 +512,11 @@ class TestCommitLog(Tester):
         if the commit log header refers to an unknown compression class, and
         the commit_failure_policy is stop, C* shouldn't start up
         """
-        if not hasattr(self, 'ignore_log_patterns'):
-            self.ignore_log_patterns = []
-
         expected_error = 'Could not create Compression for type org.apache.cassandra.io.compress.LZ5Compressor'
-        self.ignore_log_patterns.append(expected_error)
+        self.fixture_dtest_setup.ignore_log_patterns = list(self.fixture_dtest_setup.ignore_log_patterns) + [
+            expected_error]
         node = self.node1
-        self.assertIsInstance(node, Node)
+        assert isinstance(node, Node)
         node.set_configuration_options({'commit_failure_policy': 'stop',
                                         'commitlog_compression': [{'class_name': 'LZ4Compressor'}],
                                         'commitlog_sync_period_in_ms': 1000})
@@ -530,7 +530,7 @@ class TestCommitLog(Tester):
             cursor.execute("INSERT INTO ks1.tbl (k, v) VALUES ({0}, {0})".format(i))
 
         results = list(cursor.execute("SELECT * FROM ks1.tbl"))
-        self.assertEqual(len(results), 10)
+        assert len(results) == 10
 
         # with the commitlog_sync_period_in_ms set to 1000,
         # this sleep guarantees that the commitlog data is
@@ -545,31 +545,37 @@ class TestCommitLog(Tester):
             ks_dir = os.path.join(data_dir, 'ks1')
             db_dir = os.listdir(ks_dir)[0]
             sstables = sstables + len([f for f in os.listdir(os.path.join(ks_dir, db_dir)) if f.endswith('.db')])
-        self.assertEqual(sstables, 0)
+        assert sstables == 0
 
         def get_header_crc(header):
             """
             When calculating the header crc, C* splits up the 8b id, first adding the 4 least significant
             bytes to the crc, then the 5 most significant bytes, so this splits them and calculates the same way
             """
-            new_header = header[:4]
+            new_header = bytearray(header[:4])
             # C* evaluates most and least significant 4 bytes out of order
-            new_header += header[8:12]
-            new_header += header[4:8]
+            new_header.extend(header[8:12])
+            new_header.extend(header[4:8])
             # C* evaluates the short parameter length as an int
-            new_header += '\x00\x00' + header[12:14]  # the
-            new_header += header[14:]
-            return binascii.crc32(new_header)
+            new_header.extend(b'\x00\x00')
+            new_header.extend(header[12:14])  # the
+            new_header.extend(header[14:])
+
+            # https://docs.python.org/2/library/binascii.html
+            # "Changed in version 2.6: The return value is in the range [-2**31, 2**31-1] regardless
+            # of platform. In the past the value would be signed on some platforms and unsigned on
+            # others. Use & 0xffffffff on the value if you want it to match Python 3 behavior."
+            return binascii.crc32(new_header) & 0xffffffff
 
         # modify the compression parameters to look for a compressor that isn't there
         # while this scenario is pretty unlikely, if a jar or lib got moved or something,
         # you'd have a similar situation, which would be fixable by the user
         path = node.get_path()
         cl_dir = os.path.join(path, 'commitlogs')
-        self.assertTrue(len(os.listdir(cl_dir)) > 0)
+        assert len(os.listdir(cl_dir)) > 0
         for cl in os.listdir(cl_dir):
             # read the header and find the crc location
-            with open(os.path.join(cl_dir, cl), 'r') as f:
+            with open(os.path.join(cl_dir, cl), 'rb') as f:
                 f.seek(0)
                 crc_pos = 12
                 f.seek(crc_pos)
@@ -583,29 +589,39 @@ class TestCommitLog(Tester):
                 # check that we're going this right
                 f.seek(0)
                 header_bytes = f.read(header_length)
-                self.assertEqual(get_header_crc(header_bytes), crc)
+
+                # https://docs.python.org/2/library/binascii.html
+                # "Changed in version 2.6: The return value is in the range [-2**31, 2**31-1] regardless
+                # of platform. In the past the value would be signed on some platforms and unsigned on
+                # others. Use & 0xffffffff on the value if you want it to match Python 3 behavior."
+                assert get_header_crc(header_bytes) == (crc & 0xffffffff)
 
             # rewrite it with imaginary compressor
-            self.assertIn('LZ4Compressor', header_bytes)
-            header_bytes = header_bytes.replace('LZ4Compressor', 'LZ5Compressor')
-            self.assertNotIn('LZ4Compressor', header_bytes)
-            self.assertIn('LZ5Compressor', header_bytes)
-            with open(os.path.join(cl_dir, cl), 'w') as f:
+            assert 'LZ4Compressor'.encode("ascii") in header_bytes
+            header_bytes = header_bytes.replace('LZ4Compressor'.encode("ascii"), 'LZ5Compressor'.encode("ascii"))
+            assert 'LZ4Compressor'.encode("ascii") not in header_bytes
+            assert 'LZ5Compressor'.encode("ascii") in header_bytes
+            with open(os.path.join(cl_dir, cl), 'wb') as f:
                 f.seek(0)
                 f.write(header_bytes)
                 f.seek(crc_pos)
-                f.write(struct.pack('>i', get_header_crc(header_bytes)))
+                f.write(struct.pack('>I', get_header_crc(header_bytes)))
 
             # verify we wrote everything correctly
-            with open(os.path.join(cl_dir, cl), 'r') as f:
+            with open(os.path.join(cl_dir, cl), 'rb') as f:
                 f.seek(0)
-                self.assertEqual(f.read(header_length), header_bytes)
+                assert f.read(header_length) == header_bytes
                 f.seek(crc_pos)
                 crc = struct.unpack('>i', f.read(4))[0]
-                self.assertEqual(crc, get_header_crc(header_bytes))
+
+                # https://docs.python.org/2/library/binascii.html
+                # "Changed in version 2.6: The return value is in the range [-2**31, 2**31-1] regardless
+                # of platform. In the past the value would be signed on some platforms and unsigned on
+                # others. Use & 0xffffffff on the value if you want it to match Python 3 behavior."
+                assert (crc & 0xffffffff)  == get_header_crc(header_bytes)
 
         mark = node.mark_log()
         node.start()
         node.watch_log_for(expected_error, from_mark=mark)
-        with self.assertRaises(TimeoutError):
+        with pytest.raises(TimeoutError):
             node.wait_for_binary_interface(from_mark=mark, timeout=20)

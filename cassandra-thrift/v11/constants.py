@@ -7,6 +7,6 @@
 #
 
 from thrift.Thrift import TType, TMessageType, TException
-from ttypes import *
+from .ttypes import *
 
 VERSION = "19.30.0"

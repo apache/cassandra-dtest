@@ -1,12 +1,24 @@
 import os
+import pytest
+import logging
 
-from collections import OrderedDict
-
-from dtest import CASSANDRA_VERSION_FROM_BUILD, Tester, debug
-from pycassa.pool import ConnectionPool
-from pycassa.columnfamily import ColumnFamily
+from dtest import CASSANDRA_VERSION_FROM_BUILD, Tester
+from thrift_test import get_thrift_client
 from tools.assertions import assert_all
 
+from thrift_bindings.thrift010.Cassandra import (CfDef, Column, ColumnDef,
+                                           ColumnOrSuperColumn, ColumnParent,
+                                           ColumnPath, ColumnSlice,
+                                           ConsistencyLevel, CounterColumn,
+                                           Deletion, IndexExpression,
+                                           IndexOperator, IndexType,
+                                           InvalidRequestException, KeyRange,
+                                           KeySlice, KsDef, MultiSliceRequest,
+                                           Mutation, NotFoundException,
+                                           SlicePredicate, SliceRange,
+                                           SuperColumn)
+
+logger = logging.getLogger(__name__)
 
 # Use static supercolumn data to reduce total test time and avoid driver issues connecting to C* 1.2.
 # The data contained in the SSTables is (name, {'attr': {'name': name}}) for the name in NAMES.
@@ -15,28 +27,28 @@ TABLES_PATH = os.path.join("./", "upgrade_tests", "supercolumn-data", "cassandra
 NAMES = ["Alice", "Bob", "Claire", "Dave", "Ed", "Frank", "Grace"]
 
 
+@pytest.mark.upgrade_test
 class TestSCUpgrade(Tester):
     """
     Tests upgrade between a 2.0 cluster with predefined super columns and all other versions. Verifies data with both
     CQL and Thrift.
     """
-
-    def __init__(self, *args, **kwargs):
-        self.ignore_log_patterns = [
+    @pytest.fixture(autouse=True)
+    def fixture_add_additional_log_patterns(self, fixture_dtest_setup):
+        fixture_dtest_setup.allow_log_errors = True
+        fixture_dtest_setup.ignore_log_patterns = (
             # This one occurs if we do a non-rolling upgrade, the node
             # it's trying to send the migration to hasn't started yet,
             # and when it does, it gets replayed and everything is fine.
             r'Can\'t send migration request: node.*is down',
-        ]
+        )
         if CASSANDRA_VERSION_FROM_BUILD < '2.2':
             _known_teardown_race_error = (
                 'ScheduledThreadPoolExecutor$ScheduledFutureTask@[0-9a-f]+ '
                 'rejected from org.apache.cassandra.concurrent.DebuggableScheduledThreadPoolExecutor'
             )
             # don't alter ignore_log_patterns on the class, just the obj for this test
-            self.ignore_log_patterns += [_known_teardown_race_error]
-
-        Tester.__init__(self, *args, **kwargs)
+            fixture_dtest_setup.ignore_log_patterns += [_known_teardown_race_error]
 
     def prepare(self, num_nodes=1, cassandra_version="git:cassandra-2.1"):
         cluster = self.cluster
@@ -54,15 +66,20 @@ class TestSCUpgrade(Tester):
         if self.cluster.version() >= '4':
             return
 
-        pool = ConnectionPool("supcols", pool_size=1)
-        super_col_fam = ColumnFamily(pool, "cols")
+        node = self.cluster.nodelist()[0]
+        host, port = node.network_interfaces['thrift']
+        client = get_thrift_client(host, port)
+        client.transport.open()
+        client.set_keyspace('supcols')
+        p = SlicePredicate(slice_range=SliceRange('', '', False, 1000))
         for name in NAMES:
-            super_col_value = super_col_fam.get(name)
-            self.assertEqual(OrderedDict([(('attr', u'name'), name)]), super_col_value)
+            super_col_value = client.get_slice(name, ColumnParent("cols"), p, ConsistencyLevel.ONE)
+            logger.debug("get_slice(%s) returned %s" % (name, super_col_value))
+            assert name == super_col_value[0].column.value
 
     def verify_with_cql(self, session):
         session.execute("USE supcols")
-        expected = [[name, 'attr', u'name', name] for name in ['Grace', 'Claire', 'Dave', 'Frank', 'Ed', 'Bob', 'Alice']]
+        expected = [[name, 'attr', 'name', name] for name in ['Grace', 'Claire', 'Dave', 'Frank', 'Ed', 'Bob', 'Alice']]
         assert_all(session, "SELECT * FROM cols", expected)
 
     def _upgrade_super_columns_through_versions_test(self, upgrade_path):
@@ -118,20 +135,20 @@ class TestSCUpgrade(Tester):
 
         cluster.remove(node=node1)
 
-    def upgrade_super_columns_through_all_versions_test(self):
-        self._upgrade_super_columns_through_versions_test(upgrade_path=['git:cassandra-2.2', 'git:cassandra-3.X',
-                                                                        'git:trunk'])
+    def test_upgrade_super_columns_through_all_versions(self):
+        self._upgrade_super_columns_through_versions_test(upgrade_path=['git:cassandra-2.2', 'git:cassandra-3.0',
+                                                                        'git:cassandra-3.11', 'git:trunk'])
 
-    def upgrade_super_columns_through_limited_versions_test(self):
+    def test_upgrade_super_columns_through_limited_versions(self):
         self._upgrade_super_columns_through_versions_test(upgrade_path=['git:cassandra-3.0', 'git:trunk'])
 
     def upgrade_to_version(self, tag, nodes=None):
-        debug('Upgrading to ' + tag)
+        logger.debug('Upgrading to ' + tag)
         if nodes is None:
             nodes = self.cluster.nodelist()
 
         for node in nodes:
-            debug('Shutting down node: ' + node.name)
+            logger.debug('Shutting down node: ' + node.name)
             node.drain()
             node.watch_log_for("DRAINED")
             node.stop(wait_other_notice=False)
@@ -142,12 +159,12 @@ class TestSCUpgrade(Tester):
             if tag < "2.1":
                 if "memtable_allocation_type" in node.config_options:
                     node.config_options.__delitem__("memtable_allocation_type")
-            debug("Set new cassandra dir for %s: %s" % (node.name, node.get_install_dir()))
+            logger.debug("Set new cassandra dir for %s: %s" % (node.name, node.get_install_dir()))
         self.cluster.set_install_dir(version=tag)
 
         # Restart nodes on new version
         for node in nodes:
-            debug('Starting %s on new version (%s)' % (node.name, tag))
+            logger.debug('Starting %s on new version (%s)' % (node.name, tag))
             # Setup log4j / logback again (necessary moving from 2.0 -> 2.1):
             node.set_log_level("INFO")
             node.start(wait_other_notice=True, wait_for_binary_proto=True)

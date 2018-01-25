@@ -1,14 +1,18 @@
 import os
 import re
 import time
+import pytest
+import logging
+
 from collections import defaultdict
 
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
-from nose.plugins.attrib import attr
 
-from dtest import PRINT_DEBUG, DtestTimeoutError, Tester, debug, create_ks
-from tools.decorators import no_vnodes, since
+from dtest import DtestTimeoutError, Tester, create_ks
+
+since = pytest.mark.since
+logger = logging.getLogger(__name__)
 
 TRACE_DETERMINE_REPLICAS = re.compile('Determining replicas for mutation')
 TRACE_SEND_MESSAGE = re.compile('Sending (?:MUTATION|REQUEST_RESPONSE) message to /([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)')
@@ -73,8 +77,8 @@ def block_on_trace(session):
             raise DtestTimeoutError()
 
 
-@no_vnodes()
-class ReplicationTest(Tester):
+@pytest.mark.no_vnodes
+class TestReplication(Tester):
     """
     This test suite looks at how data is replicated across a cluster
     and who the coordinator, replicas and forwarders involved are.
@@ -176,7 +180,7 @@ class ReplicationTest(Tester):
         elif strategy == 'NetworkTopologyStrategy':
             # NetworkTopologyStrategy can be broken down into multiple
             # SimpleStrategies, just once per datacenter:
-            for dc, rf in replication_factor.items():
+            for dc, rf in list(replication_factor.items()):
                 dc_nodes = [n for n in nodes if n.data_center == dc]
                 replicas.extend(self.get_replicas_for_token(
                     token, rf, nodes=dc_nodes))
@@ -190,13 +194,13 @@ class ReplicationTest(Tester):
         """
         Pretty print a trace
         """
-        if PRINT_DEBUG:
-            print("-" * 40)
+        if logging.root.level == logging.DEBUG:
+            print(("-" * 40))
             for t in trace.events:
-                print("%s\t%s\t%s\t%s" % (t.source, t.source_elapsed, t.description, t.thread_name))
-            print("-" * 40)
+                print(("%s\t%s\t%s\t%s" % (t.source, t.source_elapsed, t.description, t.thread_name)))
+            print(("-" * 40))
 
-    def simple_test(self):
+    def test_simple(self):
         """
         Test the SimpleStrategy on a 3 node cluster
         """
@@ -209,8 +213,8 @@ class ReplicationTest(Tester):
         create_ks(session, 'test', replication_factor)
         session.execute('CREATE TABLE test.test (id int PRIMARY KEY, value text)', trace=False)
 
-        for key, token in murmur3_hashes.items():
-            debug('murmur3 hash key={key},token={token}'.format(key=key, token=token))
+        for key, token in list(murmur3_hashes.items()):
+            logger.debug('murmur3 hash key={key},token={token}'.format(key=key, token=token))
             query = SimpleStatement("INSERT INTO test (id, value) VALUES ({}, 'asdf')".format(key), consistency_level=ConsistencyLevel.ALL)
             future = session.execute_async(query, trace=True)
             future.result()
@@ -222,17 +226,17 @@ class ReplicationTest(Tester):
             stats = self.get_replicas_from_trace(trace)
             replicas_should_be = set(self.get_replicas_for_token(
                 token, replication_factor))
-            debug('\nreplicas should be: %s' % replicas_should_be)
-            debug('replicas were: %s' % stats['replicas'])
+            logger.debug('\nreplicas should be: %s' % replicas_should_be)
+            logger.debug('replicas were: %s' % stats['replicas'])
 
             # Make sure the correct nodes are replicas:
-            self.assertEqual(stats['replicas'], replicas_should_be)
+            assert stats['replicas'] == replicas_should_be
             # Make sure that each replica node was contacted and
             # acknowledged the write:
-            self.assertEqual(stats['nodes_sent_write'], stats['nodes_responded_write'])
+            assert stats['nodes_sent_write'] == stats['nodes_responded_write']
 
-    @attr("resource-intensive")
-    def network_topology_test(self):
+    @pytest.mark.resource_intensive
+    def test_network_topology(self):
         """
         Test the NetworkTopologyStrategy on a 2DC 3:3 node cluster
         """
@@ -248,7 +252,7 @@ class ReplicationTest(Tester):
 
         forwarders_used = set()
 
-        for key, token in murmur3_hashes.items():
+        for key, token in list(murmur3_hashes.items()):
             query = SimpleStatement("INSERT INTO test (id, value) VALUES ({}, 'asdf')".format(key), consistency_level=ConsistencyLevel.ALL)
             future = session.execute_async(query, trace=True)
             future.result()
@@ -260,9 +264,9 @@ class ReplicationTest(Tester):
             stats = self.get_replicas_from_trace(trace)
             replicas_should_be = set(self.get_replicas_for_token(
                 token, replication_factor, strategy='NetworkTopologyStrategy'))
-            debug('Current token is %s' % token)
-            debug('\nreplicas should be: %s' % replicas_should_be)
-            debug('replicas were: %s' % stats['replicas'])
+            logger.debug('Current token is %s' % token)
+            logger.debug('\nreplicas should be: %s' % replicas_should_be)
+            logger.debug('replicas were: %s' % stats['replicas'])
 
             # Make sure the coordinator only talked to a single node in
             # the second datacenter - CASSANDRA-5632:
@@ -270,27 +274,27 @@ class ReplicationTest(Tester):
             for node_contacted in stats['nodes_contacted'][node1.address()]:
                 if ip_nodes[node_contacted].data_center != node1.data_center:
                     num_in_other_dcs_contacted += 1
-            self.assertEqual(num_in_other_dcs_contacted, 1)
+            assert num_in_other_dcs_contacted == 1
 
             # Record the forwarder used for each INSERT:
             forwarders_used = forwarders_used.union(stats['forwarders'])
 
             try:
                 # Make sure the correct nodes are replicas:
-                self.assertEqual(stats['replicas'], replicas_should_be)
+                assert stats['replicas'] == replicas_should_be
                 # Make sure that each replica node was contacted and
                 # acknowledged the write:
-                self.assertEqual(stats['nodes_sent_write'], stats['nodes_responded_write'])
+                assert stats['nodes_sent_write'] == stats['nodes_responded_write']
             except AssertionError as e:
-                debug("Failed on key %s and token %s." % (key, token))
+                logger.debug("Failed on key %s and token %s." % (key, token))
                 raise e
 
         # Given a diverse enough keyset, each node in the second
         # datacenter should get a chance to be a forwarder:
-        self.assertEqual(len(forwarders_used), 3)
+        assert len(forwarders_used) == 3
 
 
-class SnitchConfigurationUpdateTest(Tester):
+class TestSnitchConfigurationUpdate(Tester):
     """
     Test to reproduce CASSANDRA-10238, wherein changing snitch properties to change racks without a restart
     could violate RF contract.
@@ -299,27 +303,31 @@ class SnitchConfigurationUpdateTest(Tester):
     which nodes should be shutdown in order to have the rack changed.
     """
 
-    ignore_log_patterns = ["Fatal exception during initialization",
-                           "Cannot start node if snitch's rack(.*) differs from previous rack(.*)",
-                           "Cannot update data center or rack"]
+    @pytest.fixture(autouse=True)
+    def fixture_add_additional_log_patterns(self, fixture_dtest_setup):
+        fixture_dtest_setup.ignore_log_patterns = (
+            "Fatal exception during initialization",
+            "Cannot start node if snitch's rack(.*) differs from previous rack(.*)",
+            "Cannot update data center or rack"
+        )
 
     def check_endpoint_count(self, ks, table, nodes, rf):
         """
         Check a dummy key expecting it to have replication factor as the sum of rf on all dcs.
         """
-        expected_count = sum([int(r) for d, r in rf.iteritems() if d != 'class'])
+        expected_count = sum([int(r) for d, r in rf.items() if d != 'class'])
         for node in nodes:
             cmd = "getendpoints {} {} dummy".format(ks, table)
             out, err, _ = node.nodetool(cmd)
 
             if len(err.strip()) > 0:
-                debug("Error running 'nodetool {}': {}".format(cmd, err))
+                logger.debug("Error running 'nodetool {}': {}".format(cmd, err))
 
-            debug("Endpoints for node {}, expected count is {}".format(node.address(), expected_count))
-            debug(out)
+            logger.debug("Endpoints for node {}, expected count is {}".format(node.address(), expected_count))
+            logger.debug(out)
             ips_found = re.findall('(\d+\.\d+\.\d+\.\d+)', out)
 
-            self.assertEqual(len(ips_found), expected_count, "wrong number of endpoints found ({}), should be: {}".format(len(ips_found), expected_count))
+            assert len(ips_found) == expected_count, "wrong number of endpoints found ({}), should be: {}".format(len(ips_found), expected_count)
 
     def wait_for_nodes_on_racks(self, nodes, expected_racks):
         """
@@ -331,9 +339,9 @@ class SnitchConfigurationUpdateTest(Tester):
             while time.time() < wait_expire:
                 out, err, _ = node.nodetool("status")
 
-                debug(out)
+                logger.debug(out)
                 if len(err.strip()) > 0:
-                    debug("Error trying to run nodetool status: {}".format(err))
+                    logger.debug("Error trying to run nodetool status: {}".format(err))
 
                 racks = []
                 for line in out.split(os.linesep):
@@ -343,10 +351,10 @@ class SnitchConfigurationUpdateTest(Tester):
 
                 if racks == expected_racks:
                     # great, the topology change is propagated
-                    debug("Topology change detected on node {}".format(i))
+                    logger.debug("Topology change detected on node {}".format(i))
                     break
                 else:
-                    debug("Waiting for topology change on node {}".format(i))
+                    logger.debug("Waiting for topology change on node {}".format(i))
                     time.sleep(5)
             else:
                 raise RuntimeError("Ran out of time waiting for topology to change on node {}".format(i))
@@ -383,7 +391,7 @@ class SnitchConfigurationUpdateTest(Tester):
                                        final_racks=["rack0", "rack1", "rack2"],
                                        nodes_to_shutdown=[0, 2])
 
-    @attr("resource-intensive")
+    @pytest.mark.resource_intensive
     def test_rf_collapse_gossiping_property_file_snitch_multi_dc(self):
         """
         @jira_ticket CASSANDRA-10238
@@ -400,7 +408,7 @@ class SnitchConfigurationUpdateTest(Tester):
                                        final_racks=["rack1", "rack1", "rack1", "rack1", "rack1", "rack1"],
                                        nodes_to_shutdown=[0, 2, 3, 5])
 
-    @attr("resource-intensive")
+    @pytest.mark.resource_intensive
     def test_rf_expand_gossiping_property_file_snitch_multi_dc(self):
         """
         @jira_ticket CASSANDRA-10238
@@ -537,7 +545,7 @@ class SnitchConfigurationUpdateTest(Tester):
 
         session = self.patient_cql_connection(cluster.nodelist()[0])
 
-        options = (', ').join(['\'{}\': {}'.format(d, r) for d, r in rf.iteritems()])
+        options = (', ').join(['\'{}\': {}'.format(d, r) for d, r in rf.items()])
         session.execute("CREATE KEYSPACE testing WITH replication = {{{}}}".format(options))
         session.execute("CREATE TABLE testing.rf_test (key text PRIMARY KEY, value text)")
 
@@ -548,10 +556,10 @@ class SnitchConfigurationUpdateTest(Tester):
 
         for i in nodes_to_shutdown:
             node = cluster.nodelist()[i]
-            debug("Shutting down node {}".format(node.address()))
+            logger.debug("Shutting down node {}".format(node.address()))
             node.stop(wait_other_notice=True)
 
-        debug("Updating snitch file")
+        logger.debug("Updating snitch file")
         for i, node in enumerate(cluster.nodelist()):
             with open(os.path.join(node.get_conf_dir(), snitch_config_file), 'w') as topo_file:
                 for line in snitch_lines_after(i, node):
@@ -559,12 +567,12 @@ class SnitchConfigurationUpdateTest(Tester):
 
         # wait until the config is reloaded before we restart the nodes, the default check period is
         # 5 seconds so we wait for 10 seconds to be sure
-        debug("Waiting 10 seconds to make sure snitch file is reloaded...")
+        logger.debug("Waiting 10 seconds to make sure snitch file is reloaded...")
         time.sleep(10)
 
         for i in nodes_to_shutdown:
             node = cluster.nodelist()[i]
-            debug("Restarting node {}".format(node.address()))
+            logger.debug("Restarting node {}".format(node.address()))
             # Since CASSANDRA-10242 it is no longer
             # possible to start a node with a different rack unless we specify -Dcassandra.ignore_rack and since
             # CASSANDRA-9474 it is no longer possible to start a node with a different dc unless we specify
@@ -594,24 +602,24 @@ class SnitchConfigurationUpdateTest(Tester):
             for line in ["dc={}".format(node1.data_center), "rack=rack1"]:
                 topo_file.write(line + os.linesep)
 
-        debug("Starting node {} with rack1".format(node1.address()))
+        logger.debug("Starting node {} with rack1".format(node1.address()))
         node1.start(wait_for_binary_proto=True)
 
-        debug("Shutting down node {}".format(node1.address()))
+        logger.debug("Shutting down node {}".format(node1.address()))
         node1.stop(wait_other_notice=True)
 
-        debug("Updating snitch file with rack2")
+        logger.debug("Updating snitch file with rack2")
         for node in cluster.nodelist():
             with open(os.path.join(node.get_conf_dir(), 'cassandra-rackdc.properties'), 'w') as topo_file:
                 for line in ["dc={}".format(node.data_center), "rack=rack2"]:
                     topo_file.write(line + os.linesep)
 
-        debug("Restarting node {} with rack2".format(node1.address()))
+        logger.debug("Restarting node {} with rack2".format(node1.address()))
         mark = node1.mark_log()
         node1.start()
 
         # check node not running
-        debug("Waiting for error message in log file")
+        logger.debug("Waiting for error message in log file")
 
         if cluster.version() >= '2.2':
             node1.watch_log_for("Cannot start node if snitch's rack(.*) differs from previous rack(.*)",
@@ -696,7 +704,7 @@ class SnitchConfigurationUpdateTest(Tester):
 
         marks = [node.mark_log() for node in cluster.nodelist()]
 
-        debug("Updating snitch file")
+        logger.debug("Updating snitch file")
         for node in cluster.nodelist():
             with open(os.path.join(node.get_conf_dir(), snitch_config_file), 'w') as topo_file:
                 for line in snitch_lines_after:
@@ -704,7 +712,7 @@ class SnitchConfigurationUpdateTest(Tester):
 
         # wait until the config is reloaded, the default check period is
         # 5 seconds so we wait for 10 seconds to be sure
-        debug("Waiting 10 seconds to make sure snitch file is reloaded...")
+        logger.debug("Waiting 10 seconds to make sure snitch file is reloaded...")
         time.sleep(10)
 
         # check racks have not changed
@@ -723,7 +731,7 @@ class SnitchConfigurationUpdateTest(Tester):
         """
         expected_error = (r"Cannot start node if snitch's data center (.*) differs from previous data center (.*)\. "
                           "Please fix the snitch configuration, decommission and rebootstrap this node or use the flag -Dcassandra.ignore_dc=true.")
-        self.ignore_log_patterns = [expected_error]
+        self.fixture_dtest_setup.ignore_log_patterns = [expected_error]
 
         cluster = self.cluster
         cluster.populate(1)
@@ -744,4 +752,4 @@ class SnitchConfigurationUpdateTest(Tester):
 
         mark = node.mark_log()
         node.start()
-        node.watch_log_for(expected_error, from_mark=mark, timeout=10)
+        node.watch_log_for(expected_error, from_mark=mark, timeout=120)

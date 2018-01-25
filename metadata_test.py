@@ -1,8 +1,11 @@
 import threading
 import time
-from unittest import skip
+import logging
+import pytest
 
 from dtest import Tester
+
+logger = logging.getLogger(__name__)
 
 
 class TestMetadata(Tester):
@@ -24,16 +27,15 @@ class TestMetadata(Tester):
         node1.stress(['read', 'no-warmup', 'n=30000', '-schema', 'replication(factor=2)', 'compression=LZ4Compressor',
                       '-rate', 'threads=1'])
 
-    @skip('hangs CI')
-    def metadata_reset_while_compact_test(self):
+    @pytest.mark.skip(reason='hangs CI')
+    def test_metadata_reset_while_compact(self):
         """
         Resets the schema while a compact, read and repair happens.
         All kinds of glorious things can fail.
         """
-
         # while the schema is being reset, there will inevitably be some
         # queries that will error with this message
-        self.ignore_log_patterns = '.*Unknown keyspace/cf pair.*'
+        self.fixture_dtest_setup.ignore_log_patterns = ['.*Unknown keyspace/cf pair.*']
 
         cluster = self.cluster
         cluster.populate(2).start(wait_other_notice=True)
@@ -43,7 +45,8 @@ class TestMetadata(Tester):
         node1.nodetool("setcompactionthroughput 1")
 
         for i in range(3):
-            node1.stress(['write', 'no-warmup', 'n=30000', '-schema', 'replication(factor=2)', 'compression=LZ4Compressor', '-rate', 'threads=5', '-pop', 'seq=1..30000'])
+            node1.stress(['write', 'no-warmup', 'n=30000', '-schema', 'replication(factor=2)',
+                          'compression=LZ4Compressor', '-rate', 'threads=5', '-pop', 'seq=1..30000'])
             node1.flush()
 
         thread = threading.Thread(target=self.force_compact)

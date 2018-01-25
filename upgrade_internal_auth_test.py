@@ -1,33 +1,47 @@
 import time
-from unittest import skipIf
+import pytest
+import logging
 
 from cassandra import Unauthorized
 from ccmlib.common import is_win
 from ccmlib.node import Node
 
-from dtest import OFFHEAP_MEMTABLES, Tester, debug
+from dtest_setup_overrides import DTestSetupOverrides
+
+from dtest import Tester
 from tools.assertions import assert_all, assert_invalid
-from tools.decorators import since
 from tools.misc import ImmutableMapping
 
+since = pytest.mark.since
+logger = logging.getLogger(__name__)
 
+
+@pytest.mark.upgrade_test
 @since('2.2')
 class TestAuthUpgrade(Tester):
-    cluster_options = ImmutableMapping({'authenticator': 'PasswordAuthenticator',
-                                        'authorizer': 'CassandraAuthorizer'})
-    ignore_log_patterns = (
-        # This one occurs if we do a non-rolling upgrade, the node
-        # it's trying to send the migration to hasn't started yet,
-        # and when it does, it gets replayed and everything is fine.
-        r'Can\'t send migration request: node.*is down',
+
+    @pytest.fixture(scope='function', autouse=True)
+    def fixture_dtest_setup_overrides(self):
+        dtest_setup_overrides = DTestSetupOverrides()
+        dtest_setup_overrides.cluster_options = ImmutableMapping({'authenticator': 'PasswordAuthenticator',
+                                                               'authorizer': 'CassandraAuthorizer'})
+        return dtest_setup_overrides
+
+    @pytest.fixture(autouse=True)
+    def fixture_add_additional_log_patterns(self, fixture_dtest_setup):
+        fixture_dtest_setup.ignore_log_patterns = (
+            # This one occurs if we do a non-rolling upgrade, the node
+            # it's trying to send the migration to hasn't started yet,
+            # and when it does, it gets replayed and everything is fine.
+            r'Can\'t send migration request: node.*is down',
     )
 
-    def upgrade_to_22_test(self):
+    def test_upgrade_to_22(self):
         self.do_upgrade_with_internal_auth("github:apache/cassandra-2.2")
 
     @since('3.0')
-    @skipIf(OFFHEAP_MEMTABLES, 'offheap_objects are not available in 3.0')
-    def upgrade_to_30_test(self):
+    @pytest.mark.no_offheap_memtables
+    def test_upgrade_to_30(self):
         self.do_upgrade_with_internal_auth("github:apache/cassandra-3.0")
 
     @since('2.2', max_version='3.X')
@@ -72,8 +86,10 @@ class TestAuthUpgrade(Tester):
 
         replacement_address = node1.address()
         replacement_node = Node('replacement', cluster=self.cluster, auto_bootstrap=True,
-                                thrift_interface=(replacement_address, 9160), storage_interface=(replacement_address, 7000),
-                                jmx_port='7400', remote_debug_port='0', initial_token=None, binary_interface=(replacement_address, 9042))
+                                thrift_interface=(replacement_address, 9160),
+                                storage_interface=(replacement_address, 7000),
+                                jmx_port='7400', remote_debug_port='0', initial_token=None,
+                                binary_interface=(replacement_address, 9042))
         self.set_node_to_current_version(replacement_node)
 
         cluster.add(replacement_node, True)
@@ -150,7 +166,7 @@ class TestAuthUpgrade(Tester):
         session.execute('DROP TABLE system_auth.permissions', timeout=60)
         # and we should still be able to authenticate and check authorization
         self.check_permissions(node1, True)
-        debug('Test completed successfully')
+        logger.debug('Test completed successfully')
 
     def check_permissions(self, node, upgraded):
         # use an exclusive connection to ensure we only talk to the specified node
@@ -185,32 +201,32 @@ class TestAuthUpgrade(Tester):
 
     def upgrade_to_version(self, tag, node):
         format_args = {'node': node.name, 'tag': tag}
-        debug('Upgrading node {node} to {tag}'.format(**format_args))
+        logger.debug('Upgrading node {node} to {tag}'.format(**format_args))
         # drain and shutdown
         node.drain()
         node.watch_log_for("DRAINED")
         node.stop(wait_other_notice=False)
-        debug('{node} stopped'.format(**format_args))
+        logger.debug('{node} stopped'.format(**format_args))
 
         # Ignore errors before upgrade on Windows
         if is_win():
             node.mark_log_for_errors()
 
         # Update Cassandra Directory
-        debug('Updating version to tag {tag}'.format(**format_args))
+        logger.debug('Updating version to tag {tag}'.format(**format_args))
         node.set_install_dir(version=tag, verbose=True)
-        debug('Set new cassandra dir for {node}: {tag}'.format(**format_args))
+        logger.debug('Set new cassandra dir for {node}: {tag}'.format(**format_args))
 
         # Restart node on new version
-        debug('Starting {node} on new version ({tag})'.format(**format_args))
+        logger.debug('Starting {node} on new version ({tag})'.format(**format_args))
         # Setup log4j / logback again (necessary moving from 2.0 -> 2.1):
         node.set_log_level("INFO")
         node.start(wait_other_notice=True)
         # wait for the conversion of legacy data to either complete or fail
         # (because not enough upgraded nodes are available yet)
-        debug('Waiting for conversion of legacy data to complete or fail')
+        logger.debug('Waiting for conversion of legacy data to complete or fail')
         node.watch_log_for('conversion of legacy permissions')
 
-        debug('Running upgradesstables')
+        logger.debug('Running upgradesstables')
         node.nodetool('upgradesstables -a')
-        debug('Upgrade of {node} complete'.format(**format_args))
+        logger.debug('Upgrade of {node} complete'.format(**format_args))

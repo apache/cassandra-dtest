@@ -1,6 +1,7 @@
-# coding: utf-8
-
 import time
+import pytest
+import logging
+
 from threading import Thread
 
 from cassandra import ConsistencyLevel, WriteTimeout
@@ -8,7 +9,9 @@ from cassandra.query import SimpleStatement
 
 from tools.assertions import assert_unavailable
 from dtest import Tester, create_ks
-from tools.decorators import no_vnodes, since
+
+since = pytest.mark.since
+logger = logging.getLogger(__name__)
 
 
 @since('2.0.6')
@@ -32,7 +35,7 @@ class TestPaxos(Tester):
             create_ks(session, 'ks', rf)
         return session
 
-    def replica_availability_test(self):
+    def test_replica_availability(self):
         """
         @jira_ticket CASSANDRA-8640
 
@@ -56,8 +59,8 @@ class TestPaxos(Tester):
         self.cluster.nodelist()[2].start(wait_for_binary_proto=True)
         session.execute("INSERT INTO test (k, v) VALUES (4, 4) IF NOT EXISTS")
 
-    @no_vnodes()
-    def cluster_availability_test(self):
+    @pytest.mark.no_vnodes
+    def test_cluster_availability(self):
         # Warning, a change in partitioner or a change in CCM token allocation
         # may require the partition keys of these inserts to be changed.
         # This must not use vnodes as it relies on assumed token values.
@@ -78,13 +81,13 @@ class TestPaxos(Tester):
         self.cluster.nodelist()[2].start(wait_for_binary_proto=True)
         session.execute("INSERT INTO test (k, v) VALUES (6, 6) IF NOT EXISTS")
 
-    def contention_test_multi_iterations(self):
-        self.skipTest("Hanging the build")
+    def test_contention_multi_iterations(self):
+        pytest.skip("Hanging the build")
         self._contention_test(8, 100)
 
     # Warning, this test will require you to raise the open
     # file limit on OSX. Use 'ulimit -n 1000'
-    def contention_test_many_threads(self):
+    def test_contention_many_threads(self):
         self._contention_test(300, 1)
 
     def _contention_test(self, threads, iterations):
@@ -119,7 +122,7 @@ class TestPaxos(Tester):
                         try:
                             res = self.session.execute(self.query, (prev + 1, prev, self.wid))
                             if verbose:
-                                print "[%3d] CAS %3d -> %3d (res: %s)" % (self.wid, prev, prev + 1, str(res))
+                                print("[%3d] CAS %3d -> %3d (res: %s)" % (self.wid, prev, prev + 1, str(res)))
                             if res[0][0] is True:
                                 done = True
                                 prev = prev + 1
@@ -131,17 +134,17 @@ class TestPaxos(Tester):
                                 prev = res[0][3]
                                 if res[0][2] is not None:
                                     if verbose:
-                                        print "[%3d] Update was inserted on previous try (res = %s)" % (self.wid, str(res))
+                                        print("[%3d] Update was inserted on previous try (res = %s)" % (self.wid, str(res)))
                                     done = True
                         except WriteTimeout as e:
                             if verbose:
-                                print "[%3d] TIMEOUT (%s)" % (self.wid, str(e))
+                                print("[%3d] TIMEOUT (%s)" % (self.wid, str(e)))
                             # This means a timeout: just retry, if it happens that our update was indeed persisted,
                             # we'll figure it out on the next run.
                             self.retries = self.retries + 1
                         except Exception as e:
                             if verbose:
-                                print "[%3d] ERROR: %s" % (self.wid, str(e))
+                                print("[%3d] ERROR: %s" % (self.wid, str(e)))
                             self.errors = self.errors + 1
                             done = True
                     i = i + 1
@@ -177,7 +180,7 @@ class TestPaxos(Tester):
 
         if verbose:
             runtime = time.time() - start
-            print "runtime:", runtime
+            print("runtime:", runtime)
 
         query = SimpleStatement("SELECT v FROM test WHERE k = 0", consistency_level=ConsistencyLevel.ALL)
         rows = session.execute(query)
@@ -189,4 +192,4 @@ class TestPaxos(Tester):
             errors = errors + w.errors
             retries = retries + w.retries
 
-        self.assertTrue((value == threads * iterations) and (errors == 0), "value={}, errors={}, retries={}".format(value, errors, retries))
+        assert (value == threads * iterations) and (errors == 0), "value={}, errors={}, retries={}".format(value, errors, retries)

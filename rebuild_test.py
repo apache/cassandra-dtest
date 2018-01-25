@@ -1,26 +1,36 @@
+import pytest
 import time
+import logging
+
+from flaky import flaky
+
 from threading import Thread
 
 from cassandra import ConsistencyLevel
 from ccmlib.node import ToolError
 
-from dtest import Tester, debug, create_ks, create_cf
+from dtest import Tester, create_ks, create_cf
 from tools.data import insert_c1c2, query_c1c2
-from tools.decorators import since, no_vnodes
+
+since = pytest.mark.since
+logger = logging.getLogger(__name__)
 
 
 class TestRebuild(Tester):
-    ignore_log_patterns = (
-        # This one occurs when trying to send the migration to a
-        # node that hasn't started yet, and when it does, it gets
-        # replayed and everything is fine.
-        r'Can\'t send migration request: node.*is down',
-        # ignore streaming error during bootstrap
-        r'Exception encountered during startup',
-        r'Streaming error occurred'
-    )
 
-    def simple_rebuild_test(self):
+    @pytest.fixture(autouse=True)
+    def fixture_add_additional_log_patterns(self, fixture_dtest_setup):
+        fixture_dtest_setup.ignore_log_patterns = (
+            # This one occurs when trying to send the migration to a
+            # node that hasn't started yet, and when it does, it gets
+            # replayed and everything is fine.
+            r'Can\'t send migration request: node.*is down',
+            # ignore streaming error during bootstrap
+            r'Exception encountered during startup',
+            r'Streaming error occurred'
+        )
+
+    def test_simple_rebuild(self):
         """
         @jira_ticket CASSANDRA-9119
 
@@ -48,7 +58,7 @@ class TestRebuild(Tester):
         insert_c1c2(session, n=keys, consistency=ConsistencyLevel.LOCAL_ONE)
 
         # check data
-        for i in xrange(0, keys):
+        for i in range(0, keys):
             query_c1c2(session, i, ConsistencyLevel.LOCAL_ONE)
         session.shutdown()
 
@@ -118,31 +128,35 @@ class TestRebuild(Tester):
         # manually raise exception from cmd1 thread
         # see http://stackoverflow.com/a/1854263
         if cmd1.thread_exc_info is not None:
-            raise cmd1.thread_exc_info[1], None, cmd1.thread_exc_info[2]
+            raise cmd1.thread_exc_info[1].with_traceback(cmd1.thread_exc_info[2])
 
         # exactly 1 of the two nodetool calls should fail
         # usually it will be the one in the main thread,
         # but occasionally it wins the race with the one in the secondary thread,
         # so we check that one succeeded and the other failed
-        self.assertEqual(self.rebuild_errors, 1,
-                         msg='rebuild errors should be 1, but found {}. Concurrent rebuild should not be allowed, but one rebuild command should have succeeded.'.format(self.rebuild_errors))
+        assert self.rebuild_errors == 1, \
+            'rebuild errors should be 1, but found {}. Concurrent rebuild should not be allowed, but one rebuild command should have succeeded.'.format(self.rebuild_errors)
 
         # check data
-        for i in xrange(0, keys):
+        for i in range(0, keys):
             query_c1c2(session, i, ConsistencyLevel.LOCAL_ONE)
 
+    @flaky
     @since('2.2')
-    def resumable_rebuild_test(self):
+    def test_resumable_rebuild(self):
         """
         @jira_ticket CASSANDRA-10810
 
         Test rebuild operation is resumable
         """
-        self.ignore_log_patterns = list(self.ignore_log_patterns) + [r'Error while rebuilding node',
-                                                                     r'Streaming error occurred on session with peer 127.0.0.3',
-                                                                     r'Remote peer 127.0.0.3 failed stream session',
-                                                                     r'Streaming error occurred on session with peer 127.0.0.3:7000',
-                                                                     r'Remote peer 127.0.0.3:7000 failed stream session']
+        self.fixture_dtest_setup.ignore_log_patterns = list(self.fixture_dtest_setup.ignore_log_patterns) + [
+            r'Error while rebuilding node',
+            r'Streaming error occurred on session with peer 127.0.0.3',
+            r'Remote peer 127.0.0.3 failed stream session',
+            r'Streaming error occurred on session with peer 127.0.0.3:7000',
+            r'Remote peer 127.0.0.3:7000 failed stream session'
+        ]
+
         cluster = self.cluster
         cluster.set_configuration_options(values={'endpoint_snitch': 'org.apache.cassandra.locator.PropertyFileSnitch'})
 
@@ -203,32 +217,32 @@ class TestRebuild(Tester):
         node3.byteman_submit(script)
 
         # First rebuild must fail and data must be incomplete
-        with self.assertRaises(ToolError, msg='Unexpected: SUCCEED'):
-            debug('Executing first rebuild -> '),
+        with pytest.raises(ToolError, msg='Unexpected: SUCCEED'):
+            logger.debug('Executing first rebuild -> '),
             node3.nodetool('rebuild dc1')
-        debug('Expected: FAILED')
+        logger.debug('Expected: FAILED')
 
         session.execute('USE ks')
-        with self.assertRaises(AssertionError, msg='Unexpected: COMPLETE'):
-            debug('Checking data is complete -> '),
-            for i in xrange(0, 20000):
+        with pytest.raises(AssertionError, msg='Unexpected: COMPLETE'):
+            logger.debug('Checking data is complete -> '),
+            for i in range(0, 20000):
                 query_c1c2(session, i, ConsistencyLevel.LOCAL_ONE)
-        debug('Expected: INCOMPLETE')
+        logger.debug('Expected: INCOMPLETE')
 
-        debug('Executing second rebuild -> '),
+        logger.debug('Executing second rebuild -> '),
         node3.nodetool('rebuild dc1')
-        debug('Expected: SUCCEED')
+        logger.debug('Expected: SUCCEED')
 
         # Check all streaming sessions completed, streamed ranges are skipped and verify streamed data
         node3.watch_log_for('All sessions completed')
         node3.watch_log_for('Skipping streaming those ranges.')
-        debug('Checking data is complete -> '),
-        for i in xrange(0, 20000):
+        logger.debug('Checking data is complete -> '),
+        for i in range(0, 20000):
             query_c1c2(session, i, ConsistencyLevel.LOCAL_ONE)
-        debug('Expected: COMPLETE')
+        logger.debug('Expected: COMPLETE')
 
     @since('3.6')
-    def rebuild_ranges_test(self):
+    def test_rebuild_ranges(self):
         """
         @jira_ticket CASSANDRA-10406
         """
@@ -285,16 +299,16 @@ class TestRebuild(Tester):
 
         # check data is sent by stopping node1
         node1.stop()
-        for i in xrange(0, keys):
+        for i in range(0, keys):
             query_c1c2(session, i, ConsistencyLevel.ONE)
         # ks2 should not be streamed
         session.execute('USE ks2')
-        for i in xrange(0, keys):
+        for i in range(0, keys):
             query_c1c2(session, i, ConsistencyLevel.ONE, tolerate_missing=True, must_be_missing=True)
 
     @since('3.10')
-    @no_vnodes()
-    def disallow_rebuild_nonlocal_range_test(self):
+    @pytest.mark.no_vnodes
+    def test_disallow_rebuild_nonlocal_range(self):
         """
         @jira_ticket CASSANDRA-9875
         Verifies that nodetool rebuild throws an error when an operator
@@ -322,12 +336,12 @@ class TestRebuild(Tester):
         session = self.patient_exclusive_cql_connection(node1)
         session.execute("CREATE KEYSPACE ks1 WITH replication = {'class':'SimpleStrategy', 'replication_factor':2};")
 
-        with self.assertRaisesRegexp(ToolError, 'is not a range that is owned by this node'):
+        with pytest.raises(ToolError, match='is not a range that is owned by this node'):
             node1.nodetool('rebuild -ks ks1 -ts (%s,%s]' % (node1_token, node2_token))
 
     @since('3.10')
-    @no_vnodes()
-    def disallow_rebuild_from_nonreplica_test(self):
+    @pytest.mark.no_vnodes
+    def test_disallow_rebuild_from_nonreplica(self):
         """
         @jira_ticket CASSANDRA-9875
         Verifies that nodetool rebuild throws an error when an operator
@@ -358,12 +372,12 @@ class TestRebuild(Tester):
         session = self.patient_exclusive_cql_connection(node1)
         session.execute("CREATE KEYSPACE ks1 WITH replication = {'class':'SimpleStrategy', 'replication_factor':2};")
 
-        with self.assertRaisesRegexp(ToolError, 'Unable to find sufficient sources for streaming range'):
+        with pytest.raises(ToolError, message='Unable to find sufficient sources for streaming range'):
             node1.nodetool('rebuild -ks ks1 -ts (%s,%s] -s %s' % (node3_token, node1_token, node3_address))
 
     @since('3.10')
-    @no_vnodes()
-    def rebuild_with_specific_sources_test(self):
+    @pytest.mark.no_vnodes
+    def test_rebuild_with_specific_sources(self):
         """
         @jira_ticket CASSANDRA-9875
         Verifies that an operator can specify specific sources to use
@@ -426,18 +440,18 @@ class TestRebuild(Tester):
 
         # verify that node2 streamed to node3
         log_matches = node2.grep_log('Session with %s is complete' % node3.address_for_current_version())
-        self.assertTrue(len(log_matches) > 0)
+        assert len(log_matches) > 0
 
         # verify that node1 did not participate
         log_matches = node1.grep_log('streaming plan for Rebuild')
-        self.assertEqual(len(log_matches), 0)
+        assert len(log_matches) == 0
 
         # check data is sent by stopping node1, node2
         node1.stop()
         node2.stop()
-        for i in xrange(0, keys):
+        for i in range(0, keys):
             query_c1c2(session, i, ConsistencyLevel.ONE)
         # ks2 should not be streamed
         session.execute('USE ks2')
-        for i in xrange(0, keys):
+        for i in range(0, keys):
             query_c1c2(session, i, ConsistencyLevel.ONE, tolerate_missing=True, must_be_missing=True)

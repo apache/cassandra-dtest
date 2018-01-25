@@ -2,17 +2,21 @@ import re
 import struct
 import time
 import uuid
-from unittest import skipIf
+import pytest
+import logging
 
 from thrift.protocol import TBinaryProtocol
 from thrift.Thrift import TApplicationException
 from thrift.transport import TSocket, TTransport
 
 from tools.assertions import assert_length_equal
-from dtest import (CASSANDRA_VERSION_FROM_BUILD, DISABLE_VNODES, NUM_TOKENS,
-                   ReusableClusterTester, debug, init_default_config)
-from thrift_bindings.v22 import Cassandra
-from thrift_bindings.v22.Cassandra import (CfDef, Column, ColumnDef,
+from tools.misc import ImmutableMapping
+
+from dtest_setup_overrides import DTestSetupOverrides
+from dtest import CASSANDRA_VERSION_FROM_BUILD, Tester
+
+from thrift_bindings.thrift010 import Cassandra
+from thrift_bindings.thrift010.Cassandra import (CfDef, Column, ColumnDef,
                                            ColumnOrSuperColumn, ColumnParent,
                                            ColumnPath, ColumnSlice,
                                            ConsistencyLevel, CounterColumn,
@@ -23,8 +27,10 @@ from thrift_bindings.v22.Cassandra import (CfDef, Column, ColumnDef,
                                            Mutation, NotFoundException,
                                            SlicePredicate, SliceRange,
                                            SuperColumn)
-from tools.assertions import assert_all, assert_none, assert_one
-from tools.decorators import since
+from tools.assertions import (assert_all, assert_none, assert_one)
+
+since = pytest.mark.since
+logger = logging.getLogger(__name__)
 
 
 def get_thrift_client(host='127.0.0.1', port=9160):
@@ -46,71 +52,45 @@ def pid():
 
 
 @since('2.0', max_version='4')
-class ThriftTester(ReusableClusterTester):
-    client = None
-    extra_args = []
-    cluster_options = {'partitioner': 'org.apache.cassandra.dht.ByteOrderedPartitioner',
-                       'start_rpc': 'true'}
+class TestThrift(Tester):
 
-    @classmethod
-    def setUpClass(cls):
-        # super() needs to be used here for 'cls' to be bound to the correct class
-        super(ThriftTester, cls).setUpClass()
+    @pytest.fixture(scope='function', autouse=True)
+    def fixture_dtest_setup_overrides(self):
+        dtest_setup_overrides = DTestSetupOverrides()
+        """
+        @jira_ticket CASSANDRA-7653
+        """
+        dtest_setup_overrides.cluster_options = ImmutableMapping(
+            {'partitioner': 'org.apache.cassandra.dht.ByteOrderedPartitioner',
+             'start_rpc': 'true'})
+        return dtest_setup_overrides
 
-    def setUp(self):
-        # This is called before the @since annotation has had time to take
-        # effect and we don't want to even try connecting on thrift in 4.0
-        if self.cluster.version() >= '4':
-            return
-
-        ReusableClusterTester.setUp(self)
-
-        # this is ugly, but the whole test module is written against a global client
-        global client
-        client = get_thrift_client()
-        client.transport.open()
-
-    def tearDown(self):
-        # This is called before the @since annotation has had time to take
-        # effect and we don't want to even try connecting on thrift in 4.0
-        if self.cluster.version() >= '4':
-            return
-
-        client.transport.close()
-        ReusableClusterTester.tearDown(self)
-
-    @classmethod
-    def post_initialize_cluster(cls):
-        cluster = cls.cluster
-
-        # This is called before the @since annotation has had time to take
-        # effect and we don't want to even try connecting on thrift in 4.0
-        if cluster.version() >= '4':
-            return
-
-        cluster.populate(1)
-        node1, = cluster.nodelist()
+    @pytest.fixture(scope='function', autouse=True)
+    def fixture_set_cluster_settings(self, fixture_dtest_setup):
+        fixture_dtest_setup.cluster.populate(1)
+        node1, = fixture_dtest_setup.cluster.nodelist()
 
         # If vnodes are not used, we must set our own initial_token
         # Because ccm will not set a hex token for ByteOrderedPartitioner
         # automatically. It does not matter what token we set as we only
         # ever use one node.
-        if DISABLE_VNODES:
+        if not self.dtest_config.use_vnodes:
             node1.set_configuration_options(values={'initial_token': "a".encode('hex')})
 
-        cluster.start(wait_for_binary_proto=True)
-        cluster.nodelist()[0].watch_log_for("Listening for thrift clients")  # Wait for the thrift port to open
+        fixture_dtest_setup.cluster.start(wait_for_binary_proto=True)
+        fixture_dtest_setup.cluster.nodelist()[0].watch_log_for("Listening for thrift clients")  # Wait for the thrift port to open
         time.sleep(0.1)
-        cls.client = get_thrift_client()
-        cls.client.transport.open()
-        cls.define_schema()
+        # this is ugly, but the whole test module is written against a global client
+        global client
+        client = get_thrift_client()
+        client.transport.open()
+        self.define_schema()
 
-    @classmethod
-    def init_config(cls):
-        init_default_config(cls.cluster, ThriftTester.cluster_options)
+        yield client
 
-    @classmethod
-    def define_schema(cls):
+        client.transport.close()
+
+    def define_schema(self):
         keyspace1 = Cassandra.KsDef('Keyspace1', 'org.apache.cassandra.locator.SimpleStrategy', {'replication_factor': '1'},
                                     cf_defs=[
             Cassandra.CfDef('Keyspace1', 'Standard1'),
@@ -361,7 +341,7 @@ _MULTI_SLICE_COLUMNS = [Column('a', '1', 0), Column('b', '2', 0), Column('c', '3
 
 
 @since('2.0', max_version='4')
-class TestMutations(ThriftTester):
+class TestMutations(TestThrift):
 
     def truncate_all(self, *table_names):
         for table in table_names:
@@ -419,11 +399,11 @@ class TestMutations(ThriftTester):
         updated_columns = [Column('c1', 'value101', 1),
                            Column('c2', 'value102', 1)]
 
-        debug("Testing CAS operations on dynamic cf")
+        logger.debug("Testing CAS operations on dynamic cf")
         test_cas_operations(_SIMPLE_COLUMNS, updated_columns, 'Standard1')
-        debug("Testing CAS operations on static cf")
+        logger.debug("Testing CAS operations on static cf")
         test_cas_operations(_SIMPLE_COLUMNS, updated_columns, 'Standard3')
-        debug("Testing CAS on mixed static/dynamic cf")
+        logger.debug("Testing CAS on mixed static/dynamic cf")
         test_cas_operations(_SIMPLE_COLUMNS, updated_columns, 'Standard4')
 
     def test_missing_super(self):
@@ -463,7 +443,7 @@ class TestMutations(ThriftTester):
         # Exercise paging
         column_parent = ColumnParent('Standard1')
         # Paging for small columns starts at 1024 columns
-        columns_to_insert = [Column('c%d' % (i,), 'value%d' % (i,), 0) for i in xrange(3, 1026)]
+        columns_to_insert = [Column('c%d' % (i,), 'value%d' % (i,), 0) for i in range(3, 1026)]
         cfmap = {'Standard1': [Mutation(ColumnOrSuperColumn(c)) for c in columns_to_insert]}
         client.batch_mutate({'key1': cfmap}, ConsistencyLevel.ONE)
 
@@ -486,7 +466,7 @@ class TestMutations(ThriftTester):
         parent = ColumnParent('Standard1')
         cl = ConsistencyLevel.ONE
 
-        for i in xrange(0, 3050):
+        for i in range(0, 3050):
             client.insert(key, parent, Column(str(i), '', 0), cl)
 
         # same as page size
@@ -576,12 +556,12 @@ class TestMutations(ThriftTester):
         L = []
 
         # 100 isn't enough to fail reliably if the comparator is borked
-        for i in xrange(500):
+        for i in range(500):
             L.append(uuid.uuid1())
             client.insert('key1', ColumnParent('Super4', 'sc1'), Column(L[-1].bytes, 'value%s' % i, i), ConsistencyLevel.ONE)
         slice = _big_slice('key1', ColumnParent('Super4', 'sc1'))
         assert len(slice) == 500, len(slice)
-        for i in xrange(500):
+        for i in range(500):
             u = slice[i].column
             assert u.value == 'value%s' % i
             assert u.name == L[i].bytes
@@ -620,7 +600,7 @@ class TestMutations(ThriftTester):
 
         column_parent = ColumnParent('StandardLong1')
         sp = SlicePredicate(slice_range=SliceRange('', '', False, 1))
-        for i in xrange(10):
+        for i in range(10):
             parent = ColumnParent('StandardLong1')
 
             client.insert('key1', parent, Column(_i64(i), 'value1', 10 * i), ConsistencyLevel.ONE)
@@ -639,7 +619,7 @@ class TestMutations(ThriftTester):
 
         column_parent = ColumnParent('StandardInteger1')
         sp = SlicePredicate(slice_range=SliceRange('', '', False, 1))
-        for i in xrange(10):
+        for i in range(10):
             parent = ColumnParent('StandardInteger1')
 
             client.insert('key1', parent, Column(_i64(i), 'value1', 10 * i), ConsistencyLevel.ONE)
@@ -1301,10 +1281,10 @@ class TestMutations(ThriftTester):
         p = SlicePredicate(slice_range=SliceRange('sc1', 'sc2', False, 2))
         result = client.get_slice('key1', ColumnParent('Super1'), p, ConsistencyLevel.ONE)
         assert_length_equal(result, 2)
-        self.assertEqual(result[0].super_column.name, 'sc1')
-        self.assertEqual(result[0].super_column.columns[0], Column(_i64(4), 'value4', 1234))
-        self.assertEqual(result[1].super_column.name, 'sc2')
-        self.assertEqual(result[1].super_column.columns, [Column(_i64(5), 'value5', 1234), Column(_i64(6), 'value6', 1234)])
+        assert result[0].super_column.name == 'sc1'
+        assert result[0].super_column.columns[0], Column(_i64(4), 'value4' == 1234)
+        assert result[1].super_column.name == 'sc2'
+        assert result[1].super_column.columns, [Column(_i64(5), 'value5', 1234), Column(_i64(6), 'value6' == 1234)]
 
     def test_range_with_remove(self):
         _set_keyspace('Keyspace1')
@@ -1333,7 +1313,7 @@ class TestMutations(ThriftTester):
         _set_keyspace('Keyspace1')
         self.truncate_all('Standard1')
 
-        for key in ['-a', '-b', 'a', 'b'] + [str(i) for i in xrange(100)]:
+        for key in ['-a', '-b', 'a', 'b'] + [str(i) for i in range(100)]:
             client.insert(key, ColumnParent('Standard1'), Column(key, 'v', 0), ConsistencyLevel.ONE)
 
         slices = get_range_slice(client, ColumnParent('Standard1'), SlicePredicate(column_names=['-a', '-a']), '', '', 1000, ConsistencyLevel.ONE)
@@ -1346,7 +1326,7 @@ class TestMutations(ThriftTester):
         _set_keyspace('Keyspace1')
         self.truncate_all('Standard1')
 
-        for key in ['-a', '-b', 'a', 'b'] + [str(i) for i in xrange(100)]:
+        for key in ['-a', '-b', 'a', 'b'] + [str(i) for i in range(100)]:
             client.insert(key, ColumnParent('Standard1'), Column(key, 'v', 0), ConsistencyLevel.ONE)
 
         def check_slices_against_keys(keyList, sliceList):
@@ -1514,7 +1494,6 @@ class TestMutations(ThriftTester):
 
     def test_multiget_slice_with_compact_table(self):
         """Insert multiple keys in a compact table and retrieve them using the multiget_slice interface"""
-
         _set_keyspace('Keyspace1')
 
         # create
@@ -1539,7 +1518,6 @@ class TestMutations(ThriftTester):
 
     def test_multiget_slice(self):
         """Insert multiple keys and retrieve them using the multiget_slice interface"""
-
         _set_keyspace('Keyspace1')
         self.truncate_all('Standard1')
 
@@ -1593,15 +1571,15 @@ class TestMutations(ThriftTester):
         _set_keyspace('Keyspace1')
         self.truncate_all('Super1')
 
-        for x in xrange(3):
+        for x in range(3):
             client.insert('key1', ColumnParent('Super1', 'sc2'), Column(_i64(x), 'value', 1), ConsistencyLevel.ONE)
 
         client.remove('key1', ColumnPath('Super1'), 2, ConsistencyLevel.ONE)
 
-        for x in xrange(3):
+        for x in range(3):
             client.insert('key1', ColumnParent('Super1', 'sc2'), Column(_i64(x + 3), 'value', 3), ConsistencyLevel.ONE)
 
-        for n in xrange(1, 4):
+        for n in range(1, 4):
             p = SlicePredicate(slice_range=SliceRange('', '', False, n))
             slice = client.get_slice('key1', ColumnParent('Super1', 'sc2'), p, ConsistencyLevel.ONE)
             assert len(slice) == n, "expected %s results; found %s" % (n, slice)
@@ -1641,13 +1619,13 @@ class TestMutations(ThriftTester):
         # test/conf/cassandra.yaml specifies org.apache.cassandra.dht.ByteOrderedPartitioner
         # which uses BytesToken, so this just tests that the string representation of the token
         # matches a regex pattern for BytesToken.toString().
-        ring = client.describe_token_map().items()
-        if DISABLE_VNODES:
-            self.assertEqual(len(ring), 1)
+        ring = list(client.describe_token_map().items())
+        if not self.dtest_config.use_vnodes:
+            assert len(ring) == 1
         else:
-            self.assertEqual(len(ring), int(NUM_TOKENS))
+            assert len(ring) == int(self.dtest_config.num_tokens)
         token, node = ring[0]
-        if not DISABLE_VNODES:
+        if self.dtest_config.use_vnodes:
             assert re.match("[0-9A-Fa-f]{32}", token)
         assert node == '127.0.0.1'
 
@@ -2028,7 +2006,7 @@ class TestMutations(ThriftTester):
         column = Column('cttl3', 'value1', 0, 0)
         client.insert('key1', ColumnParent('Expiring'), column, ConsistencyLevel.ONE)
         c = client.get('key1', ColumnPath('Expiring', column='cttl3'), ConsistencyLevel.ONE).column
-        self.assertEqual(Column('cttl3', 'value1', 0), c)
+        assert Column('cttl3', 'value1', 0) == c
 
     def test_simple_expiration_batch_mutate(self):
         """ Test that column ttled do expires using batch_mutate """
@@ -2281,12 +2259,10 @@ class TestMutations(ThriftTester):
         slice_predicate = SlicePredicate(slice_range=SliceRange('', '', False, 100))
         results = client.get_slice('key1', ColumnParent('StandardComposite'), slice_predicate, ConsistencyLevel.ONE)
         columns = [result.column.name for result in results]
-        self.assertEqual(
-            columns,
-            [composite('0', '0'), composite('1', '1'), composite('2', '2'),
-             composite('6', '6'), composite('7', '7'), composite('8', '8'), composite('9', '9')])
+        assert columns == [composite('0', '0'), composite('1', '1'), composite('2', '2'),
+             composite('6', '6'), composite('7', '7'), composite('8', '8'), composite('9', '9')]
 
-    @skipIf(CASSANDRA_VERSION_FROM_BUILD == '3.9', "Test doesn't run on 3.9")
+    @pytest.mark.skipif(CASSANDRA_VERSION_FROM_BUILD == '3.9', reason="Test doesn't run on 3.9")
     def test_range_deletion_eoc_0(self):
         """
         This test confirms that a range tombstone with a final EOC of 0
@@ -2312,12 +2288,10 @@ class TestMutations(ThriftTester):
         slice_predicate = SlicePredicate(slice_range=SliceRange('', '', False, 100))
         results = client.get_slice('key1', ColumnParent('StandardComposite'), slice_predicate, ConsistencyLevel.ONE)
         columns = [result.column.name for result in results]
-        self.assertEqual(
-            columns,
-            [composite('0', '0'), composite('1', '1'), composite('2', '2'), composite('3', '3'), composite('4', '4'), composite('5', '5'),
+        assert columns == [composite('0', '0'), composite('1', '1'), composite('2', '2'), composite('3', '3'), composite('4', '4'), composite('5', '5'),
              composite('6'),
              composite('6', '6'),
-             composite('7', '7'), composite('8', '8'), composite('9', '9')])
+             composite('7', '7'), composite('8', '8'), composite('9', '9')]
 
         # do a slice deletion with (6, ) as the end
         delete_slice = SlicePredicate(slice_range=SliceRange(composite('3', eoc='\xff'), composite('6', '\x00'), False, 100))
@@ -2328,11 +2302,9 @@ class TestMutations(ThriftTester):
         # check the columns post-deletion, ('6', ) because it is an exact much but not (6, 6)
         results = client.get_slice('key1', ColumnParent('StandardComposite'), slice_predicate, ConsistencyLevel.ONE)
         columns = [result.column.name for result in results]
-        self.assertEqual(
-            columns,
-            [composite('0', '0'), composite('1', '1'), composite('2', '2'),
+        assert columns == [composite('0', '0'), composite('1', '1'), composite('2', '2'),
              composite('6', '6'),
-             composite('7', '7'), composite('8', '8'), composite('9', '9')])
+             composite('7', '7'), composite('8', '8'), composite('9', '9')]
 
         # do another slice deletion, but make the end (6, 6) this time
         delete_slice = SlicePredicate(slice_range=SliceRange(composite('3', eoc='\xff'), composite('6', '6', '\x00'), False, 100))
@@ -2343,10 +2315,8 @@ class TestMutations(ThriftTester):
         # check the columns post-deletion, now (6, 6) is also gone
         results = client.get_slice('key1', ColumnParent('StandardComposite'), slice_predicate, ConsistencyLevel.ONE)
         columns = [result.column.name for result in results]
-        self.assertEqual(
-            columns,
-            [composite('0', '0'), composite('1', '1'), composite('2', '2'),
-             composite('7', '7'), composite('8', '8'), composite('9', '9')])
+        assert columns == [composite('0', '0'), composite('1', '1'), composite('2', '2'),
+             composite('7', '7'), composite('8', '8'), composite('9', '9')]
 
     def test_incr_decr_standard_slice(self):
         _set_keyspace('Keyspace1')
@@ -2615,7 +2585,7 @@ class TestMutations(ThriftTester):
         session.execute("CREATE TABLE t (k text, s text static, t text, v text, PRIMARY KEY (k, t))")
 
         session.execute("INSERT INTO t (k, s, t, v) VALUES ('k', 's', 't', 'v') USING TIMESTAMP 0")
-        assert_one(session, "SELECT * FROM t", [u'k', 't', 's', 'v'])
+        assert_one(session, "SELECT * FROM t", ['k', 't', 's', 'v'])
 
         # Now submit a range deletion that should include both the row and the static value
 
@@ -2643,7 +2613,7 @@ class TestMutations(ThriftTester):
         client.insert(_i32(i), ColumnParent('cs1'), Column('v', _i32(i), 0), CL)
         _assert_column('cs1', _i32(i), 'v', _i32(i), 0)
 
-    @skipIf(CASSANDRA_VERSION_FROM_BUILD == '3.9', "Test doesn't run on 3.9")
+    @pytest.mark.skipif(CASSANDRA_VERSION_FROM_BUILD == '3.9', reason="Test doesn't run on 3.9")
     def test_range_tombstone_eoc_0(self):
         """
         Insert a range tombstone with EOC=0 for a compact storage table. Insert 2 rows that
@@ -2674,6 +2644,6 @@ class TestMutations(ThriftTester):
         session.execute("INSERT INTO test (id, c1, c2, v) VALUES (1, 'asd', 'asd', 0) USING TIMESTAMP 1470761449416613")
 
         ret = list(session.execute('SELECT * FROM test'))
-        self.assertEquals(2, len(ret))
+        assert 2 == len(ret)
 
         node1.nodetool('flush Keyspace1 test')

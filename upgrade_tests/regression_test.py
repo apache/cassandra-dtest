@@ -1,23 +1,25 @@
 """
 Home for upgrade-related tests that don't fit in with the core upgrade testing in dtest.upgrade_through_versions
 """
-from unittest import skipUnless
-
-from cassandra import ConsistencyLevel as CL
-from nose.tools import assert_not_in
-
-from dtest import RUN_STATIC_UPGRADE_MATRIX, debug
-from tools.decorators import since
-from tools.jmxutils import (JolokiaAgent, make_mbean)
-from upgrade_base import UpgradeTester
-from upgrade_manifest import build_upgrade_pairs
-
 import glob
 import os
 import re
 import time
+import pytest
+import logging
+
+from cassandra import ConsistencyLevel as CL
+
+from dtest import RUN_STATIC_UPGRADE_MATRIX
+from tools.jmxutils import (JolokiaAgent, make_mbean)
+from .upgrade_base import UpgradeTester
+from .upgrade_manifest import build_upgrade_pairs
+
+since = pytest.mark.since
+logger = logging.getLogger(__name__)
 
 
+@pytest.mark.upgrade_test
 class TestForRegressions(UpgradeTester):
     """
     Catch-all class for regression tests on specific versions.
@@ -65,7 +67,7 @@ class TestForRegressions(UpgradeTester):
 
             for symbol, year in symbol_years:
                 count = s[1].execute("select count(*) from financial.symbol_history where symbol='{}' and year={};".format(symbol, year))[0][0]
-                self.assertEqual(count, expected_rows, "actual {} did not match expected {}".format(count, expected_rows))
+                assert count == expected_rows, "actual {} did not match expected {}".format(count, expected_rows)
 
     def test13294(self):
         """
@@ -80,7 +82,7 @@ class TestForRegressions(UpgradeTester):
         session = self.prepare(jolokia=True)
         session.execute("CREATE KEYSPACE test13294 WITH replication={'class':'SimpleStrategy', 'replication_factor': 2};")
         session.execute("CREATE TABLE test13294.t (id int PRIMARY KEY, d int) WITH compaction = {'class': 'SizeTieredCompactionStrategy','enabled':'false'}")
-        for x in xrange(0, 5):
+        for x in range(0, 5):
             session.execute("INSERT INTO test13294.t (id, d) VALUES (%d, %d)" % (x, x))
             cluster.flush()
 
@@ -113,9 +115,9 @@ class TestForRegressions(UpgradeTester):
                 sstables_after = self.get_all_sstables(node1)
                 # since autocompaction is disabled and we compact a single sstable above
                 # the number of sstables after should be the same as before.
-                self.assertEquals(len(sstables_before), len(sstables_after))
+                assert len(sstables_before) == len(sstables_after)
                 checked = True
-        self.assertTrue(checked)
+        assert checked
 
     @since('3.0.14', max_version='3.0.99')
     def test_schema_agreement(self):
@@ -137,10 +139,10 @@ class TestForRegressions(UpgradeTester):
         session.cluster.control_connection.wait_for_schema_agreement(wait_time=30)
 
         def validate_schema_agreement(n, is_upgr):
-            debug("querying node {} for schema information, upgraded: {}".format(n.name, is_upgr))
+            logger.debug("querying node {} for schema information, upgraded: {}".format(n.name, is_upgr))
 
             response = n.nodetool('describecluster').stdout
-            debug(response)
+            logger.debug(response)
             schemas = response.split('Schema versions:')[1].strip()
             num_schemas = len(re.findall('\[.*?\]', schemas))
             self.assertEqual(num_schemas, 1, "There were multiple schema versions during an upgrade: {}"
@@ -163,7 +165,7 @@ class TestForRegressions(UpgradeTester):
 
     def get_all_sstables(self, node):
         # note that node.get_sstables(...) only returns current version sstables
-        keyspace_dirs = [os.path.join(node.get_path(), "data{0}".format(x), "test13294") for x in xrange(0, node.cluster.data_dir_count)]
+        keyspace_dirs = [os.path.join(node.get_path(), "data{0}".format(x), "test13294") for x in range(0, node.cluster.data_dir_count)]
         files = []
         for d in keyspace_dirs:
             for f in glob.glob(d + "/*/*Data*"):
@@ -173,9 +175,11 @@ class TestForRegressions(UpgradeTester):
 
 for path in build_upgrade_pairs():
     gen_class_name = TestForRegressions.__name__ + path.name
-    assert_not_in(gen_class_name, globals())
+    assert gen_class_name not in globals()
     spec = {'UPGRADE_PATH': path,
             '__test__': True}
 
     upgrade_applies_to_env = RUN_STATIC_UPGRADE_MATRIX or path.upgrade_meta.matches_current_env_version_family
-    globals()[gen_class_name] = skipUnless(upgrade_applies_to_env, 'test not applicable to env.')(type(gen_class_name, (TestForRegressions,), spec))
+    if not upgrade_applies_to_env:
+        pytest.mark.skip(reason='test not applicable to env.')
+    globals()[gen_class_name] = type(gen_class_name, (TestForRegressions,), spec)

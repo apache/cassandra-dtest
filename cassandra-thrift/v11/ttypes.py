@@ -257,7 +257,7 @@ class Column:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -306,7 +306,7 @@ class SuperColumn:
         if ftype == TType.LIST:
           self.columns = []
           (_etype3, _size0) = iprot.readListBegin()
-          for _i4 in xrange(_size0):
+          for _i4 in range(_size0):
             _elem5 = Column()
             _elem5.read(iprot)
             self.columns.append(_elem5)
@@ -347,7 +347,7 @@ class SuperColumn:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -423,7 +423,7 @@ class CounterColumn:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -467,7 +467,7 @@ class CounterSuperColumn:
         if ftype == TType.LIST:
           self.columns = []
           (_etype10, _size7) = iprot.readListBegin()
-          for _i11 in xrange(_size7):
+          for _i11 in range(_size7):
             _elem12 = CounterColumn()
             _elem12.read(iprot)
             self.columns.append(_elem12)
@@ -508,7 +508,7 @@ class CounterSuperColumn:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -622,7 +622,7 @@ class ColumnOrSuperColumn:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -670,7 +670,7 @@ class NotFoundException(TException):
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -738,7 +738,7 @@ class InvalidRequestException(TException):
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -786,7 +786,7 @@ class UnavailableException(TException):
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -834,7 +834,7 @@ class TimedOutException(TException):
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -901,7 +901,7 @@ class AuthenticationException(TException):
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -968,7 +968,7 @@ class AuthorizationException(TException):
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -1016,7 +1016,7 @@ class SchemaDisagreementException(TException):
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -1097,7 +1097,7 @@ class ColumnParent:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -1194,7 +1194,7 @@ class ColumnPath:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -1313,7 +1313,7 @@ class SliceRange:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -1363,7 +1363,7 @@ class SlicePredicate:
         if ftype == TType.LIST:
           self.column_names = []
           (_etype17, _size14) = iprot.readListBegin()
-          for _i18 in xrange(_size14):
+          for _i18 in range(_size14):
             _elem19 = iprot.readString();
             self.column_names.append(_elem19)
           iprot.readListEnd()
@@ -1405,7 +1405,7 @@ class SlicePredicate:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -1495,7 +1495,7 @@ class IndexExpression:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -1539,7 +1539,7 @@ class IndexClause:
         if ftype == TType.LIST:
           self.expressions = []
           (_etype24, _size21) = iprot.readListBegin()
-          for _i25 in xrange(_size21):
+          for _i25 in range(_size21):
             _elem26 = IndexExpression()
             _elem26.read(iprot)
             self.expressions.append(_elem26)
@@ -1596,7 +1596,7 @@ class IndexClause:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -1674,7 +1674,7 @@ class KeyRange:
         if ftype == TType.LIST:
           self.row_filter = []
           (_etype31, _size28) = iprot.readListBegin()
-          for _i32 in xrange(_size28):
+          for _i32 in range(_size28):
             _elem33 = IndexExpression()
             _elem33.read(iprot)
             self.row_filter.append(_elem33)
@@ -1734,7 +1734,7 @@ class KeyRange:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -1784,7 +1784,7 @@ class KeySlice:
         if ftype == TType.LIST:
           self.columns = []
           (_etype38, _size35) = iprot.readListBegin()
-          for _i39 in xrange(_size35):
+          for _i39 in range(_size35):
             _elem40 = ColumnOrSuperColumn()
             _elem40.read(iprot)
             self.columns.append(_elem40)
@@ -1825,7 +1825,7 @@ class KeySlice:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -1901,7 +1901,7 @@ class KeyCount:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -1988,7 +1988,7 @@ class Deletion:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -2066,7 +2066,7 @@ class Mutation:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -2150,7 +2150,7 @@ class EndpointDetails:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -2215,7 +2215,7 @@ class TokenRange:
         if ftype == TType.LIST:
           self.endpoints = []
           (_etype45, _size42) = iprot.readListBegin()
-          for _i46 in xrange(_size42):
+          for _i46 in range(_size42):
             _elem47 = iprot.readString();
             self.endpoints.append(_elem47)
           iprot.readListEnd()
@@ -2225,7 +2225,7 @@ class TokenRange:
         if ftype == TType.LIST:
           self.rpc_endpoints = []
           (_etype51, _size48) = iprot.readListBegin()
-          for _i52 in xrange(_size48):
+          for _i52 in range(_size48):
             _elem53 = iprot.readString();
             self.rpc_endpoints.append(_elem53)
           iprot.readListEnd()
@@ -2235,7 +2235,7 @@ class TokenRange:
         if ftype == TType.LIST:
           self.endpoint_details = []
           (_etype57, _size54) = iprot.readListBegin()
-          for _i58 in xrange(_size54):
+          for _i58 in range(_size54):
             _elem59 = EndpointDetails()
             _elem59.read(iprot)
             self.endpoint_details.append(_elem59)
@@ -2296,7 +2296,7 @@ class TokenRange:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -2334,7 +2334,7 @@ class AuthenticationRequest:
         if ftype == TType.MAP:
           self.credentials = {}
           (_ktype64, _vtype65, _size63 ) = iprot.readMapBegin() 
-          for _i67 in xrange(_size63):
+          for _i67 in range(_size63):
             _key68 = iprot.readString();
             _val69 = iprot.readString();
             self.credentials[_key68] = _val69
@@ -2354,7 +2354,7 @@ class AuthenticationRequest:
     if self.credentials is not None:
       oprot.writeFieldBegin('credentials', TType.MAP, 1)
       oprot.writeMapBegin(TType.STRING, TType.STRING, len(self.credentials))
-      for kiter70,viter71 in self.credentials.items():
+      for kiter70,viter71 in list(self.credentials.items()):
         oprot.writeString(kiter70)
         oprot.writeString(viter71)
       oprot.writeMapEnd()
@@ -2370,7 +2370,7 @@ class AuthenticationRequest:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -2438,7 +2438,7 @@ class ColumnDef:
         if ftype == TType.MAP:
           self.index_options = {}
           (_ktype73, _vtype74, _size72 ) = iprot.readMapBegin() 
-          for _i76 in xrange(_size72):
+          for _i76 in range(_size72):
             _key77 = iprot.readString();
             _val78 = iprot.readString();
             self.index_options[_key77] = _val78
@@ -2474,7 +2474,7 @@ class ColumnDef:
     if self.index_options is not None:
       oprot.writeFieldBegin('index_options', TType.MAP, 5)
       oprot.writeMapBegin(TType.STRING, TType.STRING, len(self.index_options))
-      for kiter79,viter80 in self.index_options.items():
+      for kiter79,viter80 in list(self.index_options.items()):
         oprot.writeString(kiter79)
         oprot.writeString(viter80)
       oprot.writeMapEnd()
@@ -2492,7 +2492,7 @@ class ColumnDef:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -2665,7 +2665,7 @@ class CfDef:
         if ftype == TType.LIST:
           self.column_metadata = []
           (_etype84, _size81) = iprot.readListBegin()
-          for _i85 in xrange(_size81):
+          for _i85 in range(_size81):
             _elem86 = ColumnDef()
             _elem86.read(iprot)
             self.column_metadata.append(_elem86)
@@ -2721,7 +2721,7 @@ class CfDef:
         if ftype == TType.MAP:
           self.compaction_strategy_options = {}
           (_ktype88, _vtype89, _size87 ) = iprot.readMapBegin() 
-          for _i91 in xrange(_size87):
+          for _i91 in range(_size87):
             _key92 = iprot.readString();
             _val93 = iprot.readString();
             self.compaction_strategy_options[_key92] = _val93
@@ -2732,7 +2732,7 @@ class CfDef:
         if ftype == TType.MAP:
           self.compression_options = {}
           (_ktype95, _vtype96, _size94 ) = iprot.readMapBegin() 
-          for _i98 in xrange(_size94):
+          for _i98 in range(_size94):
             _key99 = iprot.readString();
             _val100 = iprot.readString();
             self.compression_options[_key99] = _val100
@@ -2753,7 +2753,7 @@ class CfDef:
         if ftype == TType.LIST:
           self.column_aliases = []
           (_etype104, _size101) = iprot.readListBegin()
-          for _i105 in xrange(_size101):
+          for _i105 in range(_size101):
             _elem106 = iprot.readString();
             self.column_aliases.append(_elem106)
           iprot.readListEnd()
@@ -2939,7 +2939,7 @@ class CfDef:
     if self.compaction_strategy_options is not None:
       oprot.writeFieldBegin('compaction_strategy_options', TType.MAP, 30)
       oprot.writeMapBegin(TType.STRING, TType.STRING, len(self.compaction_strategy_options))
-      for kiter108,viter109 in self.compaction_strategy_options.items():
+      for kiter108,viter109 in list(self.compaction_strategy_options.items()):
         oprot.writeString(kiter108)
         oprot.writeString(viter109)
       oprot.writeMapEnd()
@@ -2951,7 +2951,7 @@ class CfDef:
     if self.compression_options is not None:
       oprot.writeFieldBegin('compression_options', TType.MAP, 32)
       oprot.writeMapBegin(TType.STRING, TType.STRING, len(self.compression_options))
-      for kiter110,viter111 in self.compression_options.items():
+      for kiter110,viter111 in list(self.compression_options.items()):
         oprot.writeString(kiter110)
         oprot.writeString(viter111)
       oprot.writeMapEnd()
@@ -2992,7 +2992,7 @@ class CfDef:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -3053,7 +3053,7 @@ class KsDef:
         if ftype == TType.MAP:
           self.strategy_options = {}
           (_ktype114, _vtype115, _size113 ) = iprot.readMapBegin() 
-          for _i117 in xrange(_size113):
+          for _i117 in range(_size113):
             _key118 = iprot.readString();
             _val119 = iprot.readString();
             self.strategy_options[_key118] = _val119
@@ -3069,7 +3069,7 @@ class KsDef:
         if ftype == TType.LIST:
           self.cf_defs = []
           (_etype123, _size120) = iprot.readListBegin()
-          for _i124 in xrange(_size120):
+          for _i124 in range(_size120):
             _elem125 = CfDef()
             _elem125.read(iprot)
             self.cf_defs.append(_elem125)
@@ -3102,7 +3102,7 @@ class KsDef:
     if self.strategy_options is not None:
       oprot.writeFieldBegin('strategy_options', TType.MAP, 3)
       oprot.writeMapBegin(TType.STRING, TType.STRING, len(self.strategy_options))
-      for kiter126,viter127 in self.strategy_options.items():
+      for kiter126,viter127 in list(self.strategy_options.items()):
         oprot.writeString(kiter126)
         oprot.writeString(viter127)
       oprot.writeMapEnd()
@@ -3137,7 +3137,7 @@ class KsDef:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -3183,7 +3183,7 @@ class CqlRow:
         if ftype == TType.LIST:
           self.columns = []
           (_etype132, _size129) = iprot.readListBegin()
-          for _i133 in xrange(_size129):
+          for _i133 in range(_size129):
             _elem134 = Column()
             _elem134.read(iprot)
             self.columns.append(_elem134)
@@ -3224,7 +3224,7 @@ class CqlRow:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -3269,7 +3269,7 @@ class CqlMetadata:
         if ftype == TType.MAP:
           self.name_types = {}
           (_ktype137, _vtype138, _size136 ) = iprot.readMapBegin() 
-          for _i140 in xrange(_size136):
+          for _i140 in range(_size136):
             _key141 = iprot.readString();
             _val142 = iprot.readString();
             self.name_types[_key141] = _val142
@@ -3280,7 +3280,7 @@ class CqlMetadata:
         if ftype == TType.MAP:
           self.value_types = {}
           (_ktype144, _vtype145, _size143 ) = iprot.readMapBegin() 
-          for _i147 in xrange(_size143):
+          for _i147 in range(_size143):
             _key148 = iprot.readString();
             _val149 = iprot.readString();
             self.value_types[_key148] = _val149
@@ -3310,7 +3310,7 @@ class CqlMetadata:
     if self.name_types is not None:
       oprot.writeFieldBegin('name_types', TType.MAP, 1)
       oprot.writeMapBegin(TType.STRING, TType.STRING, len(self.name_types))
-      for kiter150,viter151 in self.name_types.items():
+      for kiter150,viter151 in list(self.name_types.items()):
         oprot.writeString(kiter150)
         oprot.writeString(viter151)
       oprot.writeMapEnd()
@@ -3318,7 +3318,7 @@ class CqlMetadata:
     if self.value_types is not None:
       oprot.writeFieldBegin('value_types', TType.MAP, 2)
       oprot.writeMapBegin(TType.STRING, TType.STRING, len(self.value_types))
-      for kiter152,viter153 in self.value_types.items():
+      for kiter152,viter153 in list(self.value_types.items()):
         oprot.writeString(kiter152)
         oprot.writeString(viter153)
       oprot.writeMapEnd()
@@ -3348,7 +3348,7 @@ class CqlMetadata:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -3398,7 +3398,7 @@ class CqlResult:
         if ftype == TType.LIST:
           self.rows = []
           (_etype157, _size154) = iprot.readListBegin()
-          for _i158 in xrange(_size154):
+          for _i158 in range(_size154):
             _elem159 = CqlRow()
             _elem159.read(iprot)
             self.rows.append(_elem159)
@@ -3456,7 +3456,7 @@ class CqlResult:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -3508,7 +3508,7 @@ class CqlPreparedResult:
         if ftype == TType.LIST:
           self.variable_types = []
           (_etype164, _size161) = iprot.readListBegin()
-          for _i165 in xrange(_size161):
+          for _i165 in range(_size161):
             _elem166 = iprot.readString();
             self.variable_types.append(_elem166)
           iprot.readListEnd()
@@ -3552,7 +3552,7 @@ class CqlPreparedResult:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):

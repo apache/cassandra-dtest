@@ -1,6 +1,8 @@
 import random
 import time
 import uuid
+import pytest
+import logging
 
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
@@ -8,7 +10,9 @@ from cassandra.query import SimpleStatement
 from tools.assertions import assert_invalid, assert_length_equal, assert_one
 from dtest import Tester, create_ks, create_cf
 from tools.data import rows_to_list
-from tools.decorators import since
+
+since = pytest.mark.since
+logger = logging.getLogger(__name__)
 
 
 class TestCounters(Tester):
@@ -74,7 +78,8 @@ class TestCounters(Tester):
         session = self.patient_cql_connection(node1, consistency_level=ConsistencyLevel.ALL)
         assert_one(session, "SELECT COUNT(*) FROM test.test", [1000])
 
-    def counter_leader_with_partial_view_test(self):
+    @pytest.mark.vnodes
+    def test_counter_leader_with_partial_view(self):
         """
         Test leader election with a starting node.
 
@@ -113,7 +118,7 @@ class TestCounters(Tester):
         # fast node 2 updates the list of nodes that are alive, it will just have a partial view on the cluster
         # and thus will raise an 'UnavailableException' exception.
         nb_attempts = 50000
-        for i in xrange(0, nb_attempts):
+        for i in range(0, nb_attempts):
             # Change the name of the counter for the sake of randomization
             q = SimpleStatement(
                 query_string="UPDATE ks.cf SET c = c + 1 WHERE key = 'counter_%d'" % i,
@@ -121,7 +126,7 @@ class TestCounters(Tester):
             )
             session.execute(q)
 
-    def simple_increment_test(self):
+    def test_simple_increment(self):
         """ Simple incrementation test (Created for #3465, that wasn't a bug) """
         cluster = self.cluster
 
@@ -136,25 +141,24 @@ class TestCounters(Tester):
         nb_increment = 50
         nb_counter = 10
 
-        for i in xrange(0, nb_increment):
-            for c in xrange(0, nb_counter):
+        for i in range(0, nb_increment):
+            for c in range(0, nb_counter):
                 session = sessions[(i + c) % len(nodes)]
                 query = SimpleStatement("UPDATE cf SET c = c + 1 WHERE key = 'counter%i'" % c, consistency_level=ConsistencyLevel.QUORUM)
                 session.execute(query)
 
             session = sessions[i % len(nodes)]
-            keys = ",".join(["'counter%i'" % c for c in xrange(0, nb_counter)])
+            keys = ",".join(["'counter%i'" % c for c in range(0, nb_counter)])
             query = SimpleStatement("SELECT key, c FROM cf WHERE key IN (%s)" % keys, consistency_level=ConsistencyLevel.QUORUM)
             res = list(session.execute(query))
 
             assert_length_equal(res, nb_counter)
-            for c in xrange(0, nb_counter):
-                self.assertEqual(len(res[c]), 2, "Expecting key and counter for counter {}, got {}".format(c, str(res[c])))
-                self.assertEqual(res[c][1], i + 1, "Expecting counter {} = {}, got {}".format(c, i + 1, res[c][0]))
+            for c in range(0, nb_counter):
+                assert len(res[c]) == 2, "Expecting key and counter for counter {}, got {}".format(c, str(res[c]))
+                assert res[c][1] == i + 1, "Expecting counter {} = {}, got {}".format(c, i + 1, res[c][0])
 
-    def upgrade_test(self):
+    def test_upgrade(self):
         """ Test for bug of #4436 """
-
         cluster = self.cluster
 
         cluster.populate(2).start()
@@ -174,7 +178,7 @@ class TestCounters(Tester):
         session.execute(query)
         time.sleep(2)
 
-        keys = range(0, 4)
+        keys = list(range(0, 4))
         updates = 50
 
         def make_updates():
@@ -191,9 +195,9 @@ class TestCounters(Tester):
             query = SimpleStatement("SELECT * FROM counterTable", consistency_level=ConsistencyLevel.QUORUM)
             rows = list(session.execute(query))
 
-            self.assertEqual(len(rows), len(keys), "Expected {} rows, got {}: {}".format(len(keys), len(rows), str(rows)))
+            assert len(rows) == len(keys), "Expected {} rows, got {}: {}".format(len(keys), len(rows), str(rows))
             for row in rows:
-                self.assertEqual(row[1], i * updates, "Unexpected value {}".format(str(row)))
+                assert row[1], i * updates == "Unexpected value {}".format(str(row))
 
         def rolling_restart():
             # Rolling restart
@@ -218,7 +222,7 @@ class TestCounters(Tester):
 
         check(3)
 
-    def counter_consistency_test(self):
+    def test_counter_consistency(self):
         """
         Do a bunch of writes with ONE, read back with ALL and check results.
         """
@@ -239,7 +243,7 @@ class TestCounters(Tester):
 
         counters = []
         # establish 50 counters (2x25 rows)
-        for i in xrange(25):
+        for i in range(25):
             _id = str(uuid.uuid4())
             counters.append(
                 {_id: {'counter_one': 1, 'counter_two': 1}}
@@ -252,9 +256,9 @@ class TestCounters(Tester):
             session.execute(query)
 
         # increment a bunch of counters with CL.ONE
-        for i in xrange(10000):
+        for i in range(10000):
             counter = counters[random.randint(0, len(counters) - 1)]
-            counter_id = counter.keys()[0]
+            counter_id = list(counter.keys())[0]
 
             query = SimpleStatement("""
                 UPDATE counter_table
@@ -286,7 +290,7 @@ class TestCounters(Tester):
 
         # let's verify the counts are correct, using CL.ALL
         for counter_dict in counters:
-            counter_id = counter_dict.keys()[0]
+            counter_id = list(counter_dict.keys())[0]
 
             query = SimpleStatement("""
                 SELECT counter_one, counter_two
@@ -296,10 +300,10 @@ class TestCounters(Tester):
 
             counter_one_actual, counter_two_actual = rows[0]
 
-            self.assertEqual(counter_one_actual, counter_dict[counter_id]['counter_one'])
-            self.assertEqual(counter_two_actual, counter_dict[counter_id]['counter_two'])
+            assert counter_one_actual == counter_dict[counter_id]['counter_one']
+            assert counter_two_actual == counter_dict[counter_id]['counter_two']
 
-    def multi_counter_update_test(self):
+    def test_multi_counter_update(self):
         """
         Test for singlular update statements that will affect multiple counters.
         """
@@ -325,22 +329,22 @@ class TestCounters(Tester):
 
             expected_counts[_id] = i
 
-        for k, v in expected_counts.items():
+        for k, v in list(expected_counts.items()):
             session.execute("""
                 UPDATE counter_table set counter_one = counter_one + {v}
                 WHERE id='foo' and myuuid = {k}
                 """.format(k=k, v=v))
 
-        for k, v in expected_counts.items():
+        for k, v in list(expected_counts.items()):
             count = list(session.execute("""
                 SELECT counter_one FROM counter_table
                 WHERE id = 'foo' and myuuid = {k}
                 """.format(k=k)))
 
-            self.assertEqual(v, count[0][0])
+            assert v == count[0][0]
 
     @since("2.0", max_version="3.X")
-    def validate_empty_column_name_test(self):
+    def test_validate_empty_column_name(self):
         cluster = self.cluster
         cluster.populate(1).start()
         node1 = cluster.nodelist()[0]
@@ -365,7 +369,7 @@ class TestCounters(Tester):
         assert_one(session, "SELECT pk, ck, value FROM compact_counter_table", [0, 'ck', 3])
 
     @since('2.0')
-    def drop_counter_column_test(self):
+    def test_drop_counter_column(self):
         """Test for CASSANDRA-7831"""
         cluster = self.cluster
         cluster.populate(1).start()
@@ -378,20 +382,19 @@ class TestCounters(Tester):
         session.execute("UPDATE counter_bug SET c = c + 1 where t = 1")
         row = list(session.execute("SELECT * from counter_bug"))
 
-        self.assertEqual(rows_to_list(row)[0], [1, 1])
-        self.assertEqual(len(row), 1)
+        assert rows_to_list(row)[0] == [1, 1]
+        assert len(row) == 1
 
         session.execute("ALTER TABLE counter_bug drop c")
 
         assert_invalid(session, "ALTER TABLE counter_bug add c counter", "Cannot re-add previously dropped counter column c")
 
-    @since("2.0", max_version="3.X")  # Compact Storage
-    def compact_counter_cluster_test(self):
+    @since("2.0", max_version="3.X") # Compact Storage
+    def test_compact_counter_cluster(self):
         """
         @jira_ticket CASSANDRA-12219
         This test will fail on 3.0.0 - 3.0.8, and 3.1 - 3.8
         """
-
         cluster = self.cluster
         cluster.populate(3).start()
         node1 = cluster.nodelist()[0]
@@ -411,4 +414,4 @@ class TestCounters(Tester):
 
         for idx in range(0, 5):
             row = list(session.execute("SELECT data from counter_cs where key = {k}".format(k=idx)))
-            self.assertEqual(rows_to_list(row)[0][0], 5)
+            assert rows_to_list(row)[0][0] == 5

@@ -1,24 +1,36 @@
 import os
 import time
+import pytest
+import parse
+import re
+import logging
 
 import ccmlib.common
-import parse
 from ccmlib.node import ToolError
 
-from dtest import Tester, debug
-from tools.decorators import since
+from dtest import Tester
 from tools.jmxutils import (JolokiaAgent, enable_jmx_ssl, make_mbean,
                             remove_perf_disable_shared_mem)
 from tools.misc import generate_ssl_stores
 
+since = pytest.mark.since
+logger = logging.getLogger(__name__)
+
 
 class TestJMX(Tester):
-    def netstats_test(self):
+
+    @pytest.fixture(autouse=True)
+    def fixture_add_additional_log_patterns(self, fixture_dtest_setup):
+        fixture_dtest_setup.ignore_log_patterns = (
+            r'Failed to properly handshake with peer.* Closing the channel'
+        )
+
+    def test_netstats(self):
         """
         Check functioning of nodetool netstats, especially with restarts.
         @jira_ticket CASSANDRA-8122, CASSANDRA-6577
         """
-
+        #
         cluster = self.cluster
         cluster.populate(3).start(wait_for_binary_proto=True)
         node1, node2, node3 = cluster.nodelist()
@@ -27,7 +39,7 @@ class TestJMX(Tester):
         node1.flush()
         node1.stop(gently=False)
 
-        with self.assertRaisesRegexp(ToolError, "ConnectException: 'Connection refused( \(Connection refused\))?'."):
+        with pytest.raises(ToolError, message="ConnectException: 'Connection refused( \(Connection refused\))?'."):
             node1.nodetool('netstats')
 
         # don't wait; we're testing for when nodetool is called on a node mid-startup
@@ -42,17 +54,16 @@ class TestJMX(Tester):
             try:
                 node1.nodetool('netstats')
             except Exception as e:
-                self.assertNotIn('java.lang.reflect.UndeclaredThrowableException', str(e),
-                                 'Netstats failed with UndeclaredThrowableException (CASSANDRA-8122)')
+                assert 'java.lang.reflect.UndeclaredThrowableException' not in str(e), \
+                    'Netstats failed with UndeclaredThrowableException (CASSANDRA-8122)'
                 if not isinstance(e, ToolError):
                     raise
                 else:
-                    self.assertRegexpMatches(str(e),
-                                             "ConnectException: 'Connection refused( \(Connection refused\))?'.")
+                    assert re.search("ConnectException: 'Connection refused( \(Connection refused\))?'.", repr(e))
 
-        self.assertTrue(running, msg='node1 never started')
+        assert running, 'node1 never started'
 
-    def table_metric_mbeans_test(self):
+    def test_table_metric_mbeans(self):
         """
         Test some basic table metric mbeans with simple writes.
         """
@@ -66,7 +77,7 @@ class TestJMX(Tester):
         node1.stress(['write', 'n=10K', 'no-warmup', '-schema', 'replication(factor=3)'])
 
         typeName = "ColumnFamily" if version <= '2.2.X' else 'Table'
-        debug('Version {} typeName {}'.format(version, typeName))
+        logger.debug('Version {} typeName {}'.format(version, typeName))
 
         # TODO the keyspace and table name are capitalized in 2.0
         memtable_size = make_mbean('metrics', type=typeName, keyspace='keyspace1', scope='standard1',
@@ -78,21 +89,21 @@ class TestJMX(Tester):
 
         with JolokiaAgent(node1) as jmx:
             mem_size = jmx.read_attribute(memtable_size, "Value")
-            self.assertGreater(int(mem_size), 10000)
+            assert int(mem_size) > 10000
 
             on_disk_size = jmx.read_attribute(disk_size, "Count")
-            self.assertEquals(int(on_disk_size), 0)
+            assert int(on_disk_size) == 0
 
             node1.flush()
 
             on_disk_size = jmx.read_attribute(disk_size, "Count")
-            self.assertGreater(int(on_disk_size), 10000)
+            assert int(on_disk_size) > 10000
 
             sstables = jmx.read_attribute(sstable_count, "Value")
-            self.assertGreaterEqual(int(sstables), 1)
+            assert int(sstables) >= 1
 
     @since('3.0')
-    def mv_metric_mbeans_release_test(self):
+    def test_mv_metric_mbeans_release(self):
         """
         Test that the right mbeans are created and released when creating mvs
         """
@@ -133,33 +144,33 @@ class TestJMX(Tester):
                                  "but wasn't!"
 
         with JolokiaAgent(node) as jmx:
-            self.assertIsNotNone(jmx.read_attribute(table_memtable_size, "Value"),
-                                 missing_metric_message.format("AllMemtablesHeapSize", "testtable"))
-            self.assertIsNotNone(jmx.read_attribute(table_view_read_time, "Count"),
-                                 missing_metric_message.format("ViewReadTime", "testtable"))
-            self.assertIsNotNone(jmx.read_attribute(table_view_lock_time, "Count"),
-                                 missing_metric_message.format("ViewLockAcquireTime", "testtable"))
-            self.assertIsNotNone(jmx.read_attribute(mv_memtable_size, "Value"),
-                                 missing_metric_message.format("AllMemtablesHeapSize", "testmv"))
-            self.assertRaisesRegexp(Exception, ".*InstanceNotFoundException.*", jmx.read_attribute,
-                                    mbean=mv_view_read_time, attribute="Count", verbose=False)
-            self.assertRaisesRegexp(Exception, ".*InstanceNotFoundException.*", jmx.read_attribute,
-                                    mbean=mv_view_lock_time, attribute="Count", verbose=False)
+            assert jmx.read_attribute(table_memtable_size, "Value") is not None, \
+                missing_metric_message.format("AllMemtablesHeapSize", "testtable")
+            assert jmx.read_attribute(table_view_read_time, "Count") is not None, \
+                missing_metric_message.format("ViewReadTime", "testtable")
+            assert jmx.read_attribute(table_view_lock_time, "Count") is not None, \
+                missing_metric_message.format("ViewLockAcquireTime", "testtable")
+            assert jmx.read_attribute(mv_memtable_size, "Value") is not None, \
+                missing_metric_message.format("AllMemtablesHeapSize", "testmv")
+            with pytest.raises(Exception, match=".*InstanceNotFoundException.*"):
+                jmx.read_attribute(mbean=mv_view_read_time, attribute="Count", verbose=False)
+            with pytest.raises(Exception, match=".*InstanceNotFoundException.*"):
+                jmx.read_attribute(mbean=mv_view_lock_time, attribute="Count", verbose=False)
 
         node.run_cqlsh(cmds="DROP KEYSPACE mvtest;")
         with JolokiaAgent(node) as jmx:
-            self.assertRaisesRegexp(Exception, ".*InstanceNotFoundException.*", jmx.read_attribute,
-                                    mbean=table_memtable_size, attribute="Value", verbose=False)
-            self.assertRaisesRegexp(Exception, ".*InstanceNotFoundException.*", jmx.read_attribute,
-                                    mbean=table_view_lock_time, attribute="Count", verbose=False)
-            self.assertRaisesRegexp(Exception, ".*InstanceNotFoundException.*", jmx.read_attribute,
-                                    mbean=table_view_read_time, attribute="Count", verbose=False)
-            self.assertRaisesRegexp(Exception, ".*InstanceNotFoundException.*", jmx.read_attribute,
-                                    mbean=mv_memtable_size, attribute="Value", verbose=False)
-            self.assertRaisesRegexp(Exception, ".*InstanceNotFoundException.*", jmx.read_attribute,
-                                    mbean=mv_view_lock_time, attribute="Count", verbose=False)
-            self.assertRaisesRegexp(Exception, ".*InstanceNotFoundException.*", jmx.read_attribute,
-                                    mbean=mv_view_read_time, attribute="Count", verbose=False)
+            with pytest.raises(Exception, match=".*InstanceNotFoundException.*"):
+                jmx.read_attribute(mbean=table_memtable_size, attribute="Value", verbose=False)
+            with pytest.raises(Exception, match=".*InstanceNotFoundException.*"):
+                jmx.read_attribute(mbean=table_view_lock_time, attribute="Count", verbose=False)
+            with pytest.raises(Exception, match=".*InstanceNotFoundException.*"):
+                jmx.read_attribute(mbean=table_view_read_time, attribute="Count", verbose=False)
+            with pytest.raises(Exception, match=".*InstanceNotFoundException.*"):
+                jmx.read_attribute(mbean=mv_memtable_size, attribute="Value", verbose=False)
+            with pytest.raises(Exception, match=".*InstanceNotFoundException.*"):
+                jmx.read_attribute(mbean=mv_view_lock_time, attribute="Count", verbose=False)
+            with pytest.raises(Exception, match=".*InstanceNotFoundException.*"):
+                jmx.read_attribute(mbean=mv_view_read_time, attribute="Count", verbose=False)
 
     def test_compactionstats(self):
         """
@@ -204,14 +215,14 @@ class TestJMX(Tester):
             progress = int(parse.search(var, progress_string).named['progress'])
             updated_progress = int(parse.search(var, updated_progress_string).named['progress'])
 
-            debug(progress_string)
-            debug(updated_progress_string)
+            logger.debug(progress_string)
+            logger.debug(updated_progress_string)
 
             # We want to make sure that the progress is increasing,
             # and that values other than zero are displayed.
-            self.assertGreater(updated_progress, progress)
-            self.assertGreaterEqual(progress, 0)
-            self.assertGreater(updated_progress, 0)
+            assert updated_progress > progress
+            assert progress >= 0
+            assert updated_progress > 0
 
             # Block until the major compaction is complete
             # Otherwise nodetool will throw an exception
@@ -219,41 +230,42 @@ class TestJMX(Tester):
             # and never ends.
             start = time.time()
             max_query_timeout = 600
-            debug("Waiting for compaction to finish:")
+            logger.debug("Waiting for compaction to finish:")
             while (len(jmx.read_attribute(compaction_manager, 'CompactionSummary')) > 0) and (
                     time.time() - start < max_query_timeout):
-                debug(jmx.read_attribute(compaction_manager, 'CompactionSummary'))
+                logger.debug(jmx.read_attribute(compaction_manager, 'CompactionSummary'))
                 time.sleep(2)
 
     @since('2.2')
-    def phi_test(self):
+    def test_phi(self):
         """
         Check functioning of nodetool failuredetector.
         @jira_ticket CASSANDRA-9526
         """
-
         cluster = self.cluster
         cluster.populate(3).start(wait_for_binary_proto=True)
         node1, node2, node3 = cluster.nodelist()
 
-        phivalues = node1.nodetool("failuredetector").stdout.splitlines()
-        endpoint1Values = phivalues[1].split()
-        endpoint2Values = phivalues[2].split()
+        stdout = node1.nodetool("failuredetector").stdout
+        phivalues = stdout.splitlines()
+        endpoint1values = phivalues[1].split()
+        endpoint2values = phivalues[2].split()
 
-        endpoint1 = endpoint1Values[0][1:-1]
-        endpoint2 = endpoint2Values[0][1:-1]
+        endpoint1 = endpoint1values[0][1:-1]
+        endpoint2 = endpoint2values[0][1:-1]
 
-        self.assertItemsEqual([endpoint1, endpoint2], ['127.0.0.2', '127.0.0.3'])
+        assert '127.0.0.2' in [endpoint1, endpoint2]
+        assert '127.0.0.3' in [endpoint1, endpoint2]
 
-        endpoint1Phi = float(endpoint1Values[1])
-        endpoint2Phi = float(endpoint2Values[1])
+        endpoint1phi = float(endpoint1values[1])
+        endpoint2phi = float(endpoint2values[1])
 
         max_phi = 2.0
-        self.assertGreater(endpoint1Phi, 0.0)
-        self.assertLess(endpoint1Phi, max_phi)
+        assert endpoint1phi > 0.0
+        assert endpoint1phi < max_phi
 
-        self.assertGreater(endpoint2Phi, 0.0)
-        self.assertLess(endpoint2Phi, max_phi)
+        assert endpoint2phi > 0.0
+        assert endpoint2phi < max_phi
 
     @since('4.0')
     def test_set_get_batchlog_replay_throttle(self):
@@ -272,9 +284,9 @@ class TestJMX(Tester):
         with JolokiaAgent(node) as jmx:
             mbean = make_mbean('db', 'StorageService')
             jmx.write_attribute(mbean, 'BatchlogReplayThrottleInKB', 4096)
-            self.assertTrue(len(node.grep_log('Updating batchlog replay throttle to 4096 KB/s, 2048 KB/s per endpoint',
-                                              filename='debug.log')) > 0)
-            self.assertEqual(4096, jmx.read_attribute(mbean, 'BatchlogReplayThrottleInKB'))
+            assert len(node.grep_log('Updating batchlog replay throttle to 4096 KB/s, 2048 KB/s per endpoint',
+                                     filename='debug.log')) > 0
+            assert 4096 == jmx.read_attribute(mbean, 'BatchlogReplayThrottleInKB')
 
 
 @since('3.9')
@@ -283,12 +295,12 @@ class TestJMXSSL(Tester):
     truststore_password = 'cassandra'
 
     def truststore(self):
-        return os.path.join(self.test_path, 'truststore.jks')
+        return os.path.join(self.fixture_dtest_setup.test_path, 'truststore.jks')
 
     def keystore(self):
-        return os.path.join(self.test_path, 'keystore.jks')
+        return os.path.join(self.fixture_dtest_setup.test_path, 'keystore.jks')
 
-    def jmx_connection_test(self):
+    def test_jmx_connection(self):
         """
         Check connecting with a JMX client (via nodetool) where SSL is enabled for JMX
         @jira_ticket CASSANDRA-12109
@@ -302,7 +314,7 @@ class TestJMXSSL(Tester):
         node.nodetool("info --ssl -Djavax.net.ssl.trustStore={ts} -Djavax.net.ssl.trustStorePassword={ts_pwd}"
                       .format(ts=self.truststore(), ts_pwd=self.truststore_password))
 
-    def require_client_auth_test(self):
+    def test_require_client_auth(self):
         """
         Check connecting with a JMX client (via nodetool) where SSL is enabled and
         client certificate auth is also configured
@@ -315,7 +327,7 @@ class TestJMXSSL(Tester):
         self.assert_insecure_connection_rejected(node)
 
         # specifying only the truststore containing the server cert should fail
-        with self.assertRaisesRegexp(ToolError, ".*SSLHandshakeException.*"):
+        with pytest.raises(ToolError, match=".*SSLHandshakeException.*"):
             node.nodetool("info --ssl -Djavax.net.ssl.trustStore={ts} -Djavax.net.ssl.trustStorePassword={ts_pwd}"
                           .format(ts=self.truststore(), ts_pwd=self.truststore_password))
 
@@ -329,14 +341,14 @@ class TestJMXSSL(Tester):
         """
         Attempts to connect to JMX (via nodetool) without any client side ssl parameters, expecting failure
         """
-        with self.assertRaises(ToolError):
+        with pytest.raises(ToolError):
             node.nodetool("info")
 
     def _populateCluster(self, require_client_auth=False):
         cluster = self.cluster
         cluster.populate(1)
 
-        generate_ssl_stores(self.test_path)
+        generate_ssl_stores(self.fixture_dtest_setup.test_path)
         if require_client_auth:
             ts = self.truststore()
             ts_pwd = self.truststore_password

@@ -1,5 +1,10 @@
 import time
 import uuid
+import pytest
+import logging
+
+from flaky import flaky
+
 from distutils.version import LooseVersion
 
 from cassandra import ConsistencyLevel as CL
@@ -8,19 +13,21 @@ from cassandra.policies import FallthroughRetryPolicy
 from cassandra.query import (SimpleStatement, dict_factory,
                              named_tuple_factory, tuple_factory)
 
-from dtest import Tester, debug, run_scenarios, create_ks, supports_v5_protocol
+from dtest import Tester, run_scenarios, create_ks
 from tools.assertions import (assert_all, assert_invalid, assert_length_equal,
-                              assert_one)
+                              assert_one, assert_lists_equal_ignoring_order)
 from tools.data import rows_to_list
 from tools.datahelp import create_rows, flatten_into_set, parse_data_into_dicts
-from tools.decorators import since
 from tools.paging import PageAssertionMixin, PageFetcher
+
+since = pytest.mark.since
+logger = logging.getLogger(__name__)
 
 
 class BasePagingTester(Tester):
 
     def prepare(self, row_factory=dict_factory):
-        supports_v5 = supports_v5_protocol(self.cluster.version())
+        supports_v5 = self.supports_v5_protocol(self.cluster.version())
         protocol_version = 5 if supports_v5 else None
         cluster = self.cluster
         cluster.populate(3).start(wait_for_binary_proto=True)
@@ -54,8 +61,8 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
 
         pf = PageFetcher(future)
         pf.request_all()
-        self.assertEqual([], pf.all_data())
-        self.assertFalse(pf.has_more_pages)
+        assert [] == pf.all_data()
+        assert not pf.has_more_pages
 
     def test_with_less_results_than_page_size(self):
         session = self.prepare()
@@ -71,7 +78,7 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
             |4 |and more testing|
             |5 |and more testing|
             """
-        expected_data = create_rows(data, session, 'paging_test', cl=CL.ALL, format_funcs={'id': int, 'value': unicode})
+        expected_data = create_rows(data, session, 'paging_test', cl=CL.ALL, format_funcs={'id': int, 'value': str})
 
         future = session.execute_async(
             SimpleStatement("select * from paging_test", fetch_size=100, consistency_level=CL.ALL)
@@ -79,8 +86,8 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
         pf = PageFetcher(future)
         pf.request_all()
 
-        self.assertFalse(pf.has_more_pages)
-        self.assertEqual(len(expected_data), len(pf.all_data()))
+        assert not pf.has_more_pages
+        assert len(expected_data) == len(pf.all_data())
 
     def test_with_more_results_than_page_size(self):
         session = self.prepare()
@@ -100,7 +107,7 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
             |8 |and more testing|
             |9 |and more testing|
             """
-        expected_data = create_rows(data, session, 'paging_test', cl=CL.ALL, format_funcs={'id': int, 'value': unicode})
+        expected_data = create_rows(data, session, 'paging_test', cl=CL.ALL, format_funcs={'id': int, 'value': str})
 
         future = session.execute_async(
             SimpleStatement("select * from paging_test", fetch_size=5, consistency_level=CL.ALL)
@@ -108,11 +115,11 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
 
         pf = PageFetcher(future).request_all()
 
-        self.assertEqual(pf.pagecount(), 2)
-        self.assertEqual(pf.num_results_all(), [5, 4])
+        assert pf.pagecount() == 2
+        assert pf.num_results_all() == [5, 4]
 
         # make sure expected and actual have same data elements (ignoring order)
-        self.assertEqualIgnoreOrder(pf.all_data(), expected_data)
+        assert_lists_equal_ignoring_order(expected_data, pf.all_data(), sort_key="id")
 
     def test_with_equal_results_to_page_size(self):
         session = self.prepare()
@@ -128,7 +135,7 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
             |4 |and more testing|
             |5 |and more testing|
             """
-        expected_data = create_rows(data, session, 'paging_test', cl=CL.ALL, format_funcs={'id': int, 'value': unicode})
+        expected_data = create_rows(data, session, 'paging_test', cl=CL.ALL, format_funcs={'id': int, 'value': str})
 
         future = session.execute_async(
             SimpleStatement("select * from paging_test", fetch_size=5, consistency_level=CL.ALL)
@@ -136,11 +143,11 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
 
         pf = PageFetcher(future).request_all()
 
-        self.assertEqual(pf.num_results_all(), [5])
-        self.assertEqual(pf.pagecount(), 1)
+        assert pf.num_results_all() == [5]
+        assert pf.pagecount() == 1
 
         # make sure expected and actual have same data elements (ignoring order)
-        self.assertEqualIgnoreOrder(pf.all_data(), expected_data)
+        assert_lists_equal_ignoring_order(expected_data, pf.all_data(), sort_key="id")
 
     def test_undefined_page_size_default(self):
         """
@@ -158,7 +165,7 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
                +--------+--------+
           *5001| [uuid] |testing |
             """
-        expected_data = create_rows(data, session, 'paging_test', cl=CL.ALL, format_funcs={'id': random_txt, 'value': unicode})
+        expected_data = create_rows(data, session, 'paging_test', cl=CL.ALL, format_funcs={'id': random_txt, 'value': str})
 
         future = session.execute_async(
             SimpleStatement("select * from paging_test", consistency_level=CL.ALL)
@@ -166,10 +173,10 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
 
         pf = PageFetcher(future).request_all()
 
-        self.assertEqual(pf.num_results_all(), [5000, 1])
+        assert pf.num_results_all(), [5000, 1]
 
         # make sure expected and actual have same data elements (ignoring order)
-        self.assertEqualIgnoreOrder(pf.all_data(), expected_data)
+        assert_lists_equal_ignoring_order(expected_data, pf.all_data(), sort_key="id")
 
 
 @since('2.0')
@@ -209,7 +216,7 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
             |1 |j    |
             """
 
-        expected_data = create_rows(data, session, 'paging_test', cl=CL.ALL, format_funcs={'id': int, 'value': unicode})
+        expected_data = create_rows(data, session, 'paging_test', cl=CL.ALL, format_funcs={'id': int, 'value': str})
 
         future = session.execute_async(
             SimpleStatement("select * from paging_test where id = 1 order by value asc", fetch_size=5, consistency_level=CL.ALL)
@@ -217,14 +224,14 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
 
         pf = PageFetcher(future).request_all()
 
-        self.assertEqual(pf.pagecount(), 2)
-        self.assertEqual(pf.num_results_all(), [5, 5])
+        assert pf.pagecount() == 2
+        assert pf.num_results_all() == [5, 5]
 
         # these should be equal (in the same order)
-        self.assertEqual(pf.all_data(), expected_data)
+        assert pf.all_data() == expected_data
 
         # make sure we don't allow paging over multiple partitions with order because that's weird
-        with self.assertRaisesRegexp(InvalidRequest, 'Cannot page queries with both ORDER BY and a IN restriction on the partition key'):
+        with pytest.raises(InvalidRequest, match='Cannot page queries with both ORDER BY and a IN restriction on the partition key'):
             stmt = SimpleStatement("select * from paging_test where id in (1,2) order by value asc", consistency_level=CL.ALL)
             session.execute(stmt)
 
@@ -259,7 +266,7 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
             |1 |j    |j     |
             """
 
-        expected_data = create_rows(data, session, 'paging_test', cl=CL.ALL, format_funcs={'id': int, 'value': unicode, 'value2': unicode})
+        expected_data = create_rows(data, session, 'paging_test', cl=CL.ALL, format_funcs={'id': int, 'value': str, 'value2': str})
 
         future = session.execute_async(
             SimpleStatement("select * from paging_test where id = 1 order by value asc", fetch_size=3, consistency_level=CL.ALL)
@@ -267,11 +274,11 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
 
         pf = PageFetcher(future).request_all()
 
-        self.assertEqual(pf.pagecount(), 4)
-        self.assertEqual(pf.num_results_all(), [3, 3, 3, 1])
+        assert pf.pagecount() == 4
+        assert pf.num_results_all(), [3, 3, 3, 1]
 
         # these should be equal (in the same order)
-        self.assertEqual(pf.all_data(), expected_data)
+        assert pf.all_data() == expected_data
 
         # drop the ORDER BY
         future = session.execute_async(
@@ -280,11 +287,11 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
 
         pf = PageFetcher(future).request_all()
 
-        self.assertEqual(pf.pagecount(), 4)
-        self.assertEqual(pf.num_results_all(), [3, 3, 3, 1])
+        assert pf.pagecount() == 4
+        assert pf.num_results_all(), [3, 3, 3, 1]
 
         # these should be equal (in the same order)
-        self.assertEqual(pf.all_data(), list(reversed(expected_data)))
+        assert pf.all_data() == list(reversed(expected_data))
 
     def test_with_limit(self):
         session = self.prepare()
@@ -292,7 +299,7 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
         session.execute("CREATE TABLE paging_test ( id int, value text, PRIMARY KEY (id, value) )")
 
         def random_txt(text):
-            return unicode(uuid.uuid4())
+            return str(uuid.uuid4())
 
         data = """
                | id | value         |
@@ -361,8 +368,8 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
                 self.fail("Invalid scenario configuration. Scenario is: {}".format(scenario))
 
             pf = PageFetcher(future).request_all()
-            self.assertEqual(pf.num_results_all(), scenario['expect_pgsizes'])
-            self.assertEqual(pf.pagecount(), scenario['expect_pgcount'])
+            assert pf.num_results_all() == scenario['expect_pgsizes']
+            assert pf.pagecount() == scenario['expect_pgcount']
 
             # make sure all the data retrieved is a subset of input data
             self.assertIsSubsetOf(pf.all_data(), expected_data)
@@ -387,7 +394,7 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
             |8 |and more testing|
             |9 |and more testing|
             """
-        create_rows(data, session, 'paging_test', cl=CL.ALL, format_funcs={'id': int, 'value': unicode})
+        create_rows(data, session, 'paging_test', cl=CL.ALL, format_funcs={'id': int, 'value': str})
 
         future = session.execute_async(
             SimpleStatement("select * from paging_test where value = 'and more testing' ALLOW FILTERING", fetch_size=4, consistency_level=CL.ALL)
@@ -395,26 +402,24 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
 
         pf = PageFetcher(future).request_all()
 
-        self.assertEqual(pf.pagecount(), 2)
-        self.assertEqual(pf.num_results_all(), [4, 3])
+        assert pf.pagecount() == 2
+        assert pf.num_results_all() == [4, 3]
 
         # make sure the allow filtering query matches the expected results (ignoring order)
-        self.assertEqualIgnoreOrder(
-            pf.all_data(),
-            parse_data_into_dicts(
-                """
-                |id|value           |
-                +--+----------------+
-                |2 |and more testing|
-                |3 |and more testing|
-                |4 |and more testing|
-                |5 |and more testing|
-                |7 |and more testing|
-                |8 |and more testing|
-                |9 |and more testing|
-                """, format_funcs={'id': int, 'value': unicode}
-            )
+        expected_data = parse_data_into_dicts(
+            """
+            |id|value           |
+            +--+----------------+
+            |2 |and more testing|
+            |3 |and more testing|
+            |4 |and more testing|
+            |5 |and more testing|
+            |7 |and more testing|
+            |8 |and more testing|
+            |9 |and more testing|
+            """, format_funcs={'id': int, 'value': str}
         )
+        assert_lists_equal_ignoring_order(expected_data, pf.all_data(), sort_key="value")
 
 
 @since('2.0')
@@ -426,7 +431,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         session.execute("CREATE TABLE paging_test ( id int, value text, PRIMARY KEY (id, value) )")
 
         def random_txt(text):
-            return unicode(uuid.uuid4())
+            return str(uuid.uuid4())
 
         data = """
               | id | value                  |
@@ -441,10 +446,9 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
         pf = PageFetcher(future).request_all()
 
-        self.assertEqual(pf.pagecount(), 4)
-        self.assertEqual(pf.num_results_all(), [3000, 3000, 3000, 1000])
-
-        self.assertEqualIgnoreOrder(pf.all_data(), expected_data)
+        assert pf.pagecount() == 4
+        assert pf.num_results_all(), [3000, 3000, 3000, 1000]
+        assert_lists_equal_ignoring_order(expected_data, pf.all_data(), sort_key="value")
 
     def test_paging_across_multi_wide_rows(self):
         session = self.prepare()
@@ -452,7 +456,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         session.execute("CREATE TABLE paging_test ( id int, value text, PRIMARY KEY (id, value) )")
 
         def random_txt(text):
-            return unicode(uuid.uuid4())
+            return str(uuid.uuid4())
 
         data = """
               | id | value                  |
@@ -468,10 +472,9 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
         pf = PageFetcher(future).request_all()
 
-        self.assertEqual(pf.pagecount(), 4)
-        self.assertEqual(pf.num_results_all(), [3000, 3000, 3000, 1000])
-
-        self.assertEqualIgnoreOrder(pf.all_data(), expected_data)
+        assert pf.pagecount() == 4
+        assert pf.num_results_all(), [3000, 3000, 3000, 1000]
+        assert_lists_equal_ignoring_order(expected_data, pf.all_data(), sort_key="value")
 
     def test_paging_using_secondary_indexes(self):
         session = self.prepare()
@@ -480,7 +483,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         session.execute("CREATE INDEX ON paging_test(mybool)")
 
         def random_txt(text):
-            return unicode(uuid.uuid4())
+            return str(uuid.uuid4())
 
         def bool_from_str_int(text):
             return bool(int(text))
@@ -505,11 +508,11 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         pf = PageFetcher(future).request_all()
 
         # the query only searched for True rows, so let's pare down the expectations for comparison
-        expected_data = filter(lambda x: x.get('mybool') is True, all_data)
+        expected_data = [x for x in all_data if x.get('mybool') is True]
 
-        self.assertEqual(pf.pagecount(), 2)
-        self.assertEqual(pf.num_results_all(), [400, 200])
-        self.assertEqualIgnoreOrder(expected_data, pf.all_data())
+        assert pf.pagecount() == 2
+        assert pf.num_results_all() == [400, 200]
+        assert_lists_equal_ignoring_order(expected_data, pf.all_data(), sort_key="sometext")
 
     def test_paging_with_in_orderby_and_two_partition_keys(self):
         session = self.prepare()
@@ -520,11 +523,10 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         assert_invalid(session, "select * from paging_test where col_2 IN (1, 2) and col_1=1 order by col_3 desc;", expected=InvalidRequest)
 
     @since('3.10')
-    def group_by_paging_test(self):
+    def test_group_by_paging(self):
         """
         @jira_ticket CASSANDRA-10707
         """
-
         session = self.prepare(row_factory=tuple_factory)
         create_ks(session, 'test_paging_with_group_by', 2)
         session.execute("CREATE TABLE test (a int, b int, c int, d int, e int, primary key (a, b, c, d))")
@@ -548,333 +550,332 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
             # Range queries
             res = rows_to_list(session.execute("SELECT a, b, e, count(b), max(e) FROM test GROUP BY a"))
-            self.assertEqual(res, [[1, 2, 6, 4L, 24], [2, 2, 6, 2L, 12], [4, 8, 24, 1L, 24]])
+            assert res == [[1, 2, 6, 4, 24], [2, 2, 6, 2, 12], [4, 8, 24, 1, 24]]
 
             res = rows_to_list(session.execute("SELECT a, b, e, count(b), max(e) FROM test GROUP BY a, b"))
-            self.assertEqual(res, [[1, 2, 6, 2L, 12],
-                                   [1, 4, 12, 2L, 24],
-                                   [2, 2, 6, 1L, 6],
-                                   [2, 4, 12, 1L, 12],
-                                   [4, 8, 24, 1L, 24]])
+            assert res == [[1, 2, 6, 2, 12],
+                           [1, 4, 12, 2, 24],
+                           [2, 2, 6, 1, 6],
+                           [2, 4, 12, 1, 12],
+                           [4, 8, 24, 1, 24]]
 
             res = rows_to_list(session.execute("SELECT a, b, e, count(b), max(e) FROM test"))
-            self.assertEqual(res, [[1, 2, 6, 7L, 24]])
+            assert res == [[1, 2, 6, 7, 24]]
 
             res = rows_to_list(
                 session.execute("SELECT a, b, e, count(b), max(e) FROM test WHERE b = 2 GROUP BY a, b ALLOW FILTERING"))
-            self.assertEqual(res, [[1, 2, 6, 2L, 12],
-                                   [2, 2, 6, 1L, 6]])
+            assert res == [[1, 2, 6, 2, 12],
+                           [2, 2, 6, 1, 6]]
 
             assert_invalid(session, "SELECT a, b, e, count(b), max(e) FROM test WHERE b = 2 GROUP BY a, b;", expected=InvalidRequest)
 
             res = rows_to_list(
                 session.execute("SELECT a, b, e, count(b), max(e) FROM test WHERE b = 2 ALLOW FILTERING"))
-            self.assertEqual(res, [[1, 2, 6, 3L, 12]])
+            assert res == [[1, 2, 6, 3, 12]]
 
             assert_invalid(session, "SELECT a, b, e, count(b), max(e) FROM test WHERE b = 2", expected=InvalidRequest)
 
             # Range queries without aggregates
             res = rows_to_list(session.execute("SELECT a, b, c, d FROM test GROUP BY a, b, c"))
-            self.assertEqual(res, [[1, 2, 1, 3],
-                                   [1, 2, 2, 6],
-                                   [1, 4, 2, 6],
-                                   [2, 2, 3, 3],
-                                   [2, 4, 3, 6],
-                                   [4, 8, 2, 12]])
+            assert res == [[1, 2, 1, 3],
+                           [1, 2, 2, 6],
+                           [1, 4, 2, 6],
+                           [2, 2, 3, 3],
+                           [2, 4, 3, 6],
+                           [4, 8, 2, 12]]
 
             res = rows_to_list(session.execute("SELECT a, b, c, d FROM test GROUP BY a, b"))
-            self.assertEqual(res, [[1, 2, 1, 3],
-                                   [1, 4, 2, 6],
-                                   [2, 2, 3, 3],
-                                   [2, 4, 3, 6],
-                                   [4, 8, 2, 12]])
+            assert res == [[1, 2, 1, 3],
+                           [1, 4, 2, 6],
+                           [2, 2, 3, 3],
+                           [2, 4, 3, 6],
+                           [4, 8, 2, 12]]
 
             # Range query with LIMIT
             res = rows_to_list(session.execute("SELECT a, b, e, count(b), max(e) FROM test GROUP BY a, b LIMIT 2"))
-            self.assertEqual(res, [[1, 2, 6, 2L, 12],
-                                   [1, 4, 12, 2L, 24]])
+            assert res == [[1, 2, 6, 2, 12],
+                           [1, 4, 12, 2, 24]]
 
             res = rows_to_list(session.execute("SELECT a, b, e, count(b), max(e) FROM test LIMIT 2"))
-            self.assertEqual(res, [[1, 2, 6, 7L, 24]])
+            assert res == [[1, 2, 6, 7, 24]]
 
             # Range queries without aggregates and with LIMIT
             res = rows_to_list(session.execute("SELECT a, b, c, d FROM test GROUP BY a, b, c LIMIT 3"))
-            self.assertEqual(res, [[1, 2, 1, 3],
-                                   [1, 2, 2, 6],
-                                   [1, 4, 2, 6]])
+            assert res == [[1, 2, 1, 3],
+                           [1, 2, 2, 6],
+                           [1, 4, 2, 6]]
 
             res = rows_to_list(session.execute("SELECT a, b, c, d FROM test GROUP BY a, b LIMIT 3"))
-            self.assertEqual(res, [[1, 2, 1, 3],
-                                   [1, 4, 2, 6],
-                                   [2, 2, 3, 3]])
+            assert res == [[1, 2, 1, 3],
+                           [1, 4, 2, 6],
+                           [2, 2, 3, 3]]
 
             # Range query with PER PARTITION LIMIT
             res = rows_to_list(session.execute("SELECT a, b, e, count(b), max(e) FROM test GROUP BY a, b PER PARTITION LIMIT 2"))
-            self.assertEqual(res, [[1, 2, 6, 2L, 12],
-                                   [1, 4, 12, 2L, 24],
-                                   [2, 2, 6, 1L, 6],
-                                   [2, 4, 12, 1L, 12],
-                                   [4, 8, 24, 1L, 24]])
+            assert res == [[1, 2, 6, 2, 12],
+                           [1, 4, 12, 2, 24],
+                           [2, 2, 6, 1, 6],
+                           [2, 4, 12, 1, 12],
+                           [4, 8, 24, 1, 24]]
 
             res = rows_to_list(session.execute("SELECT a, b, e, count(b), max(e) FROM test GROUP BY a, b PER PARTITION LIMIT 1"))
-            self.assertEqual(res, [[1, 2, 6, 2L, 12],
-                                   [2, 2, 6, 1L, 6],
-                                   [4, 8, 24, 1L, 24]])
+            assert res == [[1, 2, 6, 2, 12],
+                           [2, 2, 6, 1, 6],
+                           [4, 8, 24, 1, 24]]
 
             # Range queries with PER PARTITION LIMIT and LIMIT
             res = rows_to_list(session.execute("SELECT a, b, e, count(b), max(e) FROM test GROUP BY a, b PER PARTITION LIMIT 2 LIMIT 3"))
-            self.assertEqual(res, [[1, 2, 6, 2L, 12],
-                                   [1, 4, 12, 2L, 24],
-                                   [2, 2, 6, 1L, 6]])
+            assert res == [[1, 2, 6, 2, 12],
+                           [1, 4, 12, 2, 24],
+                           [2, 2, 6, 1, 6]]
 
             res = rows_to_list(session.execute("SELECT a, b, e, count(b), max(e) FROM test GROUP BY a, b PER PARTITION LIMIT 2 LIMIT 5"))
-            self.assertEqual(res, [[1, 2, 6, 2L, 12],
-                                   [1, 4, 12, 2L, 24],
-                                   [2, 2, 6, 1L, 6],
-                                   [2, 4, 12, 1L, 12],
-                                   [4, 8, 24, 1L, 24]])
+            assert res == [[1, 2, 6, 2, 12],
+                           [1, 4, 12, 2, 24],
+                           [2, 2, 6, 1, 6],
+                           [2, 4, 12, 1, 12],
+                           [4, 8, 24, 1, 24]]
 
             res = rows_to_list(session.execute("SELECT a, b, e, count(b), max(e) FROM test GROUP BY a, b PER PARTITION LIMIT 2 LIMIT 10"))
-            self.assertEqual(res, [[1, 2, 6, 2L, 12],
-                                   [1, 4, 12, 2L, 24],
-                                   [2, 2, 6, 1L, 6],
-                                   [2, 4, 12, 1L, 12],
-                                   [4, 8, 24, 1L, 24]])
+            assert res == [[1, 2, 6, 2, 12],
+                           [1, 4, 12, 2, 24],
+                           [2, 2, 6, 1, 6],
+                           [2, 4, 12, 1, 12],
+                           [4, 8, 24, 1, 24]]
 
             # Range queries without aggregates and with PER PARTITION LIMIT
             res = rows_to_list(session.execute("SELECT a, b, c, d FROM test GROUP BY a, b, c PER PARTITION LIMIT 2"))
-            self.assertEqual(res, [[1, 2, 1, 3],
-                                   [1, 2, 2, 6],
-                                   [2, 2, 3, 3],
-                                   [2, 4, 3, 6],
-                                   [4, 8, 2, 12]])
+            assert res == [[1, 2, 1, 3],
+                           [1, 2, 2, 6],
+                           [2, 2, 3, 3],
+                           [2, 4, 3, 6],
+                           [4, 8, 2, 12]]
 
             res = rows_to_list(session.execute("SELECT a, b, c, d FROM test GROUP BY a, b PER PARTITION LIMIT 1"))
-            self.assertEqual(res, [[1, 2, 1, 3],
-                                   [2, 2, 3, 3],
-                                   [4, 8, 2, 12]])
+            assert res == [[1, 2, 1, 3],
+                           [2, 2, 3, 3],
+                           [4, 8, 2, 12]]
 
             # Range query with DISTINCT
             res = rows_to_list(session.execute("SELECT DISTINCT a, count(a)FROM test GROUP BY a"))
-            self.assertEqual(res, [[1, 1L],
-                                   [2, 1L],
-                                   [4, 1L]])
+            assert res == [[1, 1],
+                           [2, 1],
+                           [4, 1]]
 
             res = rows_to_list(session.execute("SELECT DISTINCT a, count(a)FROM test"))
-            self.assertEqual(res, [[1, 3L]])
+            assert res == [[1, 3]]
 
             # Range query with DISTINCT and LIMIT
             res = rows_to_list(session.execute("SELECT DISTINCT a, count(a)FROM test GROUP BY a LIMIT 2"))
-            self.assertEqual(res, [[1, 1L],
-                                   [2, 1L]])
+            assert res == [[1, 1],
+                           [2, 1]]
 
             res = rows_to_list(session.execute("SELECT DISTINCT a, count(a)FROM test LIMIT 2"))
-            self.assertEqual(res, [[1, 3L]])
+            assert res == [[1, 3]]
 
             # Single partition queries
             res = rows_to_list(
                 session.execute("SELECT a, b, e, count(b), max(e) FROM test WHERE a = 1 GROUP BY a, b, c"))
-            self.assertEqual(res, [[1, 2, 6, 1L, 6],
-                                   [1, 2, 12, 1L, 12],
-                                   [1, 4, 12, 2L, 24]])
+            assert res == [[1, 2, 6, 1, 6],
+                           [1, 2, 12, 1, 12],
+                           [1, 4, 12, 2, 24]]
 
             res = rows_to_list(session.execute("SELECT a, b, e, count(b), max(e) FROM test WHERE a = 1"))
-            self.assertEqual(res, [[1, 2, 6, 4L, 24]])
+            assert res == [[1, 2, 6, 4, 24]]
 
             res = rows_to_list(
                 session.execute("SELECT a, b, e, count(b), max(e) FROM test WHERE a = 1 AND b = 2 GROUP BY a, b, c"))
-            self.assertEqual(res, [[1, 2, 6, 1L, 6],
-                                   [1, 2, 12, 1L, 12]])
+            assert res == [[1, 2, 6, 1, 6],
+                           [1, 2, 12, 1, 12]]
 
             res = rows_to_list(session.execute("SELECT a, b, e, count(b), max(e) FROM test WHERE a = 1 AND b = 2"))
-            self.assertEqual(res, [[1, 2, 6, 2L, 12]])
+            assert res == [[1, 2, 6, 2, 12]]
 
             # Single partition queries without aggregates
             res = rows_to_list(session.execute("SELECT a, b, c, d FROM test WHERE a = 1 GROUP BY a, b"))
-            self.assertEqual(res, [[1, 2, 1, 3],
-                                   [1, 4, 2, 6]])
+            assert res == [[1, 2, 1, 3],
+                           [1, 4, 2, 6]]
 
             res = rows_to_list(session.execute("SELECT a, b, c, d FROM test WHERE a = 1 GROUP BY a, b, c"))
-            self.assertEqual(res, [[1, 2, 1, 3],
-                                   [1, 2, 2, 6],
-                                   [1, 4, 2, 6]])
+            assert res == [[1, 2, 1, 3],
+                           [1, 2, 2, 6],
+                           [1, 4, 2, 6]]
 
             # Single partition query with DISTINCT
             res = rows_to_list(session.execute("SELECT DISTINCT a, count(a)FROM test WHERE a = 1 GROUP BY a"))
-            self.assertEqual(res, [[1, 1L]])
+            assert res == [[1, 1]]
 
             res = rows_to_list(session.execute("SELECT DISTINCT a, count(a)FROM test WHERE a = 1 GROUP BY a"))
-            self.assertEqual(res, [[1, 1L]])
+            assert res == [[1, 1]]
 
             # Single partition queries with LIMIT
             res = rows_to_list(
                 session.execute("SELECT a, b, e, count(b), max(e) FROM test WHERE a = 1 GROUP BY a, b, c LIMIT 10"))
-            self.assertEqual(res, [[1, 2, 6, 1L, 6],
-                                   [1, 2, 12, 1L, 12],
-                                   [1, 4, 12, 2L, 24]])
+            assert res == [[1, 2, 6, 1, 6],
+                           [1, 2, 12, 1, 12],
+                           [1, 4, 12, 2, 24]]
 
             res = rows_to_list(
                 session.execute("SELECT a, b, e, count(b), max(e) FROM test WHERE a = 1 GROUP BY a, b, c LIMIT 2"))
-            self.assertEqual(res, [[1, 2, 6, 1L, 6],
-                                   [1, 2, 12, 1L, 12]])
+            assert res == [[1, 2, 6, 1, 6],
+                           [1, 2, 12, 1, 12]]
 
             res = rows_to_list(session.execute("SELECT a, b, e, count(b), max(e) FROM test WHERE a = 1 LIMIT 2"))
-            self.assertEqual(res, [[1, 2, 6, 4L, 24]])
+            assert res == [[1, 2, 6, 4, 24]]
 
             res = rows_to_list(
                 session.execute("SELECT count(b), max(e) FROM test WHERE a = 1 GROUP BY a, b, c LIMIT 1"))
-            self.assertEqual(res, [[1L, 6]])
+            assert res == [[1, 6]]
 
             # Single partition queries with PER PARTITION LIMIT
             res = rows_to_list(
                 session.execute("SELECT a, b, e, count(b), max(e) FROM test WHERE a = 1 GROUP BY a, b, c PER PARTITION LIMIT 2"))
-            self.assertEqual(res, [[1, 2, 6, 1L, 6],
-                                   [1, 2, 12, 1L, 12]])
+            assert res == [[1, 2, 6, 1, 6],
+                           [1, 2, 12, 1, 12]]
 
             res = rows_to_list(
                 session.execute("SELECT a, b, e, count(b), max(e) FROM test WHERE a = 1 GROUP BY a, b, c PER PARTITION LIMIT 3"))
-            self.assertEqual(res, [[1, 2, 6, 1L, 6],
-                                   [1, 2, 12, 1L, 12],
-                                   [1, 4, 12, 2L, 24]])
+            assert res == [[1, 2, 6, 1, 6],
+                           [1, 2, 12, 1, 12],
+                           [1, 4, 12, 2, 24]]
 
             res = rows_to_list(
                 session.execute("SELECT a, b, e, count(b), max(e) FROM test WHERE a = 1 GROUP BY a, b, c PER PARTITION LIMIT 3"))
-            self.assertEqual(res, [[1, 2, 6, 1L, 6],
-                                   [1, 2, 12, 1L, 12],
-                                   [1, 4, 12, 2L, 24]])
+            assert res == [[1, 2, 6, 1, 6],
+                           [1, 2, 12, 1, 12],
+                           [1, 4, 12, 2, 24]]
 
             # Single partition queries without aggregates and with LIMIT
             res = rows_to_list(session.execute("SELECT a, b, c, d FROM test WHERE a = 1 GROUP BY a, b LIMIT 2"))
-            self.assertEqual(res, [[1, 2, 1, 3],
-                                   [1, 4, 2, 6]])
+            assert res == [[1, 2, 1, 3],
+                           [1, 4, 2, 6]]
 
             res = rows_to_list(session.execute("SELECT a, b, c, d FROM test WHERE a = 1 GROUP BY a, b LIMIT 1"))
-            self.assertEqual(res, [[1, 2, 1, 3]])
+            assert res == [[1, 2, 1, 3]]
 
             res = rows_to_list(session.execute("SELECT a, b, c, d FROM test WHERE a = 1 GROUP BY a, b, c LIMIT 2"))
-            self.assertEqual(res, [[1, 2, 1, 3],
-                                   [1, 2, 2, 6]])
+            assert res == [[1, 2, 1, 3],
+                           [1, 2, 2, 6]]
 
             # Single partition queries with ORDER BY
             res = rows_to_list(session.execute(
                 "SELECT a, b, e, count(b), max(e) FROM test WHERE a = 1 GROUP BY a, b, c ORDER BY b DESC, c DESC"))
-            self.assertEqual(res, [[1, 4, 24, 2L, 24],
-                                   [1, 2, 12, 1L, 12],
-                                   [1, 2, 6, 1L, 6]])
+            assert res == [[1, 4, 24, 2, 24],
+                           [1, 2, 12, 1, 12],
+                           [1, 2, 6, 1, 6]]
 
             res = rows_to_list(
                 session.execute("SELECT a, b, e, count(b), max(e) FROM test WHERE a = 1 ORDER BY b DESC, c DESC"))
-            self.assertEqual(res, [[1, 4, 24, 4L, 24]])
+            assert res == [[1, 4, 24, 4, 24]]
 
             # Single partition queries with ORDER BY and LIMIT
             res = rows_to_list(session.execute(
                 "SELECT a, b, e, count(b), max(e) FROM test WHERE a = 1 GROUP BY a, b, c ORDER BY b DESC, c DESC LIMIT 2"))
-            self.assertEqual(res, [[1, 4, 24, 2L, 24],
-                                   [1, 2, 12, 1L, 12]])
+            assert res == [[1, 4, 24, 2, 24],
+                                   [1, 2, 12, 1, 12]]
 
             res = rows_to_list(session.execute(
                 "SELECT a, b, e, count(b), max(e) FROM test WHERE a = 1 ORDER BY b DESC, c DESC LIMIT 2"))
-            self.assertEqual(res, [[1, 4, 24, 4L, 24]])
+            assert res == [[1, 4, 24, 4, 24]]
 
             # Multi-partitions queries
             res = rows_to_list(
                 session.execute("SELECT a, b, e, count(b), max(e) FROM test WHERE a IN (1, 2, 4) GROUP BY a, b, c"))
-            self.assertEqual(res, [[1, 2, 6, 1L, 6],
-                                   [1, 2, 12, 1L, 12],
-                                   [1, 4, 12, 2L, 24],
-                                   [2, 2, 6, 1L, 6],
-                                   [2, 4, 12, 1L, 12],
-                                   [4, 8, 24, 1L, 24]])
+            assert res == [[1, 2, 6, 1, 6],
+                           [1, 2, 12, 1, 12],
+                           [1, 4, 12, 2, 24],
+                           [2, 2, 6, 1, 6],
+                           [2, 4, 12, 1, 12],
+                           [4, 8, 24, 1, 24]]
 
             res = rows_to_list(session.execute("SELECT a, b, e, count(b), max(e) FROM test WHERE a IN (1, 2, 4)"))
-            self.assertEqual(res, [[1, 2, 6, 7L, 24]])
+            assert res == [[1, 2, 6, 7, 24]]
 
             res = rows_to_list(session.execute(
                 "SELECT a, b, e, count(b), max(e) FROM test WHERE a IN (1, 2, 4) AND b = 2 GROUP BY a, b, c"))
-            self.assertEqual(res, [[1, 2, 6, 1L, 6],
-                                   [1, 2, 12, 1L, 12],
-                                   [2, 2, 6, 1L, 6]])
+            assert res == [[1, 2, 6, 1, 6],
+                           [1, 2, 12, 1, 12],
+                           [2, 2, 6, 1, 6]]
 
             res = rows_to_list(
                 session.execute("SELECT a, b, e, count(b), max(e) FROM test WHERE a IN (1, 2, 4) AND b = 2"))
-            self.assertEqual(res, [[1, 2, 6, 3L, 12]])
+            assert res == [[1, 2, 6, 3, 12]]
 
             # Multi-partitions queries without aggregates
             res = rows_to_list(session.execute("SELECT a, b, c, d FROM test WHERE a IN (1, 2, 4) GROUP BY a, b"))
-            self.assertEqual(res, [[1, 2, 1, 3],
-                                   [1, 4, 2, 6],
-                                   [2, 2, 3, 3],
-                                   [2, 4, 3, 6],
-                                   [4, 8, 2, 12]])
+            assert res == [[1, 2, 1, 3],
+                           [1, 4, 2, 6],
+                           [2, 2, 3, 3],
+                           [2, 4, 3, 6],
+                           [4, 8, 2, 12]]
 
             res = rows_to_list(session.execute("SELECT a, b, c, d FROM test WHERE a IN (1, 2, 4) GROUP BY a, b, c"))
-            self.assertEqual(res, [[1, 2, 1, 3],
-                                   [1, 2, 2, 6],
-                                   [1, 4, 2, 6],
-                                   [2, 2, 3, 3],
-                                   [2, 4, 3, 6],
-                                   [4, 8, 2, 12]])
+            assert res == [[1, 2, 1, 3],
+                           [1, 2, 2, 6],
+                           [1, 4, 2, 6],
+                           [2, 2, 3, 3],
+                           [2, 4, 3, 6],
+                           [4, 8, 2, 12]]
 
             # Multi-partitions queries with DISTINCT
             res = rows_to_list(session.execute("SELECT DISTINCT a, count(a)FROM test WHERE a IN (1, 2, 4) GROUP BY a"))
-            self.assertEqual(res, [[1, 1L],
-                                   [2, 1L],
-                                   [4, 1L]])
+            assert res == [[1, 1],
+                           [2, 1],
+                           [4, 1]]
 
             res = rows_to_list(session.execute("SELECT DISTINCT a, count(a)FROM test WHERE a IN (1, 2, 4)"))
-            self.assertEqual(res, [[1, 3L]])
+            assert res == [[1, 3]]
 
             # Multi-partitions query with DISTINCT and LIMIT
             res = rows_to_list(
                 session.execute("SELECT DISTINCT a, count(a)FROM test WHERE a IN (1, 2, 4) GROUP BY a LIMIT 2"))
-            self.assertEqual(res, [[1, 1L],
-                                   [2, 1L]])
+            assert res == [[1, 1],
+                                   [2, 1]]
 
             res = rows_to_list(session.execute("SELECT DISTINCT a, count(a)FROM test WHERE a IN (1, 2, 4) LIMIT 2"))
-            self.assertEqual(res, [[1, 3L]])
+            assert res == [[1, 3]]
 
             # Multi-partitions queries without aggregates and with PER PARTITION LIMIT
             res = rows_to_list(session.execute("SELECT a, b, c, d FROM test WHERE a IN (1, 2, 4) GROUP BY a, b PER PARTITION LIMIT 1"))
-            self.assertEqual(res, [[1, 2, 1, 3],
-                                   [2, 2, 3, 3],
-                                   [4, 8, 2, 12]])
+            assert res == [[1, 2, 1, 3],
+                           [2, 2, 3, 3],
+                           [4, 8, 2, 12]]
 
             res = rows_to_list(session.execute("SELECT a, b, c, d FROM test WHERE a IN (1, 2, 4) GROUP BY a, b PER PARTITION LIMIT 2"))
-            self.assertEqual(res, [[1, 2, 1, 3],
-                                   [1, 4, 2, 6],
-                                   [2, 2, 3, 3],
-                                   [2, 4, 3, 6],
-                                   [4, 8, 2, 12]])
+            assert res == [[1, 2, 1, 3],
+                           [1, 4, 2, 6],
+                           [2, 2, 3, 3],
+                           [2, 4, 3, 6],
+                           [4, 8, 2, 12]]
 
             res = rows_to_list(session.execute("SELECT a, b, c, d FROM test WHERE a IN (1, 2, 4) GROUP BY a, b PER PARTITION LIMIT 3"))
-            self.assertEqual(res, [[1, 2, 1, 3],
-                                   [1, 4, 2, 6],
-                                   [2, 2, 3, 3],
-                                   [2, 4, 3, 6],
-                                   [4, 8, 2, 12]])
+            assert res == [[1, 2, 1, 3],
+                           [1, 4, 2, 6],
+                           [2, 2, 3, 3],
+                           [2, 4, 3, 6],
+                           [4, 8, 2, 12]]
 
             # Multi-partitions queries without aggregates, with PER PARTITION LIMIT and with LIMIT
             res = rows_to_list(session.execute("SELECT a, b, c, d FROM test WHERE a IN (1, 2, 4) GROUP BY a, b PER PARTITION LIMIT 1 LIMIT 2"))
-            self.assertEqual(res, [[1, 2, 1, 3],
-                                   [2, 2, 3, 3]])
+            assert res == [[1, 2, 1, 3],
+                                   [2, 2, 3, 3]]
 
             res = rows_to_list(session.execute("SELECT a, b, c, d FROM test WHERE a IN (1, 2, 4) GROUP BY a, b PER PARTITION LIMIT 3 LIMIT 2"))
-            self.assertEqual(res, [[1, 2, 1, 3],
-                                   [1, 4, 2, 6]])
+            assert res == [[1, 2, 1, 3],
+                                   [1, 4, 2, 6]]
 
     @since('3.10')
-    def group_by_with_range_name_query_paging_test(self):
+    def test_group_by_with_range_name_query_paging(self):
         """
         @jira_ticket CASSANDRA-10707
         """
-
         session = self.prepare(row_factory=tuple_factory)
         create_ks(session, 'group_by_with_range_name_query_paging_test', 2)
         session.execute("CREATE TABLE test (a int, b int, c int, d int, primary key (a, b, c))")
 
-        for i in xrange(1, 5):
-            for j in xrange(1, 5):
-                for k in xrange(1, 5):
+        for i in range(1, 5):
+            for j in range(1, 5):
+                for k in range(1, 5):
                     session.execute("INSERT INTO test (a, b, c, d) VALUES ({}, {}, {}, {})".format(i, j, k, i + j))
 
         # Makes sure that we have some tombstones
@@ -885,62 +886,62 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
             # Range queries
             res = rows_to_list(session.execute("SELECT a, b, d, count(b), max(d) FROM test WHERE b = 1 and c IN (1, 2) GROUP BY a ALLOW FILTERING"))
-            self.assertEqual(res, [[1, 1, 2, 2L, 2],
-                                   [2, 1, 3, 2L, 3],
-                                   [4, 1, 5, 2L, 5]])
+            assert res == [[1, 1, 2, 2, 2],
+                                   [2, 1, 3, 2, 3],
+                                   [4, 1, 5, 2, 5]]
 
             res = rows_to_list(session.execute("SELECT a, b, d, count(b), max(d) FROM test WHERE b = 1 and c IN (1, 2) GROUP BY a, b ALLOW FILTERING"))
-            self.assertEqual(res, [[1, 1, 2, 2L, 2],
-                                   [2, 1, 3, 2L, 3],
-                                   [4, 1, 5, 2L, 5]])
+            assert res == [[1, 1, 2, 2, 2],
+                                   [2, 1, 3, 2, 3],
+                                   [4, 1, 5, 2, 5]]
 
             res = rows_to_list(session.execute("SELECT a, b, d, count(b), max(d) FROM test WHERE b IN (1, 2) and c IN (1, 2) GROUP BY a, b ALLOW FILTERING"))
-            self.assertEqual(res, [[1, 1, 2, 2L, 2],
-                                   [1, 2, 3, 2L, 3],
-                                   [2, 1, 3, 2L, 3],
-                                   [2, 2, 4, 2L, 4],
-                                   [4, 1, 5, 2L, 5],
-                                   [4, 2, 6, 2L, 6]])
+            assert res == [[1, 1, 2, 2, 2],
+                                   [1, 2, 3, 2, 3],
+                                   [2, 1, 3, 2, 3],
+                                   [2, 2, 4, 2, 4],
+                                   [4, 1, 5, 2, 5],
+                                   [4, 2, 6, 2, 6]]
 
             # Range queries with LIMIT
             res = rows_to_list(session.execute("SELECT a, b, d, count(b), max(d) FROM test WHERE b = 1 and c IN (1, 2) GROUP BY a LIMIT 5 ALLOW FILTERING"))
-            self.assertEqual(res, [[1, 1, 2, 2L, 2],
-                                   [2, 1, 3, 2L, 3],
-                                   [4, 1, 5, 2L, 5]])
+            assert res == [[1, 1, 2, 2, 2],
+                                   [2, 1, 3, 2, 3],
+                                   [4, 1, 5, 2, 5]]
 
             res = rows_to_list(session.execute("SELECT a, b, d, count(b), max(d) FROM test WHERE b = 1 and c IN (1, 2) GROUP BY a, b LIMIT 3 ALLOW FILTERING"))
-            self.assertEqual(res, [[1, 1, 2, 2L, 2],
-                                   [2, 1, 3, 2L, 3],
-                                   [4, 1, 5, 2L, 5]])
+            assert res == [[1, 1, 2, 2, 2],
+                                   [2, 1, 3, 2, 3],
+                                   [4, 1, 5, 2, 5]]
 
             res = rows_to_list(session.execute("SELECT a, b, d, count(b), max(d) FROM test WHERE b IN (1, 2) and c IN (1, 2) GROUP BY a, b LIMIT 3 ALLOW FILTERING"))
-            self.assertEqual(res, [[1, 1, 2, 2L, 2],
-                                   [1, 2, 3, 2L, 3],
-                                   [2, 1, 3, 2L, 3]])
+            assert res == [[1, 1, 2, 2, 2],
+                                   [1, 2, 3, 2, 3],
+                                   [2, 1, 3, 2, 3]]
 
             # Range queries with PER PARTITION LIMIT
             res = rows_to_list(session.execute("SELECT a, b, d, count(b), max(d) FROM test WHERE b = 1 and c IN (1, 2) GROUP BY a, b PER PARTITION LIMIT 2 ALLOW FILTERING"))
-            self.assertEqual(res, [[1, 1, 2, 2L, 2],
-                                   [2, 1, 3, 2L, 3],
-                                   [4, 1, 5, 2L, 5]])
+            assert res == [[1, 1, 2, 2, 2],
+                                   [2, 1, 3, 2, 3],
+                                   [4, 1, 5, 2, 5]]
 
             res = rows_to_list(session.execute("SELECT a, b, d, count(b), max(d) FROM test WHERE b IN (1, 2) and c IN (1, 2) GROUP BY a, b PER PARTITION LIMIT 1 ALLOW FILTERING"))
-            self.assertEqual(res, [[1, 1, 2, 2L, 2],
-                                   [2, 1, 3, 2L, 3],
-                                   [4, 1, 5, 2L, 5]])
+            assert res == [[1, 1, 2, 2, 2],
+                                   [2, 1, 3, 2, 3],
+                                   [4, 1, 5, 2, 5]]
 
             # Range queries with PER PARTITION LIMIT and LIMIT
             res = rows_to_list(session.execute("SELECT a, b, d, count(b), max(d) FROM test WHERE b = 1 and c IN (1, 2) GROUP BY a, b PER PARTITION LIMIT 2 LIMIT 5 ALLOW FILTERING"))
-            self.assertEqual(res, [[1, 1, 2, 2L, 2],
-                                   [2, 1, 3, 2L, 3],
-                                   [4, 1, 5, 2L, 5]])
+            assert res == [[1, 1, 2, 2, 2],
+                                   [2, 1, 3, 2, 3],
+                                   [4, 1, 5, 2, 5]]
 
             res = rows_to_list(session.execute("SELECT a, b, d, count(b), max(d) FROM test WHERE b IN (1, 2) and c IN (1, 2) GROUP BY a, b PER PARTITION LIMIT 1 LIMIT 2 ALLOW FILTERING"))
-            self.assertEqual(res, [[1, 1, 2, 2L, 2],
-                                   [2, 1, 3, 2L, 3]])
+            assert res == [[1, 1, 2, 2, 2],
+                                   [2, 1, 3, 2, 3]]
 
     @since('3.10')
-    def group_by_with_static_columns_paging_test(self):
+    def test_group_by_with_static_columns_paging(self):
         """
         @jira_ticket CASSANDRA-10707
         """
@@ -961,148 +962,148 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
             # Range queries
             res = rows_to_list(session.execute("SELECT a, b, s, count(b), count(s) FROM test GROUP BY a"))
-            self.assertEqual(res, [[1, None, 1, 0L, 1L],
-                                   [2, None, 2, 0L, 1L],
-                                   [4, None, 3, 0L, 1L]])
+            assert res == [[1, None, 1, 0, 1],
+                                   [2, None, 2, 0, 1],
+                                   [4, None, 3, 0, 1]]
 
             res = rows_to_list(session.execute("SELECT a, b, s, count(b), count(s) FROM test GROUP BY a, b"))
-            self.assertEqual(res, [[1, None, 1, 0L, 1L],
-                                   [2, None, 2, 0L, 1L],
-                                   [4, None, 3, 0L, 1L]])
+            assert res == [[1, None, 1, 0, 1],
+                                   [2, None, 2, 0, 1],
+                                   [4, None, 3, 0, 1]]
 
             res = rows_to_list(session.execute("SELECT a, b, s, count(b), count(s) FROM test"))
-            self.assertEqual(res, [[1, None, 1, 0L, 3L]])
+            assert res == [[1, None, 1, 0, 3]]
 
             # Range query without aggregates
             res = rows_to_list(session.execute("SELECT a, b, s FROM test GROUP BY a, b"))
-            self.assertEqual(res, [[1, None, 1],
+            assert res == [[1, None, 1],
                                    [2, None, 2],
-                                   [4, None, 3]])
+                                   [4, None, 3]]
 
             # Range queries with LIMIT
             res = rows_to_list(session.execute("SELECT a, b, s, count(b), count(s) FROM test GROUP BY a, b LIMIT 2"))
-            self.assertEqual(res, [[1, None, 1, 0L, 1L],
-                                   [2, None, 2, 0L, 1L]])
+            assert res == [[1, None, 1, 0, 1],
+                                   [2, None, 2, 0, 1]]
 
             res = rows_to_list(session.execute("SELECT a, b, s, count(b), count(s) FROM test LIMIT 2"))
-            self.assertEqual(res, [[1, None, 1, 0L, 3L]])
+            assert res == [[1, None, 1, 0, 3]]
 
             # Range query with PER PARTITION LIMIT
             res = rows_to_list(session.execute("SELECT a, b, s, count(b), count(s) FROM test GROUP BY a, b PER PARTITION LIMIT 2"))
-            self.assertEqual(res, [[1, None, 1, 0L, 1L],
-                                   [2, None, 2, 0L, 1L],
-                                   [4, None, 3, 0L, 1L]])
+            assert res == [[1, None, 1, 0, 1],
+                           [2, None, 2, 0, 1],
+                           [4, None, 3, 0, 1]]
 
             # Range queries with DISTINCT
             res = rows_to_list(session.execute("SELECT DISTINCT a, s, count(s) FROM test GROUP BY a"))
-            self.assertEqual(res, [[1, 1, 1L],
-                                   [2, 2, 1L],
-                                   [4, 3, 1L]])
+            assert res == [[1, 1, 1],
+                           [2, 2, 1],
+                           [4, 3, 1]]
 
             res = rows_to_list(session.execute("SELECT DISTINCT a, s, count(s) FROM test "))
-            self.assertEqual(res, [[1, 1, 3L]])
+            assert res == [[1, 1, 3]]
 
             # Range queries with DISTINCT and LIMIT
             res = rows_to_list(session.execute("SELECT DISTINCT a, s, count(s) FROM test GROUP BY a LIMIT 2"))
-            self.assertEqual(res, [[1, 1, 1L],
-                                   [2, 2, 1L]])
+            assert res == [[1, 1, 1],
+                           [2, 2, 1]]
 
             res = rows_to_list(session.execute("SELECT DISTINCT a, s, count(s) FROM test LIMIT 2"))
-            self.assertEqual(res, [[1, 1, 3L]])
+            assert res == [[1, 1, 3]]
 
             # Single partition queries
             res = rows_to_list(session.execute("SELECT a, b, s, count(b), count(s) FROM test WHERE a = 1 GROUP BY a"))
-            self.assertEqual(res, [[1, None, 1, 0L, 1L]])
+            assert res == [[1, None, 1, 0, 1]]
 
             res = rows_to_list(
                 session.execute("SELECT a, b, s, count(b), count(s) FROM test WHERE a = 1 GROUP BY a, b"))
-            self.assertEqual(res, [[1, None, 1, 0L, 1L]])
+            assert res == [[1, None, 1, 0, 1]]
 
             res = rows_to_list(session.execute("SELECT a, b, s, count(b), count(s) FROM test WHERE a = 1"))
-            self.assertEqual(res, [[1, None, 1, 0L, 1L]])
+            assert res == [[1, None, 1, 0, 1]]
 
             # Single partition query without aggregates
             res = rows_to_list(session.execute("SELECT a, b, s FROM test WHERE a = 1 GROUP BY a, b"))
-            self.assertEqual(res, [[1, None, 1]])
+            assert res == [[1, None, 1]]
 
             # Single partition queries with LIMIT
             res = rows_to_list(
                 session.execute("SELECT a, b, s, count(b), count(s) FROM test WHERE a = 1 GROUP BY a, b LIMIT 2"))
-            self.assertEqual(res, [[1, None, 1, 0L, 1L]])
+            assert res == [[1, None, 1, 0, 1]]
 
             res = rows_to_list(session.execute("SELECT a, b, s, count(b), count(s) FROM test WHERE a = 1 LIMIT 2"))
-            self.assertEqual(res, [[1, None, 1, 0L, 1L]])
+            assert res == [[1, None, 1, 0, 1]]
 
             # Single partition queries with PER PARTITION LIMIT
             res = rows_to_list(
                 session.execute("SELECT a, b, s, count(b), count(s) FROM test WHERE a = 1 GROUP BY a, b PER PARTITION LIMIT 2"))
-            self.assertEqual(res, [[1, None, 1, 0L, 1L]])
+            assert res == [[1, None, 1, 0, 1]]
 
             # Single partition queries with DISTINCT
             res = rows_to_list(session.execute("SELECT DISTINCT a, s, count(s) FROM test WHERE a = 1 GROUP BY a"))
-            self.assertEqual(res, [[1, 1, 1L]])
+            assert res == [[1, 1, 1]]
 
             res = rows_to_list(session.execute("SELECT DISTINCT a, s, count(s) FROM test WHERE a = 1"))
-            self.assertEqual(res, [[1, 1, 1L]])
+            assert res == [[1, 1, 1]]
 
             # Multi-partitions queries
             res = rows_to_list(
                 session.execute("SELECT a, b, s, count(b), count(s) FROM test WHERE a IN (1, 2, 3, 4) GROUP BY a"))
-            self.assertEqual(res, [[1, None, 1, 0L, 1L],
-                                   [2, None, 2, 0L, 1L],
-                                   [4, None, 3, 0L, 1L]])
+            assert res == [[1, None, 1, 0, 1],
+                           [2, None, 2, 0, 1],
+                           [4, None, 3, 0, 1]]
 
             res = rows_to_list(
                 session.execute("SELECT a, b, s, count(b), count(s) FROM test WHERE a IN (1, 2, 3, 4) GROUP BY a, b"))
-            self.assertEqual(res, [[1, None, 1, 0L, 1L],
-                                   [2, None, 2, 0L, 1L],
-                                   [4, None, 3, 0L, 1L]])
+            assert res == [[1, None, 1, 0, 1],
+                           [2, None, 2, 0, 1],
+                           [4, None, 3, 0, 1]]
 
             res = rows_to_list(session.execute("SELECT a, b, s, count(b), count(s) FROM test WHERE a IN (1, 2, 3, 4)"))
-            self.assertEqual(res, [[1, None, 1, 0L, 3L]])
+            assert res == [[1, None, 1, 0, 3]]
 
             # Multi-partitions query without aggregates
             res = rows_to_list(session.execute("SELECT a, b, s FROM test WHERE a IN (1, 2, 3, 4) GROUP BY a, b"))
-            self.assertEqual(res, [[1, None, 1],
-                                   [2, None, 2],
-                                   [4, None, 3]])
+            assert res == [[1, None, 1],
+                           [2, None, 2],
+                           [4, None, 3]]
 
             # Multi-partitions query with LIMIT
             res = rows_to_list(session.execute(
                 "SELECT a, b, s, count(b), count(s) FROM test WHERE a IN (1, 2, 3, 4) GROUP BY a, b LIMIT 2"))
-            self.assertEqual(res, [[1, None, 1, 0L, 1L],
-                                   [2, None, 2, 0L, 1L]])
+            assert res == [[1, None, 1, 0, 1],
+                           [2, None, 2, 0, 1]]
 
             res = rows_to_list(
                 session.execute("SELECT a, b, s, count(b), count(s) FROM test WHERE a IN (1, 2, 3, 4) LIMIT 2"))
-            self.assertEqual(res, [[1, None, 1, 0L, 3L]])
+            assert res == [[1, None, 1, 0, 3]]
 
             # Multi-partitions query with PER PARTITION LIMIT
             res = rows_to_list(session.execute(
                 "SELECT a, b, s, count(b), count(s) FROM test WHERE a IN (1, 2, 3, 4) GROUP BY a, b PER PARTITION LIMIT 1"))
-            self.assertEqual(res, [[1, None, 1, 0L, 1L],
-                                   [2, None, 2, 0L, 1L],
-                                   [4, None, 3, 0L, 1L]])
+            assert res == [[1, None, 1, 0, 1],
+                           [2, None, 2, 0, 1],
+                           [4, None, 3, 0, 1]]
 
             # Multi-partitions queries with DISTINCT
             res = rows_to_list(
                 session.execute("SELECT DISTINCT a, s, count(s) FROM test WHERE a IN (1, 2, 3, 4) GROUP BY a"))
-            self.assertEqual(res, [[1, 1, 1L],
-                                   [2, 2, 1L],
-                                   [4, 3, 1L]])
+            assert res == [[1, 1, 1],
+                           [2, 2, 1],
+                           [4, 3, 1]]
 
             res = rows_to_list(session.execute("SELECT DISTINCT a, s, count(s) FROM test WHERE a IN (1, 2, 3, 4)"))
-            self.assertEqual(res, [[1, 1, 3L]])
+            assert res == [[1, 1, 3]]
 
             # Multi-partitions queries with DISTINCT and LIMIT
             res = rows_to_list(
                 session.execute("SELECT DISTINCT a, s, count(s) FROM test WHERE a IN (1, 2, 3, 4) GROUP BY a LIMIT 2"))
-            self.assertEqual(res, [[1, 1, 1L],
-                                   [2, 2, 1L]])
+            assert res == [[1, 1, 1],
+                           [2, 2, 1]]
 
             res = rows_to_list(
                 session.execute("SELECT DISTINCT a, s, count(s) FROM test WHERE a IN (1, 2, 3, 4) LIMIT 2"))
-            self.assertEqual(res, [[1, 1, 3L]])
+            assert res == [[1, 1, 3]]
 
         # ------------------------------------
         # Test with non static columns not empty
@@ -1129,331 +1130,330 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
             # Range queries
             res = rows_to_list(session.execute("SELECT a, b, s, count(b), count(s) FROM test GROUP BY a"))
-            self.assertEqual(res, [[1, 2, 1, 4L, 4L],
-                                   [2, 2, 2, 2L, 2L],
-                                   [4, 8, None, 1L, 0L],
-                                   [3, None, 3, 0L, 1L]])
+            assert res == [[1, 2, 1, 4, 4],
+                           [2, 2, 2, 2, 2],
+                           [4, 8, None, 1, 0],
+                           [3, None, 3, 0, 1]]
 
             res = rows_to_list(session.execute("SELECT a, b, s, count(b), count(s) FROM test GROUP BY a, b"))
-            self.assertEqual(res, [[1, 2, 1, 2L, 2L],
-                                   [1, 4, 1, 2L, 2L],
-                                   [2, 2, 2, 1L, 1L],
-                                   [2, 4, 2, 1L, 1L],
-                                   [4, 8, None, 1L, 0L],
-                                   [3, None, 3, 0L, 1L]])
+            assert res == [[1, 2, 1, 2, 2],
+                           [1, 4, 1, 2, 2],
+                           [2, 2, 2, 1, 1],
+                           [2, 4, 2, 1, 1],
+                           [4, 8, None, 1, 0],
+                           [3, None, 3, 0, 1]]
 
             res = rows_to_list(session.execute("SELECT a, b, s, count(b), count(s) FROM test"))
-            self.assertEqual(res, [[1, 2, 1, 7L, 7L]])
+            assert res == [[1, 2, 1, 7, 7]]
 
             res = rows_to_list(
                 session.execute(
                     "SELECT a, b, s, count(b), count(s) FROM test WHERE b = 2 GROUP BY a, b ALLOW FILTERING"))
-            self.assertEqual(res, [[1, 2, 1, 2L, 2L],
-                                   [2, 2, 2, 1L, 1L]])
+            assert res == [[1, 2, 1, 2, 2],
+                           [2, 2, 2, 1, 1]]
 
             assert_invalid(session, "SELECT a, b, s, count(b), count(s) FROM test WHERE b = 2 GROUP BY a, b", expected=InvalidRequest)
 
             res = rows_to_list(
                 session.execute("SELECT a, b, s, count(b), count(s) FROM test WHERE b = 2 ALLOW FILTERING"))
-            self.assertEqual(res, [[1, 2, 1, 3L, 3L]])
+            assert res == [[1, 2, 1, 3, 3]]
 
             assert_invalid(session, "SELECT a, b, s, count(b), count(s) FROM test WHERE b = 2", expected=InvalidRequest)
 
             # Range queries without aggregates
             res = rows_to_list(session.execute("SELECT a, b, s FROM test GROUP BY a"))
-            self.assertEqual(res, [[1, 2, 1],
-                                   [2, 2, 2],
-                                   [4, 8, None],
-                                   [3, None, 3]])
+            assert res == [[1, 2, 1],
+                           [2, 2, 2],
+                           [4, 8, None],
+                           [3, None, 3]]
 
             res = rows_to_list(session.execute("SELECT a, b, s FROM test GROUP BY a, b"))
-            self.assertEqual(res, [[1, 2, 1],
-                                   [1, 4, 1],
-                                   [2, 2, 2],
-                                   [2, 4, 2],
-                                   [4, 8, None],
-                                   [3, None, 3]])
+            assert res == [[1, 2, 1],
+                           [1, 4, 1],
+                           [2, 2, 2],
+                           [2, 4, 2],
+                           [4, 8, None],
+                           [3, None, 3]]
 
             # Range query with LIMIT
             res = rows_to_list(session.execute("SELECT a, b, s, count(b), count(s) FROM test GROUP BY a LIMIT 2"))
-            self.assertEqual(res, [[1, 2, 1, 4L, 4L],
-                                   [2, 2, 2, 2L, 2L]])
+            assert res == [[1, 2, 1, 4, 4],
+                           [2, 2, 2, 2, 2]]
 
             res = rows_to_list(session.execute("SELECT a, b, s, count(b), count(s) FROM test LIMIT 2"))
-            self.assertEqual(res, [[1, 2, 1, 7L, 7L]])
+            assert res == [[1, 2, 1, 7, 7]]
 
             # Range queries without aggregates and with LIMIT
             res = rows_to_list(session.execute("SELECT a, b, s FROM test GROUP BY a LIMIT 2"))
-            self.assertEqual(res, [[1, 2, 1],
-                                   [2, 2, 2]])
+            assert res == [[1, 2, 1],
+                           [2, 2, 2]]
 
             res = rows_to_list(session.execute("SELECT a, b, s FROM test GROUP BY a, b LIMIT 10"))
-            self.assertEqual(res, [[1, 2, 1],
-                                   [1, 4, 1],
-                                   [2, 2, 2],
-                                   [2, 4, 2],
-                                   [4, 8, None],
-                                   [3, None, 3]])
+            assert res == [[1, 2, 1],
+                           [1, 4, 1],
+                           [2, 2, 2],
+                           [2, 4, 2],
+                           [4, 8, None],
+                           [3, None, 3]]
 
             # Range queries with PER PARTITION LIMITS
             res = rows_to_list(session.execute("SELECT a, b, s, count(b), count(s) FROM test GROUP BY a, b PER PARTITION LIMIT 2"))
-            self.assertEqual(res, [[1, 2, 1, 2L, 2L],
-                                   [1, 4, 1, 2L, 2L],
-                                   [2, 2, 2, 1L, 1L],
-                                   [2, 4, 2, 1L, 1L],
-                                   [4, 8, None, 1L, 0L],
-                                   [3, None, 3, 0L, 1L]])
+            assert res == [[1, 2, 1, 2, 2],
+                           [1, 4, 1, 2, 2],
+                           [2, 2, 2, 1, 1],
+                           [2, 4, 2, 1, 1],
+                           [4, 8, None, 1, 0],
+                           [3, None, 3, 0, 1]]
 
             res = rows_to_list(session.execute("SELECT a, b, s, count(b), count(s) FROM test GROUP BY a, b PER PARTITION LIMIT 1"))
-            self.assertEqual(res, [[1, 2, 1, 2L, 2L],
-                                   [2, 2, 2, 1L, 1L],
-                                   [4, 8, None, 1L, 0L],
-                                   [3, None, 3, 0L, 1L]])
+            assert res == [[1, 2, 1, 2, 2],
+                           [2, 2, 2, 1, 1],
+                           [4, 8, None, 1, 0],
+                           [3, None, 3, 0, 1]]
 
             # Range queries with PER PARTITION LIMITS and LIMIT
             res = rows_to_list(session.execute("SELECT a, b, s, count(b), count(s) FROM test GROUP BY a, b PER PARTITION LIMIT 1 LIMIT 5"))
-            self.assertEqual(res, [[1, 2, 1, 2L, 2L],
-                                   [2, 2, 2, 1L, 1L],
-                                   [4, 8, None, 1L, 0L],
-                                   [3, None, 3, 0L, 1L]])
+            assert res == [[1, 2, 1, 2, 2],
+                           [2, 2, 2, 1, 1],
+                           [4, 8, None, 1, 0],
+                           [3, None, 3, 0, 1]]
 
             res = rows_to_list(session.execute("SELECT a, b, s, count(b), count(s) FROM test GROUP BY a, b PER PARTITION LIMIT 1 LIMIT 4"))
-            self.assertEqual(res, [[1, 2, 1, 2L, 2L],
-                                   [2, 2, 2, 1L, 1L],
-                                   [4, 8, None, 1L, 0L],
-                                   [3, None, 3, 0L, 1L]])
+            assert res == [[1, 2, 1, 2, 2],
+                           [2, 2, 2, 1, 1],
+                           [4, 8, None, 1, 0],
+                           [3, None, 3, 0, 1]]
 
             res = rows_to_list(session.execute("SELECT a, b, s, count(b), count(s) FROM test GROUP BY a, b PER PARTITION LIMIT 1 LIMIT 2"))
-            self.assertEqual(res, [[1, 2, 1, 2L, 2L],
-                                   [2, 2, 2, 1L, 1L]])
+            assert res == [[1, 2, 1, 2, 2],
+                           [2, 2, 2, 1, 1]]
 
             # Range queries with DISTINCT
             res = rows_to_list(session.execute("SELECT DISTINCT a, s, count(a), count(s) FROM test GROUP BY a"))
-            self.assertEqual(res, [[1, 1, 1L, 1L],
-                                   [2, 2, 1L, 1L],
-                                   [4, None, 1L, 0L],
-                                   [3, 3, 1L, 1L]])
+            assert res == [[1, 1, 1, 1],
+                           [2, 2, 1, 1],
+                           [4, None, 1, 0],
+                           [3, 3, 1, 1]]
 
             res = rows_to_list(session.execute("SELECT DISTINCT a, s, count(a), count(s) FROM test"))
-            self.assertEqual(res, [[1, 1, 4L, 3L]])
+            assert res == [[1, 1, 4, 3]]
 
             # Range queries with DISTINCT and LIMIT
             res = rows_to_list(session.execute("SELECT DISTINCT a, s, count(a), count(s) FROM test GROUP BY a LIMIT 2"))
-            self.assertEqual(res, [[1, 1, 1L, 1L],
-                                   [2, 2, 1L, 1L]])
+            assert res == [[1, 1, 1, 1],
+                           [2, 2, 1, 1]]
 
             res = rows_to_list(session.execute("SELECT DISTINCT a, s, count(a), count(s) FROM test LIMIT 2"))
-            self.assertEqual(res, [[1, 1, 4L, 3L]])
+            assert res == [[1, 1, 4, 3]]
 
             # Single partition queries
             res = rows_to_list(session.execute("SELECT a, b, s, count(b), count(s) FROM test WHERE a = 1 GROUP BY a"))
-            self.assertEqual(res, [[1, 2, 1, 4L, 4L]])
+            assert res == [[1, 2, 1, 4, 4]]
 
             res = rows_to_list(
                 session.execute("SELECT a, b, s, count(b), count(s) FROM test WHERE a = 3 GROUP BY a, b"))
-            self.assertEqual(res, [[3, None, 3, 0L, 1L]])
+            assert res == [[3, None, 3, 0, 1]]
 
             res = rows_to_list(session.execute("SELECT a, b, s, count(b), count(s) FROM test WHERE a = 3"))
-            self.assertEqual(res, [[3, None, 3, 0L, 1L]])
+            assert res == [[3, None, 3, 0, 1]]
 
             res = rows_to_list(
                 session.execute("SELECT a, b, s, count(b), count(s) FROM test WHERE a = 2 AND b = 2 GROUP BY a, b"))
-            self.assertEqual(res, [[2, 2, 2, 1L, 1L]])
+            assert res == [[2, 2, 2, 1, 1]]
 
             res = rows_to_list(session.execute("SELECT a, b, s, count(b), count(s) FROM test WHERE a = 2 AND b = 2"))
-            self.assertEqual(res, [[2, 2, 2, 1L, 1L]])
+            assert res == [[2, 2, 2, 1, 1]]
 
             # Single partition queries without aggregates
             res = rows_to_list(session.execute("SELECT a, b, s FROM test WHERE a = 1 GROUP BY a"))
-            self.assertEqual(res, [[1, 2, 1]])
+            assert res == [[1, 2, 1]]
 
             res = rows_to_list(session.execute("SELECT a, b, s FROM test WHERE a = 4 GROUP BY a, b"))
-            self.assertEqual(res, [[4, 8, None]])
+            assert res == [[4, 8, None]]
 
             # Single partition queries with LIMIT
             res = rows_to_list(
                 session.execute("SELECT a, b, s, count(b), count(s) FROM test WHERE a = 2 GROUP BY a, b LIMIT 1"))
-            self.assertEqual(res, [[2, 2, 2, 1L, 1L]])
+            assert res == [[2, 2, 2, 1, 1]]
 
             res = rows_to_list(session.execute("SELECT a, b, s, count(b), count(s) FROM test WHERE a = 2 LIMIT 1"))
-            self.assertEqual(res, [[2, 2, 2, 2L, 2L]])
+            assert res == [[2, 2, 2, 2, 2]]
 
             # Single partition queries without aggregates and with LIMIT
             res = rows_to_list(session.execute("SELECT a, b, s FROM test WHERE a = 2 GROUP BY a, b LIMIT 1"))
-            self.assertEqual(res, [[2, 2, 2]])
+            assert res == [[2, 2, 2]]
 
             res = rows_to_list(session.execute("SELECT a, b, s FROM test WHERE a = 2 GROUP BY a, b LIMIT 2"))
-            self.assertEqual(res, [[2, 2, 2],
-                                   [2, 4, 2]])
+            assert res == [[2, 2, 2],
+                           [2, 4, 2]]
 
             # Single partition queries with PER PARTITION LIMIT
             res = rows_to_list(
                 session.execute("SELECT a, b, s, count(b), count(s) FROM test WHERE a = 2 GROUP BY a, b PER PARTITION LIMIT 1"))
-            self.assertEqual(res, [[2, 2, 2, 1L, 1L]])
+            assert res == [[2, 2, 2, 1, 1]]
 
             # Single partition queries with DISTINCT
             res = rows_to_list(
                 session.execute("SELECT DISTINCT a, s, count(a), count(s) FROM test WHERE a = 2 GROUP BY a"))
-            self.assertEqual(res, [[2, 2, 1L, 1L]])
+            assert res == [[2, 2, 1, 1]]
 
             # Single partition queries with ORDER BY
             res = rows_to_list(session.execute(
                 "SELECT a, b, s, count(b), count(s) FROM test WHERE a = 2 GROUP BY a, b ORDER BY b DESC, c DESC"))
-            self.assertEqual(res, [[2, 4, 2, 1L, 1L],
-                                   [2, 2, 2, 1L, 1L]])
+            assert res == [[2, 4, 2, 1, 1],
+                           [2, 2, 2, 1, 1]]
 
             res = rows_to_list(
                 session.execute("SELECT a, b, s, count(b), count(s) FROM test WHERE a = 2 ORDER BY b DESC, c DESC"))
-            self.assertEqual(res, [[2, 4, 2, 2L, 2L]])
+            assert res == [[2, 4, 2, 2, 2]]
 
             # Single partition queries with ORDER BY and LIMIT
             res = rows_to_list(session.execute(
                 "SELECT a, b, s, count(b), count(s) FROM test WHERE a = 2 GROUP BY a, b ORDER BY b DESC, c DESC LIMIT 1"))
-            self.assertEqual(res, [[2, 4, 2, 1L, 1L]])
+            assert res == [[2, 4, 2, 1, 1]]
 
             res = rows_to_list(session.execute(
                 "SELECT a, b, s, count(b), count(s) FROM test WHERE a = 2 ORDER BY b DESC, c DESC LIMIT 2"))
-            self.assertEqual(res, [[2, 4, 2, 2L, 2L]])
+            assert res == [[2, 4, 2, 2, 2]]
 
             # Single partition queries with ORDER BY and PER PARTITION LIMIT
             res = rows_to_list(session.execute(
                 "SELECT a, b, s, count(b), count(s) FROM test WHERE a = 2 GROUP BY a, b ORDER BY b DESC, c DESC PER PARTITION LIMIT 1"))
-            self.assertEqual(res, [[2, 4, 2, 1L, 1L]])
+            assert res == [[2, 4, 2, 1, 1]]
 
             # Multi-partitions queries
             res = rows_to_list(
                 session.execute("SELECT a, b, s, count(b), count(s) FROM test WHERE a IN (1, 2, 3, 4) GROUP BY a"))
-            self.assertEqual(res, [[1, 2, 1, 4L, 4L],
-                                   [2, 2, 2, 2L, 2L],
-                                   [3, None, 3, 0L, 1L],
-                                   [4, 8, None, 1L, 0L]])
+            assert res == [[1, 2, 1, 4, 4],
+                           [2, 2, 2, 2, 2],
+                           [3, None, 3, 0, 1],
+                           [4, 8, None, 1, 0]]
 
             res = rows_to_list(
                 session.execute("SELECT a, b, s, count(b), count(s) FROM test WHERE a IN (1, 2, 3, 4) GROUP BY a, b"))
-            self.assertEqual(res, [[1, 2, 1, 2L, 2L],
-                                   [1, 4, 1, 2L, 2L],
-                                   [2, 2, 2, 1L, 1L],
-                                   [2, 4, 2, 1L, 1L],
-                                   [3, None, 3, 0L, 1L],
-                                   [4, 8, None, 1L, 0L]])
+            assert res == [[1, 2, 1, 2, 2],
+                           [1, 4, 1, 2, 2],
+                           [2, 2, 2, 1, 1],
+                           [2, 4, 2, 1, 1],
+                           [3, None, 3, 0, 1],
+                           [4, 8, None, 1, 0]]
 
             res = rows_to_list(session.execute("SELECT a, b, s, count(b), count(s) FROM test WHERE a IN (1, 2, 3, 4)"))
-            self.assertEqual(res, [[1, 2, 1, 7L, 7L]])
+            assert res == [[1, 2, 1, 7, 7]]
 
             res = rows_to_list(session.execute(
                 "SELECT a, b, s, count(b), count(s) FROM test WHERE a IN (1, 2, 3, 4) AND b = 2 GROUP BY a, b"))
-            self.assertEqual(res, [[1, 2, 1, 2L, 2L],
-                                   [2, 2, 2, 1L, 1L]])
+            assert res == [[1, 2, 1, 2, 2],
+                           [2, 2, 2, 1, 1]]
 
             res = rows_to_list(
                 session.execute("SELECT a, b, s, count(b), count(s) FROM test WHERE a IN (1, 2, 3, 4) AND b = 2"))
-            self.assertEqual(res, [[1, 2, 1, 3L, 3L]])
+            assert res == [[1, 2, 1, 3, 3]]
 
             # Multi-partitions queries without aggregates
             res = rows_to_list(session.execute("SELECT a, b, s FROM test WHERE a IN (1, 2, 3, 4) GROUP BY a"))
-            self.assertEqual(res, [[1, 2, 1],
-                                   [2, 2, 2],
-                                   [3, None, 3],
-                                   [4, 8, None]])
+            assert res == [[1, 2, 1],
+                           [2, 2, 2],
+                           [3, None, 3],
+                           [4, 8, None]]
 
             res = rows_to_list(session.execute("SELECT a, b, s FROM test WHERE a IN (1, 2, 3, 4) GROUP BY a, b"))
-            self.assertEqual(res, [[1, 2, 1],
-                                   [1, 4, 1],
-                                   [2, 2, 2],
-                                   [2, 4, 2],
-                                   [3, None, 3],
-                                   [4, 8, None]])
+            assert res == [[1, 2, 1],
+                           [1, 4, 1],
+                           [2, 2, 2],
+                           [2, 4, 2],
+                           [3, None, 3],
+                           [4, 8, None]]
 
             # Multi-partitions queries with LIMIT
             res = rows_to_list(session.execute(
                 "SELECT a, b, s, count(b), count(s) FROM test WHERE a IN (1, 2, 3, 4) GROUP BY a LIMIT 2"))
-            self.assertEqual(res, [[1, 2, 1, 4L, 4L],
-                                   [2, 2, 2, 2L, 2L]])
+            assert res == [[1, 2, 1, 4, 4],
+                           [2, 2, 2, 2, 2]]
 
             res = rows_to_list(
                 session.execute("SELECT a, b, s, count(b), count(s) FROM test WHERE a IN (1, 2, 3, 4) LIMIT 2"))
-            self.assertEqual(res, [[1, 2, 1, 7L, 7L]])
+            assert res == [[1, 2, 1, 7, 7]]
 
             # Multi-partitions queries without aggregates and with LIMIT
             res = rows_to_list(session.execute("SELECT a, b, s FROM test WHERE a IN (1, 2, 3, 4) GROUP BY a LIMIT 2"))
-            self.assertEqual(res, [[1, 2, 1],
-                                   [2, 2, 2]])
+            assert res == [[1, 2, 1],
+                           [2, 2, 2]]
 
             res = rows_to_list(
                 session.execute("SELECT a, b, s FROM test WHERE a IN (1, 2, 3, 4) GROUP BY a, b LIMIT 10"))
-            self.assertEqual(res, [[1, 2, 1],
-                                   [1, 4, 1],
-                                   [2, 2, 2],
-                                   [2, 4, 2],
-                                   [3, None, 3],
-                                   [4, 8, None]])
+            assert res == [[1, 2, 1],
+                           [1, 4, 1],
+                           [2, 2, 2],
+                           [2, 4, 2],
+                           [3, None, 3],
+                           [4, 8, None]]
 
             # Multi-partitions queries with PER PARTITION LIMIT
             res = rows_to_list(
                 session.execute("SELECT a, b, s, count(b), count(s) FROM test WHERE a IN (1, 2, 3, 4) GROUP BY a PER PARTITION LIMIT 1"))
-            self.assertEqual(res, [[1, 2, 1, 4L, 4L],
-                                   [2, 2, 2, 2L, 2L],
-                                   [3, None, 3, 0L, 1L],
-                                   [4, 8, None, 1L, 0L]])
+            assert res == [[1, 2, 1, 4, 4],
+                           [2, 2, 2, 2, 2],
+                           [3, None, 3, 0, 1],
+                           [4, 8, None, 1, 0]]
 
             res = rows_to_list(
                 session.execute("SELECT a, b, s, count(b), count(s) FROM test WHERE a IN (1, 2, 3, 4) GROUP BY a, b PER PARTITION LIMIT 2"))
-            self.assertEqual(res, [[1, 2, 1, 2L, 2L],
-                                   [1, 4, 1, 2L, 2L],
-                                   [2, 2, 2, 1L, 1L],
-                                   [2, 4, 2, 1L, 1L],
-                                   [3, None, 3, 0L, 1L],
-                                   [4, 8, None, 1L, 0L]])
+            assert res == [[1, 2, 1, 2, 2],
+                           [1, 4, 1, 2, 2],
+                           [2, 2, 2, 1, 1],
+                           [2, 4, 2, 1, 1],
+                           [3, None, 3, 0, 1],
+                           [4, 8, None, 1, 0]]
 
             res = rows_to_list(
                 session.execute("SELECT a, b, s, count(b), count(s) FROM test WHERE a IN (1, 2, 3, 4) GROUP BY a, b PER PARTITION LIMIT 1"))
-            self.assertEqual(res, [[1, 2, 1, 2L, 2L],
-                                   [2, 2, 2, 1L, 1L],
-                                   [3, None, 3, 0L, 1L],
-                                   [4, 8, None, 1L, 0L]])
+            assert res == [[1, 2, 1, 2, 2],
+                           [2, 2, 2, 1, 1],
+                           [3, None, 3, 0, 1],
+                           [4, 8, None, 1, 0]]
 
             # Multi-partitions queries with DISTINCT
             res = rows_to_list(session.execute(
                 "SELECT DISTINCT a, s, count(a), count(s) FROM test WHERE a IN (1, 2, 3, 4) GROUP BY a"))
-            self.assertEqual(res, [[1, 1, 1L, 1L],
-                                   [2, 2, 1L, 1L],
-                                   [3, 3, 1L, 1L],
-                                   [4, None, 1L, 0L]])
+            assert res == [[1, 1, 1, 1],
+                           [2, 2, 1, 1],
+                           [3, 3, 1, 1],
+                           [4, None, 1, 0]]
 
             # Multi-partitions queries with PER PARTITION LIMIT and LIMIT
             res = rows_to_list(
                 session.execute("SELECT a, b, s, count(b), count(s) FROM test WHERE a IN (1, 2, 3, 4) GROUP BY a PER PARTITION LIMIT 1 LIMIT 3"))
-            self.assertEqual(res, [[1, 2, 1, 4L, 4L],
-                                   [2, 2, 2, 2L, 2L],
-                                   [3, None, 3, 0L, 1L]])
+            assert res == [[1, 2, 1, 4, 4],
+                           [2, 2, 2, 2, 2],
+                           [3, None, 3, 0, 1]]
 
             res = rows_to_list(
                 session.execute("SELECT a, b, s, count(b), count(s) FROM test WHERE a IN (1, 2, 3, 4) GROUP BY a, b PER PARTITION LIMIT 2 LIMIT 3"))
-            self.assertEqual(res, [[1, 2, 1, 2L, 2L],
-                                   [1, 4, 1, 2L, 2L],
-                                   [2, 2, 2, 1L, 1L]])
+            assert res == [[1, 2, 1, 2, 2],
+                           [1, 4, 1, 2, 2],
+                           [2, 2, 2, 1, 1]]
 
             res = rows_to_list(
                 session.execute("SELECT DISTINCT a, s, count(a), count(s) FROM test WHERE a IN (1, 2, 3, 4)"))
-            self.assertEqual(res, [[1, 1, 4L, 3L]])
+            assert res == [[1, 1, 4, 3]]
 
             # Multi-partitions query with DISTINCT and LIMIT
             res = rows_to_list(session.execute(
                 "SELECT DISTINCT a, s, count(a), count(s) FROM test WHERE a IN (1, 2, 3, 4) GROUP BY a LIMIT 2"))
-            self.assertEqual(res, [[1, 1, 1L, 1L],
-                                   [2, 2, 1L, 1L]])
+            assert res == [[1, 1, 1, 1],
+                           [2, 2, 1, 1]]
 
             res = rows_to_list(
                 session.execute("SELECT DISTINCT a, s, count(a), count(s) FROM test WHERE a IN (1, 2, 3, 4) LIMIT 2"))
-            self.assertEqual(res, [[1, 1, 4L, 3L]])
+            assert res == [[1, 1, 4, 3]]
 
     @since('2.0.6')
-    def static_columns_paging_test(self):
+    def test_static_columns_paging(self):
         """
         Exercises paging with static columns to detect bugs
         @jira_ticket CASSANDRA-8502.
         """
-
         session = self.prepare(row_factory=named_tuple_factory)
         create_ks(session, 'test_paging_static_cols', 2)
         session.execute("CREATE TABLE test (a int, b int, c int, s1 int static, s2 int static, PRIMARY KEY (a, b))")
@@ -1472,186 +1472,186 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         PAGE_SIZES = (2, 3, 4, 5, 15, 16, 17, 100)
 
         for page_size in PAGE_SIZES:
-            debug("Current page size is {}".format(page_size))
+            logger.debug("Current page size is {}".format(page_size))
             session.default_fetch_size = page_size
             for selector in selectors:
                 results = list(session.execute("SELECT %s FROM test" % selector))
                 assert_length_equal(results, 16)
-                self.assertEqual([0] * 4 + [1] * 4 + [2] * 4 + [3] * 4, sorted([r.a for r in results]))
-                self.assertEqual([0, 1, 2, 3] * 4, [r.b for r in results])
-                self.assertEqual([0, 1, 2, 3] * 4, [r.c for r in results])
+                assert [0] * 4 + [1] * 4 + [2] * 4 + [3] * 4 == sorted([r.a for r in results])
+                assert [0, 1, 2, 3] * 4 == [r.b for r in results]
+                assert [0, 1, 2, 3] * 4 == [r.c for r in results]
                 if "s1" in selector:
-                    self.assertEqual([17] * 16, [r.s1 for r in results])
+                    assert [17] * 16 == [r.s1 for r in results]
                 if "s2" in selector:
-                    self.assertEqual([42] * 16, [r.s2 for r in results])
+                    assert [42] * 16 == [r.s2 for r in results]
 
         # IN over the partitions
         for page_size in PAGE_SIZES:
-            debug("Current page size is {}".format(page_size))
+            logger.debug("Current page size is {}".format(page_size))
             session.default_fetch_size = page_size
             for selector in selectors:
                 results = list(session.execute("SELECT %s FROM test WHERE a IN (0, 1, 2, 3)" % selector))
                 assert_length_equal(results, 16)
-                self.assertEqual([0] * 4 + [1] * 4 + [2] * 4 + [3] * 4, sorted([r.a for r in results]))
-                self.assertEqual([0, 1, 2, 3] * 4, [r.b for r in results])
-                self.assertEqual([0, 1, 2, 3] * 4, [r.c for r in results])
+                assert [0] * 4 + [1] * 4 + [2] * 4 + [3] * 4 == sorted([r.a for r in results])
+                assert [0, 1, 2, 3] * 4 == [r.b for r in results]
+                assert [0, 1, 2, 3] * 4 == [r.c for r in results]
                 if "s1" in selector:
-                    self.assertEqual([17] * 16, [r.s1 for r in results])
+                    assert [17] * 16 == [r.s1 for r in results]
                 if "s2" in selector:
-                    self.assertEqual([42] * 16, [r.s2 for r in results])
+                    assert [42] * 16 == [r.s2 for r in results]
 
         # single partition
         for i in range(16):
             session.execute("INSERT INTO test (a, b, c, s1, s2) VALUES (%d, %d, %d, %d, %d)" % (99, i, i, 17, 42))
 
         for page_size in PAGE_SIZES:
-            debug("Current page size is {}".format(page_size))
+            logger.debug("Current page size is {}".format(page_size))
             session.default_fetch_size = page_size
             for selector in selectors:
                 results = list(session.execute("SELECT %s FROM test WHERE a = 99" % selector))
                 assert_length_equal(results, 16)
-                self.assertEqual([99] * 16, [r.a for r in results])
-                self.assertEqual(range(16), [r.b for r in results])
-                self.assertEqual(range(16), [r.c for r in results])
+                assert [99] * 16 == [r.a for r in results]
+                assert list(range(16)) == [r.b for r in results]
+                assert list(range(16)) == [r.c for r in results]
                 if "s1" in selector:
-                    self.assertEqual([17] * 16, [r.s1 for r in results])
+                    assert [17] * 16 == [r.s1 for r in results]
                 if "s2" in selector:
-                    self.assertEqual([42] * 16, [r.s2 for r in results])
+                    assert [42] * 16 == [r.s2 for r in results]
 
         # reversed
         for page_size in PAGE_SIZES:
-            debug("Current page size is {}".format(page_size))
+            logger.debug("Current page size is {}".format(page_size))
             session.default_fetch_size = page_size
             for selector in selectors:
                 results = list(session.execute("SELECT %s FROM test WHERE a = 99 ORDER BY b DESC" % selector))
                 assert_length_equal(results, 16)
-                self.assertEqual([99] * 16, [r.a for r in results])
-                self.assertEqual(list(reversed(range(16))), [r.b for r in results])
-                self.assertEqual(list(reversed(range(16))), [r.c for r in results])
+                assert [99] * 16 == [r.a for r in results]
+                assert list(reversed(list(range(16)))) == [r.b for r in results]
+                assert list(reversed(list(range(16)))) == [r.c for r in results]
                 if "s1" in selector:
-                    self.assertEqual([17] * 16, [r.s1 for r in results])
+                    assert [17] * 16 == [r.s1 for r in results]
                 if "s2" in selector:
-                    self.assertEqual([42] * 16, [r.s2 for r in results])
+                    assert [42] * 16 == [r.s2 for r in results]
 
         # IN on clustering column
         for page_size in PAGE_SIZES:
-            debug("Current page size is {}".format(page_size))
+            logger.debug("Current page size is {}".format(page_size))
             session.default_fetch_size = page_size
             for selector in selectors:
                 results = list(session.execute("SELECT %s FROM test WHERE a = 99 AND b IN (3, 4, 8, 14, 15)" % selector))
                 assert_length_equal(results, 5)
-                self.assertEqual([99] * 5, [r.a for r in results])
-                self.assertEqual([3, 4, 8, 14, 15], [r.b for r in results])
-                self.assertEqual([3, 4, 8, 14, 15], [r.c for r in results])
+                assert [99] * 5 == [r.a for r in results]
+                assert [3, 4, 8, 14, 15] == [r.b for r in results]
+                assert [3, 4, 8, 14, 15] == [r.c for r in results]
                 if "s1" in selector:
-                    self.assertEqual([17] * 5, [r.s1 for r in results])
+                    assert [17] * 5 == [r.s1 for r in results]
                 if "s2" in selector:
-                    self.assertEqual([42] * 5, [r.s2 for r in results])
+                    assert [42] * 5 == [r.s2 for r in results]
 
         # reversed IN on clustering column
         for page_size in PAGE_SIZES:
-            debug("Current page size is {}".format(page_size))
+            logger.debug("Current page size is {}".format(page_size))
             session.default_fetch_size = page_size
             for selector in selectors:
                 results = list(session.execute("SELECT %s FROM test WHERE a = 99 AND b IN (3, 4, 8, 14, 15) ORDER BY b DESC" % selector))
                 assert_length_equal(results, 5)
-                self.assertEqual([99] * 5, [r.a for r in results])
-                self.assertEqual(list(reversed([3, 4, 8, 14, 15])), [r.b for r in results])
-                self.assertEqual(list(reversed([3, 4, 8, 14, 15])), [r.c for r in results])
+                assert [99] * 5 == [r.a for r in results]
+                assert list(reversed([3, 4, 8, 14, 15])) == [r.b for r in results]
+                assert list(reversed([3, 4, 8, 14, 15])) == [r.c for r in results]
                 if "s1" in selector:
-                    self.assertEqual([17] * 5, [r.s1 for r in results])
+                    assert [17] * 5 == [r.s1 for r in results]
                 if "s2" in selector:
-                    self.assertEqual([42] * 5, [r.s2 for r in results])
+                    assert [42] * 5 == [r.s2 for r in results]
 
         # slice on clustering column with set start
         for page_size in PAGE_SIZES:
-            debug("Current page size is {}".format(page_size))
+            logger.debug("Current page size is {}".format(page_size))
             session.default_fetch_size = page_size
             for selector in selectors:
                 results = list(session.execute("SELECT %s FROM test WHERE a = 99 AND b > 3" % selector))
                 assert_length_equal(results, 12)
-                self.assertEqual([99] * 12, [r.a for r in results])
-                self.assertEqual(range(4, 16), [r.b for r in results])
-                self.assertEqual(range(4, 16), [r.c for r in results])
+                assert [99] * 12 == [r.a for r in results]
+                assert list(range(4, 16)) == [r.b for r in results]
+                assert list(range(4, 16)) == [r.c for r in results]
                 if "s1" in selector:
-                    self.assertEqual([17] * 12, [r.s1 for r in results])
+                    assert [17] * 12 == [r.s1 for r in results]
                 if "s2" in selector:
-                    self.assertEqual([42] * 12, [r.s2 for r in results])
+                    assert [42] * 12 == [r.s2 for r in results]
 
         # reversed slice on clustering column with set finish
         for page_size in PAGE_SIZES:
-            debug("Current page size is {}".format(page_size))
+            logger.debug("Current page size is {}".format(page_size))
             session.default_fetch_size = page_size
             for selector in selectors:
                 results = list(session.execute("SELECT %s FROM test WHERE a = 99 AND b > 3 ORDER BY b DESC" % selector))
                 assert_length_equal(results, 12)
-                self.assertEqual([99] * 12, [r.a for r in results])
-                self.assertEqual(list(reversed(range(4, 16))), [r.b for r in results])
-                self.assertEqual(list(reversed(range(4, 16))), [r.c for r in results])
+                assert [99] * 12 == [r.a for r in results]
+                assert list(reversed(list(range(4, 16)))) == [r.b for r in results]
+                assert list(reversed(list(range(4, 16)))) == [r.c for r in results]
                 if "s1" in selector:
-                    self.assertEqual([17] * 12, [r.s1 for r in results])
+                    assert [17] * 12 == [r.s1 for r in results]
                 if "s2" in selector:
-                    self.assertEqual([42] * 12, [r.s2 for r in results])
+                    assert [42] * 12 == [r.s2 for r in results]
 
         # slice on clustering column with set finish
         for page_size in PAGE_SIZES:
-            debug("Current page size is {}".format(page_size))
+            logger.debug("Current page size is {}".format(page_size))
             session.default_fetch_size = page_size
             for selector in selectors:
                 results = list(session.execute("SELECT %s FROM test WHERE a = 99 AND b < 14" % selector))
                 assert_length_equal(results, 14)
-                self.assertEqual([99] * 14, [r.a for r in results])
-                self.assertEqual(range(14), [r.b for r in results])
-                self.assertEqual(range(14), [r.c for r in results])
+                assert [99] * 14 == [r.a for r in results]
+                assert list(range(14)) == [r.b for r in results]
+                assert list(range(14)) == [r.c for r in results]
                 if "s1" in selector:
-                    self.assertEqual([17] * 14, [r.s1 for r in results])
+                    assert [17] * 14 == [r.s1 for r in results]
                 if "s2" in selector:
-                    self.assertEqual([42] * 14, [r.s2 for r in results])
+                    assert [42] * 14 == [r.s2 for r in results]
 
         # reversed slice on clustering column with set start
         for page_size in PAGE_SIZES:
-            debug("Current page size is {}".format(page_size))
+            logger.debug("Current page size is {}".format(page_size))
             session.default_fetch_size = page_size
             for selector in selectors:
                 results = list(session.execute("SELECT %s FROM test WHERE a = 99 AND b < 14 ORDER BY b DESC" % selector))
                 assert_length_equal(results, 14)
-                self.assertEqual([99] * 14, [r.a for r in results])
-                self.assertEqual(list(reversed(range(14))), [r.b for r in results])
-                self.assertEqual(list(reversed(range(14))), [r.c for r in results])
+                assert [99] * 14 == [r.a for r in results]
+                assert list(reversed(list(range(14)))) == [r.b for r in results]
+                assert list(reversed(list(range(14)))) == [r.c for r in results]
                 if "s1" in selector:
-                    self.assertEqual([17] * 14, [r.s1 for r in results])
+                    assert [17] * 14 == [r.s1 for r in results]
                 if "s2" in selector:
-                    self.assertEqual([42] * 14, [r.s2 for r in results])
+                    assert [42] * 14 == [r.s2 for r in results]
 
         # slice on clustering column with start and finish
         for page_size in PAGE_SIZES:
-            debug("Current page size is {}".format(page_size))
+            logger.debug("Current page size is {}".format(page_size))
             session.default_fetch_size = page_size
             for selector in selectors:
                 results = list(session.execute("SELECT %s FROM test WHERE a = 99 AND b > 3 AND b < 14" % selector))
                 assert_length_equal(results, 10)
-                self.assertEqual([99] * 10, [r.a for r in results])
-                self.assertEqual(range(4, 14), [r.b for r in results])
-                self.assertEqual(range(4, 14), [r.c for r in results])
+                assert [99] * 10 == [r.a for r in results]
+                assert list(range(4, 14)) == [r.b for r in results]
+                assert list(range(4, 14)) == [r.c for r in results]
                 if "s1" in selector:
-                    self.assertEqual([17] * 10, [r.s1 for r in results])
+                    assert [17] * 10 == [r.s1 for r in results]
                 if "s2" in selector:
-                    self.assertEqual([42] * 10, [r.s2 for r in results])
+                    assert [42] * 10 == [r.s2 for r in results]
 
         # reversed slice on clustering column with start and finish
         for page_size in PAGE_SIZES:
-            debug("Current page size is {}".format(page_size))
+            logger.debug("Current page size is {}".format(page_size))
             session.default_fetch_size = page_size
             for selector in selectors:
                 results = list(session.execute("SELECT %s FROM test WHERE a = 99 AND b > 3 AND b < 14 ORDER BY b DESC" % selector))
                 assert_length_equal(results, 10)
-                self.assertEqual([99] * 10, [r.a for r in results])
-                self.assertEqual(list(reversed(range(4, 14))), [r.b for r in results])
-                self.assertEqual(list(reversed(range(4, 14))), [r.c for r in results])
+                assert [99] * 10 == [r.a for r in results]
+                assert list(reversed(list(range(4, 14)))) == [r.b for r in results]
+                assert list(reversed(list(range(4, 14)))) == [r.c for r in results]
                 if "s1" in selector:
-                    self.assertEqual([17] * 10, [r.s1 for r in results])
+                    assert [17] * 10 == [r.s1 for r in results]
                 if "s2" in selector:
-                    self.assertEqual([42] * 10, [r.s2 for r in results])
+                    assert [42] * 10 == [r.s2 for r in results]
 
     @since('2.0.6')
     def test_paging_using_secondary_indexes_with_static_cols(self):
@@ -1661,7 +1661,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         session.execute("CREATE INDEX ON paging_test(mybool)")
 
         def random_txt(text):
-            return unicode(uuid.uuid4())
+            return str(uuid.uuid4())
 
         def bool_from_str_int(text):
             return bool(int(text))
@@ -1686,17 +1686,16 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         pf = PageFetcher(future).request_all()
 
         # the query only searched for True rows, so let's pare down the expectations for comparison
-        expected_data = filter(lambda x: x.get('mybool') is True, all_data)
+        expected_data = [x for x in all_data if x.get('mybool') is True]
 
-        self.assertEqual(pf.pagecount(), 2)
-        self.assertEqual(pf.num_results_all(), [400, 200])
-        self.assertEqualIgnoreOrder(expected_data, pf.all_data())
+        assert pf.pagecount() == 2
+        assert pf.num_results_all() == [400, 200]
+        assert_lists_equal_ignoring_order(expected_data, pf.all_data(), sort_key="sometext")
 
-    def static_columns_with_empty_non_static_columns_paging_test(self):
+    def test_static_columns_with_empty_non_static_columns_paging(self):
         """
         @jira_ticket CASSANDRA-10381.
         """
-
         session = self.prepare(row_factory=named_tuple_factory)
         create_ks(session, 'test_paging_static_cols', 2)
         session.execute("CREATE TABLE test (a int, b int, c int, s int static, PRIMARY KEY (a, b))")
@@ -1706,52 +1705,50 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
         session.default_fetch_size = 2
         results = list(session.execute("SELECT * FROM test"))
-        self.assertEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9], sorted([r.s for r in results]))
+        assert [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] == sorted([r.s for r in results])
 
         results = list(session.execute("SELECT * FROM test WHERE a IN (0, 1, 2, 3, 4)"))
-        self.assertEqual([0, 1, 2, 3, 4], sorted([r.s for r in results]))
+        assert [0, 1, 2, 3, 4] == sorted([r.s for r in results])
 
     def test_select_in_clause_with_duplicate_keys(self):
         """
         @jira_ticket CASSANDRA-12420
         avoid duplicated result when key is duplicated in IN clause
         """
-
         session = self.prepare(row_factory=named_tuple_factory)
         create_ks(session, 'test_paging_static_cols', 2)
         session.execute("CREATE TABLE test (a int, b int, c int, v int, PRIMARY KEY ((a, b),c))")
 
-        for i in xrange(3):
-            for j in xrange(3):
-                for k in xrange(3):
+        for i in range(3):
+            for j in range(3):
+                for k in range(3):
                     session.execute("INSERT INTO test (a, b, c, v) VALUES ({}, {}, {}, {})".format(i, j, k, k))
 
         # based on partition key's token order instead of provided order and no duplication
-        for i in xrange(6):
+        for i in range(6):
             session.default_fetch_size = i
             results = rows_to_list(session.execute("SELECT * FROM test WHERE a = 1 AND b in (2, 2, 1, 1, 1)"))
-            self.assertEqual(results, [[1, 1, 0, 0],
+            assert results == [[1, 1, 0, 0],
                                        [1, 1, 1, 1],
                                        [1, 1, 2, 2],
                                        [1, 2, 0, 0],
                                        [1, 2, 1, 1],
-                                       [1, 2, 2, 2]])
+                                       [1, 2, 2, 2]]
 
     @since('3.0.0')
     def test_paging_with_filtering(self):
         """
         @jira_ticket CASSANDRA-6377
         """
-
         session = self.prepare(row_factory=tuple_factory)
         create_ks(session, 'test_paging_with_filtering', 2)
         session.execute("CREATE TABLE test (a int, b int, s int static, c int, d int, primary key (a, b))")
 
-        for i in xrange(5):
+        for i in range(5):
             session.execute("INSERT INTO test (a, s) VALUES ({}, {})".format(i, i))
             # Lets a row with only static values
             if i != 2:
-                for j in xrange(4):
+                for j in range(4):
                     session.execute("INSERT INTO test (a, b, c, d) VALUES ({}, {}, {}, {})".format(i, j, j, i + j))
 
         for page_size in (2, 3, 4, 5, 7, 10):
@@ -1866,8 +1863,8 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
             create_ks(session, 'test_flt_counter_columns', 2)
             session.execute("CREATE TABLE test (a int, b int, c int, cnt counter, PRIMARY KEY (a, b, c))")
 
-        for i in xrange(5):
-            for j in xrange(10):
+        for i in range(5):
+            for j in range(10):
                 session.execute("UPDATE test SET cnt = cnt + {} WHERE a={} AND b={} AND c={}".format(j + 2, i, j, j + 1))
 
         self.longMessage = True
@@ -1877,28 +1874,28 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
             # single partition
             res = rows_to_list(session.execute("SELECT * FROM test WHERE a = 4 AND b > 3 AND c > 3 AND cnt > 8 ALLOW FILTERING"))
-            self.assertEqual(res, [[4, 7, 8, 9],
-                                   [4, 8, 9, 10],
-                                   [4, 9, 10, 11]],
-                             page_size_error_msg)
+            assert res == [[4, 7, 8, 9],
+                           [4, 8, 9, 10],
+                           [4, 9, 10, 11]], \
+                page_size_error_msg
 
             res = rows_to_list(session.execute("SELECT * FROM test WHERE a = 4 AND b > 3 AND c > 3 AND cnt >= 8 ALLOW FILTERING"))
-            self.assertEqual(res, [[4, 6, 7, 8],
-                                   [4, 7, 8, 9],
-                                   [4, 8, 9, 10],
-                                   [4, 9, 10, 11]],
-                             page_size_error_msg)
+            assert res == [[4, 6, 7, 8],
+                           [4, 7, 8, 9],
+                           [4, 8, 9, 10],
+                           [4, 9, 10, 11]], \
+                             page_size_error_msg
 
             res = rows_to_list(session.execute("SELECT * FROM test WHERE a = 4 AND b > 3 AND c > 3 AND cnt >= 8 AND cnt < 10 ALLOW FILTERING"))
-            self.assertEqual(res, [[4, 6, 7, 8],
-                                   [4, 7, 8, 9]],
-                             page_size_error_msg)
+            assert res == [[4, 6, 7, 8],
+                           [4, 7, 8, 9]], \
+                             page_size_error_msg
 
             res = rows_to_list(session.execute("SELECT * FROM test WHERE a = 4 AND b > 3 AND c > 3 AND cnt >= 8 AND cnt <= 10 ALLOW FILTERING"))
-            self.assertEqual(res, [[4, 6, 7, 8],
-                                   [4, 7, 8, 9],
-                                   [4, 8, 9, 10]],
-                             page_size_error_msg)
+            assert res == [[4, 6, 7, 8],
+                           [4, 7, 8, 9],
+                           [4, 8, 9, 10]], \
+                             page_size_error_msg
 
             res = rows_to_list(session.execute("SELECT * FROM test WHERE cnt = 5 ALLOW FILTERING"))
             self.assertEqualIgnoreOrder(res, [[0, 3, 4, 5],
@@ -1918,7 +1915,6 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         test paging, when filtering on counter columns
         @jira_ticket CASSANDRA-11629
         """
-
         session = self.prepare(row_factory=tuple_factory)
         self._test_paging_with_filtering_on_counter_columns(session, False)
 
@@ -1928,7 +1924,6 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         test paging, when filtering on counter columns with compact storage
         @jira_ticket CASSANDRA-11629
         """
-
         session = self.prepare(row_factory=tuple_factory)
 
         self._test_paging_with_filtering_on_counter_columns(session, True)
@@ -1941,8 +1936,8 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
             create_ks(session, 'test_flt_clustering_columns', 2)
             session.execute("CREATE TABLE test (a int, b int, c int, d int, PRIMARY KEY (a, b, c))")
 
-        for i in xrange(5):
-            for j in xrange(10):
+        for i in range(5):
+            for j in range(10):
                 session.execute("INSERT INTO test (a,b,c,d) VALUES ({},{},{},{})".format(i, j, j + 1, j + 2))
 
         for page_size in (2, 3, 4, 5, 7, 10, 20):
@@ -2010,7 +2005,6 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         test paging, when filtering on clustering columns
         @jira_ticket CASSANDRA-11310
         """
-
         session = self.prepare(row_factory=tuple_factory)
         self._test_paging_with_filtering_on_clustering_columns(session, False)
 
@@ -2020,7 +2014,6 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         test paging, when filtering on clustering columns with compact storage
         @jira_ticket CASSANDRA-11310
         """
-
         session = self.prepare(row_factory=tuple_factory)
         self._test_paging_with_filtering_on_clustering_columns(session, True)
 
@@ -2030,14 +2023,13 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         test paging, when filtering on clustering columns (frozen collections) with CONTAINS statement
         @jira_ticket CASSANDRA-11310
         """
-
         session = self.prepare(row_factory=tuple_factory)
         create_ks(session, 'test_paging_flt_clustering_clm_contains', 2)
         session.execute("CREATE TABLE test_list (a int, b int, c frozen<list<int>>, d int, PRIMARY KEY (a, b, c))")
         session.execute("CREATE TABLE test_map (a int, b int, c frozen<map<int, int>>, d int, PRIMARY KEY (a, b, c))")
 
-        for i in xrange(5):
-            for j in xrange(10):
+        for i in range(5):
+            for j in range(10):
                 session.execute("INSERT INTO test_list (a,b,c,d) VALUES ({},{},[{}, {}],{})".format(i, j, j + 1, j + 2, j + 3, j + 4))
                 session.execute("INSERT INTO test_map (a,b,c,d) VALUES ({},{},{{ {}: {} }},{})".format(i, j, j + 1, j + 2, j + 3, j + 4))
 
@@ -2110,13 +2102,12 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         test paging, when filtering on static columns
         @jira_ticket CASSANDRA-11310
         """
-
         session = self.prepare(row_factory=tuple_factory)
         create_ks(session, 'test_paging_with_filtering_on_static_columns', 2)
         session.execute("CREATE TABLE test (a int, b int, s int static, d int, PRIMARY KEY (a, b))")
 
-        for i in xrange(5):
-            for j in xrange(10):
+        for i in range(5):
+            for j in range(10):
                 session.execute("INSERT INTO test (a,b,s,d) VALUES ({},{},{},{})".format(i, j, i + 1, j + 1))
 
         for page_size in (2, 3, 4, 5, 7, 10, 20):
@@ -2150,16 +2141,15 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         test allow filtering on partition key
         @jira_ticket CASSANDRA-11031
         """
-
         session = self.prepare(row_factory=tuple_factory)
         create_ks(session, 'test_paging_with_filtering_on_pk', 2)
         session.execute("CREATE TABLE test (a int, b int, s int static, c int, d int, primary key (a, b))")
 
-        for i in xrange(5):
+        for i in range(5):
             session.execute("INSERT INTO test (a, s) VALUES ({}, {})".format(i, i))
             # Lets a row with only static values
             if i != 2:
-                for j in xrange(4):
+                for j in range(4):
                     session.execute("INSERT INTO test (a, b, c, d) VALUES ({}, {}, {}, {})".format(i, j, j, i + j))
 
         for page_size in (2, 3, 4, 5, 7, 10):
@@ -2191,7 +2181,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
                                               [1, 2, 1, 2, 3]])
 
             res = rows_to_list(session.execute("SELECT * FROM test WHERE a <= 1 AND c = 2 AND s >= 1 LIMIT 2 ALLOW FILTERING"))
-            self.assertEqual(res, [[1, 2, 1, 2, 3]])
+            assert res == [[1, 2, 1, 2, 3]]
 
             # Range query with DISTINCT
             res = rows_to_list(session.execute("SELECT DISTINCT a, s FROM test WHERE a >= 2 AND s >= 1 ALLOW FILTERING"))
@@ -2201,16 +2191,16 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
             # Single partition queries
             res = rows_to_list(session.execute("SELECT * FROM test WHERE a <= 0 AND c >= 1 ALLOW FILTERING"))
-            self.assertEqual(res, [[0, 1, 0, 1, 1],
-                                   [0, 2, 0, 2, 2],
-                                   [0, 3, 0, 3, 3]])
+            assert res == [[0, 1, 0, 1, 1],
+                           [0, 2, 0, 2, 2],
+                           [0, 3, 0, 3, 3]]
 
             res = rows_to_list(session.execute("SELECT * FROM test WHERE a < 1 AND c >= 1 AND c <=2 ALLOW FILTERING"))
-            self.assertEqual(res, [[0, 1, 0, 1, 1],
-                                   [0, 2, 0, 2, 2]])
+            assert res == [[0, 1, 0, 1, 1],
+                           [0, 2, 0, 2, 2]]
 
             res = rows_to_list(session.execute("SELECT * FROM test WHERE a >= 0 AND c >= 1 AND d = 1 ALLOW FILTERING"))
-            self.assertEqual(res, [[0, 1, 0, 1, 1]])
+            assert res == [[0, 1, 0, 1, 1]]
 
             res = rows_to_list(session.execute("SELECT * FROM test WHERE a >= 3 AND c >= 1 AND s > 1 ALLOW FILTERING"))
             self.assertEqualIgnoreOrder(res, [[3, 1, 3, 1, 4],
@@ -2228,17 +2218,17 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
             # Single partition queries with LIMIT
             res = rows_to_list(session.execute("SELECT * FROM test WHERE a < 1 AND c >= 1 LIMIT 2 ALLOW FILTERING"))
-            self.assertEqual(res, [[0, 1, 0, 1, 1],
-                                   [0, 2, 0, 2, 2]])
+            assert res == [[0, 1, 0, 1, 1],
+                            [0, 2, 0, 2, 2]]
 
             res = rows_to_list(session.execute("SELECT * FROM test WHERE a >= 3 AND c >= 1 AND s > 1 LIMIT 2 ALLOW FILTERING"))
-            self.assertEqual(res, [[4, 1, 4, 1, 5],
-                                   [4, 2, 4, 2, 6]])
+            assert res == [[4, 1, 4, 1, 5],
+                            [4, 2, 4, 2, 6]]
 
             #  Single partition query with DISTINCT
             res = rows_to_list(session.execute("SELECT DISTINCT a, s FROM test WHERE a > 2 AND s >= 1 ALLOW FILTERING"))
-            self.assertEqual(res, [[4, 4],
-                                   [3, 3]])
+            assert res == [[4, 4],
+                           [3, 3]]
 
             # Single partition query with ORDER BY
             assert_invalid(session, "SELECT * FROM test WHERE a <= 0 AND c >= 1 ORDER BY b DESC ALLOW FILTERING", expected=InvalidRequest)
@@ -2252,15 +2242,14 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         test allow filtering on partition key
         @jira_ticket CASSANDRA-11031
         """
-
         session = self.prepare(row_factory=tuple_factory)
         create_ks(session, 'test_paging_with_filtering_on_pk_with_limit', 2)
         session.execute("CREATE TABLE test (a int, b int, c int, s int static, d int, primary key ((a, b), c))")
 
-        for i in xrange(5):
+        for i in range(5):
             session.execute("INSERT INTO test (a, b, s) VALUES ({}, {}, {})".format(i, 1, i))
             session.execute("INSERT INTO test (a, b, s) VALUES ({}, {}, {})".format(i, 2, i + 1))
-            for j in xrange(10):
+            for j in range(10):
                 session.execute("INSERT INTO test (a, b, c, d) VALUES ({}, {}, {}, {})".format(i, 1, j, i + j))
                 session.execute("INSERT INTO test (a, b, c, d) VALUES ({}, {}, {}, {})".format(i, 2, j, i + j))
 
@@ -2282,8 +2271,8 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
             create_ks(session, 'test_flt_counter_columns', 2)
             session.execute("CREATE TABLE test (a int, b int, c int, cnt counter, PRIMARY KEY (a, b, c))")
 
-        for i in xrange(5):
-            for j in xrange(10):
+        for i in range(5):
+            for j in range(10):
                 session.execute("UPDATE test SET cnt = cnt + {} WHERE a={} AND b={} AND c={}".format(j + 2, i, j, j + 1))
 
         for page_size in (2, 3, 4, 5, 7, 10, 20):
@@ -2291,24 +2280,24 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
             # single partition
             res = rows_to_list(session.execute("SELECT * FROM test WHERE a > 3 AND b > 3 AND c > 3 AND cnt > 8 ALLOW FILTERING"))
-            self.assertEqual(res, [[4, 7, 8, 9],
+            assert res == [[4, 7, 8, 9],
                                    [4, 8, 9, 10],
-                                   [4, 9, 10, 11]])
+                                   [4, 9, 10, 11]]
 
             res = rows_to_list(session.execute("SELECT * FROM test WHERE a >= 4 AND b > 3 AND c > 3 AND cnt >= 8 ALLOW FILTERING"))
-            self.assertEqual(res, [[4, 6, 7, 8],
+            assert res == [[4, 6, 7, 8],
                                    [4, 7, 8, 9],
                                    [4, 8, 9, 10],
-                                   [4, 9, 10, 11]])
+                                   [4, 9, 10, 11]]
 
             res = rows_to_list(session.execute("SELECT * FROM test WHERE a < 1 AND b > 3 AND c > 3 AND cnt >= 8 AND cnt < 10 ALLOW FILTERING"))
-            self.assertEqual(res, [[0, 6, 7, 8],
-                                   [0, 7, 8, 9]])
+            assert res == [[0, 6, 7, 8],
+                                   [0, 7, 8, 9]]
 
             res = rows_to_list(session.execute("SELECT * FROM test WHERE a > 3 AND b > 3 AND c > 3 AND cnt >= 8 AND cnt <= 10 ALLOW FILTERING"))
-            self.assertEqual(res, [[4, 6, 7, 8],
+            assert res == [[4, 6, 7, 8],
                                    [4, 7, 8, 9],
-                                   [4, 8, 9, 10]])
+                                   [4, 8, 9, 10]]
 
             res = rows_to_list(session.execute("SELECT * FROM test WHERE a > 1 AND cnt = 5 ALLOW FILTERING"))
             self.assertEqualIgnoreOrder(res, [[2, 3, 4, 5],
@@ -2321,7 +2310,6 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         test paging, when filtering on partition key on counter columns
         @jira_ticket CASSANDRA-11031
         """
-
         session = self.prepare(row_factory=tuple_factory)
 
         self._test_paging_with_filtering_on_partition_key_on_counter_columns(session, False)
@@ -2332,7 +2320,6 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         test paging, when filtering on partition key on counter columns with compact storage
         @jira_ticket CASSANDRA-11031
         """
-
         session = self.prepare(row_factory=tuple_factory)
 
         self._test_paging_with_filtering_on_partition_key_on_counter_columns(session, True)
@@ -2345,51 +2332,51 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
             create_ks(session, 'test_flt_pk_clustering_columns', 2)
             session.execute("CREATE TABLE test (a int, b int, c int, d int, PRIMARY KEY ((a, b), c))")
 
-        for i in xrange(5):
-            for j in xrange(10):
+        for i in range(5):
+            for j in range(10):
                 session.execute("INSERT INTO test (a,b,c,d) VALUES ({},{},{},{})".format(i, j, j + 1, j + 2))
 
         for page_size in (2, 3, 4, 5, 7, 10, 20):
             session.default_fetch_size = page_size
 
             res = rows_to_list(session.execute("SELECT * FROM test WHERE a = 4 AND b > 3 AND c > 3 ALLOW FILTERING"))
-            self.assertEqual(res, [[4, 8, 9, 10],
+            assert res == [[4, 8, 9, 10],
                                    [4, 6, 7, 8],
                                    [4, 7, 8, 9],
                                    [4, 5, 6, 7],
                                    [4, 9, 10, 11],
-                                   [4, 4, 5, 6]])
+                                   [4, 4, 5, 6]]
 
             res = rows_to_list(session.execute("SELECT * FROM test WHERE a = 4 AND b > 3 AND c > 3 LIMIT 4 ALLOW FILTERING"))
-            self.assertEqual(res, [[4, 8, 9, 10],
+            assert res == [[4, 8, 9, 10],
                                    [4, 6, 7, 8],
                                    [4, 7, 8, 9],
-                                   [4, 5, 6, 7]])
+                                   [4, 5, 6, 7]]
 
             res = rows_to_list(session.execute("SELECT * FROM test WHERE a = 4 AND b > 3 AND c > 3 ALLOW FILTERING"))
-            self.assertEqual(res, [[4, 8, 9, 10],
+            assert res == [[4, 8, 9, 10],
                                    [4, 6, 7, 8],
                                    [4, 7, 8, 9],
                                    [4, 5, 6, 7],
                                    [4, 9, 10, 11],
-                                   [4, 4, 5, 6]])
+                                   [4, 4, 5, 6]]
 
             res = rows_to_list(session.execute("SELECT * FROM test WHERE a > 3 AND b > 3 AND c > 3 ALLOW FILTERING"))
-            self.assertEqual(res, [[4, 8, 9, 10],
+            assert res == [[4, 8, 9, 10],
                                    [4, 6, 7, 8],
                                    [4, 7, 8, 9],
                                    [4, 5, 6, 7],
                                    [4, 9, 10, 11],
-                                   [4, 4, 5, 6]])
+                                   [4, 4, 5, 6]]
 
             res = rows_to_list(session.execute("SELECT * FROM test WHERE a < 1 AND b > 3 AND c > 3 LIMIT 4 ALLOW FILTERING"))
-            self.assertEqual(res, [[0, 6, 7, 8],
+            assert res == [[0, 6, 7, 8],
                                    [0, 5, 6, 7],
                                    [0, 8, 9, 10],
-                                   [0, 9, 10, 11]])
+                                   [0, 9, 10, 11]]
 
             res = rows_to_list(session.execute("SELECT * FROM test WHERE a < 1 AND b < 3 AND c >= 3 ALLOW FILTERING"))
-            self.assertEqual(res, [[0, 2, 3, 4]])
+            assert res == [[0, 2, 3, 4]]
 
             res = rows_to_list(session.execute("SELECT * FROM test WHERE a > 0 AND b > 7 AND c > 9 ALLOW FILTERING"))
             self.assertEqualIgnoreOrder(res, [[4, 9, 10, 11],
@@ -2426,7 +2413,6 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         test paging, when filtering on partition key clustering columns
         @jira_ticket CASSANDRA-11031
         """
-
         session = self.prepare(row_factory=tuple_factory)
         self._test_paging_with_filtering_on_partition_key_on_clustering_columns(session, False)
 
@@ -2436,7 +2422,6 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         test paging, when filtering on partition key clustering columns with compact storage
         @jira_ticket CASSANDRA-11031
         """
-
         session = self.prepare(row_factory=tuple_factory)
         self._test_paging_with_filtering_on_partition_key_on_clustering_columns(session, True)
 
@@ -2446,14 +2431,13 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         test paging, when filtering on partition key and clustering columns (frozen collections) with CONTAINS statement
         @jira_ticket CASSANDRA-11031
         """
-
         session = self.prepare(row_factory=tuple_factory)
         create_ks(session, 'test_paging_flt_pk_clustering_clm_contains', 2)
         session.execute("CREATE TABLE test_list (a int, b int, c frozen<list<int>>, d int, PRIMARY KEY (a, b, c))")
         session.execute("CREATE TABLE test_map (a int, b int, c frozen<map<int, int>>, d int, PRIMARY KEY (a, b, c))")
 
-        for i in xrange(5):
-            for j in xrange(10):
+        for i in range(5):
+            for j in range(10):
                 session.execute("INSERT INTO test_list (a,b,c,d) VALUES ({},{},[{}, {}],{})".format(i, j, j + 1, j + 2, j + 3, j + 4))
                 session.execute("INSERT INTO test_map (a,b,c,d) VALUES ({},{},{{ {}: {} }},{})".format(i, j, j + 1, j + 2, j + 3, j + 4))
 
@@ -2527,13 +2511,12 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         test paging, when filtering on partition key, on static columns
         @jira_ticket CASSANDRA-11031
         """
-
         session = self.prepare(row_factory=tuple_factory)
         create_ks(session, 'test_paging_filtering_on_pk_static_columns', 2)
         session.execute("CREATE TABLE test (a int, b int, s int static, d int, PRIMARY KEY (a, b))")
 
-        for i in xrange(5):
-            for j in xrange(10):
+        for i in range(5):
+            for j in range(10):
                 session.execute("INSERT INTO test (a,b,s,d) VALUES ({},{},{},{})".format(i, j, i + 1, j + 1))
 
         for page_size in (2, 3, 4, 5, 7, 10, 20):
@@ -2547,11 +2530,11 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
             self.assertEqualIgnoreOrder(res, [[4, 6, 5, 7]])
 
             res = rows_to_list(session.execute("SELECT * FROM test WHERE s > 1 AND a > 3 AND b > 4 ALLOW FILTERING"))
-            self.assertEqual(res, [[4, 5, 5, 6],
+            assert res == [[4, 5, 5, 6],
                                    [4, 6, 5, 7],
                                    [4, 7, 5, 8],
                                    [4, 8, 5, 9],
-                                   [4, 9, 5, 10]])
+                                   [4, 9, 5, 10]]
 
             assert_invalid(session, "SELECT * FROM test WHERE s > 1 AND a < 2 AND b > 4 ORDER BY b DESC ALLOW FILTERING", expected=InvalidRequest)
 
@@ -2561,12 +2544,11 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         test paging, on  COMPACT tables without clustering columns, when the first column has a tombstone
         @jira_ticket CASSANDRA-11467
         """
-
         session = self.prepare(row_factory=tuple_factory)
         create_ks(session, 'test_paging_on_compact_table_with_tombstone', 2)
         session.execute("CREATE TABLE test (a int primary key, b int, c int) WITH COMPACT STORAGE")
 
-        for i in xrange(5):
+        for i in range(5):
             session.execute("INSERT INTO test (a, b, c) VALUES ({}, {}, {})".format(i, 1, 1))
             session.execute("DELETE b FROM test WHERE a = {}".format(i))
 
@@ -2584,7 +2566,6 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         test paging for tables without clustering columns
         @jira_ticket CASSANDRA-11208
         """
-
         session = self.prepare(row_factory=tuple_factory)
         create_ks(session, 'test_paging_with_no_clustering_columns', 2)
         session.execute("CREATE TABLE test (a int primary key, b int)")
@@ -2596,14 +2577,13 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         test paging for tables without clustering columns
         @jira_ticket CASSANDRA-11208
         """
-
         session = self.prepare(row_factory=tuple_factory)
         create_ks(session, 'test_paging_with_no_clustering_columns', 2)
         session.execute("CREATE TABLE test_compact (a int primary key, b int) WITH COMPACT STORAGE")
         self._test_paging_with_no_clustering_columns('test_compact', session)
 
     def _test_paging_with_no_clustering_columns(self, table, session):
-        for i in xrange(5):
+        for i in range(5):
             session.execute("INSERT INTO {} (a, b) VALUES ({}, {})".format(table, i, i))
 
         for page_size in (2, 3, 4, 5, 7, 10):
@@ -2688,9 +2668,9 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
             for row in res:
                 # since partitions are coming unordered, we don't know which are trimmed by the limit
-                self.assertTrue(row[0] in set(range(5)))
-                self.assertTrue(row[1] in set(range(2)))
-                self.assertTrue(row[1] in set(range(2)))
+                assert row[0] in set(range(5))
+                assert row[1] in set(range(2))
+                assert row[1] in set(range(2))
 
             # even/odd number of results
             res = rows_to_list(session.execute("SELECT * FROM test PER PARTITION LIMIT 2 LIMIT 5"))
@@ -2743,7 +2723,6 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         test paging for range name queries
         @jira_ticket CASSANDRA-11669
         """
-
         session = self.prepare(row_factory=tuple_factory)
         create_ks(session, 'test_paging_for_range_name_queries', 2)
         session.execute("CREATE TABLE test (a int, b int, c int, d int, PRIMARY KEY(a, b, c))")
@@ -2756,7 +2735,6 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         test paging for range name queries with compact storage
         @jira_ticket CASSANDRA-11669
         """
-
         session = self.prepare(row_factory=tuple_factory)
         create_ks(session, 'test_paging_for_range_name_queries', 2)
         session.execute("CREATE TABLE test_compact (a int, b int, c int, d int, PRIMARY KEY(a, b, c)) WITH COMPACT STORAGE")
@@ -2764,9 +2742,9 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         self._test_paging_for_range_name_queries('test_compact', session)
 
     def _test_paging_for_range_name_queries(self, table, session):
-        for i in xrange(4):
-            for j in xrange(4):
-                for k in xrange(4):
+        for i in range(4):
+            for j in range(4):
+                for k in range(4):
                     session.execute("INSERT INTO {} (a, b, c, d) VALUES ({}, {}, {}, {})".format(table, i, j, k, i + j))
 
         for page_size in (2, 3, 4, 5, 7, 10):
@@ -2804,49 +2782,49 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
                                                                                                                           [3, 2, 1, 5],
                                                                                                                           [3, 2, 2, 5]])
 
+    @flaky
     @since('2.1')
     def test_paging_with_empty_row_and_empty_static_columns(self):
         """
         test paging when the rows and the static columns are empty
         @jira_ticket CASSANDRA-13017
         """
-
         session = self.prepare(row_factory=tuple_factory)
         create_ks(session, 'test_paging_with_empty_rows_and_static_columns', 2)
         session.execute("CREATE TABLE test (pk int, c int, v int, s int static, primary key(pk, c))")
 
-        for i in xrange(5):
-            for j in xrange(5):
+        for i in range(5):
+            for j in range(5):
                 session.execute("INSERT INTO test (pk, c) VALUES ({}, {})".format(i, j))
 
         for page_size in (2, 3, 4, 5, 7, 10):
             session.default_fetch_size = page_size
 
             res = rows_to_list(session.execute("SELECT DISTINCT pk FROM test"))
-            self.assertEqual(res, [[1],
-                                   [0],
-                                   [2],
-                                   [4],
-                                   [3]])
+            assert res == [[1],
+                           [0],
+                           [2],
+                           [4],
+                           [3]]
 
             res = rows_to_list(session.execute("SELECT DISTINCT pk FROM test LIMIT 4"))
-            self.assertEqual(res, [[1],
-                                   [0],
-                                   [2],
-                                   [4]])
+            assert res == [[1],
+                           [0],
+                           [2],
+                           [4]]
 
             res = rows_to_list(session.execute("SELECT DISTINCT pk, s FROM test"))
-            self.assertEqual(res, [[1, None],
-                                   [0, None],
-                                   [2, None],
-                                   [4, None],
-                                   [3, None]])
+            assert res == [[1, None],
+                           [0, None],
+                           [2, None],
+                           [4, None],
+                           [3, None]]
 
             res = rows_to_list(session.execute("SELECT DISTINCT pk, s FROM test LIMIT 4"))
-            self.assertEqual(res, [[1, None],
-                                   [0, None],
-                                   [2, None],
-                                   [4, None]])
+            assert res == [[1, None],
+                           [0, None],
+                           [2, None],
+                           [4, None]]
 
 
 @since('2.0')
@@ -2861,7 +2839,7 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
         session.execute("CREATE TABLE paging_test ( id int, mytext text, PRIMARY KEY (id, mytext) )")
 
         def random_txt(text):
-            return unicode(uuid.uuid4())
+            return str(uuid.uuid4())
 
         data = """
               | id | mytext   |
@@ -2884,8 +2862,8 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
         session.execute(SimpleStatement("insert into paging_test (id, mytext) values (1, 'foo')", consistency_level=CL.ALL))
 
         pf.request_all()
-        self.assertEqual(pf.pagecount(), 2)
-        self.assertEqual(pf.num_results_all(), [501, 499])
+        assert pf.pagecount() == 2
+        assert pf.num_results_all(), [501, 499]
 
         self.assertEqualIgnoreOrder(pf.all_data(), expected_data)
 
@@ -2895,7 +2873,7 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
         session.execute("CREATE TABLE paging_test ( id int, mytext text, PRIMARY KEY (id, mytext) )")
 
         def random_txt(text):
-            return unicode(uuid.uuid4())
+            return str(uuid.uuid4())
 
         data = """
               | id | mytext   |
@@ -2917,11 +2895,11 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
         session.execute(SimpleStatement("insert into paging_test (id, mytext) values (2, 'foo')", consistency_level=CL.ALL))
 
         pf.request_all()
-        self.assertEqual(pf.pagecount(), 2)
-        self.assertEqual(pf.num_results_all(), [500, 500])
+        assert pf.pagecount() == 2
+        assert pf.num_results_all(), [500 == 500]
 
         # add the new row to the expected data and then do a compare
-        expected_data.append({u'id': 2, u'mytext': u'foo'})
+        expected_data.append({'id': 2, 'mytext': 'foo'})
         self.assertEqualIgnoreOrder(pf.all_data(), expected_data)
 
     def test_row_TTL_expiry_during_paging(self):
@@ -2930,7 +2908,7 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
         session.execute("CREATE TABLE paging_test ( id int, mytext text, PRIMARY KEY (id, mytext) )")
 
         def random_txt(text):
-            return unicode(uuid.uuid4())
+            return str(uuid.uuid4())
 
         # create rows with TTL (some of which we'll try to get after expiry)
         create_rows(
@@ -2965,8 +2943,8 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
         time.sleep(15)
 
         pf.request_all()
-        self.assertEqual(pf.pagecount(), 3)
-        self.assertEqual(pf.num_results_all(), [300, 300, 200])
+        assert pf.pagecount() == 3
+        assert pf.num_results_all() == [300, 300, 200]
 
     def test_cell_TTL_expiry_during_paging(self):
         session = self.prepare()
@@ -2981,7 +2959,7 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
             """)
 
         def random_txt(text):
-            return unicode(uuid.uuid4())
+            return str(uuid.uuid4())
 
         data = create_rows(
             """
@@ -3002,7 +2980,7 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
 
         # no need to request page here, because the first page is automatically retrieved
         page1 = pf.page_data(1)
-        self.assertEqualIgnoreOrder(page1, data[:500])
+        assert_lists_equal_ignoring_order(page1, data[:500], sort_key="mytext")
 
         # set some TTLs for data on page 3
         for row in data[1000:1500]:
@@ -3018,20 +2996,20 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
         # check page two
         pf.request_one()
         page2 = pf.page_data(2)
-        self.assertEqualIgnoreOrder(page2, data[500:1000])
+        assert_lists_equal_ignoring_order(page2, data[500:1000], sort_key="mytext")
 
         page3expected = []
         for row in data[1000:1500]:
             _id, mytext = row['id'], row['mytext']
             page3expected.append(
-                {u'id': _id, u'mytext': mytext, u'somevalue': None, u'anothervalue': None}
+                {'id': _id, 'mytext': mytext, 'somevalue': None, 'anothervalue': None}
             )
 
         time.sleep(15)
 
         pf.request_one()
         page3 = pf.page_data(3)
-        self.assertEqualIgnoreOrder(page3, page3expected)
+        assert_lists_equal_ignoring_order(page3, page3expected, sort_key="mytext")
 
     def test_node_unavailabe_during_paging(self):
         cluster = self.cluster
@@ -3062,7 +3040,7 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
 
         # stop a node and make sure we get an error trying to page the rest
         node1.stop()
-        with self.assertRaisesRegexp(RuntimeError, 'Requested pages were not delivered before timeout'):
+        with pytest.raises(RuntimeError, match='Requested pages were not delivered before timeout'):
             pf.request_all()
 
         # TODO: can we resume the node and expect to get more results from the result set or is it done?
@@ -3083,7 +3061,7 @@ class TestPagingQueryIsolation(BasePagingTester, PageAssertionMixin):
         session.execute("CREATE TABLE paging_test ( id int, mytext text, PRIMARY KEY (id, mytext) )")
 
         def random_txt(text):
-            return unicode(uuid.uuid4())
+            return str(uuid.uuid4())
 
         data = """
                | id | mytext   |
@@ -3131,17 +3109,17 @@ class TestPagingQueryIsolation(BasePagingTester, PageAssertionMixin):
         for pf in page_fetchers:
             pf.request_all()
 
-        self.assertEqual(page_fetchers[0].pagecount(), 10)
-        self.assertEqual(page_fetchers[1].pagecount(), 9)
-        self.assertEqual(page_fetchers[2].pagecount(), 8)
-        self.assertEqual(page_fetchers[3].pagecount(), 7)
-        self.assertEqual(page_fetchers[4].pagecount(), 6)
-        self.assertEqual(page_fetchers[5].pagecount(), 5)
-        self.assertEqual(page_fetchers[6].pagecount(), 5)
-        self.assertEqual(page_fetchers[7].pagecount(), 5)
-        self.assertEqual(page_fetchers[8].pagecount(), 4)
-        self.assertEqual(page_fetchers[9].pagecount(), 4)
-        self.assertEqual(page_fetchers[10].pagecount(), 34)
+        assert page_fetchers[0].pagecount() == 10
+        assert page_fetchers[1].pagecount() == 9
+        assert page_fetchers[2].pagecount() == 8
+        assert page_fetchers[3].pagecount() == 7
+        assert page_fetchers[4].pagecount() == 6
+        assert page_fetchers[5].pagecount() == 5
+        assert page_fetchers[6].pagecount() == 5
+        assert page_fetchers[7].pagecount() == 5
+        assert page_fetchers[8].pagecount() == 4
+        assert page_fetchers[9].pagecount() == 4
+        assert page_fetchers[10].pagecount() == 34
 
         self.assertEqualIgnoreOrder(flatten_into_set(page_fetchers[0].all_data()), flatten_into_set(expected_data[:5000]))
         self.assertEqualIgnoreOrder(flatten_into_set(page_fetchers[1].all_data()), flatten_into_set(expected_data[5000:10000]))
@@ -3170,7 +3148,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
                              "PRIMARY KEY (id, mytext) )")
 
         def random_txt(text):
-            return unicode(uuid.uuid4())
+            return str(uuid.uuid4())
 
         data = """
              | id | mytext   | col1 | col2 | col3 |
@@ -3212,12 +3190,12 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
 
         pf = self.get_page_fetcher()
         pf.request_all()
-        self.assertEqual(pf.pagecount(), pagecount)
-        self.assertEqual(pf.num_results_all(), num_page_results)
+        assert pf.pagecount() == pagecount
+        assert pf.num_results_all() == num_page_results
 
         for i in range(pf.pagecount()):
             page_data = pf.page_data(i + 1)
-            self.assertEquals(page_data, expected_pages_data[i])
+            assert page_data == expected_pages_data[i]
 
     def test_single_partition_deletions(self):
         """Test single partition deletions """
@@ -3316,11 +3294,12 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
         self.check_all_paging_results(expected_data, 7,
                                       [25, 25, 25, 25, 25, 25, 25])
 
+    @pytest.mark.skip(reason="Feature In Development")
     def test_multiple_row_deletions(self):
-        """Test multiple row deletions.
-           This test should be finished when CASSANDRA-6237 is done.
         """
-        self.skipTest("Feature In Development")
+        Test multiple row deletions.
+        This test should be finished when CASSANDRA-6237 is done.
+        """
         self.session = self.prepare()
         expected_data = self.setup_data()
 
@@ -3440,10 +3419,9 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
 
     def test_failure_threshold_deletions(self):
         """Test that paging throws a failure in case of tombstone threshold """
-
         supports_v5_protocol = self.cluster.version() >= LooseVersion('3.10')
 
-        self.allow_log_errors = True
+        self.fixture_dtest_setup.allow_log_errors = True
         self.cluster.set_configuration_options(
             values={'tombstone_failure_threshold': 500}
         )
@@ -3451,7 +3429,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
         self.setup_data()
 
         # Add more data
-        values = map(lambda i: uuid.uuid4(), range(3000))
+        values = [uuid.uuid4() for i in range(3000)]
         for value in values:
             self.session.execute(SimpleStatement(
                 "insert into paging_test (id, mytext, col1) values (1, '{}', null) ".format(
@@ -3463,11 +3441,11 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
         try:
             self.session.execute(SimpleStatement("select * from paging_test", fetch_size=1000, consistency_level=CL.ALL, retry_policy=FallthroughRetryPolicy()))
         except ReadTimeout as exc:
-            self.assertTrue(self.cluster.version() < LooseVersion('2.2'))
+            assert self.cluster.version() < LooseVersion('2.2')
         except ReadFailure as exc:
             if supports_v5_protocol:
-                self.assertIsNotNone(exc.error_code_map)
-                self.assertEqual(0x0001, exc.error_code_map.values()[0])
+                assert exc.error_code_map is not None
+                assert 0x0001 == list(exc.error_code_map.values())[0]
         except Exception:
             raise
         else:
@@ -3502,7 +3480,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
             self.session.default_fetch_size = 2
             result = self.session.execute("SELECT DISTINCT k, s FROM paging_test {}".format(whereClause))
             result = list(result)
-            self.assertEqual(4, len(result))
+            assert 4 == len(result)
 
             future = self.session.execute_async("SELECT DISTINCT k, s FROM paging_test {}".format(whereClause))
 
@@ -3514,4 +3492,4 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
 
             # finish paging
             fetcher.request_all()
-            self.assertEqual([2, 2], fetcher.num_results_all())
+            assert [2, 2] == fetcher.num_results_all()

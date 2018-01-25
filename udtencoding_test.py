@@ -1,12 +1,15 @@
 import time
+import logging
 
 from tools.assertions import assert_invalid
 from dtest import Tester, create_ks
 
+logger = logging.getLogger(__name__)
+
 
 class TestUDTEncoding(Tester):
 
-    def udt_test(self):
+    def test_udt(self):
         """ Test (somewhat indirectly) that user queries involving UDT's are properly encoded (due to driver not recognizing UDT syntax) """
         cluster = self.cluster
 

@@ -5,8 +5,6 @@ making those context managers function.
 import logging
 from contextlib import contextmanager
 
-from six import print_
-
 from tools.env import ALLOW_NOISY_LOGGING
 
 
@@ -22,7 +20,7 @@ def log_filter(log_id, expected_strings=None):
     logger.addFilter(log_filter)
     yield
     if log_filter.records_silenced > 0:
-        print_("Logs were filtered to remove messages deemed unimportant, total count: {}".format(log_filter.records_silenced))
+        print("Logs were filtered to remove messages deemed unimportant, total count: %d" % log_filter.records_silenced)
     logger.removeFilter(log_filter)
 
 

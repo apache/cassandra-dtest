@@ -2,7 +2,6 @@ import csv
 import random
 
 import cassandra
-from nose.tools import assert_items_equal
 
 
 class DummyColorMap(object):
@@ -25,7 +24,7 @@ def csv_rows(filename, delimiter=None):
 
 def assert_csvs_items_equal(filename1, filename2):
     with open(filename1, 'r') as x, open(filename2, 'r') as y:
-        assert_items_equal(list(x.readlines()), list(y.readlines()))
+        assert list(x.readlines()) == list(y.readlines())
 
 
 def random_list(gen=None, n=None):

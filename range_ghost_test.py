@@ -1,12 +1,15 @@
 import time
+import logging
 
 from tools.assertions import assert_length_equal
 from dtest import Tester, create_ks, create_cf
 
+logger = logging.getLogger(__name__)
+
 
 class TestRangeGhosts(Tester):
 
-    def ghosts_test(self):
+    def test_ghosts(self):
         """ Check range ghost are correctly removed by the system """
         cluster = self.cluster
         cluster.populate(1).start()
@@ -19,7 +22,7 @@ class TestRangeGhosts(Tester):
 
         rows = 1000
 
-        for i in xrange(0, rows):
+        for i in range(0, rows):
             session.execute("UPDATE cf SET c = 'value' WHERE key = 'k%i'" % i)
 
         res = list(session.execute("SELECT * FROM cf LIMIT 10000"))
@@ -27,7 +30,7 @@ class TestRangeGhosts(Tester):
 
         node1.flush()
 
-        for i in xrange(0, rows / 2):
+        for i in range(0, rows // 2):
             session.execute("DELETE FROM cf WHERE key = 'k%i'" % i)
 
         res = list(session.execute("SELECT * FROM cf LIMIT 10000"))

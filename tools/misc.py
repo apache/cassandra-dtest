@@ -1,11 +1,15 @@
 import os
 import subprocess
 import time
+import hashlib
+import logging
+
 from collections import Mapping
 
 from ccmlib.node import Node
 
-from dtest import debug
+
+logger = logging.getLogger(__name__)
 
 
 # work for cluster started by populate
@@ -53,21 +57,63 @@ def generate_ssl_stores(base_dir, passphrase='cassandra'):
     """
 
     if os.path.exists(os.path.join(base_dir, 'keystore.jks')):
-        debug("keystores already exists - skipping generation of ssl keystores")
+        logger.debug("keystores already exists - skipping generation of ssl keystores")
         return
 
-    debug("generating keystore.jks in [{0}]".format(base_dir))
+    logger.debug("generating keystore.jks in [{0}]".format(base_dir))
     subprocess.check_call(['keytool', '-genkeypair', '-alias', 'ccm_node', '-keyalg', 'RSA', '-validity', '365',
                            '-keystore', os.path.join(base_dir, 'keystore.jks'), '-storepass', passphrase,
                            '-dname', 'cn=Cassandra Node,ou=CCMnode,o=DataStax,c=US', '-keypass', passphrase])
-    debug("exporting cert from keystore.jks in [{0}]".format(base_dir))
+    logger.debug("exporting cert from keystore.jks in [{0}]".format(base_dir))
     subprocess.check_call(['keytool', '-export', '-rfc', '-alias', 'ccm_node',
                            '-keystore', os.path.join(base_dir, 'keystore.jks'),
                            '-file', os.path.join(base_dir, 'ccm_node.cer'), '-storepass', passphrase])
-    debug("importing cert into truststore.jks in [{0}]".format(base_dir))
+    logger.debug("importing cert into truststore.jks in [{0}]".format(base_dir))
     subprocess.check_call(['keytool', '-import', '-file', os.path.join(base_dir, 'ccm_node.cer'),
                            '-alias', 'ccm_node', '-keystore', os.path.join(base_dir, 'truststore.jks'),
                            '-storepass', passphrase, '-noprompt'])
+
+
+def list_to_hashed_dict(list):
+    """
+    takes a list and hashes the contents and puts them into a dict so the contents can be compared
+    without order. unfortunately, we need to do a little massaging of our input; the result from
+    the driver can return a OrderedMapSerializedKey (e.g. [0, 9, OrderedMapSerializedKey([(10, 11)])])
+    but our "expected" list is simply a list of elements (or list of list). this means if we
+    hash the values as is we'll get different results. to avoid this, when we see a dict,
+    convert the raw values (key, value) into a list and insert that list into a new list
+    :param list the list to convert into a dict
+    :return: a dict containing the contents fo the list with the hashed contents
+    """
+    hashed_dict = dict()
+    for item_lst in list:
+        normalized_list = []
+        for item in item_lst:
+            if hasattr(item, "items"):
+                tmp_list = []
+                for a, b in item.items():
+                    tmp_list.append(a)
+                    tmp_list.append(b)
+                normalized_list.append(tmp_list)
+            else:
+                normalized_list.append(item)
+        list_digest = hashlib.sha256(str(normalized_list).encode('utf-8', 'ignore')).hexdigest()
+        hashed_dict[list_digest] = normalized_list
+    return hashed_dict
+
+
+def get_current_test_name():
+    """
+    See https://docs.pytest.org/en/latest/example/simple.html#pytest-current-test-environment-variable
+    :return: returns just the name of the current running test name
+    """
+    pytest_current_test = os.environ.get('PYTEST_CURRENT_TEST')
+    test_splits = pytest_current_test.split("::")
+    current_test_name = test_splits[len(test_splits) - 1]
+    current_test_name = current_test_name.replace(" (call)", "")
+    current_test_name = current_test_name.replace(" (setup)", "")
+    current_test_name = current_test_name.replace(" (teardown)", "")
+    return current_test_name
 
 
 class ImmutableMapping(Mapping):

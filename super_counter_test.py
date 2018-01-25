@@ -1,12 +1,17 @@
 import time
+import pytest
+import logging
 
-from cql.cassandra.ttypes import (CfDef, ColumnParent, ColumnPath,
-                                  ConsistencyLevel, CounterColumn)
-from dtest import Tester, debug, create_ks
-from thrift_tests import get_thrift_client
+from dtest_setup_overrides import DTestSetupOverrides
+from dtest import Tester, create_ks
+from thrift_test import get_thrift_client
 from tools.misc import ImmutableMapping
 
-from tools.decorators import since
+from thrift_bindings.thrift010.Cassandra import (CfDef, ColumnParent, ColumnPath,
+                                                 ConsistencyLevel, CounterColumn)
+
+since = pytest.mark.since
+logger = logging.getLogger(__name__)
 
 
 @since('2.0', max_version='4')
@@ -15,9 +20,13 @@ class TestSuperCounterClusterRestart(Tester):
     This test is part of this issue:
     https://issues.apache.org/jira/browse/CASSANDRA-3821
     """
-    cluster_options = ImmutableMapping({'start_rpc': 'true'})
+    @pytest.fixture(scope='function', autouse=True)
+    def fixture_dtest_setup_overrides(self):
+        dtest_setup_overrides = DTestSetupOverrides()
+        dtest_setup_overrides.cluster_options = ImmutableMapping({'start_rpc': 'true'})
+        return dtest_setup_overrides
 
-    def functional_test(self):
+    def test_functional(self):
         NUM_SUBCOLS = 100
         NUM_ADDS = 100
 
@@ -42,8 +51,8 @@ class TestSuperCounterClusterRestart(Tester):
         # let the sediment settle to to the bottom before drinking...
         time.sleep(2)
 
-        for subcol in xrange(NUM_SUBCOLS):
-            for add in xrange(NUM_ADDS):
+        for subcol in range(NUM_SUBCOLS):
+            for add in range(NUM_ADDS):
                 column_parent = ColumnParent(column_family='cf',
                                              super_column='subcol_%d' % subcol)
                 counter_column = CounterColumn('col_0', 1)
@@ -52,10 +61,10 @@ class TestSuperCounterClusterRestart(Tester):
         time.sleep(1)
         cluster.flush()
 
-        debug("Stopping cluster")
+        logger.debug("Stopping cluster")
         cluster.stop()
         time.sleep(5)
-        debug("Starting cluster")
+        logger.debug("Starting cluster")
         cluster.start()
         time.sleep(5)
 
@@ -65,17 +74,17 @@ class TestSuperCounterClusterRestart(Tester):
 
         from_db = []
 
-        for i in xrange(NUM_SUBCOLS):
+        for i in range(NUM_SUBCOLS):
             column_path = ColumnPath(column_family='cf', column='col_0',
                                      super_column='subcol_%d' % i)
             column_or_super_column = thrift_conn.get('row_0', column_path,
                                                      ConsistencyLevel.QUORUM)
             val = column_or_super_column.counter_column.value
-            debug(str(val)),
+            logger.debug(str(val)),
             from_db.append(val)
-        debug("")
+        logger.debug("")
 
-        expected = [NUM_ADDS for i in xrange(NUM_SUBCOLS)]
+        expected = [NUM_ADDS for i in range(NUM_SUBCOLS)]
 
         if from_db != expected:
             raise Exception("Expected a bunch of the same values out of the db. Got this: " + str(from_db))

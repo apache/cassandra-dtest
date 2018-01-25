@@ -1,21 +1,25 @@
+import logging
+import pytest
+
 from cassandra.query import SimpleStatement
-from nose.plugins.attrib import attr
 
-from dtest import TRACE, Tester, debug, create_ks
-from tools.decorators import no_vnodes
+from dtest import Tester, create_ks
+from plugins.assert_tools import assert_regexp_matches
+
+logger = logging.getLogger(__name__)
 
 
-@no_vnodes()
+@pytest.mark.no_vnodes
 class TestPendingRangeMovements(Tester):
 
-    @attr('resource-intensive')
-    def pending_range_test(self):
+    @pytest.mark.resource_intensive
+    def test_pending_range(self):
         """
         @jira_ticket CASSANDRA-10887
         """
         cluster = self.cluster
         # If we are on 2.1, we need to set the log level to debug or higher, as debug.log does not exist.
-        if cluster.version() < '2.2' and not TRACE:
+        if cluster.version() < '2.2':
             cluster.set_log_level('DEBUG')
 
         # Create 5 node cluster
@@ -35,7 +39,7 @@ class TestPendingRangeMovements(Tester):
         lwt_query = SimpleStatement("UPDATE users SET email = 'janedoe@abc.com' WHERE login = 'jdoe3' IF email = 'jdoe@abc.com'")
 
         # Show we can execute LWT no problem
-        for i in xrange(1000):
+        for i in range(1000):
             session.execute(lwt_query)
 
         token = '-634023222112864484'
@@ -61,9 +65,9 @@ class TestPendingRangeMovements(Tester):
 
         # Verify other nodes believe this is Down/Moving
         out, _, _ = node2.nodetool('ring')
-        debug("Nodetool Ring output: {}".format(out))
-        self.assertRegexpMatches(out, '127\.0\.0\.1.*?Down.*?Moving')
+        logger.debug("Nodetool Ring output: {}".format(out))
+        assert_regexp_matches(out, '127\.0\.0\.1.*?Down.*?Moving')
 
         # Check we can still execute LWT
-        for i in xrange(1000):
+        for i in range(1000):
             session.execute(lwt_query)

@@ -1,11 +1,15 @@
-from dtest import Tester, debug, create_ks, create_cf
+import logging
+
+from dtest import Tester, create_ks, create_cf
 from tools.data import putget
 from tools.misc import generate_ssl_stores
+
+logger = logging.getLogger(__name__)
 
 
 class TestInternodeSSL(Tester):
 
-    def putget_with_internode_ssl_test(self):
+    def test_putget_with_internode_ssl(self):
         """
         Simple putget test with internode ssl enabled
         with default 'all' internode compression
@@ -13,7 +17,7 @@ class TestInternodeSSL(Tester):
         """
         self.__putget_with_internode_ssl_test('all')
 
-    def putget_with_internode_ssl_without_compression_test(self):
+    def test_putget_with_internode_ssl_without_compression(self):
         """
         Simple putget test with internode ssl enabled
         without internode compression
@@ -24,10 +28,10 @@ class TestInternodeSSL(Tester):
     def __putget_with_internode_ssl_test(self, internode_compression):
         cluster = self.cluster
 
-        debug("***using internode ssl***")
-        generate_ssl_stores(self.test_path)
+        logger.debug("***using internode ssl***")
+        generate_ssl_stores(self.fixture_dtest_setup.test_path)
         cluster.set_configuration_options({'internode_compression': internode_compression})
-        cluster.enable_internode_ssl(self.test_path)
+        cluster.enable_internode_ssl(self.fixture_dtest_setup.test_path)
 
         cluster.populate(3).start()
 

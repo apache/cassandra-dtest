@@ -1,29 +1,33 @@
-# coding: utf-8
-
 import itertools
 import struct
 import time
+import pytest
+import logging
+
+from flaky import flaky
 
 from cassandra import ConsistencyLevel, InvalidRequest
 from cassandra.metadata import NetworkTopologyStrategy, SimpleStrategy
 from cassandra.policies import FallthroughRetryPolicy
-from cassandra.protocol import ProtocolException
 from cassandra.query import SimpleStatement
 
-from dtest import ReusableClusterTester, debug, Tester, create_ks
+from dtest import Tester, create_ks
 from distutils.version import LooseVersion
-from thrift_bindings.v22.ttypes import \
+from thrift_bindings.thrift010.ttypes import \
     ConsistencyLevel as ThriftConsistencyLevel
-from thrift_bindings.v22.ttypes import (CfDef, Column, ColumnOrSuperColumn,
+from thrift_bindings.thrift010.ttypes import (CfDef, Column, ColumnOrSuperColumn,
                                         Mutation)
-from thrift_tests import get_thrift_client
+from thrift_test import get_thrift_client
 from tools.assertions import (assert_all, assert_invalid, assert_length_equal,
                               assert_none, assert_one, assert_unavailable)
+
 from tools.data import rows_to_list
-from tools.decorators import since
 from tools.metadata_wrapper import (UpdatingClusterMetadataWrapper,
                                     UpdatingKeyspaceMetadataWrapper,
                                     UpdatingTableMetadataWrapper)
+
+since = pytest.mark.since
+logger = logging.getLogger(__name__)
 
 
 class CQLTester(Tester):
@@ -58,7 +62,7 @@ class CQLTester(Tester):
         return session
 
 
-class StorageProxyCQLTester(CQLTester):
+class TestCQL(CQLTester):
     """
     Each CQL statement is exercised at least once in order to
     ensure we execute the code path in StorageProxy.
@@ -70,7 +74,7 @@ class StorageProxyCQLTester(CQLTester):
     #      is covered in greater detail in other test classes.
     """
 
-    def keyspace_test(self):
+    def test_keyspace(self):
         """
         Smoke test that basic keyspace operations work:
 
@@ -84,26 +88,26 @@ class StorageProxyCQLTester(CQLTester):
         session = self.prepare(create_keyspace=False)
         meta = UpdatingClusterMetadataWrapper(session.cluster)
 
-        self.assertNotIn('ks', meta.keyspaces)
+        assert 'ks' not in meta.keyspaces
         session.execute("CREATE KEYSPACE ks WITH replication = "
                         "{ 'class':'SimpleStrategy', 'replication_factor':1} "
                         "AND DURABLE_WRITES = true")
-        self.assertIn('ks', meta.keyspaces)
+        assert 'ks' in meta.keyspaces
 
         ks_meta = UpdatingKeyspaceMetadataWrapper(session.cluster, ks_name='ks')
-        self.assertTrue(ks_meta.durable_writes)
-        self.assertIsInstance(ks_meta.replication_strategy, SimpleStrategy)
+        assert ks_meta.durable_writes
+        assert isinstance(ks_meta.replication_strategy, SimpleStrategy)
 
         session.execute("ALTER KEYSPACE ks WITH replication = "
                         "{ 'class' : 'NetworkTopologyStrategy', 'datacenter1' : 1 } "
                         "AND DURABLE_WRITES = false")
-        self.assertFalse(ks_meta.durable_writes)
-        self.assertIsInstance(ks_meta.replication_strategy, NetworkTopologyStrategy)
+        assert not ks_meta.durable_writes
+        assert isinstance(ks_meta.replication_strategy, NetworkTopologyStrategy)
 
         session.execute("DROP KEYSPACE ks")
-        self.assertNotIn('ks', meta.keyspaces)
+        assert 'ks' not in meta.keyspaces
 
-    def table_test(self):
+    def test_table(self):
         """
         Smoke test that basic table operations work:
 
@@ -122,12 +126,12 @@ class StorageProxyCQLTester(CQLTester):
         ks_meta = UpdatingKeyspaceMetadataWrapper(session.cluster, ks_name='ks')
 
         session.execute("CREATE TABLE test1 (k int PRIMARY KEY, v1 int)")
-        self.assertIn('test1', ks_meta.tables)
+        assert 'test1' in ks_meta.tables
 
         t1_meta = UpdatingTableMetadataWrapper(session.cluster, ks_name='ks', table_name='test1')
 
         session.execute("ALTER TABLE test1 ADD v2 int")
-        self.assertIn('v2', t1_meta.columns)
+        assert 'v2' in t1_meta.columns
 
         for i in range(0, 10):
             session.execute("INSERT INTO test1 (k, v1, v2) VALUES ({i}, {i}, {i})".format(i=i))
@@ -139,10 +143,10 @@ class StorageProxyCQLTester(CQLTester):
         assert_none(session, "SELECT * FROM test1")
 
         session.execute("DROP TABLE test1")
-        self.assertNotIn('test1', ks_meta.tables)
+        assert 'test1' not in ks_meta.tables
 
     @since("2.0", max_version="3.X")
-    def table_test_compact_storage(self):
+    def test_table_compact_storage(self):
         """
         Smoke test that basic table operations work:
 
@@ -160,7 +164,7 @@ class StorageProxyCQLTester(CQLTester):
         ks_meta = UpdatingKeyspaceMetadataWrapper(session.cluster, ks_name='ks')
 
         session.execute("CREATE TABLE test2 (k int, c1 int, v1 int, PRIMARY KEY (k, c1)) WITH COMPACT STORAGE")
-        self.assertIn('test2', ks_meta.tables)
+        assert 'test2' in ks_meta.tables
 
         for i in range(0, 10):
             session.execute("INSERT INTO test2 (k, c1, v1) VALUES ({i}, {i}, {i})".format(i=i))
@@ -172,9 +176,9 @@ class StorageProxyCQLTester(CQLTester):
         assert_none(session, "SELECT * FROM test2")
 
         session.execute("DROP TABLE test2")
-        self.assertNotIn('test2', ks_meta.tables)
+        assert 'test2' not in ks_meta.tables
 
-    def index_test(self):
+    def test_index(self):
         """
         Smoke test CQL statements related to indexes:
 
@@ -191,7 +195,7 @@ class StorageProxyCQLTester(CQLTester):
         session.execute("CREATE TABLE test3 (k int PRIMARY KEY, v1 int, v2 int)")
         table_meta = UpdatingTableMetadataWrapper(session.cluster, ks_name='ks', table_name='test3')
         session.execute("CREATE INDEX testidx ON test3 (v1)")
-        self.assertIn('testidx', table_meta.indexes)
+        assert 'testidx' in table_meta.indexes
 
         for i in range(0, 10):
             session.execute("INSERT INTO test3 (k, v1, v2) VALUES ({i}, {i}, {i})".format(i=i))
@@ -199,9 +203,9 @@ class StorageProxyCQLTester(CQLTester):
         assert_one(session, "SELECT * FROM test3 WHERE v1 = 0", [0, 0, 0])
 
         session.execute("DROP INDEX testidx")
-        self.assertNotIn('testidx', table_meta.indexes)
+        assert 'testidx' not in table_meta.indexes
 
-    def type_test(self):
+    def test_type(self):
         """
         Smoke test basic TYPE operations:
 
@@ -220,20 +224,20 @@ class StorageProxyCQLTester(CQLTester):
         ks_meta = UpdatingKeyspaceMetadataWrapper(session.cluster, ks_name='ks')
 
         session.execute("CREATE TYPE address_t (street text, city text, zip_code int)")
-        self.assertIn('address_t', ks_meta.user_types)
+        assert 'address_t' in ks_meta.user_types
 
         session.execute("CREATE TABLE test4 (id int PRIMARY KEY, address frozen<address_t>)")
 
         session.execute("ALTER TYPE address_t ADD phones set<text>")
-        self.assertIn('phones', ks_meta.user_types['address_t'].field_names)
+        assert 'phones' in ks_meta.user_types['address_t'].field_names
 
         # drop the table so we can safely drop the type it uses
         session.execute("DROP TABLE test4")
 
         session.execute("DROP TYPE address_t")
-        self.assertNotIn('address_t', ks_meta.user_types)
+        assert 'address_t' not in ks_meta.user_types
 
-    def user_test(self):
+    def test_user(self):
         """
         Smoke test for basic USER queries:
 
@@ -249,7 +253,7 @@ class StorageProxyCQLTester(CQLTester):
         def get_usernames():
             return [user.name for user in session.execute('LIST USERS')]
 
-        self.assertNotIn('user1', get_usernames())
+        assert 'user1' not in get_usernames()
 
         session.execute("CREATE USER user1 WITH PASSWORD 'secret'")
         # use patient to retry until it works, because it takes some time for
@@ -261,9 +265,9 @@ class StorageProxyCQLTester(CQLTester):
         self.patient_cql_connection(node1, user='user1', password='secret^2')
 
         session.execute("DROP USER user1")
-        self.assertNotIn('user1', get_usernames())
+        assert 'user1' not in get_usernames()
 
-    def statements_test(self):
+    def test_statements(self):
         """
         Smoke test SELECT and UPDATE statements:
 
@@ -307,7 +311,7 @@ class StorageProxyCQLTester(CQLTester):
         assert_one(session, "SELECT COUNT(*) FROM test7 WHERE kind = 'ev1'", [0])
 
     @since('3.10')
-    def partition_key_allow_filtering_test(self):
+    def test_partition_key_allow_filtering(self):
         """
         Filtering with unrestricted parts of partition keys
 
@@ -428,19 +432,19 @@ class StorageProxyCQLTester(CQLTester):
                    [[0]])
 
         # test invalid query
-        with self.assertRaises(InvalidRequest):
+        with pytest.raises(InvalidRequest):
             session.execute("SELECT * FROM test_filter WHERE k1 = 0")
 
-        with self.assertRaises(InvalidRequest):
+        with pytest.raises(InvalidRequest):
             session.execute("SELECT * FROM test_filter WHERE k1 = 0 AND k2 > 0")
 
-        with self.assertRaises(InvalidRequest):
+        with pytest.raises(InvalidRequest):
             session.execute("SELECT * FROM test_filter WHERE k1 >= 0 AND k2 in (0,1,2)")
 
-        with self.assertRaises(InvalidRequest):
+        with pytest.raises(InvalidRequest):
             session.execute("SELECT * FROM test_filter WHERE k2 > 0")
 
-    def batch_test(self):
+    def test_batch(self):
         """
         Smoke test for BATCH statements:
 
@@ -469,7 +473,7 @@ class StorageProxyCQLTester(CQLTester):
         session.execute(query)
 
 
-class MiscellaneousCQLTester(CQLTester):
+class TestMiscellaneousCQL(CQLTester):
     """
     CQL tests that cannot be performed as Java unit tests, see CASSANDRA-9160.
     If you're considering adding a test here, consider writing Java unit tests
@@ -479,7 +483,7 @@ class MiscellaneousCQLTester(CQLTester):
     """
 
     @since('2.1', max_version='3.0')
-    def large_collection_errors_test(self):
+    def test_large_collection_errors(self):
         """
         Assert C* logs warnings when selecting too large a collection over
         protocol v2:
@@ -496,7 +500,7 @@ class MiscellaneousCQLTester(CQLTester):
 
         cluster = self.cluster
         node1 = cluster.nodelist()[0]
-        self.ignore_log_patterns = ["Detected collection for table"]
+        self.fixture_dtest_setup.ignore_log_patterns = ["Detected collection for table"]
 
         session.execute("""
             CREATE TABLE maps (
@@ -516,7 +520,7 @@ class MiscellaneousCQLTester(CQLTester):
                             "http://cassandra.apache.org/doc/cql3/CQL.html#collections for more details.")
 
     @since('2.0', max_version='4')
-    def cql3_insert_thrift_test(self):
+    def test_cql3_insert_thrift(self):
         """
         Check that we can insert from thrift into a CQL3 table:
 
@@ -545,7 +549,7 @@ class MiscellaneousCQLTester(CQLTester):
         key = struct.pack('>i', 2)
         column_name_component = struct.pack('>i', 4)
         # component length + component + EOC + component length + component + EOC
-        column_name = '\x00\x04' + column_name_component + '\x00' + '\x00\x01' + 'v' + '\x00'
+        column_name = b'\x00\x04' + column_name_component + b'\x00' + b'\x00\x01' + 'v'.encode("utf-8") + b'\x00'
         value = struct.pack('>i', 8)
         client.batch_mutate(
             {key: {'test': [Mutation(ColumnOrSuperColumn(column=Column(name=column_name, value=value, timestamp=100)))]}},
@@ -554,7 +558,7 @@ class MiscellaneousCQLTester(CQLTester):
         assert_one(session, "SELECT * FROM test", [2, 4, 8])
 
     @since('2.0', max_version='4')
-    def rename_test(self):
+    def test_rename(self):
         """
         Check that a thrift-created table can be renamed via CQL:
 
@@ -585,7 +589,7 @@ class MiscellaneousCQLTester(CQLTester):
         session.execute("ALTER TABLE test RENAME column1 TO foo1 AND column2 TO foo2 AND column3 TO foo3")
         assert_one(session, "SELECT foo1, foo2, foo3 FROM test", [4, 3, 2])
 
-    def invalid_string_literals_test(self):
+    def test_invalid_string_literals(self):
         """
         @jira_ticket CASSANDRA-8101
 
@@ -596,20 +600,19 @@ class MiscellaneousCQLTester(CQLTester):
         """
         session = self.prepare()
         # this should fail as normal, not with a ProtocolException
-        assert_invalid(session, u"insert into invalid_string_literals (k, a) VALUES (0, '\u038E\u0394\u03B4\u03E0')")
+        assert_invalid(session, "insert into invalid_string_literals (k, a) VALUES (0, '\u038E\u0394\u03B4\u03E0')")
 
         session = self.patient_cql_connection(self.cluster.nodelist()[0], keyspace='ks')
         session.execute("create table invalid_string_literals (k int primary key, a ascii, b text)")
 
         # this should still fail with an InvalidRequest
-        assert_invalid(session, u"insert into invalid_string_literals (k, c) VALUES (0, '\u038E\u0394\u03B4\u03E0')")
-        # but since the protocol requires strings to be valid UTF-8, the error
-        # response to this is a ProtocolException, not an error about the
-        # nonexistent column
-        with self.assertRaisesRegexp(ProtocolException, 'Cannot decode string as UTF8'):
-            session.execute("insert into invalid_string_literals (k, c) VALUES (0, '\xc2\x01')")
+        assert_invalid(session, "insert into invalid_string_literals (k, c) VALUES (0, '\u038E\u0394\u03B4\u03E0')")
 
-    def prepared_statement_invalidation_test(self):
+        # try to insert utf-8 characters into an ascii column and make sure it fails
+        with pytest.raises(InvalidRequest, match='Invalid ASCII character in string literal'):
+            session.execute("insert into invalid_string_literals (k, a) VALUES (0, '\xE0\x80\x80')")
+
+    def test_prepared_statement_invalidation(self):
         """
         @jira_ticket CASSANDRA-7910
 
@@ -633,19 +636,19 @@ class MiscellaneousCQLTester(CQLTester):
         wildcard_prepared = session.prepare("SELECT * FROM test")
         explicit_prepared = session.prepare("SELECT k, a, b, c FROM test")
         result = session.execute(wildcard_prepared.bind(None))
-        self.assertEqual(result, [(0, 0, 0, 0)])
+        assert result, [(0, 0, 0 == 0)]
 
         session.execute("ALTER TABLE test DROP c")
         result = session.execute(wildcard_prepared.bind(None))
         # wildcard select can be automatically re-prepared by the driver
-        self.assertEqual(result, [(0, 0, 0)])
+        assert result, [(0, 0 == 0)]
         # but re-preparing the statement with explicit columns should fail
         # (see PYTHON-207 for why we expect InvalidRequestException instead of the normal exc)
         assert_invalid(session, explicit_prepared.bind(None), expected=InvalidRequest)
 
         session.execute("ALTER TABLE test ADD d int")
         result = session.execute(wildcard_prepared.bind(None))
-        self.assertEqual(result, [(0, 0, 0, None)])
+        assert result, [(0, 0, 0 == None)]
 
         if self.cluster.version() < LooseVersion('3.0'):
             explicit_prepared = session.prepare("SELECT k, a, b, d FROM test")
@@ -654,12 +657,12 @@ class MiscellaneousCQLTester(CQLTester):
             # by the driver, but the re-preparation should succeed
             session.execute("ALTER TABLE test ALTER d TYPE blob")
             result = session.execute(wildcard_prepared.bind(None))
-            self.assertEqual(result, [(0, 0, 0, None)])
+            assert result, [(0, 0, 0 == None)]
 
             result = session.execute(explicit_prepared.bind(None))
-            self.assertEqual(result, [(0, 0, 0, None)])
+            assert result, [(0, 0, 0 == None)]
 
-    def range_slice_test(self):
+    def test_range_slice(self):
         """
         Regression test for CASSANDRA-1337:
 
@@ -693,34 +696,34 @@ class MiscellaneousCQLTester(CQLTester):
         session.execute("INSERT INTO test (k, v) VALUES ('bar', 1)")
 
         res = list(session.execute("SELECT * FROM test"))
-        self.assertEqual(len(res), 2, msg=res)
+        assert len(res) == 2, res
 
-    def many_columns_test(self):
+    @pytest.mark.skip(reason="Skipping until PYTHON-893 is fixed")
+    def test_many_columns(self):
         """
         Test for tables with thousands of columns.
         For CASSANDRA-11621.
         """
-
         session = self.prepare()
         width = 5000
         cluster = self.cluster
 
         session.execute("CREATE TABLE very_wide_table (pk int PRIMARY KEY, " +
-                        ",".join(map(lambda i: "c_{} int".format(i), range(width))) +
+                        ",".join(["c_{} int".format(i) for i in range(width)]) +
                         ")")
 
         session.execute("INSERT INTO very_wide_table (pk, " +
-                        ",".join(map(lambda i: "c_{}".format(i), range(width))) +
+                        ",".join(["c_{}".format(i) for i in range(width)]) +
                         ") VALUES (100," +
-                        ",".join(map(lambda i: str(i), range(width))) +
+                        ",".join([str(i) for i in range(width)]) +
                         ")")
 
         assert_all(session, "SELECT " +
-                   ",".join(map(lambda i: "c_{}".format(i), range(width))) +
+                   ",".join(["c_{}".format(i) for i in range(width)]) +
                    " FROM very_wide_table", [[i for i in range(width)]])
 
     @since("3.11", max_version="3.X")
-    def drop_compact_storage_flag_test(self):
+    def test_drop_compact_storage_flag(self):
         """
         Test for CASSANDRA-10857, verifying the schema change
         distribution across the other nodes.
@@ -751,9 +754,7 @@ class MiscellaneousCQLTester(CQLTester):
 
         for session in sessions:
             res = session.execute("SELECT * from test_drop_compact_storage")
-            self.assertEqual(rows_to_list(res), [[1, 1],
-                                                 [2, 2],
-                                                 [3, 3]])
+            assert rows_to_list(res) == [[1, 1], [2, 2], [3, 3]]
 
         session1.execute("ALTER TABLE test_drop_compact_storage DROP COMPACT STORAGE")
 
@@ -780,7 +781,7 @@ class AbortedQueryTester(CQLTester):
     #      more than one value.
     """
 
-    def local_query_test(self):
+    def test_local_query(self):
         """
         Check that a query running on the local coordinator node times out:
 
@@ -824,10 +825,10 @@ class AbortedQueryTester(CQLTester):
         statement = SimpleStatement("SELECT * from test1",
                                     consistency_level=ConsistencyLevel.ONE,
                                     retry_policy=FallthroughRetryPolicy())
-        assert_unavailable(lambda c: debug(c.execute(statement)), session)
-        node.watch_log_for("operations timed out", filename='debug.log', from_mark=mark, timeout=60)
+        assert_unavailable(lambda c: logger.debug(c.execute(statement)), session)
+        node.watch_log_for("operations timed out", filename='debug.log', from_mark=mark, timeout=120)
 
-    def remote_query_test(self):
+    def test_remote_query(self):
         """
         Check that a query running on a node other than the coordinator times out:
 
@@ -870,7 +871,7 @@ class AbortedQueryTester(CQLTester):
             );
         """)
 
-        for i, j in itertools.product(range(10), range(500)):
+        for i, j in itertools.product(list(range(10)), list(range(500))):
             session.execute("INSERT INTO test2 (id, col, val) VALUES ({}, {}, 'foo')".format(i, j))
 
         # use debug logs because at info level no-spam logger has unpredictable results
@@ -879,26 +880,26 @@ class AbortedQueryTester(CQLTester):
         statement = SimpleStatement("SELECT * from test2",
                                     consistency_level=ConsistencyLevel.ONE,
                                     retry_policy=FallthroughRetryPolicy())
-        assert_unavailable(lambda c: debug(c.execute(statement)), session)
+        assert_unavailable(lambda c: logger.debug(c.execute(statement)), session)
 
         statement = SimpleStatement("SELECT * from test2 where id = 1",
                                     consistency_level=ConsistencyLevel.ONE,
                                     retry_policy=FallthroughRetryPolicy())
-        assert_unavailable(lambda c: debug(c.execute(statement)), session)
+        assert_unavailable(lambda c: logger.debug(c.execute(statement)), session)
 
         statement = SimpleStatement("SELECT * from test2 where id IN (1, 2, 3) AND col > 10",
                                     consistency_level=ConsistencyLevel.ONE,
                                     retry_policy=FallthroughRetryPolicy())
-        assert_unavailable(lambda c: debug(c.execute(statement)), session)
+        assert_unavailable(lambda c: logger.debug(c.execute(statement)), session)
 
         statement = SimpleStatement("SELECT * from test2 where col > 5 ALLOW FILTERING",
                                     consistency_level=ConsistencyLevel.ONE,
                                     retry_policy=FallthroughRetryPolicy())
-        assert_unavailable(lambda c: debug(c.execute(statement)), session)
+        assert_unavailable(lambda c: logger.debug(c.execute(statement)), session)
 
         node2.watch_log_for("operations timed out", filename='debug.log', from_mark=mark, timeout=60)
 
-    def index_query_test(self):
+    def test_index_query(self):
         """
         Check that a secondary index query times out:
 
@@ -943,10 +944,10 @@ class AbortedQueryTester(CQLTester):
         statement = session.prepare("SELECT * from test3 WHERE col = ? ALLOW FILTERING")
         statement.consistency_level = ConsistencyLevel.ONE
         statement.retry_policy = FallthroughRetryPolicy()
-        assert_unavailable(lambda c: debug(c.execute(statement, [50])), session)
-        node.watch_log_for("operations timed out", filename='debug.log', from_mark=mark, timeout=60)
+        assert_unavailable(lambda c: logger.debug(c.execute(statement, [50])), session)
+        node.watch_log_for("operations timed out", filename='debug.log', from_mark=mark, timeout=120)
 
-    def materialized_view_test(self):
+    def test_materialized_view(self):
         """
         Check that a materialized view query times out:
 
@@ -997,18 +998,18 @@ class AbortedQueryTester(CQLTester):
                                     consistency_level=ConsistencyLevel.ONE,
                                     retry_policy=FallthroughRetryPolicy())
 
-        assert_unavailable(lambda c: debug(c.execute(statement)), session)
+        assert_unavailable(lambda c: logger.debug(c.execute(statement)), session)
         node2.watch_log_for("operations timed out", filename='debug.log', from_mark=mark, timeout=60)
 
 
 @since('3.10')
-class SlowQueryTester(CQLTester):
+class TestCQLSlowQuery(CQLTester):
     """
     Test slow query logging.
 
     @jira_ticket CASSANDRA-12403
     """
-    def local_query_test(self):
+    def test_local_query(self):
         """
         Check that a query running locally on the coordinator is reported as slow:
 
@@ -1086,7 +1087,7 @@ class SlowQueryTester(CQLTester):
         node.watch_log_for(["operations were slow", "SELECT \* FROM ks.test1"],
                            from_mark=mark, filename='debug.log', timeout=60)
 
-    def remote_query_test(self):
+    def test_remote_query(self):
         """
         Check that a query running on a node other than the coordinator is reported as slow:
 
@@ -1129,7 +1130,7 @@ class SlowQueryTester(CQLTester):
             );
         """)
 
-        for i, j in itertools.product(range(100), range(10)):
+        for i, j in itertools.product(list(range(100)), list(range(10))):
             session.execute("INSERT INTO test2 (id, col, val) VALUES ({}, {}, 'foo')".format(i, j))
 
         # only check debug logs because at INFO level the no-spam logger has unpredictable results
@@ -1165,7 +1166,7 @@ class SlowQueryTester(CQLTester):
         node2.watch_log_for(["operations were slow", "SELECT \* FROM ks.test2"],
                             from_mark=mark, filename='debug.log', timeout=60)
 
-    def disable_slow_query_log_test(self):
+    def test_disable_slow_query_log(self):
         """
         Check that a query is NOT reported as slow if slow query logging is disabled.
 
@@ -1219,15 +1220,15 @@ class SlowQueryTester(CQLTester):
         assert_length_equal(ret, num_expected)
 
 
-class LWTTester(ReusableClusterTester):
+class TestLWTWithCQL(Tester):
     """
     Validate CQL queries for LWTs for static columns for null and non-existing rows
     @jira_ticket CASSANDRA-9842
     """
 
-    @classmethod
-    def post_initialize_cluster(cls):
-        cluster = cls.cluster
+    @pytest.fixture(scope='function', autouse=True)
+    def fixture_post_initialize_cluster(self, fixture_dtest_setup):
+        cluster = fixture_dtest_setup.cluster
         cluster.populate(3)
         cluster.start(wait_for_binary_proto=True)
 
@@ -1239,7 +1240,7 @@ class LWTTester(ReusableClusterTester):
         session.execute("USE ks")
         return session
 
-    def lwt_with_static_columns_test(self):
+    def test_lwt_with_static_columns(self):
         session = self.get_lwttester_session()
 
         session.execute("""
@@ -1289,7 +1290,8 @@ class LWTTester(ReusableClusterTester):
     def _is_new_lwt_format_version(self, version):
         return version > LooseVersion('3.9') or (version > LooseVersion('3.0.9') and version < LooseVersion('3.1'))
 
-    def conditional_updates_on_static_columns_with_null_values_test(self):
+    @flaky
+    def test_conditional_updates_on_static_columns_with_null_values(self):
         session = self.get_lwttester_session()
 
         table_name = "conditional_updates_on_static_columns_with_null"
@@ -1313,7 +1315,7 @@ class LWTTester(ReusableClusterTester):
 
             assert_one(session, "SELECT * FROM {} WHERE a = 5".format(table_name), [5, 5, None, None])
 
-    def conditional_updates_on_static_columns_with_non_existing_values_test(self):
+    def test_conditional_updates_on_static_columns_with_non_existing_values(self):
         session = self.get_lwttester_session()
 
         table_name = "conditional_updates_on_static_columns_with_ne"
@@ -1365,7 +1367,7 @@ class LWTTester(ReusableClusterTester):
 
         assert_one(session, "SELECT * FROM {table_name} WHERE a = 7".format(table_name=table_name), [7, 7, 8, "a"])
 
-    def conditional_updates_on_static_columns_with_null_values_batch_test(self):
+    def test_conditional_updates_on_static_columns_with_null_values_batch(self):
         session = self.get_lwttester_session()
 
         table_name = "lwt_on_static_columns_with_null_batch"
@@ -1397,7 +1399,7 @@ class LWTTester(ReusableClusterTester):
 
         assert_one(session, "SELECT * FROM {table_name} WHERE a = 6".format(table_name=table_name), [6, 6, None, None])
 
-    def conditional_deletes_on_static_columns_with_null_values_test(self):
+    def test_conditional_deletes_on_static_columns_with_null_values(self):
         session = self.get_lwttester_session()
 
         table_name = "conditional_deletes_on_static_with_null"
@@ -1428,7 +1430,7 @@ class LWTTester(ReusableClusterTester):
             assert_one(session, "DELETE s1 FROM {} WHERE a = 5 IF s2 {} 3".format(table_name, operator), [False, None])
             assert_one(session, "SELECT * FROM {} WHERE a = 5".format(table_name), [5, 5, 5, None, 5])
 
-    def conditional_deletes_on_static_columns_with_null_values_batch_test(self):
+    def test_conditional_deletes_on_static_columns_with_null_values_batch(self):
         session = self.get_lwttester_session()
 
         table_name = "conditional_deletes_on_static_with_null_batch"

@@ -7,7 +7,7 @@
 #
 
 from thrift.Thrift import TType, TMessageType, TException
-from ttypes import *
+from .ttypes import *
 from thrift.Thrift import TProcessor
 from thrift.transport import TTransport
 from thrift.protocol import TBinaryProtocol, TProtocol
@@ -1791,9 +1791,9 @@ class Processor(Iface, TProcessor):
     result = login_result()
     try:
       self._handler.login(args.auth_request)
-    except AuthenticationException, authnx:
+    except AuthenticationException as authnx:
       result.authnx = authnx
-    except AuthorizationException, authzx:
+    except AuthorizationException as authzx:
       result.authzx = authzx
     oprot.writeMessageBegin("login", TMessageType.REPLY, seqid)
     result.write(oprot)
@@ -1807,7 +1807,7 @@ class Processor(Iface, TProcessor):
     result = set_keyspace_result()
     try:
       self._handler.set_keyspace(args.keyspace)
-    except InvalidRequestException, ire:
+    except InvalidRequestException as ire:
       result.ire = ire
     oprot.writeMessageBegin("set_keyspace", TMessageType.REPLY, seqid)
     result.write(oprot)
@@ -1821,13 +1821,13 @@ class Processor(Iface, TProcessor):
     result = get_result()
     try:
       result.success = self._handler.get(args.key, args.column_path, args.consistency_level)
-    except InvalidRequestException, ire:
+    except InvalidRequestException as ire:
       result.ire = ire
-    except NotFoundException, nfe:
+    except NotFoundException as nfe:
       result.nfe = nfe
-    except UnavailableException, ue:
+    except UnavailableException as ue:
       result.ue = ue
-    except TimedOutException, te:
+    except TimedOutException as te:
       result.te = te
     oprot.writeMessageBegin("get", TMessageType.REPLY, seqid)
     result.write(oprot)
@@ -1841,11 +1841,11 @@ class Processor(Iface, TProcessor):
     result = get_slice_result()
     try:
       result.success = self._handler.get_slice(args.key, args.column_parent, args.predicate, args.consistency_level)
-    except InvalidRequestException, ire:
+    except InvalidRequestException as ire:
       result.ire = ire
-    except UnavailableException, ue:
+    except UnavailableException as ue:
       result.ue = ue
-    except TimedOutException, te:
+    except TimedOutException as te:
       result.te = te
     oprot.writeMessageBegin("get_slice", TMessageType.REPLY, seqid)
     result.write(oprot)
@@ -1859,11 +1859,11 @@ class Processor(Iface, TProcessor):
     result = get_count_result()
     try:
       result.success = self._handler.get_count(args.key, args.column_parent, args.predicate, args.consistency_level)
-    except InvalidRequestException, ire:
+    except InvalidRequestException as ire:
       result.ire = ire
-    except UnavailableException, ue:
+    except UnavailableException as ue:
       result.ue = ue
-    except TimedOutException, te:
+    except TimedOutException as te:
       result.te = te
     oprot.writeMessageBegin("get_count", TMessageType.REPLY, seqid)
     result.write(oprot)
@@ -1877,11 +1877,11 @@ class Processor(Iface, TProcessor):
     result = multiget_slice_result()
     try:
       result.success = self._handler.multiget_slice(args.keys, args.column_parent, args.predicate, args.consistency_level)
-    except InvalidRequestException, ire:
+    except InvalidRequestException as ire:
       result.ire = ire
-    except UnavailableException, ue:
+    except UnavailableException as ue:
       result.ue = ue
-    except TimedOutException, te:
+    except TimedOutException as te:
       result.te = te
     oprot.writeMessageBegin("multiget_slice", TMessageType.REPLY, seqid)
     result.write(oprot)
@@ -1895,11 +1895,11 @@ class Processor(Iface, TProcessor):
     result = multiget_count_result()
     try:
       result.success = self._handler.multiget_count(args.keys, args.column_parent, args.predicate, args.consistency_level)
-    except InvalidRequestException, ire:
+    except InvalidRequestException as ire:
       result.ire = ire
-    except UnavailableException, ue:
+    except UnavailableException as ue:
       result.ue = ue
-    except TimedOutException, te:
+    except TimedOutException as te:
       result.te = te
     oprot.writeMessageBegin("multiget_count", TMessageType.REPLY, seqid)
     result.write(oprot)
@@ -1913,11 +1913,11 @@ class Processor(Iface, TProcessor):
     result = get_range_slices_result()
     try:
       result.success = self._handler.get_range_slices(args.column_parent, args.predicate, args.range, args.consistency_level)
-    except InvalidRequestException, ire:
+    except InvalidRequestException as ire:
       result.ire = ire
-    except UnavailableException, ue:
+    except UnavailableException as ue:
       result.ue = ue
-    except TimedOutException, te:
+    except TimedOutException as te:
       result.te = te
     oprot.writeMessageBegin("get_range_slices", TMessageType.REPLY, seqid)
     result.write(oprot)
@@ -1931,11 +1931,11 @@ class Processor(Iface, TProcessor):
     result = get_paged_slice_result()
     try:
       result.success = self._handler.get_paged_slice(args.column_family, args.range, args.start_column, args.consistency_level)
-    except InvalidRequestException, ire:
+    except InvalidRequestException as ire:
       result.ire = ire
-    except UnavailableException, ue:
+    except UnavailableException as ue:
       result.ue = ue
-    except TimedOutException, te:
+    except TimedOutException as te:
       result.te = te
     oprot.writeMessageBegin("get_paged_slice", TMessageType.REPLY, seqid)
     result.write(oprot)
@@ -1949,11 +1949,11 @@ class Processor(Iface, TProcessor):
     result = get_indexed_slices_result()
     try:
       result.success = self._handler.get_indexed_slices(args.column_parent, args.index_clause, args.column_predicate, args.consistency_level)
-    except InvalidRequestException, ire:
+    except InvalidRequestException as ire:
       result.ire = ire
-    except UnavailableException, ue:
+    except UnavailableException as ue:
       result.ue = ue
-    except TimedOutException, te:
+    except TimedOutException as te:
       result.te = te
     oprot.writeMessageBegin("get_indexed_slices", TMessageType.REPLY, seqid)
     result.write(oprot)
@@ -1967,11 +1967,11 @@ class Processor(Iface, TProcessor):
     result = insert_result()
     try:
       self._handler.insert(args.key, args.column_parent, args.column, args.consistency_level)
-    except InvalidRequestException, ire:
+    except InvalidRequestException as ire:
       result.ire = ire
-    except UnavailableException, ue:
+    except UnavailableException as ue:
       result.ue = ue
-    except TimedOutException, te:
+    except TimedOutException as te:
       result.te = te
     oprot.writeMessageBegin("insert", TMessageType.REPLY, seqid)
     result.write(oprot)
@@ -1985,11 +1985,11 @@ class Processor(Iface, TProcessor):
     result = add_result()
     try:
       self._handler.add(args.key, args.column_parent, args.column, args.consistency_level)
-    except InvalidRequestException, ire:
+    except InvalidRequestException as ire:
       result.ire = ire
-    except UnavailableException, ue:
+    except UnavailableException as ue:
       result.ue = ue
-    except TimedOutException, te:
+    except TimedOutException as te:
       result.te = te
     oprot.writeMessageBegin("add", TMessageType.REPLY, seqid)
     result.write(oprot)
@@ -2003,11 +2003,11 @@ class Processor(Iface, TProcessor):
     result = remove_result()
     try:
       self._handler.remove(args.key, args.column_path, args.timestamp, args.consistency_level)
-    except InvalidRequestException, ire:
+    except InvalidRequestException as ire:
       result.ire = ire
-    except UnavailableException, ue:
+    except UnavailableException as ue:
       result.ue = ue
-    except TimedOutException, te:
+    except TimedOutException as te:
       result.te = te
     oprot.writeMessageBegin("remove", TMessageType.REPLY, seqid)
     result.write(oprot)
@@ -2021,11 +2021,11 @@ class Processor(Iface, TProcessor):
     result = remove_counter_result()
     try:
       self._handler.remove_counter(args.key, args.path, args.consistency_level)
-    except InvalidRequestException, ire:
+    except InvalidRequestException as ire:
       result.ire = ire
-    except UnavailableException, ue:
+    except UnavailableException as ue:
       result.ue = ue
-    except TimedOutException, te:
+    except TimedOutException as te:
       result.te = te
     oprot.writeMessageBegin("remove_counter", TMessageType.REPLY, seqid)
     result.write(oprot)
@@ -2039,11 +2039,11 @@ class Processor(Iface, TProcessor):
     result = batch_mutate_result()
     try:
       self._handler.batch_mutate(args.mutation_map, args.consistency_level)
-    except InvalidRequestException, ire:
+    except InvalidRequestException as ire:
       result.ire = ire
-    except UnavailableException, ue:
+    except UnavailableException as ue:
       result.ue = ue
-    except TimedOutException, te:
+    except TimedOutException as te:
       result.te = te
     oprot.writeMessageBegin("batch_mutate", TMessageType.REPLY, seqid)
     result.write(oprot)
@@ -2057,11 +2057,11 @@ class Processor(Iface, TProcessor):
     result = truncate_result()
     try:
       self._handler.truncate(args.cfname)
-    except InvalidRequestException, ire:
+    except InvalidRequestException as ire:
       result.ire = ire
-    except UnavailableException, ue:
+    except UnavailableException as ue:
       result.ue = ue
-    except TimedOutException, te:
+    except TimedOutException as te:
       result.te = te
     oprot.writeMessageBegin("truncate", TMessageType.REPLY, seqid)
     result.write(oprot)
@@ -2075,7 +2075,7 @@ class Processor(Iface, TProcessor):
     result = describe_schema_versions_result()
     try:
       result.success = self._handler.describe_schema_versions()
-    except InvalidRequestException, ire:
+    except InvalidRequestException as ire:
       result.ire = ire
     oprot.writeMessageBegin("describe_schema_versions", TMessageType.REPLY, seqid)
     result.write(oprot)
@@ -2089,7 +2089,7 @@ class Processor(Iface, TProcessor):
     result = describe_keyspaces_result()
     try:
       result.success = self._handler.describe_keyspaces()
-    except InvalidRequestException, ire:
+    except InvalidRequestException as ire:
       result.ire = ire
     oprot.writeMessageBegin("describe_keyspaces", TMessageType.REPLY, seqid)
     result.write(oprot)
@@ -2125,7 +2125,7 @@ class Processor(Iface, TProcessor):
     result = describe_ring_result()
     try:
       result.success = self._handler.describe_ring(args.keyspace)
-    except InvalidRequestException, ire:
+    except InvalidRequestException as ire:
       result.ire = ire
     oprot.writeMessageBegin("describe_ring", TMessageType.REPLY, seqid)
     result.write(oprot)
@@ -2161,9 +2161,9 @@ class Processor(Iface, TProcessor):
     result = describe_keyspace_result()
     try:
       result.success = self._handler.describe_keyspace(args.keyspace)
-    except NotFoundException, nfe:
+    except NotFoundException as nfe:
       result.nfe = nfe
-    except InvalidRequestException, ire:
+    except InvalidRequestException as ire:
       result.ire = ire
     oprot.writeMessageBegin("describe_keyspace", TMessageType.REPLY, seqid)
     result.write(oprot)
@@ -2177,7 +2177,7 @@ class Processor(Iface, TProcessor):
     result = describe_splits_result()
     try:
       result.success = self._handler.describe_splits(args.cfName, args.start_token, args.end_token, args.keys_per_split)
-    except InvalidRequestException, ire:
+    except InvalidRequestException as ire:
       result.ire = ire
     oprot.writeMessageBegin("describe_splits", TMessageType.REPLY, seqid)
     result.write(oprot)
@@ -2191,9 +2191,9 @@ class Processor(Iface, TProcessor):
     result = system_add_column_family_result()
     try:
       result.success = self._handler.system_add_column_family(args.cf_def)
-    except InvalidRequestException, ire:
+    except InvalidRequestException as ire:
       result.ire = ire
-    except SchemaDisagreementException, sde:
+    except SchemaDisagreementException as sde:
       result.sde = sde
     oprot.writeMessageBegin("system_add_column_family", TMessageType.REPLY, seqid)
     result.write(oprot)
@@ -2207,9 +2207,9 @@ class Processor(Iface, TProcessor):
     result = system_drop_column_family_result()
     try:
       result.success = self._handler.system_drop_column_family(args.column_family)
-    except InvalidRequestException, ire:
+    except InvalidRequestException as ire:
       result.ire = ire
-    except SchemaDisagreementException, sde:
+    except SchemaDisagreementException as sde:
       result.sde = sde
     oprot.writeMessageBegin("system_drop_column_family", TMessageType.REPLY, seqid)
     result.write(oprot)
@@ -2223,9 +2223,9 @@ class Processor(Iface, TProcessor):
     result = system_add_keyspace_result()
     try:
       result.success = self._handler.system_add_keyspace(args.ks_def)
-    except InvalidRequestException, ire:
+    except InvalidRequestException as ire:
       result.ire = ire
-    except SchemaDisagreementException, sde:
+    except SchemaDisagreementException as sde:
       result.sde = sde
     oprot.writeMessageBegin("system_add_keyspace", TMessageType.REPLY, seqid)
     result.write(oprot)
@@ -2239,9 +2239,9 @@ class Processor(Iface, TProcessor):
     result = system_drop_keyspace_result()
     try:
       result.success = self._handler.system_drop_keyspace(args.keyspace)
-    except InvalidRequestException, ire:
+    except InvalidRequestException as ire:
       result.ire = ire
-    except SchemaDisagreementException, sde:
+    except SchemaDisagreementException as sde:
       result.sde = sde
     oprot.writeMessageBegin("system_drop_keyspace", TMessageType.REPLY, seqid)
     result.write(oprot)
@@ -2255,9 +2255,9 @@ class Processor(Iface, TProcessor):
     result = system_update_keyspace_result()
     try:
       result.success = self._handler.system_update_keyspace(args.ks_def)
-    except InvalidRequestException, ire:
+    except InvalidRequestException as ire:
       result.ire = ire
-    except SchemaDisagreementException, sde:
+    except SchemaDisagreementException as sde:
       result.sde = sde
     oprot.writeMessageBegin("system_update_keyspace", TMessageType.REPLY, seqid)
     result.write(oprot)
@@ -2271,9 +2271,9 @@ class Processor(Iface, TProcessor):
     result = system_update_column_family_result()
     try:
       result.success = self._handler.system_update_column_family(args.cf_def)
-    except InvalidRequestException, ire:
+    except InvalidRequestException as ire:
       result.ire = ire
-    except SchemaDisagreementException, sde:
+    except SchemaDisagreementException as sde:
       result.sde = sde
     oprot.writeMessageBegin("system_update_column_family", TMessageType.REPLY, seqid)
     result.write(oprot)
@@ -2287,13 +2287,13 @@ class Processor(Iface, TProcessor):
     result = execute_cql_query_result()
     try:
       result.success = self._handler.execute_cql_query(args.query, args.compression)
-    except InvalidRequestException, ire:
+    except InvalidRequestException as ire:
       result.ire = ire
-    except UnavailableException, ue:
+    except UnavailableException as ue:
       result.ue = ue
-    except TimedOutException, te:
+    except TimedOutException as te:
       result.te = te
-    except SchemaDisagreementException, sde:
+    except SchemaDisagreementException as sde:
       result.sde = sde
     oprot.writeMessageBegin("execute_cql_query", TMessageType.REPLY, seqid)
     result.write(oprot)
@@ -2307,7 +2307,7 @@ class Processor(Iface, TProcessor):
     result = prepare_cql_query_result()
     try:
       result.success = self._handler.prepare_cql_query(args.query, args.compression)
-    except InvalidRequestException, ire:
+    except InvalidRequestException as ire:
       result.ire = ire
     oprot.writeMessageBegin("prepare_cql_query", TMessageType.REPLY, seqid)
     result.write(oprot)
@@ -2321,13 +2321,13 @@ class Processor(Iface, TProcessor):
     result = execute_prepared_cql_query_result()
     try:
       result.success = self._handler.execute_prepared_cql_query(args.itemId, args.values)
-    except InvalidRequestException, ire:
+    except InvalidRequestException as ire:
       result.ire = ire
-    except UnavailableException, ue:
+    except UnavailableException as ue:
       result.ue = ue
-    except TimedOutException, te:
+    except TimedOutException as te:
       result.te = te
-    except SchemaDisagreementException, sde:
+    except SchemaDisagreementException as sde:
       result.sde = sde
     oprot.writeMessageBegin("execute_prepared_cql_query", TMessageType.REPLY, seqid)
     result.write(oprot)
@@ -2341,7 +2341,7 @@ class Processor(Iface, TProcessor):
     result = set_cql_version_result()
     try:
       self._handler.set_cql_version(args.version)
-    except InvalidRequestException, ire:
+    except InvalidRequestException as ire:
       result.ire = ire
     oprot.writeMessageBegin("set_cql_version", TMessageType.REPLY, seqid)
     result.write(oprot)
@@ -2405,7 +2405,7 @@ class login_args:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -2479,7 +2479,7 @@ class login_result:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -2541,7 +2541,7 @@ class set_keyspace_args:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -2602,7 +2602,7 @@ class set_keyspace_result:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -2693,7 +2693,7 @@ class get_args:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -2805,7 +2805,7 @@ class get_result:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -2911,7 +2911,7 @@ class get_slice_args:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -2955,7 +2955,7 @@ class get_slice_result:
         if ftype == TType.LIST:
           self.success = []
           (_etype171, _size168) = iprot.readListBegin()
-          for _i172 in xrange(_size168):
+          for _i172 in range(_size168):
             _elem173 = ColumnOrSuperColumn()
             _elem173.read(iprot)
             self.success.append(_elem173)
@@ -3018,7 +3018,7 @@ class get_slice_result:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -3124,7 +3124,7 @@ class get_count_args:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -3222,7 +3222,7 @@ class get_count_result:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -3267,7 +3267,7 @@ class multiget_slice_args:
         if ftype == TType.LIST:
           self.keys = []
           (_etype178, _size175) = iprot.readListBegin()
-          for _i179 in xrange(_size175):
+          for _i179 in range(_size175):
             _elem180 = iprot.readString();
             self.keys.append(_elem180)
           iprot.readListEnd()
@@ -3336,7 +3336,7 @@ class multiget_slice_args:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -3380,11 +3380,11 @@ class multiget_slice_result:
         if ftype == TType.MAP:
           self.success = {}
           (_ktype183, _vtype184, _size182 ) = iprot.readMapBegin() 
-          for _i186 in xrange(_size182):
+          for _i186 in range(_size182):
             _key187 = iprot.readString();
             _val188 = []
             (_etype192, _size189) = iprot.readListBegin()
-            for _i193 in xrange(_size189):
+            for _i193 in range(_size189):
               _elem194 = ColumnOrSuperColumn()
               _elem194.read(iprot)
               _val188.append(_elem194)
@@ -3424,7 +3424,7 @@ class multiget_slice_result:
     if self.success is not None:
       oprot.writeFieldBegin('success', TType.MAP, 0)
       oprot.writeMapBegin(TType.STRING, TType.LIST, len(self.success))
-      for kiter195,viter196 in self.success.items():
+      for kiter195,viter196 in list(self.success.items()):
         oprot.writeString(kiter195)
         oprot.writeListBegin(TType.STRUCT, len(viter196))
         for iter197 in viter196:
@@ -3453,7 +3453,7 @@ class multiget_slice_result:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -3498,7 +3498,7 @@ class multiget_count_args:
         if ftype == TType.LIST:
           self.keys = []
           (_etype201, _size198) = iprot.readListBegin()
-          for _i202 in xrange(_size198):
+          for _i202 in range(_size198):
             _elem203 = iprot.readString();
             self.keys.append(_elem203)
           iprot.readListEnd()
@@ -3567,7 +3567,7 @@ class multiget_count_args:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -3611,7 +3611,7 @@ class multiget_count_result:
         if ftype == TType.MAP:
           self.success = {}
           (_ktype206, _vtype207, _size205 ) = iprot.readMapBegin() 
-          for _i209 in xrange(_size205):
+          for _i209 in range(_size205):
             _key210 = iprot.readString();
             _val211 = iprot.readI32();
             self.success[_key210] = _val211
@@ -3649,7 +3649,7 @@ class multiget_count_result:
     if self.success is not None:
       oprot.writeFieldBegin('success', TType.MAP, 0)
       oprot.writeMapBegin(TType.STRING, TType.I32, len(self.success))
-      for kiter212,viter213 in self.success.items():
+      for kiter212,viter213 in list(self.success.items()):
         oprot.writeString(kiter212)
         oprot.writeI32(viter213)
       oprot.writeMapEnd()
@@ -3675,7 +3675,7 @@ class multiget_count_result:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -3782,7 +3782,7 @@ class get_range_slices_args:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -3826,7 +3826,7 @@ class get_range_slices_result:
         if ftype == TType.LIST:
           self.success = []
           (_etype217, _size214) = iprot.readListBegin()
-          for _i218 in xrange(_size214):
+          for _i218 in range(_size214):
             _elem219 = KeySlice()
             _elem219.read(iprot)
             self.success.append(_elem219)
@@ -3889,7 +3889,7 @@ class get_range_slices_result:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -3994,7 +3994,7 @@ class get_paged_slice_args:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -4038,7 +4038,7 @@ class get_paged_slice_result:
         if ftype == TType.LIST:
           self.success = []
           (_etype224, _size221) = iprot.readListBegin()
-          for _i225 in xrange(_size221):
+          for _i225 in range(_size221):
             _elem226 = KeySlice()
             _elem226.read(iprot)
             self.success.append(_elem226)
@@ -4101,7 +4101,7 @@ class get_paged_slice_result:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -4208,7 +4208,7 @@ class get_indexed_slices_args:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -4252,7 +4252,7 @@ class get_indexed_slices_result:
         if ftype == TType.LIST:
           self.success = []
           (_etype231, _size228) = iprot.readListBegin()
-          for _i232 in xrange(_size228):
+          for _i232 in range(_size228):
             _elem233 = KeySlice()
             _elem233.read(iprot)
             self.success.append(_elem233)
@@ -4315,7 +4315,7 @@ class get_indexed_slices_result:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -4421,7 +4421,7 @@ class insert_args:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -4508,7 +4508,7 @@ class insert_result:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -4614,7 +4614,7 @@ class add_args:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -4701,7 +4701,7 @@ class add_result:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -4804,7 +4804,7 @@ class remove_args:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -4891,7 +4891,7 @@ class remove_result:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -4982,7 +4982,7 @@ class remove_counter_args:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -5069,7 +5069,7 @@ class remove_counter_result:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -5108,15 +5108,15 @@ class batch_mutate_args:
         if ftype == TType.MAP:
           self.mutation_map = {}
           (_ktype236, _vtype237, _size235 ) = iprot.readMapBegin() 
-          for _i239 in xrange(_size235):
+          for _i239 in range(_size235):
             _key240 = iprot.readString();
             _val241 = {}
             (_ktype243, _vtype244, _size242 ) = iprot.readMapBegin() 
-            for _i246 in xrange(_size242):
+            for _i246 in range(_size242):
               _key247 = iprot.readString();
               _val248 = []
               (_etype252, _size249) = iprot.readListBegin()
-              for _i253 in xrange(_size249):
+              for _i253 in range(_size249):
                 _elem254 = Mutation()
                 _elem254.read(iprot)
                 _val248.append(_elem254)
@@ -5145,10 +5145,10 @@ class batch_mutate_args:
     if self.mutation_map is not None:
       oprot.writeFieldBegin('mutation_map', TType.MAP, 1)
       oprot.writeMapBegin(TType.STRING, TType.MAP, len(self.mutation_map))
-      for kiter255,viter256 in self.mutation_map.items():
+      for kiter255,viter256 in list(self.mutation_map.items()):
         oprot.writeString(kiter255)
         oprot.writeMapBegin(TType.STRING, TType.LIST, len(viter256))
-        for kiter257,viter258 in viter256.items():
+        for kiter257,viter258 in list(viter256.items()):
           oprot.writeString(kiter257)
           oprot.writeListBegin(TType.STRUCT, len(viter258))
           for iter259 in viter258:
@@ -5174,7 +5174,7 @@ class batch_mutate_args:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -5261,7 +5261,7 @@ class batch_mutate_result:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -5323,7 +5323,7 @@ class truncate_args:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -5410,7 +5410,7 @@ class truncate_result:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -5452,7 +5452,7 @@ class describe_schema_versions_args:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -5490,11 +5490,11 @@ class describe_schema_versions_result:
         if ftype == TType.MAP:
           self.success = {}
           (_ktype261, _vtype262, _size260 ) = iprot.readMapBegin() 
-          for _i264 in xrange(_size260):
+          for _i264 in range(_size260):
             _key265 = iprot.readString();
             _val266 = []
             (_etype270, _size267) = iprot.readListBegin()
-            for _i271 in xrange(_size267):
+            for _i271 in range(_size267):
               _elem272 = iprot.readString();
               _val266.append(_elem272)
             iprot.readListEnd()
@@ -5521,7 +5521,7 @@ class describe_schema_versions_result:
     if self.success is not None:
       oprot.writeFieldBegin('success', TType.MAP, 0)
       oprot.writeMapBegin(TType.STRING, TType.LIST, len(self.success))
-      for kiter273,viter274 in self.success.items():
+      for kiter273,viter274 in list(self.success.items()):
         oprot.writeString(kiter273)
         oprot.writeListBegin(TType.STRING, len(viter274))
         for iter275 in viter274:
@@ -5542,7 +5542,7 @@ class describe_schema_versions_result:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -5584,7 +5584,7 @@ class describe_keyspaces_args:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -5622,7 +5622,7 @@ class describe_keyspaces_result:
         if ftype == TType.LIST:
           self.success = []
           (_etype279, _size276) = iprot.readListBegin()
-          for _i280 in xrange(_size276):
+          for _i280 in range(_size276):
             _elem281 = KsDef()
             _elem281.read(iprot)
             self.success.append(_elem281)
@@ -5665,7 +5665,7 @@ class describe_keyspaces_result:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -5707,7 +5707,7 @@ class describe_cluster_name_args:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -5766,7 +5766,7 @@ class describe_cluster_name_result:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -5808,7 +5808,7 @@ class describe_version_args:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -5867,7 +5867,7 @@ class describe_version_result:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -5929,7 +5929,7 @@ class describe_ring_args:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -5967,7 +5967,7 @@ class describe_ring_result:
         if ftype == TType.LIST:
           self.success = []
           (_etype286, _size283) = iprot.readListBegin()
-          for _i287 in xrange(_size283):
+          for _i287 in range(_size283):
             _elem288 = TokenRange()
             _elem288.read(iprot)
             self.success.append(_elem288)
@@ -6010,7 +6010,7 @@ class describe_ring_result:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -6052,7 +6052,7 @@ class describe_partitioner_args:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -6111,7 +6111,7 @@ class describe_partitioner_result:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -6153,7 +6153,7 @@ class describe_snitch_args:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -6212,7 +6212,7 @@ class describe_snitch_result:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -6274,7 +6274,7 @@ class describe_keyspace_args:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -6360,7 +6360,7 @@ class describe_keyspace_result:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -6464,7 +6464,7 @@ class describe_splits_args:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -6502,7 +6502,7 @@ class describe_splits_result:
         if ftype == TType.LIST:
           self.success = []
           (_etype293, _size290) = iprot.readListBegin()
-          for _i294 in xrange(_size290):
+          for _i294 in range(_size290):
             _elem295 = iprot.readString();
             self.success.append(_elem295)
           iprot.readListEnd()
@@ -6544,7 +6544,7 @@ class describe_splits_result:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -6607,7 +6607,7 @@ class system_add_column_family_args:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -6692,7 +6692,7 @@ class system_add_column_family_result:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -6754,7 +6754,7 @@ class system_drop_column_family_args:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -6839,7 +6839,7 @@ class system_drop_column_family_result:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -6902,7 +6902,7 @@ class system_add_keyspace_args:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -6987,7 +6987,7 @@ class system_add_keyspace_result:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -7049,7 +7049,7 @@ class system_drop_keyspace_args:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -7134,7 +7134,7 @@ class system_drop_keyspace_result:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -7197,7 +7197,7 @@ class system_update_keyspace_args:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -7282,7 +7282,7 @@ class system_update_keyspace_result:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -7345,7 +7345,7 @@ class system_update_column_family_args:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -7430,7 +7430,7 @@ class system_update_column_family_result:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -7506,7 +7506,7 @@ class execute_cql_query_args:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -7618,7 +7618,7 @@ class execute_cql_query_result:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -7694,7 +7694,7 @@ class prepare_cql_query_args:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -7767,7 +7767,7 @@ class prepare_cql_query_result:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -7811,7 +7811,7 @@ class execute_prepared_cql_query_args:
         if ftype == TType.LIST:
           self.values = []
           (_etype300, _size297) = iprot.readListBegin()
-          for _i301 in xrange(_size297):
+          for _i301 in range(_size297):
             _elem302 = iprot.readString();
             self.values.append(_elem302)
           iprot.readListEnd()
@@ -7851,7 +7851,7 @@ class execute_prepared_cql_query_args:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -7963,7 +7963,7 @@ class execute_prepared_cql_query_result:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -8025,7 +8025,7 @@ class set_cql_version_args:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):
@@ -8086,7 +8086,7 @@ class set_cql_version_result:
 
   def __repr__(self):
     L = ['%s=%r' % (key, value)
-      for key, value in self.__dict__.iteritems()]
+      for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
 
   def __eq__(self, other):

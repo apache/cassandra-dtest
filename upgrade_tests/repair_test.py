@@ -1,8 +1,11 @@
 import time
+import pytest
+import logging
 
-from dtest import debug
 from repair_tests.repair_test import BaseRepairTest
-from tools.decorators import since
+
+since = pytest.mark.since
+logger = logging.getLogger(__name__)
 
 LEGACY_SSTABLES_JVM_ARGS = ["-Dcassandra.streamdes.initial_mem_buffer_size=1",
                             "-Dcassandra.streamdes.max_mem_buffer_size=5",
@@ -11,18 +14,18 @@ LEGACY_SSTABLES_JVM_ARGS = ["-Dcassandra.streamdes.initial_mem_buffer_size=1",
 
 # We don't support directly upgrading from 2.2 to 4.0 so disabling this on 4.0.
 # TODO: we should probably not hardcode versions?
+@pytest.mark.upgrade_test
 @since('3.0', max_version='4')
 class TestUpgradeRepair(BaseRepairTest):
-    __test__ = True
 
     @since('3.0')
-    def repair_after_upgrade_test(self):
+    def test_repair_after_upgrade(self):
         """
         @jira_ticket CASSANDRA-10990
         """
         default_install_dir = self.cluster.get_install_dir()
         cluster = self.cluster
-        debug("Setting version to 2.2.5")
+        logger.debug("Setting version to 2.2.5")
         cluster.set_install_dir(version="2.2.5")
         self._populate_cluster()
 
@@ -33,7 +36,7 @@ class TestUpgradeRepair(BaseRepairTest):
         cluster = self.cluster
 
         for node in cluster.nodelist():
-            debug("Upgrading %s to current version" % node.name)
+            logger.debug("Upgrading %s to current version" % node.name)
             if node.is_running():
                 node.flush()
                 time.sleep(1)

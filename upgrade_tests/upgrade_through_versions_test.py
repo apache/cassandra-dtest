@@ -5,23 +5,25 @@ import random
 import signal
 import time
 import uuid
+import logging
+import pytest
+import psutil
+
 from collections import defaultdict, namedtuple
 from multiprocessing import Process, Queue
-from Queue import Empty, Full
-from unittest import skipUnless
+from queue import Empty, Full
 
-import psutil
 from cassandra import ConsistencyLevel, WriteTimeout
 from cassandra.query import SimpleStatement
-from nose.plugins.attrib import attr
-from six import print_
 
-from dtest import RUN_STATIC_UPGRADE_MATRIX, Tester, debug
+from dtest import RUN_STATIC_UPGRADE_MATRIX, Tester
 from tools.misc import generate_ssl_stores, new_node
-from upgrade_base import switch_jdks
-from upgrade_manifest import (build_upgrade_pairs, current_2_0_x,
+from .upgrade_base import switch_jdks
+from .upgrade_manifest import (build_upgrade_pairs, current_2_0_x,
                               current_2_1_x, current_2_2_x, current_3_0_x,
                               indev_2_2_x, indev_3_x)
+
+logger = logging.getLogger(__name__)
 
 
 def data_writer(tester, to_verify_queue, verification_done_queue, rewrite_probability=0):
@@ -67,7 +69,7 @@ def data_writer(tester, to_verify_queue, verification_done_queue, rewrite_probab
 
             to_verify_queue.put_nowait((key, val,))
         except Exception:
-            debug("Error in data writer process!")
+            logger.debug("Error in data writer process!")
             to_verify_queue.close()
             raise
 
@@ -107,7 +109,7 @@ def data_checker(tester, to_verify_queue, verification_done_queue):
             time.sleep(0.1)  # let's not eat CPU if the queue is empty
             continue
         except Exception:
-            debug("Error in data verifier process!")
+            logger.debug("Error in data verifier process!")
             verification_done_queue.close()
             raise
         else:
@@ -165,7 +167,7 @@ def counter_incrementer(tester, to_verify_queue, verification_done_queue, rewrit
 
             to_verify_queue.put_nowait((key, count + 1,))
         except Exception:
-            debug("Error in counter incrementer process!")
+            logger.debug("Error in counter incrementer process!")
             to_verify_queue.close()
             raise
 
@@ -205,7 +207,7 @@ def counter_checker(tester, to_verify_queue, verification_done_queue):
             time.sleep(0.1)  # let's not eat CPU if the queue is empty
             continue
         except Exception:
-            debug("Error in counter verifier process!")
+            logger.debug("Error in counter verifier process!")
             verification_done_queue.close()
             raise
         else:
@@ -221,70 +223,69 @@ def counter_checker(tester, to_verify_queue, verification_done_queue):
                 pass
 
 
-@attr("resource-intensive")
-class UpgradeTester(Tester):
+@pytest.mark.upgrade_test
+@pytest.mark.resource_intensive
+class TestUpgrade(Tester):
     """
     Upgrades a 3-node Murmur3Partitioner cluster through versions specified in test_version_metas.
     """
     test_version_metas = None  # set on init to know which versions to use
     subprocs = None  # holds any subprocesses, for status checking and cleanup
     extra_config = None  # holds a non-mutable structure that can be cast as dict()
-    __test__ = False  # this is a base class only
-    ignore_log_patterns = (
-        # This one occurs if we do a non-rolling upgrade, the node
-        # it's trying to send the migration to hasn't started yet,
-        # and when it does, it gets replayed and everything is fine.
-        r'Can\'t send migration request: node.*is down',
-        r'RejectedExecutionException.*ThreadPoolExecutor has shut down',
-        # Occurs due to test/ccm writing topo on down nodes
-        r'Cannot update data center or rack from.*for live host',
-        # Normal occurance. See CASSANDRA-12026. Likely won't be needed after C* 4.0.
-        r'Unknown column cdc during deserialization',
-    )
 
-    def __init__(self, *args, **kwargs):
-        self.subprocs = []
-        Tester.__init__(self, *args, **kwargs)
+    @pytest.fixture(autouse=True)
+    def fixture_add_additional_log_patterns(self, fixture_dtest_setup):
+        fixture_dtest_setup.ignore_log_patterns = (
+            # This one occurs if we do a non-rolling upgrade, the node
+            # it's trying to send the migration to hasn't started yet,
+            # and when it does, it gets replayed and everything is fine.
+            r'Can\'t send migration request: node.*is down',
+            r'RejectedExecutionException.*ThreadPoolExecutor has shut down',
+            # Occurs due to test/ccm writing topo on down nodes
+            r'Cannot update data center or rack from.*for live host',
+            # Normal occurance. See CASSANDRA-12026. Likely won't be needed after C* 4.0.
+            r'Unknown column cdc during deserialization',
+        )
 
     def setUp(self):
-        debug("Upgrade test beginning, setting CASSANDRA_VERSION to {}, and jdk to {}. (Prior values will be restored after test)."
+        logger.debug("Upgrade test beginning, setting CASSANDRA_VERSION to {}, and jdk to {}. (Prior values will be restored after test)."
               .format(self.test_version_metas[0].version, self.test_version_metas[0].java_version))
         os.environ['CASSANDRA_VERSION'] = self.test_version_metas[0].version
         switch_jdks(self.test_version_metas[0].java_version)
 
-        super(UpgradeTester, self).setUp()
-        debug("Versions to test (%s): %s" % (type(self), str([v.version for v in self.test_version_metas])))
+        super(TestUpgrade, self).setUp()
+        logger.debug("Versions to test (%s): %s" % (type(self), str([v.version for v in self.test_version_metas])))
 
     def init_config(self):
         Tester.init_config(self)
 
         if self.extra_config is not None:
-            debug("Setting extra configuration options:\n{}".format(
+            logger.debug("Setting extra configuration options:\n{}".format(
                 pprint.pformat(dict(self.extra_config), indent=4))
             )
             self.cluster.set_configuration_options(
                 values=dict(self.extra_config)
             )
 
-    def parallel_upgrade_test(self):
+    def test_parallel_upgrade(self):
         """
         Test upgrading cluster all at once (requires cluster downtime).
         """
         self.upgrade_scenario()
 
-    def rolling_upgrade_test(self):
+    def test_rolling_upgrade(self):
         """
         Test rolling upgrade of the cluster, so we have mixed versions part way through.
         """
         self.upgrade_scenario(rolling=True)
 
-    def parallel_upgrade_with_internode_ssl_test(self):
+    def test_parallel_upgrade_with_internode_ssl(self):
         """
         Test upgrading cluster all at once (requires cluster downtime), with internode ssl.
         """
         self.upgrade_scenario(internode_ssl=True)
 
-    def rolling_upgrade_with_internode_ssl_test(self):
+    def test_rolling_upgrade_with_internode_ssl(self):
         """
         Rolling upgrade test using internode ssl.
         """
@@ -301,17 +302,17 @@ class UpgradeTester(Tester):
             cluster.set_configuration_options({'enable_user_defined_functions': 'true'})
 
         if internode_ssl:
-            debug("***using internode ssl***")
-            generate_ssl_stores(self.test_path)
-            self.cluster.enable_internode_ssl(self.test_path)
+            logger.debug("***using internode ssl***")
+            generate_ssl_stores(self.fixture_dtest_setup.test_path)
+            self.cluster.enable_internode_ssl(self.fixture_dtest_setup.test_path)
 
         if populate:
             # Start with 3 node cluster
-            debug('Creating cluster (%s)' % self.test_version_metas[0].version)
+            logger.debug('Creating cluster (%s)' % self.test_version_metas[0].version)
             cluster.populate(3)
             [node.start(use_jna=True, wait_for_binary_proto=True) for node in cluster.nodelist()]
         else:
-            debug("Skipping cluster creation (should already be built)")
+            logger.debug("Skipping cluster creation (should already be built)")
 
         # add nodes to self for convenience
         for i, node in enumerate(cluster.nodelist(), 1):
@@ -324,7 +325,7 @@ class UpgradeTester(Tester):
             else:
                 self._create_schema()
         else:
-            debug("Skipping schema creation (should already be built)")
+            logger.debug("Skipping schema creation (should already be built)")
         time.sleep(5)  # sigh...
 
         self._log_current_ver(self.test_version_metas[0])
@@ -344,8 +345,8 @@ class UpgradeTester(Tester):
 
                     self.upgrade_to_version(version_meta, partial=True, nodes=(node,), internode_ssl=internode_ssl)
 
-                    self._check_on_subprocs(self.subprocs)
-                    debug('Successfully upgraded %d of %d nodes to %s' %
+                    self._check_on_subprocs(self.fixture_dtest_setup.subprocs)
+                    logger.debug('Successfully upgraded %d of %d nodes to %s' %
                           (num + 1, len(self.cluster.nodelist()), version_meta.version))
 
                 self.cluster.set_install_dir(version=version_meta.version)
@@ -375,7 +376,7 @@ class UpgradeTester(Tester):
         for call in after_upgrade_call:
             call()
 
-            debug('All nodes successfully upgraded to %s' % version_meta.version)
+            logger.debug('All nodes successfully upgraded to %s' % version_meta.version)
             self._log_current_ver(version_meta)
 
         cluster.stop()
@@ -384,7 +385,7 @@ class UpgradeTester(Tester):
         # just to be super sure we get cleaned up
         self._terminate_subprocs()
 
-        super(UpgradeTester, self).tearDown()
+        super(TestUpgrade, self).tearDown()
 
     def _check_on_subprocs(self, subprocs):
         """
@@ -402,12 +403,12 @@ class UpgradeTester(Tester):
             raise RuntimeError(message)
 
     def _terminate_subprocs(self):
-        for s in self.subprocs:
+        for s in self.fixture_dtest_setup.subprocs:
             if s.is_alive():
                 try:
                     psutil.Process(s.pid).kill()  # with fire damnit
                 except Exception:
-                    debug("Error terminating subprocess. There could be a lingering process.")
+                    logger.debug("Error terminating subprocess. There could be a lingering process.")
                     pass
 
     def upgrade_to_version(self, version_meta, partial=False, nodes=None, internode_ssl=False):
@@ -416,21 +417,21 @@ class UpgradeTester(Tester):
         that are specified by *nodes*, otherwise ignore *nodes* specified
         and upgrade all nodes.
         """
-        debug('Upgrading {nodes} to {version}'.format(nodes=[n.name for n in nodes] if nodes is not None else 'all nodes', version=version_meta.version))
+        logger.debug('Upgrading {nodes} to {version}'.format(nodes=[n.name for n in nodes] if nodes is not None else 'all nodes', version=version_meta.version))
         switch_jdks(version_meta.java_version)
-        debug("JAVA_HOME: " + os.environ.get('JAVA_HOME'))
+        logger.debug("JAVA_HOME: " + os.environ.get('JAVA_HOME'))
         if not partial:
             nodes = self.cluster.nodelist()
 
         for node in nodes:
-            debug('Shutting down node: ' + node.name)
+            logger.debug('Shutting down node: ' + node.name)
             node.drain()
             node.watch_log_for("DRAINED")
             node.stop(wait_other_notice=False)
 
         for node in nodes:
             node.set_install_dir(version=version_meta.version)
-            debug("Set new cassandra dir for %s: %s" % (node.name, node.get_install_dir()))
+            logger.debug("Set new cassandra dir for %s: %s" % (node.name, node.get_install_dir()))
             if internode_ssl and version_meta.version >= '4.0':
                 node.set_configuration_options({'server_encryption_options': {'enabled': True, 'enable_legacy_ssl_storage_port': True}})
 
@@ -441,7 +442,7 @@ class UpgradeTester(Tester):
 
         # Restart nodes on new version
         for node in nodes:
-            debug('Starting %s on new version (%s)' % (node.name, version_meta.version))
+            logger.debug('Starting %s on new version (%s)' % (node.name, version_meta.version))
             # Setup log4j / logback again (necessary moving from 2.0 -> 2.1):
             node.set_log_level("INFO")
             node.start(wait_other_notice=240, wait_for_binary_proto=True)
@@ -453,7 +454,7 @@ class UpgradeTester(Tester):
         """
         vers = [m.version for m in self.test_version_metas]
         curr_index = vers.index(current_version_meta.version)
-        debug(
+        logger.debug(
             "Current upgrade path: {}".format(
                 vers[:curr_index] + ['***' + current_version_meta.version + '***'] + vers[curr_index + 1:]))
 
@@ -496,7 +497,7 @@ class UpgradeTester(Tester):
     def _write_values(self, num=100):
         session = self.patient_cql_connection(self.node2, protocol_version=self.protocol_version)
         session.execute("use upgrade")
-        for i in xrange(num):
+        for i in range(num):
             x = len(self.row_values) + 1
             session.execute("UPDATE cf SET v='%d' WHERE k=%d" % (x, x))
             self.row_values.add(x)
@@ -509,8 +510,8 @@ class UpgradeTester(Tester):
                 query = SimpleStatement("SELECT k,v FROM cf WHERE k=%d" % x, consistency_level=consistency_level)
                 result = session.execute(query)
                 k, v = result[0]
-                self.assertEqual(x, k)
-                self.assertEqual(str(x), v)
+                assert x == k
+                assert str(x) == v
 
     def _wait_until_queue_condition(self, label, queue, opfunc, required_len, max_wait_s=600):
         """
@@ -528,14 +529,14 @@ class UpgradeTester(Tester):
             try:
                 qsize = queue.qsize()
             except NotImplementedError:
-                debug("Queue size may not be checkable on Mac OS X. Test will continue without waiting.")
+                logger.debug("Queue size may not be checkable on Mac OS X. Test will continue without waiting.")
                 break
             if opfunc(qsize, required_len):
-                debug("{} queue size ({}) is '{}' to {}. Continuing.".format(label, qsize, opfunc.__name__, required_len))
+                logger.debug("{} queue size ({}) is '{}' to {}. Continuing.".format(label, qsize, opfunc.__name__, required_len))
                 break
 
             if divmod(round(time.time()), 30)[1] == 0:
-                debug("{} queue size is at {}, target is to reach '{}' {}".format(label, qsize, opfunc.__name__, required_len))
+                logger.debug("{} queue size is at {}, target is to reach '{}' {}".format(label, qsize, opfunc.__name__, required_len))
 
             time.sleep(0.1)
             continue
@@ -559,7 +560,7 @@ class UpgradeTester(Tester):
         writer = Process(target=data_writer, args=(self, to_verify_queue, verification_done_queue, 25))
         # daemon subprocesses are killed automagically when the parent process exits
         writer.daemon = True
-        self.subprocs.append(writer)
+        self.fixture_dtest_setup.subprocs.append(writer)
         writer.start()
 
         if wait_for_rowcount > 0:
@@ -568,7 +569,7 @@ class UpgradeTester(Tester):
         verifier = Process(target=data_checker, args=(self, to_verify_queue, verification_done_queue))
         # daemon subprocesses are killed automagically when the parent process exits
         verifier.daemon = True
-        self.subprocs.append(verifier)
+        self.fixture_dtest_setup.subprocs.append(verifier)
         verifier.start()
 
         return writer, verifier, to_verify_queue
@@ -588,7 +589,7 @@ class UpgradeTester(Tester):
         incrementer = Process(target=data_writer, args=(self, to_verify_queue, verification_done_queue, 25))
         # daemon subprocesses are killed automagically when the parent process exits
         incrementer.daemon = True
-        self.subprocs.append(incrementer)
+        self.fixture_dtest_setup.subprocs.append(incrementer)
         incrementer.start()
 
         if wait_for_rowcount > 0:
@@ -597,13 +598,13 @@ class UpgradeTester(Tester):
         count_verifier = Process(target=data_checker, args=(self, to_verify_queue, verification_done_queue))
         # daemon subprocesses are killed automagically when the parent process exits
         count_verifier.daemon = True
-        self.subprocs.append(count_verifier)
+        self.fixture_dtest_setup.subprocs.append(count_verifier)
         count_verifier.start()
 
         return incrementer, count_verifier, to_verify_queue
 
     def _increment_counters(self, opcount=25000):
-        debug("performing {opcount} counter increments".format(opcount=opcount))
+        logger.debug("performing {opcount} counter increments".format(opcount=opcount))
         session = self.patient_cql_connection(self.node2, protocol_version=self.protocol_version)
         session.execute("use upgrade;")
 
@@ -616,7 +617,7 @@ class UpgradeTester(Tester):
         fail_count = 0
 
         for i in range(opcount):
-            key1 = random.choice(self.expected_counts.keys())
+            key1 = random.choice(list(self.expected_counts.keys()))
             key2 = random.randint(1, 10)
             try:
                 query = SimpleStatement(update_counter_query.format(key1=key1, key2=key2), consistency_level=ConsistencyLevel.ALL)
@@ -628,15 +629,15 @@ class UpgradeTester(Tester):
             if fail_count > 100:
                 break
 
-        self.assertLess(fail_count, 100, "Too many counter increment failures")
+        assert fail_count, 100 < "Too many counter increment failures"
 
     def _check_counters(self):
-        debug("Checking counter values...")
+        logger.debug("Checking counter values...")
         session = self.patient_cql_connection(self.node2, protocol_version=self.protocol_version)
         session.execute("use upgrade;")
 
-        for key1 in self.expected_counts.keys():
-            for key2 in self.expected_counts[key1].keys():
+        for key1 in list(self.expected_counts.keys()):
+            for key2 in list(self.expected_counts[key1].keys()):
                 expected_value = self.expected_counts[key1][key2]
 
                 query = SimpleStatement("SELECT c from countertable where k1='{key1}' and k2={key2};".format(key1=key1, key2=key2),
@@ -649,10 +650,10 @@ class UpgradeTester(Tester):
                     # counter wasn't found
                     actual_value = None
 
-                self.assertEqual(actual_value, expected_value)
+                assert actual_value == expected_value
 
     def _check_select_count(self, consistency_level=ConsistencyLevel.ALL):
-        debug("Checking SELECT COUNT(*)")
+        logger.debug("Checking SELECT COUNT(*)")
         session = self.patient_cql_connection(self.node2, protocol_version=self.protocol_version)
         session.execute("use upgrade;")
 
@@ -663,7 +664,7 @@ class UpgradeTester(Tester):
 
         if result is not None:
             actual_num_rows = result[0][0]
-            self.assertEqual(actual_num_rows, expected_num_rows, "SELECT COUNT(*) returned %s when expecting %s" % (actual_num_rows, expected_num_rows))
+            assert actual_num_rows == expected_num_rows, "SELECT COUNT(*) returned %s when expecting %s" % (actual_num_rows, expected_num_rows)
         else:
             self.fail("Count query did not return")
 
@@ -678,7 +679,7 @@ class BootstrapMixin(object):
 
     def _bootstrap_new_node(self):
         # Check we can bootstrap a new node on the upgraded cluster:
-        debug("Adding a node to the cluster")
+        logger.debug("Adding a node to the cluster")
         nnode = new_node(self.cluster, remote_debug_port=str(2000 + len(self.cluster.nodes)))
         nnode.start(use_jna=True, wait_other_notice=240, wait_for_binary_proto=True)
         self._write_values()
@@ -688,7 +689,7 @@ class BootstrapMixin(object):
 
     def _bootstrap_new_node_multidc(self):
         # Check we can bootstrap a new node on the upgraded cluster:
-        debug("Adding a node to the cluster")
+        logger.debug("Adding a node to the cluster")
         nnode = new_node(self.cluster, remote_debug_port=str(2000 + len(self.cluster.nodes)), data_center='dc2')
 
         nnode.start(use_jna=True, wait_other_notice=240, wait_for_binary_proto=True)
@@ -697,11 +698,11 @@ class BootstrapMixin(object):
         self._check_values()
         self._check_counters()
 
-    def bootstrap_test(self):
+    def test_bootstrap(self):
         # try and add a new node
         self.upgrade_scenario(after_upgrade_call=(self._bootstrap_new_node,))
 
-    def bootstrap_multidc_test(self):
+    def test_bootstrap_multidc(self):
         # try and add a new node
         # multi dc, 2 nodes in each dc
         cluster = self.cluster
@@ -759,26 +760,26 @@ def create_upgrade_class(clsname, version_metas, protocol_version,
         extra_config = (('partitioner', 'org.apache.cassandra.dht.Murmur3Partitioner'),)
 
     if bootstrap_test:
-        parent_classes = (UpgradeTester, BootstrapMixin)
+        parent_classes = (TestUpgrade, BootstrapMixin)
     else:
-        parent_classes = (UpgradeTester,)
+        parent_classes = (TestUpgrade,)
 
     # short names for debug output
     parent_class_names = [cls.__name__ for cls in parent_classes]
 
-    print_("Creating test class {} ".format(clsname))
-    print_("  for C* versions:\n{} ".format(pprint.pformat(version_metas)))
-    print_("  using protocol: v{}, and parent classes: {}".format(protocol_version, parent_class_names))
-    print_("  to run these tests alone, use `nosetests {}.py:{}`".format(__name__, clsname))
+    print("Creating test class {} ".format(clsname))
+    print("  for C* versions:\n{} ".format(pprint.pformat(version_metas)))
+    print("  using protocol: v{}, and parent classes: {}".format(protocol_version, parent_class_names))
+    print("  to run these tests alone, use `nosetests {}.py:{}`".format(__name__, clsname))
 
     upgrade_applies_to_env = RUN_STATIC_UPGRADE_MATRIX or version_metas[-1].matches_current_env_version_family
-
-    newcls = skipUnless(upgrade_applies_to_env, 'test not applicable to env.')(
-        type(
+    if not upgrade_applies_to_env:
+        pytest.mark.skip(reason='test not applicable to env.')
+    newcls = type(
             clsname,
             parent_classes,
             {'test_version_metas': version_metas, '__test__': True, 'protocol_version': protocol_version, 'extra_config': extra_config}
-        ))
+        )
 
     if clsname in globals():
         raise RuntimeError("Class by name already exists!")
@@ -837,7 +838,7 @@ for upgrade in MULTI_UPGRADES:
                 # looks like this test should actually run in the current env, so let's set the final version to match the env exactly
                 oldmeta = metas[-1]
                 newmeta = oldmeta.clone_with_local_env_version()
-                debug("{} appears applicable to current env. Overriding final test version from {} to {}".format(upgrade.name, oldmeta.version, newmeta.version))
+                logger.debug("{} appears applicable to current env. Overriding final test version from {} to {}".format(upgrade.name, oldmeta.version, newmeta.version))
                 metas[-1] = newmeta
 
         create_upgrade_class(upgrade.name, [m for m in metas], protocol_version=upgrade.protocol_version, extra_config=upgrade.extra_config)

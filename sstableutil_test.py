@@ -2,13 +2,17 @@ import glob
 import os
 import subprocess
 import time
+import pytest
+import logging
 
 from ccmlib import common
 from ccmlib.node import ToolError
 
-from dtest import Tester, debug
-from tools.decorators import since
+from dtest import Tester
 from tools.intervention import InterruptCompaction
+
+since = pytest.mark.since
+logger = logging.getLogger(__name__)
 
 # These must match the stress schema names
 KeyspaceName = 'keyspace1'
@@ -24,9 +28,9 @@ def _normcase_all(xs):
 
 
 @since('3.0')
-class SSTableUtilTest(Tester):
+class TestSSTableUtil(Tester):
 
-    def compaction_test(self):
+    def test_compaction(self):
         """
         @jira_ticket CASSANDRA-7066
 
@@ -38,14 +42,14 @@ class SSTableUtilTest(Tester):
 
         self._create_data(node, KeyspaceName, TableName, 100000)
         finalfiles, tmpfiles = self._check_files(node, KeyspaceName, TableName)
-        self.assertEqual(0, len(tmpfiles))
+        assert 0 == len(tmpfiles)
 
         node.compact()
         time.sleep(5)
         finalfiles, tmpfiles = self._check_files(node, KeyspaceName, TableName)
-        self.assertEqual(0, len(tmpfiles))
+        assert 0 == len(tmpfiles)
 
-    def abortedcompaction_test(self):
+    def test_abortedcompaction(self):
         """
         @jira_ticket CASSANDRA-7066
         @jira_ticket CASSANDRA-11497
@@ -61,14 +65,14 @@ class SSTableUtilTest(Tester):
 
         self._create_data(node, KeyspaceName, TableName, numrecords)
         finalfiles, tmpfiles = self._check_files(node, KeyspaceName, TableName)
-        self.assertTrue(len(finalfiles) > 0, "Expected to find some final files")
-        self.assertEqual(0, len(tmpfiles), "Expected no tmp files")
+        assert len(finalfiles) > 0, "Expected to find some final files"
+        assert 0 == len(tmpfiles), "Expected no tmp files"
 
         t = InterruptCompaction(node, TableName, filename=log_file_name, delay=2)
         t.start()
 
         try:
-            debug("Compacting...")
+            logger.debug("Compacting...")
             node.compact()
         except ToolError:
             pass  # expected to fail
@@ -81,7 +85,7 @@ class SSTableUtilTest(Tester):
         # In most cases we should end up with some temporary files to clean up, but it may happen
         # that no temporary files are created if compaction finishes too early or starts too late
         # see CASSANDRA-11497
-        debug("Got {} final files and {} tmp files after compaction was interrupted"
+        logger.debug("Got {} final files and {} tmp files after compaction was interrupted"
               .format(len(finalfiles), len(tmpfiles)))
 
         self._invoke_sstableutil(KeyspaceName, TableName, cleanup=True)
@@ -89,15 +93,15 @@ class SSTableUtilTest(Tester):
         self._check_files(node, KeyspaceName, TableName, finalfiles, [])
 
         # restart to make sure not data is lost
-        debug("Restarting node...")
+        logger.debug("Restarting node...")
         node.start(wait_for_binary_proto=True)
         # in some environments, a compaction may start that would change sstable files. We should wait if so
         node.wait_for_compactions()
 
         finalfiles, tmpfiles = self._check_files(node, KeyspaceName, TableName)
-        self.assertEqual(0, len(tmpfiles))
+        assert 0 == len(tmpfiles)
 
-        debug("Running stress to ensure data is readable")
+        logger.debug("Running stress to ensure data is readable")
         self._read_data(node, numrecords)
 
     def _create_data(self, node, ks, table, numrecords):
@@ -132,17 +136,17 @@ class SSTableUtilTest(Tester):
         else:
             expected_tmpfiles = _normcase_all(expected_tmpfiles)
 
-        debug("Comparing all files...")
-        self.assertEqual(sstablefiles, allfiles)
+        logger.debug("Comparing all files...")
+        assert sstablefiles == allfiles
 
-        debug("Comparing final files...")
-        self.assertEqual(expected_finalfiles, finalfiles)
+        logger.debug("Comparing final files...")
+        assert expected_finalfiles == finalfiles
 
-        debug("Comparing tmp files...")
-        self.assertEqual(expected_tmpfiles, tmpfiles)
+        logger.debug("Comparing tmp files...")
+        assert expected_tmpfiles == tmpfiles
 
-        debug("Comparing op logs...")
-        self.assertEqual(expected_oplogs, oplogs)
+        logger.debug("Comparing op logs...")
+        assert expected_oplogs == oplogs
 
         return finalfiles, tmpfiles
 
@@ -150,7 +154,7 @@ class SSTableUtilTest(Tester):
         """
         Invoke sstableutil and return the list of files, if any
         """
-        debug("About to invoke sstableutil with type {}...".format(type))
+        logger.debug("About to invoke sstableutil with type {}...".format(type))
         node1 = self.cluster.nodelist()[0]
         env = common.make_cassandra_env(node1.get_install_cassandra_root(), node1.get_node_cassandra_root())
         tool_bin = node1.get_tool('sstableutil')
@@ -168,14 +172,14 @@ class SSTableUtilTest(Tester):
 
         (stdout, stderr) = p.communicate()
 
-        self.assertEqual(p.returncode, 0, "Error invoking sstableutil; returned {code}".format(code=p.returncode))
+        assert p.returncode == 0, "Error invoking sstableutil; returned {code}".format(code=p.returncode)
 
         if stdout:
-            debug(stdout)
+            logger.debug(stdout.decode("utf-8"))
 
         match = ks + os.sep + table + '-'
-        ret = sorted(filter(lambda s: match in s, stdout.splitlines()))
-        debug("Got {} files of type {}".format(len(ret), type))
+        ret = sorted([s for s in stdout.decode("utf-8").splitlines() if match in s])
+        logger.debug("Got {} files of type {}".format(len(ret), type))
         return ret
 
     def _get_sstable_files(self, node, ks, table):
@@ -184,9 +188,10 @@ class SSTableUtilTest(Tester):
         """
         ret = []
         for data_dir in node.data_directories():
-            keyspace_dir = os.path.join(data_dir, ks)
+            # note, the /var/folders -> /private/var/folders stuff is to fixup mac compatibility
+            keyspace_dir = os.path.abspath(os.path.join(data_dir, ks)).replace("/var/folders", "/private/var/folders")
             for ext in ('*.db', '*.txt', '*.adler32', '*.crc32'):
-                ret.extend(glob.glob(os.path.join(keyspace_dir, table + '-*', ext)))
+                ret.extend(glob.glob(os.path.abspath(os.path.join(keyspace_dir, table + '-*', ext))))
 
         return sorted(ret)
 

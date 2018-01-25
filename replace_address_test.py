@@ -1,18 +1,24 @@
 import os
 import tempfile
+import pytest
+import logging
+import time
+
+from flaky import flaky
+
 from itertools import chain
 from shutil import rmtree
-from unittest import skipIf
 
 from cassandra import ConsistencyLevel, ReadTimeout, Unavailable
 from cassandra.query import SimpleStatement
 from ccmlib.node import Node
-from nose.plugins.attrib import attr
 
-from dtest import CASSANDRA_VERSION_FROM_BUILD, DISABLE_VNODES, Tester, debug
+from dtest import CASSANDRA_VERSION_FROM_BUILD, Tester
 from tools.assertions import assert_bootstrap_state, assert_all, assert_not_running
 from tools.data import rows_to_list
-from tools.decorators import since
+
+since = pytest.mark.since
+logger = logging.getLogger(__name__)
 
 
 class NodeUnavailable(Exception):
@@ -20,24 +26,26 @@ class NodeUnavailable(Exception):
 
 
 class BaseReplaceAddressTest(Tester):
-    __test__ = False
-    replacement_node = None
-    ignore_log_patterns = (
-        # This one occurs when trying to send the migration to a
-        # node that hasn't started yet, and when it does, it gets
-        # replayed and everything is fine.
-        r'Can\'t send migration request: node.*is down',
-        r'Migration task failed to complete',  # 10978
-        # ignore streaming error during bootstrap
-        r'Streaming error occurred',
-        r'failed stream session'
-    )
+
+    @pytest.fixture(autouse=True)
+    def fixture_add_additional_log_patterns(self, fixture_dtest_setup):
+        fixture_dtest_setup.ignore_log_patterns = (
+            # This one occurs when trying to send the migration to a
+            # node that hasn't started yet, and when it does, it gets
+            # replayed and everything is fine.
+            r'Can\'t send migration request: node.*is down',
+            r'Migration task failed to complete',  # 10978
+            # ignore streaming error during bootstrap
+            r'Streaming error occurred',
+            r'failed stream session',
+            r'Failed to properly handshake with peer'
+        )
 
     def _setup(self, n=3, opts=None, enable_byteman=False, mixed_versions=False):
-        debug("Starting cluster with {} nodes.".format(n))
-        self.cluster.populate(n, use_vnodes=not DISABLE_VNODES)
+        logger.debug("Starting cluster with {} nodes.".format(n))
+        self.cluster.populate(n)
         if opts is not None:
-            debug("Setting cluster options: {}".format(opts))
+            logger.debug("Setting cluster options: {}".format(opts))
             self.cluster.set_configuration_options(opts)
 
         self.cluster.set_batch_commitlog(enabled=True)
@@ -46,7 +54,7 @@ class BaseReplaceAddressTest(Tester):
 
         self.cluster.seeds.remove(self.replaced_node)
         NUM_TOKENS = os.environ.get('NUM_TOKENS', '256')
-        if DISABLE_VNODES:
+        if not self.dtest_config.use_vnodes:
             self.cluster.set_configuration_options(values={'initial_token': None, 'num_tokens': 1})
         else:
             self.cluster.set_configuration_options(values={'initial_token': None, 'num_tokens': NUM_TOKENS})
@@ -57,7 +65,7 @@ class BaseReplaceAddressTest(Tester):
             self.query_node.import_config_files()
 
         if mixed_versions:
-            debug("Starting nodes on version 2.2.4")
+            logger.debug("Starting nodes on version 2.2.4")
             self.cluster.set_install_dir(version="2.2.4")
 
         self.cluster.start()
@@ -83,12 +91,12 @@ class BaseReplaceAddressTest(Tester):
                 replacement_address = self.replaced_node.address()
                 self.cluster.remove(self.replaced_node)
 
-            debug("Starting replacement node {} with jvm_option '{}={}'".format(replacement_address, jvm_option, replace_address))
+            logger.debug("Starting replacement node {} with jvm_option '{}={}'".format(replacement_address, jvm_option, replace_address))
             self.replacement_node = Node('replacement', cluster=self.cluster, auto_bootstrap=True,
                                          thrift_interface=None, storage_interface=(replacement_address, 7000),
                                          jmx_port='7400', remote_debug_port='0', initial_token=None, binary_interface=(replacement_address, 9042))
             if opts is not None:
-                debug("Setting options on replacement node: {}".format(opts))
+                logger.debug("Setting options on replacement node: {}".format(opts))
                 self.replacement_node.set_configuration_options(opts)
             self.cluster.add(self.replacement_node, False, data_center=data_center)
 
@@ -107,39 +115,41 @@ class BaseReplaceAddressTest(Tester):
 
     def _stop_node_to_replace(self, gently=False, table='keyspace1.standard1', cl=ConsistencyLevel.THREE):
         if self.replaced_node.is_running():
-            debug("Stopping {}".format(self.replaced_node.name))
+            logger.debug("Stopping {}".format(self.replaced_node.name))
             self.replaced_node.stop(gently=gently, wait_other_notice=True)
 
-        debug("Testing node stoppage (query should fail).")
-        with self.assertRaises((Unavailable, ReadTimeout)):
+        logger.debug("Testing node stoppage (query should fail).")
+        with pytest.raises((Unavailable, ReadTimeout)):
             session = self.patient_cql_connection(self.query_node)
             query = SimpleStatement('select * from {}'.format(table), consistency_level=cl)
             session.execute(query)
 
     def _insert_data(self, n='1k', rf=3, whitelist=False):
-        debug("Inserting {} entries with rf={} with stress...".format(n, rf))
-        self.query_node.stress(['write', 'n={}'.format(n), 'no-warmup', '-schema', 'replication(factor={})'.format(rf)],
+        logger.debug("Inserting {} entries with rf={} with stress...".format(n, rf))
+        self.query_node.stress(['write', 'n={}'.format(n), 'no-warmup', '-schema', 'replication(factor={})'.format(rf),
+                                '-rate', 'threads=10'],
                                whitelist=whitelist)
         self.cluster.flush()
+        time.sleep(20)
 
     def _fetch_initial_data(self, table='keyspace1.standard1', cl=ConsistencyLevel.THREE, limit=10000):
-        debug("Fetching initial data from {} on {} with CL={} and LIMIT={}".format(table, self.query_node.name, cl, limit))
+        logger.debug("Fetching initial data from {} on {} with CL={} and LIMIT={}".format(table, self.query_node.name, cl, limit))
         session = self.patient_cql_connection(self.query_node)
         query = SimpleStatement('select * from {} LIMIT {}'.format(table, limit), consistency_level=cl)
-        return rows_to_list(session.execute(query))
+        return rows_to_list(session.execute(query, timeout=20))
 
     def _verify_data(self, initial_data, table='keyspace1.standard1', cl=ConsistencyLevel.ONE, limit=10000,
                      restart_nodes=False):
-        self.assertGreater(len(initial_data), 0, "Initial data must be greater than 0")
+        assert len(initial_data) > 0, "Initial data must be greater than 0"
 
         # query should work again
-        debug("Stopping old nodes")
+        logger.debug("Stopping old nodes")
         for node in self.cluster.nodelist():
             if node.is_running() and node != self.replacement_node:
-                debug("Stopping {}".format(node.name))
+                logger.debug("Stopping {}".format(node.name))
                 node.stop(gently=False, wait_other_notice=True)
 
-        debug("Verifying {} on {} with CL={} and LIMIT={}".format(table, self.replacement_node.address(), cl, limit))
+        logger.debug("Verifying {} on {} with CL={} and LIMIT={}".format(table, self.replacement_node.address(), cl, limit))
         session = self.patient_exclusive_cql_connection(self.replacement_node)
         assert_all(session, 'select * from {} LIMIT {}'.format(table, limit),
                    expected=initial_data,
@@ -166,22 +176,22 @@ class BaseReplaceAddressTest(Tester):
                                    timeout=60)
 
     def _verify_tokens_migrated_successfully(self, previous_log_size=None):
-        if DISABLE_VNODES:
+        if not self.dtest_config.use_vnodes:
             num_tokens = 1
         else:
             # a little hacky but grep_log returns the whole line...
             num_tokens = int(self.replacement_node.get_conf_option('num_tokens'))
 
-        debug("Verifying {} tokens migrated sucessfully".format(num_tokens))
+        logger.debug("Verifying {} tokens migrated sucessfully".format(num_tokens))
         logs = self.replacement_node.grep_log(r"Token (.*?) changing ownership from /{} to /{}"
                                               .format(self.replaced_node.address(),
                                                       self.replacement_node.address()))
         if (previous_log_size is not None):
-            self.assertEquals(len(logs), previous_log_size)
+            assert len(logs) == previous_log_size
 
         moved_tokens = set([l[1].group(1) for l in logs])
-        debug("number of moved tokens: {}".format(len(moved_tokens)))
-        self.assertEquals(len(moved_tokens), num_tokens)
+        logger.debug("number of moved tokens: {}".format(len(moved_tokens)))
+        assert len(moved_tokens) == num_tokens
 
         return len(logs)
 
@@ -197,11 +207,11 @@ class BaseReplaceAddressTest(Tester):
         self._stop_node_to_replace()
 
         if mixed_versions:
-            debug("Upgrading all except {} to current version".format(self.query_node.address()))
+            logger.debug("Upgrading all except {} to current version".format(self.query_node.address()))
             self.cluster.set_install_dir(install_dir=default_install_dir)
             for node in self.cluster.nodelist():
                 if node.is_running() and node != self.query_node:
-                    debug("Upgrading {} to current version".format(node.address()))
+                    logger.debug("Upgrading {} to current version".format(node.address()))
                     node.stop(gently=True, wait_other_notice=True)
                     node.start(wait_other_notice=True, wait_for_binary_proto=True)
 
@@ -216,7 +226,7 @@ class BaseReplaceAddressTest(Tester):
         if not same_address and not mixed_versions:
             initial_data = self._fetch_initial_data(cl=ConsistencyLevel.TWO)
 
-        debug("Joining replaced node")
+        logger.debug("Joining replaced node")
         self.replacement_node.nodetool("join")
 
         if not same_address:
@@ -229,33 +239,32 @@ class BaseReplaceAddressTest(Tester):
 
 
 class TestReplaceAddress(BaseReplaceAddressTest):
-    __test__ = True
 
-    @attr('resource-intensive')
-    def replace_stopped_node_test(self):
+    @pytest.mark.resource_intensive
+    def test_replace_stopped_node(self):
         """
         Test that we can replace a node that is not shutdown gracefully.
         """
         self._test_replace_node(gently=False)
 
-    @attr('resource-intensive')
-    def replace_shutdown_node_test(self):
+    @pytest.mark.resource_intensive
+    def test_replace_shutdown_node(self):
         """
         @jira_ticket CASSANDRA-9871
         Test that we can replace a node that is shutdown gracefully.
         """
         self._test_replace_node(gently=True)
 
-    @attr('resource-intensive')
-    def replace_stopped_node_same_address_test(self):
+    @pytest.mark.resource_intensive
+    def test_replace_stopped_node_same_address(self):
         """
         @jira_ticket CASSANDRA-8523
         Test that we can replace a node with the same address correctly
         """
         self._test_replace_node(gently=False, same_address=True)
 
-    @attr('resource-intensive')
-    def replace_first_boot_test(self):
+    @pytest.mark.resource_intensive
+    def test_replace_first_boot(self):
         self._test_replace_node(jvm_option='replace_address_first_boot')
 
     def _test_replace_node(self, gently=False, jvm_option='replace_address', same_address=False):
@@ -288,32 +297,35 @@ class TestReplaceAddress(BaseReplaceAddressTest):
 
         self._verify_data(initial_data)
 
-    @attr('resource-intensive')
-    def replace_active_node_test(self):
-        self.ignore_log_patterns = list(self.ignore_log_patterns) + [r'Exception encountered during startup']
+    @pytest.mark.resource_intensive
+    def test_replace_active_node(self):
+        self.fixture_dtest_setup.ignore_log_patterns = list(self.fixture_dtest_setup.ignore_log_patterns) + [
+            r'Exception encountered during startup']
+
         self._setup(n=3)
         self._do_replace(wait_for_binary_proto=False)
 
-        debug("Waiting for replace to fail")
+        logger.debug("Waiting for replace to fail")
         self.replacement_node.watch_log_for("java.lang.UnsupportedOperationException: Cannot replace a live node...")
         assert_not_running(self.replacement_node)
 
-    @attr('resource-intensive')
-    def replace_nonexistent_node_test(self):
-        self.ignore_log_patterns = list(self.ignore_log_patterns) + [
+    @pytest.mark.resource_intensive
+    def test_replace_nonexistent_node(self):
+        self.fixture_dtest_setup.ignore_log_patterns = list(self.fixture_dtest_setup.ignore_log_patterns) + [
             # This is caused by starting a node improperly (replacing active/nonexistent)
             r'Exception encountered during startup',
             # This is caused by trying to replace a nonexistent node
             r'Exception in thread Thread']
+
         self._setup(n=3)
         self._do_replace(replace_address='127.0.0.5', wait_for_binary_proto=False)
 
-        debug("Waiting for replace to fail")
+        logger.debug("Waiting for replace to fail")
         self.replacement_node.watch_log_for("java.lang.RuntimeException: Cannot replace_address /127.0.0.5 because it doesn't exist in gossip")
         assert_not_running(self.replacement_node)
 
     @since('3.6')
-    def fail_without_replace_test(self):
+    def test_fail_without_replace(self):
         """
         When starting a node from a clean slate with the same address as
         an existing down node, the node should error out even when
@@ -321,14 +333,16 @@ class TestReplaceAddress(BaseReplaceAddressTest):
         to use replace_address.
         @jira_ticket CASSANDRA-10134
         """
-        self.ignore_log_patterns = list(self.ignore_log_patterns) + [r'Exception encountered during startup']
+        self.fixture_dtest_setup.ignore_log_patterns = list(self.fixture_dtest_setup.ignore_log_patterns) + [
+            r'Exception encountered during startup']
+
         self._setup(n=3)
         self._insert_data()
         node1, node2, node3 = self.cluster.nodelist()
 
         mark = None
         for auto_bootstrap in (True, False):
-            debug("Stopping node 3.")
+            logger.debug("Stopping node 3.")
             node3.stop(gently=False)
 
             # completely delete the data, commitlog, and saved caches
@@ -339,13 +353,13 @@ class TestReplaceAddress(BaseReplaceAddressTest):
                     rmtree(d)
 
             node3.set_configuration_options(values={'auto_bootstrap': auto_bootstrap})
-            debug("Starting node 3 with auto_bootstrap = {val}".format(val=auto_bootstrap))
+            logger.debug("Starting node 3 with auto_bootstrap = {val}".format(val=auto_bootstrap))
             node3.start(wait_other_notice=False)
             node3.watch_log_for('Use cassandra.replace_address if you want to replace this node', from_mark=mark, timeout=20)
             mark = node3.mark_log()
 
     @since('3.6')
-    def unsafe_replace_test(self):
+    def test_unsafe_replace(self):
         """
         To handle situations such as failed disk in a JBOD, it may be desirable to
         replace a node without bootstrapping. In such scenarios best practice
@@ -359,14 +373,16 @@ class TestReplaceAddress(BaseReplaceAddressTest):
 
         @jira_ticket CASSANDRA-10134
         """
-        self.ignore_log_patterns = list(self.ignore_log_patterns) + [r'Exception encountered during startup']
+        self.fixture_dtest_setup.ignore_log_patterns = list(self.fixture_dtest_setup.ignore_log_patterns) + [
+            r'Exception encountered during startup']
+
         self._setup(n=3)
         self._insert_data()
         initial_data = self._fetch_initial_data()
         self.replacement_node = self.replaced_node
 
         for set_allow_unsafe_flag in [False, True]:
-            debug("Stopping {}".format(self.replaced_node.name))
+            logger.debug("Stopping {}".format(self.replaced_node.name))
             self.replaced_node.stop(gently=False)
 
             # completely delete the system keyspace data plus commitlog and saved caches
@@ -384,27 +400,27 @@ class TestReplaceAddress(BaseReplaceAddressTest):
             mark = self.replacement_node.mark_log()
 
             if set_allow_unsafe_flag:
-                debug('Starting replacement node with auto_bootstrap = false and replace_address = {} and allow_unsafe_replace = true'.format(self.replaced_node.address()))
+                logger.debug('Starting replacement node with auto_bootstrap = false and replace_address = {} and allow_unsafe_replace = true'.format(self.replaced_node.address()))
                 self._do_replace(extra_jvm_args=['-Dcassandra.allow_unsafe_replace=true'])
                 self._verify_data(initial_data)
             else:
-                debug('Starting replacement node with auto_bootstrap = false and replace_address = {}'.format(self.replaced_node.address()))
+                logger.debug('Starting replacement node with auto_bootstrap = false and replace_address = {}'.format(self.replaced_node.address()))
                 self._do_replace(wait_for_binary_proto=False)
                 self.replacement_node.watch_log_for('To perform this operation, please restart with -Dcassandra.allow_unsafe_replace=true',
                                                     from_mark=mark, timeout=20)
 
-    @skipIf(CASSANDRA_VERSION_FROM_BUILD == '3.9', "Test doesn't run on 3.9")
+    @pytest.mark.skipif(CASSANDRA_VERSION_FROM_BUILD == '3.9', reason="Test doesn't run on 3.9")
     @since('2.2')
-    def insert_data_during_replace_same_address_test(self):
+    def test_insert_data_during_replace_same_address(self):
         """
         Test that replacement node with same address DOES NOT receive writes during replacement
         @jira_ticket CASSANDRA-8523
         """
         self._test_insert_data_during_replace(same_address=True)
 
-    @skipIf(CASSANDRA_VERSION_FROM_BUILD == '3.9', "Test doesn't run on 3.9")
+    @pytest.mark.skipif(CASSANDRA_VERSION_FROM_BUILD == '3.9', reason="Test doesn't run on 3.9")
     @since('2.2')
-    def insert_data_during_replace_different_address_test(self):
+    def test_insert_data_during_replace_different_address(self):
         """
         Test that replacement node with different address DOES receive writes during replacement
         @jira_ticket CASSANDRA-8523
@@ -412,8 +428,8 @@ class TestReplaceAddress(BaseReplaceAddressTest):
         self._test_insert_data_during_replace(same_address=False)
 
     @since('2.2')
-    @attr('resource-intensive')
-    def resume_failed_replace_test(self):
+    @pytest.mark.resource_intensive
+    def test_resume_failed_replace(self):
         """
         Test resumable bootstrap while replacing node. Feature introduced in
         2.2 with ticket https://issues.apache.org/jira/browse/CASSANDRA-8838
@@ -423,21 +439,23 @@ class TestReplaceAddress(BaseReplaceAddressTest):
         self._test_restart_failed_replace(mode='resume')
 
     @since('2.2')
-    @attr('resource-intensive')
-    def restart_failed_replace_with_reset_resume_state_test(self):
+    @pytest.mark.resource_intensive
+    def test_restart_failed_replace_with_reset_resume_state(self):
         """Test replace with resetting bootstrap progress"""
         self._test_restart_failed_replace(mode='reset_resume_state')
 
     @since('2.2')
-    @attr('resource-intensive')
-    def restart_failed_replace_test(self):
+    @pytest.mark.resource_intensive
+    def test_restart_failed_replace(self):
         """
         Test that if a node fails to replace, it can join the cluster even if the data is wiped.
         """
         self._test_restart_failed_replace(mode='wipe')
 
     def _test_restart_failed_replace(self, mode):
-        self.ignore_log_patterns = list(self.ignore_log_patterns) + [r'Error while waiting on bootstrap to complete']
+        self.fixture_dtest_setup.ignore_log_patterns = list(self.fixture_dtest_setup.ignore_log_patterns) + [
+            r'Error while waiting on bootstrap to complete']
+
         self._setup(n=3, enable_byteman=True)
         self._insert_data(n="1k")
 
@@ -445,7 +463,7 @@ class TestReplaceAddress(BaseReplaceAddressTest):
 
         self._stop_node_to_replace()
 
-        debug("Submitting byteman script to make stream fail")
+        logger.debug("Submitting byteman script to make stream fail")
 
         if self.cluster.version() < '4.0':
             self.query_node.byteman_submit(['./byteman/pre4.0/stream_failure.btm'])
@@ -460,7 +478,7 @@ class TestReplaceAddress(BaseReplaceAddressTest):
 
         if mode == 'reset_resume_state':
             mark = self.replacement_node.mark_log()
-            debug("Restarting replacement node with -Dcassandra.reset_bootstrap_progress=true")
+            logger.debug("Restarting replacement node with -Dcassandra.reset_bootstrap_progress=true")
             # restart replacement node with resetting bootstrap state
             self.replacement_node.stop()
             self.replacement_node.start(jvm_args=[
@@ -471,7 +489,7 @@ class TestReplaceAddress(BaseReplaceAddressTest):
             # check if we reset bootstrap state
             self.replacement_node.watch_log_for("Resetting bootstrap progress to start fresh", from_mark=mark)
         elif mode == 'resume':
-            debug("Resuming failed bootstrap")
+            logger.debug("Resuming failed bootstrap")
             self.replacement_node.nodetool('bootstrap resume')
             # check if we skipped already retrieved ranges
             self.replacement_node.watch_log_for("already available. Skipping streaming.")
@@ -479,37 +497,39 @@ class TestReplaceAddress(BaseReplaceAddressTest):
         elif mode == 'wipe':
             self.replacement_node.stop()
 
-            debug("Waiting other nodes to detect node stopped")
-            self.query_node.watch_log_for("FatClient /{} has been silent for 30000ms, removing from gossip".format(self.replacement_node.address()), timeout=60)
-            self.query_node.watch_log_for("Node /{} failed during replace.".format(self.replacement_node.address()), timeout=60, filename='debug.log')
+            logger.debug("Waiting other nodes to detect node stopped")
+            self.query_node.watch_log_for("FatClient /{} has been silent for 30000ms, removing from gossip".format(self.replacement_node.address()), timeout=120)
+            self.query_node.watch_log_for("Node /{} failed during replace.".format(self.replacement_node.address()), timeout=120, filename='debug.log')
 
-            debug("Restarting node after wiping data")
+            logger.debug("Restarting node after wiping data")
             self._cleanup(self.replacement_node)
             self.replacement_node.start(jvm_args=["-Dcassandra.replace_address_first_boot={}".format(self.replaced_node.address())],
                                         wait_for_binary_proto=True)
         else:
-            raise RuntimeError('invalid mode value {mode}'.format(mode))
+            raise RuntimeError('invalid mode value {mode}'.format(mode=mode))
 
         # check if bootstrap succeeded
         assert_bootstrap_state(self, self.replacement_node, 'COMPLETED')
 
-        debug("Bootstrap finished successully, verifying data.")
+        logger.debug("Bootstrap finished successully, verifying data.")
 
         self._verify_data(initial_data)
 
-    def replace_with_insufficient_replicas_test(self):
+    def test_replace_with_insufficient_replicas(self):
         """
         Test that replace fails when there are insufficient replicas
         @jira_ticket CASSANDRA-11848
         """
-        self.ignore_log_patterns = list(self.ignore_log_patterns) + [r'Unable to find sufficient sources for streaming range']
+        self.fixture_dtest_setup.ignore_log_patterns = list(self.fixture_dtest_setup.ignore_log_patterns) + [
+            r'Unable to find sufficient sources for streaming range']
+
         self._setup(n=3)
         self._insert_data(rf=2)
 
         self._stop_node_to_replace()
 
         # stop other replica
-        debug("Stopping other replica")
+        logger.debug("Stopping other replica")
         self.query_node.stop(wait_other_notice=True)
 
         self._do_replace(wait_for_binary_proto=False, wait_other_notice=False)
@@ -518,7 +538,9 @@ class TestReplaceAddress(BaseReplaceAddressTest):
         self.replacement_node.watch_log_for("Unable to find sufficient sources for streaming range")
         assert_not_running(self.replacement_node)
 
-    def multi_dc_replace_with_rf1_test(self):
+    @flaky
+    @pytest.mark.vnodes
+    def test_multi_dc_replace_with_rf1(self):
         """
         Test that multi-dc replace works when rf=1 on each dc
         """
@@ -550,7 +572,11 @@ class TestReplaceAddress(BaseReplaceAddressTest):
             stress_config.write(yaml_config)
             stress_config.flush()
             self.query_node.stress(['user', 'profile=' + stress_config.name, 'n=10k', 'no-warmup',
-                                    'ops(insert=1)', '-rate', 'threads=50'])
+                                    'ops(insert=1)', '-rate', 'threads=5'])
+            # need to sleep for a bit to try and let things catch up as we frequently do a lot of
+            # GC after the stress invocation above causing the next step of the test to timeout.
+            # and then flush to make sure we really are fully caught up
+            time.sleep(30)
 
         # Save initial data
         table_name = 'keyspace1.users'
@@ -563,13 +589,13 @@ class TestReplaceAddress(BaseReplaceAddressTest):
         assert_bootstrap_state(self, self.replacement_node, 'COMPLETED')
 
         # Check that keyspace was replicated from dc1 to dc2
-        self.assertFalse(self.replacement_node.grep_log("Unable to find sufficient sources for streaming range"))
+        assert not self.replacement_node.grep_log("Unable to find sufficient sources for streaming range")
 
         self._verify_data(initial_data, table=table_name, cl=ConsistencyLevel.LOCAL_ONE)
 
     def _cleanup(self, node):
         commitlog_dir = os.path.join(node.get_path(), 'commitlogs')
         for data_dir in node.data_directories():
-            debug("Deleting {}".format(data_dir))
+            logger.debug("Deleting {}".format(data_dir))
             rmtree(data_dir)
         rmtree(commitlog_dir)

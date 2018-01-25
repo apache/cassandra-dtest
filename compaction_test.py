@@ -5,25 +5,29 @@ import string
 import tempfile
 import time
 from distutils.version import LooseVersion
-
+import pytest
 import parse
+import logging
 
-from dtest import Tester, debug, create_ks
+from dtest import Tester, create_ks
 from tools.assertions import assert_length_equal, assert_none, assert_one
-from tools.decorators import since
+
+since = pytest.mark.since
+logger = logging.getLogger(__name__)
+
+strategies = ['LeveledCompactionStrategy', 'SizeTieredCompactionStrategy', 'DateTieredCompactionStrategy']
 
 
 class TestCompaction(Tester):
 
-    __test__ = False
-
-    def setUp(self):
-        Tester.setUp(self)
+    @pytest.fixture(scope='function', autouse=True)
+    def fixture_set_cluster_log_level(self, fixture_dtest_setup):
         # compaction test for version 2.2.2 and above relies on DEBUG log in debug.log
-        self.cluster.set_log_level("DEBUG")
+        fixture_dtest_setup.cluster.set_log_level("DEBUG")
 
-    @since('0', '2.2.X')
-    def compaction_delete_test(self):
+    @pytest.mark.parametrize("strategy", strategies)
+    @since('0', max_version='2.2.X')
+    def test_compaction_delete(self, strategy):
         """
         Test that executing a delete properly tombstones a row.
         Insert data, delete a partition of data and check that the requesite rows are tombstoned.
@@ -35,7 +39,7 @@ class TestCompaction(Tester):
         session = self.patient_cql_connection(node1)
         create_ks(session, 'ks', 1)
 
-        session.execute("create table ks.cf (key int PRIMARY KEY, val int) with compaction = {'class':'" + self.strategy + "'} and gc_grace_seconds = 30;")
+        session.execute("create table ks.cf (key int PRIMARY KEY, val int) with compaction = {'class':'" + strategy + "'} and gc_grace_seconds = 30;")
 
         for x in range(0, 100):
             session.execute('insert into cf (key, val) values (' + str(x) + ',1)')
@@ -58,9 +62,9 @@ class TestCompaction(Tester):
 
         numfound = jsoninfo.count("markedForDeleteAt")
 
-        self.assertEqual(numfound, 10)
+        assert numfound == 10
 
-    def data_size_test(self):
+    def test_data_size(self):
         """
         Ensure that data size does not have unwarranted increases after compaction.
         Insert data and check data size before and after a compaction.
@@ -80,8 +84,8 @@ class TestCompaction(Tester):
             output = output[output.find("Space used (live)"):]
             initialValue = int(output[output.find(":") + 1:output.find("\n")].strip())
         else:
-            debug("datasize not found")
-            debug(output)
+            logger.debug("datasize not found")
+            logger.debug(output)
 
         node1.flush()
         node1.compact()
@@ -93,31 +97,32 @@ class TestCompaction(Tester):
             output = output[output.find("Space used (live)"):]
             finalValue = int(output[output.find(":") + 1:output.find("\n")].strip())
         else:
-            debug("datasize not found")
+            logger.debug("datasize not found")
         # allow 5% size increase - if we have few sstables it is not impossible that live size increases *slightly* after compaction
-        self.assertLess(finalValue, initialValue * 1.05)
+        assert finalValue < initialValue * 1.05
 
-    def bloomfilter_size_test(self):
+    @pytest.mark.parametrize("strategy", strategies)
+    def test_bloomfilter_size(self, strategy):
         """
         @jira_ticket CASSANDRA-11344
         Check that bloom filter size is between 50KB and 100KB for 100K keys
         """
-        if not hasattr(self, 'strategy') or self.strategy == "LeveledCompactionStrategy":
+        if not hasattr(self, 'strategy') or strategy == "LeveledCompactionStrategy":
             strategy_string = 'strategy=LeveledCompactionStrategy,sstable_size_in_mb=1'
             min_bf_size = 40000
             max_bf_size = 100000
         else:
-            if self.strategy == "DateTieredCompactionStrategy":
+            if strategy == "DateTieredCompactionStrategy":
                 strategy_string = "strategy=DateTieredCompactionStrategy,base_time_seconds=86400"  # we want a single sstable, so make sure we don't have a tiny first window
             else:
-                strategy_string = "strategy={}".format(self.strategy)
+                strategy_string = "strategy={}".format(strategy)
             min_bf_size = 100000
             max_bf_size = 150000
         cluster = self.cluster
         cluster.populate(1).start(wait_for_binary_proto=True)
         [node1] = cluster.nodelist()
 
-        for x in xrange(0, 5):
+        for x in range(0, 5):
             node1.stress(['write', 'n=100K', "no-warmup", "cl=ONE", "-rate",
                           "threads=300", "-schema", "replication(factor=1)",
                           "compaction({},enabled=false)".format(strategy_string)])
@@ -134,36 +139,37 @@ class TestCompaction(Tester):
 
         # in some rare cases we can end up with more than one sstable per data directory with
         # non-lcs strategies (see CASSANDRA-12323)
-        if not hasattr(self, 'strategy') or self.strategy == "LeveledCompactionStrategy":
+        if not hasattr(self, 'strategy') or strategy == "LeveledCompactionStrategy":
             size_factor = 1
         else:
             sstable_count = len(node1.get_sstables('keyspace1', 'standard1'))
             dir_count = len(node1.data_directories())
-            debug("sstable_count is: {}".format(sstable_count))
-            debug("dir_count is: {}".format(dir_count))
+            logger.debug("sstable_count is: {}".format(sstable_count))
+            logger.debug("dir_count is: {}".format(dir_count))
             if node1.get_cassandra_version() < LooseVersion('3.2'):
                 size_factor = sstable_count
             else:
                 size_factor = sstable_count / float(dir_count)
 
-        debug("bloom filter size is: {}".format(bfSize))
-        debug("size factor = {}".format(size_factor))
-        self.assertGreaterEqual(bfSize, size_factor * min_bf_size)
-        self.assertLessEqual(bfSize, size_factor * max_bf_size)
+        logger.debug("bloom filter size is: {}".format(bfSize))
+        logger.debug("size factor = {}".format(size_factor))
+        assert bfSize >= size_factor * min_bf_size
+        assert bfSize <= size_factor * max_bf_size
 
-    def sstable_deletion_test(self):
+    @pytest.mark.parametrize("strategy", strategies)
+    def test_sstable_deletion(self, strategy):
         """
         Test that sstables are deleted properly when able after compaction.
         Insert data setting gc_grace_seconds to 0, and determine sstable
         is deleted upon data deletion.
         """
-        self.skip_if_no_major_compaction()
+        self.skip_if_no_major_compaction(strategy)
         cluster = self.cluster
         cluster.populate(1).start(wait_for_binary_proto=True)
         [node1] = cluster.nodelist()
         session = self.patient_cql_connection(node1)
         create_ks(session, 'ks', 1)
-        session.execute("create table cf (key int PRIMARY KEY, val int) with gc_grace_seconds = 0 and compaction= {'class':'" + self.strategy + "'}")
+        session.execute("create table cf (key int PRIMARY KEY, val int) with gc_grace_seconds = 0 and compaction= {'class':'" + strategy + "'}")
 
         for x in range(0, 100):
             session.execute('insert into cf (key, val) values (' + str(x) + ',1)')
@@ -180,22 +186,21 @@ class TestCompaction(Tester):
                 cfs = os.listdir(os.path.join(data_dir, "ks"))
                 ssdir = os.listdir(os.path.join(data_dir, "ks", cfs[0]))
                 for afile in ssdir:
-                    self.assertFalse("Data" in afile, afile)
+                    assert not "Data" in afile, afile
 
         except OSError:
             self.fail("Path to sstables not valid.")
 
-    def dtcs_deletion_test(self):
+    @pytest.mark.parametrize("strategy", ['DateTieredCompactionStrategy'])
+    def test_dtcs_deletion(self, strategy):
         """
         Test that sstables are deleted properly when able after compaction with
         DateTieredCompactionStrategy.
         Insert data setting max_sstable_age_days low, and determine sstable
         is deleted upon data deletion past max_sstable_age_days.
         """
-        if not hasattr(self, 'strategy'):
-            self.strategy = 'DateTieredCompactionStrategy'
-        elif self.strategy != 'DateTieredCompactionStrategy':
-            self.skipTest('Not implemented unless DateTieredCompactionStrategy is used')
+        if strategy != 'DateTieredCompactionStrategy':
+            pytest.skip('Not implemented unless DateTieredCompactionStrategy is used')
 
         cluster = self.cluster
         cluster.populate(1).start(wait_for_binary_proto=True)
@@ -215,7 +220,7 @@ class TestCompaction(Tester):
         expected_sstable_count = 1
         if self.cluster.version() > LooseVersion('3.1'):
             expected_sstable_count = cluster.data_dir_count
-        self.assertEqual(len(expired_sstables), expected_sstable_count)
+        assert len(expired_sstables) == expected_sstable_count
         # write a new sstable to make DTCS check for expired sstables:
         for x in range(0, 100):
             session.execute('insert into cf (key, val) values ({}, {})'.format(x, x))
@@ -223,7 +228,7 @@ class TestCompaction(Tester):
         time.sleep(5)
         # we only check every 10 minutes - sstable should still be there:
         for expired_sstable in expired_sstables:
-            self.assertIn(expired_sstable, node1.get_sstables('ks', 'cf'))
+            assert expired_sstable, node1.get_sstables('ks' in 'cf')
 
         session.execute("alter table cf with compaction =  {'class':'DateTieredCompactionStrategy', 'max_sstable_age_days':0.00035, 'min_threshold':2, 'expired_sstable_check_frequency_seconds':0}")
         time.sleep(1)
@@ -232,9 +237,9 @@ class TestCompaction(Tester):
         node1.flush()
         time.sleep(5)
         for expired_sstable in expired_sstables:
-            self.assertNotIn(expired_sstable, node1.get_sstables('ks', 'cf'))
+            assert expired_sstable, node1.get_sstables('ks' not in 'cf')
 
-    def compaction_throughput_test(self):
+    def test_compaction_throughput(self):
         """
         Test setting compaction throughput.
         Set throughput, insert data and ensure compaction performance corresponds.
@@ -277,24 +282,26 @@ class TestCompaction(Tester):
         }
 
         units = ['MB'] if cluster.version() < LooseVersion('3.6') else ['KiB', 'MiB', 'GiB']
-        self.assertIn(found_units, units)
+        assert found_units in units
 
-        debug(avgthroughput)
+        logger.debug(avgthroughput)
         avgthroughput_mb = unit_conversion_dct[found_units] * float(avgthroughput)
 
         # The throughput in the log is computed independantly from the throttling and on the output files while
         # throttling is on the input files, so while that throughput shouldn't be higher than the one set in
         # principle, a bit of wiggle room is expected
-        self.assertGreaterEqual(float(threshold) + 0.5, avgthroughput_mb)
+        assert float(threshold) + 0.5 >= avgthroughput_mb
 
-    def compaction_strategy_switching_test(self):
-        """Ensure that switching strategies does not result in problems.
+    @pytest.mark.parametrize("strategy", strategies)
+    def test_compaction_strategy_switching(self, strategy):
+        """
+        Ensure that switching strategies does not result in problems.
         Insert data, switch strategies, then check against data loss.
         """
         strategies = ['LeveledCompactionStrategy', 'SizeTieredCompactionStrategy', 'DateTieredCompactionStrategy']
 
-        if self.strategy in strategies:
-            strategies.remove(self.strategy)
+        if strategy in strategies:
+            strategies.remove(strategy)
             cluster = self.cluster
             cluster.populate(1).start(wait_for_binary_proto=True)
             [node1] = cluster.nodelist()
@@ -303,7 +310,7 @@ class TestCompaction(Tester):
                 session = self.patient_cql_connection(node1)
                 create_ks(session, 'ks', 1)
 
-                session.execute("create table ks.cf (key int PRIMARY KEY, val int) with gc_grace_seconds = 0 and compaction= {'class':'" + self.strategy + "'};")
+                session.execute("create table ks.cf (key int PRIMARY KEY, val int) with gc_grace_seconds = 0 and compaction= {'class':'" + strategy + "'};")
 
                 for x in range(0, 100):
                     session.execute('insert into ks.cf (key, val) values (' + str(x) + ',1)')
@@ -326,7 +333,7 @@ class TestCompaction(Tester):
                 time.sleep(5)
                 cluster.start(wait_for_binary_proto=True)
 
-    def large_compaction_warning_test(self):
+    def test_large_compaction_warning(self):
         """
         @jira_ticket CASSANDRA-9643
         Check that we log a warning when the partition size is bigger than compaction_large_partition_warning_threshold_mb
@@ -347,7 +354,7 @@ class TestCompaction(Tester):
 
         ret = list(session.execute("SELECT properties from ks.large where userid = 'user'"))
         assert_length_equal(ret, 1)
-        self.assertEqual(200, len(ret[0][0].keys()))
+        assert 200 == len(list(ret[0][0].keys()))
 
         node.flush()
 
@@ -358,9 +365,10 @@ class TestCompaction(Tester):
 
         ret = list(session.execute("SELECT properties from ks.large where userid = 'user'"))
         assert_length_equal(ret, 1)
-        self.assertEqual(200, len(ret[0][0].keys()))
+        assert 200 == len(list(ret[0][0].keys()))
 
-    def disable_autocompaction_nodetool_test(self):
+    @pytest.mark.parametrize("strategy", strategies)
+    def test_disable_autocompaction_nodetool(self, strategy):
         """
         Make sure we can enable/disable compaction using nodetool
         """
@@ -369,7 +377,7 @@ class TestCompaction(Tester):
         [node] = cluster.nodelist()
         session = self.patient_cql_connection(node)
         create_ks(session, 'ks', 1)
-        session.execute('CREATE TABLE to_disable (id int PRIMARY KEY, d TEXT) WITH compaction = {{\'class\':\'{0}\'}}'.format(self.strategy))
+        session.execute('CREATE TABLE to_disable (id int PRIMARY KEY, d TEXT) WITH compaction = {{\'class\':\'{0}\'}}'.format(strategy))
         node.nodetool('disableautocompaction ks to_disable')
         for i in range(1000):
             session.execute('insert into to_disable (id, d) values ({0}, \'{1}\')'.format(i, 'hello' * 100))
@@ -379,13 +387,14 @@ class TestCompaction(Tester):
             log_file = 'system.log'
         else:
             log_file = 'debug.log'
-        self.assertTrue(len(node.grep_log('Compacting.+to_disable', filename=log_file)) == 0, 'Found compaction log items for {0}'.format(self.strategy))
+        assert len(node.grep_log('Compacting.+to_disable', filename=log_file)) == 0, 'Found compaction log items for {0}'.format(strategy)
         node.nodetool('enableautocompaction ks to_disable')
         # sleep to allow compactions to start
         time.sleep(2)
-        self.assertTrue(len(node.grep_log('Compacting.+to_disable', filename=log_file)) > 0, 'Found no log items for {0}'.format(self.strategy))
+        assert len(node.grep_log('Compacting.+to_disable', filename=log_file)) > 0, 'Found no log items for {0}'.format(strategy)
 
-    def disable_autocompaction_schema_test(self):
+    @pytest.mark.parametrize("strategy", strategies)
+    def test_disable_autocompaction_schema(self, strategy):
         """
         Make sure we can disable compaction via the schema compaction parameter 'enabled' = false
         """
@@ -394,7 +403,7 @@ class TestCompaction(Tester):
         [node] = cluster.nodelist()
         session = self.patient_cql_connection(node)
         create_ks(session, 'ks', 1)
-        session.execute('CREATE TABLE to_disable (id int PRIMARY KEY, d TEXT) WITH compaction = {{\'class\':\'{0}\', \'enabled\':\'false\'}}'.format(self.strategy))
+        session.execute('CREATE TABLE to_disable (id int PRIMARY KEY, d TEXT) WITH compaction = {{\'class\':\'{0}\', \'enabled\':\'false\'}}'.format(strategy))
         for i in range(1000):
             session.execute('insert into to_disable (id, d) values ({0}, \'{1}\')'.format(i, 'hello' * 100))
             if i % 100 == 0:
@@ -404,7 +413,7 @@ class TestCompaction(Tester):
         else:
             log_file = 'debug.log'
 
-        self.assertTrue(len(node.grep_log('Compacting.+to_disable', filename=log_file)) == 0, 'Found compaction log items for {0}'.format(self.strategy))
+        assert len(node.grep_log('Compacting.+to_disable', filename=log_file)) == 0, 'Found compaction log items for {0}'.format(strategy)
         # should still be disabled after restart:
         node.stop()
         node.start(wait_for_binary_proto=True)
@@ -412,13 +421,14 @@ class TestCompaction(Tester):
         session.execute("use ks")
         # sleep to make sure we dont start any logs
         time.sleep(2)
-        self.assertTrue(len(node.grep_log('Compacting.+to_disable', filename=log_file)) == 0, 'Found compaction log items for {0}'.format(self.strategy))
+        assert len(node.grep_log('Compacting.+to_disable', filename=log_file)) == 0, 'Found compaction log items for {0}'.format(strategy)
         node.nodetool('enableautocompaction ks to_disable')
         # sleep to allow compactions to start
         time.sleep(2)
-        self.assertTrue(len(node.grep_log('Compacting.+to_disable', filename=log_file)) > 0, 'Found no log items for {0}'.format(self.strategy))
+        assert len(node.grep_log('Compacting.+to_disable', filename=log_file)) > 0, 'Found no log items for {0}'.format(strategy)
 
-    def disable_autocompaction_alter_test(self):
+    @pytest.mark.parametrize("strategy", strategies)
+    def test_disable_autocompaction_alter(self, strategy):
         """
         Make sure we can enable compaction using an alter-statement
         """
@@ -427,8 +437,8 @@ class TestCompaction(Tester):
         [node] = cluster.nodelist()
         session = self.patient_cql_connection(node)
         create_ks(session, 'ks', 1)
-        session.execute('CREATE TABLE to_disable (id int PRIMARY KEY, d TEXT) WITH compaction = {{\'class\':\'{0}\'}}'.format(self.strategy))
-        session.execute('ALTER TABLE to_disable WITH compaction = {{\'class\':\'{0}\', \'enabled\':\'false\'}}'.format(self.strategy))
+        session.execute('CREATE TABLE to_disable (id int PRIMARY KEY, d TEXT) WITH compaction = {{\'class\':\'{0}\'}}'.format(strategy))
+        session.execute('ALTER TABLE to_disable WITH compaction = {{\'class\':\'{0}\', \'enabled\':\'false\'}}'.format(strategy))
         for i in range(1000):
             session.execute('insert into to_disable (id, d) values ({0}, \'{1}\')'.format(i, 'hello' * 100))
             if i % 100 == 0:
@@ -437,16 +447,17 @@ class TestCompaction(Tester):
             log_file = 'system.log'
         else:
             log_file = 'debug.log'
-        self.assertTrue(len(node.grep_log('Compacting.+to_disable', filename=log_file)) == 0, 'Found compaction log items for {0}'.format(self.strategy))
-        session.execute('ALTER TABLE to_disable WITH compaction = {{\'class\':\'{0}\', \'enabled\':\'true\'}}'.format(self.strategy))
+        assert len(node.grep_log('Compacting.+to_disable', filename=log_file)) == 0, 'Found compaction log items for {0}'.format(strategy)
+        session.execute('ALTER TABLE to_disable WITH compaction = {{\'class\':\'{0}\', \'enabled\':\'true\'}}'.format(strategy))
         # we need to flush atleast once when altering to enable:
         session.execute('insert into to_disable (id, d) values (99, \'hello\')')
         node.flush()
         # sleep to allow compactions to start
         time.sleep(2)
-        self.assertTrue(len(node.grep_log('Compacting.+to_disable', filename=log_file)) > 0, 'Found no log items for {0}'.format(self.strategy))
+        assert len(node.grep_log('Compacting.+to_disable', filename=log_file)) > 0, 'Found no log items for {0}'.format(strategy)
 
-    def disable_autocompaction_alter_and_nodetool_test(self):
+    @pytest.mark.parametrize("strategy", strategies)
+    def test_disable_autocompaction_alter_and_nodetool(self, strategy):
         """
         Make sure compaction stays disabled after an alter statement where we have disabled using nodetool first
         """
@@ -455,7 +466,7 @@ class TestCompaction(Tester):
         [node] = cluster.nodelist()
         session = self.patient_cql_connection(node)
         create_ks(session, 'ks', 1)
-        session.execute('CREATE TABLE to_disable (id int PRIMARY KEY, d TEXT) WITH compaction = {{\'class\':\'{0}\'}}'.format(self.strategy))
+        session.execute('CREATE TABLE to_disable (id int PRIMARY KEY, d TEXT) WITH compaction = {{\'class\':\'{0}\'}}'.format(strategy))
         node.nodetool('disableautocompaction ks to_disable')
         for i in range(1000):
             session.execute('insert into to_disable (id, d) values ({0}, \'{1}\')'.format(i, 'hello' * 100))
@@ -465,19 +476,19 @@ class TestCompaction(Tester):
             log_file = 'system.log'
         else:
             log_file = 'debug.log'
-        self.assertTrue(len(node.grep_log('Compacting.+to_disable', filename=log_file)) == 0, 'Found compaction log items for {0}'.format(self.strategy))
-        session.execute('ALTER TABLE to_disable WITH compaction = {{\'class\':\'{0}\', \'tombstone_threshold\':0.9}}'.format(self.strategy))
+        assert len(node.grep_log('Compacting.+to_disable', filename=log_file)) == 0, 'Found compaction log items for {0}'.format(strategy)
+        session.execute('ALTER TABLE to_disable WITH compaction = {{\'class\':\'{0}\', \'tombstone_threshold\':0.9}}'.format(strategy))
         session.execute('insert into to_disable (id, d) values (99, \'hello\')')
         node.flush()
         time.sleep(2)
-        self.assertTrue(len(node.grep_log('Compacting.+to_disable', filename=log_file)) == 0, 'Found log items for {0}'.format(self.strategy))
+        assert len(node.grep_log('Compacting.+to_disable', filename=log_file)) == 0, 'Found log items for {0}'.format(strategy)
         node.nodetool('enableautocompaction ks to_disable')
         # sleep to allow compactions to start
         time.sleep(2)
-        self.assertTrue(len(node.grep_log('Compacting.+to_disable', filename=log_file)) > 0, 'Found no log items for {0}'.format(self.strategy))
+        assert len(node.grep_log('Compacting.+to_disable', filename=log_file)) > 0, 'Found no log items for {0}'.format(strategy)
 
     @since('3.7')
-    def user_defined_compaction_test(self):
+    def test_user_defined_compaction(self):
         """
         Test a user defined compaction task by generating a few sstables with cassandra stress
         and autocompaction disabled, and then passing a list of sstable data files directly to nodetool compact.
@@ -499,20 +510,21 @@ class TestCompaction(Tester):
         node1.nodetool('flush keyspace1 standard1')
 
         sstable_files = ' '.join(node1.get_sstable_data_files('keyspace1', 'standard1'))
-        debug('Compacting {}'.format(sstable_files))
+        logger.debug('Compacting {}'.format(sstable_files))
         node1.nodetool('compact --user-defined {}'.format(sstable_files))
 
         sstable_files = node1.get_sstable_data_files('keyspace1', 'standard1')
-        self.assertEquals(len(node1.data_directories()), len(sstable_files),
-                          'Expected one sstable data file per node directory but got {}'.format(sstable_files))
+        assert len(node1.data_directories()) == len(sstable_files), \
+            'Expected one sstable data file per node directory but got {}'.format(sstable_files)
 
+    @pytest.mark.parametrize("strategy", ['LeveledCompactionStrategy'])
     @since('3.10')
-    def fanout_size_test(self):
+    def test_fanout_size(self, strategy):
         """
         @jira_ticket CASSANDRA-11550
         """
-        if not hasattr(self, 'strategy') or self.strategy != 'LeveledCompactionStrategy':
-            self.skipTest('Not implemented unless LeveledCompactionStrategy is used')
+        if not hasattr(self, 'strategy') or strategy != 'LeveledCompactionStrategy':
+            pytest.skip('Not implemented unless LeveledCompactionStrategy is used')
 
         cluster = self.cluster
         cluster.populate(1).start(wait_for_binary_proto=True)
@@ -522,7 +534,7 @@ class TestCompaction(Tester):
         node1.nodetool('disableautocompaction')
 
         session = self.patient_cql_connection(node1)
-        debug("Altering compaction strategy to LCS")
+        logger.debug("Altering compaction strategy to LCS")
         session.execute("ALTER TABLE keyspace1.standard1 with compaction={'class': 'LeveledCompactionStrategy', 'sstable_size_in_mb':1, 'fanout_size':10};")
 
         stress_write(node1, keycount=1000000)
@@ -538,9 +550,9 @@ class TestCompaction(Tester):
         # [0, ?/10, ?, 0, 0, 0...]
         p = re.compile(r'0,\s(\d+)/10,.*')
         m = p.search(output)
-        self.assertEqual(10 * len(node1.data_directories()), int(m.group(1)))
+        assert 10 * len(node1.data_directories()) == int(m.group(1))
 
-        debug("Altering the fanout_size")
+        logger.debug("Altering the fanout_size")
         session.execute("ALTER TABLE keyspace1.standard1 with compaction={'class': 'LeveledCompactionStrategy', 'sstable_size_in_mb':1, 'fanout_size':5};")
 
         # trigger the compaction
@@ -551,12 +563,12 @@ class TestCompaction(Tester):
         # [0, ?/5, ?/25, ?, 0, 0...]
         p = re.compile(r'0,\s(\d+)/5,\s(\d+)/25,.*')
         m = p.search(output)
-        self.assertEqual(5 * len(node1.data_directories()), int(m.group(1)))
-        self.assertEqual(25 * len(node1.data_directories()), int(m.group(2)))
+        assert 5 * len(node1.data_directories()) == int(m.group(1))
+        assert 25 * len(node1.data_directories()) == int(m.group(2))
 
-    def skip_if_no_major_compaction(self):
-        if self.cluster.version() < '2.2' and self.strategy == 'LeveledCompactionStrategy':
-            self.skipTest('major compaction not implemented for LCS in this version of Cassandra')
+    def skip_if_no_major_compaction(self, strategy):
+        if self.cluster.version() < '2.2' and strategy == 'LeveledCompactionStrategy':
+            pytest.skip(msg='major compaction not implemented for LCS in this version of Cassandra')
 
 
 def grep_sstables_in_each_level(node, table_name):
@@ -567,14 +579,8 @@ def grep_sstables_in_each_level(node, table_name):
 
 
 def get_random_word(wordLen, population=string.ascii_letters + string.digits):
-    return ''.join([random.choice(population) for _ in range(wordLen)])
+    return ''.join([random.choice(population) for _ in range(int(wordLen))])
 
 
 def stress_write(node, keycount=100000):
     node.stress(['write', 'n={keycount}'.format(keycount=keycount)])
-
-
-strategies = ['LeveledCompactionStrategy', 'SizeTieredCompactionStrategy', 'DateTieredCompactionStrategy']
-for strategy in strategies:
-    cls_name = ('TestCompaction_with_' + strategy)
-    vars()[cls_name] = type(cls_name, (TestCompaction,), {'strategy': strategy, '__test__': True})

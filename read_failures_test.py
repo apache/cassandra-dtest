@@ -1,9 +1,14 @@
+import logging
+import pytest
+
 from cassandra import ConsistencyLevel, ReadFailure, ReadTimeout
 from cassandra.policies import FallthroughRetryPolicy
 from cassandra.query import SimpleStatement
 
 from dtest import Tester
-from tools.decorators import since
+
+since = pytest.mark.since
+logger = logging.getLogger(__name__)
 
 KEYSPACE = "readfailures"
 
@@ -13,19 +18,21 @@ class TestReadFailures(Tester):
     Tests for read failures in the replicas, introduced as a part of
     @jira_ticket CASSANDRA-12311.
     """
-    ignore_log_patterns = (
-        "Scanned over [1-9][0-9]* tombstones",  # This is expected when testing read failures due to tombstones
-    )
+    @pytest.fixture(autouse=True)
+    def fixture_add_additional_log_patterns(self, fixture_dtest_setup):
+        fixture_dtest_setup.ignore_log_patterns = (
+            "Scanned over [1-9][0-9]* tombstones",  # This is expected when testing read failures due to tombstones
+        )
+        return fixture_dtest_setup
 
-    def setUp(self):
-        super(TestReadFailures, self).setUp()
+    @pytest.fixture(scope='function', autouse=True)
+    def parse_dtest_config(self, parse_dtest_config):
         self.tombstone_failure_threshold = 500
         self.replication_factor = 3
         self.consistency_level = ConsistencyLevel.ALL
         self.expected_expt = ReadFailure
 
-    def tearDown(self):
-        super(TestReadFailures, self).tearDown()
+        return parse_dtest_config
 
     def _prepare_cluster(self):
         self.cluster.set_configuration_options(
@@ -33,7 +40,7 @@ class TestReadFailures(Tester):
         )
         self.cluster.populate(3)
         self.cluster.start(wait_for_binary_proto=True)
-        self.nodes = self.cluster.nodes.values()
+        self.nodes = list(self.cluster.nodes.values())
 
         session = self.patient_exclusive_cql_connection(self.nodes[0], protocol_version=self.protocol_version)
 
@@ -59,11 +66,11 @@ class TestReadFailures(Tester):
         if self.expected_expt is None:
             session.execute(statement)
         else:
-            with self.assertRaises(self.expected_expt) as cm:
+            with pytest.raises(self.expected_expt) as cm:
                 # On 2.1, we won't return the ReadTimeout from coordinator until actual timeout,
                 # so we need to up the default timeout of the driver session
                 session.execute(statement, timeout=15)
-            return cm.exception
+            return cm._excinfo[1]
 
     def _assert_error_code_map_exists_with_code(self, exception, expected_code):
         """
@@ -71,14 +78,14 @@ class TestReadFailures(Tester):
         where at least one node responded with some expected code.
         This is meant for testing failure exceptions on protocol v5.
         """
-        self.assertIsNotNone(exception)
-        self.assertIsNotNone(exception.error_code_map)
+        assert exception is not None
+        assert exception.error_code_map is not None
         expected_code_found = False
-        for error_code in exception.error_code_map.values():
+        for error_code in list(exception.error_code_map.values()):
             if error_code == expected_code:
                 expected_code_found = True
                 break
-        self.assertTrue(expected_code_found, "The error code map did not contain " + str(expected_code))
+        assert expected_code_found, "The error code map did not contain " + str(expected_code)
 
     @since('2.1')
     def test_tombstone_failure_v3(self):

@@ -1,10 +1,13 @@
+import pytest
+import logging
+
 from collections import defaultdict
 from uuid import uuid4
 
-from nose.tools import assert_equal, assert_in
+from dtest import Tester, create_ks
 
-from dtest import Tester, debug, create_ks
-from tools.decorators import since
+since = pytest.mark.since
+logger = logging.getLogger(__name__)
 
 
 def establish_durable_writes_keyspace(version, session, table_name_prefix=""):
@@ -32,11 +35,10 @@ def verify_durable_writes_keyspace(created_on_version, current_version, keyspace
         "durable_writes_true": True,
         "durable_writes_false": False
     }
-    for keyspace, is_durable in expected.iteritems():
+    for keyspace, is_durable in expected.items():
         keyspace_name = _cql_name_builder(table_name_prefix, keyspace)
         meta = session.cluster.metadata.keyspaces[keyspace_name]
-        assert_equal(is_durable, meta.durable_writes,
-                     "keyspace [{}] had durable_writes of [{}] should be [{}]".format(keyspace_name, meta.durable_writes, is_durable))
+        assert is_durable == meta.durable_writes, "keyspace [{}] had durable_writes of [{}] should be [{}]".format(keyspace_name, meta.durable_writes, is_durable)
 
 
 def establish_indexes_table(version, session, table_name_prefix=""):
@@ -53,29 +55,29 @@ def establish_indexes_table(version, session, table_name_prefix=""):
 
     session.execute(cql.format(table_name))
     index_name = _cql_name_builder("idx_" + table_name_prefix, table_name)
-    debug("table name: [{}], index name: [{}], prefix: [{}]".format(table_name, index_name, table_name_prefix))
+    logger.debug("table name: [{}], index name: [{}], prefix: [{}]".format(table_name, index_name, table_name_prefix))
     session.execute("CREATE INDEX {0} ON {1}( d )".format(index_name, table_name))
 
 
 def verify_indexes_table(created_on_version, current_version, keyspace, session, table_name_prefix=""):
     table_name = _cql_name_builder(table_name_prefix, "test_indexes")
     index_name = _cql_name_builder("idx_" + table_name_prefix, table_name)
-    debug("table name: [{}], index name: [{}], prefix: [{}]".format(table_name, index_name, table_name_prefix))
+    logger.debug("table name: [{}], index name: [{}], prefix: [{}]".format(table_name, index_name, table_name_prefix))
     meta = session.cluster.metadata.keyspaces[keyspace].indexes[index_name]
 
-    assert_equal('d', meta.index_options['target'])
+    assert 'd' == meta.index_options['target']
 
     meta = session.cluster.metadata.keyspaces[keyspace].tables[table_name]
-    assert_equal(1, len(meta.clustering_key))
-    assert_equal('c', meta.clustering_key[0].name)
+    assert 1 == len(meta.clustering_key)
+    assert 'c' == meta.clustering_key[0].name
 
-    assert_equal(1, len(meta.indexes))
+    assert 1 == len(meta.indexes)
 
-    assert_equal({'target': 'd'}, meta.indexes[index_name].index_options)
-    assert_equal(3, len(meta.primary_key))
-    assert_equal('a', meta.primary_key[0].name)
-    assert_equal('b', meta.primary_key[1].name)
-    assert_equal('c', meta.primary_key[2].name)
+    assert {'target': 'd'} == meta.indexes[index_name].index_options
+    assert 3 == len(meta.primary_key)
+    assert 'a' == meta.primary_key[0].name
+    assert 'b' == meta.primary_key[1].name
+    assert 'c' == meta.primary_key[2].name
 
 
 def establish_clustering_order_table(version, session, table_name_prefix=""):
@@ -96,13 +98,13 @@ def establish_clustering_order_table(version, session, table_name_prefix=""):
 def verify_clustering_order_table(created_on_version, current_version, keyspace, session, table_name_prefix=""):
     table_name = _cql_name_builder(table_name_prefix, "test_clustering_order")
     meta = session.cluster.metadata.keyspaces[keyspace].tables[table_name]
-    assert_equal(0, len(meta.indexes))
-    assert_equal(2, len(meta.primary_key))
-    assert_equal('event_type', meta.primary_key[0].name)
-    assert_equal('insertion_time', meta.primary_key[1].name)
-    assert_equal(1, len(meta.clustering_key))
-    assert_equal('insertion_time', meta.clustering_key[0].name)
-    assert_in('insertion_time DESC', meta.as_cql_query())
+    assert 0 == len(meta.indexes)
+    assert 2 == len(meta.primary_key)
+    assert 'event_type' == meta.primary_key[0].name
+    assert 'insertion_time' == meta.primary_key[1].name
+    assert 1 == len(meta.clustering_key)
+    assert 'insertion_time' == meta.clustering_key[0].name
+    assert 'insertion_time DESC' in meta.as_cql_query()
 
 
 def establish_compact_storage_table(version, session, table_name_prefix=""):
@@ -123,16 +125,16 @@ def establish_compact_storage_table(version, session, table_name_prefix=""):
 def verify_compact_storage_table(created_on_version, current_version, keyspace, session, table_name_prefix=""):
     table_name = _cql_name_builder(table_name_prefix, "test_compact_storage")
     meta = session.cluster.metadata.keyspaces[keyspace].tables[table_name]
-    assert_equal(3, len(meta.columns))
-    assert_equal(2, len(meta.primary_key))
-    assert_equal(1, len(meta.clustering_key))
-    assert_equal('sub_block_id', meta.clustering_key[0].name)
-    assert_equal('block_id', meta.primary_key[0].name)
-    assert_equal('uuid', meta.primary_key[0].cql_type)
-    assert_equal('sub_block_id', meta.primary_key[1].name)
-    assert_equal('int', meta.primary_key[1].cql_type)
-    assert_equal(1, len(meta.clustering_key))
-    assert_equal('sub_block_id', meta.clustering_key[0].name)
+    assert 3 == len(meta.columns)
+    assert 2 == len(meta.primary_key)
+    assert 1 == len(meta.clustering_key)
+    assert 'sub_block_id' == meta.clustering_key[0].name
+    assert 'block_id' == meta.primary_key[0].name
+    assert 'uuid' == meta.primary_key[0].cql_type
+    assert 'sub_block_id' == meta.primary_key[1].name
+    assert 'int' == meta.primary_key[1].cql_type
+    assert 1 == len(meta.clustering_key)
+    assert 'sub_block_id' == meta.clustering_key[0].name
 
 
 def establish_compact_storage_composite_table(version, session, table_name_prefix=""):
@@ -153,19 +155,19 @@ def establish_compact_storage_composite_table(version, session, table_name_prefi
 def verify_compact_storage_composite_table(created_on_version, current_version, keyspace, session, table_name_prefix=""):
     table_name = _cql_name_builder(table_name_prefix, "test_compact_storage_composite")
     meta = session.cluster.metadata.keyspaces[keyspace].tables[table_name]
-    assert_equal(4, len(meta.columns))
-    assert_equal(3, len(meta.primary_key))
-    assert_equal('key', meta.primary_key[0].name)
-    assert_equal('text', meta.primary_key[0].cql_type)
-    assert_equal('column1', meta.primary_key[1].name)
-    assert_equal('int', meta.primary_key[1].cql_type)
-    assert_equal('column2', meta.primary_key[2].name)
-    assert_equal('int', meta.primary_key[2].cql_type)
-    assert_equal(2, len(meta.clustering_key))
-    assert_equal('column1', meta.clustering_key[0].name)
-    assert_equal('int', meta.clustering_key[0].cql_type)
-    assert_equal('column2', meta.clustering_key[1].name)
-    assert_equal('int', meta.clustering_key[1].cql_type)
+    assert 4 == len(meta.columns)
+    assert 3 == len(meta.primary_key)
+    assert 'key' == meta.primary_key[0].name
+    assert 'text' == meta.primary_key[0].cql_type
+    assert 'column1' == meta.primary_key[1].name
+    assert 'int' == meta.primary_key[1].cql_type
+    assert 'column2' == meta.primary_key[2].name
+    assert 'int' == meta.primary_key[2].cql_type
+    assert 2 == len(meta.clustering_key)
+    assert 'column1' == meta.clustering_key[0].name
+    assert 'int' == meta.clustering_key[0].cql_type
+    assert 'column2' == meta.clustering_key[1].name
+    assert 'int' == meta.clustering_key[1].cql_type
 
 
 def establish_nondefault_table_settings(version, session, table_name_prefix=""):
@@ -213,45 +215,45 @@ def verify_nondefault_table_settings(created_on_version, current_version, keyspa
     table_name = _cql_name_builder(table_name_prefix, "test_nondefault_settings")
     meta = session.cluster.metadata.keyspaces[keyspace].tables[table_name]
 
-    assert_equal('insightful information', meta.options['comment'])
-    assert_equal(0.88, meta.options['dclocal_read_repair_chance'])
-    assert_equal(9999, meta.options['gc_grace_seconds'])
-    assert_equal(0.99, meta.options['read_repair_chance'])
-    assert_equal(0.5, meta.options['bloom_filter_fp_chance'])
+    assert 'insightful information' == meta.options['comment']
+    assert 0.88 == meta.options['dclocal_read_repair_chance']
+    assert 9999 == meta.options['gc_grace_seconds']
+    assert 0.99 == meta.options['read_repair_chance']
+    assert 0.5 == meta.options['bloom_filter_fp_chance']
 
     if created_on_version >= '2.1':
-        assert_equal(86400, meta.options['default_time_to_live'])
-        assert_equal(1, meta.options['min_index_interval'])
-        assert_equal(20, meta.options['max_index_interval'])
+        assert 86400 == meta.options['default_time_to_live']
+        assert 1 == meta.options['min_index_interval']
+        assert 20 == meta.options['max_index_interval']
 
     if created_on_version >= '3.0':
-        assert_equal('55PERCENTILE', meta.options['speculative_retry'])
-        assert_equal(2121, meta.options['memtable_flush_period_in_ms'])
+        assert '55PERCENTILE' == meta.options['speculative_retry']
+        assert 2121 == meta.options['memtable_flush_period_in_ms']
 
     if current_version >= '3.0':
-        assert_equal('org.apache.cassandra.io.compress.DeflateCompressor', meta.options['compression']['class'])
-        assert_equal('128', meta.options['compression']['chunk_length_in_kb'])
-        assert_equal('org.apache.cassandra.db.compaction.LeveledCompactionStrategy', meta.options['compaction']['class'])
+        assert 'org.apache.cassandra.io.compress.DeflateCompressor' == meta.options['compression']['class']
+        assert '128' == meta.options['compression']['chunk_length_in_kb']
+        assert 'org.apache.cassandra.db.compaction.LeveledCompactionStrategy' == meta.options['compaction']['class']
 
     if '2.1' <= current_version < '3.0':
-        assert_equal('{"keys":"NONE", "rows_per_partition":"ALL"}', meta.options['caching'])
-        assert_in('"chunk_length_kb":"128"', meta.options['compression_parameters'])
-        assert_in('"sstable_compression":"org.apache.cassandra.io.compress.DeflateCompressor"', meta.options['compression_parameters'])
+        assert '{"keys":"NONE", "rows_per_partition":"ALL"}' == meta.options['caching']
+        assert '"chunk_length_kb":"128"' in meta.options['compression_parameters']
+        assert '"sstable_compression":"org.apache.cassandra.io.compress.DeflateCompressor"' in meta.options['compression_parameters']
     elif current_version >= '3.0':
-        assert_equal('NONE', meta.options['caching']['keys'])
-        assert_equal('ALL', meta.options['caching']['rows_per_partition'])
-        assert_equal('org.apache.cassandra.io.compress.DeflateCompressor', meta.options['compression']['class'])
-        assert_equal('128', meta.options['compression']['chunk_length_in_kb'])
-        assert_equal('org.apache.cassandra.db.compaction.LeveledCompactionStrategy', meta.options['compaction']['class'])
+        assert 'NONE' == meta.options['caching']['keys']
+        assert 'ALL' == meta.options['caching']['rows_per_partition']
+        assert 'org.apache.cassandra.io.compress.DeflateCompressor' == meta.options['compression']['class']
+        assert '128' == meta.options['compression']['chunk_length_in_kb']
+        assert 'org.apache.cassandra.db.compaction.LeveledCompactionStrategy' == meta.options['compaction']['class']
     else:
-        assert_equal('ROWS_ONLY', meta.options['caching'])
+        assert 'ROWS_ONLY' == meta.options['caching']
 
-    assert_equal(2, len(meta.partition_key))
-    assert_equal(meta.partition_key[0].name, 'a')
-    assert_equal(meta.partition_key[1].name, 'b')
+    assert 2 == len(meta.partition_key)
+    assert meta.partition_key[0].name == 'a'
+    assert meta.partition_key[1].name == 'b'
 
-    assert_equal(1, len(meta.clustering_key))
-    assert_equal(meta.clustering_key[0].name, 'c')
+    assert 1 == len(meta.clustering_key)
+    assert meta.clustering_key[0].name == 'c'
 
 
 def establish_uda(version, session, table_name_prefix=""):
@@ -281,13 +283,13 @@ def verify_uda(created_on_version, current_version, keyspace, session, table_nam
     function_name = _cql_name_builder(table_name_prefix, "test_uda_function")
     aggregate_name = _cql_name_builder(table_name_prefix, "test_uda_aggregate")
 
-    assert_in(function_name + "(int,int)", session.cluster.metadata.keyspaces[keyspace].functions.keys())
-    assert_in(aggregate_name + "(int)", session.cluster.metadata.keyspaces[keyspace].aggregates.keys())
+    assert function_name + "(int,int)" in list(session.cluster.metadata.keyspaces[keyspace].functions.keys())
+    assert aggregate_name + "(int)" in list(session.cluster.metadata.keyspaces[keyspace].aggregates.keys())
 
     aggr_meta = session.cluster.metadata.keyspaces[keyspace].aggregates[aggregate_name + "(int)"]
-    assert_equal(function_name, aggr_meta.state_func)
-    assert_equal('int', aggr_meta.state_type)
-    assert_equal('int', aggr_meta.return_type)
+    assert function_name == aggr_meta.state_func
+    assert 'int' == aggr_meta.state_type
+    assert 'int' == aggr_meta.return_type
 
 
 def establish_udf(version, session, table_name_prefix=""):
@@ -303,13 +305,13 @@ def verify_udf(created_on_version, current_version, keyspace, session, table_nam
     if created_on_version < '2.2':
         return
     function_name = _cql_name_builder(table_name_prefix, "test_udf")
-    assert_in(function_name + "(double)", session.cluster.metadata.keyspaces[keyspace].functions.keys())
+    assert function_name + "(double)" in list(session.cluster.metadata.keyspaces[keyspace].functions.keys())
     meta = session.cluster.metadata.keyspaces[keyspace].functions[function_name + "(double)"]
-    assert_equal('java', meta.language)
-    assert_equal('double', meta.return_type)
-    assert_equal(['double'], meta.argument_types)
-    assert_equal(['input'], meta.argument_names)
-    assert_equal('return Double.valueOf(Math.log(input.doubleValue()));', meta.body)
+    assert 'java' == meta.language
+    assert 'double' == meta.return_type
+    assert ['double'] == meta.argument_types
+    assert ['input'] == meta.argument_names
+    assert 'return Double.valueOf(Math.log(input.doubleValue()));' == meta.body
 
 
 def establish_udt_table(version, session, table_name_prefix=""):
@@ -330,13 +332,13 @@ def verify_udt_table(created_on_version, current_version, keyspace, session, tab
     table_name = _cql_name_builder(table_name_prefix, "test_udt")
     meta = session.cluster.metadata.keyspaces[keyspace].user_types[table_name]
 
-    assert_equal(meta.field_names, ['street', 'city', 'zip'])
-    assert_equal('street', meta.field_names[0])
-    assert_equal('text', meta.field_types[0])
-    assert_equal('city', meta.field_names[1])
-    assert_equal('text', meta.field_types[1])
-    assert_equal('zip', meta.field_names[2])
-    assert_equal('int', meta.field_types[2])
+    assert meta.field_names == ['street', 'city', 'zip']
+    assert 'street' == meta.field_names[0]
+    assert 'text' == meta.field_types[0]
+    assert 'city' == meta.field_names[1]
+    assert 'text' == meta.field_types[1]
+    assert 'zip' == meta.field_names[2]
+    assert 'int' == meta.field_types[2]
 
 
 def establish_static_column_table(version, session, table_name_prefix=""):
@@ -358,15 +360,15 @@ def verify_static_column_table(created_on_version, current_version, keyspace, se
         return
     table_name = _cql_name_builder(table_name_prefix, "test_static_column")
     meta = session.cluster.metadata.keyspaces[keyspace].tables[table_name]
-    assert_equal(4, len(meta.columns))
-    assert_equal('text', meta.columns['user'].cql_type)
-    assert_equal(False, meta.columns['user'].is_static)
-    assert_equal('int', meta.columns['balance'].cql_type)
-    assert_equal(True, meta.columns['balance'].is_static)
-    assert_equal('int', meta.columns['expense_id'].cql_type)
-    assert_equal(False, meta.columns['expense_id'].is_static)
-    assert_equal('int', meta.columns['amount'].cql_type)
-    assert_equal(False, meta.columns['amount'].is_static)
+    assert 4 == len(meta.columns)
+    assert 'text' == meta.columns['user'].cql_type
+    assert False == meta.columns['user'].is_static
+    assert 'int' == meta.columns['balance'].cql_type
+    assert True == meta.columns['balance'].is_static
+    assert 'int' == meta.columns['expense_id'].cql_type
+    assert False == meta.columns['expense_id'].is_static
+    assert 'int' == meta.columns['amount'].cql_type
+    assert False == meta.columns['amount'].is_static
 
 
 def establish_collection_datatype_table(version, session, table_name_prefix=""):
@@ -399,24 +401,24 @@ def verify_collection_datatype_table(created_on_version, current_version, keyspa
     table_name = _cql_name_builder(table_name_prefix, "test_collection_datatypes")
     meta = session.cluster.metadata.keyspaces[keyspace].tables[table_name]
     if created_on_version > '2.1':
-        assert_equal(13, len(meta.columns))
+        assert 13 == len(meta.columns)
     else:
-        assert_equal(7, len(meta.columns))
+        assert 7 == len(meta.columns)
 
-    assert_equal('list<int>', meta.columns['a'].cql_type)
-    assert_equal('list<text>', meta.columns['b'].cql_type)
-    assert_equal('set<int>', meta.columns['c'].cql_type)
-    assert_equal('set<text>', meta.columns['d'].cql_type)
-    assert_equal('map<text, text>', meta.columns['e'].cql_type)
-    assert_equal('map<text, int>', meta.columns['f'].cql_type)
+    assert 'list<int>' == meta.columns['a'].cql_type
+    assert 'list<text>' == meta.columns['b'].cql_type
+    assert 'set<int>' == meta.columns['c'].cql_type
+    assert 'set<text>' == meta.columns['d'].cql_type
+    assert 'map<text, text>' == meta.columns['e'].cql_type
+    assert 'map<text, int>' == meta.columns['f'].cql_type
 
     if created_on_version > '2.1':
-        assert_equal('frozen<list<int>>', meta.columns['g'].cql_type)
-        assert_equal('frozen<list<text>>', meta.columns['h'].cql_type)
-        assert_equal('frozen<set<int>>', meta.columns['i'].cql_type)
-        assert_equal('frozen<set<text>>', meta.columns['j'].cql_type)
-        assert_equal('frozen<map<text, text>>', meta.columns['k'].cql_type)
-        assert_equal('frozen<map<text, int>>', meta.columns['l'].cql_type)
+        assert 'frozen<list<int>>' == meta.columns['g'].cql_type
+        assert 'frozen<list<text>>' == meta.columns['h'].cql_type
+        assert 'frozen<set<int>>' == meta.columns['i'].cql_type
+        assert 'frozen<set<text>>' == meta.columns['j'].cql_type
+        assert 'frozen<map<text, text>>' == meta.columns['k'].cql_type
+        assert 'frozen<map<text, int>>' == meta.columns['l'].cql_type
 
 
 def establish_basic_datatype_table(version, session, table_name_prefix=""):
@@ -453,33 +455,33 @@ def verify_basic_datatype_table(created_on_version, current_version, keyspace, s
     table_name = _cql_name_builder(table_name_prefix, "test_basic_datatypes")
     meta = session.cluster.metadata.keyspaces[keyspace].tables[table_name]
     if created_on_version > '2.2':
-        assert_equal(19, len(meta.columns))
+        assert 19 == len(meta.columns)
     else:
-        assert_equal(15, len(meta.columns))
+        assert 15 == len(meta.columns)
 
-    assert_equal(1, len(meta.primary_key))
-    assert_equal('b', meta.primary_key[0].name)
+    assert 1 == len(meta.primary_key)
+    assert 'b' == meta.primary_key[0].name
 
-    assert_equal('ascii', meta.columns['a'].cql_type)
-    assert_equal('bigint', meta.columns['b'].cql_type)
-    assert_equal('blob', meta.columns['c'].cql_type)
-    assert_equal('boolean', meta.columns['d'].cql_type)
-    assert_equal('decimal', meta.columns['e'].cql_type)
-    assert_equal('double', meta.columns['f'].cql_type)
-    assert_equal('float', meta.columns['g'].cql_type)
-    assert_equal('inet', meta.columns['h'].cql_type)
-    assert_equal('int', meta.columns['i'].cql_type)
-    assert_equal('text', meta.columns['j'].cql_type)
-    assert_equal('timestamp', meta.columns['k'].cql_type)
-    assert_equal('timeuuid', meta.columns['l'].cql_type)
-    assert_equal('uuid', meta.columns['m'].cql_type)
-    assert_equal('text', meta.columns['n'].cql_type)
-    assert_equal('varint', meta.columns['o'].cql_type)
+    assert 'ascii' == meta.columns['a'].cql_type
+    assert 'bigint' == meta.columns['b'].cql_type
+    assert 'blob' == meta.columns['c'].cql_type
+    assert 'boolean' == meta.columns['d'].cql_type
+    assert 'decimal' == meta.columns['e'].cql_type
+    assert 'double' == meta.columns['f'].cql_type
+    assert 'float' == meta.columns['g'].cql_type
+    assert 'inet' == meta.columns['h'].cql_type
+    assert 'int' == meta.columns['i'].cql_type
+    assert 'text' == meta.columns['j'].cql_type
+    assert 'timestamp' == meta.columns['k'].cql_type
+    assert 'timeuuid' == meta.columns['l'].cql_type
+    assert 'uuid' == meta.columns['m'].cql_type
+    assert 'text' == meta.columns['n'].cql_type
+    assert 'varint' == meta.columns['o'].cql_type
     if created_on_version > '2.2':
-        assert_equal('date', meta.columns['p'].cql_type)
-        assert_equal('smallint', meta.columns['q'].cql_type)
-        assert_equal('time', meta.columns['r'].cql_type)
-        assert_equal('tinyint', meta.columns['s'].cql_type)
+        assert 'date' == meta.columns['p'].cql_type
+        assert 'smallint' == meta.columns['q'].cql_type
+        assert 'time' == meta.columns['r'].cql_type
+        assert 'tinyint' == meta.columns['s'].cql_type
 
 
 def _cql_name_builder(prefix, table_name):
@@ -495,10 +497,9 @@ def _cql_name_builder(prefix, table_name):
 
 
 class TestSchemaMetadata(Tester):
-
-    def setUp(self):
-        Tester.setUp(self)
-        cluster = self.cluster
+    @pytest.fixture(scope='function', autouse=True)
+    def fixture_set_cluster_settings(self, fixture_dtest_setup):
+        cluster = fixture_dtest_setup.cluster
         cluster.schema_event_refresh_window = 0
 
         if cluster.version() >= '3.0':
@@ -508,101 +509,101 @@ class TestSchemaMetadata(Tester):
             cluster.set_configuration_options({'enable_user_defined_functions': 'true'})
         cluster.populate(1).start()
 
-        self.session = self.patient_cql_connection(cluster.nodelist()[0])
+        self.session = fixture_dtest_setup.patient_cql_connection(cluster.nodelist()[0])
         create_ks(self.session, 'ks', 1)
 
     def _keyspace_meta(self, keyspace_name="ks"):
         self.session.cluster.refresh_schema_metadata()
         return self.session.cluster.metadata.keyspaces[keyspace_name]
 
-    def creating_and_dropping_keyspace_test(self):
+    def test_creating_and_dropping_keyspace(self):
         starting_keyspace_count = len(self.session.cluster.metadata.keyspaces)
-        self.assertEqual(True, self._keyspace_meta().durable_writes)
+        assert True == self._keyspace_meta().durable_writes
         self.session.execute("""
                 CREATE KEYSPACE so_long
                     WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}
                     AND durable_writes = false
             """)
-        self.assertEqual(False, self._keyspace_meta('so_long').durable_writes)
+        assert False == self._keyspace_meta('so_long').durable_writes
         self.session.execute("DROP KEYSPACE so_long")
-        self.assertEqual(starting_keyspace_count, len(self.session.cluster.metadata.keyspaces))
+        assert starting_keyspace_count == len(self.session.cluster.metadata.keyspaces)
 
-    def creating_and_dropping_table_test(self):
+    def test_creating_and_dropping_table(self):
         self.session.execute("create table born_to_die (id uuid primary key, name varchar)")
         meta = self._keyspace_meta().tables['born_to_die']
-        self.assertEqual('ks', meta.keyspace_name)
-        self.assertEqual('born_to_die', meta.name)
-        self.assertEqual(1, len(meta.partition_key))
-        self.assertEqual('id', meta.partition_key[0].name)
-        self.assertEqual(2, len(meta.columns))
-        self.assertIsNotNone(meta.columns.get('id'))
-        self.assertEqual('uuid', meta.columns['id'].cql_type)
-        self.assertIsNotNone(meta.columns.get('name'))
-        self.assertEqual('text', meta.columns['name'].cql_type)
-        self.assertEqual(0, len(meta.clustering_key))
-        self.assertEqual(0, len(meta.triggers))
-        self.assertEqual(0, len(meta.indexes))
+        assert 'ks' == meta.keyspace_name
+        assert 'born_to_die' == meta.name
+        assert 1 == len(meta.partition_key)
+        assert 'id' == meta.partition_key[0].name
+        assert 2 == len(meta.columns)
+        assert meta.columns.get('id') is not None
+        assert 'uuid' == meta.columns['id'].cql_type
+        assert meta.columns.get('name') is not None
+        assert 'text' == meta.columns['name'].cql_type
+        assert 0 == len(meta.clustering_key)
+        assert 0 == len(meta.triggers)
+        assert 0 == len(meta.indexes)
         self.session.execute("drop table born_to_die")
-        self.assertIsNone(self._keyspace_meta().tables.get('born_to_die'))
+        assert self._keyspace_meta().tables.get('born_to_die') is None
 
-    def creating_and_dropping_table_with_2ary_indexes_test(self):
-        self.assertEqual(0, len(self._keyspace_meta().indexes))
+    def test_creating_and_dropping_table_with_2ary_indexes(self):
+        assert 0 == len(self._keyspace_meta().indexes)
         self.session.execute("create table born_to_die (id uuid primary key, name varchar)")
         self.session.execute("create index ix_born_to_die_name on born_to_die(name)")
 
-        self.assertEqual(1, len(self._keyspace_meta().indexes))
+        assert 1 == len(self._keyspace_meta().indexes)
         ix_meta = self._keyspace_meta().indexes['ix_born_to_die_name']
-        self.assertEqual('ix_born_to_die_name', ix_meta.name)
+        assert 'ix_born_to_die_name' == ix_meta.name
 
-        self.assertEqual({'target': 'name'}, ix_meta.index_options)
-        self.assertEqual('COMPOSITES', ix_meta.kind)
+        assert {'target': 'name'} == ix_meta.index_options
+        assert 'COMPOSITES' == ix_meta.kind
 
         self.session.execute("drop table born_to_die")
-        self.assertIsNone(self._keyspace_meta().tables.get('born_to_die'))
-        self.assertIsNone(self._keyspace_meta().indexes.get('ix_born_to_die_name'))
-        self.assertEqual(0, len(self._keyspace_meta().indexes))
+        assert self._keyspace_meta().tables.get('born_to_die') is None
+        assert self._keyspace_meta().indexes.get('ix_born_to_die_name') is None
+        assert 0 == len(self._keyspace_meta().indexes)
 
     @since('2.1')
-    def creating_and_dropping_user_types_test(self):
-        self.assertEqual(0, len(self._keyspace_meta().user_types))
+    def test_creating_and_dropping_user_types(self):
+        assert 0 == len(self._keyspace_meta().user_types)
         self.session.execute("CREATE TYPE soon_to_die (foo text, bar int)")
-        self.assertEqual(1, len(self._keyspace_meta().user_types))
+        assert 1 == len(self._keyspace_meta().user_types)
 
         ut_meta = self._keyspace_meta().user_types['soon_to_die']
-        self.assertEqual('ks', ut_meta.keyspace)
-        self.assertEqual('soon_to_die', ut_meta.name)
-        self.assertEqual(['foo', 'bar'], ut_meta.field_names)
-        self.assertEqual(['text', 'int'], ut_meta.field_types)
+        assert 'ks' == ut_meta.keyspace
+        assert 'soon_to_die' == ut_meta.name
+        assert ['foo', 'bar'] == ut_meta.field_names
+        assert ['text', 'int'] == ut_meta.field_types
 
         self.session.execute("DROP TYPE soon_to_die")
-        self.assertEqual(0, len(self._keyspace_meta().user_types))
+        assert 0 == len(self._keyspace_meta().user_types)
 
     @since('2.2')
-    def creating_and_dropping_udf_test(self):
-        self.assertEqual(0, len(self._keyspace_meta().functions), "expected to start with no indexes")
+    def test_creating_and_dropping_udf(self):
+        assert 0 == len(self._keyspace_meta().functions), "expected to start with no indexes"
         self.session.execute("""
                 CREATE OR REPLACE FUNCTION ks.wasteful_function (input double)
                     CALLED ON NULL INPUT
                     RETURNS double
                     LANGUAGE java AS 'return Double.valueOf(Math.log(input.doubleValue()));';
             """)
-        self.assertEqual(1, len(self._keyspace_meta().functions), "udf count should be 1")
+        assert 1 == len(self._keyspace_meta().functions), "udf count should be 1"
         udf_meta = self._keyspace_meta().functions['wasteful_function(double)']
-        self.assertEqual('ks', udf_meta.keyspace)
-        self.assertEqual('wasteful_function', udf_meta.name)
-        self.assertEqual(['double'], udf_meta.argument_types)
-        self.assertEqual(['input'], udf_meta.argument_names)
-        self.assertEqual('double', udf_meta.return_type)
-        self.assertEqual('java', udf_meta.language)
-        self.assertEqual('return Double.valueOf(Math.log(input.doubleValue()));', udf_meta.body)
-        self.assertTrue(udf_meta.called_on_null_input)
+        assert 'ks' == udf_meta.keyspace
+        assert 'wasteful_function' == udf_meta.name
+        assert ['double'] == udf_meta.argument_types
+        assert ['input'] == udf_meta.argument_names
+        assert 'double' == udf_meta.return_type
+        assert 'java' == udf_meta.language
+        assert 'return Double.valueOf(Math.log(input.doubleValue()));' == udf_meta.body
+        assert udf_meta.called_on_null_input
         self.session.execute("DROP FUNCTION ks.wasteful_function")
-        self.assertEqual(0, len(self._keyspace_meta().functions), "expected udf list to be back to zero")
+        assert 0 == len(self._keyspace_meta().functions), "expected udf list to be back to zero"
 
     @since('2.2')
-    def creating_and_dropping_uda_test(self):
-        self.assertEqual(0, len(self._keyspace_meta().functions), "expected to start with no indexes")
-        self.assertEqual(0, len(self._keyspace_meta().aggregates), "expected to start with no aggregates")
+    def test_creating_and_dropping_uda(self):
+        assert 0 == len(self._keyspace_meta().functions), "expected to start with no indexes"
+        assert 0 == len(self._keyspace_meta().aggregates), "expected to start with no aggregates"
         self.session.execute('''
                 CREATE FUNCTION ks.max_val(current int, candidate int)
                 CALLED ON NULL INPUT
@@ -615,86 +616,86 @@ class TestSchemaMetadata(Tester):
                 STYPE int
                 INITCOND -1
             ''')
-        self.assertEqual(1, len(self._keyspace_meta().functions), "udf count should be 1")
-        self.assertEqual(1, len(self._keyspace_meta().aggregates), "uda count should be 1")
+        assert 1 == len(self._keyspace_meta().functions), "udf count should be 1"
+        assert 1 == len(self._keyspace_meta().aggregates), "uda count should be 1"
         udf_meta = self._keyspace_meta().functions['max_val(int,int)']
         uda_meta = self._keyspace_meta().aggregates['kind_of_max_agg(int)']
 
-        self.assertEqual('ks', udf_meta.keyspace)
-        self.assertEqual('max_val', udf_meta.name)
-        self.assertEqual(['int', 'int'], udf_meta.argument_types)
-        self.assertEqual(['current', 'candidate'], udf_meta.argument_names)
-        self.assertEqual('int', udf_meta.return_type)
-        self.assertEqual('java', udf_meta.language)
-        self.assertEqual('if (current == null) return candidate; else return Math.max(current, candidate);', udf_meta.body)
-        self.assertTrue(udf_meta.called_on_null_input)
+        assert 'ks' == udf_meta.keyspace
+        assert 'max_val' == udf_meta.name
+        assert ['int', 'int'] == udf_meta.argument_types
+        assert ['current', 'candidate'] == udf_meta.argument_names
+        assert 'int' == udf_meta.return_type
+        assert 'java' == udf_meta.language
+        assert 'if (current == null) return candidate; else return Math.max(current, candidate);' == udf_meta.body
+        assert udf_meta.called_on_null_input
 
-        self.assertEqual('ks', uda_meta.keyspace)
-        self.assertEqual('kind_of_max_agg', uda_meta.name)
-        self.assertEqual(['int'], uda_meta.argument_types)
-        self.assertEqual('max_val', uda_meta.state_func)
-        self.assertEqual('int', uda_meta.state_type)
-        self.assertEqual(None, uda_meta.final_func)
-        self.assertEqual('-1', uda_meta.initial_condition)
-        self.assertEqual('int', uda_meta.return_type)
+        assert 'ks' == uda_meta.keyspace
+        assert 'kind_of_max_agg' == uda_meta.name
+        assert ['int'] == uda_meta.argument_types
+        assert 'max_val' == uda_meta.state_func
+        assert 'int' == uda_meta.state_type
+        assert None == uda_meta.final_func
+        assert '-1' == uda_meta.initial_condition
+        assert 'int' == uda_meta.return_type
 
         self.session.execute("DROP AGGREGATE ks.kind_of_max_agg")
-        self.assertEqual(0, len(self._keyspace_meta().aggregates), "expected uda list to be back to zero")
+        assert 0 == len(self._keyspace_meta().aggregates), "expected uda list to be back to zero"
         self.session.execute("DROP FUNCTION ks.max_val")
-        self.assertEqual(0, len(self._keyspace_meta().functions), "expected udf list to be back to zero")
+        assert 0 == len(self._keyspace_meta().functions), "expected udf list to be back to zero"
 
-    def basic_table_datatype_test(self):
+    def test_basic_table_datatype(self):
         establish_basic_datatype_table(self.cluster.version(), self.session)
         verify_basic_datatype_table(self.cluster.version(), self.cluster.version(), 'ks', self.session)
 
-    def collection_table_datatype_test(self):
+    def test_collection_table_datatype(self):
         establish_collection_datatype_table(self.cluster.version(), self.session)
         verify_collection_datatype_table(self.cluster.version(), self.cluster.version(), 'ks', self.session)
 
-    def clustering_order_test(self):
+    def test_clustering_order(self):
         establish_clustering_order_table(self.cluster.version(), self.session)
         verify_clustering_order_table(self.cluster.version(), self.cluster.version(), 'ks', self.session)
 
     @since("2.0", max_version="3.X")  # Compact Storage
-    def compact_storage_test(self):
+    def test_compact_storage(self):
         establish_compact_storage_table(self.cluster.version(), self.session)
         verify_compact_storage_table(self.cluster.version(), self.cluster.version(), 'ks', self.session)
 
     @since("2.0", max_version="3.X")  # Compact Storage
-    def compact_storage_composite_test(self):
+    def test_compact_storage_composite(self):
         establish_compact_storage_composite_table(self.cluster.version(), self.session)
         verify_compact_storage_composite_table(self.cluster.version(), self.cluster.version(), 'ks', self.session)
 
-    def nondefault_table_settings_test(self):
+    def test_nondefault_table_settings(self):
         establish_nondefault_table_settings(self.cluster.version(), self.session)
         verify_nondefault_table_settings(self.cluster.version(), self.cluster.version(), 'ks', self.session)
 
-    def indexes_test(self):
+    def test_indexes(self):
         establish_indexes_table(self.cluster.version(), self.session)
         verify_indexes_table(self.cluster.version(), self.cluster.version(), 'ks', self.session)
 
-    def durable_writes_test(self):
+    def test_durable_writes(self):
         establish_durable_writes_keyspace(self.cluster.version(), self.session)
         verify_durable_writes_keyspace(self.cluster.version(), self.cluster.version(), 'ks', self.session)
 
     @since('2.0')
-    def static_column_test(self):
+    def test_static_column(self):
         establish_static_column_table(self.cluster.version(), self.session)
         verify_static_column_table(self.cluster.version(), self.cluster.version(), 'ks', self.session)
 
     @since('2.1')
-    def udt_table_test(self):
+    def test_udt_table(self):
         establish_udt_table(self.cluster.version(), self.session)
         verify_udt_table(self.cluster.version(), self.cluster.version(), 'ks', self.session)
 
     @since('2.2')
-    def udf_test(self):
+    def test_udf(self):
         establish_udf(self.cluster.version(), self.session)
         self.session.cluster.refresh_schema_metadata()
         verify_udf(self.cluster.version(), self.cluster.version(), 'ks', self.session)
 
     @since('2.2')
-    def uda_test(self):
+    def test_uda(self):
         establish_uda(self.cluster.version(), self.session)
         self.session.cluster.refresh_schema_metadata()
         verify_uda(self.cluster.version(), self.cluster.version(), 'ks', self.session)

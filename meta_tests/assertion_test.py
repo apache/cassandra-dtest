@@ -34,14 +34,14 @@ class TestAssertStderrClean(TestCase):
 
     def test_invalid_error(self):
         err = "This string is no good and should fail."
-        with self.assertRaises(AssertionError):
+        with pytest.raises(AssertionError):
             assert_stderr_clean(err)
 
     def test_valid_and_invalid_errors_same_line(self):
         err = ("This string is no good and should fail.objc[36358]: Class JavaLaunchHelper is implemented in both /Library/Java/JavaVirtualMachines/jdk1.8.0_91.jdk"
                "/Contents/Home/bin/java and /Library/Java/JavaVirtualMachines/jdk1.8.0_91.jdk/Contents/Home/jre/lib/libinstrument.dylib."
                "One of the two will be used. Which one is undefined.")
-        with self.assertRaises(AssertionError):
+        with pytest.raises(AssertionError):
             assert_stderr_clean(err)
 
     def test_invalid_error_after_valid_error(self):
@@ -49,7 +49,7 @@ class TestAssertStderrClean(TestCase):
                /Contents/Home/bin/java and /Library/Java/JavaVirtualMachines/jdk1.8.0_91.jdk/Contents/Home/jre/lib/libinstrument.dylib.
                One of the two will be used. Which one is undefined.
                This string is no good and should fail."""
-        with self.assertRaises(AssertionError):
+        with pytest.raises(AssertionError):
             assert_stderr_clean(err)
 
     def test_invalid_error_before_valid_errors(self):
@@ -57,13 +57,13 @@ class TestAssertStderrClean(TestCase):
                  Class JavaLaunchHelper is implemented in both /Library/Java/JavaVirtualMachines/jdk1.8.0_91.jdk/Contents/Home/bin/java
                  and /Library/Java/JavaVirtualMachines/jdk1.8.0_91.jdk/Contents/Home/jre/lib/libinstrument.dylib. One of the two will be used. Which one is undefined.
                  """
-        with self.assertRaises(AssertionError):
+        with pytest.raises(AssertionError):
             assert_stderr_clean(err)
 
 
 class TestAssertionMethods(TestCase):
 
-    def assertions_test(self):
+    def test_assertions(self):
         # assert_exception_test
         mock_session = Mock(**{'execute.side_effect': AlreadyExists("Dummy exception message.")})
         assert_exception(mock_session, "DUMMY QUERY", expected=AlreadyExists)
@@ -111,5 +111,5 @@ class TestAssertionMethods(TestCase):
         assert_almost_equal(1, 1.1, 1.3, error=.31)
 
     def test_almost_equal_expect_failure(self):
-        with self.assertRaises(AssertionError):
+        with pytest.raises(AssertionError):
             assert_almost_equal(1, 1.3, error=.1)

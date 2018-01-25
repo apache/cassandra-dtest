@@ -1,12 +1,15 @@
 import json
 import os
 import subprocess
-from urllib2 import urlopen
+import urllib.request
+import urllib.parse
+import logging
 
 import ccmlib.common as common
 
-from dtest import warning
 from distutils.version import LooseVersion
+
+logger = logging.getLogger(__name__)
 
 JOLOKIA_JAR = os.path.join('lib', 'jolokia-jvm-1.2.3-agent.jar')
 CLASSPATH_SEP = ';' if common.is_win() else ':'
@@ -18,7 +21,7 @@ def jolokia_classpath():
         tools_jar = os.path.join(os.environ['JAVA_HOME'], 'lib', 'tools.jar')
         return CLASSPATH_SEP.join((tools_jar, JOLOKIA_JAR))
     else:
-        warning("Environment variable $JAVA_HOME not present: jmx-based " +
+        logger.warning("Environment variable $JAVA_HOME not present: jmx-based " +
                 "tests may fail because of missing $JAVA_HOME/lib/tools.jar.")
         return JOLOKIA_JAR
 
@@ -50,7 +53,7 @@ def make_mbean(package, type, **kwargs):
     rv = 'org.apache.cassandra.%s:type=%s' % (package, type)
     if kwargs:
         rv += ',' + ','.join('{k}={v}'.format(k=k, v=v)
-                             for k, v in kwargs.iteritems())
+                             for k, v in kwargs.items())
     return rv
 
 
@@ -204,9 +207,9 @@ class JolokiaAgent(object):
         try:
             subprocess.check_output(args, stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError as exc:
-            print "Failed to start jolokia agent (command was: %s): %s" % (' '.join(args), exc)
-            print "Exit status was: %d" % (exc.returncode,)
-            print "Output was: %s" % (exc.output,)
+            print("Failed to start jolokia agent (command was: %s): %s" % (' '.join(args), exc))
+            print("Exit status was: %d" % (exc.returncode,))
+            print("Output was: %s" % (exc.output,))
             raise
 
     def stop(self):
@@ -220,15 +223,16 @@ class JolokiaAgent(object):
         try:
             subprocess.check_output(args, stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError as exc:
-            print "Failed to stop jolokia agent (command was: %s): %s" % (' '.join(args), exc)
-            print "Exit status was: %d" % (exc.returncode,)
-            print "Output was: %s" % (exc.output,)
+            print("Failed to stop jolokia agent (command was: %s): %s" % (' '.join(args), exc))
+            print("Exit status was: %d" % (exc.returncode,))
+            print("Output was: %s" % (exc.output,))
             raise
 
     def _query(self, body, verbose=True):
-        request_data = json.dumps(body)
+        request_data = json.dumps(body).encode("utf-8")
         url = 'http://%s:8778/jolokia/' % (self.node.network_interfaces['binary'][0],)
-        response = urlopen(url, data=request_data, timeout=10.0)
+        req = urllib.request.Request(url)
+        response = urllib.request.urlopen(req, data=request_data, timeout=10.0)
         if response.code != 200:
             raise Exception("Failed to query Jolokia agent; HTTP response code: %d; response: %s" % (response.code, response.readlines()))
 
@@ -237,9 +241,9 @@ class JolokiaAgent(object):
         if response['status'] != 200:
             stacktrace = response.get('stacktrace')
             if stacktrace and verbose:
-                print "Stacktrace from Jolokia error follows:"
+                print("Stacktrace from Jolokia error follows:")
                 for line in stacktrace.splitlines():
-                    print line
+                    print(line)
             raise Exception("Jolokia agent returned non-200 status: %s" % (response,))
         return response
 

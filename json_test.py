@@ -4,13 +4,18 @@ import os
 import re
 import subprocess
 import sys
+import pytest
+import logging
+
 from distutils.version import LooseVersion
 
 from ccmlib import common
 from ccmlib.common import is_win
 
 from dtest import Tester
-from tools.decorators import since
+
+since = pytest.mark.since
+logger = logging.getLogger(__name__)
 
 
 def build_doc_context(tester, test_name, prepare=True, connection=None, nodes=None):
@@ -79,10 +84,10 @@ def build_doc_context(tester, test_name, prepare=True, connection=None, nodes=No
         args = [host, str(port)]
         sys.stdout.flush()
         p = subprocess.Popen([cli] + args, env=env, stdin=subprocess.PIPE, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-        p.stdin.write("USE {};".format(enabled_ks()))
+        p.stdin.write("USE {};".format(enabled_ks()).encode('utf-8'))
         for cmd in cmds.split(';'):
-            p.stdin.write(cmd + ';\n')
-        p.stdin.write("quit;\n")  # may not be necesary, things could simplify a bit if removed
+            p.stdin.write((cmd + ';\n').encode('utf-8'))
+        p.stdin.write("quit;\n".encode('utf-8'))  # may not be necesary, things could simplify a bit if removed
         return p.communicate()
 
     def cqlsh(cmds, supress_err=False):
@@ -96,7 +101,7 @@ def build_doc_context(tester, test_name, prepare=True, connection=None, nodes=No
 
         # if output is empty string we want to just return None
         if output:
-            return output
+            return output.decode("utf-8")
 
     def cqlsh_print(cmds, supress_err=False):
         """
@@ -130,13 +135,13 @@ def build_doc_context(tester, test_name, prepare=True, connection=None, nodes=No
         if not err:
             raise RuntimeError("Expected cqlsh error but none occurred!")
 
-        return err
+        return err.decode("utf-8")
 
     def cqlsh_err_print(cmds):
         """
         Run cqlsh commands expecting error output, and print error output.
         """
-        print(cqlsh_err(cmds))
+        print((cqlsh_err(cmds)))
 
     def cql(query):
         """
@@ -193,12 +198,12 @@ def run_func_docstring(tester, test_func, globs=None, verbose=False, compileflag
 
 
 @since('2.2')
-class ToJsonSelectTests(Tester):
+class TestToJsonSelect(Tester):
     """
     Tests using toJson with a SELECT statement
     """
 
-    def basic_data_types_test(self):
+    def test_basic_data_types(self):
         """
         Create our schema:
 
@@ -267,10 +272,10 @@ class ToJsonSelectTests(Tester):
             (1 rows)
             <BLANKLINE>
         """
-        run_func_docstring(tester=self, test_func=self.basic_data_types_test)
+        run_func_docstring(tester=self, test_func=self.test_basic_data_types)
 
     # yes, it's probably weird to use json for counter changes
-    def counters_test(self):
+    def test_counters(self):
         """
         Add a table with a few counters:
 
@@ -299,9 +304,9 @@ class ToJsonSelectTests(Tester):
             (1 rows)
             <BLANKLINE>
         """
-        run_func_docstring(tester=self, test_func=self.counters_test)
+        run_func_docstring(tester=self, test_func=self.test_counters)
 
-    def complex_data_types_test(self):
+    def test_complex_data_types(self):
         """
         Build some user types and a schema that uses them:
 
@@ -449,16 +454,16 @@ class ToJsonSelectTests(Tester):
             (1 rows)
             <BLANKLINE>
         """
-        run_func_docstring(tester=self, test_func=self.complex_data_types_test)
+        run_func_docstring(tester=self, test_func=self.test_complex_data_types)
 
 
 @since('2.2')
-class FromJsonUpdateTests(Tester):
+class TestFromJsonUpdate(Tester):
     """
     Tests using fromJson within UPDATE statements.
     """
 
-    def basic_data_types_test(self):
+    def test_basic_data_types(self):
         """
         Create a table with the primitive types:
 
@@ -522,9 +527,9 @@ class FromJsonUpdateTests(Tester):
             (1 rows)
             <BLANKLINE>
         """
-        run_func_docstring(tester=self, test_func=self.basic_data_types_test)
+        run_func_docstring(tester=self, test_func=self.test_basic_data_types)
 
-    def complex_data_types_test(self):
+    def test_complex_data_types(self):
         """"
         UDT and schema setup:
 
@@ -676,9 +681,9 @@ class FromJsonUpdateTests(Tester):
             (1 rows)
             <BLANKLINE>
         """
-        run_func_docstring(tester=self, test_func=self.complex_data_types_test)
+        run_func_docstring(tester=self, test_func=self.test_complex_data_types)
 
-    def collection_update_test(self):
+    def test_collection_update(self):
         """
         Setup schema, add a row:
 
@@ -750,16 +755,16 @@ class FromJsonUpdateTests(Tester):
             (1 rows)
             <BLANKLINE>
         """
-        run_func_docstring(tester=self, test_func=self.collection_update_test)
+        run_func_docstring(tester=self, test_func=self.test_collection_update)
 
 
 @since('2.2')
-class FromJsonSelectTests(Tester):
+class TestFromJsonSelect(Tester):
     """
     Tests using fromJson in conjunction with a SELECT statement
     """
 
-    def selecting_pkey_as_json_test(self):
+    def test_selecting_pkey_as_json(self):
         """
         Schema setup:
 
@@ -793,9 +798,9 @@ class FromJsonSelectTests(Tester):
             (1 rows)
             <BLANKLINE>
         """
-        run_func_docstring(tester=self, test_func=self.selecting_pkey_as_json_test)
+        run_func_docstring(tester=self, test_func=self.test_selecting_pkey_as_json)
 
-    def select_using_secondary_index_test(self):
+    def test_select_using_secondary_index(self):
         """
         Schema setup and secondary index:
 
@@ -832,16 +837,16 @@ class FromJsonSelectTests(Tester):
             (1 rows)
             <BLANKLINE>
         """
-        run_func_docstring(tester=self, test_func=self.select_using_secondary_index_test)
+        run_func_docstring(tester=self, test_func=self.test_select_using_secondary_index)
 
 
 @since('2.2')
-class FromJsonInsertTests(Tester):
+class TestFromJsonInsert(Tester):
     """
     Tests using fromJson within INSERT statements.
     """
 
-    def basic_data_types_test(self):
+    def test_basic_data_types(self):
         """
         Create a table with the primitive types:
 
@@ -902,9 +907,9 @@ class FromJsonInsertTests(Tester):
             (1 rows)
             <BLANKLINE>
         """
-        run_func_docstring(tester=self, test_func=self.basic_data_types_test)
+        run_func_docstring(tester=self, test_func=self.test_basic_data_types)
 
-    def complex_data_types_test(self):
+    def test_complex_data_types(self):
         """
         Build some user types and a schema that uses them:
 
@@ -1055,16 +1060,16 @@ class FromJsonInsertTests(Tester):
             (2 rows)
             <BLANKLINE>
         """
-        run_func_docstring(tester=self, test_func=self.complex_data_types_test)
+        run_func_docstring(tester=self, test_func=self.test_complex_data_types)
 
 
 @since('2.2')
-class FromJsonDeleteTests(Tester):
+class TestFromJsonDelete(Tester):
     """
     Tests using fromJson within DELETE statements.
     """
 
-    def delete_using_pkey_json_test(self):
+    def test_delete_using_pkey_json(self):
         """
         Schema setup:
 
@@ -1119,16 +1124,16 @@ class FromJsonDeleteTests(Tester):
             <BLANKLINE>
             <BLANKLINE>
         """
-        run_func_docstring(tester=self, test_func=self.delete_using_pkey_json_test)
+        run_func_docstring(tester=self, test_func=self.test_delete_using_pkey_json)
 
 
 @since('2.2')
-class JsonFullRowInsertSelect(Tester):
+class TestJsonFullRowInsertSelect(Tester):
     """
     Tests for creating full rows from json documents, selecting full rows back as json documents, and related functionality.
     """
 
-    def simple_schema_test(self):
+    def test_simple_schema(self):
         """
         Create schema:
 
@@ -1231,9 +1236,9 @@ class JsonFullRowInsertSelect(Tester):
             (2 rows)
             <BLANKLINE>
         """
-        run_func_docstring(tester=self, test_func=self.simple_schema_test)
+        run_func_docstring(tester=self, test_func=self.test_simple_schema)
 
-    def pkey_requirement_test(self):
+    def test_pkey_requirement(self):
         """
         Create schema:
 
@@ -1263,9 +1268,9 @@ class JsonFullRowInsertSelect(Tester):
             <stdin>:2:InvalidRequest: Error from server: code=2200 [Invalid query] message="Invalid null value in condition for column key1"
             <BLANKLINE>
         """
-        run_func_docstring(tester=self, test_func=self.pkey_requirement_test)
+        run_func_docstring(tester=self, test_func=self.test_pkey_requirement)
 
-    def null_value_test(self):
+    def test_null_value(self):
         """
         Create schema:
 
@@ -1306,9 +1311,9 @@ class JsonFullRowInsertSelect(Tester):
             (1 rows)
             <BLANKLINE>
         """
-        run_func_docstring(tester=self, test_func=self.null_value_test)
+        run_func_docstring(tester=self, test_func=self.test_null_value)
 
-    def complex_schema_test(self):
+    def test_complex_schema(self):
         """
         Create some udt's and schema:
 
@@ -1507,4 +1512,4 @@ class JsonFullRowInsertSelect(Tester):
             <BLANKLINE>
 
         """
-        run_func_docstring(tester=self, test_func=self.complex_schema_test)
+        run_func_docstring(tester=self, test_func=self.test_complex_schema)

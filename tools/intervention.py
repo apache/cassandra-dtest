@@ -1,8 +1,10 @@
 import random
 import time
+import logging
+
 from threading import Thread
 
-from dtest import debug
+logger = logging.getLogger(__name__)
 
 
 class InterruptBootstrap(Thread):
@@ -38,9 +40,9 @@ class InterruptCompaction(Thread):
         self.node.watch_log_for("Compacting(.*)%s" % (self.tablename,), from_mark=self.mark, filename=self.filename)
         if self.delay > 0:
             random_delay = random.uniform(0, self.delay)
-            debug("Sleeping for {} seconds".format(random_delay))
+            logger.debug("Sleeping for {} seconds".format(random_delay))
             time.sleep(random_delay)
-        debug("Killing node {}".format(self.node.address()))
+        logger.debug("Killing node {}".format(self.node.address()))
         self.node.stop(gently=False)
 
 
