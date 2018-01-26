@@ -110,7 +110,7 @@ class TestHelper(Tester):
         if not common.is_win():  # nodetool always prints out on windows
             assert_length_equal(response, 0)  # nodetool does not print anything unless there is an error
 
-    def launch_standalone_scrub(self, ks, cf):
+    def launch_standalone_scrub(self, ks, cf, reinsert_overflowed_ttl=False, no_validate=False):
         """
         Launch the standalone scrub
         """
@@ -119,7 +119,12 @@ class TestHelper(Tester):
         scrub_bin = node1.get_tool('sstablescrub')
         logger.debug(scrub_bin)
 
-        args = [scrub_bin, ks, cf]
+        args = [scrub_bin]
+        if reinsert_overflowed_ttl:
+            args += ['--reinsert-overflowed-ttl']
+        if no_validate:
+            args += ['--no-validate']
+        args += [ks, cf] if reinsert_overflowed_ttl else [ks, cf]
         p = subprocess.Popen(args, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out, err = p.communicate()
         logger.debug(out.decode("utf-8"))
