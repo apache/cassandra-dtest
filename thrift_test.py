@@ -4,6 +4,7 @@ import time
 import uuid
 import pytest
 import logging
+import codecs
 
 from thrift.protocol import TBinaryProtocol
 from thrift.Thrift import TApplicationException
@@ -31,7 +32,9 @@ from tools.assertions import (assert_all, assert_none, assert_one)
 
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
-
+utf8encoder = codecs.getencoder('utf-8')
+def utf8encode(str):
+    return utf8encoder(str)[0]
 
 def get_thrift_client(host='127.0.0.1', port=9160):
     socket = TSocket.TSocket(host, port)
@@ -95,8 +98,8 @@ class TestThrift(Tester):
                                     cf_defs=[
             Cassandra.CfDef('Keyspace1', 'Standard1'),
             Cassandra.CfDef('Keyspace1', 'Standard2'),
-            Cassandra.CfDef('Keyspace1', 'Standard3', column_metadata=[Cassandra.ColumnDef('c1', 'AsciiType'), Cassandra.ColumnDef('c2', 'AsciiType')]),
-            Cassandra.CfDef('Keyspace1', 'Standard4', column_metadata=[Cassandra.ColumnDef('c1', 'AsciiType')]),
+            Cassandra.CfDef('Keyspace1', 'Standard3', column_metadata=[Cassandra.ColumnDef(utf8encode('c1'), 'AsciiType'), Cassandra.ColumnDef(utf8encode('c2'), 'AsciiType')]),
+            Cassandra.CfDef('Keyspace1', 'Standard4', column_metadata=[Cassandra.ColumnDef(utf8encode('c1'), 'AsciiType')]),
             Cassandra.CfDef('Keyspace1', 'StandardLong1', comparator_type='LongType'),
             Cassandra.CfDef('Keyspace1', 'StandardInteger1', comparator_type='IntegerType'),
             Cassandra.CfDef('Keyspace1', 'StandardComposite', comparator_type='CompositeType(AsciiType, AsciiType)'),
@@ -105,10 +108,10 @@ class TestThrift(Tester):
             Cassandra.CfDef('Keyspace1', 'Super3', column_type='Super', comparator_type='LongType', subcomparator_type='UTF8Type'),
             Cassandra.CfDef('Keyspace1', 'Counter1', default_validation_class='CounterColumnType'),
             Cassandra.CfDef('Keyspace1', 'SuperCounter1', column_type='Super', default_validation_class='CounterColumnType'),
-            Cassandra.CfDef('Keyspace1', 'Indexed1', column_metadata=[Cassandra.ColumnDef('birthdate', 'LongType', Cassandra.IndexType.KEYS, 'birthdate_index')]),
+            Cassandra.CfDef('Keyspace1', 'Indexed1', column_metadata=[Cassandra.ColumnDef(utf8encode('birthdate'), 'LongType', Cassandra.IndexType.KEYS, 'birthdate_index')]),
             Cassandra.CfDef('Keyspace1', 'Indexed2', comparator_type='TimeUUIDType', column_metadata=[Cassandra.ColumnDef(uuid.UUID('00000000-0000-1000-0000-000000000000').bytes, 'LongType', Cassandra.IndexType.KEYS)]),
             Cassandra.CfDef('Keyspace1', 'Indexed3', comparator_type='TimeUUIDType', column_metadata=[Cassandra.ColumnDef(uuid.UUID('00000000-0000-1000-0000-000000000000').bytes, 'UTF8Type', Cassandra.IndexType.KEYS)]),
-            Cassandra.CfDef('Keyspace1', 'Indexed4', column_metadata=[Cassandra.ColumnDef('a', 'LongType', Cassandra.IndexType.KEYS, 'a_index'), Cassandra.ColumnDef('z', 'UTF8Type')]),
+            Cassandra.CfDef('Keyspace1', 'Indexed4', column_metadata=[Cassandra.ColumnDef(utf8encode('a'), 'LongType', Cassandra.IndexType.KEYS, 'a_index'), Cassandra.ColumnDef(utf8encode('z'), 'UTF8Type')]),
             Cassandra.CfDef('Keyspace1', 'Expiring', default_time_to_live=2)
         ])
 
@@ -120,7 +123,7 @@ class TestThrift(Tester):
                                         Cassandra.CfDef('Keyspace2', 'Super4', column_type='Super', subcomparator_type='TimeUUIDType'), ])
 
         for ks in [keyspace1, keyspace2]:
-            cls.client.system_add_keyspace(ks)
+            client.system_add_keyspace(ks)
 
 
 def i64(n):
@@ -2448,25 +2451,25 @@ class TestMutations(TestThrift):
         _set_keyspace('Keyspace1')
         self.truncate_all('Indexed3')
 
-        sp = SlicePredicate(slice_range=SliceRange('', ''))
+        sp = SlicePredicate(slice_range=SliceRange(utf8encode(''), utf8encode('')))
         cp = ColumnParent('Indexed3')  # timeuuid name, utf8 values
         u = uuid.UUID('00000000-0000-1000-0000-000000000000').bytes
         u2 = uuid.UUID('00000000-0000-1000-0000-000000000001').bytes
-        client.insert('key1', ColumnParent('Indexed3'), Column(u, 'a', 0), ConsistencyLevel.ONE)
-        client.insert('key1', ColumnParent('Indexed3'), Column(u2, 'b', 0), ConsistencyLevel.ONE)
+        client.insert(utf8encode('key1'), ColumnParent('Indexed3'), Column(u, utf8encode('a'), 0), ConsistencyLevel.ONE)
+        client.insert(utf8encode('key1'), ColumnParent('Indexed3'), Column(u2, utf8encode('b'), 0), ConsistencyLevel.ONE)
         # name comparator + data validator of incompatible types -- see CASSANDRA-2347
-        key_range = KeyRange('', '', None, None, [IndexExpression(u, IndexOperator.EQ, 'a'), IndexExpression(u2, IndexOperator.EQ, 'b')], 100)
+        key_range = KeyRange(utf8encode(''), utf8encode(''), None, None, [IndexExpression(u, IndexOperator.EQ, utf8encode('a')), IndexExpression(u2, IndexOperator.EQ, utf8encode('b'))], 100)
         result = client.get_range_slices(cp, sp, key_range, ConsistencyLevel.ONE)
         assert len(result) == 1, result
 
         cp = ColumnParent('Indexed2')  # timeuuid name, long values
 
         # name must be valid (TimeUUID)
-        key_range = KeyRange('', '', None, None, [IndexExpression('foo', IndexOperator.EQ, uuid.UUID('00000000-0000-1000-0000-000000000000').bytes)], 100)
+        key_range = KeyRange(utf8encode(''), utf8encode(''), None, None, [IndexExpression(utf8encode('foo'), IndexOperator.EQ, uuid.UUID('00000000-0000-1000-0000-000000000000').bytes)], 100)
         _expect_exception(lambda: client.get_range_slices(cp, sp, key_range, ConsistencyLevel.ONE), InvalidRequestException)
 
         # value must be valid (TimeUUID)
-        key_range = KeyRange('', '', None, None, [IndexExpression(uuid.UUID('00000000-0000-1000-0000-000000000000').bytes, IndexOperator.EQ, "foo")], 100)
+        key_range = KeyRange(utf8encode(''), utf8encode(''), None, None, [IndexExpression(uuid.UUID('00000000-0000-1000-0000-000000000000').bytes, IndexOperator.EQ, utf8encode("foo"))], 100)
         _expect_exception(lambda: client.get_range_slices(cp, sp, key_range, ConsistencyLevel.ONE), InvalidRequestException)
 
     def test_index_scan_expiring(self):
