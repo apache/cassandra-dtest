@@ -222,9 +222,9 @@ class TestWriteFailures(Tester):
         client.set_keyspace(KEYSPACE)
 
         with pytest.raises(self.expected_expt):
-            client.insert('key1',
+            client.insert('key1'.encode(),
                           thrift_types.ColumnParent('mytable'),
-                          thrift_types.Column('value', 'Value 1', 0),
+                          thrift_types.Column('value'.encode(), 'Value 1'.enocde(), 0),
                           thrift_types.ConsistencyLevel.ALL)
 
         client.transport.close()

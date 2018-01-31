@@ -378,13 +378,17 @@ class TestOfflineTools(Tester):
         # change before it's release.
         if testversion < '4.0':
             (out, error, rc) = node1.run_sstableupgrade(keyspace='ks', column_family='cf')
+            out = str(out)
+            error = str(error)
             logger.debug(out)
             logger.debug(error)
             logger.debug('Upgraded ks.cf sstable: {}'.format(node1.get_sstables(keyspace='ks', column_family='cf')))
-            assert 'Found 1 sstables that need upgrading.' in out
+            assert 'Found 1 sstables that need upgrading.' in str(out)
 
         # Check that sstableupgrade finds no upgrade needed on current version.
         (out, error, rc) = node1.run_sstableupgrade(keyspace='ks', column_family='cf')
+        out = str(out)
+        error = str(error)
         logger.debug(out)
         logger.debug(error)
         assert 'Found 0 sstables that need upgrading.' in out

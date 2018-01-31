@@ -54,9 +54,9 @@ class TestSuperCounterClusterRestart(Tester):
         for subcol in range(NUM_SUBCOLS):
             for add in range(NUM_ADDS):
                 column_parent = ColumnParent(column_family='cf',
-                                             super_column='subcol_%d' % subcol)
-                counter_column = CounterColumn('col_0', 1)
-                thrift_conn.add('row_0', column_parent, counter_column,
+                                             super_column=('subcol_%d' % subcol).encode())
+                counter_column = CounterColumn('col_0'.encode(), 1)
+                thrift_conn.add('row_0'.encode(), column_parent, counter_column,
                                 ConsistencyLevel.QUORUM)
         time.sleep(1)
         cluster.flush()
@@ -75,9 +75,9 @@ class TestSuperCounterClusterRestart(Tester):
         from_db = []
 
         for i in range(NUM_SUBCOLS):
-            column_path = ColumnPath(column_family='cf', column='col_0',
-                                     super_column='subcol_%d' % i)
-            column_or_super_column = thrift_conn.get('row_0', column_path,
+            column_path = ColumnPath(column_family='cf', column='col_0'.encode(),
+                                     super_column=(('subcol_%d' % i).encode()))
+            column_or_super_column = thrift_conn.get('row_0'.encode(), column_path,
                                                      ConsistencyLevel.QUORUM)
             val = column_or_super_column.counter_column.value
             logger.debug(str(val)),

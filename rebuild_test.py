@@ -439,7 +439,7 @@ class TestRebuild(Tester):
         node3.nodetool('rebuild -ks ks1 -ts (%s,%s] -s %s' % (tokens[2], str(pow(2, 63) - 1), node2_address))
 
         # verify that node2 streamed to node3
-        log_matches = node2.grep_log('Session with %s is complete' % node3.address_for_current_version())
+        log_matches = node2.grep_log('Session with %s is complete' % node3.address_for_current_version_slashy())
         assert len(log_matches) > 0
 
         # verify that node1 did not participate

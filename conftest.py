@@ -8,6 +8,7 @@ import platform
 import copy
 import inspect
 import subprocess
+from itertools import zip_longest
 
 from dtest import running_in_docker, cleanup_docker_environment_before_test_execution
 
@@ -351,10 +352,34 @@ def fixture_dtest_setup(request, parse_dtest_config, fixture_dtest_setup_overrid
             dtest_setup.cleanup_cluster()
 
 
+#Based on https://bugs.python.org/file25808/14894.patch
+def loose_version_compare(a, b):
+    for i, j in zip_longest(a.version, b.version, fillvalue=''):
+        if type(i) != type(j):
+            i = str(i)
+            j = str(j)
+        if i == j:
+            continue
+        elif i < j:
+            return -1
+        else:  # i > j
+            return 1
+
+    #Longer version strings with equal prefixes are equal, but if one version string is longer than it is greater
+    aLen = len(a.version)
+    bLen = len(b.version)
+    if aLen == bLen:
+        return 0
+    elif aLen < bLen:
+        return -1
+    else:
+        return 1
+
+
 def _skip_msg(current_running_version, since_version, max_version):
-    if current_running_version < since_version:
+    if loose_version_compare(current_running_version, since_version) < 0:
         return "%s < %s" % (current_running_version, since_version)
-    if max_version and current_running_version > max_version:
+    if max_version and loose_version_compare(current_running_version, max_version) > 0:
         return "%s > %s" % (current_running_version, max_version)
 
 
