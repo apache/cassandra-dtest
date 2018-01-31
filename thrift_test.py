@@ -66,7 +66,7 @@ class TestThrift(Tester):
         return dtest_setup_overrides
 
     @pytest.fixture(scope='function', autouse=True)
-    def fixture_set_cluster_settings(self, fixture_dtest_setup):
+    def fixture_set_cluster_settings(self, fixture_dtest_setup, set_dtest_setup_on_function):
         fixture_dtest_setup.cluster.populate(1)
         node1, = fixture_dtest_setup.cluster.nodelist()
 
@@ -75,7 +75,7 @@ class TestThrift(Tester):
         # automatically. It does not matter what token we set as we only
         # ever use one node.
         if not self.dtest_config.use_vnodes:
-            node1.set_configuration_options(values={'initial_token': "a".encode('hex')})
+            node1.set_configuration_options(values={'initial_token': 'abcd'})
 
         fixture_dtest_setup.cluster.start(wait_for_binary_proto=True)
         fixture_dtest_setup.cluster.nodelist()[0].watch_log_for("Listening for thrift clients")  # Wait for the thrift port to open
