@@ -268,7 +268,7 @@ class Tester:
             node.set_install_dir(version=version)
         else:
             node.set_install_dir(install_dir=self.dtest_config.cassandra_dir)
-            os.environ.set('CASSANDRA_DIR', self.dtest_config.cassandra_dir)
+            os.environ['CASSANDRA_DIR'] = self.dtest_config.cassandra_dir
 
     def go(self, func):
         runner = Runner(func)
