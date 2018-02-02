@@ -76,7 +76,7 @@ class TestThriftHSHA(Tester):
 
             with JolokiaAgent(node1) as jmx:
                 num_clients = jmx.read_attribute(connected_thrift_clients, "Value")
-                assert int(num_clients), 0 == "There are still open Thrift connections after stopping service"
+                assert int(num_clients) == 0, "There are still open Thrift connections after stopping service " + str(num_clients)
 
     @unittest.skipIf(not os.path.exists(ATTACK_JAR), "No attack jar found")
     @unittest.skipIf(not os.path.exists(JNA_PATH), "No JNA jar found")
