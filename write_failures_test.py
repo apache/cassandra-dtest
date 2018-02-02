@@ -1,7 +1,6 @@
 import uuid
 import pytest
 import logging
-import codecs
 
 from cassandra import ConsistencyLevel, WriteFailure, WriteTimeout
 
@@ -223,9 +222,9 @@ class TestWriteFailures(Tester):
         client.set_keyspace(KEYSPACE)
 
         with pytest.raises(self.expected_expt):
-            client.insert(codecs.encode('key1'),
+            client.insert('key1'.encode(),
                           thrift_types.ColumnParent('mytable'),
-                          thrift_types.Column(codecs.encode('value'), codecs.encode('Value 1'), 0),
+                          thrift_types.Column('value'.encode(), 'Value 1'.enocde(), 0),
                           thrift_types.ConsistencyLevel.ALL)
 
         client.transport.close()

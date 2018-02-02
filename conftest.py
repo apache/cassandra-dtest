@@ -354,25 +354,20 @@ def fixture_dtest_setup(request, parse_dtest_config, fixture_dtest_setup_overrid
 
 #Based on https://bugs.python.org/file25808/14894.patch
 def loose_version_compare(a, b):
-    print("Comparing " + str(a) + " and " + str(b) + " lists " + str(a.version) + " and " + str(b.version))
     for i, j in zip_longest(a.version, b.version, fillvalue=''):
         if type(i) != type(j):
             i = str(i)
             j = str(j)
         if i == j:
-            print(str(i) + " == " + str(j))
             continue
         elif i < j:
-            print(str(i) + " < " + str(j))
             return -1
         else:  # i > j
-            print(str(i) + " > " + str(j))
             return 1
 
     #Longer version strings with equal prefixes are equal, but if one version string is longer than it is greater
     aLen = len(a.version)
     bLen = len(b.version)
-    print("aLen " + str(aLen) + " bLen " + str(bLen))
     if aLen == bLen:
         return 0
     elif aLen < bLen:
