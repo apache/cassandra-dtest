@@ -2318,7 +2318,7 @@ class TestMutations(TestThrift):
         for i in range(10):
             column_name = composite(str(i), str(i))
             column = Column(column_name, utf8encode('value'), int(time.time() * 1000))
-            client.insert(utf8encode('key1')), ColumnParent('StandardComposite'), column, ConsistencyLevel.ONE)
+            client.insert(utf8encode('key1'), ColumnParent('StandardComposite'), column, ConsistencyLevel.ONE)
 
         # insert a partial cell name (just the first element of the composite)
         column_name = composite('6', None, eoc=b'\x00')
