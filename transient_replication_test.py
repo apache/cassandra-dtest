@@ -13,7 +13,7 @@ from tools.misc import ImmutableMapping
 from tools.jmxutils import JolokiaAgent, make_mbean
 
 
-from cassandra.metadata import Murmur3Token
+from cassandra.metadata import Murmur3Token, OrderedDict
 import pytest
 
 
@@ -31,6 +31,33 @@ class SSTable(object):
 def jmx_start(to_start, **kwargs):
     kwargs['jvm_args'] = kwargs.get('jvm_args', []) + ['-XX:-PerfDisableSharedMem']
     to_start.start(**kwargs)
+
+
+class TableMetrics(object):
+
+    def __init__(self, node, keyspace, table):
+        assert isinstance(node, Node)
+        self.jmx = JolokiaAgent(node)
+        self.write_latency = make_mbean("metrics", type="Table", name="WriteLatency", keyspace=keyspace, scope=table)
+
+    @property
+    def write_count(self):
+        return self.jmx.read_attribute(self.write_latency, "Count")
+
+    def start(self):
+        self.jmx.start()
+
+    def stop(self):
+        self.jmx.stop()
+
+    def __enter__(self):
+        """ For contextmanager-style usage. """
+        self.start()
+        return self
+
+    def __exit__(self, exc_type, value, traceback):
+        """ For contextmanager-style usage. """
+        self.stop()
 
 
 class StorageProxy(object):
@@ -78,21 +105,49 @@ def patch_start(startable):
 
     startable.start = types.MethodType(new_start, startable)
 
+def get_sstable_data(cls, node, keyspace):
+    _sstable_name = re.compile('SSTable: (.+)')
+    _repaired_at = re.compile('Repaired at: (\d+)')
+    _pending_repair = re.compile('Pending repair: (\-\-|null|[a-f0-9\-]+)')
+
+    out = node.run_sstablemetadata(keyspace=keyspace).stdout
+
+    def matches(pattern):
+        return filter(None, [pattern.match(l) for l in out.decode("utf-8").split('\n')])
+    names = [m.group(1) for m in matches(_sstable_name)]
+    repaired_times = [int(m.group(1)) for m in matches(_repaired_at)]
+
+    def uuid_or_none(s):
+        return None if s == 'null' or s == '--' else UUID(s)
+    pending_repairs = [uuid_or_none(m.group(1)) for m in matches(_pending_repair)]
+    assert names
+    assert repaired_times
+    assert pending_repairs
+    assert len(names) == len(repaired_times) == len(pending_repairs)
+    return [SSTable(*a) for a in zip(names, repaired_times, pending_repairs)]
+
+
 
 class TestTransientReplication(Tester):
 
     keyspace = "ks"
     table = "tbl"
 
+    @pytest.fixture
+    def cheap_quorums(self):
+        return False
+
+    use_cheap_quorums = pytest.mark.parametrize('cheap_quorums', [True])
+
     @pytest.fixture(scope='function', autouse=True)
-    def setup_cluster(self, fixture_dtest_setup):
+    def setup_cluster(self, fixture_dtest_setup, cheap_quorums):
         fixture_dtest_setup.setup_overrides.cluster_options = ImmutableMapping({'hinted_handoff_enabled': 'false',
                                                                                 'num_tokens': 1,
                                                                                 'commitlog_sync_period_in_ms': 500})
         self.tokens = [0, 1, 2]
 
         patch_start(self.cluster)
-        self.cluster.populate(3, tokens=self.tokens, debug=True)
+        self.cluster.populate(3, tokens=self.tokens, debug=True, install_byteman=True)
         self.cluster.start()
 
         # enable shared memory
@@ -103,30 +158,15 @@ class TestTransientReplication(Tester):
         self.node1, self.node2, self.node3 = self.nodes
         session = self.exclusive_cql_connection(self.node3)
         # import pdb; pdb.set_trace()
-        session.execute("CREATE KEYSPACE %s WITH REPLICATION={'class':'NetworkTopologyStrategy', 'datacenter1': '3/1'}" % self.keyspace)
+        replication_params = OrderedDict()
+        replication_params['class'] = 'NetworkTopologyStrategy'
+        replication_params['datacenter1'] = '3/1'
+        if cheap_quorums:
+            replication_params['cheap_quorums'] = 'true'
+        replication_params = ', '.join("'%s': '%s'" % (k, v) for k, v in replication_params.items())
+
+        session.execute("CREATE KEYSPACE %s WITH REPLICATION={%s}" % (self.keyspace, replication_params))
         session.execute("CREATE TABLE %s.%s (k INT PRIMARY KEY, v INT)" % (self.keyspace, self.table))
-
-    @classmethod
-    def get_sstable_data(cls, node, keyspace):
-        _sstable_name = re.compile('SSTable: (.+)')
-        _repaired_at = re.compile('Repaired at: (\d+)')
-        _pending_repair = re.compile('Pending repair: (\-\-|null|[a-f0-9\-]+)')
-
-        out = node.run_sstablemetadata(keyspace=keyspace).stdout
-
-        def matches(pattern):
-            return filter(None, [pattern.match(l) for l in out.decode("utf-8").split('\n')])
-        names = [m.group(1) for m in matches(_sstable_name)]
-        repaired_times = [int(m.group(1)) for m in matches(_repaired_at)]
-
-        def uuid_or_none(s):
-            return None if s == 'null' or s == '--' else UUID(s)
-        pending_repairs = [uuid_or_none(m.group(1)) for m in matches(_pending_repair)]
-        assert names
-        assert repaired_times
-        assert pending_repairs
-        assert len(names) == len(repaired_times) == len(pending_repairs)
-        return [SSTable(*a) for a in zip(names, repaired_times, pending_repairs)]
 
     def assert_has_sstables(self, node, flush=False, compact=False):
         if flush:
@@ -200,7 +240,6 @@ class TestTransientReplication(Tester):
         with StorageProxy(self.node1) as sp:
             assert sp.blocking_read_repair == 0
 
-
     def test_trans_to_full_read_repair(self):
         """
         data on transient replicas should be rr'd to full replicas
@@ -231,3 +270,41 @@ class TestTransientReplication(Tester):
         self.assert_has_sstables(self.node3, flush=True)
 
         # TODO: check the inverse; that we're not repairing every read
+
+    @use_cheap_quorums
+    def test_cheap_quorums(self):
+        """ writes shouldn't make it to transient nodes """
+        session = self.exclusive_cql_connection(self.node1)
+        for node in self.nodes:
+            self.assert_has_no_sstables(node)
+
+        tm = lambda n: TableMetrics(n, self.keyspace, self.table)
+
+        with tm(self.node1) as tm1, tm(self.node2) as tm2, tm(self.node3) as tm3:
+            assert tm1.write_count == 0
+            assert tm2.write_count == 0
+            assert tm3.write_count == 0
+            self.insert_row(1, session=session)
+            assert tm1.write_count == 1
+            assert tm2.write_count == 1
+            assert tm3.write_count == 0
+
+    @use_cheap_quorums
+    def test_speculative_write(self):
+        """ if a full replica isn't responding, we should send the write to the transient replica """
+        session = self.exclusive_cql_connection(self.node1)
+        for node in self.nodes:
+            self.assert_has_no_sstables(node)
+
+        tm = lambda n: TableMetrics(n, self.keyspace, self.table)
+        self.node2.byteman_submit(['./byteman/stop_writes.btm'])
+
+        with tm(self.node1) as tm1, tm(self.node2) as tm2, tm(self.node3) as tm3:
+            assert tm1.write_count == 0
+            assert tm2.write_count == 0
+            assert tm3.write_count == 0
+            self.insert_row(1, session=session)
+            assert tm1.write_count == 1
+            assert tm2.write_count == 0
+            assert tm3.write_count == 1
+
