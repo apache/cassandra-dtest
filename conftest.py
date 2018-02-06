@@ -18,7 +18,7 @@ from netifaces import AF_INET
 from psutil import virtual_memory
 
 import netifaces as ni
-from ccmlib.common import validate_install_dir, is_win
+from ccmlib.common import validate_install_dir, is_win, get_version_from_build
 
 from dtest_config import DTestConfig
 from dtest_setup import DTestSetup
@@ -105,7 +105,7 @@ def fixture_dtest_cluster_name():
 Not exactly sure why :\ but, this fixture needs to be scoped to function level and not
 session or class. If you invoke pytest with tests across multiple test classes, when scopped
 at session, the root logger appears to get reset between each test class invocation.
-this means that the first test to run not from the first test class (and all subsequent 
+this means that the first test to run not from the first test class (and all subsequent
 tests), will have the root logger reset and see a level of NOTSET. Scoping it at the
 class level seems to work, and I guess it's not that much extra overhead to setup the
 logger once per test class vs. once per session in the grand scheme of things.
@@ -414,6 +414,16 @@ def pytest_collection_modifyitems(items, config):
         if config.getoption("--cassandra-version") is None:
             raise Exception("Required dtest arguments were missing! You must provide either --cassandra-dir "
                             "or --cassandra-version. Refer to the documentation or invoke the help with --help.")
+
+    # Either cassandra_version or cassandra_dir is defined, so figure out the version
+    CASSANDRA_VERSION = config.getoption("--cassandra-version") or get_version_from_build(config.getoption("--cassandra-dir"))
+
+    # Check that use_off_heap_memtables is supported in this c* version
+    if config.getoption("--use-off-heap-memtables") and ("3.0" <= CASSANDRA_VERSION < "3.4"):
+        raise Exception("The selected Cassandra version %s doesn't support the provided option "
+                        "--use-off-heap-memtables, see https://issues.apache.org/jira/browse/CASSANDRA-9472 "
+                        "for details" % CASSANDRA_VERSION)
+
 
     selected_items = []
     deselected_items = []
