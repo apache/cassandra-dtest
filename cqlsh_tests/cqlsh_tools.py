@@ -4,7 +4,6 @@ import random
 import cassandra
 
 from cassandra.cluster import ResultSet
-from nose.tools import assert_true
 from typing import List
 
 
@@ -106,7 +105,7 @@ def assert_resultset_contains(got: ResultSet, expected: List[tuple]) -> None:
     assert len(expected) <= 1000, 'This is a slow comparison method. Don\'t use for > 1000 tuples.'
 
     # First quick check: if we have a different count, we can just die.
-    assert_true(len(got.current_rows) == len(expected))
+    assert len(got.current_rows) == len(expected)
 
     for t in expected:
         assert len(t) == 2, 'Got unexpected tuple len. Expected 2, got tuple: {}'.format(t)
@@ -116,6 +115,6 @@ def assert_resultset_contains(got: ResultSet, expected: List[tuple]) -> None:
                 break
             if row.a == t[0] and row.b == t[1]:
                 found = True
-        assert_true(found, 'Failed to find expected row: {}'.format(t))
+        assert found, 'Failed to find expected row: {}'.format(t)
 
 

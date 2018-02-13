@@ -15,8 +15,6 @@ from cassandra import WriteFailure
 from cassandra.concurrent import (execute_concurrent,
                                   execute_concurrent_with_args)
 from ccmlib.node import Node
-from nose.tools import assert_equal, assert_less_equal, assert_not_equal, assert_less, assert_true, \
-    assert_greater_equal, assert_not_in, assert_is_not_none, assert_raises
 
 from cqlsh_tests.cqlsh_tools import assert_resultset_contains
 from dtest import Tester, create_ks, logger
@@ -45,7 +43,7 @@ def _insert_rows(session, table_name, insert_stmt, values):
     logger.debug('{n} rows inserted into {table_name}'.format(n=len(data_loaded), table_name=table_name))
     # use assert_equal over assert_length_equal to avoid printing out
     # potentially large lists
-    assert_equal(len(values), len(data_loaded))
+    assert len(values) == len(data_loaded)
     return data_loaded
 
 
@@ -88,14 +86,12 @@ def _write_to_cdc_write_failure(session, insert_stmt):
     while not error_found:
         # We want to fail if inserting data takes too long. Locally this
         # takes about 10s, but let's be generous.
-        assert_less_equal(
-            (time.time() - start), 600,
-            "It's taken more than 10 minutes to reach a WriteFailure trying "
-            'to overrun the space designated for CDC commitlogs. This could '
-            "be because data isn't being written quickly enough in this "
-            'environment, or because C* is failing to reject writes when '
-            'it should.'
-        )
+        assert ((time.time() - start) <= 600), (
+                "It's taken more than 10 minutes to reach a WriteFailure trying "
+                'to overrun the space designated for CDC commitlogs. This could '
+                "be because data isn't being written quickly enough in this "
+                'environment, or because C* is failing to reject writes when '
+                'it should.')
 
         # If we haven't logged from here in the last 5s, do so.
         rate_limited_debug(
@@ -117,9 +113,8 @@ def _write_to_cdc_write_failure(session, insert_stmt):
         rows_loaded += len([br for br in batch_results if br[0]])
         # then, we make sure that the only failures are the expected
         # WriteFailure.
-        assert_equal([],
-                     [result for (success, result) in batch_results
-                      if not success and not isinstance(result, WriteFailure)])
+        assert ([] == [result for (success, result) in batch_results
+                       if not success and not isinstance(result, WriteFailure)])
         # Finally, if we find a WriteFailure, that means we've inserted all
         # the CDC data we can and so we flip error_found to exit the loop.
         if any(isinstance(result, WriteFailure) for (_, result) in batch_results):
@@ -276,8 +271,8 @@ class TestCDC(Tester):
         create_ks(session, ks_name, rf=1)
 
         if table_name is not None:
-            assert_is_not_none(cdc_enabled_table, 'if creating a table in prepare, must specify whether or not CDC is enabled on it')
-            assert_is_not_none(column_spec, 'if creating a table in prepare, must specify its schema')
+            assert cdc_enabled_table is not None, 'if creating a table in prepare, must specify whether or not CDC is enabled on it'
+            assert column_spec is not None, 'if creating a table in prepare, must specify its schema'
             options = {}
             if gc_grace_seconds is not None:
                 options['gc_grace_seconds'] = gc_grace_seconds
@@ -320,7 +315,7 @@ class TestCDC(Tester):
         execute_concurrent_with_args(session, insert_stmt, data)
 
         # We need data to be in commitlogs, not sstables.
-        assert_equal([], list(node.get_sstables(ks_name, table_name)))
+        assert [] == list(node.get_sstables(ks_name, table_name))
 
         for enable in alter_path:
             set_cdc(enable)
@@ -399,9 +394,8 @@ class TestCDC(Tester):
         logger.debug('beginning data insert to fill CDC commitlogs')
         rows_loaded = _write_to_cdc_write_failure(session, full_cdc_table_info.insert_stmt)
 
-        assert_less(0, rows_loaded,
-                    'No CDC rows inserted. This may happen when '
-                    'cdc_total_space_in_mb > commitlog_segment_size_in_mb')
+        assert 0 < rows_loaded, ('No CDC rows inserted. This may happen when '
+                                 'cdc_total_space_in_mb > commitlog_segment_size_in_mb')
 
         commitlog_dir = os.path.join(node.get_path(), 'commitlogs')
         commitlogs_size = size_of_files_in_dir(commitlog_dir)
@@ -409,11 +403,17 @@ class TestCDC(Tester):
 
         # We should get a WriteFailure when trying to write to the CDC table
         # that's filled the designated CDC space...
-        with assert_raises(WriteFailure):
+        try:
             session.execute(full_cdc_table_info.insert_stmt)
+            raise Exception("WriteFailure expected")
+        except WriteFailure:
+            pass
         # or any CDC table.
-        with assert_raises(WriteFailure):
+        try:
             session.execute(empty_cdc_table_info.insert_stmt)
+            raise Exception("WriteFailure expected")
+        except WriteFailure:
+            pass
 
         # Now we test for behaviors of non-CDC tables when we've exceeded
         # cdc_total_space_in_mb.
@@ -457,10 +457,8 @@ class TestCDC(Tester):
         while _get_commitlog_files(node.get_path()) <= pre_non_cdc_write_segments:
             elapsed = time.time() - start
             rate_limited_debug('  non-cdc load step has lasted {s:.2f}s'.format(s=elapsed))
-            assert_less_equal(elapsed, time_limit,
-                              "It's been over a {s}s and we haven't written a new "
-                              "commitlog segment. Something is wrong.".format(s=time_limit)
-                              )
+            assert (elapsed <= time_limit, "It's been over a {s}s and we haven't written a new "
+                                           "commitlog segment. Something is wrong.".format(s=time_limit))
             execute_concurrent(
                 session,
                 ((non_cdc_prepared_insert, ()) for _ in range(1000)),
@@ -473,7 +471,7 @@ class TestCDC(Tester):
         session.cluster.shutdown()
 
         if self.cluster.version() < '4.0':
-            assert_equal(pre_non_cdc_write_cdc_raw_segments, _get_cdc_raw_files(node.get_path()))
+            assert pre_non_cdc_write_cdc_raw_segments == _get_cdc_raw_files(node.get_path())
         else:
             # Create ReplayData objects for each index file found in loading cluster
             node2_path = os.path.join(node.get_path(), 'cdc_raw')
@@ -587,7 +585,7 @@ class TestCDC(Tester):
         source_cdc_indexes = {ReplayData.load(source_path, name)
                               for name in source_path if name.endswith('_cdc.idx')}
         # assertNotEqual(source_cdc_indexes, {})
-        assert_not_equal(source_cdc_indexes, {})
+        assert source_cdc_indexes != {}
 
         # create a new node to use for cdc_raw cl segment replay
         loading_node = self._init_new_loading_node(ks_name, cdc_table_info.create_stmt, self.cluster.version() < '4')
@@ -617,11 +615,7 @@ class TestCDC(Tester):
         # Then we assert that the CDC data that we expect to be there is there.
         # All data that was in CDC tables should have been copied to cdc_raw,
         # then used in commitlog replay, so it should be back in the cluster.
-        assert_equal(inserted_rows,
-                     data_in_cdc_table_after_restart,
-                     # The message on failure is too long, since cdc_data is thousands
-                     # of items, so we print something else here
-                     msg='not all expected data selected')
+        assert (inserted_rows == data_in_cdc_table_after_restart), 'not all expected data selected'
 
         if self.cluster.version() >= '4.0':
             # Create ReplayData objects for each index file found in loading cluster
@@ -632,8 +626,8 @@ class TestCDC(Tester):
             # Compare source replay data to dest to ensure replay process created both hard links and index files.
             for srd in source_cdc_indexes:
                 # Confirm both log and index are in dest
-                assert_true(os.path.isfile(os.path.join(loading_path, srd.idx_name)))
-                assert_true(os.path.isfile(os.path.join(loading_path, srd.log_name)))
+                assert os.path.isfile(os.path.join(loading_path, srd.idx_name))
+                assert os.path.isfile(os.path.join(loading_path, srd.log_name))
 
                 # Find dest ReplayData that corresponds to the source (should be exactly 1)
                 corresponding_dest_replay_datae = [x for x in dest_cdc_indexes
@@ -645,10 +639,10 @@ class TestCDC(Tester):
                 # cdc offset. We *can*, however, confirm that the offset in the replayed file is >=
                 # the source file, ensuring clients are signaled to replay at least all the data in the
                 # log.
-                assert_greater_equal(drd.offset, srd.offset)
+                assert drd.offset >= srd.offset
 
                 # Confirm completed flag is the same in both
-                assert_equal(srd.completed, drd.completed)
+                assert srd.completed == drd.completed
 
             # Confirm that the relationship between index files on the source
             # and destination looks like we expect.
@@ -664,17 +658,16 @@ class TestCDC(Tester):
                 src_to_dest_idx_map[src_rd] = dest_rds[0]
             # All offsets in idx files that were copied should be >0 on the
             # destination node.
-            assert_not_in(
-                0, {i.offset for i in src_to_dest_idx_map.values()},
+            assert (
+                0 not in {i.offset for i in src_to_dest_idx_map.values()}),\
                 ('Found index offsets == 0 in an index file on the '
                  'destination node that corresponds to an index file on the '
                  'source node:\n'
                  '{}').format(pformat(src_to_dest_idx_map))
-            )
             # Offsets of all shared indexes should be >= on the destination
             # than on the source.
             for src_rd, dest_rd in src_to_dest_idx_map.items():
-                assert_greater_equal(dest_rd.offset, src_rd.offset)
+                assert dest_rd.offset >= src_rd.offset
 
             src_to_dest_idx_map = {
                 src_rd: [dest_rd for dest_rd in dest_cdc_indexes
@@ -683,7 +676,7 @@ class TestCDC(Tester):
             }
             for k, v in src_to_dest_idx_map.items():
                 assert_length_equal(v, 1)
-                assert_greater_equal(k.offset, v.offset)
+                assert k.offset >= v.offset
 
 
 def compare_replay_data(rd_one, rd_two):
