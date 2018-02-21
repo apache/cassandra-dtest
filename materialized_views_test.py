@@ -533,6 +533,53 @@ class TestMaterializedViews(Tester):
         for i in range(1000, 1100):
             assert_one(session, "SELECT * FROM t_by_v WHERE v = {}".format(-i), [-i, i])
 
+    def test_insert_during_range_movement_rf1(self):
+        self._base_test_insert_during_range_movement(rf=1)
+
+    def test_insert_during_range_movement_rf2(self):
+        self._base_test_insert_during_range_movement(rf=2)
+
+    def test_insert_during_range_movement_rf3(self):
+        self._base_test_insert_during_range_movement(rf=3)
+
+    def _base_test_insert_during_range_movement(self, rf):
+        """
+        @jira_ticket CASSANDRA-14251
+
+        Test that materialized views replication work in the middle of a join
+        for different replication factors.
+        """
+
+        session = self.prepare(rf=rf)
+
+        logger.debug("Creating table and view")
+
+        session.execute("CREATE TABLE t (id int PRIMARY KEY, v int)")
+        session.execute(("CREATE MATERIALIZED VIEW t_by_v AS SELECT * FROM t "
+                         "WHERE v IS NOT NULL AND id IS NOT NULL PRIMARY KEY (v, id)"))
+
+        logger.debug("Starting new node4 in write survey mode")
+        node4 = new_node(self.cluster)
+        # Set batchlog.replay_timeout_seconds=1 so we can ensure batchlog will be replayed below
+        node4.start(wait_for_binary_proto=True, jvm_args=["-Dcassandra.write_survey=true",
+                                                          "-Dcassandra.batchlog.replay_timeout_in_ms=1"])
+
+        logger.debug("Insert data while node4 is joining")
+
+        for i in range(1000):
+            session.execute("INSERT INTO t (id, v) VALUES ({id}, {v})".format(id=i, v=-i))
+
+        logger.debug("Finish joining node4")
+        node4.nodetool("join")
+
+        logger.debug('Replay batchlogs')
+        time.sleep(0.001)  # Wait batchlog.replay_timeout_in_ms=1 (ms)
+        self._replay_batchlogs()
+
+        logger.debug("Verify data")
+        for i in range(1000):
+            assert_one(session, "SELECT * FROM t_by_v WHERE v = {}".format(-i), [-i, i])
+
     @pytest.mark.resource_intensive
     def test_add_node_after_wide_mv_with_range_deletions(self):
         """
