@@ -1,3 +1,4 @@
+import os
 import time
 import pytest
 import logging
@@ -18,8 +19,20 @@ class TestReadRepair(Tester):
 
     @pytest.fixture(scope='function', autouse=True)
     def fixture_set_cluster_settings(self, fixture_dtest_setup):
-        fixture_dtest_setup.cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
-        fixture_dtest_setup.cluster.populate(3).start(wait_for_binary_proto=True)
+        cluster = fixture_dtest_setup.cluster
+        cluster.populate(3)
+        # disable dynamic snitch to make replica selection deterministic
+        # when we use patient_exclusive_cql_connection, CL=1 and RF=n
+        cluster.set_configuration_options(values={'hinted_handoff_enabled': False,
+                                                  'endpoint_snitch': 'GossipingPropertyFileSnitch',
+                                                  'dynamic_snitch': False})
+        for node in cluster.nodelist():
+            with open(os.path.join(node.get_conf_dir(), 'cassandra-rackdc.properties'), 'w') as snitch_file:
+                snitch_file.write("dc=datacenter1" + os.linesep)
+                snitch_file.write("rack=rack1" + os.linesep)
+                snitch_file.write("prefer_local=true" + os.linesep)
+
+        cluster.start(wait_for_binary_proto=True)
 
     @since('3.0')
     def test_alter_rf_and_run_read_repair(self):
@@ -118,10 +131,13 @@ class TestReadRepair(Tester):
         :param session: Used to perform the schema setup & insert the data
         :return: a tuple containing the node which initially acts as the replica, and a list of the other two nodes
         """
-        # Disable speculative retry to make it clear that we only query additional nodes because of read_repair_chance
+        # Disable speculative retry and [dclocal]read_repair in initial setup.
         session.execute("""CREATE KEYSPACE alter_rf_test
                            WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};""")
-        session.execute("CREATE TABLE alter_rf_test.t1 (k int PRIMARY KEY, a int, b int) WITH speculative_retry='NONE';")
+        session.execute("""CREATE TABLE alter_rf_test.t1 (k int PRIMARY KEY, a int, b int)
+                           WITH speculative_retry='NONE'
+                           AND read_repair_chance=0
+                           AND dclocal_read_repair_chance=0;""")
         session.execute("INSERT INTO alter_rf_test.t1 (k, a, b) VALUES (1, 1, 1);")
 
         # identify the initial replica and trigger a flush to ensure reads come from sstables
@@ -183,7 +199,6 @@ class TestReadRepair(Tester):
             expected = [[1, 1, 1]] if expect_fully_repaired or n == initial_replica else [[1, 1, None]]
             if res != expected:
                 raise NotRepairedException()
-
 
     @since('2.0')
     def test_range_slice_query_with_tombstones(self):
