@@ -54,7 +54,7 @@ class TestOfflineTools(Tester):
 
         output, error, rc = node1.run_sstablelevelreset("keyspace1", "standard1")
         self._check_stderr_error(error)
-        assert re.search("Found no sstables, did you give the correct keyspace", output.decode("utf-8"))
+        assert re.search("Found no sstables, did you give the correct keyspace", output)
         assert rc == 0, str(rc)
 
         # test by writing small amount of data and flushing (all sstables should be level 0)
@@ -67,8 +67,8 @@ class TestOfflineTools(Tester):
         cluster.stop(gently=False)
 
         output, error, rc = node1.run_sstablelevelreset("keyspace1", "standard1")
-        self._check_stderr_error(error.decode("utf-8"))
-        assert re.search("since it is already on level 0", output.decode("utf-8"))
+        self._check_stderr_error(error)
+        assert re.search("since it is already on level 0", output)
         assert rc == 0, str(rc)
 
         # test by loading large amount data so we have multiple levels and checking all levels are 0 at end
@@ -82,7 +82,7 @@ class TestOfflineTools(Tester):
         initial_levels = self.get_levels(node1.run_sstablemetadata(keyspace="keyspace1", column_families=["standard1"]))
         _, error, rc = node1.run_sstablelevelreset("keyspace1", "standard1")
         final_levels = self.get_levels(node1.run_sstablemetadata(keyspace="keyspace1", column_families=["standard1"]))
-        self._check_stderr_error(error.decode("utf-8"))
+        self._check_stderr_error(error)
         assert rc == 0, str(rc)
 
         logger.debug(initial_levels)
@@ -96,7 +96,7 @@ class TestOfflineTools(Tester):
 
     def get_levels(self, data):
         (out, err, rc) = data
-        return list(map(int, re.findall("SSTable Level: ([0-9])", out.decode("utf-8"))))
+        return list(map(int, re.findall("SSTable Level: ([0-9])", out)))
 
     def wait_for_compactions(self, node):
         pattern = re.compile("pending tasks: 0")
@@ -139,7 +139,7 @@ class TestOfflineTools(Tester):
         try:
             output, error, _ = node1.run_sstableofflinerelevel("keyspace1", "standard1")
         except ToolError as e:
-            assert re.search("No sstables to relevel for keyspace1.standard1", e.stdout.decode("utf-8"))
+            assert re.search("No sstables to relevel for keyspace1.standard1", e.stdout)
             assert e.exit_status == 1, str(e.exit_status)
 
         # test by flushing (sstable should be level 0)
@@ -157,7 +157,7 @@ class TestOfflineTools(Tester):
         cluster.stop()
 
         output, _, rc = node1.run_sstableofflinerelevel("keyspace1", "standard1")
-        assert re.search("L0=1", output.decode("utf-8"))
+        assert re.search("L0=1", output)
         assert rc == 0, str(rc)
 
         cluster.start(wait_for_binary_proto=True)
@@ -254,7 +254,7 @@ class TestOfflineTools(Tester):
         # map over each line of out and replace Java-normalized paths with Python equivalents.
         outlines = [re.sub("(?<=path=').*(?=')",
                                            lambda match: os.path.normcase(match.group(0)),
-                                           line) for line in out.decode("utf-8").splitlines()]
+                                           line) for line in out.splitlines()]
 
         # check output is correct for each sstable
         sstables = self._get_final_sstables(node1, "keyspace1", "standard1")
@@ -310,7 +310,7 @@ class TestOfflineTools(Tester):
         session.execute("delete from ks.cf where key = 3")
         node1.flush()
         out, error, _ = node1.run_sstableexpiredblockers(keyspace="ks", column_family="cf")
-        assert "blocks 2 expired sstables from getting dropped" in out.decode("utf-8")
+        assert "blocks 2 expired sstables from getting dropped" in out
 
     # 4.0 removes back compatibility with pre-3.0 versions, so testing upgradesstables for
     # paths from those versions to 4.0 is invalid (and can only fail). There isn't currently
@@ -467,7 +467,7 @@ class TestOfflineTools(Tester):
             env = common.make_cassandra_env(node.get_install_cassandra_root(), node.get_node_cassandra_root())
             p = subprocess.Popen(args, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             (stdout, stderr) = p.communicate()
-            tmpsstables = list(map(os.path.normcase, stdout.decode("utf-8").splitlines()))
+            tmpsstables = list(map(os.path.normcase, stdout.splitlines()))
 
             ret = list(set(allsstables) - set(tmpsstables))
         else:

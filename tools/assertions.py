@@ -285,7 +285,7 @@ def assert_stderr_clean(err, acceptable_errors=None):
                              "Failed to connect over JMX; not collecting these stats"]
 
     regex_str = "^({}|\s*|\n)*$".format("|".join(acceptable_errors))
-    err_str = err.decode("utf-8").strip()
+    err_str = err.strip()
     # empty string, as good as we can get for a clean stderr output!
     if not err_str:
         return

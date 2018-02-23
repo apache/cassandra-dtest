@@ -8,7 +8,7 @@ from tools.assertions import (assert_all, assert_almost_equal, assert_exception,
                               assert_invalid, assert_length_equal, assert_none,
                               assert_one, assert_row_count, assert_stderr_clean,
                               assert_unauthorized, assert_unavailable)
-
+import pytest
 
 class TestAssertStderrClean(TestCase):
 

@@ -335,7 +335,7 @@ class TestBootstrap(Tester):
         stdout, stderr, _ = node3.stress(['read', 'n=1k', 'no-warmup', '-schema', 'replication(factor=2)', '-rate', 'threads=8'])
 
         if stdout is not None:
-            assert "FAILURE" not in stdout.decode("utf-8")
+            assert "FAILURE" not in stdout
 
     @since('2.2')
     def test_bootstrap_with_reset_bootstrap_state(self):

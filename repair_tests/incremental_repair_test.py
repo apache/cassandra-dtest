@@ -50,7 +50,7 @@ class TestIncRepair(Tester):
         out = node.run_sstablemetadata(keyspace=keyspace).stdout
 
         def matches(pattern):
-            return filter(None, [pattern.match(l) for l in out.decode("utf-8").split('\n')])
+            return filter(None, [pattern.match(l) for l in out.split('\n')])
         names = [m.group(1) for m in matches(_sstable_name)]
         repaired_times = [int(m.group(1)) for m in matches(_repaired_at)]
 
@@ -360,7 +360,7 @@ class TestIncRepair(Tester):
                 node.nodetool('compact keyspace1 standard1')
 
         for out in (node.run_sstablemetadata(keyspace='keyspace1').stdout for node in self.cluster.nodelist()):
-            assert 'Repaired at: 0' not in out.decode("utf-8")
+            assert 'Repaired at: 0' not in out
 
     def test_multiple_repair(self):
         """
@@ -468,8 +468,8 @@ class TestIncRepair(Tester):
         node2.run_sstablerepairedset(keyspace='keyspace1')
         node2.start(wait_for_binary_proto=True)
 
-        initialOut1 = node1.run_sstablemetadata(keyspace='keyspace1').stdout.decode("utf-8")
-        initialOut2 = node2.run_sstablemetadata(keyspace='keyspace1').stdout.decode("utf-8")
+        initialOut1 = node1.run_sstablemetadata(keyspace='keyspace1').stdout
+        initialOut2 = node2.run_sstablemetadata(keyspace='keyspace1').stdout
 
         matches = findall('(?<=Repaired at:).*', '\n'.join([initialOut1, initialOut2]))
         logger.debug("Repair timestamps are: {}".format(matches))
@@ -500,10 +500,10 @@ class TestIncRepair(Tester):
 
         finalOut1 = node1.run_sstablemetadata(keyspace='keyspace1').stdout
         if not isinstance(finalOut1, str):
-            finalOut1 = finalOut1.decode("utf-8")
+            finalOut1 = finalOut1
         finalOut2 = node2.run_sstablemetadata(keyspace='keyspace1').stdout
         if not isinstance(finalOut2, str):
-            finalOut2 = finalOut2.decode("utf-8")
+            finalOut2 = finalOut2
 
         matches = findall('(?<=Repaired at:).*', '\n'.join([finalOut1, finalOut2]))
 
