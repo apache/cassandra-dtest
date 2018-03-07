@@ -812,7 +812,7 @@ class TestIncRepair(Tester):
         for i in range(10):
             session.execute(stmt, (i, i))
 
-        node2.stop()
+        node2.stop(wait_other_notice=True)
 
         # repair should fail because node2 is down
         with pytest.raises(ToolError):
@@ -824,6 +824,34 @@ class TestIncRepair(Tester):
         # ... and verify nothing was promoted to repaired
         self.assertNoRepairedSSTables(node1, 'ks')
         self.assertNoRepairedSSTables(node2, 'ks')
+
+    @since('4.0')
+    def test_force_with_none_down(self):
+        """
+        if we force an incremental repair, but all the involved nodes are up, 
+        we should run normally and promote sstables afterwards
+        """
+        self.fixture_dtest_setup.setup_overrides.cluster_options = ImmutableMapping({'hinted_handoff_enabled': 'false',
+                                                                                     'num_tokens': 1,
+                                                                                     'commitlog_sync_period_in_ms': 500})
+        self.cluster.populate(3).start()
+        node1, node2, node3 = self.cluster.nodelist()
+
+        session = self.patient_exclusive_cql_connection(node3)
+        session.execute("CREATE KEYSPACE ks WITH REPLICATION={'class':'SimpleStrategy', 'replication_factor': 3}")
+        session.execute("CREATE TABLE ks.tbl (k INT PRIMARY KEY, v INT)")
+        stmt = SimpleStatement("INSERT INTO ks.tbl (k,v) VALUES (%s, %s)")
+        stmt.consistency_level = ConsistencyLevel.ALL
+        for i in range(10):
+            session.execute(stmt, (i, i))
+
+        # run with force flag
+        node1.repair(options=['ks', '--force'])
+
+        # ... and verify everything was still promoted
+        self.assertAllRepairedSSTables(node1, 'ks')
+        self.assertAllRepairedSSTables(node2, 'ks')
+        self.assertAllRepairedSSTables(node3, 'ks')
 
     @since('4.0')
     def test_hosts(self):
