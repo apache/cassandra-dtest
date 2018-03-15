@@ -2084,6 +2084,8 @@ class TestMaterializedViews(Tester):
 
         # partition deletion for ck1 <= partition_deletion_ts
         session.execute("DELETE FROM ks.t USING TIMESTAMP {} WHERE pk=1".format(partition_deletion_ts))
+        # only partition deletion for the pk=2000
+        session.execute("DELETE FROM ks.t USING TIMESTAMP {} WHERE pk=2000".format(partition_deletion_ts))
         self._replay_batchlogs()
 
         # start nodes with different batch size
@@ -2096,6 +2098,9 @@ class TestMaterializedViews(Tester):
 
         logger.debug('repairing base table')
         node1.nodetool("repair ks t")
+        # insert data to the deleted partition with pk=2000, they should be considered dead
+        session.execute("INSERT INTO ks.t (pk, ck1, ck2, v1, v2)"
+                        " VALUES (2000, 0, 0, 0, 0) USING TIMESTAMP {}".format(partition_deletion_ts - 1))
         self._replay_batchlogs()
 
         logger.debug('stop cluster')
@@ -2127,6 +2132,9 @@ class TestMaterializedViews(Tester):
                                             "ck1={} AND ck2={}".format(ck1, ck2), [1, ck1, ck2, ck1, ck2])
                         assert_one(session, "SELECT pk,ck1,ck2,v1,v2 FROM ks.t WHERE pk=1 AND "
                                             "ck1={} AND ck2={}".format(ck1, ck2), [1, ck1, ck2, ck1, ck2])
+            # Verify partition deletion with pk=2000 has no live data
+            assert_none(session, "SELECT pk,ck1,ck2,v1,v2 FROM ks.t WHERE pk=2000")
+            assert_none(session, "SELECT pk,ck1,ck2,v1,v2 FROM ks.t_by_v WHERE pk=2000")
             logger.debug('stopping {}'.format(node.name))
             node.stop(wait_other_notice=True, wait_for_binary_proto=True)
 
