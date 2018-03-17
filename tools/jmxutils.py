@@ -22,7 +22,7 @@ def jolokia_classpath():
         return CLASSPATH_SEP.join((tools_jar, JOLOKIA_JAR))
     else:
         logger.warning("Environment variable $JAVA_HOME not present: jmx-based " +
-                "tests may fail because of missing $JAVA_HOME/lib/tools.jar.")
+                       "tests may fail because of missing $JAVA_HOME/lib/tools.jar.")
         return JOLOKIA_JAR
 
 
@@ -237,7 +237,7 @@ class JolokiaAgent(object):
             raise Exception("Failed to query Jolokia agent; HTTP response code: %d; response: %s" % (response.code, response.readlines()))
 
         raw_response = response.readline()
-        response = json.loads(raw_response)
+        response = json.loads(raw_response.decode(encoding='utf-8'))
         if response['status'] != 200:
             stacktrace = response.get('stacktrace')
             if stacktrace and verbose:
