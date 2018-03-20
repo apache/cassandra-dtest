@@ -765,6 +765,60 @@ class TestAccuracy(TestHelper):
 class TestConsistency(Tester):
 
     @since('3.0')
+    def test_14330(self):
+        """
+        @jira_ticket CASSANDRA-14330
+
+        A regression test to prove that we no longer trigger
+        AssertionError during read repair in DataResolver
+        when encountering a repeat open RT bound from short
+        read protection responses.
+        """
+        cluster = self.cluster
+
+        # disable hinted handoff and set batch commit log so this doesn't interfere with the test
+        cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
+        cluster.set_batch_commitlog(enabled=True)
+
+        cluster.populate(2).start(wait_other_notice=True)
+        node1, node2 = cluster.nodelist()
+
+        session = self.patient_cql_connection(node2)
+
+        query = "CREATE KEYSPACE test WITH replication = {'class': 'NetworkTopologyStrategy', 'datacenter1': 2};"
+        session.execute(query)
+
+        query = 'CREATE TABLE test.test (pk int, ck int, PRIMARY KEY (pk, ck));'
+        session.execute(query)
+
+        # with all nodes up, insert an RT and 2 rows on every node
+        #
+        # node1 | RT[0...] 0 1
+        # node2 | RT[0...] 0 1
+
+        session.execute('DELETE FROM test.test USING TIMESTAMP 0 WHERE pk = 0 AND ck >= 0;')
+        session.execute('INSERT INTO test.test (pk, ck) VALUES (0, 0) USING TIMESTAMP 1;')
+        session.execute('INSERT INTO test.test (pk, ck) VALUES (0, 1) USING TIMESTAMP 1;')
+
+        # with node1 down, delete row 0 on node2
+        #
+        # node1 | RT[0...] 0 1
+        # node2 | RT[0...] x 1
+
+        node1.stop(wait_other_notice=True)
+        session.execute('DELETE FROM test.test USING TIMESTAMP 1 WHERE pk = 0 AND ck = 0;')
+        node1.start(wait_other_notice=True, wait_for_binary_proto=True)
+
+        # with both nodes up, make a LIMIT 1 read that would trigger a short read protection
+        # request, which in turn will trigger the AssertionError in DataResolver (prior to
+        # CASSANDRA-14330 fix)
+
+        assert_all(session,
+                   'SELECT ck FROM test.test WHERE pk = 0 LIMIT 1;',
+                   [[1]],
+                   cl=ConsistencyLevel.ALL)
+
+    @since('3.0')
     def test_13911(self):
         """
         @jira_ticket CASSANDRA-13911
