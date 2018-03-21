@@ -103,8 +103,8 @@ class TestSSTableSplit(Tester):
         result = node.run_sstablesplit(keyspace='keyspace1', size=1, no_snapshot=True)
 
         for (stdout, stderr, rc) in result:
-            logger.debug(stderr.decode("utf-8"))
-            failure = stderr.decode("utf-8").find("java.lang.AssertionError: Data component is missing")
+            logger.debug(stderr)
+            failure = stderr.find("java.lang.AssertionError: Data component is missing")
             assert failure, -1 == "Error during sstablesplit"
 
         sstables = node.get_sstables('keyspace1', '')

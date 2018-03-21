@@ -278,7 +278,7 @@ class TestRepair(BaseRepairTest):
         out = node.run_sstablemetadata(keyspace=keyspace).stdout
 
         def matches(pattern):
-            return [_f for _f in [pattern.match(l) for l in out.decode("utf-8").split('\n')] if _f]
+            return [_f for _f in [pattern.match(l) for l in out.split('\n')] if _f]
 
         names = [m.group(1) for m in matches(_sstable_name)]
         repaired_times = [int(m.group(1)) for m in matches(_repaired_at)]
@@ -650,7 +650,7 @@ class TestRepair(BaseRepairTest):
 
         for line, m in out_of_sync_logs:
             num_out_of_sync_ranges, out_of_sync_nodes = m.group(3), {m.group(1), m.group(2)}
-            assert int(num_out_of_sync_ranges) == 1, "Expecting 1 range out of sync for {}, but saw {}".format(out_of_sync_nodes , num_out_of_sync_ranges)
+            assert int(num_out_of_sync_ranges) == 1, "Expecting 1 range out of sync for {}, but saw {}".format(out_of_sync_nodes, num_out_of_sync_ranges)
             assert out_of_sync_nodes, valid_out_of_sync_pairs in str(out_of_sync_nodes)
 
         # Check node2 now has the key
@@ -1090,6 +1090,7 @@ class TestRepair(BaseRepairTest):
         cluster.populate(3).start(wait_for_binary_proto=True)
         node1, node2, node3 = cluster.nodelist()
         node1.stress(['write', 'n=100k', '-schema', 'replication(factor=3)', '-rate', 'threads=30'])
+
         def run_repair():
             try:
                 if cluster.version() >= "2.2":
@@ -1097,7 +1098,8 @@ class TestRepair(BaseRepairTest):
                 else:
                     node1.nodetool('repair keyspace1 standard1 -inc -par')
             except ToolError:
-                debug("got expected exception during repair, ignoring")
+                logger.debug("got expected exception during repair, ignoring")
+
         t1 = threading.Thread(target=run_repair)
         t1.start()
         if cluster.version() > "2.2":
