@@ -1,0 +1,15 @@
+RULE sorted live endpoints
+CLASS org.apache.cassandra.service.StorageProxy
+METHOD getLiveSortedEndpoints
+AT ENTRY
+BIND ep1 = org.apache.cassandra.locator.InetAddressAndPort.getByName("127.0.0.1");
+     ep2 = org.apache.cassandra.locator.InetAddressAndPort.getByName("127.0.0.2");
+     ep3 = org.apache.cassandra.locator.InetAddressAndPort.getByName("127.0.0.3");
+     eps = new java.util.ArrayList();
+IF true
+DO
+    eps.add(ep1);
+    eps.add(ep2);
+    eps.add(ep3);
+    return eps;
+ENDRULE

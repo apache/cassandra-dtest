@@ -1,0 +1,10 @@
+# block data (but not digest) reads
+RULE disable data reads
+CLASS org.apache.cassandra.db.ReadCommandVerbHandler
+METHOD doVerb
+# wait until command is declared locally. because generics
+AFTER WRITE $command
+# bail out if it's not a digest request
+IF $command.isDigestQuery()
+DO return;
+ENDRULE

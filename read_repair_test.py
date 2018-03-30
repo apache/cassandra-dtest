@@ -3,12 +3,15 @@ import time
 import pytest
 import logging
 
-from cassandra import ConsistencyLevel
+from cassandra import ConsistencyLevel, WriteTimeout, ReadTimeout
 from cassandra.query import SimpleStatement
+from ccmlib.node import Node
+from pytest import raises
 
 from dtest import Tester, create_ks
 from tools.assertions import assert_one
 from tools.data import rows_to_list
+from tools.jmxutils import JolokiaAgent, make_mbean
 from tools.misc import retry_till_success
 
 since = pytest.mark.since
@@ -312,6 +315,306 @@ class TestReadRepair(Tester):
             for t in trace.events:
                 print(("%s\t%s\t%s\t%s" % (t.source, t.source_elapsed, t.description, t.thread_name)))
             print(("-" * 40))
+
+
+def quorum(query_string):
+    return SimpleStatement(query_string=query_string, consistency_level=ConsistencyLevel.QUORUM)
+
+
+kcv = lambda k, c, v: [k, c, v]
+
+
+listify = lambda results: [list(r) for r in results]
+
+
+class StorageProxy(object):
+
+    def __init__(self, node):
+        assert isinstance(node, Node)
+        self.node = node
+        self.jmx = JolokiaAgent(node)
+
+    def start(self):
+        self.jmx.start()
+
+    def stop(self):
+        self.jmx.stop()
+
+    def _get_metric(self, metric):
+        mbean = make_mbean("metrics", type="ReadRepair", name=metric)
+        return self.jmx.read_attribute(mbean, "Count")
+
+    @property
+    def blocking_read_repair(self):
+        return self._get_metric("RepairedBlocking")
+
+    @property
+    def speculated_rr_read(self):
+        return self._get_metric("SpeculatedRead")
+
+    @property
+    def speculated_rr_write(self):
+        return self._get_metric("SpeculatedWrite")
+
+    def get_table_metric(self, keyspace, table, metric, attr="Count"):
+        mbean = make_mbean("metrics", keyspace=keyspace, scope=table, type="Table", name=metric)
+        return self.jmx.read_attribute(mbean, attr)
+
+    def __enter__(self):
+        """ For contextmanager-style usage. """
+        self.start()
+        return self
+
+    def __exit__(self, exc_type, value, traceback):
+        """ For contextmanager-style usage. """
+        self.stop()
+
+
+class TestSpeculativeReadRepair(Tester):
+
+    @pytest.fixture(scope='function', autouse=True)
+    def fixture_set_cluster_settings(self, fixture_dtest_setup):
+        cluster = fixture_dtest_setup.cluster
+        cluster.set_configuration_options(values={'hinted_handoff_enabled': False,
+                                                  'dynamic_snitch': False,
+                                                  'write_request_timeout_in_ms': 500,
+                                                  'read_request_timeout_in_ms': 500})
+        cluster.populate(3, install_byteman=True, debug=True).start(wait_for_binary_proto=True,
+                                                                    jvm_args=['-XX:-PerfDisableSharedMem'])
+        session = fixture_dtest_setup.patient_exclusive_cql_connection(cluster.nodelist()[0], timeout=2)
+
+        session.execute("CREATE KEYSPACE ks WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 3}")
+        session.execute("CREATE TABLE ks.tbl (k int, c int, v int, primary key (k, c)) WITH speculative_retry = '250ms';")
+
+    def get_cql_connection(self, node, **kwargs):
+        return self.patient_exclusive_cql_connection(node, retry_policy=None, **kwargs)
+
+    @since('4.0')
+    def test_failed_read_repair(self):
+        """
+        If none of the disagreeing nodes ack the repair mutation, the read should fail
+        """
+        node1, node2, node3 = self.cluster.nodelist()
+        assert isinstance(node1, Node)
+        assert isinstance(node2, Node)
+        assert isinstance(node3, Node)
+
+        session = self.get_cql_connection(node1, timeout=2)
+        session.execute(quorum("INSERT INTO ks.tbl (k, c, v) VALUES (1, 0, 1)"))
+
+        node2.byteman_submit(['./byteman/read_repair/stop_writes.btm'])
+        node3.byteman_submit(['./byteman/read_repair/stop_writes.btm'])
+        node2.byteman_submit(['./byteman/read_repair/stop_rr_writes.btm'])
+        node3.byteman_submit(['./byteman/read_repair/stop_rr_writes.btm'])
+
+        with raises(WriteTimeout):
+            session.execute(quorum("INSERT INTO ks.tbl (k, c, v) VALUES (1, 1, 2)"))
+
+        node2.byteman_submit(['./byteman/read_repair/sorted_live_endpoints.btm'])
+        session = self.get_cql_connection(node2)
+        with StorageProxy(node2) as storage_proxy:
+            assert storage_proxy.blocking_read_repair == 0
+            assert storage_proxy.speculated_rr_read == 0
+            assert storage_proxy.speculated_rr_write == 0
+
+            with raises(ReadTimeout):
+                session.execute(quorum("SELECT * FROM ks.tbl WHERE k=1"))
+
+            assert storage_proxy.blocking_read_repair > 0
+            assert storage_proxy.speculated_rr_read == 0
+            assert storage_proxy.speculated_rr_write > 0
+
+    @since('4.0')
+    def test_normal_read_repair(self):
+        """ test the normal case """
+        node1, node2, node3 = self.cluster.nodelist()
+        assert isinstance(node1, Node)
+        assert isinstance(node2, Node)
+        assert isinstance(node3, Node)
+        session = self.get_cql_connection(node1, timeout=2)
+
+        session.execute(quorum("INSERT INTO ks.tbl (k, c, v) VALUES (1, 0, 1)"))
+
+        node2.byteman_submit(['./byteman/read_repair/stop_writes.btm'])
+        node3.byteman_submit(['./byteman/read_repair/stop_writes.btm'])
+
+        session.execute("INSERT INTO ks.tbl (k, c, v) VALUES (1, 1, 2)")
+
+        # re-enable writes
+        node2.byteman_submit(['-u', './byteman/read_repair/stop_writes.btm'])
+
+        node2.byteman_submit(['./byteman/read_repair/sorted_live_endpoints.btm'])
+        with StorageProxy(node2) as storage_proxy:
+            assert storage_proxy.blocking_read_repair == 0
+            assert storage_proxy.speculated_rr_read == 0
+            assert storage_proxy.speculated_rr_write == 0
+
+            session = self.get_cql_connection(node2)
+            expected = [kcv(1, 0, 1), kcv(1, 1, 2)]
+            results = session.execute(quorum("SELECT * FROM ks.tbl WHERE k=1"))
+            assert listify(results) == expected
+
+            assert storage_proxy.blocking_read_repair == 1
+            assert storage_proxy.speculated_rr_read == 0
+            assert storage_proxy.speculated_rr_write == 0
+
+    @since('4.0')
+    def test_speculative_data_request(self):
+        """ If one node doesn't respond to a full data request, it should query the other """
+        node1, node2, node3 = self.cluster.nodelist()
+        assert isinstance(node1, Node)
+        assert isinstance(node2, Node)
+        assert isinstance(node3, Node)
+        session = self.get_cql_connection(node1, timeout=2)
+
+        session.execute(quorum("INSERT INTO ks.tbl (k, c, v) VALUES (1, 0, 1)"))
+
+        node2.byteman_submit(['./byteman/read_repair/stop_writes.btm'])
+        node3.byteman_submit(['./byteman/read_repair/stop_writes.btm'])
+
+        session.execute("INSERT INTO ks.tbl (k, c, v) VALUES (1, 1, 2)")
+
+        # re-enable writes
+        node2.byteman_submit(['-u', './byteman/read_repair/stop_writes.btm'])
+
+        node1.byteman_submit(['./byteman/read_repair/sorted_live_endpoints.btm'])
+        with StorageProxy(node1) as storage_proxy:
+            assert storage_proxy.blocking_read_repair == 0
+            assert storage_proxy.speculated_rr_read == 0
+            assert storage_proxy.speculated_rr_write == 0
+
+            session = self.get_cql_connection(node1)
+            node2.byteman_submit(['./byteman/read_repair/stop_data_reads.btm'])
+            results = session.execute(quorum("SELECT * FROM ks.tbl WHERE k=1"))
+            assert listify(results) == [kcv(1, 0, 1), kcv(1, 1, 2)]
+
+            assert storage_proxy.blocking_read_repair == 1
+            assert storage_proxy.speculated_rr_read == 1
+            assert storage_proxy.speculated_rr_write == 0
+
+    @since('4.0')
+    def test_speculative_write(self):
+        """ if one node doesn't respond to a read repair mutation, it should be sent to the remaining node """
+        node1, node2, node3 = self.cluster.nodelist()
+        assert isinstance(node1, Node)
+        assert isinstance(node2, Node)
+        assert isinstance(node3, Node)
+        session = self.get_cql_connection(node1, timeout=2)
+
+        session.execute(quorum("INSERT INTO ks.tbl (k, c, v) VALUES (1, 0, 1)"))
+
+        node2.byteman_submit(['./byteman/read_repair/stop_writes.btm'])
+        node3.byteman_submit(['./byteman/read_repair/stop_writes.btm'])
+
+        session.execute("INSERT INTO ks.tbl (k, c, v) VALUES (1, 1, 2)")
+
+        # re-enable writes on node 3, leave them off on node2
+        node2.byteman_submit(['./byteman/read_repair/stop_rr_writes.btm'])
+
+        node1.byteman_submit(['./byteman/read_repair/sorted_live_endpoints.btm'])
+        with StorageProxy(node1) as storage_proxy:
+            assert storage_proxy.blocking_read_repair == 0
+            assert storage_proxy.speculated_rr_read == 0
+            assert storage_proxy.speculated_rr_write == 0
+
+            session = self.get_cql_connection(node1)
+            expected = [kcv(1, 0, 1), kcv(1, 1, 2)]
+            results = session.execute(quorum("SELECT * FROM ks.tbl WHERE k=1"))
+            assert listify(results) == expected
+
+            assert storage_proxy.blocking_read_repair == 1
+            assert storage_proxy.speculated_rr_read == 0
+            assert storage_proxy.speculated_rr_write == 1
+
+    @since('4.0')
+    def test_quorum_requirement(self):
+        """
+        Even if we speculate on every stage, we should still only require a quorum of responses for success
+        """
+        node1, node2, node3 = self.cluster.nodelist()
+        assert isinstance(node1, Node)
+        assert isinstance(node2, Node)
+        assert isinstance(node3, Node)
+        session = self.get_cql_connection(node1, timeout=2)
+
+        session.execute(quorum("INSERT INTO ks.tbl (k, c, v) VALUES (1, 0, 1)"))
+
+        node2.byteman_submit(['./byteman/read_repair/stop_writes.btm'])
+        node3.byteman_submit(['./byteman/read_repair/stop_writes.btm'])
+
+        session.execute("INSERT INTO ks.tbl (k, c, v) VALUES (1, 1, 2)")
+
+        # re-enable writes
+        node2.byteman_submit(['-u', './byteman/read_repair/stop_writes.btm'])
+        node3.byteman_submit(['-u', './byteman/read_repair/stop_writes.btm'])
+
+        # force endpoint order
+        node1.byteman_submit(['./byteman/read_repair/sorted_live_endpoints.btm'])
+
+        # node2.byteman_submit(['./byteman/read_repair/stop_digest_reads.btm'])
+        node2.byteman_submit(['./byteman/read_repair/stop_data_reads.btm'])
+        node3.byteman_submit(['./byteman/read_repair/stop_rr_writes.btm'])
+
+        with StorageProxy(node1) as storage_proxy:
+            assert storage_proxy.get_table_metric("ks", "tbl", "SpeculativeRetries") == 0
+            assert storage_proxy.blocking_read_repair == 0
+            assert storage_proxy.speculated_rr_read == 0
+            assert storage_proxy.speculated_rr_write == 0
+
+            session = self.get_cql_connection(node1)
+            expected = [kcv(1, 0, 1), kcv(1, 1, 2)]
+            results = session.execute(quorum("SELECT * FROM ks.tbl WHERE k=1"))
+            assert listify(results) == expected
+
+            assert storage_proxy.get_table_metric("ks", "tbl", "SpeculativeRetries") == 0
+            assert storage_proxy.blocking_read_repair == 1
+            assert storage_proxy.speculated_rr_read == 1
+            assert storage_proxy.speculated_rr_write == 1
+
+    @since('4.0')
+    def test_quorum_requirement_on_speculated_read(self):
+        """
+        Even if we speculate on every stage, we should still only require a quorum of responses for success
+        """
+        node1, node2, node3 = self.cluster.nodelist()
+        assert isinstance(node1, Node)
+        assert isinstance(node2, Node)
+        assert isinstance(node3, Node)
+        session = self.get_cql_connection(node1, timeout=2)
+
+        session.execute(quorum("INSERT INTO ks.tbl (k, c, v) VALUES (1, 0, 1)"))
+
+        node2.byteman_submit(['./byteman/read_repair/stop_writes.btm'])
+        node3.byteman_submit(['./byteman/read_repair/stop_writes.btm'])
+
+        session.execute("INSERT INTO ks.tbl (k, c, v) VALUES (1, 1, 2)")
+
+        # re-enable writes
+        node2.byteman_submit(['-u', './byteman/read_repair/stop_writes.btm'])
+        node3.byteman_submit(['-u', './byteman/read_repair/stop_writes.btm'])
+
+        # force endpoint order
+        node1.byteman_submit(['./byteman/read_repair/sorted_live_endpoints.btm'])
+
+        node2.byteman_submit(['./byteman/read_repair/stop_digest_reads.btm'])
+        node3.byteman_submit(['./byteman/read_repair/stop_data_reads.btm'])
+        node2.byteman_submit(['./byteman/read_repair/stop_rr_writes.btm'])
+
+        with StorageProxy(node1) as storage_proxy:
+            assert storage_proxy.get_table_metric("ks", "tbl", "SpeculativeRetries") == 0
+            assert storage_proxy.blocking_read_repair == 0
+            assert storage_proxy.speculated_rr_read == 0
+            assert storage_proxy.speculated_rr_write == 0
+
+            session = self.get_cql_connection(node1)
+            expected = [kcv(1, 0, 1), kcv(1, 1, 2)]
+            results = session.execute(quorum("SELECT * FROM ks.tbl WHERE k=1"))
+            assert listify(results) == expected
+
+            assert storage_proxy.get_table_metric("ks", "tbl", "SpeculativeRetries") == 1
+            assert storage_proxy.blocking_read_repair == 1
+            assert storage_proxy.speculated_rr_read == 0  # there shouldn't be any replicas to speculate on
+            assert storage_proxy.speculated_rr_write == 1
 
 
 class NotRepairedException(Exception):
