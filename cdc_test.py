@@ -335,6 +335,23 @@ class TestCDC(Tester):
         """
         self._assert_cdc_data_readable_on_round_trip(start_with_cdc_enabled=False)
 
+    def test_non_cdc_segments_deleted_after_replay(self):
+        """
+        Test that non-cdc segment files generated in previous runs are deleted
+        after replay.
+        """
+        ks_name, table_name = 'ks', 'tab'
+        node, session = self.prepare(ks_name=ks_name, table_name=table_name,
+                                     cdc_enabled_table=True,
+                                     column_spec='a int PRIMARY KEY, b int')
+        old_files = _get_cdc_raw_files(node.get_path())
+        node.drain()
+        session.cluster.shutdown()
+        node.stop()
+        node.start(wait_for_binary_proto=True)
+        new_files = _get_cdc_raw_files(node.get_path())
+        assert len(old_files.intersection(new_files)) == 0
+
     def test_insertion_and_commitlog_behavior_after_reaching_cdc_total_space(self):
         """
         Test that C* behaves correctly when CDC tables have consumed all the
