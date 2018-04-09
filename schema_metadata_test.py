@@ -227,8 +227,13 @@ def verify_nondefault_table_settings(created_on_version, current_version, keyspa
         assert 20 == meta.options['max_index_interval']
 
     if created_on_version >= '3.0':
-        assert '55PERCENTILE' == meta.options['speculative_retry']
         assert 2121 == meta.options['memtable_flush_period_in_ms']
+
+    if created_on_version >= '3.0':
+        if created_on_version >= '4.0':
+            assert '55p' == meta.options['speculative_retry']
+        else:
+            assert '55PERCENTILE' == meta.options['speculative_retry']
 
     if current_version >= '3.0':
         assert 'org.apache.cassandra.io.compress.DeflateCompressor' == meta.options['compression']['class']
