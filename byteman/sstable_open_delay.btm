@@ -1,0 +1,11 @@
+#
+# Make sstable opening on startup slower
+#
+RULE slow startup sstable opening
+CLASS org.apache.cassandra.io.sstable.format.big.BigFormat$ReaderFactory
+METHOD open
+AT ENTRY
+IF TRUE
+DO
+    Thread.sleep(10000);
+ENDRULE
