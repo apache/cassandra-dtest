@@ -301,7 +301,7 @@ class TestPushedNotifications(Tester):
         session.execute("create TABLE t (k int PRIMARY KEY , v int)")
         session.execute("alter TABLE t add v1 int;")
 
-        session.execute("create MATERIALIZED VIEW mv as select * from t WHERE v IS NOT NULL AND v1 IS NOT NULL PRIMARY KEY (v, k)")
+        session.execute("create MATERIALIZED VIEW mv as select * from t WHERE v IS NOT NULL AND k IS NOT NULL PRIMARY KEY (v, k)")
         session.execute(" alter materialized view mv with min_index_interval = 100")
 
         session.execute("drop MATERIALIZED VIEW mv")
