@@ -828,7 +828,7 @@ class TestMaterializedViews(Tester):
         """
         session = self.prepare(user_table=True)
 
-        session.execute(("CREATE MATERIALIZED VIEW users_by_state2 AS SELECT username FROM users "
+        session.execute(("CREATE MATERIALIZED VIEW users_by_state2 AS SELECT state, username FROM users "
                          "WHERE STATE IS NOT NULL AND USERNAME IS NOT NULL PRIMARY KEY (state, username)"))
 
         self._insert_data(session)
@@ -2822,7 +2822,7 @@ class TestMaterializedViewsLockcontention(Tester):
         FROM test
         WHERE int1 IS NOT NULL AND date IS NOT NULL AND int2 IS NOT NULL
         PRIMARY KEY (int1, date, int2)
-        WITH CLUSTERING ORDER BY (date DESC, int1 DESC)""")
+        WITH CLUSTERING ORDER BY (date DESC, int2 DESC)""")
 
         return session
 
