@@ -324,3 +324,67 @@ class TestNodetool(Tester):
             assert 'Number of concurrent view builders should be greater than 0.', e.message
         else:
             self.fail("Expected error when setting and invalid value")
+
+    def test_describecluster_more_information_three_datacenters(self):
+        """
+        nodetool describecluster should be more informative. It should include detailes
+        for total node count, list of datacenters, RF, number of nodes per dc, how many
+        are down and version(s).
+        @jira_ticket CASSANDRA-13853
+        @expected_result This test invokes nodetool describecluster and matches the output with the expected one
+        """
+        cluster = self.cluster
+        cluster.populate([2, 3, 1]).start(wait_for_binary_proto=True)
+
+        node1_dc1, node2_dc1, node1_dc2, node2_dc2, node3_dc2, node1_dc3 = cluster.nodelist()
+
+        session_dc1 = self.patient_cql_connection(node1_dc1)
+        session_dc1.execute("create KEYSPACE ks1 WITH replication = {'class': 'NetworkTopologyStrategy', 'dc1': 3, 'dc2':5, 'dc3':1}")
+
+        session_dc3 = self.patient_cql_connection(node1_dc3)
+        session_dc3.execute("create KEYSPACE ks2 WITH replication = {'class': 'NetworkTopologyStrategy', 'dc1': 3, 'dc2':5, 'dc3':1}")
+
+        out_node1_dc1, err, _ = node1_dc1.nodetool('describecluster')
+        assert 0 == len(err), err
+
+        out_node2_dc1, err, _ = node2_dc1.nodetool('describecluster')
+        assert 0 == len(err), err
+        assert out_node1_dc1 == out_node2_dc1
+
+        out_node1_dc2, err, _ = node1_dc2.nodetool('describecluster')
+        assert 0 == len(err), err
+        assert out_node1_dc1 == out_node1_dc2
+
+        out_node2_dc2, err, _ = node2_dc2.nodetool('describecluster')
+        assert 0 == len(err), err
+        assert out_node1_dc1 == out_node2_dc2
+
+        out_node2_dc3, err, _ = node3_dc2.nodetool('describecluster')
+        assert 0 == len(err), err
+        assert out_node1_dc1 == out_node2_dc3
+
+        out_node1_dc3, err, _ = node1_dc3.nodetool('describecluster')
+        assert 0 == len(err), err
+        assert out_node1_dc1 == out_node1_dc3
+
+        logger.debug(out_node1_dc1)
+        assert 'Live: 6' in out_node1_dc1
+        assert 'Joining: 0' in out_node1_dc1
+        assert 'Moving: 0' in out_node1_dc1
+        assert 'Leaving: 0' in out_node1_dc1
+        assert 'Unreachable: 0' in out_node1_dc1
+        assert 'Data Centers:' in out_node1_dc1
+        assert 'dc1 #Nodes: 2 #Down: 0' in out_node1_dc1
+        assert 'dc2 #Nodes: 3 #Down: 0' in out_node1_dc1
+        assert 'dc3 #Nodes: 1 #Down: 0' in out_node1_dc1
+        assert 'Database versions:' in out_node1_dc1
+        assert '4.0.0: [127.0.0.6:7000, 127.0.0.5:7000, 127.0.0.4:7000, 127.0.0.3:7000, 127.0.0.2:7000, 127.0.0.1:7000]' in out_node1_dc1
+        assert 'Keyspaces:' in out_node1_dc1
+        assert 'system_schema -> Replication class: LocalStrategy {}' in out_node1_dc1
+        assert 'system -> Replication class: LocalStrategy {}' in out_node1_dc1
+        assert 'system_traces -> Replication class: SimpleStrategy {replication_factor=2}' in out_node1_dc1
+        assert 'system_distributed -> Replication class: SimpleStrategy {replication_factor=3}' in out_node1_dc1
+        assert 'system_auth -> Replication class: SimpleStrategy {replication_factor=1}' in out_node1_dc1
+        assert 'ks1 -> Replication class: NetworkTopologyStrategy {dc2=5, dc1=3, dc3=1}' in out_node1_dc1
+        assert 'ks2 -> Replication class: NetworkTopologyStrategy {dc2=5, dc1=3, dc3=1}' in out_node1_dc1
+        assert 'Cluster Information:' in out_node1_dc1
