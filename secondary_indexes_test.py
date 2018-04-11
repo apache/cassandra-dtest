@@ -161,7 +161,7 @@ class TestSecondaryIndexes(Tester):
             logger.debug("round %s" % i)
             try:
                 session.execute("DROP KEYSPACE ks")
-            except ConfigurationException:
+            except (ConfigurationException, InvalidRequest):
                 pass
 
             create_ks(session, 'ks', 1)
