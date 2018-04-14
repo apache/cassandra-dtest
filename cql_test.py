@@ -1105,7 +1105,7 @@ class TestCQLSlowQuery(CQLTester):
         @jira_ticket CASSANDRA-12403
         """
         cluster = self.cluster
-        cluster.set_configuration_options(values={'slow_query_log_timeout_in_ms': 10,
+        cluster.set_configuration_options(values={'slow_query_log_timeout_in_ms': 1,
                                                   'request_timeout_in_ms': 120000,
                                                   'read_request_timeout_in_ms': 120000,
                                                   'range_request_timeout_in_ms': 120000})

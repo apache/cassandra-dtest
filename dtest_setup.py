@@ -45,7 +45,7 @@ def retry_till_success(fun, *args, **kwargs):
                 time.sleep(0.25)
 
 
-class DTestSetup:
+class DTestSetup(object):
     def __init__(self, dtest_config=None, setup_overrides=None, cluster_name="test"):
         self.dtest_config = dtest_config
         self.setup_overrides = setup_overrides

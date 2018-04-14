@@ -1,11 +1,14 @@
 # coding=utf-8
 
+from __future__ import unicode_literals
+
 import binascii
 import csv
 import datetime
 import locale
 import os
 import re
+import six
 import subprocess
 import sys
 import logging
@@ -23,14 +26,25 @@ from ccmlib import common
 
 from .cqlsh_tools import monkeypatch_driver, unmonkeypatch_driver
 from dtest import Tester, create_ks, create_cf
+from dtest_setup_overrides import DTestSetupOverrides
 from tools.assertions import assert_all, assert_none
 from tools.data import create_c1c2_table, insert_c1c2, rows_to_list
+from tools.misc import ImmutableMapping
 
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
 
 
 class TestCqlsh(Tester):
+
+    # override cluster options to enable user defined functions
+    # currently only needed for test_describe
+    @pytest.fixture
+    def fixture_dtest_setup_overrides(self):
+        dtest_setup_overrides = DTestSetupOverrides()
+        dtest_setup_overrides.cluster_options = ImmutableMapping({'enable_user_defined_functions': 'true',
+                                                'enable_scripted_user_defined_functions': 'true'})
+        return dtest_setup_overrides
 
     @classmethod
     def setUpClass(cls):
@@ -53,11 +67,11 @@ class TestCqlsh(Tester):
         """
         @jira_ticket CASSANDRA-10066
         Checks that cqlsh is compliant with pycodestyle (formally known as pep8) with the following command:
-        pycodestyle --ignore E501,E402,E731 pylib/cqlshlib/*.py bin/cqlsh.py
+        pycodestyle --ignore E501,E402,E731,W503 pylib/cqlshlib/*.py bin/cqlsh.py
         """
         cluster = self.cluster
 
-        if cluster.version() < '2.2':
+        if cluster.version() < LooseVersion('2.2'):
             cqlsh_path = os.path.join(cluster.get_install_dir(), 'bin', 'cqlsh')
         else:
             cqlsh_path = os.path.join(cluster.get_install_dir(), 'bin', 'cqlsh.py')
@@ -66,7 +80,7 @@ class TestCqlsh(Tester):
         cqlshlib_paths = os.listdir(cqlshlib_path)
         cqlshlib_paths = [os.path.join(cqlshlib_path, x) for x in cqlshlib_paths if '.py' in x and '.pyc' not in x]
 
-        cmds = ['pycodestyle', '--ignore', 'E501,E402,E731', cqlsh_path] + cqlshlib_paths
+        cmds = ['pycodestyle', '--ignore', 'E501,E402,E731,W503', cqlsh_path] + cqlshlib_paths
 
         logger.debug(cmds)
 
@@ -303,7 +317,7 @@ class TestCqlsh(Tester):
             'I can eat glass and it does not hurt me': 1400
         })
 
-        output, err = self.run_cqlsh(node, 'use testks; SELECT * FROM varcharmaptable', ['--encoding=utf-8'])
+        output, _ = self.run_cqlsh(node, 'use testks; SELECT * FROM varcharmaptable', ['--encoding=utf-8'])
 
         assert output.count('Можам да јадам стакло, а не ме штета.') == 16
         assert output.count(' ⠊⠀⠉⠁⠝⠀⠑⠁⠞⠀⠛⠇⠁⠎⠎⠀⠁⠝⠙⠀⠊⠞⠀⠙⠕⠑⠎⠝⠞⠀⠓⠥⠗⠞⠀⠍⠑') == 16
@@ -316,7 +330,7 @@ class TestCqlsh(Tester):
 
         node1, = self.cluster.nodelist()
 
-        node1.run_cqlsh(cmds="""create KEYSPACE testks WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
+        cmds = """create KEYSPACE testks WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
 use testks;
 
 CREATE TABLE varcharmaptable (
@@ -427,7 +441,8 @@ INSERT INTO varcharmaptable (varcharkey, varcharvarintmap ) VALUES      ('᚛᚛
 UPDATE varcharmaptable SET varcharvarintmap = varcharvarintmap + {'Vitrum edere possum, mihi non nocet.':20000} WHERE varcharkey= '᚛᚛ᚉᚑᚅᚔᚉᚉᚔᚋ ᚔᚈᚔ ᚍᚂᚐᚅᚑ ᚅᚔᚋᚌᚓᚅᚐ᚜';
 
 UPDATE varcharmaptable SET varcharvarintmap['Vitrum edere possum, mihi non nocet.'] = 1010010101020400204143243 WHERE varcharkey= '᚛᚛ᚉᚑᚅᚔᚉᚉᚔᚋ ᚔᚈᚔ ᚍᚂᚐᚅᚑ ᚅᚔᚋᚌᚓᚅᚐ᚜'
-        """)
+        """
+        node1.run_cqlsh(cmds=cmds)
 
         self.verify_glass(node1)
 
@@ -452,7 +467,9 @@ UPDATE varcharmaptable SET varcharvarintmap['Vitrum edere possum, mihi non nocet
 
         node1, = self.cluster.nodelist()
 
-        output, err, _ = node1.run_cqlsh(cmds="ä;")
+        cmds = "ä;"
+        _, err, _ = node1.run_cqlsh(cmds=cmds)
+
         assert 'Invalid syntax' in err
         assert 'ä' in err
 
@@ -468,7 +485,7 @@ UPDATE varcharmaptable SET varcharvarintmap['Vitrum edere possum, mihi non nocet
         node1, = self.cluster.nodelist()
 
         cmd = '''create keyspace "ä" WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'};'''
-        output, err, _ = node1.run_cqlsh(cmds=cmd, cqlsh_options=["--debug"])
+        _, err, _ = node1.run_cqlsh(cmds=cmd, cqlsh_options=["--debug"])
 
         if self.cluster.version() >= LooseVersion('4.0'):
             assert "Keyspace name must not be empty, more than 48 characters long, or contain non-alphanumeric-underscore characters (got 'ä')" in err
@@ -484,7 +501,7 @@ UPDATE varcharmaptable SET varcharvarintmap['Vitrum edere possum, mihi non nocet
 
         node1, = self.cluster.nodelist()
 
-        node1.run_cqlsh(cmds="""create keyspace  CASSANDRA_7196 WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1} ;
+        cmds = """create keyspace  CASSANDRA_7196 WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1} ;
 
 use CASSANDRA_7196;
 
@@ -539,9 +556,13 @@ INSERT INTO has_all_types (num, intcol, asciicol, bigintcol, blobcol, booleancol
                            timestampcol, uuidcol, varcharcol, varintcol)
 VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDecimal(0x),
         blobAsDouble(0x), blobAsFloat(0x), '', blobAsTimestamp(0x), blobAsUuid(0x), '',
-        blobAsVarint(0x))""")
+        blobAsVarint(0x))"""
 
-        output, err = self.run_cqlsh(node1, "select intcol, bigintcol, varintcol from CASSANDRA_7196.has_all_types where num in (0, 1, 2, 3, 4)")
+        node1.run_cqlsh(cmds=cmds)
+
+        select_cmd = "select intcol, bigintcol, varintcol from CASSANDRA_7196.has_all_types where num in (0, 1, 2, 3, 4)"
+        output, err = self.run_cqlsh(node1, cmds=select_cmd)
+
         if common.is_win():
             output = output.replace('\r', '')
 
@@ -637,7 +658,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         conn.execute("CREATE USER user1 WITH PASSWORD 'user1'")
         conn.execute("GRANT ALL ON ks.t1 TO user1")
 
-        if self.cluster.version() >= '4.0':
+        if self.cluster.version() >= LooseVersion('4.0'):
             self.verify_output("LIST USERS", node1, """
  name      | super | datacenters
 -----------+-------+-------------
@@ -646,7 +667,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
 
 (2 rows)
 """)
-        elif self.cluster.version() >= '2.2':
+        elif self.cluster.version() >= LooseVersion('2.2'):
             self.verify_output("LIST USERS", node1, """
  name      | super
 -----------+-------
@@ -665,7 +686,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
 (2 rows)
 """)
 
-        if self.cluster.version() >= '2.2':
+        if self.cluster.version() >= LooseVersion('2.2'):
             self.verify_output("LIST ALL PERMISSIONS OF user1", node1, """
  role  | username | resource      | permission
 -------+----------+---------------+------------
@@ -698,6 +719,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         self.cluster.populate(1)
         self.cluster.start(wait_for_binary_proto=True)
         node1, = self.cluster.nodelist()
+
         self.execute(
             cql="""
                 CREATE KEYSPACE test WITH REPLICATION = {'class' : 'SimpleStrategy', 'replication_factor' : 1};
@@ -715,21 +737,21 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         assert "system" in output
 
         # Describe keyspace
-        self.execute(cql="DESCRIBE KEYSPACE test", expected_output=self.get_keyspace_output())
-        self.execute(cql="DESCRIBE test", expected_output=self.get_keyspace_output())
+        self.execute(cql="DESCRIBE KEYSPACE test", expected_output=self.get_keyspace_output(), output_is_ordered=False)
+        self.execute(cql="DESCRIBE test", expected_output=self.get_keyspace_output(), output_is_ordered=False)
         self.execute(cql="DESCRIBE test2", expected_err="'test2' not found in keyspaces")
-        self.execute(cql="USE test; DESCRIBE KEYSPACE", expected_output=self.get_keyspace_output())
+        self.execute(cql="USE test; DESCRIBE KEYSPACE", expected_output=self.get_keyspace_output(), output_is_ordered=False)
 
         # Describe table
-        self.execute(cql="DESCRIBE TABLE test.test", expected_output=self.get_test_table_output())
-        self.execute(cql="DESCRIBE TABLE test.users", expected_output=self.get_users_table_output())
-        self.execute(cql="DESCRIBE test.test", expected_output=self.get_test_table_output())
-        self.execute(cql="DESCRIBE test.users", expected_output=self.get_users_table_output())
+        self.execute(cql="DESCRIBE TABLE test.test", expected_output=self.get_test_table_output(), output_is_ordered=False)
+        self.execute(cql="DESCRIBE TABLE test.users", expected_output=self.get_users_table_output(), output_is_ordered=False)
+        self.execute(cql="DESCRIBE test.test", expected_output=self.get_test_table_output(), output_is_ordered=False)
+        self.execute(cql="DESCRIBE test.users", expected_output=self.get_users_table_output(), output_is_ordered=False)
         self.execute(cql="DESCRIBE test.users2", expected_err="'users2' not found in keyspace 'test'")
-        self.execute(cql="USE test; DESCRIBE TABLE test", expected_output=self.get_test_table_output())
-        self.execute(cql="USE test; DESCRIBE TABLE users", expected_output=self.get_users_table_output())
-        self.execute(cql="USE test; DESCRIBE test", expected_output=self.get_keyspace_output())
-        self.execute(cql="USE test; DESCRIBE users", expected_output=self.get_users_table_output())
+        self.execute(cql="USE test; DESCRIBE TABLE test", expected_output=self.get_test_table_output(), output_is_ordered=False)
+        self.execute(cql="USE test; DESCRIBE TABLE users", expected_output=self.get_users_table_output(), output_is_ordered=False)
+        self.execute(cql="USE test; DESCRIBE test", expected_output=self.get_keyspace_output(), output_is_ordered=False)
+        self.execute(cql="USE test; DESCRIBE users", expected_output=self.get_users_table_output(), output_is_ordered=False)
         self.execute(cql="USE test; DESCRIBE users2", expected_err="'users2' not found in keyspace 'test'")
 
         # Describe index
@@ -757,7 +779,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
                 CREATE INDEX myindex ON test.users (age);
                 CREATE INDEX "QuotedNameIndex" on test.users (firstname)
                 """)
-        self.execute(cql="DESCRIBE test.users", expected_output=self.get_users_table_output())
+        self.execute(cql="DESCRIBE test.users", expected_output=self.get_users_table_output(), output_is_ordered=False)
         self.execute(cql='DESCRIBE test.myindex', expected_output=self.get_index_output('myindex', 'test', 'users', 'age'))
 
         # Drop index and recreate
@@ -774,10 +796,10 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         # Prior to 3.0 the index would have been automatically dropped, but now we need to explicitly do that.
         self.execute(cql='DROP INDEX test.test_val_idx')
         self.execute(cql='ALTER TABLE test.test DROP val')
-        self.execute(cql="DESCRIBE test.test", expected_output=self.get_test_table_output(has_val=False, has_val_idx=False))
+        self.execute(cql="DESCRIBE test.test", expected_output=self.get_test_table_output(has_val=False, has_val_idx=False), output_is_ordered=False)
         self.execute(cql='DESCRIBE test.test_val_idx', expected_err="'test_val_idx' not found in keyspace 'test'")
         self.execute(cql='ALTER TABLE test.test ADD val text')
-        self.execute(cql="DESCRIBE test.test", expected_output=self.get_test_table_output(has_val=True, has_val_idx=False))
+        self.execute(cql="DESCRIBE test.test", expected_output=self.get_test_table_output(has_val=True, has_val_idx=False), output_is_ordered=False)
         self.execute(cql='DESCRIBE test.test_val_idx', expected_err="'test_val_idx' not found in keyspace 'test'")
 
     def test_describe_describes_non_default_compaction_parameters(self):
@@ -793,6 +815,97 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         stdout, _ = self.run_cqlsh(node, describe_cmd)
         assert "'min_threshold': '10'" in stdout
         assert "'max_threshold': '100'" in stdout
+
+    def test_describe_functions(self, fixture_dtest_setup_overrides):
+        """Test DESCRIBE statements for functions and aggregate functions"""
+        self.cluster.populate(1)
+        self.cluster.start(wait_for_binary_proto=True)
+
+        create_ks_statement = "CREATE KEYSPACE test WITH REPLICATION = {'class' : 'SimpleStrategy', 'replication_factor' : 1}"
+        create_function_statement = """
+CREATE FUNCTION test.some_function(arg int)
+    RETURNS NULL ON NULL INPUT
+    RETURNS int
+    LANGUAGE java
+    AS $$ return arg;
+    $$"""
+        create_aggregate_dependencies_statement = """
+CREATE OR REPLACE FUNCTION test.average_state(state tuple<int,bigint>, val int)
+    CALLED ON NULL INPUT
+    RETURNS tuple<int,bigint>
+    LANGUAGE java
+    AS $$ if (val != null) {
+            state.setInt(0, state.getInt(0)+1);
+            state.setLong(1, state.getLong(1)+val.intValue());
+        }
+        return state;
+    $$;
+CREATE OR REPLACE FUNCTION test.average_final (state tuple<int,bigint>)
+    CALLED ON NULL INPUT
+    RETURNS double
+    LANGUAGE java
+    AS $$
+        double r = 0;
+        if (state.getInt(0) == 0) return null;
+        r = state.getLong(1);
+        r /= state.getInt(0);
+        return Double.valueOf(r);
+    $$
+"""
+        create_aggregate_statement = """
+CREATE OR REPLACE AGGREGATE test.average(int)
+    SFUNC average_state
+    STYPE tuple<int,bigint>
+    FINALFUNC average_final
+    INITCOND (0, 0)
+"""
+        # the expected output of a DESCRIBE AGGREGATE statement
+        # does not look like a valid CREATE AGGREGATE statement
+        describe_aggregate_expected = """
+CREATE AGGREGATE test.average(int)
+    SFUNC average_state
+    STYPE frozen<tuple<int, bigint>>
+    FINALFUNC average_final
+    INITCOND (0, 0);
+"""
+
+        # create keyspace, scalar function, and aggregate function
+        self.execute(cql=create_ks_statement)
+        self.execute(cql=create_function_statement)
+        self.execute(cql=create_aggregate_dependencies_statement)
+        self.execute(cql=create_aggregate_statement)
+        # describe scalar functions
+        self.execute(cql='DESCRIBE FUNCTION test.some_function', expected_output='{};'.format(create_function_statement))
+        # describe aggregate functions
+        self.execute(cql='DESCRIBE AGGREGATE test.average', expected_output=describe_aggregate_expected)
+
+    def test_describe_types(self):
+        """Test DESCRIBE statements for user defined datatypes"""
+        self.cluster.populate(1)
+        self.cluster.start(wait_for_binary_proto=True)
+
+        create_ks_statement = "CREATE KEYSPACE test WITH REPLICATION = {'class' : 'SimpleStrategy', 'replication_factor' : 1}"
+        create_name_type_statement = """
+CREATE TYPE test.name_type (
+    firstname text,
+    lastname text
+)"""
+        create_address_type_statement = """
+CREATE TYPE test.address_type (
+    name frozen<name_type>, 
+    number int,
+    street text,
+    phones set<text>
+)"""
+
+        # create test keyspace and some user defined types
+        self.execute(cql=create_ks_statement)
+        self.execute(create_name_type_statement)
+        self.execute(create_address_type_statement)
+
+        # DESCRIBE user defined types
+        self.execute(cql='DESCRIBE TYPE test.name_type', expected_output='{};'.format(create_name_type_statement))
+        self.execute(cql='DESCRIBE TYPE test.address_type', expected_output='{};'.format(create_address_type_statement))
 
     def test_describe_on_non_reserved_keywords(self):
         """
@@ -842,13 +955,14 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         self.execute(cql='USE test; DESCRIBE "users_by_state"', expected_output=self.get_users_by_state_mv_output())
 
     def get_keyspace_output(self):
-        return ("CREATE KEYSPACE test WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}  AND durable_writes = true;" +
-                self.get_test_table_output() +
-                self.get_users_table_output())
+        return ["CREATE KEYSPACE test WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}  AND durable_writes = true;",
+                self.get_test_table_output(),
+                self.get_users_table_output()]
 
     def get_test_table_output(self, has_val=True, has_val_idx=True):
+        create_table = None
         if has_val:
-            ret = """
+            create_table = """
                 CREATE TABLE test.test (
                     id int,
                     col int,
@@ -856,7 +970,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
                 PRIMARY KEY (id, col)
                 """
         else:
-            ret = """
+            create_table = """
                 CREATE TABLE test.test (
                     id int,
                     col int,
@@ -864,7 +978,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
                 """
 
         if self.cluster.version() >= LooseVersion('4.0'):
-            ret += """
+            create_table += """
         ) WITH CLUSTERING ORDER BY (col ASC)
             AND bloom_filter_fp_chance = 0.01
             AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
@@ -882,7 +996,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
             AND speculative_retry = '99p';
         """
         elif self.cluster.version() >= LooseVersion('3.9'):
-            ret += """
+            create_table += """
         ) WITH CLUSTERING ORDER BY (col ASC)
             AND bloom_filter_fp_chance = 0.01
             AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
@@ -900,7 +1014,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
             AND speculative_retry = '99PERCENTILE';
         """
         elif self.cluster.version() >= LooseVersion('3.0'):
-            ret += """
+            create_table += """
         ) WITH CLUSTERING ORDER BY (col ASC)
             AND bloom_filter_fp_chance = 0.01
             AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
@@ -918,7 +1032,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
             AND speculative_retry = '99PERCENTILE';
         """
         else:
-            ret += """
+            create_table += """
         ) WITH CLUSTERING ORDER BY (col ASC)
             AND bloom_filter_fp_chance = 0.01
             AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
@@ -936,22 +1050,18 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         """
 
         col_idx_def = self.get_index_output('test_col_idx', 'test', 'test', 'col')
-
+        expected_output = [create_table, col_idx_def]
         if has_val_idx:
-            val_idx_def = self.get_index_output('test_val_idx', 'test', 'test', 'val')
-            if self.cluster.version() >= LooseVersion('2.2'):
-                return ret + "\n" + val_idx_def + "\n" + col_idx_def
-            else:
-                return ret + "\n" + col_idx_def + "\n" + val_idx_def
-        else:
-            return ret + "\n" + col_idx_def
+            expected_output.append(self.get_index_output('test_val_idx', 'test', 'test', 'val'))
+        return expected_output
 
     def get_users_table_output(self):
         quoted_index_output = self.get_index_output('"QuotedNameIndex"', 'test', 'users', 'firstname')
         myindex_output = self.get_index_output('myindex', 'test', 'users', 'age')
+        create_table = None
 
         if self.cluster.version() >= LooseVersion('4.0'):
-            return """
+            create_table = """
         CREATE TABLE test.users (
             userid text PRIMARY KEY,
             age int,
@@ -971,9 +1081,9 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
             AND min_index_interval = 128
             AND read_repair_chance = 0.0
             AND speculative_retry = '99p';
-        """ + quoted_index_output + "\n" + myindex_output
+        """
         elif self.cluster.version() >= LooseVersion('3.9'):
-            return """
+            create_table =  """
         CREATE TABLE test.users (
             userid text PRIMARY KEY,
             age int,
@@ -993,9 +1103,9 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
             AND min_index_interval = 128
             AND read_repair_chance = 0.0
             AND speculative_retry = '99PERCENTILE';
-        """ + quoted_index_output + "\n" + myindex_output
+        """
         elif self.cluster.version() >= LooseVersion('3.0'):
-            return """
+            create_table = """
         CREATE TABLE test.users (
             userid text PRIMARY KEY,
             age int,
@@ -1015,9 +1125,9 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
             AND min_index_interval = 128
             AND read_repair_chance = 0.0
             AND speculative_retry = '99PERCENTILE';
-        """ + quoted_index_output + "\n" + myindex_output
+        """
         else:
-            return """
+            create_table = """
         CREATE TABLE test.users (
             userid text PRIMARY KEY,
             age int,
@@ -1036,8 +1146,8 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
             AND min_index_interval = 128
             AND read_repair_chance = 0.0
             AND speculative_retry = '99.0PERCENTILE';
-        """ + (quoted_index_output + "\n" + myindex_output if self.cluster.version() >= LooseVersion('2.2') else
-               myindex_output + "\n" + quoted_index_output)
+        """
+        return [create_table, quoted_index_output, myindex_output]
 
     def get_index_output(self, index, ks, table, col):
         # a quoted index name (e.g. "FooIndex") is only correctly echoed by DESCRIBE
@@ -1123,7 +1233,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
                 AND speculative_retry = '99PERCENTILE';
                """
 
-    def execute(self, cql, expected_output=None, expected_err=None, env_vars=None):
+    def execute(self, cql, expected_output=None, expected_err=None, env_vars=None, output_is_ordered=True, err_is_ordered=True):
         logger.debug(cql)
 
         node1, = self.cluster.nodelist()
@@ -1132,13 +1242,19 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         if err:
             if expected_err:
                 err = err[10:]  # strip <stdin>:2:
-                self.check_response(err, expected_err)
+                if err_is_ordered:
+                    self.check_response(err, expected_err)
+                else:
+                    self.check_response_unordered(err, expected_err)
                 return
             else:
                 assert False, err
 
         if expected_output:
-            self.check_response(output, expected_output)
+            if output_is_ordered:
+                self.check_response(output, expected_output)
+            else:
+                self.check_response_unordered(output, expected_output)
 
         return output
 
@@ -1159,6 +1275,31 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         describe_statement = re.sub(r"( AND)? default_time_to_live = [\d\.]+", "", describe_statement)
         describe_statement = re.sub(r"WITH[\s]*;", "", describe_statement)
         return describe_statement
+
+    def check_response_unordered(self, response, expected_response):
+        """
+        Assert that a response matches a concatenation of expected
+        strings in an arbitrary order. This is useful for features
+        such as DESCRIBE KEYSPACE, where output is arbitrarily
+        ordered.
+        expected_response should be a list of strings that form the
+        expected output.
+        """
+
+        def consume_expected(observed, expected):
+            unconsumed = observed
+            if isinstance(expected, list):
+                for unit in expected:
+                    unconsumed = consume_expected(unconsumed, unit)
+            else:
+                expected_stripped = "\n".join([s.strip() for s in expected.split("\n") if s.strip()])
+                assert unconsumed.find(expected_stripped) >= 0
+                unconsumed = unconsumed.replace(expected_stripped, "")
+            return unconsumed
+
+        stripped_response = "\n".join([s.strip() for s in response.split("\n") if s.strip()])
+        unconsumed = consume_expected(stripped_response, expected_response)
+        assert unconsumed.replace("\n", "") == ""
 
     def strip_read_repair_chance(self, describe_statement):
         """
@@ -1425,7 +1566,7 @@ CREATE TABLE int_checks.values (
     val4 tinyint
 """)
 
-    @since('2.2')
+    @since('2.2', max_version='4')
     def test_datetime_values(self):
         """ Tests for CASSANDRA-9399, check tables with date and time values"""
         self.cluster.populate(1)
@@ -1467,6 +1608,52 @@ CREATE TABLE datetime_checks.values (
     t time,
     PRIMARY KEY (d, t)
 """)
+
+    """
+    Starting with 4.0, date/time format needs to conform to java.time.format.DateTimeFormatter
+    See CASSANDRA-15257 for more details
+    """
+    @since('4.0')
+    def test_datetime_values_40(self):
+        self.cluster.populate(1)
+        self.cluster.start(wait_for_binary_proto=True)
+
+        node1, = self.cluster.nodelist()
+
+        stdout, stderr = self.run_cqlsh(node1, cmds="""
+            CREATE KEYSPACE datetime_checks WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
+            USE datetime_checks;
+            CREATE TABLE values (d date, t time, PRIMARY KEY (d, t));
+            INSERT INTO values (d, t) VALUES ('9800-12-31', '23:59:59.999999999');
+            INSERT INTO values (d, t) VALUES ('2015-05-14', '16:30:00.555555555');
+            INSERT INTO values (d, t) VALUES ('1582-01-01', '00:00:00.000000000');
+            INSERT INTO values (d, t) VALUES ('%04d-01-01', '00:00:00.000000000');
+            INSERT INTO values (d, t) VALUES ('%04d-01-01', '01:00:00.000000000');
+            INSERT INTO values (d, t) VALUES ('%02d-01-01', '02:00:00.000000000');
+            INSERT INTO values (d, t) VALUES ('+%02d-01-01', '03:00:00.000000000')"""
+                                        % (datetime.MINYEAR - 1, datetime.MINYEAR, datetime.MAXYEAR, datetime.MAXYEAR+1))
+
+        assert 0 == len(stderr), "Failed to execute cqlsh: {}".format(stderr)
+
+        self.verify_output("select * from datetime_checks.values", node1, """
+ d          | t
+------------+--------------------
+    -719528 | 00:00:00.000000000
+ 9800-12-31 | 23:59:59.999999999
+ 0001-01-01 | 01:00:00.000000000
+ 1582-01-01 | 00:00:00.000000000
+    2932897 | 03:00:00.000000000
+ 9999-01-01 | 02:00:00.000000000
+ 2015-05-14 | 16:30:00.555555555
+""")
+
+        self.verify_output("DESCRIBE TABLE datetime_checks.values", node1, """
+CREATE TABLE datetime_checks.values (
+    d date,
+    t time,
+    PRIMARY KEY (d, t)
+""")
+
 
     @since('2.2')
     def test_tracing(self):
@@ -1767,7 +1954,7 @@ Tracing session:""")
 
         # Can't check escape sequence on cmd prompt. Assume no errors is good enough metric.
         if not common.is_win():
-            assert re.search(chr(27) + r"\[[0,1,2]?J", out)
+            assert re.search((chr(27) + "\[[0,1,2]?J"), out)
 
     def test_batch(self):
         """
@@ -2088,6 +2275,34 @@ class TestCqlshSmoke(Tester):
         self.session.cluster.refresh_schema_metadata()
         return [table.name for table in list(self.session.cluster.metadata.keyspaces[keyspace].tables.values())]
 
+    def test_cjk_output(self):
+        """Confirm cqlsh outputs CJK text properly"""
+        create_ks(self.session, 'ks', 1)
+        create_cf(self.session, 'iroha', key_type='int', columns={'manyogana': 'text', 'modern': 'text', 'kana': 'text'})
+
+        self.session.execute("INSERT INTO iroha (key, manyogana, modern, kana) VALUES (1, '以呂波耳本部止', '色は匂へど', 'いろはにほへと')")
+        self.session.execute("INSERT INTO iroha (key, manyogana, modern, kana) VALUES (2, '千利奴流乎', '散りぬるを', 'ちりぬるを')")
+        self.session.execute("INSERT INTO iroha (key, manyogana, modern, kana) VALUES (3, '和加餘多連曽', '我が世誰ぞ', 'わかよたれそ')")
+        self.session.execute("INSERT INTO iroha (key, manyogana, modern, kana) VALUES (4, '津祢那良牟', '常ならん', 'つねならむ')")
+        self.session.execute("INSERT INTO iroha (key, manyogana, modern, kana) VALUES (5, '有為能於久耶万', '有為の奥山', 'うゐのおくやま')")
+        self.session.execute("INSERT INTO iroha (key, manyogana, modern, kana) VALUES (6, '計不己衣天阿', '今日越えて', 'けふこえて')")
+        self.session.execute("INSERT INTO iroha (key, manyogana, modern, kana) VALUES (7, '佐伎喩女美之', '浅き夢見じ', 'あさきゆめみし')")
+        self.session.execute("INSERT INTO iroha (key, manyogana, modern, kana) VALUES (8, '恵比毛勢須', '酔ひもせず', 'ゑひもせす')")
+
+        stdout, _, _ = self.node1.run_cqlsh('SELECT key, manyogana, modern, kana FROM ks.iroha')
+        stdout_lines_sorted = '\n'.join(sorted(stdout.split('\n')))
+        expected = """
+   1 | 以呂波耳本部止 | 色は匂へど | いろはにほへと
+   2 |     千利奴流乎 | 散りぬるを |     ちりぬるを
+   3 |   和加餘多連曽 | 我が世誰ぞ |   わかよたれそ
+   4 |     津祢那良牟 |   常ならん |     つねならむ
+   5 | 有為能於久耶万 | 有為の奥山 | うゐのおくやま
+   6 |   計不己衣天阿 | 今日越えて |     けふこえて
+   7 |   佐伎喩女美之 | 浅き夢見じ | あさきゆめみし
+   8 |     恵比毛勢須 | 酔ひもせず |     ゑひもせす
+"""
+        assert stdout_lines_sorted.find(expected) >= 0
+
 
 class TestCqlLogin(Tester):
     """
@@ -2145,7 +2360,7 @@ class TestCqlLogin(Tester):
         create_cf(self.session, 'ks1table')
         self.session.execute("CREATE USER user1 WITH PASSWORD 'changeme';")
 
-        if self.cluster.version() >= '2.2':
+        if self.cluster.version() >= LooseVersion('2.2'):
             query = '''
                     LOGIN user1 'changeme';
                     CREATE USER user2 WITH PASSWORD 'fail' SUPERUSER;

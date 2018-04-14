@@ -1,14 +1,17 @@
+# coding=utf-8
+
 import csv
 import datetime
 import glob
+import io
 import json
 import locale
+import logging
 import os
+import pytest
 import re
 import sys
 import time
-import pytest
-import logging
 
 from collections import namedtuple
 from contextlib import contextmanager
@@ -25,9 +28,11 @@ from cassandra.murmur3 import murmur3
 from cassandra.util import SortedSet
 from ccmlib.common import is_win
 
-from .cqlsh_tools import (DummyColorMap, assert_csvs_items_equal, csv_rows,
-                         monkeypatch_driver, random_list, unmonkeypatch_driver,
-                         write_rows_to_csv)
+from .cqlsh_test_types import (Address, Datetime, ImmutableDict,
+                               ImmutableSet, Name, UTC)
+from .cqlsh_tools import (DummyColorMap, assert_csvs_items_equal,
+                          csv_rows, monkeypatch_driver, random_list,
+                          unmonkeypatch_driver, write_rows_to_csv)
 from dtest import (Tester, create_ks)
 from dtest import (FlakyRetryPolicy, Tester, create_ks)
 from tools.data import rows_to_list
@@ -43,21 +48,6 @@ PARTITIONERS = {
     "byte": "org.apache.cassandra.dht.ByteOrderedPartitioner",
     "order": "org.apache.cassandra.dht.OrderPreservingPartitioner"
 }
-
-
-class UTC(datetime.tzinfo):
-    """
-    A utility class to specify a UTC timezone.
-    """
-
-    def utcoffset(self, dt):
-        return datetime.timedelta(0)
-
-    def tzname(self, dt):
-        return "UTC"
-
-    def dst(self, dt):
-        return datetime.timedelta(0)
 
 
 class TestCqlshCopy(Tester):
@@ -205,7 +195,7 @@ class TestCqlshCopy(Tester):
         try:
             return self._default_time_format
         except AttributeError:
-            with self._cqlshlib():
+            with self._cqlshlib() as cqlshlib:
                 try:
                     from cqlshlib.formatting import DEFAULT_TIMESTAMP_FORMAT
                     self._default_time_format = DEFAULT_TIMESTAMP_FORMAT
@@ -250,68 +240,14 @@ class TestCqlshCopy(Tester):
                 x map<text, frozen<list<text>>>
             )''')
 
-        default_time_format = self.default_time_format
-
-        try:
-            from cqlshlib.formatting import round_microseconds
-        except ImportError:
-            round_microseconds = None
-
-        class Datetime(datetime.datetime):
-
-            def _format_for_csv(self):
-                ret = self.strftime(default_time_format)
-                return round_microseconds(ret) if round_microseconds else ret
-
-            def __str__(self):
-                return self._format_for_csv()
-
-            def __repr__(self):
-                return self._format_for_csv()
-
-        def maybe_quote(s):
-            """
-            Return a quoted string representation for strings, unicode and date time parameters,
-            otherwise return a string representation of the parameter.
-            """
-            return "'{}'".format(s) if isinstance(s, (str, Datetime)) else str(s)
-
-        class ImmutableDict(frozenset):
-            iteritems = frozenset.__iter__
-
-            def __repr__(self):
-                return '{{{}}}'.format(', '.join(['{}: {}'.format(maybe_quote(t[0]), maybe_quote(t[1]))
-                                                  for t in sorted(self)]))
-
-        class ImmutableSet(SortedSet):
-
-            def __repr__(self):
-                return '{{{}}}'.format(', '.join([maybe_quote(t) for t in sorted(self._items)]))
-
-            def __hash__(self):
-                return hash(tuple([e for e in self]))
-
-        class Name(namedtuple('Name', ('firstname', 'lastname'))):
-            __slots__ = ()
-
-            def __repr__(self):
-                return "{{firstname: '{}', lastname: '{}'}}".format(self.firstname, self.lastname)
-
-        class Address(namedtuple('Address', ('name', 'number', 'street', 'phones'))):
-            __slots__ = ()
-
-            def __repr__(self):
-                phones_str = "{{{}}}".format(', '.join(maybe_quote(p) for p in sorted(self.phones)))
-                return "{{name: {}, number: {}, street: '{}', phones: {}}}".format(self.name,
-                                                                                   self.number,
-                                                                                   self.street,
-                                                                                   phones_str)
-
         self.session.cluster.register_user_type('ks', 'name_type', Name)
         self.session.cluster.register_user_type('ks', 'address_type', Address)
 
-        date1 = Datetime(2005, 7, 14, 12, 30, 0, 0, UTC())
-        date2 = Datetime(2005, 7, 14, 13, 30, 0, 0, UTC())
+        cassandra_dirpath = self.cluster.nodelist()[0].get_install_dir()
+        cqlshlib_dirpath = os.path.join(cassandra_dirpath, 'pylib')
+
+        date1 = Datetime(2005, 7, 14, 12, 30, 0, 0, UTC(), cqlshlib_path=cqlshlib_dirpath)
+        date2 = Datetime(2005, 7, 14, 13, 30, 0, 0, UTC(), cqlshlib_path=cqlshlib_dirpath)
 
         addr1 = Address(Name('name1', 'last1'), 1, 'street 1', ImmutableSet(['1111 2222', '3333 4444']))
         addr2 = Address(Name('name2', 'last2'), 2, 'street 2', ImmutableSet(['5555 6666', '7777 8888']))
@@ -388,12 +324,11 @@ class TestCqlshCopy(Tester):
 
         self.maxDiff = None
 
-        if (sort_data):
-            csv_results.sort()
-            processed_results.sort()
-
         try:
-            assert csv_results == processed_results
+            if sort_data:
+                assert sorted(csv_results) == sorted(processed_results)
+            else:
+                assert csv_results == processed_results
         except Exception as e:
             if len(csv_results) != len(processed_results):
                 logger.warning("Different # of entries. CSV: " + str(len(csv_results)) +
@@ -409,15 +344,14 @@ class TestCqlshCopy(Tester):
     def make_csv_formatter(self, time_format, nullval):
         with self._cqlshlib() as cqlshlib:  # noqa
             from cqlshlib.formatting import format_value, format_value_default
-            from cqlshlib.displaying import NO_COLOR_MAP
-        try:
-            from cqlshlib.formatting import DateTimeFormat
-            date_time_format = DateTimeFormat()
-            date_time_format.timestamp_format = time_format
-            if hasattr(date_time_format, 'milliseconds_only'):
-                date_time_format.milliseconds_only = True
-        except ImportError:
-            date_time_format = None
+            try:
+                from cqlshlib.formatting import DateTimeFormat
+                date_time_format = DateTimeFormat()
+                date_time_format.timestamp_format = time_format
+                if hasattr(date_time_format, 'milliseconds_only'):
+                    date_time_format.milliseconds_only = True
+            except ImportError:
+                date_time_format = None
 
         encoding_name = 'utf-8'  # codecs.lookup(locale.getpreferredencoding()).name
         color_map = DummyColorMap()
@@ -439,7 +373,7 @@ class TestCqlshCopy(Tester):
                 format_fn = format_value
 
             if val is None or val == EMPTY or val == nullval:
-                return format_value_default(nullval)
+                return format_value_default(nullval, color_map).strval
 
             # CASSANDRA-11255 increased COPY TO DOUBLE PRECISION TO 12
             if cql_type_name == 'double' and self.cluster.version() >= LooseVersion('3.6'):
@@ -804,7 +738,6 @@ class TestCqlshCopy(Tester):
 
         result = self.session.execute("SELECT * FROM testcounter")
         result_as_list = rows_to_list(result)
-        result_as_list.sort()
         assert data == sorted(result_as_list)
 
     def test_reading_counter(self):
@@ -859,6 +792,7 @@ class TestCqlshCopy(Tester):
         result_as_list = [tuple(r) for r in rows_to_list(result)]
         assert [tuple(d) for d in data] == sorted(result_as_list)
 
+    @since('2.2', max_version='3.X')
     @pytest.mark.depends_cqlshlib
     def test_datetimeformat_round_trip(self):
         """
@@ -894,7 +828,7 @@ class TestCqlshCopy(Tester):
         logger.debug('Exporting to csv file: {name}'.format(name=tempfile.name))
         cmds = "COPY ks.testdatetimeformat TO '{name}'".format(name=tempfile.name)
         cmds += " WITH DATETIMEFORMAT = '{}'".format(format)
-        self.run_cqlsh(cmds=cmds)
+        copy_to_out, copy_to_err, _ = self.run_cqlsh(cmds=cmds)
 
         with open(tempfile.name, 'r') as csvfile:
             csv_values = list(csv.reader(csvfile))
@@ -906,7 +840,66 @@ class TestCqlshCopy(Tester):
         self.session.execute("TRUNCATE testdatetimeformat")
         cmds = "COPY ks.testdatetimeformat FROM '{name}'".format(name=tempfile.name)
         cmds += " WITH DATETIMEFORMAT = '{}'".format(format)
-        self.run_cqlsh(cmds=cmds)
+        copy_from_out, copy_from_err, _ = self.run_cqlsh(cmds=cmds)
+
+        table_meta = UpdatingTableMetadataWrapper(self.session.cluster,
+                                                  ks_name=self.ks,
+                                                  table_name='testdatetimeformat')
+        cql_type_names = [table_meta.columns[c].cql_type for c in table_meta.columns]
+
+        imported_results = list(self.session.execute("SELECT * FROM testdatetimeformat"))
+        assert self.result_to_csv_rows(exported_results, cql_type_names, time_format=format) \
+               == self.result_to_csv_rows(imported_results, cql_type_names, time_format=format)
+
+    @since('4.0')
+    @pytest.mark.depends_cqlshlib
+    def test_datetimeformat_round_trip_40(self):
+        """
+        @jira_ticket CASSANDRA-10633
+        @jira_ticket CASSANDRA-9303
+
+        Test COPY TO and COPY FORM with the time format specified in the WITH option by:
+
+        - creating and populating a table,
+        - exporting the contents of the table to a CSV file using COPY TO WITH DATETIMEFORMAT,
+        - checking the time format written to csv.
+        - importing the CSV back into the table
+        - comparing the table contents before and after the import
+
+        CASSANDRA-9303 renamed TIMEFORMAT to DATETIMEFORMAT
+        """
+        self.prepare()
+        self.session.execute("""
+            CREATE TABLE testdatetimeformat (
+                a int primary key,
+                b timestamp
+            )""")
+        insert_statement = self.session.prepare("INSERT INTO testdatetimeformat (a, b) VALUES (?, ?)")
+        args = [(1, datetime.datetime(2015, 1, 1, 0o7, 00, 0, 0, UTC())),
+                (2, datetime.datetime(2015, 6, 10, 12, 30, 30, 500, UTC())),
+                (3, datetime.datetime(2015, 12, 31, 23, 59, 59, 999, UTC()))]
+        execute_concurrent_with_args(self.session, insert_statement, args)
+        exported_results = list(self.session.execute("SELECT * FROM testdatetimeformat"))
+
+        format = '%Y-%m-%d %H:%M:%S%z'
+
+        tempfile = self.get_temp_file()
+        logger.debug('Exporting to csv file: {name}'.format(name=tempfile.name))
+        cmds = "COPY ks.testdatetimeformat TO '{name}'".format(name=tempfile.name)
+        cmds += " WITH DATETIMEFORMAT = '{}' AND NUMPROCESSES=1".format(format)
+        copy_to_out, copy_to_err, _ = self.run_cqlsh(cmds=cmds)
+
+        with open(tempfile.name, 'r') as csvfile:
+            csv_values = list(csv.reader(csvfile))
+
+        assert sorted(csv_values) == [['1', '2015-01-01 07:00:00+0000'],
+                                      ['2', '2015-06-10 12:30:30+0000'],
+                                      ['3', '2015-12-31 23:59:59+0000']]
+
+        self.session.execute("TRUNCATE testdatetimeformat")
+        cmds = "COPY ks.testdatetimeformat FROM '{name}'".format(name=tempfile.name)
+        cmds += " WITH DATETIMEFORMAT = '{}' AND NUMPROCESSES=1".format(format)
+        copy_from_out, copy_from_err, _ = self.run_cqlsh(cmds=cmds)
 
         table_meta = UpdatingTableMetadataWrapper(self.session.cluster,
                                                   ks_name=self.ks,
@@ -1310,10 +1303,9 @@ class TestCqlshCopy(Tester):
                 cmd += " AND ERRFILE='{}'".format(err_file.name)
             self.run_cqlsh(cmds=cmd)
 
-            logger.debug('Sorting')
-            results = sorted(rows_to_list(self.session.execute("SELECT * FROM ks.testparseerrors")))
+            results = rows_to_list(self.session.execute("SELECT * FROM ks.testparseerrors"))
             logger.debug('Checking valid rows')
-            assert valid_rows == results
+            assert sorted(valid_rows) == sorted(results)
             logger.debug('Checking invalid rows')
             self.assertCsvResultEqual(err_file_name, invalid_rows, cql_type_names=['text', 'int', 'text'])
 
@@ -1368,10 +1360,9 @@ class TestCqlshCopy(Tester):
         cmd = "COPY ks.testwrongnumcols FROM '{}' WITH ERRFILE='{}'".format(tempfile.name, err_file.name)
         self.run_cqlsh(cmds=cmd)
 
-        logger.debug('Sorting')
-        results = sorted(rows_to_list(self.session.execute("SELECT * FROM ks.testwrongnumcols")))
+        results = rows_to_list(self.session.execute("SELECT * FROM ks.testwrongnumcols"))
         logger.debug('Checking valid rows')
-        assert valid_rows == results
+        assert sorted(valid_rows) == sorted(results)
         logger.debug('Checking invalid rows')
         self.assertCsvResultEqual(err_file.name, invalid_rows, 'testwrongnumcols', columns=['a', 'b', 'e'])
 
@@ -1802,7 +1793,7 @@ class TestCqlshCopy(Tester):
 
         def _test(prepared_statements):
             logger.debug('Importing from csv file: {name}'.format(name=tempfile.name))
-            self.run_cqlsh(cmds="COPY ks.testdatatype FROM '{}' WITH PREPAREDSTATEMENTS = {}"
+            out, err, _ = self.run_cqlsh(cmds="COPY ks.testdatatype FROM '{}' WITH PREPAREDSTATEMENTS = {}"
                            .format(tempfile.name, prepared_statements))
 
             results = list(self.session.execute("SELECT * FROM testdatatype"))
@@ -2043,7 +2034,7 @@ class TestCqlshCopy(Tester):
 
             exported_results = list(self.session.execute("SELECT * FROM testnumberseps"))
             self.maxDiff = None
-            assert expected_vals == sorted(list(csv_rows(tempfile.name)))
+            assert sorted(expected_vals) == sorted(list(csv_rows(tempfile.name)))
 
             logger.debug('Importing from csv file: {} with thousands_sep {} and decimal_sep {}'
                   .format(tempfile.name, thousands_sep, decimal_sep))
@@ -2060,8 +2051,8 @@ class TestCqlshCopy(Tester):
             cql_type_names = [table_meta.columns[c].cql_type for c in table_meta.columns]
 
             # we format as if we were comparing to csv to overcome loss of precision in the import
-            assert self.result_to_csv_rows(exported_results == cql_type_names,
-                             self.result_to_csv_rows(imported_results, cql_type_names))
+            assert self.result_to_csv_rows(exported_results, cql_type_names) \
+                   == self.result_to_csv_rows(imported_results, cql_type_names)
 
         do_test(expected_vals_usual, ',', '.')
         do_test(expected_vals_inverted, '.', ',')
@@ -2532,7 +2523,8 @@ class TestCqlshCopy(Tester):
         run_copy_to(tempfile1)
 
         # check all records generated were exported
-        assert num_records == sum(1 for _ in open(tempfile1.name))
+        with io.open(tempfile1.name, encoding="utf-8", newline='') as csvfile:
+            assert num_records == sum(1 for _ in csv.reader(csvfile, quotechar='"', escapechar='\\'))
 
         # import records from the first csv file
         logger.debug('Truncating {}...'.format(stress_table))
@@ -3266,6 +3258,7 @@ class TestCqlshCopy(Tester):
         _test(False)
 
     @pytest.mark.depends_cqlshlib
+    @pytest.mark.depends_driver
     @since('3.0')
     def test_unusual_dates(self):
         """

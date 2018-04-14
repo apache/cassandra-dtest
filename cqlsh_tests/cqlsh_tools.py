@@ -1,10 +1,12 @@
+from __future__ import unicode_literals
+
 import csv
 import random
+from typing import List
 
 import cassandra
 
 from cassandra.cluster import ResultSet
-from typing import List
 
 
 class DummyColorMap(object):
