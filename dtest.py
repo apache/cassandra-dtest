@@ -227,7 +227,7 @@ def test_failure_due_to_timeout(err, *args):
 
 
 @flaky(rerun_filter=test_failure_due_to_timeout)
-class Tester:
+class Tester(object):
 
     def __getattribute__(self, name):
         try:

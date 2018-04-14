@@ -1,7 +1,7 @@
 from abc import ABCMeta, abstractproperty
+from six import with_metaclass
 
-
-class UpdatingMetadataWrapperBase(object, metaclass=ABCMeta):
+class UpdatingMetadataWrapperBase(with_metaclass(ABCMeta, object)):
     @abstractproperty
     def _wrapped(self):
         pass
