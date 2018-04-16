@@ -130,7 +130,12 @@ class TestNodetool(Tester):
         session = self.patient_exclusive_cql_connection(node_dc1, consistency_level=ConsistencyLevel.ALL)
         session_dc2 = self.patient_exclusive_cql_connection(node_dc2, consistency_level=ConsistencyLevel.LOCAL_ONE)
         create_ks(session, 'ks', replication_factor)
-        session.execute('CREATE TABLE ks.cf (id int PRIMARY KEY, value text) with dclocal_read_repair_chance = 0 AND read_repair_chance = 0;', trace=False)
+
+        if self.cluster.version() < '4.0':
+            session.execute('CREATE TABLE ks.cf (id int PRIMARY KEY, value text) with dclocal_read_repair_chance = 0 AND read_repair_chance = 0;', trace=False)
+        else:
+            session.execute('CREATE TABLE ks.cf (id int PRIMARY KEY, value text);', trace=False)
+
         if with_index:
             session.execute('CREATE INDEX value_by_key on ks.cf(value)', trace=False)
 

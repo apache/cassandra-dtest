@@ -181,9 +181,7 @@ def establish_nondefault_table_settings(version, session, table_name_prefix=""):
                     primary key((a,b),c) )
                 WITH gc_grace_seconds = 9999
                 AND bloom_filter_fp_chance = 0.5
-                AND read_repair_chance = 0.99
                 AND comment = 'insightful information'
-                AND dclocal_read_repair_chance = 0.88
                 AND compaction = {{'class': 'LeveledCompactionStrategy'}}
           """
 
@@ -216,9 +214,7 @@ def verify_nondefault_table_settings(created_on_version, current_version, keyspa
     meta = session.cluster.metadata.keyspaces[keyspace].tables[table_name]
 
     assert 'insightful information' == meta.options['comment']
-    assert 0.88 == meta.options['dclocal_read_repair_chance']
     assert 9999 == meta.options['gc_grace_seconds']
-    assert 0.99 == meta.options['read_repair_chance']
     assert 0.5 == meta.options['bloom_filter_fp_chance']
 
     if created_on_version >= '2.1':

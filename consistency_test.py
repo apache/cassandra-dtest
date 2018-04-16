@@ -167,17 +167,20 @@ class TestHelper(Tester):
             )"""
 
         if requires_local_reads:
-            create_cmd += " WITH " + self.get_local_reads_properties()
+            create_cmd += " WITH " + self.get_local_reads_properties(self.cluster.version())
 
         session.execute(create_cmd)
 
     @staticmethod
-    def get_local_reads_properties():
+    def get_local_reads_properties(cluster_version):
         """
         If we must read from the local replica first, then we should disable read repair and
         speculative retry, see CASSANDRA-12092
         """
-        return " dclocal_read_repair_chance = 0 AND read_repair_chance = 0 AND speculative_retry =  'NONE'"
+        if cluster_version < '4.0':
+            return " dclocal_read_repair_chance = 0 AND read_repair_chance = 0 AND speculative_retry =  'NONE'"
+        else:
+            return " speculative_retry =  'NONE'"
 
     def insert_user(self, session, userid, age, consistency, serial_consistency=None):
         text = "INSERT INTO users (userid, firstname, lastname, age) VALUES ({}, 'first{}', 'last{}', {}) {}"\
@@ -213,7 +216,7 @@ class TestHelper(Tester):
             )"""
 
         if requires_local_reads:
-            create_cmd += " WITH " + self.get_local_reads_properties()
+            create_cmd += " WITH " + self.get_local_reads_properties(self.cluster.version())
 
         session.execute(create_cmd)
 
@@ -1239,7 +1242,11 @@ class TestConsistency(Tester):
 
         session = self.patient_cql_connection(node1)
         create_ks(session, 'ks', 3)
-        create_cf(session, 'cf', read_repair=0.0)
+
+        if cluster.version() < '4.0':
+            create_cf(session, 'cf', read_repair=0.0)
+        else:
+            create_cf(session, 'cf')
 
         normal_key = 'normal'
         reversed_key = 'reversed'
@@ -1299,7 +1306,11 @@ class TestConsistency(Tester):
 
         session = self.patient_cql_connection(node1)
         create_ks(session, 'ks', 3)
-        create_cf(session, 'cf', read_repair=0.0)
+        if cluster.version() < '4.0':
+            create_cf(session, 'cf', read_repair=0.0)
+        else:
+            create_cf(session, 'cf')
+
         # insert 2 columns in one row
         insert_columns(self, session, 0, 2)
 
@@ -1336,7 +1347,11 @@ class TestConsistency(Tester):
         session = self.patient_cql_connection(node1)
         create_ks(session, 'ks', 3)
 
-        session.execute("CREATE TABLE t (id int, v int, PRIMARY KEY(id, v)) WITH read_repair_chance = 0.0")
+        if cluster.version() < '4.0':
+            session.execute("CREATE TABLE t (id int, v int, PRIMARY KEY(id, v)) WITH read_repair_chance = 0.0")
+        else:
+            session.execute("CREATE TABLE t (id int, v int, PRIMARY KEY(id, v))")
+
         # we write 1 and 2 in a partition: all nodes get it.
         session.execute(SimpleStatement("INSERT INTO t (id, v) VALUES (0, 1)", consistency_level=ConsistencyLevel.ALL))
         session.execute(SimpleStatement("INSERT INTO t (id, v) VALUES (0, 2)", consistency_level=ConsistencyLevel.ALL))
@@ -1373,7 +1388,10 @@ class TestConsistency(Tester):
 
         session = self.patient_cql_connection(node1)
         create_ks(session, 'ks', 2)
-        create_c1c2_table(self, session, read_repair=1.0)
+        if cluster.version() < '4.0':
+            create_c1c2_table(self, session, read_repair=1.0)
+        else:
+            create_c1c2_table(self, session)
 
         node2.stop(wait_other_notice=True)
 

@@ -100,7 +100,10 @@ class BaseRepairTest(Tester):
 
         session = self.patient_cql_connection(node1, retry_policy=FlakyRetryPolicy(max_retries=15))
         create_ks(session, 'ks', 3)
-        create_cf(session, 'cf', read_repair=0.0, columns={'c1': 'text', 'c2': 'text'})
+        if cluster.version() < '4.0':
+            create_cf(session, 'cf', read_repair=0.0, columns={'c1': 'text', 'c2': 'text'})
+        else:
+            create_cf(session, 'cf', columns={'c1': 'text', 'c2': 'text'})
 
         # Insert 1000 keys, kill node 3, insert 1 key, restart node 3, insert 1000 more keys
         logger.debug("Inserting data...")
@@ -711,7 +714,10 @@ class TestRepair(BaseRepairTest):
         session = self.patient_cql_connection(node1)
         session.execute("CREATE KEYSPACE ks WITH replication = {'class': 'NetworkTopologyStrategy', 'dc1': 2, 'dc2': 1, 'dc3':1}")
         session.execute("USE ks")
-        create_cf(session, 'cf', read_repair=0.0, columns={'c1': 'text', 'c2': 'text'})
+        if cluster.version() < '4.0':
+            create_cf(session, 'cf', read_repair=0.0, columns={'c1': 'text', 'c2': 'text'})
+        else:
+            create_cf(session, 'cf', columns={'c1': 'text', 'c2': 'text'})
 
         # Insert 1000 keys, kill node 2, insert 1 key, restart node 2, insert 1000 more keys
         logger.debug("Inserting data...")

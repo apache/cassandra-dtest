@@ -68,6 +68,7 @@ class TestReadRepair(Tester):
         # Check each replica individually again now that we expect the data to be fully repaired
         self.check_data_on_each_replica(expect_fully_repaired=True, initial_replica=initial_replica)
 
+    @since('2.1', max_version='3.11.x')
     def test_read_repair_chance(self):
         """
         @jira_ticket CASSANDRA-12368
@@ -134,10 +135,12 @@ class TestReadRepair(Tester):
         # Disable speculative retry and [dclocal]read_repair in initial setup.
         session.execute("""CREATE KEYSPACE alter_rf_test
                            WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};""")
-        session.execute("""CREATE TABLE alter_rf_test.t1 (k int PRIMARY KEY, a int, b int)
-                           WITH speculative_retry='NONE'
-                           AND read_repair_chance=0
-                           AND dclocal_read_repair_chance=0;""")
+
+        options = "speculative_retry='NONE'";
+        if self.cluster.version() < '4.0':
+            options = options + " AND read_repair_chance=0 AND dclocal_read_repair_chance=0"
+        session.execute("CREATE TABLE alter_rf_test.t1 (k int PRIMARY KEY, a int, b int) WITH " + options)
+
         session.execute("INSERT INTO alter_rf_test.t1 (k, a, b) VALUES (1, 1, 1);")
 
         # identify the initial replica and trigger a flush to ensure reads come from sstables
