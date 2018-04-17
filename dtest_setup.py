@@ -46,9 +46,10 @@ def retry_till_success(fun, *args, **kwargs):
 
 
 class DTestSetup:
-    def __init__(self, dtest_config=None, setup_overrides=None):
+    def __init__(self, dtest_config=None, setup_overrides=None, cluster_name="test"):
         self.dtest_config = dtest_config
         self.setup_overrides = setup_overrides
+        self.cluster_name = cluster_name
         self.ignore_log_patterns = []
         self.cluster = None
         self.cluster_options = []
@@ -69,6 +70,8 @@ class DTestSetup:
         self.log_watch_thread = None
         self.last_test_dir = "last_test_dir"
         self.jvm_args = []
+        self.create_cluster_func = None
+        self.iterations = 0
 
     def get_test_path(self):
         test_path = tempfile.mkdtemp(prefix='dtest-')
@@ -145,7 +148,7 @@ class DTestSetup:
             os.mkdir(directory)
         logs = [(node.name, node.logfilename(), node.debuglogfilename(), node.gclogfilename(),
                  node.compactionlogfilename())
-                for node in list(self.cluster.nodes.values())]
+                for node in self.cluster.nodelist()]
         if len(logs) is not 0:
             basedir = str(int(time.time() * 1000)) + '_' + str(id(self))
             logdir = os.path.join(directory, basedir)
@@ -382,7 +385,7 @@ class DTestSetup:
 
         self.cleanup_cluster()
         self.test_path = self.get_test_path()
-        self.initialize_cluster()
+        self.initialize_cluster(self.create_cluster_func)
 
     def init_default_config(self):
         # the failure detector can be quite slow in such tests with quick start/stop
@@ -438,25 +441,27 @@ class DTestSetup:
         else:
             logger.debug("Jacoco agent not found or is not file. Execution will not be recorded.")
 
-    def create_ccm_cluster(self, name):
-        logger.debug("cluster ccm directory: " + self.test_path)
-        version = self.dtest_config.cassandra_version
+
+    @staticmethod
+    def create_ccm_cluster(dtest_setup):
+        logger.debug("cluster ccm directory: " + dtest_setup.test_path)
+        version = dtest_setup.dtest_config.cassandra_version
 
         if version:
-            cluster = Cluster(self.test_path, name, cassandra_version=version)
+            cluster = Cluster(dtest_setup.test_path, dtest_setup.cluster_name, cassandra_version=version)
         else:
-            cluster = Cluster(self.test_path, name, cassandra_dir=self.dtest_config.cassandra_dir)
+            cluster = Cluster(dtest_setup.test_path, dtest_setup.cluster_name, cassandra_dir=dtest_setup.dtest_config.cassandra_dir)
 
-        if self.dtest_config.use_vnodes:
-            cluster.set_configuration_options(values={'initial_token': None, 'num_tokens': self.dtest_config.num_tokens})
+        if dtest_setup.dtest_config.use_vnodes:
+            cluster.set_configuration_options(values={'initial_token': None, 'num_tokens': dtest_setup.dtest_config.num_tokens})
         else:
             cluster.set_configuration_options(values={'num_tokens': None})
 
-        if self.dtest_config.use_off_heap_memtables:
+        if dtest_setup.dtest_config.use_off_heap_memtables:
             cluster.set_configuration_options(values={'memtable_allocation_type': 'offheap_objects'})
 
-        cluster.set_datadir_count(self.dtest_config.data_dir_count)
-        cluster.set_environment_variable('CASSANDRA_LIBJEMALLOC', self.dtest_config.jemalloc_path)
+        cluster.set_datadir_count(dtest_setup.dtest_config.data_dir_count)
+        cluster.set_environment_variable('CASSANDRA_LIBJEMALLOC', dtest_setup.dtest_config.jemalloc_path)
 
         return cluster
 
@@ -474,7 +479,7 @@ class DTestSetup:
             log_level = logging.root.level
         self.cluster.set_log_level(log_level)
 
-    def initialize_cluster(self):
+    def initialize_cluster(self, create_cluster_func):
         """
         This method is responsible for initializing and configuring a ccm
         cluster for the next set of tests.  This can be called for two
@@ -487,7 +492,9 @@ class DTestSetup:
         """
         # connections = []
         # cluster_options = []
-        self.cluster = self.create_ccm_cluster(name='test')
+        self.iterations += 1
+        self.create_cluster_func = create_cluster_func
+        self.cluster = self.create_cluster_func(self)
         self.init_default_config()
         self.maybe_setup_jacoco()
         self.set_cluster_log_levels()

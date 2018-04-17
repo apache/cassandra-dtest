@@ -7,7 +7,7 @@ import re
 import platform
 import copy
 import inspect
-import subprocess
+
 from itertools import zip_longest
 
 from dtest import running_in_docker, cleanup_docker_environment_before_test_execution
@@ -18,61 +18,13 @@ from netifaces import AF_INET
 from psutil import virtual_memory
 
 import netifaces as ni
-import ccmlib.repository
-from ccmlib.common import validate_install_dir, get_version_from_build, is_win
+from ccmlib.common import validate_install_dir, is_win
 
+from dtest_config import DTestConfig
 from dtest_setup import DTestSetup
 from dtest_setup_overrides import DTestSetupOverrides
 
 logger = logging.getLogger(__name__)
-
-
-class DTestConfig:
-    def __init__(self):
-        self.use_vnodes = True
-        self.use_off_heap_memtables = False
-        self.num_tokens = -1
-        self.data_dir_count = -1
-        self.force_execution_of_resource_intensive_tests = False
-        self.skip_resource_intensive_tests = False
-        self.cassandra_dir = None
-        self.cassandra_version = None
-        self.cassandra_version_from_build = None
-        self.delete_logs = False
-        self.execute_upgrade_tests = False
-        self.disable_active_log_watching = False
-        self.keep_test_dir = False
-        self.enable_jacoco_code_coverage = False
-        self.jemalloc_path = find_libjemalloc()
-
-    def setup(self, request):
-        self.use_vnodes = request.config.getoption("--use-vnodes")
-        self.use_off_heap_memtables = request.config.getoption("--use-off-heap-memtables")
-        self.num_tokens = request.config.getoption("--num-tokens")
-        self.data_dir_count = request.config.getoption("--data-dir-count-per-instance")
-        self.force_execution_of_resource_intensive_tests = request.config.getoption("--force-resource-intensive-tests")
-        self.skip_resource_intensive_tests = request.config.getoption("--skip-resource-intensive-tests")
-        if request.config.getoption("--cassandra-dir") is not None:
-            self.cassandra_dir = os.path.expanduser(request.config.getoption("--cassandra-dir"))
-        self.cassandra_version = request.config.getoption("--cassandra-version")
-
-        # There are times when we want to know the C* version we're testing against
-        # before we do any cluster. In the general case, we can't know that -- the
-        # test method could use any version it wants for self.cluster. However, we can
-        # get the version from build.xml in the C* repository specified by
-        # CASSANDRA_VERSION or CASSANDRA_DIR.
-        if self.cassandra_version is not None:
-            ccm_repo_cache_dir, _ = ccmlib.repository.setup(self.cassandra_version)
-            self.cassandra_version_from_build = get_version_from_build(ccm_repo_cache_dir)
-        elif self.cassandra_dir is not None:
-            self.cassandra_version_from_build = get_version_from_build(self.cassandra_dir)
-
-        self.delete_logs = request.config.getoption("--delete-logs")
-        self.execute_upgrade_tests = request.config.getoption("--execute-upgrade-tests")
-        self.disable_active_log_watching = request.config.getoption("--disable-active-log-watching")
-        self.keep_test_dir = request.config.getoption("--keep-test-dir")
-        self.enable_jacoco_code_coverage = request.config.getoption("--enable-jacoco-code-coverage")
-
 
 def check_required_loopback_interfaces_available():
     """
@@ -87,7 +39,6 @@ def check_required_loopback_interfaces_available():
             pytest.exit("At least 9 loopback interfaces are required to run dtests. "
                             "On Mac you can create the required loopback interfaces by running "
                             "'for i in {1..9}; do sudo ifconfig lo0 alias 127.0.0.$i up; done;'")
-
 
 def pytest_addoption(parser):
     parser.addoption("--use-vnodes", action="store_true", default=False,
@@ -143,6 +94,12 @@ def fixture_dtest_setup_overrides(dtest_config):
     """
     return DTestSetupOverrides()
 
+@pytest.fixture(scope='function')
+def fixture_dtest_cluster_name():
+    """
+    :return: The name to use for the running test's cluster
+    """
+    return "test"
 
 """
 Not exactly sure why :\ but, this fixture needs to be scoped to function level and not
@@ -304,17 +261,31 @@ def reset_environment_vars(initial_environment):
     os.environ.update(initial_environment)
     os.environ['PYTEST_CURRENT_TEST'] = pytest_current_test
 
+@pytest.fixture(scope='function')
+def fixture_dtest_create_cluster_func():
+    """
+    :return: A function whose sole argument is a DTestSetup instance and returns an
+             object that operates with the same interface as ccmlib.Cluster.
+    """
+    return DTestSetup.create_ccm_cluster
 
 @pytest.fixture(scope='function', autouse=False)
-def fixture_dtest_setup(request, dtest_config, fixture_dtest_setup_overrides, fixture_logging_setup):
+def fixture_dtest_setup(request,
+                        dtest_config,
+                        fixture_dtest_setup_overrides,
+                        fixture_logging_setup,
+                        fixture_dtest_cluster_name,
+                        fixture_dtest_create_cluster_func):
     if running_in_docker():
         cleanup_docker_environment_before_test_execution()
 
     # do all of our setup operations to get the enviornment ready for the actual test
     # to run (e.g. bring up a cluster with the necessary config, populate variables, etc)
     initial_environment = copy.deepcopy(os.environ)
-    dtest_setup = DTestSetup(dtest_config=dtest_config, setup_overrides=fixture_dtest_setup_overrides)
-    dtest_setup.initialize_cluster()
+    dtest_setup = DTestSetup(dtest_config=dtest_config,
+                             setup_overrides=fixture_dtest_setup_overrides,
+                             cluster_name=fixture_dtest_cluster_name)
+    dtest_setup.initialize_cluster(fixture_dtest_create_cluster_func)
 
     if not dtest_config.disable_active_log_watching:
         dtest_setup.log_watch_thread = dtest_setup.begin_active_log_watch()
@@ -451,10 +422,6 @@ def pytest_collection_modifyitems(items, config):
     logger.debug("has sufficient resources? %s" % sufficient_system_resources_resource_intensive)
 
     for item in items:
-        #  set a timeout for all tests, it may be overwritten at the test level with an additional marker
-        if not item.get_marker("timeout"):
-            item.add_marker(pytest.mark.timeout(60*15))
-
         deselect_test = False
 
         if item.get_marker("resource_intensive"):
@@ -503,24 +470,3 @@ def pytest_collection_modifyitems(items, config):
     config.hook.pytest_deselected(items=deselected_items)
     items[:] = selected_items
 
-
-# Determine the location of the libjemalloc jar so that we can specify it
-# through environment variables when start Cassandra.  This reduces startup
-# time, making the dtests run faster.
-def find_libjemalloc():
-    if is_win():
-        # let the normal bat script handle finding libjemalloc
-        return ""
-
-    this_dir = os.path.dirname(os.path.realpath(__file__))
-    script = os.path.join(this_dir, "findlibjemalloc.sh")
-    try:
-        p = subprocess.Popen([script], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        stdout, stderr = p.communicate()
-        if stderr or not stdout:
-            return "-"  # tells C* not to look for libjemalloc
-        else:
-            return stdout
-    except Exception as exc:
-        print("Failed to run script to prelocate libjemalloc ({}): {}".format(script, exc))
-        return ""
