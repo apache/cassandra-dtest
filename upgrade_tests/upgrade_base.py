@@ -9,7 +9,7 @@ from abc import ABCMeta
 from ccmlib.common import get_version_from_build, is_win
 from tools.jmxutils import remove_perf_disable_shared_mem
 
-from dtest import CASSANDRA_VERSION_FROM_BUILD, Tester, create_ks
+from dtest import Tester, create_ks
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +49,7 @@ class UpgradeTester(Tester, metaclass=ABCMeta):
     def fixture_add_additional_log_patterns(self, fixture_dtest_setup):
         # known non-critical bug during teardown:
         # https://issues.apache.org/jira/browse/CASSANDRA-12340
-        if CASSANDRA_VERSION_FROM_BUILD < '2.2':
+        if fixture_dtest_setup.dtest_config.cassandra_version_from_build < '2.2':
             _known_teardown_race_error = (
                 'ScheduledThreadPoolExecutor$ScheduledFutureTask@[0-9a-f]+ '
                 'rejected from org.apache.cassandra.concurrent.DebuggableScheduledThreadPoolExecutor'

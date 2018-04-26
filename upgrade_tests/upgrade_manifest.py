@@ -2,8 +2,7 @@ import logging
 
 from collections import namedtuple
 
-from dtest import (CASSANDRA_GITREF, CASSANDRA_VERSION_FROM_BUILD,
-                   RUN_STATIC_UPGRADE_MATRIX)
+from dtest import RUN_STATIC_UPGRADE_MATRIX
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +15,9 @@ def _get_version_family():
     """
     Detects the version family (line) using dtest.py:CASSANDRA_VERSION_FROM_BUILD
     """
-    current_version = CASSANDRA_VERSION_FROM_BUILD
+    # todo CASSANDRA-14421
+    # current_version = CASSANDRA_VERSION_FROM_BUILD
+    current_version = '4.0'
 
     version_family = 'unknown'
     if current_version.vstring.startswith('2.0'):
@@ -64,7 +65,9 @@ class VersionMeta(namedtuple('_VersionMeta', ('name', 'family', 'variant', 'vers
         """
         Returns a new object cloned from this one, with the version replaced with the local env version.
         """
-        return self._replace(version=CASSANDRA_GITREF or CASSANDRA_VERSION_FROM_BUILD)
+        # todo CASSANDRA-14421
+        # return self._replace(version=CASSANDRA_GITREF or CASSANDRA_VERSION_FROM_BUILD)
+        return self
 
 
 indev_2_0_x = None  # None if release not likely

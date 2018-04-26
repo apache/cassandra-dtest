@@ -2,7 +2,7 @@ import os
 import pytest
 import logging
 
-from dtest import CASSANDRA_VERSION_FROM_BUILD, Tester
+from dtest import Tester
 from thrift_test import get_thrift_client
 from tools.assertions import assert_all
 
@@ -42,7 +42,7 @@ class TestSCUpgrade(Tester):
             # and when it does, it gets replayed and everything is fine.
             r'Can\'t send migration request: node.*is down',
         )
-        if CASSANDRA_VERSION_FROM_BUILD < '2.2':
+        if fixture_dtest_setup.dtest_config.cassandra_version_from_build < '2.2':
             _known_teardown_race_error = (
                 'ScheduledThreadPoolExecutor$ScheduledFutureTask@[0-9a-f]+ '
                 'rejected from org.apache.cassandra.concurrent.DebuggableScheduledThreadPoolExecutor'

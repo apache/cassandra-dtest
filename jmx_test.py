@@ -76,7 +76,7 @@ class TestJMX(Tester):
         version = cluster.version()
         node1.stress(['write', 'n=10K', 'no-warmup', '-schema', 'replication(factor=3)'])
 
-        typeName = "ColumnFamily" if version <= '2.2.X' else 'Table'
+        typeName = "ColumnFamily" if version < '3.0' else 'Table'
         logger.debug('Version {} typeName {}'.format(version, typeName))
 
         # TODO the keyspace and table name are capitalized in 2.0

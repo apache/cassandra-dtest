@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 @pytest.fixture()
-def fixture_dtest_setup_overrides(request):
+def fixture_dtest_setup_overrides(request, dtest_config):
     dtest_setup_overrides = DTestSetupOverrides()
     if request.node.name == "test_change_durable_writes":
         dtest_setup_overrides.cluster_options = ImmutableMapping({'commitlog_segment_size_in_mb': 1})

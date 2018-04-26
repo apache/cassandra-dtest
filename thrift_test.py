@@ -14,7 +14,7 @@ from tools.assertions import assert_length_equal
 from tools.misc import ImmutableMapping
 
 from dtest_setup_overrides import DTestSetupOverrides
-from dtest import CASSANDRA_VERSION_FROM_BUILD, Tester
+from dtest import Tester
 
 from thrift_bindings.thrift010 import Cassandra
 from thrift_bindings.thrift010.Cassandra import (CfDef, Column, ColumnDef,
@@ -60,7 +60,7 @@ def pid():
 class TestThrift(Tester):
 
     @pytest.fixture(scope='function', autouse=True)
-    def fixture_dtest_setup_overrides(self):
+    def fixture_dtest_setup_overrides(self, dtest_config):
         dtest_setup_overrides = DTestSetupOverrides()
         """
         @jira_ticket CASSANDRA-7653
@@ -71,7 +71,7 @@ class TestThrift(Tester):
         return dtest_setup_overrides
 
     @pytest.fixture(scope='function', autouse=True)
-    def fixture_set_cluster_settings(self, fixture_dtest_setup, set_dtest_setup_on_function):
+    def fixture_set_cluster_settings(self, fixture_dtest_setup):
         fixture_dtest_setup.cluster.populate(1)
         node1, = fixture_dtest_setup.cluster.nodelist()
 
@@ -79,7 +79,7 @@ class TestThrift(Tester):
         # Because ccm will not set a hex token for ByteOrderedPartitioner
         # automatically. It does not matter what token we set as we only
         # ever use one node.
-        if not self.dtest_config.use_vnodes:
+        if not fixture_dtest_setup.dtest_config.use_vnodes:
             node1.set_configuration_options(values={'initial_token': 'abcd'})
 
         # CASSANDRA-14092 - prevent max ttl tests from failing
@@ -2331,7 +2331,7 @@ class TestMutations(TestThrift):
         assert columns == [composite('0', '0'), composite('1', '1'), composite('2', '2'),
              composite('6', '6'), composite('7', '7'), composite('8', '8'), composite('9', '9')]
 
-    @pytest.mark.skipif(CASSANDRA_VERSION_FROM_BUILD == '3.9', reason="Test doesn't run on 3.9")
+    @pytest.mark.skip_version('3.9')
     def test_range_deletion_eoc_0(self):
         """
         This test confirms that a range tombstone with a final EOC of 0
@@ -2682,7 +2682,7 @@ class TestMutations(TestThrift):
         client.insert(_i32(i), ColumnParent('cs1'), Column(utf8encode('v'), _i32(i), 0), CL)
         _assert_column('cs1', _i32(i), utf8encode('v'), _i32(i), 0)
 
-    @pytest.mark.skipif(CASSANDRA_VERSION_FROM_BUILD == '3.9', reason="Test doesn't run on 3.9")
+    @pytest.mark.skip_version('3.9')
     def test_range_tombstone_eoc_0(self):
         """
         Insert a range tombstone with EOC=0 for a compact storage table. Insert 2 rows that

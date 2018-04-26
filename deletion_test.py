@@ -75,7 +75,7 @@ def memtable_count(node, keyspace, table):
 
 def table_metric(node, keyspace, table, name):
     version = node.get_cassandra_version()
-    typeName = "ColumnFamily" if version <= '2.2.X' else 'Table'
+    typeName = "ColumnFamily" if version < '3.0' else 'Table'
     with JolokiaAgent(node) as jmx:
         mbean = make_mbean('metrics', type=typeName,
                            name=name, keyspace=keyspace, scope=table)

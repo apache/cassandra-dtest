@@ -3,7 +3,7 @@ import time
 import pytest
 import logging
 
-from dtest import CASSANDRA_VERSION_FROM_BUILD, Tester
+from dtest import Tester
 from sstable_generation_loading_test import TestBaseSStableLoader
 from thrift_bindings.thrift010.Cassandra import (ConsistencyLevel, Deletion,
                                            Mutation, SlicePredicate,
@@ -40,7 +40,7 @@ class TestStorageEngineUpgrade(Tester):
             cluster.set_configuration_options(cluster_options)
 
         # Forcing cluster version on purpose
-        if CASSANDRA_VERSION_FROM_BUILD >= '4':
+        if self.dtest_config.cassandra_version_from_build >= '4':
             cluster.set_install_dir(version="git:cassandra-3.0")
         else:
             cluster.set_install_dir(version="git:cassandra-2.1")

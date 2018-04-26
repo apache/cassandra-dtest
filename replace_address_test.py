@@ -13,7 +13,7 @@ from cassandra import ConsistencyLevel, ReadTimeout, Unavailable
 from cassandra.query import SimpleStatement
 from ccmlib.node import Node
 
-from dtest import CASSANDRA_VERSION_FROM_BUILD, Tester
+from dtest import Tester
 from tools.assertions import assert_bootstrap_state, assert_all, assert_not_running
 from tools.data import rows_to_list
 
@@ -409,7 +409,7 @@ class TestReplaceAddress(BaseReplaceAddressTest):
                 self.replacement_node.watch_log_for('To perform this operation, please restart with -Dcassandra.allow_unsafe_replace=true',
                                                     from_mark=mark, timeout=20)
 
-    @pytest.mark.skipif(CASSANDRA_VERSION_FROM_BUILD == '3.9', reason="Test doesn't run on 3.9")
+    @pytest.mark.skip_version('3.9')
     @since('2.2')
     def test_insert_data_during_replace_same_address(self):
         """
@@ -418,7 +418,7 @@ class TestReplaceAddress(BaseReplaceAddressTest):
         """
         self._test_insert_data_during_replace(same_address=True)
 
-    @pytest.mark.skipif(CASSANDRA_VERSION_FROM_BUILD == '3.9', reason="Test doesn't run on 3.9")
+    @pytest.mark.skip_version('3.9')
     @since('2.2')
     def test_insert_data_during_replace_different_address(self):
         """

@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 class TestAuthUpgrade(Tester):
 
     @pytest.fixture(scope='function', autouse=True)
-    def fixture_dtest_setup_overrides(self):
+    def fixture_dtest_setup_overrides(self, dtest_config):
         dtest_setup_overrides = DTestSetupOverrides()
         dtest_setup_overrides.cluster_options = ImmutableMapping({'authenticator': 'PasswordAuthenticator',
                                                                'authorizer': 'CassandraAuthorizer'})

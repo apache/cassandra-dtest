@@ -9,7 +9,7 @@ from cassandra import FunctionFailure
 
 from dtest_setup_overrides import DTestSetupOverrides
 
-from dtest import CASSANDRA_VERSION_FROM_BUILD, Tester, create_ks
+from dtest import Tester, create_ks
 from tools.assertions import assert_invalid, assert_none, assert_one
 from tools.misc import ImmutableMapping
 
@@ -21,19 +21,15 @@ logger = logging.getLogger(__name__)
 class TestUserFunctions(Tester):
 
     @pytest.fixture(scope='function', autouse=True)
-    def fixture_dtest_setup_overrides(self):
+    def fixture_dtest_setup_overrides(self, dtest_config):
         dtest_setup_overrides = DTestSetupOverrides()
-        if CASSANDRA_VERSION_FROM_BUILD >= '3.0':
+
+        if dtest_config.cassandra_version_from_build >= '3.0':
             dtest_setup_overrides.cluster_options = ImmutableMapping({'enable_user_defined_functions': 'true',
-                                                'enable_scripted_user_defined_functions': 'true'})
+                                                                      'enable_scripted_user_defined_functions': 'true'})
         else:
             dtest_setup_overrides.cluster_options = ImmutableMapping({'enable_user_defined_functions': 'true'})
         return dtest_setup_overrides
-
-    @pytest.fixture(scope='function', autouse=True)
-    def parse_dtest_config(self, parse_dtest_config):
-
-        return parse_dtest_config
 
     def prepare(self, create_keyspace=True, nodes=1, rf=1):
         cluster = self.cluster

@@ -10,7 +10,6 @@ import time
 import traceback
 import pytest
 import cassandra
-import ccmlib.repository
 
 from subprocess import CalledProcessError
 
@@ -20,9 +19,7 @@ from cassandra import ConsistencyLevel, OperationTimedOut
 from cassandra.auth import PlainTextAuthProvider
 from cassandra.cluster import ExecutionProfile
 from cassandra.policies import RetryPolicy, RoundRobinPolicy
-from ccmlib.common import get_version_from_build, is_win
 from ccmlib.node import ToolError, TimeoutError
-from distutils.version import LooseVersion
 from tools.misc import retry_till_success
 
 
@@ -64,27 +61,6 @@ def get_sha(repo_dir):
         else:
             # git call failed for some unknown reason
             raise
-
-
-# There are times when we want to know the C* version we're testing against
-# before we call Tester.setUp. In the general case, we can't know that -- the
-# test method could use any version it wants for self.cluster. However, we can
-# get the version from build.xml in the C* repository specified by
-# CASSANDRA_VERSION or CASSANDRA_DIR. This should use the same resolution
-# strategy as the actual checkout code in Tester.setUp; if it does not, that is
-# a bug.
-_cassandra_version_slug = os.environ.get('CASSANDRA_VERSION')
-# Prefer CASSANDRA_VERSION if it's set in the environment. If not, use CASSANDRA_DIR
-if _cassandra_version_slug:
-    # fetch but don't build the specified C* version
-    ccm_repo_cache_dir, _ = ccmlib.repository.setup(_cassandra_version_slug)
-    CASSANDRA_VERSION_FROM_BUILD = get_version_from_build(ccm_repo_cache_dir)
-    CASSANDRA_GITREF = get_sha(ccm_repo_cache_dir)  # will be set None when not a git repo
-else:
-    CASSANDRA_VERSION_FROM_BUILD = LooseVersion("4.0") # todo kjkjkj
-    CASSANDRA_GITREF = ""
-    #CASSANDRA_VERSION_FROM_BUILD = get_version_from_build(self.dtest_config.cassandra_dir)
-    #CASSANDRA_GITREF = get_sha(dtest_config.cassandra_dir)
 
 
 # copy the initial environment variables so we can reset them later:
@@ -257,9 +233,9 @@ class Tester:
             return object.__getattribute__(fixture_dtest_setup , name)
 
     @pytest.fixture(scope='function', autouse=True)
-    def set_dtest_setup_on_function(self, fixture_dtest_setup, fixture_dtest_config):
+    def set_dtest_setup_on_function(self, fixture_dtest_setup):
         self.fixture_dtest_setup = fixture_dtest_setup
-        self.dtest_config = fixture_dtest_config
+        self.dtest_config = fixture_dtest_setup.dtest_config
 
     def set_node_to_current_version(self, node):
         version = os.environ.get('CASSANDRA_VERSION')

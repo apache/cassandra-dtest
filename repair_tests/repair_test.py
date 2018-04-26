@@ -13,7 +13,7 @@ from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
 from ccmlib.node import ToolError
 
-from dtest import CASSANDRA_VERSION_FROM_BUILD, FlakyRetryPolicy, Tester, create_ks, create_cf
+from dtest import FlakyRetryPolicy, Tester, create_ks, create_cf
 from tools.data import insert_c1c2, query_c1c2
 
 since = pytest.mark.since
@@ -187,7 +187,8 @@ class TestRepair(BaseRepairTest):
         for node in cluster.nodelist():
             assert not node.grep_log("Starting anticompaction")
 
-    @pytest.mark.skipif(CASSANDRA_VERSION_FROM_BUILD == '3.9', reason="Test doesn't run on 3.9")
+    # @pytest.mark.skipif(CASSANDRA_VERSION_FROM_BUILD == '3.9', reason="Test doesn't run on 3.9")
+    @pytest.mark.skip_version('3.9')
     def test_nonexistent_table_repair(self):
         """
         * Check that repairing a non-existent table fails

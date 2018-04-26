@@ -26,13 +26,11 @@ class TestReadFailures(Tester):
         return fixture_dtest_setup
 
     @pytest.fixture(scope='function', autouse=True)
-    def parse_dtest_config(self, parse_dtest_config):
+    def fixture_dtest_setup_params(self):
         self.tombstone_failure_threshold = 500
         self.replication_factor = 3
         self.consistency_level = ConsistencyLevel.ALL
         self.expected_expt = ReadFailure
-
-        return parse_dtest_config
 
     def _prepare_cluster(self):
         self.cluster.set_configuration_options(
