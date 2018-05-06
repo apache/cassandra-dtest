@@ -4,6 +4,7 @@ from cassandra import AuthenticationFailed, Unauthorized
 from cassandra.cluster import NoHostAvailable
 
 from dtest import Tester
+from plugins.assert_tools import assert_regexp_matches
 
 
 class TestAuth(Tester):
