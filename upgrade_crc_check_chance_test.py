@@ -1,7 +1,11 @@
+import logging
+
 import pytest
 
 from dtest import Tester
 from tools.assertions import assert_crc_check_chance_equal, assert_one
+
+logger = logging.getLogger(__name__)
 
 since = pytest.mark.since
 
