@@ -1,10 +1,14 @@
 import pytest
 import logging
+import os
+import subprocess
 
 from distutils.version import LooseVersion
 
 from cassandra import ConsistencyLevel
 from ccmlib.common import is_win
+from ccmlib.node import handle_external_tool_process, ToolError
+import ccmlib.repository
 
 from dtest import Tester, create_ks, create_cf
 from tools.assertions import assert_length_equal
@@ -180,3 +184,79 @@ class TestDeprecatedRepairAPI(Tester):
                 "data_centers": m.group("dc"),
                 "hosts": m.group("hosts"),
                 "ranges": m.group("ranges")}
+
+
+@since("3.0.16", max_version="4")
+class TestDeprecatedRepairNotifications(Tester):
+    """
+    * @jira_ticket CASSANDRA-13121
+    * Test if legacy JMX detects failures in repair jobs launched with the deprecated API.
+    * Affects cassandra-3.x clusters when users run JMX from cassandra-2.1 and older to submit repair jobs.
+    """
+
+    def get_legacy_environment(self, legacy_version, node_env=None):
+        """
+        * Set up an environment to run nodetool from cassandra-2.1.
+        """
+        env = {}
+        if (node_env is not None):
+            env = node_env
+        legacy_dirpath = ccmlib.repository.directory_name(legacy_version)
+        env["CASSANDRA_HOME"] = legacy_dirpath
+        binpaths = [legacy_dirpath,
+                    os.path.join(legacy_dirpath, "build", "classes", "main"),
+                    os.path.join(legacy_dirpath, "build", "classes", "thrift")]
+        env["cassandra_bin"] = ":".join(binpaths)
+        env["CASSANDRA_CONF"] = os.path.join(legacy_dirpath, "conf")
+        classpaths = [env["CASSANDRA_CONF"], env["cassandra_bin"]]
+        for jar in os.listdir(os.path.join(legacy_dirpath, "lib")):
+            if (jar.endswith(".jar")):
+                classpaths.append(os.path.join(legacy_dirpath, "lib", jar))
+        env['CLASSPATH'] = ":".join(classpaths)
+        return env
+
+    def test_deprecated_repair_error_notification(self):
+        """
+        * Check whether a legacy JMX nodetool understands the
+        * notification for a failed repair job.
+        """
+        # This test intentionally provokes an error in a repair job
+        self.fixture_dtest_setup.ignore_log_patterns = [r'Repair failed', r'The current host must be part of the repair']
+
+        # start a 2-node cluster
+        logger.debug("Starting cluster...")
+        cluster = self.cluster
+        cluster.populate(2)
+        node1, node2 = cluster.nodelist()
+        cluster.start(wait_for_binary_proto=True, wait_other_notice=True)
+
+        # write some data that could be repaired
+        logger.debug("Stressing node1...")
+        node1.stress(stress_options=['write', 'n=5000', 'no-warmup', 'cl=ONE', '-schema', 'replication(factor=2)', '-rate', 'threads=5'])
+
+        # set up a legacy repository
+        logger.debug("Setting up legacy repository...")
+        legacy_version = 'github:apache/cassandra-2.1'
+        ccmlib.repository.setup(legacy_version)
+
+        # Run repair with legacy nodetool.
+        # The options specified will cause an error, and legacy nodetool should error out.
+        logger.debug("Running repair on node1 using legacy nodetool (using options that will cause failure with error)")
+        legacy_dirpath = ccmlib.repository.directory_name(legacy_version)
+        legacy_nodetool_path = os.path.join(legacy_dirpath, "bin", "nodetool")
+        repair_env = self.get_legacy_environment(legacy_version, node_env=node1.get_env())
+        repair_args = [legacy_nodetool_path, "-h", "localhost", "-p", str(node1.jmx_port), "repair", "-hosts", "127.0.0.2"]
+        p = subprocess.Popen(repair_args, env=repair_env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+        nodetool_stderr = None
+        nodetool_returncode = None
+        try:
+            _, nodetool_stderr, _ = handle_external_tool_process(p, repair_args)
+        except ToolError as tool_error:
+            nodetool_stderr = tool_error.stderr
+
+        # Check for repair failed message in node1 log
+        repair_failed_logs = node1.grep_log(r"ERROR \[(Repair-Task|Thread)-\d+\] \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3} RepairRunnable.java:\d+ - Repair failed")
+        assert len(repair_failed_logs) > 0, "Node logs don't have an error message for the failed repair"
+        # Check for error and stacktrace in nodetool output
+        assert nodetool_stderr.find("error") > -1, "Legacy nodetool didn't print an error message for the failed repair"
+        assert nodetool_stderr.find("-- StackTrace --") > -1, "Legacy nodetool didn't print a stack trace for the failed repair"
