@@ -1,0 +1,29 @@
+version: 2
+jobs:
+   build:
+     docker:
+       - image: circleci/python:2.7
+     steps:
+       - checkout
+       - run:
+          name: Install System Dependencies
+          command: |
+              sudo apt-get update -qq
+              sudo pip install pycodestyle==2.3.1 flake8
+              sudo pip check
+       - run:
+          name: lint
+          command: |
+            # we want pyflakes to check all files for unused imports only
+            # we use flake8 because it allows us to ignore other warnings
+            # exclude the thrift directories - they contain auto-generated code
+            flake8 --ignore=E501,F811,F812,F822,F823,F831,F841,N8,C9 --exclude=thrift_bindings,cassandra-thrift .
+            git remote add apache git://github.com/apache/cassandra-dtest.git
+            git fetch apache # fetch master for the next diff
+            # feed changed lines with no context around them to pycodestyle
+            # I know we don't enforce line length but if you introduce
+            # 200-char lines you are doing something terribly wrong.
+            # lint all files for everything but line length errors
+            git diff apache/master...HEAD -U0 | pycodestyle --ignore=E501 --diff
+            # lint all files except json_test.py for line length errors
+            git diff apache/master...HEAD -U0 | pycodestyle --diff --exclude='json_test.py' --exclude='meta_tests/assertion_test.py' --max-line-length=200
