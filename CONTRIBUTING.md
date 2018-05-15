@@ -24,9 +24,9 @@ connect to C*.
 
 All version objects being passed from CCM are now LooseVersion objects, instead of strings. Those can still be safely compared to strings, so there is no need to do `version < LooseVersion('3.10')`.
 
-## Doxygen Docstrings
+## Documentation
 
-We are now colocating our test plans directly with the source code. We have decided to do so in a manner compatible with Doxygen, to turn the test plans into easily navigated HTML. Please view the following list of tags, as well as an example test. While this full list of tags is available for use, there is no need to use every tag for a given test. The **description** and **since** fields should be included, but most others should only be used when **appropriate**. The test plan will live in a comment block below the test method declaration.
+Please view the following list of tags, as well as an example test. While this full list of tags is available for use, there is no need to use every tag for a given test. The **description** and **jira_ticket** fields should be included, but most others should only be used when **appropriate**. The test plan will live in a comment block below the test method declaration.
 
 
 Input             | Description
@@ -37,7 +37,6 @@ Description       | Brief description of the test
 @return           | Description of expected return value (Usually used for helper methods)
 @expected_errors  | What exceptions this test is expected to throw on normal behavior (should be caught and expected in the test)
 @throws           | What exceptions this test would throw upon failure (if expecting a specific regression)
-@since            | I am unsure what we will use this for. Do not use until we have reached a decision.
 @jira_ticket      | Associated JIRA ticket identifier, including the project name (e.g. `CASSANDRA-42`, not `42`).
 @expected_result  | Brief summary of what the expected results of this test are
 @test_assumptions | Test requirements (auth, hints disabled , etc)
@@ -48,31 +47,12 @@ Description       | Brief description of the test
 ```python
 def test_example(self):
 """
-Demonstrates the expected syntax for a test plan. Parsed by Doxygen.
+Demonstrates the expected syntax for a test plan.
 @jira_ticket CASSANDRA-0000
-@since 2.0.15, 2.1.5
 @note Test should not be implemented, it is an example.
 """
     pass
 ```
-
-To run doxygen to generate HTML from these test plans, you will need to do the following:
-
-* Unzip **doxygen/doxypy-0.4.2.tar.gz** and install it
-```
-        cd doxygen/
-        tar xvf doxypy-0.4.2.tar.gz
-        cd doxypy-0.4.2
-        sudo python setup.py install
-```
-* Install **doxygen**, via your system's package manager
-* Edit the **INPUT** and **OUTPUT_DIRECTORY** fields in **doxygen/Doxyfile_python**. They must be absolute paths. **INPUT** should point to **cassandra-dtest/**.
-* Run doxygen
-```
-        doxygen doxygen/Doxyfile_python
-```
-
-Feel free to submit test plans without the implemented tests. If you are submitting a new test, we would appreciate if it were annotated in this manner. If that is not possible, we will add the markup to your pull request.
 
 ## Modules
 
@@ -82,7 +62,6 @@ In some cases, we organize our test files by putting them in directories. If you
 
 - When possible, you should use the assert functions from [`tools/assertions.py`](https://github.com/apache/cassandra-dtest/blob/master/tools/assertions.py).
 - When none of these are applicable, use python's built in [unittest assertions](https://docs.python.org/2/library/unittest.html#assert-methods).
-- Naked assert statements should never be used, e.g. `assert True`
 
 ## Byteman Files
 
