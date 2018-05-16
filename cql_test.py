@@ -15,8 +15,7 @@ from dtest import Tester, create_ks
 from distutils.version import LooseVersion
 from thrift_bindings.thrift010.ttypes import \
     ConsistencyLevel as ThriftConsistencyLevel
-from thrift_bindings.thrift010.ttypes import (CfDef, Column, ColumnOrSuperColumn,
-                                        Mutation)
+from thrift_bindings.thrift010.ttypes import (CfDef, Column, ColumnOrSuperColumn, Mutation)
 from thrift_test import get_thrift_client
 from tools.assertions import (assert_all, assert_invalid, assert_length_equal,
                               assert_none, assert_one, assert_unavailable)
@@ -648,7 +647,7 @@ class TestMiscellaneousCQL(CQLTester):
 
         session.execute("ALTER TABLE test ADD d int")
         result = session.execute(wildcard_prepared.bind(None))
-        assert result, [(0, 0, 0 == None)]
+        assert result, [(0, 0, 0 is None)]
 
         if self.cluster.version() < LooseVersion('3.0'):
             explicit_prepared = session.prepare("SELECT k, a, b, d FROM test")
@@ -657,10 +656,10 @@ class TestMiscellaneousCQL(CQLTester):
             # by the driver, but the re-preparation should succeed
             session.execute("ALTER TABLE test ALTER d TYPE blob")
             result = session.execute(wildcard_prepared.bind(None))
-            assert result, [(0, 0, 0 == None)]
+            assert result, [(0, 0, 0 is None)]
 
             result = session.execute(explicit_prepared.bind(None))
-            assert result, [(0, 0, 0 == None)]
+            assert result, [(0, 0, 0 is None)]
 
     def test_range_slice(self):
         """

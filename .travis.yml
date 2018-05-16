@@ -8,7 +8,7 @@ script:
   # we want pyflakes to check all files for unused imports only
   # we use flake8 because it allows us to ignore other warnings
   # exclude the thrift directories - they contain auto-generated code
-  - flake8 --ignore=E501,F811,F812,F822,F823,F831,F841,N8,C9 --exclude=thrift_bindings,cassandra-thrift .
+  - flake8 --ignore=E501,F811,F812,F822,F823,F831,F841,N8,C9,E999,F821 --exclude=thrift_bindings,cassandra-thrift .
   - git remote add apache git://github.com/apache/cassandra-dtest.git
   - git fetch apache # fetch master for the next diff
   # feed changed lines with no context around them to pycodestyle

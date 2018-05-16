@@ -254,8 +254,8 @@ class TestOfflineTools(Tester):
         # Java-normalized paths. To later compare these with Python-normalized paths, we
         # map over each line of out and replace Java-normalized paths with Python equivalents.
         outlines = [re.sub("(?<=path=').*(?=')",
-                                           lambda match: os.path.normcase(match.group(0)),
-                                           line) for line in out.splitlines()]
+                    lambda match: os.path.normcase(match.group(0)),
+                    line) for line in out.splitlines()]
 
         # check output is correct for each sstable
         sstables = self._get_final_sstables(node1, "keyspace1", "standard1")

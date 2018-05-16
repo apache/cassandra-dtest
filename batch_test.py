@@ -476,7 +476,7 @@ class TestBatch(Tester):
     def prepare_mixed(self, coordinator_idx, current_nodes, previous_version, previous_nodes, compression=True,
                       protocol_version=None, install_byteman=False):
         logger.debug("Testing with {} node(s) at version '{}', {} node(s) at current version"
-              .format(previous_nodes, previous_version, current_nodes))
+                     .format(previous_nodes, previous_version, current_nodes))
 
         # start a cluster using the previous version
         self.prepare(previous_nodes + current_nodes, compression, previous_version, protocol_version=protocol_version,

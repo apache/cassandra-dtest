@@ -6,18 +6,10 @@ from dtest import Tester
 from thrift_test import get_thrift_client
 from tools.assertions import assert_all
 
-from thrift_bindings.thrift010.Cassandra import (CfDef, Column, ColumnDef,
-                                           ColumnOrSuperColumn, ColumnParent,
-                                           ColumnPath, ColumnSlice,
-                                           ConsistencyLevel, CounterColumn,
-                                           Deletion, IndexExpression,
-                                           IndexOperator, IndexType,
-                                           InvalidRequestException, KeyRange,
-                                           KeySlice, KsDef, MultiSliceRequest,
-                                           Mutation, NotFoundException,
-                                           SlicePredicate, SliceRange,
-                                           SuperColumn)
-
+from thrift_bindings.thrift010.Cassandra import ColumnParent
+from thrift_bindings.thrift010.Cassandra import ConsistencyLevel
+from thrift_bindings.thrift010.Cassandra import SlicePredicate
+from thrift_bindings.thrift010.Cassandra import SliceRange
 logger = logging.getLogger(__name__)
 
 # Use static supercolumn data to reduce total test time and avoid driver issues connecting to C* 1.2.

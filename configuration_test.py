@@ -46,7 +46,7 @@ class TestConfiguration(Tester):
         session.execute(alter_chunk_len_query.format(chunk_length=64))
         self._check_chunk_length(session, 64)
 
-    @pytest.mark.timeout(60*30)
+    @pytest.mark.timeout(60 * 30)
     def test_change_durable_writes(self):
         """
         @jira_ticket CASSANDRA-9560
@@ -170,7 +170,7 @@ def write_to_trigger_fsync(session, ks, table):
                                  session.prepare('INSERT INTO "{ks}"."{table}" (key, a, b, c) '
                                                  'VALUES (?, ?, ?, ?)'.format(ks=ks, table=table)),
                                  ((x, x + 1, x + 2, x + 3)
-                                 for x in range(50000)), concurrency=5)
+                                  for x in range(50000)), concurrency=5)
 
 
 def commitlog_size(node):

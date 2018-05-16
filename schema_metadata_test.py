@@ -363,13 +363,13 @@ def verify_static_column_table(created_on_version, current_version, keyspace, se
     meta = session.cluster.metadata.keyspaces[keyspace].tables[table_name]
     assert 4 == len(meta.columns)
     assert 'text' == meta.columns['user'].cql_type
-    assert False == meta.columns['user'].is_static
+    assert not meta.columns['user'].is_static
     assert 'int' == meta.columns['balance'].cql_type
-    assert True == meta.columns['balance'].is_static
+    assert meta.columns['balance'].is_static
     assert 'int' == meta.columns['expense_id'].cql_type
-    assert False == meta.columns['expense_id'].is_static
+    assert not meta.columns['expense_id'].is_static
     assert 'int' == meta.columns['amount'].cql_type
-    assert False == meta.columns['amount'].is_static
+    assert not meta.columns['amount'].is_static
 
 
 def establish_collection_datatype_table(version, session, table_name_prefix=""):
@@ -519,13 +519,13 @@ class TestSchemaMetadata(Tester):
 
     def test_creating_and_dropping_keyspace(self):
         starting_keyspace_count = len(self.session.cluster.metadata.keyspaces)
-        assert True == self._keyspace_meta().durable_writes
+        assert self._keyspace_meta().durable_writes
         self.session.execute("""
                 CREATE KEYSPACE so_long
                     WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}
                     AND durable_writes = false
             """)
-        assert False == self._keyspace_meta('so_long').durable_writes
+        assert not self._keyspace_meta('so_long').durable_writes
         self.session.execute("DROP KEYSPACE so_long")
         assert starting_keyspace_count == len(self.session.cluster.metadata.keyspaces)
 
@@ -636,7 +636,7 @@ class TestSchemaMetadata(Tester):
         assert ['int'] == uda_meta.argument_types
         assert 'max_val' == uda_meta.state_func
         assert 'int' == uda_meta.state_type
-        assert None == uda_meta.final_func
+        assert uda_meta.final_func is None
         assert '-1' == uda_meta.initial_condition
         assert 'int' == uda_meta.return_type
 

@@ -25,7 +25,7 @@ try:
         JNA_PATH = JNA_IN_LIB[0]
 except KeyError:
     if glob.glob('%s/lib/jna-*.jar' % DEFAULT_DIR):
-        print ('Using jna.jar in DEFAULT_DIR/lib/..')
+        print('Using jna.jar in DEFAULT_DIR/lib/..')
         JNA_IN_LIB = glob.glob('%s/lib/jna-*.jar' % DEFAULT_DIR)
         JNA_PATH = JNA_IN_LIB[0]
 

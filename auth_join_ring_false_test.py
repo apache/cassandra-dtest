@@ -8,7 +8,6 @@ from dtest import Tester
 
 class TestAuth(Tester):
 
-
     def test_login_existing_node(self):
         """
         * Launch a three node cluster
@@ -45,10 +44,10 @@ class TestAuth(Tester):
         self.prepare(nodes=2)
 
         node3 = self.cluster.create_node('node3', False,
-                                    ('127.0.0.3', 9160),
-                                    ('127.0.0.3', 7000),
-                                    '7300', '2002', None,
-                                    binary_interface=('127.0.0.3', 9042))
+                                         ('127.0.0.3', 9160),
+                                         ('127.0.0.3', 7000),
+                                         '7300', '2002', None,
+                                         binary_interface=('127.0.0.3', 9042))
 
         self.cluster.add(node3, False)
         node3.start(join_ring=False, wait_other_notice=False, wait_for_binary_proto=True)
@@ -82,11 +81,11 @@ class TestAuth(Tester):
         session.execute("CREATE USER dave WITH PASSWORD '12345' SUPERUSER")
 
         node2 = self.cluster.create_node('node2', False,
-                                    ('127.0.0.2', 9160),
-                                    ('127.0.0.2', 7000),
-                                    '7200', '2001', None,
-                                    binary_interface=('127.0.0.2', 9042))
-                                    
+                                         ('127.0.0.2', 9160),
+                                         ('127.0.0.2', 7000),
+                                         '7200', '2001', None,
+                                         binary_interface=('127.0.0.2', 9042))
+
         self.cluster.add(node2, False)
         node2.start(join_ring=False, wait_other_notice=False, wait_for_binary_proto=True)
 
@@ -125,10 +124,10 @@ class TestAuth(Tester):
         cassandra.execute("CREATE TABLE ks.cf (id int primary key, val int)")
 
         node2 = self.cluster.create_node('node2', False,
-                                    ('127.0.0.2', 9160),
-                                    ('127.0.0.2', 7000),
-                                    '7200', '2001', None,
-                                    binary_interface=('127.0.0.2', 9042))
+                                         ('127.0.0.2', 9160),
+                                         ('127.0.0.2', 7000),
+                                         '7200', '2001', None,
+                                         binary_interface=('127.0.0.2', 9042))
 
         self.cluster.add(node2, False)
         node2.start(join_ring=False, wait_other_notice=False, wait_for_binary_proto=True)
@@ -136,7 +135,7 @@ class TestAuth(Tester):
         cathy = self.get_session(node_idx=1, user='cathy', password='12345')
 
         self.assert_unauthorized("User cathy has no SELECT permission on <table ks.cf> or any of its parents",
-                                cathy, "SELECT * FROM ks.cf")
+                                 cathy, "SELECT * FROM ks.cf")
 
         node2.stop()
 
@@ -150,16 +149,16 @@ class TestAuth(Tester):
         assert 0 == len(rows)
 
         self.assert_unauthorized("User cathy has no MODIFY permission on <table ks.cf> or any of its parents",
-                                cathy, "INSERT INTO ks.cf (id, val) VALUES (0, 0)")
+                                 cathy, "INSERT INTO ks.cf (id, val) VALUES (0, 0)")
 
         self.assert_unauthorized("User cathy has no MODIFY permission on <table ks.cf> or any of its parents",
-                                cathy, "UPDATE ks.cf SET val = 1 WHERE id = 1")
+                                 cathy, "UPDATE ks.cf SET val = 1 WHERE id = 1")
 
         self.assert_unauthorized("User cathy has no MODIFY permission on <table ks.cf> or any of its parents",
-                                cathy, "DELETE FROM ks.cf WHERE id = 1")
+                                 cathy, "DELETE FROM ks.cf WHERE id = 1")
 
         self.assert_unauthorized("User cathy has no MODIFY permission on <table ks.cf> or any of its parents",
-                                cathy, "TRUNCATE ks.cf")
+                                 cathy, "TRUNCATE ks.cf")
 
         node2.stop()
 
@@ -181,12 +180,11 @@ class TestAuth(Tester):
         rows = list(cathy.execute("TRUNCATE ks.cf"))
         assert len(rows) == 0
 
-
     def assert_unauthorized(self, message, session, query):
         with pytest.raises(Unauthorized) as cm:
             session.execute(query)
             assert_regexp_matches(repr(cm._excinfo[1]), message)
-            
+
     def get_session(self, node_idx=0, user=None, password=None):
         """
         Connect with a set of credentials to a given node. Connection is not exclusive to that node.
@@ -209,4 +207,3 @@ class TestAuth(Tester):
         self.cluster.populate(nodes).start(wait_for_binary_proto=True)
 
         self.cluster.wait_for_any_log('Created default superuser', 25)
-

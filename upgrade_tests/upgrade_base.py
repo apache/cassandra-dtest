@@ -55,7 +55,7 @@ class UpgradeTester(Tester, metaclass=ABCMeta):
                 'rejected from org.apache.cassandra.concurrent.DebuggableScheduledThreadPoolExecutor'
             )
             fixture_dtest_setup.ignore_log_patterns = fixture_dtest_setup.ignore_log_patterns \
-                                                      + [_known_teardown_race_error]
+                + [_known_teardown_race_error]
 
         fixture_dtest_setup.ignore_log_patterns = fixture_dtest_setup.ignore_log_patterns + [
             r'RejectedExecutionException.*ThreadPoolExecutor has shut down',  # see  CASSANDRA-12364
@@ -64,7 +64,7 @@ class UpgradeTester(Tester, metaclass=ABCMeta):
     def setUp(self):
         self.validate_class_config()
         logger.debug("Upgrade test beginning, setting CASSANDRA_VERSION to {}, and jdk to {}. (Prior values will be restored after test)."
-              .format(self.UPGRADE_PATH.starting_version, self.UPGRADE_PATH.starting_meta.java_version))
+                     .format(self.UPGRADE_PATH.starting_version, self.UPGRADE_PATH.starting_meta.java_version))
         switch_jdks(self.UPGRADE_PATH.starting_meta.java_version)
         os.environ['CASSANDRA_VERSION'] = self.UPGRADE_PATH.starting_version
         super(UpgradeTester, self).setUp()

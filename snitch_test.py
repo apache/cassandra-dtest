@@ -23,7 +23,6 @@ class TestGossipingPropertyFileSnitch(Tester):
         s.connect((address, port))
         s.close()
 
-
     def test_prefer_local_reconnect_on_listen_address(self):
         """
         @jira_ticket CASSANDRA-9748
@@ -97,9 +96,9 @@ class TestGossipingPropertyFileSnitch(Tester):
         if node1.get_base_cassandra_version() >= 3.10:
             reconnectFmtString = "Initiated reconnect to an Internal IP {} for the {}"
         node1.watch_log_for(reconnectFmtString.format(NODE2_40_LISTEN_ADDRESS if running40 else NODE2_LISTEN_FMT_ADDRESS,
-                                               NODE2_40_BROADCAST_ADDRESS if running40 else NODE2_BROADCAST_FMT_ADDRESS), filename='debug.log', timeout=60)
+                            NODE2_40_BROADCAST_ADDRESS if running40 else NODE2_BROADCAST_FMT_ADDRESS), filename='debug.log', timeout=60)
         node2.watch_log_for(reconnectFmtString.format(NODE1_40_LISTEN_ADDRESS if running40 else NODE1_LISTEN_FMT_ADDRESS,
-                                               NODE1_40_BROADCAST_ADDRESS if running40 else NODE1_BROADCAST_FMT_ADDRESS), filename='debug.log', timeout=60)
+                            NODE1_40_BROADCAST_ADDRESS if running40 else NODE1_BROADCAST_FMT_ADDRESS), filename='debug.log', timeout=60)
 
         # read data from node2 just to make sure data and connectivity is OK
         session = self.patient_exclusive_cql_connection(node2)
@@ -117,6 +116,7 @@ class TestGossipingPropertyFileSnitch(Tester):
         if running40:
             assert "INTERNAL_ADDRESS_AND_PORT:7:{}".format(NODE1_40_LISTEN_ADDRESS) in out
             assert "INTERNAL_ADDRESS_AND_PORT:7:{}".format(NODE1_40_LISTEN_ADDRESS) in out
+
 
 class TestDynamicEndpointSnitch(Tester):
     @pytest.mark.resource_intensive
@@ -189,7 +189,7 @@ class TestDynamicEndpointSnitch(Tester):
                         # If the DES correctly routed the read around the degraded node,
                         # it shouldn't have another completed read request in metrics
                         assert (degraded_reads_before ==
-                                     bad_jmx.read_attribute(read_stage, 'Value'))
+                                bad_jmx.read_attribute(read_stage, 'Value'))
                     else:
                         # sleep to give dynamic snitch time to recalculate scores
                         time.sleep(.1)

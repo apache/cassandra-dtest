@@ -26,7 +26,7 @@ class TestGlobalRowKeyCache(Tester):
             for rowcache_size in (0, 10):
                 cluster.stop()
                 logger.debug("Testing with keycache size of %d MB, rowcache size of %d MB " %
-                      (keycache_size, rowcache_size))
+                             (keycache_size, rowcache_size))
                 keyspace_name = 'ks_%d_%d' % (keycache_size, rowcache_size)
 
                 # make the caches save every five seconds

@@ -3,6 +3,7 @@ import time
 from tools.datahelp import flatten_into_set
 from tools.misc import list_to_hashed_dict
 
+
 class Page(object):
     data = None
 
@@ -166,7 +167,6 @@ class PageAssertionMixin(object):
 
     def assertEqualIgnoreOrder(self, actual, expected):
         assert list_to_hashed_dict(actual) == list_to_hashed_dict(expected)
-
 
     def assertIsSubsetOf(self, subset, superset):
         assert flatten_into_set(subset) <= flatten_into_set(superset)

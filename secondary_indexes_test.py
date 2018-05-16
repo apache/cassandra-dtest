@@ -22,6 +22,7 @@ from tools.misc import new_node
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
 
+
 class TestSecondaryIndexes(Tester):
 
     @staticmethod
@@ -555,7 +556,7 @@ class TestSecondaryIndexes(Tester):
 
         def retry_on_failure(trace, regex, expected_matches, match_counts, event_source, min_expected, max_expected):
             logger.debug("Trace event inspection did not match expected, sleeping before re-fetching trace events. "
-                  "Expected: {expected} Actual: {actual}".format(expected=expected_matches, actual=match_counts))
+                         "Expected: {expected} Actual: {actual}".format(expected=expected_matches, actual=match_counts))
             time.sleep(2)
             trace.populate(max_wait=2.0)
             check_trace_events(trace, regex, expected_matches, halt_on_failure)

@@ -10,6 +10,7 @@ from tools.assertions import (assert_all, assert_almost_equal, assert_exception,
                               assert_unauthorized, assert_unavailable)
 import pytest
 
+
 class TestAssertStderrClean(TestCase):
 
     def test_empty_string(self):

@@ -1450,8 +1450,8 @@ Tracing session:""")
         assert fut.warnings is not None
         assert 1 == len(fut.warnings)
         assert "Unlogged batch covering {} partitions detected against table [client_warnings.test]. "\
-                   .format(max_partitions_per_batch + 1) + "You should use a logged batch for atomicity, " \
-                                                           "or asynchronous writes for performance." \
+            .format(max_partitions_per_batch + 1) + "You should use a logged batch for atomicity, " \
+            "or asynchronous writes for performance." \
                == fut.warnings[0]
 
     def test_connect_timeout(self):

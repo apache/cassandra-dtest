@@ -87,11 +87,11 @@ def _write_to_cdc_write_failure(session, insert_stmt):
         # We want to fail if inserting data takes too long. Locally this
         # takes about 10s, but let's be generous.
         assert ((time.time() - start) <= 600), (
-                "It's taken more than 10 minutes to reach a WriteFailure trying "
-                'to overrun the space designated for CDC commitlogs. This could '
-                "be because data isn't being written quickly enough in this "
-                'environment, or because C* is failing to reject writes when '
-                'it should.')
+            "It's taken more than 10 minutes to reach a WriteFailure trying "
+            'to overrun the space designated for CDC commitlogs. This could '
+            "be because data isn't being written quickly enough in this "
+            'environment, or because C* is failing to reject writes when '
+            'it should.')
 
         # If we haven't logged from here in the last 5s, do so.
         rate_limited_debug(
@@ -310,7 +310,7 @@ class TestCDC(Tester):
         start = 0
         stop = 1000
         step = 1
-        data = [(n, min(n+step, stop)) for n in range(start, stop, step)]
+        data = [(n, min(n + step, stop)) for n in range(start, stop, step)]
 
         execute_concurrent_with_args(session, insert_stmt, data)
 
@@ -474,8 +474,7 @@ class TestCDC(Tester):
         while _get_commitlog_files(node.get_path()) <= pre_non_cdc_write_segments:
             elapsed = time.time() - start
             rate_limited_debug('  non-cdc load step has lasted {s:.2f}s'.format(s=elapsed))
-            assert (elapsed <= time_limit, "It's been over a {s}s and we haven't written a new "
-                                           "commitlog segment. Something is wrong.".format(s=time_limit))
+            assert elapsed <= time_limit, "It's been over a {s}s and we haven't written a new commitlog segment. Something is wrong.".format(s=time_limit)
             execute_concurrent(
                 session,
                 ((non_cdc_prepared_insert, ()) for _ in range(1000)),
@@ -698,9 +697,9 @@ class TestCDC(Tester):
 
 def compare_replay_data(rd_one, rd_two):
     return rd_one.idx_name == rd_two.idx_name and \
-           rd_one.completed == rd_two.completed and \
-           rd_one.offset == rd_two.offset and \
-           rd_one.log_name == rd_two.log_name
+        rd_one.completed == rd_two.completed and \
+        rd_one.offset == rd_two.offset and \
+        rd_one.log_name == rd_two.log_name
 
 
 class ReplayData(namedtuple('ReplayData', ['idx_name', 'completed', 'offset', 'log_name'])):

@@ -25,6 +25,7 @@ from tools.misc import generate_ssl_stores, retry_till_success
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
 
+
 class TestBootstrap(Tester):
 
     @pytest.fixture(autouse=True)

@@ -25,6 +25,7 @@ from tools.misc import ImmutableMapping
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
 
+
 class TestAuth(Tester):
 
     @pytest.fixture(autouse=True)
@@ -1931,7 +1932,6 @@ class TestAuthRoles(Tester):
 
         self.setup_table()
 
-
         # Dropping a role which doesn't exist should be a no-op. If we cache the fact
         # that the role doesn't exist though, subsequent authz attempts which should
         # succeed will fail due to the erroneous cache entry
@@ -2624,7 +2624,7 @@ class TestAuthRoles(Tester):
         self.superuser.execute("DROP AGGREGATE ks.simple_aggregate(int)")
         all_perms = list(self.superuser.execute("LIST ALL PERMISSIONS OF mike"))
         for p in agg_perms:
-            assert not p in all_perms, "Perm {p} found, but should be removed".format(p=p)
+            assert p not in all_perms, "Perm {p} found, but should be removed".format(p=p)
 
     def test_ignore_invalid_roles(self):
         """
@@ -2727,8 +2727,7 @@ class TestNetworkAuth(Tester):
         fixture_dtest_setup.superuser.execute("CREATE TABLE ks.tbl (k int primary key, v int)")
 
     def username(self):
-        return ''.join(random.choice(string.ascii_lowercase) for _ in range(8));
-
+        return ''.join(random.choice(string.ascii_lowercase) for _ in range(8))
 
     def create_user(self, query_fmt, username):
         """

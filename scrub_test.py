@@ -31,7 +31,6 @@ class TestHelper(Tester):
         """
         fixture_dtest_setup.cluster.set_datadir_count(1)
 
-
     def get_table_paths(self, table):
         """
         Return the path where the table sstables are located

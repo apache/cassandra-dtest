@@ -18,7 +18,7 @@ class Testget_rate_limited_function(TestCase):
         """
         self.assertIs(rate_limited_func_arg.func, self.mock_func)
         self.assertIs(rate_limited_func_arg.limit, self.mock_limit)
-        assert rate_limited_func_arg.last_called == False
+        assert not rate_limited_func_arg.last_called
 
     def test_init_with_positional_args(self):
         """
@@ -106,7 +106,7 @@ class Testget_rate_limited_function(TestCase):
         If you call a rate-limited function, last_called is set to a new value.
         """
         self.rate_limited_func.limit = 1
-        assert self.rate_limited_func.last_called == False
+        assert not self.rate_limited_func.last_called
         self.rate_limited_func()
         assert abs(round(self.rate_limited_func.last_called, 2) - round(time(), 2)) <= 0.0
 
@@ -115,7 +115,7 @@ class Testget_rate_limited_function(TestCase):
         If you call a rate-limited function during the time limit, last_called is not set to a new value.
         """
         self.rate_limited_func.limit = 1
-        assert self.rate_limited_func.last_called == False
+        assert not self.rate_limited_func.last_called
         self.rate_limited_func()
         last_called = self.rate_limited_func.last_called
         self.rate_limited_func()

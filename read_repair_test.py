@@ -5,12 +5,9 @@ import time
 import pytest
 import logging
 import subprocess
-import typing
 
 from cassandra import ConsistencyLevel, WriteTimeout, ReadTimeout
-from cassandra.cluster import Session
 from cassandra.query import SimpleStatement
-from ccmlib.node import Node, handle_external_tool_process
 from pytest import raises
 
 from dtest import Tester, create_ks
@@ -21,6 +18,7 @@ from tools.misc import retry_till_success
 
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
+
 
 def byteman_validate(node, script, verbose=False, opts=None):
     opts = opts or []
@@ -49,7 +47,7 @@ def byteman_validate(node, script, verbose=False, opts=None):
 
     has_errors = 'ERROR' in out
     if verbose and not has_errors:
-        print (out)
+        print(out)
 
     assert not has_errors, "byteman script didn't compile\n" + out
 
@@ -178,7 +176,7 @@ class TestReadRepair(Tester):
         session.execute("""CREATE KEYSPACE alter_rf_test
                            WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};""")
 
-        options = "speculative_retry='NONE'";
+        options = "speculative_retry='NONE'"
         if self.cluster.version() < '4.0':
             options = options + " AND read_repair_chance=0 AND dclocal_read_repair_chance=0"
         session.execute("CREATE TABLE alter_rf_test.t1 (k int PRIMARY KEY, a int, b int) WITH " + options)
@@ -357,10 +355,12 @@ def quorum(query_string):
     return SimpleStatement(query_string=query_string, consistency_level=ConsistencyLevel.QUORUM)
 
 
-kcv = lambda k, c, v: [k, c, v]
+def kcv(k, c, v):
+    [k, c, v]
 
 
-listify = lambda results: [list(r) for r in results]
+def listify(results):
+    [list(r) for r in results]
 
 
 class StorageProxy(object):
@@ -656,7 +656,8 @@ class TestSpeculativeReadRepair(Tester):
 
 @contextmanager
 def _byteman_cycle(nodes, scripts):
-    script_path = lambda name: './byteman/read_repair/' + name + '.btm'
+    def script_path(name):
+        './byteman/read_repair/' + name + '.btm'
 
     for script in scripts:
         byteman_validate(nodes[0], script_path(script))
@@ -691,7 +692,9 @@ def stop_reads(*nodes, kind='all'):
     with _byteman_cycle(nodes, {'data': [data], 'digest': [digest], 'all': [data, digest]}[kind]):
         yield
 
-kcvv = lambda k, c, v1, v2: [k, c, v1, v2]
+
+def kcvv(k, c, v1, v2):
+    [k, c, v1, v2]
 
 
 class TestReadRepairGuarantees(Tester):
@@ -717,7 +720,7 @@ class TestReadRepairGuarantees(Tester):
                              (('blocking', True), ('none', False)),
                              ids=('blocking', 'none'))
     def test_monotonic_reads(self, repair_type, expect_monotonic):
-        """ 
+        """
         tests how read repair provides, or breaks, read monotonicity
         blocking read repair should maintain monotonic quorum reads, async and none should not
          """
@@ -726,7 +729,7 @@ class TestReadRepairGuarantees(Tester):
 
         session = self.get_cql_connection(node1, timeout=2)
         ddl = "CREATE TABLE ks.tbl (k int, c int, v1 int, v2 int, primary key (k, c)) WITH read_repair = '" + repair_type + "';"
-        print (ddl)
+        print(ddl)
         session.execute(ddl)
 
         session.execute(quorum("INSERT INTO ks.tbl (k, c, v1, v2) VALUES (1, 0, 1, 1)"))
@@ -752,13 +755,12 @@ class TestReadRepairGuarantees(Tester):
             else:
                 assert listify(results) == [kcvv(1, 0, 1, 1)]
 
-
     @since('4.0')
     @pytest.mark.parametrize("repair_type,expect_atomic",
                              (('blocking', False), ('none', True)),
                              ids=('blocking', 'none'))
     def test_atomic_writes(self, repair_type, expect_atomic):
-        """ 
+        """
         tests how read repair provides, or breaks, write atomicity
         'none' read repair should maintain atomic writes, blocking and async should not
          """
@@ -767,7 +769,7 @@ class TestReadRepairGuarantees(Tester):
 
         session = self.get_cql_connection(node1, timeout=2)
         ddl = "CREATE TABLE ks.tbl (k int, c int, v1 int, v2 int, primary key (k, c)) WITH read_repair = '" + repair_type + "';"
-        print (ddl)
+        print(ddl)
         session.execute(ddl)
 
         session.execute(quorum("INSERT INTO ks.tbl (k, c, v1, v2) VALUES (1, 0, 1, 1)"))
@@ -798,4 +800,3 @@ class NotRepairedException(Exception):
     specific read repair has run. See check_data_on_each_replica.
     """
     pass
-

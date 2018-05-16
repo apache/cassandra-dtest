@@ -11,7 +11,7 @@ from flaky import flaky
 from enum import Enum
 from queue import Empty
 from functools import partial
-from multiprocessing import Process, Queue
+from multiprocessing import Queue
 
 from cassandra import ConsistencyLevel, InvalidRequest, WriteFailure
 from cassandra.cluster import NoHostAvailable

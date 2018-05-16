@@ -109,7 +109,7 @@ class TestUpgradeSuperColumnsThrough(Tester):
 
         session = self.patient_cql_connection(node, row_factory=dict_factory)
         assert (list(session.execute("SELECT * FROM ks.compact_table WHERE pk = 1")) ==
-                     [{'col2': 1, 'pk': 1, 'column1': None, 'value': None, 'col1': 1}])
+                [{'col2': 1, 'pk': 1, 'column1': None, 'value': None, 'col1': 1}])
 
     def test_force_readd_compact_storage(self):
         cluster = self.prepare(cassandra_version=VERSION_311)
@@ -130,7 +130,7 @@ class TestUpgradeSuperColumnsThrough(Tester):
         session.execute("update system_schema.tables set flags={} where keyspace_name='ks' and table_name='compact_table';")
 
         assert (list(session.execute("SELECT * FROM ks.compact_table WHERE pk = 1")) ==
-                     [{'col2': 1, 'pk': 1, 'column1': None, 'value': None, 'col1': 1}])
+                [{'col2': 1, 'pk': 1, 'column1': None, 'value': None, 'col1': 1}])
 
         self.fixture_dtest_setup.allow_log_errors = True
 
@@ -158,21 +158,21 @@ class TestUpgradeSuperColumnsThrough(Tester):
             session.execute("INSERT INTO ks.compact_table (pk, col1) VALUES ('{pk}', '{col1}')".format(pk=i, col1=i * 10))
 
         assert (list(session.execute("SELECT * FROM ks.compact_table WHERE col1 = '50'")) ==
-                     [{'pk': '5', 'col1': '50'}])
+                [{'pk': '5', 'col1': '50'}])
         assert (list(session.execute("SELECT * FROM ks.compact_table WHERE pk = '5'")) ==
-                     [{'pk': '5', 'col1': '50'}])
+                [{'pk': '5', 'col1': '50'}])
         session.execute("ALTER TABLE ks.compact_table DROP COMPACT STORAGE")
 
         assert (list(session.execute("SELECT * FROM ks.compact_table WHERE col1 = '50'")) ==
-                     [{'col1': '50', 'column1': None, 'pk': '5', 'value': None}])
+                [{'col1': '50', 'column1': None, 'pk': '5', 'value': None}])
         assert (list(session.execute("SELECT * FROM ks.compact_table WHERE pk = '5'")) ==
-                     [{'col1': '50', 'column1': None, 'pk': '5', 'value': None}])
+                [{'col1': '50', 'column1': None, 'pk': '5', 'value': None}])
 
         self.upgrade_to_version(VERSION_TRUNK, wait=True)
 
         session = self.patient_cql_connection(node, row_factory=dict_factory)
 
         assert (list(session.execute("SELECT * FROM ks.compact_table WHERE col1 = '50'")) ==
-                     [{'col1': '50', 'column1': None, 'pk': '5', 'value': None}])
+                [{'col1': '50', 'column1': None, 'pk': '5', 'value': None}])
         assert (list(session.execute("SELECT * FROM ks.compact_table WHERE pk = '5'")) ==
-                     [{'col1': '50', 'column1': None, 'pk': '5', 'value': None}])
+                [{'col1': '50', 'column1': None, 'pk': '5', 'value': None}])

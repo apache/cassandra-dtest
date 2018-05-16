@@ -116,5 +116,3 @@ def assert_resultset_contains(got: ResultSet, expected: List[tuple]) -> None:
             if row.a == t[0] and row.b == t[1]:
                 found = True
         assert found, 'Failed to find expected row: {}'.format(t)
-
-

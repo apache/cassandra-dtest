@@ -103,7 +103,6 @@ class RunDTests():
             logging.root.setLevel(logging.DEBUG)
             logger.setLevel(logging.DEBUG)
 
-
         # Get dictionaries corresponding to each point in the configuration matrix
         # we want to run, then generate a config object for each of them.
         logger.debug('Generating configurations from the following matrix:\n\t{}'.format(args))
@@ -134,10 +133,8 @@ class RunDTests():
         # but for now just leaving it as is, because it does the job (although
         # certainly is still pretty complicated code and has a hacky feeling)
         to_execute = (
-                "import pytest\n" +
-                (
-                "pytest.main([{options}])\n").format(options=original_raw_cmd_args)
-        )
+            "import pytest\n" +
+            ("pytest.main([{options}])\n").format(options=original_raw_cmd_args))
         temp = NamedTemporaryFile(dir=getcwd())
         logger.debug('Writing the following to {}:'.format(temp.name))
 
@@ -165,7 +162,7 @@ class RunDTests():
 
             all_collected_test_modules = collect_test_modules(stdout)
             joined_test_modules = "\n".join(all_collected_test_modules)
-            #print("Collected %d Test Modules" % len(all_collected_test_modules))
+            # print("Collected %d Test Modules" % len(all_collected_test_modules))
             if args.dtest_print_tests_output is not None:
                 collected_tests_output_file = open(args.dtest_print_tests_output, "w")
                 collected_tests_output_file.write(joined_test_modules)

@@ -8,8 +8,8 @@ from cassandra.query import SimpleStatement
 
 
 """
-The assertion methods in this file are used to structure, execute, and test different queries and scenarios. 
-Use these anytime you are trying to check the content of a table, the row count of a table, if a query should 
+The assertion methods in this file are used to structure, execute, and test different queries and scenarios.
+Use these anytime you are trying to check the content of a table, the row count of a table, if a query should
 raise an exception, etc. These methods handle error messaging well, and will help discovering and treating bugs.
 
 An example:

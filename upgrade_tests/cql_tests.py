@@ -17,12 +17,16 @@ from cassandra.query import SimpleStatement
 from cassandra.util import sortedset
 
 from dtest import RUN_STATIC_UPGRADE_MATRIX
-from thrift_bindings.thrift010.ttypes import \
-    ConsistencyLevel as ThriftConsistencyLevel
-from thrift_bindings.thrift010.ttypes import (CfDef, Column, ColumnDef,
-                                        ColumnOrSuperColumn, ColumnParent,
-                                        Deletion, Mutation, SlicePredicate,
-                                        SliceRange)
+from thrift_bindings.thrift010.ttypes import CfDef
+from thrift_bindings.thrift010.ttypes import Column
+from thrift_bindings.thrift010.ttypes import ColumnDef
+from thrift_bindings.thrift010.ttypes import ColumnOrSuperColumn
+from thrift_bindings.thrift010.ttypes import ColumnParent
+from thrift_bindings.thrift010.ttypes import ConsistencyLevel as ThriftConsistencyLevel
+from thrift_bindings.thrift010.ttypes import Deletion
+from thrift_bindings.thrift010.ttypes import Mutation
+from thrift_bindings.thrift010.ttypes import SlicePredicate
+from thrift_bindings.thrift010.ttypes import SliceRange
 from thrift_test import get_thrift_client
 from tools.assertions import (assert_all, assert_invalid, assert_length_equal,
                               assert_none, assert_one, assert_row_count)

@@ -19,9 +19,13 @@ from cassandra.query import SimpleStatement
 from dtest import RUN_STATIC_UPGRADE_MATRIX, Tester
 from tools.misc import generate_ssl_stores, new_node
 from .upgrade_base import switch_jdks
-from .upgrade_manifest import (build_upgrade_pairs, current_2_0_x,
-                              current_2_1_x, current_2_2_x, current_3_0_x,
-                              indev_2_2_x, indev_3_x)
+from upgrade_manifest import build_upgrade_pairs
+from upgrade_manifest import current_2_0_x
+from upgrade_manifest import current_2_1_x
+from upgrade_manifest import current_2_2_x
+from upgrade_manifest import current_3_0_x
+from upgrade_manifest import indev_2_2_x
+from upgrade_manifest import indev_3_x
 
 logger = logging.getLogger(__name__)
 
@@ -249,7 +253,7 @@ class TestUpgrade(Tester):
 
     def setUp(self):
         logger.debug("Upgrade test beginning, setting CASSANDRA_VERSION to {}, and jdk to {}. (Prior values will be restored after test)."
-              .format(self.test_version_metas[0].version, self.test_version_metas[0].java_version))
+                     .format(self.test_version_metas[0].version, self.test_version_metas[0].java_version))
         os.environ['CASSANDRA_VERSION'] = self.test_version_metas[0].version
         switch_jdks(self.test_version_metas[0].java_version)
 
@@ -347,7 +351,7 @@ class TestUpgrade(Tester):
 
                     self._check_on_subprocs(self.fixture_dtest_setup.subprocs)
                     logger.debug('Successfully upgraded %d of %d nodes to %s' %
-                          (num + 1, len(self.cluster.nodelist()), version_meta.version))
+                                 (num + 1, len(self.cluster.nodelist()), version_meta.version))
 
                 self.cluster.set_install_dir(version=version_meta.version)
 
@@ -775,11 +779,9 @@ def create_upgrade_class(clsname, version_metas, protocol_version,
     upgrade_applies_to_env = RUN_STATIC_UPGRADE_MATRIX or version_metas[-1].matches_current_env_version_family
     if not upgrade_applies_to_env:
         pytest.mark.skip(reason='test not applicable to env.')
-    newcls = type(
-            clsname,
-            parent_classes,
-            {'test_version_metas': version_metas, '__test__': True, 'protocol_version': protocol_version, 'extra_config': extra_config}
-        )
+    newcls = type(clsname,
+                  parent_classes,
+                  {'test_version_metas': version_metas, '__test__': True, 'protocol_version': protocol_version, 'extra_config': extra_config})
 
     if clsname in globals():
         raise RuntimeError("Class by name already exists!")

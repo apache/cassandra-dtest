@@ -186,7 +186,7 @@ class TestCompaction(Tester):
                 cfs = os.listdir(os.path.join(data_dir, "ks"))
                 ssdir = os.listdir(os.path.join(data_dir, "ks", cfs[0]))
                 for afile in ssdir:
-                    assert not "Data" in afile, afile
+                    assert "Data" not in afile, afile
 
         except OSError:
             self.fail("Path to sstables not valid.")

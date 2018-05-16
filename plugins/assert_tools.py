@@ -81,12 +81,13 @@ class _Dummy(unittest.TestCase):
     def do_nothing(self):
         pass
 
+
 _t = _Dummy('do_nothing')
 
-assert_raises_regex=_t.assertRaisesRegex,
-assert_raises_regexp=_t.assertRaisesRegexp,
-assert_regexp_matches=_t.assertRegexpMatches,
-assert_warns_regex=_t.assertWarnsRegex,
+assert_raises_regex = _t.assertRaisesRegex,
+assert_raises_regexp = _t.assertRaisesRegexp,
+assert_regexp_matches = _t.assertRegexpMatches,
+assert_warns_regex = _t.assertWarnsRegex,
 
 del _Dummy
 del _t

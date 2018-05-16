@@ -118,7 +118,7 @@ class UpdatingTableMetadataWrapperTest(TestCase):
         assert self.wrapper._wrapped != self.cluster_mock.metadata.keyspaces[self.ks_name_sentinel].tables['foo']
 
         # and this is the behavior we care about
-        assert self.wrapper._wrapped ==self.cluster_mock.metadata.keyspaces[self.ks_name_sentinel].tables[self.table_name_sentinel]
+        assert self.wrapper._wrapped == self.cluster_mock.metadata.keyspaces[self.ks_name_sentinel].tables[self.table_name_sentinel]
 
     def test_repr(self):
         self.assertEqual(

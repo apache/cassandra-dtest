@@ -26,6 +26,7 @@ from dtest_setup_overrides import DTestSetupOverrides
 
 logger = logging.getLogger(__name__)
 
+
 def check_required_loopback_interfaces_available():
     """
     We need at least 3 loopback interfaces configured to run almost all dtests. On Linux, loopback
@@ -37,8 +38,9 @@ def check_required_loopback_interfaces_available():
     if platform.system() == "Darwin":
         if len(ni.ifaddresses('lo0')[AF_INET]) < 9:
             pytest.exit("At least 9 loopback interfaces are required to run dtests. "
-                            "On Mac you can create the required loopback interfaces by running "
-                            "'for i in {1..9}; do sudo ifconfig lo0 alias 127.0.0.$i up; done;'")
+                        "On Mac you can create the required loopback interfaces by running "
+                        "'for i in {1..9}; do sudo ifconfig lo0 alias 127.0.0.$i up; done;'")
+
 
 def pytest_addoption(parser):
     parser.addoption("--use-vnodes", action="store_true", default=False,
@@ -79,10 +81,10 @@ def pytest_addoption(parser):
 
 def sufficient_system_resources_for_resource_intensive_tests():
     mem = virtual_memory()
-    total_mem_gb = mem.total/1024/1024/1024
+    total_mem_gb = mem.total / 1024 / 1024 / 1024
     logger.info("total available system memory is %dGB" % total_mem_gb)
     # todo kjkj: do not hard code our bound.. for now just do 9 instances at 3gb a piece
-    return total_mem_gb >= 9*3
+    return total_mem_gb >= 9 * 3
 
 
 @pytest.fixture(scope='function', autouse=True)
@@ -94,12 +96,14 @@ def fixture_dtest_setup_overrides(dtest_config):
     """
     return DTestSetupOverrides()
 
+
 @pytest.fixture(scope='function')
 def fixture_dtest_cluster_name():
     """
     :return: The name to use for the running test's cluster
     """
     return "test"
+
 
 """
 Not exactly sure why :\ but, this fixture needs to be scoped to function level and not
@@ -110,6 +114,8 @@ tests), will have the root logger reset and see a level of NOTSET. Scoping it at
 class level seems to work, and I guess it's not that much extra overhead to setup the
 logger once per test class vs. once per session in the grand scheme of things.
 """
+
+
 @pytest.fixture(scope="function", autouse=True)
 def fixture_logging_setup(request):
     # set the root logger level to whatever the user asked for
@@ -261,6 +267,7 @@ def reset_environment_vars(initial_environment):
     os.environ.update(initial_environment)
     os.environ['PYTEST_CURRENT_TEST'] = pytest_current_test
 
+
 @pytest.fixture(scope='function')
 def fixture_dtest_create_cluster_func():
     """
@@ -268,6 +275,7 @@ def fixture_dtest_create_cluster_func():
              object that operates with the same interface as ccmlib.Cluster.
     """
     return DTestSetup.create_ccm_cluster
+
 
 @pytest.fixture(scope='function', autouse=False)
 def fixture_dtest_setup(request,
@@ -311,7 +319,7 @@ def fixture_dtest_setup(request,
             if len(errors) > 0:
                 failed = True
                 pytest.fail(msg='Unexpected error found in node logs (see stdout for full details). Errors: [{errors}]'
-                                     .format(errors=str.join(", ", errors)), pytrace=False)
+                                .format(errors=str.join(", ", errors)), pytrace=False)
     finally:
         try:
             # save the logs for inspection
@@ -323,7 +331,7 @@ def fixture_dtest_setup(request,
             dtest_setup.cleanup_cluster()
 
 
-#Based on https://bugs.python.org/file25808/14894.patch
+# Based on https://bugs.python.org/file25808/14894.patch
 def loose_version_compare(a, b):
     for i, j in zip_longest(a.version, b.version, fillvalue=''):
         if type(i) != type(j):
@@ -336,7 +344,7 @@ def loose_version_compare(a, b):
         else:  # i > j
             return 1
 
-    #Longer version strings with equal prefixes are equal, but if one version string is longer than it is greater
+    # Longer version strings with equal prefixes are equal, but if one version string is longer than it is greater
     aLen = len(a.version)
     bLen = len(b.version)
     if aLen == bLen:
@@ -424,7 +432,6 @@ def pytest_collection_modifyitems(items, config):
                         "--use-off-heap-memtables, see https://issues.apache.org/jira/browse/CASSANDRA-9472 "
                         "for details" % CASSANDRA_VERSION)
 
-
     selected_items = []
     deselected_items = []
 
@@ -440,7 +447,7 @@ def pytest_collection_modifyitems(items, config):
             if config.getoption("--skip-resource-intensive-tests"):
                 deselect_test = True
                 logger.info("SKIP: Deselecting test %s as test marked resource_intensive. To force execution of "
-                      "this test re-run with the --force-resource-intensive-tests command line argument" % item.name)
+                            "this test re-run with the --force-resource-intensive-tests command line argument" % item.name)
             if not sufficient_system_resources_resource_intensive:
                 deselect_test = True
                 logger.info("SKIP: Deselecting resource_intensive test %s due to insufficient system resources" % item.name)
@@ -449,7 +456,7 @@ def pytest_collection_modifyitems(items, config):
             if config.getoption("--use-vnodes"):
                 deselect_test = True
                 logger.info("SKIP: Deselecting test %s as the test requires vnodes to be disabled. To run this test, "
-                      "re-run without the --use-vnodes command line argument" % item.name)
+                            "re-run without the --use-vnodes command line argument" % item.name)
 
         if item.get_marker("vnodes"):
             if not config.getoption("--use-vnodes"):
@@ -481,4 +488,3 @@ def pytest_collection_modifyitems(items, config):
 
     config.hook.pytest_deselected(items=deselected_items)
     items[:] = selected_items
-

@@ -231,9 +231,9 @@ class TestHelper(Tester):
         ret = rows_to_list(session.execute(statement))
         if check_ret:
             assert ret[0][1] == val, "Got {} from {}, expected {} at {}".format(ret[0][1],
-                                                                                        session.cluster.contact_points,
-                                                                                        val,
-                                                                                        consistency_value_to_name(consistency))
+                                                                                session.cluster.contact_points,
+                                                                                val,
+                                                                                consistency_value_to_name(consistency))
         return ret[0][1] if ret else 0
 
 
@@ -290,7 +290,7 @@ class TestAvailability(TestHelper):
         Test availability for read and write via the session passed in as a parameter.
         """
         logger.debug("Connected to %s for %s/%s/%s" %
-                 (session.cluster.contact_points, consistency_value_to_name(write_cl), consistency_value_to_name(read_cl), consistency_value_to_name(serial_cl)))
+                     (session.cluster.contact_points, consistency_value_to_name(write_cl), consistency_value_to_name(read_cl), consistency_value_to_name(serial_cl)))
 
         start = 0
         end = 100
@@ -430,7 +430,7 @@ class TestAccuracy(TestHelper):
             self.serial_cl = serial_cl
 
             logger.debug('Testing accuracy with WRITE/READ/SERIAL consistency set to {}/{}/{} (keys : {} to {})'
-                      .format(consistency_value_to_name(write_cl), consistency_value_to_name(read_cl), consistency_value_to_name(serial_cl), start, end - 1))
+                         .format(consistency_value_to_name(write_cl), consistency_value_to_name(read_cl), consistency_value_to_name(serial_cl), start, end - 1))
 
         def get_expected_consistency(self, idx):
             return self.outer.get_expected_consistency(idx, self.rf_factors, self.write_cl, self.read_cl)
@@ -457,7 +457,7 @@ class TestAccuracy(TestHelper):
                     if outer.query_user(s, n, val, read_cl, check_ret=expected_consistency.is_strong):
                         num += 1
                 assert num >= expected_consistency.num_write_nodes, "Failed to read value from sufficient number of nodes," + \
-                                     " required {} but got {} - [{}, {}]".format(expected_consistency.num_write_nodes, num, n, val)
+                    " required {} but got {} - [{}, {}]".format(expected_consistency.num_write_nodes, num, n, val)
 
             for n in range(start, end):
                 age = 30
@@ -495,7 +495,7 @@ class TestAccuracy(TestHelper):
                     results.append(outer.query_counter(s, n, val, read_cl, check_ret=expected_consistency.is_strong))
 
                 assert results.count(val) >= expected_consistency.num_write_nodes, "Failed to read value from sufficient number of nodes, required {} nodes to have a" + \
-                                     " counter value of {} at key {}, instead got these values: {}".format(expected_consistency.num_write_nodes, val, n, results)
+                    " counter value of {} at key {}, instead got these values: {}".format(expected_consistency.num_write_nodes, val, n, results)
 
             for n in range(start, end):
                 c = 1
@@ -792,11 +792,11 @@ class TestConsistency(Tester):
         query = "CREATE KEYSPACE journals WITH replication = {'class': 'NetworkTopologyStrategy', 'datacenter1': 1};"
         session.execute(query)
 
-        query = 'CREATE TABLE journals.logs (user text, year int, month int, day int, title text, body text, PRIMARY KEY ((user), year, month, day, title));';
+        query = 'CREATE TABLE journals.logs (user text, year int, month int, day int, title text, body text, PRIMARY KEY ((user), year, month, day, title));'
         session.execute(query)
 
         # populate the table
-        stmt = session.prepare('INSERT INTO journals.logs (user, year, month, day, title, body) VALUES (?, ?, ?, ?, ?, ?);');
+        stmt = session.prepare('INSERT INTO journals.logs (user, year, month, day, title, body) VALUES (?, ?, ?, ?, ?, ?);')
         for year in range(2011, 2018):
             for month in range(1, 13):
                 for day in range(1, 31):
@@ -850,11 +850,11 @@ class TestConsistency(Tester):
         query = "CREATE KEYSPACE journals WITH replication = {'class': 'NetworkTopologyStrategy', 'datacenter1': 3};"
         session.execute(query)
 
-        query = 'CREATE TABLE journals.logs (user text, year int, month int, day int, title text, body text, PRIMARY KEY ((user), year, month, day, title));';
+        query = 'CREATE TABLE journals.logs (user text, year int, month int, day int, title text, body text, PRIMARY KEY ((user), year, month, day, title));'
         session.execute(query)
 
         # populate the table
-        stmt = session.prepare('INSERT INTO journals.logs (user, year, month, day, title, body) VALUES (?, ?, ?, ?, ?, ?);');
+        stmt = session.prepare('INSERT INTO journals.logs (user, year, month, day, title, body) VALUES (?, ?, ?, ?, ?, ?);')
         for year in range(2011, 2018):
             for month in range(1, 13):
                 for day in range(1, 31):

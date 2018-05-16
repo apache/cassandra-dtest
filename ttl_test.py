@@ -12,13 +12,12 @@ from cassandra.query import SimpleStatement
 from cassandra.util import sortedset
 
 from dtest import Tester, create_ks
+from scrub_test import TestHelper
 from tools.assertions import (assert_all, assert_almost_equal, assert_none,
                               assert_row_count, assert_unavailable)
 
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
-
-from scrub_test import TestHelper
 
 
 @since('2.0')
@@ -419,7 +418,6 @@ class TestDistributedTTL(Tester):
         [self.node1, self.node2] = fixture_dtest_setup.cluster.nodelist()
         self.session1 = fixture_dtest_setup.patient_cql_connection(self.node1)
         create_ks(self.session1, 'ks', 2)
-
 
     def prepare(self, default_time_to_live=None):
         self.session1.execute("DROP TABLE IF EXISTS ttl_table;")

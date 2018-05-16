@@ -230,7 +230,7 @@ class Tester:
             return object.__getattribute__(self, name)
         except AttributeError:
             fixture_dtest_setup = object.__getattribute__(self, 'fixture_dtest_setup')
-            return object.__getattribute__(fixture_dtest_setup , name)
+            return object.__getattribute__(fixture_dtest_setup, name)
 
     @pytest.fixture(scope='function', autouse=True)
     def set_dtest_setup_on_function(self, fixture_dtest_setup):
@@ -264,6 +264,7 @@ class Tester:
             node.watch_log_for(msg, timeout=timeout, **kwargs)
         except TimeoutError:
             pytest.fail("Log message was not seen within timeout:\n{0}".format(msg))
+
 
 def get_eager_protocol_version(cassandra_version):
     """
@@ -325,8 +326,9 @@ def create_cf(session, name, key_type="varchar", speculative_retry=None, read_re
     except cassandra.AlreadyExists:
         logger.warn('AlreadyExists executing create cf query \'%s\'' % query)
     session.cluster.control_connection.wait_for_schema_agreement(wait_time=120)
-    #Going to ignore OperationTimedOut from create CF, so need to validate it was indeed created
-    session.execute('SELECT * FROM %s LIMIT 1' % name);
+    # Going to ignore OperationTimedOut from create CF, so need to validate it was indeed created
+    session.execute('SELECT * FROM %s LIMIT 1' % name)
+
 
 def create_cf_simple(session, name, query):
     try:
@@ -334,8 +336,9 @@ def create_cf_simple(session, name, query):
     except cassandra.AlreadyExists:
         logger.warn('AlreadyExists executing create cf query \'%s\'' % query)
     session.cluster.control_connection.wait_for_schema_agreement(wait_time=120)
-    #Going to ignore OperationTimedOut from create CF, so need to validate it was indeed created
+    # Going to ignore OperationTimedOut from create CF, so need to validate it was indeed created
     session.execute('SELECT * FROM %s LIMIT 1' % name)
+
 
 def create_ks(session, name, rf):
     query = 'CREATE KEYSPACE %s WITH replication={%s}'
@@ -354,8 +357,8 @@ def create_ks(session, name, rf):
         logger.warn('AlreadyExists executing create ks query \'%s\'' % query)
 
     session.cluster.control_connection.wait_for_schema_agreement(wait_time=120)
-    #Also validates it was indeed created even though we ignored OperationTimedOut
-    #Might happen some of the time because CircleCI disk IO is unreliable and hangs randomly
+    # Also validates it was indeed created even though we ignored OperationTimedOut
+    # Might happen some of the time because CircleCI disk IO is unreliable and hangs randomly
     session.execute('USE {}'.format(name))
 
 
@@ -406,7 +409,7 @@ def kill_windows_cassandra_procs():
                         psutil.Process(pinfo['pid']).kill()
         except ImportError:
             logger.debug("WARN: psutil not installed. Cannot detect and kill "
-                  "running cassandra processes - you may see cascading dtest failures.")
+                         "running cassandra processes - you may see cascading dtest failures.")
 
 
 class MultiError(Exception):

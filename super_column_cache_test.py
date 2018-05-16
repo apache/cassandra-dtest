@@ -4,12 +4,16 @@ import logging
 from dtest_setup_overrides import DTestSetupOverrides
 
 from dtest import Tester
-from thrift_bindings.thrift010.ttypes import \
-    ConsistencyLevel as ThriftConsistencyLevel
-from thrift_bindings.thrift010.ttypes import (CfDef, Column, ColumnOrSuperColumn,
-                                        ColumnParent, KsDef, Mutation,
-                                        SlicePredicate, SliceRange,
-                                        SuperColumn)
+from thrift_bindings.thrift010.ttypes import CfDef
+from thrift_bindings.thrift010.ttypes import Column
+from thrift_bindings.thrift010.ttypes import ColumnOrSuperColumn
+from thrift_bindings.thrift010.ttypes import ColumnParent
+from thrift_bindings.thrift010.ttypes import ConsistencyLevel as ThriftConsistencyLevel
+from thrift_bindings.thrift010.ttypes import KsDef
+from thrift_bindings.thrift010.ttypes import Mutation
+from thrift_bindings.thrift010.ttypes import SlicePredicate
+from thrift_bindings.thrift010.ttypes import SliceRange
+from thrift_bindings.thrift010.ttypes import SuperColumn
 from thrift_test import get_thrift_client
 from tools.misc import ImmutableMapping
 

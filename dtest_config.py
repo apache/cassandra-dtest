@@ -4,6 +4,7 @@ import ccmlib.repository
 
 from ccmlib.common import is_win, get_version_from_build
 
+
 class DTestConfig:
     def __init__(self):
         self.use_vnodes = True
@@ -52,7 +53,6 @@ class DTestConfig:
             return get_version_from_build(ccm_repo_cache_dir)
         elif self.cassandra_dir is not None:
             return get_version_from_build(self.cassandra_dir)
-
 
 
 # Determine the location of the libjemalloc jar so that we can specify it

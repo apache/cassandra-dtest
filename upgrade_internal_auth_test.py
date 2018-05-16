@@ -24,7 +24,7 @@ class TestAuthUpgrade(Tester):
     def fixture_dtest_setup_overrides(self, dtest_config):
         dtest_setup_overrides = DTestSetupOverrides()
         dtest_setup_overrides.cluster_options = ImmutableMapping({'authenticator': 'PasswordAuthenticator',
-                                                               'authorizer': 'CassandraAuthorizer'})
+                                                                 'authorizer': 'CassandraAuthorizer'})
         return dtest_setup_overrides
 
     @pytest.fixture(autouse=True)
@@ -33,8 +33,7 @@ class TestAuthUpgrade(Tester):
             # This one occurs if we do a non-rolling upgrade, the node
             # it's trying to send the migration to hasn't started yet,
             # and when it does, it gets replayed and everything is fine.
-            r'Can\'t send migration request: node.*is down',
-    )
+            r'Can\'t send migration request: node.*is down')
 
     def test_upgrade_to_22(self):
         self.do_upgrade_with_internal_auth("github:apache/cassandra-2.2")

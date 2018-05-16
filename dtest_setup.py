@@ -16,7 +16,6 @@ from cassandra.cluster import Cluster as PyCluster
 from cassandra.cluster import NoHostAvailable
 from cassandra.cluster import EXEC_PROFILE_DEFAULT
 from cassandra.policies import WhiteListRoundRobinPolicy
-from ccmlib.common import get_version_from_build, is_win
 from ccmlib.cluster import Cluster
 
 from dtest import (get_ip_from_node, make_execution_profile, get_auth_provider, get_port_from_node,
@@ -364,7 +363,7 @@ class DTestSetup:
                         self.stop_active_log_watch()
                 finally:
                     logger.debug("removing ccm cluster {name} at: {path}".format(name=self.cluster.name,
-                                                                          path=self.test_path))
+                                                                                 path=self.test_path))
                     self.cluster.remove()
 
                     logger.debug("clearing ssl stores from [{0}] directory".format(self.test_path))
@@ -440,7 +439,6 @@ class DTestSetup:
                     logger.debug("Jacoco execfile will be created at {}".format(jacoco_execfile))
         else:
             logger.debug("Jacoco agent not found or is not file. Execution will not be recorded.")
-
 
     @staticmethod
     def create_ccm_cluster(dtest_setup):

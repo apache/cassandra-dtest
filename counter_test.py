@@ -389,7 +389,7 @@ class TestCounters(Tester):
 
         assert_invalid(session, "ALTER TABLE counter_bug add c counter", "Cannot re-add previously dropped counter column c")
 
-    @since("2.0", max_version="3.X") # Compact Storage
+    @since("2.0", max_version="3.X")  # Compact Storage
     def test_compact_counter_cluster(self):
         """
         @jira_ticket CASSANDRA-12219

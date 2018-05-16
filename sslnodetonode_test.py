@@ -178,19 +178,19 @@ class TestNodeToNodeSSLEncryption(Tester):
         shutil.copyfile(credentials.cakeystore, tspath)
 
         server_enc_options = {
-                'internode_encryption': internode_encryption,
-                'keystore': kspath,
-                'keystore_password': 'cassandra',
-                'truststore': tspath,
-                'truststore_password': 'cassandra',
-                'require_endpoint_verification': endpoint_verification,
-                'require_client_auth': client_auth,
-            }
+            'internode_encryption': internode_encryption,
+            'keystore': kspath,
+            'keystore_password': 'cassandra',
+            'truststore': tspath,
+            'truststore_password': 'cassandra',
+            'require_endpoint_verification': endpoint_verification,
+            'require_client_auth': client_auth
+        }
 
         if self.cluster.version() >= '4.0':
             server_enc_options['enabled'] = encryption_enabled
             server_enc_options['optional'] = encryption_optional
-        
+
         node.set_configuration_options(values={
             'server_encryption_options': server_enc_options
         })

@@ -1,9 +1,11 @@
 import pytest
+import logging
 
 from dtest import Tester
 from tools.assertions import assert_crc_check_chance_equal, assert_one
 
 since = pytest.mark.since
+logger = logging.getLogger(__name__)
 
 
 @pytest.mark.upgrade_test
@@ -13,7 +15,7 @@ class TestCrcCheckChanceUpgrade(Tester):
     @pytest.fixture(autouse=True)
     def fixture_add_additional_log_patterns(self, fixture_dtest_setup):
         fixture_dtest_setup.ignore_log_patterns = (
-             # This one occurs if we do a non-rolling upgrade, the node
+            # This one occurs if we do a non-rolling upgrade, the node
             # it's trying to send the migration to hasn't started yet,
             # and when it does, it gets replayed and everything is fine.
             r'Can\'t send migration request: node.*is down',

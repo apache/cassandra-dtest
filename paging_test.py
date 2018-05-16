@@ -772,7 +772,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
             res = rows_to_list(session.execute(
                 "SELECT a, b, e, count(b), max(e) FROM test WHERE a = 1 GROUP BY a, b, c ORDER BY b DESC, c DESC LIMIT 2"))
             assert res == [[1, 4, 24, 2, 24],
-                                   [1, 2, 12, 1, 12]]
+                           [1, 2, 12, 1, 12]]
 
             res = rows_to_list(session.execute(
                 "SELECT a, b, e, count(b), max(e) FROM test WHERE a = 1 ORDER BY b DESC, c DESC LIMIT 2"))
@@ -830,7 +830,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
             res = rows_to_list(
                 session.execute("SELECT DISTINCT a, count(a)FROM test WHERE a IN (1, 2, 4) GROUP BY a LIMIT 2"))
             assert res == [[1, 1],
-                                   [2, 1]]
+                           [2, 1]]
 
             res = rows_to_list(session.execute("SELECT DISTINCT a, count(a)FROM test WHERE a IN (1, 2, 4) LIMIT 2"))
             assert res == [[1, 3]]
@@ -858,11 +858,11 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
             # Multi-partitions queries without aggregates, with PER PARTITION LIMIT and with LIMIT
             res = rows_to_list(session.execute("SELECT a, b, c, d FROM test WHERE a IN (1, 2, 4) GROUP BY a, b PER PARTITION LIMIT 1 LIMIT 2"))
             assert res == [[1, 2, 1, 3],
-                                   [2, 2, 3, 3]]
+                           [2, 2, 3, 3]]
 
             res = rows_to_list(session.execute("SELECT a, b, c, d FROM test WHERE a IN (1, 2, 4) GROUP BY a, b PER PARTITION LIMIT 3 LIMIT 2"))
             assert res == [[1, 2, 1, 3],
-                                   [1, 4, 2, 6]]
+                           [1, 4, 2, 6]]
 
     @since('3.10')
     def test_group_by_with_range_name_query_paging(self):
@@ -887,58 +887,58 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
             # Range queries
             res = rows_to_list(session.execute("SELECT a, b, d, count(b), max(d) FROM test WHERE b = 1 and c IN (1, 2) GROUP BY a ALLOW FILTERING"))
             assert res == [[1, 1, 2, 2, 2],
-                                   [2, 1, 3, 2, 3],
-                                   [4, 1, 5, 2, 5]]
+                           [2, 1, 3, 2, 3],
+                           [4, 1, 5, 2, 5]]
 
             res = rows_to_list(session.execute("SELECT a, b, d, count(b), max(d) FROM test WHERE b = 1 and c IN (1, 2) GROUP BY a, b ALLOW FILTERING"))
             assert res == [[1, 1, 2, 2, 2],
-                                   [2, 1, 3, 2, 3],
-                                   [4, 1, 5, 2, 5]]
+                           [2, 1, 3, 2, 3],
+                           [4, 1, 5, 2, 5]]
 
             res = rows_to_list(session.execute("SELECT a, b, d, count(b), max(d) FROM test WHERE b IN (1, 2) and c IN (1, 2) GROUP BY a, b ALLOW FILTERING"))
             assert res == [[1, 1, 2, 2, 2],
-                                   [1, 2, 3, 2, 3],
-                                   [2, 1, 3, 2, 3],
-                                   [2, 2, 4, 2, 4],
-                                   [4, 1, 5, 2, 5],
-                                   [4, 2, 6, 2, 6]]
+                           [1, 2, 3, 2, 3],
+                           [2, 1, 3, 2, 3],
+                           [2, 2, 4, 2, 4],
+                           [4, 1, 5, 2, 5],
+                           [4, 2, 6, 2, 6]]
 
             # Range queries with LIMIT
             res = rows_to_list(session.execute("SELECT a, b, d, count(b), max(d) FROM test WHERE b = 1 and c IN (1, 2) GROUP BY a LIMIT 5 ALLOW FILTERING"))
             assert res == [[1, 1, 2, 2, 2],
-                                   [2, 1, 3, 2, 3],
-                                   [4, 1, 5, 2, 5]]
+                           [2, 1, 3, 2, 3],
+                           [4, 1, 5, 2, 5]]
 
             res = rows_to_list(session.execute("SELECT a, b, d, count(b), max(d) FROM test WHERE b = 1 and c IN (1, 2) GROUP BY a, b LIMIT 3 ALLOW FILTERING"))
             assert res == [[1, 1, 2, 2, 2],
-                                   [2, 1, 3, 2, 3],
-                                   [4, 1, 5, 2, 5]]
+                           [2, 1, 3, 2, 3],
+                           [4, 1, 5, 2, 5]]
 
             res = rows_to_list(session.execute("SELECT a, b, d, count(b), max(d) FROM test WHERE b IN (1, 2) and c IN (1, 2) GROUP BY a, b LIMIT 3 ALLOW FILTERING"))
             assert res == [[1, 1, 2, 2, 2],
-                                   [1, 2, 3, 2, 3],
-                                   [2, 1, 3, 2, 3]]
+                           [1, 2, 3, 2, 3],
+                           [2, 1, 3, 2, 3]]
 
             # Range queries with PER PARTITION LIMIT
             res = rows_to_list(session.execute("SELECT a, b, d, count(b), max(d) FROM test WHERE b = 1 and c IN (1, 2) GROUP BY a, b PER PARTITION LIMIT 2 ALLOW FILTERING"))
             assert res == [[1, 1, 2, 2, 2],
-                                   [2, 1, 3, 2, 3],
-                                   [4, 1, 5, 2, 5]]
+                           [2, 1, 3, 2, 3],
+                           [4, 1, 5, 2, 5]]
 
             res = rows_to_list(session.execute("SELECT a, b, d, count(b), max(d) FROM test WHERE b IN (1, 2) and c IN (1, 2) GROUP BY a, b PER PARTITION LIMIT 1 ALLOW FILTERING"))
             assert res == [[1, 1, 2, 2, 2],
-                                   [2, 1, 3, 2, 3],
-                                   [4, 1, 5, 2, 5]]
+                           [2, 1, 3, 2, 3],
+                           [4, 1, 5, 2, 5]]
 
             # Range queries with PER PARTITION LIMIT and LIMIT
             res = rows_to_list(session.execute("SELECT a, b, d, count(b), max(d) FROM test WHERE b = 1 and c IN (1, 2) GROUP BY a, b PER PARTITION LIMIT 2 LIMIT 5 ALLOW FILTERING"))
             assert res == [[1, 1, 2, 2, 2],
-                                   [2, 1, 3, 2, 3],
-                                   [4, 1, 5, 2, 5]]
+                           [2, 1, 3, 2, 3],
+                           [4, 1, 5, 2, 5]]
 
             res = rows_to_list(session.execute("SELECT a, b, d, count(b), max(d) FROM test WHERE b IN (1, 2) and c IN (1, 2) GROUP BY a, b PER PARTITION LIMIT 1 LIMIT 2 ALLOW FILTERING"))
             assert res == [[1, 1, 2, 2, 2],
-                                   [2, 1, 3, 2, 3]]
+                           [2, 1, 3, 2, 3]]
 
     @since('3.10')
     def test_group_by_with_static_columns_paging(self):
@@ -963,13 +963,13 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
             # Range queries
             res = rows_to_list(session.execute("SELECT a, b, s, count(b), count(s) FROM test GROUP BY a"))
             assert res == [[1, None, 1, 0, 1],
-                                   [2, None, 2, 0, 1],
-                                   [4, None, 3, 0, 1]]
+                           [2, None, 2, 0, 1],
+                           [4, None, 3, 0, 1]]
 
             res = rows_to_list(session.execute("SELECT a, b, s, count(b), count(s) FROM test GROUP BY a, b"))
             assert res == [[1, None, 1, 0, 1],
-                                   [2, None, 2, 0, 1],
-                                   [4, None, 3, 0, 1]]
+                           [2, None, 2, 0, 1],
+                           [4, None, 3, 0, 1]]
 
             res = rows_to_list(session.execute("SELECT a, b, s, count(b), count(s) FROM test"))
             assert res == [[1, None, 1, 0, 3]]
@@ -977,13 +977,13 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
             # Range query without aggregates
             res = rows_to_list(session.execute("SELECT a, b, s FROM test GROUP BY a, b"))
             assert res == [[1, None, 1],
-                                   [2, None, 2],
-                                   [4, None, 3]]
+                           [2, None, 2],
+                           [4, None, 3]]
 
             # Range queries with LIMIT
             res = rows_to_list(session.execute("SELECT a, b, s, count(b), count(s) FROM test GROUP BY a, b LIMIT 2"))
             assert res == [[1, None, 1, 0, 1],
-                                   [2, None, 2, 0, 1]]
+                           [2, None, 2, 0, 1]]
 
             res = rows_to_list(session.execute("SELECT a, b, s, count(b), count(s) FROM test LIMIT 2"))
             assert res == [[1, None, 1, 0, 3]]
@@ -1729,11 +1729,11 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
             session.default_fetch_size = i
             results = rows_to_list(session.execute("SELECT * FROM test WHERE a = 1 AND b in (2, 2, 1, 1, 1)"))
             assert results == [[1, 1, 0, 0],
-                                       [1, 1, 1, 1],
-                                       [1, 1, 2, 2],
-                                       [1, 2, 0, 0],
-                                       [1, 2, 1, 1],
-                                       [1, 2, 2, 2]]
+                               [1, 1, 1, 1],
+                               [1, 1, 2, 2],
+                               [1, 2, 0, 0],
+                               [1, 2, 1, 1],
+                               [1, 2, 2, 2]]
 
     @since('3.0.0')
     def test_paging_with_filtering(self):
@@ -1884,18 +1884,18 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
                            [4, 7, 8, 9],
                            [4, 8, 9, 10],
                            [4, 9, 10, 11]], \
-                             page_size_error_msg
+                page_size_error_msg
 
             res = rows_to_list(session.execute("SELECT * FROM test WHERE a = 4 AND b > 3 AND c > 3 AND cnt >= 8 AND cnt < 10 ALLOW FILTERING"))
             assert res == [[4, 6, 7, 8],
                            [4, 7, 8, 9]], \
-                             page_size_error_msg
+                page_size_error_msg
 
             res = rows_to_list(session.execute("SELECT * FROM test WHERE a = 4 AND b > 3 AND c > 3 AND cnt >= 8 AND cnt <= 10 ALLOW FILTERING"))
             assert res == [[4, 6, 7, 8],
                            [4, 7, 8, 9],
                            [4, 8, 9, 10]], \
-                             page_size_error_msg
+                page_size_error_msg
 
             res = rows_to_list(session.execute("SELECT * FROM test WHERE cnt = 5 ALLOW FILTERING"))
             self.assertEqualIgnoreOrder(res, [[0, 3, 4, 5],
@@ -2219,11 +2219,11 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
             # Single partition queries with LIMIT
             res = rows_to_list(session.execute("SELECT * FROM test WHERE a < 1 AND c >= 1 LIMIT 2 ALLOW FILTERING"))
             assert res == [[0, 1, 0, 1, 1],
-                            [0, 2, 0, 2, 2]]
+                           [0, 2, 0, 2, 2]]
 
             res = rows_to_list(session.execute("SELECT * FROM test WHERE a >= 3 AND c >= 1 AND s > 1 LIMIT 2 ALLOW FILTERING"))
             assert res == [[4, 1, 4, 1, 5],
-                            [4, 2, 4, 2, 6]]
+                           [4, 2, 4, 2, 6]]
 
             #  Single partition query with DISTINCT
             res = rows_to_list(session.execute("SELECT DISTINCT a, s FROM test WHERE a > 2 AND s >= 1 ALLOW FILTERING"))
@@ -2281,23 +2281,23 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
             # single partition
             res = rows_to_list(session.execute("SELECT * FROM test WHERE a > 3 AND b > 3 AND c > 3 AND cnt > 8 ALLOW FILTERING"))
             assert res == [[4, 7, 8, 9],
-                                   [4, 8, 9, 10],
-                                   [4, 9, 10, 11]]
+                           [4, 8, 9, 10],
+                           [4, 9, 10, 11]]
 
             res = rows_to_list(session.execute("SELECT * FROM test WHERE a >= 4 AND b > 3 AND c > 3 AND cnt >= 8 ALLOW FILTERING"))
             assert res == [[4, 6, 7, 8],
-                                   [4, 7, 8, 9],
-                                   [4, 8, 9, 10],
-                                   [4, 9, 10, 11]]
+                           [4, 7, 8, 9],
+                           [4, 8, 9, 10],
+                           [4, 9, 10, 11]]
 
             res = rows_to_list(session.execute("SELECT * FROM test WHERE a < 1 AND b > 3 AND c > 3 AND cnt >= 8 AND cnt < 10 ALLOW FILTERING"))
             assert res == [[0, 6, 7, 8],
-                                   [0, 7, 8, 9]]
+                           [0, 7, 8, 9]]
 
             res = rows_to_list(session.execute("SELECT * FROM test WHERE a > 3 AND b > 3 AND c > 3 AND cnt >= 8 AND cnt <= 10 ALLOW FILTERING"))
             assert res == [[4, 6, 7, 8],
-                                   [4, 7, 8, 9],
-                                   [4, 8, 9, 10]]
+                           [4, 7, 8, 9],
+                           [4, 8, 9, 10]]
 
             res = rows_to_list(session.execute("SELECT * FROM test WHERE a > 1 AND cnt = 5 ALLOW FILTERING"))
             self.assertEqualIgnoreOrder(res, [[2, 3, 4, 5],
@@ -2341,39 +2341,39 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
             res = rows_to_list(session.execute("SELECT * FROM test WHERE a = 4 AND b > 3 AND c > 3 ALLOW FILTERING"))
             assert res == [[4, 8, 9, 10],
-                                   [4, 6, 7, 8],
-                                   [4, 7, 8, 9],
-                                   [4, 5, 6, 7],
-                                   [4, 9, 10, 11],
-                                   [4, 4, 5, 6]]
+                           [4, 6, 7, 8],
+                           [4, 7, 8, 9],
+                           [4, 5, 6, 7],
+                           [4, 9, 10, 11],
+                           [4, 4, 5, 6]]
 
             res = rows_to_list(session.execute("SELECT * FROM test WHERE a = 4 AND b > 3 AND c > 3 LIMIT 4 ALLOW FILTERING"))
             assert res == [[4, 8, 9, 10],
-                                   [4, 6, 7, 8],
-                                   [4, 7, 8, 9],
-                                   [4, 5, 6, 7]]
+                           [4, 6, 7, 8],
+                           [4, 7, 8, 9],
+                           [4, 5, 6, 7]]
 
             res = rows_to_list(session.execute("SELECT * FROM test WHERE a = 4 AND b > 3 AND c > 3 ALLOW FILTERING"))
             assert res == [[4, 8, 9, 10],
-                                   [4, 6, 7, 8],
-                                   [4, 7, 8, 9],
-                                   [4, 5, 6, 7],
-                                   [4, 9, 10, 11],
-                                   [4, 4, 5, 6]]
+                           [4, 6, 7, 8],
+                           [4, 7, 8, 9],
+                           [4, 5, 6, 7],
+                           [4, 9, 10, 11],
+                           [4, 4, 5, 6]]
 
             res = rows_to_list(session.execute("SELECT * FROM test WHERE a > 3 AND b > 3 AND c > 3 ALLOW FILTERING"))
             assert res == [[4, 8, 9, 10],
-                                   [4, 6, 7, 8],
-                                   [4, 7, 8, 9],
-                                   [4, 5, 6, 7],
-                                   [4, 9, 10, 11],
-                                   [4, 4, 5, 6]]
+                           [4, 6, 7, 8],
+                           [4, 7, 8, 9],
+                           [4, 5, 6, 7],
+                           [4, 9, 10, 11],
+                           [4, 4, 5, 6]]
 
             res = rows_to_list(session.execute("SELECT * FROM test WHERE a < 1 AND b > 3 AND c > 3 LIMIT 4 ALLOW FILTERING"))
             assert res == [[0, 6, 7, 8],
-                                   [0, 5, 6, 7],
-                                   [0, 8, 9, 10],
-                                   [0, 9, 10, 11]]
+                           [0, 5, 6, 7],
+                           [0, 8, 9, 10],
+                           [0, 9, 10, 11]]
 
             res = rows_to_list(session.execute("SELECT * FROM test WHERE a < 1 AND b < 3 AND c >= 3 ALLOW FILTERING"))
             assert res == [[0, 2, 3, 4]]
@@ -2531,10 +2531,10 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
             res = rows_to_list(session.execute("SELECT * FROM test WHERE s > 1 AND a > 3 AND b > 4 ALLOW FILTERING"))
             assert res == [[4, 5, 5, 6],
-                                   [4, 6, 5, 7],
-                                   [4, 7, 5, 8],
-                                   [4, 8, 5, 9],
-                                   [4, 9, 5, 10]]
+                           [4, 6, 5, 7],
+                           [4, 7, 5, 8],
+                           [4, 8, 5, 9],
+                           [4, 9, 5, 10]]
 
             assert_invalid(session, "SELECT * FROM test WHERE s > 1 AND a < 2 AND b > 4 ORDER BY b DESC ALLOW FILTERING", expected=InvalidRequest)
 

@@ -18,16 +18,16 @@ from dtest import Tester
 
 from thrift_bindings.thrift010 import Cassandra
 from thrift_bindings.thrift010.Cassandra import (CfDef, Column, ColumnDef,
-                                           ColumnOrSuperColumn, ColumnParent,
-                                           ColumnPath, ColumnSlice,
-                                           ConsistencyLevel, CounterColumn,
-                                           Deletion, IndexExpression,
-                                           IndexOperator, IndexType,
-                                           InvalidRequestException, KeyRange,
-                                           KeySlice, KsDef, MultiSliceRequest,
-                                           Mutation, NotFoundException,
-                                           SlicePredicate, SliceRange,
-                                           SuperColumn)
+                                                 ColumnOrSuperColumn, ColumnParent,
+                                                 ColumnPath, ColumnSlice,
+                                                 ConsistencyLevel, CounterColumn,
+                                                 Deletion, IndexExpression,
+                                                 IndexOperator, IndexType,
+                                                 InvalidRequestException, KeyRange,
+                                                 KeySlice, KsDef, MultiSliceRequest,
+                                                 Mutation, NotFoundException,
+                                                 SlicePredicate, SliceRange,
+                                                 SuperColumn)
 from tools.assertions import (assert_all, assert_none, assert_one)
 
 MAX_TTL = 20 * 365 * 24 * 60 * 60  # 20 years in seconds
@@ -35,8 +35,11 @@ MAX_TTL = 20 * 365 * 24 * 60 * 60  # 20 years in seconds
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
 utf8encoder = codecs.getencoder('utf-8')
+
+
 def utf8encode(str):
     return utf8encoder(str)[0]
+
 
 def get_thrift_client(host='127.0.0.1', port=9160):
     socket = TSocket.TSocket(host, port)
@@ -173,7 +176,7 @@ _SIMPLE_COLUMNS = [Column(utf8encode('c1'), utf8encode('value1'), 0),
                    Column(utf8encode('c2'), utf8encode('value2'), 0)]
 _SUPER_COLUMNS = [SuperColumn(name=utf8encode('sc1'), columns=[Column(_i64(4), utf8encode('value4'), 0)]),
                   SuperColumn(name=utf8encode('sc2'), columns=[Column(_i64(5), utf8encode('value5'), 0),
-                                                   Column(_i64(6), utf8encode('value6'), 0)])]
+                                                               Column(_i64(6), utf8encode('value6'), 0)])]
 
 
 def _assert_column(column_family, key, column, value, ts=0):
@@ -480,7 +483,7 @@ class TestMutations(TestThrift):
         # Paging for small columns starts at 1024 columns
         columns_to_insert = [Column(utf8encode('c%d' % (i,)), utf8encode('value%d' % (i,)), 0) for i in range(3, 1026)]
         cfmap = {'Standard1': [Mutation(ColumnOrSuperColumn(c)) for c in columns_to_insert]}
-        client.batch_mutate({utf8encode('key1') : cfmap}, ConsistencyLevel.ONE)
+        client.batch_mutate({utf8encode('key1'): cfmap}, ConsistencyLevel.ONE)
 
         p = SlicePredicate(slice_range=SliceRange(utf8encode(''), utf8encode(''), False, 2000))
         assert client.get_count(utf8encode('key1'), column_parent, p, ConsistencyLevel.ONE) == 1025
@@ -844,17 +847,17 @@ class TestMutations(TestThrift):
 
         columns = [SuperColumn(name=utf8encode('sc1'), columns=[Column(_i64(1), utf8encode('value1'), 0)]),
                    SuperColumn(name=utf8encode('sc2'),
-                               columns=[Column(_i64(2), utf8encode('value2') , 0), Column(_i64(3), utf8encode('value3') , 0)]),
+                               columns=[Column(_i64(2), utf8encode('value2'), 0), Column(_i64(3), utf8encode('value3'), 0)]),
                    SuperColumn(name=utf8encode('sc3'), columns=[Column(_i64(4), utf8encode('value4'), 0)]),
                    SuperColumn(name=utf8encode('sc4'),
-                               columns=[Column(_i64(5), utf8encode('value5') , 0), Column(_i64(6), utf8encode('value6') , 0)]),
+                               columns=[Column(_i64(5), utf8encode('value5'), 0), Column(_i64(6), utf8encode('value6'), 0)]),
                    SuperColumn(name=utf8encode('sc5'), columns=[Column(_i64(7), utf8encode('value7'), 0)])]
 
         for column in columns:
             for subcolumn in column.columns:
                 client.insert(utf8encode('key'), ColumnParent('Super1', column.name), subcolumn, ConsistencyLevel.ONE)
 
-        d = Deletion(1, predicate=SlicePredicate(slice_range=SliceRange(start=utf8encode('sc2') , finish=utf8encode('sc4') )))
+        d = Deletion(1, predicate=SlicePredicate(slice_range=SliceRange(start=utf8encode('sc2'), finish=utf8encode('sc4'))))
         client.batch_mutate({utf8encode('key'): {'Super1': [Mutation(deletion=d)]}}, ConsistencyLevel.ONE)
 
         _assert_columnpath_exists(utf8encode('key'), ColumnPath('Super1', super_column=utf8encode('sc1'), column=_i64(1)))
@@ -881,8 +884,8 @@ class TestMutations(TestThrift):
             client.insert(utf8encode('key'), ColumnParent('Super1', utf8encode('sc1')), column, ConsistencyLevel.ONE)
 
         r = SliceRange(start=_i64(2), finish=_i64(4))
-        d = Deletion(1, super_column=utf8encode('sc1') , predicate=SlicePredicate(slice_range=r))
-        client.batch_mutate({utf8encode('key'): {'Super1' : [Mutation(deletion=d)]}}, ConsistencyLevel.ONE)
+        d = Deletion(1, super_column=utf8encode('sc1'), predicate=SlicePredicate(slice_range=r))
+        client.batch_mutate({utf8encode('key'): {'Super1': [Mutation(deletion=d)]}}, ConsistencyLevel.ONE)
 
         _assert_columnpath_exists(utf8encode('key'), ColumnPath('Super1', super_column=utf8encode('sc1'), column=_i64(1)))
         _assert_no_columnpath(utf8encode('key'), ColumnPath('Super1', super_column=utf8encode('sc1'), column=_i64(2)))
@@ -908,12 +911,12 @@ class TestMutations(TestThrift):
         keys = [utf8encode('key_30'), utf8encode('key_31')]
         for key in keys:
             sc = SuperColumn(utf8encode('sc1'), [Column(_i64(22), utf8encode('value22'), 0),
-                                     Column(_i64(23), utf8encode('value23'), 0)])
+                                                 Column(_i64(23), utf8encode('value23'), 0)])
             cfmap = {'Super1': [Mutation(ColumnOrSuperColumn(super_column=sc))]}
             client.batch_mutate({key: cfmap}, ConsistencyLevel.ONE)
 
             sc2 = SuperColumn(utf8encode('sc2'), [Column(_i64(22), utf8encode('value22'), 0),
-                                      Column(_i64(23), utf8encode('value23'), 0)])
+                                                  Column(_i64(23), utf8encode('value23'), 0)])
             cfmap2 = {'Super2': [Mutation(ColumnOrSuperColumn(super_column=sc2))]}
             client.batch_mutate({key: cfmap2}, ConsistencyLevel.ONE)
 
@@ -1185,8 +1188,8 @@ class TestMutations(TestThrift):
         super_columns = [result.super_column for result in _big_slice(utf8encode('key1'), ColumnParent('Super1'))]
         super_columns_expected = [SuperColumn(name=utf8encode('sc1'), columns=[Column(_i64(4), utf8encode('value4'), 0)]),
                                   SuperColumn(name=utf8encode('sc2'), columns=[Column(_i64(5), utf8encode('value5'), 6),
-                                                                   Column(_i64(6), utf8encode('value6'), 0),
-                                                                   Column(_i64(7), utf8encode('value7'), 0)])]
+                                                                               Column(_i64(6), utf8encode('value6'), 0),
+                                                                               Column(_i64(7), utf8encode('value7'), 0)])]
         assert super_columns == super_columns_expected, super_columns
 
         # shouldn't be able to specify a column w/o a super column for remove
@@ -2329,7 +2332,7 @@ class TestMutations(TestThrift):
         results = client.get_slice(utf8encode('key1'), ColumnParent('StandardComposite'), slice_predicate, ConsistencyLevel.ONE)
         columns = [result.column.name for result in results]
         assert columns == [composite('0', '0'), composite('1', '1'), composite('2', '2'),
-             composite('6', '6'), composite('7', '7'), composite('8', '8'), composite('9', '9')]
+                           composite('6', '6'), composite('7', '7'), composite('8', '8'), composite('9', '9')]
 
     @pytest.mark.skip_version('3.9')
     def test_range_deletion_eoc_0(self):
@@ -2358,9 +2361,9 @@ class TestMutations(TestThrift):
         results = client.get_slice(utf8encode('key1'), ColumnParent('StandardComposite'), slice_predicate, ConsistencyLevel.ONE)
         columns = [result.column.name for result in results]
         assert columns == [composite('0', '0'), composite('1', '1'), composite('2', '2'), composite('3', '3'), composite('4', '4'), composite('5', '5'),
-             composite('6'),
-             composite('6', '6'),
-             composite('7', '7'), composite('8', '8'), composite('9', '9')]
+                           composite('6'),
+                           composite('6', '6'),
+                           composite('7', '7'), composite('8', '8'), composite('9', '9')]
 
         # do a slice deletion with (6, ) as the end
         delete_slice = SlicePredicate(slice_range=SliceRange(composite('3', eoc=b'\xff'), composite('6', b'\x00'), False, 100))
@@ -2372,8 +2375,8 @@ class TestMutations(TestThrift):
         results = client.get_slice(utf8encode('key1'), ColumnParent('StandardComposite'), slice_predicate, ConsistencyLevel.ONE)
         columns = [result.column.name for result in results]
         assert columns == [composite('0', '0'), composite('1', '1'), composite('2', '2'),
-             composite('6', '6'),
-             composite('7', '7'), composite('8', '8'), composite('9', '9')]
+                           composite('6', '6'),
+                           composite('7', '7'), composite('8', '8'), composite('9', '9')]
 
         # do another slice deletion, but make the end (6, 6) this time
         delete_slice = SlicePredicate(slice_range=SliceRange(composite('3', eoc=b'\xff'), composite('6', '6', b'\x00'), False, 100))
@@ -2385,7 +2388,7 @@ class TestMutations(TestThrift):
         results = client.get_slice(utf8encode('key1'), ColumnParent('StandardComposite'), slice_predicate, ConsistencyLevel.ONE)
         columns = [result.column.name for result in results]
         assert columns == [composite('0', '0'), composite('1', '1'), composite('2', '2'),
-             composite('7', '7'), composite('8', '8'), composite('9', '9')]
+                           composite('7', '7'), composite('8', '8'), composite('9', '9')]
 
     def test_incr_decr_standard_slice(self, request):
         _set_keyspace('Keyspace1')

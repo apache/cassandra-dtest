@@ -86,7 +86,7 @@ class TestSSTableUtil(Tester):
         # that no temporary files are created if compaction finishes too early or starts too late
         # see CASSANDRA-11497
         logger.debug("Got {} final files and {} tmp files after compaction was interrupted"
-              .format(len(finalfiles), len(tmpfiles)))
+                     .format(len(finalfiles), len(tmpfiles)))
 
         self._invoke_sstableutil(KeyspaceName, TableName, cleanup=True)
 

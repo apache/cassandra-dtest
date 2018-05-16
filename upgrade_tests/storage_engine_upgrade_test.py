@@ -5,9 +5,11 @@ import logging
 
 from dtest import Tester
 from sstable_generation_loading_test import TestBaseSStableLoader
-from thrift_bindings.thrift010.Cassandra import (ConsistencyLevel, Deletion,
-                                           Mutation, SlicePredicate,
-                                           SliceRange)
+from thrift_bindings.thrift010.Cassandra import ConsistencyLevel
+from thrift_bindings.thrift010.Cassandra import Deletion
+from thrift_bindings.thrift010.Cassandra import Mutation
+from thrift_bindings.thrift010.Cassandra import SlicePredicate
+from thrift_bindings.thrift010.Cassandra import SliceRange
 from thrift_test import composite, get_thrift_client, i32
 from tools.assertions import (assert_all, assert_length_equal, assert_none,
                               assert_one)

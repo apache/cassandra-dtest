@@ -6,9 +6,12 @@ from cassandra.query import dict_factory
 
 from dtest import RUN_STATIC_UPGRADE_MATRIX, Tester
 from thrift_bindings.thrift010 import Cassandra
-from thrift_bindings.thrift010.Cassandra import (Column, ColumnDef,
-                                           ColumnParent, ConsistencyLevel,
-                                           SlicePredicate, SliceRange)
+from thrift_bindings.thrift010.Cassandra import Column
+from thrift_bindings.thrift010.Cassandra import ColumnDef
+from thrift_bindings.thrift010.Cassandra import ColumnParent
+from thrift_bindings.thrift010.Cassandra import ConsistencyLevel
+from thrift_bindings.thrift010.Cassandra import SlicePredicate
+from thrift_bindings.thrift010.Cassandra import SliceRange
 from thrift_test import _i64, get_thrift_client
 from tools.assertions import assert_length_equal
 from .upgrade_base import UpgradeTester
@@ -40,17 +43,17 @@ def _validate_sparse_cql(cursor, cf='sparse_super_1', column1='column1', col1='c
     cursor.execute('use ks')
 
     assert (list(cursor.execute("SELECT * FROM {}".format(cf))) ==
-                 [{key: 'k1', column1: 'key1', col1: 200, col2: 300},
-                  {key: 'k1', column1: 'key2', col1: 200, col2: 300},
-                  {key: 'k2', column1: 'key1', col1: 200, col2: 300},
-                  {key: 'k2', column1: 'key2', col1: 200, col2: 300}])
+            [{key: 'k1', column1: 'key1', col1: 200, col2: 300},
+            {key: 'k1', column1: 'key2', col1: 200, col2: 300},
+            {key: 'k2', column1: 'key1', col1: 200, col2: 300},
+            {key: 'k2', column1: 'key2', col1: 200, col2: 300}])
 
     assert (list(cursor.execute("SELECT * FROM {} WHERE {} = 'k1'".format(cf, key))) ==
-                 [{key: 'k1', column1: 'key1', col1: 200, col2: 300},
-                  {key: 'k1', column1: 'key2', col1: 200, col2: 300}])
+            [{key: 'k1', column1: 'key1', col1: 200, col2: 300},
+            {key: 'k1', column1: 'key2', col1: 200, col2: 300}])
 
     assert (list(cursor.execute("SELECT * FROM {} WHERE {} = 'k2' AND {} = 'key1'".format(cf, key, column1))) ==
-                 [{key: 'k2', column1: 'key1', col1: 200, col2: 300}])
+            [{key: 'k2', column1: 'key1', col1: 200, col2: 300}])
 
 
 def _validate_sparse_thrift(client, cf='sparse_super_1'):
@@ -74,20 +77,20 @@ def _validate_dense_cql(cursor, cf='dense_super_1', key='key', column1='column1'
     cursor.execute('use ks')
 
     assert (list(cursor.execute("SELECT * FROM {}".format(cf))) ==
-                 [{key: 'k1', column1: 'key1', column2: 100, value: 'value1'},
-                  {key: 'k1', column1: 'key2', column2: 100, value: 'value1'},
-                  {key: 'k2', column1: 'key1', column2: 200, value: 'value2'},
-                  {key: 'k2', column1: 'key2', column2: 200, value: 'value2'}])
+            [{key: 'k1', column1: 'key1', column2: 100, value: 'value1'},
+            {key: 'k1', column1: 'key2', column2: 100, value: 'value1'},
+            {key: 'k2', column1: 'key1', column2: 200, value: 'value2'},
+            {key: 'k2', column1: 'key2', column2: 200, value: 'value2'}])
 
     assert (list(cursor.execute("SELECT * FROM {} WHERE {} = 'k1'".format(cf, key))) ==
-                 [{key: 'k1', column1: 'key1', column2: 100, value: 'value1'},
-                  {key: 'k1', column1: 'key2', column2: 100, value: 'value1'}])
+            [{key: 'k1', column1: 'key1', column2: 100, value: 'value1'},
+            {key: 'k1', column1: 'key2', column2: 100, value: 'value1'}])
 
     assert (list(cursor.execute("SELECT * FROM {} WHERE {} = 'k1' AND {} = 'key1'".format(cf, key, column1))) ==
-                 [{key: 'k1', column1: 'key1', column2: 100, value: 'value1'}])
+            [{key: 'k1', column1: 'key1', column2: 100, value: 'value1'}])
 
     assert (list(cursor.execute("SELECT * FROM {} WHERE {} = 'k1' AND {} = 'key1' AND {} = 100".format(cf, key, column1, column2))) ==
-                 [{key: 'k1', column1: 'key1', column2: 100, value: 'value1'}])
+            [{key: 'k1', column1: 'key1', column2: 100, value: 'value1'}])
 
 
 def _validate_dense_thrift(client, cf='dense_super_1'):

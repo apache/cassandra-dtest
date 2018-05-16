@@ -831,7 +831,7 @@ class TestIncRepair(Tester):
     @since('4.0')
     def test_force_with_none_down(self):
         """
-        if we force an incremental repair, but all the involved nodes are up, 
+        if we force an incremental repair, but all the involved nodes are up,
         we should run normally and promote sstables afterwards
         """
         self.fixture_dtest_setup.setup_overrides.cluster_options = ImmutableMapping({'hinted_handoff_enabled': 'false',

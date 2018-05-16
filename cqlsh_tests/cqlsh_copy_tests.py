@@ -25,8 +25,8 @@ from cassandra.util import SortedSet
 from ccmlib.common import is_win
 
 from .cqlsh_tools import (DummyColorMap, assert_csvs_items_equal, csv_rows,
-                         monkeypatch_driver, random_list, unmonkeypatch_driver,
-                         write_rows_to_csv)
+                          monkeypatch_driver, random_list, unmonkeypatch_driver,
+                          write_rows_to_csv)
 from dtest import (Tester, create_ks)
 from tools.data import rows_to_list
 from tools.metadata_wrapper import (UpdatingClusterMetadataWrapper,
@@ -386,7 +386,7 @@ class TestCqlshCopy(Tester):
         except Exception as e:
             if len(csv_results) != len(processed_results):
                 logger.warning("Different # of entries. CSV: " + str(len(csv_results)) +
-                        " vs results: " + str(len(processed_results)))
+                               " vs results: " + str(len(processed_results)))
             elif csv_results[0] is not None:
                 for x in range(0, len(csv_results[0])):
                     if csv_results[0][x] != processed_results[0][x]:
@@ -398,7 +398,6 @@ class TestCqlshCopy(Tester):
     def make_csv_formatter(self, time_format, nullval):
         with self._cqlshlib() as cqlshlib:  # noqa
             from cqlshlib.formatting import format_value, format_value_default
-            from cqlshlib.displaying import NO_COLOR_MAP
         try:
             from cqlshlib.formatting import DateTimeFormat
             date_time_format = DateTimeFormat()
@@ -875,8 +874,8 @@ class TestCqlshCopy(Tester):
             csv_values = list(csv.reader(csvfile))
 
         assert csv_values == [['1', '2015/01/01 07:00'],
-                               ['2', '2015/06/10 12:30'],
-                               ['3', '2015/12/31 23:59']]
+                              ['2', '2015/06/10 12:30'],
+                              ['3', '2015/12/31 23:59']]
 
         self.session.execute("TRUNCATE testdatetimeformat")
         cmds = "COPY ks.testdatetimeformat FROM '{name}'".format(name=tempfile.name)
@@ -890,7 +889,7 @@ class TestCqlshCopy(Tester):
 
         imported_results = list(self.session.execute("SELECT * FROM testdatetimeformat"))
         assert self.result_to_csv_rows(exported_results, cql_type_names, time_format=format) \
-               == self.result_to_csv_rows(imported_results, cql_type_names, time_format=format)
+            == self.result_to_csv_rows(imported_results, cql_type_names, time_format=format)
 
     @since('3.2')
     def test_reading_with_ttl(self):
@@ -1103,7 +1102,7 @@ class TestCqlshCopy(Tester):
 
         tempfile = self.get_temp_file()
         logger.debug('Exporting tokens {} - {} for {} records to csv file: {}'.format(begin_token, end_token,
-                                                                               num_records, tempfile.name))
+                     num_records, tempfile.name))
         cmds = "COPY ks.testtokens TO '{}'".format(tempfile.name)
         if begin_token and end_token:
             cmds += "WITH BEGINTOKEN = '{}' AND ENDTOKEN = '{}'".format(begin_token, end_token)
@@ -1215,7 +1214,7 @@ class TestCqlshCopy(Tester):
             num_expected_rows = num_rows - chunk_size  # one chunk will fail
 
             logger.debug("Importing csv file {} with {} max insert errors and chunk size {}"
-                  .format(tempfile.name, max_insert_errors, chunk_size))
+                         .format(tempfile.name, max_insert_errors, chunk_size))
             # Note: we use one attempt because each attempt counts as a failure
             out, err, _ = self.run_cqlsh(cmds="COPY ks.testmaxinserterrors FROM '{}' WITH MAXINSERTERRORS='{}' "
                                          "AND CHUNKSIZE='{}' AND MAXATTEMPTS='1'"
@@ -1279,7 +1278,7 @@ class TestCqlshCopy(Tester):
             self.session.execute("TRUNCATE testparseerrors")
 
             logger.debug("Importing csv file {} with err_file {} and {}/{}/{}"
-                  .format(tempfile.name, err_file_name, num_chunks, chunk_size, num_failing_per_chunk))
+                         .format(tempfile.name, err_file_name, num_chunks, chunk_size, num_failing_per_chunk))
             cmd = "COPY ks.testparseerrors FROM '{}' WITH CHUNKSIZE={}".format(tempfile.name, chunk_size)
             if err_file:
                 cmd += " AND ERRFILE='{}'".format(err_file.name)
@@ -1418,7 +1417,7 @@ class TestCqlshCopy(Tester):
         def do_test(max_size, header):
             tempfile = self.get_temp_file(prefix='testwritemult', suffix='.csv')
             logger.debug('Exporting to csv file: {} with max size {} and header {}'
-                  .format(tempfile.name, max_size, header))
+                         .format(tempfile.name, max_size, header))
             cmd = "COPY {} TO '{}' WITH MAXOUTPUTSIZE='{}'".format(stress_table, tempfile.name, max_size)
             if header:
                 cmd += " AND HEADER='True'"
@@ -2000,7 +1999,7 @@ class TestCqlshCopy(Tester):
 
         def do_test(expected_vals, thousands_sep, decimal_sep):
             logger.debug('Exporting to csv file: {} with thousands_sep {} and decimal_sep {}'
-                  .format(tempfile.name, thousands_sep, decimal_sep))
+                         .format(tempfile.name, thousands_sep, decimal_sep))
             self.run_cqlsh(cmds="COPY ks.testnumberseps TO '{}' WITH THOUSANDSSEP='{}' AND DECIMALSEP='{}'"
                            .format(tempfile.name, thousands_sep, decimal_sep))
 
@@ -2009,7 +2008,7 @@ class TestCqlshCopy(Tester):
             assert expected_vals == list(csv_rows(tempfile.name))
 
             logger.debug('Importing from csv file: {} with thousands_sep {} and decimal_sep {}'
-                  .format(tempfile.name, thousands_sep, decimal_sep))
+                         .format(tempfile.name, thousands_sep, decimal_sep))
             self.session.execute('TRUNCATE ks.testnumberseps')
             self.run_cqlsh(cmds="COPY ks.testnumberseps FROM '{}' WITH THOUSANDSSEP='{}' AND DECIMALSEP='{}'"
                            .format(tempfile.name, thousands_sep, decimal_sep))
@@ -2024,7 +2023,7 @@ class TestCqlshCopy(Tester):
 
             # we format as if we were comparing to csv to overcome loss of precision in the import
             assert self.result_to_csv_rows(exported_results == cql_type_names,
-                             self.result_to_csv_rows(imported_results, cql_type_names))
+                                           self.result_to_csv_rows(imported_results, cql_type_names))
 
         do_test(expected_vals_usual, ',', '.')
         do_test(expected_vals_inverted, '.', ',')
@@ -2058,8 +2057,8 @@ class TestCqlshCopy(Tester):
 
         csv_results = sorted(list(csv_rows(tempfile2.name)))
         assert [['1', '1943-06-19 11:21:01.000+0000'],
-                               ['2', '1943-06-19 11:21:01.123+0000'],
-                               ['3', '1943-06-19 11:21:01.124+0000']] == csv_results
+                ['2', '1943-06-19 11:21:01.123+0000'],
+                ['3', '1943-06-19 11:21:01.124+0000']] == csv_results
 
     @since('3.6')
     def test_round_trip_with_different_number_precision(self):
@@ -2145,7 +2144,7 @@ class TestCqlshCopy(Tester):
         logger.debug(out)
         assert 'Using {} child processes'.format(num_processes) in out
         assert [[num_records]] == rows_to_list(self.session.execute("SELECT COUNT(* FROM {}"
-                                                                            .format(stress_table)))
+                                               .format(stress_table)))
 
     def test_round_trip_with_rate_file(self):
         """
@@ -2193,7 +2192,7 @@ class TestCqlshCopy(Tester):
 
         # check all records were imported
         assert [[num_rows]] == rows_to_list(self.session.execute("SELECT COUNT(* FROM {}"
-                                                                         .format(stress_table)))
+                                            .format(stress_table)))
 
         check_rate_file()
 
@@ -2661,7 +2660,7 @@ class TestCqlshCopy(Tester):
         os.environ['CQLSH_COPY_TEST_FAILURES'] = json.dumps(failures)
 
         logger.debug('Exporting to csv file: {} with {} and 3 max attempts'
-              .format(tempfile.name, os.environ['CQLSH_COPY_TEST_FAILURES']))
+                     .format(tempfile.name, os.environ['CQLSH_COPY_TEST_FAILURES']))
         out, err, _ = self.run_cqlsh(cmds="COPY {} TO '{}' WITH MAXATTEMPTS='3'"
                                      .format(stress_table, tempfile.name))
         logger.debug(out)
@@ -2690,7 +2689,7 @@ class TestCqlshCopy(Tester):
         failures = {'failing_range': {'start': start, 'end': end, 'num_failures': 3}}
         os.environ['CQLSH_COPY_TEST_FAILURES'] = json.dumps(failures)
         logger.debug('Exporting to csv file: {} with {} and 5 max attemps'
-              .format(tempfile.name, os.environ['CQLSH_COPY_TEST_FAILURES']))
+                     .format(tempfile.name, os.environ['CQLSH_COPY_TEST_FAILURES']))
         out, err, _ = self.run_cqlsh(cmds="COPY {} TO '{}' WITH MAXATTEMPTS='5'"
                                      .format(stress_table, tempfile.name))
         logger.debug(out)
@@ -2720,7 +2719,7 @@ class TestCqlshCopy(Tester):
         os.environ['CQLSH_COPY_TEST_FAILURES'] = json.dumps(failures)
 
         logger.debug('Exporting to csv file: {} with {}'
-              .format(tempfile.name, os.environ['CQLSH_COPY_TEST_FAILURES']))
+                     .format(tempfile.name, os.environ['CQLSH_COPY_TEST_FAILURES']))
         out, err, _ = self.run_cqlsh(cmds="COPY {} TO '{}'".format(stress_table, tempfile.name))
         logger.debug(out)
         logger.debug(err)

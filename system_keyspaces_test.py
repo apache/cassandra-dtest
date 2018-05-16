@@ -9,7 +9,6 @@ since = pytest.mark.since
 logger = logging.getLogger(__name__)
 
 
-
 class TestSystemKeyspaces(Tester):
 
     @since('3.0')

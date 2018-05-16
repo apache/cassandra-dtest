@@ -27,8 +27,7 @@ class TestGossiper(Tester):
         self.cluster.set_configuration_options({
             'seed_provider': [{'class_name': 'org.apache.cassandra.locator.SimpleSeedProvider',
                                'parameters': [{'seeds': '127.0.0.2'}]  # dummy node doesn't exist
-                               }]
-            })
+                               }]})
 
         try:
             STARTUP_TIMEOUT = 15  # seconds
@@ -70,8 +69,7 @@ class TestGossiper(Tester):
         self.cluster.set_configuration_options({
             'seed_provider': [{'class_name': 'org.apache.cassandra.locator.SimpleSeedProvider',
                                'parameters': [{'seeds': '127.0.0.1'}]
-                               }]
-            })
+                               }]})
 
         # test non seed node can start when peer is started but seed isn't
         node3.start(wait_other_notice=False, wait_for_binary_proto=120)
