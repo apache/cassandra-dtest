@@ -567,6 +567,8 @@ class TestRecoverNegativeExpirationDate(TestHelper):
         Check that row with negative overflowed ttl is recovered by offline scrub
         """
         cluster = self.cluster
+        if self.cluster.version() >= '4':
+            cluster.set_configuration_options(values={'corrupted_tombstone_strategy': 'disabled'})
         cluster.populate(1).start(wait_for_binary_proto=True)
         [node] = cluster.nodelist()
 

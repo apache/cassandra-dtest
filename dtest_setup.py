@@ -417,6 +417,8 @@ class DTestSetup:
         # No more thrift in 4.0, and start_rpc doesn't exists anymore
         if self.cluster.version() >= '4' and 'start_rpc' in values:
             del values['start_rpc']
+        if self.cluster.version() >= '4':
+            values['corrupted_tombstone_strategy'] = 'exception'
 
         self.cluster.set_configuration_options(values)
         logger.debug("Done setting configuration options:\n" + pprint.pformat(self.cluster._config_options, indent=4))
