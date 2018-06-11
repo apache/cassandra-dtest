@@ -8,7 +8,7 @@ from collections import OrderedDict, namedtuple
 from copy import deepcopy
 
 from cassandra import ConsistencyLevel, consistency_value_to_name
-from cassandra.query import SimpleStatement
+from cassandra.query import BatchStatement, BatchType, SimpleStatement
 
 from tools.assertions import (assert_all, assert_length_equal, assert_none,
                               assert_unavailable)
@@ -766,6 +766,139 @@ class TestAccuracy(TestHelper):
 
 
 class TestConsistency(Tester):
+
+    @since('3.0')
+    def test_14513_transient(self):
+        """
+        @jira_ticket CASSANDRA-14513
+
+        A reproduction / regression test to illustrate CASSANDRA-14513:
+        transient data loss when doing reverse-order queries with range
+        tombstones in place.
+
+        This test shows how the bug can cause queries to return invalid
+        results by just a single node.
+        """
+        cluster = self.cluster
+
+        # set column_index_size_in_kb to 1 for a slightly easier reproduction sequence
+        cluster.set_configuration_options(values={'column_index_size_in_kb': 1})
+
+        cluster.populate(1).start(wait_other_notice=True)
+        node1 = cluster.nodelist()[0]
+
+        session = self.patient_cql_connection(node1)
+
+        query = "CREATE KEYSPACE journals WITH replication = {'class': 'NetworkTopologyStrategy', 'datacenter1': 1};"
+        session.execute(query)
+
+        query = 'CREATE TABLE journals.logs (user text, year int, month int, day int, title text, body text, PRIMARY KEY ((user), year, month, day, title));';
+        session.execute(query)
+
+        # populate the table
+        stmt = session.prepare('INSERT INTO journals.logs (user, year, month, day, title, body) VALUES (?, ?, ?, ?, ?, ?);');
+        for year in range(2011, 2018):
+            for month in range(1, 13):
+                for day in range(1, 31):
+                    session.execute(stmt, ['beobal', year, month, day, 'title', 'Lorem ipsum dolor sit amet'], ConsistencyLevel.ONE)
+        node1.flush()
+
+        # make sure the data is there
+        assert_all(session,
+                   "SELECT COUNT(*) FROM journals.logs WHERE user = 'beobal' AND year < 2018 ORDER BY year DESC;",
+                   [[7 * 12 * 30]],
+                   cl=ConsistencyLevel.ONE)
+
+        # generate an sstable with an RT that opens in the penultimate block and closes in the last one
+        stmt = session.prepare('DELETE FROM journals.logs WHERE user = ? AND year = ? AND month = ? AND day = ?;')
+        batch = BatchStatement(batch_type=BatchType.UNLOGGED)
+        for day in range(1, 31):
+            batch.add(stmt, ['beobal', 2018, 1, day])
+        session.execute(batch)
+        node1.flush()
+
+        # the data should still be there for years 2011-2017, but prior to CASSANDRA-14513 it would've been gone
+        assert_all(session,
+                   "SELECT COUNT(*) FROM journals.logs WHERE user = 'beobal' AND year < 2018 ORDER BY year DESC;",
+                   [[7 * 12 * 30]],
+                   cl=ConsistencyLevel.ONE)
+
+    @since('3.0')
+    def test_14513_permanent(self):
+        """
+        @jira_ticket CASSANDRA-14513
+
+        A reproduction / regression test to illustrate CASSANDRA-14513:
+        permanent data loss when doing reverse-order queries with range
+        tombstones in place.
+
+        This test shows how the invalid RT can propagate to other replicas
+        and delete data permanently.
+        """
+        cluster = self.cluster
+
+        # disable hinted handoff and set batch commit log so this doesn't interfere with the test
+        # set column_index_size_in_kb to 1 for a slightly easier reproduction sequence
+        cluster.set_configuration_options(values={'column_index_size_in_kb': 1, 'hinted_handoff_enabled': False})
+        cluster.set_batch_commitlog(enabled=True)
+
+        cluster.populate(3).start(wait_other_notice=True)
+        node1, node2, node3 = cluster.nodelist()
+
+        session = self.patient_exclusive_cql_connection(node1)
+
+        query = "CREATE KEYSPACE journals WITH replication = {'class': 'NetworkTopologyStrategy', 'datacenter1': 3};"
+        session.execute(query)
+
+        query = 'CREATE TABLE journals.logs (user text, year int, month int, day int, title text, body text, PRIMARY KEY ((user), year, month, day, title));';
+        session.execute(query)
+
+        # populate the table
+        stmt = session.prepare('INSERT INTO journals.logs (user, year, month, day, title, body) VALUES (?, ?, ?, ?, ?, ?);');
+        for year in range(2011, 2018):
+            for month in range(1, 13):
+                for day in range(1, 31):
+                    session.execute(stmt, ['beobal', year, month, day, 'title', 'Lorem ipsum dolor sit amet'], ConsistencyLevel.QUORUM)
+        cluster.flush()
+
+        # make sure the data is there
+        assert_all(session,
+                   "SELECT COUNT(*) FROM journals.logs WHERE user = 'beobal' AND year < 2018 ORDER BY year DESC;",
+                   [[7 * 12 * 30]],
+                   cl=ConsistencyLevel.QUORUM)
+
+        # take one node down
+        node3.stop(wait_other_notice=True)
+
+        # generate an sstable with an RT that opens in the penultimate block and closes in the last one
+        stmt = session.prepare('DELETE FROM journals.logs WHERE user = ? AND year = ? AND month = ? AND day = ?;')
+        batch = BatchStatement(batch_type=BatchType.UNLOGGED)
+        for day in range(1, 31):
+            batch.add(stmt, ['beobal', 2018, 1, day])
+        session.execute(batch, [], ConsistencyLevel.QUORUM)
+        node1.flush()
+        node2.flush()
+
+        # take node2 down, get node3 up
+        node2.stop(wait_other_notice=True)
+        node3.start(wait_other_notice=True)
+
+        # insert an RT somewhere so that we would have a closing marker and RR makes its mutations
+        stmt = SimpleStatement("DELETE FROM journals.logs WHERE user = 'beobal' AND year = 2010 AND month = 12 AND day = 30",
+                               consistency_level=ConsistencyLevel.QUORUM)
+        session.execute(stmt)
+
+        # this read will trigger read repair with the invalid RT and propagate the wide broken RT,
+        # permanently killing the partition
+        stmt = SimpleStatement("SELECT * FROM journals.logs WHERE user = 'beobal' AND year < 2018 ORDER BY year DESC;",
+                               consistency_level=ConsistencyLevel.QUORUM)
+        session.execute(stmt)
+
+        # everything is gone
+        assert_all(session,
+                   "SELECT COUNT(*) FROM journals.logs WHERE user = 'beobal';",
+                   [[7 * 12 * 30]],
+                   cl=ConsistencyLevel.QUORUM)
 
     @since('3.0')
     def test_14330(self):
