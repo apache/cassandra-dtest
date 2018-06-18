@@ -1204,10 +1204,11 @@ class TestPreJoinCallback(Tester):
                 yaml_opts['streaming_socket_timeout_in_ms'] = 1000
 
             node2.set_configuration_options(values=yaml_opts)
-            node2.start(wait_other_notice=False, wait_for_binary_proto=True)
-            assert_bootstrap_state(self, node2, 'IN_PROGRESS')
+            node2.start(wait_other_notice=True, wait_for_binary_proto=False)
+            node2.watch_log_for('Some data streaming failed. Use nodetool to check bootstrap state and resume.')
 
             node2.nodetool("bootstrap resume")
+            node2.watch_log_for('Starting listening for CQL clients')
             assert_bootstrap_state(self, node2, 'COMPLETED')
             assert node2.grep_log('Executing pre-join post-bootstrap tasks')
 

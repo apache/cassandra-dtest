@@ -311,17 +311,19 @@ def assert_stderr_clean(err, acceptable_errors=None):
                   "stderr is {}".format(err_str, regex_str)
 
 
-def assert_bootstrap_state(tester, node, expected_bootstrap_state):
+def assert_bootstrap_state(tester, node, expected_bootstrap_state, user=None, password=None):
     """
     Assert that a node is on a given bootstrap state
     @param tester The dtest.Tester object to fetch the exclusive connection to the node
     @param node The node to check bootstrap state
     @param expected_bootstrap_state Bootstrap state to expect
+    @param user To connect as for authenticated nodes
+    @param password for corresponding user
 
     Examples:
     assert_bootstrap_state(self, node3, 'COMPLETED')
     """
-    session = tester.patient_exclusive_cql_connection(node)
+    session = tester.patient_exclusive_cql_connection(node, user=user, password=password)
     assert_one(session, "SELECT bootstrapped FROM system.local WHERE key='local'", [expected_bootstrap_state])
     session.shutdown()
 
