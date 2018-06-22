@@ -1,0 +1,8 @@
+# block mutation verb
+RULE disable mutations
+CLASS org.apache.cassandra.db.ReadCommandVerbHandler
+METHOD doVerb
+AT ENTRY
+IF true
+DO return;
+ENDRULE
