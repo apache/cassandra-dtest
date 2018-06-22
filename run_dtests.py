@@ -41,7 +41,7 @@ from _pytest.config import Parser
 import argparse
 
 from conftest import pytest_addoption
-from dtest import get_version_from_build
+from ccmlib.common import get_version_from_build
 
 logger = logging.getLogger(__name__)
 
