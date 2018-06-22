@@ -1,0 +1,7 @@
+RULE fail repairs
+CLASS org.apache.cassandra.repair.RepairMessageVerbHandler
+METHOD doVerb
+AT ENTRY
+IF true
+DO throw new RuntimeException("Repair failed");
+ENDRULE

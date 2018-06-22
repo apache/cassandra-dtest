@@ -1,0 +1,7 @@
+RULE slow mutations
+CLASS org.apache.cassandra.db.MutationVerbHandler
+METHOD doVerb
+AT ENTRY
+IF true
+DO Thread.sleep(60000);
+ENDRULE

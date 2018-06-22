@@ -1,0 +1,7 @@
+RULE block digest
+CLASS org.apache.cassandra.db.ReadResponse
+METHOD createDigestResponse
+AT ENTRY
+IF true
+DO throw new RuntimeException("Digest response throws");
+ENDRULE
