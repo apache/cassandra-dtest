@@ -470,7 +470,9 @@ def pytest_collection_modifyitems(items, config):
             if not config.getoption("--execute-upgrade-tests"):
                 deselect_test = True
 
-        # todo kjkj: deal with no_offheap_memtables mark
+        if item.get_marker("no_offheap_memtables"):
+            if config.getoption("use_off_heap_memtables"):
+                deselect_test = True
 
         if deselect_test:
             deselected_items.append(item)
