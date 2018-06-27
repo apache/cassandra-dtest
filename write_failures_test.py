@@ -224,7 +224,7 @@ class TestWriteFailures(Tester):
         with pytest.raises(self.expected_expt):
             client.insert('key1'.encode(),
                           thrift_types.ColumnParent('mytable'),
-                          thrift_types.Column('value'.encode(), 'Value 1'.enocde(), 0),
+                          thrift_types.Column('value'.encode(), 'Value 1'.encode(), 0),
                           thrift_types.ConsistencyLevel.ALL)
 
         client.transport.close()
