@@ -217,13 +217,13 @@ class TestRebuild(Tester):
         node3.byteman_submit(script)
 
         # First rebuild must fail and data must be incomplete
-        with pytest.raises(ToolError, msg='Unexpected: SUCCEED'):
+        with pytest.raises(ToolError, message='Unexpected: SUCCEED'):
             logger.debug('Executing first rebuild -> '),
             node3.nodetool('rebuild dc1')
         logger.debug('Expected: FAILED')
 
         session.execute('USE ks')
-        with pytest.raises(AssertionError, msg='Unexpected: COMPLETE'):
+        with pytest.raises(AssertionError, message='Unexpected: COMPLETE'):
             logger.debug('Checking data is complete -> '),
             for i in range(0, 20000):
                 query_c1c2(session, i, ConsistencyLevel.LOCAL_ONE)
