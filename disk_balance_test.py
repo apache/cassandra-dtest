@@ -24,6 +24,15 @@ class TestDiskBalance(Tester):
     @jira_ticket CASSANDRA-6696
     """
 
+    @pytest.fixture(scope='function', autouse=True)
+    def fixture_set_cluster_settings(self, fixture_dtest_setup):
+        cluster = fixture_dtest_setup.cluster
+        cluster.schema_event_refresh_window = 0
+
+        # CASSANDRA-14556 should be disabled if you need directories to be perfectly balanced.
+        if cluster.version() >= '4.0':
+            cluster.set_configuration_options({'stream_entire_sstables': 'false'})
+
     def test_disk_balance_stress(self):
         cluster = self.cluster
         if self.dtest_config.use_vnodes:

@@ -283,7 +283,13 @@ def get_eager_protocol_version(cassandra_version):
 
 # We default to UTF8Type because it's simpler to use in tests
 def create_cf(session, name, key_type="varchar", speculative_retry=None, read_repair=None, compression=None,
-              gc_grace=None, columns=None, validation="UTF8Type", compact_storage=False):
+              gc_grace=None, columns=None, validation="UTF8Type", compact_storage=False, compaction_strategy='SizeTieredCompactionStrategy'):
+
+    compaction_fragment = "compaction = {'class': '%s', 'enabled': 'true'}"
+    if compaction_strategy == '':
+        compaction_fragment = compaction_fragment % 'SizeTieredCompactionStrategy'
+    else:
+        compaction_fragment = compaction_fragment % compaction_strategy
 
     additional_columns = ""
     if columns is not None:
@@ -294,6 +300,9 @@ def create_cf(session, name, key_type="varchar", speculative_retry=None, read_re
         query = 'CREATE COLUMNFAMILY %s (key %s, c varchar, v varchar, PRIMARY KEY(key, c)) WITH comment=\'test cf\'' % (name, key_type)
     else:
         query = 'CREATE COLUMNFAMILY %s (key %s PRIMARY KEY%s) WITH comment=\'test cf\'' % (name, key_type, additional_columns)
+
+    if compaction_fragment is not None:
+        query = '%s AND %s' % (query, compaction_fragment)
 
     if compression is not None:
         query = '%s AND compression = { \'sstable_compression\': \'%sCompressor\' }' % (query, compression)
