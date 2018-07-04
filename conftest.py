@@ -288,7 +288,7 @@ def fixture_dtest_setup(request,
     dtest_setup.initialize_cluster(fixture_dtest_create_cluster_func)
 
     if not dtest_config.disable_active_log_watching:
-        dtest_setup.log_watch_thread = dtest_setup.begin_active_log_watch()
+        dtest_setup.begin_active_log_watch()
 
     # at this point we're done with our setup operations in this fixture
     # yield to allow the actual test to run

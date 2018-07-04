@@ -102,7 +102,7 @@ class DTestSetup:
         When the cluster is no longer in use, stop_active_log_watch should be called to end log watching.
         (otherwise a 'daemon' thread will (needlessly) run until the process exits).
         """
-        self._log_watch_thread = self.cluster.actively_watch_logs_for_error(self._log_error_handler, interval=0.25)
+        self.log_watch_thread = self.cluster.actively_watch_logs_for_error(self._log_error_handler, interval=0.25)
 
     def _log_error_handler(self, errordata):
         """
