@@ -47,8 +47,8 @@ class TestJson(Tester):
 
         res = session.execute("SELECT * FROM Test. users")
 
-        assert assert_lists_equal_ignoring_order(rows_to_list(res), [['frodo', 1985, 'male', 'pass@', 'CA'],
-                               ['sam', 1980, 'male', '@pass', 'NY']])
+        assert_lists_equal_ignoring_order(rows_to_list(res), [['frodo', 1985, 'male', 'pass@', 'CA'],
+                                                              ['sam', 1980, 'male', '@pass', 'NY']])
 
         logger.debug("Flushing and stopping cluster...")
         node1.flush()
@@ -102,6 +102,6 @@ class TestJson(Tester):
 
         logger.debug("data: " + str(res))
 
-        assert rows_to_list(res) == [['frodo', 1985, 'male', 'pass@', 'CA'],
-                               ['sam', 1980, 'male', '@pass', 'NY'],
-                               ['gandalf', 1955, 'male', 'p@$$', 'WA']]
+        assert_lists_equal_ignoring_order(rows_to_list(res), [['frodo', 1985, 'male', 'pass@', 'CA'],
+                                                              ['sam', 1980, 'male', '@pass', 'NY'],
+                                                              ['gandalf', 1955, 'male', 'p@$$', 'WA']])
