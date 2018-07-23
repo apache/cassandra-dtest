@@ -42,7 +42,7 @@ class TestWriteFailures(Tester):
         self.consistency_level = ConsistencyLevel.ALL
         self.failing_nodes = [1, 2]
 
-    def _prepare_cluster(self, start_rpc=False):
+    def _prepare_cluster(self, start_rpc=False, compact_storage=False):
         self.cluster.populate(3)
 
         if start_rpc:
@@ -59,7 +59,7 @@ class TestWriteFailures(Tester):
             """ % (KEYSPACE, self.replication_factor))
         session.set_keyspace(KEYSPACE)
 
-        session.execute("CREATE TABLE IF NOT EXISTS mytable (key text PRIMARY KEY, value text)")
+        session.execute("CREATE TABLE IF NOT EXISTS mytable (key text PRIMARY KEY, value text) %s"%("WITH COMPACT STORAGE" if compact_storage else ''))
         session.execute("CREATE TABLE IF NOT EXISTS countertable (key uuid PRIMARY KEY, value counter)")
 
         for idx in self.failing_nodes:
@@ -214,7 +214,7 @@ class TestWriteFailures(Tester):
         """
         A thrift client receives a TimedOutException
         """
-        self._prepare_cluster(start_rpc=True)
+        self._prepare_cluster(start_rpc=True, compact_storage=True)
         self.expected_expt = thrift_types.TimedOutException
 
         client = get_thrift_client()
