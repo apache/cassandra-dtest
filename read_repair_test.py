@@ -58,7 +58,8 @@ class TestReadRepair(Tester):
 
         # The read repair should have repaired the replicas, at least partially (see CASSANDRA-10655)
         # verify by querying each replica in turn.
-        self.check_data_on_each_replica(expect_fully_repaired=False, initial_replica=initial_replica)
+        value_skipping_disabled = True if self.cluster.version() < '3.4' else False
+        self.check_data_on_each_replica(expect_fully_repaired=value_skipping_disabled, initial_replica=initial_replica)
 
         # Now query again at CL.ALL but this time selecting all columns, which should ensure that 'b' also gets repaired
         query = "SELECT * FROM alter_rf_test.t1 WHERE k=1"
@@ -92,14 +93,16 @@ class TestReadRepair(Tester):
                                                     consistency_level=ConsistencyLevel.ONE))
 
         # Query each replica individually to ensure that read repair was triggered. We should expect that only
-        # the initial replica has data for both the 'a' and 'b' columns. The read repair should only have affected
-        # the selected column, so the other two replicas should only have that data.
+        # the initial replica has data for both the 'a' and 'b' columns. If the cluster is on > 3.4, the read repair
+        # should only have affected the selected column (CASSANDRA-10655), so the other two replicas should only have
+        # that data.
         # Note: we need to temporarily set read_repair_chance to 0 while we perform this check.
         logger.debug("Setting table read repair chance to 0 while we verify each replica's data")
         session.execute("""ALTER TABLE alter_rf_test.t1 WITH read_repair_chance = 0;""")
         # The read repair is run in the background, so we spin while checking that the repair has completed
+        value_skipping_disabled = True if self.cluster.version() < '3.4' else False
         retry_till_success(self.check_data_on_each_replica,
-                           expect_fully_repaired=False,
+                           expect_fully_repaired=value_skipping_disabled,
                            initial_replica=initial_replica,
                            timeout=30,
                            bypassed_exception=NotRepairedException)
