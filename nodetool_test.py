@@ -330,6 +330,7 @@ class TestNodetool(Tester):
         else:
             self.fail("Expected error when setting and invalid value")
 
+    @since('4.0')
     def test_describecluster_more_information_three_datacenters(self):
         """
         nodetool describecluster should be more informative. It should include detailes
