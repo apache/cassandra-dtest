@@ -10,8 +10,7 @@ import signal
 
 from cassandra import ConsistencyLevel
 from cassandra.concurrent import execute_concurrent_with_args
-from ccmlib.node import NodeError, TimeoutError, ToolError
-from ccmlib.node import TimeoutError
+from ccmlib.node import NodeError, TimeoutError, ToolError, Node
 
 import pytest
 
@@ -21,9 +20,8 @@ from dtest import Tester, create_ks, create_cf, data_size
 from tools.assertions import (assert_almost_equal, assert_bootstrap_state, assert_not_running,
                               assert_one, assert_stderr_clean)
 from tools.data import query_c1c2
-from tools.intervention import InterruptBootstrap, KillOnBootstrap
-from tools.misc import new_node
-from tools.misc import generate_ssl_stores
+from tools.intervention import InterruptBootstrap, KillOnBootstrap, KillOnReadyToBootstrap
+from tools.misc import new_node, generate_ssl_stores
 
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
@@ -658,6 +656,89 @@ class TestBootstrap(Tester):
         mark = node2.mark_log()
         node2.start(wait_other_notice=True)
         node2.watch_log_for("JOINING:", from_mark=mark)
+
+    @since('3.0')
+    def test_node_cannot_join_as_hibernating_node_without_replace_address(self):
+        """
+        @jira_ticket CASSANDRA-14559
+        Test that a node cannot bootstrap without replace_address if a hibernating node exists with that address
+        """
+        cluster = self.cluster
+        cluster.populate(2)
+        # Setting seed node to first node to make sure replaced node is not in own seed list
+        cluster.set_configuration_options({
+            'seed_provider': [{'class_name': 'org.apache.cassandra.locator.SimpleSeedProvider',
+                               'parameters': [{'seeds': '127.0.0.1'}]
+                               }]
+        })
+
+        cluster.start(wait_for_binary_proto=True)
+
+        node1 = cluster.nodelist()[0]
+        node2 = cluster.nodelist()[1]
+
+        replacement_address = node2.address()
+        node2.stop()
+
+        jvm_option = 'replace_address'
+
+        logger.debug("Starting replacement node {} with jvm_option '{}={}'".format(replacement_address, jvm_option,
+                                                                                   replacement_address))
+        replacement_node = Node('replacement', cluster=self.cluster, auto_bootstrap=True,
+                                thrift_interface=None, storage_interface=(replacement_address, 7000),
+                                jmx_port='7400', remote_debug_port='0', initial_token=None,
+                                binary_interface=(replacement_address, 9042))
+        cluster.add(replacement_node, False)
+
+        extra_jvm_args = []
+        extra_jvm_args.extend(["-Dcassandra.{}={}".format(jvm_option, replacement_address),
+                               "-Dcassandra.ring_delay_ms=10000",
+                               "-Dcassandra.broadcast_interval_ms=10000"])
+
+        wait_other_notice = False
+        wait_for_binary_proto = False
+
+        # Killing node earlier in bootstrap to prevent node making it to 'normal' status.
+        t = KillOnReadyToBootstrap(replacement_node)
+
+        t.start()
+
+        replacement_node.start(jvm_args=extra_jvm_args,
+                               wait_for_binary_proto=wait_for_binary_proto, wait_other_notice=wait_other_notice)
+
+        t.join()
+
+        logger.debug("Asserting that original replacement node is not running")
+        assert not replacement_node.is_running()
+
+        # Assert node is actually in hibernate for test to be accurate.
+        logger.debug("Asserting that node is actually in hibernate status for test accuracy")
+        assert 'hibernate' in node1.nodetool("gossipinfo").stdout
+
+        extra_jvm_args = []
+        extra_jvm_args.extend(["-Dcassandra.ring_delay_ms=10000",
+                               "-Dcassandra.broadcast_interval_ms=10000"])
+
+        logger.debug("Starting blind replacement node {}".format(replacement_address))
+        blind_replacement_node = Node('blind_replacement', cluster=self.cluster, auto_bootstrap=True,
+                                      thrift_interface=None, storage_interface=(replacement_address, 7000),
+                                      jmx_port='7400', remote_debug_port='0', initial_token=None,
+                                      binary_interface=(replacement_address, 9042))
+        cluster.add(blind_replacement_node, False)
+        wait_other_notice = False
+        wait_for_binary_proto = False
+
+        blind_replacement_node.start(wait_for_binary_proto=wait_for_binary_proto, wait_other_notice=wait_other_notice)
+
+        # Asserting that the new node has correct log entry
+        self.assert_log_had_msg(blind_replacement_node, "A node with the same IP in hibernate status was detected", timeout=60)
+        # Waiting two seconds to give node a chance to stop in case above assertion is True.
+        # When this happens cassandra may not shut down fast enough and the below assertion fails.
+        time.sleep(2)
+        # Asserting that then new node is not running.
+        # This tests the actual expected state as opposed to just checking for the existance of the above error message.
+        assert not blind_replacement_node.is_running()
+
 
     @since('2.1.1')
     def test_simultaneous_bootstrap(self):
