@@ -146,7 +146,7 @@ class TestOfflineTools(Tester):
         cluster.start(wait_for_binary_proto=True)
         session = self.patient_cql_connection(node1)
         logger.debug("Altering compaction strategy to LCS")
-        session.execute("ALTER TABLE keyspace1.standard1 with compaction={'class': 'LeveledCompactionStrategy', 'sstable_size_in_mb':1};")
+        session.execute("ALTER TABLE keyspace1.standard1 with compaction={'class': 'LeveledCompactionStrategy', 'sstable_size_in_mb':1, 'enabled':'false'};")
 
         node1.stress(['write', 'n=1K', 'no-warmup',
                       '-schema', 'replication(factor=1)',
@@ -161,6 +161,7 @@ class TestOfflineTools(Tester):
         assert rc == 0, str(rc)
 
         cluster.start(wait_for_binary_proto=True)
+        node1.nodetool('enableautocompaction keyspace1 standard1')
         # test by loading large amount data so we have multiple sstables
         # must write enough to create more than just L1 sstables
         keys = 8 * cluster.data_dir_count
