@@ -1,3 +1,4 @@
+import pytest
 import time
 import logging
 
@@ -9,6 +10,12 @@ logger = logging.getLogger(__name__)
 
 
 class TestGlobalRowKeyCache(Tester):
+
+    @pytest.fixture(autouse=True)
+    def fixture_add_additional_log_patterns(self, fixture_dtest_setup):
+        fixture_dtest_setup.ignore_log_patterns = (
+            r'Failed to load Java8 implementation ohc-core-j8'
+        )
 
     def test_functional(self):
         cluster = self.cluster
