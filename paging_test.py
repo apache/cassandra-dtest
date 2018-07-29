@@ -3419,7 +3419,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
 
     def test_failure_threshold_deletions(self):
         """Test that paging throws a failure in case of tombstone threshold """
-        supports_v5_protocol = self.cluster.version() >= LooseVersion('3.10')
+        supports_v5_protocol = self.supports_v5_protocol(self.cluster.version())
 
         self.fixture_dtest_setup.allow_log_errors = True
         self.cluster.set_configuration_options(
