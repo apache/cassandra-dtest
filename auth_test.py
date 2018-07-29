@@ -69,8 +69,8 @@ class TestAuth(Tester):
         logger.debug("Repairing before altering RF")
         self.cluster.repair()
 
-        logger.debug("Shutting down client session")
-        session.shutdown()
+        logger.debug("Shutting down client cluster")
+        session.cluster.shutdown()
 
         # make sure schema change is persistent
         logger.debug("Stopping cluster..")
