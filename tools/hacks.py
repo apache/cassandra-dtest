@@ -21,7 +21,7 @@ def _files_in(directory):
 
 def advance_to_next_cl_segment(session, commitlog_dir,
                                keyspace_name='ks', table_name='junk_table',
-                               timeout=60):
+                               timeout=120):
     """
     This is a hack to work around problems like CASSANDRA-11811.
 
