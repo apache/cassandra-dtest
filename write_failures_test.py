@@ -126,7 +126,7 @@ class TestWriteFailures(Tester):
         self.protocol_version = 4
         self._perform_cql_statement("INSERT INTO mytable (key, value) VALUES ('key1', 'Value 1')")
 
-    @since('3.10')
+    @since('4.0')
     def test_mutation_v5(self):
         """
         A failed mutation at v5 receives a WriteFailure with an error code map containing error code 0x0000
