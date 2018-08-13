@@ -1,21 +1,17 @@
-import re
 import logging
+import re
 import types
 from struct import pack
 from uuid import UUID
 
+import pytest
 from cassandra import ConsistencyLevel
+from cassandra.metadata import Murmur3Token, OrderedDict
 from cassandra.query import SimpleStatement
 from ccmlib.node import Node
 
 from dtest import Tester
-from tools.misc import ImmutableMapping
 from tools.jmxutils import JolokiaAgent, make_mbean
-
-
-from cassandra.metadata import Murmur3Token, OrderedDict
-import pytest
-
 
 logging.getLogger('cassandra').setLevel(logging.CRITICAL)
 
@@ -224,7 +220,7 @@ class TestTransientReplication(Tester):
         self.assert_has_no_sstables(self.node2, flush=True)
         self.assert_has_sstables(self.node3, flush=True)
 
-    def test_speculative_write_repair_cycle(self):
+    def _test_speculative_write_repair_cycle(self, primary_range, optimized_repair, repair_coordinator, expect_node3_data):
         """
         if one of the full replicas is not available, data should be written to the transient replica, but removed after incremental repair
         """
@@ -247,11 +243,45 @@ class TestTransientReplication(Tester):
         self.assert_has_no_sstables(self.node2, flush=True)
         self.assert_has_sstables(self.node3, flush=True)
 
-        self.node1.nodetool(' '.join(['repair', self.keyspace, '-pr']))
+        repair_opts = ['repair', self.keyspace]
+        if primary_range: repair_opts.append('-pr')
+        if optimized_repair: repair_opts.append('-os')
+        self.node1.nodetool(' '.join(repair_opts))
 
         self.assert_has_sstables(self.node1, compact=True)
         self.assert_has_sstables(self.node2, compact=True)
-        self.assert_has_no_sstables(self.node3, compact=True)
+        if expect_node3_data:
+            self.assert_has_sstables(self.node3, compact=True)
+        else:
+            self.assert_has_no_sstables(self.node3, compact=True)
+
+    def test_speculative_write_repair_cycle(self):
+        """ incremental repair from full replica should remove data on node3 """
+        self._test_speculative_write_repair_cycle(primary_range=False,
+                                                  optimized_repair=False,
+                                                  repair_coordinator=self.node1,
+                                                  expect_node3_data=False)
+
+    def test_primary_range_repair(self):
+        """ optimized primary range incremental repair from full replica should remove data on node3 """
+        self._test_speculative_write_repair_cycle(primary_range=True,
+                                                  optimized_repair=False,
+                                                  repair_coordinator=self.node1,
+                                                  expect_node3_data=False)
+
+    def test_optimized_primary_range_repair(self):
+        """ optimized primary range incremental repair from full replica should remove data on node3 """
+        self._test_speculative_write_repair_cycle(primary_range=True,
+                                                  optimized_repair=True,
+                                                  repair_coordinator=self.node1,
+                                                  expect_node3_data=False)
+
+    def test_transient_incremental_repair(self):
+        """ transiently replicated ranges should be skipped when coordinating repairs """
+        self._test_speculative_write_repair_cycle(primary_range=True,
+                                                  optimized_repair=False,
+                                                  repair_coordinator=self.node1,
+                                                  expect_node3_data=False)
 
     def test_full_to_trans_read_repair(self):
         """ Data on a full replica shouldn't be rr'd to transient replicas """
@@ -351,14 +381,39 @@ class TestTransientReplication(Tester):
             assert tm2.write_count == 1
             assert tm3.write_count == 0
 
-    def test_full_repair(self):
+    def test_full_repair_from_full_replica(self):
         """ full repairs shouldn't replicate data to transient replicas """
-        # TODO: this
+        session = self.exclusive_cql_connection(self.node1)
+        for node in self.nodes:
+            self.assert_has_no_sstables(node)
 
-    def test_multi_range_repair(self):
-        """ 
-        incremental repairs that touch both full and transient ranges 
-        for a node should only delete transient data 
-        """
-        # TODO: this
+        self.insert_row(1, session=session)
+
+        self.assert_has_sstables(self.node1, flush=True)
+        self.assert_has_sstables(self.node2, flush=True)
+        self.assert_has_no_sstables(self.node3, flush=True)
+
+        self.node1.nodetool(' '.join(['repair', self.keyspace, '-full']))
+
+        self.assert_has_sstables(self.node1, flush=True)
+        self.assert_has_sstables(self.node2, flush=True)
+        self.assert_has_no_sstables(self.node3, flush=True)
+
+    def test_full_repair_from_transient_replica(self):
+        """ full repairs shouldn't replicate data to transient replicas """
+        session = self.exclusive_cql_connection(self.node1)
+        for node in self.nodes:
+            self.assert_has_no_sstables(node)
+
+        self.insert_row(1, session=session)
+
+        self.assert_has_sstables(self.node1, flush=True)
+        self.assert_has_sstables(self.node2, flush=True)
+        self.assert_has_no_sstables(self.node3, flush=True)
+
+        self.node3.nodetool(' '.join(['repair', self.keyspace, '-full']))
+
+        self.assert_has_sstables(self.node1, flush=True)
+        self.assert_has_sstables(self.node2, flush=True)
+        self.assert_has_no_sstables(self.node3, flush=True)
 
