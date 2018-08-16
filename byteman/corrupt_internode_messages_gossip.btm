@@ -1,0 +1,17 @@
+#
+# corrupt the first gossip ACK message. we corrupt it on the way out,
+# in serialize(), so it fails on deserializing. However, we also need
+# to hack the serializedSize().
+#
+
+RULE corrupt the first gossip ACK message
+CLASS org.apache.cassandra.gms.GossipDigestAckSerializer
+METHOD serialize(org.apache.cassandra.gms.GossipDigestAck, org.apache.cassandra.io.util.DataOutputPlus, int)
+AT ENTRY
+# set flag to only run this rule once.
+IF NOT flagged("done")
+DO
+   flag("done");
+   $2.writeInt(-1);
+ENDRULE
+
