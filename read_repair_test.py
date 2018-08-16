@@ -1,9 +1,12 @@
+from contextlib import contextmanager
 import os
 import time
 import pytest
 import logging
+import typing
 
 from cassandra import ConsistencyLevel, WriteTimeout, ReadTimeout
+from cassandra.cluster import Session
 from cassandra.query import SimpleStatement
 from ccmlib.node import Node
 from pytest import raises
@@ -615,6 +618,140 @@ class TestSpeculativeReadRepair(Tester):
             assert storage_proxy.blocking_read_repair == 1
             assert storage_proxy.speculated_rr_read == 0  # there shouldn't be any replicas to speculate on
             assert storage_proxy.speculated_rr_write == 1
+
+
+@contextmanager
+def _byteman_cycle(nodes, scripts):
+    script_path = lambda name: './byteman/read_repair/' + name + '.btm'
+    for node in nodes:
+        assert isinstance(node, Node)
+        for name in scripts:
+
+            print(node.name)
+            node.byteman_submit([script_path(name)])
+    yield
+
+    for node in nodes:
+        for name in scripts:
+            print(node.name)
+            node.byteman_submit(['-u', script_path(name)])
+
+
+@contextmanager
+def stop_writes(*nodes, kind='all'):
+    assert kind in ('all', 'normal', 'repair')
+    normal = 'stop_writes'
+    repair = 'stop_rr_writes'
+    with _byteman_cycle(nodes, {'normal': [normal], 'repair': [repair], 'all': [normal, repair]}[kind]):
+        yield
+
+
+@contextmanager
+def stop_reads(*nodes, kind='all'):
+    data = 'stop_data_reads'
+    digest = 'stop_digest_reads'
+    with _byteman_cycle(nodes, {'data': [data], 'digest': [digest], 'all': [data, digest]}[kind]):
+        yield
+
+kcvv = lambda k, c, v1, v2: [k, c, v1, v2]
+
+
+class TestReadRepairGuarantees(Tester):
+
+    @pytest.fixture(scope='function', autouse=True)
+    def fixture_set_cluster_settings(self, fixture_dtest_setup):
+        cluster = fixture_dtest_setup.cluster
+        cluster.set_configuration_options(values={'hinted_handoff_enabled': False,
+                                                  'dynamic_snitch': False,
+                                                  'write_request_timeout_in_ms': 500,
+                                                  'read_request_timeout_in_ms': 500})
+        cluster.populate(3, install_byteman=True, debug=True).start(wait_for_binary_proto=True,
+                                                                    jvm_args=['-XX:-PerfDisableSharedMem'])
+        session = fixture_dtest_setup.patient_exclusive_cql_connection(cluster.nodelist()[0], timeout=2)
+
+        session.execute("CREATE KEYSPACE ks WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 3}")
+
+    def get_cql_connection(self, node, **kwargs):
+        return self.patient_exclusive_cql_connection(node, retry_policy=None, **kwargs)
+
+    @since('4.0')
+    @pytest.mark.parametrize("repair_type,expect_monotonic",
+                             (('blocking', True), ('none', False)),
+                             ids=('blocking', 'async', 'none'))
+    def test_monotonic_reads(self, repair_type, expect_monotonic):
+        """ 
+        tests how read repair provides, or breaks, read monotonicity
+        blocking read repair should maintain monotonic quorum reads, async and none should not
+         """
+        assert repair_type in ('blocking', 'async', 'none')
+        node1, node2, node3 = self.cluster.nodelist()
+
+        session = self.get_cql_connection(node1, timeout=2)
+        ddl = "CREATE TABLE ks.tbl (k int, c int, v1 int, v2 int, primary key (k, c)) WITH read_repair = '" + repair_type + "';"
+        print (ddl)
+        session.execute(ddl)
+
+        session.execute(quorum("INSERT INTO ks.tbl (k, c, v1, v2) VALUES (1, 0, 1, 1)"))
+
+        with stop_writes(node2, node3):
+            session.execute("INSERT INTO ks.tbl (k, c, v1, v2) VALUES (1, 0, 2, 2)")
+
+        with stop_reads(node3), stop_writes(node3):
+
+            if expect_monotonic:
+                results = session.execute(quorum("SELECT * FROM ks.tbl WHERE k=1"))
+            else:
+                # if we don't expect monotonicity, read repair writes shouldn't block
+                with stop_writes(node2, kind='repair'):
+                    results = session.execute(quorum("SELECT * FROM ks.tbl WHERE k=1"))
+            assert listify(results) == [kcvv(1, 0, 2, 2)]
+
+        session = self.get_cql_connection(node3, timeout=2)
+        with stop_reads(node1):
+            results = session.execute(quorum("SELECT * FROM ks.tbl WHERE k=1"))
+            if expect_monotonic:
+                assert listify(results) == [kcvv(1, 0, 2, 2)]
+            else:
+                assert listify(results) == [kcvv(1, 0, 1, 1)]
+
+
+    @since('4.0')
+    @pytest.mark.parametrize("repair_type,expect_atomic",
+                             (('blocking', False), ('none', True)),
+                             ids=('blocking', 'async', 'none'))
+    def test_atomic_writes(self, repair_type, expect_atomic):
+        """ 
+        tests how read repair provides, or breaks, write atomicity
+        'none' read repair should maintain atomic writes, blocking and async should not
+         """
+        assert repair_type in ('blocking', 'async', 'none')
+        node1, node2, node3 = self.cluster.nodelist()
+
+        session = self.get_cql_connection(node1, timeout=2)
+        ddl = "CREATE TABLE ks.tbl (k int, c int, v1 int, v2 int, primary key (k, c)) WITH read_repair = '" + repair_type + "';"
+        print (ddl)
+        session.execute(ddl)
+
+        session.execute(quorum("INSERT INTO ks.tbl (k, c, v1, v2) VALUES (1, 0, 1, 1)"))
+
+        with stop_writes(node2, node3):
+            session.execute("INSERT INTO ks.tbl (k, c, v1, v2) VALUES (1, 0, 2, 2)")
+
+        with stop_reads(node3), stop_writes(node3):
+            results = session.execute(quorum("SELECT v1 FROM ks.tbl WHERE k=1"))
+            assert listify(results) == [[2]]
+
+        # make sure async read repair has a chance to write the repair value
+        if repair_type == 'async':
+            time.sleep(1)
+
+        session = self.get_cql_connection(node3, timeout=2)
+        with stop_reads(node1):
+            results = session.execute(quorum("SELECT * FROM ks.tbl WHERE k=1"))
+            if expect_atomic:
+                assert listify(results) == [kcvv(1, 0, 1, 1)]
+            else:
+                assert listify(results) == [kcvv(1, 0, 2, 1)]
 
 
 class NotRepairedException(Exception):

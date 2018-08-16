@@ -1,5 +1,5 @@
 # block data (but not digest) reads
-RULE disable data reads
+RULE disable digest reads
 CLASS org.apache.cassandra.db.ReadCommandVerbHandler
 METHOD doVerb
 # wait until command is declared locally. because generics
