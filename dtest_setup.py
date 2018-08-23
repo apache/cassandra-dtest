@@ -391,11 +391,16 @@ class DTestSetup:
         # the failure detector can be quite slow in such tests with quick start/stop
         phi_values = {'phi_convict_threshold': 5}
 
+        # enable read time tracking of repaired data between replicas by default
+        repaired_data_tracking_values = {'repaired_data_tracking_for_partition_reads_enabled': 'true',
+                                         'repaired_data_tracking_for_range_reads_enabled': 'true',
+                                         'report_unconfirmed_repaired_data_mismatches': 'true'}
+
         timeout = 15000
         if self.cluster_options is not None and len(self.cluster_options) > 0:
-            values = merge_dicts(self.cluster_options, phi_values)
+            values = merge_dicts(self.cluster_options, phi_values, repaired_data_tracking_values)
         else:
-            values = merge_dicts(phi_values, {
+            values = merge_dicts(phi_values, repaired_data_tracking_values, {
                 'read_request_timeout_in_ms': timeout,
                 'range_request_timeout_in_ms': timeout,
                 'write_request_timeout_in_ms': timeout,
