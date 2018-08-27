@@ -677,7 +677,7 @@ class TestReadRepairGuarantees(Tester):
     @since('4.0')
     @pytest.mark.parametrize("repair_type,expect_monotonic",
                              (('blocking', True), ('none', False)),
-                             ids=('blocking', 'async', 'none'))
+                             ids=('blocking', 'none'))
     def test_monotonic_reads(self, repair_type, expect_monotonic):
         """ 
         tests how read repair provides, or breaks, read monotonicity
@@ -718,7 +718,7 @@ class TestReadRepairGuarantees(Tester):
     @since('4.0')
     @pytest.mark.parametrize("repair_type,expect_atomic",
                              (('blocking', False), ('none', True)),
-                             ids=('blocking', 'async', 'none'))
+                             ids=('blocking', 'none'))
     def test_atomic_writes(self, repair_type, expect_atomic):
         """ 
         tests how read repair provides, or breaks, write atomicity
