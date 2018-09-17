@@ -284,7 +284,10 @@ class TestBootstrap(Tester):
             assert_bootstrap_state(self, node3, 'COMPLETED')
         else:
             if consistent_range_movement:
-                node3.watch_log_for("A node required to move the data consistently is down")
+                if cluster.version() < '4.0':
+                    node3.watch_log_for("A node required to move the data consistently is down")
+                else:
+                    node3.watch_log_for("Necessary replicas for strict consistency were removed by source filters")
             else:
                 node3.watch_log_for("Unable to find sufficient sources for streaming range")
             assert_not_running(node3)
