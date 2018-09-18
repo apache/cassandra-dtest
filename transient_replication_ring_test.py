@@ -10,10 +10,12 @@ from tools.assertions import (assert_all)
 
 from flaky import flaky
 
-from cassandra.metadata import BytesToken, OrderedDict
+from cassandra.metadata import OrderedDict
 import pytest
 from itertools import chain
 from tools.misc import new_node
+
+since = pytest.mark.since
 
 logging.getLogger('cassandra').setLevel(logging.CRITICAL)
 
@@ -46,6 +48,8 @@ def patch_start(startable):
 
     startable.start = types.MethodType(new_start, startable)
 
+
+@since('4.0')
 class TestTransientReplicationRing(Tester):
 
     keyspace = "ks"
@@ -125,14 +129,9 @@ class TestTransientReplicationRing(Tester):
 
         session.execute("CREATE KEYSPACE %s WITH REPLICATION={%s}" % (self.keyspace, replication_params))
         print("CREATE KEYSPACE %s WITH REPLICATION={%s}" % (self.keyspace, replication_params))
-        self.create_table(session)
-
-    def create_table(self, session, never_speculate=False):
-        if never_speculate:
-            session.execute("CREATE TABLE %s.%s (pk varchar, ck int, value int, PRIMARY KEY (pk, ck)) WITH speculative_retry = 'NEVER' AND read_repair = 'NONE'" % (self.keyspace, self.table))
-        else:
-            session.execute("CREATE TABLE %s.%s (pk varchar, ck int, value int, PRIMARY KEY (pk, ck)) WITH read_repair = 'NONE'" % (self.keyspace, self.table))
-        print(str(self.node1.run_cqlsh("describe table %s.%s" % (self.keyspace, self.table))))
+        session.execute(
+            "CREATE TABLE %s.%s (pk varchar, ck int, value int, PRIMARY KEY (pk, ck)) WITH speculative_retry = 'NEVER' AND speculative_write_threshold = 'NEVER' AND read_repair = 'NONE'" % (
+            self.keyspace, self.table))
 
     def quorum(self, session, stmt_str):
         return session.execute(SimpleStatement(stmt_str, consistency_level=ConsistencyLevel.QUORUM))
@@ -150,8 +149,6 @@ class TestTransientReplicationRing(Tester):
     def test_bootstrap_and_cleanup(self):
         """Test bootstrapping a new node across a mix of repaired and unrepaired data"""
         main_session = self.patient_cql_connection(self.node1)
-        self.table = 'tbl2'
-        self.create_table(main_session, never_speculate=True)
         nodes = [self.node1, self.node2, self.node3]
 
         for i in range(0, 40, 2):
@@ -232,8 +229,6 @@ class TestTransientReplicationRing(Tester):
         patch_start(node4)
         node4.start(wait_for_binary_proto=True, wait_other_notice=True)
         main_session = self.patient_cql_connection(self.node1)
-        self.table = 'tbl2'
-        self.create_table(main_session, never_speculate=True)
         nodes = [self.node1, self.node2, self.node3, node4]
 
         for i in range(0, 40, 2):
@@ -345,8 +340,6 @@ class TestTransientReplicationRing(Tester):
         patch_start(node4)
         node4.start(wait_for_binary_proto=True, wait_other_notice=True)
         main_session = self.patient_cql_connection(self.node1)
-        self.table = 'tbl2'
-        self.create_table(main_session, never_speculate=True)
         nodes = [self.node1, self.node2, self.node3, node4]
 
         for i in range(0, 40, 2):
@@ -408,8 +401,6 @@ class TestTransientReplicationRing(Tester):
         patch_start(node4)
         node4.start(wait_for_binary_proto=True, wait_other_notice=True)
         main_session = self.patient_cql_connection(self.node1)
-        self.table = 'tbl2'
-        self.create_table(main_session, never_speculate=True)
         nodes = [self.node1, self.node2, self.node3]
 
         #We want the node being removed to have no data on it so nodetool remove always gets all the necessary data
@@ -457,8 +448,6 @@ class TestTransientReplicationRing(Tester):
     @pytest.mark.no_vnodes
     def test_replace(self):
         main_session = self.patient_cql_connection(self.node1)
-        self.table = 'tbl2'
-        self.create_table(main_session, never_speculate=True)
 
         #We want the node being replaced to have no data on it so the replacement definitely fetches all the data
         self.node2.stop(wait_other_notice=True)

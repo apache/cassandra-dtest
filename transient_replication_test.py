@@ -10,15 +10,14 @@ from cassandra.protocol import ConfigurationException
 from ccmlib.node import Node
 
 from dtest import Tester
-from tools.misc import ImmutableMapping
 from tools.jmxutils import JolokiaAgent, make_mbean
 from tools.data import rows_to_list
-from tools.assertions import (assert_all, assert_invalid, assert_length_equal,
-                              assert_none, assert_one, assert_unavailable)
+from tools.assertions import (assert_all)
 
 from cassandra.metadata import Murmur3Token, OrderedDict
 import pytest
 
+since = pytest.mark.since
 
 logging.getLogger('cassandra').setLevel(logging.CRITICAL)
 
@@ -161,7 +160,7 @@ def get_sstable_data(cls, node, keyspace):
     assert len(names) == len(repaired_times) == len(pending_repairs)
     return [SSTable(*a) for a in zip(names, repaired_times, pending_repairs)]
 
-
+@since('4.0')
 class TransientReplicationBase(Tester):
 
     keyspace = "ks"
@@ -278,7 +277,7 @@ class TransientReplicationBase(Tester):
     def generate_rows(self, partitions, rows):
         return [[pk, ck, pk+ck] for ck in range(rows) for pk in range(partitions)]
 
-
+@since('4.0')
 class TestTransientReplication(TransientReplicationBase):
 
     @pytest.mark.no_vnodes
@@ -560,6 +559,7 @@ class TestTransientReplication(TransientReplicationBase):
             session.execute("ALTER TABLE %s.%s WITH read_repair = 'BLOCKING'" % (self.keyspace, self.table))
 
 
+@since('4.0')
 class TestTransientReplicationSpeculativeQueries(TransientReplicationBase):
     def setup_schema(self):
         session = self.exclusive_cql_connection(self.node1)
@@ -604,6 +604,7 @@ class TestTransientReplicationSpeculativeQueries(TransientReplicationBase):
                         [1, 2, 2]],
                        cl=ConsistencyLevel.QUORUM)
 
+@since('4.0')
 class TestMultipleTransientNodes(TransientReplicationBase):
     def populate(self):
         self.cluster.populate(5, tokens=self.tokens, debug=True, install_byteman=True)
