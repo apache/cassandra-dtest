@@ -1087,6 +1087,35 @@ class TestRepair(BaseRepairTest):
         node2.start(wait_for_binary_proto=True)
         node2.repair()
 
+    def _cancel_open_ir_sessions(self, nodes):
+        cancelled = 0;
+        for node in nodes:
+            stdout = node.nodetool('repair_admin').stdout.strip()
+            if stdout.strip() == 'no sessions':
+                continue
+
+            for line in stdout.split('\n')[1:]:
+                columns = [c.strip() for c in line.split('|')]
+                session = columns[0]
+                coordinator = columns[3]
+                if coordinator == node.address_and_port():
+                    node.nodetool('repair_admin --cancel {}'.format(session))
+                    cancelled += 1
+
+        time.sleep(1)
+
+        # force all of the sstables out of pending repair
+        for node in nodes:
+            node.nodetool('compact')
+
+        for node in nodes:
+            stdout = node.nodetool('repair_admin').stdout.strip()
+            assert stdout.strip() == 'no sessions'
+
+        return cancelled
+
+
+
     def test_dead_coordinator(self):
         """
         @jira_ticket CASSANDRA-11824
@@ -1122,6 +1151,9 @@ class TestRepair(BaseRepairTest):
         node1.start(wait_for_binary_proto=True, wait_other_notice=True)
         logger.debug("running second repair")
         if cluster.version() >= "2.2":
+            # 4.0+ actually requires manual intervention here (CASSANDRA-14763)
+            if cluster.version() >= '4.0':
+                assert self._cancel_open_ir_sessions(cluster.nodelist()) == 1
             node1.repair()
         else:
             node1.nodetool('repair keyspace1 standard1 -inc -par')
