@@ -174,7 +174,7 @@ def fixture_maybe_skip_tests_requiring_novnodes(request):
     has vnodes enabled. This should always be a no-op as we explicitly deselect tests
     in pytest_collection_modifyitems that match this configuration -- but this is explicit :)
     """
-    if request.node.get_marker('no_vnodes'):
+    if request.node.get_closest_marker('no_vnodes'):
         if request.config.getoption("--use-vnodes"):
             pytest.skip("Skipping test marked with no_vnodes as tests executed with vnodes enabled via the "
                         "--use-vnodes command line argument")
@@ -356,13 +356,13 @@ def _skip_msg(current_running_version, since_version, max_version):
 
 @pytest.fixture(autouse=True)
 def fixture_since(request, fixture_dtest_setup):
-    if request.node.get_marker('since'):
-        max_version_str = request.node.get_marker('since').kwargs.get('max_version', None)
+    if request.node.get_closest_marker('since'):
+        max_version_str = request.node.get_closest_marker('since').kwargs.get('max_version', None)
         max_version = None
         if max_version_str:
             max_version = LooseVersion(max_version_str)
 
-        since_str = request.node.get_marker('since').args[0]
+        since_str = request.node.get_closest_marker('since').args[0]
         since = LooseVersion(since_str)
         # use cassandra_version_from_build as it's guaranteed to be a LooseVersion
         # whereas cassandra_version may be a string if set in the cli options
@@ -374,12 +374,11 @@ def fixture_since(request, fixture_dtest_setup):
 
 @pytest.fixture(autouse=True)
 def fixture_skip_version(request, fixture_dtest_setup):
-    marker = request.node.get_marker('skip_version')
+    marker = request.node.get_closest_marker('skip_version')
     if marker is not None:
-        for info in marker:
-            version_to_skip = LooseVersion(info.args[0])
-            if version_to_skip == fixture_dtest_setup.dtest_config.cassandra_version_from_build:
-                pytest.skip("Test marked not to run on version %s" % version_to_skip)
+        version_to_skip = LooseVersion(marker.args[0])
+        if version_to_skip == fixture_dtest_setup.dtest_config.cassandra_version_from_build:
+            pytest.skip("Test marked not to run on version %s" % version_to_skip)
 
 
 @pytest.fixture(scope='session', autouse=True)
@@ -434,7 +433,7 @@ def pytest_collection_modifyitems(items, config):
     for item in items:
         deselect_test = False
 
-        if item.get_marker("resource_intensive"):
+        if item.get_closest_marker("resource_intensive"):
             if config.getoption("--force-resource-intensive-tests"):
                 pass
             if config.getoption("--skip-resource-intensive-tests"):
@@ -445,13 +444,13 @@ def pytest_collection_modifyitems(items, config):
                 deselect_test = True
                 logger.info("SKIP: Deselecting resource_intensive test %s due to insufficient system resources" % item.name)
 
-        if item.get_marker("no_vnodes"):
+        if item.get_closest_marker("no_vnodes"):
             if config.getoption("--use-vnodes"):
                 deselect_test = True
                 logger.info("SKIP: Deselecting test %s as the test requires vnodes to be disabled. To run this test, "
                       "re-run without the --use-vnodes command line argument" % item.name)
 
-        if item.get_marker("vnodes"):
+        if item.get_closest_marker("vnodes"):
             if not config.getoption("--use-vnodes"):
                 deselect_test = True
                 logger.info("SKIP: Deselecting test %s as the test requires vnodes to be enabled. To run this test, "
@@ -466,11 +465,11 @@ def pytest_collection_modifyitems(items, config):
                     if not config.getoption("--execute-upgrade-tests"):
                         deselect_test = True
 
-        if item.get_marker("upgrade_test"):
+        if item.get_closest_marker("upgrade_test"):
             if not config.getoption("--execute-upgrade-tests"):
                 deselect_test = True
 
-        if item.get_marker("no_offheap_memtables"):
+        if item.get_closest_marker("no_offheap_memtables"):
             if config.getoption("use_off_heap_memtables"):
                 deselect_test = True
 

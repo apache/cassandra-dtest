@@ -140,9 +140,9 @@ def patch_start(startable):
     return startable
 
 def get_sstable_data(cls, node, keyspace):
-    _sstable_name = re.compile('SSTable: (.+)')
-    _repaired_at = re.compile('Repaired at: (\d+)')
-    _pending_repair = re.compile('Pending repair: (\-\-|null|[a-f0-9\-]+)')
+    _sstable_name = re.compile(r'SSTable: (.+)')
+    _repaired_at = re.compile(r'Repaired at: (\d+)')
+    _pending_repair = re.compile(r'Pending repair: (\-\-|null|[a-f0-9\-]+)')
 
     out = node.run_sstablemetadata(keyspace=keyspace).stdout
 

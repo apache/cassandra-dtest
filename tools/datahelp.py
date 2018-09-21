@@ -48,7 +48,7 @@ def parse_headers_into_list(data):
 def get_row_multiplier(row):
     # find prefix like *1234 meaning create 1,234 rows
     row_cells = [l.strip() for l in row.split('|')]
-    m = re.findall('\*(\d+)$', row_cells[0])
+    m = re.findall(r'\*(\d+)$', row_cells[0])
 
     if m:
         return int(m[0])

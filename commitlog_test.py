@@ -273,7 +273,7 @@ class TestCommitLog(Tester):
         node1.start()
         node1.watch_log_for("Log replay complete")
         # Here we verify from the logs that some mutations were replayed
-        replays = [match_tuple[0] for match_tuple in node1.grep_log(" \d+ replayed mutations")]
+        replays = [match_tuple[0] for match_tuple in node1.grep_log(r" \d+ replayed mutations")]
         logger.debug('The following log lines indicate that mutations were replayed: {msgs}'.format(msgs=replays))
         num_replayed_mutations = [
             parse('{} {num_mutations:d} replayed mutations{}', line).named['num_mutations']
@@ -379,7 +379,7 @@ class TestCommitLog(Tester):
         })
 
         self._provoke_commitlog_failure()
-        failure = self.node1.grep_log("ERROR \[COMMIT-LOG-ALLOCATOR\].+JVM state determined to be unstable.  Exiting forcefully")
+        failure = self.node1.grep_log(r"ERROR \[COMMIT-LOG-ALLOCATOR\].+JVM state determined to be unstable.  Exiting forcefully")
         logger.debug(failure)
         assert failure, "Cannot find the commitlog failure message in logs"
         assert not self.node1.is_running(), "Node1 should not be running"
@@ -393,7 +393,7 @@ class TestCommitLog(Tester):
         })
 
         self._provoke_commitlog_failure()
-        failure = self.node1.grep_log("ERROR \[COMMIT-LOG-ALLOCATOR\].+Failed .+ commit log segments")
+        failure = self.node1.grep_log(r"ERROR \[COMMIT-LOG-ALLOCATOR\].+Failed .+ commit log segments")
         assert failure, "Cannot find the commitlog failure message in logs"
         assert self.node1.is_running(), "Node1 should still be running"
 

@@ -165,10 +165,10 @@ class TestDeprecatedRepairAPI(Tester):
         # wait for log to start
         node1.watch_log_for("Starting repair command")
         # get repair parameters from the log
-        line = node1.grep_log(("Starting repair command #1" + (" \([^\)]+\)" if cluster.version() >= LooseVersion("3.10") else "") +
-                               ", repairing keyspace ks with repair options \(parallelism: (?P<parallelism>\w+), primary range: (?P<pr>\w+), "
-                               "incremental: (?P<incremental>\w+), job threads: (?P<jobs>\d+), ColumnFamilies: (?P<cfs>.+), dataCenters: (?P<dc>.+), "
-                               "hosts: (?P<hosts>.+), # of ranges: (?P<ranges>\d+)(, pull repair: (?P<pullrepair>true|false))?\)"))
+        line = node1.grep_log((r"Starting repair command #1" + (r" \([^\)]+\)" if cluster.version() >= LooseVersion("3.10") else "") +
+                               r", repairing keyspace ks with repair options \(parallelism: (?P<parallelism>\w+), primary range: (?P<pr>\w+), "
+                               r"incremental: (?P<incremental>\w+), job threads: (?P<jobs>\d+), ColumnFamilies: (?P<cfs>.+), dataCenters: (?P<dc>.+), "
+                               r"hosts: (?P<hosts>.+), # of ranges: (?P<ranges>\d+)(, pull repair: (?P<pullrepair>true|false))?\)"))
 
         assert_length_equal(line, 1)
         line, m = line[0]

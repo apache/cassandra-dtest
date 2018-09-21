@@ -208,7 +208,7 @@ class TestSchemaAgreementUpgrade(Tester):
                     logger.debug("nodetool describecluster of {}:".format(n.name))
                     logger.debug(out)
                     versions = out.split('Schema versions:')[1].strip()
-                    num_schemas = len(re.findall('\[.*?\]', versions))
+                    num_schemas = len(re.findall(r'\[.*?\]', versions))
                     self.assertEqual(num_schemas, 1, "Multiple schema versions detected on {}: {}".format(n.name, out))
 
     def upgrade_schema_agreement_30_3112_test(self):

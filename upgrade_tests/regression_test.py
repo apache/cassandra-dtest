@@ -144,7 +144,7 @@ class TestForRegressions(UpgradeTester):
             response = n.nodetool('describecluster').stdout
             logger.debug(response)
             schemas = response.split('Schema versions:')[1].strip()
-            num_schemas = len(re.findall('\[.*?\]', schemas))
+            num_schemas = len(re.findall(r'\[.*?\]', schemas))
             self.assertEqual(num_schemas, 1, "There were multiple schema versions during an upgrade: {}"
                              .format(schemas))
 

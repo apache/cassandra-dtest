@@ -125,7 +125,7 @@ class TestConcurrentSchemaChanges(Tester):
 
         response = node.nodetool('describecluster').stdout
         schemas = response.split('Schema versions:')[1].strip()
-        num_schemas = len(re.findall('\[.*?\]', schemas))
+        num_schemas = len(re.findall(r'\[.*?\]', schemas))
         assert num_schemas, 1 == "There were multiple schema versions: {}".format(pprint.pformat(schemas))
 
     def test_create_lots_of_tables_concurrently(self):

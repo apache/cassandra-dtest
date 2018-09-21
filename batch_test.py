@@ -81,7 +81,7 @@ class TestBatch(Tester):
             APPLY BATCH
         """)
         node1 = self.cluster.nodelist()[0]
-        warning = node1.grep_log("Executing a LOGGED BATCH on table \[ks.users\], configured with a "
+        warning = node1.grep_log(r"Executing a LOGGED BATCH on table \[ks.users\], configured with a "
                                  "gc_grace_seconds of 0. The gc_grace_seconds is used to TTL "
                                  "batchlog entries, so setting gc_grace_seconds too low on tables "
                                  "involved in an atomic batch might cause batchlog entries to expire "
@@ -108,7 +108,7 @@ class TestBatch(Tester):
             APPLY BATCH
         """)
         node1 = self.cluster.nodelist()[0]
-        warning = node1.grep_log("Executing a LOGGED BATCH on tables \[ks.views, ks.users\], configured with a "
+        warning = node1.grep_log(r"Executing a LOGGED BATCH on tables \[ks.views, ks.users\], configured with a "
                                  "gc_grace_seconds of 0. The gc_grace_seconds is used to TTL "
                                  "batchlog entries, so setting gc_grace_seconds too low on tables "
                                  "involved in an atomic batch might cause batchlog entries to expire "

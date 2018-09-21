@@ -1255,7 +1255,7 @@ class TestMutations(TestThrift):
         _insert_simple()
         assert get_range_slice(client, ColumnParent('Super1'), SlicePredicate(column_names=[utf8encode('c1'), utf8encode('c1')]), utf8encode(''), utf8encode(''), 1000, ConsistencyLevel.ONE) == []
 
-    @since('2.1')
+    @since('2.1', max_version='4')
     def test_super_cql_read_compatibility(self):
         _set_keyspace('Keyspace1')
         self.truncate_all('Super1')
@@ -1296,7 +1296,7 @@ class TestMutations(TestThrift):
                    [[5, utf8encode("value5")],
                     [6, utf8encode("value6")]])
 
-    @since('2.1')
+    @since('2.1', max_version='4')
     def test_super_cql_write_compatibility(self):
         _set_keyspace('Keyspace1')
         self.truncate_all('Super1')
@@ -2063,7 +2063,7 @@ class TestMutations(TestThrift):
         time.sleep(3)
         _expect_missing(lambda: client.get(utf8encode('key1'), ColumnPath('Expiring', column=utf8encode('cttl3')), ConsistencyLevel.ONE))
 
-    @since('3.6')
+    @since('3.6', max_version='4')
     def test_expiration_with_default_ttl_and_zero_ttl(self):
         """
         Test that we can remove the default ttl by setting the ttl explicitly to zero
@@ -2644,7 +2644,7 @@ class TestMutations(TestThrift):
         assert _big_slice(utf8encode('key1'), ColumnParent('Super1')) == []
         assert _big_slice(utf8encode('key1'), ColumnParent('Super1', utf8encode('sc1'))) == []
 
-    @since('3.0')
+    @since('3.0', max_version='4')
     def test_cql_range_tombstone_and_static(self):
         node1 = self.cluster.nodelist()[0]
         session = self.patient_cql_connection(node1)

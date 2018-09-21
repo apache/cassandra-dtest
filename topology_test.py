@@ -428,7 +428,7 @@ class TestTopology(Tester):
         t.start()
 
         node1.watch_log_for("DECOMMISSIONING", filename='debug.log')
-        null_status_pattern = re.compile(".N(?:\s*)127\.0\.0\.1(?:.*)null(?:\s*)rack1")
+        null_status_pattern = re.compile(r".N(?:\s*)127\.0\.0\.1(?:.*)null(?:\s*)rack1")
         while t.is_alive():
             out = self.show_status(node2)
             if null_status_pattern.search(out):

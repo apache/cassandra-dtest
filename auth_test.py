@@ -123,7 +123,7 @@ class TestAuth(Tester):
         cassandra.execute("CREATE USER jackob WITH PASSWORD '12345' NOSUPERUSER")
 
         jackob = self.get_session(user='jackob', password='12345')
-        assert_unauthorized(jackob, "CREATE USER james WITH PASSWORD '54321' NOSUPERUSER", 'Only superusers are allowed to perform CREATE (\[ROLE\|USER\]|USER) queries', )
+        assert_unauthorized(jackob, "CREATE USER james WITH PASSWORD '54321' NOSUPERUSER", 'Only superusers are allowed to perform CREATE (\\[ROLE\\|USER\\]|USER) queries', )
 
     @since('1.2', max_version='2.1.x')
     def test_password_authenticator_create_user_requires_password(self):
@@ -256,7 +256,7 @@ class TestAuth(Tester):
         assert 3 == len(rows)
 
         cathy = self.get_session(user='cathy', password='12345')
-        assert_unauthorized(cathy, 'DROP USER dave', 'Only superusers are allowed to perform DROP (\[ROLE\|USER\]|USER) queries')
+        assert_unauthorized(cathy, 'DROP USER dave', 'Only superusers are allowed to perform DROP (\\[ROLE\\|USER\\]|USER) queries')
 
         rows = list(cassandra.execute("LIST USERS"))
         assert 3 == len(rows)
@@ -2202,7 +2202,7 @@ class TestAuthRoles(Tester):
         self.superuser.execute("GRANT EXECUTE ON FUNCTION ks.func_one(int) TO mike")
         as_mike.execute(select_one)
         assert_unauthorized(as_mike, select_two,
-                            "User mike has no EXECUTE permission on <function ks.func_two\(int\)> or any of its parents")
+                            r"User mike has no EXECUTE permission on <function ks.func_two\(int\)> or any of its parents")
         # granting EXECUTE on all of the parent keyspace's should enable mike to use both functions
         self.superuser.execute("GRANT EXECUTE ON ALL FUNCTIONS IN KEYSPACE ks TO mike")
         as_mike.execute(select_one)
@@ -2211,7 +2211,7 @@ class TestAuthRoles(Tester):
         self.superuser.execute("REVOKE EXECUTE ON ALL FUNCTIONS IN KEYSPACE ks FROM mike")
         as_mike.execute(select_one)
         assert_unauthorized(as_mike, select_two,
-                            "User mike has no EXECUTE permission on <function ks.func_two\(int\)> or any of its parents")
+                            r"User mike has no EXECUTE permission on <function ks.func_two\(int\)> or any of its parents")
         # now check that EXECUTE on ALL FUNCTIONS works in the same way
         self.superuser.execute("GRANT EXECUTE ON ALL FUNCTIONS TO mike")
         as_mike.execute(select_one)
@@ -2219,7 +2219,7 @@ class TestAuthRoles(Tester):
         self.superuser.execute("REVOKE EXECUTE ON ALL FUNCTIONS FROM mike")
         as_mike.execute(select_one)
         assert_unauthorized(as_mike, select_two,
-                            "User mike has no EXECUTE permission on <function ks.func_two\(int\)> or any of its parents")
+                            r"User mike has no EXECUTE permission on <function ks.func_two\(int\)> or any of its parents")
         # finally, check that revoking function level permissions doesn't affect root/keyspace level perms
         self.superuser.execute("GRANT EXECUTE ON ALL FUNCTIONS IN KEYSPACE ks TO mike")
         self.superuser.execute("REVOKE EXECUTE ON FUNCTION ks.func_one(int) FROM mike")
@@ -2253,7 +2253,7 @@ class TestAuthRoles(Tester):
         # can't replace an existing function without ALTER permission on the parent ks
         cql = "CREATE OR REPLACE FUNCTION ks.plus_one( input int ) CALLED ON NULL INPUT RETURNS int LANGUAGE javascript as '1 + input'"
         assert_unauthorized(as_mike, cql,
-                            "User mike has no ALTER permission on <function ks.plus_one\(int\)> or any of its parents")
+                            r"User mike has no ALTER permission on <function ks.plus_one\(int\)> or any of its parents")
         self.superuser.execute("GRANT ALTER ON FUNCTION ks.plus_one(int) TO mike")
         as_mike.execute(cql)
 
@@ -2262,21 +2262,21 @@ class TestAuthRoles(Tester):
         self.superuser.execute("CREATE ROLE role1")
         cql = "GRANT EXECUTE ON FUNCTION ks.plus_one(int) TO role1"
         assert_unauthorized(as_mike, cql,
-                            "User mike has no AUTHORIZE permission on <function ks.plus_one\(int\)> or any of its parents")
+                            r"User mike has no AUTHORIZE permission on <function ks.plus_one\(int\)> or any of its parents")
         self.superuser.execute("GRANT AUTHORIZE ON FUNCTION ks.plus_one(int) TO mike")
         as_mike.execute(cql)
         # now revoke AUTHORIZE from mike
         self.superuser.execute("REVOKE AUTHORIZE ON FUNCTION ks.plus_one(int) FROM mike")
         cql = "REVOKE EXECUTE ON FUNCTION ks.plus_one(int) FROM role1"
         assert_unauthorized(as_mike, cql,
-                            "User mike has no AUTHORIZE permission on <function ks.plus_one\(int\)> or any of its parents")
+                            r"User mike has no AUTHORIZE permission on <function ks.plus_one\(int\)> or any of its parents")
         self.superuser.execute("GRANT AUTHORIZE ON FUNCTION ks.plus_one(int) TO mike")
         as_mike.execute(cql)
 
         # can't drop a function without DROP
         cql = "DROP FUNCTION ks.plus_one(int)"
         assert_unauthorized(as_mike, cql,
-                            "User mike has no DROP permission on <function ks.plus_one\(int\)> or any of its parents")
+                            r"User mike has no DROP permission on <function ks.plus_one\(int\)> or any of its parents")
         self.superuser.execute("GRANT DROP ON FUNCTION ks.plus_one(int) TO mike")
         as_mike.execute(cql)
 
@@ -2287,7 +2287,7 @@ class TestAuthRoles(Tester):
 
         cql = "DROP FUNCTION ks.no_such_function(int,int)"
         assert_invalid(as_mike, cql,
-                       "Unconfigured function ks.no_such_function\(int,int\)",
+                       r"Unconfigured function ks.no_such_function\(int,int\)",
                        InvalidRequest)
 
         # can't create a new function without CREATE on the parent keyspace's collection of functions
@@ -2467,7 +2467,7 @@ class TestAuthRoles(Tester):
         as_mike = self.get_session(user='mike', password='12345')
         assert_unauthorized(as_mike,
                             cql,
-                            "User mike has no EXECUTE permission on <function ks.plus_one\(int\)> or any of its parents")
+                            r"User mike has no EXECUTE permission on <function ks.plus_one\(int\)> or any of its parents")
 
         self.superuser.execute("GRANT EXECUTE ON FUNCTION ks.plus_one(int) TO mike")
         return as_mike.execute(cql)
@@ -2489,7 +2489,7 @@ class TestAuthRoles(Tester):
         select = "SELECT k, v, ks.plus_one(v) FROM ks.t1 WHERE k = 1"
         assert_unauthorized(as_mike,
                             select,
-                            "User mike has no EXECUTE permission on <function ks.plus_one\(int\)> or any of its parents")
+                            r"User mike has no EXECUTE permission on <function ks.plus_one\(int\)> or any of its parents")
 
         self.superuser.execute("GRANT function_user TO mike")
         assert_one(as_mike, select, [1, 1, 2])
@@ -2591,11 +2591,11 @@ class TestAuthRoles(Tester):
         # check permissions to create the aggregate
         assert_unauthorized(as_mike,
                             create_aggregate_cql,
-                            "User mike has no EXECUTE permission on <function ks.state_function\(int, int\)> or any of its parents")
+                            r"User mike has no EXECUTE permission on <function ks.state_function\(int, int\)> or any of its parents")
         self.superuser.execute("GRANT EXECUTE ON FUNCTION ks.state_function(int, int) TO mike")
         assert_unauthorized(as_mike,
                             create_aggregate_cql,
-                            "User mike has no EXECUTE permission on <function ks.final_function\(int\)> or any of its parents")
+                            r"User mike has no EXECUTE permission on <function ks.final_function\(int\)> or any of its parents")
         self.superuser.execute("GRANT EXECUTE ON FUNCTION ks.final_function(int) TO mike")
         as_mike.execute(create_aggregate_cql)
 
@@ -2606,11 +2606,11 @@ class TestAuthRoles(Tester):
         execute_aggregate_cql = "SELECT ks.simple_aggregate(v) FROM ks.t1"
         assert_unauthorized(as_mike,
                             execute_aggregate_cql,
-                            "User mike has no EXECUTE permission on <function ks.state_function\(int, int\)> or any of its parents")
+                            r"User mike has no EXECUTE permission on <function ks.state_function\(int, int\)> or any of its parents")
         self.superuser.execute("GRANT EXECUTE ON FUNCTION ks.state_function(int, int) TO mike")
         assert_unauthorized(as_mike,
                             execute_aggregate_cql,
-                            "User mike has no EXECUTE permission on <function ks.final_function\(int\)> or any of its parents")
+                            r"User mike has no EXECUTE permission on <function ks.final_function\(int\)> or any of its parents")
         self.superuser.execute("GRANT EXECUTE ON FUNCTION ks.final_function(int) TO mike")
 
         # mike *does* have execute permission on the aggregate function, as its creator

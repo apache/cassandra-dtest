@@ -15,10 +15,10 @@ since = pytest.mark.since
 logger = logging.getLogger(__name__)
 
 TRACE_DETERMINE_REPLICAS = re.compile('Determining replicas for mutation')
-TRACE_SEND_MESSAGE = re.compile('Sending (?:MUTATION|REQUEST_RESPONSE) message to /([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)')
-TRACE_RESPOND_MESSAGE = re.compile('(?:MUTATION|REQUEST_RESPONSE) message received from /([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)')
+TRACE_SEND_MESSAGE = re.compile(r'Sending (?:MUTATION|REQUEST_RESPONSE) message to /([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)')
+TRACE_RESPOND_MESSAGE = re.compile(r'(?:MUTATION|REQUEST_RESPONSE) message received from /([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)')
 TRACE_COMMIT_LOG = re.compile('Appending to commitlog')
-TRACE_FORWARD_WRITE = re.compile('Enqueuing forwarded write to /([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)')
+TRACE_FORWARD_WRITE = re.compile(r'Enqueuing forwarded write to /([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)')
 
 # Some pre-computed murmur 3 hashes; there are no good python murmur3
 # hashing libraries :(
@@ -333,7 +333,7 @@ class TestSnitchConfigurationUpdate(Tester):
         """
         Waits for nodes to match the expected racks.
         """
-        regex = re.compile("^UN(?:\s*)127\.0\.0(?:.*)\s(.*)$", re.IGNORECASE)
+        regex = re.compile(r"^UN(?:\s*)127\.0\.0(?:.*)\s(.*)$", re.IGNORECASE)
         for i, node in enumerate(nodes):
             wait_expire = time.time() + 120
             while time.time() < wait_expire:

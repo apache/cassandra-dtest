@@ -86,7 +86,7 @@ class TestMaterializedViews(Tester):
 
     def _settle_nodes(self):
         logger.debug("Settling all nodes")
-        stage_match = re.compile("(?P<name>\S+)\s+(?P<active>\d+)\s+(?P<pending>\d+)\s+(?P<completed>\d+)\s+(?P<blocked>\d+)\s+(?P<alltimeblocked>\d+)")
+        stage_match = re.compile(r"(?P<name>\S+)\s+(?P<active>\d+)\s+(?P<pending>\d+)\s+(?P<completed>\d+)\s+(?P<blocked>\d+)\s+(?P<alltimeblocked>\d+)")
 
         def _settled_stages(node):
             (stdout, stderr, rc) = node.nodetool("tpstats")
@@ -2693,12 +2693,11 @@ class TestMaterializedViewsConsistency(Tester):
         output = "\r{}".format(row)
         for key in list(self.exception_type.keys()):
             output = "{} ({}: {})".format(output, key, self.exception_type[key])
-        sys.stdout.write(output)
-        sys.stdout.flush()
+        logger.debug(output)
 
     def _print_read_status(self, row):
         if self.counts[MutationPresence.unknown] == 0:
-            sys.stdout.write(
+            logger.debug(
                 "\rOn {}; match: {}; extra: {}; missing: {}".format(
                     row,
                     self.counts[MutationPresence.match],
@@ -2706,7 +2705,7 @@ class TestMaterializedViewsConsistency(Tester):
                     self.counts[MutationPresence.missing])
             )
         else:
-            sys.stdout.write(
+            logger.debug(
                 "\rOn {}; match: {}; extra: {}; missing: {}; WTF: {}".format(
                     row,
                     self.counts[MutationPresence.match],
@@ -2714,7 +2713,6 @@ class TestMaterializedViewsConsistency(Tester):
                     self.counts[MutationPresence.missing],
                     self.counts[MutationPresence.unkown])
             )
-        sys.stdout.flush()
 
     def _do_row(self, insert_stmt, i, num_partitions):
 
@@ -2846,12 +2844,10 @@ class TestMaterializedViewsConsistency(Tester):
                 pytest.skip("Failed to get range {range} within timeout from queue. {error}".format(range=i, error=str(e)))
 
             if not mm.out() is None:
-                sys.stdout.write("\r{}\n" .format(mm.out()))
+                logger.debug("\r{}\n" .format(mm.out()))
             self.counts[mm.mp] += 1
 
         self._print_read_status(upper)
-        sys.stdout.write("\n")
-        sys.stdout.flush()
 
         for thread in threads:
             thread.join(timeout=300)

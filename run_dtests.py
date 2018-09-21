@@ -37,7 +37,7 @@ from os import getcwd
 from tempfile import NamedTemporaryFile
 from bs4 import BeautifulSoup
 
-from _pytest.config import Parser
+from _pytest.config.argparsing import Parser
 import argparse
 
 from conftest import pytest_addoption
@@ -200,7 +200,7 @@ def collect_test_modules(stdout):
     """
     # unfortunately, pytest emits xml like output -- but it's not actually xml, so we'll fail to parse
     # if we try. first step is to fix up the pytest output to create well formatted xml
-    xml_line_regex_pattern = re.compile("^([\s])*<(Module|Class|Function|Instance) '(.*)'>")
+    xml_line_regex_pattern = re.compile(r"^([\s])*<(Module|Class|Function|Instance) '(.*)'>")
     is_first_module = True
     is_first_class = True
     has_closed_class = False

@@ -1031,7 +1031,7 @@ class TestSecondaryIndexesOnCollections(Tester):
         stmt = "CREATE INDEX user_uuids_values on map_index_search.users (uuids);"
         if self.cluster.version() < '3.0':
             if self.cluster.version() >= '2.2':
-                matching = "Cannot create index on values\(uuids\): an index on keys\(uuids\) already exists and indexing a map on more than one dimension at the same time is not currently supported"
+                matching = r"Cannot create index on values\(uuids\): an index on keys\(uuids\) already exists and indexing a map on more than one dimension at the same time is not currently supported"
             else:
                 matching = "Cannot create index on uuids values, an index on uuids keys already exists and indexing a map on both keys and values at the same time is not currently supported"
             assert_invalid(session, stmt, matching)

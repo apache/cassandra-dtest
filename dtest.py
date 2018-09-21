@@ -171,8 +171,8 @@ def cleanup_docker_environment_before_test_execution():
     mode there is no way for us to do this.
     """
     # attempt to wack all existing running Cassandra processes forcefully to get us into a clean state
-    p_kill = subprocess.Popen('ps aux | grep -ie CassandraDaemon | grep java | awk \'{print $2}\' | xargs kill -9',
-                              shell=True)
+    p_kill = subprocess.Popen('ps aux | grep -ie CassandraDaemon | grep java | grep -v grep | awk \'{print $2}\' | xargs kill -9',
+                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True)
     p_kill.wait(timeout=10)
 
     # explicitly call "sync" to flush everything that might be pending from a previous test

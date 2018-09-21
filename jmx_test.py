@@ -39,7 +39,7 @@ class TestJMX(Tester):
         node1.flush()
         node1.stop(gently=False)
 
-        with pytest.raises(ToolError, message="ConnectException: 'Connection refused( \(Connection refused\))?'."):
+        with pytest.raises(ToolError, message=r"ConnectException: 'Connection refused( \(Connection refused\))?'."):
             node1.nodetool('netstats')
 
         # don't wait; we're testing for when nodetool is called on a node mid-startup

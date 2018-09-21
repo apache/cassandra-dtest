@@ -44,5 +44,5 @@ class TestInternodeMessaging(Tester):
 
         # now, make sure node2 reconnects (and continues gossiping).
         # node.watch_log_for() will time out if it cannot find the log entry
-        assert node2.grep_log('successfully connected to 127.0.0.1:7000 \(GOSSIP\)',
+        assert node2.grep_log(r'successfully connected to 127.0.0.1:7000 \(GOSSIP\)',
                               from_mark=node2_log_mark, filename='debug.log')

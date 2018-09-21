@@ -7,7 +7,7 @@ docopt
 enum34
 flaky
 mock
-pytest
+pytest==3.6.4
 pytest-timeout
 parse
 pycodestyle

@@ -1629,7 +1629,7 @@ Tracing session:""")
 
         # Can't check escape sequence on cmd prompt. Assume no errors is good enough metric.
         if not common.is_win():
-            assert re.search(chr(27) + "\[[0,1,2]?J", out)
+            assert re.search(chr(27) + r"\[[0,1,2]?J", out)
 
     def test_batch(self):
         """
