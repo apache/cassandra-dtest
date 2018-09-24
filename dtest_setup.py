@@ -392,9 +392,12 @@ class DTestSetup:
         phi_values = {'phi_convict_threshold': 5}
 
         # enable read time tracking of repaired data between replicas by default
-        repaired_data_tracking_values = {'repaired_data_tracking_for_partition_reads_enabled': 'true',
-                                         'repaired_data_tracking_for_range_reads_enabled': 'true',
-                                         'report_unconfirmed_repaired_data_mismatches': 'true'}
+        if self.cluster.version() >= '4':
+            repaired_data_tracking_values = {'repaired_data_tracking_for_partition_reads_enabled': 'true',
+                                             'repaired_data_tracking_for_range_reads_enabled': 'true',
+                                             'report_unconfirmed_repaired_data_mismatches': 'true'}
+        else:
+            repaired_data_tracking_values = {}
 
         timeout = 15000
         if self.cluster_options is not None and len(self.cluster_options) > 0:
