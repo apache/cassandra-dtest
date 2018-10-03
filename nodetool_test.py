@@ -340,9 +340,9 @@ class TestNodetool(Tester):
         @expected_result This test invokes nodetool describecluster and matches the output with the expected one
         """
         cluster = self.cluster
-        cluster.populate([2, 3, 1]).start(wait_for_binary_proto=True)
+        cluster.populate([1, 2, 1]).start(wait_for_binary_proto=True)
 
-        node1_dc1, node2_dc1, node1_dc2, node2_dc2, node3_dc2, node1_dc3 = cluster.nodelist()
+        node1_dc1, node1_dc2, node2_dc2, node1_dc3 = cluster.nodelist()
 
         session_dc1 = self.patient_cql_connection(node1_dc1)
         session_dc1.execute("create KEYSPACE ks1 WITH replication = {'class': 'NetworkTopologyStrategy', 'dc1': 3, 'dc2':5, 'dc3':1}")
@@ -350,47 +350,78 @@ class TestNodetool(Tester):
         session_dc3 = self.patient_cql_connection(node1_dc3)
         session_dc3.execute("create KEYSPACE ks2 WITH replication = {'class': 'NetworkTopologyStrategy', 'dc1': 3, 'dc2':5, 'dc3':1}")
 
-        out_node1_dc1, err, _ = node1_dc1.nodetool('describecluster')
-        assert 0 == len(err), err
+        all_nodes = cluster.nodelist()
 
-        out_node2_dc1, err, _ = node2_dc1.nodetool('describecluster')
-        assert 0 == len(err), err
-        assert out_node1_dc1 == out_node2_dc1
+        out_node1_dc1, node1_dc1_sorted = self._describe(all_nodes.pop())
 
-        out_node1_dc2, err, _ = node1_dc2.nodetool('describecluster')
-        assert 0 == len(err), err
-        assert out_node1_dc1 == out_node1_dc2
-
-        out_node2_dc2, err, _ = node2_dc2.nodetool('describecluster')
-        assert 0 == len(err), err
-        assert out_node1_dc1 == out_node2_dc2
-
-        out_node2_dc3, err, _ = node3_dc2.nodetool('describecluster')
-        assert 0 == len(err), err
-        assert out_node1_dc1 == out_node2_dc3
-
-        out_node1_dc3, err, _ = node1_dc3.nodetool('describecluster')
-        assert 0 == len(err), err
-        assert out_node1_dc1 == out_node1_dc3
+        for node in all_nodes:
+            out, out_sorted = self._describe(node)
+            assert node1_dc1_sorted == out_sorted
 
         logger.debug(out_node1_dc1)
-        assert 'Live: 6' in out_node1_dc1
+        assert 'Live: 4' in out_node1_dc1
         assert 'Joining: 0' in out_node1_dc1
         assert 'Moving: 0' in out_node1_dc1
         assert 'Leaving: 0' in out_node1_dc1
         assert 'Unreachable: 0' in out_node1_dc1
         assert 'Data Centers:' in out_node1_dc1
-        assert 'dc1 #Nodes: 2 #Down: 0' in out_node1_dc1
-        assert 'dc2 #Nodes: 3 #Down: 0' in out_node1_dc1
+        assert 'dc1 #Nodes: 1 #Down: 0' in out_node1_dc1
+        assert 'dc2 #Nodes: 2 #Down: 0' in out_node1_dc1
         assert 'dc3 #Nodes: 1 #Down: 0' in out_node1_dc1
-        assert 'Database versions:' in out_node1_dc1
-        assert '4.0.0: [127.0.0.6:7000, 127.0.0.5:7000, 127.0.0.4:7000, 127.0.0.3:7000, 127.0.0.2:7000, 127.0.0.1:7000]' in out_node1_dc1
         assert 'Keyspaces:' in out_node1_dc1
-        assert 'system_schema -> Replication class: LocalStrategy {}' in out_node1_dc1
-        assert 'system -> Replication class: LocalStrategy {}' in out_node1_dc1
-        assert 'system_traces -> Replication class: SimpleStrategy {replication_factor=2}' in out_node1_dc1
-        assert 'system_distributed -> Replication class: SimpleStrategy {replication_factor=3}' in out_node1_dc1
-        assert 'system_auth -> Replication class: SimpleStrategy {replication_factor=1}' in out_node1_dc1
-        assert 'ks1 -> Replication class: NetworkTopologyStrategy {dc2=5, dc1=3, dc3=1}' in out_node1_dc1
-        assert 'ks2 -> Replication class: NetworkTopologyStrategy {dc2=5, dc1=3, dc3=1}' in out_node1_dc1
-        assert 'Cluster Information:' in out_node1_dc1
+
+        expected_keyspaces = [('system_schema', 'LocalStrategy', {''}),
+                              ('system', 'LocalStrategy', {''}),
+                              ('system_traces', 'SimpleStrategy', {'replication_factor=2'}),
+                              ('system_distributed', 'SimpleStrategy', {'replication_factor=3'}),
+                              ('system_auth', 'SimpleStrategy', {'replication_factor=1'}),
+                              ('ks1', 'NetworkTopologyStrategy', {'dc1=3','dc2=5','dc3=1'}),
+                              ('ks2', 'NetworkTopologyStrategy', {'dc1=3','dc2=5','dc3=1'})]
+
+        for (ks, strategy, _) in expected_keyspaces:
+            assert "{} -> Replication class: {}".format(ks, strategy) in out_node1_dc1 # replication factor is verified below
+
+        # now check db versions & replication factor:
+        # Database versions:
+        #       4.0.0: [127.0.0.6:7000, 127.0.0.5:7000, 127.0.0.4:7000, 127.0.0.3:7000, 127.0.0.2:7000, 127.0.0.1:7000]
+
+        lines = out_node1_dc1.splitlines()
+        rex = r'(\S+)\s\[(.*)\]'
+        found_keyspaces = False
+        found_database = False
+        verified_rfs = 0
+        for i in range(0, len(lines)):
+            if 'Keyspaces' in lines[i]:
+                found_keyspaces = True
+                for x in range(i+1, len(lines)):
+                    for (ks, strategy, replication) in expected_keyspaces:
+                        if "{} ->".format(ks) in lines[x]:
+                            verified_rfs += 1
+                            assert strategy in lines[x]
+                            assert replication == self._get_replication(lines[x])
+
+            if 'Database versions:' in lines[i]:
+                found_database = True
+                m = re.search(rex, lines[i+1])
+                # group(1) is the version, and all nodes are on the same version
+                assert "{}".format(node1_dc1.get_cassandra_version()) in m.group(1)
+                nodestring = m.group(2)
+                for n in cluster.nodelist():
+                    assert n.address_and_port() in nodestring
+
+        assert found_keyspaces
+        assert found_database
+        assert verified_rfs == len(expected_keyspaces)
+
+    def _get_replication(self, line):
+        # ks1 -> Replication class: NetworkTopologyStrategy {dc2=5, dc1=3, dc3=1}
+        repl_rex = r'{(.*)}'
+        repl_m = re.search(repl_rex, line)
+        return {x.strip() for x in repl_m.group(1).split(",")}
+
+    def _describe(self, node):
+        node_describe, err, _ = node.nodetool('describecluster')
+        assert 0 == len(err), err
+        out_sorted = node_describe.split()
+        out_sorted.sort()
+        return (node_describe, out_sorted)
