@@ -495,6 +495,8 @@ class TestSpeculativeReadRepair(Tester):
             assert storage_proxy.speculated_rr_read == 0
             assert storage_proxy.speculated_rr_write == 0
 
+        assert len(node2.grep_log("Message-to-self TYPE:READ", filename='debug.log')) == 0
+
     @since('4.0')
     def test_speculative_data_request(self):
         """ If one node doesn't respond to a full data request, it should query the other """
