@@ -481,12 +481,15 @@ class TestSpeculativeReadRepair(Tester):
         node2.byteman_submit(['-u', './byteman/read_repair/stop_writes.btm'])
 
         node2.byteman_submit(['./byteman/read_repair/sorted_live_endpoints.btm'])
-        with StorageProxy(node2) as storage_proxy:
+        coordinator = node2
+        # Stop reads on coordinator in order to make sure we do not go through
+        # the messaging service for the local reads
+        with StorageProxy(node2) as storage_proxy, stop_reads(coordinator):
             assert storage_proxy.blocking_read_repair == 0
             assert storage_proxy.speculated_rr_read == 0
             assert storage_proxy.speculated_rr_write == 0
 
-            session = self.get_cql_connection(node2)
+            session = self.get_cql_connection(coordinator)
             expected = [kcv(1, 0, 1), kcv(1, 1, 2)]
             results = session.execute(quorum("SELECT * FROM ks.tbl WHERE k=1"))
             assert listify(results) == expected
