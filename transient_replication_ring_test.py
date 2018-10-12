@@ -130,7 +130,7 @@ class TestTransientReplicationRing(Tester):
         session.execute("CREATE KEYSPACE %s WITH REPLICATION={%s}" % (self.keyspace, replication_params))
         print("CREATE KEYSPACE %s WITH REPLICATION={%s}" % (self.keyspace, replication_params))
         session.execute(
-            "CREATE TABLE %s.%s (pk varchar, ck int, value int, PRIMARY KEY (pk, ck)) WITH speculative_retry = 'NEVER' AND speculative_write_threshold = 'NEVER' AND read_repair = 'NONE'" % (
+            "CREATE TABLE %s.%s (pk varchar, ck int, value int, PRIMARY KEY (pk, ck)) WITH speculative_retry = 'NEVER' AND additional_write_policy = 'NEVER' AND read_repair = 'NONE'" % (
             self.keyspace, self.table))
 
     def quorum(self, session, stmt_str):
