@@ -165,7 +165,19 @@ class PageAssertionMixin(object):
     """Can be added to subclasses of unittest.Tester"""
 
     def assertEqualIgnoreOrder(self, actual, expected):
-        assert list_to_hashed_dict(actual) == list_to_hashed_dict(expected)
+        hashed_expected = list_to_hashed_dict(expected)
+        hashed_actual = list_to_hashed_dict(actual)
+        for key, expected in hashed_expected.items():
+            assert key in hashed_actual, "expected %s not in actual" % str(expected)
+            actual = hashed_actual[key]
+            assert actual == expected, "actual %s not same as expected %s" % (str(actual), str(expected))
+
+        for key, actual in hashed_actual.items():
+            assert key in hashed_expected, "actual %s not in expected" % str(actual)
+            expected = hashed_expected[key]
+            assert expected == actual, "expected %s not same as actual %s" % (str(expected), str(actual))
+
+        assert hashed_expected == hashed_actual
 
 
     def assertIsSubsetOf(self, subset, superset):

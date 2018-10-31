@@ -9,10 +9,12 @@ from cassandra import InvalidRequest
 from cassandra.query import SimpleStatement, dict_factory, named_tuple_factory
 from ccmlib.common import LogPatternToVersion
 
-from dtest import RUN_STATIC_UPGRADE_MATRIX, run_scenarios
-from tools.assertions import assert_read_timeout_or_failure
+from dtest import RUN_STATIC_UPGRADE_MATRIX, run_scenarios, MAJOR_VERSION_4
+
+from tools.assertions import (assert_read_timeout_or_failure, assert_lists_equal_ignoring_order)
 from tools.data import rows_to_list
 from tools.datahelp import create_rows, flatten_into_set, parse_data_into_dicts
+from tools.misc import add_skip
 from tools.paging import PageAssertionMixin, PageFetcher
 from .upgrade_base import UpgradeTester
 from .upgrade_manifest import build_upgrade_pairs
@@ -121,7 +123,7 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
             assert pf.num_results_all() == [5, 4]
 
             # make sure expected and actual have same data elements (ignoring order)
-            self.assertEqualIgnoreOrder(pf.all_data(), expected_data)
+            assert_lists_equal_ignoring_order(pf.all_data(), expected_data, sort_key='value')
 
     def test_with_equal_results_to_page_size(self):
         cursor = self.prepare()
@@ -151,7 +153,7 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
             assert pf.pagecount() == 1
 
             # make sure expected and actual have same data elements (ignoring order)
-            self.assertEqualIgnoreOrder(pf.all_data(), expected_data)
+            assert_lists_equal_ignoring_order(pf.all_data(), expected_data, sort_key='value')
 
     def test_undefined_page_size_default(self):
         """
@@ -183,7 +185,7 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
 
             self.maxDiff = None
             # make sure expected and actual have same data elements (ignoring order)
-            self.assertEqualIgnoreOrder(pf.all_data(), expected_data)
+            assert_lists_equal_ignoring_order(pf.all_data(), expected_data, sort_key='value')
 
 
 class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
@@ -422,7 +424,7 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
             assert pf.num_results_all() == [4, 3]
 
             # make sure the allow filtering query matches the expected results (ignoring order)
-            self.assertEqualIgnoreOrder(
+            assert_lists_equal_ignoring_order(
                 pf.all_data(),
                 parse_data_into_dicts(
                     """
@@ -435,7 +437,8 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
                     |8 |and more testing|
                     |9 |and more testing|
                     """, format_funcs={'id': int, 'value': str}
-                )
+                ),
+                sort_key='value'
             )
 
 
@@ -457,21 +460,30 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
             );
         """)
 
-        cursor.execute("""
-            CREATE TABLE test2 (
-                k int,
-                c int,
-                v text,
-                PRIMARY KEY (k, c)
-            ) WITH COMPACT STORAGE;
-        """)
+        testing_compact_storage = self.cluster.version() <= MAJOR_VERSION_4
+        if testing_compact_storage:
+            cursor.execute("""
+                CREATE TABLE test2 (
+                    k int,
+                    c int,
+                    v text,
+                    PRIMARY KEY (k, c)
+                ) WITH COMPACT STORAGE;
+            """)
+
+        version_string = self.upgrade_version_string()
+        #4.0 doesn't support compact storage
+        if version_string == 'trunk' or version_string >= MAJOR_VERSION_4:
+            cursor.execute("ALTER TABLE test2 DROP COMPACT STORAGE;")
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
             logger.debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE test")
-            cursor.execute("TRUNCATE test2")
+            if testing_compact_storage:
+                cursor.execute("TRUNCATE test2")
 
-            for table in ("test", "test2"):
+            tables = ("test", "test2") if testing_compact_storage else ("test")
+            for table in tables:
                 logger.debug("Querying table %s" % (table,))
                 expected = []
                 # match the key ordering for murmur3
@@ -503,22 +515,31 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
             );
         """)
 
-        cursor.execute("""
-            CREATE TABLE test2 (
-                k int,
-                c1 int,
-                c2 int,
-                v text,
-                PRIMARY KEY (k, c1, c2)
-            ) WITH COMPACT STORAGE;
-        """)
+        testing_compact_storage = self.cluster.version() <= MAJOR_VERSION_4
+        if testing_compact_storage:
+            cursor.execute("""
+                CREATE TABLE test2 (
+                    k int,
+                    c1 int,
+                    c2 int,
+                    v text,
+                    PRIMARY KEY (k, c1, c2)
+                ) WITH COMPACT STORAGE;
+            """)
+
+        version_string = self.upgrade_version_string()
+        #4.0 doesn't support compact storage
+        if version_string == 'trunk' or version_string >= MAJOR_VERSION_4:
+            cursor.execute("ALTER TABLE test2 DROP COMPACT STORAGE;")
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
             logger.debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE test")
-            cursor.execute("TRUNCATE test2")
+            if testing_compact_storage:
+              cursor.execute("TRUNCATE test2")
 
-            for table in ("test", "test2"):
+            tables = ("test", "test2") if testing_compact_storage else ("test")
+            for table in tables:
                 logger.debug("Querying table %s" % (table,))
                 expected = []
                 # match the key ordering for murmur3
@@ -566,7 +587,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
             all_results = pf.all_data()
             assert len(expected_data) == len(all_results)
             self.maxDiff = None
-            self.assertEqualIgnoreOrder(expected_data, all_results)
+            assert_lists_equal_ignoring_order(expected_data, all_results, sort_key='value')
 
     def test_paging_across_multi_wide_rows(self):
         cursor = self.prepare()
@@ -635,7 +656,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
             assert pf.pagecount() == 2
             assert pf.num_results_all() == [400, 200]
-            self.assertEqualIgnoreOrder(expected_data, pf.all_data())
+            assert_lists_equal_ignoring_order(expected_data, pf.all_data(), sort_key='sometext')
 
     @since('2.0.6')
     def test_static_columns_paging(self):
@@ -902,7 +923,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
             assert pf.pagecount() == 2
             assert pf.num_results_all() == [400, 200]
-            self.assertEqualIgnoreOrder(expected_data, pf.all_data())
+            assert_lists_equal_ignoring_order(expected_data, pf.all_data(), sort_key='sometext')
 
 
 class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
@@ -944,7 +965,7 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
             assert pf.pagecount() == 2
             assert pf.num_results_all(), [501 == 499]
 
-            self.assertEqualIgnoreOrder(pf.all_data(), expected_data)
+            assert_lists_equal_ignoring_order(pf.all_data(), expected_data, sort_key='mytext')
 
     def test_data_change_impacting_later_page(self):
         cursor = self.prepare()
@@ -981,7 +1002,7 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
 
             # add the new row to the expected data and then do a compare
             expected_data.append({'id': 2, 'mytext': 'foo'})
-            self.assertEqualIgnoreOrder(pf.all_data(), expected_data)
+            assert_lists_equal_ignoring_order(pf.all_data(), expected_data, sort_key='mytext')
 
     def test_row_TTL_expiry_during_paging(self):
         cursor = self.prepare()
@@ -1064,7 +1085,7 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
 
             # no need to request page here, because the first page is automatically retrieved
             page1 = pf.page_data(1)
-            self.assertEqualIgnoreOrder(page1, data[:500])
+            assert_lists_equal_ignoring_order(page1, data[:500], sort_key="mytext")
 
             # set some TTLs for data on page 3
             for row in data[1000:1500]:
@@ -1080,7 +1101,7 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
             # check page two
             pf.request_one()
             page2 = pf.page_data(2)
-            self.assertEqualIgnoreOrder(page2, data[500:1000])
+            assert_lists_equal_ignoring_order(page2, data[500:1000], sort_key="mytext")
 
             page3expected = []
             for row in data[1000:1500]:
@@ -1093,7 +1114,7 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
 
             pf.request_one()
             page3 = pf.page_data(3)
-            self.assertEqualIgnoreOrder(page3, page3expected)
+            assert_lists_equal_ignoring_order(page3, page3expected, sort_key="mytext")
 
 
 class TestPagingQueryIsolation(BasePagingTester, PageAssertionMixin):
@@ -1476,13 +1497,11 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
     def test_failure_threshold_deletions(self):
         """Test that paging throws a failure in case of tombstone threshold """
         self.fixture_dtest_setup.allow_log_errors = True
-        self.cluster.set_configuration_options(
-            values={'tombstone_failure_threshold': 500,
-                    'read_request_timeout_in_ms': 1000,
-                    'request_timeout_in_ms': 1000,
-                    'range_request_timeout_in_ms': 1000}
-        )
-        cursor = self.prepare()
+        cursor = self.prepare(
+            extra_config_options={'tombstone_failure_threshold': 500,
+                                  'read_request_timeout_in_ms': 1000,
+                                  'request_timeout_in_ms': 1000,
+                                  'range_request_timeout_in_ms': 1000})
         nodes = self.cluster.nodelist()
         self.setup_schema(cursor)
 
@@ -1530,6 +1549,7 @@ for klaus in BasePagingTester.__subclasses__():
         assert gen_class_name not in globals()
 
         upgrade_applies_to_env = RUN_STATIC_UPGRADE_MATRIX or spec['UPGRADE_PATH'].upgrade_meta.matches_current_env_version_family
+        cls = type(gen_class_name, (klaus,), spec)
         if not upgrade_applies_to_env:
-            pytest.mark.skip(reason='test not applicable to env.')
-        globals()[gen_class_name] = type(gen_class_name, (klaus,), spec)
+            add_skip(cls, 'test not applicable to env.')
+        globals()[gen_class_name] = cls

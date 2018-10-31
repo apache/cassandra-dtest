@@ -52,6 +52,7 @@ class TestSchemaAgreementUpgrade(Tester):
 
         # Forcing cluster version on purpose
         cluster.set_install_dir(version=version)
+        self.fixture_dtest_setup.reinitialize_cluster_for_different_version()
         cluster.populate(num_nodes).start()
 
         return cluster
@@ -145,6 +146,7 @@ class TestSchemaAgreementUpgrade(Tester):
             logger.debug("")
             logger.debug("Upgrading cluster to {}".format(version))
             cluster.set_install_dir(version=version)
+            self.fixture_dtest_setup.reinitialize_cluster_for_different_version()
 
             for node in nodes:
                 other_nodes = [n for n in nodes if n != node]

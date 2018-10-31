@@ -25,6 +25,7 @@ class TestCompatibilityFlag(Tester):
         cluster.populate(2)
         node1, node2 = cluster.nodelist()
         cluster.set_install_dir(version=from_version)
+        self.fixture_dtest_setup.reinitialize_cluster_for_different_version()
         cluster.start(wait_for_binary_proto=True)
 
         node1.drain()
@@ -46,6 +47,7 @@ class TestCompatibilityFlag(Tester):
         cluster.populate(2)
         node1, node2 = cluster.nodelist()
         cluster.set_install_dir(version=from_version)
+        self.fixture_dtest_setup.reinitialize_cluster_for_different_version()
         cluster.start(wait_for_binary_proto=True)
 
         node1.drain()

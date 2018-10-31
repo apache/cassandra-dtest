@@ -2,17 +2,18 @@ import os
 import subprocess
 import time
 import distutils.dir_util
+from distutils.version import LooseVersion
+
 import pytest
 import logging
 
 from ccmlib import common as ccmcommon
 
-from dtest import Tester, create_ks, create_cf
+from dtest import Tester, create_ks, create_cf, MAJOR_VERSION_4
 from tools.assertions import assert_all, assert_none, assert_one
 
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
-
 
 # WARNING: sstableloader tests should be added to TestSSTableGenerationAndLoading (below),
 # and not to BaseSStableLoaderTest (which is shared with upgrade tests)
@@ -27,45 +28,62 @@ class TestBaseSStableLoader(Tester):
         fixture_dtest_setup.allow_log_errors = True
 
     upgrade_from = None
-    compact = False
+    test_compact = False
+
+    def compact(self):
+        return self.fixture_dtest_setup.cluster.version() < MAJOR_VERSION_4 and self.test_compact
 
     def create_schema(self, session, ks, compression):
         create_ks(session, ks, rf=2)
-        create_cf(session, "standard1", compression=compression, compact_storage=self.compact)
+        create_cf(session, "standard1", compression=compression, compact_storage=self.compact())
         create_cf(session, "counter1", compression=compression, columns={'v': 'counter'},
-                  compact_storage=self.compact)
+                  compact_storage=self.compact())
+
+    def skip_base_class_test(self):
+        if self.__class__.__name__ != 'TestBasedSSTableLoader' and self.upgrade_from is None:
+            pytest.skip("Don't need to run base class test, only derived classes")
 
     def test_sstableloader_compression_none_to_none(self):
+        self.skip_base_class_test()
         self.load_sstable_with_configuration(None, None)
 
     def test_sstableloader_compression_none_to_snappy(self):
+        self.skip_base_class_test()
         self.load_sstable_with_configuration(None, 'Snappy')
 
     def test_sstableloader_compression_none_to_deflate(self):
+        self.skip_base_class_test()
         self.load_sstable_with_configuration(None, 'Deflate')
 
     def test_sstableloader_compression_snappy_to_none(self):
+        self.skip_base_class_test()
         self.load_sstable_with_configuration('Snappy', None)
 
     def test_sstableloader_compression_snappy_to_snappy(self):
+        self.skip_base_class_test()
         self.load_sstable_with_configuration('Snappy', 'Snappy')
 
     def test_sstableloader_compression_snappy_to_deflate(self):
+        self.skip_base_class_test()
         self.load_sstable_with_configuration('Snappy', 'Deflate')
 
     def test_sstableloader_compression_deflate_to_none(self):
+        self.skip_base_class_test()
         self.load_sstable_with_configuration('Deflate', None)
 
     def test_sstableloader_compression_deflate_to_snappy(self):
+        self.skip_base_class_test()
         self.load_sstable_with_configuration('Deflate', 'Snappy')
 
     def test_sstableloader_compression_deflate_to_deflate(self):
+        self.skip_base_class_test()
         self.load_sstable_with_configuration('Deflate', 'Deflate')
 
     def test_sstableloader_with_mv(self):
         """
         @jira_ticket CASSANDRA-11275
         """
+        self.skip_base_class_test()
         def create_schema_with_mv(session, ks, compression):
             self.create_schema(session, ks, compression)
             # create a materialized view
@@ -125,9 +143,11 @@ class TestBaseSStableLoader(Tester):
         cluster = self.cluster
         if self.upgrade_from:
             logger.debug("Generating sstables with version %s" % (self.upgrade_from))
+            default_install_version = self.cluster.version()
             default_install_dir = self.cluster.get_install_dir()
             # Forcing cluster version on purpose
             cluster.set_install_dir(version=self.upgrade_from)
+            self.fixture_dtest_setup.reinitialize_cluster_for_different_version()
         logger.debug("Using jvm_args={}".format(self.jvm_args))
         cluster.populate(2).start(jvm_args=list(self.jvm_args))
         node1, node2 = cluster.nodelist()
@@ -140,6 +160,16 @@ class TestBaseSStableLoader(Tester):
         for i in range(NUM_KEYS):
             session.execute("UPDATE standard1 SET v='{}' WHERE KEY='{}' AND c='col'".format(i, i))
             session.execute("UPDATE counter1 SET v=v+1 WHERE KEY='{}'".format(i))
+
+        #Will upgrade to a version that doesn't support compact storage so revert the compact
+        #storage, this doesn't actually fix it yet
+        if self.compact() and default_install_version >= MAJOR_VERSION_4:
+            session.execute('alter table standard1 drop compact storage');
+            session.execute('alter table counter1 drop compact storage');
+            node1.nodetool('rebuild')
+            node1.nodetool('cleanup')
+            node2.nodetool('rebuild')
+            node2.nodetool('cleanup')
 
         node1.nodetool('drain')
         node1.stop()
@@ -158,6 +188,7 @@ class TestBaseSStableLoader(Tester):
             logger.debug("Running sstableloader with version from %s" % (default_install_dir))
             # Return to previous version
             cluster.set_install_dir(install_dir=default_install_dir)
+            self.fixture_dtest_setup.reinitialize_cluster_for_different_version()
 
         cluster.start(jvm_args=list(self.jvm_args))
         time.sleep(5)  # let gossip figure out what is going on

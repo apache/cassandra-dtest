@@ -3,7 +3,7 @@ import time
 import pytest
 import logging
 
-from dtest import Tester
+from dtest import Tester, MAJOR_VERSION_4
 from sstable_generation_loading_test import TestBaseSStableLoader
 from thrift_bindings.thrift010.Cassandra import (ConsistencyLevel, Deletion,
                                            Mutation, SlicePredicate,
@@ -25,13 +25,11 @@ LEGACY_SSTABLES_JVM_ARGS = ["-Dcassandra.streamdes.initial_mem_buffer_size=1",
 @since('3.0')
 class TestStorageEngineUpgrade(Tester):
 
-    def setUp(self, bootstrap=False, jvm_args=None):
-        super(TestStorageEngineUpgrade, self).setUp()
-        self.default_install_dir = self.cluster.get_install_dir()
-        self.bootstrap = bootstrap
-        if jvm_args is None:
-            jvm_args = []
-        self.jvm_args = jvm_args
+    @pytest.fixture(autouse=True)
+    def storage_engine_upgrade_setup(self, fixture_dtest_setup):
+        self.fixture_dtest_setup.default_install_dir = fixture_dtest_setup.cluster.get_install_dir()
+        self.fixture_dtest_setup.bootstrap = False
+        return ()
 
     def _setup_cluster(self, create_keyspace=True, cluster_options=None):
         cluster = self.cluster
@@ -40,10 +38,11 @@ class TestStorageEngineUpgrade(Tester):
             cluster.set_configuration_options(cluster_options)
 
         # Forcing cluster version on purpose
-        if self.dtest_config.cassandra_version_from_build >= '4':
+        if self.dtest_config.cassandra_version_from_build >= MAJOR_VERSION_4:
             cluster.set_install_dir(version="git:cassandra-3.0")
         else:
             cluster.set_install_dir(version="git:cassandra-2.1")
+        self.fixture_dtest_setup.reinitialize_cluster_for_different_version()
         cluster.populate(1).start()
 
         node1 = cluster.nodelist()[0]
@@ -62,14 +61,14 @@ class TestStorageEngineUpgrade(Tester):
         time.sleep(.5)
         node1.stop(wait_other_notice=True)
 
-        node1.set_install_dir(install_dir=self.default_install_dir)
+        node1.set_install_dir(install_dir=self.fixture_dtest_setup.default_install_dir)
         node1.start(wait_other_notice=True, wait_for_binary_proto=True)
 
-        if self.bootstrap:
-            cluster.set_install_dir(install_dir=self.default_install_dir)
+        if self.fixture_dtest_setup.bootstrap:
+            cluster.set_install_dir(install_dir=self.fixture_dtest_setup.default_install_dir)
             # Add a new node, bootstrap=True ensures that it is not a seed
             node2 = new_node(cluster, bootstrap=True)
-            node2.start(wait_for_binary_proto=True, jvm_args=self.jvm_args)
+            node2.start(wait_for_binary_proto=True, jvm_args=self.fixture_dtest_setup.jvm_args)
 
             temp_files = self.glob_data_dirs(os.path.join('*', "tmp", "*.dat"))
             logger.debug("temp files: " + str(temp_files))
@@ -140,6 +139,10 @@ class TestStorageEngineUpgrade(Tester):
             for r in range(ROWS):
                 session.execute("INSERT INTO t(k, t, v) VALUES ({n}, {r}, {r})".format(n=n, r=r))
 
+        #4.0 doesn't support compact storage
+        if compact_storage and self.dtest_config.cassandra_version_from_build >= MAJOR_VERSION_4:
+            session.execute("ALTER TABLE t DROP COMPACT STORAGE;")
+
         session = self._do_upgrade()
 
         for n in range(PARTITIONS):
@@ -151,8 +154,8 @@ class TestStorageEngineUpgrade(Tester):
                        [[n, v, v] for v in range(ROWS - 1, -1, -1)])
 
             # Querying a "large" slice
-            start = ROWS / 10
-            end = ROWS - 1 - (ROWS / 10)
+            start = ROWS // 10
+            end = ROWS - 1 - (ROWS // 10)
             assert_all(session,
                        "SELECT * FROM t WHERE k = {n} AND t >= {start} AND t < {end}".format(n=n, start=start, end=end),
                        [[n, v, v] for v in range(start, end)])
@@ -161,8 +164,8 @@ class TestStorageEngineUpgrade(Tester):
                        [[n, v, v] for v in range(end - 1, start - 1, -1)])
 
             # Querying a "small" slice
-            start = ROWS / 2
-            end = ROWS / 2 + 5
+            start = ROWS // 2
+            end = ROWS // 2 + 5
             assert_all(session,
                        "SELECT * FROM t WHERE k = {n} AND t >= {start} AND t < {end}".format(n=n, start=start, end=end),
                        [[n, v, v] for v in range(start, end)])
@@ -179,8 +182,8 @@ class TestStorageEngineUpgrade(Tester):
                        [[n, v, v] for v in range(ROWS - 1, -1, -1)])
 
             # Querying a "large" slice
-            start = ROWS / 10
-            end = ROWS - 1 - (ROWS / 10)
+            start = ROWS // 10
+            end = ROWS - 1 - (ROWS // 10)
             assert_all(session,
                        "SELECT * FROM t WHERE k = {n} AND t >= {start} AND t < {end}".format(n=n, start=start, end=end),
                        [[n, v, v] for v in range(start, end)])
@@ -189,8 +192,8 @@ class TestStorageEngineUpgrade(Tester):
                        [[n, v, v] for v in range(end - 1, start - 1, -1)])
 
             # Querying a "small" slice
-            start = ROWS / 2
-            end = ROWS / 2 + 5
+            start = ROWS // 2
+            end = ROWS // 2 + 5
             assert_all(session,
                        "SELECT * FROM t WHERE k = {n} AND t >= {start} AND t < {end}".format(n=n, start=start, end=end),
                        [[n, v, v] for v in range(start, end)])
@@ -209,15 +212,25 @@ class TestStorageEngineUpgrade(Tester):
         for n in range(PARTITIONS):
             session.execute("INSERT INTO t(k, v1, v2, v3, v4) VALUES ({}, {}, {}, {}, {})".format(n, n + 1, n + 2, n + 3, n + 4))
 
+        is40 = self.dtest_config.cassandra_version_from_build >= MAJOR_VERSION_4
+        if compact_storage and is40:
+            session.execute("ALTER TABLE t DROP COMPACT STORAGE;")
+
         session = self._do_upgrade()
 
+        def maybe_add_compact_columns(expected):
+            if is40 and compact_storage:
+                expected.insert(1, None)
+                expected.append(None)
+            return expected
+
         for n in range(PARTITIONS):
-            assert_one(session, "SELECT * FROM t WHERE k = {}".format(n), [n, n + 1, n + 2, n + 3, n + 4])
+            assert_one(session, "SELECT * FROM t WHERE k = {}".format(n), maybe_add_compact_columns([n, n + 1, n + 2, n + 3, n + 4]))
 
         self.cluster.compact()
 
         for n in range(PARTITIONS):
-            assert_one(session, "SELECT * FROM t WHERE k = {}".format(n), [n, n + 1, n + 2, n + 3, n + 4])
+            assert_one(session, "SELECT * FROM t WHERE k = {}".format(n), maybe_add_compact_columns([n, n + 1, n + 2, n + 3, n + 4]))
 
     def test_upgrade_with_statics(self):
         self.upgrade_with_statics(rows=10)
@@ -402,7 +415,7 @@ class TestStorageEngineUpgrade(Tester):
 
         assert_one(session, "SELECT k FROM t", ['some_key'])
 
-    @since('3.0', max_version='4')
+    @since('3.0', max_version='3.99')
     def test_upgrade_with_range_tombstone_eoc_0(self):
         """
         Check sstable upgrading when the sstable contains a range tombstone with EOC=0.
@@ -457,35 +470,68 @@ class TestStorageEngineUpgrade(Tester):
 @since('3.0')
 class TestBootstrapAfterUpgrade(TestStorageEngineUpgrade):
 
-    def setUp(self):
-        super(TestBootstrapAfterUpgrade, self).setUp(bootstrap=True, jvm_args=LEGACY_SSTABLES_JVM_ARGS)
-
+    @pytest.fixture(autouse=True)
+    def set_up(self, storage_engine_upgrade_setup):
+        self.fixture_dtest_setup.bootstrap=True
+        self.fixture_dtest_setup.jvm_args=LEGACY_SSTABLES_JVM_ARGS
 
 @pytest.mark.upgrade_test
-@since('3.0', max_version='4')
+@since('3.0', max_version='3.99')
 class TestLoadKaSStables(TestBaseSStableLoader):
-    upgrade_from = '2.1.6'
+    upgrade_test = True
+    upgrade_from = '2.1.20'
     jvm_args = LEGACY_SSTABLES_JVM_ARGS
 
 
 @pytest.mark.upgrade_test
-@since('3.0', max_version='4')
+@since('3.0', max_version='3.99')
 class TestLoadKaCompactSStables(TestBaseSStableLoader):
-    upgrade_from = '2.1.6'
+    upgrade_test = True
+    upgrade_from = '2.1.20'
     jvm_args = LEGACY_SSTABLES_JVM_ARGS
-    compact = True
+    test_compact = True
 
 
 @pytest.mark.upgrade_test
-@since('3.0', max_version='4')
+@since('3.0', max_version='3.99')
 class TestLoadLaSStables(TestBaseSStableLoader):
-    upgrade_from = '2.2.4'
+    upgrade_test = True
+    upgrade_from = '2.2.13'
     jvm_args = LEGACY_SSTABLES_JVM_ARGS
 
 
 @pytest.mark.upgrade_test
-@since('3.0', max_version='4')
+@since('3.0', max_version='3.99')
 class TestLoadLaCompactSStables(TestBaseSStableLoader):
-    upgrade_from = '2.2.4'
+    upgrade_test = True
+    upgrade_from = '2.2.13'
     jvm_args = LEGACY_SSTABLES_JVM_ARGS
-    compact = True
+    test_compact = True
+
+
+@pytest.mark.upgrade_test
+@since('4.0', max_version='4.99')
+class TestLoadMdSStables(TestBaseSStableLoader):
+    upgrade_from = '3.0.17'
+
+
+@pytest.mark.upgrade_test
+@pytest.mark.skip("4.0 sstableloader can't handle formerly compact tables even after drop compact storage, rebuild, cleanup")
+@since('4.0', max_version='4.99')
+class TestLoadMdCompactSStables(TestBaseSStableLoader):
+    upgrade_from = '3.0.17'
+    test_compact = True
+
+
+@pytest.mark.upgrade_test
+@since('4.0', max_version='4.99')
+class TestLoadMdThreeOneOneSStables(TestBaseSStableLoader):
+    upgrade_from = '3.11.3'
+
+
+@pytest.mark.upgrade_test
+@pytest.mark.skip("4.0 sstableloader can't handle formerly compact tables even after drop compact storage, rebuild, cleanup")
+@since('4.0', max_version='4.99')
+class TestLoadMdThreeOneOneCompactSStables(TestBaseSStableLoader):
+    upgrade_from = '3.11.3'
+    test_compact = True

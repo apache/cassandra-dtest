@@ -18,6 +18,7 @@ from netifaces import AF_INET
 from psutil import virtual_memory
 
 import netifaces as ni
+import ccmlib.repository
 from ccmlib.common import validate_install_dir, is_win, get_version_from_build
 
 from dtest_config import DTestConfig
@@ -75,6 +76,8 @@ def pytest_addoption(parser):
                           "after the test completes")
     parser.addoption("--enable-jacoco-code-coverage", action="store_true", default=False,
                      help="Enable JaCoCo Code Coverage Support")
+    parser.addoption("--upgrade-version-selection", action="store", default="indev",
+                     help="Specify whether to run indev, releases, or both")
 
 
 def sufficient_system_resources_for_resource_intensive_tests():
@@ -364,12 +367,29 @@ def fixture_since(request, fixture_dtest_setup):
 
         since_str = request.node.get_closest_marker('since').args[0]
         since = LooseVersion(since_str)
-        # use cassandra_version_from_build as it's guaranteed to be a LooseVersion
-        # whereas cassandra_version may be a string if set in the cli options
-        current_running_version = fixture_dtest_setup.dtest_config.cassandra_version_from_build
-        skip_msg = _skip_msg(current_running_version, since, max_version)
-        if skip_msg:
-            pytest.skip(skip_msg)
+        #For upgrade tests don't run the test if any of the involved versions
+        #are excluded by the annotation
+        if hasattr(request.cls, "UPGRADE_PATH"):
+            upgrade_path = request.cls.UPGRADE_PATH
+            ccm_repo_cache_dir, _ = ccmlib.repository.setup(upgrade_path.starting_meta.version)
+            starting_version = get_version_from_build(ccm_repo_cache_dir)
+            skip_msg = _skip_msg(starting_version, since, max_version)
+            if skip_msg:
+                pytest.skip(skip_msg)
+            ccm_repo_cache_dir, _ = ccmlib.repository.setup(upgrade_path.upgrade_meta.version)
+            ending_version = get_version_from_build(ccm_repo_cache_dir)
+            skip_msg = _skip_msg(ending_version, since, max_version)
+            if skip_msg:
+                pytest.skip(skip_msg)
+        else:
+            # For regular tests the value in the current cluster actually means something so we should
+            # use that to check.
+            # Use cassandra_version_from_build as it's guaranteed to be a LooseVersion
+            # whereas cassandra_version may be a string if set in the cli options
+            current_running_version = fixture_dtest_setup.dtest_config.cassandra_version_from_build
+            skip_msg = _skip_msg(current_running_version, since, max_version)
+            if skip_msg:
+                pytest.skip(skip_msg)
 
 
 @pytest.fixture(autouse=True)
@@ -409,13 +429,16 @@ def pytest_collection_modifyitems(items, config):
     This function is called upon during the pytest test collection phase and allows for modification
     of the test items within the list
     """
-    if not config.getoption("--collect-only") and config.getoption("--cassandra-dir") is None:
-        if config.getoption("--cassandra-version") is None:
+    collect_only = config.getoption("--collect-only")
+    cassandra_dir = config.getoption("--cassandra-dir")
+    cassandra_version = config.getoption("--cassandra-version")
+    if not collect_only and cassandra_dir is None:
+        if  cassandra_version is None:
             raise Exception("Required dtest arguments were missing! You must provide either --cassandra-dir "
                             "or --cassandra-version. Refer to the documentation or invoke the help with --help.")
 
     # Either cassandra_version or cassandra_dir is defined, so figure out the version
-    CASSANDRA_VERSION = config.getoption("--cassandra-version") or get_version_from_build(config.getoption("--cassandra-dir"))
+    CASSANDRA_VERSION = cassandra_version or get_version_from_build(cassandra_dir)
 
     # Check that use_off_heap_memtables is supported in this c* version
     if config.getoption("--use-off-heap-memtables") and ("3.0" <= CASSANDRA_VERSION < "3.4"):
@@ -433,16 +456,17 @@ def pytest_collection_modifyitems(items, config):
     for item in items:
         deselect_test = False
 
-        if item.get_closest_marker("resource_intensive"):
-            if config.getoption("--force-resource-intensive-tests"):
-                pass
-            if config.getoption("--skip-resource-intensive-tests"):
-                deselect_test = True
-                logger.info("SKIP: Deselecting test %s as test marked resource_intensive. To force execution of "
-                      "this test re-run with the --force-resource-intensive-tests command line argument" % item.name)
-            if not sufficient_system_resources_resource_intensive:
-                deselect_test = True
-                logger.info("SKIP: Deselecting resource_intensive test %s due to insufficient system resources" % item.name)
+        if item.get_closest_marker("resource_intensive") and not collect_only:
+            force_resource_intensive = config.getoption("--force-resource-intensive-tests")
+            skip_resource_intensive = config.getoption("--skip-resource-intensive-tests")
+            if not force_resource_intensive:
+                if skip_resource_intensive:
+                    deselect_test = True
+                    logger.info("SKIP: Deselecting test %s as test marked resource_intensive. To force execution of "
+                          "this test re-run with the --force-resource-intensive-tests command line argument" % item.name)
+                if not sufficient_system_resources_resource_intensive:
+                    deselect_test = True
+                    logger.info("SKIP: Deselecting resource_intensive test %s due to insufficient system resources" % item.name)
 
         if item.get_closest_marker("no_vnodes"):
             if config.getoption("--use-vnodes"):
@@ -480,4 +504,3 @@ def pytest_collection_modifyitems(items, config):
 
     config.hook.pytest_deselected(items=deselected_items)
     items[:] = selected_items
-

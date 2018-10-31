@@ -15,10 +15,10 @@ LEGACY_SSTABLES_JVM_ARGS = ["-Dcassandra.streamdes.initial_mem_buffer_size=1",
 # We don't support directly upgrading from 2.2 to 4.0 so disabling this on 4.0.
 # TODO: we should probably not hardcode versions?
 @pytest.mark.upgrade_test
-@since('3.0', max_version='4')
+@since('3.0', max_version='3.99')
 class TestUpgradeRepair(BaseRepairTest):
 
-    @since('3.0')
+    @since('3.0', max_version='3.99')
     def test_repair_after_upgrade(self):
         """
         @jira_ticket CASSANDRA-10990
