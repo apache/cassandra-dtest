@@ -19,9 +19,10 @@ from cassandra.query import SimpleStatement
 from dtest import RUN_STATIC_UPGRADE_MATRIX, Tester
 from tools.misc import generate_ssl_stores, new_node
 from .upgrade_base import switch_jdks
-from .upgrade_manifest import (build_upgrade_pairs, current_2_0_x,
-                              current_2_1_x, current_2_2_x, current_3_0_x,
-                              indev_2_2_x, indev_3_x)
+from .upgrade_manifest import (build_upgrade_pairs,
+                               current_2_1_x, current_2_2_x, current_3_0_x,
+                               indev_3_11_x,
+                               current_3_11_x, indev_trunk)
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +68,7 @@ def data_writer(tester, to_verify_queue, verification_done_queue, rewrite_probab
 
             session.execute(prepared, (val, key))
 
-            to_verify_queue.put_nowait((key, val,))
+            to_verify_queue.put((key, val,))
         except Exception:
             logger.debug("Error in data writer process!")
             to_verify_queue.close()
@@ -122,7 +123,7 @@ def data_checker(tester, to_verify_queue, verification_done_queue):
                 # rewrite rows in the same sequence as originally written
                 pass
 
-        tester.assertEqual(expected_val, actual_val, "Data did not match expected value!")
+        assert expected_val == actual_val, "Data did not match expected value!"
 
 
 def counter_incrementer(tester, to_verify_queue, verification_done_queue, rewrite_probability=0):
@@ -225,6 +226,7 @@ def counter_checker(tester, to_verify_queue, verification_done_queue):
 
 @pytest.mark.upgrade_test
 @pytest.mark.resource_intensive
+@pytest.mark.skip("Fake skip so that this isn't run outside of a generated class that removes this annotation")
 class TestUpgrade(Tester):
     """
     Upgrades a 3-node Murmur3Partitioner cluster through versions specified in test_version_metas.
@@ -247,13 +249,13 @@ class TestUpgrade(Tester):
             r'Unknown column cdc during deserialization',
         )
 
-    def setUp(self):
+    def prepare(self):
         logger.debug("Upgrade test beginning, setting CASSANDRA_VERSION to {}, and jdk to {}. (Prior values will be restored after test)."
               .format(self.test_version_metas[0].version, self.test_version_metas[0].java_version))
-        os.environ['CASSANDRA_VERSION'] = self.test_version_metas[0].version
+        cluster = self.cluster
+        cluster.set_install_dir(version=self.test_version_metas[0].version)
         switch_jdks(self.test_version_metas[0].java_version)
-
-        super(TestUpgrade, self).setUp()
+        self.fixture_dtest_setup.reinitialize_cluster_for_different_version()
         logger.debug("Versions to test (%s): %s" % (type(self), str([v.version for v in self.test_version_metas])))
 
     def init_config(self):
@@ -273,6 +275,7 @@ class TestUpgrade(Tester):
         """
         self.upgrade_scenario()
 
+    @pytest.mark.timeout(3000)
     def test_rolling_upgrade(self):
         """
         Test rolling upgrade of the cluster, so we have mixed versions part way through.
@@ -285,6 +288,7 @@ class TestUpgrade(Tester):
         """
         self.upgrade_scenario(internode_ssl=True)
 
+    @pytest.mark.timeout(3000)
     def test_rolling_upgrade_with_internode_ssl(self):
         """
         Rolling upgrade test using internode ssl.
@@ -293,6 +297,8 @@ class TestUpgrade(Tester):
 
     def upgrade_scenario(self, populate=True, create_schema=True, rolling=False, after_upgrade_call=(), internode_ssl=False):
         # Record the rows we write as we go:
+        if populate:
+            self.prepare()
         self.row_values = set()
         cluster = self.cluster
         if cluster.version() >= '3.0':
@@ -350,6 +356,7 @@ class TestUpgrade(Tester):
                           (num + 1, len(self.cluster.nodelist()), version_meta.version))
 
                 self.cluster.set_install_dir(version=version_meta.version)
+                self.fixture_dtest_setup.reinitialize_cluster_for_different_version()
 
             # Stop write processes
             write_proc.terminate()
@@ -367,6 +374,7 @@ class TestUpgrade(Tester):
 
                 self.upgrade_to_version(version_meta, internode_ssl=internode_ssl)
                 self.cluster.set_install_dir(version=version_meta.version)
+                self.fixture_dtest_setup.reinitialize_cluster_for_different_version()
 
                 self._check_values()
                 self._check_counters()
@@ -432,7 +440,7 @@ class TestUpgrade(Tester):
         for node in nodes:
             node.set_install_dir(version=version_meta.version)
             logger.debug("Set new cassandra dir for %s: %s" % (node.name, node.get_install_dir()))
-            if internode_ssl and version_meta.version >= '4.0':
+            if internode_ssl and (version_meta.family == 'trunk' or version_meta.family >= '4.0'):
                 node.set_configuration_options({'server_encryption_options': {'enabled': True, 'enable_legacy_ssl_storage_port': True}})
 
         # hacky? yes. We could probably extend ccm to allow this publicly.
@@ -553,7 +561,7 @@ class TestUpgrade(Tester):
         Returns the writer process, verifier process, and the to_verify_queue.
         """
         # queue of writes to be verified
-        to_verify_queue = Queue()
+        to_verify_queue = Queue(10000)
         # queue of verified writes, which are update candidates
         verification_done_queue = Queue(maxsize=500)
 
@@ -629,7 +637,7 @@ class TestUpgrade(Tester):
             if fail_count > 100:
                 break
 
-        assert fail_count, 100 < "Too many counter increment failures"
+        assert fail_count < 100, "Too many counter increment failures"
 
     def _check_counters(self):
         logger.debug("Checking counter values...")
@@ -668,7 +676,6 @@ class TestUpgrade(Tester):
         else:
             self.fail("Count query did not return")
 
-
 class BootstrapMixin(object):
     """
     Can be mixed into UpgradeTester or a subclass thereof to add bootstrap tests.
@@ -705,6 +712,7 @@ class BootstrapMixin(object):
     def test_bootstrap_multidc(self):
         # try and add a new node
         # multi dc, 2 nodes in each dc
+        self.prepare()
         cluster = self.cluster
 
         if cluster.version() >= '3.0':
@@ -773,13 +781,16 @@ def create_upgrade_class(clsname, version_metas, protocol_version,
     print("  to run these tests alone, use `nosetests {}.py:{}`".format(__name__, clsname))
 
     upgrade_applies_to_env = RUN_STATIC_UPGRADE_MATRIX or version_metas[-1].matches_current_env_version_family
-    if not upgrade_applies_to_env:
-        pytest.mark.skip(reason='test not applicable to env.')
     newcls = type(
             clsname,
             parent_classes,
             {'test_version_metas': version_metas, '__test__': True, 'protocol_version': protocol_version, 'extra_config': extra_config}
         )
+    # Remove the skip annotation in the superclass we just derived from, we will add it back if we actually intend
+    # to skip with a better message
+    newcls.pytestmark = [mark for mark in newcls.pytestmark if not mark.name == "skip"]
+    if not upgrade_applies_to_env:
+        newcls.pytestmark.append(pytest.mark.skip("test not applicable to env"))
 
     if clsname in globals():
         raise RuntimeError("Class by name already exists!")
@@ -791,41 +802,33 @@ def create_upgrade_class(clsname, version_metas, protocol_version,
 MultiUpgrade = namedtuple('MultiUpgrade', ('name', 'version_metas', 'protocol_version', 'extra_config'))
 
 MULTI_UPGRADES = (
-    # Proto v1 upgrades (v1 supported on 2.0, 2.1, 2.2)
-    MultiUpgrade(name='ProtoV1Upgrade_AllVersions_EndsAt_indev_2_2_x',
-                 version_metas=[current_2_0_x, current_2_1_x, indev_2_2_x], protocol_version=1, extra_config=None),
-    MultiUpgrade(name='ProtoV1Upgrade_AllVersions_RandomPartitioner_EndsAt_indev_2_2_x',
-                 version_metas=[current_2_0_x, current_2_1_x, indev_2_2_x], protocol_version=1,
-                 extra_config=(
-                     ('partitioner', 'org.apache.cassandra.dht.RandomPartitioner'),
-                 )),
-
-    # Proto v2 upgrades (v2 is supported on 2.0, 2.1, 2.2)
-    MultiUpgrade(name='ProtoV2Upgrade_AllVersions_EndsAt_indev_2_2_x',
-                 version_metas=[current_2_0_x, current_2_1_x, indev_2_2_x], protocol_version=2, extra_config=None),
-    MultiUpgrade(name='ProtoV2Upgrade_AllVersions_RandomPartitioner_EndsAt_indev_2_2_x',
-                 version_metas=[current_2_0_x, current_2_1_x, indev_2_2_x], protocol_version=2,
-                 extra_config=(
-                     ('partitioner', 'org.apache.cassandra.dht.RandomPartitioner'),
-                 )),
-
-    # Proto v3 upgrades (v3 is supported on 2.1, 2.2, 3.0, 3.1, trunk)
-    MultiUpgrade(name='ProtoV3Upgrade_AllVersions_EndsAt_Trunk_HEAD',
-                 version_metas=[current_2_1_x, current_2_2_x, current_3_0_x, indev_3_x], protocol_version=3, extra_config=None),
-    MultiUpgrade(name='ProtoV3Upgrade_AllVersions_RandomPartitioner_EndsAt_Trunk_HEAD',
-                 version_metas=[current_2_1_x, current_2_2_x, current_3_0_x, indev_3_x], protocol_version=3,
+    # Proto v3 upgrades (v3 is supported on 2.1, 2.2, 3.0, 3.11)
+    MultiUpgrade(name='TestProtoV3Upgrade_AllVersions_EndsAt_3_11_X',
+                 version_metas=[current_2_1_x, current_2_2_x, current_3_0_x, indev_3_11_x], protocol_version=3, extra_config=None),
+    MultiUpgrade(name='TestProtoV3Upgrade_AllVersions_RandomPartitioner_EndsAt_3_11_X_HEAD',
+                 version_metas=[current_2_1_x, current_2_2_x, current_3_0_x, indev_3_11_x], protocol_version=3,
                  extra_config=(
                      ('partitioner', 'org.apache.cassandra.dht.RandomPartitioner'),
                  )),
 
     # Proto v4 upgrades (v4 is supported on 2.2, 3.0, 3.1, trunk)
-    MultiUpgrade(name='ProtoV4Upgrade_AllVersions_EndsAt_Trunk_HEAD',
-                 version_metas=[current_2_2_x, current_3_0_x, indev_3_x], protocol_version=4, extra_config=None),
-    MultiUpgrade(name='ProtoV4Upgrade_AllVersions_RandomPartitioner_EndsAt_Trunk_HEAD',
-                 version_metas=[current_2_2_x, current_3_0_x, indev_3_x], protocol_version=4,
+    MultiUpgrade(name='TestProtoV4Upgrade_AllVersions_EndsAt_Trunk_HEAD',
+                 version_metas=[current_2_2_x, current_3_0_x, current_3_11_x, indev_trunk], protocol_version=4, extra_config=None),
+    MultiUpgrade(name='TestProtoV4Upgrade_AllVersions_RandomPartitioner_EndsAt_Trunk_HEAD',
+                 version_metas=[current_2_2_x, current_3_0_x, current_3_11_x, indev_trunk], protocol_version=4,
                  extra_config=(
                      ('partitioner', 'org.apache.cassandra.dht.RandomPartitioner'),
                  )),
+    #Beta versions don't work with this test since it doesn't specify use beta in the client
+    #It's fine I guess for now? Can update on release
+    # Proto v5 upgrades (v5 is supported on 3.0, 3.11, trunk)
+    # MultiUpgrade(name='TestProtoV5Upgrade_AllVersions_EndsAt_Trunk_HEAD',
+    #              version_metas=[current_3_0_x, current_3_x, indev_trunk], protocol_version=5, extra_config=None),
+    # MultiUpgrade(name='TestProtoV5Upgrade_AllVersions_RandomPartitioner_EndsAt_Trunk_HEAD',
+    #              version_metas=[current_3_0_x, current_3_x, indev_trunk], protocol_version=5,
+    #              extra_config=(
+    #                  ('partitioner', 'org.apache.cassandra.dht.RandomPartitioner'),
+    #              )),
 )
 
 for upgrade in MULTI_UPGRADES:

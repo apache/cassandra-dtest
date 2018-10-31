@@ -3,6 +3,7 @@ import subprocess
 import time
 import hashlib
 import logging
+import pytest
 
 from collections import Mapping
 
@@ -97,7 +98,9 @@ def list_to_hashed_dict(list):
                 normalized_list.append(tmp_list)
             else:
                 normalized_list.append(item)
-        list_digest = hashlib.sha256(str(normalized_list).encode('utf-8', 'ignore')).hexdigest()
+        list_str = str(normalized_list)
+        utf8 = list_str.encode('utf-8', 'ignore')
+        list_digest = hashlib.sha256(utf8).hexdigest()
         hashed_dict[list_digest] = normalized_list
     return hashed_dict
 
@@ -136,3 +139,20 @@ class ImmutableMapping(Mapping):
 
     def __repr__(self):
         return '{cls}({data})'.format(cls=self.__class__.__name__, data=self._data)
+
+
+def wait_for_agreement(thrift, timeout=10):
+    def check_agreement():
+        schemas = thrift.describe_schema_versions()
+        if len([ss for ss in list(schemas.keys()) if ss != 'UNREACHABLE']) > 1:
+            raise Exception("schema agreement not reached")
+    retry_till_success(check_agreement, timeout=timeout)
+
+
+def add_skip(cls, reason=""):
+    if hasattr(cls, "pytestmark"):
+        cls.pytestmark = cls.pytestmark.copy()
+        cls.pytestmark.append(pytest.mark.skip(reason))
+    else:
+        cls.pytestmark = [pytest.mark.skip(reason)]
+    return cls

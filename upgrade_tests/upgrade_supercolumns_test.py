@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 # The data contained in the SSTables is (name, {'attr': {'name': name}}) for the name in NAMES.
 SCHEMA_PATH = os.path.join("./", "upgrade_tests", "supercolumn-data", "cassandra-2.0", "schema-2.0.cql")
 TABLES_PATH = os.path.join("./", "upgrade_tests", "supercolumn-data", "cassandra-2.0", "supcols", "cols")
-NAMES = ["Alice", "Bob", "Claire", "Dave", "Ed", "Frank", "Grace"]
+NAMES = [name.encode() for name in ["Alice", "Bob", "Claire", "Dave", "Ed", "Frank", "Grace"]]
 
 
 @pytest.mark.upgrade_test
@@ -55,6 +55,7 @@ class TestSCUpgrade(Tester):
 
         # Forcing cluster version on purpose
         cluster.set_install_dir(version=cassandra_version)
+        self.fixture_dtest_setup.reinitialize_cluster_for_different_version()
         if "memtable_allocation_type" in cluster._config_options:
             del cluster._config_options['memtable_allocation_type']
         cluster.populate(num_nodes).start()
@@ -71,7 +72,7 @@ class TestSCUpgrade(Tester):
         client = get_thrift_client(host, port)
         client.transport.open()
         client.set_keyspace('supcols')
-        p = SlicePredicate(slice_range=SliceRange('', '', False, 1000))
+        p = SlicePredicate(slice_range=SliceRange(''.encode(), ''.encode(), False, 1000))
         for name in NAMES:
             super_col_value = client.get_slice(name, ColumnParent("cols"), p, ConsistencyLevel.ONE)
             logger.debug("get_slice(%s) returned %s" % (name, super_col_value))
@@ -79,7 +80,7 @@ class TestSCUpgrade(Tester):
 
     def verify_with_cql(self, session):
         session.execute("USE supcols")
-        expected = [[name, 'attr', 'name', name] for name in ['Grace', 'Claire', 'Dave', 'Frank', 'Ed', 'Bob', 'Alice']]
+        expected = [[name.encode(), 'attr'.encode(), 'name', name.encode()] for name in ['Grace', 'Claire', 'Dave', 'Frank', 'Ed', 'Bob', 'Alice']]
         assert_all(session, "SELECT * FROM cols", expected)
 
     def _upgrade_super_columns_through_versions_test(self, upgrade_path):
@@ -123,15 +124,17 @@ class TestSCUpgrade(Tester):
         self.verify_with_thrift()
 
         for version in upgrade_path:
+            if version == 'git:cassandra-4.0' or version == 'git:trunk':
+                session.execute("ALTER TABLE supcols.cols DROP COMPACT STORAGE")
             self.upgrade_to_version(version)
-
-            if self.cluster.version() < '4':
-                node1.nodetool("enablethrift")
 
             session = self.patient_exclusive_cql_connection(node1)
 
             self.verify_with_cql(session)
-            self.verify_with_thrift()
+
+            if self.cluster.version() < '4':
+                node1.nodetool("enablethrift")
+                self.verify_with_thrift()
 
         cluster.remove(node=node1)
 
@@ -156,11 +159,13 @@ class TestSCUpgrade(Tester):
         # Update Cassandra Directory
         for node in nodes:
             node.set_install_dir(version=tag)
+            logger.debug("Set new cassandra dir for %s: %s" % (node.name, node.get_install_dir()))
+        self.cluster.set_install_dir(version=tag)
+        self.fixture_dtest_setup.reinitialize_cluster_for_different_version()
+        for node in nodes:
             if tag < "2.1":
                 if "memtable_allocation_type" in node.config_options:
                     node.config_options.__delitem__("memtable_allocation_type")
-            logger.debug("Set new cassandra dir for %s: %s" % (node.name, node.get_install_dir()))
-        self.cluster.set_install_dir(version=tag)
 
         # Restart nodes on new version
         for node in nodes:

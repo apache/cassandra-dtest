@@ -27,6 +27,7 @@ since = pytest.mark.since
 logger = logging.getLogger(__name__)
 
 
+@pytest.mark.skip("These aren't functioning just yet")
 class TestCqlsh(Tester):
 
     @classmethod
@@ -1673,6 +1674,7 @@ Tracing session:""")
         return p.communicate()
 
 
+@pytest.mark.skip("These aren't functioning just yet")
 class TestCqlshSmoke(Tester):
     """
     Tests simple use cases for clqsh.
@@ -1945,6 +1947,7 @@ class TestCqlshSmoke(Tester):
         return [table.name for table in list(self.session.cluster.metadata.keyspaces[keyspace].tables.values())]
 
 
+@pytest.mark.skip("These aren't functioning just yet")
 class CqlLoginTest(Tester):
     """
     Tests login which requires password authenticator

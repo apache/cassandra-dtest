@@ -420,6 +420,15 @@ class DTestSetup:
         if self.cluster.version() >= '4':
             values['corrupted_tombstone_strategy'] = 'exception'
 
+        if self.dtest_config.use_vnodes:
+            self.cluster.set_configuration_options(
+                values={'initial_token': None, 'num_tokens': self.dtest_config.num_tokens})
+        else:
+            self.cluster.set_configuration_options(values={'num_tokens': None})
+
+        if self.dtest_config.use_off_heap_memtables:
+            self.cluster.set_configuration_options(values={'memtable_allocation_type': 'offheap_objects'})
+
         self.cluster.set_configuration_options(values)
         logger.debug("Done setting configuration options:\n" + pprint.pformat(self.cluster._config_options, indent=4))
 
@@ -454,21 +463,13 @@ class DTestSetup:
 
     @staticmethod
     def create_ccm_cluster(dtest_setup):
-        logger.debug("cluster ccm directory: " + dtest_setup.test_path)
+        logger.info("cluster ccm directory: " + dtest_setup.test_path)
         version = dtest_setup.dtest_config.cassandra_version
 
         if version:
             cluster = Cluster(dtest_setup.test_path, dtest_setup.cluster_name, cassandra_version=version)
         else:
             cluster = Cluster(dtest_setup.test_path, dtest_setup.cluster_name, cassandra_dir=dtest_setup.dtest_config.cassandra_dir)
-
-        if dtest_setup.dtest_config.use_vnodes:
-            cluster.set_configuration_options(values={'initial_token': None, 'num_tokens': dtest_setup.dtest_config.num_tokens})
-        else:
-            cluster.set_configuration_options(values={'num_tokens': None})
-
-        if dtest_setup.dtest_config.use_off_heap_memtables:
-            cluster.set_configuration_options(values={'memtable_allocation_type': 'offheap_objects'})
 
         cluster.set_datadir_count(dtest_setup.dtest_config.data_dir_count)
         cluster.set_environment_variable('CASSANDRA_LIBJEMALLOC', dtest_setup.dtest_config.jemalloc_path)
@@ -513,3 +514,12 @@ class DTestSetup:
         # write_last_test_file(cls.test_path, cls.cluster)
 
         # cls.post_initialize_cluster()
+
+    def reinitialize_cluster_for_different_version(self):
+        """
+        This method is used by upgrade tests to re-init the cluster to work with a specific
+        version that may not be compatible with the existing configuration options
+        """
+        self.init_default_config()
+
+

@@ -346,3 +346,11 @@ def assert_lists_equal_ignoring_order(list1, list2, sort_key=None):
                 sorted_list2 = sorted(normalized_list2, key=lambda elm: str(elm[sort_key]))
 
     assert sorted_list1 == sorted_list2
+
+
+def assert_lists_of_dicts_equal(list1, list2):
+    for adict, bdict in zip(list1, list2):
+        assert(len(adict) == len(bdict))
+        for key, value in adict.items():
+            assert key in bdict
+            assert bdict[key] == value

@@ -34,6 +34,7 @@ class TestUpgradeSuperColumnsThrough(Tester):
             node.set_install_dir(version=tag)
             logger.debug("Set new cassandra dir for %s: %s" % (node.name, node.get_install_dir()))
         self.cluster.set_install_dir(version=tag)
+        self.fixture_dtest_setup.reinitialize_cluster_for_different_version()
 
         # Restart nodes on new version
         for node in nodes:
@@ -45,6 +46,7 @@ class TestUpgradeSuperColumnsThrough(Tester):
 
         # Forcing cluster version on purpose
         cluster.set_install_dir(version=cassandra_version)
+        self.fixture_dtest_setup.reinitialize_cluster_for_different_version()
 
         cluster.populate(num_nodes)
 
