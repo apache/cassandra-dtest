@@ -1,0 +1,12 @@
+- repo: https://github.com/pre-commit/pre-commit-hooks.git
+  sha: v2.0.0
+  hooks:
+    - id: trailing-whitespace
+    - id: flake8
+      args: ['--ignore=E501,F811,F812,F822,F823,F831,F841,N8,C9']
+      exclude: ^thrift_bindings|^cassandra-thrift
+- repo: https://github.com/asottile/reorder_python_imports.git
+  sha: v1.3.3
+  hooks:
+    - id: reorder-python-imports
+      exclude: ^thrift_bindings|^cassandra-thrift

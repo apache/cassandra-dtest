@@ -8,7 +8,7 @@ of code that can be tested in isolation should ideally be a unit test (which can
 found in the actual Cassandra repository). 
 
 Setup and Prerequisites
-------------
+-----------------------
 
 Some environmental setup is required before you can start running DTests.
 
@@ -33,24 +33,48 @@ bootstrap your development environment and then use [Homebrew](https://brew.sh)
 2. ``brew install python3 libev``
 
 ### Python Dependencies
-There are multiple external Python dependencies required to run DTests. 
-The current Python depenendcy list is maintained in a file named 
+There are multiple external Python dependencies required to run DTests.
+The current Python dependency list is maintained in a file named
 [requirements.txt](https://github.com/apache/cassandra-dtest/blob/master/requirements.txt) 
 in the root of the cassandra-dtest repository.
 
-The easiest way to install these dependencies is with pip and virtualenv. 
+The easiest way to install these dependencies is with [`tox`](https://tox.readthedocs.io/en/latest/install.html)
+which will automatically setup and manage a `virtualenv` for you. You can also
+manually setup and manage a `virtualenv`. It is highly discouraged to run
+outside of some kind of virtualenv.
 
-**Note**: While virtualenv isn't strictly required, using virtualenv is almost always the quickest 
-path to success as it provides common base setup across various configurations.
+**Note**: While `tox` or using `virtualenv` manually isn't strictly required,
+it is almost always the quickest path to success as it provides common
+base setup across various configurations.
+
+#### Automatic `tox` install
+
+1. [Install tox](https://tox.readthedocs.io/en/latest/install.html)
+2. Run tests with the `tox -e pytest` or `tox -e dtest` targets
+
+For example to run using `pytest`:
+```
+tox -e pytest -- --cassandra-dir=/path/to/cassandra -k TestTTL
+```
+
+Tox will automatically manage python versions and virtualenvs for you in the
+`.tox` directory.  If you change the `requirements.txt` just remember to run
+with the `--recreate` flag. If you want to activate the virtualenv like you
+used to you can:
+
+```
+source .tox/dtest/bin/activate
+```
+
+#### Manual `virtualenv` install
 
 1. Install virtualenv: ``pip install virtualenv``
 2. Create a new virtualenv: ``virtualenv --python=python3 --no-site-packages ~/dtest``
-3. Switch/Activate the new virtualenv: ``source ~/dtest/bin/activate``
-4. Install remaining DTest Python dependencies: ``pip install -r /path/to/cassandra-dtest/requirements.txt``
+3. Install DTest Python dependencies ``~/dtest/bin/pip install -r /path/to/cassandra-dtest/requirements.txt``
+4. Switch/Activate the new virtualenv: ``source ~/dtest/bin/activate``
 
-
-Usage
------
+Running The Tests
+-----------------
 
 The tests are executed by the pytest framework. For convenience, a wrapper ``run_dtests.py`` 
 is included with the intent to make starting execution of the dtests with sane defaults as easy 
@@ -59,17 +83,21 @@ ultimately works the best and provides the most flexibility.
 
 Pytest has a great [Usage and Invocations](https://docs.pytest.org/en/latest/usage.html) document which is a great place to start for basic invocation options when using pytest.
 
-At minimum, 
-
-  The only thing the framework needs to know is
-the location of the (compiled (hint: ``ant clean jar``)) sources for Cassandra. There are two options:
+At minimum the framework needs to know the location of the compiled
+(hint: ``ant clean jar``)) sources for Cassandra. There are two options:
 
 Use existing sources:
 
+    # If you are running via tox
+    tox -e pytest -- --cassandra-dir=~/path/to/cassandra
+    # If you have sourced your virtualenv
     pytest --cassandra-dir=~/path/to/cassandra
 
 Use ccm ability to download/compile released sources from archives.apache.org:
 
+    # If you are running via tox
+    tox -e pytest --cassandra-version=1.0.0
+    # If you have sourced your virtualenv
     pytest --cassandra-version=1.0.0
 
 A convenient option if tests are regularly run against the same existing
@@ -81,13 +109,10 @@ directory is to set a `cassandra_dir` in `~/path/to/cassandra-dtest/pytest.ini`:
 The tests will use this directory by default, avoiding the need for any
 environment variable (that still will have precedence if given though).
 
-Existing tests are probably the best place to start to look at how to write
-tests.
-
 The ``run_dtests.py`` included script is simply a wrapper to make starting the dtests 
 with sane defaults as simple as possible. If you just want to run the tests and do nothing more, 
 this is most likely the most easy place to start; however, anyone attempting to do active development
- and testing will find invoking pytest directly to be likely the best option.
+and testing will find invoking pytest directly to be likely the best option.
 
 Each test spawns a new fresh cluster and tears it down after the test. If a
 test fails, the logs for the node are saved in a `logs/<timestamp>` directory
@@ -98,13 +123,43 @@ To run the upgrade tests, you have must both JDK7 and JDK8 installed. Paths
 to these installations should be defined in the environment variables
 JAVA7_HOME and JAVA8_HOME, respectively.
 
-Installation Instructions
--------------------------
+Running a Single Test
+---------------------
+Use `pytest` filters to run a single test:
 
-See more detailed instructions in the included [INSTALL file](https://github.com/apache/cassandra-dtest/blob/master/INSTALL.md).
+```
+tox -e pytest -- --cassandra-dir=/path/to/cassandra -k TestRecoverNegativeExpirationDate
+```
+
+Pre-commit hooks for Style
+--------------------------
+If you want to make sure that your changes pass basic Python linting, you can
+use the bundled [pre-commit](https://pre-commit.com/) `tox` target to install
+pre-commit hooks that will validate any files you change in your commit
+are validated. You only have to do this once and every future git commit will
+automatically be run through the linters.
+
+```
+# You only have to do this once
+tox -e pre-commit
+```
+
+If you want to commit bypassing the linters, just use `--no-verify`:
+```
+git commit --no-verify
+```
+
+If you decide that having your code automatically linted is not cool,
+just uninstall pre-commit:
+```
+tox -e pre-commit-remove
+```
 
 Writing Tests
 -------------
+Existing tests are probably the best place to start to look at how to write
+tests.
+
 
 - Most of the time when you start a cluster with `cluster.start()`, you'll want to pass in `wait_for_binary_proto=True` so the call blocks until the cluster is ready to accept CQL connections. We tried setting this to `True` by default once, but the problems caused there (e.g. when it waited the full timeout time on a node that was deliberately down) were more unpleasant and more difficult to debug than the problems caused by having it `False` by default.
 - If you're using JMX via [the `tools.jmxutils` module](tools/jmxutils.py), make sure to call `remove_perf_disable_shared_mem` on the node or nodes you want to query with JMX _before starting the nodes_. `remove_perf_disable_shared_mem` disables a JVM option that's incompatible with JMX (see [this JMX ticket](https://github.com/rhuss/jolokia/issues/198)). It works by performing a string replacement in the node's Cassandra startup script, so changes will only propagate to the node at startup time.
@@ -117,6 +172,9 @@ Some general tips for debugging dtest/pytest tests
 
 #### pytest.set_trace()
 If there is an unexpected value being asserted on and you'd like to inspect the state of all the tests variables just before a paricular assert, add ``pytest.set_trace()`` right before the problematic code. The next time you execute the test, when that line of code is reached pytest will drop you into an interactive python debugger (pdb). From there you can use standard python options to inspect various methods and variables for debugging.
+
+You can also add `--pdb` to the command line and it will automatically drop you
+into `pdb` when a test fails.
 
 #### Hung tests/hung pytest framework
 Debugging hung tests can be very difficult but thanks to improvements in Python 3 it's now pretty painless to get a python thread dump of all the threads currently running in the pytest process.

@@ -10,3 +10,6 @@ last_test_dir
 upgrade
 html/
 doxygen/doxypy-0.4.2/
+
+.tox
+.pytest_cache
