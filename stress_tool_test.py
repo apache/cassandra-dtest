@@ -54,3 +54,19 @@ class TestStressSparsenessRatio(Tester):
         num_results = sum(len(row) for row in written)
 
         assert abs(float(num_nones) / num_results - expected_ratio) <= delta
+
+
+@since('3.0')
+class TestStressWrite(Tester):
+
+    @pytest.mark.timeout(3 * 60)
+    def test_quick_write(self):
+        """
+        @jira_ticket CASSANDRA-14890
+        A simple write stress test should be done very quickly
+        """
+        self.cluster.populate(1).start(wait_for_binary_proto=True)
+        node = self.cluster.nodelist()[0]
+        node.stress(['write', 'err<0.9', 'n>1', '-rate', 'threads=1'])
+        out, err, _ = node.run_cqlsh('describe table keyspace1.standard1')
+        assert 'standard1' in out
