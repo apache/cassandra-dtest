@@ -217,7 +217,7 @@ class ThriftConnection(object):
 
         socket = TSocket.TSocket(host, port)
         self.transport = TTransport.TFramedTransport(socket)
-        protocol = TBinaryProtocol.TBinaryProtocolAccelerated(self.transport)
+        protocol = TBinaryProtocol.TBinaryProtocol(self.transport)
         self.client = self.Cassandra.Client(protocol)
 
         socket.open()
