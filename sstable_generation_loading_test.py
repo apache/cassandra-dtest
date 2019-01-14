@@ -43,6 +43,14 @@ class TestBaseSStableLoader(Tester):
         if self.__class__.__name__ != 'TestBasedSSTableLoader' and self.upgrade_from is None:
             pytest.skip("Don't need to run base class test, only derived classes")
 
+    def create_schema_40(self, session, ks, compression):
+        create_ks(session, ks, rf=2)
+        create_cf(session, "standard1", compression=compression, compact_storage=self.compact())
+        create_cf(session, "counter1", key_type='text', compression=compression, columns={'column1': 'text',
+                                                                                    'v': 'counter static',
+                                                                                    'value': 'counter'},
+                  primary_key="key, column1", clustering='column1 ASC', compact_storage=self.compact())
+
     def test_sstableloader_compression_none_to_none(self):
         self.skip_base_class_test()
         self.load_sstable_with_configuration(None, None)
@@ -195,7 +203,11 @@ class TestBaseSStableLoader(Tester):
 
         logger.debug("re-creating the keyspace and column families.")
         session = self.cql_connection(node1)
-        self.create_schema(session, ks, post_compression)
+
+        if self.test_compact and default_install_version >= MAJOR_VERSION_4:
+            self.create_schema_40(session, ks, post_compression)
+        else:
+            self.create_schema(session, ks, post_compression)
         time.sleep(2)
 
         logger.debug("Calling sstableloader")
@@ -206,7 +218,7 @@ class TestBaseSStableLoader(Tester):
             for i in range(NUM_KEYS):
                 query = "SELECT * FROM standard1 WHERE KEY='{}'".format(i)
                 assert_one(session, query, [str(i), 'col', str(i)])
-                query = "SELECT * FROM counter1 WHERE KEY='{}'".format(i)
+                query = "SELECT key, v FROM counter1 WHERE KEY='{}'".format(i)
                 assert_one(session, query, [str(i), 1])
 
         logger.debug("Reading data back")
