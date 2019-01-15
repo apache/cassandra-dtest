@@ -457,7 +457,6 @@ class TestCQL(UpgradeTester):
             res = list(cursor.execute("SELECT * FROM clicks LIMIT 4"))
             assert_length_equal(res, 4)
 
-    @pytest.mark.skip("https://issues.apache.org/jira/browse/CASSANDRA-14958")
     def test_counters(self):
         """ Validate counter support """
         cursor = self.prepare()
