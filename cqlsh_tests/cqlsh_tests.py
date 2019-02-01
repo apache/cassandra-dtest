@@ -802,9 +802,9 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         """
         @jira_ticket CASSANDRA-9961
         """
+        self.cluster.set_configuration_options({'enable_materialized_views': 'true'})
         self.cluster.populate(1)
         self.cluster.start(wait_for_binary_proto=True)
-        node1, = self.cluster.nodelist()
 
         self.execute(
             cql="""
@@ -1533,6 +1533,7 @@ Tracing session:""")
         Test operations on a materialized view: create, describe, select from, drop, create using describe output.
         @jira_ticket CASSANDRA-9961 and CASSANDRA-10348
         """
+        self.cluster.set_configuration_options({'enable_materialized_views': 'true'})
         self.cluster.populate(1)
         self.cluster.start(wait_for_binary_proto=True)
         node1, = self.cluster.nodelist()

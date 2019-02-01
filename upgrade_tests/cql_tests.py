@@ -5500,7 +5500,7 @@ class TestCQL(UpgradeTester):
         Test that creates and populate a simple materialized view.
         @jira_ticket CASSANDRA-13382
         """
-        cursor = self.prepare()
+        cursor = self.prepare(extra_config_options={'enable_materialized_views': 'true'})
 
         cursor.execute("CREATE KEYSPACE foo WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}")
         cursor.execute("CREATE TABLE foo.test1 (k int, t int, v int, PRIMARY KEY(k, t))")

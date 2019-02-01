@@ -108,6 +108,7 @@ class TestJMX(Tester):
         Test that the right mbeans are created and released when creating mvs
         """
         cluster = self.cluster
+        cluster.set_configuration_options({'enable_materialized_views': 'true'})
         cluster.populate(1)
         node = cluster.nodelist()[0]
         remove_perf_disable_shared_mem(node)
