@@ -53,6 +53,7 @@ class TestMaterializedViews(Tester):
 
     def prepare(self, user_table=False, rf=1, options=None, nodes=3, install_byteman=False, **kwargs):
         cluster = self.cluster
+        cluster.set_configuration_options({'enable_materialized_views': 'true'})
         cluster.populate([nodes, 0], install_byteman=install_byteman)
         if options:
             cluster.set_configuration_options(values=options)
@@ -2316,6 +2317,7 @@ class TestMaterializedViews(Tester):
         @jira_ticket CASSANDRA-9664
         """
         cluster = self.cluster
+        cluster.set_configuration_options({'enable_materialized_views': 'true'})
         cluster.populate(3).start()
         node1 = cluster.nodelist()[0]
         session = self.patient_cql_connection(node1, consistency_level=ConsistencyLevel.QUORUM)
@@ -2672,6 +2674,7 @@ class TestMaterializedViewsConsistency(Tester):
 
     def prepare(self, user_table=False):
         cluster = self.cluster
+        cluster.set_configuration_options({'enable_materialized_views': 'true'})
         cluster.populate(3).start()
         node2 = cluster.nodelist()[1]
 
@@ -2863,6 +2866,7 @@ class TestMaterializedViewsLockcontention(Tester):
 
     def _prepare_cluster(self):
         self.cluster.populate(1)
+        self.cluster.set_configuration_options({'enable_materialized_views': 'true'})
         self.supports_v5_protocol = self.supports_v5_protocol(self.cluster.version())
         self.protocol_version = 5 if self.supports_v5_protocol else 4
 

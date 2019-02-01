@@ -291,6 +291,7 @@ class TestPushedNotifications(Tester):
         Creating, updating and dropping a keyspace, a table and a materialized view
         will generate the correct schema change notifications.
         """
+        self.cluster.set_configuration_options({'enable_materialized_views': 'true'})
         self.cluster.populate(2).start(wait_for_binary_proto=True)
         node1, node2 = self.cluster.nodelist()
 

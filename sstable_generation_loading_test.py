@@ -336,6 +336,7 @@ class TestSSTableGenerationAndLoading(TestBaseSStableLoader):
         @jira_ticket CASSANDRA-11275
         """
         def create_schema_with_mv(session, ks, compression):
+            self.cluster.nodelist()[0].set_configuration_options({'enable_materialized_views': 'true'})
             self.create_schema(session, ks, compression)
             # create a materialized view
             session.execute("CREATE MATERIALIZED VIEW mv1 AS "
