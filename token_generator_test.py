@@ -40,7 +40,7 @@ class TestTokenGenerator(Tester):
             args.append(str(n))
 
         logger.debug('Invoking {}'.format(args))
-        token_gen_output = subprocess.check_output(args)
+        token_gen_output = subprocess.check_output(args).decode()
         lines = token_gen_output.split("\n")
         dc_tokens = None
         generated_tokens = []
