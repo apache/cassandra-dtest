@@ -15,7 +15,7 @@ from ccmlib.node import TimeoutError
 
 import pytest
 
-from dtest import Tester, create_ks, create_cf
+from dtest import Tester, create_ks, create_cf, data_size
 from tools.assertions import (assert_almost_equal, assert_bootstrap_state, assert_not_running,
                               assert_one, assert_stderr_clean)
 from tools.data import query_c1c2
@@ -82,16 +82,16 @@ class TestBootstrap(Tester):
         create_cf(session, 'cf', columns={'c1': 'text', 'c2': 'text'})
 
         # record the size before inserting any of our own data
-        empty_size = node1.data_size()
-        logger.debug("node1 empty size : %s" % float(empty_size))
+        empty_size = data_size(node1, 'ks','cf')
+        logger.debug("node1 empty size for ks.cf: %s" % float(empty_size))
 
         insert_statement = session.prepare("INSERT INTO ks.cf (key, c1, c2) VALUES (?, 'value1', 'value2')")
         execute_concurrent_with_args(session, insert_statement, [['k%d' % k] for k in range(keys)])
 
         node1.flush()
         node1.compact()
-        initial_size = node1.data_size()
-        logger.debug("node1 size before bootstrapping node2: %s" % float(initial_size))
+        initial_size = data_size(node1,'ks','cf')
+        logger.debug("node1 size for ks.cf before bootstrapping node2: %s" % float(initial_size))
 
         # Reads inserted data all during the bootstrap process. We shouldn't
         # get any error
@@ -103,14 +103,14 @@ class TestBootstrap(Tester):
         node2.compact()
 
         node1.cleanup()
-        logger.debug("node1 size after cleanup: %s" % float(node1.data_size()))
+        logger.debug("node1 size for ks.cf after cleanup: %s" % float(data_size(node1,'ks','cf')))
         node1.compact()
-        logger.debug("node1 size after compacting: %s" % float(node1.data_size()))
+        logger.debug("node1 size for ks.cf after compacting: %s" % float(data_size(node1,'ks','cf')))
 
-        logger.debug("node2 size after compacting: %s" % float(node2.data_size()))
+        logger.debug("node2 size for ks.cf after compacting: %s" % float(data_size(node2,'ks','cf')))
 
-        size1 = float(node1.data_size())
-        size2 = float(node2.data_size())
+        size1 = float(data_size(node1,'ks','cf'))
+        size2 = float(data_size(node2,'ks','cf'))
         assert_almost_equal(size1, size2, error=0.3)
         assert_almost_equal(float(initial_size - empty_size), 2 * (size1 - float(empty_size)))
 
@@ -139,6 +139,20 @@ class TestBootstrap(Tester):
             return node2
 
         self._base_bootstrap_test(bootstrap_on_write_survey_and_join)
+
+    def _test_bootstrap_with_compatibility_flag_on(self, bootstrap_from_version):
+        def bootstrap_with_compatibility_flag_on(cluster, token):
+            node2 = new_node(cluster)
+            node2.set_configuration_options(values={'initial_token': token})
+            # cassandra.force_3_0_protocol_version parameter is needed to allow schema
+            # changes during the bootstrapping for upgrades from 3.0.14+ to anything upwards for 3.0.x or 3.x clusters.
+            # @jira_ticket CASSANDRA-13004 for detailed context on `cassandra.force_3_0_protocol_version` flag
+            node2.start(jvm_args=["-Dcassandra.force_3_0_protocol_version=true"],
+                        wait_for_binary_proto=True)
+            return node2
+
+        self._base_bootstrap_test(bootstrap_with_compatibility_flag_on,
+                                      bootstrap_from_version=bootstrap_from_version)
 
     @since('3.10')
     @pytest.mark.no_vnodes

@@ -17,4 +17,7 @@ class TestBootstrapUpgrade(TestBootstrap):
     @pytest.mark.no_vnodes
     @since('3.10', max_version='3.99')
     def test_simple_bootstrap_mixed_versions(self):
-        self._base_bootstrap_test(bootstrap_from_version="3.5")
+        # Compatibility flag ensures that bootstrapping gets schema information during
+        # upgrades from 3.0.14+ to anything upwards for 3.0.x or 3.x clusters.
+        # @jira_ticket CASSANDRA-13004 for detailed context on `force_3_0_protocol_version` flag
+        self._test_bootstrap_with_compatibility_flag_on(bootstrap_from_version="3.5")
