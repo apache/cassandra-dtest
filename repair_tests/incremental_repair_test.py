@@ -1007,7 +1007,7 @@ class TestIncRepair(Tester):
         node1.compact()
         node2.start(wait_other_notice=True)
 
-        # we don't expect any inconsistencies as all repaired data is read on both replicas
+        # we don't expect any inconsistencies as all repaired data is read on both replicas
         with JolokiaAgent(node1) as jmx:
             self.query_and_check_repaired_mismatches(jmx, session, "SELECT * FROM ks.tbl WHERE k = 5")
             self.query_and_check_repaired_mismatches(jmx, session, "SELECT * FROM ks.tbl WHERE k = 5 AND c = 5")
@@ -1057,7 +1057,7 @@ class TestIncRepair(Tester):
         assert all(t == 0 for t in [int(x) for x in [y.split(' ')[0] for y in findall('(?<=Repaired at: ).*', out1)]])
         assert all(t > 0 for t in [int(x) for x in [y.split(' ')[0] for y in findall('(?<=Repaired at: ).*', out2)]])
 
-        # we expect inconsistencies due to sstables being marked repaired on one replica only
+        # we expect inconsistencies due to sstables being marked repaired on one replica only
         # these are marked confirmed because no sessions are pending & all sstables are
         # skipped due to partition deletes
         with JolokiaAgent(node1) as jmx:
@@ -1066,7 +1066,9 @@ class TestIncRepair(Tester):
             self.query_and_check_repaired_mismatches(jmx, session, "SELECT * FROM ks.tbl WHERE k = 5 AND c = 5",
                                                      expect_confirmed_inconsistencies=True)
             # no digest reads for range queries so read repair metric isn't incremented
-            self.query_and_check_repaired_mismatches(jmx, session, "SELECT * FROM ks.tbl", expect_read_repair=False)
+            self.query_and_check_repaired_mismatches(jmx, session, "SELECT * FROM ks.tbl",
+                                                     expect_confirmed_inconsistencies=True,
+                                                     expect_read_repair=False)
 
     def setup_for_repaired_data_tracking(self):
         self.fixture_dtest_setup.setup_overrides.cluster_options = ImmutableMapping({'hinted_handoff_enabled': 'false',
