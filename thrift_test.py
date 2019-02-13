@@ -149,6 +149,8 @@ def composite(item1, item2=None, eoc=b'\x00'):
         item1 = utf8encode(item1)
     if isinstance(item2, str):
         item2 = utf8encode(item2)
+    if isinstance(eoc, str):
+        eoc = utf8encode(eoc)
 
     packed = _i16(len(item1)) + item1 + eoc
     if item2 is not None:

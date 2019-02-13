@@ -431,8 +431,8 @@ class TestStorageEngineUpgrade(Tester):
             i32(1): {
                 'rt': [Mutation(deletion=Deletion(2470761440040513,
                                                   predicate=SlicePredicate(slice_range=SliceRange(
-                                                      start=composite('a', eoc='\x00'),
-                                                      finish=composite('asd', eoc='\x00')))))]
+                                                      start=composite('a', eoc=b'\x00'),
+                                                      finish=composite('asd', eoc=b'\x00')))))]
             }
         }
 
