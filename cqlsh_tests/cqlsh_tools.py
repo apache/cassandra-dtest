@@ -20,14 +20,18 @@ def csv_rows(filename, delimiter=None):
     reader_opts = {}
     if delimiter is not None:
         reader_opts['delimiter'] = delimiter
-    with open(filename, 'rb') as csvfile:
+    with open(filename, 'r') as csvfile:
         for row in csv.reader(csvfile, **reader_opts):
             yield row
 
 
 def assert_csvs_items_equal(filename1, filename2):
     with open(filename1, 'r') as x, open(filename2, 'r') as y:
-        assert list(x.readlines()) == list(y.readlines())
+        list_x = list(x.readlines())
+        list_y = list(y.readlines())
+        list_x.sort()
+        list_y.sort()
+        assert list_x == list_y
 
 
 def random_list(gen=None, n=None):
@@ -45,7 +49,7 @@ def random_list(gen=None, n=None):
 
 
 def write_rows_to_csv(filename, data):
-    with open(filename, 'wb') as csvfile:
+    with open(filename, 'w') as csvfile:
         writer = csv.writer(csvfile)
         for row in data:
             writer.writerow(row)
@@ -116,5 +120,3 @@ def assert_resultset_contains(got: ResultSet, expected: List[tuple]) -> None:
             if row.a == t[0] and row.b == t[1]:
                 found = True
         assert found, 'Failed to find expected row: {}'.format(t)
-
-
