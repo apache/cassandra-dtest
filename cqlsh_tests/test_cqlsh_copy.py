@@ -2188,7 +2188,7 @@ class TestCqlshCopy(Tester):
 
         @jira_ticket CASSANDRA-9303
         """
-        num_rows = 600000
+        num_rows = 200000
         report_frequency = 0.1  # every 100 milliseconds
         stress_table = 'keyspace1.standard1'
         ratefile = self.get_temp_file()
