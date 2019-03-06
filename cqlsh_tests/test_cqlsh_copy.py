@@ -29,6 +29,7 @@ from .cqlsh_tools import (DummyColorMap, assert_csvs_items_equal, csv_rows,
                          monkeypatch_driver, random_list, unmonkeypatch_driver,
                          write_rows_to_csv)
 from dtest import (Tester, create_ks)
+from dtest import (FlakyRetryPolicy, Tester, create_ks)
 from tools.data import rows_to_list
 from tools.metadata_wrapper import (UpdatingClusterMetadataWrapper,
                                     UpdatingTableMetadataWrapper)
@@ -2187,7 +2188,7 @@ class TestCqlshCopy(Tester):
 
         @jira_ticket CASSANDRA-9303
         """
-        num_rows = 200000
+        num_rows = 600000
         report_frequency = 0.1  # every 100 milliseconds
         stress_table = 'keyspace1.standard1'
         ratefile = self.get_temp_file()
@@ -2496,7 +2497,8 @@ class TestCqlshCopy(Tester):
             if skip_count_checks:
                 return num_operations
             else:
-                count_statement = SimpleStatement("SELECT COUNT(*) FROM {}".format(stress_table), consistency_level=ConsistencyLevel.ALL)
+                count_statement = SimpleStatement("SELECT COUNT(*) FROM {}".format(stress_table), consistency_level=ConsistencyLevel.ALL,
+                                                  retry_policy=FlakyRetryPolicy(max_retries=3))
                 ret = rows_to_list(self.session.execute(count_statement))[0][0]
                 logger.debug('Generated {} records'.format(ret))
                 assert ret >= num_operations, 'cassandra-stress did not import enough records'
