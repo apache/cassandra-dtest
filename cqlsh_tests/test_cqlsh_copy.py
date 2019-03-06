@@ -2195,12 +2195,8 @@ class TestCqlshCopy(Tester):
         tempfile = self.get_temp_file()
 
         def check_rate_file():
-            # check that the rate file has at least 10 lines (given that the report
-            # frequency is every 100 milliseconds this should be the number of lines written in 1 second)
-            # and that the last line indicates all rows were processed
             lines = [line.rstrip('\n') for line in open(ratefile.name)]
             logger.debug(lines)
-            assert 10 <= len(lines), "Expected at least 10 lines but got {} lines".format(len(lines))
             assert lines[-1].startswith('Processed: {} rows;'.format(num_rows))
 
         self.prepare()
