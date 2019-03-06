@@ -2569,7 +2569,7 @@ class TestCqlshCopy(Tester):
 
         @jira_ticket CASSANDRA-9302
         """
-        self._test_bulk_round_trip(nodes=5, partitioner="murmur3", num_operations=10000,
+        self._test_bulk_round_trip(nodes=3, partitioner="murmur3", num_operations=10000,
                                    configuration_options={'batch_size_warn_threshold_in_kb': '10'},
                                    profile=os.path.join(os.path.dirname(os.path.realpath(__file__)), 'blogposts.yaml'),
                                    stress_table='stresscql.blogposts')
@@ -2583,7 +2583,7 @@ class TestCqlshCopy(Tester):
 
         @jira_ticket CASSANDRA-10938
         """
-        self._test_bulk_round_trip(nodes=5, partitioner="murmur3", num_operations=10000,
+        self._test_bulk_round_trip(nodes=3, partitioner="murmur3", num_operations=10000,
                                    configuration_options={'native_transport_max_concurrent_connections': '12',
                                                           'batch_size_warn_threshold_in_kb': '10'},
                                    profile=os.path.join(os.path.dirname(os.path.realpath(__file__)), 'blogposts.yaml'),
