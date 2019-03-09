@@ -1203,7 +1203,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
             csvreader = csv.reader(csvfile)
             selected_results_strings = [list(map(str, cql_row)) for cql_row in selected_results]
             exported_results = [row for row in csvreader]
-            assert selected_results_strings == exported_results
+            assert sorted(selected_results_strings) == sorted(exported_results)
 
         # import the CSV file with COPY FROM
         session.execute("TRUNCATE ks.testcopyto")

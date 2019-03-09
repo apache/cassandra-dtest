@@ -369,7 +369,8 @@ class TestCqlshCopy(Tester):
             sys.path = saved_path
 
     def assertCsvResultEqual(self, csv_filename, results, table_name=None,
-                             columns=None, cql_type_names=None, nullval=''):
+                             columns=None, cql_type_names=None, nullval='',
+                             sort_data=True):
         if cql_type_names is None:
             if table_name:
                 table_meta = UpdatingTableMetadataWrapper(
@@ -386,6 +387,11 @@ class TestCqlshCopy(Tester):
         csv_results = list(csv_rows(csv_filename))
 
         self.maxDiff = None
+
+        if (sort_data):
+            csv_results.sort()
+            processed_results.sort()
+
         try:
             assert csv_results == processed_results
         except Exception as e:
@@ -740,11 +746,11 @@ class TestCqlshCopy(Tester):
         self.prepare()
         self.session.execute("""
             CREATE TABLE testheader (
-                a int primary key,
+                a text primary key,
                 b int
             )""")
         insert_statement = self.session.prepare("INSERT INTO testheader (a, b) VALUES (?, ?)")
-        args = [(1, 10), (2, 20), (3, 30)]
+        args = [('b', 10), ('c', 20), ('d', 30)]
         execute_concurrent_with_args(self.session, insert_statement, args)
 
         tempfile = self.get_temp_file()
@@ -756,7 +762,7 @@ class TestCqlshCopy(Tester):
         with open(tempfile.name, 'r') as csvfile:
             csv_values = list(csv.reader(csvfile))
 
-        assert csv_values == [['a', 'b'], ['1', '10'], ['2', '20'], ['3', '30']]
+        assert sorted(csv_values) == [['a', 'b'], ['b', '10'], ['c', '20'], ['d', '30']]
 
     def _test_reading_counter_template(self, copy_options=None):
         """
@@ -799,7 +805,7 @@ class TestCqlshCopy(Tester):
         result = self.session.execute("SELECT * FROM testcounter")
         result_as_list = rows_to_list(result)
         result_as_list.sort()
-        assert data == result_as_list
+        assert data == sorted(result_as_list)
 
     def test_reading_counter(self):
         """
@@ -851,8 +857,7 @@ class TestCqlshCopy(Tester):
 
         result = self.session.execute("SELECT * FROM testheader")
         result_as_list = [tuple(r) for r in rows_to_list(result)]
-        result_as_list.sort()
-        assert [tuple(d) for d in data] == result_as_list
+        assert [tuple(d) for d in data] == sorted(result_as_list)
 
     @pytest.mark.depends_cqlshlib
     def test_datetimeformat_round_trip(self):
@@ -943,8 +948,7 @@ class TestCqlshCopy(Tester):
         self.run_cqlsh(cmds="COPY ks.testttl FROM '{name}' WITH TTL = '5'".format(name=tempfile.name))
 
         result = rows_to_list(self.session.execute("SELECT * FROM testttl"))
-        result.sort()
-        assert data == result
+        assert data == sorted(result)
 
         time.sleep(10)
 
@@ -1039,7 +1043,7 @@ class TestCqlshCopy(Tester):
             out, err, _ = self.run_cqlsh(cmds="COPY ks.testskipcols FROM '{}' WITH SKIPCOLS = '{}'"
                                          .format(tempfile.name, skip_cols))
             logger.debug(out)
-            assert expected_results == rows_to_list(self.session.execute("SELECT * FROM ks.testskipcols"))
+            assert expected_results == sorted(rows_to_list(self.session.execute("SELECT * FROM ks.testskipcols")))
 
         do_test('c, d ,e', [[1, 2, None, None, None], [6, 7, None, None, None]])
         do_test('b,', [[1, None, 3, 4, 5], [6, None, 8, 9, 10]])
@@ -1087,7 +1091,7 @@ class TestCqlshCopy(Tester):
             out, err, _ = self.run_cqlsh(cmds="COPY ks.testskipcols FROM '{}' WITH SKIPCOLS = '{}'"
                                          .format(tempfile.name, skip_cols))
             logger.debug(out)
-            assert expected_results == rows_to_list(self.session.execute("SELECT * FROM ks.testskipcols"))
+            assert expected_results == sorted(rows_to_list(self.session.execute("SELECT * FROM ks.testskipcols")))
 
         do_test('c, d ,e', [[1, 1, None, None, None], [2, 1, None, None, None]])
         do_test('b', [[1, 1, 1, 1, 1], [2, 1, 1, 1, 1]])
@@ -1877,8 +1881,7 @@ class TestCqlshCopy(Tester):
                 return
 
             tempfile_rows_as_list = list(csv_rows(tempfile.name))
-            tempfile_rows_as_list.sort()
-            assert [['0', falseval], ['1', trueval]] == tempfile_rows_as_list
+            assert [['0', falseval], ['1', trueval]] == sorted(tempfile_rows_as_list)
             exported_results = list(self.session.execute("SELECT * FROM testbooleans"))
 
             logger.debug('Importing from csv file: {}'.format(tempfile.name))
@@ -1887,7 +1890,7 @@ class TestCqlshCopy(Tester):
                            .format(tempfile.name, trueval, falseval))
 
             imported_results = list(self.session.execute("SELECT * FROM testbooleans"))
-            assert exported_results == imported_results
+            assert sorted(exported_results) == sorted(imported_results)
 
         self.prepare()
         self.session.execute("""
@@ -2040,7 +2043,7 @@ class TestCqlshCopy(Tester):
 
             exported_results = list(self.session.execute("SELECT * FROM testnumberseps"))
             self.maxDiff = None
-            assert expected_vals == list(csv_rows(tempfile.name))
+            assert expected_vals == sorted(list(csv_rows(tempfile.name)))
 
             logger.debug('Importing from csv file: {} with thousands_sep {} and decimal_sep {}'
                   .format(tempfile.name, thousands_sep, decimal_sep))
@@ -2384,7 +2387,7 @@ class TestCqlshCopy(Tester):
         logger.debug(out)
 
         new_results = list(self.session.execute("SELECT * FROM testcopyto"))
-        assert results == new_results
+        assert sorted(results) == sorted(new_results)
 
     def test_round_trip_murmur3(self):
         self._test_round_trip(nodes=3, partitioner="murmur3")
@@ -2441,7 +2444,7 @@ class TestCqlshCopy(Tester):
 
         self.run_cqlsh(cmds="SOURCE '{name}'".format(name=commandfile.name))
         new_results = list(self.session.execute("SELECT * FROM testcopyto"))
-        assert results == new_results
+        assert sorted(results) == sorted(new_results)
 
     def _test_bulk_round_trip(self, nodes, partitioner,
                               num_operations, profile=None,
