@@ -99,7 +99,7 @@ class RunDTests():
                                 "--use-off-heap-memtables, see https://issues.apache.org/jira/browse/CASSANDRA-9472 "
                                 "for details" % CASSANDRA_VERSION)
 
-        if args.dtest_enable_debug_logging or True:
+        if args.dtest_enable_debug_logging:
             logging.root.setLevel(logging.DEBUG)
             logger.setLevel(logging.DEBUG)
 
