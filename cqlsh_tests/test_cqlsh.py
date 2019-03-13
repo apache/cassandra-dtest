@@ -1,6 +1,9 @@
+# coding=utf-8
+
 import binascii
 import csv
 import datetime
+import locale
 import os
 import re
 import subprocess
@@ -27,12 +30,13 @@ since = pytest.mark.since
 logger = logging.getLogger(__name__)
 
 
-@pytest.mark.skip("These aren't functioning just yet")
 class TestCqlsh(Tester):
 
     @classmethod
     def setUpClass(cls):
         cls._cached_driver_methods = monkeypatch_driver()
+        if locale.getpreferredencoding() != 'UTF-8':
+            os.environ['LC_CTYPE'] = 'en_US.utf8'
 
     @classmethod
     def tearDownClass(cls):
@@ -43,6 +47,7 @@ class TestCqlsh(Tester):
             os.unlink(self.tempfile.name)
         super(TestCqlsh, self).tearDown()
 
+    @pytest.mark.depends_cqlshlib
     @since('2.1.9')
     def test_pycodestyle_compliance(self):
         """
@@ -68,8 +73,8 @@ class TestCqlsh(Tester):
         p = subprocess.Popen(cmds, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         stdout, stderr = p.communicate()
 
-        assert len(stdout), 0 == stdout
-        assert len(stderr), 0 == stderr
+        assert 0 == len(stdout), stdout
+        assert 0 == len(stderr), stderr
 
     def test_simple_insert(self):
 
@@ -91,8 +96,7 @@ class TestCqlsh(Tester):
         session = self.patient_cql_connection(node1)
         rows = list(session.execute("select id, value from simple.simple"))
 
-        self.assertEqual({1: 'one', 2: 'two', 3: 'three', 4: 'four', 5: 'five'},
-                         {k: v for k, v in rows})
+        assert {1: 'one', 2: 'two', 3: 'three', 4: 'four', 5: 'five'} == {k: v for k, v in rows}
 
     def test_lwt(self):
         """
@@ -118,7 +122,7 @@ class TestCqlsh(Tester):
                 stmt=repr(stmt),
                 routput=repr(output)
             )
-            assert expected_substring == output in msg
+            assert expected_substring in output, msg
 
         assert_applied("INSERT INTO lwt.lwt (id, value) VALUES (1, 'one') IF NOT EXISTS")
         assert_applied("INSERT INTO lwt.lwt (id, value) VALUES (1, 'one') IF NOT EXISTS")
@@ -187,11 +191,11 @@ class TestCqlsh(Tester):
         session = self.patient_cql_connection(node)
 
         def verify_varcharmap(map_name, expected, encode_value=False):
-            rows = list(session.execute(("SELECT %s FROM testks.varcharmaptable WHERE varcharkey= '᚛᚛ᚉᚑᚅᚔᚉᚉᚔᚋ ᚔᚈᚔ ᚍᚂᚐᚅᚑ ᚅᚔᚋᚌᚓᚅᚐ᚜';" % map_name).encode("utf-8")))
+            rows = list(session.execute(("SELECT %s FROM testks.varcharmaptable WHERE varcharkey= '᚛᚛ᚉᚑᚅᚔᚉᚉᚔᚋ ᚔᚈᚔ ᚍᚂᚐᚅᚑ ᚅᚔᚋᚌᚓᚅᚐ᚜';" % map_name)))
             if encode_value:
                 got = {k.encode("utf-8"): v.encode("utf-8") for k, v in rows[0][0].items()}
             else:
-                got = {k.encode("utf-8"): v for k, v in rows[0][0].items()}
+                got = {k: v for k, v in rows[0][0].items()}
             assert got == expected
 
         verify_varcharmap('varcharasciimap', {
@@ -290,7 +294,7 @@ class TestCqlsh(Tester):
             ' ⠊⠀⠉⠁⠝⠀⠑⠁⠞⠀⠛⠇⠁⠎⠎⠀⠁⠝⠙⠀⠊⠞⠀⠙⠕⠑⠎⠝⠞⠀⠓⠥⠗⠞⠀⠍⠑': ' ⠊⠀⠉⠁⠝⠀⠑⠁⠞⠀⠛⠇⠁⠎⠎⠀⠁⠝⠙⠀⠊⠞⠀⠙⠕⠑⠎⠝⠞⠀⠓⠥⠗⠞⠀⠍⠑',
             'Можам да јадам стакло, а не ме штета.': 'Можам да јадам стакло, а не ме штета.',
             'I can eat glass and it does not hurt me': 'I can eat glass and it does not hurt me'
-        }, encode_value=True)
+        })
 
         verify_varcharmap('varcharvarintmap', {
             'Vitrum edere possum, mihi non nocet.': 1010010101020400204143243,
@@ -301,9 +305,9 @@ class TestCqlsh(Tester):
 
         output, err = self.run_cqlsh(node, 'use testks; SELECT * FROM varcharmaptable', ['--encoding=utf-8'])
 
-        assert output.decode("utf-8").count('Можам да јадам стакло, а не ме штета.') == 16
-        assert output.decode("utf-8").count(' ⠊⠀⠉⠁⠝⠀⠑⠁⠞⠀⠛⠇⠁⠎⠎⠀⠁⠝⠙⠀⠊⠞⠀⠙⠕⠑⠎⠝⠞⠀⠓⠥⠗⠞⠀⠍⠑') == 16
-        assert output.decode("utf-8").count('᚛᚛ᚉᚑᚅᚔᚉᚉᚔᚋ ᚔᚈᚔ ᚍᚂᚐᚅᚑ ᚅᚔᚋᚌᚓᚅᚐ᚜') == 2
+        assert output.count('Можам да јадам стакло, а не ме штета.') == 16
+        assert output.count(' ⠊⠀⠉⠁⠝⠀⠑⠁⠞⠀⠛⠇⠁⠎⠎⠀⠁⠝⠙⠀⠊⠞⠀⠙⠕⠑⠎⠝⠞⠀⠓⠥⠗⠞⠀⠍⠑') == 16
+        assert output.count('᚛᚛ᚉᚑᚅᚔᚉᚉᚔᚋ ᚔᚈᚔ ᚍᚂᚐᚅᚑ ᚅᚔᚋᚌᚓᚅᚐ᚜') == 2
 
     def test_eat_glass(self):
 
@@ -423,7 +427,7 @@ INSERT INTO varcharmaptable (varcharkey, varcharvarintmap ) VALUES      ('᚛᚛
 UPDATE varcharmaptable SET varcharvarintmap = varcharvarintmap + {'Vitrum edere possum, mihi non nocet.':20000} WHERE varcharkey= '᚛᚛ᚉᚑᚅᚔᚉᚉᚔᚋ ᚔᚈᚔ ᚍᚂᚐᚅᚑ ᚅᚔᚋᚌᚓᚅᚐ᚜';
 
 UPDATE varcharmaptable SET varcharvarintmap['Vitrum edere possum, mihi non nocet.'] = 1010010101020400204143243 WHERE varcharkey= '᚛᚛ᚉᚑᚅᚔᚉᚉᚔᚋ ᚔᚈᚔ ᚍᚂᚐᚅᚑ ᚅᚔᚋᚌᚓᚅᚐ᚜'
-        """.encode("utf-8"))
+        """)
 
         self.verify_glass(node1)
 
@@ -448,8 +452,7 @@ UPDATE varcharmaptable SET varcharvarintmap['Vitrum edere possum, mihi non nocet
 
         node1, = self.cluster.nodelist()
 
-        output, err, _ = node1.run_cqlsh(cmds="ä;".encode('utf8'))
-        err = err.decode('utf8')
+        output, err, _ = node1.run_cqlsh(cmds="ä;")
         assert 'Invalid syntax' in err
         assert 'ä' in err
 
@@ -465,11 +468,12 @@ UPDATE varcharmaptable SET varcharvarintmap['Vitrum edere possum, mihi non nocet
         node1, = self.cluster.nodelist()
 
         cmd = '''create keyspace "ä" WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'};'''
-        cmd = cmd.encode('utf8')
         output, err, _ = node1.run_cqlsh(cmds=cmd, cqlsh_options=["--debug"])
 
-        err = err.decode('utf8')
-        assert '"ä" is not a valid keyspace name' in err
+        if self.cluster.version() >= LooseVersion('4.0'):
+            assert "Keyspace name must not be empty, more than 48 characters long, or contain non-alphanumeric-underscore characters (got 'ä')" in err
+        else:
+            assert '"ä" is not a valid keyspace name' in err
 
     def test_with_empty_values(self):
         """
@@ -535,11 +539,11 @@ INSERT INTO has_all_types (num, intcol, asciicol, bigintcol, blobcol, booleancol
                            timestampcol, uuidcol, varcharcol, varintcol)
 VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDecimal(0x),
         blobAsDouble(0x), blobAsFloat(0x), '', blobAsTimestamp(0x), blobAsUuid(0x), '',
-        blobAsVarint(0x))""".encode("utf-8"))
+        blobAsVarint(0x))""")
 
         output, err = self.run_cqlsh(node1, "select intcol, bigintcol, varintcol from CASSANDRA_7196.has_all_types where num in (0, 1, 2, 3, 4)")
         if common.is_win():
-            output = output.decode("utf-8").replace('\r', '')
+            output = output.replace('\r', '')
 
         expected = """
  intcol      | bigintcol            | varintcol
@@ -550,7 +554,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
  -2147483648 | -9223372036854775808 | -10000000000000000000000000
              |                      |                            \n\n(5 rows)"""
 
-        assert expected in output, "Output \n {%s} \n doesn't contain expected\n {%s}" % (output, expected)
+        assert expected in output, "Output \n {0} \n doesn't contain expected\n {1}".format(output, expected)
 
     def test_tracing_from_system_traces(self):
         self.cluster.populate(1).start(wait_for_binary_proto=True)
@@ -612,10 +616,10 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         if common.is_win():
             output = output.replace('\r', '')
 
-        assert len(err), 0 == "Failed to execute cqlsh: {}".format(err)
+        assert 0 == len(err), "Failed to execute cqlsh: {}".format(err)
 
         logger.debug(output)
-        assert expected in output, "Output \n {%s} \n doesn't contain expected\n {%s}" % (output, expected)
+        assert expected in output, "Output \n {0} \n doesn't contain expected\n {1}".format(output, expected)
 
     def test_list_queries(self):
         config = {'authenticator': 'org.apache.cassandra.auth.PasswordAuthenticator',
@@ -633,7 +637,16 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         conn.execute("CREATE USER user1 WITH PASSWORD 'user1'")
         conn.execute("GRANT ALL ON ks.t1 TO user1")
 
-        if self.cluster.version() >= '2.2':
+        if self.cluster.version() >= '4.0':
+            self.verify_output("LIST USERS", node1, """
+ name      | super | datacenters
+-----------+-------+-------------
+ cassandra |  True |         ALL
+     user1 | False |         ALL
+
+(2 rows)
+""")
+        elif self.cluster.version() >= '2.2':
             self.verify_output("LIST USERS", node1, """
  name      | super
 -----------+-------
@@ -850,7 +863,25 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
                 PRIMARY KEY (id, col)
                 """
 
-        if self.cluster.version() >= LooseVersion('3.9'):
+        if self.cluster.version() >= LooseVersion('4.0'):
+            ret += """
+        ) WITH CLUSTERING ORDER BY (col ASC)
+            AND bloom_filter_fp_chance = 0.01
+            AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
+            AND comment = ''
+            AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32', 'min_threshold': '4'}
+            AND compression = {'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+            AND crc_check_chance = 1.0
+            AND dclocal_read_repair_chance = 0.0
+            AND default_time_to_live = 0
+            AND gc_grace_seconds = 864000
+            AND max_index_interval = 2048
+            AND memtable_flush_period_in_ms = 0
+            AND min_index_interval = 128
+            AND read_repair_chance = 0.0
+            AND speculative_retry = '99p';
+        """
+        elif self.cluster.version() >= LooseVersion('3.9'):
             ret += """
         ) WITH CLUSTERING ORDER BY (col ASC)
             AND bloom_filter_fp_chance = 0.01
@@ -919,7 +950,29 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         quoted_index_output = self.get_index_output('"QuotedNameIndex"', 'test', 'users', 'firstname')
         myindex_output = self.get_index_output('myindex', 'test', 'users', 'age')
 
-        if self.cluster.version() >= LooseVersion('3.9'):
+        if self.cluster.version() >= LooseVersion('4.0'):
+            return """
+        CREATE TABLE test.users (
+            userid text PRIMARY KEY,
+            age int,
+            firstname text,
+            lastname text
+        ) WITH bloom_filter_fp_chance = 0.01
+            AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
+            AND comment = ''
+            AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32', 'min_threshold': '4'}
+            AND compression = {'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+            AND crc_check_chance = 1.0
+            AND dclocal_read_repair_chance = 0.0
+            AND default_time_to_live = 0
+            AND gc_grace_seconds = 864000
+            AND max_index_interval = 2048
+            AND memtable_flush_period_in_ms = 0
+            AND min_index_interval = 128
+            AND read_repair_chance = 0.0
+            AND speculative_retry = '99p';
+        """ + quoted_index_output + "\n" + myindex_output
+        elif self.cluster.version() >= LooseVersion('3.9'):
             return """
         CREATE TABLE test.users (
             userid text PRIMARY KEY,
@@ -1000,7 +1053,30 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         return "CREATE INDEX {} ON {}.{} ({});".format(index, ks, table, col)
 
     def get_users_by_state_mv_output(self):
-        if self.cluster.version() >= LooseVersion('3.9'):
+        if self.cluster.version() >= LooseVersion('4.0'):
+            return """
+                CREATE MATERIALIZED VIEW test.users_by_state AS
+                SELECT *
+                FROM test.users
+                WHERE state IS NOT NULL AND username IS NOT NULL
+                PRIMARY KEY (state, username)
+                WITH CLUSTERING ORDER BY (username ASC)
+                AND bloom_filter_fp_chance = 0.01
+                AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
+                AND comment = ''
+                AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32', 'min_threshold': '4'}
+                AND compression = {'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+                AND crc_check_chance = 1.0
+                AND dclocal_read_repair_chance = 0.0
+                AND default_time_to_live = 0
+                AND gc_grace_seconds = 864000
+                AND max_index_interval = 2048
+                AND memtable_flush_period_in_ms = 0
+                AND min_index_interval = 128
+                AND read_repair_chance = 0.0
+                AND speculative_retry = '99p';
+               """
+        elif self.cluster.version() >= LooseVersion('3.9'):
             return """
                 CREATE MATERIALIZED VIEW test.users_by_state AS
                 SELECT *
@@ -1049,6 +1125,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
 
     def execute(self, cql, expected_output=None, expected_err=None, env_vars=None):
         logger.debug(cql)
+
         node1, = self.cluster.nodelist()
         output, err = self.run_cqlsh(node1, cql, env_vars=env_vars)
 
@@ -1070,6 +1147,32 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         expected_lines = [s.strip() for s in expected_response.split("\n") if s.strip()]
         assert expected_lines == lines
 
+    def strip_default_time_to_live(self, describe_statement):
+        """
+        Remove default_time_to_live options from output of DESCRIBE
+        statements. The resulting string may be reused as a CREATE
+        statement.
+        Useful after CASSANDRA-14071, which removed
+        default_time_to_live options from CREATE MATERIALIZED VIEW
+        statements.
+        """
+        describe_statement = re.sub(r"( AND)? default_time_to_live = [\d\.]+", "", describe_statement)
+        describe_statement = re.sub(r"WITH[\s]*;", "", describe_statement)
+        return describe_statement
+
+    def strip_read_repair_chance(self, describe_statement):
+        """
+        Remove read_repair_chance and dclocal_read_repair_chance options
+        from output of DESCRIBE statements. The resulting string may be
+        reused as a CREATE statement.
+        Useful after CASSANDRA-13910, which removed read_repair_chance
+        options from CREATE statements but did not remove them completely
+        from the system.
+        """
+        describe_statement = re.sub(r"( AND)? (dclocal_)?read_repair_chance = [\d\.]+", "", describe_statement)
+        describe_statement = re.sub(r"WITH[\s]*;", "", describe_statement)
+        return describe_statement
+
     def test_copy_to(self):
         self.cluster.populate(1).start()
         node1, = self.cluster.nodelist()
@@ -1089,7 +1192,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         args = [(i, str(i), float(i) + 0.5, uuid4()) for i in range(10000)]
         execute_concurrent_with_args(session, insert_statement, args)
 
-        results = list(session.execute("SELECT * FROM testcopyto"))
+        selected_results = list(session.execute("SELECT * FROM testcopyto"))
 
         self.tempfile = NamedTemporaryFile(delete=False)
         logger.debug('Exporting to csv file: %s' % (self.tempfile.name,))
@@ -1098,14 +1201,15 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         # session
         with open(self.tempfile.name, 'r') as csvfile:
             csvreader = csv.reader(csvfile)
-            result_list = [list(map(str, cql_row)) for cql_row in results]
-            assert result_list == csvreader
+            selected_results_strings = [list(map(str, cql_row)) for cql_row in selected_results]
+            exported_results = [row for row in csvreader]
+            assert sorted(selected_results_strings) == sorted(exported_results)
 
         # import the CSV file with COPY FROM
         session.execute("TRUNCATE ks.testcopyto")
         node1.run_cqlsh(cmds="COPY ks.testcopyto FROM '%s'" % (self.tempfile.name,))
         new_results = list(session.execute("SELECT * FROM testcopyto"))
-        assert results == new_results
+        assert sorted(selected_results) == sorted(new_results)
 
     def test_float_formatting(self):
         """ Tests for CASSANDRA-9224, check format of float and double values"""
@@ -1301,7 +1405,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
             INSERT INTO values (part, val1, val2, val3, val4) VALUES ('min', %d, %d, -32768, -128);
             INSERT INTO values (part, val1, val2, val3, val4) VALUES ('max', %d, %d, 32767, 127)""" % (-1 << 31, -1 << 63, (1 << 31) - 1, (1 << 63) - 1))
 
-        assert len(stderr), 0 == "Failed to execute cqlsh: {}".format(stderr)
+        assert 0 == len(stderr), "Failed to execute cqlsh: {}".format(stderr)
 
         self.verify_output("select * from int_checks.values", node1, """
  part | val1        | val2                 | val3   | val4
@@ -1343,7 +1447,7 @@ CREATE TABLE int_checks.values (
                                         % (datetime.MINYEAR - 1, datetime.MINYEAR, datetime.MAXYEAR, datetime.MAXYEAR + 1,))
         # outside the MIN and MAX range it should print the number of days from the epoch
 
-        assert len(stderr), 0 == "Failed to execute cqlsh: {}".format(stderr)
+        assert 0 == len(stderr), "Failed to execute cqlsh: {}".format(stderr)
 
         self.verify_output("select * from datetime_checks.values", node1, """
  d          | t
@@ -1384,7 +1488,7 @@ CREATE TABLE datetime_checks.values (
             INSERT INTO test (id, val) VALUES (2, 'lkjlk');
             INSERT INTO test (id, val) VALUES (3, 'iuiou')""")
 
-        assert len(stderr), 0 == "Failed to execute cqlsh: {}".format(stderr)
+        assert 0 == len(stderr), "Failed to execute cqlsh: {}".format(stderr)
 
         self.verify_output("use tracing_checks; tracing on; select * from test", node1, """Now Tracing is enabled
 
@@ -1428,7 +1532,7 @@ Tracing session:""")
             USE client_warnings;
             CREATE TABLE test (id int, val text, PRIMARY KEY (id))""")
 
-        assert len(stderr), 0 == "Failed to execute cqlsh: {}".format(stderr)
+        assert 0 == len(stderr), "Failed to execute cqlsh: {}".format(stderr)
 
         session = self.patient_cql_connection(node1)
         prepared = session.prepare("INSERT INTO client_warnings.test (id, val) VALUES (?, 'abc')")
@@ -1450,10 +1554,10 @@ Tracing session:""")
         logger.debug(fut.warnings)
         assert fut.warnings is not None
         assert 1 == len(fut.warnings)
-        assert "Unlogged batch covering {} partitions detected against table [client_warnings.test]. "\
-                   .format(max_partitions_per_batch + 1) + "You should use a logged batch for atomicity, " \
-                                                           "or asynchronous writes for performance." \
-               == fut.warnings[0]
+        expected_fut_warning = ("Unlogged batch covering {} partitions detected against table [client_warnings.test]. " +
+                                "You should use a logged batch for atomicity, or asynchronous writes for performance.") \
+                                .format(max_partitions_per_batch + 1)
+        assert expected_fut_warning == fut.warnings[0]
 
     def test_connect_timeout(self):
         """
@@ -1517,7 +1621,8 @@ Tracing session:""")
 
         session.execute('DROP TABLE test_ks.lcs_describe')
 
-        create_statement = 'USE test_ks; ' + ' '.join(describe_out.decode("utf-8").splitlines())
+        create_statement = 'USE test_ks; ' + ' '.join(describe_out.splitlines())
+        create_statement = self.strip_read_repair_chance(create_statement)
         create_out, create_err = self.run_cqlsh(node1, create_statement)
 
         # these statements shouldn't fall down
@@ -1525,7 +1630,7 @@ Tracing session:""")
         session.execute('INSERT INTO lcs_describe (key) VALUES (1)')
 
         # the table created before and after should be the same
-        assert reloaded_describe_out.decode("utf-8") == describe_out.decode("utf-8")
+        assert reloaded_describe_out == describe_out
 
     @since('3.0')
     def test_materialized_view(self):
@@ -1554,38 +1659,32 @@ Tracing session:""")
         session.execute(insert_stmt + "('user4', 'ch@ngem3d', 'm', 'TX', 1974);")
 
         describe_out, err = self.run_cqlsh(node1, 'DESCRIBE MATERIALIZED VIEW test.users_by_state')
-        describe_out_str = describe_out.decode("utf-8")
-        err_str = err.decode("utf-8")
-        assert 0 == len(err_str), err_str
+        assert 0 == len(err), err
 
         select_out, err = self.run_cqlsh(node1, "SELECT * FROM test.users_by_state")
-        err_str = err.decode("utf-8")
-        assert 0 == len(err_str), err_str
+        assert 0 == len(err), err
         logger.debug(select_out)
 
-        out, err = self.run_cqlsh(node1, "DROP MATERIALIZED VIEW test.users_by_state; DESCRIBE KEYSPACE test; DESCRIBE table test.users")
-        err_str = err.decode("utf-8")
-        assert 0 == len(err_str), err_str
-        assert "CREATE MATERIALIZED VIEW users_by_state" not in out
+        drop_out, err = self.run_cqlsh(node1, "DROP MATERIALIZED VIEW test.users_by_state; DESCRIBE KEYSPACE test; DESCRIBE table test.users")
+        assert 0 == len(err), err
+        assert "CREATE MATERIALIZED VIEW users_by_state" not in drop_out
 
-        out, err = self.run_cqlsh(node1, 'DESCRIBE MATERIALIZED VIEW test.users_by_state')
-        describe_out_str = describe_out.decode("utf-8")
-        assert 0 == len(describe_out_str.strip()), describe_out_str
+        describe_after_drop_out, err = self.run_cqlsh(node1, 'DESCRIBE MATERIALIZED VIEW test.users_by_state')
+        assert 0 == len(describe_after_drop_out.strip()), describe_after_drop_out
         assert "Materialized view 'users_by_state' not found" in err
 
-        create_statement = 'USE test; ' + ' '.join(describe_out_str.splitlines()).strip()[:-1]
+        create_statement = 'USE test; ' + ' '.join(describe_out.splitlines()).strip()[:-1]
+        create_statement = self.strip_default_time_to_live(create_statement)
+        create_statement = self.strip_read_repair_chance(create_statement)
         out, err = self.run_cqlsh(node1, create_statement)
-        err_str = err.decode("utf-8")
-        assert 0 == len(err_str), err_str
+        assert 0 == len(err), err
 
         reloaded_describe_out, err = self.run_cqlsh(node1, 'DESCRIBE MATERIALIZED VIEW test.users_by_state')
-        err_str = err.decode("utf-8")
-        assert 0 == len(err_str), err_str
-        assert describe_out_str == reloaded_describe_out
+        assert 0 == len(err), err
+        assert describe_out == reloaded_describe_out
 
         reloaded_select_out, err = self.run_cqlsh(node1, "SELECT * FROM test.users_by_state")
-        err_str = err.decode("utf-8")
-        assert 0 == len(err_str), err_str
+        assert 0 == len(err), err
         assert select_out == reloaded_select_out
 
     @since('3.0')
@@ -1651,6 +1750,10 @@ Tracing session:""")
         assert 0 == len(stdout), stdout
 
     def run_cqlsh(self, node, cmds, cqlsh_options=None, env_vars=None):
+        """
+        Local version of run_cqlsh to open a cqlsh subprocess with
+        additional environment variables.
+        """
         if env_vars is None:
             env_vars = {}
         if cqlsh_options is None:
@@ -1668,14 +1771,15 @@ Tracing session:""")
             port = node.network_interfaces['thrift'][1]
         args = cqlsh_options + [host, str(port)]
         sys.stdout.flush()
-        p = subprocess.Popen([cli] + args, env=env, stdin=subprocess.PIPE, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+        p = subprocess.Popen([cli] + args, env=env, stdin=subprocess.PIPE,
+                             stderr=subprocess.PIPE, stdout=subprocess.PIPE,
+                             universal_newlines=True)
         for cmd in cmds.split(';'):
             p.stdin.write(cmd + ';\n')
         p.stdin.write("quit;\n")
         return p.communicate()
 
 
-@pytest.mark.skip("These aren't functioning just yet")
 class TestCqlshSmoke(Tester):
     """
     Tests simple use cases for clqsh.
@@ -1683,9 +1787,9 @@ class TestCqlshSmoke(Tester):
 
     @pytest.fixture(scope='function', autouse=True)
     def fixture_cluster_setup(self, fixture_dtest_setup):
-        self.cluster.populate(1).start(wait_for_binary_proto=True)
-        [self.node1] = self.cluster.nodelist()
-        self.session = self.patient_cql_connection(self.node1)
+        fixture_dtest_setup.cluster.populate(1).start(wait_for_binary_proto=True)
+        [self.node1] = fixture_dtest_setup.cluster.nodelist()
+        self.session = fixture_dtest_setup.patient_cql_connection(self.node1)
 
     def test_uuid(self):
         """
@@ -1711,7 +1815,7 @@ class TestCqlshSmoke(Tester):
         assert len(result[1]) == 1
         assert isinstance(result[0][0], UUID)
         assert isinstance(result[1][0], UUID)
-        self.assertNotEqual(result[0][0], result[1][0])
+        assert result[0][0] != result[1][0]
 
     def test_commented_lines(self):
         create_ks(self.session, 'ks', 1)
@@ -1948,8 +2052,7 @@ class TestCqlshSmoke(Tester):
         return [table.name for table in list(self.session.cluster.metadata.keyspaces[keyspace].tables.values())]
 
 
-@pytest.mark.skip("These aren't functioning just yet")
-class CqlLoginTest(Tester):
+class TestCqlLogin(Tester):
     """
     Tests login which requires password authenticator
     """
@@ -1962,7 +2065,7 @@ class CqlLoginTest(Tester):
         cluster.populate(1).start(wait_for_binary_proto=True)
         [self.node1] = cluster.nodelist()
         self.node1.watch_log_for('Created default superuser')
-        self.session = self.patient_cql_connection(self.node1, user='cassandra', password='cassandra')
+        self.session = fixture_dtest_setup.patient_cql_connection(self.node1, user='cassandra', password='cassandra')
 
     def assert_login_not_allowed(self, user, input):
         message = ("Provided username {user} and/or password are incorrect".format(user=user)
