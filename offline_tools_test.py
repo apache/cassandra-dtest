@@ -445,7 +445,7 @@ class TestOfflineTools(Tester):
         assert {'1', '2'} == dumped_keys
 
     def _check_stderr_error(self, error):
-        acceptable = ["Max sstable size of", "Consider adding more capacity", "JNA link failure", "Class JavaLaunchHelper is implemented in both"]
+        acceptable = ["Max sstable size of", "Consider adding more capacity", "JNA link failure", "Class JavaLaunchHelper is implemented in both", "Small commitlog volume detected", "Small cdc volume detected"]
 
         if len(error) > 0:
             for line in error.splitlines():
