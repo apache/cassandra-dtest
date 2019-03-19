@@ -74,8 +74,13 @@ class TestGossipingPropertyFileSnitch(Tester):
                 snitch_file.write("prefer_local=true" + os.linesep)
 
         node1.start(wait_for_binary_proto=True)
-        node1.watch_log_for("Starting Messaging Service on {}:{}".format(NODE1_40_LISTEN_ADDRESS[:-5] if running40 else NODE1_LISTEN_FMT_ADDRESS, STORAGE_PORT), timeout=60)
-        node1.watch_log_for("Starting Messaging Service on {}:{}".format(NODE1_40_BROADCAST_ADDRESS[:-5] if running40 else NODE1_BROADCAST_FMT_ADDRESS, STORAGE_PORT), timeout=60)
+        if running40:
+            node1.watch_log_for("Listening on address: \({}:{}\)".format(NODE1_40_LISTEN_ADDRESS[:-5], STORAGE_PORT), timeout=60)
+            node1.watch_log_for("Listening on address: \({}:{}\)".format(NODE1_40_BROADCAST_ADDRESS[:-5], STORAGE_PORT), timeout=60)
+        else:
+            node1.watch_log_for("Starting Messaging Service on {}:{}".format(NODE1_LISTEN_FMT_ADDRESS, STORAGE_PORT), timeout=60)
+            node1.watch_log_for("Starting Messaging Service on {}:{}".format(NODE1_BROADCAST_FMT_ADDRESS, STORAGE_PORT), timeout=60)
+
         self._test_connect(NODE1_LISTEN_ADDRESS, STORAGE_PORT)
         self._test_connect(NODE1_BROADCAST_ADDRESS, STORAGE_PORT)
 
@@ -87,8 +92,13 @@ class TestGossipingPropertyFileSnitch(Tester):
         original_rows = list(session.execute("SELECT * FROM {}".format(stress_table)))
 
         node2.start(wait_for_binary_proto=True, wait_other_notice=False)
-        node2.watch_log_for("Starting Messaging Service on {}:{}".format(NODE2_40_LISTEN_ADDRESS[:-5] if running40 else NODE2_LISTEN_FMT_ADDRESS, STORAGE_PORT), timeout=60)
-        node2.watch_log_for("Starting Messaging Service on {}:{}".format(NODE2_40_BROADCAST_ADDRESS[:-5] if running40 else NODE2_BROADCAST_FMT_ADDRESS, STORAGE_PORT), timeout=60)
+        if running40:
+            node2.watch_log_for("Listening on address: \({}:{}\)".format(NODE2_40_LISTEN_ADDRESS[:-5], STORAGE_PORT), timeout=60)
+            node2.watch_log_for("Listening on address: \({}:{}\)".format(NODE2_40_BROADCAST_ADDRESS[:-5], STORAGE_PORT), timeout=60)
+        else:
+            node2.watch_log_for("Starting Messaging Service on {}:{}".format(NODE2_LISTEN_FMT_ADDRESS, STORAGE_PORT), timeout=60)
+            node2.watch_log_for("Starting Messaging Service on {}:{}".format(NODE2_BROADCAST_FMT_ADDRESS, STORAGE_PORT), timeout=60)
+
         self._test_connect(NODE2_LISTEN_ADDRESS, STORAGE_PORT)
         self._test_connect(NODE2_BROADCAST_ADDRESS, STORAGE_PORT)
 
