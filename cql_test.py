@@ -1138,32 +1138,23 @@ class TestCQLSlowQuery(CQLTester):
         session.execute(SimpleStatement("SELECT * from test2",
                                         consistency_level=ConsistencyLevel.ONE,
                                         retry_policy=FallthroughRetryPolicy()))
-
         node2.watch_log_for(["operations were slow", "SELECT \* FROM ks.test2"],
                             from_mark=mark, filename='debug.log', timeout=60)
-        mark = node2.mark_log(filename='debug.log')
 
+
+        mark = node2.mark_log(filename='debug.log')
         session.execute(SimpleStatement("SELECT * from test2 where id = 1",
                                         consistency_level=ConsistencyLevel.ONE,
                                         retry_policy=FallthroughRetryPolicy()))
-
-        node2.watch_log_for(["operations were slow", "SELECT \* FROM ks.test2"],
+        node2.watch_log_for(["operations were slow", "SELECT \* FROM ks.test2 WHERE id = 1"],
                             from_mark=mark, filename='debug.log', timeout=60)
-        mark = node2.mark_log(filename='debug.log')
 
-        session.execute(SimpleStatement("SELECT * from test2 where id = 1",
+
+        mark = node2.mark_log(filename='debug.log')
+        session.execute(SimpleStatement("SELECT * from test2 where token(id) <= 0",
                                         consistency_level=ConsistencyLevel.ONE,
                                         retry_policy=FallthroughRetryPolicy()))
-
-        node2.watch_log_for(["operations were slow", "SELECT \* FROM ks.test2"],
-                            from_mark=mark, filename='debug.log', timeout=60)
-        mark = node2.mark_log(filename='debug.log')
-
-        session.execute(SimpleStatement("SELECT * from test2 where token(id) < 0",
-                                        consistency_level=ConsistencyLevel.ONE,
-                                        retry_policy=FallthroughRetryPolicy()))
-
-        node2.watch_log_for(["operations were slow", "SELECT \* FROM ks.test2"],
+        node2.watch_log_for(["operations were slow", "SELECT \* FROM ks.test2 WHERE token\(id\) <= 0"],
                             from_mark=mark, filename='debug.log', timeout=60)
 
     def test_disable_slow_query_log(self):
