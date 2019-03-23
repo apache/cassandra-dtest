@@ -25,7 +25,7 @@ from cassandra.query import BatchStatement, BatchType
 from ccmlib import common
 
 from .cqlsh_tools import monkeypatch_driver, unmonkeypatch_driver
-from dtest import CASSANDRA_VERSION_FROM_BUILD, Tester, create_ks, create_cf
+from dtest import Tester, create_ks, create_cf
 from dtest_setup_overrides import DTestSetupOverrides
 from tools.assertions import assert_all, assert_none
 from tools.data import create_c1c2_table, insert_c1c2, rows_to_list
@@ -42,11 +42,8 @@ class TestCqlsh(Tester):
     @pytest.fixture
     def fixture_dtest_setup_overrides(self):
         dtest_setup_overrides = DTestSetupOverrides()
-        if CASSANDRA_VERSION_FROM_BUILD >= LooseVersion('3.0'):
-            dtest_setup_overrides.cluster_options = ImmutableMapping({'enable_user_defined_functions': 'true',
+        dtest_setup_overrides.cluster_options = ImmutableMapping({'enable_user_defined_functions': 'true',
                                                 'enable_scripted_user_defined_functions': 'true'})
-        else:
-            dtest_setup_overrides.cluster_options = ImmutableMapping({'enable_user_defined_functions': 'true'})
         return dtest_setup_overrides
 
     @classmethod
