@@ -503,9 +503,8 @@ def pytest_collection_modifyitems(items, config):
             if config.getoption("use_off_heap_memtables"):
                 deselect_test = True
 
-        # temporarily deselect tests in cqlsh_copy_tests that depend on cqlshlib,
-        # until cqlshlib is Python 3 compatibile
-        if item.get_marker("depends_cqlshlib"):
+        # deselect cqlsh tests that depend on fixing a driver behavior
+        if item.get_closest_marker("depends_driver"):
             deselect_test = True
 
         if deselect_test:

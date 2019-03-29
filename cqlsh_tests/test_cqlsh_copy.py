@@ -3198,6 +3198,7 @@ class TestCqlshCopy(Tester):
         _test(False)
 
     @pytest.mark.depends_cqlshlib
+    @pytest.mark.depends_driver
     @since('3.0')
     def test_unusual_dates(self):
         """
