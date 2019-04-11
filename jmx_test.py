@@ -328,7 +328,7 @@ class TestJMXSSL(Tester):
         self.assert_insecure_connection_rejected(node)
 
         # specifying only the truststore containing the server cert should fail
-        with pytest.raises(ToolError, match=".*SSLHandshakeException.*"):
+        with pytest.raises(ToolError):
             node.nodetool("info --ssl -Djavax.net.ssl.trustStore={ts} -Djavax.net.ssl.trustStorePassword={ts_pwd}"
                           .format(ts=self.truststore(), ts_pwd=self.truststore_password))
 

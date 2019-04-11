@@ -47,6 +47,7 @@ class TestDiskBalance(Tester):
         for node in cluster.nodelist():
             self.assert_balanced(node)
 
+    @pytest.mark.resource_intensive
     def test_disk_balance_bootstrap(self):
         cluster = self.cluster
         if self.dtest_config.use_vnodes:

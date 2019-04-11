@@ -20,9 +20,7 @@ class TestGossiper(Tester):
         """
 
         self.fixture_dtest_setup.allow_log_errors = True
-        n1 = self.cluster.create_node('node1', True, None, ('127.0.0.1', 7000), '7100',
-                                      None, None, binary_interface=('127.0.0.1', 9042))
-        self.cluster.add(n1, False)
+        self.cluster.populate(1)
         node1 = self.cluster.nodelist()[0]
         self.cluster.set_configuration_options({
             'seed_provider': [{'class_name': 'org.apache.cassandra.locator.SimpleSeedProvider',
@@ -52,15 +50,7 @@ class TestGossiper(Tester):
 
         self.fixture_dtest_setup.allow_log_errors = True
 
-        n1 = self.cluster.create_node('node1', True, None, ('127.0.0.1', 7000), '7100',
-                                      None, None, binary_interface=('127.0.0.1', 9042))
-        n2 = self.cluster.create_node('node2', True, None, ('127.0.0.2', 7000), '7101',
-                                      None, None, binary_interface=('127.0.0.2', 9042))
-        n3 = self.cluster.create_node('node3', True, None, ('127.0.0.3', 7000), '7102',
-                                      None, None, binary_interface=('127.0.0.3', 9042))
-        self.cluster.add(n1, True)
-        self.cluster.add(n2, True)
-        self.cluster.add(n3, True)
+        self.cluster.populate(3)
 
         node1, node2, node3 = self.cluster.nodelist()
 
@@ -93,15 +83,10 @@ class TestGossiper(Tester):
         """
         RING_DELAY = 15000  # ms
         self.fixture_dtest_setup.allow_log_errors = True
-        n1 = self.cluster.create_node('node1', True, None, ('127.0.0.1', 7000), '7100',
-                                      None, None, binary_interface=('127.0.0.1', 9042))
-        n2 = self.cluster.create_node('node2', True, None, ('127.0.0.2', 7000), '7101',
-                                      None, None, binary_interface=('127.0.0.2', 9042))
-        self.cluster.add(n1, True)
-        self.cluster.add(n2, False)
+        self.cluster.populate(2)
         node1, node2 = self.cluster.nodelist()
 
-        node2.start(wait_other_notice=False, jvm_args=['-Dcassandra.ring_delay_ms={}'.format(RING_DELAY)])
+        node2.start(wait_other_notice=False, jvm_args=['-Dcassandra.ring_delay_ms={}'.format(RING_DELAY)], verbose=True)
         node2.watch_log_for('Starting shadow gossip round to check for endpoint collision', filename='debug.log')
         sleep(RING_DELAY / 1000)
         # Start seed, ensure node2 joins before it exits shadow round.

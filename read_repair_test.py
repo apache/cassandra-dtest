@@ -413,15 +413,15 @@ class TestSpeculativeReadRepair(Tester):
         cluster = fixture_dtest_setup.cluster
         cluster.set_configuration_options(values={'hinted_handoff_enabled': False,
                                                   'dynamic_snitch': False,
-                                                  'write_request_timeout_in_ms': 500,
-                                                  'read_request_timeout_in_ms': 500})
+                                                  'write_request_timeout_in_ms': 1000,
+                                                  'read_request_timeout_in_ms': 1000})
         cluster.populate(3, install_byteman=True, debug=True)
         byteman_validate(cluster.nodelist()[0], './byteman/read_repair/sorted_live_endpoints.btm', verbose=True)
         cluster.start(wait_for_binary_proto=True, jvm_args=['-XX:-PerfDisableSharedMem'])
         session = fixture_dtest_setup.patient_exclusive_cql_connection(cluster.nodelist()[0], timeout=2)
 
         session.execute("CREATE KEYSPACE ks WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 3}")
-        session.execute("CREATE TABLE ks.tbl (k int, c int, v int, primary key (k, c)) WITH speculative_retry = '250ms';")
+        session.execute("CREATE TABLE ks.tbl (k int, c int, v int, primary key (k, c)) WITH speculative_retry = '400ms';")
 
     def get_cql_connection(self, node, **kwargs):
         return self.patient_exclusive_cql_connection(node, retry_policy=None, **kwargs)

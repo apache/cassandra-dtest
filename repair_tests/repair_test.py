@@ -1186,7 +1186,8 @@ class TestRepair(BaseRepairTest):
         node_to_kill.import_config_files()
 
         logger.debug("Starting cluster..")
-        cluster.start(wait_other_notice=True)
+        cluster.start(wait_other_notice=True, jvm_args=['-Djdk.attach.allowAttachSelf=true'])
+        # cluster.start(wait_other_notice=True)
 
         logger.debug("stopping node3")
         node3.stop(gently=False, wait_other_notice=True)
@@ -1201,7 +1202,14 @@ class TestRepair(BaseRepairTest):
         logger.debug("bring back node3")
         node3.start(wait_other_notice=True, wait_for_binary_proto=True)
 
-        script = 'stream_sleep.btm' if phase == 'sync' else 'repair_{}_sleep.btm'.format(phase)
+        if phase == 'sync':
+            script = 'stream_sleep.btm'
+        else:
+            script = 'repair_{}_sleep.btm'.format(phase)
+            if phase == 'validation':
+                prefix = '4.0' if cluster.version() >= '4.0' else 'pre4.0'
+                script = prefix + '/' + script
+
         logger.debug("Submitting byteman script to {}".format(node_to_kill.name))
         # Sleep on anticompaction/stream so there will be time for node to be killed
         node_to_kill.byteman_submit(['./byteman/{}'.format(script)])

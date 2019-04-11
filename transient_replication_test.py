@@ -618,6 +618,7 @@ class TestMultipleTransientNodes(TransientReplicationBase):
     def tokens(self):
         return [0, 1, 2, 3, 4]
 
+    @pytest.mark.resource_intensive
     @pytest.mark.no_vnodes
     def test_transient_full_merge_read(self):
         """ When reading, transient replica should serve a missing read """

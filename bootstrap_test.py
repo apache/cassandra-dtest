@@ -451,17 +451,21 @@ class TestBootstrap(Tester):
         with tempfile.NamedTemporaryFile(mode='w+') as stress_config:
             stress_config.write(yaml_config)
             stress_config.flush()
-            node1.stress(['user', 'profile=' + stress_config.name, 'n=2M', 'no-warmup',
-                          'ops(insert=1)', '-rate', 'threads=50'])
+            node1.stress(['user', 'profile=' + stress_config.name, 'n=200K', 'no-warmup',
+                          'ops(insert=1)', '-rate', 'threads=10'])
 
             node3 = new_node(cluster, data_center='dc2')
             node3.start(no_wait=True)
             time.sleep(3)
 
+            ntout = node1.nodetool('status').stdout
+            assert re.search(r'UJ\s+' + node3.ip_addr, ntout), ntout
             out, err, _ = node1.stress(['user', 'profile=' + stress_config.name, 'ops(insert=1)',
-                                        'n=500K', 'no-warmup', 'cl=LOCAL_QUORUM',
-                                        '-rate', 'threads=5',
+                                        'n=10k', 'no-warmup', 'cl=LOCAL_QUORUM',
+                                        '-rate', 'threads=10',
                                         '-errors', 'retries=2'])
+            ntout = node1.nodetool('status').stdout
+            assert re.search(r'UJ\s+' + node3.ip_addr, ntout), ntout
 
         logger.debug(out)
         assert_stderr_clean(err)
