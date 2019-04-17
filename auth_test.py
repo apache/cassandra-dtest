@@ -3076,6 +3076,11 @@ class TestNetworkAuth(Tester):
     def assertWontConnectTo(self, username, node):
         self.assertUnauthorized(lambda: self.exclusive_cql_connection(node, user=username, password='password'))
 
+    def clear_roles_cache(self, node):
+        mbean = make_mbean('auth', type='RolesCache')
+        with JolokiaAgent(node) as jmx:
+            jmx.execute_method(mbean, 'invalidate')
+
     def clear_network_auth_cache(self, node):
         mbean = make_mbean('auth', type='NetworkAuthCache')
         with JolokiaAgent(node) as jmx:
@@ -3131,6 +3136,7 @@ class TestNetworkAuth(Tester):
         If the login flag is set to false for a user with a current connection,
         all their requests should fail once the cache is cleared. Here because it has
         more in common with these tests that the other auth tests
+        the roles cache is also cleared to invalidate the cached LOGIN privilege
         """
         username = self.username()
         superuser = self.patient_exclusive_cql_connection(self.dc1_node, user='cassandra', password='cassandra')
@@ -3141,6 +3147,7 @@ class TestNetworkAuth(Tester):
         # connect to the dc2 node, then remove permission for it
         session = self.exclusive_cql_connection(self.dc2_node, user=username, password='password')
         superuser.execute("ALTER ROLE %s WITH LOGIN=false" % username)
+        self.clear_roles_cache(self.dc2_node)
         self.clear_network_auth_cache(self.dc2_node)
         self.assertUnauthorized(lambda: session.execute("SELECT * FROM ks.tbl"))
 
