@@ -45,7 +45,9 @@ class TestLargeColumn(Tester):
         cluster = self.cluster
         # Commit log segment size needs to increase for the database to be willing to accept columns that large
         # internode compression is disabled because the regression being tested occurs in NIO buffer pooling without compression
-        cluster.set_configuration_options({'commitlog_segment_size_in_mb': 128, 'internode_compression': 'none'})
+        cluster.set_configuration_options({'commitlog_segment_size_in_mb': 128,
+                                           'internode_compression': 'none',
+                                           'internode_max_message_size_in_bytes': 128 * 1024 * 1024})
         # Have Netty allocate memory on heap so it is clear if memory used for large columns is related to intracluster messaging
         cluster.populate(2).start(jvm_args=[" -Dcassandra.netty_use_heap_allocator=true "])
         node1, node2 = cluster.nodelist()
