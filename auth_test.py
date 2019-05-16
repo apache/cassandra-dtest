@@ -8,7 +8,7 @@ import re
 import pytest
 import logging
 
-from cassandra import AuthenticationFailed, InvalidRequest, Unauthorized
+from cassandra import AuthenticationFailed, InvalidRequest, Unauthorized, Unavailable
 from cassandra.cluster import NoHostAvailable
 from cassandra.protocol import ServerError, SyntaxException
 
@@ -2706,6 +2706,326 @@ class TestAuthRoles(Tester):
 
     def assert_no_permissions(self, session, query):
         assert list(session.execute(query)) == []
+
+
+@since('2.2')
+class TestAuthUnavailable(Tester):
+    """
+    * These tests verify behavior when backends for authentication & authorization are unable to pull data from the
+    * system_auth keyspace. Failure scenarios are simulated based on the assumption that internal queries for role
+    * hierarchies and role properties of the "cassandra" super-user get CL=QUORUM (other roles get CL=LOCAL_ONE). And so
+    * we expect these internal queries to fail when one of two nodes are down and system_auth have RF=2. Though the
+    * permissions cache is used in these tests, it is always populated by permissions derived from the super-user status
+    * (all applicable to resource) of the "cassandra" user. The network_authorizer is always disabled to make sure the
+    * queries utilize the role/permissions cache only.
+    """
+
+    def test_authentication_handle_unavailable(self):
+        """
+        * Launch a two node cluster with role/permissions cache disabled
+        * Connect as default super user
+        * Increase the system_auth RF to 2
+        * Run repair
+        * Stop one of the nodes
+        * Verify that attempt to login fail with AuthenticationFailed
+
+        @jira_ticket CASSANDRA-15041
+        """
+        self.prepare(nodes=2)
+        logger.debug("Nodes started")
+
+        node0, node1 = self.cluster.nodelist()
+
+        cassandra = self.patient_exclusive_cql_connection(node0, user='cassandra', password='cassandra')
+
+        self.set_rf2_on_system_auth(cassandra)
+
+        node1.stop()
+
+        try:
+            self.patient_exclusive_cql_connection(node0, timeout=2, user='cassandra', password='cassandra')
+            self.fail("Expected login attempt to raise an exception.")
+        except NoHostAvailable as e:
+            # From driver
+            assert isinstance(list(e.errors.values())[0], AuthenticationFailed)
+            # AuthenticationFailed from server
+            assert re.search("code=0100", str(e))
+            # Message from server
+            assert re.search("Unable to perform authentication:.* Cannot achieve consistency level QUORUM", str(e))
+
+    def test_authentication_through_cache_handle_unavailable(self):
+        """
+        * Launch a two node cluster with role/permissions cache enabled
+        * Connect as default super user
+        * Increase the system_auth RF to 2
+        * Run repair
+        * Stop one of the nodes
+        * Verify that attempt to login fail with AuthenticationFailed
+
+        @jira_ticket CASSANDRA-15041
+        """
+        self.prepare(nodes=2, cache_validity=500, cache_update_interval=500)
+        logger.debug("Nodes started")
+
+        node0, node1 = self.cluster.nodelist()
+
+        cassandra = self.patient_exclusive_cql_connection(node0, user='cassandra', password='cassandra')
+
+        self.set_rf2_on_system_auth(cassandra)
+
+        # Warm up cache
+        self.patient_exclusive_cql_connection(node0, user='cassandra', password='cassandra')
+
+        node1.stop()
+
+        # Wait for cache to timeout
+        time.sleep(1)
+
+        try:
+            self.patient_exclusive_cql_connection(node0, timeout=2, user='cassandra', password='cassandra')
+            self.fail("Expected login attempt to raise an exception.")
+        except NoHostAvailable as e:
+            # From driver
+            assert isinstance(list(e.errors.values())[0], AuthenticationFailed)
+            # AuthenticationFailed from server
+            assert re.search("code=0100", str(e))
+            # Message from server
+            assert re.search("Unable to perform authentication:.* Cannot achieve consistency level QUORUM", str(e))
+
+    @since('4.0')
+    def test_authentication_from_cache_while_unavailable(self):
+        """
+        * Launch a two node cluster with role/permissions cache enabled
+        * Connect as default super user
+        * Increase the system_auth RF to 2
+        * Run repair
+        * Stop one of the nodes
+        * Verify that login is successful from cached entries
+
+        @jira_ticket CASSANDRA-15041
+        """
+        self.prepare(nodes=2, cache_validity=60000, cache_update_interval=60000)
+        logger.debug("Nodes started")
+
+        node0, node1 = self.cluster.nodelist()
+
+        cassandra = self.patient_exclusive_cql_connection(node0, user='cassandra', password='cassandra')
+
+        self.set_rf2_on_system_auth(cassandra)
+
+        # Warm up cache
+        self.patient_exclusive_cql_connection(node0, user='cassandra', password='cassandra')
+
+        node1.stop()
+
+        self.patient_exclusive_cql_connection(node0, user='cassandra', password='cassandra')
+
+    @since('4.0')
+    def test_credentials_cache_background_reload_handle_unavailable(self):
+        """
+        * Launch a two node cluster with role/permissions cache update interval at a fraction of validity time
+        * Connect as default super user
+        * Increase the system_auth RF to 2
+        * Run repair
+        * Stop one of the nodes
+        * Wait for cache update interval to expire
+        * Trigger async update of cache
+
+        @jira_ticket CASSANDRA-15041
+        """
+        self.prepare(nodes=2, cache_validity=60000, cache_update_interval=10)
+        logger.debug("Nodes started")
+
+        node0, node1 = self.cluster.nodelist()
+
+        cassandra = self.patient_exclusive_cql_connection(node0, user='cassandra', password='cassandra')
+
+        self.set_rf2_on_system_auth(cassandra)
+
+        # Warm up cache
+        self.patient_exclusive_cql_connection(node0, user='cassandra', password='cassandra')
+
+        node1.stop()
+
+        # Trigger async update of role/permissions cache
+        time.sleep(0.5)
+        self.patient_exclusive_cql_connection(node0, user='cassandra', password='cassandra')
+
+        # Give background update operation time to fail and check logs
+        time.sleep(6)
+        assert not self.check_logs_for_errors()
+
+    def test_authorization_handle_unavailable(self):
+        """
+        * Launch a two node cluster with role/permissions cache disabled
+        * Connect as default super user
+        * Increase the system_auth RF to 2
+        * Run repair
+        * Create dummy ks/table
+        * Stop one of the nodes
+        * Verify that attempt to select on table fail with Unauthorized
+
+        @jira_ticket CASSANDRA-15041
+        """
+        self.prepare(nodes=2)
+        logger.debug("Nodes started")
+
+        node0, node1 = self.cluster.nodelist()
+
+        cassandra = self.patient_exclusive_cql_connection(node0, user='cassandra', password='cassandra')
+
+        self.set_rf2_on_system_auth(cassandra)
+
+        cassandra.execute("CREATE KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor':2}")
+        cassandra.execute("CREATE TABLE ks.cf (id int primary key)")
+
+        node1.stop()
+
+        assert_exception(cassandra, "SELECT * from ks.cf", matching="Unable to perform authorization of super-user permission: Cannot achieve consistency level QUORUM", expected=Unauthorized)
+
+    def test_authorization_through_cache_handle_unavailable(self):
+        """
+        * Launch a two node cluster with role/permissions cache enabled
+        * Connect as default super user
+        * Increase the system_auth RF to 2
+        * Run repair
+        * Create dummy ks/table
+        * Stop one of the nodes
+        * Verify that attempt to select on table fail with Unauthorized
+
+        @jira_ticket CASSANDRA-15041
+        """
+        self.prepare(nodes=2, cache_validity=500, cache_update_interval=500)
+        logger.debug("Nodes started")
+
+        node0, node1 = self.cluster.nodelist()
+
+        cassandra = self.patient_exclusive_cql_connection(node0, user='cassandra', password='cassandra')
+
+        self.set_rf2_on_system_auth(cassandra)
+
+        cassandra.execute("CREATE KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor':2}")
+        cassandra.execute("CREATE TABLE ks.cf (id int primary key)")
+
+        # Warm up cache
+        cassandra.execute("SELECT * from ks.cf")
+
+        node1.stop()
+
+        # Wait for cache to timeout
+        time.sleep(1)
+
+        assert_exception(cassandra, "SELECT * from ks.cf", matching="Unable to perform authorization of super-user permission: Cannot achieve consistency level QUORUM", expected=Unauthorized)
+
+    def test_authorization_from_cache_while_unavailable(self):
+        """
+        * Launch a two node cluster with role/permissions cache enabled
+        * Connect as default super user
+        * Increase the system_auth RF to 2
+        * Run repair
+        * Create dummy ks/table
+        * Stop one of the nodes
+        * Verify that select on table is authorized from cached entries
+
+        @jira_ticket CASSANDRA-15041
+        """
+        self.prepare(nodes=2, cache_validity=60000, cache_update_interval=60000)
+        logger.debug("Nodes started")
+
+        node0, node1 = self.cluster.nodelist()
+
+        cassandra = self.patient_exclusive_cql_connection(node0, user='cassandra', password='cassandra')
+
+        self.set_rf2_on_system_auth(cassandra)
+
+        cassandra.execute("CREATE KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor':2}")
+        cassandra.execute("CREATE TABLE ks.cf (id int primary key)")
+
+        # Warm up cache
+        cassandra.execute("SELECT * from ks.cf")
+
+        node1.stop()
+
+        # Authorized from cache
+        cassandra.execute("SELECT * from ks.cf")
+
+    def test_permission_cache_background_reload_handle_unavailable(self):
+        """
+        * Launch a two node cluster with role/permissions cache update interval at a fraction of validity time
+        * Connect as default super user
+        * Increase the system_auth RF to 2
+        * Run repair
+        * Create dummy ks/table
+        * Stop one of the nodes
+        * Wait for cache update interval to expire
+        * Trigger async update of cache
+        * Verify that background update don't log errors
+
+        @jira_ticket CASSANDRA-15041
+        """
+        self.prepare(nodes=2, cache_validity=60000, cache_update_interval=10)
+        logger.debug("Nodes started")
+
+        node0, node1 = self.cluster.nodelist()
+
+        cassandra = self.patient_exclusive_cql_connection(node0, user='cassandra', password='cassandra')
+
+        self.set_rf2_on_system_auth(cassandra)
+
+        cassandra.execute("CREATE KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor':2}")
+        cassandra.execute("CREATE TABLE ks.cf (id int primary key)")
+
+        # Warm up cache
+        cassandra.execute("SELECT * from ks.cf")
+
+        node1.stop()
+
+        # Trigger async update of role/permissions cache
+        time.sleep(0.5)
+        cassandra.execute("SELECT * from ks.cf")
+
+        # Give background update operation time to fail and check logs
+        time.sleep(6)
+        assert not self.check_logs_for_errors()
+
+    def set_rf2_on_system_auth(self, session):
+        """
+        Set RF=2 on system_auth and repair
+        @param session The session used to alter keyspace
+        """
+        session.execute("""
+            ALTER KEYSPACE system_auth
+                WITH replication = {'class':'SimpleStrategy', 'replication_factor':2};
+        """)
+
+        logger.debug("Repairing after altering RF")
+        self.cluster.repair()
+
+    def prepare(self, nodes=1, cache_validity=0, cache_update_interval=-1):
+        """
+        Sets up and launches C* cluster.
+        Always set same cache validity and update-interval on roles, permissions and credentials to overcome differences
+        in cache strategies between 4.0 and pre-4.0.
+        @param nodes Number of nodes in the cluster. Default is 1
+        @param cache_validity The timeout for the roles/permissions/credentials cache in ms. Default is 0.
+        @param cache_update_interval The update interval for the roles/permissions/credentials cache in ms. Default is -1.
+        """
+        config = {'authenticator': 'org.apache.cassandra.auth.PasswordAuthenticator',
+                  'authorizer': 'org.apache.cassandra.auth.CassandraAuthorizer',
+                  'permissions_validity_in_ms': cache_validity,
+                  'permissions_update_interval_in_ms': cache_update_interval,
+                  'roles_validity_in_ms': cache_validity,
+                  'roles_update_interval_in_ms': cache_update_interval}
+        if self.dtest_config.cassandra_version_from_build >= '3.0':
+            config['enable_materialized_views'] = 'true'
+        if self.dtest_config.cassandra_version_from_build >= '3.4':
+            config['credentials_validity_in_ms'] = cache_validity
+            config['credentials_update_interval_in_ms'] = cache_update_interval
+        self.cluster.set_configuration_options(values=config)
+        self.cluster.populate(nodes).start()
+
+        n = self.cluster.wait_for_any_log('Created default superuser', 25)
+        logger.debug("Default role created by " + n.name)
 
 
 @since('4.0')
