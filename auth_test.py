@@ -1091,8 +1091,9 @@ class TestAuth(Tester):
         """
         config = {'authenticator': 'org.apache.cassandra.auth.PasswordAuthenticator',
                   'authorizer': 'org.apache.cassandra.auth.CassandraAuthorizer',
-                  'permissions_validity_in_ms': permissions_validity,
-                  'enable_materialized_views': 'true'}
+                  'permissions_validity_in_ms': permissions_validity}
+        if self.dtest_config.cassandra_version_from_build >= '3.0':
+            config['enable_materialized_views'] = 'true'
         if self.dtest_config.cassandra_version_from_build >= '4.0':
             config['network_authorizer'] = 'org.apache.cassandra.auth.CassandraNetworkAuthorizer'
         self.cluster.set_configuration_options(values=config)
