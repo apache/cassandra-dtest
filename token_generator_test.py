@@ -15,7 +15,7 @@ since = pytest.mark.since
 logger = logging.getLogger(__name__)
 
 
-@since('2.0.16', max_version='3.0.0')
+@since('2.2', max_version='3.0.0')
 class TestTokenGenerator(Tester):
     """
     Basic tools/bin/token-generator test.
