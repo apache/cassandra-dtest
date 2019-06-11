@@ -6,6 +6,7 @@ from cassandra.cluster import NoHostAvailable
 from dtest import Tester
 
 
+@since('2.2')
 class TestAuth(Tester):
 
 
