@@ -5,6 +5,7 @@ from cassandra.cluster import NoHostAvailable
 
 from dtest import Tester
 
+since = pytest.mark.since
 
 @since('2.2')
 class TestAuth(Tester):
