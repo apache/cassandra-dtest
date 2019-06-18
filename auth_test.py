@@ -2940,7 +2940,6 @@ class TestAuthUnavailable(Tester):
         # Authorized from cache
         cassandra.execute("SELECT * from ks.cf")
 
-    @since('4.0')
     def test_permission_cache_background_reload_handle_unavailable(self):
         """
         * Launch a two node cluster with role/permissions cache update interval at a fraction of validity time
