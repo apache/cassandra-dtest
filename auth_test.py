@@ -2710,6 +2710,15 @@ class TestAuthRoles(Tester):
 
 @since('2.2')
 class TestAuthUnavailable(Tester):
+    """
+    * These tests verify behavior when backends for authentication & authorization are unable to pull data from the
+    * system_auth keyspace. Failure scenarios are simulated based on the assumption that internal queries for role
+    * hierarchies and role properties of the "cassandra" super-user get CL=QUORUM (other roles get CL=LOCAL_ONE). And so
+    * we expect these internal queries to fail when one of two nodes are down and system_auth have RF=2. Though the
+    * permissions cache is used in these tests, it is always populated by permissions derived from the super-user status
+    * (all applicable to resource) of the "cassandra" user. The network_authorizer is always disabled to make sure the
+    * queries utilize the role/permissions cache only.
+    """
 
     def test_authentication_handle_unavailable(self):
         """
@@ -2722,7 +2731,7 @@ class TestAuthUnavailable(Tester):
 
         @jira_ticket CASSANDRA-15041
         """
-        self.prepare(nodes=2, cache_validity=0, cache_update_interval=0)
+        self.prepare(nodes=2)
         logger.debug("Nodes started")
 
         node0, node1 = self.cluster.nodelist()
@@ -2742,7 +2751,7 @@ class TestAuthUnavailable(Tester):
             # AuthenticationFailed from server
             assert re.search("code=0100", str(e))
             # Message from server
-            assert re.search("Unable to perform authentication: Cannot achieve consistency level QUORUM", str(e))
+            assert re.search("Unable to perform authentication:.* Cannot achieve consistency level QUORUM", str(e))
 
     def test_authentication_through_cache_handle_unavailable(self):
         """
@@ -2781,7 +2790,7 @@ class TestAuthUnavailable(Tester):
             # AuthenticationFailed from server
             assert re.search("code=0100", str(e))
             # Message from server
-            assert re.search("Unable to perform authentication: Cannot achieve consistency level QUORUM", str(e))
+            assert re.search("Unable to perform authentication:.* Cannot achieve consistency level QUORUM", str(e))
 
     @since('4.0')
     def test_authentication_from_cache_while_unavailable(self):
@@ -2858,7 +2867,7 @@ class TestAuthUnavailable(Tester):
 
         @jira_ticket CASSANDRA-15041
         """
-        self.prepare(nodes=2, cache_validity=0, cache_update_interval=0)
+        self.prepare(nodes=2)
         logger.debug("Nodes started")
 
         node0, node1 = self.cluster.nodelist()
@@ -2872,7 +2881,7 @@ class TestAuthUnavailable(Tester):
 
         node1.stop()
 
-        assert_invalid(cassandra, "SELECT * from ks.cf", "Unable to perform authorization: Cannot achieve consistency level QUORUM", expected=Unauthorized)
+        assert_exception(cassandra, "SELECT * from ks.cf", matching="Unable to perform authorization of super-user permission: Cannot achieve consistency level QUORUM", expected=Unauthorized)
 
     def test_authorization_through_cache_handle_unavailable(self):
         """
@@ -2906,7 +2915,7 @@ class TestAuthUnavailable(Tester):
         # Wait for cache to timeout
         time.sleep(1)
 
-        assert_invalid(cassandra, "SELECT * from ks.cf", "Unable to perform authorization: Cannot achieve consistency level QUORUM", expected=Unauthorized)
+        assert_exception(cassandra, "SELECT * from ks.cf", matching="Unable to perform authorization of super-user permission: Cannot achieve consistency level QUORUM", expected=Unauthorized)
 
     def test_authorization_from_cache_while_unavailable(self):
         """
@@ -2995,6 +3004,8 @@ class TestAuthUnavailable(Tester):
     def prepare(self, nodes=1, cache_validity=0, cache_update_interval=-1):
         """
         Sets up and launches C* cluster.
+        Always set same cache validity and update-interval on roles, permissions and credentials to overcome differences
+        in cache strategies between 4.0 and pre-4.0.
         @param nodes Number of nodes in the cluster. Default is 1
         @param cache_validity The timeout for the roles/permissions/credentials cache in ms. Default is 0.
         @param cache_update_interval The update interval for the roles/permissions/credentials cache in ms. Default is -1.
@@ -3010,8 +3021,6 @@ class TestAuthUnavailable(Tester):
         if self.dtest_config.cassandra_version_from_build >= '3.4':
             config['credentials_validity_in_ms'] = cache_validity
             config['credentials_update_interval_in_ms'] = cache_update_interval
-        if self.dtest_config.cassandra_version_from_build >= '4.0':
-            config['network_authorizer'] = 'org.apache.cassandra.auth.CassandraNetworkAuthorizer'
         self.cluster.set_configuration_options(values=config)
         self.cluster.populate(nodes).start()
 
