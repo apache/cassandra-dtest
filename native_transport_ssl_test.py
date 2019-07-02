@@ -34,7 +34,12 @@ class TestNativeTransportSSL(Tester):
         except NoHostAvailable:
             pass
 
-        assert len(node1.grep_log("io.netty.handler.ssl.NotSslRecordException.*")), 0 > "Missing SSL handshake exception while connecting with non-SSL enabled client"
+        if cluster.version() >= '4.0':
+            assert len(node1.grep_log("javax.net.ssl.SSLHandshakeException")) > 0, \
+                    "Missing SSL handshake exception while connecting with non-SSL enabled client"
+        else:
+            assert len(node1.grep_log("io.netty.handler.ssl.NotSslRecordException.*")) > 0, \
+                    "Missing SSL handshake exception while connecting with non-SSL enabled client"
 
         # enabled ssl on the client and try again (this should work)
         session = self.patient_cql_connection(node1, ssl_opts={'ca_certs': os.path.join(self.fixture_dtest_setup.test_path, 'ccm_node.cer')})
