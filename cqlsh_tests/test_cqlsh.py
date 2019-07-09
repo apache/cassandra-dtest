@@ -1571,6 +1571,43 @@ Tracing session:""")
         stdout, stderr = self.run_cqlsh(node1, cmds='USE system', cqlsh_options=['--debug', '--connect-timeout=10'])
         assert "Using connect timeout: 10 seconds" in stderr
 
+    @since('3.0.19')
+    def test_protocol_negotiation(self):
+        """
+        @jira_ticket CASSANDRA-15193
+        """
+        self.cluster.populate(1)
+        self.cluster.start(wait_for_binary_proto=True)
+
+        node1, = self.cluster.nodelist()
+        stdout, stderr = self.run_cqlsh(node1, cmds='USE system', cqlsh_options=['--tty'])
+        assert "Native protocol v4" in stdout
+
+        stdout, stderr = self.run_cqlsh(node1, cmds='USE systeml', cqlsh_options=['--protocol-version=3', '--tty'])
+        assert "Native protocol v3" in stdout
+
+    @since('3.0.19')
+    def test_protocol_version_restriction(self):
+        """
+        @jira_ticket CASSANDRA-15193
+        """
+        self.cluster.populate(1)
+        self.cluster.set_configuration_options({ 'native_transport_max_negotiable_protocol_version': str(3)})
+        self.cluster.start(wait_for_binary_proto=True)
+
+        node1, = self.cluster.nodelist()
+        stdout, stderr = self.run_cqlsh(node1, cmds='USE system', cqlsh_options=['--tty'])
+        # yaml property is deprecated from 4.0 and has no effect
+        if node1.get_cassandra_version() < '4.0':
+            assert "Native protocol v3" in stdout
+
+        node1, = self.cluster.nodelist()
+        stdout, stderr = self.run_cqlsh(node1, cmds='USE system', cqlsh_options=['--protocol-version=4', '--tty'])
+        # yaml property is deprecated from 4.0 and has no effect
+        if node1.get_cassandra_version() < '4.0':
+            assert "ProtocolError returned from server while using explicitly set client protocol_version 4" in stderr
+
+
     def test_update_schema_with_down_node(self):
         """
         Test that issuing a DML statement after a DDL statement will work with a down node

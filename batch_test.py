@@ -505,4 +505,4 @@ class TestBatch(Tester):
         remove_perf_disable_shared_mem(node)
         # Restart nodes on new version
         logger.debug('Starting {} on new version ({})'.format(node.name, node.get_cassandra_version()))
-        node.start(wait_other_notice=True, wait_for_binary_proto=True)
+        node.start(wait_other_notice=True, wait_for_binary_proto=True, jvm_args=['-Dcassandra.disable_max_protocol_auto_override=true'])
