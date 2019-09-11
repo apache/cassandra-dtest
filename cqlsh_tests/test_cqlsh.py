@@ -712,6 +712,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
 (6 rows)
 """)
 
+    @since('1.2', max_version='3.X')
     def test_describe(self):
         """
         @jira_ticket CASSANDRA-7814
@@ -802,6 +803,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         self.execute(cql="DESCRIBE test.test", expected_output=self.get_test_table_output(has_val=True, has_val_idx=False), output_is_ordered=False)
         self.execute(cql='DESCRIBE test.test_val_idx', expected_err="'test_val_idx' not found in keyspace 'test'")
 
+    @since('1.2', max_version='3.X')
     def test_describe_describes_non_default_compaction_parameters(self):
         self.cluster.populate(1)
         self.cluster.start(wait_for_binary_proto=True)
@@ -816,6 +818,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         assert "'min_threshold': '10'" in stdout
         assert "'max_threshold': '100'" in stdout
 
+    @since('2.2', max_version='3.X')
     def test_describe_functions(self, fixture_dtest_setup_overrides):
         """Test DESCRIBE statements for functions and aggregate functions"""
         self.cluster.populate(1)
@@ -888,27 +891,7 @@ CREATE OR REPLACE AGGREGATE test.average(int)
             INITCOND (0, 0);
         """
 
-    @since('4.0')
-    def test_default_keyspaces_exist(self):
-        self.cluster.populate(1)
-        self.cluster.start(wait_for_binary_proto=True)
-        node1, = self.cluster.nodelist()
-
-        # Describe keyspaces
-        expected_keyspaces = ['system_schema', 'system', 'system_traces', 'system_views',
-                              'system_auth', 'system_distributed', 'system_virtual_schema']
-
-        node1, = self.cluster.nodelist()
-        output, err = self.run_cqlsh(node1, "DESCRIBE KEYSPACES")
-
-        if err:
-            assert False, err
-
-        stripped_response = re.sub("(\n|\t|\s+)", " ", output).strip()
-        keyspaces = stripped_response.split(" ")
-
-        assert sorted(keyspaces) == sorted(expected_keyspaces)
-
+    @since('2.2', max_version='3.X')
     def test_describe_types(self):
         """Test DESCRIBE statements for user defined datatypes"""
         self.cluster.populate(1)
@@ -937,6 +920,7 @@ CREATE TYPE test.address_type (
         self.execute(cql='DESCRIBE TYPE test.name_type', expected_output='{};'.format(create_name_type_statement))
         self.execute(cql='DESCRIBE TYPE test.address_type', expected_output='{};'.format(create_address_type_statement))
 
+    @since('1.2', max_version='3.X')
     def test_describe_on_non_reserved_keywords(self):
         """
         @jira_ticket CASSANDRA-9232
@@ -953,7 +937,7 @@ CREATE TYPE test.address_type (
         assert "" == err
         assert "CREATE TABLE ks.map (" in out
 
-    @since('3.0')
+    @since('3.0', max_version='3.X')
     def test_describe_mv(self):
         """
         @jira_ticket CASSANDRA-9961
@@ -1849,6 +1833,7 @@ Tracing session:""")
                                                   describe tables""", cqlsh_options=cqlsh_opts)
         assert "mytable" in stdout
 
+    @since('1.2', max_version="3.X")
     def test_describe_round_trip(self):
         """
         @jira_ticket CASSANDRA-9064
