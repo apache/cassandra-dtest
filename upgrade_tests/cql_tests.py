@@ -5465,7 +5465,7 @@ class TestCQL(UpgradeTester):
             logger.debug("Querying {} node".format("upgraded" if is_upgraded else "old"))
             assert_all(cursor, "SELECT k FROM ks.test WHERE v = 0", [[0]])
 
-    def test_tracing_prevents_startup_after_upgrading(self, fixture_dtest_setup):
+    def test_tracing_prevents_startup_after_upgrading(self):
         """
         Test that after upgrading from 2.1 to 3.0, the system_traces.sessions table is properly upgraded to include
         the client column.
@@ -5475,13 +5475,6 @@ class TestCQL(UpgradeTester):
 
         cursor.execute("CREATE KEYSPACE foo WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}")
         cursor.execute("CREATE TABLE foo.bar (k int PRIMARY KEY, v int)")
-
-        #It's possible to log an error when reading trace information because the schema at node differs
-        #between versions
-        if self.is_40_or_greater():
-            fixture_dtest_setup.ignore_log_patterns = fixture_dtest_setup.ignore_log_patterns +\
-                                                      ["Unknown column coordinator_port during deserialization",
-                                                       "Unknown column source_port during deserialization"]
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
             logger.debug("Querying {} node".format("upgraded" if is_upgraded else "old"))
