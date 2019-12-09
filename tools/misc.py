@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 # work for cluster started by populate
-def new_node(cluster, bootstrap=True, token=None, remote_debug_port='0', data_center=None):
+def new_node(cluster, bootstrap=True, token=None, remote_debug_port='0', data_center=None, byteman_port='0'):
     i = len(cluster.nodes) + 1
     node = Node('node%s' % i,
                 cluster,
@@ -24,7 +24,8 @@ def new_node(cluster, bootstrap=True, token=None, remote_debug_port='0', data_ce
                 str(7000 + i * 100),
                 remote_debug_port,
                 token,
-                binary_interface=('127.0.0.%s' % i, 9042))
+                binary_interface=('127.0.0.%s' % i, 9042),
+                                 byteman_port=byteman_port)
     cluster.add(node, not bootstrap, data_center=data_center)
     return node
 

@@ -1,0 +1,13 @@
+#
+ # Sleep 5s when finishing bootstrap
+ #
+ RULE Sleep 5s when finishing bootstrap
+ CLASS org.apache.cassandra.service.StorageService
+ METHOD bootstrapFinished
+ AT ENTRY
+ # set flag to only run this rule once.
+ IF NOT flagged("done")
+ DO
+    flag("done");
+    Thread.sleep(5000)
+ ENDRULE
