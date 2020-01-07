@@ -445,3 +445,37 @@ class TestNodetool(Tester):
         out_sorted = node_describe.split()
         out_sorted.sort()
         return (node_describe, out_sorted)
+
+    @since('4.0')
+    def test_sjk(self):
+        """
+        Verify that SJK generally works.
+        """
+
+        cluster = self.cluster
+        cluster.populate([1]).start()
+        node = cluster.nodelist()[0]
+
+        out, err, _ = node.nodetool('sjk --help')
+        logger.debug(out)
+        hasPattern = False
+        for line in out.split(os.linesep):
+            if "    ttop      [Thread Top] Displays threads from JVM process" == line:
+                hasPattern = True
+        assert hasPattern == True, "Expected help about SJK ttop"
+
+        out, err, _ = node.nodetool('sjk')
+        logger.debug(out)
+        hasPattern = False
+        for line in out.split(os.linesep):
+            if "    ttop      [Thread Top] Displays threads from JVM process" == line:
+                hasPattern = True
+        assert hasPattern == True, "Expected help about SJK ttop"
+
+        out, err, _ = node.nodetool('sjk hh -n 10 --live')
+        logger.debug(out)
+        hasPattern = False
+        for line in out.split(os.linesep):
+            if re.match('.*Instances.*Bytes.*Type.*', line):
+                hasPattern = True
+        assert hasPattern == True, "Expected 'SJK hh' output"
