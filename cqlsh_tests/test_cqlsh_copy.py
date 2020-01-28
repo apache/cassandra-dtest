@@ -792,6 +792,7 @@ class TestCqlshCopy(Tester):
         result_as_list = [tuple(r) for r in rows_to_list(result)]
         assert [tuple(d) for d in data] == sorted(result_as_list)
 
+    @since('2.2', max_version='4.0')
     @pytest.mark.depends_cqlshlib
     def test_datetimeformat_round_trip(self):
         """
@@ -835,6 +836,65 @@ class TestCqlshCopy(Tester):
         assert csv_values == [['1', '2015/01/01 07:00'],
                               ['2', '2015/06/10 12:30'],
                               ['3', '2015/12/31 23:59']]
+
+        self.session.execute("TRUNCATE testdatetimeformat")
+        cmds = "COPY ks.testdatetimeformat FROM '{name}'".format(name=tempfile.name)
+        cmds += " WITH DATETIMEFORMAT = '{}'".format(format)
+        copy_from_out, copy_from_err, _ = self.run_cqlsh(cmds=cmds)
+
+        table_meta = UpdatingTableMetadataWrapper(self.session.cluster,
+                                                  ks_name=self.ks,
+                                                  table_name='testdatetimeformat')
+        cql_type_names = [table_meta.columns[c].cql_type for c in table_meta.columns]
+
+        imported_results = list(self.session.execute("SELECT * FROM testdatetimeformat"))
+        assert self.result_to_csv_rows(exported_results, cql_type_names, time_format=format) \
+               == self.result_to_csv_rows(imported_results, cql_type_names, time_format=format)
+
+    @since('4.0')
+    @pytest.mark.depends_cqlshlib
+    def test_datetimeformat_round_trip_40(self):
+        """
+        @jira_ticket CASSANDRA-10633
+        @jira_ticket CASSANDRA-9303
+
+        Test COPY TO and COPY FORM with the time format specified in the WITH option by:
+
+        - creating and populating a table,
+        - exporting the contents of the table to a CSV file using COPY TO WITH DATETIMEFORMAT,
+        - checking the time format written to csv.
+        - importing the CSV back into the table
+        - comparing the table contents before and after the import
+
+        CASSANDRA-9303 renamed TIMEFORMAT to DATETIMEFORMAT
+        """
+        self.prepare()
+        self.session.execute("""
+            CREATE TABLE testdatetimeformat (
+                a int primary key,
+                b timestamp
+            )""")
+        insert_statement = self.session.prepare("INSERT INTO testdatetimeformat (a, b) VALUES (?, ?)")
+        args = [(1, datetime.datetime(2015, 1, 1, 0o7, 00, 0, 0, UTC())),
+                (2, datetime.datetime(2015, 6, 10, 12, 30, 30, 500, UTC())),
+                (3, datetime.datetime(2015, 12, 31, 23, 59, 59, 999, UTC()))]
+        execute_concurrent_with_args(self.session, insert_statement, args)
+        exported_results = list(self.session.execute("SELECT * FROM testdatetimeformat"))
+
+        format = '%Y-%m-%d %H:%M:%S%z'
+
+        tempfile = self.get_temp_file()
+        logger.debug('Exporting to csv file: {name}'.format(name=tempfile.name))
+        cmds = "COPY ks.testdatetimeformat TO '{name}'".format(name=tempfile.name)
+        cmds += " WITH DATETIMEFORMAT = '{}'".format(format)
+        copy_to_out, copy_to_err, _ = self.run_cqlsh(cmds=cmds)
+
+        with open(tempfile.name, 'r') as csvfile:
+            csv_values = list(csv.reader(csvfile))
+
+        assert csv_values == [['1', '2015-01-01 07:00:00+0000'],
+                              ['2', '2015-06-10 12:30:30+0000'],
+                              ['3', '2015-12-31 23:59:59+0000']]
 
         self.session.execute("TRUNCATE testdatetimeformat")
         cmds = "COPY ks.testdatetimeformat FROM '{name}'".format(name=tempfile.name)
