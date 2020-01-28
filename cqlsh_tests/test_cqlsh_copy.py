@@ -792,7 +792,7 @@ class TestCqlshCopy(Tester):
         result_as_list = [tuple(r) for r in rows_to_list(result)]
         assert [tuple(d) for d in data] == sorted(result_as_list)
 
-    @since('2.2', max_version='4.0')
+    @since('2.2', max_version='3.X')
     @pytest.mark.depends_cqlshlib
     def test_datetimeformat_round_trip(self):
         """
