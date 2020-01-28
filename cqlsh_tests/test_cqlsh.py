@@ -1579,7 +1579,7 @@ CREATE TABLE int_checks.values (
     val4 tinyint
 """)
 
-    @since('2.2')
+    @since('2.2', max_version='4')
     def test_datetime_values(self):
         """ Tests for CASSANDRA-9399, check tables with date and time values"""
         self.cluster.populate(1)
@@ -1621,6 +1621,52 @@ CREATE TABLE datetime_checks.values (
     t time,
     PRIMARY KEY (d, t)
 """)
+
+    """
+    Starting with 4.0, date/time format needs to conform to java.time.format.DateTimeFormatter
+    See CASSANDRA-15257 for more details
+    """
+    @since('4.0')
+    def test_datetime_values_40(self):
+        self.cluster.populate(1)
+        self.cluster.start(wait_for_binary_proto=True)
+
+        node1, = self.cluster.nodelist()
+
+        stdout, stderr = self.run_cqlsh(node1, cmds="""
+            CREATE KEYSPACE datetime_checks WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
+            USE datetime_checks;
+            CREATE TABLE values (d date, t time, PRIMARY KEY (d, t));
+            INSERT INTO values (d, t) VALUES ('9800-12-31', '23:59:59.999999999');
+            INSERT INTO values (d, t) VALUES ('2015-05-14', '16:30:00.555555555');
+            INSERT INTO values (d, t) VALUES ('1582-01-01', '00:00:00.000000000');
+            INSERT INTO values (d, t) VALUES ('%04d-01-01', '00:00:00.000000000');
+            INSERT INTO values (d, t) VALUES ('%04d-01-01', '01:00:00.000000000');
+            INSERT INTO values (d, t) VALUES ('%02d-01-01', '02:00:00.000000000');
+            INSERT INTO values (d, t) VALUES ('+%02d-01-01', '03:00:00.000000000')"""
+                                        % (datetime.MINYEAR - 1, datetime.MINYEAR, datetime.MAXYEAR, datetime.MAXYEAR+1))
+
+        assert 0 == len(stderr), "Failed to execute cqlsh: {}".format(stderr)
+
+        self.verify_output("select * from datetime_checks.values", node1, """
+ d          | t
+------------+--------------------
+    -719528 | 00:00:00.000000000
+ 9800-12-31 | 23:59:59.999999999
+ 0001-01-01 | 01:00:00.000000000
+ 1582-01-01 | 00:00:00.000000000
+    2932897 | 03:00:00.000000000
+ 9999-01-01 | 02:00:00.000000000
+ 2015-05-14 | 16:30:00.555555555
+""")
+
+        self.verify_output("DESCRIBE TABLE datetime_checks.values", node1, """
+CREATE TABLE datetime_checks.values (
+    d date,
+    t time,
+    PRIMARY KEY (d, t)
+""")
+
 
     @since('2.2')
     def test_tracing(self):
