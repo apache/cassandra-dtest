@@ -1116,7 +1116,7 @@ class TestCQLSlowQuery(CQLTester):
         node1.start(wait_for_binary_proto=True, join_ring=False)  # ensure other node executes queries
         node2.start(wait_for_binary_proto=True,
                     jvm_args=["-Dcassandra.monitoring_report_interval_ms=10",
-                              "-Dcassandra.test.read_iteration_delay_ms=1"])  # see above for explanation
+                              "-Dcassandra.test.read_iteration_delay_ms=2"])  # see above for explanation
 
         session = self.patient_exclusive_cql_connection(node1)
 
