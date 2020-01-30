@@ -886,7 +886,7 @@ class TestCqlshCopy(Tester):
         tempfile = self.get_temp_file()
         logger.debug('Exporting to csv file: {name}'.format(name=tempfile.name))
         cmds = "COPY ks.testdatetimeformat TO '{name}'".format(name=tempfile.name)
-        cmds += " WITH DATETIMEFORMAT = '{}'".format(format)
+        cmds += " WITH DATETIMEFORMAT = '{}' AND NUMPROCESSES=1".format(format)
         copy_to_out, copy_to_err, _ = self.run_cqlsh(cmds=cmds)
 
         with open(tempfile.name, 'r') as csvfile:
@@ -898,7 +898,7 @@ class TestCqlshCopy(Tester):
 
         self.session.execute("TRUNCATE testdatetimeformat")
         cmds = "COPY ks.testdatetimeformat FROM '{name}'".format(name=tempfile.name)
-        cmds += " WITH DATETIMEFORMAT = '{}'".format(format)
+        cmds += " WITH DATETIMEFORMAT = '{}' AND NUMPROCESSES=1".format(format)
         copy_from_out, copy_from_err, _ = self.run_cqlsh(cmds=cmds)
 
         table_meta = UpdatingTableMetadataWrapper(self.session.cluster,
