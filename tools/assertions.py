@@ -297,7 +297,8 @@ def assert_stderr_clean(err, acceptable_errors=None):
         acceptable_errors = ["WARN.*JNA link failure.*unavailable.",
                              "objc.*Class JavaLaunchHelper.*?Which one is undefined.",
                              # Stress tool JMX connection failure, see CASSANDRA-12437
-                             "Failed to connect over JMX; not collecting these stats"]
+                             "Failed to connect over JMX; not collecting these stats",
+                             "Picked up JAVA_TOOL_OPTIONS:.*"]
 
     regex_str = r"^({}|\s*|\n)*$".format("|".join(acceptable_errors))
     err_str = err.strip()
