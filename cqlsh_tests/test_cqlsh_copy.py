@@ -892,9 +892,9 @@ class TestCqlshCopy(Tester):
         with open(tempfile.name, 'r') as csvfile:
             csv_values = list(csv.reader(csvfile))
 
-        assert csv_values == [['1', '2015-01-01 07:00:00+0000'],
-                              ['2', '2015-06-10 12:30:30+0000'],
-                              ['3', '2015-12-31 23:59:59+0000']]
+        assert sorted(csv_values) == [['1', '2015-01-01 07:00:00+0000'],
+                                      ['2', '2015-06-10 12:30:30+0000'],
+                                      ['3', '2015-12-31 23:59:59+0000']]
 
         self.session.execute("TRUNCATE testdatetimeformat")
         cmds = "COPY ks.testdatetimeformat FROM '{name}'".format(name=tempfile.name)
