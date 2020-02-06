@@ -24,12 +24,8 @@ from dtest_config import DTestConfig
 from dtest_setup import DTestSetup
 from dtest_setup_overrides import DTestSetupOverrides
 
-try:
-    # Python 3 imports
-    from itertools import zip_longest
-except ImportError:
-    # Python 2 imports
-    from itertools import izip_longest as zip_longest
+# Python 3 imports
+from itertools import zip_longest
 
 logger = logging.getLogger(__name__)
 

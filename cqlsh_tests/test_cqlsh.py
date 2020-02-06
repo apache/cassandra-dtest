@@ -318,8 +318,6 @@ class TestCqlsh(Tester):
         })
 
         output, _ = self.run_cqlsh(node, 'use testks; SELECT * FROM varcharmaptable', ['--encoding=utf-8'])
-        if six.PY2:
-            output = output.decode(encoding='utf-8')
 
         assert output.count('Можам да јадам стакло, а не ме штета.') == 16
         assert output.count(' ⠊⠀⠉⠁⠝⠀⠑⠁⠞⠀⠛⠇⠁⠎⠎⠀⠁⠝⠙⠀⠊⠞⠀⠙⠕⠑⠎⠝⠞⠀⠓⠥⠗⠞⠀⠍⠑') == 16
@@ -444,9 +442,6 @@ UPDATE varcharmaptable SET varcharvarintmap = varcharvarintmap + {'Vitrum edere 
 
 UPDATE varcharmaptable SET varcharvarintmap['Vitrum edere possum, mihi non nocet.'] = 1010010101020400204143243 WHERE varcharkey= '᚛᚛ᚉᚑᚅᚔᚉᚉᚔᚋ ᚔᚈᚔ ᚍᚂᚐᚅᚑ ᚅᚔᚋᚌᚓᚅᚐ᚜'
         """
-        if six.PY2:
-            cmds = cmds.encode(encoding='utf-8')
-
         node1.run_cqlsh(cmds=cmds)
 
         self.verify_glass(node1)
@@ -473,8 +468,6 @@ UPDATE varcharmaptable SET varcharvarintmap['Vitrum edere possum, mihi non nocet
         node1, = self.cluster.nodelist()
 
         cmds = "ä;"
-        if six.PY2:
-            cmds = cmds.encode(encoding='utf-8')
         _, err, _ = node1.run_cqlsh(cmds=cmds)
 
         assert 'Invalid syntax' in err
@@ -492,8 +485,6 @@ UPDATE varcharmaptable SET varcharvarintmap['Vitrum edere possum, mihi non nocet
         node1, = self.cluster.nodelist()
 
         cmd = '''create keyspace "ä" WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'};'''
-        if six.PY2:
-            cmd = cmd.encode(encoding='utf-8')
         _, err, _ = node1.run_cqlsh(cmds=cmd, cqlsh_options=["--debug"])
 
         if self.cluster.version() >= LooseVersion('4.0'):
@@ -566,14 +557,10 @@ INSERT INTO has_all_types (num, intcol, asciicol, bigintcol, blobcol, booleancol
 VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDecimal(0x),
         blobAsDouble(0x), blobAsFloat(0x), '', blobAsTimestamp(0x), blobAsUuid(0x), '',
         blobAsVarint(0x))"""
-        if six.PY2:
-            cmds = cmds.encode(encoding='utf-8')
 
         node1.run_cqlsh(cmds=cmds)
 
         select_cmd = "select intcol, bigintcol, varintcol from CASSANDRA_7196.has_all_types where num in (0, 1, 2, 3, 4)"
-        if six.PY2:
-            select_cmd = select_cmd.encode(encoding='utf-8')
         output, err = self.run_cqlsh(node1, cmds=select_cmd)
 
         if common.is_win():
