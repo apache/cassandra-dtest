@@ -2,7 +2,7 @@ from __future__ import unicode_literals
 
 import csv
 import random
-import six
+from typing import List
 
 import cassandra
 
