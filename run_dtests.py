@@ -109,9 +109,9 @@ class RunDTests():
         logger.debug('Generating configurations from the following matrix:\n\t{}'.format(args))
 
         args_to_invoke_pytest = []
-        if args.pytest_options:
-            for arg in args.pytest_options.split(" "):
-                args_to_invoke_pytest.append("'{the_arg}'".format(the_arg=arg))
+        # if args.pytest_options:
+        #     for arg in args.pytest_options.split(" "):
+        #         args_to_invoke_pytest.append("'{the_arg}'".format(the_arg=arg))
 
         for arg in argv:
             if arg.startswith("--pytest-options") or arg.startswith("--dtest-"):
