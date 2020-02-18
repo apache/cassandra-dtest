@@ -879,6 +879,27 @@ CREATE AGGREGATE test.average(int)
         # describe aggregate functions
         self.execute(cql='DESCRIBE AGGREGATE test.average', expected_output=describe_aggregate_expected)
 
+    @since('4.0')
+    def test_default_keyspaces_exist(self):
+        self.cluster.populate(1)
+        self.cluster.start(wait_for_binary_proto=True)
+        node1, = self.cluster.nodelist()
+
+        # Describe keyspaces
+        expected_keyspaces = ['system_schema', 'system', 'system_traces', 'system_views',
+                              'system_auth', 'system_distributed', 'system_virtual_schema']
+
+        node1, = self.cluster.nodelist()
+        output, err = self.run_cqlsh(node1, "DESCRIBE KEYSPACES")
+
+        if err:
+            assert False, err
+
+        stripped_response = re.sub("(\n|\t|\s+)", " ", output).strip()
+        keyspaces = stripped_response.split(" ")
+
+        assert sorted(keyspaces) == sorted(expected_keyspaces)
+
     def test_describe_types(self):
         """Test DESCRIBE statements for user defined datatypes"""
         self.cluster.populate(1)
