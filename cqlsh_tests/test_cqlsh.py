@@ -859,15 +859,6 @@ CREATE OR REPLACE AGGREGATE test.average(int)
     FINALFUNC average_final
     INITCOND (0, 0)
 """
-        # the expected output of a DESCRIBE AGGREGATE statement
-        # does not look like a valid CREATE AGGREGATE statement
-        describe_aggregate_expected = """
-CREATE AGGREGATE test.average(int)
-    SFUNC average_state
-    STYPE frozen<tuple<int, bigint>>
-    FINALFUNC average_final
-    INITCOND (0, 0);
-"""
 
         # create keyspace, scalar function, and aggregate function
         self.execute(cql=create_ks_statement)
@@ -877,7 +868,25 @@ CREATE AGGREGATE test.average(int)
         # describe scalar functions
         self.execute(cql='DESCRIBE FUNCTION test.some_function', expected_output='{};'.format(create_function_statement))
         # describe aggregate functions
-        self.execute(cql='DESCRIBE AGGREGATE test.average', expected_output=describe_aggregate_expected)
+        self.execute(cql='DESCRIBE AGGREGATE test.average', expected_output=self.get_describe_aggregate_output())
+
+    def get_describe_aggregate_output(self):
+        if self.cluster.version() >= LooseVersion("4.0"):
+            return """
+                CREATE AGGREGATE test.average(int)
+                    SFUNC average_state
+                    STYPE tuple<int, bigint>
+                    FINALFUNC average_final
+                    INITCOND (0, 0);
+                """
+
+        return """
+        CREATE AGGREGATE test.average(int)
+            SFUNC average_state
+            STYPE frozen<tuple<int, bigint>>
+            FINALFUNC average_final
+            INITCOND (0, 0);
+        """
 
     @since('4.0')
     def test_default_keyspaces_exist(self):
@@ -1001,19 +1010,19 @@ CREATE TYPE test.address_type (
         if self.cluster.version() >= LooseVersion('4.0'):
             create_table += """
         ) WITH CLUSTERING ORDER BY (col ASC)
+            AND additional_write_policy = '99p'
             AND bloom_filter_fp_chance = 0.01
             AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
             AND comment = ''
             AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32', 'min_threshold': '4'}
             AND compression = {'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
             AND crc_check_chance = 1.0
-            AND dclocal_read_repair_chance = 0.0
             AND default_time_to_live = 0
             AND gc_grace_seconds = 864000
             AND max_index_interval = 2048
             AND memtable_flush_period_in_ms = 0
             AND min_index_interval = 128
-            AND read_repair_chance = 0.0
+            AND read_repair = 'BLOCKING'
             AND speculative_retry = '99p';
         """
         elif self.cluster.version() >= LooseVersion('3.9'):
@@ -1088,19 +1097,19 @@ CREATE TYPE test.address_type (
             age int,
             firstname text,
             lastname text
-        ) WITH bloom_filter_fp_chance = 0.01
+        ) WITH additional_write_policy = '99p'
+            AND bloom_filter_fp_chance = 0.01
             AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
             AND comment = ''
             AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32', 'min_threshold': '4'}
             AND compression = {'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
             AND crc_check_chance = 1.0
-            AND dclocal_read_repair_chance = 0.0
             AND default_time_to_live = 0
             AND gc_grace_seconds = 864000
             AND max_index_interval = 2048
             AND memtable_flush_period_in_ms = 0
             AND min_index_interval = 128
-            AND read_repair_chance = 0.0
+            AND read_repair = 'BLOCKING'
             AND speculative_retry = '99p';
         """
         elif self.cluster.version() >= LooseVersion('3.9'):
@@ -1192,19 +1201,19 @@ CREATE TYPE test.address_type (
                 WHERE state IS NOT NULL AND username IS NOT NULL
                 PRIMARY KEY (state, username)
                 WITH CLUSTERING ORDER BY (username ASC)
+                AND additional_write_policy = '99p'
                 AND bloom_filter_fp_chance = 0.01
                 AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
                 AND comment = ''
                 AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32', 'min_threshold': '4'}
                 AND compression = {'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
                 AND crc_check_chance = 1.0
-                AND dclocal_read_repair_chance = 0.0
                 AND default_time_to_live = 0
                 AND gc_grace_seconds = 864000
                 AND max_index_interval = 2048
                 AND memtable_flush_period_in_ms = 0
                 AND min_index_interval = 128
-                AND read_repair_chance = 0.0
+                AND read_repair = 'BLOCKING'
                 AND speculative_retry = '99p';
                """
         elif self.cluster.version() >= LooseVersion('3.9'):
