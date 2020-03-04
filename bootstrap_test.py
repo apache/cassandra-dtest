@@ -481,8 +481,9 @@ class TestBootstrap(Tester):
                           'ops(insert=1)', '-rate', 'threads=10'])
 
             node3 = new_node(cluster, data_center='dc2')
-            node3.start(no_wait=True)
-            time.sleep(3)
+            node3.start(jvm_args=["-Dcassandra.write_survey=true"], no_wait=True)
+            time.sleep(5)
+
 
             ntout = node1.nodetool('status').stdout
             assert re.search(r'UJ\s+' + node3.ip_addr, ntout), ntout
