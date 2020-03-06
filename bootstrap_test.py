@@ -336,50 +336,6 @@ class TestBootstrap(Tester):
             assert_not_running(node3)
 
     @since('2.2')
-    def test_resumable_bootstrap(self):
-        """
-        Test resuming bootstrap after data streaming failure
-        """
-        cluster = self.cluster
-        cluster.populate(2)
-
-        node1 = cluster.nodes['node1']
-        # set up byteman
-        node1.byteman_port = '8100'
-        node1.import_config_files()
-
-        cluster.start(wait_other_notice=True)
-        # kill stream to node3 in the middle of streaming to let it fail
-        if cluster.version() < '4.0':
-            node1.byteman_submit([self.byteman_submit_path_pre_4_0])
-        else:
-            node1.byteman_submit([self.byteman_submit_path_4_0])
-        node1.stress(['write', 'n=1K', 'no-warmup', 'cl=TWO', '-schema', 'replication(factor=2)', '-rate', 'threads=50'])
-        cluster.flush()
-
-        # start bootstrapping node3 and wait for streaming
-        node3 = new_node(cluster)
-        node3.start(wait_other_notice=False)
-
-        # let streaming fail as we expect
-        node3.watch_log_for('Some data streaming failed')
-
-        # bring back node3 and invoke nodetool bootstrap to resume bootstrapping
-        node3.nodetool('bootstrap resume')
-        node3.wait_for_binary_interface()
-        assert_bootstrap_state(self, node3, 'COMPLETED')
-
-        # cleanup to guarantee each node will only have sstables of its ranges
-        cluster.cleanup()
-
-        logger.debug("Check data is present")
-        # Let's check stream bootstrap completely transferred data
-        stdout, stderr, _ = node3.stress(['read', 'n=1k', 'no-warmup', '-schema', 'replication(factor=2)', '-rate', 'threads=8'])
-
-        if stdout is not None:
-            assert "FAILURE" not in stdout
-
-    @since('2.2')
     def test_bootstrap_with_reset_bootstrap_state(self):
         """Test bootstrap with resetting bootstrap progress"""
         cluster = self.cluster
@@ -752,10 +708,13 @@ class TestBootstrap(Tester):
         shutil.rmtree(commitlog_dir)
 
     @since('2.2')
-    def test_bootstrap_binary_disabled(self):
+    def test_bootstrap_binary_disabled_resumable_bootstrap(self):
         """
         Test binary while bootstrapping and streaming fails
         @jira_ticket CASSANDRA-14526, CASSANDRA-14525
+        Test resumable bootstrap
+        In very rare cases this test might fail because the bootstrap completes before the streaming failure
+        @jira_ticket CASSANDRA-15614
         """
         config = {'authenticator': 'org.apache.cassandra.auth.PasswordAuthenticator',
                   'authorizer': 'org.apache.cassandra.auth.CassandraAuthorizer',
@@ -786,8 +745,8 @@ class TestBootstrap(Tester):
         node2.byteman_port = '8101' # set for when we add node3
         node2.import_config_files()
         node2.start(jvm_args=["-Dcassandra.ring_delay_ms=5000"], wait_other_notice=True)
-        self.assert_log_had_msg(node2, 'Some data streaming failed', timeout=30)
-        self.assert_log_had_msg(node2, 'Not starting client transports as bootstrap has not completed', timeout=30)
+        self.assert_log_had_msg(node2, 'Some data streaming failed')
+        self.assert_log_had_msg(node2, 'Not starting client transports as bootstrap has not completed')
 
         try:
             node2.nodetool('join')
@@ -811,8 +770,8 @@ class TestBootstrap(Tester):
             node1.byteman_submit([self.byteman_submit_path_4_0])
             node2.byteman_submit([self.byteman_submit_path_4_0])
         node3.start(jvm_args=["-Dcassandra.write_survey=true", "-Dcassandra.ring_delay_ms=5000"], wait_other_notice=True)
-        self.assert_log_had_msg(node3, 'Some data streaming failed', timeout=30)
-        self.assert_log_had_msg(node3, "Not starting client transports in write_survey mode as it's bootstrapping or auth is enabled", timeout=30)
+        self.assert_log_had_msg(node3, 'Some data streaming failed')
+        self.assert_log_had_msg(node3, "Not starting client transports in write_survey mode as it's bootstrapping or auth is enabled")
 
         try:
             node3.nodetool('join')
@@ -821,10 +780,10 @@ class TestBootstrap(Tester):
             assert "Cannot join the ring until bootstrap completes" in t.stdout
 
         node3.nodetool('bootstrap resume')
-        self.assert_log_had_msg(node3, "Not starting client transports in write_survey mode as it's bootstrapping or auth is enabled", timeout=30)
+        self.assert_log_had_msg(node3, "Not starting client transports in write_survey mode as it's bootstrapping or auth is enabled")
 
         # Should succeed in joining
         node3.nodetool('join')
-        self.assert_log_had_msg(node3, "Leaving write survey mode and joining ring at operator request", timeout=30)
+        self.assert_log_had_msg(node3, "Leaving write survey mode and joining ring at operator request")
         assert_bootstrap_state(self, node3, 'COMPLETED', user='cassandra', password='cassandra')
-        node3.wait_for_binary_interface(timeout=30)
+        node3.wait_for_binary_interface()
