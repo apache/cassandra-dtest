@@ -348,7 +348,7 @@ class TestSnitchConfigurationUpdate(Tester):
                     m = regex.match(line)
                     if m:
                         racks.append(m.group(1))
-
+                racks.sort() #order is not deterministic
                 if racks == expected_racks:
                     # great, the topology change is propagated
                     logger.debug("Topology change detected on node {}".format(i))
