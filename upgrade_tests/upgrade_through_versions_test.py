@@ -342,6 +342,13 @@ class TestUpgrade(Tester):
 
             # upgrade through versions
             for version_meta in self.test_version_metas[1:]:
+                if version_meta.family > '3.11' and internode_ssl:
+                    seeds =[]
+                    for seed in cluster.seeds:
+                        seeds.append(seed.ip_addr + ':7001')
+                    logger.debug("Forcing seeds to 7001 for internode ssl")
+                    cluster.seeds = seeds
+
                 for num, node in enumerate(self.cluster.nodelist()):
                     # sleep (sigh) because driver needs extra time to keep up with topo and make quorum possible
                     # this is ok, because a real world upgrade would proceed much slower than this programmatic one
@@ -453,7 +460,7 @@ class TestUpgrade(Tester):
             logger.debug('Starting %s on new version (%s)' % (node.name, version_meta.version))
             # Setup log4j / logback again (necessary moving from 2.0 -> 2.1):
             node.set_log_level("INFO")
-            node.start(wait_other_notice=240, wait_for_binary_proto=True)
+            node.start(wait_other_notice=400, wait_for_binary_proto=True)
             node.nodetool('upgradesstables -a')
 
     def _log_current_ver(self, current_version_meta):
