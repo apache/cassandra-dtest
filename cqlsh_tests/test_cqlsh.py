@@ -2003,6 +2003,27 @@ Tracing session:""")
         assert 0 == len(stderr), stderr
         assert 0 == len(stdout), stdout
 
+    @since('3.0')
+    def test_execute_statement(self):
+        """
+        Test: cqlsh -e "<STATEMENT>"
+        @jira_ticket CASSANDRA-15660
+        """
+        self.cluster.populate(1)
+        self.cluster.start(wait_for_binary_proto=True)
+        node1, = self.cluster.nodelist()
+        session = self.patient_cql_connection(node1)
+
+        session.execute("CREATE KEYSPACE ks WITH REPLICATION={'class':'SimpleStrategy','replication_factor':1};")
+        session.execute("CREATE TABLE ks.cf (id int primary key);")
+
+        stdout, stderr = self.run_cqlsh(node1, cmds="", cqlsh_options=['-e', 'INSERT INTO ks.cf (id) VALUES (0);'])
+
+        assert 0 == len(stderr), stderr
+        assert 0 == len(stdout), stdout
+
+        assert_all(session, "SELECT * FROM ks.cf", [[0]])
+
     def run_cqlsh(self, node, cmds, cqlsh_options=None, env_vars=None):
         """
         Local version of run_cqlsh to open a cqlsh subprocess with
