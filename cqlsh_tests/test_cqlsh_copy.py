@@ -237,7 +237,10 @@ class TestCqlshCopy(Tester):
                 u frozen<list<list<address_type>>>,
                 v frozen<map<map<int,int>,set<text>>>,
                 w frozen<set<set<inet>>>,
-                x map<text, frozen<list<text>>>
+                x map<text, frozen<list<text>>>,
+                y map<int, blob>,
+                z list<blob>,
+                aa set<blob>
             )''')
 
         self.session.cluster.register_user_type('ks', 'name_type', Name)
@@ -282,7 +285,10 @@ class TestCqlshCopy(Tester):
                      # and this will cause comparison problems when comparing with csv strings therefore failing
                      # some tests
                      ImmutableSet([ImmutableSet(['127.0.0.1']), ImmutableSet(['127.0.0.1', '127.0.0.2'])]),
-                     {'key1': ['value1', 'value2']}  # map<text, frozen<list<text>>>
+                     {'key1': ['value1', 'value2']},  # map<text, frozen<list<text>>>
+                     {3: bytes.fromhex('74776f')},  # y
+                     [bytes.fromhex('74776f')],  # z
+                     {bytes.fromhex('74776f')}  # aa
                      )
 
     @contextmanager
@@ -1751,8 +1757,8 @@ class TestCqlshCopy(Tester):
         self.all_datatypes_prepare()
 
         insert_statement = self.session.prepare(
-            """INSERT INTO testdatatype (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""")
+            """INSERT INTO testdatatype (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, aa)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""")
         self.session.execute(insert_statement, self.data)
 
         def _test(prepared_statements):
@@ -1788,8 +1794,14 @@ class TestCqlshCopy(Tester):
             writer = csv.writer(csvfile)
             # serializing blob bytearray in friendly format
             data_set = list(self.data)
-            data_set[2] = '0x{}'.format(''.join('%02x' % c for c in self.data[2]))
+            data_set[2] = _format_blob(self.data[2])
+            data_set[25][3] =  _format_blob(self.data[25][3])
+            data_set[26] = [_format_blob(el) for el in self.data[26]]
+            data_set[27] = {_format_blob(el) for el in self.data[27]}
             writer.writerow(data_set)
+
+        def _format_blob(blob):
+            return '0x{}'.format(''.join('%02x' % c for c in self.data[2]))
 
         def _test(prepared_statements):
             logger.debug('Importing from csv file: {name}'.format(name=tempfile.name))
@@ -1822,8 +1834,8 @@ class TestCqlshCopy(Tester):
         self.all_datatypes_prepare()
 
         insert_statement = self.session.prepare(
-            """INSERT INTO testdatatype (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""")
+            """INSERT INTO testdatatype (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, aa)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""")
         self.session.execute(insert_statement, self.data)
 
         tempfile = self.get_temp_file()
