@@ -260,7 +260,10 @@ class TestCqlshCopy(Tester):
                 u frozen<list<list<address_type>>>,
                 v frozen<map<map<int,int>,set<text>>>,
                 w frozen<set<set<inet>>>,
-                x map<text, frozen<list<text>>>
+                x map<text, frozen<list<text>>>,
+                y map<int, blob>,
+                z list<blob>,
+                za set<blob>
             )''')
 
         self.session.cluster.register_user_type('ks', 'name_type', Name)
@@ -302,7 +305,10 @@ class TestCqlshCopy(Tester):
                      # and this will cause comparison problems when comparing with csv strings therefore failing
                      # some tests
                      ImmutableSet([ImmutableSet(['127.0.0.1']), ImmutableSet(['127.0.0.1', '127.0.0.2'])]),
-                     {'key1': ['value1', 'value2']}  # map<text, frozen<list<text>>>
+                     {'key1': ['value1', 'value2']},  # map<text, frozen<list<text>>>
+                     {3: bytes.fromhex('74776f')},  # y
+                     [bytes.fromhex('74776f')],  # z
+                     {bytes.fromhex('74776f')}  # za
                      )
 
     def assertCsvResultEqual(self, csv_filename, results, table_name=None,
@@ -1649,12 +1655,11 @@ class TestCqlshCopy(Tester):
 
         @jira_ticket CASSANDRA-9302
         """
-
         self.all_datatypes_prepare()
 
         insert_statement = self.session.prepare(
-            """INSERT INTO testdatatype (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""")
+            """INSERT INTO testdatatype (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, za)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""")
         self.session.execute(insert_statement, self.data)
 
         def _test(prepared_statements):
@@ -1691,13 +1696,20 @@ class TestCqlshCopy(Tester):
             writer = csv.writer(csvfile)
             # serializing blob bytearray in friendly format
             data_set = list(self.data)
+
             data_set[2] = self.format_blob(self.data[2])
+            # Here we convert containers of blobs to strings that match exactly the output of the SELECT *
+            # because otherwise the comparison fails due to extra quotes added by the csv writer around the blobs
+            # that were converted to strings. White spaces do matter
+            data_set[24] = '{3: ' + self.format_blob(self.data[24][3]) + '}'
+            data_set[25] = '[' + ', '.join(self.format_blob(b) for b in self.data[25]) + ']'
+            data_set[26] = '{' + ', '.join(self.format_blob(b) for b in self.data[26]) + '}'
             writer.writerow(data_set)
 
         def _test(prepared_statements):
             logger.debug('Importing from csv file: {name}'.format(name=tempfile.name))
             out, err, _ = self.run_cqlsh(cmds="COPY ks.testdatatype FROM '{}' WITH PREPAREDSTATEMENTS = {}"
-                              .format(tempfile.name, prepared_statements))
+                           .format(tempfile.name, prepared_statements))
 
             out, err, _ = self.run_cqlsh(cmds="SELECT * FROM ks.testdatatype")
             results = self.parse_cqlsh_query(out=out, num_cols=len(self.data), timestamps_to_be_rounded=[10, 17])
@@ -1725,8 +1737,8 @@ class TestCqlshCopy(Tester):
         self.all_datatypes_prepare()
 
         insert_statement = self.session.prepare(
-            """INSERT INTO testdatatype (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""")
+            """INSERT INTO testdatatype (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, za)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""")
         self.session.execute(insert_statement, self.data)
 
         tempfile = self.get_temp_file()
