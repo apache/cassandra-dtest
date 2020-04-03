@@ -1805,7 +1805,6 @@ class TestCqlshCopy(Tester):
             data_set[24] = '{3: ' + _format_blob(self.data[24][3]) + '}'
             data_set[25] = '[' + ', '.join(_format_blob(b) for b in self.data[25]) + ']'
             data_set[26] = '{' + ', '.join(_format_blob(b) for b in self.data[26]) + '}'
-            # logger.debug('{}'.format(data_set))
             writer.writerow(data_set)
 
         def _test(prepared_statements):
