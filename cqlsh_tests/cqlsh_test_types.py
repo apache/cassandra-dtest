@@ -1,29 +1,12 @@
 import datetime
-import sys
+import logging
+import re
 
 from collections import namedtuple
-from contextlib import contextmanager
 
 from cassandra.util import SortedSet
 
-
-@contextmanager
-def _cqlshlib(cqlshlib_path):
-    """
-    Returns the cqlshlib module found at the specified path.
-    """
-    # This method accomplishes its goal by manually adding the library to
-    # sys.path, returning the module, then restoring the old path once the
-    # context manager exits. This isn't great for maintainability and should
-    # be replaced if cqlshlib is made easier to interact with.
-    saved_path = list(sys.path)
-
-    try:
-        sys.path = sys.path + [cqlshlib_path]
-        import cqlshlib
-        yield cqlshlib
-    finally:
-        sys.path = saved_path
+logger = logging.getLogger(__name__)
 
 
 def maybe_quote(s):
@@ -52,21 +35,33 @@ class Address(namedtuple('Address', ('name', 'number', 'street', 'phones'))):
                                                                            phones_str)
 
 
+def drop_microseconds(val):
+    """
+    For COPY TO, we need to round microsecond to milliseconds because server side
+    TimestampSerializer.dateStringPatterns only parses milliseconds. If we keep microseconds,
+    users may try to import with COPY FROM a file generated with COPY TO and have problems if
+    prepared statements are disabled, see CASSANDRA-11631.
+    """
+    def drop_micros(m):
+        return m.group(0)[:12] + '+'
+
+    # Matches H:MM:SS.000000+ and drops the last 3 digits before the +
+    ret = re.sub('\\d{2}\\:\\d{2}\\:\\d{2}\\.(\\d{6})\\+', drop_micros, val)
+    logger.debug("Rounded microseconds: {} -> {}".format(val, ret))
+    return ret
+
+
 class Datetime(datetime.datetime):
     """
     Extend standard datetime.datetime class with cql formatting.
     This could be cleaner if this class was declared inside TestCqlshCopy, but then pickle
     wouldn't have access to the class.
     """
-    def __new__(cls, year, month, day, hour=0, minute=0, second=0, microsecond=0, tzinfo=None, cqlshlib_path=None):
+    def __new__(cls, year, month, day, hour=0, minute=0, second=0, microsecond=0, tzinfo=None,
+                time_format='%Y-%m-%d %H:%M:%S%z', round_timestamp=True):
         self = datetime.datetime.__new__(cls, year, month, day, hour, minute, second, microsecond, tzinfo)
-        if (cqlshlib_path is not None):
-            with _cqlshlib(cqlshlib_path) as cqlshlib:
-                from cqlshlib.formatting import DEFAULT_TIMESTAMP_FORMAT, round_microseconds
-                self.default_time_format = DEFAULT_TIMESTAMP_FORMAT
-                self.round_microseconds = round_microseconds
-        else:
-            self.default_time_format = '%Y-%m-%d %H:%M:%S%z'
+        self.default_time_format = time_format
+        self.round_timestamp = round_timestamp
         return self
 
     def __repr__(self):
@@ -77,8 +72,7 @@ class Datetime(datetime.datetime):
 
     def _format_for_csv(self):
         ret = self.strftime(self.default_time_format)
-        return self.round_microseconds(ret) if self.round_microseconds else ret
-
+        return drop_microseconds(ret) if self.round_timestamp else ret
 
 class ImmutableDict(frozenset):
     """
