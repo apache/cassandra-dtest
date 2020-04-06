@@ -60,13 +60,14 @@ class Datetime(datetime.datetime):
     """
     def __new__(cls, year, month, day, hour=0, minute=0, second=0, microsecond=0, tzinfo=None, cqlshlib_path=None):
         self = datetime.datetime.__new__(cls, year, month, day, hour, minute, second, microsecond, tzinfo)
-        if (cqlshlib_path is not None):
+        try:
             with _cqlshlib(cqlshlib_path) as cqlshlib:
                 from cqlshlib.formatting import DEFAULT_TIMESTAMP_FORMAT, round_microseconds
                 self.default_time_format = DEFAULT_TIMESTAMP_FORMAT
                 self.round_microseconds = round_microseconds
-        else:
+        except:
             self.default_time_format = '%Y-%m-%d %H:%M:%S%z'
+            self.round_microseconds = None
         return self
 
     def __repr__(self):
