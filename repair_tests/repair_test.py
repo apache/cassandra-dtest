@@ -1171,6 +1171,12 @@ class TestRepair(BaseRepairTest):
             "failed to send a stream message/data to peer"
         ]
 
+        # stream session will be closed upon EOF, see CASSANDRA-15666
+        if cluster.version() >= '4.0':
+            self.ignore_log_patterns.append("Socket closed before session completion")
+            self.ignore_log_patterns.append("is finished with state FAILED")
+            self.ignore_log_patterns.append("stream has been closed")
+
         # Disable hinted handoff and set batch commit log so this doesn't
         # interfere with the test (this must be after the populate)
         cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
