@@ -34,9 +34,9 @@ bootstrap your development environment and then use [Homebrew](https://brew.sh)
 
 ### Python Dependencies
 There are multiple external Python dependencies required to run DTests. 
-The current Python depenendcy list is maintained in a file named 
+The current Python dependency list is maintained in a file named
 [requirements.txt](https://github.com/apache/cassandra-dtest/blob/master/requirements.txt) 
-in the root of the cassandra-dtest repository.
+in the root of the `cassandra-dtest` repository.
 
 The easiest way to install these dependencies is with pip and virtualenv. 
 
@@ -73,7 +73,7 @@ Use ccm ability to download/compile released sources from archives.apache.org:
     pytest --cassandra-version=1.0.0
 
 A convenient option if tests are regularly run against the same existing
-directory is to set a `cassandra_dir` in `~/path/to/cassandra-dtest/pytest.ini`:
+directory is to set `cassandra_dir` in `~/path/to/cassandra-dtest/pytest.ini`:
 
     [pytest]
     cassandra_dir=~/path/to/cassandra
@@ -97,11 +97,6 @@ better suggestions).
 To run the upgrade tests, you have must both JDK7 and JDK8 installed. Paths
 to these installations should be defined in the environment variables
 JAVA7_HOME and JAVA8_HOME, respectively.
-
-Installation Instructions
--------------------------
-
-See more detailed instructions in the included [INSTALL file](https://github.com/apache/cassandra-dtest/blob/master/INSTALL.md).
 
 Writing Tests
 -------------

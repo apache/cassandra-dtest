@@ -62,6 +62,11 @@ def pytest_addoption(parser):
                           "(e.g. the path to the root of a cloned C* git directory. Before executing dtests using "
                           "this directory you must build C* with 'ant clean jar'). If you're doing C* development and "
                           "want to run the tests this is almost always going to be the correct option.")
+    parser.addini("cassandra_dir", default=None,
+                  help="The directory containing the built C* artifacts to run the tests against. "
+                       "(e.g. the path to the root of a cloned C* git directory. Before executing dtests using "
+                       "this directory you must build C* with 'ant clean jar'). If you're doing C* development and "
+                       "want to run the tests this is almost always going to be the correct option.")
     parser.addoption("--cassandra-version", action="store", default=None,
                      help="A specific C* version to run the dtests against. The dtest framework will "
                           "pull the required artifacts for this version.")
@@ -432,12 +437,13 @@ def pytest_collection_modifyitems(items, config):
     of the test items within the list
     """
     collect_only = config.getoption("--collect-only")
-    cassandra_dir = config.getoption("--cassandra-dir")
+    cassandra_dir = config.getoption("--cassandra-dir") or config.getini("cassandra_dir")
     cassandra_version = config.getoption("--cassandra-version")
     if not collect_only and cassandra_dir is None:
         if  cassandra_version is None:
             raise Exception("Required dtest arguments were missing! You must provide either --cassandra-dir "
-                            "or --cassandra-version. Refer to the documentation or invoke the help with --help.")
+                            "or --cassandra-version. You can also set 'cassandra_dir' in pytest.ini. "
+                            "Refer to the documentation or invoke the help with --help.")
 
     # Either cassandra_version or cassandra_dir is defined, so figure out the version
     CASSANDRA_VERSION = cassandra_version or get_version_from_build(cassandra_dir)
