@@ -62,7 +62,7 @@ def set_version_family():
     # strategy as the actual checkout code in Tester.setUp; if it does not, that is
     # a bug.
     cassandra_version_slug = CONFIG.getoption("--cassandra-version")
-    cassandra_dir = CONFIG.getoption("--cassandra-dir")
+    cassandra_dir = CONFIG.getoption("--cassandra-dir") or CONFIG.getini("cassandra_dir")
     # Prefer CASSANDRA_VERSION if it's set in the environment. If not, use CASSANDRA_DIR
     if cassandra_version_slug:
         # fetch but don't build the specified C* version
