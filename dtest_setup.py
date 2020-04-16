@@ -121,7 +121,7 @@ class DTestSetup(object):
 
         for nodename, errors in list(errordata.items()):
             filtered_errors = list(self.__filter_errors(['\n'.join(msg) for msg in errors]))
-            if len(filtered_errors) is not 0:
+            if len(filtered_errors) != 0:
                 reportable_errordata[nodename] = filtered_errors
 
         # no errors worthy of halting the test
@@ -149,7 +149,7 @@ class DTestSetup(object):
         logs = [(node.name, node.logfilename(), node.debuglogfilename(), node.gclogfilename(),
                  node.compactionlogfilename())
                 for node in self.cluster.nodelist()]
-        if len(logs) is not 0:
+        if len(logs) != 0:
             basedir = str(int(time.time() * 1000)) + '_' + str(id(self))
             logdir = os.path.join(directory, basedir)
             os.mkdir(logdir)
@@ -283,7 +283,7 @@ class DTestSetup(object):
         for node in self.cluster.nodelist():
             errors = list(self.__filter_errors(
                 ['\n'.join(msg) for msg in node.grep_log_for_errors()]))
-            if len(errors) is not 0:
+            if len(errors) != 0:
                 for error in errors:
                     print("Unexpected error in {node_name} log, error: \n{error}".format(node_name=node.name, error=error))
                 return True

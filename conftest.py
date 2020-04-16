@@ -209,7 +209,7 @@ def check_logs_for_errors(dtest_setup):
     errors = []
     for node in dtest_setup.cluster.nodelist():
         errors = list(_filter_errors(dtest_setup, ['\n'.join(msg) for msg in node.grep_log_for_errors()]))
-        if len(errors) is not 0:
+        if len(errors) != 0:
             for error in errors:
                 if isinstance(error, (bytes, bytearray)):
                     error_str = error.decode("utf-8").strip()
@@ -242,7 +242,7 @@ def copy_logs(request, cluster, directory=None, name=None):
         os.mkdir(directory)
     logs = [(node.name, node.logfilename(), node.debuglogfilename(), node.gclogfilename(), node.compactionlogfilename())
             for node in list(cluster.nodes.values())]
-    if len(logs) is not 0:
+    if len(logs) != 0:
         basedir = str(int(time.time() * 1000)) + '_' + request.node.name
         logdir = os.path.join(directory, basedir)
         os.mkdir(logdir)

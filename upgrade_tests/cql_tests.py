@@ -1182,7 +1182,7 @@ class TestCQL(UpgradeTester):
 
             cursor.execute("DELETE FROM test WHERE k=2")
 
-            assert_all(cursor, "SELECT k FROM test", [[k] for k in range(0, 5) if k is not 2], ignore_order=True)
+            assert_all(cursor, "SELECT k FROM test", [[k] for k in range(0, 5) if k != 2], ignore_order=True)
 
             # Example from #3505
             cursor.execute("USE ks1")
