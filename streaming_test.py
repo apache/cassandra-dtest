@@ -88,7 +88,6 @@ class TestStreaming(Tester):
     def test_zerocopy_streaming_leveled_compaction(self):
         self._test_streaming(op_zerocopy=operator.gt, op_partial=operator.gt, num_zerocopy=1, num_partial=1, rf=2)
 
-    @mark.xfail(reason="Not implemented yet. Should be functional after CASSANDRA-10540, CASSANDRA-14586 are fixed.")
     @since('4.0')
     def test_zerocopy_streaming_size_tiered_compaction(self):
         self._test_streaming(op_zerocopy=operator.gt, op_partial=operator.gt, num_zerocopy=1, num_partial=1, rf=2,
