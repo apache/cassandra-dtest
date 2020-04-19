@@ -7,6 +7,8 @@ from pytest import mark
 
 from dtest import Tester, create_ks, create_cf
 from tools.data import insert_c1c2
+from tools.misc import generate_ssl_stores
+from itertools import product
 
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
@@ -35,11 +37,19 @@ class TestStreaming(Tester):
             r'Streaming error occurred'
         )
 
-    def _test_streaming(self, op_zerocopy, op_partial, num_partial, num_zerocopy,
-                        compaction_strategy='LeveledCompactionStrategy', num_keys=1000, rf=3, num_nodes=3):
-        keys = num_keys
+    def setup_internode_ssl(self, cluster):
+        logger.debug("***using internode ssl***")
+        generate_ssl_stores(self.fixture_dtest_setup.test_path)
+        cluster.enable_internode_ssl(self.fixture_dtest_setup.test_path)
 
+    def _test_streaming(self, op_zerocopy, op_partial, num_partial, num_zerocopy,
+                        compaction_strategy='LeveledCompactionStrategy', num_keys=1000, rf=3, num_nodes=3, ssl=False):
+        keys = num_keys
         cluster = self.cluster
+
+        if ssl:
+            self.setup_internode_ssl(cluster)
+
         tokens = cluster.balanced_tokens(num_nodes)
         cluster.set_configuration_options(values={'endpoint_snitch': 'org.apache.cassandra.locator.PropertyFileSnitch'})
         cluster.set_configuration_options(values={'num_tokens': 1})
@@ -80,18 +90,15 @@ class TestStreaming(Tester):
                                                                                 partial_streamed_sstable)
 
     @since('4.0')
+    @pytest.mark.parametrize('ssl,compaction_strategy', product(['SSL', 'NoSSL'], ['LeveledCompactionStrategy', 'SizeTieredCompactionStrategy']))
+    def test_zerocopy_streaming(self, ssl, compaction_strategy):
+        self._test_streaming(op_zerocopy=operator.gt, op_partial=operator.gt, num_zerocopy=1, num_partial=1, rf=2,
+                             num_nodes=3, ssl=(ssl == 'SSL'), compaction_strategy=compaction_strategy)
+
+    @since('4.0')
     def test_zerocopy_streaming(self):
         self._test_streaming(op_zerocopy=operator.gt, op_partial=operator.eq, num_zerocopy=1, num_partial=0,
                              num_nodes=2, rf=2)
-
-    @since('4.0')
-    def test_zerocopy_streaming_leveled_compaction(self):
-        self._test_streaming(op_zerocopy=operator.gt, op_partial=operator.gt, num_zerocopy=1, num_partial=1, rf=2)
-
-    @since('4.0')
-    def test_zerocopy_streaming_size_tiered_compaction(self):
-        self._test_streaming(op_zerocopy=operator.gt, op_partial=operator.gt, num_zerocopy=1, num_partial=1, rf=2,
-                             num_nodes=3, compaction_strategy='SizeTieredCompactionStrategy')
 
     @since('4.0')
     def test_zerocopy_streaming_no_replication(self):
