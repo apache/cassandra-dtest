@@ -55,6 +55,8 @@ def pytest_addoption(parser):
                      help="Control the number of data directories to create per instance")
     parser.addoption("--force-resource-intensive-tests", action="store_true", default=False,
                      help="Forces the execution of tests marked as resource_intensive")
+    parser.addoption("--only-resource-intensive-tests", action="store_true", default=False,
+                     help="Only run tests marked as resource_intensive")
     parser.addoption("--skip-resource-intensive-tests", action="store_true", default=False,
                      help="Skip all tests marked as resource_intensive")
     parser.addoption("--cassandra-dir", action="store", default=None,
@@ -475,6 +477,13 @@ def pytest_collection_modifyitems(items, config):
                 if not sufficient_system_resources_resource_intensive:
                     deselect_test = True
                     logger.info("SKIP: Deselecting resource_intensive test %s due to insufficient system resources" % item.name)
+
+        if not item.get_closest_marker("resource_intensive") and not collect_only:
+            only_resource_intensive = config.getoption("--only-resource-intensive-tests")
+            if only_resource_intensive:
+                deselect_test = True
+                logger.info("SKIP: Deselecting non resource_intensive test %s as --only-resource-intensive-tests specified" % item.name)
+
 
         if item.get_closest_marker("no_vnodes"):
             if config.getoption("--use-vnodes"):
