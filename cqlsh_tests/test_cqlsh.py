@@ -8,7 +8,6 @@ import datetime
 import locale
 import os
 import re
-import six
 import subprocess
 import sys
 import logging
@@ -30,6 +29,7 @@ from dtest_setup_overrides import DTestSetupOverrides
 from tools.assertions import assert_all, assert_none
 from tools.data import create_c1c2_table, insert_c1c2, rows_to_list
 from tools.misc import ImmutableMapping
+from . import util
 
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
@@ -468,8 +468,8 @@ UPDATE varcharmaptable SET varcharvarintmap['Vitrum edere possum, mihi non nocet
         node1, = self.cluster.nodelist()
 
         cmds = "ä;"
-        _, err, _ = node1.run_cqlsh(cmds=cmds)
 
+        _, err, _ = util.run_cqlsh_safe(node=node1, cmds=cmds)
         assert 'Invalid syntax' in err
         assert 'ä' in err
 
@@ -485,7 +485,8 @@ UPDATE varcharmaptable SET varcharvarintmap['Vitrum edere possum, mihi non nocet
         node1, = self.cluster.nodelist()
 
         cmd = '''create keyspace "ä" WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'};'''
-        _, err, _ = node1.run_cqlsh(cmds=cmd, cqlsh_options=["--debug"])
+
+        _, err, _ = util.run_cqlsh_safe(node=node1, cmds=cmd, cqlsh_options=["--debug"])
 
         if self.cluster.version() >= LooseVersion('4.0'):
             assert "Keyspace name must not be empty, more than 48 characters long, or contain non-alphanumeric-underscore characters (got 'ä')" in err
@@ -2097,13 +2098,14 @@ class TestCqlshSmoke(Tester):
         create_cf(self.session, 'test')
 
         self.node1.run_cqlsh(
-            """
+            cmds="""
             -- commented line
             // Another comment
             /* multiline
              *
              * comment */
-            """)
+             """,
+            terminator="")
         out, err, _ = self.node1.run_cqlsh("DESCRIBE KEYSPACE ks; // post-line comment")
         assert err == ""
         assert out.strip().startswith("CREATE KEYSPACE ks")
@@ -2398,11 +2400,11 @@ class TestCqlLogin(Tester):
         create_cf(self.session, 'ks1table')
         self.session.execute("CREATE USER user1 WITH PASSWORD 'changeme';")
 
-        cqlsh_stdout, cqlsh_stderr, _ = self.node1.run_cqlsh(
+        cqlsh_stdout, cqlsh_stderr, _ = util.run_cqlsh_safe(self.node1,
             '''
             LOGIN user1 'badpass';
             ''',
-            cqlsh_options=['-u', 'cassandra', '-p', 'cassandra'])
+                                                            cqlsh_options=['-u', 'cassandra', '-p', 'cassandra'])
 
         self.assert_login_not_allowed('user1', cqlsh_stderr)
 
@@ -2424,9 +2426,9 @@ class TestCqlLogin(Tester):
                     '''
             expected_error = 'Only superusers are allowed to perform CREATE USER queries'
 
-        cqlsh_stdout, cqlsh_stderr, _ = self.node1.run_cqlsh(
-            query,
-            cqlsh_options=['-u', 'cassandra', '-p', 'cassandra'])
+        cqlsh_stdout, cqlsh_stderr, _ = util.run_cqlsh_safe(self.node1,
+                                                            query,
+                                                            cqlsh_options=['-u', 'cassandra', '-p', 'cassandra'])
 
         err_lines = str(cqlsh_stderr).splitlines()
         for err_line in err_lines:
@@ -2442,13 +2444,13 @@ class TestCqlLogin(Tester):
         create_cf(self.session, 'ks1table')
         self.session.execute("CREATE USER user1 WITH PASSWORD 'changeme';")
 
-        cqlsh_stdout, cqlsh_stderr, _ = self.node1.run_cqlsh(
+        cqlsh_stdout, cqlsh_stderr, _ = util.run_cqlsh_safe(self.node1,
             '''
             LOGIN user1 'badpass';
             USE ks1;
             DESCRIBE TABLES;
             ''',
-            cqlsh_options=['-u', 'cassandra', '-p', 'cassandra'])
+                                                            cqlsh_options=['-u', 'cassandra', '-p', 'cassandra'])
         assert [x for x in cqlsh_stdout.split() if x] == ['ks1table']
         self.assert_login_not_allowed('user1', cqlsh_stderr)
 

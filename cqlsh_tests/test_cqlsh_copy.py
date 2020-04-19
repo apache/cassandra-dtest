@@ -8,36 +8,29 @@ import json
 import locale
 import logging
 import os
-import pytest
 import re
-import sys
 import time
-
 from collections import namedtuple
-from contextlib import contextmanager
 from decimal import Decimal
 from distutils.version import LooseVersion
-from functools import partial
 from tempfile import NamedTemporaryFile, gettempdir, template
 from uuid import uuid1, uuid4
 
+import pytest
 from cassandra.cluster import ConsistencyLevel, SimpleStatement
 from cassandra.concurrent import execute_concurrent_with_args
-from cassandra.cqltypes import EMPTY
 from cassandra.murmur3 import murmur3
 from cassandra.util import SortedSet
 from ccmlib.common import is_win
 
-from .cqlsh_test_types import (Address, Datetime, ImmutableDict,
-                               ImmutableSet, Name, UTC, drop_microseconds)
-from .cqlsh_tools import (DummyColorMap, assert_csvs_items_equal,
-                          csv_rows, monkeypatch_driver, random_list,
-                          unmonkeypatch_driver, write_rows_to_csv)
-from dtest import (Tester, create_ks)
 from dtest import (FlakyRetryPolicy, Tester, create_ks)
 from tools.data import rows_to_list
-from tools.metadata_wrapper import (UpdatingClusterMetadataWrapper,
-                                    UpdatingTableMetadataWrapper)
+from . import util
+from .cqlsh_test_types import (Address, Datetime, ImmutableDict,
+                               ImmutableSet, Name, UTC, drop_microseconds)
+from .cqlsh_tools import (assert_csvs_items_equal,
+                          csv_rows, monkeypatch_driver, random_list,
+                          unmonkeypatch_driver, write_rows_to_csv)
 
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
@@ -171,14 +164,14 @@ class TestCqlshCopy(Tester):
         if retry_on_request_timeout:
             num_attempts = 0
             while num_attempts < 5:
-                ret = self.node1.run_cqlsh(cmds=cmds, cqlsh_options=cqlsh_options)
+                ret = util.run_cqlsh_safe(self.node1, cmds=cmds, cqlsh_options=cqlsh_options, expect_error=False)
 
                 if not re.search(r"Client request timeout", ret[0]):
                     break
 
                 num_attempts += 1
         else:
-            ret = self.node1.run_cqlsh(cmds=cmds, cqlsh_options=cqlsh_options)
+            ret = util.run_cqlsh_safe(self.node1, cmds=cmds, cqlsh_options=cqlsh_options, expect_error=False)
 
         if show_output:
             logger.debug('Output:\n{}'.format(ret[0]))  # show stdout of copy cmd
