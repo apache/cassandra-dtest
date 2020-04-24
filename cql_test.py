@@ -1040,52 +1040,7 @@ class TestCQLSlowQuery(CQLTester):
         node = cluster.nodelist()[0]
         session = self.patient_cql_connection(node)
 
-        create_ks(session, 'ks', 1)
-        session.execute("""
-            CREATE TABLE test1 (
-                id int,
-                col int,
-                val text,
-                PRIMARY KEY(id, col)
-            );
-        """)
-
-        for i in range(100):
-            session.execute("INSERT INTO test1 (id, col, val) VALUES (1, {}, 'foo')".format(i))
-
-        # only check debug logs because at INFO level the no-spam logger has unpredictable results
-        mark = node.mark_log(filename='debug.log')
-
-        session.execute(SimpleStatement("SELECT * from test1",
-                                        consistency_level=ConsistencyLevel.ONE,
-                                        retry_policy=FallthroughRetryPolicy()))
-
-        node.watch_log_for(["operations were slow", "SELECT \* FROM ks.test1"],
-                           from_mark=mark, filename='debug.log', timeout=60)
-        mark = node.mark_log(filename='debug.log')
-
-        session.execute(SimpleStatement("SELECT * from test1 where id = 1",
-                                        consistency_level=ConsistencyLevel.ONE,
-                                        retry_policy=FallthroughRetryPolicy()))
-
-        node.watch_log_for(["operations were slow", "SELECT \* FROM ks.test1"],
-                           from_mark=mark, filename='debug.log', timeout=60)
-        mark = node.mark_log(filename='debug.log')
-
-        session.execute(SimpleStatement("SELECT * from test1 where id = 1",
-                                        consistency_level=ConsistencyLevel.ONE,
-                                        retry_policy=FallthroughRetryPolicy()))
-
-        node.watch_log_for(["operations were slow", "SELECT \* FROM ks.test1"],
-                           from_mark=mark, filename='debug.log', timeout=60)
-        mark = node.mark_log(filename='debug.log')
-
-        session.execute(SimpleStatement("SELECT * from test1 where token(id) < 0",
-                                        consistency_level=ConsistencyLevel.ONE,
-                                        retry_policy=FallthroughRetryPolicy()))
-
-        node.watch_log_for(["operations were slow", "SELECT \* FROM ks.test1"],
-                           from_mark=mark, filename='debug.log', timeout=60)
+        self._assert_logs_slow_queries(node, session)
 
     def test_remote_query(self):
         """
@@ -1120,42 +1075,7 @@ class TestCQLSlowQuery(CQLTester):
 
         session = self.patient_exclusive_cql_connection(node1)
 
-        create_ks(session, 'ks', 1)
-        session.execute("""
-            CREATE TABLE test2 (
-                id int,
-                col int,
-                val text,
-                PRIMARY KEY(id, col)
-            );
-        """)
-
-        for i, j in itertools.product(list(range(100)), list(range(10))):
-            session.execute("INSERT INTO test2 (id, col, val) VALUES ({}, {}, 'foo')".format(i, j))
-
-        # only check debug logs because at INFO level the no-spam logger has unpredictable results
-        mark = node2.mark_log(filename='debug.log')
-        session.execute(SimpleStatement("SELECT * from test2",
-                                        consistency_level=ConsistencyLevel.ONE,
-                                        retry_policy=FallthroughRetryPolicy()))
-        node2.watch_log_for(["operations were slow", "SELECT \* FROM ks.test2"],
-                            from_mark=mark, filename='debug.log', timeout=60)
-
-
-        mark = node2.mark_log(filename='debug.log')
-        session.execute(SimpleStatement("SELECT * from test2 where id = 1",
-                                        consistency_level=ConsistencyLevel.ONE,
-                                        retry_policy=FallthroughRetryPolicy()))
-        node2.watch_log_for(["operations were slow", "SELECT \* FROM ks.test2 WHERE id = 1"],
-                            from_mark=mark, filename='debug.log', timeout=60)
-
-
-        mark = node2.mark_log(filename='debug.log')
-        session.execute(SimpleStatement("SELECT * from test2 where token(id) <= 0",
-                                        consistency_level=ConsistencyLevel.ONE,
-                                        retry_policy=FallthroughRetryPolicy()))
-        node2.watch_log_for(["operations were slow", "SELECT \* FROM ks.test2 WHERE token\(id\) <= 0"],
-                            from_mark=mark, filename='debug.log', timeout=60)
+        self._assert_logs_slow_queries(node2, session)
 
     def test_disable_slow_query_log(self):
         """
@@ -1206,7 +1126,263 @@ class TestCQLSlowQuery(CQLTester):
 
         self._check_logs(node, "SELECT \* FROM ks.test3", 'debug.log', 0)
 
-    def _check_logs(self, node, pattern, filename, num_expected):
+    @staticmethod
+    def _assert_logs_slow_queries(node, session):
+        TestCQLSlowQuery._assert_logs_slow_queries_with_skinny_table(node, session)
+        for asc in (True, False):
+            TestCQLSlowQuery._assert_logs_slow_queries_with_wide_table(node, session, asc=asc)
+
+    @staticmethod
+    def _assert_logs_slow_queries_with_skinny_table(node, session):
+        create_ks(session, 'ks', 1)
+        table = "t_skinny"
+        session.execute("""
+            CREATE TABLE {} (
+                k int,
+                v int,
+                PRIMARY KEY(k)
+            );
+        """.format(table))
+
+        # insert some partitions
+        for k in range(100):
+            session.execute("INSERT INTO {} (k, v) VALUES ({}, 1)".format(table, k))
+
+        # test logging of slow queries without restricitons
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {}",
+                                      logged_query="SELECT \* FROM ks.t")
+
+        # test logging of slow queries with restriciton on token
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {} WHERE token(k) < 0",
+                                      logged_query="SELECT \* FROM ks.{} WHERE token\(k\) < 0")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {} WHERE token(k) > 0",
+                                      logged_query="SELECT \* FROM ks.{} WHERE token\(k\) > 0")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {} WHERE token(k) <= 0",
+                                      logged_query="SELECT \* FROM ks.{} WHERE token\(k\) <= 0")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {} WHERE token(k) >= 0",
+                                      logged_query="SELECT \* FROM ks.{} WHERE token\(k\) >= 0")
+
+        # test logging of slow queries with restriciton on partition key
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {} WHERE k > 0 ALLOW FILTERING",
+                                      logged_query="SELECT \* FROM ks.{} WHERE k > 0")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {} WHERE k < 100 ALLOW FILTERING",
+                                      logged_query="SELECT \* FROM ks.{} WHERE k < 100")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {} WHERE k >= 0 ALLOW FILTERING",
+                                      logged_query="SELECT \* FROM ks.{} WHERE k >= 0")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {} WHERE k <= 100 ALLOW FILTERING",
+                                      logged_query="SELECT \* FROM ks.{} WHERE k <= 100")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {} WHERE k > 0 AND k <= 100 ALLOW FILTERING",
+                                      logged_query="SELECT \* FROM ks.{} WHERE k > 0 AND k <= 100")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {} WHERE k >= 0 AND k < 100 ALLOW FILTERING",
+                                      logged_query="SELECT \* FROM ks.{} WHERE k >= 0 AND k < 100")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {} WHERE k <= 100 AND k > 0 ALLOW FILTERING",
+                                      logged_query="SELECT \* FROM ks.{} WHERE k > 0 AND k <= 100")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {} WHERE k < 100 AND k >= 0 ALLOW FILTERING",
+                                      logged_query="SELECT \* FROM ks.{} WHERE k >= 0 AND k < 100")
+
+        # test logging of slow queries with restriciton on regular column
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {} WHERE v = 1 ALLOW FILTERING",
+                                      logged_query="SELECT \* FROM ks.{} WHERE v = 1")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {} WHERE v > 0 ALLOW FILTERING",
+                                      logged_query="SELECT \* FROM ks.{} WHERE v > 0")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {} WHERE v < 2 ALLOW FILTERING",
+                                      logged_query="SELECT \* FROM ks.{} WHERE v < 2")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {} WHERE v >= 0 ALLOW FILTERING",
+                                      logged_query="SELECT \* FROM ks.{} WHERE v >= 0")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {} WHERE v <= 2 ALLOW FILTERING",
+                                      logged_query="SELECT \* FROM ks.{} WHERE v <= 2")
+
+    @staticmethod
+    def _assert_logs_slow_queries_with_wide_table(node, session, asc=True):
+        create_ks(session, 'ks', 1)
+        table = "t_wide_asc" if asc else "t_wide_desc"
+        session.execute("""
+            CREATE TABLE {} (
+                k int,
+                c1 int,
+                c2 int,
+                v int,
+                s int STATIC,
+                PRIMARY KEY(k, c1, c2)
+            ) WITH CLUSTERING ORDER BY (c1 {}, c2 {});
+        """.format(table, "ASC" if asc else "DESC", "ASC" if asc else "DESC"))
+
+        # insert some partitions
+        for k in range(100):
+            session.execute("INSERT INTO {} (k, c1, c2, s, v) VALUES ({}, 1, 1, 1, 1)".format(table, k))
+
+        # add some rows to one of the partitions
+        for c1 in range(100):
+            session.execute("INSERT INTO {} (k, c1, c2, s, v) VALUES (0, {}, 1, 1, 1)".format(table, c1))
+
+        # add some rows to one of the pairs partition-first clustering
+        for c2 in range(100):
+            session.execute("INSERT INTO {} (k, c1, c2, s, v) VALUES (0, 0, {}, 1, 1)".format(table, c2))
+
+        # test logging of slow queries without restricitons
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {}",
+                                      logged_query="SELECT \* FROM ks.t")
+
+        # test logging of slow queries with restriciton on token
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {} WHERE token(k) < 0",
+                                      logged_query="SELECT \* FROM ks.{} WHERE token\(k\) < 0")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {} WHERE token(k) > 0",
+                                      logged_query="SELECT \* FROM ks.{} WHERE token\(k\) > 0")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {} WHERE token(k) <= 0",
+                                      logged_query="SELECT \* FROM ks.{} WHERE token\(k\) <= 0")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {} WHERE token(k) >= 0",
+                                      logged_query="SELECT \* FROM ks.{} WHERE token\(k\) >= 0")
+
+        # test logging of slow queries with restriciton on partition key
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {} WHERE k = 0",
+                                      logged_query="SELECT \* FROM ks.{} WHERE k = 0")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {} WHERE k IN (0) ALLOW FILTERING",
+                                      logged_query="SELECT \* FROM ks.{} WHERE k = 0")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {} WHERE k IN (0, 1) ALLOW FILTERING",
+                                      logged_query="SELECT \* FROM ks.{} WHERE k = 0")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {} WHERE k > 0 ALLOW FILTERING",
+                                      logged_query="SELECT \* FROM ks.{} WHERE k > 0")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {} WHERE k < 100 ALLOW FILTERING",
+                                      logged_query="SELECT \* FROM ks.{} WHERE k < 100")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {} WHERE k >= 0 ALLOW FILTERING",
+                                      logged_query="SELECT \* FROM ks.{} WHERE k >= 0")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {} WHERE k <= 100 ALLOW FILTERING",
+                                      logged_query="SELECT \* FROM ks.{} WHERE k <= 100")
+
+        # test logging of slow queries with restriciton on first clustering key
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {} WHERE c1 = 1 ALLOW FILTERING",
+                                      logged_query="SELECT \* FROM ks.{} WHERE c1 = 1")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {} WHERE c1 IN (1) ALLOW FILTERING",
+                                      logged_query="SELECT \* FROM ks.{} WHERE c1 = 1")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {} WHERE c1 IN (1, 2) ALLOW FILTERING",
+                                      logged_query="SELECT \* FROM ks.{} WHERE c1 IN \({}, {}\)"
+                                      .format(table, 1 if asc else 2, 2 if asc else 1))
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {} WHERE c1 > 0 ALLOW FILTERING",
+                                      logged_query="SELECT \* FROM ks.{} WHERE c1 > 0")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {} WHERE c1 < 100 ALLOW FILTERING",
+                                      logged_query="SELECT \* FROM ks.{} WHERE c1 < 100")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {} WHERE c1 >= 0 ALLOW FILTERING",
+                                      logged_query="SELECT \* FROM ks.{} WHERE c1 >= 0")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {} WHERE c1 <= 100 ALLOW FILTERING",
+                                      logged_query="SELECT \* FROM ks.{} WHERE c1 <= 100")
+
+        # test logging of slow queries with restriction in both partition and first clustering key prefix
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {} WHERE k = 0 AND c1 > 0",
+                                      logged_query="SELECT \* FROM ks.{} WHERE k = 0 AND c1 > 0")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {} WHERE k = 0 AND c1 < 100",
+                                      logged_query="SELECT \* FROM ks.{} WHERE k = 0 AND c1 < 100")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {} WHERE k = 0 AND c1 >= 0",
+                                      logged_query="SELECT \* FROM ks.{} WHERE k = 0 AND c1 >= 0")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {} WHERE k = 0 AND c1 <= 100",
+                                      logged_query="SELECT \* FROM ks.{} WHERE k = 0 AND c1 <= 100")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {} WHERE k IN (0) AND c1 > 0",
+                                      logged_query="SELECT \* FROM ks.{} WHERE k = 0 AND c1 > 0")
+
+        # test logging of slow queries with restriction in both partition and second clustering key prefix
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {} WHERE k = 0 AND c1 = 0 AND c2 > 0",
+                                      logged_query="SELECT \* FROM ks.{} WHERE k = 0 AND c1 = 0 AND c2 > 0")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {} WHERE k = 0 AND c1 = 0 AND c2 < 100",
+                                      logged_query="SELECT \* FROM ks.{} WHERE k = 0 AND c1 = 0 AND c2 < 100")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {} WHERE k = 0 AND c1 = 0 AND c2 >= 0",
+                                      logged_query="SELECT \* FROM ks.{} WHERE k = 0 AND c1 = 0 AND c2 >= 0")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {} WHERE k = 0 AND c1 = 0 AND c2 <= 100",
+                                      logged_query="SELECT \* FROM ks.{} WHERE k = 0 AND c1 = 0 AND c2 <= 100")
+
+        # test logging of slow queries with restriciton on regular column
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {} WHERE v = 1 ALLOW FILTERING",
+                                      logged_query="SELECT \* FROM ks.{} WHERE v = 1")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {} WHERE v > 0 ALLOW FILTERING",
+                                      logged_query="SELECT \* FROM ks.{} WHERE v > 0")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {} WHERE v < 2 ALLOW FILTERING",
+                                      logged_query="SELECT \* FROM ks.{} WHERE v < 2")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {} WHERE v >= 0 ALLOW FILTERING",
+                                      logged_query="SELECT \* FROM ks.{} WHERE v >= 0")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {} WHERE v <= 2 ALLOW FILTERING",
+                                      logged_query="SELECT \* FROM ks.{} WHERE v <= 2")
+
+        # test logging of slow queries with restriciton on static column
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {} WHERE s = 1 ALLOW FILTERING",
+                                      logged_query="SELECT \* FROM ks.{} WHERE s = 1")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {} WHERE s > 0 ALLOW FILTERING",
+                                      logged_query="SELECT \* FROM ks.{} WHERE s > 0")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {} WHERE s < 2 ALLOW FILTERING",
+                                      logged_query="SELECT \* FROM ks.{} WHERE s < 2")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {} WHERE s >= 0 ALLOW FILTERING",
+                                      logged_query="SELECT \* FROM ks.{} WHERE s >= 0")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT * FROM {} WHERE s <= 2 ALLOW FILTERING",
+                                      logged_query="SELECT \* FROM ks.{} WHERE s <= 2")
+
+    @staticmethod
+    def _assert_logs(node, session, table, query, logged_query):
+
+        # only check debug logs because at INFO level the no-spam logger has unpredictable results
+        mark = node.mark_log(filename='debug.log')
+
+        session.execute(SimpleStatement(query.format(table),
+                                        consistency_level=ConsistencyLevel.ONE,
+                                        retry_policy=FallthroughRetryPolicy()))
+
+        node.watch_log_for(["operations were slow", logged_query.format(table)],
+                           from_mark=mark, filename='debug.log', timeout=60)
+
+    @staticmethod
+    def _check_logs(node, pattern, filename, num_expected):
         ret = node.grep_log(pattern, filename=filename)
         assert_length_equal(ret, num_expected)
 
