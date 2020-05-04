@@ -103,7 +103,11 @@ class TestCompression(TestHelper):
         for n in range(0, 100):
             session.execute("insert into compression_opts_table (id) values (uuid());")
 
-        sstables = self.flush('compression_opts_table')
+        self.flush('compression_opts_table')
+        # Due to CASSANDRA-15379 we have to compact to get the actual table
+        # compression to take effect since deflate is a slow compressor
+        self.perform_node_tool_cmd(cmd='compact', table='compression_opts_table', indexes=list())
+        sstables = self.get_sstables(table='compression_opts_table', indexes=list())
         sstable_paths = self.get_table_paths('compression_opts_table')
         found = False
         for sstable_path in sstable_paths:
