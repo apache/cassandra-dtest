@@ -123,27 +123,24 @@ class TestNodeToNodeSSLEncryption(Tester):
         credNode1 = sslkeygen.generate_credentials("127.0.0.1")
         credNode2 = sslkeygen.generate_credentials("127.0.0.2", credNode1.cakeystore, credNode1.cacert)
 
-        # first, start cluster without TLS (either listening or connecting
-        self.setup_nodes(credNode1, credNode2, internode_encryption='none', encryption_enabled=False)
+        # first, start cluster without TLS (either listening or connecting)
+        # Optional should be true by default in 4.0 thanks to CASSANDRA-15262
+        self.setup_nodes(credNode1, credNode2, internode_encryption='none')
         self.cluster.start()
         self.cql_connection(self.node1)
 
-        # next bounce the cluster to listen on both plain/secure sockets (do not connect secure port, yet, though)
-        self.bounce_node_with_updated_config(credNode1, self.node1, 'none', True, True)
-        self.bounce_node_with_updated_config(credNode2, self.node2, 'none', True, True)
-
         # next connect with TLS for the outbound connections
-        self.bounce_node_with_updated_config(credNode1, self.node1, 'all', True, True)
-        self.bounce_node_with_updated_config(credNode2, self.node2, 'all', True, True)
+        self.bounce_node_with_updated_config(credNode1, self.node1, 'all', encryption_optional=True)
+        self.bounce_node_with_updated_config(credNode2, self.node2, 'all', encryption_optional=True)
 
         # now shutdown the plaintext port
-        self.bounce_node_with_updated_config(credNode1, self.node1, 'all', True, False)
-        self.bounce_node_with_updated_config(credNode2, self.node2, 'all', True, False)
+        self.bounce_node_with_updated_config(credNode1, self.node1, 'all', encryption_optional=False)
+        self.bounce_node_with_updated_config(credNode2, self.node2, 'all', encryption_optional=False)
         self.cluster.stop()
 
-    def bounce_node_with_updated_config(self, credentials, node, internode_encryption, encryption_enabled, encryption_optional):
+    def bounce_node_with_updated_config(self, credentials, node, internode_encryption, encryption_optional):
         node.stop()
-        self.copy_cred(credentials, node, internode_encryption, encryption_enabled, encryption_optional)
+        self.copy_cred(credentials, node, internode_encryption, encryption_optional)
         node.start(wait_for_binary_proto=True)
 
     def _grep_msg(self, node, *kwargs):
@@ -161,16 +158,16 @@ class TestNodeToNodeSSLEncryption(Tester):
 
         return False
 
-    def setup_nodes(self, credentials1, credentials2, endpoint_verification=False, client_auth=False, internode_encryption='all', encryption_enabled=True, encryption_optional=False):
+    def setup_nodes(self, credentials1, credentials2, endpoint_verification=False, client_auth=False, internode_encryption='all', encryption_optional=None):
         cluster = self.cluster
         cluster = cluster.populate(2)
         self.node1 = cluster.nodelist()[0]
-        self.copy_cred(credentials1, self.node1, internode_encryption, encryption_enabled, encryption_optional, endpoint_verification, client_auth)
+        self.copy_cred(credentials1, self.node1, internode_encryption, encryption_optional, endpoint_verification, client_auth)
 
         self.node2 = cluster.nodelist()[1]
-        self.copy_cred(credentials2, self.node2, internode_encryption, encryption_enabled, encryption_optional, endpoint_verification, client_auth)
+        self.copy_cred(credentials2, self.node2, internode_encryption, encryption_optional, endpoint_verification, client_auth)
 
-    def copy_cred(self, credentials, node, internode_encryption, encryption_enabled, encryption_optional, endpoint_verification=False, client_auth=False):
+    def copy_cred(self, credentials, node, internode_encryption, encryption_optional, endpoint_verification=False, client_auth=False):
         dir = node.get_conf_dir()
         kspath = os.path.join(dir, 'keystore.jks')
         tspath = os.path.join(dir, 'truststore.jks')
@@ -187,10 +184,9 @@ class TestNodeToNodeSSLEncryption(Tester):
                 'require_client_auth': client_auth,
             }
 
-        if self.cluster.version() >= '4.0':
-            server_enc_options['enabled'] = encryption_enabled
+        if self.cluster.version() >= '4.0' and encryption_optional is not None:
             server_enc_options['optional'] = encryption_optional
-        
+
         node.set_configuration_options(values={
             'server_encryption_options': server_enc_options
         })

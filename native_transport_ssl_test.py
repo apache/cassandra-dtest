@@ -102,25 +102,14 @@ class TestNativeTransportSSL(Tester):
 
         if enableSSL:
             generate_ssl_stores(self.fixture_dtest_setup.test_path)
-            # C* versions before 3.0 (CASSANDRA-10559) do not know about
-            # 'client_encryption_options.optional' - so we must not add that parameter
-            if sslOptional:
-                cluster.set_configuration_options({
-                    'client_encryption_options': {
-                        'enabled': True,
-                        'optional': sslOptional,
-                        'keystore': os.path.join(self.fixture_dtest_setup.test_path, 'keystore.jks'),
-                        'keystore_password': 'cassandra'
-                    }
-                })
-            else:
-                cluster.set_configuration_options({
-                    'client_encryption_options': {
-                        'enabled': True,
-                        'keystore': os.path.join(self.fixture_dtest_setup.test_path, 'keystore.jks'),
-                        'keystore_password': 'cassandra'
-                    }
-                })
+            cluster.set_configuration_options({
+                'client_encryption_options': {
+                    'enabled': True,
+                    'optional': sslOptional,
+                    'keystore': os.path.join(self.fixture_dtest_setup.test_path, 'keystore.jks'),
+                    'keystore_password': 'cassandra'
+                }
+            })
 
         if nativePort:
             cluster.set_configuration_options({
