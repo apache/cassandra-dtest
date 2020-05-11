@@ -188,6 +188,10 @@ class TransientReplicationBase(Tester):
     def tokens(self):
         return [0, 1, 2]
 
+    def use_lcs(self):
+        session = self.exclusive_cql_connection(self.node1)
+        session.execute("ALTER TABLE %s.%s with compaction={'class': 'LeveledCompactionStrategy'};" % (self.keyspace, self.table))
+
     def setup_schema(self):
         session = self.exclusive_cql_connection(self.node1)
         replication_params = OrderedDict()
@@ -450,12 +454,18 @@ class TestTransientReplication(TransientReplicationBase):
 @since('4.0')
 class TestTransientReplicationRepairStreamEntireSSTable(TransientReplicationBase):
 
-    def _test_speculative_write_repair_cycle(self, primary_range, optimized_repair, repair_coordinator, expect_node3_data):
+    def stream_entire_sstables(self):
+        return True
+
+    def _test_speculative_write_repair_cycle(self, primary_range, optimized_repair, repair_coordinator, expect_node3_data, use_lcs=False):
         """
         if one of the full replicas is not available, data should be written to the transient replica, but removed after incremental repair
         """
         for node in self.nodes:
             self.assert_has_no_sstables(node)
+
+        if use_lcs:
+            self.use_lcs()
 
         self.node2.byteman_submit(['./byteman/stop_writes.btm'])
         # self.insert_row(1)
@@ -498,7 +508,7 @@ class TestTransientReplicationRepairStreamEntireSSTable(TransientReplicationBase
 
     @pytest.mark.no_vnodes
     def test_primary_range_repair(self):
-        """ optimized primary range incremental repair from full replica should remove data on node3 """
+        """ primary range incremental repair from full replica should remove data on node3 """
         self._test_speculative_write_repair_cycle(primary_range=True,
                                                   optimized_repair=False,
                                                   repair_coordinator=self.node1,
@@ -511,6 +521,15 @@ class TestTransientReplicationRepairStreamEntireSSTable(TransientReplicationBase
                                                   optimized_repair=True,
                                                   repair_coordinator=self.node1,
                                                   expect_node3_data=False)
+
+    @pytest.mark.no_vnodes
+    def test_optimized_primary_range_repair_with_lcs(self):
+        """ optimized primary range incremental repair from full replica should remove data on node3 using LCS """
+        self._test_speculative_write_repair_cycle(primary_range=True,
+                                                  optimized_repair=True,
+                                                  repair_coordinator=self.node1,
+                                                  expect_node3_data=False,
+                                                  use_lcs=True)
 
     @pytest.mark.no_vnodes
     def test_transient_incremental_repair(self):
