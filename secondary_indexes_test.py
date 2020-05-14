@@ -15,7 +15,8 @@ from cassandra.protocol import ConfigurationException
 from cassandra.query import BatchStatement, SimpleStatement
 
 from dtest import Tester, create_ks, create_cf
-from tools.assertions import assert_bootstrap_state, assert_invalid, assert_none, assert_one, assert_row_count
+from tools.assertions import assert_bootstrap_state, assert_invalid, assert_none, assert_one, assert_row_count, \
+    assert_length_equal, assert_all
 from tools.data import block_until_index_is_built, rows_to_list
 from tools.misc import new_node
 
@@ -342,47 +343,62 @@ class TestSecondaryIndexes(Tester):
         session.execute("INSERT INTO k.t(k, v) VALUES (0, 1)")
         session.execute("INSERT INTO k.t(k, v) VALUES (2, 3)")
 
-        # Verify that the index is marked as built and it can answer queries
+        # Verify that the index is marked as built and it can answer queries and accept writes
         assert_one(session, """SELECT table_name, index_name FROM system."IndexInfo" WHERE table_name='k'""", ['k', 'idx'])
-        assert_one(session, "SELECT * FROM k.t WHERE v = 1", [0, 1])
+        assert_length_equal(node.grep_log('became queryable after successful build'), 1)
+        assert_length_equal(node.grep_log('registered and writable'), 1)
+        session.execute("INSERT INTO k.t(k, v) VALUES (1, 1)")
+        assert_all(session, "SELECT k FROM k.t WHERE v = 1", [[0], [1]], ignore_order=True)
 
         # Simulate a failing index rebuild
         before_files = self._index_sstables_files(node, 'k', 't', 'idx')
+        mark = node.mark_log()
         node.byteman_submit(['./byteman/index_build_failure.btm'])
         with pytest.raises(Exception):
             node.nodetool("rebuild_index k t idx")
         after_files = self._index_sstables_files(node, 'k', 't', 'idx')
 
-        # Verify that the index is not rebuilt, not marked as built, and it still can answer queries
+        # Verify that the index is not built, not marked as built, and it still can answer queries and accept writes
         assert before_files == after_files
         assert_none(session, """SELECT * FROM system."IndexInfo" WHERE table_name='k'""")
-        assert_one(session, "SELECT * FROM k.t WHERE v = 1", [0, 1])
+        assert_length_equal(node.grep_log('became queryable', from_mark=mark), 0)
+        assert_length_equal(node.grep_log('became writable', from_mark=mark), 0)
+        session.execute("INSERT INTO k.t(k, v) VALUES (2, 1)")
+        assert_all(session, "SELECT k FROM k.t WHERE v = 1", [[0], [1], [2]], ignore_order=True)
 
         # Restart the node to trigger the scheduled index rebuild
         before_files = after_files
         node.nodetool('drain')
         node.stop()
+        mark = node.mark_log()
         cluster.start()
         session = self.patient_cql_connection(node)
         session.execute("USE k")
         after_files = self._index_sstables_files(node, 'k', 't', 'idx')
 
-        # Verify that, the index is rebuilt, marked as built, and it can answer queries
+        # Verify that the index is rebuilt, marked as built, and it still can answer queries and accept writes
         assert before_files != after_files
         assert_one(session, """SELECT table_name, index_name FROM system."IndexInfo" WHERE table_name='k'""", ['k', 'idx'])
-        assert_one(session, "SELECT * FROM k.t WHERE v = 1", [0, 1])
+        assert_length_equal(node.grep_log('became queryable after successful build', from_mark=mark), 1)
+        assert_length_equal(node.grep_log('registered and writable', from_mark=mark), 1)
+        session.execute("INSERT INTO k.t(k, v) VALUES (3, 1)")
+        assert_all(session, "SELECT k FROM k.t WHERE v = 1", [[0], [1], [2], [3]], ignore_order=True)
 
         # Simulate another failing index rebuild
-        before_files = self._index_sstables_files(node, 'k', 't', 'idx')
+        before_files = after_files
+        mark = node.mark_log()
         node.byteman_submit(['./byteman/index_build_failure.btm'])
         with pytest.raises(Exception):
             node.nodetool("rebuild_index k t idx")
         after_files = self._index_sstables_files(node, 'k', 't', 'idx')
 
-        # Verify that the index is not rebuilt, not marked as built, and it still can answer queries
+        # Verify that the index is not built, not marked as built, and it still can answer queries and accept writes
         assert before_files == after_files
         assert_none(session, """SELECT * FROM system."IndexInfo" WHERE table_name='k'""")
-        assert_one(session, "SELECT * FROM k.t WHERE v = 1", [0, 1])
+        assert_length_equal(node.grep_log('became queryable', from_mark=mark), 0)
+        assert_length_equal(node.grep_log('became writable', from_mark=mark), 0)
+        session.execute("INSERT INTO k.t(k, v) VALUES (4, 1)")
+        assert_all(session, "SELECT k FROM k.t WHERE v = 1", [[0], [1], [2], [3], [4]], ignore_order=True)
 
         # Successfully rebuild the index
         before_files = after_files
@@ -390,10 +406,13 @@ class TestSecondaryIndexes(Tester):
         cluster.wait_for_compactions()
         after_files = self._index_sstables_files(node, 'k', 't', 'idx')
 
-        # Verify that the index is rebuilt, marked as built, and it can answer queries
+        # Verify that the index is rebuilt, marked as built, and it still can answer queries and accept writes
         assert before_files != after_files
         assert_one(session, """SELECT table_name, index_name FROM system."IndexInfo" WHERE table_name='k'""", ['k', 'idx'])
-        assert_one(session, "SELECT * FROM k.t WHERE v = 1", [0, 1])
+        assert_length_equal(node.grep_log('became queryable', from_mark=mark), 0)
+        assert_length_equal(node.grep_log('became writable', from_mark=mark), 0)
+        session.execute("INSERT INTO k.t(k, v) VALUES (5, 1)")
+        assert_all(session, "SELECT k FROM k.t WHERE v = 1", [[0], [1], [2], [3], [4], [5]], ignore_order=True)
 
     @since('4.0')
     def test_drop_index_while_building(self):
