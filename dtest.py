@@ -1,10 +1,10 @@
 import configparser
 import copy
+import glob
 import logging
 import os
 import re
 import subprocess
-import sys
 import threading
 import time
 import traceback
@@ -21,6 +21,7 @@ from cassandra import ConsistencyLevel, OperationTimedOut
 from cassandra.auth import PlainTextAuthProvider
 from cassandra.cluster import ExecutionProfile
 from cassandra.policies import RetryPolicy, RoundRobinPolicy
+from ccmlib.common import is_win
 from ccmlib.node import ToolError, TimeoutError
 from tools.misc import retry_till_success
 
@@ -451,6 +452,38 @@ def kill_windows_cassandra_procs():
         except ImportError:
             logger.debug("WARN: psutil not installed. Cannot detect and kill "
                   "running cassandra processes - you may see cascading dtest failures.")
+
+
+def byteman_validate(node, script, verbose=False, opts=None):
+    opts = opts or []
+    cdir = node.get_install_dir()
+    byteman_cmd = []
+    byteman_cmd.append(os.path.join(os.environ['JAVA_HOME'],
+                                    'bin',
+                                    'java'))
+    byteman_cmd.append('-cp')
+    jars = [
+        glob.glob(os.path.join(cdir, 'build', 'lib', 'jars', 'byteman-[0-9]*.jar'))[0],
+        os.path.join(cdir, 'build', '*'),
+    ]
+    byteman_cmd.append(':'.join(jars))
+    byteman_cmd.append('org.jboss.byteman.check.TestScript')
+    byteman_cmd.append('-p')
+    byteman_cmd.append(node.byteman_port)
+    if verbose and '-v' not in opts:
+        byteman_cmd.append('-v')
+    byteman_cmd.append(script)
+    # process = subprocess.Popen(byteman_cmd)
+    # out, err = process.communicate()
+    out = subprocess.check_output(byteman_cmd)
+    if (out is not None) and isinstance(out, bytes):
+        out = out.decode()
+
+    has_errors = 'ERROR' in out
+    if verbose and not has_errors:
+        print (out)
+
+    assert not has_errors, "byteman script didn't compile\n" + out
 
 
 class MultiError(Exception):

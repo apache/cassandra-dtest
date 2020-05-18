@@ -1,0 +1,8 @@
+# ignore all mutations
+RULE ignore mutations
+CLASS org.apache.cassandra.db.Mutation
+METHOD apply
+AT ENTRY
+IF true
+DO return;
+ENDRULE

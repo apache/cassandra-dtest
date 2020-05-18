@@ -1,19 +1,15 @@
 from contextlib import contextmanager
-import glob
 import os
 import time
 import pytest
 import logging
-import subprocess
-import typing
 
 from cassandra import ConsistencyLevel, WriteTimeout, ReadTimeout
-from cassandra.cluster import Session
 from cassandra.query import SimpleStatement
-from ccmlib.node import Node, handle_external_tool_process
+from ccmlib.node import Node
 from pytest import raises
 
-from dtest import Tester, create_ks
+from dtest import Tester, create_ks, byteman_validate
 from tools.assertions import assert_one
 from tools.data import rows_to_list
 from tools.jmxutils import JolokiaAgent, make_mbean
@@ -21,38 +17,6 @@ from tools.misc import retry_till_success
 
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
-
-def byteman_validate(node, script, verbose=False, opts=None):
-    opts = opts or []
-    cdir = node.get_install_dir()
-    byteman_cmd = []
-    byteman_cmd.append(os.path.join(os.environ['JAVA_HOME'],
-                                    'bin',
-                                    'java'))
-    byteman_cmd.append('-cp')
-    jars = [
-        glob.glob(os.path.join(cdir, 'build', 'lib', 'jars', 'byteman-[0-9]*.jar'))[0],
-        os.path.join(cdir, 'build', '*'),
-    ]
-    byteman_cmd.append(':'.join(jars))
-    byteman_cmd.append('org.jboss.byteman.check.TestScript')
-    byteman_cmd.append('-p')
-    byteman_cmd.append(node.byteman_port)
-    if verbose and '-v' not in opts:
-        byteman_cmd.append('-v')
-    byteman_cmd.append(script)
-    # process = subprocess.Popen(byteman_cmd)
-    # out, err = process.communicate()
-    out = subprocess.check_output(byteman_cmd)
-    if (out is not None) and isinstance(out, bytes):
-        out = out.decode()
-
-    has_errors = 'ERROR' in out
-    if verbose and not has_errors:
-        print (out)
-
-    assert not has_errors, "byteman script didn't compile\n" + out
-
 
 class TestReadRepair(Tester):
 

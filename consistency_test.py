@@ -12,7 +12,7 @@ from cassandra.query import BatchStatement, BatchType, SimpleStatement
 
 from tools.assertions import (assert_all, assert_length_equal, assert_none,
                               assert_unavailable)
-from dtest import MultiError, Tester, create_ks, create_cf
+from dtest import MultiError, Tester, byteman_validate, create_ks, create_cf
 from tools.data import (create_c1c2_table, insert_c1c2, insert_columns,
                         query_c1c2, rows_to_list)
 from tools.jmxutils import JolokiaAgent, make_mbean, remove_perf_disable_shared_mem
@@ -1570,6 +1570,78 @@ class TestConsistency(Tester):
         logger.debug("Reading back data.")
         for n in range(100):
             query_c1c2(session, n, cl)
+
+    @since('3.11')
+    def test_group_by_srp(self):
+        """
+        Test GROUP BY with short read protection, particularly when there is a limit.
+        @jira_ticket CASSANDRA-15459
+        """
+        cluster = self.cluster
+
+        # disable hinted handoff and set batch commit log so this doesn't interfere with the test
+        cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
+        cluster.set_batch_commitlog(enabled=True)
+
+        # We want to disable read repair so it doesn't interfere with the test. On 4.0 we can just disable it on table
+        # creation, but if we are before 4.0 we'll have to use byteman to disable it.
+        use_byteman = self.dtest_config.cassandra_version_from_build < '4.0'
+
+        cluster.populate(2, install_byteman=use_byteman).start(wait_other_notice=True)
+        node1, node2 = cluster.nodelist()
+
+        session = self.patient_cql_connection(node1)
+
+        query = "CREATE KEYSPACE test WITH replication = {'class':'SimpleStrategy', 'replication_factor':2}"
+        session.execute(query)
+
+        query = "CREATE TABLE test.test (pk int, ck int, PRIMARY KEY (pk, ck))"
+        if not use_byteman:
+            query += " WITH READ_REPAIR='NONE'"
+        session.execute(query)
+
+        # with node2 down, populate data on node1
+        # node1:
+        #   key 1 : 1
+        #   key 0 : x
+        #   key 2 : 2
+
+        node2.stop()
+        session.execute('INSERT INTO test.test (pk, ck) VALUES (1, 1) USING TIMESTAMP 9')
+        session.execute('DELETE FROM test.test USING TIMESTAMP 10 WHERE pk=0 AND ck=0')
+        session.execute('INSERT INTO test.test (pk, ck) VALUES (2, 2) USING TIMESTAMP 9')
+        node2.start(wait_other_notice=True, wait_for_binary_proto=True)
+
+        # with node1 down, populate data on node2
+        # node1:
+        #   key 1 : 1
+        #   key 0 : x
+        #   key 2 : 2
+        # node2:
+        #   key 1 : x
+        #   key 0 : 0
+        #   key 2 : x
+
+        node1.stop()
+        session = self.patient_exclusive_cql_connection(node2)
+        session.execute('DELETE FROM test.test USING TIMESTAMP 10 WHERE pk=1 AND ck=1')
+        session.execute('INSERT INTO test.test (pk, ck) VALUES (0, 0) USING TIMESTAMP 9')
+        session.execute('DELETE FROM test.test USING TIMESTAMP 10 WHERE pk=2 AND ck=2')
+        node1.start(wait_other_notice=True, wait_for_binary_proto=True)
+
+        if use_byteman:
+            script = './byteman/read_repair/ignore_writes.btm'
+            byteman_validate(node1, script, verbose=True)
+            node1.byteman_submit([script])
+            node2.byteman_submit([script])
+
+        session = self.patient_exclusive_cql_connection(node1, consistency_level=ConsistencyLevel.ALL)
+
+        assert_none(session, 'SELECT pk, ck FROM test.test LIMIT 1')
+        assert_none(session, 'SELECT pk, ck FROM test.test GROUP BY pk LIMIT 10')
+        assert_none(session, 'SELECT pk, ck FROM test.test GROUP BY pk LIMIT 1')
+        assert_none(session, 'SELECT pk, ck FROM test.test GROUP BY pk, ck LIMIT 10')
+        assert_none(session, 'SELECT pk, ck FROM test.test GROUP BY pk, ck LIMIT 1')
 
     def stop_node(self, node_number):
         to_stop = self.cluster.nodes["node%d" % node_number]
