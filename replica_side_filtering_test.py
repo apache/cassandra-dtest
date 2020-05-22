@@ -16,13 +16,15 @@ class ReplicaSideFiltering(Tester):
     """
     __test__ = False
 
-    def _prepare_cluster(self, create_table, create_index, both_nodes=None, only_node1=None, only_node2=None):
+    def _prepare_cluster(self, create_table, create_index=None, both_nodes=None, only_node1=None, only_node2=None,
+                         transient=False):
         """
         :param create_table a table creation CQL query
         :param create_index an index creation CQL query, that will be executed depending on ``_create_index`` method
         :param both_nodes queries to be executed in both nodes with CL=ALL
         :param only_node1 queries to be executed in the first node only, with CL=ONE, while the second node is stopped
         :param only_node2 queries to be executed in the second node only, with CL=ONE, while the first node is stopped
+        :param transient whether the second node should be a transient replica
         :return: a session connected exclusively to the first node with CL=ALL
         """
         cluster = self.cluster
@@ -32,15 +34,27 @@ class ReplicaSideFiltering(Tester):
             cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
             cluster.set_batch_commitlog(enabled=True)
 
-        cluster.populate(2)
+        if transient:
+            cluster.set_configuration_options(values={'num_tokens': 1,
+                                                      'commitlog_sync_period_in_ms': 500,
+                                                      'enable_transient_replication': True,
+                                                      'dynamic_snitch': False})
+
+        cluster.populate(2, tokens=[0, 1] if transient else None)
         node1, node2 = cluster.nodelist()
         cluster.start()
 
         session = self.patient_exclusive_cql_connection(node1, consistency_level=CL.ALL)
-        create_ks(session, keyspace, 2)
+        if transient:
+            session.execute("CREATE KEYSPACE %s WITH replication = "
+                            "{'class': 'NetworkTopologyStrategy', 'datacenter1': '2/1'}" % (keyspace))
+        else:
+            create_ks(session, keyspace, 2)
         session.execute("USE " + keyspace)
 
         # create the table
+        if transient:
+            create_table += " WITH speculative_retry = 'NEVER' AND read_repair = 'NONE'"
         session.execute(create_table)
 
         # create the index if it's required
@@ -496,3 +510,25 @@ class TestAllowFiltering(ReplicaSideFiltering):
 
     def create_index(self):
         return False
+
+    @since('4.0')
+    def test_update_missed_by_transient_replica(self):
+        self._prepare_cluster(
+            create_table="CREATE TABLE t (k int PRIMARY KEY, v text)",
+            both_nodes=["INSERT INTO t(k, v) VALUES (0, 'old')"],
+            only_node1=["UPDATE t SET v = 'new' WHERE k = 0"],
+            transient=True)
+
+        self._assert_none("SELECT * FROM t WHERE v = 'old'")
+        self._assert_one("SELECT * FROM t WHERE v = 'new'", row=[0, 'new'])
+
+    @since('4.0')
+    def test_update_only_on_transient_replica(self):
+        self._prepare_cluster(
+            create_table="CREATE TABLE t (k int PRIMARY KEY, v text)",
+            both_nodes=["INSERT INTO t(k, v) VALUES (0, 'old')"],
+            only_node2=["UPDATE t SET v = 'new' WHERE k = 0"],
+            transient=True)
+
+        self._assert_none("SELECT * FROM t WHERE v = 'old'")
+        self._assert_one("SELECT * FROM t WHERE v = 'new'", row=[0, 'new'])
