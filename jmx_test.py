@@ -10,9 +10,11 @@ from ccmlib.node import ToolError
 
 from distutils.version import LooseVersion
 
-from dtest import Tester
-from tools.jmxutils import (JolokiaAgent, enable_jmx_ssl, make_mbean)
+from dtest import Tester, create_ks
+from tools.jmxutils import (JolokiaAgent, enable_jmx_ssl, make_mbean,
+                            remove_perf_disable_shared_mem)
 from tools.misc import generate_ssl_stores
+from tools.data import create_c1c2_table, insert_c1c2
 
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
@@ -287,6 +289,44 @@ class TestJMX(Tester):
             assert len(node.grep_log('Updating batchlog replay throttle to 4096 KB/s, 2048 KB/s per endpoint',
                                      filename='debug.log')) > 0
             assert 4096 == jmx.read_attribute(mbean, 'BatchlogReplayThrottleInKB')
+
+    def test_bloom_filter_false_ratio(self):
+        """
+        Test for CASSANDRA-15834
+
+        Verifies if BloomFilterFalseRatio takes into account true negatives. Without this fix, the following
+        scenario (many reads for non-existing rows) would yield BloomFilterFalseRatio=1.0. With the fix we assume
+        it should be less then the default bloom_filter_fp_chance.
+        """
+        cluster = self.cluster
+        cluster.populate(1)
+        node = cluster.nodelist()[0]
+        remove_perf_disable_shared_mem(node)
+        cluster.start(wait_for_binary_proto=True)
+
+        session = self.patient_exclusive_cql_connection(node)
+
+        keyspace = 'bloom_ratio_test_ks'
+        create_ks(session, keyspace, 1)
+        create_c1c2_table(self, session)
+        insert_c1c2(session, n=10)
+        node.nodetool("flush " + keyspace)
+
+        for key in range(10000):
+            session.execute("SELECT * from cf where key = '{0}'".format(key))
+
+        bloom_filter_false_ratios = [
+            make_mbean('metrics', type='Table', name='RecentBloomFilterFalseRatio'),
+            make_mbean('metrics', type='Table', keyspace=keyspace, scope='cf', name='BloomFilterFalseRatio'),
+            make_mbean('metrics', type='Table', name='BloomFilterFalseRatio'),
+            make_mbean('metrics', type='Table', keyspace=keyspace, scope='cf', name='RecentBloomFilterFalseRatio'),
+        ]
+
+        with JolokiaAgent(node) as jmx:
+            for metric in bloom_filter_false_ratios:
+                ratio = jmx.read_attribute(metric, "Value")
+                # Bloom filter false positive ratio should not be greater than the default bloom_filter_fp_chance.
+                assert ratio < 0.01
 
 
 @since('3.9')
