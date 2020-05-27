@@ -210,6 +210,8 @@ def _filter_errors(dtest_setup, errors):
 def check_logs_for_errors(dtest_setup):
     errors = []
     for node in dtest_setup.cluster.nodelist():
+        if not os.path.exists(node.logfilename()):
+            continue
         errors = list(_filter_errors(dtest_setup, ['\n'.join(msg) for msg in node.grep_log_for_errors()]))
         if len(errors) != 0:
             for error in errors:
