@@ -114,6 +114,14 @@ class ReplicaSideFiltering(Tester):
     def _decorate_query(self, query):
         return query if self.create_index() else query + " ALLOW FILTERING"
 
+    def _skip_if_index_on_static_is_not_supported(self):
+        if self.create_index() and self.cluster.version() < '3.4':
+            pytest.skip('Secondary indexes on static column are not supported before 3.4 (CASSANDRA-8103)')
+
+    def _skip_if_filtering_partition_columns_is_not_supported(self):
+        if not self.create_index() and self.cluster.version() < '3.11':
+            pytest.skip('Filtering of partition key parts is not supported before 3.11 (CASSANDRA-13275)')
+
     @abstractmethod
     def create_index(self):
         """
@@ -145,6 +153,7 @@ class ReplicaSideFiltering(Tester):
         self._assert_all("SELECT * FROM t WHERE v = 'new'", rows=[[0, 0, 9, 'new']])
 
     def test_update_on_static_column_with_empty_partition(self):
+        self._skip_if_index_on_static_is_not_supported()
         self._prepare_cluster(
             create_table="CREATE TABLE t (k int, c int, v int, s text STATIC, PRIMARY KEY (k, c))",
             create_index="CREATE INDEX ON t(s)",
@@ -156,6 +165,7 @@ class ReplicaSideFiltering(Tester):
         self._assert_one("SELECT * FROM t WHERE s = 'new'", row=[0, None, 'new', None])
 
     def test_update_on_static_column_with_not_empty_partition(self):
+        self._skip_if_index_on_static_is_not_supported()
         self._prepare_cluster(
             create_table="CREATE TABLE t (k int, c int, v int, s text STATIC, PRIMARY KEY (k, c))",
             create_index="CREATE INDEX ON t(s)",
@@ -181,6 +191,7 @@ class ReplicaSideFiltering(Tester):
         self._assert_one("SELECT * FROM t WHERE v CONTAINS 1", row=[0, [-1, 1]])
 
     def test_complementary_deletion_with_limit_on_partition_key_column_with_empty_partitions(self):
+        self._skip_if_filtering_partition_columns_is_not_supported()
         self._prepare_cluster(
             create_table="CREATE TABLE t (k1 int, k2 int, c int, s int STATIC, PRIMARY KEY ((k1, k2), c))",
             create_index="CREATE INDEX ON t(k1)",
@@ -192,6 +203,7 @@ class ReplicaSideFiltering(Tester):
         self._assert_none("SELECT * FROM t WHERE k1 = 0 LIMIT 1")
 
     def test_complementary_deletion_with_limit_on_partition_key_column_with_not_empty_partitions(self):
+        self._skip_if_filtering_partition_columns_is_not_supported()
         self._prepare_cluster(
             create_table="CREATE TABLE t (k1 int, k2 int, c int, s int STATIC, PRIMARY KEY ((k1, k2), c))",
             create_index="CREATE INDEX ON t(k1)",
@@ -214,6 +226,7 @@ class ReplicaSideFiltering(Tester):
         self._assert_none("SELECT * FROM t WHERE c = 0 LIMIT 1")
 
     def test_complementary_deletion_with_limit_on_static_column_with_empty_partitions(self):
+        self._skip_if_index_on_static_is_not_supported()
         self._prepare_cluster(
             create_table="CREATE TABLE t (k int, c int, s int STATIC, PRIMARY KEY (k, c))",
             create_index="CREATE INDEX ON t(s)",
@@ -225,6 +238,7 @@ class ReplicaSideFiltering(Tester):
         self._assert_none("SELECT * FROM t WHERE s = 0 LIMIT 1")
 
     def test_complementary_deletion_with_limit_on_static_column_with_empty_partitions_and_rows_after(self):
+        self._skip_if_index_on_static_is_not_supported()
         self._prepare_cluster(
             create_table="CREATE TABLE t (k int, c int, s int STATIC, PRIMARY KEY (k, c))",
             create_index="CREATE INDEX ON t(s)",
@@ -241,6 +255,7 @@ class ReplicaSideFiltering(Tester):
         self._assert_all("SELECT * FROM t WHERE s = 0", rows=[[3, 1, 0], [3, 2, 0]])
 
     def test_complementary_deletion_with_limit_on_static_column_with_not_empty_partitions(self):
+        self._skip_if_index_on_static_is_not_supported()
         self._prepare_cluster(
             create_table="CREATE TABLE t (k int, c int, s int STATIC, v int, PRIMARY KEY (k, c))",
             create_index="CREATE INDEX ON t(s)",
@@ -252,6 +267,7 @@ class ReplicaSideFiltering(Tester):
         self._assert_none("SELECT * FROM t WHERE s = 0 LIMIT 1")
 
     def test_complementary_deletion_with_limit_on_static_column_with_not_empty_partitions_and_rows_after(self):
+        self._skip_if_index_on_static_is_not_supported()
         self._prepare_cluster(
             create_table="CREATE TABLE t (k int, c int, s int STATIC, v int, PRIMARY KEY(k, c))",
             create_index="CREATE INDEX ON t(s)",
@@ -311,6 +327,7 @@ class ReplicaSideFiltering(Tester):
         self._assert_all("SELECT * FROM t WHERE v = 0 LIMIT 3", rows=[[0, 2, 0], [0, 3, 0]])
 
     def test_complementary_update_with_limit_on_static_column_with_empty_partitions(self):
+        self._skip_if_index_on_static_is_not_supported()
         self._prepare_cluster(
             create_table="CREATE TABLE t (k int, c int, s text STATIC, v int, PRIMARY KEY (k, c))",
             create_index="CREATE INDEX ON t(s)",
@@ -325,6 +342,7 @@ class ReplicaSideFiltering(Tester):
                          rows=[[1, None, None, 'new'], [2, None, None, 'new']])
 
     def test_complementary_update_with_limit_on_static_column_with_not_empty_partitions(self):
+        self._skip_if_index_on_static_is_not_supported()
         self._prepare_cluster(
             create_table="CREATE TABLE t (k int, c int, s text STATIC, v int, PRIMARY KEY (k, c))",
             create_index="CREATE INDEX ON t(s)",
@@ -488,7 +506,7 @@ class ReplicaSideFiltering(Tester):
         self._assert_one("SELECT COUNT(*) FROM t WHERE v = 'new'", row=[2])
 
 
-@since('3.11')
+@since('3.0.21')
 class TestSecondaryIndexes(ReplicaSideFiltering):
     """
     @jira_ticket CASSANDRA-8272
@@ -500,7 +518,7 @@ class TestSecondaryIndexes(ReplicaSideFiltering):
         return True
 
 
-@since('3.11')
+@since('3.0.21')
 class TestAllowFiltering(ReplicaSideFiltering):
     """
     @jira_ticket CASSANDRA-8273
