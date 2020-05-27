@@ -239,30 +239,34 @@ def copy_logs(request, cluster, directory=None, name=None):
     if directory is None:
         directory = log_saved_dir
     if name is None:
-        name = os.path.join(log_saved_dir, "last")
+        name = os.path.join(directory, "last")
     else:
         name = os.path.join(directory, name)
     if not os.path.exists(directory):
         os.mkdir(directory)
-    logs = [(node.name, node.logfilename(), node.debuglogfilename(), node.gclogfilename(), node.compactionlogfilename())
-            for node in list(cluster.nodes.values())]
-    if len(logs) != 0:
-        basedir = str(int(time.time() * 1000)) + '_' + request.node.name
-        logdir = os.path.join(directory, basedir)
-        os.mkdir(logdir)
-        for n, log, debuglog, gclog, compactionlog in logs:
-            if os.path.exists(log):
-                assert os.path.getsize(log) >= 0
-                shutil.copyfile(log, os.path.join(logdir, n + ".log"))
-            if os.path.exists(debuglog):
-                assert os.path.getsize(debuglog) >= 0
-                shutil.copyfile(debuglog, os.path.join(logdir, n + "_debug.log"))
-            if os.path.exists(gclog):
-                assert os.path.getsize(gclog) >= 0
-                shutil.copyfile(gclog, os.path.join(logdir, n + "_gc.log"))
-            if os.path.exists(compactionlog):
-                assert os.path.getsize(compactionlog) >= 0
-                shutil.copyfile(compactionlog, os.path.join(logdir, n + "_compaction.log"))
+
+    basedir = str(int(time.time() * 1000)) + '_' + request.node.name
+    logdir = os.path.join(directory, basedir)
+
+    any_file = False
+    for node in cluster.nodes.values():
+        nodelogdir = node.log_directory()
+        for f in os.listdir(nodelogdir):
+            file = os.path.join(nodelogdir, f)
+            if os.path.isfile(file):
+                if not any_file:
+                    os.mkdir(logdir)
+                    any_file = True
+
+                if f == 'system.log':
+                    target_name = node.name + '.log'
+                elif f == 'gc.log.0.current':
+                    target_name = node.name + '_gc.log'
+                else:
+                    target_name = node.name + '_' + f
+                shutil.copyfile(file, os.path.join(logdir, target_name))
+
+    if any_file:
         if os.path.exists(name):
             os.unlink(name)
         if not is_win():
