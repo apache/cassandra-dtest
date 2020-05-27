@@ -433,14 +433,19 @@ def dtest_config(request):
     yield dtest_config
 
 
+def cassandra_dir_and_version(config):
+    cassandra_dir = config.getoption("--cassandra-dir") or config.getini("cassandra_dir")
+    cassandra_version = config.getoption("--cassandra-version")
+    return cassandra_dir, cassandra_version
+
+
 def pytest_collection_modifyitems(items, config):
     """
     This function is called upon during the pytest test collection phase and allows for modification
     of the test items within the list
     """
     collect_only = config.getoption("--collect-only")
-    cassandra_dir = config.getoption("--cassandra-dir") or config.getini("cassandra_dir")
-    cassandra_version = config.getoption("--cassandra-version")
+    cassandra_dir, cassandra_version = cassandra_dir_and_version(config)
     if not collect_only and cassandra_dir is None:
         if  cassandra_version is None:
             raise Exception("Required dtest arguments were missing! You must provide either --cassandra-dir "
