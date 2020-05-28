@@ -2,6 +2,7 @@ from abc import abstractmethod
 
 import pytest
 from cassandra import ConsistencyLevel as CL
+from cassandra.query import SimpleStatement
 
 from dtest import Tester, create_ks
 from tools.assertions import (assert_all, assert_none, assert_one)
@@ -16,15 +17,13 @@ class ReplicaSideFiltering(Tester):
     """
     __test__ = False
 
-    def _prepare_cluster(self, create_table, create_index=None, both_nodes=None, only_node1=None, only_node2=None,
-                         transient=False):
+    def _prepare_cluster(self, create_table, create_index=None, both_nodes=None, only_node1=None, only_node2=None):
         """
         :param create_table a table creation CQL query
         :param create_index an index creation CQL query, that will be executed depending on ``_create_index`` method
         :param both_nodes queries to be executed in both nodes with CL=ALL
         :param only_node1 queries to be executed in the first node only, with CL=ONE, while the second node is stopped
         :param only_node2 queries to be executed in the second node only, with CL=ONE, while the first node is stopped
-        :param transient whether the second node should be a transient replica
         :return: a session connected exclusively to the first node with CL=ALL
         """
         cluster = self.cluster
@@ -34,27 +33,15 @@ class ReplicaSideFiltering(Tester):
             cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
             cluster.set_batch_commitlog(enabled=True)
 
-        if transient:
-            cluster.set_configuration_options(values={'num_tokens': 1,
-                                                      'commitlog_sync_period_in_ms': 500,
-                                                      'enable_transient_replication': True,
-                                                      'dynamic_snitch': False})
-
-        cluster.populate(2, tokens=[0, 1] if transient else None)
+        cluster.populate(2)
         node1, node2 = cluster.nodelist()
         cluster.start()
 
         session = self.patient_exclusive_cql_connection(node1, consistency_level=CL.ALL)
-        if transient:
-            session.execute("CREATE KEYSPACE %s WITH replication = "
-                            "{'class': 'NetworkTopologyStrategy', 'datacenter1': '2/1'}" % (keyspace))
-        else:
-            create_ks(session, keyspace, 2)
+        create_ks(session, keyspace, 2)
         session.execute("USE " + keyspace)
 
         # create the table
-        if transient:
-            create_table += " WITH speculative_retry = 'NEVER' AND read_repair = 'NONE'"
         session.execute(create_table)
 
         # create the index if it's required
@@ -74,7 +61,7 @@ class ReplicaSideFiltering(Tester):
         if only_node2:
             self._execute_isolated(node_to_update=node2, node_to_stop=node1, queries=only_node2)
 
-        # set the session with CL=ALL for testing index searches with the created scenario
+        # set the session with CL=ALL for testing queries with the created scenario
         self.session = self.patient_exclusive_cql_connection(node1, keyspace=keyspace, consistency_level=CL.ALL)
 
     def _execute_isolated(self, node_to_update, node_to_stop, queries):
@@ -529,24 +516,43 @@ class TestAllowFiltering(ReplicaSideFiltering):
     def create_index(self):
         return False
 
-    @since('4.0')
-    def test_update_missed_by_transient_replica(self):
-        self._prepare_cluster(
-            create_table="CREATE TABLE t (k int PRIMARY KEY, v text)",
-            both_nodes=["INSERT INTO t(k, v) VALUES (0, 'old')"],
-            only_node1=["UPDATE t SET v = 'new' WHERE k = 0"],
-            transient=True)
+    def _test_missed_update_with_transient_replicas(self, missed_by_transient):
+        cluster = self.cluster
+        cluster.set_configuration_options(values={'hinted_handoff_enabled': False,
+                                                  'num_tokens': 1,
+                                                  'commitlog_sync_period_in_ms': 500,
+                                                  'enable_transient_replication': True,
+                                                  'partitioner': 'org.apache.cassandra.dht.OrderPreservingPartitioner'})
+        cluster.set_batch_commitlog(enabled=True)
+        cluster.populate(2, tokens=[0, 1], debug=True, install_byteman=True)
+        node1, node2 = cluster.nodelist()
+        cluster.start()
 
+        self.session = self.patient_exclusive_cql_connection(node1, consistency_level=CL.ALL)
+        self.session.execute("CREATE KEYSPACE %s WITH replication = "
+                             "{'class': 'SimpleStrategy', 'replication_factor': '2/1'}" % (keyspace))
+        self.session.execute("USE " + keyspace)
+        self.session.execute("CREATE TABLE t (k int PRIMARY KEY, v text)"
+                             " WITH speculative_retry = 'NEVER'"
+                             " AND additional_write_policy = 'NEVER'"
+                             " AND read_repair = 'NONE'")
+
+        # insert in both nodes with CL=ALL
+        self.session.execute("INSERT INTO t(k, v) VALUES (0, 'old')")
+
+        # update the previous value with CL=ONE only in one replica
+        node = cluster.nodelist()[1 if missed_by_transient else 0]
+        node.byteman_submit(['./byteman/stop_writes.btm'])
+        self.session.execute(SimpleStatement("UPDATE t SET v = 'new' WHERE k = 0", consistency_level=CL.ONE))
+
+        # query with CL=ALL to verify that no old values are resurrected
         self._assert_none("SELECT * FROM t WHERE v = 'old'")
         self._assert_one("SELECT * FROM t WHERE v = 'new'", row=[0, 'new'])
+
+    @since('4.0')
+    def test_update_missed_by_transient_replica(self):
+        self._test_missed_update_with_transient_replicas(missed_by_transient=True)
 
     @since('4.0')
     def test_update_only_on_transient_replica(self):
-        self._prepare_cluster(
-            create_table="CREATE TABLE t (k int PRIMARY KEY, v text)",
-            both_nodes=["INSERT INTO t(k, v) VALUES (0, 'old')"],
-            only_node2=["UPDATE t SET v = 'new' WHERE k = 0"],
-            transient=True)
-
-        self._assert_none("SELECT * FROM t WHERE v = 'old'")
-        self._assert_one("SELECT * FROM t WHERE v = 'new'", row=[0, 'new'])
+        self._test_missed_update_with_transient_replicas(missed_by_transient=False)
