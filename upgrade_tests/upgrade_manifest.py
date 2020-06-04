@@ -3,6 +3,7 @@ import logging
 from collections import namedtuple
 
 from dtest import RUN_STATIC_UPGRADE_MATRIX
+from conftest import cassandra_dir_and_version
 
 import ccmlib.repository
 from ccmlib.common import get_version_from_build
@@ -115,9 +116,10 @@ class VersionMeta(namedtuple('_VersionMeta', ('name', 'family', 'variant', 'vers
         """
         Returns a new object cloned from this one, with the version replaced with the local env version.
         """
-        # todo CASSANDRA-14421
-        # return self._replace(version=CASSANDRA_GITREF or CASSANDRA_VERSION_FROM_BUILD)
-        return self
+        cassandra_dir, cassandra_version = cassandra_dir_and_version(CONFIG)
+        if cassandra_version:
+            return self._replace(version=cassandra_version)
+        return self._replace(version="clone:{}".format(cassandra_dir))
 
 
 indev_2_1_x = VersionMeta(name='indev_2_1_x', family='2.1', variant='indev', version='github:apache/cassandra-2.1', min_proto_v=1, max_proto_v=3, java_versions=(7, 8))

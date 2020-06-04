@@ -61,13 +61,32 @@ class UpgradeTester(Tester, metaclass=ABCMeta):
             r'RejectedExecutionException.*ThreadPoolExecutor has shut down',  # see  CASSANDRA-12364
         ]
 
-    def setUp(self):
+    @pytest.fixture(autouse=True)
+    def around_test(self):
         self.validate_class_config()
-        logger.debug("Upgrade test beginning, setting CASSANDRA_VERSION to {}, and jdk to {}. (Prior values will be restored after test)."
-              .format(self.UPGRADE_PATH.starting_version, self.UPGRADE_PATH.starting_meta.java_version))
+        logger.info("Upgrade test beginning, setting CASSANDRA_VERSION to {}, and jdk to {}. (Prior values will be restored after test)."
+                    .format(self.UPGRADE_PATH.starting_version, self.UPGRADE_PATH.starting_meta.java_version))
+
+        previous_java_home = os.environ['JAVA_HOME']
+        previous_cassandra_version = os.environ['CASSANDRA_VERSION'] if 'CASSANDRA_VERSION' in os.environ else None
+
         switch_jdks(self.UPGRADE_PATH.starting_meta.java_version)
         os.environ['CASSANDRA_VERSION'] = self.UPGRADE_PATH.starting_version
-        super(UpgradeTester, self).setUp()
+
+        yield
+
+        os.environ['JAVA_HOME'] = previous_java_home
+        if previous_cassandra_version:
+            os.environ['CASSANDRA_VERSION'] = previous_cassandra_version
+
+        # Ignore errors before upgrade on Windows
+        # We ignore errors from 2.1, because windows 2.1
+        # support is only beta. There are frequent log errors,
+        # related to filesystem interactions that are a direct result
+        # of the lack of full functionality on 2.1 Windows, and we dont
+        # want these to pollute our results.
+        if is_win() and self.cluster.version() <= '2.2':
+            self.cluster.nodelist()[1].mark_log_for_errors()
 
     def prepare(self, ordered=False, create_keyspace=True, use_cache=False, use_thrift=False,
                 nodes=None, rf=None, protocol_version=None, cl=None, extra_config_options=None, **kwargs):
@@ -229,17 +248,6 @@ class UpgradeTester(Tester, metaclass=ABCMeta):
         node_versions = self.get_node_versions()
         assert len({v.vstring for v in node_versions}) <= 2
         return max(node_versions) if is_upgraded else min(node_versions)
-
-    def tearDown(self):
-        # Ignore errors before upgrade on Windows
-        # We ignore errors from 2.1, because windows 2.1
-        # support is only beta. There are frequent log errors,
-        # related to filesystem interactions that are a direct result
-        # of the lack of full functionality on 2.1 Windows, and we dont
-        # want these to pollute our results.
-        if is_win() and self.cluster.version() <= '2.2':
-            self.cluster.nodelist()[1].mark_log_for_errors()
-        super(UpgradeTester, self).tearDown()
 
     def validate_class_config(self):
         # check that an upgrade path is specified
