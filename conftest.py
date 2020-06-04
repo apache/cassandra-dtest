@@ -1,31 +1,27 @@
-import pytest
-import logging
-import os
-import shutil
-import time
-import re
-import platform
 import copy
 import inspect
-import subprocess
-
-from dtest import running_in_docker, cleanup_docker_environment_before_test_execution
-
+import logging
+import os
+import platform
+import re
+import shutil
+import time
 from datetime import datetime
 from distutils.version import LooseVersion
+# Python 3 imports
+from itertools import zip_longest
+
+import ccmlib.repository
+import netifaces as ni
+import pytest
+from ccmlib.common import validate_install_dir, is_win, get_version_from_build
 from netifaces import AF_INET
 from psutil import virtual_memory
 
-import netifaces as ni
-import ccmlib.repository
-from ccmlib.common import validate_install_dir, is_win, get_version_from_build
-
+from dtest import running_in_docker, cleanup_docker_environment_before_test_execution
 from dtest_config import DTestConfig
 from dtest_setup import DTestSetup
 from dtest_setup_overrides import DTestSetupOverrides
-
-# Python 3 imports
-from itertools import zip_longest
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +72,8 @@ def pytest_addoption(parser):
                      help="Delete all generated logs created by a test after the completion of a test.")
     parser.addoption("--execute-upgrade-tests", action="store_true", default=False,
                      help="Execute Cassandra Upgrade Tests (e.g. tests annotated with the upgrade_test mark)")
+    parser.addoption("--execute-upgrade-tests-only", action="store_true", default=False,
+                     help="Execute Cassandra Upgrade Tests without running any other tests")
     parser.addoption("--disable-active-log-watching", action="store_true", default=False,
                      help="Disable ccm active log watching, which will cause dtests to check for errors in the "
                           "logs in a single operation instead of semi-realtime processing by consuming "
@@ -477,6 +475,11 @@ def pytest_collection_modifyitems(items, config):
     for item in items:
         deselect_test = False
 
+        if config.getoption("--execute-upgrade-tests-only"):
+            deselect_test = not item.get_closest_marker("upgrade_test")
+            if deselect_test:
+                logger.info("SKIP: Deselecting non-upgrade test %s because of --execute-upgrade-tests-only" % item.name)
+
         if item.get_closest_marker("resource_intensive") and not collect_only:
             force_resource_intensive = config.getoption("--force-resource-intensive-tests")
             skip_resource_intensive = config.getoption("--skip-resource-intensive-tests")
@@ -494,7 +497,6 @@ def pytest_collection_modifyitems(items, config):
             if only_resource_intensive:
                 deselect_test = True
                 logger.info("SKIP: Deselecting non resource_intensive test %s as --only-resource-intensive-tests specified" % item.name)
-
 
         if item.get_closest_marker("no_vnodes"):
             if config.getoption("--use-vnodes"):
@@ -514,12 +516,10 @@ def pytest_collection_modifyitems(items, config):
 
             for module_pytest_mark in test_item_class[1].pytestmark:
                 if module_pytest_mark.name == "upgrade_test":
-                    if not config.getoption("--execute-upgrade-tests"):
-                        deselect_test = True
+                    deselect_test = not _upgrade_testing_enabled(config)
 
         if item.get_closest_marker("upgrade_test"):
-            if not config.getoption("--execute-upgrade-tests"):
-                deselect_test = True
+            deselect_test = not _upgrade_testing_enabled(config)
 
         if item.get_closest_marker("no_offheap_memtables"):
             if config.getoption("use_off_heap_memtables"):
@@ -536,3 +536,7 @@ def pytest_collection_modifyitems(items, config):
 
     config.hook.pytest_deselected(items=deselected_items)
     items[:] = selected_items
+
+
+def _upgrade_testing_enabled(config):
+    return config.getoption("--execute-upgrade-tests") or config.getoption("--execute-upgrade-tests-only")
