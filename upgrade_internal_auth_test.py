@@ -36,10 +36,11 @@ class TestAuthUpgrade(Tester):
             r'Can\'t send migration request: node.*is down',
     )
 
+    @since('2.2', max_version='2.2.X')
     def test_upgrade_to_22(self):
         self.do_upgrade_with_internal_auth("github:apache/cassandra-2.2")
 
-    @since('3.0')
+    @since('3.0', max_version='3.0.X')
     @pytest.mark.no_offheap_memtables
     def test_upgrade_to_30(self):
         self.do_upgrade_with_internal_auth("github:apache/cassandra-3.0")
