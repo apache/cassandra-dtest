@@ -330,6 +330,12 @@ class TestMaterializedViews(Tester):
         for i in range(1000):
             assert_one(session, "SELECT * FROM t_by_v WHERE v = {}".format(i), [i, i])
 
+    @pytest.mark.xfail(reason="Should be addressed with CASSANDRA-15845")
+    @since('4.0')
+    def test_populate_mv_after_insert_wide_rows_version40(self):
+        self.test_populate_mv_after_insert_wide_rows()
+
+    @since('3.0', max_version='3.X')
     def test_populate_mv_after_insert_wide_rows(self):
         """Test that a view is OK when created with existing data with wide rows"""
         session = self.prepare(consistency_level=ConsistencyLevel.QUORUM)
