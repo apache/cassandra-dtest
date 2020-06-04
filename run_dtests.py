@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """
 usage: run_dtests.py [-h] [--use-vnodes] [--use-off-heap-memtables] [--num-tokens NUM_TOKENS] [--data-dir-count-per-instance DATA_DIR_COUNT_PER_INSTANCE] [--force-resource-intensive-tests]
-                     [--skip-resource-intensive-tests] [--cassandra-dir CASSANDRA_DIR] [--cassandra-version CASSANDRA_VERSION] [--delete-logs] [--execute-upgrade-tests] [--disable-active-log-watching]
+                     [--skip-resource-intensive-tests] [--cassandra-dir CASSANDRA_DIR] [--cassandra-version CASSANDRA_VERSION] [--delete-logs] [--execute-upgrade-tests] [--execute-upgrade-tests-only] [--disable-active-log-watching]
                      [--keep-test-dir] [--enable-jacoco-code-coverage] [--dtest-enable-debug-logging] [--dtest-print-tests-only] [--dtest-print-tests-output DTEST_PRINT_TESTS_OUTPUT]
                      [--pytest-options PYTEST_OPTIONS] [--dtest-tests DTEST_TESTS]
 
@@ -17,6 +17,7 @@ optional arguments:
   --cassandra-version CASSANDRA_VERSION
   --delete-logs
   --execute-upgrade-tests                                    Execute Cassandra Upgrade Tests (e.g. tests annotated with the upgrade_test mark) (default: False)
+  --execute-upgrade-tests-only                               Execute Cassandra Upgrade Tests without running any other tests (e.g. tests annotated with the upgrade_test mark) (default: False)
   --disable-active-log-watching                              Disable ccm active log watching, which will cause dtests to check for errors in the logs in a single operation instead of semi-realtime
                                                              processing by consuming ccm _log_error_handler callbacks (default: False)
   --keep-test-dir                                            Do not remove/cleanup the test ccm cluster directory and it's artifacts after the test completes (default: False)

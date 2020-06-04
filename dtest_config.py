@@ -17,6 +17,7 @@ class DTestConfig:
         self.cassandra_version_from_build = None
         self.delete_logs = False
         self.execute_upgrade_tests = False
+        self.execute_upgrade_tests_only = False
         self.disable_active_log_watching = False
         self.keep_test_dir = False
         self.enable_jacoco_code_coverage = False
@@ -38,6 +39,7 @@ class DTestConfig:
 
         self.delete_logs = request.config.getoption("--delete-logs")
         self.execute_upgrade_tests = request.config.getoption("--execute-upgrade-tests")
+        self.execute_upgrade_tests_only = request.config.getoption("--execute-upgrade-tests-only")
         self.disable_active_log_watching = request.config.getoption("--disable-active-log-watching")
         self.keep_test_dir = request.config.getoption("--keep-test-dir")
         self.enable_jacoco_code_coverage = request.config.getoption("--enable-jacoco-code-coverage")
