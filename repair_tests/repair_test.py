@@ -1274,7 +1274,8 @@ class TestRepairDataSystemTable(Tester):
         Prepares a cluster for tests of the repair history tables by starting
         a 5-node cluster, then inserting 5000 values with RF=3.
         """
-        fixture_dtest_setup.cluster.populate(5).start(wait_for_binary_proto=True)
+        self.cluster = fixture_dtest_setup.cluster
+        self.cluster.populate(5).start(wait_for_binary_proto=True)
         self.node1 = self.cluster.nodelist()[0]
         self.session = fixture_dtest_setup.patient_cql_connection(self.node1)
 
