@@ -182,10 +182,13 @@ class BaseReplaceAddressTest(Tester):
             # a little hacky but grep_log returns the whole line...
             num_tokens = int(self.replacement_node.get_conf_option('num_tokens'))
 
-        logger.debug("Verifying {} tokens migrated sucessfully".format(num_tokens))
-        logs = self.replacement_node.grep_log(r"Token (.*?) changing ownership from /{} to /{}"
-                                              .format(self.replaced_node.address(),
-                                                      self.replacement_node.address()))
+        logger.debug("Verifying {} tokens migrated successfully".format(num_tokens))
+        replmnt_address = ("/" + self.replacement_node.address()) if self.cluster.version() < '4.0' else self.replacement_node.address_and_port()
+        repled_address = ("/" + self.replaced_node.address()) if self.cluster.version() < '4.0' else self.replaced_node.address_and_port()
+        token_ownership_log = r"Token (.*?) changing ownership from {} to {}".format(repled_address,
+                                                                                     replmnt_address)
+        logs = self.replacement_node.grep_log(token_ownership_log)
+
         if (previous_log_size is not None):
             assert len(logs) == previous_log_size
 
@@ -321,7 +324,9 @@ class TestReplaceAddress(BaseReplaceAddressTest):
         self._do_replace(replace_address='127.0.0.5', wait_for_binary_proto=False)
 
         logger.debug("Waiting for replace to fail")
-        self.replacement_node.watch_log_for("java.lang.RuntimeException: Cannot replace_address /127.0.0.5 because it doesn't exist in gossip")
+        node_log_str = "/127.0.0.5" if self.cluster.version() < '4.0' else "127.0.0.5:7000"
+        self.replacement_node.watch_log_for("java.lang.RuntimeException: Cannot replace_address "
+                                            + node_log_str + " because it doesn't exist in gossip")
         assert_not_running(self.replacement_node)
 
     @since('3.6')
@@ -464,17 +469,23 @@ class TestReplaceAddress(BaseReplaceAddressTest):
         self._stop_node_to_replace()
 
         logger.debug("Submitting byteman script to make stream fail")
+        btmmark = self.query_node.mark_log()
 
         if self.cluster.version() < '4.0':
             self.query_node.byteman_submit(['./byteman/pre4.0/stream_failure.btm'])
             self._do_replace(jvm_option='replace_address_first_boot',
-                             opts={'streaming_socket_timeout_in_ms': 1000})
+                             opts={'streaming_socket_timeout_in_ms': 1000},
+                             wait_for_binary_proto=False,
+                             wait_other_notice=True)
         else:
             self.query_node.byteman_submit(['./byteman/4.0/stream_failure.btm'])
-            self._do_replace(jvm_option='replace_address_first_boot')
+            self._do_replace(jvm_option='replace_address_first_boot', wait_for_binary_proto=False, wait_other_notice=True)
 
         # Make sure bootstrap did not complete successfully
-        assert_bootstrap_state(self, self.replacement_node, 'IN_PROGRESS')
+        self.query_node.watch_log_for("Triggering network failure", from_mark=btmmark)
+        self.query_node.watch_log_for("Stream failed", from_mark=btmmark)
+        self.replacement_node.watch_log_for("Stream failed")
+        self.replacement_node.watch_log_for("Some data streaming failed.*IN_PROGRESS$")
 
         if mode == 'reset_resume_state':
             mark = self.replacement_node.mark_log()
@@ -498,12 +509,14 @@ class TestReplaceAddress(BaseReplaceAddressTest):
             self.replacement_node.stop()
 
             logger.debug("Waiting other nodes to detect node stopped")
-            self.query_node.watch_log_for("FatClient /{} has been silent for 30000ms, removing from gossip".format(self.replacement_node.address()), timeout=120)
-            self.query_node.watch_log_for("Node /{} failed during replace.".format(self.replacement_node.address()), timeout=120, filename='debug.log')
+            node_log_str = ("/" + self.replacement_node.address()) if self.cluster.version() < '4.0' else self.replacement_node.address_and_port()
+            self.query_node.watch_log_for("FatClient {} has been silent for 30000ms, removing from gossip".format(node_log_str), timeout=120)
+            self.query_node.watch_log_for("Node {} failed during replace.".format(node_log_str), timeout=120, filename='debug.log')
 
             logger.debug("Restarting node after wiping data")
             self._cleanup(self.replacement_node)
-            self.replacement_node.start(jvm_args=["-Dcassandra.replace_address_first_boot={}".format(self.replaced_node.address())],
+            self.replacement_node.start(jvm_args=["-Dcassandra.replace_address_first_boot={}"
+                                        .format(self.replaced_node.address())],
                                         wait_for_binary_proto=True)
         else:
             raise RuntimeError('invalid mode value {mode}'.format(mode=mode))
@@ -511,7 +524,7 @@ class TestReplaceAddress(BaseReplaceAddressTest):
         # check if bootstrap succeeded
         assert_bootstrap_state(self, self.replacement_node, 'COMPLETED')
 
-        logger.debug("Bootstrap finished successully, verifying data.")
+        logger.debug("Bootstrap finished successfully, verifying data.")
 
         self._verify_data(initial_data)
 
