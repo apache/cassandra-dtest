@@ -11,7 +11,7 @@ from cassandra import ReadFailure
 from cassandra.query import SimpleStatement
 from ccmlib.node import Node, TimeoutError
 
-from dtest import Tester, get_ip_from_node, create_ks
+from dtest import Tester, get_ip_from_node, get_port_from_node, create_ks
 
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
@@ -121,9 +121,12 @@ class TestPushedNotifications(Tester):
     @pytest.mark.no_vnodes
     def test_move_single_node_localhost(self):
         """
-        @jira_ticket  CASSANDRA-10052
         Test that we don't get NODE_MOVED notifications from nodes other than the local one,
-        when rpc_address is set to localhost (127.0.0.1).
+        when rpc_address is set to localhost (127.0.0.1) Pre 4.0.
+        Test that we get NODE_MOVED notifications from nodes other than the local one,
+        when rpc_address is set to localhost (127.0.0.1) Post 4.0.
+        @jira_ticket  CASSANDRA-10052
+        @jira_ticket  CASSANDRA-15677
 
         To set-up this test we override the rpc_address to "localhost (127.0.0.1)" for all nodes, and
         therefore we must change the rpc port or else processes won't start.
@@ -148,10 +151,22 @@ class TestPushedNotifications(Tester):
         node1 = list(self.cluster.nodes.values())[0]
         node1.move("123")
 
+        version = self.cluster.cassandra_version()
         for waiter in waiters:
             logger.debug("Waiting for notification from {}".format(waiter.address,))
             notifications = waiter.wait_for_notifications(30.0)
-            assert 1 if waiter.node is node1 else 0 == len(notifications), notifications
+            if version >= '4.0':
+                # CASSANDRA-15677 Post 4.0 we'll get the notifications. Check that they are for the right node.
+                assert 1 == len(notifications), notifications
+                notification = notifications[0]
+                change_type = notification["change_type"]
+                address, port = notification["address"]
+                assert "MOVED_NODE" == change_type
+                assert get_ip_from_node(node1) == address
+                assert get_port_from_node(node1) == port
+            else:
+                assert 1 if waiter.node is node1 else 0 == len(notifications), notifications
+
 
     def test_restart_node(self):
         """
@@ -194,8 +209,10 @@ class TestPushedNotifications(Tester):
 
     def test_restart_node_localhost(self):
         """
-        Test that we don't get client notifications when rpc_address is set to localhost.
+        Test that we don't get client notifications when rpc_address is set to localhost Pre 4.0.
+        Test that we get correct client notifications when rpc_address is set to localhost Post 4.0.
         @jira_ticket  CASSANDRA-10052
+        @jira_ticket  CASSANDRA-15677
 
         To set-up this test we override the rpc_address to "localhost" for all nodes, and
         therefore we must change the rpc port or else processes won't start.
@@ -219,7 +236,18 @@ class TestPushedNotifications(Tester):
         # check that node1 did not send UP or DOWN notification for node2
         logger.debug("Waiting for notifications from {}".format(waiter.address,))
         notifications = waiter.wait_for_notifications(timeout=30.0, num_notifications=2)
-        assert 0 == len(notifications), notifications
+        version = self.cluster.cassandra_version()
+
+        if version >= '4.0':
+            # CASSANDRA-15677 Post 4.0 we'll get the notifications. Check that they are for the right node.
+            for notification in notifications:
+                address, port = notification["address"]
+                assert get_ip_from_node(node2) == address
+                assert get_port_from_node(node2) == port
+            assert "DOWN" == notifications[0]["change_type"], notifications
+            assert "UP" == notifications[1]["change_type"], notifications
+        else:
+            assert 0 == len(notifications), notifications
 
     @since("2.2")
     def test_add_and_remove_node(self):
