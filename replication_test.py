@@ -349,7 +349,7 @@ class TestSnitchConfigurationUpdate(Tester):
                     if m:
                         racks.append(m.group(1))
                 racks.sort() #order is not deterministic
-                if racks == expected_racks:
+                if racks == sorted(expected_racks.copy()):
                     # great, the topology change is propagated
                     logger.debug("Topology change detected on node {}".format(i))
                     break
