@@ -947,7 +947,7 @@ CREATE OR REPLACE AGGREGATE test.average(int)
         self.execute(cql='DESCRIBE AGGREGATE test.average', expected_output=self.get_describe_aggregate_output())
 
     def get_describe_aggregate_output(self):
-        if self.cluster.version() >= LooseVersion("4.0"):
+        if self.cluster.version() >= LooseVersion("3.11"):
             return """
                 CREATE AGGREGATE test.average(int)
                     SFUNC average_state
@@ -998,7 +998,7 @@ CREATE TYPE test.name_type (
 )"""
         create_address_type_statement = """
 CREATE TYPE test.address_type (
-    name frozen<name_type>, 
+    name frozen<name_type>,
     number int,
     street text,
     phones set<text>
