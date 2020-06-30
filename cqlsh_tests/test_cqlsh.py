@@ -2031,6 +2031,33 @@ Tracing session:""")
 
         assert_all(session, "SELECT * FROM ks.cf", [[0]])
 
+    def test_fetch_all_rows_in_batch_mode(self):
+        """
+        Test: cqlsh -e "<SELECT STATEMENT>" with more rows than 1 page
+        @jira_ticket CASSANDRA-15905
+        """
+        self.cluster.populate(1)
+        self.cluster.start(wait_for_binary_proto=True)
+        node1, = self.cluster.nodelist()
+        session = self.patient_cql_connection(node1)
+
+        session.execute("CREATE KEYSPACE ks WITH REPLICATION={'class':'SimpleStrategy','replication_factor':1};")
+        session.execute("CREATE TABLE ks.test (key uuid primary key);")
+
+        num_rows = 200
+        expected_lines = num_rows + 5 # 5: header + empty lines
+
+        for i in range(num_rows):
+            session.execute("INSERT INTO ks.test (key) VALUES (uuid())")
+
+        stdout, err = self.run_cqlsh(node1, cmds="", cqlsh_options=['-e', 'SELECT * FROM ks.test;'])
+        assert err == ""
+        output_lines = stdout.splitlines()
+        assert expected_lines == len(output_lines)
+        assert output_lines[0].strip() == ''
+        assert output_lines[-2].strip() == ''
+        assert output_lines[-1].strip() == "({} rows)".format(num_rows)
+
     def run_cqlsh(self, node, cmds, cqlsh_options=None, env_vars=None):
         """
         Local version of run_cqlsh to open a cqlsh subprocess with
