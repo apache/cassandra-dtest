@@ -1360,8 +1360,8 @@ class TestConsistency(Tester):
         """
         cluster = self.cluster
 
-        # this test causes the python driver to be extremely noisy due to
-        # frequent starting and stopping of nodes. let's move the log level
+        # This test causes the python driver to be extremely noisy due to
+        # frequent starting and stopping of nodes. Let's move the log level
         # of the driver to ERROR for this test only
         logging.getLogger("cassandra").setLevel('ERROR')
 
@@ -1384,46 +1384,44 @@ class TestConsistency(Tester):
         normal_key = 'normal'
         reversed_key = 'reversed'
 
-        # Repeat this test 10 times to make it more easy to spot a null pointer exception caused by a race, see CASSANDRA-9460
-        for k in range(10):
-            # insert 9 columns in two rows
-            insert_columns(self, session, normal_key, 9)
-            insert_columns(self, session, reversed_key, 9)
+        # insert 9 columns in two rows
+        insert_columns(self, session, normal_key, 9)
+        insert_columns(self, session, reversed_key, 9)
 
-            # Delete 3 first columns (and 3 last columns, for the reversed version) with a different node dead each time
-            for node, column_number_to_delete in zip(list(range(1, 4)), list(range(3))):
-                self.stop_node(node)
-                self.delete(node, normal_key, column_number_to_delete)
-                self.delete(node, reversed_key, 8 - column_number_to_delete)
-                self.restart_node(node)
+        # Delete 3 first columns (and 3 last columns, for the reversed version) with a different node dead each time
+        for node, column_number_to_delete in zip(list(range(1, 4)), list(range(3))):
+            self.stop_node(node)
+            self.delete(node, normal_key, column_number_to_delete)
+            self.delete(node, reversed_key, 8 - column_number_to_delete)
+            self.restart_node(node)
 
-            # Query 3 firsts columns in normal order
-            session = self.patient_cql_connection(node1, 'ks')
-            query = SimpleStatement(
-                'SELECT c, v FROM cf WHERE key=\'k{}\' LIMIT 3'.format(normal_key),
-                consistency_level=ConsistencyLevel.QUORUM)
-            rows = list(session.execute(query))
-            res = rows
-            assert_length_equal(res, 3)
+        # Query 3 firsts columns in normal order
+        session = self.patient_cql_connection(node1, 'ks')
+        query = SimpleStatement(
+            'SELECT c, v FROM cf WHERE key=\'k{}\' LIMIT 3'.format(normal_key),
+            consistency_level=ConsistencyLevel.QUORUM)
+        rows = list(session.execute(query))
+        res = rows
+        assert_length_equal(res, 3)
 
-            # value 0, 1 and 2 have been deleted
-            for i in range(1, 4):
-                assert 'value{}'.format(i + 2) == res[i - 1][1]
+        # value 0, 1 and 2 have been deleted
+        for i in range(1, 4):
+            assert 'value{}'.format(i + 2) == res[i - 1][1]
 
-            # Query 3 firsts columns in reverse order
-            session = self.patient_cql_connection(node1, 'ks')
-            query = SimpleStatement(
-                'SELECT c, v FROM cf WHERE key=\'k{}\' ORDER BY c DESC LIMIT 3'.format(reversed_key),
-                consistency_level=ConsistencyLevel.QUORUM)
-            rows = list(session.execute(query))
-            res = rows
-            assert_length_equal(res, 3)
+        # Query 3 firsts columns in reverse order
+        session = self.patient_cql_connection(node1, 'ks')
+        query = SimpleStatement(
+            'SELECT c, v FROM cf WHERE key=\'k{}\' ORDER BY c DESC LIMIT 3'.format(reversed_key),
+            consistency_level=ConsistencyLevel.QUORUM)
+        rows = list(session.execute(query))
+        res = rows
+        assert_length_equal(res, 3)
 
-            # value 6, 7 and 8 have been deleted
-            for i in range(0, 3):
-                assert 'value{}'.format(5 - i) == res[i][1]
+        # value 6, 7 and 8 have been deleted
+        for i in range(0, 3):
+            assert 'value{}'.format(5 - i) == res[i][1]
 
-            session.execute('TRUNCATE cf')
+        session.execute('TRUNCATE cf')
 
     def test_short_read_delete(self):
         """ Test short reads ultimately leaving no columns alive [#4000] """
