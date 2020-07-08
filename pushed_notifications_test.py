@@ -229,6 +229,12 @@ class TestPushedNotifications(Tester):
         waiter = NotificationWaiter(self, node1, ["STATUS_CHANGE", "TOPOLOGY_CHANGE"])
 
         # restart node 2
+        version = self.cluster.cassandra_version()
+        if version >= '4.0':
+            # >=4.0 we wait for the NEW_NODE and UP notifications to reach us
+            waiter.wait_for_notifications(timeout=30.0, num_notifications=2)
+            waiter.clear_notifications()
+
         logger.debug("Restarting second node...")
         node2.stop(wait_other_notice=True)
         node2.start(wait_other_notice=True)
@@ -236,7 +242,6 @@ class TestPushedNotifications(Tester):
         # check that node1 did not send UP or DOWN notification for node2
         logger.debug("Waiting for notifications from {}".format(waiter.address,))
         notifications = waiter.wait_for_notifications(timeout=30.0, num_notifications=2)
-        version = self.cluster.cassandra_version()
 
         if version >= '4.0':
             # CASSANDRA-15677 Post 4.0 we'll get the notifications. Check that they are for the right node.
