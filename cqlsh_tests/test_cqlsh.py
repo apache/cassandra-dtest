@@ -934,6 +934,16 @@ CREATE TYPE test.address_type (
         self.execute(create_name_type_statement)
         self.execute(create_address_type_statement)
 
+        # Support for non-frozen UDTs was added in CASSANDRA-7423, so the output of DESCRIBE TYPE must account for this:
+        if self.cluster.version() < LooseVersion('3.6'):
+            create_address_type_statement = """
+                CREATE TYPE test.address_type (
+                    name frozen<name_type>,
+                    number int,
+                    street text,
+                    phones frozen<set<text>>
+                )"""
+
         # DESCRIBE user defined types
         self.execute(cql='DESCRIBE TYPE test.name_type', expected_output='{};'.format(create_name_type_statement))
         self.execute(cql='DESCRIBE TYPE test.address_type', expected_output='{};'.format(create_address_type_statement))
