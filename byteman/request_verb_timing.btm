@@ -1,0 +1,12 @@
+RULE timing of request messages broken down by verb
+CLASS org.apache.cassandra.net.MessagingService
+METHOD doSend
+AT ENTRY
+BIND prefix:String = "org.jboss.byteman."; # byteman in strict mode requires the o.j.b prefix
+    toHost:String = $to.address.toString();
+    verb:String = $message.header.verb.toString();
+    prop:String = prefix + "|request_verb_timing|" + toHost + "|" + verb;
+IF true
+DO
+    System.setProperty(prop, String.valueOf(System.currentTimeMillis()));
+ENDRULE

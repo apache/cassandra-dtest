@@ -53,6 +53,33 @@ def byteman_validate(node, script, verbose=False, opts=None):
 
     assert not has_errors, "byteman script didn't compile\n" + out
 
+def build_byteman_submit_command(node, opts):
+    cdir = node.get_install_dir()
+    byteman_cmd = [os.path.join(os.environ['JAVA_HOME'], 'bin', 'java'),
+                   '-cp',
+                   glob.glob(os.path.join(cdir, 'build', 'lib', 'jars', 'byteman-submit-[0-9]*.jar'))[0],
+                   'org.jboss.byteman.agent.submit.Submit',
+                   '-p', node.byteman_port,
+                   '-h', node.network_interfaces['binary'][0]] + opts
+    return byteman_cmd
+
+def request_verb_timing(node):
+    # -y is byteman's built-in flag for reading system props
+    byteman_cmd = build_byteman_submit_command(node, ['-y'])
+    out = subprocess.check_output(byteman_cmd)
+    if (out is not None) and isinstance(out, bytes):
+        out = out.decode()
+    lines = out.splitlines()
+    props = {}
+    for line in lines:
+        # look for the custom separators, otherwise skip
+        if "=" in line and "|" in line:
+            key, value = line.split("=")
+            split_key = key.split("|")
+            ip = split_key[-2].replace("/", "")
+            verb = split_key[-1]
+            props.setdefault(ip, {}).update({verb: int(value)})
+    return props
 
 class TestReadRepair(Tester):
 
@@ -518,6 +545,8 @@ class TestSpeculativeReadRepair(Tester):
         node2.byteman_submit(['-u', './byteman/read_repair/stop_writes.btm'])
 
         node1.byteman_submit(['./byteman/read_repair/sorted_live_endpoints.btm'])
+        node1.byteman_submit(['./byteman/request_verb_timing.btm'])
+
         with StorageProxy(node1) as storage_proxy:
             assert storage_proxy.blocking_read_repair == 0
             assert storage_proxy.speculated_rr_read == 0
@@ -526,11 +555,20 @@ class TestSpeculativeReadRepair(Tester):
             session = self.get_cql_connection(node1)
             node2.byteman_submit(['./byteman/read_repair/stop_data_reads.btm'])
             results = session.execute(quorum("SELECT * FROM ks.tbl WHERE k=1"))
+
+            timing = request_verb_timing(node1)
+            repair_req_node3 = timing[node3.ip_addr].get('READ_REPAIR_REQ')
+            repair_req_node2 = timing[node2.ip_addr].get('READ_REPAIR_REQ')
             assert listify(results) == [kcv(1, 0, 1), kcv(1, 1, 2)]
 
             assert storage_proxy.blocking_read_repair == 1
             assert storage_proxy.speculated_rr_read == 1
-            assert storage_proxy.speculated_rr_write == 0
+            
+            # under normal circumstances we don't expect a speculated write here,
+            # but the repair request to node 3 may timeout due to CPU contention and
+            # then a speculated write is sent to node 2, so we just make sure that the
+            # request to node 2 didn't happen before the request to node 3
+            assert storage_proxy.speculated_rr_write == 0 or repair_req_node2 > repair_req_node3
 
     @since('4.0')
     def test_speculative_write(self):
