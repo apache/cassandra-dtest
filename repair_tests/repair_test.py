@@ -85,7 +85,7 @@ class BaseRepairTest(Tester):
 
         if restart:
             for node in stopped_nodes:
-                node.start(wait_other_notice=True)
+                node.start(wait_for_binary_proto=True, wait_other_notice=True)
 
     def _populate_cluster(self, start=True):
         cluster = self.cluster
@@ -95,7 +95,7 @@ class BaseRepairTest(Tester):
         cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
         cluster.set_batch_commitlog(enabled=True)
         logger.debug("Starting cluster..")
-        cluster.populate(3).start()
+        cluster.populate(3).start(wait_for_binary_proto=True, wait_other_notice=True)
         node1, node2, node3 = cluster.nodelist()
 
         session = self.patient_cql_connection(node1, retry_policy=FlakyRetryPolicy(max_retries=15))
