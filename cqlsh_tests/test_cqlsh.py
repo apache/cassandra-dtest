@@ -11,6 +11,7 @@ import re
 import subprocess
 import sys
 import logging
+import tempfile
 
 import pytest
 from decimal import Decimal
@@ -35,7 +36,62 @@ since = pytest.mark.since
 logger = logging.getLogger(__name__)
 
 
-class TestCqlsh(Tester):
+class CqlshMixin():
+
+    # If enabled, log all stdout/stderr of cqlsh commands
+    cqlsh_debug_enabled = False
+
+    def verify_output(self, query, node, expected):
+        output, err = self.run_cqlsh(node, query, ['-u', 'cassandra', '-p', 'cassandra'])
+        if common.is_win():
+            output = output.replace('\r', '')
+
+        assert 0 == len(err), "Failed to execute cqlsh: {}".format(err)
+
+        logger.debug(output)
+        assert expected in output, "Output \n {0} \n doesn't contain expected\n {1}".format(output, expected)
+
+    def _get_base_cli_args(self, node, cqlsh_options=None, env_vars=None):
+        if env_vars is None:
+            env_vars = {}
+        if cqlsh_options is None:
+            cqlsh_options = []
+        cdir = node.get_install_dir()
+        cli = os.path.join(cdir, 'bin', common.platform_binary('cqlsh'))
+        env = common.make_cassandra_env(cdir, node.get_path())
+        env['LANG'] = 'en_US.UTF-8'
+        env.update(env_vars)
+        if self.cluster.version() >= LooseVersion('2.1'):
+            host = node.network_interfaces['binary'][0]
+            port = node.network_interfaces['binary'][1]
+        else:
+            host = node.network_interfaces['thrift'][0]
+            port = node.network_interfaces['thrift'][1]
+
+        return cli, cqlsh_options + [host, str(port)], env
+
+    def run_cqlsh(self, node, cmds, cqlsh_options=None, env_vars=None):
+        """
+        Local version of run_cqlsh to open a cqlsh subprocess with
+        additional environment variables.
+        """
+        cli, args, env = self._get_base_cli_args(node, cqlsh_options, env_vars)
+        sys.stdout.flush()
+        p = subprocess.Popen([cli] + args, env=env, stdin=subprocess.PIPE,
+                             stderr=subprocess.PIPE, stdout=subprocess.PIPE,
+                             universal_newlines=True)
+        for cmd in cmds.split(';'):
+            p.stdin.write(cmd + ';\n')
+        p.stdin.write("quit;\n")
+        stdout, stderr = p.communicate()
+        if self.cqlsh_debug_enabled:
+            cmd = " ".join([cli] + args)
+            logger.debug("Cqlsh command: " + cmd)
+            logger.debug("Cqlsh command stdout:\n" + stdout)
+            logger.debug("Cqlsh command stderr:\n" + stderr)
+        return stdout, stderr
+
+class TestCqlsh(Tester, CqlshMixin):
 
     # override cluster options to enable user defined functions
     # currently only needed for test_describe
@@ -633,15 +689,8 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         assert 'list index out of range' not in err
         # If this assertion fails check CASSANDRA-7891
 
-    def verify_output(self, query, node, expected):
-        output, err = self.run_cqlsh(node, query, ['-u', 'cassandra', '-p', 'cassandra'])
-        if common.is_win():
-            output = output.replace('\r', '')
-
-        assert 0 == len(err), "Failed to execute cqlsh: {}".format(err)
-
-        logger.debug(output)
-        assert expected in output, "Output \n {0} \n doesn't contain expected\n {1}".format(output, expected)
+    # If enabled, log all stdout/stderr of cqlsh commands
+    cqlsh_debug_enabled = False
 
     def test_list_queries(self):
         config = {'authenticator': 'org.apache.cassandra.auth.PasswordAuthenticator',
@@ -2068,38 +2117,8 @@ Tracing session:""")
         assert output_lines[-2].strip() == ''
         assert output_lines[-1].strip() == "({} rows)".format(num_rows)
 
-    def run_cqlsh(self, node, cmds, cqlsh_options=None, env_vars=None):
-        """
-        Local version of run_cqlsh to open a cqlsh subprocess with
-        additional environment variables.
-        """
-        if env_vars is None:
-            env_vars = {}
-        if cqlsh_options is None:
-            cqlsh_options = []
-        cdir = node.get_install_dir()
-        cli = os.path.join(cdir, 'bin', common.platform_binary('cqlsh'))
-        env = common.make_cassandra_env(cdir, node.get_path())
-        env['LANG'] = 'en_US.UTF-8'
-        env.update(env_vars)
-        if self.cluster.version() >= LooseVersion('2.1'):
-            host = node.network_interfaces['binary'][0]
-            port = node.network_interfaces['binary'][1]
-        else:
-            host = node.network_interfaces['thrift'][0]
-            port = node.network_interfaces['thrift'][1]
-        args = cqlsh_options + [host, str(port)]
-        sys.stdout.flush()
-        p = subprocess.Popen([cli] + args, env=env, stdin=subprocess.PIPE,
-                             stderr=subprocess.PIPE, stdout=subprocess.PIPE,
-                             universal_newlines=True)
-        for cmd in cmds.split(';'):
-            p.stdin.write(cmd + ';\n')
-        p.stdin.write("quit;\n")
-        return p.communicate()
 
-
-class TestCqlshSmoke(Tester):
+class TestCqlshSmoke(Tester, CqlshMixin):
     """
     Tests simple use cases for clqsh.
     """
@@ -2400,7 +2419,7 @@ class TestCqlshSmoke(Tester):
         assert stdout_lines_sorted.find(expected) >= 0
 
 
-class TestCqlLogin(Tester):
+class TestCqlLogin(Tester, CqlshMixin):
     """
     Tests login which requires password authenticator
     """
@@ -2513,3 +2532,92 @@ class TestCqlLogin(Tester):
             cqlsh_options=['-u', 'cassandra', '-p', 'cassandra'])
         assert 'super' in out
         assert '' == err
+
+
+class TestCqlshUnicode(Tester, CqlshMixin):
+    """
+    Tests to make sure some specific unicode use cases work.
+    """
+
+    # enable cqlsh debug for all tests
+    cqlsh_debug_enabled = True
+
+    @pytest.fixture(scope='function', autouse=True)
+    def fixture_cluster_setup(self, fixture_dtest_setup):
+        cluster = fixture_dtest_setup.cluster
+        cluster.populate(1).start(wait_for_binary_proto=True)
+        [self.node1] = cluster.nodelist()
+        self.session = fixture_dtest_setup.patient_cql_connection(self.node1)
+
+    def tearDown(self):
+        self.close_all_connections()
+        super(TestCqlshUnicode, self).tearDown()
+
+    def test_cqlsh_execute_cmdline(self):
+        create_ks(self.session, 'ks', 1)
+        create_cf(self.session, 'test', key_type='int', columns={'v': 'text'})
+        self.session.execute("INSERT INTO ks.test(key, v) VALUES (1, 'FA Cup 2009–09 ϑΉӁװڜ')")
+        output, _ = self.run_cqlsh(self.node1, 'SELECT * FROM ks.test')
+
+        assert "FA Cup 2009–09 ϑΉӁ" in output, "Cannot find inserted data"
+
+    def test_cqlsh_input_cmdline(self):
+        create_ks(self.session, 'ks', 1)
+        create_cf(self.session, 'test', key_type='int', columns={'v': 'text'})
+        self.run_cqlsh(self.node1, "INSERT INTO ks.test(key, v) VALUES (1, 'FA Cup 2010–09 ϑΉӁװڜ')")
+        output, _ = self.run_cqlsh(self.node1, "SELECT * FROM ks.test")
+        assert 'FA Cup 2010–09 ϑΉӁ' in output, "Cannot find inserted data"
+
+    def test_cqlsh_file_cmdline(self):
+        create_ks(self.session, 'ks', 1)
+        create_cf(self.session, 'test', key_type='int', columns={'v': 'text'})
+        with tempfile.NamedTemporaryFile(mode='w+') as cqlfile:
+            cqlfile.write("INSERT INTO ks.test(key, v) VALUES (2, 'FA Cup 2011–09 ϑΉװڜ')")
+            cqlfile.seek(0)
+            _, err = self.run_cqlsh(self.node1, str(cqlfile.read()))
+            assert "'ascii' codec can't decode byte" not in err, "ascii codec error detected"
+            output, _ = self.run_cqlsh(self.node1, "SELECT * FROM ks.test")
+            assert 'FA Cup 2011–09 ϑΉװڜ'in output, "Cannot find inserted data"
+
+    def test_cqlsh_copy(self):
+        create_ks(self.session, 'ks', 1)
+        create_cf(self.session, 'test', key_type='int', columns={'v': 'text'})
+        self.run_cqlsh(self.node1, "INSERT INTO ks.test(key, v) values (1, 'FA Cup 2013–09 ϑΉӁװڜ')")
+        output, _ = self.run_cqlsh(self.node1, "SELECT * FROM ks.test")
+        assert 'FA Cup 2013–09 ϑΉӁװڜ' in output, "Cannot find inserted data"
+
+        with tempfile.NamedTemporaryFile() as csvfile:
+            self.run_cqlsh(self.node1, cmds="COPY ks.test TO '%s';" % csvfile.name)
+            self.run_cqlsh(self.node1, "truncate ks.test")
+
+            output, _ = self.run_cqlsh(self.node1, "SELECT * FROM ks.test")
+            assert 'FA Cup 2013–09 ϑΉӁװڜ' not in output, "Unexpected data found in table"
+
+            self.run_cqlsh(self.node1, cmds="COPY ks.test FROM '%s';" % csvfile.name)
+            output, _ = self.run_cqlsh(self.node1, "SELECT * FROM ks.test")
+            assert 'FA Cup 2013–09 ϑΉӁװڜ' in output, "Cannot find inserted data"
+
+    def test_cqlsh_source(self):
+        create_ks(self.session, 'ks', 1)
+        create_cf(self.session, 'test', key_type='int', columns={'v': 'text'})
+        output, _ = self.run_cqlsh(self.node1, "SELECT * FROM ks.test")
+        assert 'FA Cup 2011–09 ϑΉװڜ' not in output, "Unexpected data found in table"
+
+        with tempfile.NamedTemporaryFile(mode='w+') as cqlfile:
+            cqlfile.write("INSERT INTO ks.test(key, v) VALUES (1, 'FA Cup 2011–09 ϑΉװڜ');")
+            cqlfile.seek(0)
+            self.run_cqlsh(self.node1, cqlfile.read())
+            output, _ = self.run_cqlsh(self.node1, "SELECT * FROM ks.test")
+            assert 'FA Cup 2011–09 ϑΉװڜ' in output, "Cannot find inserted data"
+
+    @since('2.2')
+    def test_cqlsh_json(self):
+        create_ks(self.session, 'ks', 1)
+        create_cf(self.session, 'test', key_type='int', columns={'v': 'text'})
+        output, _ = self.run_cqlsh(self.node1, "select json * from ks.test")
+        assert 'FA Cup 2011–09 ϑΉװڜ' not in output, "Unexpected data found in table"
+
+        output, _ = self.run_cqlsh(self.node1,
+                                   cmds="""insert into ks.test JSON '{ "key" : 1, "v" : "FA Cup 2011–09 ϑΉװڜ" }'""")
+        output, _ = self.run_cqlsh(self.node1, "select * from ks.test")
+        assert 'FA Cup 2011–09 ϑΉװڜ' in output, "Cannot find inserted data"
