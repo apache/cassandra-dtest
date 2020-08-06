@@ -734,7 +734,7 @@ class TestBootstrap(Tester):
         self.assert_log_had_msg(blind_replacement_node, "A node with the same IP in hibernate status was detected", timeout=60)
         # Waiting two seconds to give node a chance to stop in case above assertion is True.
         # When this happens cassandra may not shut down fast enough and the below assertion fails.
-        time.sleep(2)
+        time.sleep(15)
         # Asserting that then new node is not running.
         # This tests the actual expected state as opposed to just checking for the existance of the above error message.
         assert not blind_replacement_node.is_running()
