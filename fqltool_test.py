@@ -51,7 +51,7 @@ class TestFQLTool(Tester):
                 got_exception = True
             assert got_exception
             # replay the log files
-            self._run_fqltool_replay(node1, [tmpdir, tmpdir2], "127.0.0.1", None, None)
+            self._run_fqltool_replay(node1, [tmpdir, tmpdir2], "127.0.0.1", None, None, True)
             # and verify the data is there
             node1.stress(['read', 'n=1000'])
 
@@ -132,13 +132,15 @@ class TestFQLTool(Tester):
             output = self._run_fqltool_compare(node1, queries1, [results1, results2])
             assert b"MISMATCH" in output  # compares two different stress runs, should mismatch
 
-    def _run_fqltool_replay(self, node, logdirs, target, queries, results):
+    def _run_fqltool_replay(self, node, logdirs, target, queries, results, replay_ddl_statements=False):
         fqltool = self.fqltool(node)
         args = [fqltool, "replay", "--target {}".format(target)]
         if queries is not None:
             args.append("--store-queries {}".format(queries))
         if results is not None:
             args.append("--results {}".format(results))
+        if replay_ddl_statements is True:
+            args.append("--replay-ddl-statements")
         args.extend(logdirs)
         rc = subprocess.call(args)
         assert rc == 0
