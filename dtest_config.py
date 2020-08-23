@@ -20,6 +20,7 @@ class DTestConfig:
         self.execute_upgrade_tests_only = False
         self.disable_active_log_watching = False
         self.keep_test_dir = False
+        self.keep_failed_test_dir = False
         self.enable_jacoco_code_coverage = False
         self.jemalloc_path = find_libjemalloc()
 
@@ -42,6 +43,7 @@ class DTestConfig:
         self.execute_upgrade_tests_only = request.config.getoption("--execute-upgrade-tests-only")
         self.disable_active_log_watching = request.config.getoption("--disable-active-log-watching")
         self.keep_test_dir = request.config.getoption("--keep-test-dir")
+        self.keep_failed_test_dir = request.config.getoption("--keep-failed-test-dir")
         self.enable_jacoco_code_coverage = request.config.getoption("--enable-jacoco-code-coverage")
 
     def get_version_from_build(self):

@@ -81,6 +81,9 @@ def pytest_addoption(parser):
     parser.addoption("--keep-test-dir", action="store_true", default=False,
                      help="Do not remove/cleanup the test ccm cluster directory and it's artifacts "
                           "after the test completes")
+    parser.addoption("--keep-failed-test-dir", action="store_true", default=False,
+                     help="Do not remove/cleanup the test ccm cluster directory and it's artifacts "
+                          "after the test fails")
     parser.addoption("--enable-jacoco-code-coverage", action="store_true", default=False,
                      help="Enable JaCoCo Code Coverage Support")
     parser.addoption("--upgrade-version-selection", action="store", default="indev",
@@ -285,6 +288,13 @@ def fixture_dtest_create_cluster_func():
     """
     return DTestSetup.create_ccm_cluster
 
+@pytest.hookimpl(hookwrapper=True, tryfirst=True)
+def pytest_runtest_makereport(item, call):
+    outcome = yield
+    rep = outcome.get_result()
+    setattr(item, "rep_" + rep.when, rep)
+    return rep
+
 @pytest.fixture(scope='function', autouse=False)
 def fixture_dtest_setup(request,
                         dtest_config,
@@ -336,7 +346,7 @@ def fixture_dtest_setup(request,
         except Exception as e:
             logger.error("Error saving log:", str(e))
         finally:
-            dtest_setup.cleanup_cluster()
+            dtest_setup.cleanup_cluster(request)
 
 
 #Based on https://bugs.python.org/file25808/14894.patch
