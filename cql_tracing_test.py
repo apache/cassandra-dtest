@@ -78,7 +78,8 @@ class TestCqlTracing(Tester):
         out, err, _ = node1.run_cqlsh(
             "CONSISTENCY ALL; TRACING ON; "
             "INSERT INTO ks.users (userid, firstname, lastname, age) "
-            "VALUES (550e8400-e29b-41d4-a716-446655440000, 'Frodo', 'Baggins', 32)")
+            "VALUES (550e8400-e29b-41d4-a716-446655440000, 'Frodo', 'Baggins', 32)",
+            cqlsh_options=['--request-timeout', '30'])
         logger.debug(out)
         assert 'Tracing session: ' in out
 
@@ -92,7 +93,8 @@ class TestCqlTracing(Tester):
         # Queries
         out, err, _ = node1.run_cqlsh('CONSISTENCY ALL; TRACING ON; '
                                       'SELECT firstname, lastname '
-                                      'FROM ks.users WHERE userid = 550e8400-e29b-41d4-a716-446655440000')
+                                      'FROM ks.users WHERE userid = 550e8400-e29b-41d4-a716-446655440000',
+                                      cqlsh_options=['--request-timeout', '30'])
         logger.debug(out)
         assert 'Tracing session: ' in out
 
