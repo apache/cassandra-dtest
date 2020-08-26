@@ -231,10 +231,10 @@ class TestIncRepair(Tester):
             assert re.match(str(session_id), line)
             assert "REPAIRING" in line
 
-        node1.nodetool("repair_admin --cancel {}".format(session_id))
+        node1.nodetool("repair_admin cancel --session {}".format(session_id))
 
         for node in self.cluster.nodelist():
-            out = node.nodetool('repair_admin --all')
+            out = node.nodetool('repair_admin list --all')
             lines = out.stdout.split('\n')
             assert len(lines) > 1
             line = lines[1]
@@ -272,7 +272,7 @@ class TestIncRepair(Tester):
             assert "REPAIRING" in line
 
         try:
-            node2.nodetool("repair_admin --cancel {}".format(session_id))
+            node2.nodetool("repair_admin --cancel --session {}".format(session_id))
             self.fail("cancel from a non coordinator should fail")
         except ToolError:
             pass  # expected
@@ -315,10 +315,10 @@ class TestIncRepair(Tester):
             assert re.match(str(session_id), line)
             assert "REPAIRING" in line
 
-        node2.nodetool("repair_admin --cancel {} --force".format(session_id))
+        node2.nodetool("repair_admin cancel --session {} --force".format(session_id))
 
         for node in self.cluster.nodelist():
-            out = node.nodetool('repair_admin --all')
+            out = node.nodetool('repair_admin list --all')
             lines = out.stdout.split('\n')
             assert len(lines) > 1
             line = lines[1]
