@@ -1165,7 +1165,7 @@ class TestPreJoinCallback(Tester):
             r'Streaming error occurred',
             r'\[Stream.*\] Streaming error occurred',
             r'\[Stream.*\] Remote peer 127.0.0.\d failed stream session',
-            r'\[Stream.*\] Remote peer 127.0.0.\d:7000 failed stream session',
+            r'\[Stream.*\] Remote peer /127.0.0.\d:7000 failed stream session',
             r'Error while waiting on bootstrap to complete. Bootstrap will have to be restarted.'
         ]
 

@@ -43,6 +43,9 @@ class TestGossipingPropertyFileSnitch(Tester):
         NODE1_40_LISTEN_ADDRESS = '127.0.0.1:7000'
         NODE1_40_BROADCAST_ADDRESS = '127.0.0.3:7000'
 
+        NODE1_40_LISTEN_FMT_ADDRESS = '/127.0.0.1:7000'
+        NODE1_40_BROADCAST_FMT_ADDRESS = '/127.0.0.3:7000'
+
         NODE2_LISTEN_ADDRESS = '127.0.0.2'
         NODE2_BROADCAST_ADDRESS = '127.0.0.4'
 
@@ -51,6 +54,9 @@ class TestGossipingPropertyFileSnitch(Tester):
 
         NODE2_40_LISTEN_ADDRESS = '127.0.0.2:7000'
         NODE2_40_BROADCAST_ADDRESS = '127.0.0.4:7000'
+
+        NODE2_40_LISTEN_FMT_ADDRESS = '/127.0.0.2:7000'
+        NODE2_40_BROADCAST_FMT_ADDRESS = '/127.0.0.4:7000'
 
         STORAGE_PORT = 7000
 
@@ -75,8 +81,8 @@ class TestGossipingPropertyFileSnitch(Tester):
 
         node1.start(wait_for_binary_proto=True)
         if running40:
-            node1.watch_log_for("Listening on address: \({}:{}\)".format(NODE1_40_LISTEN_ADDRESS[:-5], STORAGE_PORT), timeout=60)
-            node1.watch_log_for("Listening on address: \({}:{}\)".format(NODE1_40_BROADCAST_ADDRESS[:-5], STORAGE_PORT), timeout=60)
+            node1.watch_log_for("Listening on address: \({}:{}\)".format(NODE1_40_LISTEN_FMT_ADDRESS[:-5], STORAGE_PORT), timeout=60)
+            node1.watch_log_for("Listening on address: \({}:{}\)".format(NODE1_40_BROADCAST_FMT_ADDRESS[:-5], STORAGE_PORT), timeout=60)
         else:
             node1.watch_log_for("Starting Messaging Service on {}:{}".format(NODE1_LISTEN_FMT_ADDRESS, STORAGE_PORT), timeout=60)
             node1.watch_log_for("Starting Messaging Service on {}:{}".format(NODE1_BROADCAST_FMT_ADDRESS, STORAGE_PORT), timeout=60)
@@ -93,8 +99,8 @@ class TestGossipingPropertyFileSnitch(Tester):
 
         node2.start(wait_for_binary_proto=True, wait_other_notice=False)
         if running40:
-            node2.watch_log_for("Listening on address: \({}:{}\)".format(NODE2_40_LISTEN_ADDRESS[:-5], STORAGE_PORT), timeout=60)
-            node2.watch_log_for("Listening on address: \({}:{}\)".format(NODE2_40_BROADCAST_ADDRESS[:-5], STORAGE_PORT), timeout=60)
+            node2.watch_log_for("Listening on address: \({}:{}\)".format(NODE2_40_LISTEN_FMT_ADDRESS[:-5], STORAGE_PORT), timeout=60)
+            node2.watch_log_for("Listening on address: \({}:{}\)".format(NODE2_40_BROADCAST_FMT_ADDRESS[:-5], STORAGE_PORT), timeout=60)
         else:
             node2.watch_log_for("Starting Messaging Service on {}:{}".format(NODE2_LISTEN_FMT_ADDRESS, STORAGE_PORT), timeout=60)
             node2.watch_log_for("Starting Messaging Service on {}:{}".format(NODE2_BROADCAST_FMT_ADDRESS, STORAGE_PORT), timeout=60)
@@ -106,10 +112,10 @@ class TestGossipingPropertyFileSnitch(Tester):
         reconnectFmtString = "Ini?tiated reconnect to an Internal IP {} for the {}"
         if node1.get_base_cassandra_version() >= 3.10:
             reconnectFmtString = "Initiated reconnect to an Internal IP {} for the {}"
-        node1.watch_log_for(reconnectFmtString.format(NODE2_40_LISTEN_ADDRESS if running40 else NODE2_LISTEN_FMT_ADDRESS,
-                                               NODE2_40_BROADCAST_ADDRESS if running40 else NODE2_BROADCAST_FMT_ADDRESS), filename='debug.log', timeout=60)
-        node2.watch_log_for(reconnectFmtString.format(NODE1_40_LISTEN_ADDRESS if running40 else NODE1_LISTEN_FMT_ADDRESS,
-                                               NODE1_40_BROADCAST_ADDRESS if running40 else NODE1_BROADCAST_FMT_ADDRESS), filename='debug.log', timeout=60)
+        node1.watch_log_for(reconnectFmtString.format(NODE2_40_LISTEN_FMT_ADDRESS if running40 else NODE2_LISTEN_FMT_ADDRESS,
+                                               NODE2_40_BROADCAST_FMT_ADDRESS if running40 else NODE2_BROADCAST_FMT_ADDRESS), filename='debug.log', timeout=60)
+        node2.watch_log_for(reconnectFmtString.format(NODE1_40_LISTEN_FMT_ADDRESS if running40 else NODE1_LISTEN_FMT_ADDRESS,
+                                               NODE1_40_BROADCAST_FMT_ADDRESS if running40 else NODE1_BROADCAST_FMT_ADDRESS), filename='debug.log', timeout=60)
 
         # read data from node2 just to make sure data and connectivity is OK
         session = self.patient_exclusive_cql_connection(node2)
@@ -126,7 +132,7 @@ class TestGossipingPropertyFileSnitch(Tester):
         assert "INTERNAL_IP:{}:{}".format('9' if running40 else '6', NODE2_LISTEN_ADDRESS) in out
         if running40:
             assert "INTERNAL_ADDRESS_AND_PORT:7:{}".format(NODE1_40_LISTEN_ADDRESS) in out
-            assert "INTERNAL_ADDRESS_AND_PORT:7:{}".format(NODE1_40_LISTEN_ADDRESS) in out
+            assert "INTERNAL_ADDRESS_AND_PORT:7:{}".format(NODE2_40_LISTEN_ADDRESS) in out
 
 class TestDynamicEndpointSnitch(Tester):
     @pytest.mark.resource_intensive

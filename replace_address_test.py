@@ -158,15 +158,14 @@ class BaseReplaceAddressTest(Tester):
     def _verify_replacement(self, node, same_address):
         if not same_address:
             if self.cluster.cassandra_version() >= '2.2.7':
-                address_prefix = '' if self.cluster.cassandra_version() >= '4.0' else '/'
-                node.watch_log_for("Node {}{} is replacing {}{}"
-                                   .format(address_prefix, self.replacement_node.address_for_current_version(),
-                                           address_prefix, self.replaced_node.address_for_current_version()),
+                node.watch_log_for("Node {} is replacing {}"
+                                   .format(self.replacement_node.address_for_current_version_slashy(),
+                                           self.replaced_node.address_for_current_version_slashy()),
                                    timeout=60, filename='debug.log')
-                node.watch_log_for("Node {}{} will complete replacement of {}{} for tokens"
-                                   .format(address_prefix, self.replacement_node.address_for_current_version(),
-                                           address_prefix, self.replaced_node.address_for_current_version()), timeout=10)
-                node.watch_log_for("removing endpoint {}{}".format(address_prefix, self.replaced_node.address_for_current_version()),
+                node.watch_log_for("Node {} will complete replacement of {} for tokens"
+                                   .format(self.replacement_node.address_for_current_version_slashy(),
+                                           self.replaced_node.address_for_current_version_slashy()), timeout=10)
+                node.watch_log_for("removing endpoint {}".format(self.replaced_node.address_for_current_version_slashy()),
                                    timeout=60, filename='debug.log')
             else:
                 node.watch_log_for("between /{} and /{}; /{} is the new owner"
@@ -183,8 +182,8 @@ class BaseReplaceAddressTest(Tester):
             num_tokens = int(self.replacement_node.get_conf_option('num_tokens'))
 
         logger.debug("Verifying {} tokens migrated successfully".format(num_tokens))
-        replmnt_address = ("/" + self.replacement_node.address()) if self.cluster.version() < '4.0' else self.replacement_node.address_and_port()
-        repled_address = ("/" + self.replaced_node.address()) if self.cluster.version() < '4.0' else self.replaced_node.address_and_port()
+        replmnt_address = self.replacement_node.address_for_current_version_slashy()
+        repled_address = self.replaced_node.address_for_current_version_slashy()
         token_ownership_log = r"Token (.*?) changing ownership from {} to {}".format(repled_address,
                                                                                      replmnt_address)
         logs = self.replacement_node.grep_log(token_ownership_log)
@@ -324,7 +323,7 @@ class TestReplaceAddress(BaseReplaceAddressTest):
         self._do_replace(replace_address='127.0.0.5', wait_for_binary_proto=False)
 
         logger.debug("Waiting for replace to fail")
-        node_log_str = "/127.0.0.5" if self.cluster.version() < '4.0' else "127.0.0.5:7000"
+        node_log_str = "/127.0.0.5" if self.cluster.version() < '4.0' else "/127.0.0.5:7000"
         self.replacement_node.watch_log_for("java.lang.RuntimeException: Cannot replace_address "
                                             + node_log_str + " because it doesn't exist in gossip")
         assert_not_running(self.replacement_node)
@@ -509,7 +508,7 @@ class TestReplaceAddress(BaseReplaceAddressTest):
             self.replacement_node.stop()
 
             logger.debug("Waiting other nodes to detect node stopped")
-            node_log_str = ("/" + self.replacement_node.address()) if self.cluster.version() < '4.0' else self.replacement_node.address_and_port()
+            node_log_str = self.replacement_node.address_for_current_version_slashy()
             self.query_node.watch_log_for("FatClient {} has been silent for 30000ms, removing from gossip".format(node_log_str), timeout=120)
             self.query_node.watch_log_for("Node {} failed during replace.".format(node_log_str), timeout=120, filename='debug.log')
 
