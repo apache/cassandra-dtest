@@ -399,7 +399,7 @@ class DTestSetup(object):
         else:
             repaired_data_tracking_values = {}
 
-        timeout = 30000
+        timeout = 15000
         if self.cluster_options is not None and len(self.cluster_options) > 0:
             values = merge_dicts(self.cluster_options, phi_values, repaired_data_tracking_values)
         else:
