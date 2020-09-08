@@ -8,6 +8,8 @@ import logging
 import ccmlib.common
 from ccmlib.node import ToolError
 
+from distutils.version import LooseVersion
+
 from dtest import Tester
 from tools.jmxutils import (JolokiaAgent, enable_jmx_ssl, make_mbean,
                             remove_perf_disable_shared_mem)
@@ -213,6 +215,8 @@ class TestJMX(Tester):
 
             updated_progress_string = jmx.read_attribute(compaction_manager, 'CompactionSummary')[0]
             var = 'Compaction@{uuid}(keyspace1, standard1, {progress}/{total})bytes'
+            if self.cluster.version() >= LooseVersion('4.0'): # CASSANDRA-15954
+                var = 'Compaction({taskUuid}, {progress} / {total} bytes)@{uuid}(keyspace1, standard1)'
             progress = int(parse.search(var, progress_string).named['progress'])
             updated_progress = int(parse.search(var, updated_progress_string).named['progress'])
 
