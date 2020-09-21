@@ -1176,6 +1176,7 @@ class TestRepair(BaseRepairTest):
             self.ignore_log_patterns.append("Socket closed before session completion")
             self.ignore_log_patterns.append("is finished with state FAILED")
             self.ignore_log_patterns.append("stream has been closed")
+            self.ignore_log_patterns.append("stream operation from .* failed")
 
         # Disable hinted handoff and set batch commit log so this doesn't
         # interfere with the test (this must be after the populate)
