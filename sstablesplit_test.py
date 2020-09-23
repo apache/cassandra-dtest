@@ -18,7 +18,7 @@ class TestSSTableSplit(Tester):
         after carrying out these operations.
         """
         cluster = self.cluster
-        cluster.populate(1).start(wait_for_binary_proto=True)
+        cluster.populate(1).start()
         node = cluster.nodelist()[0]
         version = cluster.version()
 
@@ -91,7 +91,7 @@ class TestSSTableSplit(Tester):
         Check that sstablesplit doesn't crash when splitting a single sstable at the time.
         """
         cluster = self.cluster
-        cluster.populate(1).start(wait_for_binary_proto=True)
+        cluster.populate(1).start()
         node = cluster.nodelist()[0]
 
         logger.debug("Run stress to insert data")

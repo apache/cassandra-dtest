@@ -132,7 +132,7 @@ class TestHelper(Tester):
             cluster.set_configuration_options(values={
                 'endpoint_snitch': 'org.apache.cassandra.locator.PropertyFileSnitch'})
 
-        cluster.start(wait_for_binary_proto=True, wait_other_notice=True)
+        cluster.start()
 
         self.ksname = 'mytestks'
         session = self.patient_exclusive_cql_connection(cluster.nodelist()[0])
@@ -784,7 +784,7 @@ class TestConsistency(Tester):
         # set column_index_size_in_kb to 1 for a slightly easier reproduction sequence
         cluster.set_configuration_options(values={'column_index_size_in_kb': 1})
 
-        cluster.populate(1).start(wait_other_notice=True)
+        cluster.populate(1).start()
         node1 = cluster.nodelist()[0]
 
         session = self.patient_cql_connection(node1)
@@ -842,7 +842,7 @@ class TestConsistency(Tester):
         cluster.set_configuration_options(values={'column_index_size_in_kb': 1, 'hinted_handoff_enabled': False})
         cluster.set_batch_commitlog(enabled=True)
 
-        cluster.populate(3).start(wait_other_notice=True)
+        cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
 
         session = self.patient_exclusive_cql_connection(node1)
@@ -916,7 +916,7 @@ class TestConsistency(Tester):
         cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
         cluster.set_batch_commitlog(enabled=True)
 
-        cluster.populate(2).start(wait_other_notice=True)
+        cluster.populate(2).start()
         node1, node2 = cluster.nodelist()
 
         session = self.patient_cql_connection(node2)
@@ -965,7 +965,7 @@ class TestConsistency(Tester):
         cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
         cluster.set_batch_commitlog(enabled=True)
 
-        cluster.populate(2).start(wait_other_notice=True)
+        cluster.populate(2).start()
         node1, node2 = cluster.nodelist()
 
         session = self.patient_cql_connection(node1)
@@ -1018,7 +1018,7 @@ class TestConsistency(Tester):
         cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
         cluster.set_batch_commitlog(enabled=True)
 
-        cluster.populate(2).start(wait_other_notice=True)
+        cluster.populate(2).start()
         node1, node2 = cluster.nodelist()
 
         session = self.patient_cql_connection(node1)
@@ -1081,7 +1081,7 @@ class TestConsistency(Tester):
         cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
         cluster.set_batch_commitlog(enabled=True)
 
-        cluster.populate(2).start(wait_other_notice=True)
+        cluster.populate(2).start()
         node1, node2 = cluster.nodelist()
 
         session = self.patient_cql_connection(node1)
@@ -1141,7 +1141,7 @@ class TestConsistency(Tester):
         cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
         cluster.set_batch_commitlog(enabled=True)
 
-        cluster.populate(2).start(wait_other_notice=True)
+        cluster.populate(2).start()
         node1, node2 = cluster.nodelist()
 
         session = self.patient_cql_connection(node1)
@@ -1176,7 +1176,7 @@ class TestConsistency(Tester):
         cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
         cluster.set_batch_commitlog(enabled=True)
 
-        cluster.populate(2).start(wait_other_notice=True)
+        cluster.populate(2).start()
         node1, node2 = cluster.nodelist()
 
         session = self.patient_cql_connection(node1)
@@ -1232,7 +1232,7 @@ class TestConsistency(Tester):
         cluster.populate(2)
         node1, node2 = cluster.nodelist()
         remove_perf_disable_shared_mem(node1)  # necessary for jmx
-        cluster.start(wait_other_notice=True)
+        cluster.start()
 
         session = self.patient_cql_connection(node1)
 
@@ -1298,7 +1298,7 @@ class TestConsistency(Tester):
         cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
         cluster.set_batch_commitlog(enabled=True)
 
-        cluster.populate(2).start(wait_other_notice=True)
+        cluster.populate(2).start()
         node1, node2 = cluster.nodelist()
 
         session = self.patient_cql_connection(node1)
@@ -1370,7 +1370,7 @@ class TestConsistency(Tester):
         cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
         cluster.set_batch_commitlog(enabled=True)
 
-        cluster.populate(3).start(wait_other_notice=True)
+        cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
 
         session = self.patient_cql_connection(node1)
@@ -1432,7 +1432,7 @@ class TestConsistency(Tester):
         cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
         cluster.set_batch_commitlog(enabled=True)
 
-        cluster.populate(2).start(wait_other_notice=True)
+        cluster.populate(2).start()
         node1, node2 = cluster.nodelist()
 
         session = self.patient_cql_connection(node1)
@@ -1472,7 +1472,7 @@ class TestConsistency(Tester):
         cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
         cluster.set_batch_commitlog(enabled=True)
 
-        cluster.populate(3).start(wait_other_notice=True)
+        cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
 
         session = self.patient_cql_connection(node1)

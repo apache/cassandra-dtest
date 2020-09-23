@@ -38,7 +38,7 @@ class TestCqlTracing(Tester):
         cluster.populate(nodes)
         node1 = cluster.nodelist()[0]
         remove_perf_disable_shared_mem(node1)  # necessary for jmx
-        cluster.start(wait_for_binary_proto=True, jvm_args=jvm_args)
+        cluster.start(jvm_args=jvm_args)
 
         session = self.patient_cql_connection(node1, protocol_version=protocol_version)
         if create_keyspace:

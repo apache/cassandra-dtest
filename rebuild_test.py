@@ -331,7 +331,7 @@ class TestRebuild(Tester):
         node1.set_configuration_options(values={'initial_token': node1_token})
         node2.set_configuration_options(values={'initial_token': node2_token})
         node3.set_configuration_options(values={'initial_token': node3_token})
-        cluster.start(wait_for_binary_proto=True)
+        cluster.start()
 
         session = self.patient_exclusive_cql_connection(node1)
         session.execute("CREATE KEYSPACE ks1 WITH replication = {'class':'SimpleStrategy', 'replication_factor':2};")
@@ -365,7 +365,7 @@ class TestRebuild(Tester):
         node1.set_configuration_options(values={'initial_token': node1_token})
         node2.set_configuration_options(values={'initial_token': node2_token})
         node3.set_configuration_options(values={'initial_token': node3_token})
-        cluster.start(wait_for_binary_proto=True)
+        cluster.start()
 
         node3_address = node3.network_interfaces['binary'][0]
 
@@ -401,7 +401,7 @@ class TestRebuild(Tester):
         cluster.populate([1, 1], tokens=tokens[:2])
         node1, node2 = cluster.nodelist()
 
-        cluster.start(wait_for_binary_proto=True)
+        cluster.start()
 
         # populate data in dc1, dc2
         session = self.patient_exclusive_cql_connection(node1)

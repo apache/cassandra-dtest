@@ -333,7 +333,7 @@ class TestSecondaryIndexes(Tester):
         """
 
         cluster = self.cluster
-        cluster.populate(1, install_byteman=True).start(wait_for_binary_proto=True)
+        cluster.populate(1, install_byteman=True).start()
         node = cluster.nodelist()[0]
 
         session = self.patient_cql_connection(node)
@@ -461,7 +461,7 @@ class TestSecondaryIndexes(Tester):
         """
 
         cluster = self.cluster
-        cluster.populate(1).start(wait_for_binary_proto=True)
+        cluster.populate(1).start()
         node = cluster.nodelist()[0]
 
         session = self.patient_cql_connection(node)
@@ -1178,7 +1178,7 @@ class TestPreJoinCallback(Tester):
         cluster.populate(1)
         node1 = cluster.nodelist()[0]
         node1.set_configuration_options(values={'initial_token': tokens[0]})
-        cluster.start(wait_other_notice=True)
+        cluster.start()
 
         # Create a table with 2i
         session = self.patient_cql_connection(node1)

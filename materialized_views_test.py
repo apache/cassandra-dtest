@@ -1118,7 +1118,7 @@ class TestMaterializedViews(Tester):
             node.mark_log(filename='debug.log')
 
         logger.debug("Restart the cluster")
-        self.cluster.start(wait_for_binary_proto=True)
+        self.cluster.start()
         session = self.patient_cql_connection(node1)
         session.execute("USE ks")
 
@@ -1292,7 +1292,7 @@ class TestMaterializedViews(Tester):
         logger.debug("Restart the cluster")
         self.cluster.stop()
         marks = [node.mark_log() for node in nodes]
-        self.cluster.start(wait_for_binary_proto=True)
+        self.cluster.start()
         session = self.patient_cql_connection(nodes[0])
 
         logger.debug("Verify that the MV has been successfully created")
@@ -2884,7 +2884,7 @@ class TestMaterializedViewsLockcontention(Tester):
         for node in self.nodes:
             remove_perf_disable_shared_mem(node)
 
-        self.cluster.start(wait_for_binary_proto=True, jvm_args=[
+        self.cluster.start(jvm_args=[
             "-Dcassandra.test.fail_mv_locks_count=64"
         ])
 

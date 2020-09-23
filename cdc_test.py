@@ -265,7 +265,7 @@ class TestCDC(Tester):
             configuration_overrides = {}
         self.cluster.populate(1)
         self.cluster.set_configuration_options(dict(config_defaults, **configuration_overrides))
-        self.cluster.start(wait_for_binary_proto=True)
+        self.cluster.start()
         node = self.cluster.nodelist()[0]
         session = self.patient_cql_connection(node)
         create_ks(session, ks_name, rf=1)

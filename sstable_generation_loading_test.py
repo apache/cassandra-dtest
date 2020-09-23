@@ -301,7 +301,7 @@ class TestSSTableGenerationAndLoading(TestBaseSStableLoader):
         @jira_ticket CASSANDRA-343
         """
         cluster = self.cluster
-        cluster.populate(1).start(wait_for_binary_proto=True)
+        cluster.populate(1).start()
         node1 = cluster.nodelist()[0]
 
         # Makinge sure the cluster is ready to accept the subsequent
@@ -363,7 +363,7 @@ class TestSSTableGenerationAndLoading(TestBaseSStableLoader):
             session.execute("CREATE INDEX idx ON k.t(v)")
 
         cluster = self.cluster
-        cluster.populate(1, install_byteman=True).start(wait_for_binary_proto=True)
+        cluster.populate(1, install_byteman=True).start()
         node = cluster.nodelist()[0]
 
         session = self.patient_cql_connection(node)

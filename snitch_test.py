@@ -164,7 +164,7 @@ class TestDynamicEndpointSnitch(Tester):
         # Delay reads on the degraded node by 50 milliseconds
         degraded_node.start(jvm_args=['-Dcassandra.test.read_iteration_delay_ms=50',
                                       '-Dcassandra.allow_unsafe_join=true'])
-        cluster.start(wait_for_binary_proto=30, wait_other_notice=True)
+        cluster.start()
 
         des = make_mbean('db', type='DynamicEndpointSnitch')
         read_stage = make_mbean('metrics', type='ThreadPools', path='request',

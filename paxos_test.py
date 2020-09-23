@@ -53,10 +53,10 @@ class TestPaxos(Tester):
         self.cluster.nodelist()[1].stop()
         assert_unavailable(session.execute, "INSERT INTO test (k, v) VALUES (2, 2) IF NOT EXISTS")
 
-        self.cluster.nodelist()[1].start(wait_for_binary_proto=True, wait_other_notice=True)
+        self.cluster.nodelist()[1].start()
         session.execute("INSERT INTO test (k, v) VALUES (3, 3) IF NOT EXISTS")
 
-        self.cluster.nodelist()[2].start(wait_for_binary_proto=True)
+        self.cluster.nodelist()[2].start()
         session.execute("INSERT INTO test (k, v) VALUES (4, 4) IF NOT EXISTS")
 
     @pytest.mark.no_vnodes
@@ -75,10 +75,10 @@ class TestPaxos(Tester):
         self.cluster.nodelist()[1].stop()
         session.execute("INSERT INTO test (k, v) VALUES (3, 2) IF NOT EXISTS")
 
-        self.cluster.nodelist()[1].start(wait_for_binary_proto=True)
+        self.cluster.nodelist()[1].start()
         session.execute("INSERT INTO test (k, v) VALUES (5, 5) IF NOT EXISTS")
 
-        self.cluster.nodelist()[2].start(wait_for_binary_proto=True)
+        self.cluster.nodelist()[2].start()
         session.execute("INSERT INTO test (k, v) VALUES (6, 6) IF NOT EXISTS")
 
     def test_contention_multi_iterations(self):

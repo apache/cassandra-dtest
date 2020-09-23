@@ -54,7 +54,7 @@ class TestNodetool(Tester):
                 for line in ["dc={}".format(node.data_center), "rack=rack{}".format(i % 2)]:
                     snitch_file.write(line + os.linesep)
 
-        cluster.start(wait_for_binary_proto=True)
+        cluster.start()
 
         for i, node in enumerate(cluster.nodelist()):
             out, err, _ = node.nodetool('info')
@@ -120,7 +120,7 @@ class TestNodetool(Tester):
         @jira_ticket CASSANDRA-13526
         Test nodetool cleanup KS to remove old data when new replicas in current node instead of directly returning success.
         """
-        self.cluster.populate([1, 1]).start(wait_for_binary_proto=True, wait_other_notice=True)
+        self.cluster.populate([1, 1]).start()
 
         node_dc1 = self.cluster.nodelist()[0]
         node_dc2 = self.cluster.nodelist()[1]
@@ -360,7 +360,7 @@ class TestNodetool(Tester):
         @expected_result This test invokes nodetool describecluster and matches the output with the expected one
         """
         cluster = self.cluster
-        cluster.populate([1, 2, 1]).start(wait_for_binary_proto=True)
+        cluster.populate([1, 2, 1]).start()
 
         node1_dc1, node1_dc2, node2_dc2, node1_dc3 = cluster.nodelist()
 

@@ -228,7 +228,7 @@ class TestDeprecatedRepairNotifications(Tester):
         cluster = self.cluster
         cluster.populate(2)
         node1, node2 = cluster.nodelist()
-        cluster.start(wait_for_binary_proto=True, wait_other_notice=True)
+        cluster.start()
 
         # write some data that could be repaired
         logger.debug("Stressing node1...")

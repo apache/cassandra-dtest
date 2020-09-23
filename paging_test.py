@@ -30,7 +30,7 @@ class BasePagingTester(Tester):
         supports_v5 = self.supports_v5_protocol(self.cluster.version())
         protocol_version = 5 if supports_v5 else None
         cluster = self.cluster
-        cluster.populate(3).start(wait_for_binary_proto=True)
+        cluster.populate(3).start()
         node1 = cluster.nodelist()[0]
         session = self.patient_cql_connection(node1,
                                               protocol_version=protocol_version,

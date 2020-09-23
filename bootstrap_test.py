@@ -75,7 +75,7 @@ class TestBootstrap(Tester):
             logger.debug("starting source node on version {}".format(bootstrap_from_version))
             node1.set_install_dir(version=bootstrap_from_version)
         node1.set_configuration_options(values={'initial_token': tokens[0]})
-        cluster.start(wait_other_notice=True)
+        cluster.start()
 
         session = self.patient_cql_connection(node1)
         create_ks(session, 'ks', 1)
@@ -177,7 +177,7 @@ class TestBootstrap(Tester):
         node1.byteman_port = '8100'
         node1.import_config_files()
 
-        cluster.start(wait_other_notice=True)
+        cluster.start()
 
         # Create more than one sstable larger than 1MB
         node1.stress(['write', 'n=1K', '-rate', 'threads=8', '-schema',
@@ -208,7 +208,7 @@ class TestBootstrap(Tester):
         cluster = self.cluster
         # Create a two-node cluster
         cluster.populate(2)
-        cluster.start(wait_other_notice=True)
+        cluster.start()
 
         # Bootstrapping a new node
         node3 = new_node(cluster)
@@ -348,7 +348,7 @@ class TestBootstrap(Tester):
         node1.byteman_port = '8100'
         node1.import_config_files()
 
-        cluster.start(wait_other_notice=True)
+        cluster.start()
         # kill stream to node3 in the middle of streaming to let it fail
         if cluster.version() < '4.0':
             node1.byteman_submit([self.byteman_submit_path_pre_4_0])
@@ -384,7 +384,7 @@ class TestBootstrap(Tester):
         """Test bootstrap with resetting bootstrap progress"""
         cluster = self.cluster
         cluster.set_configuration_options(values={'stream_throughput_outbound_megabits_per_sec': 1})
-        cluster.populate(2).start(wait_other_notice=True)
+        cluster.populate(2).start()
 
         node1 = cluster.nodes['node1']
         node1.stress(['write', 'n=100K', '-schema', 'replication(factor=2)'])
@@ -422,7 +422,7 @@ class TestBootstrap(Tester):
             @jira_ticket CASSANDRA-9022
         """
         cluster = self.cluster
-        cluster.populate(2).start(wait_other_notice=True)
+        cluster.populate(2).start()
         (node1, node2) = cluster.nodelist()
 
         node1.stress(['write', 'n=1K', 'no-warmup', '-schema', 'replication(factor=2)',
@@ -515,7 +515,7 @@ class TestBootstrap(Tester):
         """
         cluster = self.cluster
         cluster.populate(3)
-        cluster.start(wait_for_binary_proto=True)
+        cluster.start()
 
         stress_table = 'keyspace1.standard1'
 
@@ -548,7 +548,7 @@ class TestBootstrap(Tester):
         """
         cluster = self.cluster
         cluster.populate(3)
-        cluster.start(wait_for_binary_proto=True)
+        cluster.start()
 
         stress_table = 'keyspace1.standard1'
 
@@ -584,7 +584,7 @@ class TestBootstrap(Tester):
         """
         cluster = self.cluster
         cluster.populate(1)
-        cluster.start(wait_for_binary_proto=True)
+        cluster.start()
 
         node1 = cluster.nodelist()[0]
         # Add a new node, bootstrap=True ensures that it is not a seed
@@ -627,7 +627,7 @@ class TestBootstrap(Tester):
         cluster = self.cluster
         cluster.populate(1)
         cluster.set_configuration_options(values={'stream_throughput_outbound_megabits_per_sec': 1})
-        cluster.start(wait_for_binary_proto=True)
+        cluster.start()
 
         stress_table = 'keyspace1.standard1'
 
@@ -672,7 +672,7 @@ class TestBootstrap(Tester):
                                }]
         })
 
-        cluster.start(wait_for_binary_proto=True)
+        cluster.start()
 
         node1 = cluster.nodelist()[0]
         node2 = cluster.nodelist()[1]
@@ -758,7 +758,7 @@ class TestBootstrap(Tester):
 
         cluster = self.cluster
         cluster.populate(1)
-        cluster.start(wait_for_binary_proto=True)
+        cluster.start()
 
         node1, = cluster.nodelist()
 
@@ -795,7 +795,7 @@ class TestBootstrap(Tester):
         cluster = self.cluster
         cluster.set_configuration_options(values={'concurrent_compactors': 4})
         cluster.populate(1)
-        cluster.start(wait_for_binary_proto=True)
+        cluster.start()
         node1, = cluster.nodelist()
         for x in range(0, 5):
             node1.stress(['write', 'n=100k', 'no-warmup', '-schema', 'compaction(strategy=SizeTieredCompactionStrategy,enabled=false)', 'replication(factor=1)', '-rate', 'threads=10'])
@@ -854,7 +854,7 @@ class TestBootstrap(Tester):
         node1.byteman_port = '8100'
         node1.import_config_files()
 
-        cluster.start(wait_other_notice=True)
+        cluster.start()
         # kill stream to node2 in the middle of streaming to let it fail
         if cluster.version() < '4.0':
             node1.byteman_submit([self.byteman_submit_path_pre_4_0])

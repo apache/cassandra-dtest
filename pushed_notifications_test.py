@@ -93,7 +93,7 @@ class TestPushedNotifications(Tester):
         @jira_ticket CASSANDRA-8516
         Moving a token should result in MOVED_NODE notifications.
         """
-        self.cluster.populate(3).start(wait_for_binary_proto=True, wait_other_notice=True)
+        self.cluster.populate(3).start()
 
         waiters = [NotificationWaiter(self, node, ["TOPOLOGY_CHANGE"])
                    for node in list(self.cluster.nodes.values())]
@@ -136,7 +136,7 @@ class TestPushedNotifications(Tester):
 
         self.change_rpc_address_to_localhost()
 
-        cluster.start(wait_for_binary_proto=True, wait_other_notice=True)
+        cluster.start()
 
         waiters = [NotificationWaiter(self, node, ["TOPOLOGY_CHANGE"])
                    for node in list(self.cluster.nodes.values())]
@@ -173,7 +173,7 @@ class TestPushedNotifications(Tester):
         @jira_ticket CASSANDRA-7816
         Restarting a node should generate exactly one DOWN and one UP notification
         """
-        self.cluster.populate(2).start(wait_for_binary_proto=True, wait_other_notice=True)
+        self.cluster.populate(2).start()
         node1, node2 = self.cluster.nodelist()
 
         waiter = NotificationWaiter(self, node1, ["STATUS_CHANGE", "TOPOLOGY_CHANGE"])
@@ -223,7 +223,7 @@ class TestPushedNotifications(Tester):
 
         self.change_rpc_address_to_localhost()
 
-        cluster.start(wait_for_binary_proto=True, wait_other_notice=True)
+        cluster.start()
 
         # register for notification with node1
         waiter = NotificationWaiter(self, node1, ["STATUS_CHANGE", "TOPOLOGY_CHANGE"])
@@ -260,7 +260,7 @@ class TestPushedNotifications(Tester):
         Test that NEW_NODE and REMOVED_NODE are sent correctly as nodes join and leave.
         @jira_ticket CASSANDRA-11038
         """
-        self.cluster.populate(1).start(wait_for_binary_proto=True)
+        self.cluster.populate(1).start()
         node1 = self.cluster.nodelist()[0]
 
         waiter = NotificationWaiter(self, node1, ["STATUS_CHANGE", "TOPOLOGY_CHANGE"])
@@ -325,7 +325,7 @@ class TestPushedNotifications(Tester):
         will generate the correct schema change notifications.
         """
         self.cluster.set_configuration_options({'enable_materialized_views': 'true'})
-        self.cluster.populate(2).start(wait_for_binary_proto=True)
+        self.cluster.populate(2).start()
         node1, node2 = self.cluster.nodelist()
 
         session = self.patient_cql_connection(node1)

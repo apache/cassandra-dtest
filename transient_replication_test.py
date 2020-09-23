@@ -213,7 +213,7 @@ class TransientReplicationBase(Tester):
                                                        'enable_transient_replication': True,
                                                        'dynamic_snitch': False})
         self.populate()
-        self.cluster.start(wait_other_notice=True, wait_for_binary_proto=True)
+        self.cluster.start()
 
         self.nodes = [patch_start(node) for node in self.cluster.nodelist()]
         self.set_nodes()

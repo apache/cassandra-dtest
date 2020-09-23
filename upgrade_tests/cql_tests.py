@@ -5458,7 +5458,7 @@ class TestCQL(UpgradeTester):
 
         self.cluster.stop()
         time.sleep(0.5)
-        self.cluster.start(wait_for_binary_proto=True)
+        self.cluster.start()
         time.sleep(0.5)
 
         for is_upgraded, cursor in self.do_upgrade(cursor):

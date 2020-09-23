@@ -53,7 +53,7 @@ class CQLTester(Tester):
             cluster.set_configuration_options(values=config)
 
         if not cluster.nodelist():
-            cluster.populate(nodes).start(wait_for_binary_proto=True)
+            cluster.populate(nodes).start()
         node1 = cluster.nodelist()[0]
 
         session = self.patient_cql_connection(node1, protocol_version=protocol_version, user=user, password=password)
@@ -803,8 +803,7 @@ class AbortedQueryTester(CQLTester):
         # introduced by CASSANDRA-7392 to pause by the specified amount of milliseconds every
         # CQL row iterated for non system queries, so that these queries take much longer to complete,
         # see ReadCommand.withStateTracking()
-        cluster.populate(1).start(wait_for_binary_proto=True,
-                                  jvm_args=["-Dcassandra.monitoring_report_interval_ms=10",
+        cluster.populate(1).start(jvm_args=["-Dcassandra.monitoring_report_interval_ms=10",
                                             "-Dcassandra.test.read_iteration_delay_ms=5"])
         node = cluster.nodelist()[0]
         session = self.patient_cql_connection(node)
@@ -919,8 +918,7 @@ class AbortedQueryTester(CQLTester):
                                                   'read_request_timeout_in_ms': 1000,
                                                   'range_request_timeout_in_ms': 1000})
 
-        cluster.populate(1).start(wait_for_binary_proto=True,
-                                  jvm_args=["-Dcassandra.monitoring_report_interval_ms=10",
+        cluster.populate(1).start(jvm_args=["-Dcassandra.monitoring_report_interval_ms=10",
                                             "-Dcassandra.test.read_iteration_delay_ms=5"])  # see above for explanation
         node = cluster.nodelist()[0]
         session = self.patient_cql_connection(node)
@@ -1034,8 +1032,7 @@ class TestCQLSlowQuery(CQLTester):
         # introduced by CASSANDRA-7392 to pause by the specified amount of milliseconds during each
         # iteration of non system queries, so that these queries take much longer to complete,
         # see ReadCommand.withStateTracking()
-        cluster.populate(1).start(wait_for_binary_proto=True,
-                                  jvm_args=["-Dcassandra.monitoring_report_interval_ms=10",
+        cluster.populate(1).start(jvm_args=["-Dcassandra.monitoring_report_interval_ms=10",
                                             "-Dcassandra.test.read_iteration_delay_ms=1"])
         node = cluster.nodelist()[0]
         session = self.patient_cql_connection(node)
@@ -1101,8 +1098,7 @@ class TestCQLSlowQuery(CQLTester):
         # introduced by CASSANDRA-7392 to pause by the specified amount of milliseconds during each
         # iteration of non system queries, so that these queries take much longer to complete,
         # see ReadCommand.withStateTracking()
-        cluster.populate(1).start(wait_for_binary_proto=True,
-                                  jvm_args=["-Dcassandra.monitoring_report_interval_ms=10",
+        cluster.populate(1).start(jvm_args=["-Dcassandra.monitoring_report_interval_ms=10",
                                             "-Dcassandra.test.read_iteration_delay_ms=1"])
         node = cluster.nodelist()[0]
         session = self.patient_cql_connection(node)
@@ -1397,7 +1393,7 @@ class TestLWTWithCQL(Tester):
     def fixture_post_initialize_cluster(self, fixture_dtest_setup):
         cluster = fixture_dtest_setup.cluster
         cluster.populate(3)
-        cluster.start(wait_for_binary_proto=True)
+        cluster.start()
 
     def get_lwttester_session(self):
         node1 = self.cluster.nodelist()[0]

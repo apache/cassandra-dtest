@@ -28,7 +28,7 @@ class TestLegacySSTables(Tester):
         # start with 2.1.20 to generate a legacy sstable
         cluster.set_install_dir(version='2.1.20')
 
-        cluster.populate(1).start(wait_other_notice=True)
+        cluster.populate(1).start()
         node1 = cluster.nodelist()[0]
         session = self.patient_cql_connection(node1)
 

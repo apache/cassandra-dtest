@@ -84,7 +84,7 @@ class TestTokenGenerator(Tester):
             cluster._config_options.__delitem__('initial_token')
 
         assert not cluster.nodelist(), "nodelist() already initialized"
-        cluster.populate(nodes, use_vnodes=False, tokens=generated_tokens[0]).start(wait_for_binary_proto=True)
+        cluster.populate(nodes, use_vnodes=False, tokens=generated_tokens[0]).start()
         time.sleep(0.2)
 
         node = cluster.nodelist()[0]

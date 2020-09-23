@@ -373,7 +373,7 @@ class TestTTL(Tester):
 
         # Restart node with expiration_date_overflow_policy
         self.cluster.stop()
-        self.cluster.start(jvm_args=['-Dcassandra.expiration_date_overflow_policy={}'.format(policy)], wait_for_binary_proto=True)
+        self.cluster.start(jvm_args=['-Dcassandra.expiration_date_overflow_policy={}'.format(policy)])
         self.session1 = self.patient_cql_connection(self.cluster.nodelist()[0])
         self.session1.execute("USE ks;")
 
@@ -569,7 +569,7 @@ class TestRecoverNegativeExpirationDate(TestHelper):
         cluster = self.cluster
         if self.cluster.version() >= '4':
             cluster.set_configuration_options(values={'corrupted_tombstone_strategy': 'disabled'})
-        cluster.populate(1).start(wait_for_binary_proto=True)
+        cluster.populate(1).start()
         [node] = cluster.nodelist()
 
         session = self.patient_cql_connection(node)
@@ -611,7 +611,7 @@ class TestRecoverNegativeExpirationDate(TestHelper):
         logger.debug("Executed offline scrub on {}", str(scrubbed_sstables))
 
         logger.debug("Starting node again")
-        self.cluster.start(wait_for_binary_proto=True)
+        self.cluster.start()
         session = self.patient_cql_connection(node)
         session.execute("USE ks;")
 

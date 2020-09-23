@@ -37,7 +37,7 @@ class TestReadFailures(Tester):
             values={'tombstone_failure_threshold': self.tombstone_failure_threshold}
         )
         self.cluster.populate(3)
-        self.cluster.start(wait_for_binary_proto=True)
+        self.cluster.start()
         self.nodes = list(self.cluster.nodes.values())
 
         session = self.patient_exclusive_cql_connection(self.nodes[0], protocol_version=self.protocol_version)

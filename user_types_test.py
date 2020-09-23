@@ -647,7 +647,7 @@ class TestUserTypes(Tester):
         # make sure we can define a table with a user type as a clustering column
         # and do a basic insert/query of data in that table.
         cluster = self.cluster
-        cluster.populate(3).start(wait_for_binary_proto=True)
+        cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
         session = self.patient_cql_connection(node1, consistency_level=ConsistencyLevel.LOCAL_QUORUM)
         create_ks(session, 'user_type_pkeys', 2)

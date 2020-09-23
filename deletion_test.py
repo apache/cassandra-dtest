@@ -51,7 +51,7 @@ class TestDeletion(Tester):
 
         remove_perf_disable_shared_mem(node1)
 
-        self.cluster.start(wait_for_binary_proto=True)
+        self.cluster.start()
         [node1] = self.cluster.nodelist()
         session = self.patient_cql_connection(node1)
         create_ks(session, 'ks', 1)

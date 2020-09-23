@@ -442,7 +442,7 @@ class TestBatch(Tester):
         for n in self.cluster.nodelist():
             remove_perf_disable_shared_mem(n)
 
-        self.cluster.start(wait_other_notice=True)
+        self.cluster.start()
 
         node1 = self.cluster.nodelist()[0]
         session = self.patient_cql_connection(node1, protocol_version=protocol_version)

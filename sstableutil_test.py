@@ -37,7 +37,7 @@ class TestSSTableUtil(Tester):
         Check that we can list sstable files after a successful compaction (no temporary sstable files)
         """
         cluster = self.cluster
-        cluster.populate(1).start(wait_for_binary_proto=True)
+        cluster.populate(1).start()
         node = cluster.nodelist()[0]
 
         self._create_data(node, KeyspaceName, TableName, 100000)
@@ -58,7 +58,7 @@ class TestSSTableUtil(Tester):
         """
         log_file_name = 'debug.log'
         cluster = self.cluster
-        cluster.populate(1).start(wait_for_binary_proto=True)
+        cluster.populate(1).start()
         node = cluster.nodelist()[0]
 
         numrecords = 250000

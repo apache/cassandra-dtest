@@ -60,7 +60,7 @@ class TestStreaming(Tester):
         for i in range(0, len(nodes)):
             nodes[i].set_configuration_options(values={'initial_token': tokens[i]})
 
-        cluster.start(wait_for_binary_proto=True)
+        cluster.start()
 
         session = self.patient_cql_connection(nodes[0])
 

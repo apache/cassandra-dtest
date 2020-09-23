@@ -204,7 +204,7 @@ class TestReplication(Tester):
         """
         Test the SimpleStrategy on a 3 node cluster
         """
-        self.cluster.populate(3).start(wait_for_binary_proto=True, wait_other_notice=True)
+        self.cluster.populate(3).start()
         node1 = self.cluster.nodelist()[0]
         session = self.patient_exclusive_cql_connection(node1, consistency_level=ConsistencyLevel.ALL)
         session.max_trace_wait = 120
@@ -240,7 +240,7 @@ class TestReplication(Tester):
         """
         Test the NetworkTopologyStrategy on a 2DC 3:3 node cluster
         """
-        self.cluster.populate([3, 3]).start(wait_for_binary_proto=True, wait_other_notice=True)
+        self.cluster.populate([3, 3]).start()
 
         node1 = self.cluster.nodelist()[0]
         ip_nodes = dict((node.address(), node) for node in self.cluster.nodelist())
@@ -541,7 +541,7 @@ class TestSnitchConfigurationUpdate(Tester):
                 for line in snitch_lines_before(i, node):
                     topo_file.write(line + os.linesep)
 
-        cluster.start(wait_for_binary_proto=True)
+        cluster.start()
 
         session = self.patient_cql_connection(cluster.nodelist()[0])
 
@@ -697,7 +697,7 @@ class TestSnitchConfigurationUpdate(Tester):
                 for line in snitch_lines_before:
                     topo_file.write(line + os.linesep)
 
-        cluster.start(wait_for_binary_proto=True)
+        cluster.start()
 
         # check racks are as specified
         self.wait_for_nodes_on_racks(cluster.nodelist(), racks)
@@ -742,7 +742,7 @@ class TestSnitchConfigurationUpdate(Tester):
             topo_file.write("dc=dc9" + os.linesep)
             topo_file.write("rack=rack1" + os.linesep)
 
-        cluster.start(wait_for_binary_proto=True)
+        cluster.start()
 
         node.stop()
 

@@ -76,7 +76,7 @@ class TestAuth(Tester):
         logger.debug("Stopping cluster..")
         self.cluster.stop()
         logger.debug("Restarting cluster..")
-        self.cluster.start(wait_other_notice=True)
+        self.cluster.start()
 
         # check each node directly
         for i in range(3):
@@ -1026,7 +1026,7 @@ class TestAuth(Tester):
         if self.dtest_config.cassandra_version_from_build >= '4.0':
             config['network_authorizer'] = 'org.apache.cassandra.auth.AllowAllNetworkAuthorizer'
         self.cluster.set_configuration_options(values=config)
-        self.cluster.start(wait_for_binary_proto=True)
+        self.cluster.start()
 
         self.cluster.stop()
         config = {'authenticator': 'org.apache.cassandra.auth.PasswordAuthenticator',
@@ -1034,7 +1034,7 @@ class TestAuth(Tester):
         if self.dtest_config.cassandra_version_from_build >= '4.0':
             config['network_authorizer'] = 'org.apache.cassandra.auth.CassandraNetworkAuthorizer'
         self.cluster.set_configuration_options(values=config)
-        self.cluster.start(wait_for_binary_proto=True)
+        self.cluster.start()
 
         philip = self.get_session(user='philip', password='strongpass')
         cathy = self.get_session(user='cathy', password='12345')
@@ -1057,7 +1057,7 @@ class TestAuth(Tester):
         cluster.populate(1)
         [node] = cluster.nodelist()
         remove_perf_disable_shared_mem(node)
-        cluster.start(wait_for_binary_proto=True)
+        cluster.start()
 
         with JolokiaAgent(node) as jmx:
             success = jmx.read_attribute(
@@ -1173,7 +1173,7 @@ class TestAuthRoles(Tester):
                 'roles_validity_in_ms': 0,
                 'num_tokens': 1
             })
-        fixture_dtest_setup.cluster.populate(1, debug=True).start(wait_for_binary_proto=True, jvm_args=['-XX:-PerfDisableSharedMem'])
+        fixture_dtest_setup.cluster.populate(1, debug=True).start(jvm_args=['-XX:-PerfDisableSharedMem'])
         nodes = fixture_dtest_setup.cluster.nodelist()
         fixture_dtest_setup.superuser = fixture_dtest_setup.patient_exclusive_cql_connection(nodes[0], user='cassandra', password='cassandra')
 
@@ -2695,7 +2695,7 @@ class TestAuthRoles(Tester):
             config['network_authorizer'] = 'org.apache.cassandra.auth.CassandraNetworkAuthorizer'
 
         self.cluster.set_configuration_options(values=config)
-        self.cluster.populate(nodes).start(wait_for_binary_proto=True)
+        self.cluster.populate(nodes).start()
 
         self.cluster.wait_for_any_log('Created default superuser', 25)
 
@@ -3040,7 +3040,7 @@ class TestNetworkAuth(Tester):
             'network_authorizer': 'org.apache.cassandra.auth.CassandraNetworkAuthorizer',
             'num_tokens': 1
         })
-        fixture_dtest_setup.cluster.populate([1, 1], debug=True).start(wait_for_binary_proto=True, jvm_args=['-XX:-PerfDisableSharedMem'])
+        fixture_dtest_setup.cluster.populate([1, 1], debug=True).start(jvm_args=['-XX:-PerfDisableSharedMem'])
         fixture_dtest_setup.dc1_node, fixture_dtest_setup.dc2_node = fixture_dtest_setup.cluster.nodelist()
         fixture_dtest_setup.superuser = fixture_dtest_setup.patient_exclusive_cql_connection(fixture_dtest_setup.dc1_node, user='cassandra', password='cassandra')
 
