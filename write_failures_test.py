@@ -48,7 +48,7 @@ class TestWriteFailures(Tester):
         if start_rpc:
             self.cluster.set_configuration_options(values={'start_rpc': True})
 
-        self.cluster.start(wait_for_binary_proto=True)
+        self.cluster.start()
         self.nodes = list(self.cluster.nodes.values())
 
         session = self.patient_exclusive_cql_connection(self.nodes[0], protocol_version=self.protocol_version)

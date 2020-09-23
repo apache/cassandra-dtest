@@ -578,7 +578,7 @@ class TestIncRepair(Tester):
         @jira_ticket CASSANDRA-11172 - repeated full repairs should not cause infinite loop in getNextBackgroundTask
         """
         cluster = self.cluster
-        cluster.populate(2).start(wait_for_binary_proto=True)
+        cluster.populate(2).start()
         node1, node2 = cluster.nodelist()
         for x in range(0, 10):
             node1.stress(['write', 'n=100k', 'no-warmup', '-rate', 'threads=10', '-schema', 'compaction(strategy=LeveledCompactionStrategy,sstable_size_in_mb=10)', 'replication(factor=2)'])
@@ -663,7 +663,7 @@ class TestIncRepair(Tester):
         * Assert no extra, unrepaired sstables are generated
         """
         cluster = self.cluster
-        cluster.populate(4).start(wait_for_binary_proto=True)
+        cluster.populate(4).start()
         node1, node2, node3, node4 = cluster.nodelist()
 
         logger.debug("Inserting data with stress")

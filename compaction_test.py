@@ -33,7 +33,7 @@ class TestCompaction(Tester):
         Insert data, delete a partition of data and check that the requesite rows are tombstoned.
         """
         cluster = self.cluster
-        cluster.populate(1).start(wait_for_binary_proto=True)
+        cluster.populate(1).start()
         [node1] = cluster.nodelist()
 
         session = self.patient_cql_connection(node1)
@@ -70,7 +70,7 @@ class TestCompaction(Tester):
         Insert data and check data size before and after a compaction.
         """
         cluster = self.cluster
-        cluster.populate(1).start(wait_for_binary_proto=True)
+        cluster.populate(1).start()
         [node1] = cluster.nodelist()
 
         stress_write(node1)
@@ -119,7 +119,7 @@ class TestCompaction(Tester):
             min_bf_size = 100000
             max_bf_size = 150000
         cluster = self.cluster
-        cluster.populate(1).start(wait_for_binary_proto=True)
+        cluster.populate(1).start()
         [node1] = cluster.nodelist()
 
         for x in range(0, 5):
@@ -165,7 +165,7 @@ class TestCompaction(Tester):
         """
         self.skip_if_no_major_compaction(strategy)
         cluster = self.cluster
-        cluster.populate(1).start(wait_for_binary_proto=True)
+        cluster.populate(1).start()
         [node1] = cluster.nodelist()
         session = self.patient_cql_connection(node1)
         create_ks(session, 'ks', 1)
@@ -203,7 +203,7 @@ class TestCompaction(Tester):
             pytest.skip('Not implemented unless DateTieredCompactionStrategy is used')
 
         cluster = self.cluster
-        cluster.populate(1).start(wait_for_binary_proto=True)
+        cluster.populate(1).start()
         [node1] = cluster.nodelist()
         session = self.patient_cql_connection(node1)
         create_ks(session, 'ks', 1)
@@ -245,7 +245,7 @@ class TestCompaction(Tester):
         Set throughput, insert data and ensure compaction performance corresponds.
         """
         cluster = self.cluster
-        cluster.populate(1).start(wait_for_binary_proto=True)
+        cluster.populate(1).start()
         [node1] = cluster.nodelist()
 
         # disableautocompaction only disables compaction for existing tables,
@@ -303,7 +303,7 @@ class TestCompaction(Tester):
         if strategy in strategies:
             strategies.remove(strategy)
             cluster = self.cluster
-            cluster.populate(1).start(wait_for_binary_proto=True)
+            cluster.populate(1).start()
             [node1] = cluster.nodelist()
 
             for strat in strategies:
@@ -331,7 +331,7 @@ class TestCompaction(Tester):
                 node1.flush()
                 cluster.clear()
                 time.sleep(5)
-                cluster.start(wait_for_binary_proto=True)
+                cluster.start()
 
     def test_large_compaction_warning(self):
         """
@@ -340,7 +340,7 @@ class TestCompaction(Tester):
         """
         cluster = self.cluster
         cluster.set_configuration_options({'compaction_large_partition_warning_threshold_mb': 1})
-        cluster.populate(1).start(wait_for_binary_proto=True)
+        cluster.populate(1).start()
         [node] = cluster.nodelist()
 
         session = self.patient_cql_connection(node)
@@ -373,7 +373,7 @@ class TestCompaction(Tester):
         Make sure we can enable/disable compaction using nodetool
         """
         cluster = self.cluster
-        cluster.populate(1).start(wait_for_binary_proto=True)
+        cluster.populate(1).start()
         [node] = cluster.nodelist()
         session = self.patient_cql_connection(node)
         create_ks(session, 'ks', 1)
@@ -399,7 +399,7 @@ class TestCompaction(Tester):
         Make sure we can disable compaction via the schema compaction parameter 'enabled' = false
         """
         cluster = self.cluster
-        cluster.populate(1).start(wait_for_binary_proto=True)
+        cluster.populate(1).start()
         [node] = cluster.nodelist()
         session = self.patient_cql_connection(node)
         create_ks(session, 'ks', 1)
@@ -433,7 +433,7 @@ class TestCompaction(Tester):
         Make sure we can enable compaction using an alter-statement
         """
         cluster = self.cluster
-        cluster.populate(1).start(wait_for_binary_proto=True)
+        cluster.populate(1).start()
         [node] = cluster.nodelist()
         session = self.patient_cql_connection(node)
         create_ks(session, 'ks', 1)
@@ -462,7 +462,7 @@ class TestCompaction(Tester):
         Make sure compaction stays disabled after an alter statement where we have disabled using nodetool first
         """
         cluster = self.cluster
-        cluster.populate(1).start(wait_for_binary_proto=True)
+        cluster.populate(1).start()
         [node] = cluster.nodelist()
         session = self.patient_cql_connection(node)
         create_ks(session, 'ks', 1)
@@ -498,7 +498,7 @@ class TestCompaction(Tester):
         @jira_ticket CASSANDRA-11765
         """
         cluster = self.cluster
-        cluster.populate(1).start(wait_for_binary_proto=True)
+        cluster.populate(1).start()
         [node1] = cluster.nodelist()
 
         # disableautocompaction only disables compaction for existing tables,
@@ -527,7 +527,7 @@ class TestCompaction(Tester):
             pytest.skip('Not implemented unless LeveledCompactionStrategy is used')
 
         cluster = self.cluster
-        cluster.populate(1).start(wait_for_binary_proto=True)
+        cluster.populate(1).start()
         [node1] = cluster.nodelist()
 
         stress_write(node1, keycount=1)

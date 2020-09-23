@@ -149,7 +149,7 @@ class TestCqlsh(Tester, CqlshMixin):
     def test_simple_insert(self):
 
         self.cluster.populate(1)
-        self.cluster.start(wait_for_binary_proto=True)
+        self.cluster.start()
 
         node1, = self.cluster.nodelist()
 
@@ -176,7 +176,7 @@ class TestCqlsh(Tester, CqlshMixin):
         """
 
         self.cluster.populate(1)
-        self.cluster.start(wait_for_binary_proto=True)
+        self.cluster.start()
 
         node1, = self.cluster.nodelist()
 
@@ -202,7 +202,7 @@ class TestCqlsh(Tester, CqlshMixin):
     @since('2.2')
     def test_past_and_future_dates(self):
         self.cluster.populate(1)
-        self.cluster.start(wait_for_binary_proto=True)
+        self.cluster.start()
 
         node1, = self.cluster.nodelist()
 
@@ -232,7 +232,7 @@ class TestCqlsh(Tester, CqlshMixin):
         @jira_ticket 10428
         """
         self.cluster.populate(1)
-        self.cluster.start(wait_for_binary_proto=True)
+        self.cluster.start()
 
         node1, = self.cluster.nodelist()
 
@@ -382,7 +382,7 @@ class TestCqlsh(Tester, CqlshMixin):
     def test_eat_glass(self):
 
         self.cluster.populate(1)
-        self.cluster.start(wait_for_binary_proto=True)
+        self.cluster.start()
 
         node1, = self.cluster.nodelist()
 
@@ -505,7 +505,7 @@ UPDATE varcharmaptable SET varcharvarintmap['Vitrum edere possum, mihi non nocet
     def test_source_glass(self):
 
         self.cluster.populate(1)
-        self.cluster.start(wait_for_binary_proto=True)
+        self.cluster.start()
 
         node1, = self.cluster.nodelist()
 
@@ -519,7 +519,7 @@ UPDATE varcharmaptable SET varcharvarintmap['Vitrum edere possum, mihi non nocet
         @jira_ticket CASSANDRA-11626
         """
         self.cluster.populate(1)
-        self.cluster.start(wait_for_binary_proto=True)
+        self.cluster.start()
 
         node1, = self.cluster.nodelist()
 
@@ -536,7 +536,7 @@ UPDATE varcharmaptable SET varcharvarintmap['Vitrum edere possum, mihi non nocet
         @jira_ticket CASSANDRA-11626
         """
         self.cluster.populate(1)
-        self.cluster.start(wait_for_binary_proto=True)
+        self.cluster.start()
 
         node1, = self.cluster.nodelist()
 
@@ -554,7 +554,7 @@ UPDATE varcharmaptable SET varcharvarintmap['Vitrum edere possum, mihi non nocet
         CASSANDRA-7196. Make sure the server returns empty values and CQLSH prints them properly
         """
         self.cluster.populate(1)
-        self.cluster.start(wait_for_binary_proto=True)
+        self.cluster.start()
 
         node1, = self.cluster.nodelist()
 
@@ -635,7 +635,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         assert expected in output, "Output \n {0} \n doesn't contain expected\n {1}".format(output, expected)
 
     def test_tracing_from_system_traces(self):
-        self.cluster.populate(1).start(wait_for_binary_proto=True)
+        self.cluster.populate(1).start()
 
         node1, = self.cluster.nodelist()
 
@@ -767,7 +767,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         @jira_ticket CASSANDRA-7814
         """
         self.cluster.populate(1)
-        self.cluster.start(wait_for_binary_proto=True)
+        self.cluster.start()
         node1, = self.cluster.nodelist()
 
         self.execute(
@@ -854,7 +854,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
 
     def test_describe_describes_non_default_compaction_parameters(self):
         self.cluster.populate(1)
-        self.cluster.start(wait_for_binary_proto=True)
+        self.cluster.start()
         node, = self.cluster.nodelist()
         session = self.patient_cql_connection(node)
         create_ks(session, 'ks', 1)
@@ -869,7 +869,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
     def test_describe_functions(self, fixture_dtest_setup_overrides):
         """Test DESCRIBE statements for functions and aggregate functions"""
         self.cluster.populate(1)
-        self.cluster.start(wait_for_binary_proto=True)
+        self.cluster.start()
 
         create_ks_statement = "CREATE KEYSPACE test WITH REPLICATION = {'class' : 'SimpleStrategy', 'replication_factor' : 1}"
         create_function_statement = """
@@ -941,7 +941,7 @@ CREATE OR REPLACE AGGREGATE test.average(int)
     @since('4.0')
     def test_default_keyspaces_exist(self):
         self.cluster.populate(1)
-        self.cluster.start(wait_for_binary_proto=True)
+        self.cluster.start()
         node1, = self.cluster.nodelist()
 
         # Describe keyspaces
@@ -962,7 +962,7 @@ CREATE OR REPLACE AGGREGATE test.average(int)
     def test_describe_types(self):
         """Test DESCRIBE statements for user defined datatypes"""
         self.cluster.populate(1)
-        self.cluster.start(wait_for_binary_proto=True)
+        self.cluster.start()
 
         create_ks_statement = "CREATE KEYSPACE test WITH REPLICATION = {'class' : 'SimpleStrategy', 'replication_factor' : 1}"
         create_name_type_statement = """
@@ -1003,7 +1003,7 @@ CREATE TYPE test.address_type (
         Test that we can describe tables whose name is a non-reserved CQL keyword
         """
         self.cluster.populate(1)
-        self.cluster.start(wait_for_binary_proto=True)
+        self.cluster.start()
         node, = self.cluster.nodelist()
         session = self.patient_cql_connection(node)
         create_ks(session, 'ks', 1)
@@ -1020,7 +1020,7 @@ CREATE TYPE test.address_type (
         """
         self.cluster.set_configuration_options({'enable_materialized_views': 'true'})
         self.cluster.populate(1)
-        self.cluster.start(wait_for_binary_proto=True)
+        self.cluster.start()
 
         self.execute(
             cql="""
@@ -1451,7 +1451,7 @@ CREATE TYPE test.address_type (
     def test_float_formatting(self):
         """ Tests for CASSANDRA-9224, check format of float and double values"""
         self.cluster.populate(1)
-        self.cluster.start(wait_for_binary_proto=True)
+        self.cluster.start()
 
         node1, = self.cluster.nodelist()
 
@@ -1629,7 +1629,7 @@ CREATE TYPE test.address_type (
     def test_int_values(self):
         """ Tests for CASSANDRA-9399, check tables with int, bigint, smallint and tinyint values"""
         self.cluster.populate(1)
-        self.cluster.start(wait_for_binary_proto=True)
+        self.cluster.start()
 
         node1, = self.cluster.nodelist()
 
@@ -1666,7 +1666,7 @@ CREATE TABLE int_checks.values (
     def test_datetime_values(self):
         """ Tests for CASSANDRA-9399, check tables with date and time values"""
         self.cluster.populate(1)
-        self.cluster.start(wait_for_binary_proto=True)
+        self.cluster.start()
 
         node1, = self.cluster.nodelist()
 
@@ -1712,7 +1712,7 @@ CREATE TABLE datetime_checks.values (
     @since('4.0')
     def test_datetime_values_40(self):
         self.cluster.populate(1)
-        self.cluster.start(wait_for_binary_proto=True)
+        self.cluster.start()
 
         node1, = self.cluster.nodelist()
 
@@ -1759,7 +1759,7 @@ CREATE TABLE datetime_checks.values (
         therefore make this test too brittle.
         """
         self.cluster.populate(1)
-        self.cluster.start(wait_for_binary_proto=True)
+        self.cluster.start()
 
         node1, = self.cluster.nodelist()
 
@@ -1806,7 +1806,7 @@ Tracing session:""")
         self.cluster.set_configuration_options({
             'unlogged_batch_across_partitions_warn_threshold': str(max_partitions_per_batch)})
 
-        self.cluster.start(wait_for_binary_proto=True)
+        self.cluster.start()
 
         node1 = self.cluster.nodelist()[0]
 
@@ -1847,7 +1847,7 @@ Tracing session:""")
         @jira_ticket CASSANDRA-9601
         """
         self.cluster.populate(1)
-        self.cluster.start(wait_for_binary_proto=True)
+        self.cluster.start()
 
         node1, = self.cluster.nodelist()
 
@@ -1860,7 +1860,7 @@ Tracing session:""")
         @jira_ticket CASSANDRA-15193
         """
         self.cluster.populate(1)
-        self.cluster.start(wait_for_binary_proto=True)
+        self.cluster.start()
 
         node1, = self.cluster.nodelist()
         stdout, stderr = self.run_cqlsh(node1, cmds='USE system', cqlsh_options=['--tty'])
@@ -1876,7 +1876,7 @@ Tracing session:""")
         """
         self.cluster.populate(1)
         self.cluster.set_configuration_options({ 'native_transport_max_negotiable_protocol_version': str(3)})
-        self.cluster.start(wait_for_binary_proto=True)
+        self.cluster.start()
 
         node1, = self.cluster.nodelist()
         stdout, stderr = self.run_cqlsh(node1, cmds='USE system', cqlsh_options=['--tty'])
@@ -1890,14 +1890,13 @@ Tracing session:""")
         if node1.get_cassandra_version() < '4.0':
             assert "ProtocolError returned from server while using explicitly set client protocol_version 4" in stderr
 
-
     def test_update_schema_with_down_node(self):
         """
         Test that issuing a DML statement after a DDL statement will work with a down node
         @jira_ticket CASSANDRA-9689
         """
         self.cluster.populate(3)
-        self.cluster.start(wait_for_binary_proto=True, wait_other_notice=True)
+        self.cluster.start()
 
         node1, node2, node3 = self.cluster.nodelist()
         node2.stop(wait_other_notice=True)
@@ -1930,7 +1929,7 @@ Tracing session:""")
         indicates the output of DESCRIBE is not a correct CREATE TABLE statement.
         """
         self.cluster.populate(1)
-        self.cluster.start(wait_for_binary_proto=True)
+        self.cluster.start()
         node1, = self.cluster.nodelist()
         session = self.patient_cql_connection(node1)
 
@@ -1960,7 +1959,7 @@ Tracing session:""")
         """
         self.cluster.set_configuration_options({'enable_materialized_views': 'true'})
         self.cluster.populate(1)
-        self.cluster.start(wait_for_binary_proto=True)
+        self.cluster.start()
         node1, = self.cluster.nodelist()
         session = self.patient_cql_connection(node1)
 
@@ -2042,7 +2041,7 @@ Tracing session:""")
             expression.
         """
         self.cluster.populate(1)
-        self.cluster.start(wait_for_binary_proto=True)
+        self.cluster.start()
         node1, = self.cluster.nodelist()
 
         out, err = self.run_cqlsh(node1, cmd, env_vars={'TERM': 'xterm'})
@@ -2058,7 +2057,7 @@ Tracing session:""")
         @jira_ticket CASSANDRA-10272
         """
         self.cluster.populate(1)
-        self.cluster.start(wait_for_binary_proto=True)
+        self.cluster.start()
         node1, = self.cluster.nodelist()
 
         stdout, stderr = self.run_cqlsh(node1, cmds="""
@@ -2076,7 +2075,7 @@ Tracing session:""")
         @jira_ticket CASSANDRA-15660
         """
         self.cluster.populate(1)
-        self.cluster.start(wait_for_binary_proto=True)
+        self.cluster.start()
         node1, = self.cluster.nodelist()
         session = self.patient_cql_connection(node1)
 
@@ -2096,7 +2095,7 @@ Tracing session:""")
         @jira_ticket CASSANDRA-15905
         """
         self.cluster.populate(1)
-        self.cluster.start(wait_for_binary_proto=True)
+        self.cluster.start()
         node1, = self.cluster.nodelist()
         session = self.patient_cql_connection(node1)
 
@@ -2125,7 +2124,7 @@ class TestCqlshSmoke(Tester, CqlshMixin):
 
     @pytest.fixture(scope='function', autouse=True)
     def fixture_cluster_setup(self, fixture_dtest_setup):
-        fixture_dtest_setup.cluster.populate(1).start(wait_for_binary_proto=True)
+        fixture_dtest_setup.cluster.populate(1).start()
         [self.node1] = fixture_dtest_setup.cluster.nodelist()
         self.session = fixture_dtest_setup.patient_cql_connection(self.node1)
 
@@ -2429,7 +2428,7 @@ class TestCqlLogin(Tester, CqlshMixin):
         cluster = fixture_dtest_setup.cluster
         config = {'authenticator': 'org.apache.cassandra.auth.PasswordAuthenticator'}
         cluster.set_configuration_options(values=config)
-        cluster.populate(1).start(wait_for_binary_proto=True)
+        cluster.populate(1).start()
         [self.node1] = cluster.nodelist()
         self.node1.watch_log_for('Created default superuser')
         self.session = fixture_dtest_setup.patient_cql_connection(self.node1, user='cassandra', password='cassandra')
@@ -2545,7 +2544,7 @@ class TestCqlshUnicode(Tester, CqlshMixin):
     @pytest.fixture(scope='function', autouse=True)
     def fixture_cluster_setup(self, fixture_dtest_setup):
         cluster = fixture_dtest_setup.cluster
-        cluster.populate(1).start(wait_for_binary_proto=True)
+        cluster.populate(1).start()
         [self.node1] = cluster.nodelist()
         self.session = fixture_dtest_setup.patient_cql_connection(self.node1)
 

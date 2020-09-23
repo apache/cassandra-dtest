@@ -65,7 +65,7 @@ class TestBootstrapConsistency(Tester):
 
         cluster.populate(2)
         node1, node2 = cluster.nodelist()
-        cluster.start(wait_for_binary_proto=True, wait_other_notice=True)
+        cluster.start()
 
         logger.debug("Set to talk to node 2")
         n2session = self.patient_cql_connection(node2)

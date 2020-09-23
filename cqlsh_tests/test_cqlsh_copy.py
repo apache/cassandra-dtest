@@ -101,7 +101,7 @@ class TestCqlshCopy(Tester):
 
             if configuration_options:
                 self.cluster.set_configuration_options(values=configuration_options)
-            self.cluster.populate(nodes, tokens=tokens).start(wait_for_binary_proto=True)
+            self.cluster.populate(nodes, tokens=tokens).start()
         else:
             assert self.cluster.partitioner == p, "Cannot reuse cluster: different partitioner"
             assert len(self.cluster.nodelist()) == nodes, "Cannot reuse cluster: different number of nodes"

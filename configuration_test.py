@@ -75,7 +75,7 @@ class TestConfiguration(Tester):
             # disable JVM option so we can use Jolokia
             # this has to happen after .set_configuration_options because of implementation details
             remove_perf_disable_shared_mem(node)
-            self.fixture_dtest_setup.cluster.start(wait_for_binary_proto=True)
+            self.fixture_dtest_setup.cluster.start()
             return node
 
         durable_node = new_commitlog_cluster_node()
@@ -117,7 +117,7 @@ class TestConfiguration(Tester):
         default_path = node1.data_directories()[0]
         node1.set_configuration_options({'saved_caches_directory': os.path.join(default_path, 'saved_caches')})
         remove_perf_disable_shared_mem(node1)
-        self.cluster.start(wait_for_binary_proto=True)
+        self.cluster.start()
 
         session = self.patient_exclusive_cql_connection(node1)
         session.execute("CREATE KEYSPACE ks WITH REPLICATION = {'class': 'SimpleStrategy', 'replication_factor': 1}")
@@ -130,7 +130,7 @@ class TestConfiguration(Tester):
             jmx.execute_method(cache_service, 'saveCaches')
 
         self.cluster.stop()
-        self.cluster.start(wait_for_binary_proto=True)
+        self.cluster.start()
 
     def _check_chunk_length(self, session, value):
         result = session.cluster.metadata.keyspaces['ks'].tables['test_table'].as_cql_query()

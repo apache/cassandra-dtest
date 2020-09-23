@@ -181,7 +181,7 @@ class TestHintedHandoff(Tester):
 
     @pytest.mark.no_vnodes
     def test_hintedhandoff_decom(self):
-        self.cluster.populate(4).start(wait_for_binary_proto=True)
+        self.cluster.populate(4).start()
         [node1, node2, node3, node4] = self.cluster.nodelist()
         session = self.patient_cql_connection(node1)
         create_ks(session, 'ks', 2)

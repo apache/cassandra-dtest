@@ -98,7 +98,7 @@ class TestReadRepair(Tester):
                 snitch_file.write("rack=rack1" + os.linesep)
                 snitch_file.write("prefer_local=true" + os.linesep)
 
-        cluster.start(wait_for_binary_proto=True)
+        cluster.start()
 
     @since('3.0')
     def test_alter_rf_and_run_read_repair(self):
@@ -302,7 +302,7 @@ class TestReadRepair(Tester):
 
         self.cluster.flush()
         self.cluster.stop()
-        self.cluster.start(wait_for_binary_proto=True)
+        self.cluster.start()
         session1 = self.patient_exclusive_cql_connection(node1)
 
         for n in range(1, 1000):
@@ -444,7 +444,7 @@ class TestSpeculativeReadRepair(Tester):
                                                   'read_request_timeout_in_ms': 1000})
         cluster.populate(3, install_byteman=True, debug=True)
         byteman_validate(cluster.nodelist()[0], './byteman/read_repair/sorted_live_endpoints.btm', verbose=True)
-        cluster.start(wait_for_binary_proto=True, jvm_args=['-XX:-PerfDisableSharedMem'])
+        cluster.start(jvm_args=['-XX:-PerfDisableSharedMem'])
         session = fixture_dtest_setup.patient_exclusive_cql_connection(cluster.nodelist()[0], timeout=2)
 
         session.execute("CREATE KEYSPACE ks WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 3}")
@@ -744,8 +744,7 @@ class TestReadRepairGuarantees(Tester):
                                                   'dynamic_snitch': False,
                                                   'write_request_timeout_in_ms': 500,
                                                   'read_request_timeout_in_ms': 500})
-        cluster.populate(3, install_byteman=True, debug=True).start(wait_for_binary_proto=True,
-                                                                    jvm_args=['-XX:-PerfDisableSharedMem'])
+        cluster.populate(3, install_byteman=True, debug=True).start(jvm_args=['-XX:-PerfDisableSharedMem'])
         session = fixture_dtest_setup.patient_exclusive_cql_connection(cluster.nodelist()[0], timeout=2)
 
         session.execute("CREATE KEYSPACE ks WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 3}")

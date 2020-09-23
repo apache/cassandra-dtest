@@ -84,8 +84,7 @@ class TestThrift(Tester):
 
         # CASSANDRA-14092 - prevent max ttl tests from failing
         fixture_dtest_setup.cluster.start(jvm_args=['-Dcassandra.expiration_date_overflow_policy=CAP',
-                                                    '-Dcassandra.expiration_overflow_warning_interval_minutes=0'],
-                                          wait_for_binary_proto=True)
+                                                    '-Dcassandra.expiration_overflow_warning_interval_minutes=0'])
         fixture_dtest_setup.cluster.nodelist()[0].watch_log_for("Listening for thrift clients")  # Wait for the thrift port to open
         time.sleep(0.1)
         # this is ugly, but the whole test module is written against a global client

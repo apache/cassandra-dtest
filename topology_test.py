@@ -134,7 +134,7 @@ class TestTopology(Tester):
         """
         cluster = self.cluster
         cluster.populate(3)
-        cluster.start(wait_for_binary_proto=True, jvm_args=["-Dcassandra.size_recorder_interval=1"])
+        cluster.start(jvm_args=["-Dcassandra.size_recorder_interval=1"])
         node1, node2, node3 = cluster.nodelist()
 
         session = self.patient_cql_connection(node1)
@@ -161,7 +161,7 @@ class TestTopology(Tester):
         """
         cluster = self.cluster
         cluster.set_configuration_options(values={'stream_throughput_outbound_megabits_per_sec': 1})
-        cluster.populate(2).start(wait_other_notice=True)
+        cluster.populate(2).start()
         node1, node2 = cluster.nodelist()
 
         session = self.patient_cql_connection(node2)
@@ -206,7 +206,7 @@ class TestTopology(Tester):
                                                         r'Remote peer 127.0.0.2:7000 failed stream session']
         cluster = self.cluster
         cluster.set_configuration_options(values={'stream_throughput_outbound_megabits_per_sec': 1})
-        cluster.populate(3, install_byteman=True).start(wait_other_notice=True)
+        cluster.populate(3, install_byteman=True).start()
         node1, node2, node3 = cluster.nodelist()
 
         session = self.patient_cql_connection(node2)
@@ -381,7 +381,7 @@ class TestTopology(Tester):
         self.fixture_dtest_setup.ignore_log_patterns = list(self.fixture_dtest_setup.ignore_log_patterns) + [
             rejoin_err]
 
-        self.cluster.populate(3).start(wait_for_binary_proto=True)
+        self.cluster.populate(3).start()
         node1, node2, node3 = self.cluster.nodelist()
 
         logger.debug('decommissioning...')
@@ -420,7 +420,7 @@ class TestTopology(Tester):
         """
         cluster = self.cluster
         self.fixture_dtest_setup.ignore_log_patterns = [r'Streaming error occurred', 'Stream failed']
-        cluster.populate(3).start(wait_other_notice=True)
+        cluster.populate(3).start()
 
         node1, node2 = cluster.nodelist()[0:2]
 
@@ -457,7 +457,7 @@ class TestTopology(Tester):
         @expected_errors ToolError when # nodes will drop below configured replicas in NTS/SimpleStrategy
         """
         cluster = self.cluster
-        cluster.populate([2, 2]).start(wait_for_binary_proto=True)
+        cluster.populate([2, 2]).start()
         node1, node2, node3, node4 = self.cluster.nodelist()
         session = self.patient_cql_connection(node2)
         session.execute("ALTER KEYSPACE system_distributed WITH REPLICATION = {'class':'SimpleStrategy', 'replication_factor':'2'};")

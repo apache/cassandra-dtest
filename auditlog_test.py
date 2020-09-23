@@ -24,7 +24,7 @@ class TestAuditlog(Tester):
                                                                             'audit_logs_dir': log_dir,
                                                                             'roll_cycle': 'TEST_SECONDLY',
                                                                             'archive_command':'%s %%path'%(move_script)}})
-        cluster.populate(1).start(wait_for_binary_proto=True)
+        cluster.populate(1).start()
         node = cluster.nodelist()[0]
         node.stress(['write', 'n=100k', "no-warmup", "cl=ONE", "-rate", "threads=300"])
         node.nodetool("disableauditlog")
@@ -38,7 +38,7 @@ class TestAuditlog(Tester):
         moved_log_dir, move_script = self._create_script()
         cluster.set_configuration_options(values={'full_query_logging_options': {'log_dir': log_dir,
                                                                                  'archive_command': 'conf should not be used'}})
-        cluster.populate(1).start(wait_for_binary_proto=True)
+        cluster.populate(1).start()
         node = cluster.nodelist()[0]
         node.nodetool("enablefullquerylog --archive-command \"%s %%path\" --roll-cycle=TEST_SECONDLY"%move_script)
         node.stress(['write', 'n=100k', "no-warmup", "cl=ONE", "-rate", "threads=300"])
@@ -58,7 +58,7 @@ class TestAuditlog(Tester):
         cluster.set_configuration_options(values={'full_query_logging_options': {'log_dir': log_dir,
                                                                                  'roll_cycle': 'TEST_SECONDLY',
                                                                                  'archive_command':'%s %%path'%(move_script)}})
-        cluster.populate(1).start(wait_for_binary_proto=True)
+        cluster.populate(1).start()
         node = cluster.nodelist()[0]
         node.nodetool("enablefullquerylog")
         node.stress(['write', 'n=100k', "no-warmup", "cl=ONE", "-rate", "threads=300"])
@@ -87,7 +87,7 @@ class TestAuditlog(Tester):
         cluster.set_configuration_options(values={'full_query_logging_options': {'log_dir': log_dir,
                                                                                  'roll_cycle': 'TEST_SECONDLY',
                                                                                  'archive_command':'%s %%path'%(move_script)}})
-        cluster.populate(1).start(wait_for_binary_proto=True)
+        cluster.populate(1).start()
         node = cluster.nodelist()[0]
         node.nodetool("enablefullquerylog")
 
@@ -104,7 +104,7 @@ class TestAuditlog(Tester):
         cluster.set_configuration_options(values={'full_query_logging_options': {'log_dir': log_dir,
                                                                                  'roll_cycle': 'TEST_SECONDLY',
                                                                                  'archive_command':'%s %%path'%(move_script)}})
-        cluster.populate(1).start(wait_for_binary_proto=True)
+        cluster.populate(1).start()
         node = cluster.nodelist()[0]
         node.nodetool("enablefullquerylog")
 

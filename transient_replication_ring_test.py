@@ -111,7 +111,7 @@ class TestTransientReplicationRing(Tester):
         print(self.cluster.get_install_dir())
         self.cluster.populate(3, tokens=self.tokens, debug=True, install_byteman=True)
         # self.cluster.populate(3, debug=True, install_byteman=True)
-        self.cluster.start(wait_other_notice=True, wait_for_binary_proto=True, jvm_args=['-Dcassandra.enable_nodelocal_queries=true'])
+        self.cluster.start(jvm_args=['-Dcassandra.enable_nodelocal_queries=true'])
 
         # enable shared memory
         for node in self.cluster.nodelist():

@@ -29,7 +29,7 @@ class TestCompression(TestHelper):
         using new cql create table syntax to disable compression
         """
         cluster = self.cluster
-        cluster.populate(1).start(wait_for_binary_proto=True)
+        cluster.populate(1).start()
         [node] = cluster.nodelist()
 
         session = self.patient_cql_connection(node)
@@ -59,7 +59,7 @@ class TestCompression(TestHelper):
         using new cql create table syntax to configure compression
         """
         cluster = self.cluster
-        cluster.populate(1).start(wait_for_binary_proto=True)
+        cluster.populate(1).start()
         [node] = cluster.nodelist()
 
         session = self.patient_cql_connection(node)
@@ -124,7 +124,7 @@ class TestCompression(TestHelper):
         starting with compression enabled then disabling it
         """
         cluster = self.cluster
-        cluster.populate(1).start(wait_for_binary_proto=True)
+        cluster.populate(1).start()
         [node] = cluster.nodelist()
 
         session = self.patient_cql_connection(node)
@@ -155,7 +155,7 @@ class TestCompression(TestHelper):
         starting with compression disabled and enabling it
         """
         cluster = self.cluster
-        cluster.populate(1).start(wait_for_binary_proto=True)
+        cluster.populate(1).start()
         [node] = cluster.nodelist()
 
         session = self.patient_cql_connection(node)

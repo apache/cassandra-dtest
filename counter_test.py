@@ -102,7 +102,7 @@ class TestCounters(Tester):
             nodes[0].update_startup_byteman_script('./byteman/4.0/election_counter_leader_favor_node2.btm')
             nodes[2].update_startup_byteman_script('./byteman/4.0/election_counter_leader_favor_node2.btm')
 
-        cluster.start(wait_for_binary_proto=True)
+        cluster.start()
         session = self.patient_cql_connection(nodes[0])
         create_ks(session, 'ks', 3)
         create_cf(session, 'cf', validation="CounterColumnType", columns={'c': 'counter'})

@@ -402,7 +402,7 @@ class TestArchiveCommitlog(SnapshotTester):
             for snapshot_dir in snapshot_dirs:
                 self.restore_snapshot(snapshot_dir, node1, 'ks', 'cf', 'basic')
 
-            cluster.start(wait_for_binary_proto=True)
+            cluster.start()
 
             session = self.patient_cql_connection(node1)
             node1.nodetool('refresh ks cf')
@@ -487,7 +487,7 @@ class TestArchiveCommitlog(SnapshotTester):
                          (r'^restore_directories=.*$', 'restore_directories={tmp_commitlog}'.format(
                           tmp_commitlog=tmp_commitlog))])
 
-        cluster.start(wait_for_binary_proto=True)
+        cluster.start()
 
         logger.debug("Creating initial connection")
         session = self.patient_cql_connection(node1)

@@ -95,7 +95,7 @@ class BaseRepairTest(Tester):
         cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
         cluster.set_batch_commitlog(enabled=True)
         logger.debug("Starting cluster..")
-        cluster.populate(3).start(wait_for_binary_proto=True, wait_other_notice=True)
+        cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
 
         session = self.patient_cql_connection(node1, retry_policy=FlakyRetryPolicy(max_retries=15))
@@ -172,7 +172,7 @@ class TestRepair(BaseRepairTest):
         """
         cluster = self.cluster
         logger.debug("Starting cluster..")
-        cluster.populate([2, 2]).start(wait_for_binary_proto=True)
+        cluster.populate([2, 2]).start()
         node1_1, node2_1, node1_2, node2_2 = cluster.nodelist()
         node1_1.stress(stress_options=['write', 'n=50K', 'no-warmup', 'cl=ONE', '-schema', 'replication(factor=4)', '-rate', 'threads=50'])
         node1_1.nodetool("repair -local keyspace1 standard1")
@@ -197,7 +197,7 @@ class TestRepair(BaseRepairTest):
         self.fixture_dtest_setup.ignore_log_patterns = [r'Unknown keyspace/cf pair']
         cluster = self.cluster
         logger.debug('Starting nodes')
-        cluster.populate(2).start(wait_for_binary_proto=True)
+        cluster.populate(2).start()
         node1, _ = cluster.nodelist()
         logger.debug('Creating keyspace and tables')
         node1.stress(stress_options=['write', 'n=1', 'no-warmup',
@@ -241,7 +241,7 @@ class TestRepair(BaseRepairTest):
         """
         cluster = self.cluster
         logger.debug("Starting cluster..")
-        cluster.populate([2, 2]).start(wait_for_binary_proto=True)
+        cluster.populate([2, 2]).start()
         node1_1, node2_1, node1_2, node2_2 = cluster.nodelist()
         node1_1.stress(stress_options=['write', 'n=100K', 'no-warmup', 'cl=ONE', '-schema', 'replication(factor=4)', '-rate', 'threads=50'])
         node1_1.nodetool("repair -hosts 127.0.0.1,127.0.0.2,127.0.0.3,127.0.0.4 keyspace1 standard1")
@@ -262,7 +262,7 @@ class TestRepair(BaseRepairTest):
         """
         cluster = self.cluster
         logger.debug("Starting cluster..")
-        cluster.populate(3).start(wait_for_binary_proto=True)
+        cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
         node1.stress(stress_options=['write', 'n=50K', 'no-warmup', 'cl=ONE', '-schema', 'replication(factor=3)', '-rate', 'threads=50'])
         node1.nodetool("repair -st 0 -et 1000 keyspace1 standard1")
@@ -304,7 +304,7 @@ class TestRepair(BaseRepairTest):
         logger.debug("Starting cluster..")
         # disable JBOD conf since the test expects sstables to be on the same disk
         cluster.set_datadir_count(1)
-        cluster.populate(3).start(wait_for_binary_proto=True)
+        cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
         # we use RF to make sure to cover only a set of sub-ranges when doing -full -pr
         node1.stress(stress_options=['write', 'n=50K', 'no-warmup', 'cl=ONE', '-schema', 'replication(factor=2)', '-rate', 'threads=50'])
@@ -337,7 +337,7 @@ class TestRepair(BaseRepairTest):
         """
         cluster = self.cluster
         logger.debug("Starting cluster..")
-        cluster.populate([2, 2]).start(wait_for_binary_proto=True)
+        cluster.populate([2, 2]).start()
         node1_1, node2_1, node1_2, node2_2 = cluster.nodelist()
         node1_1.stress(stress_options=['write', 'n=50K', 'no-warmup', 'cl=ONE', '-schema', 'replication(factor=4)'])
         node1_1.nodetool("repair keyspace1 standard1")
@@ -709,7 +709,7 @@ class TestRepair(BaseRepairTest):
         cluster.set_batch_commitlog(enabled=True)
         logger.debug("Starting cluster..")
         # populate 2 nodes in dc1, and one node each in dc2 and dc3
-        cluster.populate([2, 1, 1]).start(wait_for_binary_proto=True)
+        cluster.populate([2, 1, 1]).start()
 
         node1, node2, node3, node4 = cluster.nodelist()
         session = self.patient_cql_connection(node1)
@@ -758,7 +758,7 @@ class TestRepair(BaseRepairTest):
 
         cluster = self.cluster
         logger.debug("Starting cluster..")
-        cluster.populate([3]).start(wait_for_binary_proto=True)
+        cluster.populate([3]).start()
         node1, node2, node3 = cluster.nodelist()
         node1.stress(stress_options=['write', 'n=10k', 'no-warmup', 'cl=ONE', '-schema', 'replication(factor=3)', '-rate', 'threads=50'])
 
@@ -795,7 +795,7 @@ class TestRepair(BaseRepairTest):
         cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
         cluster.set_batch_commitlog(enabled=True)
         logger.debug("Starting cluster..")
-        cluster.populate(3).start(wait_for_binary_proto=True)
+        cluster.populate(3).start()
 
         node1, node2, node3 = cluster.nodelist()
 
@@ -819,7 +819,7 @@ class TestRepair(BaseRepairTest):
         cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
         cluster.set_batch_commitlog(enabled=True)
         logger.debug("Starting cluster..")
-        cluster.populate(3).start(wait_for_binary_proto=True)
+        cluster.populate(3).start()
 
         node1, node2, node3 = cluster.nodelist()
 
@@ -868,7 +868,7 @@ class TestRepair(BaseRepairTest):
         cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
         cluster.set_batch_commitlog(enabled=True)
         logger.debug("Starting cluster..")
-        cluster.populate(3).start(wait_for_binary_proto=True)
+        cluster.populate(3).start()
 
         node1, node2, node3 = cluster.nodelist()
 
@@ -892,7 +892,7 @@ class TestRepair(BaseRepairTest):
         cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
         cluster.set_batch_commitlog(enabled=True)
         logger.debug("Starting cluster..")
-        cluster.populate(3).start(wait_for_binary_proto=True)
+        cluster.populate(3).start()
 
         node1, node2, node3 = cluster.nodelist()
 
@@ -966,7 +966,7 @@ class TestRepair(BaseRepairTest):
         cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
         cluster.set_batch_commitlog(enabled=True)
         logger.debug("Starting cluster..")
-        cluster.populate(3).start(wait_for_binary_proto=True)
+        cluster.populate(3).start()
 
         node1, node2, node3 = cluster.nodelist()
 
@@ -1009,7 +1009,7 @@ class TestRepair(BaseRepairTest):
         cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
         cluster.set_batch_commitlog(enabled=True)
         logger.debug("Starting cluster..")
-        cluster.populate(3).start(wait_for_binary_proto=True)
+        cluster.populate(3).start()
 
         node1, node2, node3 = cluster.nodelist()
 
@@ -1050,7 +1050,7 @@ class TestRepair(BaseRepairTest):
         """
         cluster = self.cluster
         cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
-        cluster.populate(3).start(wait_for_binary_proto=True)
+        cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
         node2.stop(wait_other_notice=True)
         node1.stress(['write', 'n=1M', 'no-warmup', '-schema', 'replication(factor=3)', '-rate', 'threads=30'])
@@ -1077,7 +1077,7 @@ class TestRepair(BaseRepairTest):
         """
         cluster = self.cluster
         cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
-        cluster.populate(2).start(wait_for_binary_proto=True)
+        cluster.populate(2).start()
         node1, node2 = cluster.nodelist()
         node2.stop(wait_other_notice=True)
         profile_path = os.path.join(os.getcwd(), 'stress_profiles/repair_wide_rows.yaml')
@@ -1095,7 +1095,7 @@ class TestRepair(BaseRepairTest):
         """
         cluster = self.cluster
         cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
-        cluster.populate(3).start(wait_for_binary_proto=True)
+        cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
         node1.stress(['write', 'n=100k', '-schema', 'replication(factor=3)', '-rate', 'threads=30'])
 
@@ -1193,8 +1193,8 @@ class TestRepair(BaseRepairTest):
         node_to_kill.import_config_files()
 
         logger.debug("Starting cluster..")
-        cluster.start(wait_other_notice=True, jvm_args=['-Djdk.attach.allowAttachSelf=true'])
-        # cluster.start(wait_other_notice=True)
+        cluster.start(jvm_args=['-Djdk.attach.allowAttachSelf=true'])
+        # cluster.start()
 
         logger.debug("stopping node3")
         node3.stop(gently=False, wait_other_notice=True)
@@ -1276,7 +1276,7 @@ class TestRepairDataSystemTable(Tester):
         a 5-node cluster, then inserting 5000 values with RF=3.
         """
         self.cluster = fixture_dtest_setup.cluster
-        self.cluster.populate(5).start(wait_for_binary_proto=True)
+        self.cluster.populate(5).start()
         self.node1 = self.cluster.nodelist()[0]
         self.session = fixture_dtest_setup.patient_cql_connection(self.node1)
 

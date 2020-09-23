@@ -23,7 +23,7 @@ class TestFQLTool(Tester):
         query log, then makes sure that the data is correct.
         @jira_ticket CASSANDRA-14690
         """
-        self.cluster.populate(2).start(wait_for_binary_proto=True)
+        self.cluster.populate(2).start()
         node1, node2 = self.cluster.nodelist()
 
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -61,7 +61,7 @@ class TestFQLTool(Tester):
         sure that the results match
         @jira_ticket CASSANDRA-14690
         """
-        self.cluster.populate(1).start(wait_for_binary_proto=True)
+        self.cluster.populate(1).start()
         node1 = self.cluster.nodelist()[0]
 
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -87,7 +87,7 @@ class TestFQLTool(Tester):
         then asserts that the replays of each generates a mismatch
         @jira_ticket CASSANDRA-14690
         """
-        self.cluster.populate(1).start(wait_for_binary_proto=True)
+        self.cluster.populate(1).start()
         node1 = self.cluster.nodelist()[0]
 
         with tempfile.TemporaryDirectory() as temp_dir:

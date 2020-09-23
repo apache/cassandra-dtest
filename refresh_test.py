@@ -14,7 +14,7 @@ class TestRefresh(Tester):
         node = self.cluster.nodelist()[0]
         node.byteman_port = '8100'
         node.import_config_files()
-        self.cluster.start(wait_other_notice=True)
+        self.cluster.start()
         session = self.patient_cql_connection(node)
         session.execute("CREATE KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor':1}")
         session.execute("CREATE TABLE ks.a (id int primary key, d text)")
