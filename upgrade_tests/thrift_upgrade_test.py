@@ -217,7 +217,7 @@ class TestUpgradeSuperColumnsThrough(Tester):
             logger.debug('Starting %s on new version (%s)' % (node.name, tag))
             # Setup log4j / logback again (necessary moving from 2.0 -> 2.1):
             node.set_log_level("INFO")
-            node.start(wait_other_notice=True, wait_for_binary_proto=True)
+            node.start(wait_for_binary_proto=True)
             node.nodetool('upgradesstables -a')
 
     def prepare(self, num_nodes=1, cassandra_version="github:apache/cassandra-2.2"):

@@ -222,7 +222,7 @@ class TestAuthUpgrade(Tester):
         logger.debug('Starting {node} on new version ({tag})'.format(**format_args))
         # Setup log4j / logback again (necessary moving from 2.0 -> 2.1):
         node.set_log_level("INFO")
-        node.start(wait_other_notice=True)
+        node.start()
         # wait for the conversion of legacy data to either complete or fail
         # (because not enough upgraded nodes are available yet)
         logger.debug('Waiting for conversion of legacy data to complete or fail')

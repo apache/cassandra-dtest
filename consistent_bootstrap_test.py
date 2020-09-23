@@ -42,7 +42,7 @@ class TestBootstrapConsistency(Tester):
         node2.flush()
 
         logger.debug("Restart node1")
-        node1.start(wait_other_notice=True)
+        node1.start()
 
         logger.debug("Move token on node3")
         node3.move(2)
@@ -84,7 +84,7 @@ class TestBootstrapConsistency(Tester):
         node2.flush()
 
         logger.debug("Restart node1")
-        node1.start(wait_other_notice=True)
+        node1.start()
 
         logger.debug("Bootstraping node3")
         node3 = new_node(cluster)

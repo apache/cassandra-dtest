@@ -80,7 +80,7 @@ class TestUpgradeSuperColumnsThrough(Tester):
         node1.watch_log_for("DRAINED")
         node1.stop(wait_other_notice=False)
         node1.set_install_dir(version=VERSION_TRUNK)
-        node1.start(wait_other_notice=True, wait_for_binary_proto=True)
+        node1.start(wait_for_binary_proto=True)
 
         session = self.patient_cql_connection(node2, row_factory=dict_factory)
 

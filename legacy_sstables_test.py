@@ -47,7 +47,7 @@ class TestLegacySSTables(Tester):
         # stop, upgrade to current version (3.0 or 3.11), start up
         node1.stop(wait_other_notice=True)
         self.set_node_to_current_version(node1)
-        node1.start(wait_other_notice=True)
+        node1.start()
         session = self.patient_cql_connection(node1)
 
         # make sure all 4 rows are there when reading backwards

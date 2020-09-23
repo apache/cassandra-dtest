@@ -70,7 +70,7 @@ class ReplicaSideFiltering(Tester):
         session = self.patient_cql_connection(node_to_update, keyspace, consistency_level=CL.ONE)
         for q in queries:
             session.execute(q)
-        node_to_stop.start(wait_other_notice=True)
+        node_to_stop.start()
 
     def _assert_none(self, query):
         """

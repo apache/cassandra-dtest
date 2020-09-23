@@ -69,7 +69,7 @@ class TestRebuild(Tester):
                                     '7200', '2001', None,
                                     binary_interface=('127.0.0.2', 9042))
         cluster.add(node2, False, data_center='dc2')
-        node2.start(wait_other_notice=True, wait_for_binary_proto=True)
+        node2.start(wait_for_binary_proto=True)
 
         # wait for snitch to reload
         time.sleep(60)
@@ -284,7 +284,7 @@ class TestRebuild(Tester):
                                     binary_interface=('127.0.0.2', 9042))
         node2.set_configuration_options(values={'initial_token': tokens[1]})
         cluster.add(node2, False, data_center='dc2')
-        node2.start(wait_other_notice=True, wait_for_binary_proto=True)
+        node2.start(wait_for_binary_proto=True)
 
         # wait for snitch to reload
         time.sleep(60)
@@ -422,7 +422,7 @@ class TestRebuild(Tester):
                                     '7300', '2002', tokens[2],
                                     binary_interface=('127.0.0.3', 9042))
         cluster.add(node3, False, data_center='dc3')
-        node3.start(wait_other_notice=True, wait_for_binary_proto=True)
+        node3.start(wait_for_binary_proto=True)
 
         # wait for snitch to reload
         time.sleep(60)

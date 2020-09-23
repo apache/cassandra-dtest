@@ -85,7 +85,7 @@ class BaseRepairTest(Tester):
 
         if restart:
             for node in stopped_nodes:
-                node.start(wait_for_binary_proto=True, wait_other_notice=True)
+                node.start(wait_for_binary_proto=True)
 
     def _populate_cluster(self, start=True):
         cluster = self.cluster
@@ -111,7 +111,7 @@ class BaseRepairTest(Tester):
         node3.flush()
         node3.stop(wait_other_notice=True)
         insert_c1c2(session, keys=(1000, ), consistency=ConsistencyLevel.TWO)
-        node3.start(wait_other_notice=True, wait_for_binary_proto=True)
+        node3.start(wait_for_binary_proto=True)
         insert_c1c2(session, keys=list(range(1001, 2001)), consistency=ConsistencyLevel.ALL)
 
         cluster.flush()
@@ -319,7 +319,7 @@ class TestRepair(BaseRepairTest):
         # stop node2, stress and start full repair to find out how synced ranges affect repairedAt values
         node2.stop(wait_other_notice=True)
         node1.stress(stress_options=['write', 'n=40K', 'no-warmup', 'cl=ONE', '-rate', 'threads=50'])
-        node2.start(wait_for_binary_proto=True, wait_other_notice=True)
+        node2.start(wait_for_binary_proto=True)
         node1.nodetool("repair -full -pr keyspace1 standard1")
 
         meta = self._get_repaired_data(node1, 'keyspace1')
@@ -509,7 +509,7 @@ class TestRepair(BaseRepairTest):
         time.sleep(2)
 
         # bring up node2 and repair
-        node2.start(wait_for_binary_proto=True, wait_other_notice=True)
+        node2.start(wait_for_binary_proto=True)
         node2.repair(_repair_options(self.cluster.version(), ks='ks', sequential=sequential))
 
         # check no rows will be returned
@@ -726,7 +726,7 @@ class TestRepair(BaseRepairTest):
         node2.flush()
         node2.stop(wait_other_notice=True)
         insert_c1c2(session, keys=(1000, ), consistency=ConsistencyLevel.THREE)
-        node2.start(wait_for_binary_proto=True, wait_other_notice=True)
+        node2.start(wait_for_binary_proto=True)
         node1.watch_log_for_alive(node2)
         insert_c1c2(session, keys=list(range(1001, 2001)), consistency=ConsistencyLevel.ALL)
 
@@ -829,7 +829,7 @@ class TestRepair(BaseRepairTest):
         node2.flush()
         node2.stop(wait_other_notice=True)
         node1.stress(['write', 'n=1K', 'no-warmup', 'cl=ONE', '-schema', 'replication(factor=2)', '-rate', 'threads=30', '-pop', 'seq=20..40K'])
-        node2.start(wait_for_binary_proto=True, wait_other_notice=True)
+        node2.start(wait_for_binary_proto=True)
         node1.stress(['write', 'n=1K', 'no-warmup', 'cl=ALL', '-schema', 'replication(factor=2)', '-rate', 'threads=30', '-pop', 'seq=40..60K'])
         cluster.flush()
 
@@ -931,7 +931,7 @@ class TestRepair(BaseRepairTest):
         node2.stop(wait_other_notice=True)
 
         node1.stress(['write', 'n=20K', 'no-warmup', 'cl=ONE', '-schema', 'replication(factor=2)', '-rate', 'threads=30', '-pop', 'seq=20..40K'])
-        node2.start(wait_for_binary_proto=True, wait_other_notice=True)
+        node2.start(wait_for_binary_proto=True)
 
         node1.stress(['write', 'n=20K', 'no-warmup', 'cl=ALL', '-schema', 'replication(factor=2)', '-rate', 'threads=30', '-pop', 'seq=40..60K'])
 
@@ -977,7 +977,7 @@ class TestRepair(BaseRepairTest):
         node2.stop(wait_other_notice=True)
 
         node1.stress(['write', 'n=20K', 'no-warmup', 'cl=ONE', '-schema', 'replication(factor=2)', '-rate', 'threads=30', '-pop', 'seq=20..40K'])
-        node2.start(wait_for_binary_proto=True, wait_other_notice=True)
+        node2.start(wait_for_binary_proto=True)
 
         cluster.flush()
 
@@ -1024,7 +1024,7 @@ class TestRepair(BaseRepairTest):
 
             node1.stress(['write', 'n=2K', 'no-warmup', 'cl=ONE', '-schema', 'replication(factor=2)', '-rate',
                           'threads=30', '-pop', 'seq={}..{}K'.format(2 * (job_thread_count), 2 * (job_thread_count + 1))])
-            node2.start(wait_for_binary_proto=True, wait_other_notice=True)
+            node2.start(wait_for_binary_proto=True)
 
             cluster.flush()
             session = self.patient_cql_connection(node1)
@@ -1120,7 +1120,7 @@ class TestRepair(BaseRepairTest):
         node1.stop(gently=False, wait_other_notice=True)
         t1.join()
         logger.debug("starting node1 - first repair should have failed")
-        node1.start(wait_for_binary_proto=True, wait_other_notice=True)
+        node1.start(wait_for_binary_proto=True)
         logger.debug("running second repair")
         if cluster.version() >= "2.2":
             node1.repair()
@@ -1207,7 +1207,7 @@ class TestRepair(BaseRepairTest):
                                      '-rate', 'threads=10'])
 
         logger.debug("bring back node3")
-        node3.start(wait_other_notice=True, wait_for_binary_proto=True)
+        node3.start(wait_for_binary_proto=True)
 
         if phase == 'sync':
             script = 'stream_sleep.btm'

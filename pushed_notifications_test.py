@@ -191,7 +191,7 @@ class TestPushedNotifications(Tester):
         for i in range(5):
             logger.debug("Restarting second node...")
             node2.stop(wait_other_notice=True)
-            node2.start(wait_other_notice=True)
+            node2.start()
             logger.debug("Waiting for notifications from {}".format(waiter.address))
             notifications = waiter.wait_for_notifications(timeout=60.0, num_notifications=expected_notifications)
             assert expected_notifications, len(notifications) == notifications
@@ -237,7 +237,7 @@ class TestPushedNotifications(Tester):
 
         logger.debug("Restarting second node...")
         node2.stop(wait_other_notice=True)
-        node2.start(wait_other_notice=True)
+        node2.start()
 
         # check that node1 did not send UP or DOWN notification for node2
         logger.debug("Waiting for notifications from {}".format(waiter.address,))
@@ -279,7 +279,7 @@ class TestPushedNotifications(Tester):
         logger.debug("Adding second node...")
         node2 = Node('node2', self.cluster, True, None, ('127.0.0.2', 7000), '7200', '0', None, binary_interface=('127.0.0.2', 9042))
         self.cluster.add(node2, False)
-        node2.start(wait_other_notice=True)
+        node2.start()
         logger.debug("Waiting for notifications from {}".format(waiter.address))
         notifications = waiter.wait_for_notifications(timeout=60.0, num_notifications=2)
         assert 2 == len(notifications), notifications

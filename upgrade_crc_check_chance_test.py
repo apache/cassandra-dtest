@@ -136,7 +136,7 @@ class TestCrcCheckChanceUpgrade(Tester):
         logger.debug('Starting {node} on new version ({tag})'.format(**format_args))
         # Setup log4j / logback again (necessary moving from 2.0 -> 2.1):
         node.set_log_level("INFO")
-        node.start(wait_other_notice=True, wait_for_binary_proto=True)
+        node.start(wait_for_binary_proto=True)
 
         logger.debug('Running upgradesstables')
         node.nodetool('upgradesstables -a')

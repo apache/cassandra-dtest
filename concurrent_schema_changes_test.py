@@ -350,7 +350,7 @@ class TestConcurrentSchemaChanges(Tester):
         node2.stop()
         self._do_lots_of_schema_actions(session)
         wait(15)
-        node2.start(wait_other_notice=True)
+        node2.start()
         logger.debug("waiting for things to settle and sync")
         wait(120)
         self._verify_lots_of_schema_actions(session)

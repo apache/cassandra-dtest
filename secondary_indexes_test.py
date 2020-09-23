@@ -1121,7 +1121,7 @@ class TestUpgradeSecondaryIndexes(Tester):
         node1.stop(wait_other_notice=False)
         logger.debug("Upgrading to current version")
         self.set_node_to_current_version(node1)
-        node1.start(wait_other_notice=True)
+        node1.start()
 
         [node1] = cluster.nodelist()
         session = self.patient_cql_connection(node1)
@@ -1150,7 +1150,7 @@ class TestUpgradeSecondaryIndexes(Tester):
             logger.debug('Starting %s on new version (%s)' % (node.name, tag))
             # Setup log4j / logback again (necessary moving from 2.0 -> 2.1):
             node.set_log_level("INFO")
-            node.start(wait_other_notice=True)
+            node.start()
             # node.nodetool('upgradesstables -a')
 
 
@@ -1223,7 +1223,7 @@ class TestPreJoinCallback(Tester):
                 yaml_opts['streaming_socket_timeout_in_ms'] = 1000
 
             node2.set_configuration_options(values=yaml_opts)
-            node2.start(wait_other_notice=True, wait_for_binary_proto=False)
+            node2.start(wait_for_binary_proto=False)
             node2.watch_log_for('Some data streaming failed. Use nodetool to check bootstrap state and resume.')
 
             node2.nodetool("bootstrap resume")

@@ -69,7 +69,7 @@ class TestCounters(Tester):
 
         node3.stop(wait_other_notice=True)
         node3.set_install_dir(install_dir=default_install_dir)
-        node3.start(wait_other_notice=True)
+        node3.start()
 
         #
         # with a 2.1 coordinator, try to read the table with CL.ALL
@@ -205,7 +205,7 @@ class TestCounters(Tester):
                 time.sleep(.2)
                 nodes[i].nodetool("drain")
                 nodes[i].stop(wait_other_notice=False)
-                nodes[i].start(wait_other_notice=True, wait_for_binary_proto=True)
+                nodes[i].start(wait_for_binary_proto=True)
                 time.sleep(.2)
 
         make_updates()

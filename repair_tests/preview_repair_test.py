@@ -51,11 +51,11 @@ class TestPreviewRepair(Tester):
         node1.flush()
         time.sleep(1)
         node1.stop(gently=False)
-        node3.start(wait_other_notice=True, wait_for_binary_proto=True)
+        node3.start(wait_for_binary_proto=True)
         session = self.exclusive_cql_connection(node2)
         for i in range(10):
             session.execute(stmt, (i + 20, i + 20))
-        node1.start(wait_other_notice=True, wait_for_binary_proto=True)
+        node1.start(wait_for_binary_proto=True)
 
         # data should not be in sync for full and unrepaired previews
         result = node1.repair(options=['ks', '--preview'])
