@@ -62,7 +62,7 @@ class TestStorageEngineUpgrade(Tester):
         node1.stop(wait_other_notice=True)
 
         node1.set_install_dir(install_dir=self.fixture_dtest_setup.default_install_dir)
-        node1.start(wait_other_notice=True, wait_for_binary_proto=True)
+        node1.start(wait_for_binary_proto=True)
 
         if self.fixture_dtest_setup.bootstrap:
             cluster.set_install_dir(install_dir=self.fixture_dtest_setup.default_install_dir)

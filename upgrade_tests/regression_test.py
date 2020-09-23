@@ -105,7 +105,7 @@ class TestForRegressions(UpgradeTester):
                     if first_sstable == '' and '-Data' in new_filename:
                         first_sstable = new_filename  # we should compact this
                 mul = mul * 10
-        node1.start(wait_other_notice=True)
+        node1.start()
         sessions = self.do_upgrade(session)
         checked = False
         for is_upgraded, cursor in sessions:

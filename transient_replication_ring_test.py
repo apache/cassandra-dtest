@@ -173,7 +173,7 @@ class TestTransientReplicationRing(Tester):
         for i in range(1, 40, 2):
             self.insert_row(i, i, i, main_session)
 
-        nodes[1].start(wait_for_binary_proto=True, wait_other_notice=True)
+        nodes[1].start(wait_for_binary_proto=True)
 
         sessions = [self.exclusive_cql_connection(node) for node in [self.node1, self.node2, self.node3]]
 
@@ -187,7 +187,7 @@ class TestTransientReplicationRing(Tester):
         node4 = new_node(self.cluster, bootstrap=True, token='00040')
         patch_start(node4)
         nodes.append(node4)
-        node4.start(wait_for_binary_proto=True, wait_other_notice=True)
+        node4.start(wait_for_binary_proto=True)
 
         expected.append(gen_expected(range(11, 20, 2), range(21, 40)))
         sessions.append(self.exclusive_cql_connection(node4))
@@ -227,7 +227,7 @@ class TestTransientReplicationRing(Tester):
         """Helper method to run a move test cycle"""
         node4 = new_node(self.cluster, bootstrap=True, token='00040')
         patch_start(node4)
-        node4.start(wait_for_binary_proto=True, wait_other_notice=True)
+        node4.start(wait_for_binary_proto=True)
         main_session = self.patient_cql_connection(self.node1)
         nodes = [self.node1, self.node2, self.node3, node4]
 
@@ -246,7 +246,7 @@ class TestTransientReplicationRing(Tester):
             print("Inserting " + str(i))
             self.insert_row(i, i, i, main_session)
 
-        nodes[1].start(wait_for_binary_proto=True, wait_other_notice=True)
+        nodes[1].start(wait_for_binary_proto=True)
         sessions = [self.exclusive_cql_connection(node) for node in [self.node1, self.node2, self.node3, node4]]
 
         expected = [gen_expected(range(0, 11), range(31, 40)),
@@ -338,7 +338,7 @@ class TestTransientReplicationRing(Tester):
         """Test decommissioning a node correctly streams out all the data"""
         node4 = new_node(self.cluster, bootstrap=True, token='00040')
         patch_start(node4)
-        node4.start(wait_for_binary_proto=True, wait_other_notice=True)
+        node4.start(wait_for_binary_proto=True)
         main_session = self.patient_cql_connection(self.node1)
         nodes = [self.node1, self.node2, self.node3, node4]
 
@@ -357,7 +357,7 @@ class TestTransientReplicationRing(Tester):
             print("Inserting " + str(i))
             self.insert_row(i, i, i, main_session)
 
-        nodes[1].start(wait_for_binary_proto=True, wait_other_notice=True)
+        nodes[1].start(wait_for_binary_proto=True)
         sessions = [self.exclusive_cql_connection(node) for node in [self.node1, self.node2, self.node3, node4]]
 
         expected = [gen_expected(range(0, 11), range(31, 40)),
@@ -399,7 +399,7 @@ class TestTransientReplicationRing(Tester):
         """Test  a mix of ring change operations across a mix of transient and repaired/unrepaired data"""
         node4 = new_node(self.cluster, bootstrap=True, token='00040')
         patch_start(node4)
-        node4.start(wait_for_binary_proto=True, wait_other_notice=True)
+        node4.start(wait_for_binary_proto=True)
         main_session = self.patient_cql_connection(self.node1)
         nodes = [self.node1, self.node2, self.node3]
 
@@ -468,7 +468,7 @@ class TestTransientReplicationRing(Tester):
         jvm_args = ["-Dcassandra.replace_address=%s" % replacement_address,
                     "-Dcassandra.ring_delay_ms=10000",
                     "-Dcassandra.broadcast_interval_ms=10000"]
-        self.node2.start(jvm_args=jvm_args, wait_for_binary_proto=True, wait_other_notice=True)
+        self.node2.start(jvm_args=jvm_args, wait_for_binary_proto=True)
 
         sessions = [self.exclusive_cql_connection(node) for node in [self.node1, self.node2, self.node3]]
 

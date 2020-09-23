@@ -42,6 +42,6 @@ class TestUpgradeRepair(BaseRepairTest):
                 time.sleep(1)
                 node.stop(wait_other_notice=True)
             node.set_install_dir(install_dir=default_install_dir)
-            node.start(wait_other_notice=True, wait_for_binary_proto=True)
+            node.start(wait_for_binary_proto=True)
             cursor = self.patient_cql_connection(node)
         cluster.set_install_dir(default_install_dir)

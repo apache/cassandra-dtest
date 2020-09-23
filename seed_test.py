@@ -90,5 +90,5 @@ class TestGossiper(Tester):
         node2.watch_log_for('Starting shadow gossip round to check for endpoint collision', filename='debug.log')
         sleep(RING_DELAY / 1000)
         # Start seed, ensure node2 joins before it exits shadow round.
-        node1.start(wait_other_notice=True, wait_for_binary_proto=120)
+        node1.start(wait_for_binary_proto=120)
         self.assert_log_had_msg(node2, 'Starting listening for CQL clients', timeout=60)

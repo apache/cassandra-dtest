@@ -60,7 +60,7 @@ class TestHintedHandoffConfig(Tester):
         insert_c1c2(session, n=100, consistency=ConsistencyLevel.ONE)
 
         log_mark = node1.mark_log()
-        node2.start(wait_other_notice=True)
+        node2.start()
 
         if enabled:
             node1.watch_log_for(["Finished hinted"], from_mark=log_mark, timeout=120)
@@ -139,7 +139,7 @@ class TestHintedHandoffConfig(Tester):
         res = self._launch_nodetool_cmd(node, 'getmaxhintwindow')
         assert 'Current max hint window: 300000 ms' == res.rstrip()
         self._do_hinted_handoff(node1, node2, True)
-        node1.start(wait_other_notice=True)
+        node1.start()
         self._launch_nodetool_cmd(node, 'setmaxhintwindow 1')
         res = self._launch_nodetool_cmd(node, 'getmaxhintwindow')
         assert 'Current max hint window: 1 ms' == res.rstrip()

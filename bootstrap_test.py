@@ -212,7 +212,7 @@ class TestBootstrap(Tester):
 
         # Bootstrapping a new node
         node3 = new_node(cluster)
-        node3.start(wait_for_binary_proto=True, wait_other_notice=True)
+        node3.start(wait_for_binary_proto=True)
 
         assert_bootstrap_state(self, node3, 'COMPLETED')
 
@@ -252,7 +252,7 @@ class TestBootstrap(Tester):
              node1 = cluster.nodelist()[0]
 
              logger.debug("Start node 1")
-             node1.start(wait_for_binary_proto=True, wait_other_notice=True)
+             node1.start(wait_for_binary_proto=True)
 
              logger.debug("Insert 10k rows")
              node1.stress(['write', 'n=10K', 'no-warmup', '-rate', 'threads=8', '-schema', 'replication(factor=2)'])
@@ -260,7 +260,7 @@ class TestBootstrap(Tester):
              logger.debug("Bootstrap node 2 with delay")
              node2 = new_node(cluster, byteman_port='4200')
              node2.update_startup_byteman_script('./byteman/bootstrap_5s_sleep.btm')
-             node2.start(wait_for_binary_proto=True, wait_other_notice=True)
+             node2.start(wait_for_binary_proto=True)
 
              assert_bootstrap_state(self, node2, 'COMPLETED')
              assert node2.grep_log('Bootstrap completed', filename='debug.log')
@@ -561,7 +561,7 @@ class TestBootstrap(Tester):
 
         # Add a new node, bootstrap=True ensures that it is not a seed
         node4 = new_node(cluster, bootstrap=True)
-        node4.start(wait_for_binary_proto=True, wait_other_notice=True)
+        node4.start(wait_for_binary_proto=True)
 
         session = self.patient_cql_connection(node4)
         assert original_rows == list(session.execute("SELECT * FROM {}".format(stress_table,)))
@@ -572,7 +572,7 @@ class TestBootstrap(Tester):
         self._cleanup(node4)
         # Now start it, it should be allowed to join
         mark = node4.mark_log()
-        node4.start(wait_other_notice=True)
+        node4.start()
         node4.watch_log_for("JOINING:", from_mark=mark)
 
     def test_decommissioned_wiped_node_can_gossip_to_single_seed(self):
@@ -589,7 +589,7 @@ class TestBootstrap(Tester):
         node1 = cluster.nodelist()[0]
         # Add a new node, bootstrap=True ensures that it is not a seed
         node2 = new_node(cluster, bootstrap=True)
-        node2.start(wait_for_binary_proto=True, wait_other_notice=True)
+        node2.start(wait_for_binary_proto=True)
 
         session = self.patient_cql_connection(node1)
 
@@ -654,7 +654,7 @@ class TestBootstrap(Tester):
         self._cleanup(node2)
         # Now start it again, it should be allowed to join
         mark = node2.mark_log()
-        node2.start(wait_other_notice=True)
+        node2.start()
         node2.watch_log_for("JOINING:", from_mark=mark)
 
     @since('3.0')
@@ -766,7 +766,7 @@ class TestBootstrap(Tester):
                       '-rate', 'threads=10'])
 
         node2 = new_node(cluster)
-        node2.start(wait_other_notice=True)
+        node2.start()
 
         node3 = new_node(cluster, remote_debug_port='2003')
         try:
@@ -801,7 +801,7 @@ class TestBootstrap(Tester):
             node1.stress(['write', 'n=100k', 'no-warmup', '-schema', 'compaction(strategy=SizeTieredCompactionStrategy,enabled=false)', 'replication(factor=1)', '-rate', 'threads=10'])
             node1.flush()
         node2 = new_node(cluster)
-        node2.start(wait_for_binary_proto=True, wait_other_notice=True)
+        node2.start(wait_for_binary_proto=True)
         event = threading.Event()
         failed = threading.Event()
         jobs = 1
@@ -868,7 +868,7 @@ class TestBootstrap(Tester):
         node2.set_configuration_options(values=config)
         node2.byteman_port = '8101' # set for when we add node3
         node2.import_config_files()
-        node2.start(jvm_args=["-Dcassandra.ring_delay_ms=5000"], wait_other_notice=True)
+        node2.start(jvm_args=["-Dcassandra.ring_delay_ms=5000"])
         self.assert_log_had_msg(node2, 'Some data streaming failed')
 
         if self.cluster.version() >= LooseVersion('4.0'):
@@ -895,7 +895,7 @@ class TestBootstrap(Tester):
         else:
             node1.byteman_submit([self.byteman_submit_path_4_0])
             node2.byteman_submit([self.byteman_submit_path_4_0])
-        node3.start(jvm_args=["-Dcassandra.write_survey=true", "-Dcassandra.ring_delay_ms=5000"], wait_other_notice=True)
+        node3.start(jvm_args=["-Dcassandra.write_survey=true", "-Dcassandra.ring_delay_ms=5000"])
         self.assert_log_had_msg(node3, 'Some data streaming failed')
         self.assert_log_had_msg(node3, "Not starting client transports in write_survey mode as it's bootstrapping or auth is enabled")
 

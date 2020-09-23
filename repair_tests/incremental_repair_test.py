@@ -119,11 +119,11 @@ class TestIncRepair(Tester):
         node1.flush()
         time.sleep(1)
         node1.stop(gently=False)
-        node3.start(wait_other_notice=True, wait_for_binary_proto=True)
+        node3.start(wait_for_binary_proto=True)
         session = self.exclusive_cql_connection(node2)
         for i in range(10):
             session.execute(stmt, (i + 20, i + 20))
-        node1.start(wait_other_notice=True, wait_for_binary_proto=True)
+        node1.start(wait_for_binary_proto=True)
 
         # flush and check that no sstables are marked repaired
         for node in self.cluster.nodelist():
@@ -346,7 +346,7 @@ class TestIncRepair(Tester):
         node1.flush()
         node2.flush()
 
-        node3.start(wait_other_notice=True)
+        node3.start()
         if node3.get_cassandra_version() < '2.2':
             log_file = 'system.log'
         else:
@@ -443,7 +443,7 @@ class TestIncRepair(Tester):
         node3.stop(gently=False)
         node5 = Node('node5', cluster, True, ('127.0.0.5', 9160), ('127.0.0.5', 7000), '7500', '0', None, ('127.0.0.5', 9042))
         cluster.add(node5, False)
-        node5.start(replace_address='127.0.0.3', wait_other_notice=True)
+        node5.start(replace_address='127.0.0.3')
 
         assert_one(session, "SELECT COUNT(*) FROM ks.cf LIMIT 200", [149])
 
@@ -956,7 +956,7 @@ class TestIncRepair(Tester):
         session.execute("delete from ks.tbl where k = 5")
 
         node1.flush()
-        node2.start(wait_other_notice=True)
+        node2.start()
 
         # expect unconfirmed inconsistencies as the partition deletes cause some sstables to be skipped
         with JolokiaAgent(node1) as jmx:
@@ -1005,7 +1005,7 @@ class TestIncRepair(Tester):
         node1.flush()
         node1.compact()
         node1.compact()
-        node2.start(wait_other_notice=True)
+        node2.start()
 
         # we don't expect any inconsistencies as all repaired data is read on both replicas
         with JolokiaAgent(node1) as jmx:

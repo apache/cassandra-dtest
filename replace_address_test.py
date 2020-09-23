@@ -215,7 +215,7 @@ class BaseReplaceAddressTest(Tester):
                 if node.is_running() and node != self.query_node:
                     logger.debug("Upgrading {} to current version".format(node.address()))
                     node.stop(gently=True, wait_other_notice=True)
-                    node.start(wait_other_notice=True, wait_for_binary_proto=True)
+                    node.start(wait_for_binary_proto=True)
 
         # start node in current version on write survey mode
         self._do_replace(same_address=same_address, extra_jvm_args=["-Dcassandra.write_survey=true"])

@@ -42,7 +42,7 @@ class TestFQLTool(Tester):
             node2.clear()
 
             node1.start(wait_for_binary_proto=True)
-            node2.start(wait_for_binary_proto=True, wait_other_notice=True)
+            node2.start(wait_for_binary_proto=True)
             # make sure the node is empty:
             got_exception = False
             try:

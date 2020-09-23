@@ -196,7 +196,7 @@ class UpgradeTester(Tester, metaclass=ABCMeta):
         if self.fixture_dtest_setup.enable_for_jolokia:
             remove_perf_disable_shared_mem(node1)
 
-        node1.start(wait_for_binary_proto=True, wait_other_notice=True)
+        node1.start(wait_for_binary_proto=True)
 
         sessions_and_meta = []
         if self.CL:

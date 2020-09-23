@@ -881,7 +881,7 @@ class TestConsistency(Tester):
 
         # take node2 down, get node3 up
         node2.stop(wait_other_notice=True)
-        node3.start(wait_other_notice=True)
+        node3.start()
 
         # insert an RT somewhere so that we would have a closing marker and RR makes its mutations
         stmt = SimpleStatement("DELETE FROM journals.logs WHERE user = 'beobal' AND year = 2010 AND month = 12 AND day = 30",
@@ -943,7 +943,7 @@ class TestConsistency(Tester):
 
         node1.stop(wait_other_notice=True)
         session.execute('DELETE FROM test.test USING TIMESTAMP 1 WHERE pk = 0 AND ck = 0;')
-        node1.start(wait_other_notice=True, wait_for_binary_proto=True)
+        node1.start(wait_for_binary_proto=True)
 
         # with both nodes up, make a LIMIT 1 read that would trigger a short read protection
         # request, which in turn will trigger the AssertionError in DataResolver (prior to
@@ -983,7 +983,7 @@ class TestConsistency(Tester):
 
         node2.stop(wait_other_notice=True)
         session.execute('INSERT INTO test.test (pk, ck) VALUES (0, 0);')
-        node2.start(wait_other_notice=True, wait_for_binary_proto=True)
+        node2.start(wait_for_binary_proto=True)
 
         # with node1 down, delete row 1 and 2 on node2
         #
@@ -994,7 +994,7 @@ class TestConsistency(Tester):
 
         node1.stop(wait_other_notice=True)
         session.execute('DELETE FROM test.test WHERE pk = 0 AND ck IN (1, 2);')
-        node1.start(wait_other_notice=True, wait_for_binary_proto=True)
+        node1.start(wait_for_binary_proto=True)
 
         # with both nodes up, do a CL.ALL query with per partition limit of 1;
         # prior to CASSANDRA-13911 this would trigger an IllegalStateException
@@ -1039,7 +1039,7 @@ class TestConsistency(Tester):
         session.execute('INSERT INTO test.test (pk, ck) VALUES (0, 1) USING TIMESTAMP 42;')
         session.execute('INSERT INTO test.test (pk, ck) VALUES (2, 0) USING TIMESTAMP 42;')
         session.execute('DELETE FROM test.test USING TIMESTAMP 42 WHERE pk = 2 AND ck = 1;')
-        node2.start(wait_other_notice=True, wait_for_binary_proto=True)
+        node2.start(wait_for_binary_proto=True)
 
         # with node1 down
         #
@@ -1054,7 +1054,7 @@ class TestConsistency(Tester):
         session.execute('DELETE FROM test.test USING TIMESTAMP 42 WHERE pk = 2 AND ck = 0;')
         session.execute('INSERT INTO test.test (pk, ck) VALUES (2, 1) USING TIMESTAMP 42;')
         session.execute('INSERT INTO test.test (pk, ck) VALUES (2, 2) USING TIMESTAMP 42;')
-        node1.start(wait_other_notice=True, wait_for_binary_proto=True)
+        node1.start(wait_for_binary_proto=True)
 
         # with both nodes up, do a CL.ALL query with per partition limit of 2 and limit of 3;
         # without the change to if (!singleResultCounter.isDoneForPartition()) branch,
@@ -1101,7 +1101,7 @@ class TestConsistency(Tester):
         session.execute('INSERT INTO test.test (pk, ck) VALUES (0, 0) USING TIMESTAMP 42;')
         session.execute('INSERT INTO test.test (pk, ck) VALUES (0, 1) USING TIMESTAMP 42;')
         session.execute('DELETE FROM test.test USING TIMESTAMP 42 WHERE pk = 2 AND ck IN  (0, 1);')
-        node2.start(wait_other_notice=True, wait_for_binary_proto=True)
+        node2.start(wait_for_binary_proto=True)
 
         # with node1 down
         #
@@ -1118,7 +1118,7 @@ class TestConsistency(Tester):
         session.execute('INSERT INTO test.test (pk, ck) VALUES (2, 1) USING TIMESTAMP 42;')
         session.execute('INSERT INTO test.test (pk, ck) VALUES (4, 0) USING TIMESTAMP 42;')
         session.execute('INSERT INTO test.test (pk, ck) VALUES (4, 1) USING TIMESTAMP 42;')
-        node1.start(wait_other_notice=True, wait_for_binary_proto=True)
+        node1.start(wait_for_binary_proto=True)
 
         # with both nodes up, do a CL.ALL query with per partition limit of 2 and limit of 4;
         # without the extra condition in if (!singleResultCounter.isDone()) branch,
@@ -1159,7 +1159,7 @@ class TestConsistency(Tester):
         # with node2 down and hints disabled, delete the partition on node1
         node2.stop(wait_other_notice=True)
         session.execute("DELETE FROM test.test WHERE id = 0;")
-        node2.start(wait_other_notice=True)
+        node2.start()
 
         # with both nodes up, do a CL.ALL query with per partition limit of 1;
         # prior to CASSANDRA-13880 this would cause short read protection to loop forever
@@ -1212,7 +1212,7 @@ class TestConsistency(Tester):
 
         # with both nodes up, do a DISTINCT range query with CL.ALL;
         # prior to CASSANDRA-13747 this would cause an assertion in short read protection code
-        node2.start(wait_other_notice=True)
+        node2.start()
         stmt = SimpleStatement("SELECT DISTINCT token(id), id FROM test.test;",
                                consistency_level=ConsistencyLevel.ALL)
         result = list(session.execute(stmt))
@@ -1265,14 +1265,14 @@ class TestConsistency(Tester):
         # delete every other partition on node1 while node2 is down
         node2.stop(wait_other_notice=True)
         session.execute('DELETE FROM test.test WHERE id IN (5, 8, 2, 7, 9);')
-        node2.start(wait_other_notice=True, wait_for_binary_proto=True)
+        node2.start(wait_for_binary_proto=True)
 
         session = self.patient_cql_connection(node2)
 
         # delete every other alternate partition on node2 while node1 is down
         node1.stop(wait_other_notice=True)
         session.execute('DELETE FROM test.test WHERE id IN (1, 0, 4, 6);')
-        node1.start(wait_other_notice=True, wait_for_binary_proto=True)
+        node1.start(wait_for_binary_proto=True)
 
         session = self.patient_exclusive_cql_connection(node1)
 
@@ -1331,7 +1331,7 @@ class TestConsistency(Tester):
         # node1 |   up | 0 x x x   5
         # node2 | down | 0 1 2 3
 
-        node2.start(wait_other_notice=True)
+        node2.start()
         node1.stop(wait_other_notice=True)
 
         # node1 | down | 0 x x x   5
@@ -1344,7 +1344,7 @@ class TestConsistency(Tester):
         # node1 | down | 0 x x x   5
         # node2 |   up | 0 1 2 3 4
 
-        node1.start(wait_other_notice=True)
+        node1.start()
 
         # node1 |   up | 0 x x x   5
         # node2 |   up | 0 1 2 3 4
@@ -1453,7 +1453,7 @@ class TestConsistency(Tester):
         query = SimpleStatement('DELETE FROM cf WHERE key=\'k0\'', consistency_level=ConsistencyLevel.ONE)
         session.execute(query)
 
-        node1.start(wait_other_notice=True)
+        node1.start()
 
         # Query first column
         session = self.patient_cql_connection(node1, 'ks')
@@ -1491,14 +1491,14 @@ class TestConsistency(Tester):
         node2.flush()
         node2.stop(wait_other_notice=True)
         session.execute(SimpleStatement("DELETE FROM t WHERE id = 0 AND v = 1", consistency_level=ConsistencyLevel.QUORUM))
-        node2.start(wait_other_notice=True)
+        node2.start()
 
         # we delete 2: only B and C get it.
         node1.flush()
         node1.stop(wait_other_notice=True)
         session = self.patient_cql_connection(node2, 'ks')
         session.execute(SimpleStatement("DELETE FROM t WHERE id = 0 AND v = 2", consistency_level=ConsistencyLevel.QUORUM))
-        node1.start(wait_other_notice=True)
+        node1.start()
         session = self.patient_cql_connection(node1, 'ks')
 
         # we read the first row in the partition (so with a LIMIT 1) and A and B answer first.
@@ -1528,7 +1528,7 @@ class TestConsistency(Tester):
 
         insert_c1c2(session, n=10000, consistency=ConsistencyLevel.ONE)
 
-        node2.start(wait_for_binary_proto=True, wait_other_notice=True)
+        node2.start(wait_for_binary_proto=True)
 
         # query everything to cause RR
         for n in range(0, 10000):
@@ -1588,4 +1588,4 @@ class TestConsistency(Tester):
 
     def restart_node(self, node_number):
         stopped_node = self.cluster.nodes["node%d" % node_number]
-        stopped_node.start(wait_for_binary_proto=True, wait_other_notice=True)
+        stopped_node.start(wait_for_binary_proto=True)
