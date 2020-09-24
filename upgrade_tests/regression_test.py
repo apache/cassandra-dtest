@@ -80,7 +80,7 @@ class TestForRegressions(UpgradeTester):
         """
         cluster = self.cluster
         cluster.set_datadir_count(1)  # we want the same prefix for all sstables
-        session = self.prepare(jolokia=True)
+        session = self.prepare()
         session.execute("CREATE KEYSPACE test13294 WITH replication={'class':'SimpleStrategy', 'replication_factor': 2};")
         session.execute("CREATE TABLE test13294.t (id int PRIMARY KEY, d int) WITH compaction = {'class': 'SizeTieredCompactionStrategy','enabled':'false'}")
         for x in range(0, 5):

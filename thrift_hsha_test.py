@@ -9,7 +9,7 @@ import logging
 
 from dtest import DEFAULT_DIR, Tester, create_ks
 from thrift_test import get_thrift_client
-from tools.jmxutils import JolokiaAgent, make_mbean, remove_perf_disable_shared_mem
+from tools.jmxutils import JolokiaAgent, make_mbean
 
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
@@ -48,7 +48,6 @@ class TestThriftHSHA(Tester):
 
         cluster.populate(1)
         (node1,) = cluster.nodelist()
-        remove_perf_disable_shared_mem(node1)
         cluster.start()
 
         session = self.patient_cql_connection(node1)

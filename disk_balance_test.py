@@ -9,8 +9,7 @@ from ccmlib.node import Node
 from dtest import Tester, create_ks
 from tools.assertions import assert_almost_equal
 from tools.data import create_c1c2_table, insert_c1c2, query_c1c2
-from tools.jmxutils import (JolokiaAgent, make_mbean,
-                            remove_perf_disable_shared_mem)
+from tools.jmxutils import (JolokiaAgent, make_mbean)
 from tools.misc import new_node
 from compaction_test import grep_sstables_in_each_level
 
@@ -127,7 +126,6 @@ class TestDiskBalance(Tester):
         cluster.set_datadir_count(3)
         cluster.populate(1)
         [node] = cluster.nodelist()
-        remove_perf_disable_shared_mem(node)
         cluster.start()
 
         session = self.patient_cql_connection(node)

@@ -11,8 +11,7 @@ from ccmlib.node import ToolError
 from distutils.version import LooseVersion
 
 from dtest import Tester
-from tools.jmxutils import (JolokiaAgent, enable_jmx_ssl, make_mbean,
-                            remove_perf_disable_shared_mem)
+from tools.jmxutils import (JolokiaAgent, enable_jmx_ssl, make_mbean)
 from tools.misc import generate_ssl_stores
 
 since = pytest.mark.since
@@ -72,7 +71,6 @@ class TestJMX(Tester):
         cluster = self.cluster
         cluster.populate(3)
         node1, node2, node3 = cluster.nodelist()
-        remove_perf_disable_shared_mem(node1)
         cluster.start()
 
         version = cluster.version()
@@ -113,7 +111,6 @@ class TestJMX(Tester):
         cluster.set_configuration_options({'enable_materialized_views': 'true'})
         cluster.populate(1)
         node = cluster.nodelist()[0]
-        remove_perf_disable_shared_mem(node)
         cluster.start()
 
         node.run_cqlsh(cmds="""
@@ -187,7 +184,6 @@ class TestJMX(Tester):
         cluster = self.cluster
         cluster.populate(1)
         node = cluster.nodelist()[0]
-        remove_perf_disable_shared_mem(node)
         cluster.start()
 
         # Run a quick stress command to create the keyspace and table
@@ -282,7 +278,6 @@ class TestJMX(Tester):
         cluster = self.cluster
         cluster.populate(2)
         node = cluster.nodelist()[0]
-        remove_perf_disable_shared_mem(node)
         cluster.start()
 
         # Set and get throttle with JMX, ensuring that the rate change is logged

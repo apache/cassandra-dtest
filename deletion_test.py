@@ -3,8 +3,7 @@ import logging
 
 from dtest import Tester, create_ks, create_cf
 from tools.data import rows_to_list
-from tools.jmxutils import (JolokiaAgent, make_mbean,
-                            remove_perf_disable_shared_mem)
+from tools.jmxutils import (JolokiaAgent, make_mbean)
 
 logger = logging.getLogger(__name__)
 
@@ -47,10 +46,6 @@ class TestDeletion(Tester):
 
     def test_tombstone_size(self):
         self.cluster.populate(1)
-        node1 = self.cluster.nodelist()[0]
-
-        remove_perf_disable_shared_mem(node1)
-
         self.cluster.start()
         [node1] = self.cluster.nodelist()
         session = self.patient_cql_connection(node1)

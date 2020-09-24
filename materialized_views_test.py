@@ -26,7 +26,7 @@ from tools.assertions import (assert_all, assert_crc_check_chance_equal,
                               assert_unavailable)
 from tools.data import rows_to_list
 from tools.misc import new_node
-from tools.jmxutils import (JolokiaAgent, make_mbean, remove_perf_disable_shared_mem)
+from tools.jmxutils import (JolokiaAgent, make_mbean)
 
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
@@ -2881,9 +2881,6 @@ class TestMaterializedViewsLockcontention(Tester):
             'concurrent_writes': 1,
         })
         self.nodes = list(self.cluster.nodes.values())
-        for node in self.nodes:
-            remove_perf_disable_shared_mem(node)
-
         self.cluster.start(jvm_args=[
             "-Dcassandra.test.fail_mv_locks_count=64"
         ])

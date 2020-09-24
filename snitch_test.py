@@ -6,8 +6,7 @@ import logging
 
 from cassandra import ConsistencyLevel
 from dtest import Tester
-from tools.jmxutils import (JolokiaAgent, make_mbean,
-                            remove_perf_disable_shared_mem)
+from tools.jmxutils import (JolokiaAgent, make_mbean)
 
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
@@ -159,8 +158,6 @@ class TestDynamicEndpointSnitch(Tester):
         cluster.set_configuration_options(values={'dynamic_snitch_reset_interval_in_ms': 10000,
                                                   'dynamic_snitch_update_interval_in_ms': 50,
                                                   'phi_convict_threshold': 12})
-        remove_perf_disable_shared_mem(coordinator_node)
-        remove_perf_disable_shared_mem(degraded_node)
         # Delay reads on the degraded node by 50 milliseconds
         degraded_node.start(jvm_args=['-Dcassandra.test.read_iteration_delay_ms=50',
                                       '-Dcassandra.allow_unsafe_join=true'])

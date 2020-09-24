@@ -65,7 +65,6 @@ class DTestSetup(object):
 
         self.last_log = os.path.join(self.log_saved_dir, "last")
         self.test_path = self.get_test_path()
-        self.enable_for_jolokia = False
         self.subprocs = []
         self.log_watch_thread = None
         self.last_test_dir = "last_test_dir"

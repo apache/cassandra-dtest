@@ -9,7 +9,7 @@ from ccmlib.node import ToolError
 
 from dtest import Tester, create_ks
 from tools.assertions import assert_all, assert_invalid, assert_none
-from tools.jmxutils import JolokiaAgent, make_mbean, remove_perf_disable_shared_mem
+from tools.jmxutils import JolokiaAgent, make_mbean
 
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
@@ -254,7 +254,6 @@ class TestNodetool(Tester):
         cluster = self.cluster
         cluster.populate(1)
         node = cluster.nodelist()[0]
-        remove_perf_disable_shared_mem(node)  # for jmx
         cluster.start()
 
         session = self.patient_cql_connection(node)
