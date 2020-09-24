@@ -474,8 +474,8 @@ class TestCDC(Tester):
         while _get_commitlog_files(node.get_path()) <= pre_non_cdc_write_segments:
             elapsed = time.time() - start
             rate_limited_debug('  non-cdc load step has lasted {s:.2f}s'.format(s=elapsed))
-            assert (elapsed <= time_limit, "It's been over a {s}s and we haven't written a new "
-                                           "commitlog segment. Something is wrong.".format(s=time_limit))
+            assert elapsed <= time_limit, "It's been over a {s}s and we haven't written a new " \
+                                           "commitlog segment. Something is wrong.".format(s=time_limit)
             execute_concurrent(
                 session,
                 ((non_cdc_prepared_insert, ()) for _ in range(1000)),

@@ -344,7 +344,7 @@ class TestTTL(Tester):
 
     @since('2.1')
     def test_expiration_overflow_policy_cap_default_ttl(self):
-        self._base_expiration_overflow_policy_test(default_ttl=False, policy='CAP')
+        self._base_expiration_overflow_policy_test(default_ttl=True, policy='CAP')
 
     @since('3.0')
     def test_expiration_overflow_policy_capnowarn(self):
@@ -352,7 +352,7 @@ class TestTTL(Tester):
 
     @since('3.0')
     def test_expiration_overflow_policy_capnowarn_default_ttl(self):
-        self._base_expiration_overflow_policy_test(default_ttl=False, policy='CAP_NOWARN')
+        self._base_expiration_overflow_policy_test(default_ttl=True, policy='CAP_NOWARN')
 
     @since('2.1')
     def test_expiration_overflow_policy_reject(self):
@@ -360,7 +360,7 @@ class TestTTL(Tester):
 
     @since('2.1')
     def test_expiration_overflow_policy_reject_default_ttl(self):
-        self._base_expiration_overflow_policy_test(default_ttl=False, policy='REJECT')
+        self._base_expiration_overflow_policy_test(default_ttl=True, policy='REJECT')
 
     def _base_expiration_overflow_policy_test(self, default_ttl, policy):
         """
