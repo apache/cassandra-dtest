@@ -17,8 +17,7 @@ from dtest import Tester
 from tools.assertions import (assert_all, assert_exception, assert_invalid,
                               assert_length_equal, assert_one,
                               assert_unauthorized)
-from tools.jmxutils import (JolokiaAgent, make_mbean,
-                            remove_perf_disable_shared_mem)
+from tools.jmxutils import (JolokiaAgent, make_mbean)
 from tools.metadata_wrapper import UpdatingKeyspaceMetadataWrapper
 from tools.misc import ImmutableMapping
 
@@ -1056,7 +1055,6 @@ class TestAuth(Tester):
         cluster.set_datadir_count(1)
         cluster.populate(1)
         [node] = cluster.nodelist()
-        remove_perf_disable_shared_mem(node)
         cluster.start()
 
         with JolokiaAgent(node) as jmx:

@@ -7,7 +7,6 @@ import logging
 from abc import ABCMeta
 
 from ccmlib.common import get_version_from_build, is_win
-from tools.jmxutils import remove_perf_disable_shared_mem
 
 from dtest import Tester, create_ks
 
@@ -124,11 +123,6 @@ class UpgradeTester(Tester, metaclass=ABCMeta):
             cluster.set_configuration_options(values=extra_config_options)
 
         cluster.populate(nodes)
-        node1 = cluster.nodelist()[0]
-        self.fixture_dtest_setup.enable_for_jolokia = kwargs.pop('jolokia', False)
-        if self.fixture_dtest_setup.enable_for_jolokia:
-            remove_perf_disable_shared_mem(node1)
-
         cluster.start()
 
         node1 = cluster.nodelist()[0]
@@ -192,9 +186,6 @@ class UpgradeTester(Tester, metaclass=ABCMeta):
 
         if use_thrift and node1.get_cassandra_version() < '4':
             node1.set_configuration_options(values={'start_rpc': 'true'})
-
-        if self.fixture_dtest_setup.enable_for_jolokia:
-            remove_perf_disable_shared_mem(node1)
 
         node1.start(wait_for_binary_proto=True)
 

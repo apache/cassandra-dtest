@@ -1,4 +1,3 @@
-import glob
 import json
 import os
 import subprocess
@@ -8,11 +7,9 @@ import logging
 
 import ccmlib.common as common
 
-from distutils.version import LooseVersion
-
 logger = logging.getLogger(__name__)
 
-JOLOKIA_JAR = os.path.join('lib', 'jolokia-jvm-1.2.3-agent.jar')
+JOLOKIA_JAR = os.path.join('lib', 'jolokia-jvm-1.6.2-agent.jar')
 CLASSPATH_SEP = ';' if common.is_win() else ':'
 
 
@@ -153,25 +150,6 @@ def apply_jmx_authentication(node):
     ]
 
     common.replaces_in_file(node.envfilename(), replacement_list)
-
-
-def remove_perf_disable_shared_mem(node):
-    """
-    The Jolokia agent is incompatible with the -XX:+PerfDisableSharedMem JVM
-    option (see https://github.com/rhuss/jolokia/issues/198 for details).  This
-    edits cassandra-env.sh (or the Windows equivalent), or jvm.options file on 3.2+ to remove that option.
-    """
-    if node.get_cassandra_version() >= LooseVersion('3.2'):
-        pattern = r'\-XX:\+PerfDisableSharedMem'
-        replacement = '#-XX:+PerfDisableSharedMem'
-        for f in glob.glob(os.path.join(node.get_conf_dir(), common.JVM_OPTS_PATTERN)):
-            if os.path.isfile(f):
-                common.replace_in_file(f, pattern, replacement)
-    else:
-        conf_file = node.envfilename()
-        pattern = 'PerfDisableSharedMem'
-        replacement = ''
-        common.replace_in_file(conf_file, pattern, replacement)
 
 
 class JolokiaAgent(object):

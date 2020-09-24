@@ -15,7 +15,7 @@ from tools.assertions import (assert_all, assert_length_equal, assert_none,
 from dtest import MultiError, Tester, create_ks, create_cf
 from tools.data import (create_c1c2_table, insert_c1c2, insert_columns,
                         query_c1c2, rows_to_list)
-from tools.jmxutils import JolokiaAgent, make_mbean, remove_perf_disable_shared_mem
+from tools.jmxutils import JolokiaAgent, make_mbean
 
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
@@ -1231,7 +1231,6 @@ class TestConsistency(Tester):
 
         cluster.populate(2)
         node1, node2 = cluster.nodelist()
-        remove_perf_disable_shared_mem(node1)  # necessary for jmx
         cluster.start()
 
         session = self.patient_cql_connection(node1)

@@ -8,8 +8,7 @@ from cassandra.concurrent import execute_concurrent_with_args
 from tools.misc import ImmutableMapping
 from dtest_setup_overrides import DTestSetupOverrides
 from dtest import Tester, create_ks
-from tools.jmxutils import (JolokiaAgent, make_mbean,
-                            remove_perf_disable_shared_mem)
+from tools.jmxutils import (JolokiaAgent, make_mbean)
 
 logger = logging.getLogger(__name__)
 
@@ -72,9 +71,6 @@ class TestConfiguration(Tester):
             node = self.fixture_dtest_setup.cluster.nodelist()[0]
             self.fixture_dtest_setup.cluster.set_batch_commitlog(enabled=True)
 
-            # disable JVM option so we can use Jolokia
-            # this has to happen after .set_configuration_options because of implementation details
-            remove_perf_disable_shared_mem(node)
             self.fixture_dtest_setup.cluster.start()
             return node
 
@@ -116,7 +112,6 @@ class TestConfiguration(Tester):
         node1 = self.cluster.nodelist()[0]
         default_path = node1.data_directories()[0]
         node1.set_configuration_options({'saved_caches_directory': os.path.join(default_path, 'saved_caches')})
-        remove_perf_disable_shared_mem(node1)
         self.cluster.start()
 
         session = self.patient_exclusive_cql_connection(node1)

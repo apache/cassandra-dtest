@@ -9,8 +9,7 @@ from cassandra.query import SimpleStatement
 from dtest import Tester, create_ks
 from tools.assertions import (assert_all, assert_invalid, assert_one,
                               assert_unavailable)
-from tools.jmxutils import (JolokiaAgent, make_mbean,
-                            remove_perf_disable_shared_mem)
+from tools.jmxutils import (JolokiaAgent, make_mbean)
 
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
@@ -438,10 +437,6 @@ class TestBatch(Tester):
             logger.debug("Set cassandra dir to {}".format(self.cluster.get_install_dir()))
 
         self.cluster.populate(nodes, install_byteman=install_byteman)
-
-        for n in self.cluster.nodelist():
-            remove_perf_disable_shared_mem(n)
-
         self.cluster.start()
 
         node1 = self.cluster.nodelist()[0]
@@ -501,8 +496,6 @@ class TestBatch(Tester):
         node.stop(wait_other_notice=False)
         self.set_node_to_current_version(node)
         logger.debug("Set cassandra dir for {} to {}".format(node.name, node.get_install_dir()))
-        # needed for jmx
-        remove_perf_disable_shared_mem(node)
         # Restart nodes on new version
         logger.debug('Starting {} on new version ({})'.format(node.name, node.get_cassandra_version()))
         node.start(wait_for_binary_proto=True, jvm_args=['-Dcassandra.disable_max_protocol_auto_override=true'])

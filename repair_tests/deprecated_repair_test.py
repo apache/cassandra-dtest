@@ -13,8 +13,7 @@ import ccmlib.repository
 from dtest import Tester, create_ks, create_cf
 from tools.assertions import assert_length_equal
 from tools.data import insert_c1c2
-from tools.jmxutils import (JolokiaAgent, make_mbean,
-                            remove_perf_disable_shared_mem)
+from tools.jmxutils import (JolokiaAgent, make_mbean)
 
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
@@ -147,7 +146,6 @@ class TestDeprecatedRepairAPI(Tester):
         logger.debug("Starting cluster..")
         cluster.populate([1, 1])
         node1, node2 = cluster.nodelist()
-        remove_perf_disable_shared_mem(node1)
         cluster.start()
         supports_pull_repair = cluster.version() >= LooseVersion('3.10')
 

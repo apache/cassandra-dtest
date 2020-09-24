@@ -18,7 +18,7 @@ from dtest import Tester, create_ks, create_cf
 from tools.assertions import assert_almost_equal, assert_one
 from tools.data import insert_c1c2
 from tools.misc import new_node, ImmutableMapping
-from tools.jmxutils import make_mbean, JolokiaAgent, remove_perf_disable_shared_mem
+from tools.jmxutils import make_mbean, JolokiaAgent
 
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
@@ -1077,7 +1077,6 @@ class TestIncRepair(Tester):
         self.init_default_config()
         self.cluster.populate(2)
         node1, node2 = self.cluster.nodelist()
-        remove_perf_disable_shared_mem(node1)  # necessary for jmx
         self.cluster.start()
 
         session = self.patient_exclusive_cql_connection(node1)
