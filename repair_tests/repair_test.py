@@ -15,6 +15,7 @@ from ccmlib.node import ToolError
 
 from dtest import FlakyRetryPolicy, Tester, create_ks, create_cf
 from tools.data import insert_c1c2, query_c1c2
+from tools.jmxutils import JolokiaAgent, make_mbean, remove_perf_disable_shared_mem
 
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
@@ -910,6 +911,63 @@ class TestRepair(BaseRepairTest):
         assert len(node2.grep_log("Receiving [1-9][0-9]* files")) == 0
         assert len(node2.grep_log("Receiving 0 files")) > 0
         assert len(node2.grep_log("sending [1-9][0-9]* files")) > 0
+
+    @since('4.0')
+    def test_non_replicated_ks_repair(self):
+        cluster = self.cluster
+        cluster.populate([2, 2]).start(wait_for_binary_proto=True)
+        self.fixture_dtest_setup.ignore_log_patterns.extend(["no neighbors to repair with",
+                                                            "keyspace is skipped since repair was called with --skip-empty"])
+        _, _, node, _ = cluster.nodelist()
+        session = self.patient_cql_connection(node)
+        create_ks(session, "repair1", {'dc1': 2, 'dc2': 0})
+        create_ks(session, "repair2", {'dc1': 2, 'dc2': 2})
+        session.execute("create table repair1.t1 (id int primary key, i int)")
+        session.cluster.control_connection.wait_for_schema_agreement(wait_time=120)
+        session.execute("create table repair2.t2 (id int primary key, i int)")
+        session.cluster.control_connection.wait_for_schema_agreement(wait_time=120)
+
+        session.execute("insert into repair1.t1 (id, i) values (1, 1)")
+        session.execute("insert into repair2.t2 (id, i) values (2, 2)")
+
+        node.nodetool("repair --ignore-unreplicated-keyspaces -st 0 -et 1")
+
+        assert len(node.grep_log("t2 is fully synced")) > 0
+        assert len(node.grep_log("in repair1 - unreplicated keyspace is ignored since repair was called with --ignore-unreplicated-keyspaces")) > 0
+
+        try:
+            self.fixture_dtest_setup.ignore_log_patterns.append("Nothing to repair for .+ in repair1")
+            node.nodetool("repair -st 0 -et 1")
+            assert False, "repair should fail"
+        except ToolError:
+            logger.debug("got expected exception during repair")
+
+    @since('4.0')
+    @pytest.mark.no_vnodes
+    def test_multiple_ranges_repair(self):
+        cluster = self.cluster
+        cluster.populate([3])
+        node1, node2, node3 = cluster.nodelist()
+        remove_perf_disable_shared_mem(node1) # for jmx
+        cluster.start(wait_for_binary_proto=True)
+        self.fixture_dtest_setup.ignore_log_patterns.extend(["Nothing to repair for"])
+        session = self.patient_cql_connection(node1)
+        create_ks(session, "repair1", {'dc1': 2})
+        session.execute("create table repair1.t1 (id int primary key, i int)")
+        session.cluster.control_connection.wait_for_schema_agreement(wait_time=120)
+        session.execute("insert into repair1.t1 (id, i) values (1, 1)")
+        with JolokiaAgent(node1) as jmx:
+            repair_mbean = make_mbean('db', 'StorageService')
+            # 0,1 is replicated, -3074457345618258606:-3074457345618258605 is not:
+            jmx.execute_method(repair_mbean, 'repairAsync(java.lang.String,java.util.Map)',
+                               ["repair1", {"ranges": "0:1,-3074457345618258606:-3074457345618258605"}])
+            node1.watch_log_for("Nothing to repair for \(-3074457345618258606,-3074457345618258605\] in repair1 - aborting")
+            assert len(node1.grep_log("fully synced")) == 0
+            jmx.execute_method(repair_mbean, 'repairAsync(java.lang.String,java.util.Map)',
+                               ["repair1", {"ranges": "0:1,-3074457345618258606:-3074457345618258605",
+                                            "ignoreUnreplicatedKeyspaces": "true"}])
+            node1.watch_log_for("Found no neighbors for range \(-3074457345618258606,-3074457345618258605\] for repair1 - ignoring since repairing with --ignore-unreplicated-keyspaces")
+            node1.watch_log_for("t1 is fully synced")
 
     def _parameterized_range_repair(self, repair_opts):
         """
