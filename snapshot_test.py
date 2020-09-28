@@ -206,7 +206,10 @@ class TestArchiveCommitlog(SnapshotTester):
         node.nodetool(snapshot_cmd)
         tmpdirs = []
         base_tmpdir = safe_mkdtemp()
-        for x in range(0, self.cluster.data_dir_count):
+        data_dir_count = self.cluster.data_dir_count
+        if self.cluster.version() >= '4.0' and ks in ['system', 'system_schema']:
+            data_dir_count = 1
+        for x in range(0, data_dir_count):
             tmpdir = os.path.join(base_tmpdir, str(x))
             os.mkdir(tmpdir)
             # Copy files from the snapshot dir to existing temp dir
