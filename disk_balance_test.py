@@ -139,7 +139,7 @@ class TestDiskBalance(Tester):
         node.compact()
         mbean = make_mbean('db', type='BlacklistedDirectories')
         with JolokiaAgent(node) as jmx:
-            jmx.execute_method(mbean, 'markUnwritable', [os.path.join(node.get_path(), 'data0')])
+            jmx.execute_method(mbean, 'markUnwritable', [os.path.join(node.get_path(), 'data1')])
 
         for k in range(0, 10000):
             query_c1c2(session, k)
