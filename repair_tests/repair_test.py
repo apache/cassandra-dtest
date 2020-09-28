@@ -15,7 +15,7 @@ from ccmlib.node import ToolError
 
 from dtest import FlakyRetryPolicy, Tester, create_ks, create_cf
 from tools.data import insert_c1c2, query_c1c2
-from tools.jmxutils import JolokiaAgent, make_mbean, remove_perf_disable_shared_mem
+from tools.jmxutils import JolokiaAgent, make_mbean
 
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
@@ -948,7 +948,6 @@ class TestRepair(BaseRepairTest):
         cluster = self.cluster
         cluster.populate([3])
         node1, node2, node3 = cluster.nodelist()
-        remove_perf_disable_shared_mem(node1) # for jmx
         cluster.start(wait_for_binary_proto=True)
         self.fixture_dtest_setup.ignore_log_patterns.extend(["Nothing to repair for"])
         session = self.patient_cql_connection(node1)
