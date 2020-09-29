@@ -234,7 +234,10 @@ class TestDiskBalance(Tester):
 
         # Add a new node, so disk boundaries will change
         logger.debug("Bootstrap node2 and flush")
-        node2 = new_node(cluster, bootstrap=True)
+        # Fixed initial token to bisect the ring and make sure the nodes are balanced (otherwise a random token is generated).
+        balanced_tokens = cluster.balanced_tokens(2)
+        assert balanced_tokens[0] == node1.initial_token  # make sure cluster population still works as assumed
+        node2 = new_node(cluster, token=balanced_tokens[1], bootstrap=True)
         node2.start(wait_for_binary_proto=True, jvm_args=["-Dcassandra.migration_task_wait_in_seconds=10"], set_migration_task=False)
         node2.flush()
 
