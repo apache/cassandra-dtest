@@ -209,13 +209,14 @@ class TestMaterializedViews(Tester):
             logger.debug("create view")
             for view in range(views):
                 session.execute("CREATE MATERIALIZED VIEW mv{} AS SELECT * FROM t "
-                                "WHERE k IS NOT NULL AND c IS NOT NULL PRIMARY KEY (c,k)".format(view))
-            for view in range(views):
+                                "WHERE k IS NOT NULL AND c IS NOT NULL PRIMARY KEY (c,k)".format(view),
+                                timeout=60)
                 self._wait_for_view(keyspace, "mv{}".format(view))
 
         def drop_keyspace(session, keyspace="ks1"):
             logger.debug("drop keyspace {}".format(keyspace))
-            session.execute("DROP KEYSPACE IF EXISTS {}".format(keyspace))
+            session.execute("DROP KEYSPACE IF EXISTS {}".format(keyspace),
+                            timeout=60)
 
         def drop_views(session, views):
             logger.debug("drop all views")
