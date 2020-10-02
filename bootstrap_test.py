@@ -815,12 +815,12 @@ class TestBootstrap(Tester):
 
     def _monitor_datadir(self, node, event, basecount, jobs, failed):
         while True:
-            sstables = [s for s in node.get_sstables("keyspace1", "standard1") if "tmplink" not in s]
-            logger.debug("---")
-            for sstable in sstables:
-                logger.debug(sstable)
             if len(sstables) > basecount + jobs:
-                logger.debug("Current count is {}, basecount was {}".format(len(sstables), basecount))
+                sstables = [s for s in node.get_sstables("keyspace1", "standard1") if "tmplink" not in s]
+                logger.error("---")
+                for sstable in sstables:
+                    logger.error(sstable)
+                logger.error("Current count is {}, basecount was {}".format(len(sstables), basecount))
                 failed.set()
                 return
             if event.is_set():
