@@ -24,7 +24,9 @@ class TestClientNetworkStopStart(Tester):
         return self._normalize(a) in self._normalize(b)
 
     def _assert_client_active_msg(self, name, enabled, out):
-        assert self._in("{} active: {}".format(name, str(enabled).lower()), out), "{} is expected to be {} ({}) but was not found in output: {}".format(name, "actived" if enabled else "deactivated", str(enabled).lower(), out)
+        expected = "{} active: {}".format(name, str(enabled).lower())
+        actived = "actived" if enabled else "deactivated"
+        assert self._in(expected, out), "{} is expected to be {} ({}) but was not found in output: {}".format(name, actived, str(enabled).lower(), out)
 
     def _watch_log_for_loop(self, node, to_watch):
         """Rely on looping and timeout in order to detect if an error is found.  If the node crashes before the match is found, this will exit with an error rather than loop until the timeout."""
