@@ -1,15 +1,15 @@
+import logging
 import os
 import os.path
-import shutil
-import time
 import pytest
-import logging
+import shutil
 import string
+import time
 
-from dtest import Tester
-from distutils.version import LooseVersion
-from tools import sslkeygen
 from ccmlib.node import TimeoutError
+from distutils.version import LooseVersion
+from dtest import Tester
+from tools import sslkeygen
 
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
