@@ -28,21 +28,21 @@ class TestClientNetworkStopStart(Tester):
         actived = "actived" if enabled else "deactivated"
         assert self._in(expected, out), "{} is expected to be {} ({}) but was not found in output: {}".format(name, actived, str(enabled).lower(), out)
 
-    def _watch_log_for_loop(self, node, to_watch):
-        """Rely on looping and timeout in order to detect if an error is found.  If the node crashes before the match is found, this will exit with an error rather than loop until the timeout."""
-        while True:
-            try:
-                return node.watch_log_for(to_watch, timeout=5)
-            except TimeoutError:
-                logger.debug("waited 5s watching for '{}' but was not found; checking for errors".format(to_watch))
-                # since the api doesn't return the mark read it isn't thread safe to use mark
-                # as the length of the file can change between calls which may mean we skip over
-                # errors; to avoid this keep reading the whole file over and over again...
-                errors = node.grep_log_for_errors_from()
-                if errors:
-                    msg = "Errors were found in the logs while watching for '{}'; attempting to fail the test".format(to_watch)
-                    logger.debug(msg)
-                    raise AssertionError("{}:\n".format(msg) + '\n\n'.join(['\n'.join(msg) for msg in errors]))
+    #def _watch_log_for_loop(self, node, to_watch):
+    #    """Rely on looping and timeout in order to detect if an error is found.  If the node crashes before the match is found, this will exit with an error rather than loop until the timeout."""
+    #    while True:
+    #        try:
+    #            return node.watch_log_for(to_watch, timeout=5)
+    #        except TimeoutError:
+    #            logger.debug("waited 5s watching for '{}' but was not found; checking for errors".format(to_watch))
+    #            # since the api doesn't return the mark read it isn't thread safe to use mark
+    #            # as the length of the file can change between calls which may mean we skip over
+    #            # errors; to avoid this keep reading the whole file over and over again...
+    #            errors = node.grep_log_for_errors_from()
+    #            if errors:
+    #                msg = "Errors were found in the logs while watching for '{}'; attempting to fail the test".format(to_watch)
+    #                logger.debug(msg)
+    #                raise AssertionError("{}:\n".format(msg) + '\n\n'.join(['\n'.join(msg) for msg in errors]))
 
     def _assert_watch_log_for(self, node_or_cluster, to_watch, assert_msg=None):
         if assert_msg is None:
@@ -52,9 +52,11 @@ class TestClientNetworkStopStart(Tester):
         start = time.perf_counter()
         if callable(nodelist_fn):
             for node in nodelist_fn():
-                assert self._watch_log_for_loop(node, to_watch), assert_msg
+                assert node.watch_log_for_no_errors(to_watch), assert_msg
+                #assert self._watch_log_for_loop(node, to_watch), assert_msg
         else:
-            assert self._watch_log_for_loop(node, to_watch), assert_msg
+            assert node_or_cluster.watch_log_for_no_errors(to_watch), assert_msg
+            #assert self._watch_log_for_loop(node_or_cluster, to_watch), assert_msg
         logger.debug("Completed watching for '{}'; took {}s".format(to_watch, time.perf_counter() - start))
 
     def _assert_binary_actually_found(self, node_or_cluster):
