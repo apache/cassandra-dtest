@@ -5,12 +5,11 @@ import time
 import pytest
 import logging
 import subprocess
-import typing
+from uuid import uuid4
 
 from cassandra import ConsistencyLevel, WriteTimeout, ReadTimeout
-from cassandra.cluster import Session
 from cassandra.query import SimpleStatement
-from ccmlib.node import Node, handle_external_tool_process
+from ccmlib.node import Node
 from pytest import raises
 
 from dtest import Tester, create_ks
@@ -83,7 +82,7 @@ def request_verb_timing(node):
 
 class TestReadRepair(Tester):
 
-    @pytest.fixture(scope='function', autouse=True)
+    @pytest.fixture(scope='function')
     def fixture_set_cluster_settings(self, fixture_dtest_setup):
         cluster = fixture_dtest_setup.cluster
         cluster.populate(3)
@@ -101,7 +100,7 @@ class TestReadRepair(Tester):
         cluster.start()
 
     @since('3.0')
-    def test_alter_rf_and_run_read_repair(self):
+    def test_alter_rf_and_run_read_repair(self, fixture_set_cluster_settings):
         """
         @jira_ticket CASSANDRA-10655
         @jira_ticket CASSANDRA-10657
@@ -136,7 +135,7 @@ class TestReadRepair(Tester):
         self.check_data_on_each_replica(expect_fully_repaired=True, initial_replica=initial_replica)
 
     @since('2.1', max_version='3.11.x')
-    def test_read_repair_chance(self):
+    def test_read_repair_chance(self, fixture_set_cluster_settings):
         """
         @jira_ticket CASSANDRA-12368
         """
@@ -273,7 +272,7 @@ class TestReadRepair(Tester):
                 raise NotRepairedException()
 
     @since('2.0')
-    def test_range_slice_query_with_tombstones(self):
+    def test_range_slice_query_with_tombstones(self, fixture_set_cluster_settings):
         """
         @jira_ticket CASSANDRA-8989
         @jira_ticket CASSANDRA-9502
@@ -327,7 +326,7 @@ class TestReadRepair(Tester):
             assert "Acquiring switchLock read lock" not in activity
 
     @since('3.0')
-    def test_gcable_tombstone_resurrection_on_range_slice_query(self):
+    def test_gcable_tombstone_resurrection_on_range_slice_query(self, fixture_set_cluster_settings):
         """
         @jira_ticket CASSANDRA-11427
 
@@ -370,6 +369,64 @@ class TestReadRepair(Tester):
         for trace_event in trace.events:
             activity = trace_event.description
             assert "Sending READ_REPAIR message" not in activity
+
+
+    @since('3.0')
+    def test_tracing_does_not_interfere_with_digest_calculation(self):
+        """
+        Test that enabling tracing doesn't interfere with digest responses when using RandomPartitioner.
+        The use of a threadlocal MessageDigest for generating both DigestResponse messages and for
+        calculating tokens meant that the DigestResponse was always incorrect when both RP and tracing
+        were enabled, leading to unnecessary data reads.
+
+        @jira_ticket CASSANDRA-13964
+        """
+        cluster = self.cluster
+        cluster.populate(3)
+        cluster.set_configuration_options(values={'write_request_timeout_in_ms': 30000,
+                                                  'read_request_timeout_in_ms': 30000})
+        cluster.set_partitioner("org.apache.cassandra.dht.RandomPartitioner")
+        cluster.start(jvm_args=['-Dcassandra.wait_for_tracing_events_timeout_secs=15'])
+
+        node1 = cluster.nodelist()[0]
+        session = self.patient_cql_connection(node1)
+        create_ks(session, 'ks', 3)
+
+        session.execute("""
+            CREATE TABLE ks.users (
+                userid uuid PRIMARY KEY,
+                firstname text,
+                lastname text,
+                age int
+            );
+        """)
+
+        insert = session.prepare(
+              "INSERT INTO ks.users (userid, firstname, lastname, age) "
+              "VALUES (?, 'Frodo', 'Baggins', 32)")
+        insert.consistency_level = ConsistencyLevel.ALL
+
+        select = session.prepare(
+              "SELECT firstname, lastname "
+              "FROM ks.users WHERE userid = ?")
+        select.consistency_level = ConsistencyLevel.ALL
+
+        for _ in range(10):
+            id = uuid4()
+            session.execute(insert.bind((id,)), timeout=30)
+            res = session.execute(select.bind((id,)), timeout=30, trace=True)
+            assert 1 == len(res.response_future.get_query_trace_ids())
+
+        rr_count = make_mbean('metrics', type='ReadRepair', name='RepairedBlocking')
+        with JolokiaAgent(node1) as jmx:
+            # the MBean may not have been initialized, in which case Jolokia agent will return
+            # a HTTP 404 response. If we receive such, we know that no digest mismatch was reported
+            # If we are able to read the MBean attribute, assert that the count is 0
+            if jmx.has_mbean(rr_count):
+                # expect 0 digest mismatches
+                assert 0 == jmx.read_attribute(rr_count, 'Count')
+            else:
+                pass
 
     def pprint_trace(self, trace):
         """Pretty print a trace"""

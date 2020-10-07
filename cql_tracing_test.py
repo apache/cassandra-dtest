@@ -4,7 +4,6 @@ import logging
 from distutils.version import LooseVersion
 
 from dtest import Tester, create_ks
-from tools.jmxutils import make_mbean, JolokiaAgent
 
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
@@ -190,30 +189,3 @@ class TestCqlTracing(Tester):
             check_for_errs_in = err
         assert "Default constructor for Tracing class 'org.apache.cassandra.tracing.TracingImpl' is inaccessible." \
                in check_for_errs_in
-
-    @since('3.0')
-    def test_tracing_does_not_interfere_with_digest_calculation(self):
-        """
-        Test that enabling tracing doesn't interfere with digest responses when using RandomPartitioner.
-        The use of a threadlocal MessageDigest for generating both DigestResponse messages and for
-        calculating tokens meant that the DigestResponse was always incorrect when both RP and tracing
-        were enabled, leading to unnecessary data reads.
-
-        @jira_ticket CASSANDRA-13964
-        """
-
-        session = self.prepare(random_partitioner=True)
-        self.trace(session)
-
-        node1 = self.cluster.nodelist()[0]
-
-        rr_count = make_mbean('metrics', type='ReadRepair', name='RepairedBlocking')
-        with JolokiaAgent(node1) as jmx:
-            # the MBean may not have been initialized, in which case Jolokia agent will return
-            # a HTTP 404 response. If we receive such, we know that no digest mismatch was reported
-            # If we are able to read the MBean attribute, assert that the count is 0
-            if jmx.has_mbean(rr_count):
-                # expect 0 digest mismatches
-                assert 0 == jmx.read_attribute(rr_count, 'Count')
-            else:
-                pass
