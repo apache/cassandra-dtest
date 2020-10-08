@@ -1,4 +1,5 @@
 import itertools
+import re
 import struct
 import time
 import pytest
@@ -764,6 +765,38 @@ class TestMiscellaneousCQL(CQLTester):
                         [2, None, 2, None],
                         [3, None, 3, None]])
 
+    @since("4.0")
+    def test_truncate_failure(self):
+        """
+        @jira_ticket CASSANDRA-16208
+        Tests that if a TRUNCATE query fails on some replica, the coordinator will immediately return an error to the
+        client instead of waiting to time out because it couldn't get the necessary number of success acks.
+        """
+        cluster = self.cluster
+        cluster.populate(3, install_byteman=True).start()
+        node1, _, node3 = cluster.nodelist()
+        node3.byteman_submit(['./byteman/truncate_fail.btm'])
+
+        session = self.patient_exclusive_cql_connection(node1)
+        create_ks(session, 'ks', 3)
+
+        logger.debug("Creating data table")
+        session.execute("CREATE TABLE data (id int PRIMARY KEY, data text)")
+        session.execute("UPDATE data SET data = 'Awesome' WHERE id = 1")
+
+        self.fixture_dtest_setup.ignore_log_patterns = ['Dummy failure']
+        logger.debug("Truncating data table (error expected)")
+
+        thrown = False
+        exception = None
+        try:
+            session.execute("TRUNCATE data")
+        except Exception as e:
+            exception = e
+            thrown = True
+
+        assert thrown, "No exception has been thrown"
+        assert re.search("Truncate failed on replica /127.0.0.3", str(exception)) is not None
 
 @since('3.2')
 class AbortedQueryTester(CQLTester):

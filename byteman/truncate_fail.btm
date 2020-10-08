@@ -1,0 +1,8 @@
+RULE Throw during truncate operation
+CLASS org.apache.cassandra.db.ColumnFamilyStore
+METHOD truncateBlocking()
+AT ENTRY
+IF TRUE
+DO
+   throw new RuntimeException("Dummy failure");
+ENDRULE
