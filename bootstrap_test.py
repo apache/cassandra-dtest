@@ -835,7 +835,7 @@ class TestBootstrap(Tester):
         shutil.rmtree(commitlog_dir)
 
     @since('2.2')
-    @pytest.mark.vnodes
+    @pytest.mark.ported_to_in_jvm
     def test_bootstrap_binary_disabled(self):
         """
         Test binary while bootstrapping and streaming fails.

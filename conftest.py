@@ -538,7 +538,9 @@ def pytest_collection_modifyitems(items, config):
                 logger.info("SKIP: Deselecting test %s as the test requires vnodes to be disabled. To run this test, "
                       "re-run without the --use-vnodes command line argument" % item.name)
 
-        if item.get_closest_marker("vnodes"):
+        # include ported_to_in_jvm when doing the vnode check as tests ported to jvm-dtest
+        # do not support vnode, so these tests still need to run, only on vnode though
+        if item.get_closest_marker("vnodes") or item.get_closest_marker("ported_to_in_jvm"):
             if not config.getoption("--use-vnodes"):
                 deselect_test = True
                 logger.info("SKIP: Deselecting test %s as the test requires vnodes to be enabled. To run this test, "
