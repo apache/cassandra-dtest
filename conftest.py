@@ -378,6 +378,7 @@ def _skip_msg(current_running_version, since_version, max_version):
     if isinstance(since_version, collections.Sequence):
         previous = None
         since_version.sort()
+
         for i in range(1, len(since_version) + 1):
             sv = since_version[-i]
             if loose_version_compare(current_running_version, sv) >= 0:
@@ -385,9 +386,12 @@ def _skip_msg(current_running_version, since_version, max_version):
                     if max_version and loose_version_compare(current_running_version, max_version) > 0:
                         return "%s > %s" % (current_running_version, max_version)
                     return None
+
                 if loose_version_compare(current_running_version, previous) < 0:
                     return None
+
             previous = LooseVersion('.'.join([str(s) for s in sv.version[:-1]]))
+
         # no matches found, so fail
         return "%s < %s" % (current_running_version, since_version)
     else:
