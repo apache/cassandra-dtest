@@ -835,10 +835,17 @@ class TestBootstrap(Tester):
         shutil.rmtree(commitlog_dir)
 
     @since('2.2')
+    @pytest.mark.vnodes
     def test_bootstrap_binary_disabled(self):
         """
-        Test binary while bootstrapping and streaming fails
-        @jira_ticket CASSANDRA-14526, CASSANDRA-14525
+        Test binary while bootstrapping and streaming fails.
+
+        This test was ported to jvm-dtest org.apache.cassandra.distributed.test.BootstrapBinaryDisabledTest,
+        as of this writing there are a few limitations with jvm-dtest which requries this test to
+        stay, namely vnode support (ci also tests under different configs).  Once jvm-dtest supports
+        vnodes, this test can go away in favor of that class.
+
+        @jira_ticket CASSANDRA-14526, CASSANDRA-14525, CASSANDRA-16127
         """
         config = {'authenticator': 'org.apache.cassandra.auth.PasswordAuthenticator',
                   'authorizer': 'org.apache.cassandra.auth.CassandraAuthorizer',
