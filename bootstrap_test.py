@@ -835,7 +835,7 @@ class TestBootstrap(Tester):
         shutil.rmtree(commitlog_dir)
 
     @since('2.2')
-    @pytest.mark.ported_to_in_jvm
+    @pytest.mark.ported_to_in_jvm # see org.apache.cassandra.distributed.test.BootstrapBinaryDisabledTest
     def test_bootstrap_binary_disabled(self):
         """
         Test binary while bootstrapping and streaming fails.
