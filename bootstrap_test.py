@@ -482,11 +482,17 @@ class TestBootstrap(Tester):
 
             node3 = new_node(cluster, data_center='dc2')
             node3.start(jvm_args=["-Dcassandra.write_survey=true"], no_wait=True)
-            time.sleep(5)
 
+            node3_seen = False
+            for _ in range(30):  # give node3 up to 30 seconds to start
+                ntout = node1.nodetool('status').stdout
+                if re.search(r'UJ\s+' + node3.ip_addr, ntout):
+                    node3_seen = True
+                    break
+                time.sleep(1)
 
-            ntout = node1.nodetool('status').stdout
-            assert re.search(r'UJ\s+' + node3.ip_addr, ntout), ntout
+            assert node3_seen, "expected {} in status:\n{}".format(node3.ip_addr, ntout)
+
             out, err, _ = node1.stress(['user', 'profile=' + stress_config.name, 'ops(insert=1)',
                                         'n=10k', 'no-warmup', 'cl=LOCAL_QUORUM',
                                         '-rate', 'threads=10',
@@ -767,6 +773,12 @@ class TestBootstrap(Tester):
 
         node2 = new_node(cluster)
         node2.start()
+
+        for _ in range(30):  # wait until node2 shows up
+            ntout = node1.nodetool('status').stdout
+            if re.search(r'UJ\s+' + node2.ip_addr, ntout):
+                break
+            time.sleep(0.1)
 
         node3 = new_node(cluster, remote_debug_port='2003')
         try:
