@@ -19,6 +19,7 @@ from tools.jmxutils import JolokiaAgent, make_mbean
 from tools.misc import retry_till_success
 
 since = pytest.mark.since
+ported_to_in_jvm = pytest.mark.ported_to_in_jvm
 logger = logging.getLogger(__name__)
 
 def byteman_validate(node, script, verbose=False, opts=None):
@@ -100,6 +101,7 @@ class TestReadRepair(Tester):
         cluster.start()
 
     @since('3.0')
+    @ported_to_in_jvm('4.0')
     def test_alter_rf_and_run_read_repair(self, fixture_set_cluster_settings):
         """
         @jira_ticket CASSANDRA-10655
@@ -272,6 +274,7 @@ class TestReadRepair(Tester):
                 raise NotRepairedException()
 
     @since('2.0')
+    @ported_to_in_jvm('4.0')
     def test_range_slice_query_with_tombstones(self, fixture_set_cluster_settings):
         """
         @jira_ticket CASSANDRA-8989
@@ -326,6 +329,7 @@ class TestReadRepair(Tester):
             assert "Acquiring switchLock read lock" not in activity
 
     @since('3.0')
+    @ported_to_in_jvm('4.0')
     def test_gcable_tombstone_resurrection_on_range_slice_query(self, fixture_set_cluster_settings):
         """
         @jira_ticket CASSANDRA-11427
@@ -792,6 +796,8 @@ def stop_reads(*nodes, kind='all'):
 kcvv = lambda k, c, v1, v2: [k, c, v1, v2]
 
 
+@since('4.0')
+@ported_to_in_jvm('4.0')
 class TestReadRepairGuarantees(Tester):
 
     @pytest.fixture(scope='function', autouse=True)
@@ -809,7 +815,6 @@ class TestReadRepairGuarantees(Tester):
     def get_cql_connection(self, node, **kwargs):
         return self.patient_exclusive_cql_connection(node, retry_policy=None, **kwargs)
 
-    @since('4.0')
     @pytest.mark.parametrize("repair_type,expect_monotonic",
                              (('blocking', True), ('none', False)),
                              ids=('blocking', 'none'))
@@ -850,7 +855,6 @@ class TestReadRepairGuarantees(Tester):
                 assert listify(results) == [kcvv(1, 0, 1, 1)]
 
 
-    @since('4.0')
     @pytest.mark.parametrize("repair_type,expect_atomic",
                              (('blocking', False), ('none', True)),
                              ids=('blocking', 'none'))
