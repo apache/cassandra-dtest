@@ -445,6 +445,12 @@ def _skip_ported_msg(current_running_version, ported_from_version):
 
 @pytest.fixture(autouse=True)
 def fixture_ported_to_in_jvm(request, fixture_dtest_setup):
+    """
+    Adds a new mark called 'ported_to_in_jvm' which denotes that a test was ported to jvm-dtest.
+
+    As of this point in time there are weaknesses of jvm-dtest which require these tests to still
+    be run in the cases not covered by jvm-dtest; namely vnode.
+    """
     marker = request.node.get_closest_marker('ported_to_in_jvm')
     if marker and not request.config.getoption("--use-vnodes"):
 
