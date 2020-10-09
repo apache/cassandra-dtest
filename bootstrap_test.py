@@ -878,9 +878,6 @@ class TestBootstrap(Tester):
         node2.start(jvm_args=["-Dcassandra.ring_delay_ms=5000"])
         self.assert_log_had_msg(node2, 'Some data streaming failed')
 
-        if self.cluster.version() >= LooseVersion('4.0'):
-            self.assert_log_had_msg(node2, 'Not starting client transports as bootstrap has not completed')
-
         try:
             node2.nodetool('join')
             pytest.fail('nodetool should have errored and failed to join ring')
