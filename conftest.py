@@ -1,4 +1,5 @@
 import copy
+import collections
 import inspect
 import logging
 import os
@@ -374,10 +375,30 @@ def loose_version_compare(a, b):
 
 
 def _skip_msg(current_running_version, since_version, max_version):
-    if loose_version_compare(current_running_version, since_version) < 0:
+    if isinstance(since_version, collections.Sequence):
+        previous = None
+        since_version.sort()
+
+        for i in range(1, len(since_version) + 1):
+            sv = since_version[-i]
+            if loose_version_compare(current_running_version, sv) >= 0:
+                if not previous:
+                    if max_version and loose_version_compare(current_running_version, max_version) > 0:
+                        return "%s > %s" % (current_running_version, max_version)
+                    return None
+
+                if loose_version_compare(current_running_version, previous) < 0:
+                    return None
+
+            previous = LooseVersion('.'.join([str(s) for s in sv.version[:-1]]))
+
+        # no matches found, so fail
         return "%s < %s" % (current_running_version, since_version)
-    if max_version and loose_version_compare(current_running_version, max_version) > 0:
-        return "%s > %s" % (current_running_version, max_version)
+    else:
+        if loose_version_compare(current_running_version, since_version) < 0:
+            return "%s < %s" % (current_running_version, since_version)
+        if max_version and loose_version_compare(current_running_version, max_version) > 0:
+            return "%s > %s" % (current_running_version, max_version)
 
 
 @pytest.fixture(autouse=True)
@@ -388,8 +409,11 @@ def fixture_since(request, fixture_dtest_setup):
         if max_version_str:
             max_version = LooseVersion(max_version_str)
 
-        since_str = request.node.get_closest_marker('since').args[0]
-        since = LooseVersion(since_str)
+        since_str_or_list = request.node.get_closest_marker('since').args[0]
+        if not isinstance(since_str_or_list, str) and isinstance(since_str_or_list, collections.Sequence):
+            since = [LooseVersion(since_str) for since_str in since_str_or_list]
+        else:
+            since = LooseVersion(since_str_or_list)
         # For upgrade tests don't run the test if any of the involved versions
         # are excluded by the annotation
         if hasattr(request.cls, "UPGRADE_PATH"):
@@ -414,6 +438,51 @@ def fixture_since(request, fixture_dtest_setup):
             if skip_msg:
                 pytest.skip(skip_msg)
 
+def _skip_ported_msg(current_running_version, ported_from_version):
+    if loose_version_compare(current_running_version, ported_from_version) >= 0:
+        return "ported to in-JVM from %s >= %s" % (ported_from_version, current_running_version)
+
+
+@pytest.fixture(autouse=True)
+def fixture_ported_to_in_jvm(request, fixture_dtest_setup):
+    """
+    Adds a new mark called 'ported_to_in_jvm' which denotes that a test was ported to jvm-dtest.
+
+    As of this point in time there are weaknesses of jvm-dtest which require these tests to still
+    be run in the cases not covered by jvm-dtest; namely vnode.
+    """
+    marker = request.node.get_closest_marker('ported_to_in_jvm')
+    if marker and not request.config.getoption("--use-vnodes"):
+
+        if not marker.args:
+            pytest.skip("ported to in-jvm")
+
+        from_str = marker.args[0]
+        ported_from_version = LooseVersion(from_str)
+
+        # For upgrade tests don't run the test if any of the involved versions
+        # are excluded by the annotation
+        if hasattr(request.cls, "UPGRADE_PATH"):
+            upgrade_path = request.cls.UPGRADE_PATH
+            ccm_repo_cache_dir, _ = ccmlib.repository.setup(upgrade_path.starting_meta.version)
+            starting_version = get_version_from_build(ccm_repo_cache_dir)
+            skip_msg = _skip_ported_msg(starting_version, ported_from_version)
+            if skip_msg:
+                pytest.skip(skip_msg)
+            ccm_repo_cache_dir, _ = ccmlib.repository.setup(upgrade_path.upgrade_meta.version)
+            ending_version = get_version_from_build(ccm_repo_cache_dir)
+            skip_msg = _skip_ported_msg(ending_version, ported_from_version)
+            if skip_msg:
+                pytest.skip(skip_msg)
+        else:
+            # For regular tests the value in the current cluster actually means something so we should
+            # use that to check.
+            # Use cassandra_version_from_build as it's guaranteed to be a LooseVersion
+            # whereas cassandra_version may be a string if set in the cli options
+            current_running_version = fixture_dtest_setup.dtest_config.cassandra_version_from_build
+            skip_msg = _skip_ported_msg(current_running_version, ported_from_version)
+            if skip_msg:
+                pytest.skip(skip_msg)
 
 @pytest.fixture(autouse=True)
 def fixture_skip_version(request, fixture_dtest_setup):

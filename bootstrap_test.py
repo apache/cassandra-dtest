@@ -835,10 +835,17 @@ class TestBootstrap(Tester):
         shutil.rmtree(commitlog_dir)
 
     @since('2.2')
+    @pytest.mark.ported_to_in_jvm # see org.apache.cassandra.distributed.test.BootstrapBinaryDisabledTest
     def test_bootstrap_binary_disabled(self):
         """
-        Test binary while bootstrapping and streaming fails
-        @jira_ticket CASSANDRA-14526, CASSANDRA-14525
+        Test binary while bootstrapping and streaming fails.
+
+        This test was ported to jvm-dtest org.apache.cassandra.distributed.test.BootstrapBinaryDisabledTest,
+        as of this writing there are a few limitations with jvm-dtest which requries this test to
+        stay, namely vnode support (ci also tests under different configs).  Once jvm-dtest supports
+        vnodes, this test can go away in favor of that class.
+
+        @jira_ticket CASSANDRA-14526, CASSANDRA-14525, CASSANDRA-16127
         """
         config = {'authenticator': 'org.apache.cassandra.auth.PasswordAuthenticator',
                   'authorizer': 'org.apache.cassandra.auth.CassandraAuthorizer',
@@ -870,9 +877,6 @@ class TestBootstrap(Tester):
         node2.import_config_files()
         node2.start(jvm_args=["-Dcassandra.ring_delay_ms=5000"])
         self.assert_log_had_msg(node2, 'Some data streaming failed')
-
-        if self.cluster.version() >= LooseVersion('4.0'):
-            self.assert_log_had_msg(node2, 'Not starting client transports as bootstrap has not completed')
 
         try:
             node2.nodetool('join')
