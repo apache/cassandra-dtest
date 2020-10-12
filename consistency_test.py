@@ -15,7 +15,6 @@ from tools.assertions import (assert_all, assert_length_equal, assert_none,
 from dtest import MultiError, Tester, create_ks, create_cf
 from tools.data import (create_c1c2_table, insert_c1c2, insert_columns,
                         query_c1c2, rows_to_list)
-from tools.jmxutils import JolokiaAgent, make_mbean
 
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
@@ -1280,11 +1279,6 @@ class TestConsistency(Tester):
                    'SELECT id FROM test.test LIMIT 1;',
                    [[3]],
                    cl=ConsistencyLevel.ALL)
-
-        srp = make_mbean('metrics', type='Table', name='ShortReadProtectionRequests', keyspace='test', scope='test')
-        with JolokiaAgent(node1) as jmx:
-            # 4 srp requests for node1 and 5 for node2, total of 9
-            assert 9 == jmx.read_attribute(srp, 'Count')
 
     @since('3.0')
     def test_12872(self):
