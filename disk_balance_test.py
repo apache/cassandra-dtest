@@ -1,6 +1,7 @@
 import os
 import os.path
 import re
+from time import sleep
 
 import pytest
 import logging
@@ -165,13 +166,24 @@ class TestDiskBalance(Tester):
             self.assert_balanced(node)
 
     def assert_balanced(self, node):
-        sums = []
-        for sstabledir in node.get_sstables_per_data_directory('keyspace1', 'standard1'):
-            sum = 0
-            for sstable in sstabledir:
-                sum = sum + os.path.getsize(sstable)
-            sums.append(sum)
-        assert_almost_equal(*sums, error=0.1, error_message=node.name)
+        old_sums = new_sums = None
+        # This extra looping and logic is to account for a race with obsolete file deletions, which are scheduled
+        # asynchronously in the server. We want to allow a chance to settle if files are still being removed
+        for _ in range(20):
+            old_sums = new_sums
+            new_sums = []
+            for sstabledir in node.get_sstables_per_data_directory('keyspace1', 'standard1'):
+                sum = 0
+                for sstable in sstabledir:
+                    sum = sum + os.path.getsize(sstable)
+                new_sums.append(sum)
+            if new_sums == old_sums:
+                break
+            sleep(2)
+
+        assert len(new_sums)
+        assert new_sums == old_sums  # we settled
+        assert_almost_equal(*new_sums, error=0.1, error_message=node.name)
 
     @since('3.10')
     def test_disk_balance_after_boundary_change_stcs(self):
