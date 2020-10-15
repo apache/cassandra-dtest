@@ -141,9 +141,11 @@ class TestHintedHandoffConfig(Tester):
         assert 'Current max hint window: 300000 ms' == res.rstrip()
         self._do_hinted_handoff(node1, node2, True)
         node1.start()
-        self._launch_nodetool_cmd(node, 'setmaxhintwindow 1')
-        res = self._launch_nodetool_cmd(node, 'getmaxhintwindow')
-        assert 'Current max hint window: 1 ms' == res.rstrip()
+        for node in node1, node2:
+            # Make sure HH is effective on both nodes despite node startup races CASSANDRA-15865
+            self._launch_nodetool_cmd(node, 'setmaxhintwindow 1')
+            res = self._launch_nodetool_cmd(node, 'getmaxhintwindow')
+            assert 'Current max hint window: 1 ms' == res.rstrip()
         self._do_hinted_handoff(node1, node2, False, keyspace='ks2')
 
     def test_hintedhandoff_dc_disabled(self):
