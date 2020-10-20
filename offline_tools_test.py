@@ -450,7 +450,7 @@ class TestOfflineTools(Tester):
                 "Consider adding more capacity",
                 "JNA link failure",
                 "Class JavaLaunchHelper is implemented in both",
-                "Picked up JAVA_TOOL_OPTIONS:.*"]
+                "Picked up JAVA_TOOL_OPTIONS:"]
 
         if len(error) > 0:
             for line in error.splitlines():
