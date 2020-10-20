@@ -8,6 +8,7 @@ import logging
 
 from ccmlib import common
 from ccmlib.node import ToolError
+from tools.assertions import assert_stderr_clean
 
 from dtest import Tester, create_ks
 
@@ -445,7 +446,11 @@ class TestOfflineTools(Tester):
         assert {'1', '2'} == dumped_keys
 
     def _check_stderr_error(self, error):
-        acceptable = ["Max sstable size of", "Consider adding more capacity", "JNA link failure", "Class JavaLaunchHelper is implemented in both"]
+        acceptable = ["Max sstable size of",
+                "Consider adding more capacity",
+                "JNA link failure",
+                "Class JavaLaunchHelper is implemented in both",
+                "Picked up JAVA_TOOL_OPTIONS:.*"]
 
         if len(error) > 0:
             for line in error.splitlines():

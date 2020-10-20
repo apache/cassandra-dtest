@@ -7,6 +7,7 @@ from cassandra import ConsistencyLevel
 
 from dtest import Tester, create_ks
 from tools.data import create_c1c2_table, insert_c1c2, query_c1c2
+from tools.assertions import assert_stderr_clean
 
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
@@ -43,7 +44,7 @@ class TestHintedHandoffConfig(Tester):
         Launch a nodetool command and check there is no error, return the result
         """
         out, err, _ = node.nodetool(cmd)
-        assert '' == err
+        assert_stderr_clean(err)
         return out
 
     def _do_hinted_handoff(self, node1, node2, enabled, keyspace='ks'):

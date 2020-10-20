@@ -8,7 +8,7 @@ from cassandra.query import SimpleStatement
 from ccmlib.node import ToolError
 
 from dtest import Tester, create_ks
-from tools.assertions import assert_all, assert_invalid, assert_none
+from tools.assertions import assert_all, assert_invalid, assert_none, assert_stderr_clean
 from tools.jmxutils import JolokiaAgent, make_mbean
 
 since = pytest.mark.since
@@ -35,7 +35,7 @@ class TestNodetool(Tester):
             node.decommission()
             assert not "Expected nodetool error"
         except ToolError as e:
-            assert '' == e.stderr
+            assert_stderr_clean(e.stderr)
             assert 'Unsupported operation' in e.stdout
 
     def test_correct_dc_rack_in_nodetool_info(self):
@@ -58,7 +58,7 @@ class TestNodetool(Tester):
 
         for i, node in enumerate(cluster.nodelist()):
             out, err, _ = node.nodetool('info')
-            assert 0 == len(err), err
+            assert_stderr_clean(err)
             out_str = out
             if isinstance(out, (bytes, bytearray)):
                 out_str = out.decode("utf-8")
@@ -91,19 +91,19 @@ class TestNodetool(Tester):
         # read all of the timeouts, make sure we get a sane response
         for timeout_type in types:
             out, err, _ = node.nodetool('gettimeout {}'.format(timeout_type))
-            assert 0 == len(err), err
+            assert_stderr_clean(err)
             logger.debug(out)
             assert re.search(r'.* \d+ ms', out)
 
         # set all of the timeouts to 123
         for timeout_type in types:
             _, err, _ = node.nodetool('settimeout {} 123'.format(timeout_type))
-            assert 0 == len(err), err
+            assert_stderr_clean(err)
 
         # verify that they're all reported as 123
         for timeout_type in types:
             out, err, _ = node.nodetool('gettimeout {}'.format(timeout_type))
-            assert 0 == len(err), err
+            assert_stderr_clean(err)
             logger.debug(out)
             assert re.search(r'.* 123 ms', out)
 
@@ -197,7 +197,7 @@ class TestNodetool(Tester):
 
         # Do a first try without any keypace, we shouldn't have the notice
         out, err, _ = node.nodetool('status')
-        assert 0 == len(err), err
+        assert_stderr_clean(err)
         assert not re.search(notice_message, out)
 
         session = self.patient_cql_connection(node)
@@ -205,21 +205,21 @@ class TestNodetool(Tester):
 
         # With 1 keyspace, we should still not get the notice
         out, err, _ = node.nodetool('status')
-        assert 0 == len(err), err
+        assert_stderr_clean(err)
         assert not re.search(notice_message, out)
 
         session.execute("CREATE KEYSPACE ks2 WITH replication = { 'class':'SimpleStrategy', 'replication_factor':1}")
 
         # With 2 keyspaces with the same settings, we should not get the notice
         out, err, _ = node.nodetool('status')
-        assert 0 == len(err), err
+        assert_stderr_clean(err)
         assert not re.search(notice_message, out)
 
         session.execute("CREATE KEYSPACE ks3 WITH replication = { 'class':'SimpleStrategy', 'replication_factor':3}")
 
         # With a keyspace without the same replication factor, we should get the notice
         out, err, _ = node.nodetool('status')
-        assert 0 == len(err), err
+        assert_stderr_clean(err)
         assert re.search(notice_message, out)
 
     @since('4.0')
@@ -440,7 +440,7 @@ class TestNodetool(Tester):
 
     def _describe(self, node):
         node_describe, err, _ = node.nodetool('describecluster')
-        assert 0 == len(err), err
+        assert_stderr_clean(err)
         out_sorted = node_describe.split()
         out_sorted.sort()
         return (node_describe, out_sorted)
