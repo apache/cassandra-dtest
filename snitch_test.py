@@ -6,6 +6,7 @@ import logging
 
 from cassandra import ConsistencyLevel
 from dtest import Tester
+from tools.assertions import assert_stderr_clean
 from tools.jmxutils import (JolokiaAgent, make_mbean)
 
 since = pytest.mark.since
@@ -122,7 +123,7 @@ class TestGossipingPropertyFileSnitch(Tester):
         assert original_rows == new_rows
 
         out, err, _ = node1.nodetool('gossipinfo')
-        assert 0 == len(err), err
+        assert_stderr_clean(err)
         logger.debug(out)
 
         assert "/{}".format(NODE1_BROADCAST_ADDRESS) in out
