@@ -1,10 +1,10 @@
 import logging
 import pytest
+import re
 
 from cassandra.query import SimpleStatement
 
 from dtest import Tester, create_ks
-from plugins.assert_tools import assert_regexp_matches
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +54,10 @@ class TestPendingRangeMovements(Tester):
         node1.watch_log_for('Sleeping 30000 ms before start streaming/fetching ranges', timeout=10, from_mark=mark)
 
         if cluster.version() >= '2.2':
-            node2.watch_log_for('127.0.0.1 state moving', timeout=10, filename='debug.log')
+            if cluster.version() >= '4.0':
+                node2.watch_log_for('127.0.0.1:7000 state MOVING', timeout=10, filename='debug.log')
+            else:
+                node2.watch_log_for('127.0.0.1 state moving', timeout=10, filename='debug.log')
         else:
             # 2.1 doesn't have debug.log, so we are logging at trace, and look
             # in the system.log file
@@ -66,7 +69,7 @@ class TestPendingRangeMovements(Tester):
         # Verify other nodes believe this is Down/Moving
         out, _, _ = node2.nodetool('ring')
         logger.debug("Nodetool Ring output: {}".format(out))
-        assert_regexp_matches(out, '127\.0\.0\.1.*?Down.*?Moving')
+        assert re.search('127\.0\.0\.1.*?Down.*?Moving', out) is not None
 
         # Check we can still execute LWT
         for i in range(1000):
