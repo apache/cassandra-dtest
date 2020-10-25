@@ -35,7 +35,7 @@ bootstrap your development environment and then use [Homebrew](https://brew.sh)
 ### Python Dependencies
 There are multiple external Python dependencies required to run DTests. 
 The current Python dependency list is maintained in a file named
-[requirements.txt](https://github.com/apache/cassandra-dtest/blob/master/requirements.txt) 
+[requirements.txt](https://github.com/apache/cassandra-dtest/blob/trunk/requirements.txt)
 in the root of the `cassandra-dtest` repository.
 
 The easiest way to install these dependencies is with pip and virtualenv. 

@@ -60,7 +60,7 @@ In some cases, we organize our test files by putting them in directories. If you
 
 ## Assertions
 
-- When possible, you should use the assert functions from [`tools/assertions.py`](https://github.com/apache/cassandra-dtest/blob/master/tools/assertions.py).
+- When possible, you should use the assert functions from [`tools/assertions.py`](https://github.com/apache/cassandra-dtest/blob/trunk/tools/assertions.py).
 - When none of these are applicable, use python's built in [unittest assertions](https://docs.python.org/2/library/unittest.html#assert-methods).
 
 ## Byteman Files
