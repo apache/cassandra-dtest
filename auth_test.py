@@ -216,7 +216,7 @@ class TestAuth(Tester):
 
         self.fixture_dtest_setup.ignore_log_patterns = list(self.fixture_dtest_setup.ignore_log_patterns) + [
             r'Invalid metadata has been detected for role bob']
-        assert_exception(session, "LIST USERS", "Invalid metadata has been detected for role", expected=(ServerError))
+        assert_exception(session, "LIST USERS", "Invalid metadata has been detected for role", expected=(NoHostAvailable))
         try:
             self.get_session(user='bob', password='12345')
         except NoHostAvailable as e:
