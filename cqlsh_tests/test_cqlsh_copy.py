@@ -99,6 +99,12 @@ class TestCqlshCopy(Tester):
                 else:
                     configuration_options['authenticator'] = 'org.apache.cassandra.auth.PasswordAuthenticator'
 
+            if self.cluster.cassandra_version() >= '4' and not ('Murmur3' in p or 'Random' in p):
+                if configuration_options is None:
+                    configuration_options = {'allocate_tokens_for_local_replication_factor': None}
+                else:
+                    configuration_options['allocate_tokens_for_local_replication_factor'] = None
+
             if configuration_options:
                 self.cluster.set_configuration_options(values=configuration_options)
             self.cluster.populate(nodes, tokens=tokens).start()

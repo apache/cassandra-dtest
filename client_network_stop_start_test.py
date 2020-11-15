@@ -64,6 +64,7 @@ class TestClientNetworkStopStart(Tester):
         """Tests default configurations have the correct client network setup"""
         cluster = self.cluster
         logger.debug("Starting cluster..")
+        cluster.set_environment_variable('CASSANDRA_TOKEN_PREGENERATION_DISABLED', 'True')
         cluster.populate(1).start(wait_for_binary_proto=True)
         self._assert_binary_actually_found(cluster)
         self._assert_startup(cluster)

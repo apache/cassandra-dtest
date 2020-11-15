@@ -31,12 +31,7 @@ class TestHintedHandoffConfig(Tester):
         if config_options:
             cluster.set_configuration_options(values=config_options)
 
-        if not self.dtest_config.use_vnodes:
-            cluster.populate([2]).start()
-        else:
-            tokens = cluster.balanced_tokens(2)
-            cluster.populate([2], tokens=tokens).start()
-
+        cluster.populate([2]).start()
         return cluster.nodelist()
 
     def _launch_nodetool_cmd(self, node, cmd):

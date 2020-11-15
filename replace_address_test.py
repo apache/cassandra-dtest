@@ -53,11 +53,6 @@ class BaseReplaceAddressTest(Tester):
         self.replaced_node = self.cluster.nodelist()[-1]
 
         self.cluster.seeds.remove(self.replaced_node)
-        NUM_TOKENS = os.environ.get('NUM_TOKENS', '256')
-        if not self.dtest_config.use_vnodes:
-            self.cluster.set_configuration_options(values={'initial_token': None, 'num_tokens': 1})
-        else:
-            self.cluster.set_configuration_options(values={'initial_token': None, 'num_tokens': NUM_TOKENS})
 
         if enable_byteman:
             # set up byteman

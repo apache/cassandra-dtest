@@ -420,8 +420,7 @@ class DTestSetup(object):
             values['corrupted_tombstone_strategy'] = 'exception'
 
         if self.dtest_config.use_vnodes:
-            self.cluster.set_configuration_options(
-                values={'initial_token': None, 'num_tokens': self.dtest_config.num_tokens})
+            self.cluster.set_configuration_options(values={'num_tokens': self.dtest_config.num_tokens})
         else:
             self.cluster.set_configuration_options(values={'num_tokens': 1})
 

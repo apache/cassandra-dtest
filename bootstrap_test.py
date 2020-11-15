@@ -206,6 +206,7 @@ class TestBootstrap(Tester):
         Test that bootstrap completes if streaming from nodes with no data
         """
         cluster = self.cluster
+        cluster.set_environment_variable('CASSANDRA_TOKEN_PREGENERATION_DISABLED', 'True')
         # Create a two-node cluster
         cluster.populate(2)
         cluster.start()
@@ -222,6 +223,7 @@ class TestBootstrap(Tester):
         @jira_ticket CASSANDRA-6648
         """
         cluster = self.cluster
+        cluster.set_environment_variable('CASSANDRA_TOKEN_PREGENERATION_DISABLED', 'True')
         cluster.populate(3)
         cluster.start()
 
@@ -246,6 +248,7 @@ class TestBootstrap(Tester):
              """
 
              cluster = self.cluster
+             cluster.set_environment_variable('CASSANDRA_TOKEN_PREGENERATION_DISABLED', 'True')
 
              logger.debug("Create a cluster")
              cluster.populate(1)
@@ -283,6 +286,7 @@ class TestBootstrap(Tester):
         @jira_ticket CASSANDRA-11848
         """
         cluster = self.cluster
+        cluster.set_environment_variable('CASSANDRA_TOKEN_PREGENERATION_DISABLED', 'True')
 
         cluster.populate(2)
         node1, node2 = cluster.nodelist()
@@ -341,6 +345,7 @@ class TestBootstrap(Tester):
         Test resuming bootstrap after data streaming failure
         """
         cluster = self.cluster
+        cluster.set_environment_variable('CASSANDRA_TOKEN_PREGENERATION_DISABLED', 'True')
         cluster.populate(2)
 
         node1 = cluster.nodes['node1']
@@ -383,6 +388,7 @@ class TestBootstrap(Tester):
     def test_bootstrap_with_reset_bootstrap_state(self):
         """Test bootstrap with resetting bootstrap progress"""
         cluster = self.cluster
+        cluster.set_environment_variable('CASSANDRA_TOKEN_PREGENERATION_DISABLED', 'True')
         cluster.set_configuration_options(values={'stream_throughput_outbound_megabits_per_sec': 1})
         cluster.populate(2).start()
 
@@ -422,6 +428,7 @@ class TestBootstrap(Tester):
             @jira_ticket CASSANDRA-9022
         """
         cluster = self.cluster
+        cluster.set_environment_variable('CASSANDRA_TOKEN_PREGENERATION_DISABLED', 'True')
         cluster.populate(2).start()
         (node1, node2) = cluster.nodelist()
 
@@ -448,6 +455,7 @@ class TestBootstrap(Tester):
         @jira_ticket CASSANDRA-8058
         """
         cluster = self.cluster
+        cluster.set_environment_variable('CASSANDRA_TOKEN_PREGENERATION_DISABLED', 'True')
         cluster.populate([1, 1])
         cluster.start()
 
@@ -520,6 +528,7 @@ class TestBootstrap(Tester):
         the gently parameter.
         """
         cluster = self.cluster
+        cluster.set_environment_variable('CASSANDRA_TOKEN_PREGENERATION_DISABLED', 'True')
         cluster.populate(3)
         cluster.start()
 
@@ -553,6 +562,7 @@ class TestBootstrap(Tester):
         Test that if we decommission a node and then wipe its data, it can join the cluster.
         """
         cluster = self.cluster
+        cluster.set_environment_variable('CASSANDRA_TOKEN_PREGENERATION_DISABLED', 'True')
         cluster.populate(3)
         cluster.start()
 
@@ -589,6 +599,7 @@ class TestBootstrap(Tester):
         seed node.
         """
         cluster = self.cluster
+        cluster.set_environment_variable('CASSANDRA_TOKEN_PREGENERATION_DISABLED', 'True')
         cluster.populate(1)
         cluster.start()
 
@@ -631,6 +642,7 @@ class TestBootstrap(Tester):
         Test that if a node fails to bootstrap, it can join the cluster even if the data is wiped.
         """
         cluster = self.cluster
+        cluster.set_environment_variable('CASSANDRA_TOKEN_PREGENERATION_DISABLED', 'True')
         cluster.populate(1)
         cluster.set_configuration_options(values={'stream_throughput_outbound_megabits_per_sec': 1})
         cluster.start()
@@ -670,6 +682,7 @@ class TestBootstrap(Tester):
         Test that a node cannot bootstrap without replace_address if a hibernating node exists with that address
         """
         cluster = self.cluster
+        cluster.set_environment_variable('CASSANDRA_TOKEN_PREGENERATION_DISABLED', 'True')
         cluster.populate(2)
         # Setting seed node to first node to make sure replaced node is not in own seed list
         cluster.set_configuration_options({
@@ -763,6 +776,7 @@ class TestBootstrap(Tester):
                           " cannot bootstrap while cassandra.consistent.rangemovement is true"
 
         cluster = self.cluster
+        cluster.set_environment_variable('CASSANDRA_TOKEN_PREGENERATION_DISABLED', 'True')
         cluster.populate(1)
         cluster.start()
 
@@ -805,6 +819,7 @@ class TestBootstrap(Tester):
         Make sure we remove processed files during cleanup
         """
         cluster = self.cluster
+        cluster.set_environment_variable('CASSANDRA_TOKEN_PREGENERATION_DISABLED', 'True')
         cluster.set_configuration_options(values={'concurrent_compactors': 4})
         cluster.populate(1)
         cluster.start()
@@ -866,6 +881,7 @@ class TestBootstrap(Tester):
                   'roles_validity_in_ms': 0}
 
         cluster = self.cluster
+        cluster.set_environment_variable('CASSANDRA_TOKEN_PREGENERATION_DISABLED', 'True')
         cluster.populate(1)
 
         node1 = cluster.nodes['node1']

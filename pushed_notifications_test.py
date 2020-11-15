@@ -281,7 +281,7 @@ class TestPushedNotifications(Tester):
         self.cluster.add(node2, False)
         node2.start()
         logger.debug("Waiting for notifications from {}".format(waiter.address))
-        notifications = waiter.wait_for_notifications(timeout=60.0, num_notifications=2)
+        notifications = waiter.wait_for_notifications(timeout=120.0, num_notifications=2)
         assert 2 == len(notifications), notifications
         for notification in notifications:
             assert get_ip_from_node(node2) == notification["address"][0]
@@ -293,7 +293,7 @@ class TestPushedNotifications(Tester):
         node2.decommission()
         node2.stop(gently=False)
         logger.debug("Waiting for notifications from {}".format(waiter.address))
-        notifications = waiter.wait_for_notifications(timeout=60.0, num_notifications=2)
+        notifications = waiter.wait_for_notifications(timeout=120.0, num_notifications=2)
         assert 2 == len(notifications), notifications
         for notification in notifications:
             assert get_ip_from_node(node2) == notification["address"][0]
