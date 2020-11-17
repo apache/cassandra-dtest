@@ -423,7 +423,7 @@ class DTestSetup(object):
             self.cluster.set_configuration_options(
                 values={'initial_token': None, 'num_tokens': self.dtest_config.num_tokens})
         else:
-            self.cluster.set_configuration_options(values={'num_tokens': None})
+            self.cluster.set_configuration_options(values={'num_tokens': 1})
 
         if self.dtest_config.use_off_heap_memtables:
             self.cluster.set_configuration_options(values={'memtable_allocation_type': 'offheap_objects'})
