@@ -827,8 +827,8 @@ class TestBootstrap(Tester):
 
     def _monitor_datadir(self, node, event, basecount, jobs, failed):
         while True:
+            sstables = [s for s in node.get_sstables("keyspace1", "standard1") if "tmplink" not in s]
             if len(sstables) > basecount + jobs:
-                sstables = [s for s in node.get_sstables("keyspace1", "standard1") if "tmplink" not in s]
                 logger.error("---")
                 for sstable in sstables:
                     logger.error(sstable)
