@@ -955,6 +955,7 @@ class TestConsistency(Tester):
                    cl=ConsistencyLevel.ALL)
 
     @since('3.0')
+    @ported_to_in_jvm('4.0')
     def test_13911(self):
         """
         @jira_ticket CASSANDRA-13911
@@ -1004,6 +1005,7 @@ class TestConsistency(Tester):
                    cl=ConsistencyLevel.ALL)
 
     @since('3.11')
+    @ported_to_in_jvm('4.0')
     def test_13911_rows_srp(self):
         """
         @jira_ticket CASSANDRA-13911
@@ -1067,6 +1069,7 @@ class TestConsistency(Tester):
                    cl=ConsistencyLevel.ALL)
 
     @since('3.11')
+    @ported_to_in_jvm('4.0')
     def test_13911_partitions_srp(self):
         """
         @jira_ticket CASSANDRA-13911
@@ -1131,6 +1134,7 @@ class TestConsistency(Tester):
                    cl=ConsistencyLevel.ALL)
 
     @since('3.0')
+    @ported_to_in_jvm('4.0')
     def test_13880(self):
         """
         @jira_ticket CASSANDRA-13880
@@ -1166,6 +1170,7 @@ class TestConsistency(Tester):
         assert_none(session, "SELECT DISTINCT id FROM test.test WHERE id = 0;", cl=ConsistencyLevel.ALL)
 
     @since('3.0')
+    @ported_to_in_jvm('4.0')
     def test_13747(self):
         """
         @jira_ticket CASSANDRA-13747
@@ -1219,6 +1224,7 @@ class TestConsistency(Tester):
         assert_length_equal(result, 5)
 
     @since('3.0')
+    @ported_to_in_jvm('4.0')
     def test_13595(self):
         """
         @jira_ticket CASSANDRA-13595
@@ -1282,6 +1288,7 @@ class TestConsistency(Tester):
                    cl=ConsistencyLevel.ALL)
 
     @since('3.0')
+    @ported_to_in_jvm('4.0')
     def test_12872(self):
         """
         @jira_ticket CASSANDRA-12872
@@ -1348,6 +1355,7 @@ class TestConsistency(Tester):
                    [[0], [4]],
                    cl=ConsistencyLevel.ALL)
 
+    @ported_to_in_jvm('4.0')
     def test_short_read(self):
         """
         @jira_ticket CASSANDRA-9460
@@ -1417,6 +1425,7 @@ class TestConsistency(Tester):
 
         session.execute('TRUNCATE cf')
 
+    @ported_to_in_jvm('4.0')
     def test_short_read_delete(self):
         """ Test short reads ultimately leaving no columns alive [#4000] """
         cluster = self.cluster
@@ -1454,6 +1463,7 @@ class TestConsistency(Tester):
 
         assert_none(session, "SELECT c, v FROM cf WHERE key=\'k0\' LIMIT 1", cl=ConsistencyLevel.QUORUM)
 
+    @ported_to_in_jvm('4.0')
     def test_short_read_quorum_delete(self):
         """
         @jira_ticket CASSANDRA-8933
