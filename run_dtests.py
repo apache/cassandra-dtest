@@ -104,6 +104,13 @@ class RunDTests():
             logging.root.setLevel(logging.DEBUG)
             logger.setLevel(logging.DEBUG)
 
+            # cause logger to go to stdout
+            handler = logging.StreamHandler(sys.stdout)
+            handler.setLevel(logging.DEBUG)
+            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+            handler.setFormatter(formatter)
+            logging.root.addHandler(handler)
+
 
         # Get dictionaries corresponding to each point in the configuration matrix
         # we want to run, then generate a config object for each of them.

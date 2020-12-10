@@ -194,6 +194,7 @@ def build_upgrade_pairs():
 
     configured_strategy = CONFIG.getoption("--upgrade-version-selection").upper()
     version_select_strategy = VersionSelectionStrategies[configured_strategy].value[0]
+    filter_for_current_family = CONFIG.getoption("--upgrade-target-version-only")
 
     for origin_meta, destination_metas in list(manifest.items()):
         for destination_meta in destination_metas:
@@ -206,6 +207,12 @@ def build_upgrade_pairs():
 
             if not _have_common_proto(origin_meta, destination_meta):
                 logger.debug("skipping class creation, no compatible protocol version between {} and {}".format(origin_meta.name, destination_meta.name))
+                continue
+
+            # if either origin or destination match version, then do the test
+            # the assumption is that a change in 3.0 could break upgrades to trunk, so include those tests as well
+            if filter_for_current_family and not origin_meta.matches_current_env_version_family and not destination_meta.matches_current_env_version_family:
+                logger.debug("skipping class creation, origin version {} and destination version {} do not match target version {}, and --upgrade-target-version-only was set".format(origin_meta.name, destination_meta.name, VERSION_FAMILY))
                 continue
 
             path_name = 'Upgrade_' + origin_meta.name + '_To_' + destination_meta.name
