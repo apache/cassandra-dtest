@@ -29,9 +29,13 @@ def is_same_family_current_to_indev(origin, destination):
 
 class VersionSelectionStrategies(Enum):
     """
+    Allow all versions
+    """
+    ALL=(lambda origin, destination: True,)
+    """
     Test upgrading from indev -> indev, current -> current across versions, and current -> indev within a version
     """
-    BOTH=(lambda origin, destination: (origin.variant == destination.variant) or is_same_family_current_to_indev(origin,destination))
+    BOTH=(lambda origin, destination: (origin.variant == destination.variant) or is_same_family_current_to_indev(origin,destination),)
     """
     Exclusively test in development branches so your bug fixes show up
     """
@@ -151,7 +155,7 @@ MANIFEST = {
     indev_2_2_x: [indev_3_0_x, current_3_0_x, indev_3_11_x, current_3_11_x],
     current_2_2_x: [indev_2_2_x, indev_3_0_x, current_3_0_x, indev_3_11_x, current_3_11_x],
 
-    indev_3_0_x: [indev_3_11_x, current_3_11_x],
+    indev_3_0_x: [indev_3_11_x, current_3_11_x, indev_trunk],
     current_3_0_x: [indev_3_0_x, indev_3_11_x, current_3_11_x, indev_trunk],
 
     current_3_11_x: [indev_3_11_x, indev_trunk],
