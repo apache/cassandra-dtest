@@ -127,26 +127,26 @@ class TestGossipingPropertyFileSnitch(Tester):
         logger.debug(out)
 
         assert "/{}".format(NODE1_BROADCAST_ADDRESS) in out
-        assert "INTERNAL_IP:{}:{}".format('9' if running40 else '6', NODE1_LISTEN_ADDRESS) in out
+        assert "INTERNAL_IP:{}:{}".format('10' if running40 else '7', NODE1_LISTEN_ADDRESS) in out
         assert "/{}".format(NODE2_BROADCAST_ADDRESS) in out
         if running40:
-            assert "INTERNAL_ADDRESS_AND_PORT:7:{}".format(NODE1_40_LISTEN_ADDRESS) in out
-            assert "INTERNAL_ADDRESS_AND_PORT:7:{}".format(NODE2_40_LISTEN_ADDRESS) in out
+            assert "INTERNAL_ADDRESS_AND_PORT:8:{}".format(NODE1_40_LISTEN_ADDRESS) in out
+            assert "INTERNAL_ADDRESS_AND_PORT:8:{}".format(NODE2_40_LISTEN_ADDRESS) in out
         else:
-            assert "INTERNAL_IP:{}:{}".format('6', NODE2_LISTEN_ADDRESS) in out
+            assert "INTERNAL_IP:{}:{}".format('7', NODE2_LISTEN_ADDRESS) in out
 
         out, err, _ = node2.nodetool('gossipinfo')
         assert_stderr_clean(err)
         logger.debug(out)
 
         assert "/{}".format(NODE1_BROADCAST_ADDRESS) in out
-        assert "INTERNAL_IP:{}:{}".format('9' if running40 else '6', NODE2_LISTEN_ADDRESS) in out
+        assert "INTERNAL_IP:{}:{}".format('10' if running40 else '7', NODE2_LISTEN_ADDRESS) in out
         assert "/{}".format(NODE2_BROADCAST_ADDRESS) in out
         if running40:
-            assert "INTERNAL_ADDRESS_AND_PORT:7:{}".format(NODE1_40_LISTEN_ADDRESS) in out
-            assert "INTERNAL_ADDRESS_AND_PORT:7:{}".format(NODE2_40_LISTEN_ADDRESS) in out
+            assert "INTERNAL_ADDRESS_AND_PORT:8:{}".format(NODE1_40_LISTEN_ADDRESS) in out
+            assert "INTERNAL_ADDRESS_AND_PORT:8:{}".format(NODE2_40_LISTEN_ADDRESS) in out
         else:
-            assert "INTERNAL_IP:{}:{}".format('6', NODE1_LISTEN_ADDRESS) in out
+            assert "INTERNAL_IP:{}:{}".format('7', NODE1_LISTEN_ADDRESS) in out
 
 class TestDynamicEndpointSnitch(Tester):
     @pytest.mark.resource_intensive
