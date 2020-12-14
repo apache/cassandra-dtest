@@ -89,6 +89,8 @@ def pytest_addoption(parser):
                      help="Enable JaCoCo Code Coverage Support")
     parser.addoption("--upgrade-version-selection", action="store", default="indev",
                      help="Specify whether to run indev, releases, or both")
+    parser.addoption("--upgrade-target-version-only", action="store_true", default=False,
+                     help="When running upgrade tests, only run tests upgrading to the current version")
 
 
 def sufficient_system_resources_for_resource_intensive_tests():

@@ -29,9 +29,13 @@ def is_same_family_current_to_indev(origin, destination):
 
 class VersionSelectionStrategies(Enum):
     """
+    Allow all versions
+    """
+    ALL=(lambda origin, destination: True,)
+    """
     Test upgrading from indev -> indev, current -> current across versions, and current -> indev within a version
     """
-    BOTH=(lambda origin, destination: (origin.variant == destination.variant) or is_same_family_current_to_indev(origin,destination))
+    BOTH=(lambda origin, destination: (origin.variant == destination.variant) or is_same_family_current_to_indev(origin,destination),)
     """
     Exclusively test in development branches so your bug fixes show up
     """
@@ -129,7 +133,7 @@ indev_2_2_x = VersionMeta(name='indev_2_2_x', family='2.2', variant='indev', ver
 current_2_2_x = VersionMeta(name='current_2_2_x', family='2.2', variant='current', version='2.2.13', min_proto_v=1, max_proto_v=4, java_versions=(7, 8))
 
 indev_3_0_x = VersionMeta(name='indev_3_0_x', family='3.0', variant='indev', version='github:apache/cassandra-3.0', min_proto_v=3, max_proto_v=4, java_versions=(8,))
-current_3_0_x = VersionMeta(name='current_3_0_x', family='3.0', variant='current', version='3.0.17', min_proto_v=3, max_proto_v=4, java_versions=(8,))
+current_3_0_x = VersionMeta(name='current_3_0_x', family='3.0', variant='current', version='3.0.23', min_proto_v=3, max_proto_v=4, java_versions=(8,))
 
 indev_3_11_x = VersionMeta(name='indev_3_11_x', family='3.11', variant='indev', version='github:apache/cassandra-3.11', min_proto_v=3, max_proto_v=4, java_versions=(8,))
 current_3_11_x = VersionMeta(name='current_3_11_x', family='3.11', variant='current', version='github:apache/cassandra-3.11', min_proto_v=3, max_proto_v=4, java_versions=(8,))
@@ -151,7 +155,7 @@ MANIFEST = {
     indev_2_2_x: [indev_3_0_x, current_3_0_x, indev_3_11_x, current_3_11_x],
     current_2_2_x: [indev_2_2_x, indev_3_0_x, current_3_0_x, indev_3_11_x, current_3_11_x],
 
-    indev_3_0_x: [indev_3_11_x, current_3_11_x],
+    indev_3_0_x: [indev_3_11_x, current_3_11_x, indev_trunk],
     current_3_0_x: [indev_3_0_x, indev_3_11_x, current_3_11_x, indev_trunk],
 
     current_3_11_x: [indev_3_11_x, indev_trunk],
@@ -194,6 +198,7 @@ def build_upgrade_pairs():
 
     configured_strategy = CONFIG.getoption("--upgrade-version-selection").upper()
     version_select_strategy = VersionSelectionStrategies[configured_strategy].value[0]
+    filter_for_current_family = CONFIG.getoption("--upgrade-target-version-only")
 
     for origin_meta, destination_metas in list(manifest.items()):
         for destination_meta in destination_metas:
@@ -206,6 +211,12 @@ def build_upgrade_pairs():
 
             if not _have_common_proto(origin_meta, destination_meta):
                 logger.debug("skipping class creation, no compatible protocol version between {} and {}".format(origin_meta.name, destination_meta.name))
+                continue
+
+            # if either origin or destination match version, then do the test
+            # the assumption is that a change in 3.0 could break upgrades to trunk, so include those tests as well
+            if filter_for_current_family and not origin_meta.matches_current_env_version_family and not destination_meta.matches_current_env_version_family:
+                logger.debug("skipping class creation, origin version {} and destination version {} do not match target version {}, and --upgrade-target-version-only was set".format(origin_meta.name, destination_meta.name, VERSION_FAMILY))
                 continue
 
             path_name = 'Upgrade_' + origin_meta.name + '_To_' + destination_meta.name
