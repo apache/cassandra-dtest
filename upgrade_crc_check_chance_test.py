@@ -1,10 +1,11 @@
 import pytest
+import logging
 
 from dtest import Tester
 from tools.assertions import assert_crc_check_chance_equal, assert_one
 
 since = pytest.mark.since
-
+logger = logging.getLogger(__name__)
 
 @pytest.mark.upgrade_test
 @since('3.0')
