@@ -4109,6 +4109,7 @@ class TestCQL(UpgradeTester):
 
     def test_static_columns_with_2i(self):
         cursor = self.prepare()
+        initial_version = self.cluster.version()
 
         cursor.execute("""
             CREATE TABLE test (
@@ -4133,8 +4134,8 @@ class TestCQL(UpgradeTester):
             assert_all(cursor, "SELECT * FROM test WHERE v = 1", [[0, 0, 42, 1], [0, 1, 42, 1]])
             assert_all(cursor, "SELECT p, s FROM test WHERE v = 1", [[0, 42], [1, 42]])
             assert_all(cursor, "SELECT p FROM test WHERE v = 1", [[0], [1]])
-            # We don't support that
-            assert_invalid(cursor, "SELECT s FROM test WHERE v = 1")
+            if initial_version >= LooseVersion('3.11.7'):  # See CASSANDRA-16332. This fails with a known limitation on versions before 3.11.7 (CASSANDRA-14242)
+                assert_all(cursor, "SELECT s FROM test WHERE v = 1", [[42], [42]])
 
     @since('2.1')
     def test_static_columns_with_distinct(self):
