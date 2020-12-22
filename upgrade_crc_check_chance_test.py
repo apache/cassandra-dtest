@@ -137,7 +137,7 @@ class TestCrcCheckChanceUpgrade(Tester):
         logger.debug('Starting {node} on new version ({tag})'.format(**format_args))
         # Setup log4j / logback again (necessary moving from 2.0 -> 2.1):
         node.set_log_level("INFO")
-        node.start(wait_for_binary_proto=True)
+        node.start(wait_for_binary_proto=True, jvm_args=['-Dcassandra.disable_max_protocol_auto_override=true'])
 
         logger.debug('Running upgradesstables')
         node.nodetool('upgradesstables -a')
