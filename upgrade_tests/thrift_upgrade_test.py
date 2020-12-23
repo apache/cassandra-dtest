@@ -588,10 +588,7 @@ class TestThrift(UpgradeTester):
         _validate_dense_cql(cursor)
         _validate_dense_thrift(client)
 
-        version_string = self.upgrade_version_string()
-        is_version_4_or_greater = version_string == 'trunk' or version_string >= '4.0'
-        #4.0 doesn't support compact storage
-        if is_version_4_or_greater:
+        if self.upgrade_is_version_4_or_greater():  # 4.0 doesn't support compact storage
             cursor.execute("ALTER TABLE ks.dense_super_1 DROP COMPACT STORAGE;")
 
         for is_upgraded, cursor in self.do_upgrade(cursor, row_factory=dict_factory, use_thrift=True):
@@ -628,10 +625,7 @@ class TestThrift(UpgradeTester):
         _validate_dense_cql(cursor, cf='dense_super_2', key='renamed_key', column1='renamed_column1', column2='renamed_column2', value='renamed_value')
         _validate_dense_thrift(client, cf='dense_super_2')
 
-        version_string = self.upgrade_version_string()
-        is_version_4_or_greater = version_string == 'trunk' or version_string >= '4.0'
-        #4.0 doesn't support compact storage
-        if is_version_4_or_greater:
+        if self.upgrade_is_version_4_or_greater():  # 4.0 doesn't support compact storage
             cursor.execute("ALTER TABLE ks.dense_super_2 DROP COMPACT STORAGE;")
 
         for is_upgraded, cursor in self.do_upgrade(cursor, row_factory=dict_factory, use_thrift=True):
@@ -671,10 +665,7 @@ class TestThrift(UpgradeTester):
         _validate_sparse_thrift(client)
         _validate_sparse_cql(cursor, column1='renamed_column1', key='renamed_key')
 
-        version_string = self.upgrade_version_string()
-        is_version_4_or_greater = version_string == 'trunk' or version_string >= '4.0'
-        #4.0 doesn't support compact storage
-        if is_version_4_or_greater:
+        if self.upgrade_is_version_4_or_greater():  # 4.0 doesn't support compact storage
             cursor.execute("ALTER TABLE ks.sparse_super_1 DROP COMPACT STORAGE;")
 
         for is_upgraded, cursor in self.do_upgrade(cursor, row_factory=dict_factory, use_thrift=True):
@@ -711,10 +702,7 @@ class TestThrift(UpgradeTester):
         _validate_sparse_thrift(client, cf='sparse_super_2')
         _validate_sparse_cql(cursor, cf='sparse_super_2')
 
-        version_string = self.upgrade_version_string()
-        is_version_4_or_greater = version_string == 'trunk' or version_string >= '4.0'
-        #4.0 doesn't support compact storage
-        if is_version_4_or_greater:
+        if self.upgrade_is_version_4_or_greater():  # 4.0 doesn't support compact storage
             cursor.execute("ALTER TABLE ks.sparse_super_2 DROP COMPACT STORAGE;")
 
         for is_upgraded, cursor in self.do_upgrade(cursor, row_factory=dict_factory, use_thrift=True):

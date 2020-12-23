@@ -251,18 +251,15 @@ class UpgradeTester(Tester, metaclass=ABCMeta):
         )
         assert self.UPGRADE_PATH is not None, no_upgrade_path_error
 
-    def upgrade_version_string(self):
+    def upgrade_version_family(self):
         """
         Returns a hopefully useful version string that can be compared
         to tune test behavior. For trunk this returns trunk, for an earlier
         version like github:apache/cassandra-3.11 it returns a version number
         as a string
-        :return:
         """
-        version_string = self.UPGRADE_PATH.upgrade_version
-        if version_string.startswith('github'):
-            version_string = version_string.partition('/')[2]
-        if "-" in version_string:
-            version_string = version_string.partition('-')[2]
-        return version_string
+        return self.UPGRADE_PATH.upgrade_meta.family
 
+    def upgrade_is_version_4_or_greater(self):
+        upgrade_version = self.upgrade_version_family()
+        return upgrade_version == 'trunk' or upgrade_version >= '4.0'

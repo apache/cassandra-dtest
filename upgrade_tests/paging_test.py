@@ -471,9 +471,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
                 ) WITH COMPACT STORAGE;
             """)
 
-        version_string = self.upgrade_version_string()
-        #4.0 doesn't support compact storage
-        if version_string == 'trunk' or version_string >= MAJOR_VERSION_4:
+        if testing_compact_storage and self.upgrade_is_version_4_or_greater():  # 4.0 doesn't support compact storage
             cursor.execute("ALTER TABLE test2 DROP COMPACT STORAGE;")
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
@@ -527,9 +525,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
                 ) WITH COMPACT STORAGE;
             """)
 
-        version_string = self.upgrade_version_string()
-        #4.0 doesn't support compact storage
-        if version_string == 'trunk' or version_string >= MAJOR_VERSION_4:
+        if testing_compact_storage and self.upgrade_is_version_4_or_greater():  # 4.0 doesn't support compact storage
             cursor.execute("ALTER TABLE test2 DROP COMPACT STORAGE;")
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
