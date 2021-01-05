@@ -460,7 +460,8 @@ class TestUpgrade(Tester):
             logger.debug('Starting %s on new version (%s)' % (node.name, version_meta.version))
             # Setup log4j / logback again (necessary moving from 2.0 -> 2.1):
             node.set_log_level("INFO")
-            node.start(wait_other_notice=400, wait_for_binary_proto=True)
+            node.start(wait_other_notice=400, wait_for_binary_proto=True,
+                       jvm_args=['-Dcassandra.disable_max_protocol_auto_override=true'])  # prevent protocol capping in mixed version clusters
             node.nodetool('upgradesstables -a')
 
     def _log_current_ver(self, current_version_meta):
