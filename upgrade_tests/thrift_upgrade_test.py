@@ -446,12 +446,12 @@ class TestUpgradeTo40(Tester):
         return self._connect(self.cluster.nodelist()[0])
 
     def test_keys_index_3_0_created(self):
-        self.test_keys_index_3_x_created('github:apache/cassandra-3.0')
+        self._test_keys_index_3_x_created('github:apache/cassandra-3.0')
 
     def test_keys_index_3_11_created(self):
-        self.test_keys_index_3_x_created('github:apache/cassandra-3.11')
+        self._test_keys_index_3_x_created('github:apache/cassandra-3.11')
 
-    def test_keys_index_3_x_created(self, from_version):
+    def _test_keys_index_3_x_created(self, from_version):
         cql, thrift = self.prepare(start_version=from_version,
                                    num_nodes=3,
                                    rf=3)
