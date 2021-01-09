@@ -270,6 +270,7 @@ class TestCqlshCopy(Tester):
 
         date1 = Datetime(2005, 7, 14, 12, 30, 0, 0, UTC(), time_format=self.default_time_format)
         date2 = Datetime(2005, 7, 14, 13, 30, 0, 0, UTC(), time_format=self.default_time_format)
+        date3 = Datetime(2005, 7, 14, 14, 30, 0, 0, UTC(), time_format=self.default_time_format)
 
         addr1 = Address(Name('name1', 'last1'), 1, 'street 1', ImmutableSet(['1111 2222', '3333 4444']))
         addr2 = Address(Name('name2', 'last2'), 2, 'street 2', ImmutableSet(['5555 6666', '7777 8888']))
@@ -292,8 +293,8 @@ class TestCqlshCopy(Tester):
                      'asdf',  # n varchar
                      2 ** 65,  # o varint
                      [1, 2, 3],  # p list<int>,
-                     ImmutableSet(['3', '2', '1']),  # q set<text>,
-                     ImmutableDict([(date1, '1'), (date2, '2')]),  # r map<timestamp, text>,
+                     ImmutableSet(['3', '2', '1', '']),  # q set<text>,
+                     ImmutableDict([(date1, '1'), (date2, '2'), (date3, '')]),  # r map<timestamp, text>,
                      (1, '1', True),  # s tuple<int, text, boolean>,
                      addr1,  # t frozen<address_type>,
                      [[addr1, addr2], [addr3, addr4]],  # u frozen<list<list<address_type>>>,
@@ -304,7 +305,7 @@ class TestCqlshCopy(Tester):
                      # and this will cause comparison problems when comparing with csv strings therefore failing
                      # some tests
                      ImmutableSet([ImmutableSet(['127.0.0.1']), ImmutableSet(['127.0.0.1', '127.0.0.2'])]),
-                     {'key1': ['value1', 'value2']},  # map<text, frozen<list<text>>>
+                     {'key1': ['value1', 'value2', '']},  # map<text, frozen<list<text>>>
                      {3: bytes.fromhex('74776f')},  # y
                      [bytes.fromhex('74776f')],  # z
                      {bytes.fromhex('74776f')}  # za
