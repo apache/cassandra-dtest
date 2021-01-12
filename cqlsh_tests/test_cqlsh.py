@@ -99,12 +99,12 @@ class TestCqlsh(Tester, CqlshMixin):
     @pytest.fixture
     def fixture_dtest_setup_overrides(self, dtest_config):
         dtest_setup_overrides = DTestSetupOverrides()
+
         if dtest_config.cassandra_version_from_build >= '3.0':
             dtest_setup_overrides.cluster_options = ImmutableMapping({'enable_user_defined_functions': 'true',
                                                                       'enable_scripted_user_defined_functions': 'true'})
         else:
             dtest_setup_overrides.cluster_options = ImmutableMapping({'enable_user_defined_functions': 'true'})
-
         return dtest_setup_overrides
 
     @classmethod
@@ -151,8 +151,8 @@ class TestCqlsh(Tester, CqlshMixin):
         p = subprocess.Popen(cmds, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         stdout, stderr = p.communicate()
 
-        assert 0 == len(stdout), str(stdout)
-        assert 0 == len(stderr), str(stderr)
+        assert 0 == len(stdout), stdout.decode("utf-8")
+        assert 0 == len(stderr), stderr.decode("utf-8")
 
     def test_simple_insert(self):
 
@@ -555,7 +555,13 @@ UPDATE varcharmaptable SET varcharvarintmap['Vitrum edere possum, mihi non nocet
 
         cmds = "ä;"
 
-        _, err, _ = util.run_cqlsh_safe(node=node1, cmds=cmds)
+        if self.cluster.version() >= LooseVersion('3.0'):
+            _, err, _ = util.run_cqlsh_safe(node=node1, cmds=cmds)
+        else:
+            # Versions prior to 3.0 print the error message to stderr, but do not throw.
+            # See CASSANDRA-15985 for more details
+             err = node1.run_cqlsh(cmds=cmds).stderr
+
         assert 'Invalid syntax' in err
         assert 'ä' in err
 
@@ -572,7 +578,13 @@ UPDATE varcharmaptable SET varcharvarintmap['Vitrum edere possum, mihi non nocet
 
         cmd = '''create keyspace "ä" WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'};'''
 
-        _, err, _ = util.run_cqlsh_safe(node=node1, cmds=cmd, cqlsh_options=["--debug"])
+        options = ["--debug"]
+        if self.cluster.version() >= LooseVersion('3.0'):
+            _, err, _ = util.run_cqlsh_safe(node=node1, cmds=cmd, cqlsh_options=options)
+        else:
+            # Versions prior to 3.0 print the error message to stderr, but do not throw.
+            # See CASSANDRA-15985 for more details
+            err = node1.run_cqlsh(cmds=cmd, cqlsh_options=options).stderr
 
         if self.cluster.version() >= LooseVersion('4.0'):
             assert "Keyspace name must not be empty, more than 48 characters long, or contain non-alphanumeric-underscore characters (got 'ä')" in err
@@ -896,7 +908,6 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         assert "'min_threshold': '10'" in stdout
         assert "'max_threshold': '100'" in stdout
 
-    @since('3.0')
     def test_describe_functions(self, fixture_dtest_setup_overrides):
         """Test DESCRIBE statements for functions and aggregate functions"""
         self.cluster.populate(1)
@@ -941,15 +952,24 @@ CREATE OR REPLACE AGGREGATE test.average(int)
     INITCOND (0, 0)
 """
 
-        # create keyspace, scalar function, and aggregate function
+        # create keyspace, scalar function
         self.execute(cql=create_ks_statement)
         self.execute(cql=create_function_statement)
-        self.execute(cql=create_aggregate_dependencies_statement)
-        self.execute(cql=create_aggregate_statement)
+
         # describe scalar functions
-        self.execute(cql='DESCRIBE FUNCTION test.some_function', expected_output='{};'.format(create_function_statement))
-        # describe aggregate functions
-        self.execute(cql='DESCRIBE AGGREGATE test.average', expected_output=self.get_describe_aggregate_output())
+        if self.cluster.version() >= LooseVersion('3.0'):
+            expected_output = create_function_statement + ';'
+        else:
+            expected_output = create_function_statement
+        self.execute(cql='DESCRIBE FUNCTION test.some_function', expected_output=expected_output)
+
+        if self.cluster.version() >= LooseVersion('3.0'):
+            # create aggregate function
+            self.execute(cql=create_aggregate_dependencies_statement)
+            self.execute(cql=create_aggregate_statement)
+
+            # describe aggregate functions
+            self.execute(cql='DESCRIBE AGGREGATE test.average', expected_output=self.get_describe_aggregate_output())
 
     def get_describe_aggregate_output(self):
         if self.cluster.version() >= LooseVersion("4.0"):
@@ -1003,7 +1023,7 @@ CREATE TYPE test.name_type (
 )"""
         create_address_type_statement = """
 CREATE TYPE test.address_type (
-    name frozen<name_type>, 
+    name frozen<name_type>,
     number int,
     street text,
     phones set<text>
@@ -1025,8 +1045,15 @@ CREATE TYPE test.address_type (
                 )"""
 
         # DESCRIBE user defined types
-        self.execute(cql='DESCRIBE TYPE test.name_type', expected_output='{};'.format(create_name_type_statement))
-        self.execute(cql='DESCRIBE TYPE test.address_type', expected_output='{};'.format(create_address_type_statement))
+        if self.cluster.version() >= LooseVersion('3.0'):
+            expected_create_name_type_statement = create_name_type_statement + ';'
+            expected_create_address_type_statement = create_address_type_statement + ';'
+        else:
+            expected_create_name_type_statement = create_name_type_statement
+            expected_create_address_type_statement = create_address_type_statement
+
+        self.execute(cql='DESCRIBE TYPE test.name_type', expected_output=expected_create_name_type_statement)
+        self.execute(cql='DESCRIBE TYPE test.address_type', expected_output=expected_create_address_type_statement)
 
     def test_describe_on_non_reserved_keywords(self):
         """
@@ -2502,11 +2529,16 @@ class TestCqlLogin(Tester, CqlshMixin):
         create_cf(self.session, 'ks1table')
         self.session.execute("CREATE USER user1 WITH PASSWORD 'changeme';")
 
-        cqlsh_stdout, cqlsh_stderr, _ = util.run_cqlsh_safe(self.node1,
-            '''
-            LOGIN user1 'badpass';
-            ''',
-                                                            cqlsh_options=['-u', 'cassandra', '-p', 'cassandra'])
+        cqlsh_options = ['-u', 'cassandra', '-p', 'cassandra']
+        cmd = "LOGIN user1 'badpass';"
+        if self.cluster.version() >= LooseVersion('3.0'):
+            _, cqlsh_stderr, _ = util.run_cqlsh_safe(self.node1,
+                                                     cmds=cmd,
+                                                     cqlsh_options=cqlsh_options)
+        else:
+            # Versions prior to 3.0 print the error message to stderr, but do not throw.
+            # See CASSANDRA-15985 for more details
+            cqlsh_stderr = self.node1.run_cqlsh(cmds=cmd, cqlsh_options=cqlsh_options).stderr
 
         self.assert_login_not_allowed('user1', cqlsh_stderr)
 
@@ -2514,6 +2546,7 @@ class TestCqlLogin(Tester, CqlshMixin):
         create_ks(self.session, 'ks1', 1)
         create_cf(self.session, 'ks1table')
         self.session.execute("CREATE USER user1 WITH PASSWORD 'changeme';")
+        cqlsh_options = ['-u', 'cassandra', '-p', 'cassandra']
 
         if self.cluster.version() >= LooseVersion('2.2'):
             query = '''
@@ -2528,9 +2561,14 @@ class TestCqlLogin(Tester, CqlshMixin):
                     '''
             expected_error = 'Only superusers are allowed to perform CREATE USER queries'
 
-        cqlsh_stdout, cqlsh_stderr, _ = util.run_cqlsh_safe(self.node1,
-                                                            query,
-                                                            cqlsh_options=['-u', 'cassandra', '-p', 'cassandra'])
+        if self.cluster.version() >= LooseVersion('3.0'):
+            cqlsh_stdout, cqlsh_stderr, _ = util.run_cqlsh_safe(self.node1,
+                                                                query,
+                                                                cqlsh_options=cqlsh_options)
+        else:
+            # Versions prior to 3.0 print the error message to stderr, but do not throw.
+            # See CASSANDRA-15985 for more details
+            cqlsh_stderr = self.node1.run_cqlsh(cmds=query, cqlsh_options=cqlsh_options).stderr
 
         err_lines = str(cqlsh_stderr).splitlines()
         for err_line in err_lines:
@@ -2546,13 +2584,22 @@ class TestCqlLogin(Tester, CqlshMixin):
         create_cf(self.session, 'ks1table')
         self.session.execute("CREATE USER user1 WITH PASSWORD 'changeme';")
 
-        cqlsh_stdout, cqlsh_stderr, _ = util.run_cqlsh_safe(self.node1,
-            '''
+        cmds =  '''
             LOGIN user1 'badpass';
             USE ks1;
             DESCRIBE TABLES;
-            ''',
-                                                            cqlsh_options=['-u', 'cassandra', '-p', 'cassandra'])
+            '''
+        cqlsh_options=['-u', 'cassandra', '-p', 'cassandra']
+        if self.cluster.version() >= LooseVersion('3.0'):
+            cqlsh_stdout, cqlsh_stderr, _ = util.run_cqlsh_safe(self.node1,
+                                                                cmds=cmds,
+                                                                cqlsh_options=cqlsh_options)
+        else:
+            # Versions prior to 3.0 print the error message to stderr, but do not throw.
+            # See CASSANDRA-15985 for more details
+             ret = self.node1.run_cqlsh(cmds=cmds, cqlsh_options=cqlsh_options)
+             cqlsh_stdout, cqlsh_stderr  = ret.stdout, ret.stderr
+
         assert [x for x in cqlsh_stdout.split() if x] == ['ks1table']
         self.assert_login_not_allowed('user1', cqlsh_stderr)
 
