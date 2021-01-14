@@ -14,9 +14,11 @@ from tools.data import (create_c1c2_table, insert_c1c2, insert_columns, putget,
 from tools.misc import ImmutableMapping, retry_till_success
 
 since = pytest.mark.since
+ported_to_in_jvm = pytest.mark.ported_to_in_jvm
 logger = logging.getLogger(__name__)
 
 
+@ported_to_in_jvm('4.0')
 class TestPutGet(Tester):
 
     @pytest.fixture(scope='function', autouse=True)
