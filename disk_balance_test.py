@@ -97,7 +97,7 @@ class TestDiskBalance(Tester):
                      binary_interface=(node5_address, 9042))
         self.cluster.add(node5, False)
         node5.start(jvm_args=["-Dcassandra.replace_address_first_boot={}".format(node2.address())],
-                    wait_for_binary_proto=True,
+                    wait_for_binary_proto=180,
                     wait_other_notice=True)
 
         logger.debug("Checking replacement node is balanced")

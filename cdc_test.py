@@ -547,7 +547,7 @@ class TestCDC(Tester):
         logger.debug('adding node')
         self.cluster.add(loading_node, is_seed=True)
         logger.debug('starting new node')
-        loading_node.start(wait_for_binary_proto=True)
+        loading_node.start(wait_for_binary_proto=120)
         logger.debug('recreating ks and table')
         loading_session = self.patient_exclusive_cql_connection(loading_node)
         create_ks(loading_session, ks_name, rf=1)
@@ -615,7 +615,7 @@ class TestCDC(Tester):
             os.path.join(generation_node.get_path(), 'cdc_raw'),
             os.path.join(loading_node.get_path(), 'commitlogs')
         )
-        loading_node.start(wait_for_binary_proto=True)
+        loading_node.start(wait_for_binary_proto=120)
         logger.debug('node successfully started; waiting on log replay')
         loading_node.grep_log('Log replay complete')
         logger.debug('log replay complete')
