@@ -415,8 +415,8 @@ class TestBootstrap(Tester):
         node3.start(jvm_args=["-Dcassandra.reset_bootstrap_progress=true"])
         # check if we reset bootstrap state
         node3.watch_log_for("Resetting bootstrap progress to start fresh", from_mark=mark)
-        # wait for node3 ready to query
-        node3.wait_for_binary_interface(from_mark=mark)
+        # wait for node3 ready to query, 180s as the node needs to bootstrap
+        node3.wait_for_binary_interface(from_mark=mark, timeout=180)
 
         # check if 2nd bootstrap succeeded
         assert_bootstrap_state(self, node3, 'COMPLETED')

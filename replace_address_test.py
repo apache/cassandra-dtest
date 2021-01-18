@@ -484,13 +484,13 @@ class TestReplaceAddress(BaseReplaceAddressTest):
         if mode == 'reset_resume_state':
             mark = self.replacement_node.mark_log()
             logger.debug("Restarting replacement node with -Dcassandra.reset_bootstrap_progress=true")
-            # restart replacement node with resetting bootstrap state
+            # restart replacement node with resetting bootstrap state (with 180s timeout)
             self.replacement_node.stop()
             self.replacement_node.start(jvm_args=[
                                         "-Dcassandra.replace_address_first_boot={}".format(self.replaced_node.address()),
                                         "-Dcassandra.reset_bootstrap_progress=true"
                                         ],
-                                        wait_for_binary_proto=True)
+                                        wait_for_binary_proto=180)
             # check if we reset bootstrap state
             self.replacement_node.watch_log_for("Resetting bootstrap progress to start fresh", from_mark=mark)
         elif mode == 'resume':
