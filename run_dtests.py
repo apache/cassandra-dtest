@@ -1,20 +1,21 @@
 #!/usr/bin/env python
 """
-usage: run_dtests.py [-h] [--use-vnodes] [--use-off-heap-memtables] [--num-tokens NUM_TOKENS] [--data-dir-count-per-instance DATA_DIR_COUNT_PER_INSTANCE] [--force-resource-intensive-tests]
-                     [--skip-resource-intensive-tests] [--cassandra-dir CASSANDRA_DIR] [--cassandra-version CASSANDRA_VERSION] [--delete-logs] [--execute-upgrade-tests] [--execute-upgrade-tests-only] [--disable-active-log-watching]
-                     [--keep-test-dir] [--enable-jacoco-code-coverage] [--dtest-enable-debug-logging] [--dtest-print-tests-only] [--dtest-print-tests-output DTEST_PRINT_TESTS_OUTPUT]
-                     [--pytest-options PYTEST_OPTIONS] [--dtest-tests DTEST_TESTS]
+usage: run_dtests.py [-h] [--use-vnodes] [--use-off-heap-memtables] [--num-tokens=NUM_TOKENS] [--data-dir-count-per-instance=DATA_DIR_COUNT_PER_INSTANCE]
+                     [--force-resource-intensive-tests] [--skip-resource-intensive-tests] [--cassandra-dir=CASSANDRA_DIR] [--cassandra-version=CASSANDRA_VERSION]
+                     [--delete-logs] [--execute-upgrade-tests] [--execute-upgrade-tests-only] [--disable-active-log-watching] [--keep-test-dir]
+                     [--enable-jacoco-code-coverage] [--dtest-enable-debug-logging] [--dtest-print-tests-only] [--dtest-print-tests-output=DTEST_PRINT_TESTS_OUTPUT]
+                     [--pytest-options=PYTEST_OPTIONS] [--dtest-tests=DTEST_TESTS]
 
 optional arguments:
   -h, --help                                                 show this help message and exit
   --use-vnodes                                               Determines wither or not to setup clusters using vnodes for tests (default: False)
   --use-off-heap-memtables                                   Enable Off Heap Memtables when creating test clusters for tests (default: False)
-  --num-tokens NUM_TOKENS                                    Number of tokens to set num_tokens yaml setting to when creating instances with vnodes enabled (default: 256)
-  --data-dir-count-per-instance DATA_DIR_COUNT_PER_INSTANCE  Control the number of data directories to create per instance (default: 3)
+  --num-tokens=NUM_TOKENS                                    Number of tokens to set num_tokens yaml setting to when creating instances with vnodes enabled (default: 256)
+  --data-dir-count-per-instance=DATA_DIR_COUNT_PER_INSTANCE  Control the number of data directories to create per instance (default: 3)
   --force-resource-intensive-tests                           Forces the execution of tests marked as resource_intensive (default: False)
   --skip-resource-intensive-tests                            Skip all tests marked as resource_intensive (default: False)
-  --cassandra-dir CASSANDRA_DIR
-  --cassandra-version CASSANDRA_VERSION
+  --cassandra-dir=CASSANDRA_DIR
+  --cassandra-version=CASSANDRA_VERSION
   --delete-logs
   --execute-upgrade-tests                                    Execute Cassandra Upgrade Tests (e.g. tests annotated with the upgrade_test mark) (default: False)
   --execute-upgrade-tests-only                               Execute Cassandra Upgrade Tests without running any other tests (e.g. tests annotated with the upgrade_test mark) (default: False)
@@ -24,9 +25,9 @@ optional arguments:
   --enable-jacoco-code-coverage                              Enable JaCoCo Code Coverage Support (default: False)
   --dtest-enable-debug-logging                               Enable debug logging (for this script, pytest, and during execution of test functions) (default: False)
   --dtest-print-tests-only                                   Print list of all tests found eligible for execution given the provided options. (default: False)
-  --dtest-print-tests-output DTEST_PRINT_TESTS_OUTPUT        Path to file where the output of --dtest-print-tests-only should be written to (default: False)
-  --pytest-options PYTEST_OPTIONS                            Additional command line arguments to proxy directly thru when invoking pytest. (default: None)
-  --dtest-tests DTEST_TESTS                                  Comma separated list of test files, test classes, or test methods to execute. (default: None)
+  --dtest-print-tests-output=DTEST_PRINT_TESTS_OUTPUT        Path to file where the output of --dtest-print-tests-only should be written to (default: False)
+  --pytest-options=PYTEST_OPTIONS                            Additional command line arguments to proxy directly thru when invoking pytest. (default: None)
+  --dtest-tests=DTEST_TESTS                                  Comma separated list of test files, test classes, or test methods to execute. (default: None)
 """
 import subprocess
 import sys
@@ -36,13 +37,11 @@ import logging
 
 from os import getcwd
 from tempfile import NamedTemporaryFile
-from bs4 import BeautifulSoup
 
 from _pytest.config.argparsing import Parser
 import argparse
 
 from conftest import pytest_addoption
-from ccmlib.common import get_version_from_build
 
 logger = logging.getLogger(__name__)
 
@@ -87,19 +86,6 @@ class RunDTests():
 
         args = parser.parse_args()
 
-        if not args.dtest_print_tests_only:
-            if args.cassandra_dir is None and args.cassandra_version is None:
-                raise Exception("Required dtest arguments were missing! You must provide either --cassandra-dir "
-                                "or --cassandra-version. Refer to the documentation or invoke the help with --help.")
-
-            # Either cassandra_version or cassandra_dir is defined, so figure out the version
-            CASSANDRA_VERSION = args.cassandra_version or get_version_from_build(args.cassandra_dir)
-
-            if args.use_off_heap_memtables and ("3.0" <= CASSANDRA_VERSION < "3.4"):
-                raise Exception("The selected Cassandra version %s doesn't support the provided option "
-                                "--use-off-heap-memtables, see https://issues.apache.org/jira/browse/CASSANDRA-9472 "
-                                "for details" % CASSANDRA_VERSION)
-
         if args.dtest_enable_debug_logging:
             logging.root.setLevel(logging.DEBUG)
             logger.setLevel(logging.DEBUG)
@@ -110,7 +96,6 @@ class RunDTests():
             formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
             handler.setFormatter(formatter)
             logging.root.addHandler(handler)
-
 
         # Get dictionaries corresponding to each point in the configuration matrix
         # we want to run, then generate a config object for each of them.
@@ -125,10 +110,13 @@ class RunDTests():
 
         if args.dtest_print_tests_only:
             args_to_invoke_pytest.append("'--collect-only'")
+            args_to_invoke_pytest.append("'-q'")
 
         if args.dtest_tests:
             for test in args.dtest_tests.split(","):
                 args_to_invoke_pytest.append("'{test_name}'".format(test_name=test))
+
+        args_to_invoke_pytest.append("'--ignore=meta_tests'")
 
         original_raw_cmd_args = ", ".join(args_to_invoke_pytest)
 
@@ -139,14 +127,12 @@ class RunDTests():
         # but for now just leaving it as is, because it does the job (although
         # certainly is still pretty complicated code and has a hacky feeling)
         to_execute = (
-                "import pytest\n" +
-                (
-                "pytest.main([{options}])\n").format(options=original_raw_cmd_args)
-        )
+            "import pytest\n"
+            "import sys\n"
+            "sys.exit(pytest.main([{options}]))\n".format(options=original_raw_cmd_args))
         temp = NamedTemporaryFile(dir=getcwd())
         logger.debug('Writing the following to {}:'.format(temp.name))
 
-        logger.debug('```\n{to_execute}```\n'.format(to_execute=to_execute))
         temp.write(to_execute.encode("utf-8"))
         temp.flush()
 
@@ -163,20 +149,19 @@ class RunDTests():
         if args.dtest_print_tests_only:
             stdout, stderr = sp.communicate()
 
-            if stderr:
+            if sp.returncode != 0:
                 print(stderr.decode("utf-8"))
                 result = sp.returncode
                 exit(result)
 
             all_collected_test_modules = collect_test_modules(stdout)
             joined_test_modules = "\n".join(all_collected_test_modules)
-            #print("Collected %d Test Modules" % len(all_collected_test_modules))
+            print("Collected %d Test Modules" % len(all_collected_test_modules))
             if args.dtest_print_tests_output is not None:
                 collected_tests_output_file = open(args.dtest_print_tests_output, "w")
                 collected_tests_output_file.write(joined_test_modules)
                 collected_tests_output_file.close()
 
-            print(joined_test_modules)
         else:
             while True:
                 stdout_output = sp.stdout.readline()
@@ -197,96 +182,14 @@ class RunDTests():
 
 
 def collect_test_modules(stdout):
-    """
-    Takes the xml-ish (no, it's not actually xml so we need to format it a bit) --collect-only output as printed
-    by pytest to stdout and normalizes it to get a list of all collected tests in a human friendly format
-    :param stdout: the stdout from pytest (should have been invoked with the --collect-only cmdline argument)
-    :return: a formatted list of collected test modules in format test_file.py::TestClass::test_function
-    """
-    # unfortunately, pytest emits xml like output -- but it's not actually xml, so we'll fail to parse
-    # if we try. first step is to fix up the pytest output to create well formatted xml
-    xml_line_regex_pattern = re.compile(r"^([\s])*<(Module|Class|Function|Instance) '(.*)'>")
-    is_first_module = True
-    is_first_class = True
-    has_closed_class = False
-    section_has_instance = False
-    section_has_class = False
-    test_collect_xml_lines = []
-
-    test_collect_xml_lines.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>")
-    test_collect_xml_lines.append("<Modules>")
-    for line in stdout.decode("utf-8").split('\n'):
-        re_ret = re.search(xml_line_regex_pattern, line)
-        if re_ret:
-            if not is_first_module and re_ret.group(2) == "Module":
-                if section_has_instance:
-                    test_collect_xml_lines.append("      </Instance>")
-                if section_has_class:
-                    test_collect_xml_lines.append("    </Class>")
-
-                test_collect_xml_lines.append("  </Module>")
-                is_first_class = True
-                has_closed_class = False
-                section_has_instance = False
-                section_has_class = False
-                is_first_module = False
-            elif is_first_module and re_ret.group(2) == "Module":
-                if not has_closed_class and section_has_instance:
-                    test_collect_xml_lines.append("      </Instance>")
-                if not has_closed_class and section_has_class:
-                    test_collect_xml_lines.append("    </Class>")
-
-                is_first_class = True
-                is_first_module = False
-                has_closed_class = False
-                section_has_instance = False
-                section_has_class = False
-            elif re_ret.group(2) == "Instance":
-                section_has_instance = True
-            elif not is_first_class and re_ret.group(2) == "Class":
-                if section_has_instance:
-                    test_collect_xml_lines.append("      </Instance>")
-                if section_has_class:
-                    test_collect_xml_lines.append("    </Class>")
-                has_closed_class = True
-                section_has_class = True
-            elif re_ret.group(2) == "Class":
-                is_first_class = False
-                section_has_class = True
-                has_closed_class = False
-
-            if re_ret.group(2) == "Function":
-                test_collect_xml_lines.append("          <Function name=\"{name}\"></Function>"
-                                              .format(name=re_ret.group(3)))
-            elif re_ret.group(2) == "Class":
-                test_collect_xml_lines.append("    <Class name=\"{name}\">".format(name=re_ret.group(3)))
-            elif re_ret.group(2) == "Module":
-                test_collect_xml_lines.append("  <Module name=\"{name}\">".format(name=re_ret.group(3)))
-            elif re_ret.group(2) == "Instance":
-                test_collect_xml_lines.append("      <Instance name=\"\">".format(name=re_ret.group(3)))
-            else:
-                test_collect_xml_lines.append(line)
-
-    test_collect_xml_lines.append("      </Instance>")
-    test_collect_xml_lines.append("    </Class>")
-    test_collect_xml_lines.append("  </Module>")
-    test_collect_xml_lines.append("</Modules>")
-
+    test_regex_pattern = re.compile(r".+::.+::.+")
     all_collected_test_modules = []
-
-    # parse the now valid xml
-    print("\n".join(test_collect_xml_lines))
-    test_collect_xml = BeautifulSoup("\n".join(test_collect_xml_lines), "lxml-xml")
-
-    # find all Modules (followed by classes in those modules, and then finally functions)
-    for pytest_module in test_collect_xml.findAll("Module"):
-        for test_class_name in pytest_module.findAll("Class"):
-            for function_name in test_class_name.findAll("Function"):
-                # adds to test list in format like test_file.py::TestClass::test_function for every test function found
-                all_collected_test_modules.append("{module_name}::{class_name}::{function_name}"
-                                                  .format(module_name=pytest_module.attrs['name'],
-                                                          class_name=test_class_name.attrs['name'],
-                                                          function_name=function_name.attrs['name']))
+    for line in stdout.decode("utf-8").split('\n'):
+        re_ret = re.search(test_regex_pattern, line)
+        if re_ret:
+            all_collected_test_modules.append(line)
+        elif line.strip() != "":
+            print(line)
 
     return all_collected_test_modules
 
