@@ -106,7 +106,7 @@ class TestReadFailures(Tester):
         self._insert_tombstones(session, 600)
         self._perform_cql_statement(session, "SELECT value FROM tombstonefailure")
 
-    @since('3.10')
+    @since('4.0')
     def test_tombstone_failure_v5(self):
         """
         A failed read due to tombstones at v5 should result in a ReadFailure with

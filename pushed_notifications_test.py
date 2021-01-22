@@ -385,7 +385,7 @@ class TestVariousNotifications(Tester):
         read_request_timeout_in_ms.
         @jira_ticket CASSANDRA-7886
         """
-        have_v5_protocol = self.cluster.version() >= LooseVersion('3.10')
+        have_v5_protocol = self.supports_v5_protocol(self.cluster.version())
 
         self.fixture_dtest_setup.allow_log_errors = True
         self.cluster.set_configuration_options(
