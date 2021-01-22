@@ -26,6 +26,7 @@ from dtest_setup_overrides import DTestSetupOverrides
 
 logger = logging.getLogger(__name__)
 
+
 def check_required_loopback_interfaces_available():
     """
     We need at least 3 loopback interfaces configured to run almost all dtests. On Linux, loopback
@@ -37,8 +38,9 @@ def check_required_loopback_interfaces_available():
     if platform.system() == "Darwin":
         if len(ni.ifaddresses('lo0')[AF_INET]) < 9:
             pytest.exit("At least 9 loopback interfaces are required to run dtests. "
-                            "On Mac you can create the required loopback interfaces by running "
-                            "'for i in {1..9}; do sudo ifconfig lo0 alias 127.0.0.$i up; done;'")
+                        "On Mac you can create the required loopback interfaces by running "
+                        "'for i in {1..9}; do sudo ifconfig lo0 alias 127.0.0.$i up; done;'")
+
 
 def pytest_addoption(parser):
     parser.addoption("--use-vnodes", action="store_true", default=False,
@@ -91,14 +93,25 @@ def pytest_addoption(parser):
                      help="Specify whether to run indev, releases, or both")
     parser.addoption("--upgrade-target-version-only", action="store_true", default=False,
                      help="When running upgrade tests, only run tests upgrading to the current version")
+    parser.addoption("--metatests", action="store_true", default=False,
+                     help="Run only meta tests")
+
+
+def pytest_configure(config):
+    """Fail fast if arguments are invalid"""
+    if not config.getoption("--help"):
+        dtest_config = DTestConfig()
+        dtest_config.setup(config)
+        if dtest_config.metatests and config.args[0] == str(os.getcwd()):
+            config.args = ['./meta_tests']
 
 
 def sufficient_system_resources_for_resource_intensive_tests():
     mem = virtual_memory()
-    total_mem_gb = mem.total/1024/1024/1024
+    total_mem_gb = mem.total / 1024 / 1024 / 1024
     logger.info("total available system memory is %dGB" % total_mem_gb)
     # todo kjkj: do not hard code our bound.. for now just do 9 instances at 3gb a piece
-    return total_mem_gb >= 9*3
+    return total_mem_gb >= 9 * 3
 
 
 @pytest.fixture(scope='function', autouse=True)
@@ -110,6 +123,7 @@ def fixture_dtest_setup_overrides(dtest_config):
     """
     return DTestSetupOverrides()
 
+
 @pytest.fixture(scope='function')
 def fixture_dtest_cluster_name():
     """
@@ -117,17 +131,19 @@ def fixture_dtest_cluster_name():
     """
     return "test"
 
-"""
-Not exactly sure why :\ but, this fixture needs to be scoped to function level and not
-session or class. If you invoke pytest with tests across multiple test classes, when scopped
-at session, the root logger appears to get reset between each test class invocation.
-this means that the first test to run not from the first test class (and all subsequent
-tests), will have the root logger reset and see a level of NOTSET. Scoping it at the
-class level seems to work, and I guess it's not that much extra overhead to setup the
-logger once per test class vs. once per session in the grand scheme of things.
-"""
+
 @pytest.fixture(scope="function", autouse=True)
 def fixture_logging_setup(request):
+    """
+    Not exactly sure why :/ but, this fixture needs to be scoped to function level and not
+    session or class. If you invoke pytest with tests across multiple test classes, when scopped
+    at session, the root logger appears to get reset between each test class invocation.
+    this means that the first test to run not from the first test class (and all subsequent
+    tests), will have the root logger reset and see a level of NOTSET. Scoping it at the
+    class level seems to work, and I guess it's not that much extra overhead to setup the
+    logger once per test class vs. once per session in the grand scheme of things.
+    """
+
     # set the root logger level to whatever the user asked for
     # all new loggers created will use the root logger as a template
     # essentially making this the "default" active log level
@@ -283,6 +299,7 @@ def reset_environment_vars(initial_environment):
     os.environ.update(initial_environment)
     os.environ['PYTEST_CURRENT_TEST'] = pytest_current_test
 
+
 @pytest.fixture(scope='function')
 def fixture_dtest_create_cluster_func():
     """
@@ -291,12 +308,14 @@ def fixture_dtest_create_cluster_func():
     """
     return DTestSetup.create_ccm_cluster
 
+
 @pytest.hookimpl(hookwrapper=True, tryfirst=True)
 def pytest_runtest_makereport(item, call):
     outcome = yield
     rep = outcome.get_result()
     setattr(item, "rep_" + rep.when, rep)
     return rep
+
 
 @pytest.fixture(scope='function', autouse=False)
 def fixture_dtest_setup(request,
@@ -340,7 +359,7 @@ def fixture_dtest_setup(request,
             if len(errors) > 0:
                 failed = True
                 pytest.fail(msg='Unexpected error found in node logs (see stdout for full details). Errors: [{errors}]'
-                                     .format(errors=str.join(", ", errors)), pytrace=False)
+                            .format(errors=str.join(", ", errors)), pytrace=False)
     finally:
         try:
             # save the logs for inspection
@@ -352,7 +371,7 @@ def fixture_dtest_setup(request,
             dtest_setup.cleanup_cluster(request)
 
 
-#Based on https://bugs.python.org/file25808/14894.patch
+# Based on https://bugs.python.org/file25808/14894.patch
 def loose_version_compare(a, b):
     for i, j in zip_longest(a.version, b.version, fillvalue=''):
         if type(i) != type(j):
@@ -365,7 +384,7 @@ def loose_version_compare(a, b):
         else:  # i > j
             return 1
 
-    #Longer version strings with equal prefixes are equal, but if one version string is longer than it is greater
+    # Longer version strings with equal prefixes are equal, but if one version string is longer than it is greater
     aLen = len(a.version)
     bLen = len(b.version)
     if aLen == bLen:
@@ -440,6 +459,7 @@ def fixture_since(request, fixture_dtest_setup):
             if skip_msg:
                 pytest.skip(skip_msg)
 
+
 def _skip_ported_msg(current_running_version, ported_from_version):
     if loose_version_compare(current_running_version, ported_from_version) >= 0:
         return "ported to in-JVM from %s >= %s" % (ported_from_version, current_running_version)
@@ -485,6 +505,7 @@ def fixture_ported_to_in_jvm(request, fixture_dtest_setup):
             skip_msg = _skip_ported_msg(current_running_version, ported_from_version)
             if skip_msg:
                 pytest.skip(skip_msg)
+
 
 def _skip_ported_msg(current_running_version, ported_from_version):
     if loose_version_compare(current_running_version, ported_from_version) >= 0:
@@ -545,7 +566,7 @@ def install_debugging_signal_handler():
 @pytest.fixture(scope='session')
 def dtest_config(request):
     dtest_config = DTestConfig()
-    dtest_config.setup(request)
+    dtest_config.setup(request.config)
 
     # if we're on mac, check that we have the required loopback interfaces before doing anything!
     check_required_loopback_interfaces_available()
@@ -565,91 +586,88 @@ def cassandra_dir_and_version(config):
     return cassandra_dir, cassandra_version
 
 
+def has_mark(item, mark):
+    if item.get_closest_marker(mark) is not None:
+        return True
+    else:
+        for item_module in inspect.getmembers(item.module, inspect.isclass):
+            if hasattr(item_module[1], "pytestmark"):
+                mark_names = [m.name for m in item_module[1].pytestmark]
+                if mark in mark_names:
+                    return True
+
+        return False
+
+
+def _is_skippable(item, mark, include_marked, include_other):
+    if has_mark(item, mark):
+        if include_marked:
+            return False
+        else:
+            logger.info("SKIP: Skipping %s because it is marked with %s" % (item, mark))
+            return True
+    else:
+        if include_other:
+            return False
+        else:
+            logger.info("SKIP: Skipping %s because it is not marked with %s" % (item, mark))
+            return True
+
+
+def is_skippable(item,
+                 include_upgrade_tests,
+                 include_non_upgrade_tests,
+                 include_resource_intensive_tests,
+                 include_non_resource_intensive_tests,
+                 include_vnodes_tests,
+                 include_no_vnodes_tests,
+                 include_no_offheap_memtables_tests):
+
+    skippable = False
+
+    skippable = skippable or _is_skippable(item, "upgrade_test", include_upgrade_tests, include_non_upgrade_tests)
+    skippable = skippable or _is_skippable(item, "resource_intensive", include_resource_intensive_tests, include_non_resource_intensive_tests)
+    skippable = skippable or _is_skippable(item, "vnodes", include_vnodes_tests, True)
+    skippable = skippable or _is_skippable(item, "no_vnodes", include_no_vnodes_tests, True)
+    skippable = skippable or _is_skippable(item, "no_offheap_memtables", include_no_offheap_memtables_tests, True)
+    skippable = skippable or _is_skippable(item, "depends_driver", False, True)
+
+    return skippable
+
+
 def pytest_collection_modifyitems(items, config):
     """
     This function is called upon during the pytest test collection phase and allows for modification
     of the test items within the list
     """
-    collect_only = config.getoption("--collect-only")
-    cassandra_dir, cassandra_version = cassandra_dir_and_version(config)
-    if not collect_only and cassandra_dir is None:
-        if  cassandra_version is None:
-            raise Exception("Required dtest arguments were missing! You must provide either --cassandra-dir "
-                            "or --cassandra-version. You can also set 'cassandra_dir' in pytest.ini. "
-                            "Refer to the documentation or invoke the help with --help.")
-
-    # Either cassandra_version or cassandra_dir is defined, so figure out the version
-    CASSANDRA_VERSION = cassandra_version or get_version_from_build(cassandra_dir)
-
-    # Check that use_off_heap_memtables is supported in this c* version
-    if config.getoption("--use-off-heap-memtables") and ("3.0" <= CASSANDRA_VERSION < "3.4"):
-        raise Exception("The selected Cassandra version %s doesn't support the provided option "
-                        "--use-off-heap-memtables, see https://issues.apache.org/jira/browse/CASSANDRA-9472 "
-                        "for details" % CASSANDRA_VERSION)
-
+    dtest_config = DTestConfig()
+    dtest_config.setup(config)
 
     selected_items = []
     deselected_items = []
 
-    sufficient_system_resources_resource_intensive = sufficient_system_resources_for_resource_intensive_tests()
-    logger.debug("has sufficient resources? %s" % sufficient_system_resources_resource_intensive)
+    can_run_resource_intensive_tests = dtest_config.force_execution_of_resource_intensive_tests or sufficient_system_resources_for_resource_intensive_tests()
+    if not can_run_resource_intensive_tests:
+        logger.info("Resource intensive tests will be skipped because there is not enough system resource "
+                    "and --force-resource-intensive-tests was not specified")
+
+    include_upgrade_tests = dtest_config.execute_upgrade_tests or dtest_config.execute_upgrade_tests_only
+    include_non_upgrade_tests = not dtest_config.execute_upgrade_tests_only
+    include_resource_intensive_tests = can_run_resource_intensive_tests and not dtest_config.skip_resource_intensive_tests
+    include_non_resource_intensive_tests = not dtest_config.only_resource_intensive_tests
+    include_vnodes_tests = dtest_config.use_vnodes
+    include_no_vnodes_tests = not dtest_config.use_vnodes
+    include_no_offheap_memtables_tests = not dtest_config.use_off_heap_memtables
 
     for item in items:
-        deselect_test = False
-
-        if config.getoption("--execute-upgrade-tests-only"):
-            deselect_test = not item.get_closest_marker("upgrade_test")
-            if deselect_test:
-                logger.info("SKIP: Deselecting non-upgrade test %s because of --execute-upgrade-tests-only" % item.name)
-
-        if item.get_closest_marker("resource_intensive") and not collect_only:
-            force_resource_intensive = config.getoption("--force-resource-intensive-tests")
-            skip_resource_intensive = config.getoption("--skip-resource-intensive-tests")
-            if not force_resource_intensive:
-                if skip_resource_intensive:
-                    deselect_test = True
-                    logger.info("SKIP: Deselecting test %s as test marked resource_intensive. To force execution of "
-                          "this test re-run with the --force-resource-intensive-tests command line argument" % item.name)
-                if not sufficient_system_resources_resource_intensive:
-                    deselect_test = True
-                    logger.info("SKIP: Deselecting resource_intensive test %s due to insufficient system resources" % item.name)
-
-        if not item.get_closest_marker("resource_intensive") and not collect_only:
-            only_resource_intensive = config.getoption("--only-resource-intensive-tests")
-            if only_resource_intensive:
-                deselect_test = True
-                logger.info("SKIP: Deselecting non resource_intensive test %s as --only-resource-intensive-tests specified" % item.name)
-
-        if item.get_closest_marker("no_vnodes"):
-            if config.getoption("--use-vnodes"):
-                deselect_test = True
-                logger.info("SKIP: Deselecting test %s as the test requires vnodes to be disabled. To run this test, "
-                      "re-run without the --use-vnodes command line argument" % item.name)
-
-        if item.get_closest_marker("vnodes"):
-            if not config.getoption("--use-vnodes"):
-                deselect_test = True
-                logger.info("SKIP: Deselecting test %s as the test requires vnodes to be enabled. To run this test, "
-                            "re-run with the --use-vnodes command line argument" % item.name)
-
-        for test_item_class in inspect.getmembers(item.module, inspect.isclass):
-            if not hasattr(test_item_class[1], "pytestmark"):
-                continue
-
-            for module_pytest_mark in test_item_class[1].pytestmark:
-                if module_pytest_mark.name == "upgrade_test":
-                    deselect_test = not _upgrade_testing_enabled(config)
-
-        if item.get_closest_marker("upgrade_test"):
-            deselect_test = not _upgrade_testing_enabled(config)
-
-        if item.get_closest_marker("no_offheap_memtables"):
-            if config.getoption("use_off_heap_memtables"):
-                deselect_test = True
-
-        # deselect cqlsh tests that depend on fixing a driver behavior
-        if item.get_closest_marker("depends_driver"):
-            deselect_test = True
+        deselect_test = is_skippable(item,
+                                     include_upgrade_tests,
+                                     include_non_upgrade_tests,
+                                     include_resource_intensive_tests,
+                                     include_non_resource_intensive_tests,
+                                     include_vnodes_tests,
+                                     include_no_vnodes_tests,
+                                     include_no_offheap_memtables_tests)
 
         if deselect_test:
             deselected_items.append(item)
@@ -658,7 +676,3 @@ def pytest_collection_modifyitems(items, config):
 
     config.hook.pytest_deselected(items=deselected_items)
     items[:] = selected_items
-
-
-def _upgrade_testing_enabled(config):
-    return config.getoption("--execute-upgrade-tests") or config.getoption("--execute-upgrade-tests-only")
