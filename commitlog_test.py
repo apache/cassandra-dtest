@@ -11,7 +11,7 @@ import logging
 from cassandra import WriteTimeout
 from cassandra.cluster import NoHostAvailable, OperationTimedOut
 from ccmlib.common import is_win
-from ccmlib.node import Node, TimeoutError
+from ccmlib.node import Node, TimeoutError, NodeError
 from parse import parse
 
 from dtest import Tester, create_ks
@@ -43,16 +43,14 @@ class TestCommitLog(Tester):
         # so this changes them back so we can delete them.
         self._change_commitlog_perms(stat.S_IWRITE | stat.S_IREAD | stat.S_IEXEC)
 
-
     def prepare(self, configuration=None, create_test_keyspace=True, **kwargs):
         if configuration is None:
             configuration = {}
         default_conf = {'commitlog_sync_period_in_ms': 1000}
 
         set_conf = dict(default_conf, **configuration)
-        logger.debug('setting commitlog configuration with the following values: '
-              '{set_conf} and the following kwargs: {kwargs}'.format(
-                  set_conf=set_conf, kwargs=kwargs))
+        logger.debug('setting commitlog configuration with the following values: {set_conf}'
+                     ' and the following kwargs: {kwargs}'.format(set_conf=set_conf, kwargs=kwargs))
         self.cluster.set_configuration_options(values=set_conf, **kwargs)
         self.cluster.start()
         self.session1 = self.patient_cql_connection(self.node1)
@@ -76,10 +74,10 @@ class TestCommitLog(Tester):
 
             if commitlogs:
                 logger.debug('changing permissions to {perms} on the following files:'
-                      '\n  {files}'.format(perms=oct(mod), files='\n  '.join(commitlogs)))
+                             '\n  {files}'.format(perms=oct(mod), files='\n  '.join(commitlogs)))
             else:
                 logger.debug(self._change_commitlog_perms.__name__ + ' called on empty commitlog directory '
-                      '{path} with permissions {perms}'.format(path=path, perms=oct(mod)))
+                                                                     '{path} with permissions {perms}'.format(path=path, perms=oct(mod)))
 
             for commitlog in commitlogs:
                 os.chmod(commitlog, mod)
@@ -503,7 +501,7 @@ class TestCommitLog(Tester):
         mark = node.mark_log()
         node.start()
         node.watch_log_for(expected_error, from_mark=mark)
-        with pytest.raises(TimeoutError):
+        with pytest.raises((TimeoutError, NodeError)):
             node.wait_for_binary_interface(from_mark=mark, timeout=20)
         assert not node.is_running()
 
@@ -620,10 +618,10 @@ class TestCommitLog(Tester):
                 # "Changed in version 2.6: The return value is in the range [-2**31, 2**31-1] regardless
                 # of platform. In the past the value would be signed on some platforms and unsigned on
                 # others. Use & 0xffffffff on the value if you want it to match Python 3 behavior."
-                assert (crc & 0xffffffff)  == get_header_crc(header_bytes)
+                assert (crc & 0xffffffff) == get_header_crc(header_bytes)
 
         mark = node.mark_log()
         node.start()
         node.watch_log_for(expected_error, from_mark=mark)
-        with pytest.raises(TimeoutError):
+        with pytest.raises((TimeoutError, NodeError)):
             node.wait_for_binary_interface(from_mark=mark, timeout=20)
