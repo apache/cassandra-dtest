@@ -455,7 +455,7 @@ class TestTransientReplicationRing(Tester):
         jvm_args = ["-Dcassandra.replace_address=%s" % replacement_address,
                     "-Dcassandra.ring_delay_ms=10000",
                     "-Dcassandra.broadcast_interval_ms=10000"]
-        self.node2.start(jvm_args=jvm_args, wait_for_binary_proto=True)
+        self.node2.start(jvm_args=jvm_args, wait_for_binary_proto=True, wait_other_notice=180)
 
         sessions = [self.exclusive_cql_connection(node) for node in [self.node1, self.node2, self.node3]]
 
