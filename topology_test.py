@@ -127,6 +127,21 @@ class TestTopology(Tester):
         assert_none(session, "SELECT range_start, range_end FROM system.size_estimates "
                              "WHERE keyspace_name = 'ks2'")
 
+    def test_simple_removenode(self):
+        """ test removenode """
+        cluster = self.cluster
+        cluster.populate(3)
+        cluster.start(jvm_args=["-Dcassandra.size_recorder_interval=1"])
+        node1, node2, node3 = cluster.nodelist()
+
+        node1.stress(['write', 'n=10K', 'no-warmup', '-rate', 'threads=8', '-schema', 'replication(factor=2)'])
+
+        node3_id = node3.nodetool('info').stdout[25:61]
+        node3.stop(wait_other_notice=True)
+        node1.nodetool('removenode ' + node3_id)
+
+        node1.stress(['read', 'n=10K', 'no-warmup', '-rate', 'threads=8'])
+
     def test_simple_decommission(self):
         """
         @jira_ticket CASSANDRA-9912
