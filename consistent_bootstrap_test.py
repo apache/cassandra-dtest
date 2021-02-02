@@ -87,7 +87,7 @@ class TestBootstrapConsistency(Tester):
         node1.start()
 
         logger.debug("Bootstraping node3")
-        node3 = new_node(cluster)
+        node3 = new_node(cluster, data_center="dc1")
         node3.start(wait_for_binary_proto=True)
 
         n3session = self.patient_cql_connection(node3)

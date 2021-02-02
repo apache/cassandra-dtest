@@ -545,7 +545,7 @@ class TestCDC(Tester):
             binary_interface=('127.0.0.2', 9042)
         )
         logger.debug('adding node')
-        self.cluster.add(loading_node, is_seed=True)
+        self.cluster.add(loading_node, is_seed=True, data_center="dc1")
         logger.debug('starting new node')
         loading_node.start(wait_for_binary_proto=120)
         logger.debug('recreating ks and table')

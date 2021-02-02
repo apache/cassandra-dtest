@@ -52,7 +52,7 @@ class TestAuth(Tester):
                                     '7300', '2002', None,
                                     binary_interface=('127.0.0.3', 9042))
 
-        self.cluster.add(node3, False)
+        self.cluster.add(node3, False, data_center="dc1")
         node3.start(join_ring=False, wait_other_notice=False, wait_for_binary_proto=True)
 
         self.patient_exclusive_cql_connection(node=node3, user='cassandra', password='cassandra')
@@ -89,7 +89,7 @@ class TestAuth(Tester):
                                     '7200', '2001', None,
                                     binary_interface=('127.0.0.2', 9042))
                                     
-        self.cluster.add(node2, False)
+        self.cluster.add(node2, False, data_center="dc1")
         node2.start(join_ring=False, wait_other_notice=False, wait_for_binary_proto=True)
 
         self.patient_exclusive_cql_connection(node=node2, user='cassandra', password='cassandra')
@@ -132,7 +132,7 @@ class TestAuth(Tester):
                                     '7200', '2001', None,
                                     binary_interface=('127.0.0.2', 9042))
 
-        self.cluster.add(node2, False)
+        self.cluster.add(node2, False, data_center="dc1")
         node2.start(join_ring=False, wait_other_notice=False, wait_for_binary_proto=True)
 
         cathy = self.get_session(node_idx=1, user='cathy', password='12345')

@@ -278,7 +278,7 @@ class TestPushedNotifications(Tester):
 
         logger.debug("Adding second node...")
         node2 = Node('node2', self.cluster, True, None, ('127.0.0.2', 7000), '7200', '0', None, binary_interface=('127.0.0.2', 9042))
-        self.cluster.add(node2, False)
+        self.cluster.add(node2, False, data_center="dc1")
         node2.start()
         logger.debug("Waiting for notifications from {}".format(waiter.address))
         notifications = waiter.wait_for_notifications(timeout=120.0, num_notifications=2)
