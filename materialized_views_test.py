@@ -649,7 +649,7 @@ class TestMaterializedViews(Tester):
                          "WHERE v IS NOT NULL AND id IS NOT NULL PRIMARY KEY (v, id)"))
 
         logger.debug("Starting new node4 in write survey mode")
-        node4 = new_node(self.cluster)
+        node4 = new_node(self.cluster, data_center="dc1")
         # Set batchlog.replay_timeout_seconds=1 so we can ensure batchlog will be replayed below
         node4.start(wait_for_binary_proto=True, jvm_args=["-Dcassandra.write_survey=true",
                                                           "-Dcassandra.batchlog.replay_timeout_in_ms=1"])

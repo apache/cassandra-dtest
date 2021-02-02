@@ -78,6 +78,8 @@ class BaseReplaceAddressTest(Tester):
                     extra_jvm_args=None):
         if replace_address is None:
             replace_address = self.replaced_node.address()
+        if data_center is None:
+            data_center = "dc1"
 
         # only create node if it's not yet created
         if self.replacement_node is None:

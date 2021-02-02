@@ -95,7 +95,7 @@ class TestDiskBalance(Tester):
                      thrift_interface=None, storage_interface=(node5_address, 7000),
                      jmx_port='7500', remote_debug_port='0', initial_token=None,
                      binary_interface=(node5_address, 9042))
-        self.cluster.add(node5, False)
+        self.cluster.add(node5, False, data_center="dc1")
         node5.start(jvm_args=["-Dcassandra.replace_address_first_boot={}".format(node2.address())],
                     wait_for_binary_proto=180,
                     wait_other_notice=True)
@@ -249,7 +249,7 @@ class TestDiskBalance(Tester):
         # Fixed initial token to bisect the ring and make sure the nodes are balanced (otherwise a random token is generated).
         balanced_tokens = cluster.balanced_tokens(2)
         assert self.dtest_config.use_vnodes or balanced_tokens[0] == node1.initial_token  # make sure cluster population still works as assumed
-        node2 = new_node(cluster, token=balanced_tokens[1], bootstrap=True)
+        node2 = new_node(cluster, token=balanced_tokens[1], bootstrap=True, data_center="dc1")
         node2.set_configuration_options(values={'num_tokens': 1})
         node2.start(wait_for_binary_proto=True, jvm_args=["-Dcassandra.migration_task_wait_in_seconds=10"], set_migration_task=False)
         node2.flush()
