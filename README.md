@@ -94,10 +94,6 @@ test fails, the logs for the node are saved in a `logs/<timestamp>` directory
 for analysis (it's not perfect but has been good enough so far, I'm open to
 better suggestions).
 
-To run the upgrade tests, you have must both JDK7 and JDK8 installed. Paths
-to these installations should be defined in the environment variables
-JAVA7_HOME and JAVA8_HOME, respectively.
-
 Writing Tests
 -------------
 
