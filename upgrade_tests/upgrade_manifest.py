@@ -19,6 +19,12 @@ UpgradePath = namedtuple('UpgradePath', ('name', 'starting_version', 'upgrade_ve
 VERSION_FAMILY = None
 CONFIG = None
 
+CASSANDRA_2_0 = '2.0'
+CASSANDRA_2_1 = '2.1'
+CASSANDRA_2_2 = '2.2'
+CASSANDRA_3_0 = '3.0'
+CASSANDRA_3_11 = '3.11'
+CASSANDRA_4_0 = '4.0'
 
 def is_same_family_current_to_indev(origin, destination):
     """
@@ -77,20 +83,20 @@ def set_version_family():
         current_version = get_version_from_build(cassandra_dir)
 
     if current_version.vstring.startswith('2.0'):
-        version_family = '2.0.x'
+        version_family = CASSANDRA_2_0
     elif current_version.vstring.startswith('2.1'):
-        version_family = '2.1.x'
+        version_family = CASSANDRA_2_1
     elif current_version.vstring.startswith('2.2'):
-        version_family = '2.2.x'
+        version_family = CASSANDRA_2_2
     elif current_version.vstring.startswith('3.0'):
-        version_family = '3.0.x'
-    elif '3.1' <= current_version < '4.0':
-        version_family = '3.x'
-    elif '4.0' <= current_version < '4.1':
-        version_family = 'trunk'
+        version_family = CASSANDRA_3_0
+    elif current_version.vstring.startswith('3.11'):
+        version_family = CASSANDRA_3_11
+    elif current_version.vstring.startswith('4.0'):
+        version_family = CASSANDRA_4_0
     else:
         # when this occurs, it's time to update this manifest a bit!
-        raise RuntimeError("4.1+ not yet supported on upgrade tests!")
+        raise RuntimeError("Testing upgrades from/to version %s is not supported. Please use a custom manifest (see upgrade_manifest.py)" % current_version.vstring)
 
     global VERSION_FAMILY
     VERSION_FAMILY = version_family
@@ -126,19 +132,19 @@ class VersionMeta(namedtuple('_VersionMeta', ('name', 'family', 'variant', 'vers
         return self._replace(version="clone:{}".format(cassandra_dir))
 
 
-indev_2_1_x = VersionMeta(name='indev_2_1_x', family='2.1', variant='indev', version='github:apache/cassandra-2.1', min_proto_v=1, max_proto_v=3, java_versions=(7, 8))
-current_2_1_x = VersionMeta(name='current_2_1_x', family='2.1', variant='current', version='2.1.20', min_proto_v=1, max_proto_v=3, java_versions=(7, 8))
+indev_2_1_x = VersionMeta(name='indev_2_1_x', family=CASSANDRA_2_1, variant='indev', version='github:apache/cassandra-2.1', min_proto_v=1, max_proto_v=3, java_versions=(7, 8))
+current_2_1_x = VersionMeta(name='current_2_1_x', family=CASSANDRA_2_1, variant='current', version='2.1.20', min_proto_v=1, max_proto_v=3, java_versions=(7, 8))
 
-indev_2_2_x = VersionMeta(name='indev_2_2_x', family='2.2', variant='indev', version='github:apache/cassandra-2.2', min_proto_v=1, max_proto_v=4, java_versions=(7, 8))
-current_2_2_x = VersionMeta(name='current_2_2_x', family='2.2', variant='current', version='2.2.13', min_proto_v=1, max_proto_v=4, java_versions=(7, 8))
+indev_2_2_x = VersionMeta(name='indev_2_2_x', family=CASSANDRA_2_2, variant='indev', version='github:apache/cassandra-2.2', min_proto_v=1, max_proto_v=4, java_versions=(7, 8))
+current_2_2_x = VersionMeta(name='current_2_2_x', family=CASSANDRA_2_2, variant='current', version='2.2.13', min_proto_v=1, max_proto_v=4, java_versions=(7, 8))
 
-indev_3_0_x = VersionMeta(name='indev_3_0_x', family='3.0', variant='indev', version='github:apache/cassandra-3.0', min_proto_v=3, max_proto_v=4, java_versions=(8,))
-current_3_0_x = VersionMeta(name='current_3_0_x', family='3.0', variant='current', version='3.0.23', min_proto_v=3, max_proto_v=4, java_versions=(8,))
+indev_3_0_x = VersionMeta(name='indev_3_0_x', family=CASSANDRA_3_0, variant='indev', version='github:apache/cassandra-3.0', min_proto_v=3, max_proto_v=4, java_versions=(8,))
+current_3_0_x = VersionMeta(name='current_3_0_x', family=CASSANDRA_3_0, variant='current', version='3.0.23', min_proto_v=3, max_proto_v=4, java_versions=(8,))
 
-indev_3_11_x = VersionMeta(name='indev_3_11_x', family='3.11', variant='indev', version='github:apache/cassandra-3.11', min_proto_v=3, max_proto_v=4, java_versions=(8,))
-current_3_11_x = VersionMeta(name='current_3_11_x', family='3.11', variant='current', version='3.11.9', min_proto_v=3, max_proto_v=4, java_versions=(8,))
+indev_3_11_x = VersionMeta(name='indev_3_11_x', family=CASSANDRA_3_11, variant='indev', version='github:apache/cassandra-3.11', min_proto_v=3, max_proto_v=4, java_versions=(8,))
+current_3_11_x = VersionMeta(name='current_3_11_x', family=CASSANDRA_3_11, variant='current', version='3.11.9', min_proto_v=3, max_proto_v=4, java_versions=(8,))
 
-indev_trunk = VersionMeta(name='indev_trunk', family='trunk', variant='indev', version='github:apache/trunk', min_proto_v=4, max_proto_v=5, java_versions=(8,))
+indev_trunk = VersionMeta(name='indev_trunk', family=CASSANDRA_4_0, variant='indev', version='github:apache/trunk', min_proto_v=4, max_proto_v=5, java_versions=(8,))
 
 
 # MANIFEST maps a VersionMeta representing a line/variant to a list of other VersionMeta's representing supported upgrades
@@ -169,10 +175,10 @@ MANIFEST = {
 # 4) Run the tests!
 #      To run all, use 'nosetests -v upgrade_tests/'. To run specific tests, use 'nosetests -vs --collect-only' to preview the test names, then run nosetests using the desired test name.
 #      Note that nosetests outputs test names in a format that needs to be tweaked a bit before they will run from the command line.
-custom_1 = VersionMeta(name='custom_branch_1', family='2.1.x', variant='indev', version='local:some_branch', min_proto_v=3, max_proto_v=4, java_versions=(7, 8))
-custom_2 = VersionMeta(name='custom_branch_2', family='2.2.x', variant='indev', version='git:trunk', min_proto_v=3, max_proto_v=4, java_versions=(7, 8))
-custom_3 = VersionMeta(name='custom_branch_3', family='3.0.x', variant='indev', version='git:cassandra-3.5', min_proto_v=3, max_proto_v=4, java_versions=(7, 8))
-custom_4 = VersionMeta(name='custom_branch_4', family='3.x', variant='indev', version='git:cassandra-3.6', min_proto_v=3, max_proto_v=4, java_versions=(7, 8))
+custom_1 = VersionMeta(name='custom_branch_1', family=CASSANDRA_2_1, variant='indev', version='local:some_branch', min_proto_v=3, max_proto_v=4, java_versions=(7, 8))
+custom_2 = VersionMeta(name='custom_branch_2', family=CASSANDRA_2_2, variant='indev', version='git:trunk', min_proto_v=3, max_proto_v=4, java_versions=(7, 8))
+custom_3 = VersionMeta(name='custom_branch_3', family=CASSANDRA_3_0, variant='indev', version='git:cassandra-3.5', min_proto_v=3, max_proto_v=4, java_versions=(7, 8))
+custom_4 = VersionMeta(name='custom_branch_4', family=CASSANDRA_3_11, variant='indev', version='git:cassandra-3.6', min_proto_v=3, max_proto_v=4, java_versions=(7, 8))
 OVERRIDE_MANIFEST = {
     # EXAMPLE:
     # custom_1: [custom_2, custom_3],  # creates a test of custom_1 -> custom_2, and another test from custom_1 -> custom_3

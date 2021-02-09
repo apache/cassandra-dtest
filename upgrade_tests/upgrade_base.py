@@ -8,6 +8,8 @@ from abc import ABCMeta
 
 from ccmlib.common import get_version_from_build, is_win
 
+from .upgrade_manifest import CASSANDRA_4_0
+
 from dtest import Tester, create_ks
 
 logger = logging.getLogger(__name__)
@@ -262,4 +264,4 @@ class UpgradeTester(Tester, metaclass=ABCMeta):
 
     def upgrade_is_version_4_or_greater(self):
         upgrade_version = self.upgrade_version_family()
-        return upgrade_version == 'trunk' or upgrade_version >= '4.0'
+        return upgrade_version == upgrade_version >= CASSANDRA_4_0
