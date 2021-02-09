@@ -29,7 +29,7 @@ from tools.assertions import (assert_all, assert_invalid, assert_length_equal,
 from tools.data import rows_to_list
 from tools.misc import add_skip
 from .upgrade_base import UpgradeTester
-from .upgrade_manifest import build_upgrade_pairs
+from .upgrade_manifest import build_upgrade_pairs, CASSANDRA_4_0
 
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 class TestCQL(UpgradeTester):
 
     def is_40_or_greater(self):
-        return self.UPGRADE_PATH.upgrade_meta.family in ('trunk', '4.0')
+        return LooseVersion(self.UPGRADE_PATH.upgrade_meta.family) >= CASSANDRA_4_0
 
     def test_static_cf(self):
         """ Test static CF syntax """

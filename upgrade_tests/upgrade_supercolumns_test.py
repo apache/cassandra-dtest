@@ -1,3 +1,5 @@
+from distutils.version import LooseVersion
+
 import os
 import pytest
 import logging
@@ -17,6 +19,8 @@ from thrift_bindings.thrift010.Cassandra import (CfDef, Column, ColumnDef,
                                            Mutation, NotFoundException,
                                            SlicePredicate, SliceRange,
                                            SuperColumn)
+from upgrade_tests.upgrade_manifest import indev_2_1_x, indev_2_2_x, indev_3_0_x, indev_3_11_x, indev_trunk, \
+    CASSANDRA_4_0
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +54,7 @@ class TestSCUpgrade(Tester):
             # don't alter ignore_log_patterns on the class, just the obj for this test
             fixture_dtest_setup.ignore_log_patterns += [_known_teardown_race_error]
 
-    def prepare(self, num_nodes=1, cassandra_version="git:cassandra-2.1"):
+    def prepare(self, num_nodes=1, cassandra_version=indev_2_1_x.version):
         cluster = self.cluster
 
         # Forcing cluster version on purpose
@@ -124,26 +128,26 @@ class TestSCUpgrade(Tester):
         self.verify_with_thrift()
 
         for version in upgrade_path:
-            if version == 'git:cassandra-4.0' or version == 'git:trunk':
+            if LooseVersion(version.family) >= CASSANDRA_4_0:
                 session.execute("ALTER TABLE supcols.cols DROP COMPACT STORAGE")
-            self.upgrade_to_version(version)
+            self.upgrade_to_version(version.version)
 
             session = self.patient_exclusive_cql_connection(node1)
 
             self.verify_with_cql(session)
 
-            if self.cluster.version() < '4':
+            if self.cluster.version() < CASSANDRA_4_0:
                 node1.nodetool("enablethrift")
                 self.verify_with_thrift()
 
         cluster.remove(node=node1)
 
     def test_upgrade_super_columns_through_all_versions(self):
-        self._upgrade_super_columns_through_versions_test(upgrade_path=['git:cassandra-2.2', 'git:cassandra-3.0',
-                                                                        'git:cassandra-3.11', 'git:trunk'])
+        self._upgrade_super_columns_through_versions_test(upgrade_path=[indev_2_2_x, indev_3_0_x,
+                                                                        indev_3_11_x, indev_trunk])
 
     def test_upgrade_super_columns_through_limited_versions(self):
-        self._upgrade_super_columns_through_versions_test(upgrade_path=['git:cassandra-3.0', 'git:trunk'])
+        self._upgrade_super_columns_through_versions_test(upgrade_path=[indev_3_0_x, indev_trunk])
 
     def upgrade_to_version(self, tag, nodes=None):
         logger.debug('Upgrading to ' + tag)

@@ -1,3 +1,5 @@
+from distutils.version import LooseVersion
+
 import operator
 import os
 import pprint
@@ -22,7 +24,7 @@ from .upgrade_base import switch_jdks
 from .upgrade_manifest import (build_upgrade_pairs,
                                current_2_1_x, current_2_2_x, current_3_0_x,
                                indev_3_11_x,
-                               current_3_11_x, indev_trunk)
+                               current_3_11_x, indev_trunk, CASSANDRA_4_0)
 
 logger = logging.getLogger(__name__)
 
@@ -40,18 +42,24 @@ def data_writer(tester, to_verify_queue, verification_done_queue, rewrite_probab
     # 'tester' is a cloned object so we shouldn't be inappropriately sharing anything with another process
     session = tester.patient_cql_connection(tester.node1, keyspace="upgrade", protocol_version=tester.protocol_version)
 
+    running = True
+
     prepared = session.prepare("UPDATE cf SET v=? WHERE k=?")
     prepared.consistency_level = ConsistencyLevel.QUORUM
 
     def handle_sigterm(signum, frame):
-        # need to close queue gracefully if possible, or the data_checker process
-        # can't seem to empty the queue and test failures result.
+        nonlocal running
+        running = False
+
+    def shutdown_gently():
+        logger.info("Data writer process terminating, closing queues")
         to_verify_queue.close()
-        exit(0)
+        verification_done_queue.close()
+        session.shutdown()
 
     signal.signal(signal.SIGTERM, handle_sigterm)
 
-    while True:
+    while running:
         try:
             key = None
 
@@ -69,10 +77,12 @@ def data_writer(tester, to_verify_queue, verification_done_queue, rewrite_probab
             session.execute(prepared, (val, key))
 
             to_verify_queue.put((key, val,))
-        except Exception:
-            logger.debug("Error in data writer process!")
-            to_verify_queue.close()
+        except Exception as ex:
+            logger.error("Error in data writer process!", ex)
+            shutdown_gently()
             raise
+
+    shutdown_gently()
 
 
 def data_checker(tester, to_verify_queue, verification_done_queue):
@@ -88,18 +98,24 @@ def data_checker(tester, to_verify_queue, verification_done_queue):
     # 'tester' is a cloned object so we shouldn't be inappropriately sharing anything with another process
     session = tester.patient_cql_connection(tester.node1, keyspace="upgrade", protocol_version=tester.protocol_version)
 
+    running = True
+
     prepared = session.prepare("SELECT v FROM cf WHERE k=?")
     prepared.consistency_level = ConsistencyLevel.QUORUM
 
     def handle_sigterm(signum, frame):
-        # need to close queue gracefully if possible, or the data_checker process
-        # can't seem to empty the queue and test failures result.
+        nonlocal running
+        running = False
+
+    def shutdown_gently():
+        logger.info("Data checker process terminating, closing queues")
+        to_verify_queue.close()
         verification_done_queue.close()
-        exit(0)
+        session.shutdown()
 
     signal.signal(signal.SIGTERM, handle_sigterm)
 
-    while True:
+    while running:
         try:
             # here we could block, but if the writer process terminates early with an empty queue
             # we would end up blocking indefinitely
@@ -107,11 +123,12 @@ def data_checker(tester, to_verify_queue, verification_done_queue):
 
             actual_val = session.execute(prepared, (key,))[0][0]
         except Empty:
-            time.sleep(0.1)  # let's not eat CPU if the queue is empty
+            time.sleep(1)  # let's not eat CPU if the queue is empty
+            logger.info("to_verify_queue is empty: %d" % to_verify_queue.qsize())
             continue
-        except Exception:
-            logger.debug("Error in data verifier process!")
-            verification_done_queue.close()
+        except Exception as ex:
+            logger.error("Error in data checker process!", ex)
+            shutdown_gently()
             raise
         else:
             try:
@@ -122,8 +139,12 @@ def data_checker(tester, to_verify_queue, verification_done_queue):
                 # and allow dropping some rewritables because we don't want to
                 # rewrite rows in the same sequence as originally written
                 pass
+            except Exception as ex:
+                logger.error("Failed to put into verification_done_queue", ex)
 
         assert expected_val == actual_val, "Data did not match expected value!"
+
+    shutdown_gently()
 
 
 def counter_incrementer(tester, to_verify_queue, verification_done_queue, rewrite_probability=0):
@@ -139,18 +160,24 @@ def counter_incrementer(tester, to_verify_queue, verification_done_queue, rewrit
     # 'tester' is a cloned object so we shouldn't be inappropriately sharing anything with another process
     session = tester.patient_cql_connection(tester.node1, keyspace="upgrade", protocol_version=tester.protocol_version)
 
+    running = True
+
     prepared = session.prepare("UPDATE countertable SET c = c + 1 WHERE k1=?")
     prepared.consistency_level = ConsistencyLevel.QUORUM
 
     def handle_sigterm(signum, frame):
-        # need to close queue gracefully if possible, or the data_checker process
-        # can't seem to empty the queue and test failures result.
+        nonlocal running
+        running = False
+
+    def shutdown_gently():
+        logger.info("Counter incrementer process terminating, closing queues")
         to_verify_queue.close()
-        exit(0)
+        verification_done_queue.close()
+        session.shutdown()
 
     signal.signal(signal.SIGTERM, handle_sigterm)
 
-    while True:
+    while running:
         try:
             key = None
             count = 0  # this will get set to actual last known count if we do a re-write
@@ -167,10 +194,12 @@ def counter_incrementer(tester, to_verify_queue, verification_done_queue, rewrit
             session.execute(prepared, (key))
 
             to_verify_queue.put_nowait((key, count + 1,))
-        except Exception:
-            logger.debug("Error in counter incrementer process!")
-            to_verify_queue.close()
+        except Exception as ex:
+            logger.error("Error in counter incrementer process!", ex)
+            shutdown_gently()
             raise
+
+    shutdown_gently()
 
 
 def counter_checker(tester, to_verify_queue, verification_done_queue):
@@ -186,18 +215,24 @@ def counter_checker(tester, to_verify_queue, verification_done_queue):
     # 'tester' is a cloned object so we shouldn't be inappropriately sharing anything with another process
     session = tester.patient_cql_connection(tester.node1, keyspace="upgrade", protocol_version=tester.protocol_version)
 
+    running = True
+
     prepared = session.prepare("SELECT c FROM countertable WHERE k1=?")
     prepared.consistency_level = ConsistencyLevel.QUORUM
 
     def handle_sigterm(signum, frame):
-        # need to close queue gracefully if possible, or the data_checker process
-        # can't seem to empty the queue and test failures result.
+        nonlocal running
+        running = False
+
+    def shutdown_gently():
+        logger.info("Counter checker process terminating, closing queues")
+        to_verify_queue.close()
         verification_done_queue.close()
-        exit(0)
+        session.shutdown()
 
     signal.signal(signal.SIGTERM, handle_sigterm)
 
-    while True:
+    while running:
         try:
             # here we could block, but if the writer process terminates early with an empty queue
             # we would end up blocking indefinitely
@@ -207,9 +242,9 @@ def counter_checker(tester, to_verify_queue, verification_done_queue):
         except Empty:
             time.sleep(0.1)  # let's not eat CPU if the queue is empty
             continue
-        except Exception:
-            logger.debug("Error in counter verifier process!")
-            verification_done_queue.close()
+        except Exception as ex:
+            logger.error("Error in counter verifier process!", ex)
+            shutdown_gently()
             raise
         else:
             tester.assertEqual(expected_count, actual_count, "Data did not match expected value!")
@@ -222,6 +257,8 @@ def counter_checker(tester, to_verify_queue, verification_done_queue):
                 # and allow dropping some rewritables because we don't want to
                 # rewrite rows in the same sequence as originally written
                 pass
+
+    shutdown_gently()
 
 
 @pytest.mark.upgrade_test
@@ -368,6 +405,7 @@ class TestUpgrade(Tester):
             # Stop write processes
             write_proc.terminate()
             # wait for the verification queue's to empty (and check all rows) before continuing
+            self._check_on_subprocs([verify_proc])  # make sure the verification processes are running still
             self._wait_until_queue_condition('writes pending verification', verification_queue, operator.le, 0, max_wait_s=1200)
             self._check_on_subprocs([verify_proc])  # make sure the verification processes are running still
 
@@ -447,7 +485,7 @@ class TestUpgrade(Tester):
         for node in nodes:
             node.set_install_dir(version=version_meta.version)
             logger.debug("Set new cassandra dir for %s: %s" % (node.name, node.get_install_dir()))
-            if internode_ssl and (version_meta.family == 'trunk' or version_meta.family >= '4.0'):
+            if internode_ssl and (LooseVersion(version_meta.family) >= CASSANDRA_4_0):
                 node.set_configuration_options({'server_encryption_options': {'enabled': True, 'enable_legacy_ssl_storage_port': True}})
 
         # hacky? yes. We could probably extend ccm to allow this publicly.
