@@ -15,7 +15,7 @@ from tools.assertions import (assert_all, assert_length_equal,
                               assert_lists_of_dicts_equal)
 from tools.misc import wait_for_agreement, add_skip
 from .upgrade_base import UpgradeTester
-from .upgrade_manifest import build_upgrade_pairs
+from .upgrade_manifest import build_upgrade_pairs, CASSANDRA_4_0
 
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
@@ -270,7 +270,7 @@ class TestUpgradeSuperColumnsThrough(Tester):
         if node.get_cassandra_version() < '4':
             client = get_thrift_client(host, port)
             _validate_dense_thrift(client, cf='dense_super_1')
-        _validate_dense_cql(cursor, cf='dense_super_1', is_version_4_or_greater=node.get_cassandra_version() >= '4')
+        _validate_dense_cql(cursor, cf='dense_super_1', is_version_4_or_greater=node.get_cassandra_version() >= CASSANDRA_4_0)
 
     def test_dense_supercolumn(self):
         cluster = self.prepare()
@@ -317,7 +317,7 @@ class TestUpgradeSuperColumnsThrough(Tester):
             _validate_dense_thrift(client, cf='dense_super_1')
 
         cursor = self.patient_cql_connection(node, row_factory=dict_factory)
-        _validate_dense_cql(cursor, cf='dense_super_1', is_version_4_or_greater=node.get_cassandra_version() >= '4')
+        _validate_dense_cql(cursor, cf='dense_super_1', is_version_4_or_greater=node.get_cassandra_version() >= CASSANDRA_4_0)
 
     def test_sparse_supercolumn(self):
         cluster = self.prepare()
@@ -355,7 +355,7 @@ class TestUpgradeSuperColumnsThrough(Tester):
         _validate_sparse_thrift(client, cf='sparse_super_2')
 
         self.set_node_to_current_version(node)
-        is_version_4_or_greater = node.get_cassandra_version() >= '4'
+        is_version_4_or_greater = node.get_cassandra_version() >= CASSANDRA_4_0
         #4.0 doesn't support compact storage
         if is_version_4_or_greater:
             cursor.execute("ALTER TABLE ks.sparse_super_2 DROP COMPACT STORAGE;")
@@ -374,7 +374,7 @@ class TestUpgradeSuperColumnsThrough(Tester):
 
 
 @pytest.mark.upgrade_test
-@since('4')
+@since('4.0')
 class TestUpgradeTo40(Tester):
     """
     Thrift is dead in 4.0. However, we still want to ensure users that used thrift
@@ -593,6 +593,7 @@ class TestThrift(UpgradeTester):
 
         for is_upgraded, cursor in self.do_upgrade(cursor, row_factory=dict_factory, use_thrift=True):
             logger.debug("Querying {} node".format("upgraded" if is_upgraded else "old"))
+            is_version_4_or_greater = node.get_cassandra_version() >= CASSANDRA_4_0
             if not is_version_4_or_greater:
                 client = get_thrift_client(host, port)
                 _validate_dense_thrift(client)
@@ -630,6 +631,7 @@ class TestThrift(UpgradeTester):
 
         for is_upgraded, cursor in self.do_upgrade(cursor, row_factory=dict_factory, use_thrift=True):
             logger.debug("Querying {} node".format("upgraded" if is_upgraded else "old"))
+            is_version_4_or_greater = node.get_cassandra_version() >= CASSANDRA_4_0
             if not is_version_4_or_greater:
                 client = get_thrift_client(host, port)
                 _validate_dense_thrift(client, cf='dense_super_2')
@@ -670,6 +672,7 @@ class TestThrift(UpgradeTester):
 
         for is_upgraded, cursor in self.do_upgrade(cursor, row_factory=dict_factory, use_thrift=True):
             logger.debug("Querying {} node".format("upgraded" if is_upgraded else "old"))
+            is_version_4_or_greater = node.get_cassandra_version() >= CASSANDRA_4_0
             if not is_version_4_or_greater:
                 client = get_thrift_client(host, port)
                 _validate_sparse_thrift(client)
@@ -707,6 +710,7 @@ class TestThrift(UpgradeTester):
 
         for is_upgraded, cursor in self.do_upgrade(cursor, row_factory=dict_factory, use_thrift=True):
             logger.debug("Querying {} node".format("upgraded" if is_upgraded else "old"))
+            is_version_4_or_greater = node.get_cassandra_version() >= CASSANDRA_4_0
             if not is_version_4_or_greater:
                 client = get_thrift_client(host, port)
                 _validate_sparse_thrift(client, cf='sparse_super_2')

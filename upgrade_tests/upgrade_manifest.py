@@ -19,6 +19,14 @@ UpgradePath = namedtuple('UpgradePath', ('name', 'starting_version', 'upgrade_ve
 VERSION_FAMILY = None
 CONFIG = None
 
+# TODO add a new item whenever Cassandra is branched and update TRUNK to the version present in trunk
+CASSANDRA_2_0 = '2.0'
+CASSANDRA_2_1 = '2.1'
+CASSANDRA_2_2 = '2.2'
+CASSANDRA_3_0 = '3.0'
+CASSANDRA_3_11 = '3.11'
+CASSANDRA_4_0 = '4.0'
+TRUNK = CASSANDRA_4_0
 
 def is_same_family_current_to_indev(origin, destination):
     """
@@ -76,21 +84,22 @@ def set_version_family():
     else:
         current_version = get_version_from_build(cassandra_dir)
 
+    # TODO add a new item whenever Cassandra is branched
     if current_version.vstring.startswith('2.0'):
-        version_family = '2.0.x'
+        version_family = CASSANDRA_2_0
     elif current_version.vstring.startswith('2.1'):
-        version_family = '2.1.x'
+        version_family = CASSANDRA_2_1
     elif current_version.vstring.startswith('2.2'):
-        version_family = '2.2.x'
+        version_family = CASSANDRA_2_2
     elif current_version.vstring.startswith('3.0'):
-        version_family = '3.0.x'
-    elif '3.1' <= current_version < '4.0':
-        version_family = '3.x'
-    elif '4.0' <= current_version < '4.1':
-        version_family = 'trunk'
+        version_family = CASSANDRA_3_0
+    elif current_version.vstring.startswith('3.11'):
+        version_family = CASSANDRA_3_11
+    elif current_version.vstring.startswith('4.0'):
+        version_family = CASSANDRA_4_0
     else:
         # when this occurs, it's time to update this manifest a bit!
-        raise RuntimeError("4.1+ not yet supported on upgrade tests!")
+        raise RuntimeError("Testing upgrades from/to version %s is not supported. Please use a custom manifest (see upgrade_manifest.py)" % current_version.vstring)
 
     global VERSION_FAMILY
     VERSION_FAMILY = version_family
@@ -116,6 +125,14 @@ class VersionMeta(namedtuple('_VersionMeta', ('name', 'family', 'variant', 'vers
         """
         return self.family == VERSION_FAMILY
 
+    @property
+    def matches_current_env_version_family_and_is_indev(self):
+        """
+        Returns boolean indicating whether this meta matches the current version family of the environment
+        and whether this meta is in indev variant
+        """
+        return self.family == VERSION_FAMILY and self.variant == "indev"
+
     def clone_with_local_env_version(self):
         """
         Returns a new object cloned from this one, with the version replaced with the local env version.
@@ -126,19 +143,20 @@ class VersionMeta(namedtuple('_VersionMeta', ('name', 'family', 'variant', 'vers
         return self._replace(version="clone:{}".format(cassandra_dir))
 
 
-indev_2_1_x = VersionMeta(name='indev_2_1_x', family='2.1', variant='indev', version='github:apache/cassandra-2.1', min_proto_v=1, max_proto_v=3, java_versions=(7, 8))
-current_2_1_x = VersionMeta(name='current_2_1_x', family='2.1', variant='current', version='2.1.20', min_proto_v=1, max_proto_v=3, java_versions=(7, 8))
+# TODO define new versions whenever Cassandra is branched
+indev_2_1_x = VersionMeta(name='indev_2_1_x', family=CASSANDRA_2_1, variant='indev', version='github:apache/cassandra-2.1', min_proto_v=1, max_proto_v=3, java_versions=(7, 8))
+current_2_1_x = VersionMeta(name='current_2_1_x', family=CASSANDRA_2_1, variant='current', version='2.1.22', min_proto_v=1, max_proto_v=3, java_versions=(7, 8))
 
-indev_2_2_x = VersionMeta(name='indev_2_2_x', family='2.2', variant='indev', version='github:apache/cassandra-2.2', min_proto_v=1, max_proto_v=4, java_versions=(7, 8))
-current_2_2_x = VersionMeta(name='current_2_2_x', family='2.2', variant='current', version='2.2.13', min_proto_v=1, max_proto_v=4, java_versions=(7, 8))
+indev_2_2_x = VersionMeta(name='indev_2_2_x', family=CASSANDRA_2_2, variant='indev', version='github:apache/cassandra-2.2', min_proto_v=1, max_proto_v=3, java_versions=(7, 8))
+current_2_2_x = VersionMeta(name='current_2_2_x', family=CASSANDRA_2_2, variant='current', version='2.2.19', min_proto_v=1, max_proto_v=3, java_versions=(7, 8))
 
-indev_3_0_x = VersionMeta(name='indev_3_0_x', family='3.0', variant='indev', version='github:apache/cassandra-3.0', min_proto_v=3, max_proto_v=4, java_versions=(8,))
-current_3_0_x = VersionMeta(name='current_3_0_x', family='3.0', variant='current', version='3.0.23', min_proto_v=3, max_proto_v=4, java_versions=(8,))
+indev_3_0_x = VersionMeta(name='indev_3_0_x', family=CASSANDRA_3_0, variant='indev', version='github:apache/cassandra-3.0', min_proto_v=3, max_proto_v=4, java_versions=(8,))
+current_3_0_x = VersionMeta(name='current_3_0_x', family=CASSANDRA_3_0, variant='current', version='3.0.24', min_proto_v=3, max_proto_v=4, java_versions=(8,))
 
-indev_3_11_x = VersionMeta(name='indev_3_11_x', family='3.11', variant='indev', version='github:apache/cassandra-3.11', min_proto_v=3, max_proto_v=4, java_versions=(8,))
-current_3_11_x = VersionMeta(name='current_3_11_x', family='3.11', variant='current', version='3.11.9', min_proto_v=3, max_proto_v=4, java_versions=(8,))
+indev_3_11_x = VersionMeta(name='indev_3_11_x', family=CASSANDRA_3_11, variant='indev', version='github:apache/cassandra-3.11', min_proto_v=3, max_proto_v=4, java_versions=(8,))
+current_3_11_x = VersionMeta(name='current_3_11_x', family=CASSANDRA_3_11, variant='current', version='3.11.9', min_proto_v=3, max_proto_v=4, java_versions=(8,))
 
-indev_trunk = VersionMeta(name='indev_trunk', family='trunk', variant='indev', version='github:apache/trunk', min_proto_v=4, max_proto_v=5, java_versions=(8,))
+indev_trunk = VersionMeta(name='indev_trunk', family=TRUNK, variant='indev', version='github:apache/trunk', min_proto_v=4, max_proto_v=5, java_versions=(8,))
 
 
 # MANIFEST maps a VersionMeta representing a line/variant to a list of other VersionMeta's representing supported upgrades
@@ -148,37 +166,17 @@ indev_trunk = VersionMeta(name='indev_trunk', family='trunk', variant='indev', v
 #   2) Features exclusive to version B may not work until all nodes are running version B.
 #   3) Nodes upgraded to version B can read data stored by the predecessor version A, and from a data standpoint will function the same as if they always ran version B.
 #   4) If a new sstable format is present in version B, writes will occur in that format after upgrade. Running sstableupgrade on version B will proactively convert version A sstables to version B.
+# TODO define new upgrade scenarios whenever Cassandra is branched
 MANIFEST = {
-    indev_2_1_x: [indev_2_2_x, current_2_2_x, indev_3_0_x, current_3_0_x, indev_3_11_x, current_3_11_x],
-    current_2_1_x: [indev_2_1_x, indev_2_2_x, current_2_2_x, indev_3_0_x, current_3_0_x, indev_3_11_x, current_3_11_x],
-
-    indev_2_2_x: [indev_3_0_x, current_3_0_x, indev_3_11_x, current_3_11_x],
-    current_2_2_x: [indev_2_2_x, indev_3_0_x, current_3_0_x, indev_3_11_x, current_3_11_x],
-
-    indev_3_0_x: [indev_3_11_x, current_3_11_x, indev_trunk],
-    current_3_0_x: [indev_3_0_x, indev_3_11_x, current_3_11_x, indev_trunk],
-
+    current_2_1_x: [indev_2_2_x, indev_3_0_x, indev_3_11_x],
+    current_2_2_x: [indev_2_2_x, indev_3_0_x, indev_3_11_x],
+    current_3_0_x: [indev_3_0_x, indev_3_11_x, indev_trunk],
     current_3_11_x: [indev_3_11_x, indev_trunk],
+
+    indev_2_2_x: [indev_3_0_x, indev_3_11_x],
+    indev_3_0_x: [indev_3_11_x, indev_trunk],
     indev_3_11_x: [indev_trunk]
 }
-
-# Local env and custom path testing instructions. Use these steps to REPLACE the normal upgrade test cases with your own.
-# 1) Add a VersionMeta for each version you wish to test (see examples below). Update the name, family, version, and protocol restrictions as needed. Use a unique name for each VersionMeta.
-# 2) Update OVERRIDE_MANIFEST (see example below).
-# 3) If you want to test using local code, set the version attribute using local slugs in the format 'local:/path/to/cassandra/:branch_name'
-# 4) Run the tests!
-#      To run all, use 'nosetests -v upgrade_tests/'. To run specific tests, use 'nosetests -vs --collect-only' to preview the test names, then run nosetests using the desired test name.
-#      Note that nosetests outputs test names in a format that needs to be tweaked a bit before they will run from the command line.
-custom_1 = VersionMeta(name='custom_branch_1', family='2.1.x', variant='indev', version='local:some_branch', min_proto_v=3, max_proto_v=4, java_versions=(7, 8))
-custom_2 = VersionMeta(name='custom_branch_2', family='2.2.x', variant='indev', version='git:trunk', min_proto_v=3, max_proto_v=4, java_versions=(7, 8))
-custom_3 = VersionMeta(name='custom_branch_3', family='3.0.x', variant='indev', version='git:cassandra-3.5', min_proto_v=3, max_proto_v=4, java_versions=(7, 8))
-custom_4 = VersionMeta(name='custom_branch_4', family='3.x', variant='indev', version='git:cassandra-3.6', min_proto_v=3, max_proto_v=4, java_versions=(7, 8))
-OVERRIDE_MANIFEST = {
-    # EXAMPLE:
-    # custom_1: [custom_2, custom_3],  # creates a test of custom_1 -> custom_2, and another test from custom_1 -> custom_3
-    # custom_3: [custom_4]             # creates a test of custom_3 -> custom_4
-}
-
 
 def _have_common_proto(origin_meta, destination_meta):
     """
@@ -194,7 +192,7 @@ def build_upgrade_pairs():
     Returns a list of UpgradePath's.
     """
     valid_upgrade_pairs = []
-    manifest = OVERRIDE_MANIFEST or MANIFEST
+    manifest = MANIFEST
 
     configured_strategy = CONFIG.getoption("--upgrade-version-selection").upper()
     version_select_strategy = VersionSelectionStrategies[configured_strategy].value[0]
@@ -215,13 +213,13 @@ def build_upgrade_pairs():
 
             # if either origin or destination match version, then do the test
             # the assumption is that a change in 3.0 could break upgrades to trunk, so include those tests as well
-            if filter_for_current_family and not origin_meta.matches_current_env_version_family and not destination_meta.matches_current_env_version_family:
+            if filter_for_current_family and not origin_meta.matches_current_env_version_family_and_is_indev and not destination_meta.matches_current_env_version_family:
                 logger.debug("skipping class creation, origin version {} and destination version {} do not match target version {}, and --upgrade-target-version-only was set".format(origin_meta.name, destination_meta.name, VERSION_FAMILY))
                 continue
 
             path_name = 'Upgrade_' + origin_meta.name + '_To_' + destination_meta.name
 
-            if not (RUN_STATIC_UPGRADE_MATRIX or OVERRIDE_MANIFEST):
+            if not RUN_STATIC_UPGRADE_MATRIX:
                 if destination_meta.matches_current_env_version_family:
                     # looks like this test should actually run in the current env, so let's set the final version to match the env exactly
                     oldmeta = destination_meta

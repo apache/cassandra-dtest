@@ -276,11 +276,11 @@ def get_eager_protocol_version(cassandra_version):
     Returns the highest protocol version accepted
     by the given C* version
     """
-    if cassandra_version >= '2.2':
+    if LooseVersion('3.0') <= cassandra_version:
         protocol_version = 4
-    elif cassandra_version >= '2.1':
+    elif LooseVersion('2.1') <= cassandra_version:
         protocol_version = 3
-    elif cassandra_version >= '2.0':
+    elif LooseVersion('2.0') <= cassandra_version:
         protocol_version = 2
     else:
         protocol_version = 1

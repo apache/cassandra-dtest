@@ -1,3 +1,5 @@
+from distutils.version import LooseVersion
+
 import os
 import sys
 import time
@@ -7,6 +9,8 @@ import logging
 from abc import ABCMeta
 
 from ccmlib.common import get_version_from_build, is_win
+
+from .upgrade_manifest import CASSANDRA_4_0
 
 from dtest import Tester, create_ks
 
@@ -261,5 +265,5 @@ class UpgradeTester(Tester, metaclass=ABCMeta):
         return self.UPGRADE_PATH.upgrade_meta.family
 
     def upgrade_is_version_4_or_greater(self):
-        upgrade_version = self.upgrade_version_family()
-        return upgrade_version == 'trunk' or upgrade_version >= '4.0'
+        upgrade_version = LooseVersion(self.upgrade_version_family())
+        return upgrade_version >= CASSANDRA_4_0

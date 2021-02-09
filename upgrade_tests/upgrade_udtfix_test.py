@@ -4,12 +4,13 @@ import logging
 from dtest import RUN_STATIC_UPGRADE_MATRIX, Tester
 from distutils.version import LooseVersion
 from tools.misc import add_skip
-from .upgrade_manifest import build_upgrade_pairs
+from .upgrade_manifest import build_upgrade_pairs, CASSANDRA_3_0
 
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
 
 @pytest.mark.upgrade_test
+@since('3.11.6')
 class UpgradeUDTFixTest(Tester):
     __test__ = False
 
@@ -154,7 +155,7 @@ for path in build_upgrade_pairs():
 
     start_family = spec['UPGRADE_PATH'].starting_meta.family
     upgrade_family = spec['UPGRADE_PATH'].upgrade_meta.family
-    start_family_applies = start_family == '3.0' and (upgrade_family == 'trunk' or LooseVersion(upgrade_family) > '3.0')
+    start_family_applies = start_family == CASSANDRA_3_0
     upgrade_applies_to_env = RUN_STATIC_UPGRADE_MATRIX or start_family_applies
     cls = type(gen_class_name, (UpgradeUDTFixTest,), spec)
     if not upgrade_applies_to_env:

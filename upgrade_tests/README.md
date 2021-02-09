@@ -52,9 +52,10 @@ it is not yet released code.
 
 The second useful concept is that of a __version family__. This simply describes which
 'version line' a particular version belongs to. For example, Cassandra 3.0.7 belongs
-to the '3.0.x' version family. Organizing specific versions into families allows
+to the `CASSANDRA_3_0` version family. Organizing specific versions into families allows
 us to generalize about support, so we can say, for example that: "2.2.x versions should be
-able to upgrade to 3.0.x versions, or 2.2.x versions can skip 3.0.x versions and upgrade directly to a 3.x version".
+able to upgrade to 3.0.x versions, or 2.2.x versions can skip 3.0.x versions and upgrade
+directly to a 3.x version".
 
 ### Code generation
 
