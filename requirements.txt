@@ -1,5 +1,11 @@
 -e git+https://github.com/datastax/python-driver.git@cassandra-test#egg=cassandra-driver
-# Used ccm version is tracked by cassandra-test branch in ccm repo. Please create a PR there for fixes or upgrades to new releases.
+# For ccm changes, please, create a PR to the master branch of the ccm repository.
+# New commits to master are not automatically used by the python dtests. And changes 
+# made to ccm and intended/needed to be used by the dtests can be put in use by re-tagging cassandra-test to master's HEAD.
+# The re-tagging approach is
+# git tag -a -f cassandra-test
+# git push origin :refs/tags/cassandra-test
+# git push -f origin refs/tags/cassandra-test
 -e git+https://github.com/riptano/ccm.git@cassandra-test#egg=ccm
 decorator
 docopt
