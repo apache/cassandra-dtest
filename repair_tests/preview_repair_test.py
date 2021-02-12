@@ -4,7 +4,9 @@ import time
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
 
-from dtest import Tester
+from dtest import Tester, create_ks
+from repair_tests.incremental_repair_test import assert_parent_repair_session_count
+from tools.data import create_c1c2_table
 
 since = pytest.mark.since
 
@@ -17,6 +19,21 @@ class TestPreviewRepair(Tester):
         assert rows.current_rows == []
         rows = session.execute("select * from system_distributed.parent_repair_history")
         assert rows.current_rows == []
+
+    @since('4.0')
+    def test_parent_repair_session_cleanup(self):
+        """
+        Calls incremental repair preview on 3 node cluster and verifies if all ParentRepairSession objects are cleaned
+        """
+        self.cluster.populate(3).start()
+        session = self.patient_cql_connection(self.cluster.nodelist()[0])
+        create_ks(session, 'ks', 2)
+        create_c1c2_table(self, session)
+
+        for node in self.cluster.nodelist():
+            node.repair(options=['ks', '--preview'])
+
+        assert_parent_repair_session_count(self.cluster.nodelist(), 0)
 
     @pytest.mark.no_vnodes
     def test_preview(self):
