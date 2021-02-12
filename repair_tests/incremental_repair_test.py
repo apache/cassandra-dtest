@@ -16,7 +16,7 @@ from ccmlib.node import Node, ToolError
 
 from dtest import Tester, create_ks, create_cf
 from tools.assertions import assert_almost_equal, assert_one
-from tools.data import insert_c1c2
+from tools.data import create_c1c2_table, insert_c1c2
 from tools.misc import new_node, ImmutableMapping
 from tools.jmxutils import make_mbean, JolokiaAgent
 
@@ -31,6 +31,16 @@ class ConsistentState(object):
     FINALIZE_PROMISED = 3
     FINALIZED = 4
     FAILED = 5
+
+
+def assert_parent_repair_session_count(nodes, expected):
+    for node in nodes:
+        with JolokiaAgent(node) as jmx:
+            result = jmx.execute_method("org.apache.cassandra.db:type=RepairService",
+                                        "parentRepairSessionCount")
+            assert expected == result, "The number of cached ParentRepairSessions should be {} but was {}. " \
+                                       "This may mean that PRS objects are leaking on node {}. Check " \
+                                       "ActiveRepairService for PRS clean up code.".format(expected, result, node.name)
 
 
 class TestIncRepair(Tester):
@@ -1069,6 +1079,20 @@ class TestIncRepair(Tester):
             self.query_and_check_repaired_mismatches(jmx, session, "SELECT * FROM ks.tbl",
                                                      expect_confirmed_inconsistencies=True,
                                                      expect_read_repair=False)
+
+    def test_parent_repair_session_cleanup(self):
+        """
+        Calls incremental repair on 3 node cluster and verifies if all ParentRepairSession objects are cleaned
+        """
+        self.cluster.populate(3).start()
+        session = self.patient_cql_connection(self.cluster.nodelist()[0])
+        create_ks(session, 'ks', 2)
+        create_c1c2_table(self, session)
+
+        for node in self.cluster.nodelist():
+            node.repair(options=['ks'])
+
+        assert_parent_repair_session_count(self.cluster.nodelist(), 0)
 
     def setup_for_repaired_data_tracking(self):
         self.fixture_dtest_setup.setup_overrides.cluster_options = ImmutableMapping({'hinted_handoff_enabled': 'false',
