@@ -60,7 +60,7 @@ class TestDiskBalance(Tester):
         node1.stress(['write', 'n=50k', 'no-warmup', '-rate', 'threads=100', '-schema', 'replication(factor=3)',
                       'compaction(strategy=SizeTieredCompactionStrategy,enabled=false)'])
         cluster.flush()
-        node5 = new_node(cluster)
+        node5 = new_node(cluster, data_center="dc1")
         node5.start(wait_for_binary_proto=True)
         self.assert_balanced(node5)
 
