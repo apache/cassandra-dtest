@@ -280,6 +280,55 @@ class TestBootstrap(Tester):
     def test_consistent_range_movement_false_with_rf1_should_succeed(self):
         self._bootstrap_test_with_replica_down(False, rf=1)
 
+    def test_rf_gt_nodes_multidc_should_succeed(self):
+        """
+        Validating a KS with RF > N on multi DC doesn't break bootstrap
+        @jira_ticket CASSANDRA-16296 CASSANDRA-16411
+        """
+        cluster = self.cluster
+        cluster.set_environment_variable('CASSANDRA_TOKEN_PREGENERATION_DISABLED', 'True')
+        cluster.populate([1, 1])
+        cluster.start()
+
+        node1 = cluster.nodelist()[0]
+        node2 = cluster.nodelist()[1]
+        session = self.patient_exclusive_cql_connection(node1)
+        session.execute("CREATE KEYSPACE k WITH REPLICATION = {'class' : 'NetworkTopologyStrategy', 'dc1' : '3'}")
+
+        if cluster.version() >= '4.0':
+            warning = 'Your replication factor 3 for keyspace k is higher than the number of nodes 1 for datacenter dc1'
+            assert len(node1.grep_log(warning)) == 1
+            assert len(node2.grep_log(warning)) == 0
+
+        session.execute("ALTER KEYSPACE k WITH REPLICATION = {'class' : 'NetworkTopologyStrategy', 'dc1' : '2'}")
+        session.execute("CREATE TABLE k.testgtrfmultidc (KEY text PRIMARY KEY)")
+        session.execute("INSERT INTO k.testgtrfmultidc (KEY) VALUES ('test_rf_gt_nodes_multidc_should_succeed')")
+
+        if cluster.version() >= '4.0':
+            warning = 'Your replication factor 2 for keyspace k is higher than the number of nodes 1 for datacenter dc1'
+            assert len(node1.grep_log(warning)) == 1
+            assert len(node2.grep_log(warning)) == 0
+
+        marks = map(lambda n: n.mark_log(), cluster.nodelist())
+        node3 = Node(name='node3',
+                     cluster=cluster,
+                     auto_bootstrap=True,
+                     thrift_interface=('127.0.0.3', 9160),
+                     storage_interface=('127.0.0.3', 7000),
+                     jmx_port='7300',
+                     remote_debug_port='0',
+                     initial_token=None,
+                     binary_interface=('127.0.0.3', 9042))
+        cluster.add(node3, is_seed=False, data_center="dc1")
+        node3.start(wait_for_binary_proto=True)
+        if cluster.version() >= '4.0':
+            warning = 'is higher than the number of nodes'
+            for (node, mark) in zip(cluster.nodelist(), marks):
+                assert len(node.grep_log(warning, from_mark=mark)) == 0
+
+        session3 = self.patient_exclusive_cql_connection(node3)
+        assert_one(session3, "SELECT * FROM k.testgtrfmultidc", ["test_rf_gt_nodes_multidc_should_succeed"])
+
     def _bootstrap_test_with_replica_down(self, consistent_range_movement, rf=2):
         """
         Test to check consistent bootstrap will not succeed when there are insufficient replicas
