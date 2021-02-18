@@ -37,7 +37,7 @@ def assert_parent_repair_session_count(nodes, expected):
     for node in nodes:
         with JolokiaAgent(node) as jmx:
             result = jmx.execute_method("org.apache.cassandra.db:type=RepairService",
-                                        "parentRepairSessionCount")
+                                        "parentRepairSessionsCount")
             assert expected == result, "The number of cached ParentRepairSessions should be {} but was {}. " \
                                        "This may mean that PRS objects are leaking on node {}. Check " \
                                        "ActiveRepairService for PRS clean up code.".format(expected, result, node.name)
