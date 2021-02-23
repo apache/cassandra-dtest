@@ -33,6 +33,7 @@ class SnapshotTester(Tester):
 
     def make_snapshot(self, node, ks, cf, name):
         logger.debug("Making snapshot....")
+        node.nodetool('disableautocompaction')
         node.flush()
         snapshot_cmd = 'snapshot {ks} -cf {cf} -t {name}'.format(ks=ks, cf=cf, name=name)
         logger.debug("Running snapshot cmd: {snapshot_cmd}".format(snapshot_cmd=snapshot_cmd))
@@ -200,6 +201,7 @@ class TestArchiveCommitlog(SnapshotTester):
 
     def make_snapshot(self, node, ks, cf, name):
         logger.debug("Making snapshot....")
+        node.nodetool('disableautocompaction')
         node.flush()
         snapshot_cmd = 'snapshot {ks} -cf {cf} -t {name}'.format(ks=ks, cf=cf, name=name)
         logger.debug("Running snapshot cmd: {snapshot_cmd}".format(snapshot_cmd=snapshot_cmd))
