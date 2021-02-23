@@ -166,6 +166,7 @@ class TestRepair(BaseRepairTest):
         """
         Calls range_tombstone_digest with a sequential repair and verifies if
         all ParentRepairSession objects are cleaned
+        @jira_ticket CASSANDRA-16446
         """
         self._range_tombstone_digest(sequential=True)
         assert_parent_repair_session_count(self.cluster.nodes.values(), 0)

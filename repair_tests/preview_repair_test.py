@@ -24,6 +24,7 @@ class TestPreviewRepair(Tester):
     def test_parent_repair_session_cleanup(self):
         """
         Calls incremental repair preview on 3 node cluster and verifies if all ParentRepairSession objects are cleaned
+        @jira_ticket CASSANDRA-16446
         """
         self.cluster.populate(3).start()
         session = self.patient_cql_connection(self.cluster.nodelist()[0])
