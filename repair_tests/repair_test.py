@@ -16,6 +16,7 @@ from ccmlib.node import ToolError
 from dtest import FlakyRetryPolicy, Tester, create_ks, create_cf
 from tools.data import insert_c1c2, query_c1c2
 from tools.jmxutils import JolokiaAgent, make_mbean
+from repair_tests.incremental_repair_test import assert_parent_repair_session_count
 
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
@@ -159,6 +160,16 @@ class BaseRepairTest(Tester):
 
 
 class TestRepair(BaseRepairTest):
+
+    @since('4.0')
+    def test_parent_repair_session_cleanup(self):
+        """
+        Calls range_tombstone_digest with a sequential repair and verifies if
+        all ParentRepairSession objects are cleaned
+        @jira_ticket CASSANDRA-16446
+        """
+        self._range_tombstone_digest(sequential=True)
+        assert_parent_repair_session_count(self.cluster.nodes.values(), 0)
 
     @since('2.2.1', max_version='4')
     def test_no_anticompaction_after_dclocal_repair(self):
