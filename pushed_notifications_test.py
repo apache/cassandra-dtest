@@ -35,7 +35,8 @@ class NotificationWaiter(object):
         self.keyspace = keyspace
 
         # get a single, new connection
-        session = tester.patient_exclusive_cql_connection(node)
+        version = 5 if node.get_cassandra_version() >= LooseVersion('4.0') else None
+        session = tester.patient_exclusive_cql_connection(node, protocol_version=version)
         connection = session.cluster.connection_factory(self.address, is_control_connection=True)
 
         # coordinate with an Event
@@ -53,7 +54,6 @@ class NotificationWaiter(object):
         Called when a notification is pushed from Cassandra.
         """
         logger.debug("Got {} from {} at {}".format(notification, self.address, datetime.now()))
-
         if self.keyspace and notification['keyspace'] and self.keyspace != notification['keyspace']:
             return  # we are not interested in this schema change
 

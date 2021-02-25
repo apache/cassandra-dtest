@@ -1864,9 +1864,15 @@ Tracing session:""")
 
         node1, = self.cluster.nodelist()
         stdout, stderr = self.run_cqlsh(node1, cmds='USE system', cqlsh_options=['--tty'])
+        if node1.get_cassandra_version() < '4.0':
+            assert "Native protocol v4" in stdout
+        else:
+            assert "Native protocol v5" in stdout
+
+        stdout, stderr = self.run_cqlsh(node1, cmds='USE system', cqlsh_options=['--protocol-version=4', '--tty'])
         assert "Native protocol v4" in stdout
 
-        stdout, stderr = self.run_cqlsh(node1, cmds='USE systeml', cqlsh_options=['--protocol-version=3', '--tty'])
+        stdout, stderr = self.run_cqlsh(node1, cmds='USE system', cqlsh_options=['--protocol-version=3', '--tty'])
         assert "Native protocol v3" in stdout
 
     @since('3.0.19')
