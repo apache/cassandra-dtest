@@ -1169,6 +1169,10 @@ class TestCQLSlowQuery(CQLTester):
             CREATE TABLE {} (
                 k int,
                 v int,
+                l list<int>,
+                s set<int>,
+                m map<int, int>,
+                "Escaped_Name" int,
                 PRIMARY KEY(k)
             );
         """.format(table))
@@ -1239,6 +1243,46 @@ class TestCQLSlowQuery(CQLTester):
                                       query="SELECT * FROM {} WHERE v <= 2 ALLOW FILTERING",
                                       logged_query="SELECT \* FROM ks.{} WHERE v <= 2")
 
+        # test logging of slow queries with column selections
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT v FROM {}",
+                                      logged_query="SELECT v FROM ks.{}")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT l FROM {}",
+                                      logged_query="SELECT l FROM ks.{}")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT s FROM {}",
+                                      logged_query="SELECT s FROM ks.{}")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT m FROM {}",
+                                      logged_query="SELECT m FROM ks.{}")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT \"Escaped_Name\" FROM {}",
+                                      logged_query="SELECT \"Escaped_Name\" FROM ks.{}")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT v,s FROM {}",
+                                      logged_query="SELECT s, v FROM ks.{}")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT k,v,s FROM {}",
+                                      logged_query="SELECT s, v FROM ks.{}")
+
+        # test logging of slow queries with primary key-only column selections
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT k FROM {}",
+                                      logged_query="SELECT \* FROM ks.{}")
+
+        # test logging of slow queries with sub-selections (only supported since 4.0)
+        if node.cluster.version() >= '4.0':
+            TestCQLSlowQuery._assert_logs(node, session, table,
+                                          query="SELECT s[0] FROM {}",
+                                          logged_query="SELECT s\[0\] FROM ks.{}")
+            TestCQLSlowQuery._assert_logs(node, session, table,
+                                          query="SELECT m[0] FROM {}",
+                                          logged_query="SELECT m\[0\] FROM ks.{}")
+            TestCQLSlowQuery._assert_logs(node, session, table,
+                                          query="SELECT k,v,s[0],m[1] FROM {}",
+                                          logged_query="SELECT m\[1\], s\[0\], v FROM ks.{}")
+
     @staticmethod
     def _assert_logs_slow_queries_with_wide_table(node, session, asc=True):
         create_ks(session, 'ks', 1)
@@ -1250,6 +1294,10 @@ class TestCQLSlowQuery(CQLTester):
                 c2 int,
                 v int,
                 s int STATIC,
+                lt list<int>,
+                st set<int>,
+                mp map<int, int>,
+                "Escaped_Name" int,
                 PRIMARY KEY(k, c1, c2)
             ) WITH CLUSTERING ORDER BY (c1 {}, c2 {});
         """.format(table, "ASC" if asc else "DESC", "ASC" if asc else "DESC"))
@@ -1316,8 +1364,8 @@ class TestCQLSlowQuery(CQLTester):
                                       query="SELECT * FROM {} WHERE c1 IN (1) ALLOW FILTERING",
                                       logged_query="SELECT \* FROM ks.{} WHERE c1 = 1")
         TestCQLSlowQuery._assert_logs(node, session, table,
-                                      query="SELECT * FROM {} WHERE c1 IN (1, 2) ALLOW FILTERING",
-                                      logged_query="SELECT \* FROM ks.{} WHERE c1 IN \({}, {}\)"
+                                      query="SELECT v FROM {} WHERE c1 IN (1, 2) ALLOW FILTERING",
+                                      logged_query="SELECT v FROM ks.{} WHERE c1 IN \({}, {}\)"
                                       .format(table, 1 if asc else 2, 2 if asc else 1))
         TestCQLSlowQuery._assert_logs(node, session, table,
                                       query="SELECT * FROM {} WHERE c1 > 0 ALLOW FILTERING",
@@ -1396,6 +1444,61 @@ class TestCQLSlowQuery(CQLTester):
         TestCQLSlowQuery._assert_logs(node, session, table,
                                       query="SELECT * FROM {} WHERE s <= 2 ALLOW FILTERING",
                                       logged_query="SELECT \* FROM ks.{} WHERE s <= 2")
+
+        # test logging of slow queries with column selections
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT s FROM {}",
+                                      logged_query="SELECT s FROM ks.{}")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT v FROM {}",
+                                      logged_query="SELECT v FROM ks.{}")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT lt FROM {}",
+                                      logged_query="SELECT lt FROM ks.{}")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT st FROM {}",
+                                      logged_query="SELECT st FROM ks.{}")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT mp FROM {}",
+                                      logged_query="SELECT mp FROM ks.{}")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT \"Escaped_Name\" FROM {}",
+                                      logged_query="SELECT \"Escaped_Name\" FROM ks.{}")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT v,s,st FROM {}",
+                                      logged_query="SELECT s, st, v FROM ks.{}")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT k,v,s,st FROM {}",
+                                      logged_query="SELECT s, st, v FROM ks.{}")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT k,c1,v,st FROM {}",
+                                      logged_query="SELECT st, v FROM ks.{}")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT k,c2,v,st FROM {}",
+                                      logged_query="SELECT st, v FROM ks.{}")
+        TestCQLSlowQuery._assert_logs(node, session, table,
+                                      query="SELECT k,c1,c2,v,st FROM {}",
+                                      logged_query="SELECT st, v FROM ks.{}")
+
+        # test logging of slow queries with primary key-only column selections
+        logged_query = "SELECT \* FROM ks.{}"
+        TestCQLSlowQuery._assert_logs(node, session, table, query="SELECT k FROM {}", logged_query=logged_query)
+        TestCQLSlowQuery._assert_logs(node, session, table, query="SELECT c1 FROM {}", logged_query=logged_query)
+        TestCQLSlowQuery._assert_logs(node, session, table, query="SELECT c2 FROM {}", logged_query=logged_query)
+        TestCQLSlowQuery._assert_logs(node, session, table, query="SELECT k,c1 FROM {}", logged_query=logged_query)
+        TestCQLSlowQuery._assert_logs(node, session, table, query="SELECT k,c1,c2 FROM {}", logged_query=logged_query)
+
+        # test logging of slow queries with column sub-selections (only supported since 4.0)
+        if node.cluster.version() >= '4.0':
+            TestCQLSlowQuery._assert_logs(node, session, table,
+                                          query="SELECT st[0] FROM {}",
+                                          logged_query="SELECT st\[0\] FROM ks.{}")
+            TestCQLSlowQuery._assert_logs(node, session, table,
+                                          query="SELECT mp[0] FROM {}",
+                                          logged_query="SELECT mp\[0\] FROM ks.{}")
+            TestCQLSlowQuery._assert_logs(node, session, table,
+                                          query="SELECT k,c1,v,st[0],mp[1] FROM {}",
+                                          logged_query="SELECT mp\[1\], st\[0\], v FROM ks.{}")
 
     @staticmethod
     def _assert_logs(node, session, table, query, logged_query):
