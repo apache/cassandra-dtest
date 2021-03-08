@@ -468,52 +468,11 @@ def _skip_ported_msg(current_running_version, ported_from_version):
 @pytest.fixture(autouse=True)
 def fixture_ported_to_in_jvm(request, fixture_dtest_setup):
     """
-    Adds a new mark called 'ported_to_in_jvm' which denotes that a test was ported to jvm-dtest.
+    Adds a new mark called 'ported_to_in_jvm' which denotes that a test was ported to an in-JVM dtest.
 
-    As of this point in time there are weaknesses of jvm-dtest which require these tests to still
-    be run in the cases not covered by jvm-dtest; namely vnode.
+    In-JVM dtests do not currently support running with vnodes, so tests that use this annotation will
+    still be run around those configurations.
     """
-    marker = request.node.get_closest_marker('ported_to_in_jvm')
-    if marker and not request.config.getoption("--use-vnodes"):
-
-        if not marker.args:
-            pytest.skip("ported to in-jvm")
-
-        from_str = marker.args[0]
-        ported_from_version = LooseVersion(from_str)
-
-        # For upgrade tests don't run the test if any of the involved versions
-        # are excluded by the annotation
-        if hasattr(request.cls, "UPGRADE_PATH"):
-            upgrade_path = request.cls.UPGRADE_PATH
-            ccm_repo_cache_dir, _ = ccmlib.repository.setup(upgrade_path.starting_meta.version)
-            starting_version = get_version_from_build(ccm_repo_cache_dir)
-            skip_msg = _skip_ported_msg(starting_version, ported_from_version)
-            if skip_msg:
-                pytest.skip(skip_msg)
-            ccm_repo_cache_dir, _ = ccmlib.repository.setup(upgrade_path.upgrade_meta.version)
-            ending_version = get_version_from_build(ccm_repo_cache_dir)
-            skip_msg = _skip_ported_msg(ending_version, ported_from_version)
-            if skip_msg:
-                pytest.skip(skip_msg)
-        else:
-            # For regular tests the value in the current cluster actually means something so we should
-            # use that to check.
-            # Use cassandra_version_from_build as it's guaranteed to be a LooseVersion
-            # whereas cassandra_version may be a string if set in the cli options
-            current_running_version = fixture_dtest_setup.dtest_config.cassandra_version_from_build
-            skip_msg = _skip_ported_msg(current_running_version, ported_from_version)
-            if skip_msg:
-                pytest.skip(skip_msg)
-
-
-def _skip_ported_msg(current_running_version, ported_from_version):
-    if loose_version_compare(current_running_version, ported_from_version) >= 0:
-        return "ported to in-JVM from %s >= %s" % (ported_from_version, current_running_version)
-
-
-@pytest.fixture(autouse=True)
-def fixture_ported_to_in_jvm(request, fixture_dtest_setup):
     marker = request.node.get_closest_marker('ported_to_in_jvm')
     if marker and not request.config.getoption("--use-vnodes"):
 

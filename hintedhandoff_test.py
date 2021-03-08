@@ -10,6 +10,7 @@ from tools.data import create_c1c2_table, insert_c1c2, query_c1c2
 from tools.assertions import assert_stderr_clean
 
 since = pytest.mark.since
+ported_to_in_jvm = pytest.mark.ported_to_in_jvm
 logger = logging.getLogger(__name__)
 
 
@@ -71,6 +72,7 @@ class TestHintedHandoffConfig(Tester):
             else:
                 query_c1c2(session, n, ConsistencyLevel.ONE, tolerate_missing=True, must_be_missing=True)
 
+    @ported_to_in_jvm('4.0')
     def test_nodetool(self):
         """
         Test various nodetool commands
@@ -177,6 +179,7 @@ class TestHintedHandoffConfig(Tester):
 
 class TestHintedHandoff(Tester):
 
+    @ported_to_in_jvm('4.0')
     @pytest.mark.no_vnodes
     def test_hintedhandoff_decom(self):
         self.cluster.populate(4).start()

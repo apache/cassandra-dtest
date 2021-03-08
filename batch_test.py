@@ -12,6 +12,7 @@ from tools.assertions import (assert_all, assert_invalid, assert_one,
 from tools.jmxutils import (JolokiaAgent, make_mbean)
 
 since = pytest.mark.since
+ported_to_in_jvm = pytest.mark.ported_to_in_jvm
 logger = logging.getLogger(__name__)
 
 
@@ -288,6 +289,7 @@ class TestBatch(Tester):
         assert_one(session, "SELECT * FROM users", [0, 'Jack', 'Sparrow'])
         assert_one(session, "SELECT * FROM dogs", [0, 'Pluto'])
 
+    @ported_to_in_jvm('4.0')
     @since('3.0', max_version='3.x')
     def test_logged_batch_compatibility_1(self):
         """
@@ -297,6 +299,7 @@ class TestBatch(Tester):
         """
         self._logged_batch_compatibility_test(0, 1, 'github:apache/cassandra-2.2', 2, 4)
 
+    @ported_to_in_jvm('4.0')
     @since('3.0', max_version='3.x')
     def test_batchlog_replay_compatibility_1(self):
         """
@@ -326,6 +329,7 @@ class TestBatch(Tester):
         """
         self._logged_batch_compatibility_test(0, 2, 'github:apache/cassandra-2.1', 1, 3)
 
+    @ported_to_in_jvm('4.0')
     @since('3.0', max_version='3.x')
     def test_logged_batch_compatibility_4(self):
         """
@@ -335,6 +339,7 @@ class TestBatch(Tester):
         """
         self._logged_batch_compatibility_test(2, 2, 'github:apache/cassandra-2.2', 1, 4)
 
+    @ported_to_in_jvm('4.0')
     @since('3.0', max_version='3.x')
     def test_batchlog_replay_compatibility_4(self):
         """
