@@ -190,7 +190,7 @@ class TestDynamicEndpointSnitch(Tester):
         insert_stmt.consistency_level = ConsistencyLevel.ALL
         with JolokiaAgent(coordinator_node) as jmx:
             with JolokiaAgent(degraded_node) as bad_jmx:
-                for x in range(0, 300):
+                for x in range(0, 150):
                     session.execute(insert_stmt, [x])
 
                 cleared = False
@@ -202,7 +202,7 @@ class TestDynamicEndpointSnitch(Tester):
 
                 snitchable_count = 0
 
-                for x in range(0, 300):
+                for x in range(0, 150):
                     degraded_reads_before = bad_jmx.read_attribute(read_stage, 'Value')
                     scores_before = jmx.read_attribute(des, 'Scores')
                     assert no_cross_dc(scores_before, [node4, node5, node6]), "Cross DC scores were present: " + str(scores_before)
@@ -215,13 +215,15 @@ class TestDynamicEndpointSnitch(Tester):
                                   [coordinator_node, healthy_node, degraded_node]):
                         snitchable_count = snitchable_count + 1
                         # If the DES correctly routed the read around the degraded node,
-                        # it shouldn't have another completed read request in metrics
-                        assert (degraded_reads_before ==
-                                     bad_jmx.read_attribute(read_stage, 'Value'))
+                        # it shouldn't have another completed read request in metrics,
+                        # unless there was one right after a reset.
+                        degraded_reads = bad_jmx.read_attribute(read_stage, 'Value')
+                        difference = abs(degraded_reads_before - degraded_reads)
+                        assert difference <= 1, "too many reads hit the degraded node: %s" % difference
                     else:
                         # sleep to give dynamic snitch time to recalculate scores
                         time.sleep(.1)
 
                 # check that most reads were snitchable, with some
                 # room allowed in case score recalculation is slow
-                assert snitchable_count >= 250
+                assert snitchable_count >= 125
