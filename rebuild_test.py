@@ -141,7 +141,6 @@ class TestRebuild(Tester):
         for i in range(0, keys):
             query_c1c2(session, i, ConsistencyLevel.LOCAL_ONE)
 
-    @flaky
     @since('2.2')
     def test_resumable_rebuild(self):
         """
@@ -154,7 +153,8 @@ class TestRebuild(Tester):
             r'Streaming error occurred on session with peer 127.0.0.3',
             r'Remote peer 127.0.0.3 failed stream session',
             r'Streaming error occurred on session with peer 127.0.0.3:7000',
-            r'Remote peer 127.0.0.3:7000 failed stream session'
+            r'Remote peer 127.0.0.3:7000 failed stream session',
+            r'Stream receive task .* already finished'
         ]
 
         cluster = self.cluster
