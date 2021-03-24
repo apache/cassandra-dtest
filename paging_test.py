@@ -3404,17 +3404,18 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
         data = self.setup_data()
 
         # Set TTL to all row
+        ttl_seconds = 15
         for row in data:
             s = ("insert into paging_test (id, mytext, col1, col2, col3) "
-                 "values ({}, '{}', {}, {}, {}) using ttl 15;").format(
+                 "values ({}, '{}', {}, {}, {}) using ttl {};").format(
                 row['id'], row['mytext'], row['col1'],
-                row['col2'], row['col3'])
+                row['col2'], row['col3'], ttl_seconds)
             self.session.execute(
                 SimpleStatement(s, consistency_level=CL.ALL)
             )
         self.check_all_paging_results(data, 8,
                                       [25, 25, 25, 25, 25, 25, 25, 25])
-        time.sleep(15)
+        time.sleep(ttl_seconds)
         self.check_all_paging_results([], 0, [])
 
     def test_failure_threshold_deletions(self):
