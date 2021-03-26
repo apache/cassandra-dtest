@@ -5,6 +5,7 @@ import logging
 from threading import Thread
 
 from cassandra import ConsistencyLevel, WriteTimeout
+from cassandra.cluster import Cluster, ExecutionProfile, EXEC_PROFILE_DEFAULT
 from cassandra.query import SimpleStatement
 
 from tools.assertions import assert_unavailable
@@ -88,7 +89,7 @@ class TestPaxos(Tester):
     # Warning, this test will require you to raise the open
     # file limit on OSX. Use 'ulimit -n 1000'
     def test_contention_many_threads(self):
-        self._contention_test(300, 1)
+        self._contention_test(250, 1)
 
     def _contention_test(self, threads, iterations):
         """
@@ -113,7 +114,6 @@ class TestPaxos(Tester):
                 self.retries = 0
 
             def run(self):
-                global worker_done
                 i = 0
                 prev = 0
                 while i < self.iterations:
@@ -159,8 +159,10 @@ class TestPaxos(Tester):
         nodes = self.cluster.nodelist()
         workers = []
 
-        c = self.patient_cql_connection(nodes[0], keyspace='ks')
-        q = c.prepare("""
+        
+        session = Cluster([nodes[0].ip_addr], connect_timeout=15, idle_heartbeat_interval=0,
+                          execution_profiles={EXEC_PROFILE_DEFAULT: ExecutionProfile(request_timeout=60)}).connect('ks')
+        q = session.prepare("""
                 BEGIN BATCH
                    UPDATE test SET v = ? WHERE k = 0 IF v = ?;
                    INSERT INTO test (k, id) VALUES (0, ?) IF NOT EXISTS;
@@ -168,7 +170,7 @@ class TestPaxos(Tester):
             """)
 
         for n in range(0, threads):
-            workers.append(Worker(n, c, iterations, q))
+            workers.append(Worker(n, session, iterations, q))
 
         start = time.time()
 
