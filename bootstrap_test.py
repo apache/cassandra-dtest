@@ -217,6 +217,26 @@ class TestBootstrap(Tester):
 
         assert_bootstrap_state(self, node3, 'COMPLETED')
 
+    def test_schema_removed_nodes(self):
+        """
+        @jira_ticket CASSANDRA-16577
+        Test that nodes can bootstrap after a schema change performed with a node removed
+        """
+        cluster = self.cluster
+        cluster.set_environment_variable('CASSANDRA_TOKEN_PREGENERATION_DISABLED', 'True')
+        cluster.populate(2)
+        cluster.start()
+
+        node1, node2 = cluster.nodelist()
+
+        node2.decommission(force=cluster.version() > '4')
+
+        session = self.patient_cql_connection(node1)
+        session.execute("CREATE KEYSPACE k WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};")
+
+        node3 = new_node(cluster)
+        node3.start(wait_for_binary_proto=True)
+
     def test_read_from_bootstrapped_node(self):
         """
         Test bootstrapped node sees existing data
