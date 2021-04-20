@@ -53,24 +53,26 @@ class TestPendingRangeMovements(Tester):
         node1.watch_log_for('Moving .* to {}'.format(token), timeout=10, from_mark=mark)
         node1.watch_log_for('Sleeping 30000 ms before start streaming/fetching ranges', timeout=10, from_mark=mark)
 
-        if cluster.version() >= '2.2':
-            if cluster.version() >= '4.0':
-                node2.watch_log_for('127.0.0.1:7000 state MOVING', timeout=10, filename='debug.log')
-            else:
-                node2.watch_log_for('127.0.0.1 state moving', timeout=10, filename='debug.log')
-        else:
-            # 2.1 doesn't have debug.log, so we are logging at trace, and look
-            # in the system.log file
-            node2.watch_log_for('127.0.0.1 state moving', timeout=10, filename='system.log')
+        self.watch_log_for_moving(node2)
 
         # Once the node is MOVING, kill it immediately, let the other nodes notice
         node1.stop(gently=False, wait_other_notice=True)
 
-        # Verify other nodes believe this is Down/Moving
-        out, _, _ = node2.nodetool('ring')
-        logger.debug("Nodetool Ring output: {}".format(out))
-        assert re.search('127\.0\.0\.1.*?Down.*?Moving', out) is not None
+        # Verify all nodes noticed this Down/Moving
+        for node in cluster.nodelist():
+            self.watch_log_for_moving(node)
 
         # Check we can still execute LWT
         for i in range(1000):
             session.execute(lwt_query)
+
+    def watch_log_for_moving(self, node):
+        if node.cluster.version() >= '2.2':
+            if node.cluster.version() >= '4.0':
+                node.watch_log_for('127.0.0.1:7000 state MOVING', timeout=10, filename='debug.log')
+            else:
+                node.watch_log_for('127.0.0.1 state moving', timeout=10, filename='debug.log')
+        else:
+            # 2.1 doesn't have debug.log, so we are logging at trace, and look
+            # in the system.log file
+            node.watch_log_for('127.0.0.1 state moving', timeout=10, filename='system.log')
