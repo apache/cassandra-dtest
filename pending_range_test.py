@@ -1,6 +1,7 @@
 import logging
 import pytest
 import re
+import threading
 
 from cassandra.query import SimpleStatement
 
@@ -23,7 +24,8 @@ class TestPendingRangeMovements(Tester):
             cluster.set_log_level('DEBUG')
 
         # Create 5 node cluster
-        cluster.populate(5).start()
+        ring_delay_ms = 3_600_000  # 1 hour
+        cluster.populate(5).start(jvm_args=['-Dcassandra.ring_delay_ms={}'.format(ring_delay_ms)])
         node1, node2 = cluster.nodelist()[0:2]
 
         # Set up RF=3 keyspace
@@ -46,27 +48,30 @@ class TestPendingRangeMovements(Tester):
 
         mark = node1.mark_log()
 
-        # Move a node
-        node1.nodetool('move {}'.format(token))
+        # Move a node without waiting for the response of nodetool, so we don't have to wait for ring_delay
+        threading.Thread(target=(lambda: node1.nodetool('move {}'.format(token)))).start()
 
         # Watch the log so we know when the node is moving
         node1.watch_log_for('Moving .* to {}'.format(token), timeout=10, from_mark=mark)
-        node1.watch_log_for('Sleeping 30000 ms before start streaming/fetching ranges', timeout=10, from_mark=mark)
+        node1.watch_log_for('Sleeping {} ms before start streaming/fetching ranges'.format(ring_delay_ms),
+                            timeout=10, from_mark=mark)
 
-        if cluster.version() >= '2.2':
-            if cluster.version() >= '4.0':
-                node2.watch_log_for('127.0.0.1:7000 state MOVING', timeout=10, filename='debug.log')
+        # Watch the logs so we know when all the nodes see the status update to MOVING
+        for node in cluster.nodelist():
+            if cluster.version() >= '2.2':
+                if cluster.version() >= '4.0':
+                    node.watch_log_for('127.0.0.1:7000 state MOVING', timeout=10, filename='debug.log')
+                else:
+                    node.watch_log_for('127.0.0.1 state moving', timeout=10, filename='debug.log')
             else:
-                node2.watch_log_for('127.0.0.1 state moving', timeout=10, filename='debug.log')
-        else:
-            # 2.1 doesn't have debug.log, so we are logging at trace, and look
-            # in the system.log file
-            node2.watch_log_for('127.0.0.1 state moving', timeout=10, filename='system.log')
+                # 2.1 doesn't have debug.log, so we are logging at trace, and look
+                # in the system.log file
+                node.watch_log_for('127.0.0.1 state moving', timeout=10, filename='system.log')
 
         # Once the node is MOVING, kill it immediately, let the other nodes notice
         node1.stop(gently=False, wait_other_notice=True)
 
-        # Verify other nodes believe this is Down/Moving
+        # Verify other nodes believe that the killed node is Down/Moving
         out, _, _ = node2.nodetool('ring')
         logger.debug("Nodetool Ring output: {}".format(out))
         assert re.search('127\.0\.0\.1.*?Down.*?Moving', out) is not None

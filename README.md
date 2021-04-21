@@ -78,6 +78,19 @@ directory is to set `cassandra_dir` in `~/path/to/cassandra-dtest/pytest.ini`:
 The tests will use this directory by default, avoiding the need for any
 environment variable (that still will have precedence if given though).
 
+To run a specific test file, class or individual test, you only have to 
+pass its path as an argument:
+
+    pytest --cassandra-dir=~/path/to/cassandra pending_range_test.py
+    pytest --cassandra-dir=~/path/to/cassandra pending_range_test.py::TestPendingRangeMovements
+    pytest --cassandra-dir=~/path/to/cassandra pending_range_test.py::TestPendingRangeMovements::test_pending_range
+    
+When adding a new test or modifying an existing one, it's always a good idea to
+run it several times to make sure it is stable. This can be easily done with 
+the ``--count`` option. For example, to run a test class 10 times:
+
+    pytest --count=10 --cassandra-dir=~/path/to/cassandra pending_range_test.py
+
 Existing tests are probably the best place to start to look at how to write
 tests.
 
