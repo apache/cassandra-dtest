@@ -52,12 +52,9 @@ path to success as it provides common base setup across various configurations.
 Usage
 -----
 
-The tests are executed by the pytest framework. For convenience, a wrapper ``run_dtests.py`` 
-is included with the intent to make starting execution of the dtests with sane defaults as easy 
-as possible. Most users will most likely find that invoking the tests directly using ``pytest`` 
-ultimately works the best and provides the most flexibility.
-
-Pytest has a great [Usage and Invocations](https://docs.pytest.org/en/latest/usage.html) document which is a great place to start for basic invocation options when using pytest.
+The tests are executed by the pytest framework which includes a helpful [Usage and
+Invocations](https://docs.pytest.org/en/latest/usage.html) document which is a great place to start
+for basic invocation options when using pytest.
 
 At minimum, 
 
@@ -83,11 +80,6 @@ environment variable (that still will have precedence if given though).
 
 Existing tests are probably the best place to start to look at how to write
 tests.
-
-The ``run_dtests.py`` included script is simply a wrapper to make starting the dtests 
-with sane defaults as simple as possible. If you just want to run the tests and do nothing more, 
-this is most likely the most easy place to start; however, anyone attempting to do active development
- and testing will find invoking pytest directly to be likely the best option.
 
 Each test spawns a new fresh cluster and tears it down after the test. If a
 test fails, the logs for the node are saved in a `logs/<timestamp>` directory
