@@ -5499,12 +5499,20 @@ class TestCQL(UpgradeTester):
         cursor.execute("CREATE KEYSPACE foo WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}")
         cursor.execute("CREATE TABLE foo.test1 (k int, t int, v int, PRIMARY KEY(k, t))")
 
-        cursor.execute("""
-            CREATE MATERIALIZED VIEW foo.view1
-            AS SELECT * FROM foo.test1
-            WHERE v IS NOT NULL AND t IS NOT NULL
-            PRIMARY KEY (k, v, t)
-        """)
+        if self.is_40_or_greater():
+            cursor.execute("""
+                CREATE MATERIALIZED VIEW foo.view1
+                AS SELECT * FROM foo.test1
+                WHERE k IS NOT NULL AND v IS NOT NULL AND t IS NOT NULL
+                PRIMARY KEY (k, v, t)
+            """)
+        else:
+            cursor.execute("""
+                CREATE MATERIALIZED VIEW foo.view1
+                AS SELECT * FROM foo.test1
+                WHERE v IS NOT NULL AND t IS NOT NULL
+                PRIMARY KEY (k, v, t)
+            """)
 
         for i in range(0, 10):
             cursor.execute("INSERT INTO foo.test1(k, t, v) VALUES (0, %d, %d)" % (i, 10 - i - 1))

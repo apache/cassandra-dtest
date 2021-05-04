@@ -480,7 +480,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
             if testing_compact_storage:
                 cursor.execute("TRUNCATE test2")
 
-            tables = ("test", "test2") if testing_compact_storage else ("test")
+            tables = ["test", "test2"] if testing_compact_storage else ["test"]
             for table in tables:
                 logger.debug("Querying table %s" % (table,))
                 expected = []
@@ -534,7 +534,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
             if testing_compact_storage:
               cursor.execute("TRUNCATE test2")
 
-            tables = ("test", "test2") if testing_compact_storage else ("test")
+            tables = ["test", "test2"] if testing_compact_storage else ["test"]
             for table in tables:
                 logger.debug("Querying table %s" % (table,))
                 expected = []

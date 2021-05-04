@@ -26,7 +26,8 @@ CASSANDRA_2_2 = '2.2'
 CASSANDRA_3_0 = '3.0'
 CASSANDRA_3_11 = '3.11'
 CASSANDRA_4_0 = '4.0'
-TRUNK = CASSANDRA_4_0
+CASSANDRA_4_1 = '4.1'
+TRUNK = CASSANDRA_4_1
 
 def is_same_family_current_to_indev(origin, destination):
     """
@@ -97,6 +98,8 @@ def set_version_family():
         version_family = CASSANDRA_3_11
     elif current_version.vstring.startswith('4.0'):
         version_family = CASSANDRA_4_0
+    elif current_version.vstring.startswith('4.1'):
+        version_family = CASSANDRA_4_1
     else:
         # when this occurs, it's time to update this manifest a bit!
         raise RuntimeError("Testing upgrades from/to version %s is not supported. Please use a custom manifest (see upgrade_manifest.py)" % current_version.vstring)
@@ -154,7 +157,10 @@ indev_3_0_x = VersionMeta(name='indev_3_0_x', family=CASSANDRA_3_0, variant='ind
 current_3_0_x = VersionMeta(name='current_3_0_x', family=CASSANDRA_3_0, variant='current', version='3.0.24', min_proto_v=3, max_proto_v=4, java_versions=(8,))
 
 indev_3_11_x = VersionMeta(name='indev_3_11_x', family=CASSANDRA_3_11, variant='indev', version='github:apache/cassandra-3.11', min_proto_v=3, max_proto_v=4, java_versions=(8,))
-current_3_11_x = VersionMeta(name='current_3_11_x', family=CASSANDRA_3_11, variant='current', version='3.11.9', min_proto_v=3, max_proto_v=4, java_versions=(8,))
+current_3_11_x = VersionMeta(name='current_3_11_x', family=CASSANDRA_3_11, variant='current', version='3.11.10', min_proto_v=3, max_proto_v=4, java_versions=(8,))
+
+indev_4_0_x = VersionMeta(name='indev_4_0_x', family=CASSANDRA_4_0, variant='indev', version='github:apache/cassandra-4.0', min_proto_v=3, max_proto_v=4, java_versions=(8,))
+current_4_0_x = VersionMeta(name='current_4_0_x', family=CASSANDRA_4_0, variant='current', version='4.0-rc1', min_proto_v=4, max_proto_v=5, java_versions=(8,))
 
 indev_trunk = VersionMeta(name='indev_trunk', family=TRUNK, variant='indev', version='github:apache/trunk', min_proto_v=4, max_proto_v=5, java_versions=(8,))
 
@@ -170,12 +176,14 @@ indev_trunk = VersionMeta(name='indev_trunk', family=TRUNK, variant='indev', ver
 MANIFEST = {
     current_2_1_x: [indev_2_2_x, indev_3_0_x, indev_3_11_x],
     current_2_2_x: [indev_2_2_x, indev_3_0_x, indev_3_11_x],
-    current_3_0_x: [indev_3_0_x, indev_3_11_x, indev_trunk],
-    current_3_11_x: [indev_3_11_x, indev_trunk],
+    current_3_0_x: [indev_3_0_x, indev_3_11_x, indev_4_0_x],
+    current_3_11_x: [indev_3_11_x, indev_4_0_x],
+    current_4_0_x: [indev_4_0_x, indev_trunk],
 
     indev_2_2_x: [indev_3_0_x, indev_3_11_x],
-    indev_3_0_x: [indev_3_11_x, indev_trunk],
-    indev_3_11_x: [indev_trunk]
+    indev_3_0_x: [indev_3_11_x, indev_4_0_x],
+    indev_3_11_x: [indev_4_0_x],
+    indev_4_0_x: [indev_trunk]
 }
 
 def _have_common_proto(origin_meta, destination_meta):
