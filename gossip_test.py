@@ -4,6 +4,7 @@ import pytest
 
 from dtest import Tester
 from tools.misc import new_node
+from tools.assertions import assert_stderr_clean
 
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
@@ -40,7 +41,7 @@ class TestGossip(Tester):
 
         logger.debug("Assassinating unknown node 11.1.1.1")
         out, err, _ = node1.nodetool("assassinate 11.1.1.1")
-        assert len(err.strip()) <= 0, "nodetool command failed: {}".format(err)
+        assert_stderr_clean(err)
 
         logger.debug("Starting node {}".format(node3.address()))
         node3.start()
@@ -70,7 +71,7 @@ class TestGossip(Tester):
         assassination_target = non_seed_nodes[0]
         logger.debug("Assassinating non-seed node {}".format(assassination_target.address()))
         out, err, _ = node1.nodetool("assassinate {}".format(assassination_target.address()))
-        assert len(err.strip()) <= 0, "nodetool command failed: {}".format(err)
+        assert_stderr_clean(err)
 
         logger.debug("Starting non-seed nodes")
         for node in non_seed_nodes:

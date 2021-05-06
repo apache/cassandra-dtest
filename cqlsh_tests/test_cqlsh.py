@@ -140,11 +140,14 @@ class TestCqlsh(Tester, CqlshMixin):
 
         logger.debug(cmds)
 
+        # 3.7 adds a text=True option which converts stdout/stderr to str type, until then
+        # when printing out need to convert in order to avoid assert failing as the type
+        # does not have an encoding
         p = subprocess.Popen(cmds, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         stdout, stderr = p.communicate()
 
-        assert 0 == len(stdout), stdout
-        assert 0 == len(stderr), stderr
+        assert 0 == len(stdout), str(stdout)
+        assert 0 == len(stderr), str(stderr)
 
     def test_simple_insert(self):
 
