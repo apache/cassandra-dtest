@@ -3,7 +3,9 @@ import types
 
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
+from ccmlib.cluster import DEFAULT_CLUSTER_WAIT_TIMEOUT_IN_SECS
 from ccmlib.node import Node
+from ccmlib.node import NODE_WAIT_TIMEOUT_IN_SECS
 
 from dtest import Tester
 from tools.assertions import (assert_all)
@@ -116,7 +118,8 @@ class TestTransientReplicationRing(Tester):
         print(self.cluster.get_install_dir())
         self.cluster.populate(3, tokens=self.tokens, debug=True, install_byteman=True)
         # self.cluster.populate(3, debug=True, install_byteman=True)
-        self.cluster.start(jvm_args=['-Dcassandra.enable_nodelocal_queries=true'])
+        self.cluster.start(jvm_args=['-Dcassandra.enable_nodelocal_queries=true'],
+                           timeout=DEFAULT_CLUSTER_WAIT_TIMEOUT_IN_SECS * 2)
 
         # enable shared memory
         for node in self.cluster.nodelist():
@@ -226,13 +229,12 @@ class TestTransientReplicationRing(Tester):
         # Every value should be replicated exactly 2 times
         self.check_replication(sessions, exactly=2)
 
-    @flaky(max_runs=1)
     @pytest.mark.no_vnodes
     def move_test(self, move_token, expected_after_move, expected_after_repair):
         """Helper method to run a move test cycle"""
         node4 = new_node(self.cluster, bootstrap=True, token='00040')
         patch_start(node4)
-        node4.start(wait_for_binary_proto=True)
+        node4.start(wait_for_binary_proto=NODE_WAIT_TIMEOUT_IN_SECS * 2)
         main_session = self.patient_cql_connection(self.node1)
         nodes = [self.node1, self.node2, self.node3, node4]
 
@@ -392,7 +394,6 @@ class TestTransientReplicationRing(Tester):
         self.check_expected(sessions, expected, nodes, cleanup=True)
         self.check_replication(sessions, exactly=2)
 
-    @flaky(max_runs=1)
     @pytest.mark.no_vnodes
     def test_remove(self):
         """Test  a mix of ring change operations across a mix of transient and repaired/unrepaired data"""
@@ -432,7 +433,6 @@ class TestTransientReplicationRing(Tester):
 
         self._nodes_have_proper_ranges_after_repair_and_cleanup(sessions)
 
-    @flaky(max_runs=1)
     @pytest.mark.no_vnodes
     def test_replace(self):
         main_session = self.patient_cql_connection(self.node1)
