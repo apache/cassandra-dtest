@@ -461,18 +461,26 @@ class TestCQL(UpgradeTester):
         """ Validate counter support """
         cursor = self.prepare()
 
-        cursor.execute("""
+        logger.debug('*** VERSION FAMILY: ' + str(self.UPGRADE_PATH.upgrade_meta.family))
+        logger.debug('*** VERSION: ' + str(self.cluster.version()))
+
+        create_table_query = """
             CREATE TABLE clicks (
                 userid int,
                 url text,
                 total counter,
                 PRIMARY KEY (userid, url)
-            ) WITH COMPACT STORAGE;
-        """)
+            )
+        """
 
-        #4.0 doesn't support compact storage
-        if self.is_40_or_greater():
-            cursor.execute("ALTER TABLE clicks DROP COMPACT STORAGE;")
+        if self.cluster.version() >= LooseVersion('4.0'):
+            cursor.execute(create_table_query)
+        else:
+            cursor.execute(create_table_query + '  WITH COMPACT STORAGE')
+
+            # 4.0 doesn't support compact storage
+            if self.is_40_or_greater():
+                cursor.execute("ALTER TABLE clicks DROP COMPACT STORAGE")
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
             logger.debug("Querying {} node".format("upgraded" if is_upgraded else "old"))
