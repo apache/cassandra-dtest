@@ -24,6 +24,7 @@ from tools.intervention import InterruptBootstrap, KillOnBootstrap, KillOnReadyT
 from tools.misc import new_node, generate_ssl_stores
 
 since = pytest.mark.since
+ported_to_in_jvm = pytest.mark.ported_to_in_jvm
 logger = logging.getLogger(__name__)
 
 class TestBootstrap(Tester):
@@ -745,6 +746,7 @@ class TestBootstrap(Tester):
         node2.watch_log_for("JOINING:", from_mark=mark)
 
     @since('3.0')
+    @ported_to_in_jvm('4.1')
     def test_node_cannot_join_as_hibernating_node_without_replace_address(self):
         """
         @jira_ticket CASSANDRA-14559
