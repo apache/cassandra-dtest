@@ -1883,6 +1883,10 @@ Tracing session:""")
         """
         @jira_ticket CASSANDRA-15193
         """
+        self.fixture_dtest_setup.ignore_log_patterns = (
+                r'.*Unknown exception in client networking.*',
+                r'.*Invalid or unsupported protocol version \(4\).*',
+                )
         self.cluster.populate(1)
         self.cluster.set_configuration_options({ 'native_transport_max_negotiable_protocol_version': str(3)})
         self.cluster.start()

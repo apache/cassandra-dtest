@@ -18,6 +18,12 @@ class TestNativeTransportSSL(Tester):
     Native transport integration tests, specifically for ssl and port configurations.
     """
 
+    @pytest.fixture(autouse=True)
+    def fixture_add_additional_log_patterns(self, fixture_dtest_setup):
+        fixture_dtest_setup.ignore_log_patterns = (
+            r'.*Unknown exception in client networking.*'
+        )
+
     def test_connect_to_ssl(self):
         """
         Connecting to SSL enabled native transport port should only be possible using SSL enabled client

@@ -49,6 +49,12 @@ class TestCqlshCopy(Tester):
     @jira_ticket CASSANDRA-3906
     """
 
+    @pytest.fixture(autouse=True)
+    def fixture_add_additional_log_patterns(self, fixture_dtest_setup):
+        fixture_dtest_setup.ignore_log_patterns = (
+            r'.*Unknown exception in client networking.*'
+        )
+
     @pytest.fixture(scope='function', autouse=True)
     def fixture_temp_files(self):
         self._tempfiles = []
