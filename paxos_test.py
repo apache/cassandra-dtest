@@ -67,19 +67,21 @@ class TestPaxos(Tester):
         # This must not use vnodes as it relies on assumed token values.
 
         session = self.prepare(nodes=3)
+        node2 = self.cluster.nodelist()[1]
+        node3 = self.cluster.nodelist()[2]
         session.execute("CREATE TABLE test (k int PRIMARY KEY, v int)")
         session.execute("INSERT INTO test (k, v) VALUES (0, 0) IF NOT EXISTS")
 
-        self.cluster.nodelist()[2].stop()
+        node3.stop()
         session.execute("INSERT INTO test (k, v) VALUES (1, 1) IF NOT EXISTS")
 
-        self.cluster.nodelist()[1].stop()
+        node2.stop()
         session.execute("INSERT INTO test (k, v) VALUES (3, 2) IF NOT EXISTS")
 
-        self.cluster.nodelist()[1].start()
+        node2.start(wait_for_binary_proto = True)
         session.execute("INSERT INTO test (k, v) VALUES (5, 5) IF NOT EXISTS")
 
-        self.cluster.nodelist()[2].start()
+        node3.start(wait_for_binary_proto = True)
         session.execute("INSERT INTO test (k, v) VALUES (6, 6) IF NOT EXISTS")
 
     def test_contention_multi_iterations(self):
