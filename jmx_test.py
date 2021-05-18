@@ -11,8 +11,8 @@ from ccmlib.node import ToolError
 from distutils.version import LooseVersion
 
 from dtest import Tester, create_ks
-from tools.jmxutils import (JolokiaAgent, enable_jmx_ssl, make_mbean,
-                            remove_perf_disable_shared_mem)
+from tools.jmxutils import (JolokiaAgent, enable_jmx_ssl, make_mbean)
+                            
 from tools.misc import generate_ssl_stores
 from tools.data import create_c1c2_table, insert_c1c2
 
@@ -301,7 +301,6 @@ class TestJMX(Tester):
         cluster = self.cluster
         cluster.populate(1)
         node = cluster.nodelist()[0]
-        remove_perf_disable_shared_mem(node)
         cluster.start(wait_for_binary_proto=True)
 
         session = self.patient_exclusive_cql_connection(node)
