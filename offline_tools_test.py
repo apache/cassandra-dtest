@@ -290,11 +290,12 @@ class TestOfflineTools(Tester):
         # use verbose to get some coverage on it
         try:
             (out, error, rc) = node1.run_sstableverify("keyspace1", "standard1", options=['-v'])
+            assert False, "sstable verify did not fail; rc={}\nout={}\nerr={}".format(str(rc), out, error)
         except ToolError as e:
             # Process sstableverify output to normalize paths in string to Python casing as above
-            error = re.sub("(?<=Corrupted: ).*", lambda match: os.path.normcase(match.group(0)), str(e))
+            error = re.sub("(?<=WARNING: Corrupted SSTable : ).*", lambda match: os.path.normcase(match.group(0)), str(e))
 
-            assert re.search("Corrupted: " + sstable1, error)
+            assert re.search("WARNING: Corrupted SSTable : " + sstable1, error)
             assert e.exit_status == 1, str(e.exit_status)
 
     def test_sstableexpiredblockers(self):
