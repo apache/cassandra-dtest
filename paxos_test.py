@@ -48,16 +48,19 @@ class TestPaxos(Tester):
         session.execute("CREATE TABLE test (k int PRIMARY KEY, v int)")
         session.execute("INSERT INTO test (k, v) VALUES (0, 0) IF NOT EXISTS")
 
-        self.cluster.nodelist()[2].stop()
+        node1 = self.cluster.nodelist()[1]
+        node2 = self.cluster.nodelist()[2]
+
+        node2.stop()
         session.execute("INSERT INTO test (k, v) VALUES (1, 1) IF NOT EXISTS")
 
-        self.cluster.nodelist()[1].stop()
+        node1.stop()
         assert_unavailable(session.execute, "INSERT INTO test (k, v) VALUES (2, 2) IF NOT EXISTS")
 
-        self.cluster.nodelist()[1].start()
+        node1.start(wait_for_binary_proto=True)
         session.execute("INSERT INTO test (k, v) VALUES (3, 3) IF NOT EXISTS")
 
-        self.cluster.nodelist()[2].start()
+        node2.start(wait_for_binary_proto=True)
         session.execute("INSERT INTO test (k, v) VALUES (4, 4) IF NOT EXISTS")
 
     @pytest.mark.no_vnodes
