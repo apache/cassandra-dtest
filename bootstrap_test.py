@@ -7,6 +7,7 @@ import threading
 import time
 import logging
 import signal
+import uuid
 
 from cassandra import ConsistencyLevel
 from cassandra.concurrent import execute_concurrent_with_args
@@ -1016,3 +1017,37 @@ class TestBootstrap(Tester):
         self.assert_log_had_msg(node3, "Leaving write survey mode and joining ring at operator request")
         assert_bootstrap_state(self, node3, 'COMPLETED', user='cassandra', password='cassandra')
         node3.wait_for_binary_interface()
+
+    def test_invalid_host_id(self):
+        """
+        @jira_ticket CASSANDRA-14582
+        Test that node fails to bootstrap if host id is invalid
+        """
+        cluster = self.cluster
+        cluster.populate(1)
+
+        node2 = new_node(cluster)
+        node2.start(jvm_args=["-Dcassandra.host_id_first_boot=invalid-host-id"])
+        self.assert_log_had_msg(node2, 'hostId to use was illegal UUID')
+
+    def test_host_id_override(self):
+        """
+        @jira_ticket CASSANDRA-14582
+        Test that node persists host id
+        """
+        cluster = self.cluster
+        cluster.populate(1)
+        cluster.start()
+
+        host_id = "06fc931f-33b5-4e22-0001-000000000001"
+
+        node2 = new_node(cluster)
+
+        node2.start(wait_for_binary_proto=True, wait_other_notice=True, jvm_args=["-Dcassandra.host_id_first_boot={}".format(host_id)])
+        
+        address = "'{}'".format(node2.address())
+
+        print("SELECT host_id FROM system.peers_v2 WHERE peer = {}".format(address))
+
+        session = self.patient_cql_connection(node2)
+        assert_one(session, "SELECT host_id FROM system.peers_v2 WHERE peer = {}".format(address), [uuid.UUID(host_id)])
