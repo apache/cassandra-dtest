@@ -1044,7 +1044,7 @@ class TestBootstrap(Tester):
         node2 = new_node(cluster)
 
         node2.start(wait_for_binary_proto=True, wait_other_notice=True, jvm_args=["-Dcassandra.host_id_first_boot={}".format(host_id)])
-        
+
         address = "'{}'".format(node2.address())
 
         print("SELECT host_id FROM system.peers_v2 WHERE peer = {}".format(address))
