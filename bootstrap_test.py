@@ -1024,7 +1024,9 @@ class TestBootstrap(Tester):
         Test that node fails to bootstrap if host id is invalid
         """
         cluster = self.cluster
+        cluster.set_environment_variable('CASSANDRA_TOKEN_PREGENERATION_DISABLED', 'True')
         cluster.populate(1)
+        cluster.start()
 
         node2 = new_node(cluster)
         node2.start(jvm_args=["-Dcassandra.host_id_first_boot=invalid-host-id"])
@@ -1036,18 +1038,56 @@ class TestBootstrap(Tester):
         Test that node persists host id
         """
         cluster = self.cluster
+        cluster.set_environment_variable('CASSANDRA_TOKEN_PREGENERATION_DISABLED', 'True')
         cluster.populate(1)
         cluster.start()
 
         host_id = "06fc931f-33b5-4e22-0001-000000000001"
 
-        node2 = new_node(cluster)
+        node1 = cluster.nodes['node1']
 
+        node2 = new_node(cluster)
         node2.start(wait_for_binary_proto=True, wait_other_notice=True, jvm_args=["-Dcassandra.host_id_first_boot={}".format(host_id)])
 
-        address = "'{}'".format(node2.address())
+        address2 = "'{}'".format(node2.address())
 
-        print("SELECT host_id FROM system.peers_v2 WHERE peer = {}".format(address))
+        # 1. wait for host_id setup
+        node2.watch_log_for(host_id)
 
-        session = self.patient_cql_connection(node2)
-        assert_one(session, "SELECT host_id FROM system.peers_v2 WHERE peer = {}".format(address), [uuid.UUID(host_id)])
+        # 2. check host_id in local table
+        session2 = self.patient_exclusive_cql_connection(node2)
+        assert_one(session2, "SELECT host_id FROM system.local", [uuid.UUID(host_id)])
+
+        # 3. check host_id in other node's table
+        session1 = self.patient_cql_connection(node1)
+        assert_one(session1, "SELECT host_id FROM system.peers_v2 WHERE peer = {}".format(address2), [uuid.UUID(host_id)])
+
+        # restart node and repeat
+        node2.stop()
+        node2.start(wait_for_binary_proto=True, wait_other_notice=True)
+
+        # 1. wait for host_id setup
+        node2.watch_log_for(host_id)
+
+        # 2. check host_id in local table
+        session2 = self.patient_exclusive_cql_connection(node2)
+        assert_one(session2, "SELECT host_id FROM system.local", [uuid.UUID(host_id)])
+
+        # 3. check host_id in other node's table
+        session1 = self.patient_cql_connection(node1)
+        assert_one(session1, "SELECT host_id FROM system.peers_v2 WHERE peer = {}".format(address2), [uuid.UUID(host_id)])
+
+        # restart node with another host_id and repeat
+        node2.stop()
+        node2.start(wait_for_binary_proto=True, wait_other_notice=True, jvm_args=["-Dcassandra.host_id_first_boot=setting-new-host-id-first-boot"])
+        
+        # 1. wait for host_id setup
+        node2.watch_log_for(host_id)
+
+        # 2. check host_id in local table
+        session2 = self.patient_exclusive_cql_connection(node2)
+        assert_one(session2, "SELECT host_id FROM system.local", [uuid.UUID(host_id)])
+
+        # 3. check host_id in other node's table
+        session1 = self.patient_cql_connection(node1)
+        assert_one(session1, "SELECT host_id FROM system.peers_v2 WHERE peer = {}".format(address2), [uuid.UUID(host_id)])
