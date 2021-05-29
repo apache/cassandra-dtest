@@ -1029,8 +1029,8 @@ class TestBootstrap(Tester):
         cluster.start()
 
         node2 = new_node(cluster)
-        node2.start(jvm_args=["-Dcassandra.host_id_first_boot=invalid-host-id"])
-        self.assert_log_had_msg(node2, 'hostId to use was illegal UUID')
+        node2.start(jvm_args=["-Dcassandra.host_id_first_boot=invalid-host-id"], no_wait=True, wait_other_notice=False)
+        node2.watch_log_for("Invalid UUID string: invalid-host-id")
 
     def test_host_id_override(self):
         """
