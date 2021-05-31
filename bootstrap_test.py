@@ -1059,7 +1059,7 @@ class TestBootstrap(Tester):
         assert_one(session2, "SELECT host_id FROM system.local", [uuid.UUID(host_id)])
 
         # 3. check host_id in other node's table
-        session1 = self.patient_cql_connection(node1)
+        session1 = self.patient_exclusive_cql_connection(node1)
         assert_one(session1, "SELECT host_id FROM system.peers_v2 WHERE peer = {}".format(address2), [uuid.UUID(host_id)])
 
         # restart node and repeat
@@ -1074,7 +1074,7 @@ class TestBootstrap(Tester):
         assert_one(session2, "SELECT host_id FROM system.local", [uuid.UUID(host_id)])
 
         # 3. check host_id in other node's table
-        session1 = self.patient_cql_connection(node1)
+        session1 = self.patient_exclusive_cql_connection(node1)
         assert_one(session1, "SELECT host_id FROM system.peers_v2 WHERE peer = {}".format(address2), [uuid.UUID(host_id)])
 
         # restart node with another host_id and repeat
@@ -1089,5 +1089,5 @@ class TestBootstrap(Tester):
         assert_one(session2, "SELECT host_id FROM system.local", [uuid.UUID(host_id)])
 
         # 3. check host_id in other node's table
-        session1 = self.patient_cql_connection(node1)
+        session1 = self.patient_exclusive_cql_connection(node1)
         assert_one(session1, "SELECT host_id FROM system.peers_v2 WHERE peer = {}".format(address2), [uuid.UUID(host_id)])
