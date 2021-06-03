@@ -26,6 +26,7 @@ CASSANDRA_2_2 = '2.2'
 CASSANDRA_3_0 = '3.0'
 CASSANDRA_3_11 = '3.11'
 CASSANDRA_4_0 = '4.0'
+CASSANDRA_4_0_0 = '4.0.0'
 CASSANDRA_4_1 = '4.1'
 TRUNK = CASSANDRA_4_1
 
@@ -96,6 +97,8 @@ def set_version_family():
         version_family = CASSANDRA_3_0
     elif current_version.vstring.startswith('3.11'):
         version_family = CASSANDRA_3_11
+    elif current_version.vstring.startswith('4.0.0'):
+        version_family = CASSANDRA_4_0_0
     elif current_version.vstring.startswith('4.0'):
         version_family = CASSANDRA_4_0
     elif current_version.vstring.startswith('4.1'):
