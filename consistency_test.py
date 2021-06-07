@@ -1163,7 +1163,7 @@ class TestConsistency(Tester):
         # with node2 down and hints disabled, delete the partition on node1
         node2.stop(wait_other_notice=True)
         session.execute("DELETE FROM test.test WHERE id = 0;")
-        node2.start()
+        node2.start(wait_for_binary_proto=True)
 
         # with both nodes up, do a CL.ALL query with per partition limit of 1;
         # prior to CASSANDRA-13880 this would cause short read protection to loop forever
