@@ -4,8 +4,10 @@ import os
 import shutil
 import subprocess
 import time
+from pathlib import Path
 import pytest
 import logging
+import json
 
 from cassandra.concurrent import execute_concurrent_with_args
 
@@ -31,11 +33,13 @@ class SnapshotTester(Tester):
         args = [(r,) for r in range(start, end)]
         execute_concurrent_with_args(session, insert_statement, args, concurrency=20)
 
-    def make_snapshot(self, node, ks, cf, name):
+    def make_snapshot(self, node, ks, cf, name, ttl=None):
         logger.debug("Making snapshot....")
         node.nodetool('disableautocompaction')
         node.flush()
         snapshot_cmd = 'snapshot {ks} -cf {cf} -t {name}'.format(ks=ks, cf=cf, name=name)
+        if ttl is not None:
+            snapshot_cmd += ' --ttl ' + ttl
         logger.debug("Running snapshot cmd: {snapshot_cmd}".format(snapshot_cmd=snapshot_cmd))
         node.nodetool(snapshot_cmd)
         tmpdir = safe_mkdtemp()
@@ -119,6 +123,27 @@ class TestSnapshot(SnapshotTester):
         shutil.rmtree(snapshot_dir)
 
         assert rows[0][0] == 100
+
+    def test_ttl_fields(self):
+        cluster = self.cluster
+        cluster.populate(1).start()
+        (node1,) = cluster.nodelist()
+        session = self.patient_cql_connection(node1)
+        self.create_schema(session)
+
+        self.insert_rows(session, 0, 100)
+        snapshot_dir = self.make_snapshot(node1, 'ks', 'cf', 'basic', '3m')
+
+        for item in Path(snapshot_dir).rglob("*manifest.json"):
+            fields = json.load(open(item))
+            assert 'expires_at' in fields
+            assert 'created_at' in fields
+
+        snapshot_dir = self.make_snapshot(node1, 'ks', 'cf', 'basic-another')
+        for item in Path(snapshot_dir).rglob("*manifest.json"):
+            fields = json.load(open(item))
+            assert 'expires_at' not in fields
+            assert 'created_at' not in fields
 
     @since('3.0')
     def test_snapshot_and_restore_drop_table_remove_dropped_column(self):
