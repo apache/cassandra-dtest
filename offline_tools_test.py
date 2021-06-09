@@ -8,7 +8,6 @@ import logging
 
 from ccmlib import common
 from ccmlib.node import ToolError
-from tools.assertions import assert_stderr_clean
 
 from dtest import Tester, create_ks
 
@@ -89,11 +88,14 @@ class TestOfflineTools(Tester):
         logger.debug(initial_levels)
         logger.debug(final_levels)
 
-        # let's make sure there was at least L1 beforing resetting levels
+        # let's make sure there was at least L1 before resetting levels
         assert max(initial_levels) > 0
 
         # let's check all sstables are on L0 after sstablelevelreset
         assert max(final_levels) == 0
+
+        # verify that the cluster can still start after messing with the sstables
+        cluster.start()
 
     def get_levels(self, data):
         (out, err, rc) = data
@@ -113,7 +115,7 @@ class TestOfflineTools(Tester):
         Run sstableofflinerelevel and ensure tables are promoted correctly
         Also test a variety of bad inputs including nonexistent keyspace and sstables
         @since 2.1.5
-        @jira_ticket CASSANRDA-8031
+        @jira_ticket CASSANDRA-8031
         """
         cluster = self.cluster
         cluster.set_configuration_options(values={'compaction_throughput_mb_per_sec': 0})
@@ -213,6 +215,9 @@ class TestOfflineTools(Tester):
 
         # let's check sstables were promoted after releveling
         assert max(final_levels) > 1
+
+        # verify that the cluster can still start after messing with the sstables
+        cluster.start()
 
     @since('2.2')
     def test_sstableverify(self):
