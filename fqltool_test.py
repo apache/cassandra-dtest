@@ -132,6 +132,34 @@ class TestFQLTool(Tester):
             output = self._run_fqltool_compare(node1, queries1, [results1, results2])
             assert b"MISMATCH" in output  # compares two different stress runs, should mismatch
 
+    def test_jvmdtest(self):
+        """ mimics the behavior of the in-jvm dtest, see CASSANDRA-16720 """
+        self.cluster.populate(1).start()
+        node1 = self.cluster.nodelist()[0]
+
+        session = self.patient_cql_connection(node1)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            tmpdir = tempfile.mkdtemp(dir=temp_dir)
+            session.execute("CREATE KEYSPACE fql_ks WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};")
+            node1.nodetool("enablefullquerylog --path={}".format(tmpdir))
+            session.execute("CREATE TABLE fql_ks.fql_table (id int primary key);")
+            session.execute("INSERT INTO fql_ks.fql_table (id) VALUES (1)")
+            node1.nodetool("disablefullquerylog")
+            session.execute("DROP TABLE fql_ks.fql_table;")
+            self._run_fqltool_replay(node1, [tmpdir], "127.0.0.1", None, None, replay_ddl_statements=False)
+
+            got_exception = False
+            try:
+                session.execute("SELECT * FROM fql_ks.fql_table;")
+            except Exception:
+                got_exception = True
+            assert got_exception
+
+            self._run_fqltool_replay(node1, [tmpdir], "127.0.0.1", None, None, replay_ddl_statements=True)
+            rs = session.execute("SELECT * FROM fql_ks.fql_table;")
+            assert(len(list(rs)) == 1)
+
     def _run_fqltool_replay(self, node, logdirs, target, queries, results, replay_ddl_statements=False):
         fqltool = self.fqltool(node)
         args = [fqltool, "replay", "--target {}".format(target)]
