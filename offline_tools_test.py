@@ -8,7 +8,6 @@ import logging
 
 from ccmlib import common
 from ccmlib.node import ToolError
-from tools.assertions import assert_stderr_clean
 
 from dtest import Tester, create_ks
 
@@ -113,7 +112,7 @@ class TestOfflineTools(Tester):
         Run sstableofflinerelevel and ensure tables are promoted correctly
         Also test a variety of bad inputs including nonexistent keyspace and sstables
         @since 2.1.5
-        @jira_ticket CASSANRDA-8031
+        @jira_ticket CASSANDRA-8031
         """
         cluster = self.cluster
         cluster.set_configuration_options(values={'compaction_throughput_mb_per_sec': 0})
@@ -178,6 +177,9 @@ class TestOfflineTools(Tester):
         cluster.stop()
         logger.debug("Done stopping node")
 
+        # cleanup any outstanding transactions
+        self._cleanup_via_sstableutil(node1, "keyspace1", "standard1")
+
         # Let's reset all sstables to L0
         logger.debug("Getting initial levels")
         initial_levels = list(self.get_levels(node1.run_sstablemetadata(keyspace="keyspace1", column_families=["standard1"])))
@@ -213,6 +215,22 @@ class TestOfflineTools(Tester):
 
         # let's check sstables were promoted after releveling
         assert max(final_levels) > 1
+
+    def _cleanup_via_sstableutil(self, node, ks, table):
+        logger.debug("Invoking sstableutil")
+        env = common.make_cassandra_env(node.get_install_cassandra_root(), node.get_node_cassandra_root())
+        tool_bin = node.get_tool('sstableutil')
+
+        args = [tool_bin, '--type', 'all', '--oplog', '--cleanup', ks, table]
+
+        p = subprocess.Popen(args, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+        (stdout, stderr) = p.communicate()
+
+        assert p.returncode == 0, "Error invoking sstableutil; returned {code}".format(code=p.returncode)
+
+        if stdout:
+            logger.debug(stdout.decode("utf-8"))
 
     @since('2.2')
     def test_sstableverify(self):
