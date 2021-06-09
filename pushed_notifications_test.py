@@ -445,7 +445,7 @@ class TestVariousNotifications(Tester):
                        node2.grep_log(failure_msg) or
                        node3.grep_log(failure_msg))
 
-            assert failure == "Cannot find tombstone failure threshold error in log after failed query"
+            assert failure, "Cannot find tombstone failure threshold error in log after failed query"
 
         mark1 = node1.mark_log()
         mark2 = node2.mark_log()
