@@ -1,3 +1,8 @@
+import logging
+import time
+
+logger = logging.getLogger(__name__)
+
 class RerunTestException(Exception):
     """
     This exception can be raised to signal a likely harmless test problem. If fixing a test is reasonable, that should be preferred.
@@ -30,3 +35,18 @@ def requires_rerun(err, *args):
     """
     # err[0] contains the type of the error that occurred
     return err[0] == RerunTestException
+
+def retry(fn, num_retries=10, allowed_error=None, sleep_seconds=1):
+    last_error = None
+    for x in range(0, num_retries): 
+        try:
+            return fn()
+        except Exception as e:
+            last_error = e
+            if allowed_error and not allowed_error(e):
+                break
+            logger.info("Retrying as error '{}' was seen; sleeping for {} seconds".format(str(e), str(sleep_seconds)))
+            time.sleep(sleep_seconds)
+    raise last_error
+
+
