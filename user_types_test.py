@@ -5,11 +5,12 @@ import logging
 
 from flaky import flaky
 
-from cassandra import ConsistencyLevel, Unauthorized
+from cassandra import ConsistencyLevel, Unauthorized, InvalidRequest
 from cassandra.query import SimpleStatement
 
 from dtest import Tester, create_ks
 from tools.assertions import assert_invalid
+from tools.flaky import retry
 from plugins.assert_tools import assert_regexp_matches
 
 since = pytest.mark.since
@@ -529,17 +530,24 @@ class TestUserTypes(Tester):
         cluster.set_configuration_options(values=config)
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
-        # need a bit of time for user to be created and propagate
-        time.sleep(5)
 
         # do setup that requires a super user
         superuser_session = self.patient_cql_connection(node1, user='cassandra', password='cassandra')
-        superuser_session.execute("create user ks1_user with password 'cassandra' nosuperuser;")
-        superuser_session.execute("create user ks2_user with password 'cassandra' nosuperuser;")
-        create_ks(superuser_session, 'ks1', 2)
-        create_ks(superuser_session, 'ks2', 2)
-        superuser_session.execute("grant all permissions on keyspace ks1 to ks1_user;")
-        superuser_session.execute("grant all permissions on keyspace ks2 to ks2_user;")
+
+        # role setup is async and does not log when complete; the only way to know its done (on a single instance) is to get a successful return.
+        def allowed_error(error):
+            return isinstance(error, InvalidRequest) and "Cannot process role related query as the role manager isn't yet setup" in str(error)
+        def r(fn):
+            retry(fn, allowed_error=allowed_error, sleep_seconds=10)
+
+        # role setup  process is local to each instance, so can't rely on the first query passing to say this is complete; node1 may be complete but not node2 and node3
+        # for this reason, need to be aggressive about retries
+        r(lambda: superuser_session.execute("create user ks1_user with password 'cassandra' nosuperuser;"))
+        r(lambda: superuser_session.execute("create user ks2_user with password 'cassandra' nosuperuser;"))
+        r(lambda: create_ks(superuser_session, 'ks1', 2))
+        r(lambda: create_ks(superuser_session, 'ks2', 2))
+        r(lambda: superuser_session.execute("grant all permissions on keyspace ks1 to ks1_user;"))
+        r(lambda: superuser_session.execute("grant all permissions on keyspace ks2 to ks2_user;"))
 
         user1_session = self.patient_cql_connection(node1, user='ks1_user', password='cassandra')
         user2_session = self.patient_cql_connection(node1, user='ks2_user', password='cassandra')
