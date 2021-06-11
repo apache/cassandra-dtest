@@ -88,11 +88,14 @@ class TestOfflineTools(Tester):
         logger.debug(initial_levels)
         logger.debug(final_levels)
 
-        # let's make sure there was at least L1 beforing resetting levels
+        # let's make sure there was at least L1 before resetting levels
         assert max(initial_levels) > 0
 
         # let's check all sstables are on L0 after sstablelevelreset
         assert max(final_levels) == 0
+
+        # verify that the cluster can still start after messing with the sstables
+        cluster.start()
 
     def get_levels(self, data):
         (out, err, rc) = data
@@ -177,9 +180,6 @@ class TestOfflineTools(Tester):
         cluster.stop()
         logger.debug("Done stopping node")
 
-        # cleanup any outstanding transactions
-        self._cleanup_via_sstableutil(node1, "keyspace1", "standard1")
-
         # Let's reset all sstables to L0
         logger.debug("Getting initial levels")
         initial_levels = list(self.get_levels(node1.run_sstablemetadata(keyspace="keyspace1", column_families=["standard1"])))
@@ -216,21 +216,8 @@ class TestOfflineTools(Tester):
         # let's check sstables were promoted after releveling
         assert max(final_levels) > 1
 
-    def _cleanup_via_sstableutil(self, node, ks, table):
-        logger.debug("Invoking sstableutil")
-        env = common.make_cassandra_env(node.get_install_cassandra_root(), node.get_node_cassandra_root())
-        tool_bin = node.get_tool('sstableutil')
-
-        args = [tool_bin, '--type', 'all', '--oplog', '--cleanup', ks, table]
-
-        p = subprocess.Popen(args, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-        (stdout, stderr) = p.communicate()
-
-        assert p.returncode == 0, "Error invoking sstableutil; returned {code}".format(code=p.returncode)
-
-        if stdout:
-            logger.debug(stdout.decode("utf-8"))
+        # verify that the cluster can still start after messing with the sstables
+        cluster.start()
 
     @since('2.2')
     def test_sstableverify(self):
