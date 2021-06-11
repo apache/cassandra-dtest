@@ -29,7 +29,8 @@ from dtest import Tester, create_ks, create_cf
 from dtest_setup_overrides import DTestSetupOverrides
 from tools.assertions import assert_all, assert_none
 from tools.data import create_c1c2_table, insert_c1c2, rows_to_list
-from tools.misc import ImmutableMapping
+from tools.misc import ImmutableMapping, generate_ssl_stores
+
 from . import util
 
 since = pytest.mark.since
@@ -170,6 +171,28 @@ class TestCqlsh(Tester, CqlshMixin):
         rows = list(session.execute("select id, value from simple.simple"))
 
         assert {1: 'one', 2: 'two', 3: 'three', 4: 'four', 5: 'five'} == {k: v for k, v in rows}
+
+    def test_tls(self):
+        """ Test that TLSv1.2 connections work CASSANDRA-16695 """
+        generate_ssl_stores(self.fixture_dtest_setup.test_path)
+        self.cluster.set_configuration_options({
+            'client_encryption_options': {
+            'enabled': True,
+            'optional': False,
+            'protocol': 'TLSv1.2',
+            'keystore': os.path.join(self.fixture_dtest_setup.test_path, 'keystore.jks'),
+            'keystore_password': 'cassandra'
+            }
+        })
+
+        self.cluster.populate(1)
+        self.cluster.start()
+
+        node1, = self.cluster.nodelist()
+
+        out, err = self.run_cqlsh(node1, cmds="DESCRIBE KEYSPACES", cqlsh_options=['--ssl'], env_vars={'SSL_CERTFILE': os.path.join(self.fixture_dtest_setup.test_path, 'ccm_node.cer')})
+        assert err == ''
+
 
     def test_lwt(self):
         """
