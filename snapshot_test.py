@@ -1,3 +1,4 @@
+from datetime import datetime
 import distutils.dir_util
 import glob
 import os
@@ -138,6 +139,9 @@ class TestSnapshot(SnapshotTester):
             fields = json.load(open(item))
             assert 'expires_at' in fields
             assert 'created_at' in fields
+            created_at = datetime.strptime(fields['created_at'], "%Y-%m-%dT%H:%M:%S.%fZ")
+            expires_at = datetime.strptime(fields['expires_at'], "%Y-%m-%dT%H:%M:%S.%fZ")
+            assert (expires_at - created_at).seconds == 180
 
         snapshot_dir = self.make_snapshot(node1, 'ks', 'cf', 'basic-another')
         for item in Path(snapshot_dir).rglob("*manifest.json"):
