@@ -70,6 +70,7 @@ class TestDropCompactStorage(Tester):
             node.stop(wait_other_notice=False)
 
             self.set_node_to_current_version(node)
+            node.set_configuration_options(values={'enable_drop_compact_storage': 'true'})
             node.start(wait_for_binary_proto=True)
 
         session = self.patient_exclusive_cql_connection(node1)
