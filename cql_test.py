@@ -732,7 +732,7 @@ class TestMiscellaneousCQL(CQLTester):
         """
 
         cluster = self.cluster
-
+        cluster.set_configuration_options({'enable_drop_compact_storage': 'true'})
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
 
