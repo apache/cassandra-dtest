@@ -132,10 +132,6 @@ class TestCQL(UpgradeTester):
             ) WITH COMPACT STORAGE;
         """)
 
-        #4.0 doesn't support compact storage
-        if self.is_40_or_greater():
-            cursor.execute("ALTER TABLE users DROP COMPACT STORAGE;")
-
         for is_upgraded, cursor in self.do_upgrade(cursor):
             logger.debug("Querying {} node".format("upgraded" if is_upgraded else "old"))
             cursor.execute("TRUNCATE users")
@@ -147,25 +143,16 @@ class TestCQL(UpgradeTester):
             # Queries
             assert_one(cursor, "SELECT firstname, lastname FROM users WHERE userid = 550e8400-e29b-41d4-a716-446655440000", ['Frodo', 'Baggins'])
 
-            if self.is_40_or_greater():
-                assert_one(cursor, "SELECT * FROM users WHERE userid = 550e8400-e29b-41d4-a716-446655440000",
-                           [UUID('550e8400-e29b-41d4-a716-446655440000'), None, 32, 'Frodo', 'Baggins', None])
-                assert_one(cursor, "SELECT * FROM users WHERE userid = f47ac10b-58cc-4372-a567-0e02b2c3d479",
-                           [UUID('f47ac10b-58cc-4372-a567-0e02b2c3d479'), None, 33, 'Samwise', 'Gamgee', None])
-                assert_all(cursor, "SELECT * FROM users",
-                           [[UUID('f47ac10b-58cc-4372-a567-0e02b2c3d479'), None, 33, 'Samwise', 'Gamgee', None],
-                            [UUID('550e8400-e29b-41d4-a716-446655440000'), None, 32, 'Frodo', 'Baggins', None]])
-            else:
-                assert_one(cursor, "SELECT * FROM users WHERE userid = 550e8400-e29b-41d4-a716-446655440000",
-                           [UUID('550e8400-e29b-41d4-a716-446655440000'), 32, 'Frodo', 'Baggins'])
-                # FIXME There appears to be some sort of problem with reusable cells
-                # when executing this query.  It's likely that CASSANDRA-9705 will
-                # fix this, but I'm not 100% sure.
-                assert_one(cursor, "SELECT * FROM users WHERE userid = f47ac10b-58cc-4372-a567-0e02b2c3d479",
-                           [UUID('f47ac10b-58cc-4372-a567-0e02b2c3d479'), 33, 'Samwise', 'Gamgee'])
-                assert_all(cursor, "SELECT * FROM users",
-                           [[UUID('f47ac10b-58cc-4372-a567-0e02b2c3d479'), 33, 'Samwise', 'Gamgee'],
-                            [UUID('550e8400-e29b-41d4-a716-446655440000'), 32, 'Frodo', 'Baggins']])
+            assert_one(cursor, "SELECT * FROM users WHERE userid = 550e8400-e29b-41d4-a716-446655440000",
+                       [UUID('550e8400-e29b-41d4-a716-446655440000'), 32, 'Frodo', 'Baggins'])
+            # FIXME There appears to be some sort of problem with reusable cells
+            # when executing this query.  It's likely that CASSANDRA-9705 will
+            # fix this, but I'm not 100% sure.
+            assert_one(cursor, "SELECT * FROM users WHERE userid = f47ac10b-58cc-4372-a567-0e02b2c3d479",
+                       [UUID('f47ac10b-58cc-4372-a567-0e02b2c3d479'), 33, 'Samwise', 'Gamgee'])
+            assert_all(cursor, "SELECT * FROM users",
+                       [[UUID('f47ac10b-58cc-4372-a567-0e02b2c3d479'), 33, 'Samwise', 'Gamgee'],
+                        [UUID('550e8400-e29b-41d4-a716-446655440000'), 32, 'Frodo', 'Baggins']])
 
             # Test batch inserts
             cursor.execute("""
@@ -177,12 +164,8 @@ class TestCQL(UpgradeTester):
                 APPLY BATCH
             """)
 
-            if self.is_40_or_greater():
-                assert_all(cursor, "SELECT * FROM users", [[UUID('f47ac10b-58cc-4372-a567-0e02b2c3d479'), None, 37, None, None, None],
-                                                           [UUID('550e8400-e29b-41d4-a716-446655440000'), None, 36, None, None, None]])
-            else:
-                assert_all(cursor, "SELECT * FROM users", [[UUID('f47ac10b-58cc-4372-a567-0e02b2c3d479'), 37, None, None],
-                                                           [UUID('550e8400-e29b-41d4-a716-446655440000'), 36, None, None]])
+            assert_all(cursor, "SELECT * FROM users", [[UUID('f47ac10b-58cc-4372-a567-0e02b2c3d479'), 37, None, None],
+                                                       [UUID('550e8400-e29b-41d4-a716-446655440000'), 36, None, None]])
 
     def test_dynamic_cf(self):
         """ Test non-composite dynamic CF syntax """
@@ -196,10 +179,6 @@ class TestCQL(UpgradeTester):
                 PRIMARY KEY (userid, url)
             ) WITH COMPACT STORAGE;
         """)
-
-        #4.0 doesn't support compact storage
-        if self.is_40_or_greater():
-            cursor.execute("ALTER TABLE clicks DROP COMPACT STORAGE;")
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
             logger.debug("Querying {} node".format("upgraded" if is_upgraded else "old"))
@@ -240,10 +219,6 @@ class TestCQL(UpgradeTester):
             ) WITH COMPACT STORAGE;
         """)
 
-        #4.0 doesn't support compact storage
-        if self.is_40_or_greater():
-            cursor.execute("ALTER TABLE connections DROP COMPACT STORAGE;")
-
         for is_upgraded, cursor in self.do_upgrade(cursor):
             logger.debug("Querying {} node".format("upgraded" if is_upgraded else "old"))
             cursor.execute("TRUNCATE connections")
@@ -255,12 +230,8 @@ class TestCQL(UpgradeTester):
             cursor.execute("UPDATE connections SET time = 24 WHERE userid = f47ac10b-58cc-4372-a567-0e02b2c3d479 AND ip = '192.168.0.2' AND port = 80")
 
             # we don't have to include all of the clustering columns (see CASSANDRA-7990)
-            if self.is_40_or_greater():
-                cursor.execute("INSERT INTO connections (userid, ip, port, time) VALUES (f47ac10b-58cc-4372-a567-0e02b2c3d479, '192.168.0.3', 80, 42)")
-                cursor.execute("UPDATE connections SET time = 42 WHERE userid = f47ac10b-58cc-4372-a567-0e02b2c3d479 AND ip = '192.168.0.4' AND port = 90")
-            else:
-                cursor.execute("INSERT INTO connections (userid, ip, time) VALUES (f47ac10b-58cc-4372-a567-0e02b2c3d479, '192.168.0.3', 42)")
-                cursor.execute("UPDATE connections SET time = 42 WHERE userid = f47ac10b-58cc-4372-a567-0e02b2c3d479 AND ip = '192.168.0.4'")
+            cursor.execute("INSERT INTO connections (userid, ip, time) VALUES (f47ac10b-58cc-4372-a567-0e02b2c3d479, '192.168.0.3', 42)")
+            cursor.execute("UPDATE connections SET time = 42 WHERE userid = f47ac10b-58cc-4372-a567-0e02b2c3d479 AND ip = '192.168.0.4'")
 
             # Queries
             assert_all(cursor, "SELECT ip, port, time FROM connections WHERE userid = 550e8400-e29b-41d4-a716-446655440000",
@@ -274,16 +245,10 @@ class TestCQL(UpgradeTester):
 
             assert_none(cursor, "SELECT ip, port, time FROM connections WHERE userid = 550e8400-e29b-41d4-a716-446655440000 and ip > '192.168.0.2'")
 
-            if self.is_40_or_greater():
-                assert_one(cursor, "SELECT ip, port, time FROM connections WHERE userid = f47ac10b-58cc-4372-a567-0e02b2c3d479 AND ip = '192.168.0.3'",
-                           ['192.168.0.3', 80, 42])
-                assert_one(cursor, "SELECT ip, port, time FROM connections WHERE userid = f47ac10b-58cc-4372-a567-0e02b2c3d479 AND ip = '192.168.0.4'",
-                           ['192.168.0.4', 90, 42])
-            else:
-                assert_one(cursor, "SELECT ip, port, time FROM connections WHERE userid = f47ac10b-58cc-4372-a567-0e02b2c3d479 AND ip = '192.168.0.3'",
-                           ['192.168.0.3', None, 42])
-                assert_one(cursor, "SELECT ip, port, time FROM connections WHERE userid = f47ac10b-58cc-4372-a567-0e02b2c3d479 AND ip = '192.168.0.4'",
-                           ['192.168.0.4', None, 42])
+            assert_one(cursor, "SELECT ip, port, time FROM connections WHERE userid = f47ac10b-58cc-4372-a567-0e02b2c3d479 AND ip = '192.168.0.3'",
+                       ['192.168.0.3', None, 42])
+            assert_one(cursor, "SELECT ip, port, time FROM connections WHERE userid = f47ac10b-58cc-4372-a567-0e02b2c3d479 AND ip = '192.168.0.4'",
+                       ['192.168.0.4', None, 42])
 
             # Deletion
             cursor.execute("DELETE time FROM connections WHERE userid = 550e8400-e29b-41d4-a716-446655440000 AND ip = '192.168.0.2' AND port = 80")
@@ -351,10 +316,6 @@ class TestCQL(UpgradeTester):
             ) WITH COMPACT STORAGE;
         """)
 
-        #4.0 doesn't support compact storage
-        if self.is_40_or_greater():
-            cursor.execute("ALTER TABLE clicks DROP COMPACT STORAGE;")
-
         for is_upgraded, cursor in self.do_upgrade(cursor):
             logger.debug("Querying {} node".format("upgraded" if is_upgraded else "old"))
             cursor.execute("TRUNCATE clicks")
@@ -381,10 +342,6 @@ class TestCQL(UpgradeTester):
                 PRIMARY KEY (userid, url)
             ) WITH COMPACT STORAGE;
         """)
-
-        #4.0 doesn't support compact storage
-        if self.is_40_or_greater():
-            cursor.execute("ALTER TABLE clicks DROP COMPACT STORAGE;")
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
             logger.debug("Querying {} node".format("upgraded" if is_upgraded else "old"))
@@ -477,10 +434,6 @@ class TestCQL(UpgradeTester):
             cursor.execute(create_table_query)
         else:
             cursor.execute(create_table_query + '  WITH COMPACT STORAGE')
-
-            # 4.0 doesn't support compact storage
-            if self.is_40_or_greater():
-                cursor.execute("ALTER TABLE clicks DROP COMPACT STORAGE")
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
             logger.debug("Querying {} node".format("upgraded" if is_upgraded else "old"))
@@ -577,10 +530,6 @@ class TestCQL(UpgradeTester):
             ) WITH COMPACT STORAGE;
         """)
 
-        #4.0 doesn't support compact storage
-        if self.is_40_or_greater():
-            cursor.execute("ALTER TABLE test DROP COMPACT STORAGE;")
-
         for is_upgraded, cursor in self.do_upgrade(cursor):
             logger.debug("Querying {} node".format("upgraded" if is_upgraded else "old"))
             cursor.execute("TRUNCATE test")
@@ -628,11 +577,6 @@ class TestCQL(UpgradeTester):
                 PRIMARY KEY (k, c1, c2)
             ) WITH COMPACT STORAGE;
         """)
-
-        #4.0 doesn't support compact storage
-        if self.is_40_or_greater():
-            cursor.execute("ALTER TABLE test1 DROP COMPACT STORAGE;")
-            cursor.execute("ALTER TABLE test2 DROP COMPACT STORAGE;")
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
             logger.debug("Querying {} node".format("upgraded" if is_upgraded else "old"))
@@ -682,10 +626,6 @@ class TestCQL(UpgradeTester):
                 PRIMARY KEY (k, c1, c2)
             );
         """)
-
-        #4.0 doesn't support compact storage
-        if self.is_40_or_greater():
-            cursor.execute("ALTER TABLE test1 DROP COMPACT STORAGE;")
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
             logger.debug("Querying {} node".format("upgraded" if is_upgraded else "old"))
@@ -737,11 +677,6 @@ class TestCQL(UpgradeTester):
                 PRIMARY KEY (row, number, number2)
             ) WITH COMPACT STORAGE
         """)
-
-        #4.0 doesn't support compact storage
-        if self.is_40_or_greater():
-            cursor.execute("ALTER TABLE Test DROP COMPACT STORAGE;")
-            cursor.execute("ALTER TABLE test2 DROP COMPACT STORAGE;")
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
             logger.debug("Querying {} node".format("upgraded" if is_upgraded else "old"))
@@ -979,10 +914,6 @@ class TestCQL(UpgradeTester):
                 PRIMARY KEY(username, id, name)
             ) WITH COMPACT STORAGE;
         """)
-
-        #4.0 doesn't support compact storage
-        if self.is_40_or_greater():
-            cursor.execute("ALTER TABLE testcf2 DROP COMPACT STORAGE;")
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
             logger.debug("Querying {} node".format("upgraded" if is_upgraded else "old"))
@@ -1756,10 +1687,6 @@ class TestCQL(UpgradeTester):
             ) WITH COMPACT STORAGE
         """)
 
-        #4.0 doesn't support compact storage
-        if self.is_40_or_greater():
-            cursor.execute("ALTER TABLE test2 DROP COMPACT STORAGE;")
-
         for is_upgraded, cursor in self.do_upgrade(cursor):
             logger.debug("Querying {} node".format("upgraded" if is_upgraded else "old"))
             cursor.execute("TRUNCATE test")
@@ -2132,11 +2059,6 @@ class TestCQL(UpgradeTester):
             ) WITH COMPACT STORAGE;
         """)
 
-        #4.0 doesn't support compact storage
-        if self.is_40_or_greater():
-            cursor.execute("ALTER TABLE test1 DROP COMPACT STORAGE;")
-            cursor.execute("ALTER TABLE test2 DROP COMPACT STORAGE;")
-
         for is_upgraded, cursor in self.do_upgrade(cursor):
             logger.debug("Querying {} node".format("upgraded" if is_upgraded else "old"))
             cursor.execute("TRUNCATE test1")
@@ -2201,10 +2123,6 @@ class TestCQL(UpgradeTester):
                 ) WITH COMPACT STORAGE
                   AND CLUSTERING ORDER BY(c1 DESC, c2 DESC);
         """)
-
-        #4.0 doesn't support compact storage
-        if self.is_40_or_greater():
-            cursor.execute("ALTER TABLE test DROP COMPACT STORAGE;")
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
             logger.debug("Querying {} node".format("upgraded" if is_upgraded else "old"))
@@ -2596,10 +2514,6 @@ class TestCQL(UpgradeTester):
 
         cursor.execute(create)
 
-        #4.0 doesn't support compact storage
-        if compact and self.is_40_or_greater():
-            cursor.execute("ALTER TABLE zipcodes DROP COMPACT STORAGE;")
-
         for is_upgraded, cursor in self.do_upgrade(cursor):
             logger.debug("Querying {} node".format("upgraded" if is_upgraded else "old"))
             cursor.execute("TRUNCATE zipcodes")
@@ -2653,10 +2567,6 @@ class TestCQL(UpgradeTester):
                 PRIMARY KEY (key, c)
             ) WITH COMPACT STORAGE
         """)
-
-        #4.0 doesn't support compact storage
-        if self.is_40_or_greater():
-            cursor.execute("ALTER TABLE test DROP COMPACT STORAGE;")
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
             logger.debug("Querying {} node".format("upgraded" if is_upgraded else "old"))
@@ -2782,10 +2692,6 @@ class TestCQL(UpgradeTester):
             ) WITH COMPACT STORAGE;
         """)
 
-        #4.0 doesn't support compact storage
-        if self.is_40_or_greater():
-            cursor.execute("ALTER TABLE bar DROP COMPACT STORAGE;")
-
         for is_upgraded, cursor in self.do_upgrade(cursor):
             logger.debug("Querying {} node".format("upgraded" if is_upgraded else "old"))
             cursor.execute("TRUNCATE bar")
@@ -2818,10 +2724,6 @@ class TestCQL(UpgradeTester):
                                      cursor.prepare("INSERT INTO t1 (a, b) VALUES (?, ?)"),
                                      [(i, i) for i in range(100)])
         self.cluster.flush()
-
-        #4.0 doesn't support compact storage
-        if self.is_40_or_greater():
-            cursor.execute("ALTER TABLE t1 DROP COMPACT STORAGE;")
 
         def check_read_all(cursor):
             read_count = 0
@@ -3376,10 +3278,6 @@ class TestCQL(UpgradeTester):
         # Same test, but for compact
         cursor.execute("CREATE TABLE test_compact (k1 int, k2 int, v int, PRIMARY KEY (k1, k2)) WITH COMPACT STORAGE")
 
-        #4.0 doesn't support compact storage
-        if self.is_40_or_greater():
-            cursor.execute("ALTER TABLE test_compact DROP COMPACT STORAGE;")
-
         for is_upgraded, cursor in self.do_upgrade(cursor):
             logger.debug("Querying {} node".format("upgraded" if is_upgraded else "old"))
             cursor.execute("TRUNCATE test")
@@ -3449,11 +3347,6 @@ class TestCQL(UpgradeTester):
         cursor.execute('CREATE TABLE compact (pk0 int, pk1 int, val int, PRIMARY KEY((pk0, pk1))) WITH COMPACT STORAGE')
         # Test a 'wide row' thrift table.
         cursor.execute('CREATE TABLE wide (pk int, name text, val int, PRIMARY KEY(pk, name)) WITH COMPACT STORAGE')
-
-        #4.0 doesn't support compact storage
-        if self.is_40_or_greater():
-            cursor.execute("ALTER TABLE compact DROP COMPACT STORAGE;")
-            cursor.execute("ALTER TABLE wide DROP COMPACT STORAGE;")
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
             logger.debug("Querying {} node".format("upgraded" if is_upgraded else "old"))
@@ -4421,10 +4314,6 @@ class TestCQL(UpgradeTester):
             ) WITH COMPACT STORAGE
         """)
 
-        #4.0 doesn't support compact storage
-        if self.is_40_or_greater():
-            cursor.execute("ALTER TABLE lock DROP COMPACT STORAGE;")
-
         for is_upgraded, cursor in self.do_upgrade(cursor):
             logger.debug("Querying {} node".format("upgraded" if is_upgraded else "old"))
             cursor.execute("TRUNCATE lock")
@@ -4997,10 +4886,6 @@ class TestCQL(UpgradeTester):
             ) WITH COMPACT STORAGE
         """)
 
-        #4.0 doesn't support compact storage
-        if self.is_40_or_greater():
-            cursor.execute("ALTER TABLE test DROP COMPACT STORAGE;")
-
         for is_upgraded, cursor in self.do_upgrade(cursor):
             logger.debug("Querying {} node".format("upgraded" if is_upgraded else "old"))
             cursor.execute("TRUNCATE test")
@@ -5012,14 +4897,9 @@ class TestCQL(UpgradeTester):
             assert_all(cursor, "SELECT v FROM test WHERE k=0 AND v > 0 AND v <= 4 LIMIT 2", [[1], [2]])
             assert_all(cursor, "SELECT v FROM test WHERE k=0 AND v > -1 AND v <= 4 LIMIT 2", [[0], [1]])
 
-            if self.is_40_or_greater():
-                assert_all(cursor, "SELECT * FROM test WHERE k IN (0, 1, 2) AND v > 0 AND v <= 4 LIMIT 2", [[0, 1, None], [0, 2, None]])
-                assert_all(cursor, "SELECT * FROM test WHERE k IN (0, 1, 2) AND v > -1 AND v <= 4 LIMIT 2", [[0, 0, None], [0, 1, None]])
-                assert_all(cursor, "SELECT * FROM test WHERE k IN (0, 1, 2) AND v > 0 AND v <= 4 LIMIT 6", [[0, 1, None], [0, 2, None], [0, 3, None], [1, 1, None], [1, 2, None], [1, 3, None]])
-            else:
-                assert_all(cursor, "SELECT * FROM test WHERE k IN (0, 1, 2) AND v > 0 AND v <= 4 LIMIT 2", [[0, 1], [0, 2]])
-                assert_all(cursor, "SELECT * FROM test WHERE k IN (0, 1, 2) AND v > -1 AND v <= 4 LIMIT 2", [[0, 0], [0, 1]])
-                assert_all(cursor, "SELECT * FROM test WHERE k IN (0, 1, 2) AND v > 0 AND v <= 4 LIMIT 6", [[0, 1], [0, 2], [0, 3], [1, 1], [1, 2], [1, 3]])
+            assert_all(cursor, "SELECT * FROM test WHERE k IN (0, 1, 2) AND v > 0 AND v <= 4 LIMIT 2", [[0, 1], [0, 2]])
+            assert_all(cursor, "SELECT * FROM test WHERE k IN (0, 1, 2) AND v > -1 AND v <= 4 LIMIT 2", [[0, 0], [0, 1]])
+            assert_all(cursor, "SELECT * FROM test WHERE k IN (0, 1, 2) AND v > 0 AND v <= 4 LIMIT 6", [[0, 1], [0, 2], [0, 3], [1, 1], [1, 2], [1, 3]])
 
             # This doesn't work -- see #7059
             # assert_all(cursor, "SELECT * FROM test WHERE v > 1 AND v <= 3 LIMIT 6 ALLOW FILTERING", [[1, 2], [1, 3], [0, 2], [0, 3], [2, 2], [2, 3]])

@@ -140,10 +140,6 @@ class TestStorageEngineUpgrade(Tester):
             for r in range(ROWS):
                 session.execute("INSERT INTO t(k, t, v) VALUES ({n}, {r}, {r})".format(n=n, r=r))
 
-        #4.0 doesn't support compact storage
-        if compact_storage and self.dtest_config.cassandra_version_from_build >= MAJOR_VERSION_4:
-            session.execute("ALTER TABLE t DROP COMPACT STORAGE;")
-
         session = self._do_upgrade()
 
         for n in range(PARTITIONS):
@@ -213,25 +209,15 @@ class TestStorageEngineUpgrade(Tester):
         for n in range(PARTITIONS):
             session.execute("INSERT INTO t(k, v1, v2, v3, v4) VALUES ({}, {}, {}, {}, {})".format(n, n + 1, n + 2, n + 3, n + 4))
 
-        is40 = self.dtest_config.cassandra_version_from_build >= MAJOR_VERSION_4
-        if compact_storage and is40:
-            session.execute("ALTER TABLE t DROP COMPACT STORAGE;")
-
         session = self._do_upgrade()
 
-        def maybe_add_compact_columns(expected):
-            if is40 and compact_storage:
-                expected.insert(1, None)
-                expected.append(None)
-            return expected
-
         for n in range(PARTITIONS):
-            assert_one(session, "SELECT * FROM t WHERE k = {}".format(n), maybe_add_compact_columns([n, n + 1, n + 2, n + 3, n + 4]))
+            assert_one(session, "SELECT * FROM t WHERE k = {}".format(n), [n, n + 1, n + 2, n + 3, n + 4])
 
         self.cluster.compact()
 
         for n in range(PARTITIONS):
-            assert_one(session, "SELECT * FROM t WHERE k = {}".format(n), maybe_add_compact_columns([n, n + 1, n + 2, n + 3, n + 4]))
+            assert_one(session, "SELECT * FROM t WHERE k = {}".format(n), [n, n + 1, n + 2, n + 3, n + 4])
 
     def test_upgrade_with_statics(self):
         self.upgrade_with_statics(rows=10)
