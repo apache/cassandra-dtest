@@ -380,7 +380,6 @@ class TestUpgradeTo40(Tester):
     Thrift is dead in 4.0. However, we still want to ensure users that used thrift
      in 3.0 or earlier have an upgrade path to 4.0 and this class provides tests
      cases for this.
-
      Note that we don't want to run this if the "current" version (the one we're
      upgrading to) is not 4.0 or more, as the tests makes assumptions on that.
     """
@@ -389,7 +388,6 @@ class TestUpgradeTo40(Tester):
         Prepare the test, starting a cluster on the initial version, creating
         a keyspace (named 'ks') and returning a CQL and a thrift connection to
         the first node (and set on the created keyspace).
-
         :param start_version: the version to set the node at initially.
         :param num_nodes: the number of nodes to use.
         :param rf: replication factor for the keyspace created.
@@ -427,7 +425,6 @@ class TestUpgradeTo40(Tester):
         """
         Upgrade all the nodes in the cluster to the "current" version (so 4.0+)
         in a rolling fashion.
-
         :param after_each_upgrade: if not None, a function that is called with 2
           arguments (in that order):
           - the index of the node we just upgraded.
@@ -563,7 +560,6 @@ class TestThrift(UpgradeTester):
     """
     Verify dense and sparse supercolumn functionality with and without renamed columns
     in 3.X after upgrading from 2.x.
-
     @jira_ticket CASSANDRA-12373
     """
 

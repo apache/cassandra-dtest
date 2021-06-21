@@ -128,8 +128,6 @@ class TestSCUpgrade(Tester):
         self.verify_with_thrift()
 
         for version in upgrade_path:
-            if LooseVersion(version.family) >= CASSANDRA_4_0:
-                session.execute("ALTER TABLE supcols.cols DROP COMPACT STORAGE")
             self.upgrade_to_version(version.version)
 
             session = self.patient_exclusive_cql_connection(node1)
