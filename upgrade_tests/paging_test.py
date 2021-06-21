@@ -471,9 +471,6 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
                 ) WITH COMPACT STORAGE;
             """)
 
-        if testing_compact_storage and self.upgrade_is_version_4_or_greater():  # 4.0 doesn't support compact storage
-            cursor.execute("ALTER TABLE test2 DROP COMPACT STORAGE;")
-
         for is_upgraded, cursor in self.do_upgrade(cursor):
             logger.debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE test")
@@ -524,9 +521,6 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
                     PRIMARY KEY (k, c1, c2)
                 ) WITH COMPACT STORAGE;
             """)
-
-        if testing_compact_storage and self.upgrade_is_version_4_or_greater():  # 4.0 doesn't support compact storage
-            cursor.execute("ALTER TABLE test2 DROP COMPACT STORAGE;")
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
             logger.debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))

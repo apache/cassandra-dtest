@@ -50,6 +50,7 @@ class TestDropCompactStorage(Tester):
         node.stop(wait_other_notice=False)
 
         node.set_install_dir(version=to_version)
+        node.set_configuration_options(values={'enable_drop_compact_storage': 'true'})
         node.start(wait_other_notice=False, wait_for_binary_proto=False, verbose=False)
 
     @since('3.0', max_version='3.11')
