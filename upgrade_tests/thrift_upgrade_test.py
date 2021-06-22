@@ -20,7 +20,6 @@ from .upgrade_manifest import build_upgrade_pairs, CASSANDRA_4_0
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
 
-
 def _create_dense_super_cf(thrift, name):
     cfdef = Cassandra.CfDef('ks', name, column_type='Super',
                            key_validation_class='AsciiType',        # pk
@@ -205,12 +204,12 @@ class TestUpgradeSuperColumnsThrough(Tester):
         # Update Cassandra Directory
         for node in nodes:
             node.set_install_dir(version=tag)
-            node.set_configuration_options(values={'start_rpc': 'true'})
+            node.set_configuration_options(values={'start_rpc': 'true', 'enable_drop_compact_storage': 'true'})
             logger.debug("Set new cassandra dir for %s: %s" % (node.name, node.get_install_dir()))
         self.cluster.set_install_dir(version=tag)
         self.fixture_dtest_setup.reinitialize_cluster_for_different_version()
         for node in nodes:
-            node.set_configuration_options(values={'start_rpc': 'true'})
+            node.set_configuration_options(values={'start_rpc': 'true', 'enable_drop_compact_storage': 'true'})
 
         # Restart nodes on new version
         for node in nodes:
@@ -229,7 +228,10 @@ class TestUpgradeSuperColumnsThrough(Tester):
 
         cluster.populate(num_nodes)
         for node in self.cluster.nodelist():
-            node.set_configuration_options(values={'start_rpc': 'true'})
+            if (cassandra_version > "github:apache/cassandra-2.2"):
+                node.set_configuration_options(values={'start_rpc': 'true', 'enable_drop_compact_storage': 'true'})
+            else:
+                node.set_configuration_options(values={'start_rpc': 'true'})
 
         cluster.start()
         return cluster
@@ -399,7 +401,7 @@ class TestUpgradeTo40(Tester):
 
         self.cluster.populate(num_nodes)
         for node in self.cluster.nodelist():
-            node.set_configuration_options(values={'start_rpc': 'true'})
+            node.set_configuration_options(values={'start_rpc': 'true', 'enable_drop_compact_storage': 'true'})
 
         self.cluster.start()
         logger.debug("Started node on %s", start_version)
