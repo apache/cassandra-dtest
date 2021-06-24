@@ -720,7 +720,7 @@ class TestUpgrade(Tester):
             actual_num_rows = result[0][0]
             assert actual_num_rows == expected_num_rows, "SELECT COUNT(*) returned %s when expecting %s" % (actual_num_rows, expected_num_rows)
         else:
-            self.fail("Count query did not return")
+            pytest.fail("Count query did not return")
 
 class BootstrapMixin(object):
     """

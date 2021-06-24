@@ -5083,7 +5083,7 @@ class TestCQL(UpgradeTester):
             # since the protocol requires strings to be valid UTF-8, the error response to this is a ProtocolError
             try:
                 cursor.execute("insert into ks.invalid_string_literals (k, b) VALUES (0, '\xc2\x01')")
-                self.fail("Expected error")
+                pytest.fail("Expected error")
             except ProtocolException as e:
                 assert "Cannot decode string as UTF8" in str(e)
 

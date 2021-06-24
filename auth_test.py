@@ -845,7 +845,7 @@ class TestAuth(Tester):
         def check_caching(attempt=0):
             attempt += 1
             if attempt > 3:
-                self.fail("Unable to verify cache expiry in 3 attempts, failing")
+                pytest.fail("Unable to verify cache expiry in 3 attempts, failing")
 
             logger.debug("Attempting to verify cache expiry, attempt #{i}".format(i=attempt))
             # grant SELECT to cathy
@@ -866,7 +866,7 @@ class TestAuth(Tester):
                         check_caching(attempt)
                     else:
                         # legit failure
-                        self.fail("Expecting query to raise an exception, but nothing was raised.")
+                        pytest.fail("Expecting query to raise an exception, but nothing was raised.")
                 except Unauthorized as e:
                     assert re.search("User cathy has no SELECT permission on <table ks.cf> or any of its parents", str(e))
 
@@ -2742,7 +2742,7 @@ class TestAuthUnavailable(Tester):
 
         try:
             self.patient_exclusive_cql_connection(node0, timeout=2, user='cassandra', password='cassandra')
-            self.fail("Expected login attempt to raise an exception.")
+            pytest.fail("Expected login attempt to raise an exception.")
         except NoHostAvailable as e:
             # From driver
             assert isinstance(list(e.errors.values())[0], AuthenticationFailed)
@@ -2781,7 +2781,7 @@ class TestAuthUnavailable(Tester):
 
         try:
             self.patient_exclusive_cql_connection(node0, timeout=2, user='cassandra', password='cassandra')
-            self.fail("Expected login attempt to raise an exception.")
+            pytest.fail("Expected login attempt to raise an exception.")
         except NoHostAvailable as e:
             # From driver
             assert isinstance(list(e.errors.values())[0], AuthenticationFailed)

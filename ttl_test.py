@@ -385,7 +385,7 @@ class TestTTL(Tester):
             result = self.session1.execute_async(query + ";")
             result.result()
             if policy == 'REJECT':
-                self.fail("should throw InvalidRequest")
+                pytest.fail("should throw InvalidRequest")
             if self.cluster.version() >= '3.0':  # client warn only on 3.0+
                 if policy == 'CAP':
                     logger.debug("Warning is {}", result.warnings[0])

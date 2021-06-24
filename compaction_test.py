@@ -189,7 +189,7 @@ class TestCompaction(Tester):
                     assert not "Data" in afile, afile
 
         except OSError:
-            self.fail("Path to sstables not valid.")
+            pytest.fail("Path to sstables not valid.")
 
     @pytest.mark.parametrize("strategy", ['DateTieredCompactionStrategy'])
     def test_dtcs_deletion(self, strategy):

@@ -149,7 +149,7 @@ class TestMaterializedViews(Tester):
 
             elapsed = (time.time() - start) / 60
             if elapsed > wait_minutes:
-                self.fail("The MV build hasn't started in 2 minutes.")
+                pytest.fail("The MV build hasn't started in 2 minutes.")
 
     def _insert_data(self, session):
         # insert data
@@ -1859,10 +1859,10 @@ class TestMaterializedViews(Tester):
                 if expect_digest:
                     break
                 else:
-                    self.fail("Encountered digest mismatch when we shouldn't")
+                    pytest.fail("Encountered digest mismatch when we shouldn't")
         else:
             if expect_digest:
-                self.fail("Didn't find digest mismatch")
+                pytest.fail("Didn't find digest mismatch")
 
     def test_simple_repair_by_base(self):
         self._simple_repair_test(repair_base=True)

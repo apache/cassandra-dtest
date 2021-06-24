@@ -347,7 +347,7 @@ class TestNodetool(Tester):
             assert 'concurrent_view_builders should be great than 0.' in e.stdout
             assert 'Number of concurrent view builders should be greater than 0.', e.message
         else:
-            self.fail("Expected error when setting and invalid value")
+            pytest.fail("Expected error when setting and invalid value")
 
     @since('4.0')
     def test_describecluster_more_information_three_datacenters(self):

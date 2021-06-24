@@ -36,7 +36,7 @@ class TestNativeTransportSSL(Tester):
         try:  # hack around assertRaise's lack of msg parameter
             # try to connect without ssl options
             self.patient_cql_connection(node1)
-            self.fail('Should not be able to connect to SSL socket without SSL enabled client')
+            pytest.fail('Should not be able to connect to SSL socket without SSL enabled client')
         except NoHostAvailable:
             pass
 
@@ -78,7 +78,7 @@ class TestNativeTransportSSL(Tester):
         cluster.start()
         try:  # hack around assertRaise's lack of msg parameter
             self.patient_cql_connection(node1)
-            self.fail('Should not be able to connect to non-default port')
+            pytest.fail('Should not be able to connect to non-default port')
         except NoHostAvailable:
             pass
 

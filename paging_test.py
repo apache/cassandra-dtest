@@ -365,7 +365,7 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
                 )
             else:
                 # this should not happen
-                self.fail("Invalid scenario configuration. Scenario is: {}".format(scenario))
+                pytest.fail("Invalid scenario configuration. Scenario is: {}".format(scenario))
 
             pf = PageFetcher(future).request_all()
             assert pf.num_results_all() == scenario['expect_pgsizes']
@@ -3450,7 +3450,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
         except Exception:
             raise
         else:
-            self.fail('Expected ReadFailure or ReadTimeout, depending on the cluster version')
+            pytest.fail('Expected ReadFailure or ReadTimeout, depending on the cluster version')
 
         if self.cluster.version() < "3.0":
             failure_msg = ("Scanned over.* tombstones in test_paging_size."

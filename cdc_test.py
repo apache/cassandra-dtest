@@ -530,7 +530,7 @@ class TestCDC(Tester):
         print('Set Two:')
         for idx_two in rd_two:
             print('   {},{},{},{}'.format(idx_two.name, idx_two.completed, idx_two.offset, idx_two.log_name))
-        self.fail(msg)
+        pytest.fail(msg)
 
     def _init_new_loading_node(self, ks_name, create_stmt, use_thrift=False):
         loading_node = Node(

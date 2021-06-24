@@ -2532,7 +2532,7 @@ class TestCqlLogin(Tester, CqlshMixin):
             if expected_error in err_line:
                 break
         else:
-            self.fail("Did not find expected error '{}' in "
+            pytest.fail("Did not find expected error '{}' in "
                       "cqlsh stderr output: {}".format(expected_error,
                                                        '\n'.join(err_lines)))
 
