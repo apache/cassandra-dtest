@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 import logging
 import json
+import csv
 
 from cassandra.concurrent import execute_concurrent_with_args
 
@@ -65,6 +66,9 @@ class SnapshotTester(Tester):
             x += 1
 
         return tmpdir
+
+    def list_snapshots(self, node):
+        return node.nodetool("listsnapshots")
 
     def restore_snapshot(self, snapshot_dir, node, ks, cf):
         logger.debug("Restoring snapshot....")
@@ -148,6 +152,20 @@ class TestSnapshot(SnapshotTester):
             fields = json.load(open(item))
             assert 'expires_at' not in fields
             assert 'created_at' not in fields
+
+    def test_ttl_simple(self):
+        cluster = self.cluster
+        cluster.populate(1).start()
+        (node1,) = cluster.nodelist()
+        session = self.patient_cql_connection(node1)
+        self.create_schema(session)
+
+        self.insert_rows(session, 0, 100)
+        snapshot_dir = self.make_snapshot(node1, 'ks', 'cf', 'basic', '1m')
+        print(snapshot_dir)
+        time.sleep(80)
+        output = self.list_snapshots(node1).stdout
+        assert 'basic' not in output
 
     @since('3.0')
     def test_snapshot_and_restore_drop_table_remove_dropped_column(self):
