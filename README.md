@@ -69,15 +69,6 @@ Use ccm ability to download/compile released sources from archives.apache.org:
 
     pytest --cassandra-version=1.0.0
 
-A convenient option if tests are regularly run against the same existing
-directory is to set `cassandra_dir` in `~/path/to/cassandra-dtest/pytest.ini`:
-
-    [pytest]
-    cassandra_dir=~/path/to/cassandra
-
-The tests will use this directory by default, avoiding the need for any
-environment variable (that still will have precedence if given though).
-
 To run a specific test file, class or individual test, you only have to 
 pass its path as an argument:
 
