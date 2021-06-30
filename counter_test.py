@@ -79,6 +79,7 @@ class TestCounters(Tester):
         assert_one(session, "SELECT COUNT(*) FROM test.test", [1000])
 
     @pytest.mark.vnodes
+    @since('3.0')
     def test_counter_leader_with_partial_view(self):
         """
         Test leader election with a starting node.
