@@ -25,8 +25,8 @@ CASSANDRA_2_1 = '2.1'
 CASSANDRA_2_2 = '2.2'
 CASSANDRA_3_0 = '3.0'
 CASSANDRA_3_11 = '3.11'
-CASSANDRA_4_0 = '4.0'
-CASSANDRA_4_0_0 = '4.0.0'
+CASSANDRA_4_0 = '4.0' # TODO remove when cassandra-4.0.0 is released (and that branch is removed)
+CASSANDRA_4_0_X = '4.0.1' # TODO rename to CASSANDRA_4_0 when cassandra-4.0.0 is released (and that branch is removed)
 CASSANDRA_4_1 = '4.1'
 TRUNK = CASSANDRA_4_1
 
@@ -97,10 +97,12 @@ def set_version_family():
         version_family = CASSANDRA_3_0
     elif current_version.vstring.startswith('3.11'):
         version_family = CASSANDRA_3_11
-    elif current_version.vstring.startswith('4.0.0'):
-        version_family = CASSANDRA_4_0_0
-    elif current_version.vstring.startswith('4.0'):
+    # TODO remove when cassandra-4.0.0 is released (and that branch is removed)
+    elif current_version.vstring.startswith('4.0.0') or current_version.vstring.startswith('4.0-'):
         version_family = CASSANDRA_4_0
+    elif current_version.vstring.startswith('4.0'):
+        # TODO rename to CASSANDRA_4_0 when cassandra-4.0.0 is released (and that branch is removed)
+        version_family = CASSANDRA_4_0_X
     elif current_version.vstring.startswith('4.1'):
         version_family = CASSANDRA_4_1
     else:
@@ -162,8 +164,12 @@ current_3_0_x = VersionMeta(name='current_3_0_x', family=CASSANDRA_3_0, variant=
 indev_3_11_x = VersionMeta(name='indev_3_11_x', family=CASSANDRA_3_11, variant='indev', version='github:apache/cassandra-3.11', min_proto_v=3, max_proto_v=4, java_versions=(8,))
 current_3_11_x = VersionMeta(name='current_3_11_x', family=CASSANDRA_3_11, variant='current', version='3.11.10', min_proto_v=3, max_proto_v=4, java_versions=(8,))
 
-indev_4_0_x = VersionMeta(name='indev_4_0_x', family=CASSANDRA_4_0, variant='indev', version='github:apache/cassandra-4.0', min_proto_v=3, max_proto_v=4, java_versions=(8,))
-current_4_0_x = VersionMeta(name='current_4_0_x', family=CASSANDRA_4_0, variant='current', version='4.0-rc1', min_proto_v=4, max_proto_v=5, java_versions=(8,))
+# TODO remove when cassandra-4.0.0 is released (and that branch is removed)
+indev_4_0_0 = VersionMeta(name='indev_4_0_0', family=CASSANDRA_4_0, variant='indev', version='github:apache/cassandra-4.0.0', min_proto_v=3, max_proto_v=4, java_versions=(8,))
+current_4_0_0 = VersionMeta(name='current_4_0_0', family=CASSANDRA_4_0, variant='current', version='4.0-rc2', min_proto_v=4, max_proto_v=5, java_versions=(8,))
+
+indev_4_0_x = VersionMeta(name='indev_4_0_x', family=CASSANDRA_4_0_X, variant='indev', version='github:apache/cassandra-4.0', min_proto_v=3, max_proto_v=4, java_versions=(8,))
+current_4_0_x = VersionMeta(name='current_4_0_x', family=CASSANDRA_4_0_X, variant='current', version='4.0', min_proto_v=4, max_proto_v=5, java_versions=(8,))
 
 indev_trunk = VersionMeta(name='indev_trunk', family=TRUNK, variant='indev', version='github:apache/trunk', min_proto_v=4, max_proto_v=5, java_versions=(8,))
 
