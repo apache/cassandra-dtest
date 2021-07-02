@@ -48,8 +48,8 @@ class TestAuditlog(Tester):
         node.nodetool("disablefullquerylog")
         for f in os.listdir(log_dir):
             assert not f.endswith(".cq4")
-        # make sure the non-rolled file gets archived when we disable fql
-        node.watch_log_for("Archiving existing file", filename="debug.log")
+        # make sure there are not non-rolled files
+        assert not node.grep_log("Archiving existing file", filename="debug.log")
 
     def test_archiving_fql(self):
         cluster = self.cluster
@@ -68,8 +68,8 @@ class TestAuditlog(Tester):
         node.nodetool("disablefullquerylog")
         for f in os.listdir(log_dir):
             assert not f.endswith(".cq4")
-        # make sure the non-rolled file gets archived when we disable fql
-        node.watch_log_for("Archiving existing file", filename="debug.log")
+        # make sure there are not non-rolled files
+        assert not node.grep_log("Archiving existing file", filename="debug.log")
 
     def test_archive_on_startup(self):
         cluster = self.cluster
