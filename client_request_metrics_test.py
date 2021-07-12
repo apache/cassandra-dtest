@@ -599,9 +599,11 @@ def validate_stat_values(prefix, values, cassandra_version):
 def validate_sane_histogram_values(prefix, values, cassandra_version):
     validators = defaultdict(lambda: is_positive)
     if 'DurationUnit' in values and cassandra_version >= '4.1':
-        validators['RecentValues'] = is_timer_histo_list
+        # Timer values (since 4.1) are in micros resolution. The default number of buckets should be 91.
+        # See CASSANDRA-16760
+        validators['RecentValues'] = partial(is_histo_list, expected_len=91)
     else:
-        validators['RecentValues'] = is_histo_list
+        validators['RecentValues'] = partial(is_histo_list, expected_len=165)
     validators['StdDev'] = is_non_negative
     validators['Min'] = is_non_negative
 
@@ -769,25 +771,20 @@ def is_microseconds(k, v):
     assert v == 'microseconds', k
 
 
-def is_zero_list(k, l):
-    assert not any(l), k
+def is_zero_list(k, values):
+    assert not any(values), k
 
 
-def is_nonzero_list(k, l):
-    assert any(l), k
+def is_nonzero_list(k, values):
+    assert any(values), k
 
 
-def is_histo_list(k, l):
+def is_histo_list(k, values, expected_len):
     # since these values change on sampling, we can only generally verify it takes the proper form
     # There are in-tree unit tests around ClearableHistogram and DecayingEstimatedHistogramReservoir
-    assert len(l) == 165, k
-    assert all(isinstance(i, int) for i in l), k
+    assert len(values) == expected_len, k
+    assert all(isinstance(i, int) for i in values), k
 
-def is_timer_histo_list(k, l):
-    # Timer values (since 4.1) are in micros resolution. The default number of buckets should be 91. 
-    # See CASSANDRA-16760
-    assert len(l) == 91, k
-    assert all(isinstance(i, int) for i in l), k
 
 last_key = 0
 
