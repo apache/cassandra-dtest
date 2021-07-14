@@ -97,10 +97,14 @@ class TestCqlsh(Tester, CqlshMixin):
     # override cluster options to enable user defined functions
     # currently only needed for test_describe
     @pytest.fixture
-    def fixture_dtest_setup_overrides(self):
+    def fixture_dtest_setup_overrides(self, dtest_config):
         dtest_setup_overrides = DTestSetupOverrides()
-        dtest_setup_overrides.cluster_options = ImmutableMapping({'enable_user_defined_functions': 'true',
-                                                'enable_scripted_user_defined_functions': 'true'})
+        if dtest_config.cassandra_version_from_build >= '3.0':
+            dtest_setup_overrides.cluster_options = ImmutableMapping({'enable_user_defined_functions': 'true',
+                                                                      'enable_scripted_user_defined_functions': 'true'})
+        else:
+            dtest_setup_overrides.cluster_options = ImmutableMapping({'enable_user_defined_functions': 'true'})
+
         return dtest_setup_overrides
 
     @classmethod
@@ -892,6 +896,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         assert "'min_threshold': '10'" in stdout
         assert "'max_threshold': '100'" in stdout
 
+    @since('3.0')
     def test_describe_functions(self, fixture_dtest_setup_overrides):
         """Test DESCRIBE statements for functions and aggregate functions"""
         self.cluster.populate(1)
