@@ -2,7 +2,9 @@ import os
 import pytest
 import re
 import logging
+import subprocess
 
+import ccmlib.node
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
 from ccmlib.node import ToolError
@@ -478,3 +480,45 @@ class TestNodetool(Tester):
             if re.match('.*Instances.*Bytes.*Type.*', line):
                 hasPattern = True
         assert hasPattern == True, "Expected 'SJK hh' output"
+
+    @since('3.0', max_version='3.x')
+    def test_jobs_option_warning(self):
+        """
+        Verify that nodetool -j/--jobs option warning is raised depending on the value of `concurrent_compactors` in the
+        target node, independently from where the tool is used.
+
+        Before CASSANDRA-16104 the warning was based on the local value of `concurrent_compactors`, and not in the value
+        used in the target node, which is got through JMX.
+
+        From 4.0 we have a JUnit test in place that supersedes this test.
+
+        @jira_ticket CASSANDRA-16104
+        """
+
+        # setup a cluster with a different value for concurrent_compactors in each node
+        cluster = self.cluster
+        cluster.populate(2)
+        node1, node2 = cluster.nodelist()
+        node1.set_configuration_options(values={'concurrent_compactors': '1'})
+        node2.set_configuration_options(values={'concurrent_compactors': '10'})
+        cluster.start()
+
+        # we will invoke nodetool always from node1 environment
+        tool = node1.get_tool('nodetool')
+        env = node1.get_env()
+        warning = 'jobs (10) is bigger than configured concurrent_compactors (1)'
+
+        def nodetool(node):
+            cmd = [tool, '-h', 'localhost', '-p', str(node.jmx_port), 'upgradesstables', '-j', '10']
+            p = subprocess.Popen(cmd, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+            return ccmlib.node.handle_external_tool_process(p, cmd)
+
+        # from node1 environment, connect to node1 and verify that the warning is raised
+        out, err, _ = nodetool(node1)
+        assert_stderr_clean(err)
+        assert warning in out
+
+        # from node1 environment, connect to node2 and verify that the warning is not raised
+        out, err, _ = nodetool(node2)
+        assert_stderr_clean(err)
+        assert warning not in out
