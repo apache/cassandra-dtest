@@ -140,19 +140,20 @@ class TestClientRequestMetrics(Tester):
         global_baseline = metric_class(global_scope)
         cl_baseline = metric_class(cl_scope)
         other_baselines = [metric_class(scope_for_cl(global_scope, c)) for c in other_cls]
+        cassandra_version = self.dtest_config.cassandra_version_from_build
 
-        global_baseline.validate()
-        cl_baseline.validate()
+        global_baseline.validate(cassandra_version)
+        cl_baseline.validate(cassandra_version)
         for b in other_baselines:
-            b.validate()
+            b.validate(cassandra_version)
 
         for _ in range(query_count):
             self.session.execute(statement)
 
         global_updated = metric_class(global_scope)
         cl_updated = metric_class(cl_scope)
-        global_updated.validate()
-        cl_updated.validate()
+        global_updated.validate(cassandra_version)
+        cl_updated.validate(cassandra_version)
 
         global_diff = global_updated.diff(global_baseline)
         cl_diff = cl_updated.diff(cl_baseline)
@@ -322,7 +323,8 @@ class TestClientRequestMetrics(Tester):
     def run_collect_view_write_metrics(self, statement, query_count):
         scope = 'ViewWrite'
         baseline = ViewWriteMetrics(scope)
-        baseline.validate()
+        cassandra_version = self.dtest_config.cassandra_version_from_build
+        baseline.validate(cassandra_version)
         for _ in range(query_count):
             self.session.execute(statement)
 
@@ -336,7 +338,7 @@ class TestClientRequestMetrics(Tester):
             sample = ViewWriteMetrics(scope)
             diff = sample.diff(last)
 
-        sample.validate()
+        sample.validate(cassandra_version)
 
         return sample.diff(baseline)
 
@@ -355,17 +357,18 @@ class TestClientRequestMetrics(Tester):
     def cas_contention(self, metric_factory, statement):
 
         query_count = 20
+        cassandra_version = self.dtest_config.cassandra_version_from_build
 
         def sample():
             baseline = metric_factory()
-            baseline.validate()
+            baseline.validate(cassandra_version)
 
             execute_concurrent_with_args(self.session,
                                          statement,
                                          repeat([], query_count), raise_on_first_error=False)
 
             updated = metric_factory()
-            updated.validate()
+            updated.validate(cassandra_version)
 
             return updated.diff(baseline)
 
@@ -477,7 +480,7 @@ class TestClientRequestMetrics(Tester):
         cl_scope = scope_for_cl(global_scope, query_cl)
 
         cl_baseline = metric_class(cl_scope)
-        cl_baseline.validate()
+        cl_baseline.validate(self.dtest_config.cassandra_version_from_build)
 
         core_diff = self.validate_metric(global_scope, metric_class, statement, query_count, secondary_meter, expected_exception)
 
@@ -525,7 +528,7 @@ class AbstractPropertyValues(ABC):
         pass
 
     @abstractmethod
-    def validate(self):
+    def validate(self, cassandra_version):
         pass
 
     def load(self, attr):
@@ -547,7 +550,7 @@ class Counter(AbstractPropertyValues):
     def init(self):
         self.load("Count")
 
-    def validate(self):
+    def validate(self, cassandra_version):
         v = self.values['Count']
         assert isinstance(v, int), self.mbean
         assert v >= 0, self.mbean
@@ -563,7 +566,7 @@ class Meter(AbstractPropertyValues):
                   "RateUnit"]:
             self.load(a)
 
-    def validate(self):
+    def validate(self, cassandra_version):
         assert self.values['RateUnit'] == 'events/second'
         for k, v in self.values.items():
             if k == 'RateUnit':
@@ -585,17 +588,22 @@ stat_words = [
     'RecentValues']
 
 
-def validate_stat_values(prefix, values):
+def validate_stat_values(prefix, values, cassandra_version):
     sample_count = values['Count']
     if sample_count:
-        validate_sane_latency(prefix, values)
+        validate_sane_histogram_values(prefix, values, cassandra_version)
     else:
-        validate_zero_latency(prefix, values)
+        validate_zero_histogram_values(prefix, values)
 
 
-def validate_sane_latency(prefix, values):
+def validate_sane_histogram_values(prefix, values, cassandra_version):
     validators = defaultdict(lambda: is_positive)
-    validators['RecentValues'] = is_histo_list
+    if 'DurationUnit' in values and cassandra_version >= '4.1':
+        # Timer values (since 4.1) are in micros resolution. The default number of buckets should be 91.
+        # See CASSANDRA-16760
+        validators['RecentValues'] = partial(is_histo_list, expected_len=91)
+    else:
+        validators['RecentValues'] = partial(is_histo_list, expected_len=165)
     validators['StdDev'] = is_non_negative
     validators['Min'] = is_non_negative
 
@@ -612,7 +620,7 @@ def validate_sane_latency(prefix, values):
         last_pct = this_pct
 
 
-def validate_zero_latency(prefix, values):
+def validate_zero_histogram_values(prefix, values):
     validators = defaultdict(lambda: is_zero)
     validators['RecentValues'] = is_zero_list
     validators['Mean'] = is_none
@@ -627,8 +635,8 @@ class Histogram(AbstractPropertyValues):
             self.load(a)
         self.load('Count')
 
-    def validate(self):
-        validate_stat_values(self.mbean, self.values)
+    def validate(self, cassandra_version):
+        validate_stat_values(self.mbean, self.values, cassandra_version)
         is_non_negative(self.mbean, self.values['Count'])
 
 
@@ -640,8 +648,8 @@ class LatencyMetricsTimer(Counter):
             self.load(a)
         self.load('DurationUnit')
 
-    def validate(self):
-        validate_stat_values(self.mbean, self.values)
+    def validate(self, cassandra_version):
+        validate_stat_values(self.mbean, self.values, cassandra_version)
         is_microseconds(self.mbean, self.values['DurationUnit'])
 
 
@@ -657,9 +665,9 @@ class LatencyMetrics(object):
             d.update(other.values[k].diff(v))
         return d
 
-    def validate(self):
+    def validate(self, cassandra_version):
         for v in self.values.values():
-            v.validate()
+            v.validate(cassandra_version)
 
 
 class ClientRequestMetrics(LatencyMetrics):
@@ -684,11 +692,11 @@ class ViewWriteMetrics(ClientRequestMetrics):
         self.values['ViewReplicasSuccess'] = Counter(scope, 'ViewReplicasSuccess')
         self.values['ViewWriteLatency'] = LatencyMetricsTimer(scope, 'ViewWriteLatency')
 
-    def validate(self):
-        super(ViewWriteMetrics, self).validate()
-        self.values['ViewReplicasAttempted'].validate()
-        self.values['ViewReplicasSuccess'].validate()
-        self.values['ViewWriteLatency'].validate()
+    def validate(self, cassandra_version):
+        super(ViewWriteMetrics, self).validate(cassandra_version)
+        self.values['ViewReplicasAttempted'].validate(cassandra_version)
+        self.values['ViewReplicasSuccess'].validate(cassandra_version)
+        self.values['ViewWriteLatency'].validate(cassandra_version)
 
 
 class CASClientRequestMetrics(ClientRequestMetrics):
@@ -698,11 +706,11 @@ class CASClientRequestMetrics(ClientRequestMetrics):
         self.values['UnfinishedCommit'] = Counter(scope, 'UnfinishedCommit')
         self.values['UnknownResult'] = Meter(scope, 'UnknownResult')
 
-    def validate(self):
-        super(CASClientRequestMetrics, self).validate()
-        self.values['ContentionHistogram'].validate()
-        self.values['UnfinishedCommit'].validate()
-        self.values['UnknownResult'].validate()
+    def validate(self, cassandra_version):
+        super(CASClientRequestMetrics, self).validate(cassandra_version)
+        self.values['ContentionHistogram'].validate(cassandra_version)
+        self.values['UnfinishedCommit'].validate(cassandra_version)
+        self.values['UnknownResult'].validate(cassandra_version)
 
 
 class CASClientWriteRequestMetrics(CASClientRequestMetrics):
@@ -711,10 +719,10 @@ class CASClientWriteRequestMetrics(CASClientRequestMetrics):
         self.values['MutationSizeHistogram'] = Histogram(scope, 'MutationSizeHistogram')
         self.values['ConditionNotMet'] = Counter(scope, 'ConditionNotMet')
 
-    def validate(self):
-        super(CASClientWriteRequestMetrics, self).validate()
-        self.values['MutationSizeHistogram'].validate()
-        self.values['ConditionNotMet'].validate()
+    def validate(self, cassandra_version):
+        super(CASClientWriteRequestMetrics, self).validate(cassandra_version)
+        self.values['MutationSizeHistogram'].validate(cassandra_version)
+        self.values['ConditionNotMet'].validate(cassandra_version)
 
 
 def diff_num(v1, v2):
@@ -763,19 +771,19 @@ def is_microseconds(k, v):
     assert v == 'microseconds', k
 
 
-def is_zero_list(k, l):
-    assert not any(l), k
+def is_zero_list(k, values):
+    assert not any(values), k
 
 
-def is_nonzero_list(k, l):
-    assert any(l), k
+def is_nonzero_list(k, values):
+    assert any(values), k
 
 
-def is_histo_list(k, l):
+def is_histo_list(k, values, expected_len):
     # since these values change on sampling, we can only generally verify it takes the proper form
     # There are in-tree unit tests around ClearableHistogram and DecayingEstimatedHistogramReservoir
-    assert len(l) == 165, k
-    assert all(isinstance(i, int) for i in l), k
+    assert len(values) == expected_len, k
+    assert all(isinstance(i, int) for i in values), k
 
 
 last_key = 0
