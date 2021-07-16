@@ -131,6 +131,24 @@ class BaseSStableLoaderTester(Tester):
                     assert 0 == exit_status, \
                         "sstableloader exited with a non-zero status: {}".format(exit_status)
 
+    def load_sstables_from_another_node(self, cluster, node_from, node_to, ks):
+        cdir = node_to.get_install_dir()
+        sstableloader = os.path.join(cdir, 'bin', ccmcommon.platform_binary('sstableloader'))
+        env = ccmcommon.make_cassandra_env(cdir, node_to.get_path())
+        host = node_to.address()
+        ret = []
+        for x in range(cluster.data_dir_count):
+            sstable_dir = os.path.join(node_from.get_path(), 'data' + str(x), ks.strip('"'))
+            for cf_dir in os.listdir(sstable_dir):
+                full_cf_dir = os.path.join(sstable_dir, cf_dir)
+                if os.path.isdir(full_cf_dir):
+                    cmd_args = [sstableloader, '--verbose', '--nodes', host, full_cf_dir]
+                    p = subprocess.Popen(cmd_args, stderr=subprocess.PIPE, stdout=subprocess.PIPE, env=env)
+                    stdout, stderr = p.communicate()
+                    exit_status = p.returncode
+                    ret.append((exit_status, stdout.decode("utf-8"), stderr.decode("utf-8")))
+        return ret
+
     def load_sstable_with_configuration(self, pre_compression=None, post_compression=None, ks="ks", create_schema=create_schema):
         """
         tests that the sstableloader works by using it to load data.
@@ -413,3 +431,28 @@ class TestSSTableGenerationAndLoading(BaseSStableLoaderTester):
         assert_one(session, """SELECT * FROM system."IndexInfo" WHERE table_name='k'""", ['k', 'idx', None])
         assert_all(session, "SELECT * FROM k.t", [[0, 1, 8], [0, 2, 8]])
         assert_all(session, "SELECT * FROM k.t WHERE v = 8", [[0, 1, 8], [0, 2, 8]])
+
+    @since("3.0")
+    def test_sstableloader_empty_stream(self):
+        """
+        @jira_ticket CASSANDRA-16349
+
+        Tests that sstableloader does not throw if SSTables it attempts to load do not
+        intersect with the node's ranges.
+        """
+        cluster = self.cluster
+        cluster.populate(2).start()
+        node1, node2 = cluster.nodelist()
+        session = self.patient_cql_connection(node1)
+
+        create_ks(session, 'k', 1)
+        session.execute("CREATE TABLE k.t (k int PRIMARY KEY, v int)")
+        for i in range(10):
+            session.execute("INSERT INTO k.t (k, v) VALUES ({0}, {0})".format(i))
+        node1.nodetool('flush')
+
+        ret = self.load_sstables_from_another_node(cluster, node1, node2, "k")
+        assert len(ret) > 0, "Expected to stream at least 1 table"
+        for exit_status, _, stderr in ret:
+            assert exit_status == 0, "Expected exit code 0, got {}".format(exit_status)
+            assert len(stderr) == 0, "Expected empty stderr, got {}".format(stderr)
