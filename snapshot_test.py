@@ -161,9 +161,23 @@ class TestSnapshot(SnapshotTester):
         self.create_schema(session)
 
         self.insert_rows(session, 0, 100)
-        snapshot_dir = self.make_snapshot(node1, 'ks', 'cf', 'basic', '1m')
-        print(snapshot_dir)
+        self.make_snapshot(node1, 'ks', 'cf', 'basic', '1m')
         time.sleep(80)
+        output = self.list_snapshots(node1).stdout
+        assert 'basic' not in output
+
+    def test_ttl_stop_and_start(self):
+        cluster = self.cluster
+        cluster.populate(1).start()
+        (node1,) = cluster.nodelist()
+        session = self.patient_cql_connection(node1)
+        self.create_schema(session)
+
+        self.insert_rows(session, 0, 100)
+        self.make_snapshot(node1, 'ks', 'cf', 'basic', '1m')
+        node1.stop()
+        node1.start(wait_for_binary_proto=True)
+        time.sleep(90)
         output = self.list_snapshots(node1).stdout
         assert 'basic' not in output
 
