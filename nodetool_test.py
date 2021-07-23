@@ -481,7 +481,7 @@ class TestNodetool(Tester):
                 hasPattern = True
         assert hasPattern == True, "Expected 'SJK hh' output"
 
-    @since('3.0')
+    @since('3.0', max_version='3.x')
     def test_jobs_option_warning(self):
         """
         Verify that nodetool -j/--jobs option warning is raised depending on the value of `concurrent_compactors` in the
@@ -489,6 +489,8 @@ class TestNodetool(Tester):
 
         Before CASSANDRA-16104 the warning was based on the local value of `concurrent_compactors`, and not in the value
         used in the target node, which is got through JMX.
+
+        From 4.0 we have a JUnit test in place that supersedes this test.
 
         @jira_ticket CASSANDRA-16104
         """
