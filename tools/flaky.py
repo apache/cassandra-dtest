@@ -36,9 +36,11 @@ def requires_rerun(err, *args):
     # err[0] contains the type of the error that occurred
     return err[0] == RerunTestException
 
-def retry(fn, num_retries=10, allowed_error=None, sleep_seconds=1):
+def retry(fn, max_attempts=10, allowed_error=None, sleep_seconds=1):
+    if max_attempts <= 0:
+        raise ValueError("max_attempts must be a positive value, but given {}".format(str(max_attempts)))
     last_error = None
-    for x in range(0, num_retries): 
+    for _ in range(0, max_attempts): 
         try:
             return fn()
         except Exception as e:

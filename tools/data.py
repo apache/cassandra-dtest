@@ -8,6 +8,7 @@ from cassandra.query import SimpleStatement
 from . import assertions
 from dtest import create_cf, DtestTimeoutError
 from tools.funcutils import get_rate_limited_function
+from tools.flaky import retry
 
 logger = logging.getLogger(__name__)
 
@@ -29,9 +30,9 @@ def insert_c1c2(session, keys=None, n=None, consistency=ConsistencyLevel.QUORUM)
     execute_concurrent_with_args(session, statement, [['k{}'.format(k)] for k in keys])
 
 
-def query_c1c2(session, key, consistency=ConsistencyLevel.QUORUM, tolerate_missing=False, must_be_missing=False):
+def query_c1c2(session, key, consistency=ConsistencyLevel.QUORUM, tolerate_missing=False, must_be_missing=False, max_attempts=1):
     query = SimpleStatement('SELECT c1, c2 FROM cf WHERE key=\'k%d\'' % key, consistency_level=consistency)
-    rows = list(session.execute(query))
+    rows = list(retry(lambda: session.execute(query), max_attempts=max_attempts))
     if not tolerate_missing:
         assertions.assert_length_equal(rows, 1)
         res = rows[0]

@@ -49,10 +49,10 @@ class TestBootstrapConsistency(Tester):
 
         logger.debug("Checking that no data was lost")
         for n in range(10, 20):
-            query_c1c2(n2session, n, ConsistencyLevel.ALL)
+            query_c1c2(n2session, n, ConsistencyLevel.ALL, max_attempts=3)
 
         for n in range(30, 1000):
-            query_c1c2(n2session, n, ConsistencyLevel.ALL)
+            query_c1c2(n2session, n, ConsistencyLevel.ALL, max_attempts=3)
 
     def test_consistent_reads_after_bootstrap(self):
         logger.debug("Creating a ring")
