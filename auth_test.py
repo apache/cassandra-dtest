@@ -3079,8 +3079,8 @@ class TestNetworkAuth(Tester):
         with JolokiaAgent(node) as jmx:
             jmx.execute_method(mbean, 'invalidate')
 
-    def clear_network_auth_cache(self, node):
-        mbean = make_mbean('auth', type='NetworkAuthCache')
+    def clear_network_auth_cache(self, node, cache_name='NetworkPermissionsCache'):
+        mbean = make_mbean('auth', type=cache_name)
         with JolokiaAgent(node) as jmx:
             jmx.execute_method(mbean, 'invalidate')
 
@@ -3101,16 +3101,25 @@ class TestNetworkAuth(Tester):
         if a user's access to a dc is revoked while they're connected,
         all of their requests should fail once the cache is cleared
         """
-        username = self.username()
-        self.create_user("CREATE ROLE %s WITH password = 'password' AND LOGIN = true", username)
-        self.assertConnectsTo(username, self.dc1_node)
-        self.assertConnectsTo(username, self.dc2_node)
+        def test_revoked_access(cache_name):
+            logger.debug('Testing with cache name: %s' % cache_name)
+            username = self.username()
+            self.create_user("CREATE ROLE %s WITH password = 'password' AND LOGIN = true", username)
+            self.assertConnectsTo(username, self.dc1_node)
+            self.assertConnectsTo(username, self.dc2_node)
 
-        # connect to the dc2 node, then remove permission for it
-        session = self.exclusive_cql_connection(self.dc2_node, user=username, password='password')
-        self.superuser.execute("ALTER ROLE %s WITH ACCESS TO DATACENTERS {'dc1'}" % username)
-        self.clear_network_auth_cache(self.dc2_node)
-        self.assertUnauthorized(lambda: session.execute("SELECT * FROM ks.tbl"))
+            # connect to the dc2 node, then remove permission for it
+            session = self.exclusive_cql_connection(self.dc2_node, user=username, password='password')
+            self.superuser.execute("ALTER ROLE %s WITH ACCESS TO DATACENTERS {'dc1'}" % username)
+            self.clear_network_auth_cache(self.dc2_node, cache_name)
+            self.assertUnauthorized(lambda: session.execute("SELECT * FROM ks.tbl"))
+
+        if self.dtest_config.cassandra_version_from_build > '4.0':
+            test_revoked_access("NetworkPermissionsCache")
+
+        # deprecated cache name, scheduled for removal in 5.0
+        if self.dtest_config.cassandra_version_from_build < '5.0':
+            test_revoked_access("NetworkAuthCache")
 
     def test_create_dc_validation(self):
         """
