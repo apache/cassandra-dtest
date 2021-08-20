@@ -1,0 +1,11 @@
+#
+# Delay schema reloading
+#
+RULE delay reload scheme
+CLASS org.apache.cassandra.schema.Schema
+METHOD reloadSchema
+AT ENTRY
+IF TRUE
+DO
+java.lang.Thread.sleep(2000);
+ENDRULE
