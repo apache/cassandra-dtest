@@ -8,9 +8,9 @@ import re
 import pytest
 import logging
 
-from cassandra import AuthenticationFailed, InvalidRequest, Unauthorized, Unavailable
+from cassandra import AuthenticationFailed, InvalidRequest, Unauthorized
 from cassandra.cluster import NoHostAvailable
-from cassandra.protocol import ServerError, SyntaxException
+from cassandra.protocol import SyntaxException
 
 from dtest_setup_overrides import DTestSetupOverrides
 from dtest import Tester
@@ -23,6 +23,7 @@ from tools.misc import ImmutableMapping
 
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
+
 
 class TestAuth(Tester):
 
@@ -3047,8 +3048,7 @@ class TestNetworkAuth(Tester):
         fixture_dtest_setup.superuser.execute("CREATE TABLE ks.tbl (k int primary key, v int)")
 
     def username(self):
-        return ''.join(random.choice(string.ascii_lowercase) for _ in range(8));
-
+        return ''.join(random.choice(string.ascii_lowercase) for _ in range(8))
 
     def create_user(self, query_fmt, username):
         """

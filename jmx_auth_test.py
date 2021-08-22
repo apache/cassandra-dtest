@@ -1,3 +1,5 @@
+import random
+import string
 import pytest
 import logging
 from distutils.version import LooseVersion
@@ -12,12 +14,14 @@ logger = logging.getLogger(__name__)
 
 @since('3.6')
 class TestJMXAuth(Tester):
+    """
+    Uses nodetool as a means of exercising the JMX interface as JolokiaAgent
+    exposes its own connector which bypasses the in-built security features
+    """
 
     def test_basic_auth(self):
         """
         Some basic smoke testing of JMX authentication and authorization.
-        Uses nodetool as a means of exercising the JMX interface as JolokiaAgent
-        exposes its own connector which bypasses the in-built security features
         @jira_ticket CASSANDRA-10091
         """
         self.prepare()
@@ -55,6 +59,42 @@ class TestJMXAuth(Tester):
         # superuser status applies to JMX authz too
         node.nodetool('-u cassandra -pw cassandra gossipinfo')
 
+    @since('4.1')
+    def test_revoked_jmx_access(self):
+        """
+        if a user's access to a JMX MBean is revoked while they're connected,
+        all of their requests should fail once the cache is cleared.
+        @jira_ticket CASSANDRA-16404
+        """
+        self.prepare(permissions_validity=60000)
+        [node] = self.cluster.nodelist()
+
+        def test_revoked_access(cache_name):
+            logger.debug('Testing with cache name: %s' % cache_name)
+            username = self.username()
+            session = self.patient_cql_connection(node, user='cassandra', password='cassandra')
+            session.execute("CREATE ROLE %s WITH LOGIN=true AND PASSWORD='abc123'" % username)
+            session.execute("GRANT SELECT ON MBEAN 'org.apache.cassandra.net:type=FailureDetector' TO %s" % username)
+            session.execute("GRANT DESCRIBE ON ALL MBEANS TO %s" % username)
+
+            # works fine
+            node.nodetool('-u %s -pw abc123 gossipinfo' % username)
+
+            session.execute("REVOKE SELECT ON MBEAN 'org.apache.cassandra.net:type=FailureDetector' FROM %s" % username)
+            # works fine because the JMX permission is cached
+            node.nodetool('-u %s -pw abc123 gossipinfo' % username)
+
+            node.nodetool('-u cassandra -pw cassandra invalidatejmxpermissionscache')
+            # the user has no permissions to the JMX resource anymore
+            with pytest.raises(ToolError, match='Access Denied'):
+                node.nodetool('-u %s -pw abc123 gossipinfo' % username)
+
+        test_revoked_access("JmxPermissionsCache")
+
+        # deprecated cache name, scheduled for removal in 5.0
+        if self.dtest_config.cassandra_version_from_build < '5.0':
+            test_revoked_access("JMXPermissionsCache")
+
     def prepare(self, nodes=1, permissions_validity=0):
         config = {'authenticator': 'org.apache.cassandra.auth.PasswordAuthenticator',
                   'authorizer': 'org.apache.cassandra.auth.CassandraAuthorizer',
@@ -69,3 +109,6 @@ class TestJMXAuth(Tester):
     def authentication_fail_message(self, node, username):
         return "Provided username {user} and/or password are incorrect".format(user=username) \
             if node.cluster.version() >= LooseVersion('3.10') else "Username and/or password are incorrect"
+
+    def username(self):
+        return ''.join(random.choice(string.ascii_lowercase) for _ in range(8))
