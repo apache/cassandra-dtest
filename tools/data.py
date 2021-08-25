@@ -22,7 +22,10 @@ def insert_c1c2(session, keys=None, n=None, consistency=ConsistencyLevel.QUORUM)
         raise ValueError("Expected exactly one of 'keys' or 'n' arguments to not be None; "
                          "got keys={keys}, n={n}".format(keys=keys, n=n))
     if n:
-        keys = list(range(n))
+        if isinstance(n, tuple):
+            keys = range(*n)
+        else:
+            keys = range(n)
 
     statement = session.prepare("INSERT INTO cf (key, c1, c2) VALUES (?, 'value1', 'value2')")
     statement.consistency_level = consistency
