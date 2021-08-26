@@ -265,7 +265,7 @@ class TestUpgradeSuperColumnsThrough(Tester):
         node.stop()
         if node.get_cassandra_version() < '4':
            node.set_configuration_options(values={'start_rpc': 'true'})
-        node.start()
+        node.start(wait_for_binary_proto=True)
 
         cursor = self.patient_cql_connection(node, row_factory=dict_factory)
 
@@ -312,7 +312,7 @@ class TestUpgradeSuperColumnsThrough(Tester):
         node.stop()
         if node.get_cassandra_version() < '4':
             node.set_configuration_options(values={'start_rpc': 'true'})
-        node.start()
+        node.start(wait_for_binary_proto=True)
 
         if node.get_cassandra_version() < '4':
             client = get_thrift_client(host, port)
@@ -365,7 +365,7 @@ class TestUpgradeSuperColumnsThrough(Tester):
         node.stop()
         if not is_version_4_or_greater:
             node.set_configuration_options(values={'start_rpc': 'true'})
-        node.start()
+        node.start(wait_for_binary_proto=True)
 
         if not is_version_4_or_greater:
             client = get_thrift_client(host, port)
