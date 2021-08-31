@@ -25,7 +25,17 @@ since = pytest.mark.since
 logger = logging.getLogger(__name__)
 
 
-class TestAuth(Tester):
+class AbstractTestAuth(Tester):
+
+    def role_creator_permissions(self, creator, role):
+        if self.dtest_config.cassandra_version_from_build <= '4.0':
+            permissions = ('ALTER', 'DROP', 'AUTHORIZE')
+        else:
+            permissions = ('ALTER', 'DROP', 'DESCRIBE', 'AUTHORIZE')
+        return [(creator, role, perm) for perm in permissions]
+
+
+class TestAuth(AbstractTestAuth):
 
     @pytest.fixture(autouse=True)
     def fixture_add_additional_log_patterns(self, fixture_dtest_setup):
@@ -940,8 +950,8 @@ class TestAuth(Tester):
             all_permissions.extend(data_resource_creator_permissions('cassandra', '<keyspace ks>'))
             all_permissions.extend(data_resource_creator_permissions('cassandra', '<table ks.cf>'))
             all_permissions.extend(data_resource_creator_permissions('cassandra', '<table ks.cf2>'))
-            all_permissions.extend(role_creator_permissions('cassandra', '<role bob>'))
-            all_permissions.extend(role_creator_permissions('cassandra', '<role cathy>'))
+            all_permissions.extend(self.role_creator_permissions('cassandra', '<role bob>'))
+            all_permissions.extend(self.role_creator_permissions('cassandra', '<role cathy>'))
 
         self.assertPermissionsListed(all_permissions, cassandra, "LIST ALL PERMISSIONS")
 
@@ -1146,7 +1156,7 @@ def data_resource_creator_permissions(creator, resource):
 
 
 @since('2.2')
-class TestAuthRoles(Tester):
+class TestAuthRoles(AbstractTestAuth):
 
     Role = None
     cassandra_role = None
@@ -1364,10 +1374,10 @@ class TestAuthRoles(Tester):
                         STYPE int
                         INITCOND 0""")
 
-        cassandra_permissions = role_creator_permissions('cassandra', '<role mike>')
+        cassandra_permissions = self.role_creator_permissions('cassandra', '<role mike>')
         mike_permissions = [('mike', '<all roles>', 'CREATE'),
                             ('mike', '<all keyspaces>', 'CREATE')]
-        mike_permissions.extend(role_creator_permissions('mike', '<role role1>'))
+        mike_permissions.extend(self.role_creator_permissions('mike', '<role role1>'))
         mike_permissions.extend(data_resource_creator_permissions('mike', '<keyspace ks>'))
         mike_permissions.extend(data_resource_creator_permissions('mike', '<table ks.cf>'))
         mike_permissions.extend(function_resource_creator_permissions('mike', '<function ks.state_function_1(int, int)>'))
@@ -1693,9 +1703,7 @@ class TestAuthRoles(Tester):
 
         # GRANT ALL ON ROLE does not include CREATE (because the role must already be created before the GRANT)
         self.superuser.execute("GRANT ALL ON ROLE role1 TO mike")
-        self.assert_permissions_listed([("mike", "<role role1>", "ALTER"),
-                                        ("mike", "<role role1>", "DROP"),
-                                        ("mike", "<role role1>", "AUTHORIZE")],
+        self.assert_permissions_listed(self.role_creator_permissions("mike", "<role role1>"),
                                        self.superuser,
                                        "LIST ALL PERMISSIONS OF mike")
         assert_invalid(self.superuser,
@@ -1772,9 +1780,9 @@ class TestAuthRoles(Tester):
                                 ("role2", "<role role1>", "ALTER")]
         expected_permissions.extend(data_resource_creator_permissions('cassandra', '<keyspace ks>'))
         expected_permissions.extend(data_resource_creator_permissions('cassandra', '<table ks.cf>'))
-        expected_permissions.extend(role_creator_permissions('cassandra', '<role mike>'))
-        expected_permissions.extend(role_creator_permissions('cassandra', '<role role1>'))
-        expected_permissions.extend(role_creator_permissions('cassandra', '<role role2>'))
+        expected_permissions.extend(self.role_creator_permissions('cassandra', '<role mike>'))
+        expected_permissions.extend(self.role_creator_permissions('cassandra', '<role role1>'))
+        expected_permissions.extend(self.role_creator_permissions('cassandra', '<role role2>'))
 
         self.assert_permissions_listed(expected_permissions, self.superuser, "LIST ALL PERMISSIONS")
 
@@ -1788,10 +1796,8 @@ class TestAuthRoles(Tester):
                                        self.superuser,
                                        "LIST ALL PERMISSIONS OF role2")
 
-        self.assert_permissions_listed([("cassandra", "<role role1>", "ALTER"),
-                                        ("cassandra", "<role role1>", "DROP"),
-                                        ("cassandra", "<role role1>", "AUTHORIZE"),
-                                        ("role2", "<role role1>", "ALTER")],
+        self.assert_permissions_listed(self.role_creator_permissions("cassandra", "<role role1>") +
+                                       [("role2", "<role role1>", "ALTER")],
                                        self.superuser,
                                        "LIST ALL PERMISSIONS ON ROLE role1")
         # we didn't specifically grant DROP on role1, so only it's creator should have it
@@ -2708,7 +2714,7 @@ class TestAuthRoles(Tester):
 
 
 @since('2.2')
-class TestAuthUnavailable(Tester):
+class TestAuthUnavailable(AbstractTestAuth):
     """
     * These tests verify behavior when backends for authentication & authorization are unable to pull data from the
     * system_auth keyspace. Failure scenarios are simulated based on the default CL for auth being LOCAL_QUORUM for reads,
@@ -3031,7 +3037,7 @@ class TestAuthUnavailable(Tester):
 
 
 @since('4.0')
-class TestNetworkAuth(Tester):
+class TestNetworkAuth(AbstractTestAuth):
 
     @pytest.fixture(autouse=True)
     def fixture_setup_auth(self, fixture_dtest_setup):
@@ -3163,10 +3169,6 @@ class TestNetworkAuth(Tester):
         self.clear_network_auth_cache(self.dc2_node, cache_name)
 
         self.assertUnauthorized(lambda: session.execute("SELECT * FROM ks.tbl"))
-
-
-def role_creator_permissions(creator, role):
-    return [(creator, role, perm) for perm in ('ALTER', 'DROP', 'AUTHORIZE')]
 
 
 def function_resource_creator_permissions(creator, resource):
