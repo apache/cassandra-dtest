@@ -13,6 +13,7 @@ from dtest import Tester, create_ks
 from tools.assertions import assert_invalid, assert_none, assert_one
 from tools.misc import ImmutableMapping
 
+reuse_cluster = pytest.mark.reuse_cluster
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
 
@@ -31,10 +32,6 @@ class TestUserFunctions(Tester):
             dtest_setup_overrides.cluster_options = ImmutableMapping({'enable_user_defined_functions': 'true'})
         return dtest_setup_overrides
 
-    @pytest.fixture(scope='function', autouse=False)
-    def fixture_dtest_reuse_cluster(self):
-        return False
-
     def prepare(self, create_keyspace=True, nodes=1, rf=1):
         cluster = self.cluster
         node1 = None
@@ -43,14 +40,17 @@ class TestUserFunctions(Tester):
             cluster.populate(nodes).start()
             node1 = cluster.nodelist()[0]
             time.sleep(0.2)
+            print("*** Started nodes: " + str(nodes))
         else:
+            print("*** Reusing nodes: " + str(nodes))
             node1 = cluster.nodelist()[0]
 
         session = self.patient_cql_connection(node1)
         if create_keyspace:
-            create_ks(session, 'ks' + str(round(time.time() * 1000)), rf)
+            create_ks(session, 'ks', rf)
         return session
 
+    @reuse_cluster
     def not_test_migration(self):
         """ Test migration of user functions """
         cluster = self.cluster
@@ -141,6 +141,7 @@ class TestUserFunctions(Tester):
                        "CREATE FUNCTION bad_sin ( input double ) CALLED ON NULL INPUT RETURNS uuid LANGUAGE java AS 'return Math.sin(input);';",
                        "Type mismatch: cannot convert from double to UUID")
 
+    @reuse_cluster
     def not_test_udf_overload(self):
 
         session = self.prepare(nodes=3)
@@ -175,7 +176,7 @@ class TestUserFunctions(Tester):
         # should now work - unambiguous
         session.execute("DROP FUNCTION overloaded")
 
-    def test_udf_scripting(self, fixture_dtest_reuse_cluster):
+    def test_udf_scripting(self):
         session = self.prepare()
         session.execute("create table nums (key int primary key, val double);")
 
@@ -198,7 +199,8 @@ class TestUserFunctions(Tester):
 
         assert_one(session, "select plustwo(key) from nums where key = 3", [5])
 
-    def test_default_aggregate(self, fixture_dtest_reuse_cluster):
+    @reuse_cluster
+    def test_default_aggregate(self):
         session = self.prepare()
         session.execute("create table nums (key int primary key, val double);")
 
@@ -211,7 +213,8 @@ class TestUserFunctions(Tester):
         assert_one(session, "SELECT avg(val) FROM nums", [5.0])
         assert_one(session, "SELECT count(*) FROM nums", [9])
 
-    def test_aggregate_udf(self, fixture_dtest_reuse_cluster):
+    @reuse_cluster
+    def test_aggregate_udf(self):
         session = self.prepare()
         session.execute("create table nums (key int primary key, val int);")
 
@@ -230,7 +233,8 @@ class TestUserFunctions(Tester):
 
         assert_invalid(session, "create aggregate aggthree(int) sfunc test stype int finalfunc aggtwo")
 
-    def test_udf_with_udt(self, fixture_dtest_reuse_cluster):
+    @reuse_cluster
+    def test_udf_with_udt(self):
         """
         Test UDFs that operate on non-frozen UDTs.
         @jira_ticket CASSANDRA-7423
@@ -261,7 +265,8 @@ class TestUserFunctions(Tester):
             assert_invalid(session, "drop type test;")
 
     @since('2.2')
-    def test_udf_with_udt_keyspace_isolation(self, fixture_dtest_reuse_cluster):
+    @reuse_cluster
+    def test_udf_with_udt_keyspace_isolation(self):
         """
         Ensure functions dont allow a UDT from another keyspace
         @jira_ticket CASSANDRA-9409
@@ -287,7 +292,8 @@ class TestUserFunctions(Tester):
             "Statement on keyspace user_ks cannot refer to a user type in keyspace ks"
         )
 
-    def test_aggregate_with_udt_keyspace_isolation(self, fixture_dtest_reuse_cluster):
+    @reuse_cluster
+    def test_aggregate_with_udt_keyspace_isolation(self):
         """
         Ensure aggregates dont allow a UDT from another keyspace
         @jira_ticket CASSANDRA-9409

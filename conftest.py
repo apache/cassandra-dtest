@@ -124,13 +124,13 @@ def fixture_dtest_setup_overrides(dtest_config):
     return DTestSetupOverrides()
 
 @pytest.fixture(scope='function', autouse=True)
-def fixture_dtest_reuse_cluster():
-    """
-    no-op default implementation of fixture_dtest_reuse_cluster.
-    we run this when a test class hasn't implemented their own
-    fixture_dtest_reuse_cluster
-    """
-    return False
+def fixture_dtest_reuse_cluster(request):
+    marker = request.node.get_closest_marker("reuse_cluster")
+    if marker is None:
+        return False
+    else:
+        return True
+
 
 @pytest.fixture(scope='class', autouse=True)
 def fixture_dtest_clean_reused_cluster(request):
@@ -355,28 +355,25 @@ def fixture_dtest_setup(request,
 
     initial_environment = copy.deepcopy(os.environ)
 
-    if reusable_dtest_setup is None or not reuse_dtest_setup:
-        if running_in_docker():
-            cleanup_docker_environment_before_test_execution()
-
-        # do all of our setup operations to get the enviornment ready for the actual test
-        # to run (e.g. bring up a cluster with the necessary config, populate variables, etc)
-        #initial_environment = copy.deepcopy(os.environ)
-        dtest_setup = DTestSetup(dtest_config=dtest_config,
-                                 setup_overrides=fixture_dtest_setup_overrides,
-                                 cluster_name=fixture_dtest_cluster_name)
-        dtest_setup.initialize_cluster(fixture_dtest_create_cluster_func)
-
-        if not dtest_config.disable_active_log_watching:
-            dtest_setup.begin_active_log_watch()
-
-        if reusable_dtest_setup is not None and reuse_dtest_setup:
-            close_connections(reusable_dtest_setup)
-            reusable_dtest_setup.cleanup_cluster(request)
-
-        reusable_dtest_setup = dtest_setup
-    else:
+    if reuse_dtest_setup:
+        if reusable_dtest_setup is None:
+            reusable_dtest_setup = setup_cluster(dtest_config,
+                                        fixture_dtest_setup_overrides,
+                                        fixture_dtest_cluster_name,
+                                        fixture_dtest_create_cluster_func)
+        drop_test_ks(reusable_dtest_setup)
         dtest_setup = reusable_dtest_setup
+
+    else:
+        if reusable_dtest_setup is not None:
+            reusable_dtest_setup.cleanup_cluster(request)
+            reusable_dtest_setup = None
+
+        dtest_setup = setup_cluster(dtest_config,
+                                    fixture_dtest_setup_overrides,
+                                    fixture_dtest_cluster_name,
+                                    fixture_dtest_create_cluster_func)
+        reusable_dtest_setup = dtest_setup
 
     # at this point we're done with our setup operations in this fixture
     # yield to allow the actual test to run
@@ -388,8 +385,9 @@ def fixture_dtest_setup(request,
     reset_environment_vars(initial_environment)
     dtest_setup.jvm_args = []
 
-    if not reuse_dtest_setup:
-        close_connections(dtest_setup)
+    for con in dtest_setup.connections:
+        con.cluster.shutdown()
+    dtest_setup.connections = []
 
     failed = False
     try:
@@ -406,15 +404,48 @@ def fixture_dtest_setup(request,
                 copy_logs(request, dtest_setup.cluster)
         except Exception as e:
             logger.error("Error saving log:", str(e))
-        finally:
-            if not reuse_dtest_setup:
-                dtest_setup.cleanup_cluster(request)
 
 
-def close_connections(dtest_setup):
-    for con in dtest_setup.connections:
-        con.cluster.shutdown()
-    dtest_setup.connections = []
+def drop_test_ks(dtest_setup):
+    wait_schema_agreement = False
+    session = None
+
+    if not len(dtest_setup.cluster.nodelist()) is 0:
+        node1 = dtest_setup.cluster.nodelist()[0]
+        if node1.is_running():
+            session = dtest_setup.cql_connection(node1)
+            query = "select * from system_schema.keyspaces"
+            rows = session.execute(query=query, timeout=120)
+            for row in rows:
+                ks = str(row.keyspace_name)
+                if not ks.startswith("system"):
+                    query = "drop keyspace " + ks
+                    session.execute(query=query, timeout=120)
+                    wait_schema_agreement = True
+
+    if wait_schema_agreement:
+        session.cluster.control_connection.wait_for_schema_agreement(wait_time=120)
+
+
+def setup_cluster(dtest_config,
+                  fixture_dtest_setup_overrides,
+                  fixture_dtest_cluster_name,
+                  fixture_dtest_create_cluster_func):
+    if running_in_docker():
+        cleanup_docker_environment_before_test_execution()
+
+    # do all of our setup operations to get the enviornment ready for the actual test
+    # to run (e.g. bring up a cluster with the necessary config, populate variables, etc)
+    # initial_environment = copy.deepcopy(os.environ)
+    dtest_setup = DTestSetup(dtest_config=dtest_config,
+                             setup_overrides=fixture_dtest_setup_overrides,
+                             cluster_name=fixture_dtest_cluster_name)
+    dtest_setup.initialize_cluster(fixture_dtest_create_cluster_func)
+
+    if not dtest_config.disable_active_log_watching:
+        dtest_setup.begin_active_log_watch()
+
+    return dtest_setup
 
 
 # Based on https://bugs.python.org/file25808/14894.patch
