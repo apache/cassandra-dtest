@@ -24,6 +24,7 @@ from dtest_setup import DTestSetup
 from dtest_setup_overrides import DTestSetupOverrides
 
 logger = logging.getLogger(__name__)
+reusable_dtest_setup = None
 
 
 def check_required_loopback_interfaces_available():
@@ -121,6 +122,30 @@ def fixture_dtest_setup_overrides(dtest_config):
     fixture_dtest_setup_overrides
     """
     return DTestSetupOverrides()
+
+@pytest.fixture(scope='function', autouse=True)
+def fixture_dtest_reuse_cluster():
+    """
+    no-op default implementation of fixture_dtest_reuse_cluster.
+    we run this when a test class hasn't implemented their own
+    fixture_dtest_reuse_cluster
+    """
+    return False
+
+@pytest.fixture(scope='class', autouse=True)
+def fixture_dtest_clean_reused_cluster(request):
+    """
+    Clean re-used cluster at end of class
+    """
+
+    yield
+
+    global reusable_dtest_setup
+    if reusable_dtest_setup is not None:
+        try:
+            reusable_dtest_setup.cleanup_cluster(request)
+        except FileNotFoundError:
+            pass
 
 
 @pytest.fixture(scope='function')
@@ -322,20 +347,36 @@ def fixture_dtest_setup(request,
                         fixture_dtest_setup_overrides,
                         fixture_logging_setup,
                         fixture_dtest_cluster_name,
-                        fixture_dtest_create_cluster_func):
-    if running_in_docker():
-        cleanup_docker_environment_before_test_execution()
+                        fixture_dtest_create_cluster_func,
+                        fixture_dtest_reuse_cluster):
+    dtest_setup = None
+    global reusable_dtest_setup # Reusable cluster/nodes/config
+    reuse_dtest_setup = fixture_dtest_reuse_cluster
 
-    # do all of our setup operations to get the enviornment ready for the actual test
-    # to run (e.g. bring up a cluster with the necessary config, populate variables, etc)
     initial_environment = copy.deepcopy(os.environ)
-    dtest_setup = DTestSetup(dtest_config=dtest_config,
-                             setup_overrides=fixture_dtest_setup_overrides,
-                             cluster_name=fixture_dtest_cluster_name)
-    dtest_setup.initialize_cluster(fixture_dtest_create_cluster_func)
 
-    if not dtest_config.disable_active_log_watching:
-        dtest_setup.begin_active_log_watch()
+    if reusable_dtest_setup is None or not reuse_dtest_setup:
+        if running_in_docker():
+            cleanup_docker_environment_before_test_execution()
+
+        # do all of our setup operations to get the enviornment ready for the actual test
+        # to run (e.g. bring up a cluster with the necessary config, populate variables, etc)
+        #initial_environment = copy.deepcopy(os.environ)
+        dtest_setup = DTestSetup(dtest_config=dtest_config,
+                                 setup_overrides=fixture_dtest_setup_overrides,
+                                 cluster_name=fixture_dtest_cluster_name)
+        dtest_setup.initialize_cluster(fixture_dtest_create_cluster_func)
+
+        if not dtest_config.disable_active_log_watching:
+            dtest_setup.begin_active_log_watch()
+
+        if reusable_dtest_setup is not None and reuse_dtest_setup:
+            close_connections(reusable_dtest_setup)
+            reusable_dtest_setup.cleanup_cluster(request)
+
+        reusable_dtest_setup = dtest_setup
+    else:
+        dtest_setup = reusable_dtest_setup
 
     # at this point we're done with our setup operations in this fixture
     # yield to allow the actual test to run
@@ -347,9 +388,8 @@ def fixture_dtest_setup(request,
     reset_environment_vars(initial_environment)
     dtest_setup.jvm_args = []
 
-    for con in dtest_setup.connections:
-        con.cluster.shutdown()
-    dtest_setup.connections = []
+    if not reuse_dtest_setup:
+        close_connections(dtest_setup)
 
     failed = False
     try:
@@ -367,7 +407,14 @@ def fixture_dtest_setup(request,
         except Exception as e:
             logger.error("Error saving log:", str(e))
         finally:
-            dtest_setup.cleanup_cluster(request)
+            if not reuse_dtest_setup:
+                dtest_setup.cleanup_cluster(request)
+
+
+def close_connections(dtest_setup):
+    for con in dtest_setup.connections:
+        con.cluster.shutdown()
+    dtest_setup.connections = []
 
 
 # Based on https://bugs.python.org/file25808/14894.patch
