@@ -544,21 +544,6 @@ def cassandra_dir_and_version(config):
     return cassandra_dir, cassandra_version
 
 
-def _is_skippable(item, mark, skip_marked, skip_non_marked):
-    if item.get_closest_marker(mark) is not None:
-        if skip_marked:
-            logger.info("SKIP: Skipping %s because it is marked with %s" % (item, mark))
-            return True
-        else:
-            return False
-    else:
-        if skip_non_marked:
-            logger.info("SKIP: Skipping %s because it is not marked with %s" % (item, mark))
-            return True
-        else:
-            return False
-
-
 class SkipConditions:
     def __init__(self, dtest_config, sufficient_resources):
         self.skip_upgrade_tests = not dtest_config.execute_upgrade_tests and not dtest_config.execute_upgrade_tests_only
@@ -572,16 +557,40 @@ class SkipConditions:
         self.skip_no_vnodes_tests = dtest_config.use_vnodes
         self.skip_no_offheap_memtables_tests = dtest_config.use_off_heap_memtables
 
+    @staticmethod
+    def _is_skippable(item, mark, skip_marked, skip_non_marked):
+        if item.get_closest_marker(mark) is not None:
+            if skip_marked:
+                logger.info("SKIP: Skipping %s because it is marked with %s" % (item, mark))
+                return True
+            else:
+                return False
+        else:
+            if skip_non_marked:
+                logger.info("SKIP: Skipping %s because it is not marked with %s" % (item, mark))
+                return True
+            else:
+                return False
 
-def is_skippable(item, skip_cond):
-    return (_is_skippable(item, "upgrade_test",
-                          skip_cond.skip_upgrade_tests, skip_cond.skip_non_upgrade_tests)
-            or _is_skippable(item, "resource_intensive",
-                             skip_cond.skip_resource_intensive_tests, skip_cond.skip_non_resource_intensive_tests)
-            or _is_skippable(item, "vnodes", skip_cond.skip_vnodes_tests, skip_non_marked=False)
-            or _is_skippable(item, "no_vnodes", skip_cond.skip_no_vnodes_tests, skip_non_marked=False)
-            or _is_skippable(item, "no_offheap_memtables", skip_cond.skip_no_offheap_memtables_tests, skip_non_marked=False)
-            or _is_skippable(item, "depends_driver", skip_marked=True, skip_non_marked=False))
+    def is_skippable(self, item):
+        return (self._is_skippable(item, "upgrade_test",
+                                   skip_marked=self.skip_upgrade_tests,
+                                   skip_non_marked=self.skip_non_upgrade_tests)
+                or self._is_skippable(item, "resource_intensive",
+                                      skip_marked=self.skip_resource_intensive_tests,
+                                      skip_non_marked=self.skip_non_resource_intensive_tests)
+                or self._is_skippable(item, "vnodes",
+                                      skip_marked=self.skip_vnodes_tests,
+                                      skip_non_marked=False)
+                or self._is_skippable(item, "no_vnodes",
+                                      skip_marked=self.skip_no_vnodes_tests,
+                                      skip_non_marked=False)
+                or self._is_skippable(item, "no_offheap_memtables",
+                                      skip_marked=self.skip_no_offheap_memtables_tests,
+                                      skip_non_marked=False)
+                or self._is_skippable(item, "depends_driver",
+                                      skip_marked=True,
+                                      skip_non_marked=False))
 
 
 def pytest_collection_modifyitems(items, config):
@@ -605,7 +614,7 @@ def pytest_collection_modifyitems(items, config):
                     "were not specified")
 
     for item in items:
-        deselect_test = is_skippable(item, skip_conditions)
+        deselect_test = SkipConditions.is_skippable(skip_conditions, item)
 
         if deselect_test:
             deselected_items.append(item)

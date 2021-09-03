@@ -1,6 +1,6 @@
 import pytest
 
-from conftest import SkipConditions, dtest_config, is_skippable
+from conftest import SkipConditions
 from mock import Mock
 
 
@@ -32,7 +32,7 @@ class TestConfTest(object):
     no_offheap_memtables_test = Mock(name="no_offheap_memtables_test_mock")
     depends_driver_test = Mock(name="depends_driver_test_mock")
 
-    def setup_method(self, method):
+    def setup_method(self):
         self.regular_test.get_closest_marker.side_effect = _mock_responses({})
         self.upgrade_test.get_closest_marker.side_effect = _mock_responses(
             {"upgrade_test": True})
@@ -51,13 +51,13 @@ class TestConfTest(object):
                                       depends_driver_test])
     def test_skip_if_no_config(self, item):
         dtest_config = DTestConfigMock()
-        assert is_skippable(item, SkipConditions(dtest_config, False))
+        assert SkipConditions(dtest_config, False).is_skippable(item)
 
     @pytest.mark.parametrize("item", [regular_test, resource_intensive_test, no_vnodes_test,
                                       no_offheap_memtables_test])
     def test_include_if_no_config(self, item):
         dtest_config = DTestConfigMock()
-        assert not is_skippable(item, SkipConditions(dtest_config, True))
+        assert not SkipConditions(dtest_config, True).is_skippable(item)
 
     @pytest.mark.parametrize("item,config",
                              [(upgrade_test, "execute_upgrade_tests_only"),
@@ -66,8 +66,7 @@ class TestConfTest(object):
     def test_include_if_config_only(self, item, config, sufficient_resources):
         dtest_config = DTestConfigMock()
         dtest_config.set(config)
-        assert not is_skippable(item, SkipConditions(
-            dtest_config, sufficient_resources))
+        assert not SkipConditions(dtest_config, sufficient_resources).is_skippable(item)
 
     @pytest.mark.parametrize("item",
                              [regular_test, upgrade_test, resource_intensive_test, vnodes_test,
@@ -78,10 +77,11 @@ class TestConfTest(object):
     def test_config_only(self, item, only_item, config):
         dtest_config = DTestConfigMock()
         dtest_config.set(config)
+        skip_conditions = SkipConditions(dtest_config, True)
         if item != only_item:
-            assert is_skippable(item, SkipConditions(dtest_config, True))
+            assert skip_conditions.is_skippable(item)
         else:
-            assert not is_skippable(item, SkipConditions(dtest_config, True))
+            assert not skip_conditions.is_skippable(item)
 
     @pytest.mark.parametrize("item",
                              [regular_test, upgrade_test, resource_intensive_test,
@@ -89,7 +89,7 @@ class TestConfTest(object):
     def test_include_if_execute_upgrade(self, item):
         dtest_config = DTestConfigMock()
         dtest_config.set("execute_upgrade_tests")
-        assert not is_skippable(item, SkipConditions(dtest_config, True))
+        assert not SkipConditions(dtest_config, True).is_skippable(item)
 
     @pytest.mark.parametrize("config, sufficient_resources",
                              [("", False),
@@ -98,8 +98,7 @@ class TestConfTest(object):
     def test_skip_resource_intensive(self, config, sufficient_resources):
         dtest_config = DTestConfigMock()
         dtest_config.set(config)
-        assert is_skippable(self.resource_intensive_test,
-                            SkipConditions(dtest_config, sufficient_resources))
+        assert SkipConditions(dtest_config, sufficient_resources).is_skippable(self.resource_intensive_test)
 
     @pytest.mark.parametrize("config", ["force_execution_of_resource_intensive_tests",
                                         "only_resource_intensive_tests"])
@@ -107,16 +106,14 @@ class TestConfTest(object):
     def test_include_resource_intensive_if_any_resources(self, config, sufficient_resources):
         dtest_config = DTestConfigMock()
         dtest_config.set(config)
-        assert not is_skippable(self.resource_intensive_test, SkipConditions(
-            dtest_config, sufficient_resources))
+        assert not SkipConditions(dtest_config, sufficient_resources).is_skippable(self.resource_intensive_test)
 
     def test_skip_resource_intensive_wins(self):
         dtest_config = DTestConfigMock()
         dtest_config.set("force_execution_of_resource_intensive_tests")
         dtest_config.set("only_resource_intensive_tests")
         dtest_config.set("skip_resource_intensive_tests")
-        assert is_skippable(self.resource_intensive_test,
-                            SkipConditions(dtest_config, True))
+        assert SkipConditions(dtest_config, True).is_skippable(self.resource_intensive_test)
 
     @pytest.mark.parametrize("item",
                              [regular_test, resource_intensive_test, vnodes_test,
@@ -124,13 +121,12 @@ class TestConfTest(object):
     def test_if_config_vnodes(self, item):
         dtest_config = DTestConfigMock()
         dtest_config.set("use_vnodes")
-        assert not is_skippable(item, SkipConditions(dtest_config, True))
+        assert not SkipConditions(dtest_config, True).is_skippable(item)
 
     def test_skip_no_offheap_memtables(self):
         dtest_config = DTestConfigMock()
         dtest_config.set("use_off_heap_memtables")
-        assert is_skippable(self.no_offheap_memtables_test,
-                            SkipConditions(dtest_config, True))
+        assert SkipConditions(dtest_config, True).is_skippable(self.no_offheap_memtables_test)
 
     @pytest.mark.parametrize("config", ["", "execute_upgrade_tests", "execute_upgrade_tests_only",
                                         "force_execution_of_resource_intensive_tests",
@@ -141,5 +137,4 @@ class TestConfTest(object):
     def test_skip_depends_driver_always(self, config, sufficient_resources):
         dtest_config = DTestConfigMock()
         dtest_config.set(config)
-        assert is_skippable(self.depends_driver_test, SkipConditions(
-            dtest_config, sufficient_resources))
+        assert SkipConditions(dtest_config, sufficient_resources).is_skippable(self.depends_driver_test)
