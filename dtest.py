@@ -167,19 +167,17 @@ def running_in_docker():
     return os.path.isfile('/.dockerenv')
 
 
-def cleanup_docker_environment_before_test_execution(reuse_nodes = True):
+def cleanup_docker_environment_before_test_execution():
     """
     perform a bunch of system cleanup operations, like kill any instances that might be
     hanging around incorrectly from a previous run, sync the disk, and clear swap.
     Ideally we would also drop the page cache, but as docker isn't running in privileged
     mode there is no way for us to do this.
     """
-
-    if reuse_nodes:
-        # attempt to wack all existing running Cassandra processes forcefully to get us into a clean state
-        p_kill = subprocess.Popen('ps aux | grep -ie CassandraDaemon | grep java | grep -v grep | awk \'{print $2}\' | xargs kill -9',
-                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True)
-        p_kill.wait(timeout=10)
+    # attempt to wack all existing running Cassandra processes forcefully to get us into a clean state
+    p_kill = subprocess.Popen('ps aux | grep -ie CassandraDaemon | grep java | grep -v grep | awk \'{print $2}\' | xargs kill -9',
+                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True)
+    p_kill.wait(timeout=10)
 
     # explicitly call "sync" to flush everything that might be pending from a previous test
     # so tests are less likely to hit a very slow fsync during the test by starting from a 'known' state

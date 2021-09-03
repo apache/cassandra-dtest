@@ -436,9 +436,9 @@ def setup_cluster(dtest_config,
                   fixture_dtest_setup_overrides,
                   fixture_dtest_cluster_name,
                   fixture_dtest_create_cluster_func,
-                  reusable_dtest_setup = False):
-    if running_in_docker():
-        cleanup_docker_environment_before_test_execution(reusable_dtest_setup)
+                  reuse_cluster = False):
+    if running_in_docker() and not reuse_cluster:
+        cleanup_docker_environment_before_test_execution()
 
     # do all of our setup operations to get the enviornment ready for the actual test
     # to run (e.g. bring up a cluster with the necessary config, populate variables, etc)
