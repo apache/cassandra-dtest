@@ -35,7 +35,6 @@ since = pytest.mark.since
 logger = logging.getLogger(__name__)
 
 
-@pytest.mark.upgrade_test
 class TestCQL(UpgradeTester):
 
     def is_40_or_greater(self):

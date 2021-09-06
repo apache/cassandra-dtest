@@ -20,7 +20,6 @@ since = pytest.mark.since
 logger = logging.getLogger(__name__)
 
 
-@pytest.mark.upgrade_test
 class TestForRegressions(UpgradeTester):
     """
     Catch-all class for regression tests on specific versions.

@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 # Also used by upgrade_tests/storage_engine_upgrade_test
 # to test loading legacy sstables
-class TestBaseSStableLoader(Tester):
+class BaseSStableLoaderTester(Tester):
 
     @pytest.fixture(autouse=True)
     def fixture_add_additional_log_patterns(self, fixture_dtest_setup):
@@ -250,7 +250,7 @@ class TestBaseSStableLoader(Tester):
                     assert 0 == len(temp_files), "Temporary files were not cleaned up."
 
 
-class TestSSTableGenerationAndLoading(TestBaseSStableLoader):
+class TestSSTableGenerationAndLoading(BaseSStableLoaderTester):
 
     def test_sstableloader_uppercase_keyspace_name(self):
         """

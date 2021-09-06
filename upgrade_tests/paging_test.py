@@ -37,7 +37,6 @@ class BasePagingTester(UpgradeTester):
         return cursor
 
 
-@pytest.mark.upgrade_test
 class TestPagingSize(BasePagingTester, PageAssertionMixin):
     """
     Basic tests relating to page size (relative to results set)
@@ -442,7 +441,6 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
             )
 
 
-@pytest.mark.upgrade_test
 class TestPagingData(BasePagingTester, PageAssertionMixin):
 
     def test_basic_paging(self):

@@ -14,7 +14,7 @@ Another way to make sure that your code will pass compliance checks is to run **
 ```
 flake8 --install-hook
 git config flake8.strict true
-git config flake8.ignore E501,F811,F812,F821,F822,F823,F831,F841,N8,C9
+git config flake8.ignore E501,F811,F812,F821,F822,F823,F831,F841,N8,C9,W503
 ```
 
 We do not enforce **import** sorting, but if you choose to organize imports by some convention, use the `isort` tool (`pip install isort`).
