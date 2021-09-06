@@ -16,7 +16,8 @@ script:
   # I know we don't enforce line length but if you introduce
   # 200-char lines you are doing something terribly wrong.
   # lint all files for everything but line length errors
-  - git diff apache/trunk...HEAD -U0 | pycodestyle --ignore=E501 --diff
+  # and W503, since it is inconflict with W504
+  - git diff apache/trunk...HEAD -U0 | pycodestyle --ignore=E501,W503 --diff
   # lint all files except json_test.py for line length errors
   - git diff apache/trunk...HEAD -U0 | pycodestyle --diff --exclude='json_test.py' --exclude='meta_tests/assertion_test.py' --max-line-length=200
   - pytest --metatests
