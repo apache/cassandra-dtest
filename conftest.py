@@ -547,15 +547,13 @@ def cassandra_dir_and_version(config):
 def _is_skippable(item, mark, skip_marked, skip_non_marked):
     if item.get_closest_marker(mark) is not None:
         if skip_marked:
-            logger.info(
-                "SKIP: Skipping %s because it is marked with %s" % (item, mark))
+            logger.info("SKIP: Skipping %s because it is marked with %s" % (item, mark))
             return True
         else:
             return False
     else:
         if skip_non_marked:
-            logger.info(
-                "SKIP: Skipping %s because it is not marked with %s" % (item, mark))
+            logger.info("SKIP: Skipping %s because it is not marked with %s" % (item, mark))
             return True
         else:
             return False

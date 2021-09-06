@@ -37,7 +37,6 @@ class BasePagingTester(UpgradeTester):
         return cursor
 
 
-@pytest.mark.upgrade_test
 class TestPagingSize(BasePagingTester, PageAssertionMixin):
     """
     Basic tests relating to page size (relative to results set)
@@ -188,7 +187,6 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
             assert_lists_equal_ignoring_order(pf.all_data(), expected_data, sort_key='value')
 
 
-@pytest.mark.upgrade_test
 class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
     """
     Tests concerned with paging when CQL modifiers (such as order, limit, allow filtering) are used.
@@ -443,7 +441,6 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
             )
 
 
-@pytest.mark.upgrade_test
 class TestPagingData(BasePagingTester, PageAssertionMixin):
 
     def test_basic_paging(self):
@@ -917,7 +914,6 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
             assert_lists_equal_ignoring_order(expected_data, pf.all_data(), sort_key='sometext')
 
 
-@pytest.mark.upgrade_test
 class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
     """
     Tests concerned with paging when the queried dataset changes while pages are being retrieved.
@@ -1109,7 +1105,6 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
             assert_lists_equal_ignoring_order(page3, page3expected, sort_key="mytext")
 
 
-@pytest.mark.upgrade_test
 class TestPagingQueryIsolation(BasePagingTester, PageAssertionMixin):
     """
     Tests concerned with isolation of paged queries (queries can't affect each other).
@@ -1199,7 +1194,6 @@ class TestPagingQueryIsolation(BasePagingTester, PageAssertionMixin):
             self.assertEqualIgnoreOrder(flatten_into_set(page_fetchers[10].all_data()), flatten_into_set(expected_data[:50000]))
 
 
-@pytest.mark.upgrade_test
 class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
     """
     Tests concerned with paging when deletions occur.

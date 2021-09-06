@@ -144,6 +144,13 @@ Though that can be very verbose! To reduce the output a bit, you can use somethi
 This procedure is very similar to adding a single test, but requires a little bit more work.
 In the above example, the [cql_tests.py](cql_tests.py) module has already been built to do the necessary code generation covering the various upgrade paths, and that module is a good reference for seeing how the code generation works (see the end of the file).
 
+The upgrade tests need to be marked as upgrade tests to be selected for the execution. It happens
+implicitly if the test class inherits from `UpgradeTester`. If not, then the base test class,
+the test class or the test method needs to be marked with:
+```python
+@pytest.mark.upgrade_test
+```
+
 The basic module creation procedure:
 
 - Add the new module file.
@@ -151,6 +158,8 @@ The basic module creation procedure:
 - If you don't extend UpgradeTester, set ```__test__ = False```. This will prevent
 nosetests from directly running the base class as a test, since the class is intended
 to act as a template and not be directly executed.
+- If you don't extend UpgradeTester, mark the base class or each class if no base class with 
+`@pytest.mark.upgrade_test`.
 - At the end of the module, you'll query the supported upgrade manifest using
 [upgrade_manifest.py](upgrade_manifest.py):build_upgrade_pairs. Similar to [cql_tests.py](cql_tests.py) you'll probably want to combine the upgrade paths with other configurations for a more complete test matrix. Don't forget to do the class gen
 for each class in your module.
