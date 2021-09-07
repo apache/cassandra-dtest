@@ -356,7 +356,9 @@ def fixture_dtest_setup(request,
     initial_environment = copy.deepcopy(os.environ)
 
     if reuse_dtest_setup:
-        if reusable_dtest_setup is None:
+        if reusable_dtest_setup is None \
+                or len([node for node in reusable_dtest_setup.cluster.nodelist() if
+                        node.is_live()]) != reusable_dtest_setup.cluster.nodelist():
             reusable_dtest_setup = setup_cluster(dtest_config,
                                                  fixture_dtest_setup_overrides,
                                                  fixture_dtest_cluster_name,
@@ -415,7 +417,7 @@ def drop_test_ks(dtest_setup):
     wait_schema_agreement = False
     session = None
 
-    if not len(dtest_setup.cluster.nodelist()) is 0:
+    if len(dtest_setup.cluster.nodelist()) != 0:
         node1 = dtest_setup.cluster.nodelist()[0]
         if node1.is_running():
             session = dtest_setup.cql_connection(node1)
