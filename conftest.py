@@ -25,7 +25,7 @@ from dtest_setup_overrides import DTestSetupOverrides
 
 logger = logging.getLogger(__name__)
 reusable_dtest_setup = None
-
+last_test_class = None
 
 def check_required_loopback_interfaces_available():
     """
@@ -132,10 +132,10 @@ def fixture_dtest_reuse_cluster(request):
         return True
 
 
-@pytest.fixture(scope='class', autouse=True)
+@pytest.fixture(scope='session', autouse=True)
 def fixture_dtest_clean_reused_cluster(request):
     """
-    Clean re-used cluster at end of class
+    Clean re-used cluster at end of session
     """
 
     yield
@@ -351,14 +351,28 @@ def fixture_dtest_setup(request,
                         fixture_dtest_reuse_cluster):
     dtest_setup = None
     global reusable_dtest_setup # Reusable cluster/nodes/config
+    global last_test_class
     reuse_dtest_setup = fixture_dtest_reuse_cluster
+
+    current_test_class = str(request.cls.__name__)
+    if last_test_class is not None and current_test_class != last_test_class:
+        logger.debug("Cleaning cluster to run new test class: " + str(request.cls.__name__))
+        reusable_dtest_setup.cleanup_cluster(request)
+    last_test_class = current_test_class
 
     initial_environment = copy.deepcopy(os.environ)
 
+    logger.debug("Reuse cluster: " + str(reuse_dtest_setup))
     if reuse_dtest_setup:
+
+        if reusable_dtest_setup is not None:
+            logger.debug("Cluster nodes: " + str(len(reusable_dtest_setup.cluster.nodelist())))
+            logger.debug("Cluster alive nodes: " + str(len([node for node in reusable_dtest_setup.cluster.nodelist() if node.is_live()])))
+
         if reusable_dtest_setup is None \
                 or len([node for node in reusable_dtest_setup.cluster.nodelist() if
-                        node.is_live()]) != reusable_dtest_setup.cluster.nodelist():
+                        node.is_live()]) != len(reusable_dtest_setup.cluster.nodelist()):
+            logger.debug("Creating reusable node")
             reusable_dtest_setup = setup_cluster(dtest_config,
                                                  fixture_dtest_setup_overrides,
                                                  fixture_dtest_cluster_name,
@@ -370,11 +384,13 @@ def fixture_dtest_setup(request,
     else:
         if reusable_dtest_setup is not None:
             try:
+                logger.debug("Cleaning previous cluster before creating non-reusable node")
                 reusable_dtest_setup.cleanup_cluster(request)
             except FileNotFoundError:
                 pass
             reusable_dtest_setup = None
 
+        logger.debug("Creating non-reusable node")
         dtest_setup = setup_cluster(dtest_config,
                                     fixture_dtest_setup_overrides,
                                     fixture_dtest_cluster_name,
