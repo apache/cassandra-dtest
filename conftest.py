@@ -353,7 +353,7 @@ def fixture_dtest_setup(request,
     #TODO
     #Docker clean-up
     #Clean cluster on error
-    
+
     dtest_setup = None
     global reusable_dtest_setup # Reusable cluster/nodes/config
     global last_test_class
@@ -384,7 +384,7 @@ def fixture_dtest_setup(request,
                                                  fixture_dtest_create_cluster_func,
                                                  True)
         drop_test_ks(reusable_dtest_setup)
-        #dtest_setup = reusable_dtest_setup
+        dtest_setup = reusable_dtest_setup
 
     else:
         if reusable_dtest_setup is not None:
