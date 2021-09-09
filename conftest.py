@@ -358,6 +358,7 @@ def fixture_dtest_setup(request,
     #TODO
     #Docker clean-up
     #Byteman cleanup
+    #logging of reusable debug traces
 
     # Use reuse_option = "REUSE_CLUSTER_NO" to fully disable node-reusage
     reuse_option = fixture_dtest_reuse_cluster
@@ -382,7 +383,7 @@ def fixture_dtest_setup(request,
             or cant_reuse\
             or missing_reuse_cluster:
 
-        reason = "non-reusable" if reuse_option == "REUSE_CLUSTER_NO" else "reusable"
+        reason = "non-reusable requested" if reuse_option == "REUSE_CLUSTER_NO" else "reusable requested"
         if cant_reuse:
             reason = "Can't reuse"
         if missing_reuse_cluster:
@@ -499,8 +500,8 @@ def setup_cluster(dtest_config,
                   fixture_dtest_cluster_name,
                   fixture_dtest_create_cluster_func,
                   reuse_cluster = False):
-    if running_in_docker() and not reuse_cluster:
-        cleanup_docker_environment_before_test_execution()
+    if running_in_docker():
+        cleanup_docker_environment_before_test_execution(reuse_cluster)
 
     # do all of our setup operations to get the enviornment ready for the actual test
     # to run (e.g. bring up a cluster with the necessary config, populate variables, etc)
