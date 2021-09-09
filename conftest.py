@@ -365,7 +365,6 @@ def fixture_dtest_setup(request,
     global reusable_dtest_setup # Reusable cluster/nodes/config
     global last_test_class
 
-    #logger.info("Reuse cluster1:")
     initial_environment = copy.deepcopy(os.environ)
 
     # Create new node if:
@@ -373,7 +372,6 @@ def fixture_dtest_setup(request,
     # - Reusing clusters but explicitly asking for a new one
     # - Wanting to reuse but env doesn't allow reusing
     # - Wanting to reuse but no reusable cluster available
-
     logger.info("Reuse cluster: %s", reuse_option)
     cant_reuse_reason = can_reuse_cluster_reason(request, reusable_dtest_setup, last_test_class)
     cant_reuse = reusable_dtest_setup is not None and cant_reuse_reason is not None
