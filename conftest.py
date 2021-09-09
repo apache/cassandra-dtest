@@ -353,6 +353,8 @@ def fixture_dtest_setup(request,
     #TODO
     #Docker clean-up
     #Clean cluster on error
+    #Byteman cleanup
+    #what happens with skipped tests
 
     dtest_setup = None
     global reusable_dtest_setup # Reusable cluster/nodes/config
