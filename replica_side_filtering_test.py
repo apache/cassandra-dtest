@@ -132,7 +132,7 @@ class ReplicaSideFiltering(Tester):
         self._assert_none("SELECT * FROM t WHERE v = 'old'")
         self._assert_one("SELECT * FROM t WHERE v = 'new'", row=[0, 'new'])
 
-    @reuse_cluster(new_cluster=True)
+    #@reuse_cluster(new_cluster=True)
     def testupdate_on_wide_table(self):
         self._prepare_cluster(
             create_table="CREATE TABLE t (k int, c int, v text, s int STATIC, PRIMARY KEY (k, c))",
@@ -146,7 +146,7 @@ class ReplicaSideFiltering(Tester):
         self._assert_all("SELECT * FROM t WHERE v = 'old'", rows=[[0, -1, 9, 'old'], [0, 1, 9, 'old']])
         self._assert_all("SELECT * FROM t WHERE v = 'new'", rows=[[0, 0, 9, 'new']])
 
-    @reuse_cluster
+    #@reuse_cluster
     def testupdate_on_static_column_with_empty_partition(self):
         self._skip_if_index_on_static_is_not_supported()
         self._prepare_cluster(
@@ -159,7 +159,7 @@ class ReplicaSideFiltering(Tester):
         self._assert_one("SELECT * FROM t WHERE s = 'old'", row=[1, None, 'old', None])
         self._assert_one("SELECT * FROM t WHERE s = 'new'", row=[0, None, 'new', None])
 
-    @reuse_cluster
+    #@reuse_cluster
     def testupdate_on_static_column_with_not_empty_partition(self):
         self._skip_if_index_on_static_is_not_supported()
         self._prepare_cluster(
@@ -176,7 +176,7 @@ class ReplicaSideFiltering(Tester):
         self._assert_all("SELECT * FROM t WHERE s = 'old'", rows=[[1, 30, 'old', 300], [1, 40, 'old', 400]])
         self._assert_all("SELECT * FROM t WHERE s = 'new'", rows=[[0, 10, 'new', 100], [0, 20, 'new', 200]])
 
-    @reuse_cluster
+    #@reuse_cluster
     def testupdate_on_collection(self):
         self._prepare_cluster(
             create_table="CREATE TABLE t (k int PRIMARY KEY, v set<int>)",
@@ -187,7 +187,7 @@ class ReplicaSideFiltering(Tester):
         self._assert_none("SELECT * FROM t WHERE v CONTAINS 0")
         self._assert_one("SELECT * FROM t WHERE v CONTAINS 1", row=[0, [-1, 1]])
 
-    @reuse_cluster
+    #@reuse_cluster
     def testcomplementary_deletion_with_limit_on_partition_key_column_with_empty_partitions(self):
         self._skip_if_filtering_partition_columns_is_not_supported()
         self._prepare_cluster(
@@ -200,7 +200,7 @@ class ReplicaSideFiltering(Tester):
 
         self._assert_none("SELECT * FROM t WHERE k1 = 0 LIMIT 1")
 
-    @reuse_cluster
+    #@reuse_cluster
     def testcomplementary_deletion_with_limit_on_partition_key_column_with_not_empty_partitions(self):
         self._skip_if_filtering_partition_columns_is_not_supported()
         self._prepare_cluster(
@@ -213,7 +213,7 @@ class ReplicaSideFiltering(Tester):
 
         self._assert_none("SELECT * FROM t WHERE k1 = 0 LIMIT 1")
 
-    @reuse_cluster
+    #@reuse_cluster
     def testcomplementary_deletion_with_limit_on_clustering_key_column(self):
         self._prepare_cluster(
             create_table="CREATE TABLE t (k int, c int, PRIMARY KEY (k, c))",
@@ -225,7 +225,7 @@ class ReplicaSideFiltering(Tester):
 
         self._assert_none("SELECT * FROM t WHERE c = 0 LIMIT 1")
 
-    @reuse_cluster
+    #@reuse_cluster
     def testcomplementary_deletion_with_limit_on_static_column_with_empty_partitions(self):
         self._skip_if_index_on_static_is_not_supported()
         self._prepare_cluster(
@@ -238,7 +238,7 @@ class ReplicaSideFiltering(Tester):
 
         self._assert_none("SELECT * FROM t WHERE s = 0 LIMIT 1")
 
-    @reuse_cluster
+    #@reuse_cluster
     def testcomplementary_deletion_with_limit_on_static_column_with_empty_partitions_and_rows_after(self):
         self._skip_if_index_on_static_is_not_supported()
         self._prepare_cluster(
@@ -256,7 +256,7 @@ class ReplicaSideFiltering(Tester):
         self._assert_all("SELECT * FROM t WHERE s = 0 LIMIT 10", rows=[[3, 1, 0], [3, 2, 0]])
         self._assert_all("SELECT * FROM t WHERE s = 0", rows=[[3, 1, 0], [3, 2, 0]])
 
-    @reuse_cluster
+    #@reuse_cluster
     def testcomplementary_deletion_with_limit_on_static_column_with_not_empty_partitions(self):
         self._skip_if_index_on_static_is_not_supported()
         self._prepare_cluster(
@@ -269,7 +269,7 @@ class ReplicaSideFiltering(Tester):
 
         self._assert_none("SELECT * FROM t WHERE s = 0 LIMIT 1")
 
-    @reuse_cluster
+    #@reuse_cluster
     def testcomplementary_deletion_with_limit_on_static_column_with_not_empty_partitions_and_rows_after(self):
         self._skip_if_index_on_static_is_not_supported()
         self._prepare_cluster(
@@ -287,7 +287,7 @@ class ReplicaSideFiltering(Tester):
         self._assert_all("SELECT * FROM t WHERE s = 0 LIMIT 10", rows=[[3, 1, 0, None], [3, 2, 0, None]])
         self._assert_all("SELECT * FROM t WHERE s = 0", rows=[[3, 1, 0, None], [3, 2, 0, None]])
 
-    @reuse_cluster
+    #@reuse_cluster
     def testcomplementary_deletion_with_limit_on_regular_column(self):
         self._prepare_cluster(
             create_table="CREATE TABLE t (k int, c int, v int, PRIMARY KEY (k, c))",
@@ -299,7 +299,7 @@ class ReplicaSideFiltering(Tester):
 
         self._assert_none("SELECT * FROM t WHERE v = 0 LIMIT 1")
 
-    @reuse_cluster
+    #@reuse_cluster
     def testcomplementary_deletion_with_limit_and_rows_after(self):
         self._prepare_cluster(
             create_table="CREATE TABLE t (k int, c int, v int, PRIMARY KEY (k, c))",
@@ -317,7 +317,7 @@ class ReplicaSideFiltering(Tester):
         self._assert_all("SELECT * FROM t WHERE v = 0 LIMIT 3", rows=[[0, 3, 0], [0, 4, 0], [0, 5, 0]])
         self._assert_all("SELECT * FROM t WHERE v = 0 LIMIT 4", rows=[[0, 3, 0], [0, 4, 0], [0, 5, 0]])
 
-    @reuse_cluster
+    #@reuse_cluster
     def testcomplementary_deletion_with_limit_and_rows_between(self):
         self._prepare_cluster(
             create_table="CREATE TABLE t (k int, c int, v int, PRIMARY KEY (k, c))",
@@ -333,7 +333,7 @@ class ReplicaSideFiltering(Tester):
         self._assert_all("SELECT * FROM t WHERE v = 0 LIMIT 2", rows=[[0, 2, 0], [0, 3, 0]])
         self._assert_all("SELECT * FROM t WHERE v = 0 LIMIT 3", rows=[[0, 2, 0], [0, 3, 0]])
 
-    @reuse_cluster
+    #@reuse_cluster
     def testcomplementary_update_with_limit_on_static_column_with_empty_partitions(self):
         self._skip_if_index_on_static_is_not_supported()
         self._prepare_cluster(
@@ -349,7 +349,7 @@ class ReplicaSideFiltering(Tester):
         self._assert_all("SELECT k, c, v, s FROM t WHERE s = 'new'",
                          rows=[[1, None, None, 'new'], [2, None, None, 'new']])
 
-    @reuse_cluster
+    #@reuse_cluster
     def testcomplementary_update_with_limit_on_static_column_with_not_empty_partitions(self):
         self._skip_if_index_on_static_is_not_supported()
         self._prepare_cluster(
@@ -364,7 +364,7 @@ class ReplicaSideFiltering(Tester):
         self._assert_one("SELECT k, c, v, s FROM t WHERE s = 'new' LIMIT 1", row=[1, 10, 100, 'new'])
         self._assert_all("SELECT k, c, v, s FROM t WHERE s = 'new'", rows=[[1, 10, 100, 'new'], [2, 20, 200, 'new']])
 
-    @reuse_cluster
+    #@reuse_cluster
     def testcomplementary_update_with_limit_on_regular_column(self):
         self._prepare_cluster(
             create_table="CREATE TABLE t (k int, c int, v text, PRIMARY KEY (k, c))",
@@ -378,7 +378,7 @@ class ReplicaSideFiltering(Tester):
         self._assert_one("SELECT * FROM t WHERE v = 'new' LIMIT 1", row=[0, 1, 'new'])
         self._assert_all("SELECT * FROM t WHERE v = 'new'", rows=[[0, 1, 'new'], [0, 2, 'new']])
 
-    @reuse_cluster
+    #@reuse_cluster
     def testcomplementary_update_with_limit_and_rows_between(self):
         self._prepare_cluster(
             create_table="CREATE TABLE t (k int, c int, v text, PRIMARY KEY (k, c))",
@@ -396,7 +396,7 @@ class ReplicaSideFiltering(Tester):
         self._assert_one("SELECT * FROM t WHERE v = 'new' LIMIT 1", row=[0, 1, 'new'])
         self._assert_all("SELECT * FROM t WHERE v = 'new'", rows=[[0, 1, 'new'], [0, 4, 'new']])
 
-    @reuse_cluster
+    #@reuse_cluster
     def testpartition_deletion_on_skinny_table(self):
         self._prepare_cluster(
             create_table="CREATE TABLE t (k int PRIMARY KEY, v text)",
@@ -407,7 +407,7 @@ class ReplicaSideFiltering(Tester):
         self._assert_none("SELECT * FROM t WHERE v = 'old' LIMIT 1")
         self._assert_none("SELECT * FROM t WHERE v = 'old'")
 
-    @reuse_cluster
+    #@reuse_cluster
     def testpartition_deletion_on_wide_table(self):
         self._prepare_cluster(
             create_table="CREATE TABLE t (k int, c int, v text, PRIMARY KEY (k, c))",
@@ -418,7 +418,7 @@ class ReplicaSideFiltering(Tester):
         self._assert_none("SELECT * FROM t WHERE v = 'old' LIMIT 1")
         self._assert_none("SELECT * FROM t WHERE v = 'old'")
 
-    @reuse_cluster
+    #@reuse_cluster
     def testrow_deletion_on_wide_table(self):
         self._prepare_cluster(
             create_table="CREATE TABLE t (k int, c int, v text, PRIMARY KEY (k, c))",
@@ -429,7 +429,7 @@ class ReplicaSideFiltering(Tester):
         self._assert_none("SELECT * FROM t WHERE v = 'old' LIMIT 1")
         self._assert_none("SELECT * FROM t WHERE v = 'old'")
 
-    @reuse_cluster
+    #@reuse_cluster
     def testrange_deletion_on_wide_table(self):
         self._prepare_cluster(
             create_table="CREATE TABLE t (k int, c int, v text, PRIMARY KEY (k, c))",
@@ -443,7 +443,7 @@ class ReplicaSideFiltering(Tester):
         self._assert_one("SELECT * FROM t WHERE v = 'old' LIMIT 1", row=[0, 1, 'old'])
         self._assert_all("SELECT * FROM t WHERE v = 'old'", rows=[[0, 1, 'old'], [0, 4, 'old']])
 
-    @reuse_cluster
+    #@reuse_cluster
     def testmismatching_insertions_on_skinny_table(self):
         self._prepare_cluster(
             create_table="CREATE TABLE t (k int PRIMARY KEY, v text)",
@@ -455,7 +455,7 @@ class ReplicaSideFiltering(Tester):
         self._assert_none("SELECT * FROM t WHERE v = 'old'")
         self._assert_one("SELECT * FROM t WHERE v = 'new'", row=[0, 'new'])
 
-    @reuse_cluster
+    #@reuse_cluster
     def testmismatching_insertions_on_wide_table(self):
         self._prepare_cluster(
             create_table="CREATE TABLE t (k int, c int, v text, PRIMARY KEY (k, c))",
@@ -467,7 +467,7 @@ class ReplicaSideFiltering(Tester):
         self._assert_none("SELECT * FROM t WHERE v = 'old'")
         self._assert_one("SELECT * FROM t WHERE v = 'new'", row=[0, 1, 'new'])
 
-    @reuse_cluster
+    #@reuse_cluster
     def testconsistent_skinny_table(self):
         self._prepare_cluster(
             create_table="CREATE TABLE t (k int PRIMARY KEY, v text)",
@@ -486,7 +486,7 @@ class ReplicaSideFiltering(Tester):
         self._assert_all("SELECT * FROM t WHERE v = 'old'", rows=[[2, 'old'], [4, 'old']])
         self._assert_all("SELECT * FROM t WHERE v = 'new'", rows=[[1, 'new'], [3, 'new']])
 
-    @reuse_cluster
+    #@reuse_cluster
     def testconsistent_wide_table(self):
         self._prepare_cluster(
             create_table="CREATE TABLE t (k int, c int, v text, PRIMARY KEY (k, c))",
@@ -508,7 +508,7 @@ class ReplicaSideFiltering(Tester):
         self._assert_all("SELECT * FROM t WHERE v = 'old'", rows=[[0, 2, 'old'], [0, 4, 'old']])
         self._assert_all("SELECT * FROM t WHERE v = 'new'", rows=[[0, 1, 'new'], [0, 3, 'new']])
 
-    @reuse_cluster
+    #@reuse_cluster
     def testcount(self):
         self._prepare_cluster(
             create_table="CREATE TABLE t (k int PRIMARY KEY, v text)",
